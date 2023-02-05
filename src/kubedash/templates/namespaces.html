@@ -19,7 +19,9 @@
 
 <!-- Page Heading -->
 <nav class="navbar navbar-light bg-light row">
-  <div class="col"></div>
+  <div class="col">
+    <button type="button" class="btn btn-success float-right col-1 me-lg-4" onclick="reload()">Reload</button>
+  </div>
   <!-- Button trigger modal add -->
   {% if username_role == "Admin" %}
   <button type="button" class="btn btn-success float-right col-1 me-lg-4" data-toggle="modal" data-target="#modaladd">
@@ -115,15 +117,16 @@
 {% endblock %}
 
 {% block scripts %}
-    <script>
-        $(document).ready(function () {
-        $('#data').DataTable();
-        });
-    </script>
     <!-- Page level plugins -->
     <script src="{{ url_for('static',filename='vendor/datatables/jquery.dataTables.js') }}"></script>
     <script src="{{ url_for('static',filename='vendor/datatables/dataTables.bootstrap4.min.js') }}"></script>
 
     <!-- Page level custom scripts -->
     <script src="{{ url_for('static',filename='js/demo/datatables-demo.js') }}"></script>
+
+    <script type="text/javascript">
+      function reload() {
+        location.reload(true);
+      };
+    </script>
 {% endblock %}

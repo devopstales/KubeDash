@@ -11,7 +11,8 @@ from functions.k8s import k8sNodesListGet, \
     k8sUserClusterRoleTemplateListGet, k8sUserRoleTemplateListGet, \
     k8sStatefulSetsGet, k8sDaemonSetsGet, k8sDeploymentsGet, k8sReplicaSetsGet, \
     k8sPodListGet, k8sPodGet, \
-    k8sPodListVulnsGet, k8sPodVulnsGet
+    k8sPodListVulnsGet, k8sPodVulnsGet, \
+    k8sHelmChartListGet
 from flask import jsonify, session, render_template, request, redirect, flash, url_for, \
     Response
 from flask_login import login_user, login_required, current_user, logout_user
@@ -346,13 +347,14 @@ def k8s_config():
     current_username = current_user.username
     user_tmp = User.query.filter_by(username=current_username).first()
     username_role = user_tmp.role
-    k8s_servers = k8sServerConfigList()
+    k8s_servers, k8s_config_list_length = k8sServerConfigList()
 
     return render_template(
         'k8s.html',
         current_username = current_username,
         username_role = username_role,
         k8s_servers = k8s_servers,
+        k8s_config_list_length = k8s_config_list_length,
     )
 
 
@@ -785,3 +787,35 @@ def pods_data():
         )
     else:
         return redirect(url_for('login'))
+    
+##############################################################
+## Helm Charts
+##############################################################
+
+@app.route('/charts', methods=['GET', 'POST'])
+@login_required
+def charts():
+    ns_select = "default"
+    current_username = current_user.username
+    user_tmp = User.query.filter_by(username=current_username).first()
+    username_role = user_tmp.role
+    username_type = user_tmp.user_type
+
+    if username_type == "OpenID":
+        user_token = session['oauth_token']
+    else:
+        user_token = None
+
+    if request.method == 'POST':
+        ns_select = request.form.get('ns_select')
+
+    k8sHelmChartListGet(username_role, user_token, ns_select)
+    namespace_list = k8sNamespaceListGet(username_role, user_token)
+
+    return render_template(
+        'charts.html',
+        ns_select = ns_select,
+        namespaces = namespace_list,
+        username_role = username_role,
+        current_username = current_username,
+    )

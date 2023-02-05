@@ -20,9 +20,11 @@
     <div class="col"></div>
     <!-- Button trigger modal add -->
     {% if username_role == "Admin" %}
+    {% if k8s_config_list_length == 0 %}
     <button type="button" class="btn btn-success float-right col-1 me-lg-4" data-toggle="modal" data-target="#modaladd">
-      Add User
+      Add Cluster
     </button>
+    {% endif %}
     {% endif %}
 
   <!-- Modal Add User -->
