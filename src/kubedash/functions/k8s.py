@@ -8,6 +8,7 @@ import kubernetes.config as k8s_config
 import kubernetes.client as k8s_client
 from kubernetes.client.rest import ApiException
 from functions.logger import logger
+import zlib, json
 
 ##############################################################
 ## Kubernetes Config
@@ -40,7 +41,8 @@ def k8sServerConfigGet():
 
 def k8sServerConfigList():
     k8s_config_list = k8sConfig.query
-    return k8s_config_list
+    k8s_config_list_length = k8sConfig.query.count()
+    return k8s_config_list, k8s_config_list_length
 
 def k8sServerDelete(k8s_context):
     k8s = k8sConfig.query.filter_by(k8s_context=k8s_context).first()
@@ -853,3 +855,46 @@ def k8sPodVulnsGet(username_role, user_token, ns, pod):
         return HAS_REPORT, POD_VULNS
 
         # PublishedDate, FixedVersion
+
+##############################################################
+## Helm Charts
+##############################################################
+
+def k8sHelmChartListGet(username_role, user_token, namespace):
+    k8sClientConfigGet(username_role, user_token)
+    helmchart_list = list()
+    try:
+        secret_list = k8s_client.CoreV1Api().list_namespaced_secret(namespace)
+        for secret in secret_list.items:
+            helmchart = {
+                'icon': '',
+                'name': '',
+                'status': '',
+                'chart': '',
+                'appVersion': '',
+                'revision': '',
+                'updated': '',
+            }
+            if secret.type == 'helm.sh/release.v1':
+                base64_secret_data = str(base64_decode(secret.data['release']), 'UTF-8')
+                secret_data = json.loads(zlib.decompress(base64_decode(base64_secret_data), 16 + zlib.MAX_WBITS).decode('utf-8'))
+                if secret_data['chart']['metadata']['icon']:
+                    helmchart['icon'] = secret_data['chart']['metadata']['icon']
+                else:
+                    helmchart['icon'] = None
+                helmchart['name'] = secret_data['name']
+                helmchart['status'] = secret_data['info']['status']
+                helmchart["chart"] = secret_data['chart']['metadata']['name'] + "-" + secret_data['chart']['metadata']['version']
+                helmchart["appVersion"] = secret_data['chart']['metadata']['appVersion']
+                helmchart["revision"] = secret_data['version']
+                helmchart['updated'] = secret_data['info']['last_deployed']
+                helmchart_list.append(helmchart)
+            
+        print(helmchart_list)
+        return helmchart_list, None
+    except ApiException as error:
+        ErrorHandler(error, "get helm release")
+        return helmchart_list, error
+    except:
+        ErrorHandler("ConnectError", "Cannot Connect to Kubernetes")
+        return helmchart_list, "ConnectError"

@@ -1,5 +1,6 @@
 # custom
 *instance/
+*neo4j/
 test*
 *.crt
 
