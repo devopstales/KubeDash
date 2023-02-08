@@ -775,7 +775,7 @@ def pods_data():
 
         pod_data = k8sPodGet(username_role, user_token, ns_name, po_name)
         has_report, pod_vulns = k8sPodVulnsGet(username_role, user_token, ns_name, po_name)
- 
+
         return render_template(
             'pod-data.html',
             po_now = po_name,
