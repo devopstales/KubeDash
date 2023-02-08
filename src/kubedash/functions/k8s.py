@@ -9,6 +9,7 @@ import kubernetes.client as k8s_client
 from kubernetes.client.rest import ApiException
 from functions.logger import logger
 import zlib, json
+from datetime import datetime
 
 ##############################################################
 ## Kubernetes Config
@@ -868,39 +869,43 @@ def k8sPodVulnsGet(username_role, user_token, ns, pod):
 
 def k8sHelmChartListGet(username_role, user_token, namespace):
     k8sClientConfigGet(username_role, user_token)
-    helmchart_list = list()
-    try:
-        secret_list = k8s_client.CoreV1Api().list_namespaced_secret(namespace)
-        for secret in secret_list.items:
-            helmchart = {
-                'icon': '',
-                'name': '',
-                'status': '',
-                'chart': '',
-                'appVersion': '',
-                'revision': '',
-                'updated': '',
-            }
-            if secret.type == 'helm.sh/release.v1':
-                base64_secret_data = str(base64_decode(secret.data['release']), 'UTF-8')
-                secret_data = json.loads(zlib.decompress(base64_decode(base64_secret_data), 16 + zlib.MAX_WBITS).decode('utf-8'))
-                if secret_data['chart']['metadata']['icon']:
-                    helmchart['icon'] = secret_data['chart']['metadata']['icon']
-                else:
-                    helmchart['icon'] = None
-                helmchart['name'] = secret_data['name']
-                helmchart['status'] = secret_data['info']['status']
-                helmchart["chart"] = secret_data['chart']['metadata']['name'] + "-" + secret_data['chart']['metadata']['version']
-                helmchart["appVersion"] = secret_data['chart']['metadata']['appVersion']
-                helmchart["revision"] = secret_data['version']
-                helmchart['updated'] = secret_data['info']['last_deployed']
-                helmchart_list.append(helmchart)
-            
-        print(helmchart_list)
-        return helmchart_list, None
-    except ApiException as error:
-        ErrorHandler(error, "get helm release")
-        return helmchart_list, error
-    except:
-        ErrorHandler("ConnectError", "Cannot Connect to Kubernetes")
-        return helmchart_list, "ConnectError"
+    HAS_CHART = False
+    CHART_LIST = {}
+    CHART_DATA = list()
+#    try:
+    secret_list = k8s_client.CoreV1Api().list_namespaced_secret(namespace)
+    for secret in secret_list.items:
+
+        if secret.type == 'helm.sh/release.v1':
+            base64_secret_data = str(base64_decode(secret.data['release']), 'UTF-8')
+            secret_data = json.loads(zlib.decompress(base64_decode(base64_secret_data), 16 + zlib.MAX_WBITS).decode('utf-8'))
+            # updated = datetime.strptime(secret_data['info']['last_deployed'], '%Y-%m-%dT%H:%M:%S.%f%z')
+            # updated.strftime("%Y-%m-%d %H:%M")
+            if secret_data['chart']['metadata']['icon']:
+                CHART_DATA.append({
+                    'icon': secret_data['chart']['metadata']['icon'],
+                    'status': secret_data['info']['status'],
+                    'chart': secret_data['chart']['metadata']['name'] + "-" + secret_data['chart']['metadata']['version'],
+                    'appVersion': secret_data['chart']['metadata']['appVersion'],
+                    'revision': secret_data['version'],
+                    'updated': secret_data['info']['last_deployed'],
+                })
+            else:
+                CHART_DATA.append({
+                    'icon': None,
+                    'status': secret_data['info']['status'],
+                    'chart': secret_data['chart']['metadata']['name'] + "-" + secret_data['chart']['metadata']['version'],
+                    'appVersion': secret_data['chart']['metadata']['appVersion'],
+                    'revision': secret_data['version'],
+                    'updated': secret_data['info']['last_deployed'],
+                })
+            HAS_CHART = True
+            CHART_LIST.update({secret_data['name']: CHART_DATA})
+        
+    return HAS_CHART, CHART_LIST
+#    except ApiException as error:
+#        ErrorHandler(error, "get helm release")
+#        return HAS_CHART, CHART_LIST
+#    except:
+#        ErrorHandler("ConnectError", "Cannot Connect to Kubernetes")
+#        return HAS_CHART, CHART_LIST

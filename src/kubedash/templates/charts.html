@@ -18,6 +18,60 @@
   {% endfor %}
 {% endif %}
 
+<div class="card shadow mb-4">
+  <div class="card-header">
+    <h6 class="m-0 font-weight-bold text-primary">Helm Charts</h6>
+  </div>
+  <div class="card-body">
+    <div class="table-responsive">
+      <table class="table table-bordered" id="dataTable" width="100%" cellspacing="0">
+        <thead>
+          <tr>
+            <th>Icon</th>
+            <th>Release</th>
+            <th>Status</th>
+            <th>Chart</th>
+            <th>App Version</th>
+            <th>Revision</th>
+            <th>Updated</th>
+          </tr>
+        </thead>
+        <tbody>
+          {% if has_chart %}
+          {% for name, release in chart_list.items() %}
+          {% for rd in release %}
+          {% if loop.last %}
+          <tr>
+            {% if rd.icon is not none %}
+            <td><img src="{{ rd.icon }}" width="50" height="50"> </td>
+            {% else %}
+            <td><img src="/img/helm-icon-color.svg" width="50" height="50"> </td>
+            {% endif %}
+            <td>{{ name }}</td>
+            <td>{{ rd.status }}</td>
+            <td>{{ rd.chart }}</td>
+            <td>{{ rd.appVersion }}</td>
+            <td>{{ rd.revision }}</td>
+            <td>{{ rd.updated }}</td>
+          </tr>
+          {% endif %}
+          {% endfor %}
+          {% endfor %}
+          {% else %}
+          <td></td>
+          <td></td>
+          <td></td>
+          <td></td>
+          <td></td>
+          <td></td>
+          <td></td>
+        </tr>
+          {% endif %}
+        </tbody>
+      </table>
+    </div>
+  </div>
+</div>
 {% endblock %}
 
 {% block scripts %}
