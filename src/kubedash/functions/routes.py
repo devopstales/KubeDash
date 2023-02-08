@@ -809,13 +809,15 @@ def charts():
     if request.method == 'POST':
         ns_select = request.form.get('ns_select')
 
-    k8sHelmChartListGet(username_role, user_token, ns_select)
     namespace_list = k8sNamespaceListGet(username_role, user_token)
+    has_chart, chart_list = k8sHelmChartListGet(username_role, user_token, ns_select)
 
     return render_template(
         'charts.html',
         ns_select = ns_select,
         namespaces = namespace_list,
+        has_chart = has_chart,
+        chart_list = chart_list,
         username_role = username_role,
         current_username = current_username,
     )
