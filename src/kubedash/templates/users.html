@@ -21,7 +21,7 @@
 <nav class="navbar navbar-light bg-light row">
   <div class="col"></div>
   <!-- Button trigger modal add -->
-  {% if username_role == "Admin" %}
+  {% if session['user_role'] == "Admin" %}
   <button type="button" class="btn btn-success float-right col-1 me-lg-4" data-toggle="modal" data-target="#modaladd">
     Add User
   </button>
@@ -102,7 +102,7 @@
                 <tbody>
                   {% for user in users %}
                   <tr>
-                    {% if user.username == current_username %}
+                    {% if user.username == session['username'] %}
                     <td>
                       <a href="/users/privileges/{{ user.username }}">{{ user.username }}</a>
                     </td>
@@ -113,7 +113,7 @@
                     <td>{{ user.role }}</td>
                     <td>{{ user.user_type }}</td>
                     <td>
-                      {% if username_role == "Admin" and user.username != "admin" %}
+                      {% if session['user_role'] == "Admin" and user.username != "admin" %}
                       <!-- Button trigger modal edit -->
                       <form action="/users/delete" method="POST">
                           <button type="button" class="btn btn-success btn-just-icon btn-xs" data-toggle="modal" data-target="#modaledit{{ user.id }}" data-user="{{ user.username }}" data-role="{{ user.role }}">

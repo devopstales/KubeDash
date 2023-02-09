@@ -57,7 +57,7 @@
                         </td>
                         <td>
                           <form action="/pod-data" method="post">
-                            <input type="hidden" name="ns_name" value="{{ ns_select }}" />
+                            <input type="hidden" name="ns_name" value="{{ session['ns_select'] }}" />
                             <input type="hidden" name="po_name" value="{{ po.name }}" />
                             <a href="javascript:;" onclick="parentNode.submit();">{{ po.name }}</a>
                           </form>
@@ -66,7 +66,7 @@
                         {% if po.owner %}
                         <td>
                           <form action="/{{ po.owner.split("/")[0] }}" method="post">
-                            <input type="hidden" name="ns_select" value="{{ ns_select }}" />
+                            <input type="hidden" name="ns_select" value="{{ session['ns_select'] }}" />
                             <input type="hidden" name="tr_select" value="{{ po.owner.split("/")[1] }}" />
                             <a href="javascript:;" onclick="parentNode.submit();">{{ po.owner }}</a>
                           </form>

@@ -36,8 +36,8 @@
             <th>Updated</th>
           </tr>
         </thead>
+        {% if has_chart %}
         <tbody>
-          {% if has_chart %}
           {% for name, release in chart_list.items() %}
           {% for rd in release %}
           {% if loop.last %}
@@ -57,17 +57,11 @@
           {% endif %}
           {% endfor %}
           {% endfor %}
-          {% else %}
-          <td></td>
-          <td></td>
-          <td></td>
-          <td></td>
-          <td></td>
-          <td></td>
-          <td></td>
-        </tr>
-          {% endif %}
         </tbody>
+        {% else %}
+        <tbody>
+        </tbody>
+        {% endif %}
       </table>
     </div>
   </div>

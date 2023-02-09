@@ -84,44 +84,44 @@
                 <div id="collapseWorkloads" class="collapse" aria-labelledby="headingWorkloads"
                     data-parent="#accordionSidebar">
                     <div class="bg-white py-2 collapse-inner rounded">
-                        {% if ns_select %}
+                        {% if session['ns_select'] %}
                         <form action="/statefulsets" method="POST">
-                            <input type="hidden" name="ns_select" value="{{ ns_select }}" />
+                            <input type="hidden" name="ns_select" value="{{ session['ns_select'] }}" />
                             <a class="collapse-item" href="#" onclick="event.preventDefault(); this.parentNode.submit()">StatefulSets</a> {{ po_now }}
                          </form>
                          {% else %}
                          <a class="collapse-item" href="/statefulsets">StatefulSets</a>
                          {% endif %}
-                        {% if ns_select %}
+                        {% if session['ns_select'] %}
                         <form action="/daemonsets" method="POST">
-                            <input type="hidden" name="ns_select" value="{{ ns_select }}" />
+                            <input type="hidden" name="ns_select" value="{{ session['ns_select'] }}" />
                             <a class="collapse-item" href="#" onclick="event.preventDefault(); this.parentNode.submit()">DaemonSets</a> {{ po_now }}
                          </form>
                          {% else %}
                          <a class="collapse-item" href="/daemonsets">DaemonSets</a>
                          {% endif %}
                          <!-- -->
-                        {% if ns_select %}
+                        {% if session['ns_select'] %}
                         <form action="/deployments" method="POST">
-                            <input type="hidden" name="ns_select" value="{{ ns_select }}" />
+                            <input type="hidden" name="ns_select" value="{{ session['ns_select'] }}" />
                             <a class="collapse-item" href="#" onclick="event.preventDefault(); this.parentNode.submit()">Deployments</a> {{ po_now }}
                          </form>
                          {% else %}
                          <a class="collapse-item" href="/deployments">Deployments</a>
                          {% endif %}
                          <!-- -->
-                        {% if ns_select %}
+                        {% if session['ns_select'] %}
                         <form action="/replicasets" method="POST">
-                            <input type="hidden" name="ns_select" value="{{ ns_select }}" />
+                            <input type="hidden" name="ns_select" value="{{ session['ns_select'] }}" />
                             <a class="collapse-item" href="#" onclick="event.preventDefault(); this.parentNode.submit()">ReplicaSets</a> {{ po_now }}
                          </form>
                          {% else %}
                          <a class="collapse-item" href="/replicasets">ReplicaSets</a>
                          {% endif %}
                          <!-- -->
-                        {% if ns_select %}
+                        {% if session['ns_select'] %}
                         <form action="/pods" method="POST">
-                            <input type="hidden" name="ns_select" value="{{ ns_select }}" />
+                            <input type="hidden" name="ns_select" value="{{ session['ns_select'] }}" />
                             <a class="collapse-item" href="#" onclick="event.preventDefault(); this.parentNode.submit()">Pods</a> {{ po_now }}
                          </form>
                          {% else %}
@@ -142,9 +142,9 @@
                     data-parent="#accordionSidebar">
                     <div class="bg-white py-2 collapse-inner rounded">
                         <!-- -->
-                        {% if ns_select %}
+                        {% if session['ns_select'] %}
                         <form action="/service-accounts" method="POST">
-                            <input type="hidden" name="ns_select" value="{{ ns_select }}" />
+                            <input type="hidden" name="ns_select" value="{{ session['ns_select'] }}" />
                             <a class="collapse-item" href="#" onclick="event.preventDefault(); this.parentNode.submit()">ServiceAccounts</a> {{ po_now }}
                         </form>
                         {% else %}
@@ -153,18 +153,18 @@
                         <a class="collapse-item" href="/cluster-roles">ClusterRoles</a>
                         <a class="collapse-item" href="/cluster-role-bindings">ClusterRoleBindings</a>
                         <!-- -->
-                        {% if ns_select %}
+                        {% if session['ns_select'] %}
                         <form action="/roles" method="POST">
-                            <input type="hidden" name="ns_select" value="{{ ns_select }}" />
+                            <input type="hidden" name="ns_select" value="{{ session['ns_select'] }}" />
                             <a class="collapse-item" href="#" onclick="event.preventDefault(); this.parentNode.submit()">Roles</a> {{ po_now }}
                         </form>
                         {% else %}
                         <a class="collapse-item" href="/roles">Roles</a>
                         {% endif %} 
                         <!-- -->
-                        {% if ns_select %}
+                        {% if session['ns_select'] %}
                         <form action="/role-bindings" method="POST">
-                            <input type="hidden" name="ns_select" value="{{ ns_select }}" />
+                            <input type="hidden" name="ns_select" value="{{ session['ns_select'] }}" />
                             <a class="collapse-item" href="#" onclick="event.preventDefault(); this.parentNode.submit()">RoleBindings</a> {{ po_now }}
                         </form>
                         {% else %}
@@ -185,7 +185,7 @@
                     data-parent="#accordionSidebar">
                     <div class="bg-white py-2 collapse-inner rounded">
                         <a class="collapse-item" href="/users">Users & Roles</a>
-                        {% if username_role == "Admin" %}
+                        {% if session['user_role'] == "Admin" %}
                         <a class="collapse-item" href="/sso-config">SSO Settings</a>
                         <!-- LDAP/AD -->
                         <a class="collapse-item" href="/k8s-config">Kubernetes Integration</a>
@@ -244,7 +244,7 @@
                             {% if namespaces %}
                             <select name= "ns_select" class="custom-select" id="inputGroupSelect04" aria-label="Select Namespace">
                                 {% for ns in namespaces %}
-                                {% if ns == ns_select %}
+                                {% if ns == session['ns_select'] %}
                                 <option selected>{{ ns }}</option>
                                 {% else %}
                                 <option value="{{ ns }}">{{ ns }}</option>
@@ -409,7 +409,7 @@
                         <li class="nav-item dropdown no-arrow">
                             <a class="nav-link dropdown-toggle" href="#" id="userDropdown" role="button"
                                 data-toggle="dropdown" aria-haspopup="true" aria-expanded="false">
-                                <span class="mr-2 d-none d-lg-inline text-gray-600 small">{{ current_username }}</span>
+                                <span class="mr-2 d-none d-lg-inline text-gray-600 small">{{ session['username'] }}</span>
                                 <img class="img-profile rounded-circle"
                                     src="/img/undraw_profile.svg">
                             </a>
