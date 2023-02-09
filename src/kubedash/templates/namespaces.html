@@ -23,7 +23,7 @@
     <button type="button" class="btn btn-success float-right col-1 me-lg-4" onclick="reload()">Reload</button>
   </div>
   <!-- Button trigger modal add -->
-  {% if username_role == "Admin" %}
+  {% if session['user_role'] == "Admin" %}
   <button type="button" class="btn btn-success float-right col-1 me-lg-4" data-toggle="modal" data-target="#modaladd">
     New
   </button>
@@ -92,7 +92,7 @@
                       </td>
                       <td>{{ ns.name }}</td>
                       <td>
-                        {% if username_role == "Admin" %}
+                        {% if session['user_role'] == "Admin" %}
                         <!-- Button trigger modal -->
                         <form action="/namespaces/delete" method="post">
                           <button type="button" class="btn btn-success btn-just-icon btn-xs" data-toggle="modal" data-bs-target="#modaledit" data-ns="{{ ns.name }}">
