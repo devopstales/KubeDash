@@ -39,6 +39,7 @@
                 </div>
                 <div class="modal-body">
                     <form action="/k8s-config" method="POST">
+                        <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
                         <input type="hidden" name="request_type" value="create" />
                         <div class="form-group">
                             <label for="k8s_context">Kubernetes Config Context</label>
@@ -90,6 +91,7 @@
                             {% if session['user_role'] == "Admin" %}
                             <!-- Button trigger modal edit -->
                             <form action="k8s-config" method="POST">
+                                <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
                                 <button type="button" class="btn btn-success btn-just-icon btn-xs" data-toggle="modal" data-target="#modaledit{{ server.k8s_context }}">
                                     <i class="material-icons">edit</i>
                                 </button>
@@ -123,6 +125,7 @@
             </div>
             <div class="modal-body">
                 <form action="/k8s-config" method="POST">
+                    <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
                     <input type="hidden" name="request_type" value="edit" />
                     <input type="hidden" name="k8s_context_old" value="{{ server.k8s_context }}" />
                     <div class="form-group">

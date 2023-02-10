@@ -41,6 +41,7 @@
         </div>
         <div class="modal-body">
           <form action="/namespaces/create" method="POST">
+            <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
             <div class="form-group">
               <label>Namespace:</label>
               <input class="form-control user" name="namespace" type="text" placeholder="Type your username">
@@ -95,6 +96,7 @@
                         {% if session['user_role'] == "Admin" %}
                         <!-- Button trigger modal -->
                         <form action="/namespaces/delete" method="post">
+                          <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
                           <button type="button" class="btn btn-success btn-just-icon btn-xs" data-toggle="modal" data-bs-target="#modaledit" data-ns="{{ ns.name }}">
                               <i class="material-icons">edit</i>
                           </button>

@@ -39,6 +39,7 @@
         </div>
         <div class="modal-body">
           <form action="/users/add" method="POST">
+            <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
             <div class="form-group">
               <label>Name:</label>
               <input class="form-control user" name="username" type="text" placeholder="Type your username">
@@ -116,6 +117,7 @@
                       {% if session['user_role'] == "Admin" and user.username != "admin" %}
                       <!-- Button trigger modal edit -->
                       <form action="/users/delete" method="POST">
+                          <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
                           <button type="button" class="btn btn-success btn-just-icon btn-xs" data-toggle="modal" data-target="#modaledit{{ user.id }}" data-user="{{ user.username }}" data-role="{{ user.role }}">
                               <i class="material-icons">edit</i>
                           </button>
@@ -151,6 +153,7 @@
       </div>
       <div class="modal-body">
         <form action="" method="POST">
+          <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
           <div class="form-group">
             <label>Name:</label>
             <input class="form-control" name="username" type="text" value="{{ user.username }}">
