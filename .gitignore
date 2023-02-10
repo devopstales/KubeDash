@@ -3,6 +3,7 @@
 *neo4j/
 test*
 *.crt
+*manage.py
 
 # deploy
 docker/*.py

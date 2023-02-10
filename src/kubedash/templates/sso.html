@@ -21,7 +21,7 @@
 
 <div class="card mb-4 mx-5">
   <div class="card-header py-3">
-    <h5 class="m-0 font-weight-bold text-primary" id="KubernetesApiServer">Kubernetes ApiServer</h5>
+    <h5 class="m-0 font-weight-bold text-primary" id="KubernetesApiServer">Identity Provider Config</h5>
   </div>
   
   <div class="card-body">
@@ -36,7 +36,7 @@
       {% endif %}
       <div class="col-sm-4">
         <div class="form-group">
-          <label for="oauth_server_uri">Identity Provider Config</label>
+          <label for="oauth_server_uri">Callback URL</label>
           <input type="text" class="form-control" id="base_uri" name= "base_uri" value="{{ base_uri }}">
         </div>
       </div>

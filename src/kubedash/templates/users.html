@@ -111,7 +111,7 @@
                     <td>{{ user.username }}</td>
                     {% endif %}
                     <td>{{ user.email }}</td>
-                    <td>{{ user.role }}</td>
+                    <td>{{ session['user_role'] }}</td>
                     <td>{{ user.user_type }}</td>
                     <td>
                       {% if session['user_role'] == "Admin" and user.username != "admin" %}

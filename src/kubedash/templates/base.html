@@ -88,7 +88,7 @@
                         <form action="/statefulsets" method="POST">
                             <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
                             <input type="hidden" name="ns_select" value="{{ session['ns_select'] }}" />
-                            <a class="collapse-item" href="#" onclick="event.preventDefault(); this.parentNode.submit()">StatefulSets</a> {{ po_now }}
+                            <a class="collapse-item" href="#" onclick="event.preventDefault(); this.parentNode.submit()">StatefulSets</a>
                          </form>
                          {% else %}
                          <a class="collapse-item" href="/statefulsets">StatefulSets</a>
@@ -97,7 +97,7 @@
                         <form action="/daemonsets" method="POST">
                             <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
                             <input type="hidden" name="ns_select" value="{{ session['ns_select'] }}" />
-                            <a class="collapse-item" href="#" onclick="event.preventDefault(); this.parentNode.submit()">DaemonSets</a> {{ po_now }}
+                            <a class="collapse-item" href="#" onclick="event.preventDefault(); this.parentNode.submit()">DaemonSets</a>
                          </form>
                          {% else %}
                          <a class="collapse-item" href="/daemonsets">DaemonSets</a>
@@ -107,7 +107,7 @@
                         <form action="/deployments" method="POST">
                             <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
                             <input type="hidden" name="ns_select" value="{{ session['ns_select'] }}" />
-                            <a class="collapse-item" href="#" onclick="event.preventDefault(); this.parentNode.submit()">Deployments</a> {{ po_now }}
+                            <a class="collapse-item" href="#" onclick="event.preventDefault(); this.parentNode.submit()">Deployments</a>
                          </form>
                          {% else %}
                          <a class="collapse-item" href="/deployments">Deployments</a>
@@ -117,7 +117,7 @@
                         <form action="/replicasets" method="POST">
                             <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
                             <input type="hidden" name="ns_select" value="{{ session['ns_select'] }}" />
-                            <a class="collapse-item" href="#" onclick="event.preventDefault(); this.parentNode.submit()">ReplicaSets</a> {{ po_now }}
+                            <a class="collapse-item" href="#" onclick="event.preventDefault(); this.parentNode.submit()">ReplicaSets</a>
                          </form>
                          {% else %}
                          <a class="collapse-item" href="/replicasets">ReplicaSets</a>
@@ -127,7 +127,7 @@
                         <form action="/pods" method="POST">
                             <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
                             <input type="hidden" name="ns_select" value="{{ session['ns_select'] }}" />
-                            <a class="collapse-item" href="#" onclick="event.preventDefault(); this.parentNode.submit()">Pods</a> {{ po_now }}
+                            <a class="collapse-item" href="#" onclick="event.preventDefault(); this.parentNode.submit()">Pods</a>
                          </form>
                          {% else %}
                          <a class="collapse-item" href="/pods">Pods</a>
@@ -151,7 +151,7 @@
                         <form action="/service-accounts" method="POST">
                             <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
                             <input type="hidden" name="ns_select" value="{{ session['ns_select'] }}" />
-                            <a class="collapse-item" href="#" onclick="event.preventDefault(); this.parentNode.submit()">ServiceAccounts</a> {{ po_now }}
+                            <a class="collapse-item" href="#" onclick="event.preventDefault(); this.parentNode.submit()">ServiceAccounts</a>
                         </form>
                         {% else %}
                         <a class="collapse-item" href="/service-accounts">ServiceAccounts</a>
@@ -163,7 +163,7 @@
                         <form action="/roles" method="POST">
                             <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
                             <input type="hidden" name="ns_select" value="{{ session['ns_select'] }}" />
-                            <a class="collapse-item" href="#" onclick="event.preventDefault(); this.parentNode.submit()">Roles</a> {{ po_now }}
+                            <a class="collapse-item" href="#" onclick="event.preventDefault(); this.parentNode.submit()">Roles</a>
                         </form>
                         {% else %}
                         <a class="collapse-item" href="/roles">Roles</a>
@@ -173,7 +173,7 @@
                         <form action="/role-bindings" method="POST">
                             <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
                             <input type="hidden" name="ns_select" value="{{ session['ns_select'] }}" />
-                            <a class="collapse-item" href="#" onclick="event.preventDefault(); this.parentNode.submit()">RoleBindings</a> {{ po_now }}
+                            <a class="collapse-item" href="#" onclick="event.preventDefault(); this.parentNode.submit()">RoleBindings</a>
                         </form>
                         {% else %}
                         <a class="collapse-item" href="/role-bindings">RoleBindings</a>
@@ -247,7 +247,7 @@
 
                     <!-- Topbar Namespace -->
                     <nav class="navbar navbar-light bg-light row">
-                        <form name="add" method="post" class="form-inline row row-cols-1 mr-auto ml-md-0 mw-100">
+                        <form name="add" method="POST" class="form-inline row row-cols-1 mr-auto ml-md-0 mw-100">
                           <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
                           <div class="input-group">
                             {% if namespaces %}

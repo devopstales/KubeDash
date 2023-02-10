@@ -16,6 +16,7 @@ from datetime import datetime
 ##############################################################
 
 class k8sConfig(UserMixin, db.Model):
+    __tablename__ = 'k8s_config'
     id = db.Column(db.Integer, primary_key=True)
     k8s_server_url = db.Column(db.Text, unique=True, nullable=False)
     k8s_context = db.Column(db.Text, unique=True, nullable=False)
@@ -74,18 +75,18 @@ def ErrorHandler(error, action):
         flash(error, "danger")
 
 def k8sClientConfigGet(username_role, user_token):
-    k8sConfig = k8sServerConfigGet()
-    k8s_server_url = k8sConfig.k8s_server_url
-    k8s_server_ca = str(base64_decode(k8sConfig.k8s_server_ca), 'UTF-8')
-    if k8s_server_ca:
-        file = open("CA.crt", "w+")
-        file.write( k8s_server_ca )
-        file.close 
-
     if username_role == "Admin":
         # k8s_config.load_incluster_config()
         k8s_config.load_kube_config()
     elif username_role == "User":
+        k8sConfig = k8sServerConfigGet()
+        k8s_server_url = k8sConfig.k8s_server_url
+        k8s_server_ca = str(base64_decode(k8sConfig.k8s_server_ca), 'UTF-8')
+        if k8s_server_ca:
+            file = open("CA.crt", "w+")
+            file.write( k8s_server_ca )
+            file.close 
+
         configuration = k8s_client.Configuration()
         configuration.host = k8s_server_url
         configuration.verify_ssl = True

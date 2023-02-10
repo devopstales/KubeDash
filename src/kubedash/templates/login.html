@@ -51,7 +51,8 @@
                                     </div>
                                     {% endfor %}
                                     {% endif %}
-                                    <form class="user" method="post">
+                                    <form class="user" method="POST">
+                                        <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
                                         <div class="form-group mb-4">
                                             <input type="text" placeholder="Username" class="form-control form-control-user" id="floatingInput" name="username" value="{{request.form.username }}">
                                         </div>
