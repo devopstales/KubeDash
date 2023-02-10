@@ -20,40 +20,64 @@ def email_check(email):
 def load_user(user_id):
     return User.query.get(int(user_id))
 
+# Define the User data model.
 class User(UserMixin, db.Model):
+    __tablename__ = 'users'
     id = db.Column(db.Integer, primary_key=True)
     username = db.Column(db.String(80), unique=True, nullable=False)
     password_hash = db.Column(db.String(120), nullable=True)
     email = db.Column(db.String(80), unique=True, nullable=True)
-    role = db.Column(db.String(5), nullable=False)
+    roles = db.relationship('Role', secondary='users_roles',
+                            backref=db.backref('users', lazy='dynamic'))
     user_type = db.Column(db.String(5), nullable=False)
     tokens = db.Column(db.Text, nullable=True)
 
     def __repr__(self):
         return '<User %r>' % self.username
 
-def UserCreate(username, password, email, role, user_type, tokens):
+# Define the Role data model
+class Role(db.Model):
+    __tablename__ = 'roles'
+    id = db.Column(db.Integer(), primary_key=True)
+    name = db.Column(db.String(50), nullable=False, server_default=u'', unique=True)
+
+# Define the UserRoles association model
+class UsersRoles(db.Model):
+    __tablename__ = 'users_roles'
+    id = db.Column(db.Integer(), primary_key=True)
+    user_id = db.Column(db.Integer(), db.ForeignKey('users.id', ondelete='CASCADE'))
+    role_id = db.Column(db.Integer(), db.ForeignKey('roles.id', ondelete='CASCADE'))
+
+def RoleCreate(name):
+    role = Role.query.filter(Role.name == name).first()
+    if not role:
+        role_data = Role(name=name)
+        db.session.add(role_data)
+        db.session.commit()
+
+def UserCreate(username, password, email, user_type, role=None, tokens=None):
     user = User.query.filter_by(username=username).first()
-    if password is None:
-        user_data = User(
-            username      = username,
-            password_hash = None,
-            email         = email,
-            role          = role,
-            user_type     = user_type,
-            tokens        = tokens
-        )
-    else:
-        user_data = User(
-            username      = username,
-            password_hash = generate_password_hash(password, method='sha256'),
-            email         = email,
-            role          = role,
-            user_type     = user_type,
-            tokens        = tokens
-        )
-    if user is None:
-        db.session.add(user_data)
+    if not user:
+        if password is None:
+            user = User(
+                username      = username,
+                password_hash = None,
+                email         = email,
+                user_type     = user_type,
+                tokens        = tokens
+            )
+        else:
+            user = User(
+                username      = username,
+                password_hash = generate_password_hash(password, method='sha256'),
+                email         = email,
+                user_type     = user_type,
+                tokens        = tokens
+            )
+        if role:
+            role_data = Role.query.filter(Role.name == role).first()
+            user.roles.append(role_data)
+        db.session.add(user)
         db.session.commit()
 
 def UserUpdate(username, role):
@@ -69,4 +93,4 @@ def UserDelete(username):
         db.session.commit()
 
 def UserCreateSSO(username, email, tokens, user_type):
-    UserCreate(username, None, email, "User", user_type, tokens)
+    UserCreate(username, None, email, user_type, "User", tokens)

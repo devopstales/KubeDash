@@ -60,10 +60,11 @@
                                 <tr>
                                     <th>Owner:</th>
                                     <td>
-                                        <form action="/{{ pod_data.owner.split("/")[0] }}" method="post">
-                                        <input type="hidden" name="ns_select" value="{{ pod_data.namespace }}" />
-                                        <input type="hidden" name="tr_select" value="{{ pod_data.owner.split("/")[1] }}" />
-                                        <a href="javascript:;" onclick="parentNode.submit();">{{ pod_data.owner }}</a>
+                                        <form action="/{{ pod_data.owner.split("/")[0] }}" method="POST">
+                                            <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+                                            <input type="hidden" name="ns_select" value="{{ pod_data.namespace }}" />
+                                            <input type="hidden" name="tr_select" value="{{ pod_data.owner.split("/")[1] }}" />
+                                            <a href="javascript:;" onclick="parentNode.submit();">{{ pod_data.owner }}</a>
                                         </form>
                                     </td>
                                 </tr>
@@ -352,63 +353,63 @@
                             </table>
                         </div>
                         <h3>Refers To</h3>
-                            <div class="table-responsive">
-                                <table class="table table-bordered" id="refersTable" width="100%" cellspacing="0">
-                                    <!-- service account, secret, configmap, volume-->
-                                    <thead>
-                                        <th>Type</th>
-                                        <th>Name</th>
-                                        <th>Namespace</th>
-                                    </thead>
-                                    <tbody>
-                                    {% if pod_data.image_pull_secrets %}
-                                        {% for dict_item in pod_data.image_pull_secrets %}
-                                        {% for key, value in dict_item.items() %}
-                                        <tr>
-                                            <td>ImagePullSecret</td>
-                                            <td>{{ value }}</td>
-                                            <td>{{ pod_data.namespace }}</td>
-                                        </tr>
-                                        {% endfor %}
-                                        {% endfor %}
-                                    {% endif %}
-                                    {% if pod_data.service_account %}
-                                        <tr>
-                                            <td>ServiceAccount</td>
-                                            <td>{{ pod_data.service_account }}</td>
-                                            <td>{{ pod_data.namespace }}</td>
-                                        </tr>
-                                    {% endif %}
-                                    {% if pod_data.secrets %}
-                                        {% for secret in pod_data.secrets %}
-                                        <tr>
-                                            <td>Secret</td>
-                                            <td>{{ secret }}</td>
-                                            <td>{{ pod_data.namespace }}</td>
-                                        </tr>
-                                        {% endfor %}
-                                    {% endif %}
-                                    {% if pod_data.cm %}
-                                        {% for cm in pod_data.cm %}
-                                        <tr>
-                                            <td>Configmap</td>
-                                            <td>{{ cm }}</td>
-                                            <td>{{ pod_data.namespace }}</td>
-                                        </tr>
-                                        {% endfor %}
-                                    {% endif %}
-                                    {% if pod_data.pvc %}
-                                        {% for pvc in pod_data.pvc %}
-                                        <tr>
-                                            <td>PeristentVolumeClame</td>
-                                            <td>{{ pvc }}</td>
-                                            <td>{{ pod_data.namespace }}</td>
-                                        </tr>
-                                        {% endfor %}
-                                    {% endif %}
-                                    </tbody>
-                                </table>
-                            </div>
+                        <div class="table-responsive">
+                            <table class="table table-bordered" id="refersTable" width="100%" cellspacing="0">
+                                <!-- service account, secret, configmap, volume-->
+                                <thead>
+                                    <th>Type</th>
+                                    <th>Name</th>
+                                    <th>Namespace</th>
+                                </thead>
+                                <tbody>
+                                {% if pod_data.image_pull_secrets %}
+                                    {% for dict_item in pod_data.image_pull_secrets %}
+                                    {% for key, value in dict_item.items() %}
+                                    <tr>
+                                        <td>ImagePullSecret</td>
+                                        <td>{{ value }}</td>
+                                        <td>{{ pod_data.namespace }}</td>
+                                    </tr>
+                                    {% endfor %}
+                                    {% endfor %}
+                                {% endif %}
+                                {% if pod_data.service_account %}
+                                    <tr>
+                                        <td>ServiceAccount</td>
+                                        <td>{{ pod_data.service_account }}</td>
+                                        <td>{{ pod_data.namespace }}</td>
+                                    </tr>
+                                {% endif %}
+                                {% if pod_data.secrets %}
+                                    {% for secret in pod_data.secrets %}
+                                    <tr>
+                                        <td>Secret</td>
+                                        <td>{{ secret }}</td>
+                                        <td>{{ pod_data.namespace }}</td>
+                                    </tr>
+                                    {% endfor %}
+                                {% endif %}
+                                {% if pod_data.cm %}
+                                    {% for cm in pod_data.cm %}
+                                    <tr>
+                                        <td>Configmap</td>
+                                        <td>{{ cm }}</td>
+                                        <td>{{ pod_data.namespace }}</td>
+                                    </tr>
+                                    {% endfor %}
+                                {% endif %}
+                                {% if pod_data.pvc %}
+                                    {% for pvc in pod_data.pvc %}
+                                    <tr>
+                                        <td>PeristentVolumeClame</td>
+                                        <td>{{ pvc }}</td>
+                                        <td>{{ pod_data.namespace }}</td>
+                                    </tr>
+                                    {% endfor %}
+                                {% endif %}
+                                </tbody>
+                            </table>
+                        </div>
                     </div>
                 </div>
             </div>

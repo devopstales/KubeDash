@@ -2,8 +2,8 @@
 
 from __main__ import app
 import requests, json, yaml
-from functions.user import email_check, User, UserCreate, UserUpdate, UserDelete, \
-    UserCreateSSO
+from functions.user import email_check, User, Role, UsersRoles, UserCreate, UserUpdate, \
+    UserDelete, UserCreateSSO
 from functions.sso import SSOServerCreate, SSOSererGet, SSOServerUpdate, get_auth_server_info
 from functions.k8s import k8sNodesListGet, \
     k8sServerConfigCreate, k8sServerConfigGet, k8sServerConfigList, k8sServerDelete, k8sServerConfigUpdate, \
@@ -83,9 +83,11 @@ def login_post():
         flash('Please check your login details and try again.', "warning")
         return redirect(url_for('login')) # if user doesn't exist or password is wrong, reload the page
     else:
+        user_role = UsersRoles.query.filter_by(user_id=user.id).first()
+        role = Role.query.filter_by(id=user_role.role_id).first()
         login_user(user, remember=remember)
         session['username'] = username
-        session['user_role'] = user.role
+        session['user_role'] = role.name
         session['user_type'] = user.user_type
         session['ns_select'] = "default"
         return redirect(url_for('users'))
@@ -126,8 +128,6 @@ def users():
         from functions.k8s import k8sClusterRolesAdd
         k8sClusterRolesAdd()
 
-    print(session)
-
     return render_template(
         'users.html',
         users = users,
@@ -152,7 +152,7 @@ def users_add():
             flash("Password must be 8 character in length", "danger")
             return redirect(url_for('users'))
         else:
-            UserCreate(username, password, email, role, "Local", None)
+            UserCreate(username, password, email, "Local", None, role)
             flash("User Created Successfully", "success")
             return redirect(url_for('users'))
     else:
@@ -289,16 +289,20 @@ def callback():
         user_token = json.dumps(token)
         user = User.query.filter_by(username=username).first()
 
-        session['oauth_token'] = token
-        session['refresh_token'] = token.get("refresh_token")
-        session['username'] = username
-        session['user_role'] = user.role
-        session['user_type'] = user.user_type
-        session['ns_select'] = "default"
-
         if user is None:
             UserCreateSSO(username, email, user_token, "OpenID")
             user = User.query.filter_by(username=username, user_type = "OpenID").first()
+
+        user_role = UsersRoles.query.filter_by(user_id=user.id).first()
+        role = Role.query.filter_by(id=user_role.role_id).first()
+
+        session['oauth_token'] = token
+        session['refresh_token'] = token.get("refresh_token")
+        session['username'] = username
+        session['user_role'] = role.name
+        session['user_type'] = user.user_type
+        session['ns_select'] = "default"
+
         login_user(user)
         return redirect(url_for('users'))
 

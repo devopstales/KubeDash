@@ -11,6 +11,7 @@ from requests_oauthlib import OAuth2Session
 ##############################################################
 
 class Openid(UserMixin, db.Model):
+    __tablename__ = 'openid'
     id = db.Column(db.Integer, primary_key=True)
     oauth_server_uri = db.Column(db.Text, unique=True, nullable=False)
     client_id = db.Column(db.Text, nullable=False)

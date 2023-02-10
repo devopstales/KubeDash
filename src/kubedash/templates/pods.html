@@ -56,7 +56,8 @@
                         {% endif %}
                         </td>
                         <td>
-                          <form action="/pod-data" method="post">
+                          <form action="/pod-data" method="POST">
+                            <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
                             <input type="hidden" name="ns_name" value="{{ session['ns_select'] }}" />
                             <input type="hidden" name="po_name" value="{{ po.name }}" />
                             <a href="javascript:;" onclick="parentNode.submit();">{{ po.name }}</a>
@@ -65,7 +66,8 @@
                         <td>{{ po.pod_ip }}</td>
                         {% if po.owner %}
                         <td>
-                          <form action="/{{ po.owner.split("/")[0] }}" method="post">
+                            <form action="/{{ po.owner.split("/")[0] }}" method="POST">
+                            <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
                             <input type="hidden" name="ns_select" value="{{ session['ns_select'] }}" />
                             <input type="hidden" name="tr_select" value="{{ po.owner.split("/")[1] }}" />
                             <a href="javascript:;" onclick="parentNode.submit();">{{ po.owner }}</a>
@@ -90,7 +92,8 @@
                         <td><span class="badge badge-secondary">{{ po.low }}</span></td>
                         {% endif %}
                         <td>
-                          <form action="/pods/delete" method="post">
+                          <form action="/pods/delete" method="POST">
+                              <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
                               <input type="hidden"  name="pod_name" value="{{ po.name }}"/>
                               <button type="submit" rel="tooltip" class="btn btn-danger btn-info btn-just-icon btn-sm" value="upvote">
                                   <i class="material-icons">delete</i>

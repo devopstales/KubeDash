@@ -157,4 +157,11 @@
 {% endblock %}
 
 {% block scripts %}
+<script>
+    $(document).ready(function () {
+        $('#dataTable').DataTable({
+           responsive: true
+        });
+    });
+</script>
 {% endblock %}

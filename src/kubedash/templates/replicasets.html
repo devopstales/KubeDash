@@ -46,7 +46,8 @@
                         <td>{{ rs.name }}</td>
                         {% if rs.owner %}
                         <td>
-                          <form action="/{{ rs.owner.split("/")[0] }}" method="post">
+                          <form action="/{{ rs.owner.split("/")[0] }}" method="POST">
+                            <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
                             <input type="hidden" name="ns_select" value="{{ ns_select }}" />
                             <input type="hidden" name="tr_select" value="{{ rs.owner.split("/")[1] }}" />
                             <a href="javascript:;" onclick="parentNode.submit();">{{ rs.owner }}</a>
