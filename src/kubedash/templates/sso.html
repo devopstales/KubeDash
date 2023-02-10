@@ -26,6 +26,7 @@
   
   <div class="card-body">
     <form action="/sso-config" method="POST">
+      <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
       <div class="messages"></div>
       {% if oauth_server_uri %}
       <input type="hidden" name="request_type" value="edit" />
