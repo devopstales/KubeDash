@@ -26,6 +26,10 @@ def health():
     resp.status_code = 200
     return resp
 
+@app.errorhandler(404)
+def page_not_found(e):
+    return render_template('404.html'), 404
+
 ##############################################################
 ## Login
 ##############################################################
@@ -725,7 +729,6 @@ def service_accounts():
     if request.method == 'POST':
         session['ns_select'] = request.form.get('ns_select')
         sa_select = request.form.get('sa_select')
-        print(sa_select) # debug
 
     namespace_list = k8sNamespaceListGet(session['user_role'], user_token)
     service_accounts = k8sSaListGet(session['user_role'], user_token, session['ns_select'])
