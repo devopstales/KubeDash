@@ -5,15 +5,7 @@ import requests, json, yaml
 from functions.user import email_check, User, Role, UsersRoles, UserCreate, UserUpdate, \
     UserDelete, UserCreateSSO
 from functions.sso import SSOServerCreate, SSOSererGet, SSOServerUpdate, get_auth_server_info
-from functions.k8s import k8sNodesListGet, \
-    k8sServerConfigCreate, k8sServerConfigGet, k8sServerConfigList, k8sServerDelete, k8sServerConfigUpdate, \
-    k8sNamespaceListGet, k8sNamespacesGet, k8sNamespaceCreate, k8sNamespaceDelete, \
-    k8sUserClusterRoleTemplateListGet, k8sUserRoleTemplateListGet, \
-    k8sStatefulSetsGet, k8sDaemonSetsGet, k8sDeploymentsGet, k8sReplicaSetsGet, \
-    k8sPodListGet, k8sPodGet, \
-    k8sPodListVulnsGet, k8sPodVulnsGet, \
-    k8sSaListGet, k8sClusterRoleListGet, \
-    k8sHelmChartListGet
+from functions.k8s import *
 from flask import jsonify, session, render_template, request, redirect, flash, url_for, \
     Response
 from flask_login import login_user, login_required, current_user, logout_user
@@ -737,8 +729,32 @@ def service_accounts():
 
     return render_template(
         'service-accounts.html',
-        service_accounts=service_accounts,
-        namespaces=namespace_list,
+        service_accounts = service_accounts,
+        namespaces = namespace_list,
+    )
+
+##############################################################
+##  Role
+##############################################################
+
+@app.route("/roles", methods=['GET', 'POST'])
+@login_required
+def roles():
+    if session['user_type'] == "OpenID":
+        user_token = session['oauth_token']
+    else:
+        user_token = None
+
+    if request.method == 'POST':
+        session['ns_select'] = request.form.get('ns_select')
+
+    namespace_list = k8sNamespaceListGet(session['user_role'], user_token)
+    roles = k8sRoleListGet(session['user_role'], user_token, session['ns_select'])
+
+    return render_template(
+        'roles.html',
+        roles = roles,
+        namespaces = namespace_list,
     )
 
 ##############################################################
@@ -757,7 +773,7 @@ def cluster_roles():
 
     return render_template(
         'cluster-roles.html',
-        cluster_roles=cluster_roles,
+        cluster_roles = cluster_roles,
     )
 
 ##############################################################
