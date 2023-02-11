@@ -37,25 +37,36 @@
                       <tr>
                         <td>{{ rb.name }}</td>
                         <td>
-                            <form action="/roles" method="POST">
-                                <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
-                                <input type="hidden" name="ns_select" value="{{ session['ns_select'] }}" />
-                                <input type="hidden" name="role_select" value="{{ rb.role }}" />
-                                <a href="javascript:;" onclick="parentNode.submit();">{{ rb.role }}</a>
-                            </form>
+                            {% for rbr in rb.role %}
+                              {% for rbr_type, rbr_name in rbr.items() %}
+                                {% if rbr_type == "Role" %}
+                                  <form action="/roles" method="POST">
+                                      <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+                                      <input type="hidden" name="ns_select" value="{{ session['ns_select'] }}" />
+                                      <input type="hidden" name="role_select" value="{{ rbr_name }}" />
+                                      <a href="javascript:;" onclick="parentNode.submit();">{{ rbr_name }}</a>
+                                  </form>
+                                {% elif rbr_type == "ClusterRole" %}
+                                  <form action="/cluster-roles" method="POST">
+                                    <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+                                    <input type="hidden" name="cluster_role_select" value="{{ rbr_name }}" />
+                                    <a href="javascript:;" onclick="parentNode.submit();">{{ rbr_name }}</a>
+                                  </form>
+                                {% else %}
+                                  {{ rbr_name }}
+                                {% endif %}
+                                {% if not loop.last %}<br>{% endif %}
+                                {% endfor %}
+                            {% endfor %}
                         </td>
                         <td>
                           {% for rbu in rb.user %}
-                              {% for rbu_name, rbu_ns in rbu.items()  %}
-                                {{ rbu_name }}{% if not loop.last %}<br>{% endif %}
-                              {% endfor %}
+                              {{ rbu }}{% if not loop.last %}<br>{% endif %}
                           {% endfor %}
                         </td>
                         <td>
                           {% for rbg in rb.group %}
-                            {% for rbg_name, rbg_ns in rbg.items()  %}
-                                {{ rbg_name }}{% if not loop.last %}<br>{% endif %}
-                            {% endfor %}
+                            {{ rbg }}{% if not loop.last %}<br>{% endif %}
                           {% endfor %}
                         </td>
                         <td>

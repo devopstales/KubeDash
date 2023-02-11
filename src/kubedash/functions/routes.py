@@ -725,6 +725,7 @@ def service_accounts():
     if request.method == 'POST':
         session['ns_select'] = request.form.get('ns_select')
         sa_select = request.form.get('sa_select')
+        print(sa_select) # debug
 
     namespace_list = k8sNamespaceListGet(session['user_role'], user_token)
     service_accounts = k8sSaListGet(session['user_role'], user_token, session['ns_select'])
@@ -780,7 +781,6 @@ def role_bindings():
 
     namespace_list = k8sNamespaceListGet(session['user_role'], user_token)
     role_bindings = k8sRoleBindingListGet(session['user_role'], user_token, session['ns_select'])
-    print(role_bindings) # debug
 
     return render_template(
         'role-bindings.html',
@@ -792,19 +792,42 @@ def role_bindings():
 ## Cluster Role
 ##############################################################
 
-@app.route("/cluster-roles")
+@app.route("/cluster-roles", methods=['GET', 'POST'])
 @login_required
 def cluster_roles():
+    cluster_role_select = None
     if session['user_type'] == "OpenID":
         user_token = session['oauth_token']
     else:
         user_token = None
+
+    if request.method == 'POST':
+        cluster_role_select = request.form.get('cluster_role_select')
 
     cluster_roles = k8sClusterRoleListGet(session['user_role'], user_token)
 
     return render_template(
         'cluster-roles.html',
         cluster_roles = cluster_roles,
+        cluster_role_select = cluster_role_select,
+    )
+
+##############################################################
+## Cluster Role Bindings
+##############################################################
+
+@app.route("/cluster-role-bindings")
+@login_required
+def cluster_role_bindings():
+    if session['user_type'] == "OpenID":
+        user_token = session['oauth_token']
+    else:
+        user_token = None
+
+    cluster_role_bindings = k8sClusterRoleBindingListGet(session['user_role'], user_token)
+    return render_template(
+        'cluster-role-bindings.html',
+        cluster_role_bindings = cluster_role_bindings,
     )
 
 ##############################################################
