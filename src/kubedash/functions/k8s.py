@@ -898,7 +898,28 @@ def k8sSaListGet(username_role, user_token, ns):
         return SA_LIST
     except:
         return SA_LIST
-    
+
+##############################################################
+## Role
+##############################################################
+
+def k8sRoleListGet(username_role, user_token, ns):
+    k8sClientConfigGet(username_role, user_token)
+    ROLE_LIST = list()
+    try:
+        role_list = k8s_client.RbacAuthorizationV1Api().list_namespaced_role(ns)
+        for role in role_list.items:
+            ROLE_INFO = {
+                "name": role.metadata.name
+            }
+            ROLE_LIST.append(ROLE_INFO)
+        return ROLE_LIST
+    except ApiException as error:
+        ErrorHandler(error, "get roles list")
+        return ROLE_LIST
+    except:
+        return ROLE_LIST
+
 ##############################################################
 ## Cluster Role
 ##############################################################
