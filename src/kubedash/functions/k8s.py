@@ -937,13 +937,14 @@ def k8sRoleBindingListGet(username_role, user_token, ns):
             "group": list(),
             "ServiceAccount": list(),
             }
+            print(rb) # debug
             for obj in rb.subjects:
                 if obj.kind == "User":
-                    ROLE_BINDING_INFO['user'].append(obj.name)
+                    ROLE_BINDING_INFO['user'].append({obj.name: obj.namespace})
                 elif obj.kind == "Group":
-                    ROLE_BINDING_INFO['group'].append(obj.name)
+                    ROLE_BINDING_INFO['group'].append({obj.name: obj.namespace})
                 elif obj.kind == "ServiceAccount":
-                    ROLE_BINDING_INFO['ServiceAccount'].append(obj.name)
+                    ROLE_BINDING_INFO['ServiceAccount'].append({obj.name: obj.namespace})
             ROLE_BINDING_LIST.append(ROLE_BINDING_INFO)    
         return ROLE_BINDING_LIST
     except ApiException as error:

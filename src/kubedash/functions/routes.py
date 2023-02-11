@@ -780,6 +780,7 @@ def role_bindings():
 
     namespace_list = k8sNamespaceListGet(session['user_role'], user_token)
     role_bindings = k8sRoleBindingListGet(session['user_role'], user_token, session['ns_select'])
+    print(role_bindings) # debug
 
     return render_template(
         'role-bindings.html',
