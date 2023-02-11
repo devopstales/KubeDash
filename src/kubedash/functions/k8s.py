@@ -932,17 +932,21 @@ def k8sRoleBindingListGet(username_role, user_token, ns):
         for rb in role_binding_list.items:
             ROLE_BINDING_INFO = {
             "name": rb.metadata.name,
-            "role": rb.role_ref.name,
+            "role": list(),
             "user": list(),
             "group": list(),
             "ServiceAccount": list(),
             }
-            print(rb) # debug
+            if type(rb.role_ref) == list:
+                for role in rb.role_ref:
+                    ROLE_BINDING_INFO['role'].append({role.kind: role.name})
+            else:
+                ROLE_BINDING_INFO['role'].append({rb.role_ref.kind: rb.role_ref.name})
             for obj in rb.subjects:
                 if obj.kind == "User":
-                    ROLE_BINDING_INFO['user'].append({obj.name: obj.namespace})
+                    ROLE_BINDING_INFO['user'].append(obj.name)
                 elif obj.kind == "Group":
-                    ROLE_BINDING_INFO['group'].append({obj.name: obj.namespace})
+                    ROLE_BINDING_INFO['group'].append(obj.name)
                 elif obj.kind == "ServiceAccount":
                     ROLE_BINDING_INFO['ServiceAccount'].append({obj.name: obj.namespace})
             ROLE_BINDING_LIST.append(ROLE_BINDING_INFO)    
@@ -973,6 +977,46 @@ def k8sClusterRoleListGet(username_role, user_token):
         return CLUSTER_ROLE_LIST
     except:
         return CLUSTER_ROLE_LIST
+
+##############################################################
+## Cluster Role Bindings
+##############################################################
+
+def k8sClusterRoleBindingListGet(username_role, user_token):
+    k8sClientConfigGet(username_role, user_token)
+    CLUSTER_ROLE_BINDING_LIST = []
+    try:
+        cluster_role_bindings = k8s_client.RbacAuthorizationV1Api().list_cluster_role_binding()
+        for crb in cluster_role_bindings.items:
+            CLUSTER_ROLE_BINDING_INFO = {
+            "name": crb.metadata.name,
+            "role": list(),
+            "user": list(),
+            "group": list(),
+            "ServiceAccount": list(),
+            }
+            if type(crb.role_ref) == list:
+                for role in crb.role_ref:
+                    CLUSTER_ROLE_BINDING_INFO['role'].append(role.name)
+            else:
+                CLUSTER_ROLE_BINDING_INFO['role'].append(crb.role_ref.name)
+            if crb.subjects:
+                for obj in crb.subjects:
+                    if obj.kind == "User":
+                        CLUSTER_ROLE_BINDING_INFO['user'].append(obj.name)
+                    elif obj.kind == "Group":
+                        CLUSTER_ROLE_BINDING_INFO['group'].append(obj.name)
+                    elif obj.kind == "ServiceAccount":
+                        CLUSTER_ROLE_BINDING_INFO["ServiceAccount"].append({obj.name: obj.namespace})
+
+                    CLUSTER_ROLE_BINDING_LIST.append(CLUSTER_ROLE_BINDING_INFO)
+        return CLUSTER_ROLE_BINDING_LIST
+    except ApiException as error:
+        ErrorHandler(error, "get cluster role bindings list")
+        return CLUSTER_ROLE_BINDING_LIST
+    except:
+        return CLUSTER_ROLE_BINDING_LIST
+
 
 ##############################################################
 ## Helm Charts
