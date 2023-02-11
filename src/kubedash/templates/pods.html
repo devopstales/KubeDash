@@ -67,10 +67,10 @@
                         {% if po.owner %}
                         <td>
                             <form action="/{{ po.owner.split("/")[0] }}" method="POST">
-                            <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
-                            <input type="hidden" name="ns_select" value="{{ session['ns_select'] }}" />
-                            <input type="hidden" name="tr_select" value="{{ po.owner.split("/")[1] }}" />
-                            <a href="javascript:;" onclick="parentNode.submit();">{{ po.owner }}</a>
+                              <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+                              <input type="hidden" name="ns_select" value="{{ session['ns_select'] }}" />
+                              <input type="hidden" name="tr_select" value="{{ po.owner.split("/")[1] }}" />
+                              <a href="javascript:;" onclick="parentNode.submit();">{{ po.owner }}</a>
                           </form>
                         </td>
                         {% else %}

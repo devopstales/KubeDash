@@ -921,6 +921,38 @@ def k8sRoleListGet(username_role, user_token, ns):
         return ROLE_LIST
 
 ##############################################################
+##  Role Binding
+##############################################################
+
+def k8sRoleBindingListGet(username_role, user_token, ns):
+    k8sClientConfigGet(username_role, user_token)
+    ROLE_BINDING_LIST = list()
+    try:
+        role_binding_list = k8s_client.RbacAuthorizationV1Api().list_namespaced_role_binding(ns)
+        for rb in role_binding_list.items:
+            ROLE_BINDING_INFO = {
+            "name": rb.metadata.name,
+            "role": rb.role_ref.name,
+            "user": list(),
+            "group": list(),
+            "ServiceAccount": list(),
+            }
+            for obj in rb.subjects:
+                if obj.kind == "User":
+                    ROLE_BINDING_INFO['user'].append(obj.name)
+                elif obj.kind == "Group":
+                    ROLE_BINDING_INFO['group'].append(obj.name)
+                elif obj.kind == "ServiceAccount":
+                    ROLE_BINDING_INFO['ServiceAccount'].append(obj.name)
+            ROLE_BINDING_LIST.append(ROLE_BINDING_INFO)    
+        return ROLE_BINDING_LIST
+    except ApiException as error:
+        ErrorHandler(error, "get role bindings list")
+        return ROLE_BINDING_LIST
+    except:
+        return ROLE_BINDING_LIST
+
+##############################################################
 ## Cluster Role
 ##############################################################
 

@@ -716,6 +716,7 @@ def pods_data():
 @app.route("/service-accounts", methods=['GET', 'POST'])
 @login_required
 def service_accounts():
+    sa_select = None
     if session['user_type'] == "OpenID":
         user_token = session['oauth_token']
     else:
@@ -723,12 +724,14 @@ def service_accounts():
 
     if request.method == 'POST':
         session['ns_select'] = request.form.get('ns_select')
+        sa_select = request.form.get('sa_select')
 
     namespace_list = k8sNamespaceListGet(session['user_role'], user_token)
     service_accounts = k8sSaListGet(session['user_role'], user_token, session['ns_select'])
 
     return render_template(
         'service-accounts.html',
+        sa_select = sa_select,
         service_accounts = service_accounts,
         namespaces = namespace_list,
     )
@@ -740,6 +743,33 @@ def service_accounts():
 @app.route("/roles", methods=['GET', 'POST'])
 @login_required
 def roles():
+    role_select = None
+    if session['user_type'] == "OpenID":
+        user_token = session['oauth_token']
+    else:
+        user_token = None
+
+    if request.method == 'POST':
+        session['ns_select'] = request.form.get('ns_select')
+        role_select = request.form.get('role_select')
+
+    namespace_list = k8sNamespaceListGet(session['user_role'], user_token)
+    roles = k8sRoleListGet(session['user_role'], user_token, session['ns_select'])
+
+    return render_template(
+        'roles.html',
+        role_select = role_select,
+        roles = roles,
+        namespaces = namespace_list,
+    )
+
+##############################################################
+##  Role Binding
+##############################################################
+
+@app.route("/role-bindings", methods=['GET', 'POST'])
+@login_required
+def role_bindings():
     if session['user_type'] == "OpenID":
         user_token = session['oauth_token']
     else:
@@ -749,11 +779,11 @@ def roles():
         session['ns_select'] = request.form.get('ns_select')
 
     namespace_list = k8sNamespaceListGet(session['user_role'], user_token)
-    roles = k8sRoleListGet(session['user_role'], user_token, session['ns_select'])
+    role_bindings = k8sRoleBindingListGet(session['user_role'], user_token, session['ns_select'])
 
     return render_template(
-        'roles.html',
-        roles = roles,
+        'role-bindings.html',
+        role_bindings = role_bindings,
         namespaces = namespace_list,
     )
 

@@ -2,6 +2,7 @@
 
 {% block header %}
     <link href="{{ url_for('static',filename='/vendor/datatables/dataTables.bootstrap4.min.css') }}" rel="stylesheet" >
+    <link href="{{ url_for('static',filename='/vendor/datatables/jquery.dataTables.css') }}" rel="stylesheet" >
 {% endblock %}
 
 {% block content %}
@@ -30,8 +31,14 @@
                   </thead>
                   <tbody>
                     {% for r in roles %}
+                    {% if role_select == r.name %}
+                      <tr class="selected" >
+                    {% else %}
                       <tr>
-                        <td>{{ r.name }}</td>
+                    {% endif %}
+                        <td>
+                          {{ r.name }}
+                        </td>
                       </tr>
                     {% endfor %}
                   </tbody>
