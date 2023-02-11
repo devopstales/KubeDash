@@ -136,14 +136,14 @@
                 </div>
             </li>
 
-            <!-- Nav Item - RBAC Collapse Menu -->
+            <!-- Nav Item - Security Collapse Menu -->
             <li class="nav-item">
-                <a class="nav-link collapsed" href="#" data-toggle="collapse" data-target="#collapseRBAC"
-                    aria-expanded="true" aria-controls="collapseRBAC">
+                <a class="nav-link collapsed" href="#" data-toggle="collapse" data-target="#collapseSecurity"
+                    aria-expanded="true" aria-controls="collapseSecurity">
                     <i class="fas fa-fw fa-folder"></i>
-                    <span>RBAC</span>
+                    <span>Security</span>
                 </a>
-                <div id="collapseRBAC" class="collapse" aria-labelledby="headingRBAC"
+                <div id="collapseSecurity" class="collapse" aria-labelledby="headingSecurity"
                     data-parent="#accordionSidebar">
                     <div class="bg-white py-2 collapse-inner rounded">
                         <!-- -->
@@ -156,8 +156,6 @@
                         {% else %}
                         <a class="collapse-item" href="/service-accounts">ServiceAccounts</a>
                         {% endif %}
-                        <a class="collapse-item" href="/cluster-roles">ClusterRoles</a>
-                        <a class="collapse-item" href="/cluster-role-bindings">ClusterRoleBindings</a>
                         <!-- -->
                         {% if session['ns_select'] %}
                         <form action="/roles" method="POST">
@@ -178,6 +176,11 @@
                         {% else %}
                         <a class="collapse-item" href="/role-bindings">RoleBindings</a>
                         {% endif %}
+                        <a class="collapse-item" href="">RoleBindingTemplates</a>
+                        <a class="collapse-item" href="/cluster-roles">ClusterRoles</a>
+                        <a class="collapse-item" href="/cluster-role-bindings">ClusterRoleBindings</a>
+                        <a class="collapse-item" href="">ClusterRoleBindingTemplates</a>
+                        <a class="collapse-item" href="">Secrets</a>
                     </div>
                 </div>
             </li>

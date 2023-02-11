@@ -867,7 +867,7 @@ def k8sPodVulnsGet(username_role, user_token, ns, pod):
         # PublishedDate, FixedVersion
 
 ##############################################################
-## RBAC
+## Security
 ##############################################################
 ## Service Account
 ##############################################################
@@ -898,7 +898,27 @@ def k8sSaListGet(username_role, user_token, ns):
         return SA_LIST
     except:
         return SA_LIST
+    
+##############################################################
+## Cluster Role
+##############################################################
 
+def k8sClusterRoleListGet(username_role, user_token):
+    k8sClientConfigGet(username_role, user_token)
+    CLUSTER_ROLE_LIST = list()
+    try:
+        cluster_roles = k8s_client.RbacAuthorizationV1Api().list_cluster_role()
+        try:
+            for cr in cluster_roles.items:
+                CLUSTER_ROLE_LIST.append(cr.metadata.name)
+            return CLUSTER_ROLE_LIST
+        except:
+            return CLUSTER_ROLE_LIST
+    except ApiException as error:
+        ErrorHandler(error, "get cluster role list")
+        return CLUSTER_ROLE_LIST
+    except:
+        return CLUSTER_ROLE_LIST
 
 ##############################################################
 ## Helm Charts
