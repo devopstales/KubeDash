@@ -27,6 +27,8 @@
                 <thead>
                     <tr>
                       <th>Name</th>
+                      <th>Labels</th>
+                      <th>Annotations</th>
                     </tr>
                   </thead>
                   <tbody>
@@ -38,6 +40,22 @@
                     {% endif %}
                         <td>
                           {{ r.name }}
+                        </td>
+                        <td>
+                          {% if r.labels %}
+                          {% for lb_key, lb_value in r.labels.items() %}
+                          <span style="font-size: 85%" class="badge badge-secondary">{{ lb_key }}: {{ lb_value }}</span>
+                          {% if not loop.last %}<br>{% endif %}
+                          {% endfor %}
+                          {% endif %}
+                        </td>
+                        <td>
+                          {% if r.annotations %}
+                          {% for an_key, an_value in r.annotations.items() %}
+                          <span style="font-size: 85%" class="badge badge-secondary">{{ an_key }}: {{ an_value }}</span>
+                          {% if not loop.last %}<br>{% endif %}
+                          {% endfor %}
+                          {% endif %}
                         </td>
                       </tr>
                     {% endfor %}

@@ -488,6 +488,8 @@ def k8sNodesListGet(username_role, user_token):
                     NODE_INFO['os'] = value
                 elif label == "node-role.kubernetes.io/master":
                     NODE_INFO['role'] = "Master"
+                elif label == "node-role.kubernetes.io/control-plane":
+                    NODE_INFO['role'] = "Master"
             for key, value in no.status.node_info.__dict__.items():
                 if key == "_container_runtime_version":
                     NODE_INFO['runtime'] = value
@@ -653,7 +655,6 @@ def k8sReplicaSetsGet(username_role, user_token, ns):
 def k8sPodListGet(username_role, user_token, ns):
     k8sClientConfigGet(username_role, user_token)
     POD_LIST = list()
-    print(ns)
     try:
         pod_list = k8s_client.CoreV1Api().list_namespaced_pod(ns)
         for pod in pod_list.items:
@@ -910,7 +911,10 @@ def k8sRoleListGet(username_role, user_token, ns):
         role_list = k8s_client.RbacAuthorizationV1Api().list_namespaced_role(ns)
         for role in role_list.items:
             ROLE_INFO = {
-                "name": role.metadata.name
+                "name": role.metadata.name,
+                "annotations": role.metadata.annotations,
+                "labels": role.metadata.labels,
+                "rules": role.rules,
             }
             ROLE_LIST.append(ROLE_INFO)
         return ROLE_LIST
@@ -968,7 +972,13 @@ def k8sClusterRoleListGet(username_role, user_token):
         cluster_roles = k8s_client.RbacAuthorizationV1Api().list_cluster_role()
         try:
             for cr in cluster_roles.items:
-                CLUSTER_ROLE_LIST.append(cr.metadata.name)
+                CLUSTER_ROLE_DATA = {
+                    "name": cr.metadata.name,
+                    "annotations": cr.metadata.annotations,
+                    "labels": cr.metadata.labels,
+                    "rules": cr.rules,
+                }
+                CLUSTER_ROLE_LIST.append(CLUSTER_ROLE_DATA)
             return CLUSTER_ROLE_LIST
         except:
             return CLUSTER_ROLE_LIST
