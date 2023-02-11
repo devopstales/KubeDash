@@ -12,6 +12,7 @@ from functions.k8s import k8sNodesListGet, \
     k8sStatefulSetsGet, k8sDaemonSetsGet, k8sDeploymentsGet, k8sReplicaSetsGet, \
     k8sPodListGet, k8sPodGet, \
     k8sPodListVulnsGet, k8sPodVulnsGet, \
+    k8sSaListGet, \
     k8sHelmChartListGet
 from flask import jsonify, session, render_template, request, redirect, flash, url_for, \
     Response
@@ -713,7 +714,34 @@ def pods_data():
         )
     else:
         return redirect(url_for('login'))
-    
+
+##############################################################
+## RBAC
+##############################################################
+## Service Account
+##############################################################
+
+@app.route("/service-accounts", methods=['GET', 'POST'])
+@login_required
+def service_accounts():
+    if session['user_type'] == "OpenID":
+        user_token = session['oauth_token']
+    else:
+        user_token = None
+
+    if request.method == 'POST':
+        session['ns_select'] = request.form.get('ns_select')
+
+    namespace_list = k8sNamespaceListGet(session['user_role'], user_token)
+    service_accounts = k8sSaListGet(session['user_role'], user_token, session['ns_select'])
+    return render_template(
+        'service-accounts.html',
+        service_accounts=service_accounts,
+        namespaces=namespace_list,
+    )
+
+
+
 ##############################################################
 ## Helm Charts
 ##############################################################
