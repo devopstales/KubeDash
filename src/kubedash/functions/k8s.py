@@ -777,6 +777,8 @@ def k8sPodGet(username_role, user_token, ns, po):
     except ApiException as error:
         ErrorHandler(error, "get pods in this namespace")
         return POD_DATA
+    except:
+        return POD_DATA
 
 def k8sPodListVulnsGet(username_role, user_token, ns):
     k8sClientConfigGet(username_role, user_token)
@@ -863,6 +865,40 @@ def k8sPodVulnsGet(username_role, user_token, ns, pod):
                 return HAS_REPORT, POD_VULNS
 
         # PublishedDate, FixedVersion
+
+##############################################################
+## RBAC
+##############################################################
+## Service Account
+##############################################################
+
+def k8sSaListGet(username_role, user_token, ns):
+    k8sClientConfigGet(username_role, user_token)
+    SA_LIST = list()
+    try:
+        service_accounts = k8s_client.CoreV1Api().list_namespaced_service_account(ns)
+        for sa in service_accounts.items:
+            SA_INFO = {
+                "name": sa.metadata.name,
+                "secret": "",
+                "pull_secret": "",
+            }
+            try:
+                SA_INFO['pull_secret'] = sa.image_pull_secrets[0].name
+            except:
+                SA_INFO['pull_secret'] = sa.image_pull_secrets
+            try:
+                SA_INFO['secret'] = sa.secrets[0].name
+            except:
+                SA_INFO['secret'] = sa.secrets
+            SA_LIST.append(SA_INFO)
+        return SA_LIST
+    except ApiException as error:
+        ErrorHandler(error, "get service account list")
+        return SA_LIST
+    except:
+        return SA_LIST
+
 
 ##############################################################
 ## Helm Charts
