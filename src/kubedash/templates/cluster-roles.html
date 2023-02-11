@@ -27,16 +27,36 @@
                 <thead>
                     <tr>
                       <th>Name</th>
+                      <th>Labels</th>
+                      <th>Annotations</th>
                     </tr>
                   </thead>
                   <tbody>
                     {% for cr in cluster_roles %}
-                    {% if cluster_role_select == cr %}
+                    {% if cluster_role_select == cr.name %}
                       <tr class="selected" >
                     {% else %}
                       <tr>
                     {% endif %}
-                        <td>{{ cr }}</td>
+                        <td>{{ cr.name }}</td>
+                        <td>
+                          {% if cr.labels %}
+                          {% for lb_key, lb_value in cr.labels.items() %}
+                          <span style="font-size: 85%" class="badge badge-secondary">{{ lb_key }}: {{ lb_value }}</span>
+                          {% if not loop.last %}<br>{% endif %}
+                          {% endfor %}
+                          {% endif %}
+                        </td>
+                        <td>
+                          {% if cr.annotations %}
+                          {% for an_key, an_value in cr.annotations.items() %}
+                          {% if an_key != "kubectl.kubernetes.io/last-applied-configuration" %}
+                          <span style="font-size: 85%" class="badge badge-secondary">{{ an_key }}: {{ an_value }}</span>
+                          {% if not loop.last %}<br>{% endif %}
+                          {% endif %}
+                          {% endfor %}
+                          {% endif %}
+                        </td>
                       </tr>
                     {% endfor %}
                   </tbody>

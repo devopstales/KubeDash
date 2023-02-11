@@ -32,7 +32,7 @@
                       <th>Version</th>
                       <th>Runetime</th>
                       <th>OS</th>
-                      <th>Taint</th>
+                      <th>Taints</th>
                     </tr>
                   </thead>
                   <tbody>
@@ -54,7 +54,12 @@
                         <td>{{ no.version }}</td>
                         <td>{{ no.runtime }}</td>
                         <td>{{ no.os }}</td>
-                        <td>{{ no.taint }}</td>
+                        <td>
+                          {% for taint in no.taint %}
+                          <span style="font-size: 85%" class="badge badge-secondary">{{ taint }}</span>
+                          {% if not loop.last %}<br>{% endif %}
+                          {% endfor %}
+                        </td>
                       </tr>
                     {% endfor %}
                   </tbody>
