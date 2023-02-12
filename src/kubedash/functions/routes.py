@@ -28,7 +28,7 @@ def health():
 
 @app.errorhandler(404)
 def page_not_found(e):
-    return render_template('404.html'), 404
+    return render_template('404.html.j2'), 404
 
 ##############################################################
 ## Login
@@ -60,7 +60,7 @@ def login():
             return redirect(url_for('users'))
         else:
             return render_template(
-                'login.html',
+                'login.html.j2',
                 sso_enabled = is_sso_enabled,
                 ldap_enabled = is_ldap_enabled,
                 auth_url = authorization_url
@@ -115,7 +115,7 @@ def users():
     users = User.query
 
     return render_template(
-        'users.html',
+        'users.html.j2',
         users = users,
     )
 
@@ -197,7 +197,7 @@ def users_privilege():
             k8sClusterRolesAdd()
 
         return render_template(
-            'user-privilege.html',
+            'user-privilege.html.j2',
             username = username,
             user_role_template_list = user_role_template_list,
             namespace_list = namespace_list,
@@ -233,7 +233,7 @@ def sso_config():
 
         flash("SSO Server Updated Successfully", "success")
         return render_template(
-            'sso.html',
+            'sso.html.j2',
             oauth_server_uri = oauth_server_uri,
             client_id = client_id,
             client_secret = client_secret,
@@ -244,7 +244,7 @@ def sso_config():
         ssoServer = SSOSererGet()
         if ssoServer is None:
             return render_template(
-                'sso.html',
+                'sso.html.j2',
                 base_uri = request.root_url.rstrip(request.root_url[-1]),
                 scope = [
                     "openid",          # mandatory for OpenIDConnect auth
@@ -256,7 +256,7 @@ def sso_config():
             )
         else:
             return render_template(
-                'sso.html',
+                'sso.html.j2',
                 oauth_server_uri = ssoServer.oauth_server_uri,
                 client_id = ssoServer.client_id,
                 client_secret = ssoServer.client_secret,
@@ -387,7 +387,7 @@ def k8s_config():
     k8s_servers, k8s_config_list_length = k8sServerConfigList()
 
     return render_template(
-        'k8s.html',
+        'k8s.html.j2',
         k8s_servers = k8s_servers,
         k8s_config_list_length = k8s_config_list_length,
     )
@@ -400,7 +400,7 @@ def export():
     user = User.query.filter_by(username=session['username'], user_type = "OpenID").first()
     if user is None:
         return render_template(
-            'export.html',
+            'export.html.j2',
             preferred_username = session['username'],
             username_role = session['user_role']
         )
@@ -429,7 +429,7 @@ def export():
         ).json()
 
         return render_template(
-            'export.html',
+            'export.html.j2',
             preferred_username = user_data["preferred_username"],
             redirect_uri = redirect_uri,
             client_id = ssoServer.client_id,
@@ -532,7 +532,7 @@ def nodes():
     node_data = k8sNodesListGet(session['user_role'], user_token)
 
     return render_template(
-        'nodes.html',
+        'nodes.html.j2',
         nodes = node_data,
         tr_select = tr_select,
     )
@@ -552,7 +552,7 @@ def namespaces():
     namespace_list = k8sNamespacesGet(session['user_role'], user_token)
 
     return render_template(
-        'namespaces.html',
+        'namespaces.html.j2',
         namespace_list = namespace_list,
     )
 
@@ -612,7 +612,7 @@ def statefulsets():
     namespace_list = k8sNamespaceListGet(session['user_role'], user_token)
 
     return render_template(
-        'statefulsets.html',
+        'statefulsets.html.j2',
         tr_select = tr_select,
         statefulsets = statefulset_list,
         namespaces = namespace_list,
@@ -640,7 +640,7 @@ def daemonsets():
     namespace_list = k8sNamespaceListGet(session['user_role'], user_token)
 
     return render_template(
-        'daemonsets.html',
+        'daemonsets.html.j2',
         daemonsets = daemonset_list,
         namespaces = namespace_list,
         tr_select = tr_select,
@@ -668,7 +668,7 @@ def deployments():
     namespace_list = k8sNamespaceListGet(session['user_role'], user_token)
 
     return render_template(
-        'deployments.html',
+        'deployments.html.j2',
         tr_select = tr_select,
         deployments = deployments_list,
         namespaces = namespace_list,
@@ -696,7 +696,7 @@ def replicasets():
     namespace_list = k8sNamespaceListGet(session['user_role'], user_token)
 
     return render_template(
-        'replicasets.html',
+        'replicasets.html.j2',
         replicasets = replicaset_list,
         namespaces = namespace_list,
         tr_select = tr_select,
@@ -720,7 +720,7 @@ def pods():
     namespace_list = k8sNamespaceListGet(session['user_role'], user_token)
 
     return render_template(
-        'pods.html',
+        'pods.html.j2',
         pods = pod_list,
         has_report = has_report,
         namespaces = namespace_list,
@@ -742,7 +742,7 @@ def pods_data():
         has_report, pod_vulns = k8sPodVulnsGet(session['user_role'], user_token, session['ns_select'], po_name)
 
         return render_template(
-            'pod-data.html',
+            'pod-data.html.j2',
             po_now = po_name,
             pod_data = pod_data,
             has_report = has_report,
@@ -774,7 +774,7 @@ def service_accounts():
     service_accounts = k8sSaListGet(session['user_role'], user_token, session['ns_select'])
 
     return render_template(
-        'service-accounts.html',
+        'service-accounts.html.j2',
         sa_select = sa_select,
         service_accounts = service_accounts,
         namespaces = namespace_list,
@@ -801,7 +801,7 @@ def roles():
     roles = k8sRoleListGet(session['user_role'], user_token, session['ns_select'])
 
     return render_template(
-        'roles.html',
+        'roles.html.j2',
         role_select = role_select,
         roles = roles,
         namespaces = namespace_list,
@@ -826,7 +826,7 @@ def role_bindings():
     role_bindings = k8sRoleBindingListGet(session['user_role'], user_token, session['ns_select'])
 
     return render_template(
-        'role-bindings.html',
+        'role-bindings.html.j2',
         role_bindings = role_bindings,
         namespaces = namespace_list,
     )
@@ -850,7 +850,7 @@ def cluster_roles():
     cluster_roles = k8sClusterRoleListGet(session['user_role'], user_token)
 
     return render_template(
-        'cluster-roles.html',
+        'cluster-roles.html.j2',
         cluster_roles = cluster_roles,
         cluster_role_select = cluster_role_select,
     )
@@ -869,7 +869,7 @@ def cluster_role_bindings():
 
     cluster_role_bindings = k8sClusterRoleBindingListGet(session['user_role'], user_token)
     return render_template(
-        'cluster-role-bindings.html',
+        'cluster-role-bindings.html.j2',
         cluster_role_bindings = cluster_role_bindings,
     )
 
@@ -892,7 +892,7 @@ def charts():
     has_chart, chart_list = k8sHelmChartListGet(session['user_role'], user_token, session['ns_select'])
 
     return render_template(
-        'charts.html',
+        'charts.html.j2',
         namespaces = namespace_list,
         has_chart = has_chart,
         chart_list = chart_list,
