@@ -112,6 +112,31 @@ def users():
         UserUpdate(username, role)
         flash("User Updated Successfully", "success")
 
+        user_cluster_role = request.form.get('user_cluster_role')
+        user_namespaced_role_1 = request.form.get('user_namespaced_role_1')
+        user_all_namespaces_1 = request.form.get('user_all_namespaces_1')
+        user_namespaces_1 = request.form.getlist('user_namespaces_1')
+        user_namespaced_role_2 = request.form.get('user_namespaced_role_2')
+        user_all_namespaces_2 = request.form.get('user_all_namespaces_2')
+        user_namespaces_2 = request.form.getlist('user_namespaces_2')
+
+        if "user_cluster_role":
+            k8sClusterRoleBindingAdd(user_cluster_role, username)
+
+        if user_namespaced_role_1:
+            if user_all_namespaces_1:
+                k8sRoleBindingAdd(user_namespaced_role_1, username, None, user_all_namespaces_1)
+            else:
+                k8sRoleBindingAdd(user_namespaced_role_1, username, user_namespaces_1, user_all_namespaces_1)
+
+        if user_namespaced_role_2:
+            print("0: %s" % user_namespaces_2) # debug 0
+            if user_all_namespaces_2:
+                k8sRoleBindingAdd(user_namespaced_role_2, username, None, user_all_namespaces_2)
+            else:
+                k8sRoleBindingAdd(user_namespaced_role_2, username, user_namespaces_2, user_all_namespaces_2)
+
+
     users = User.query
     if session['user_type'] == "OpenID":
         user_token = session['oauth_token']
@@ -141,10 +166,12 @@ def users_add():
         role = request.form['role']
         password = request.form['password']
         email = request.form['email']
+
         email_test = bool(email_check(email))
         if not email_test:
             flash("Email is not valid", "danger")
             return redirect(url_for('users'))
+        
         elif not len(password) >= 8:
             flash("Password must be 8 character in length", "danger")
             return redirect(url_for('users'))
