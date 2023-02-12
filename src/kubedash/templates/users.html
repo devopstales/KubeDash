@@ -180,7 +180,7 @@
                         <!--1-->
                         <label>template</label>
                         <select class="form-select" aria-label="Select template" name="user_namespaced_role_1">
-                          <option value="none">None</option>
+                          <option value=None>None</option>
                           {% for user_role in user_role_template_list %}
                           <option value="{{ user_role }}">{{ user_role }}</option>
                           {% endfor %}
@@ -209,7 +209,7 @@
                         <!--1-->
                         <label>template</label>
                         <select class="form-select" aria-label="Select template" name="user_namespaced_role_2">
-                          <option value="none">None</option>
+                          <option value=None>None</option>
                           {% for user_role in user_role_template_list %}
                           <option value="{{ user_role }}">{{ user_role }}</option>
                           {% endfor %}
@@ -237,7 +237,7 @@
             </div>
             <div class="block uppercase font-bold mb-2">access to cluster resouces (non-namespaced):</div>
             <select class="form-select" aria-label="Select template" name="user_cluster_role">
-              <option value="none">None</option>
+              <option value=None>None</option>
               {% for user_clusterRole in user_clusterRole_template_list %}
               <option value="{{ user_clusterRole }}">{{ user_clusterRole }}</option>
               {% endfor %}

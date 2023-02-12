@@ -10,6 +10,7 @@ from kubernetes.client.rest import ApiException
 from functions.logger import logger
 import zlib, json
 from datetime import datetime
+from functions.user import email_check
 
 ##############################################################
 ## Kubernetes Config
@@ -63,16 +64,18 @@ def k8sServerConfigUpdate(k8s_context_old, k8s_server_url, k8s_context, k8s_serv
 ##############################################################
 ## Kubernetes Config
 ##############################################################
-
 def ErrorHandler(error, action):
-    if error == "ConnectError":
+    if error == "DirectMessage":
         flash(action, "danger")
-    elif error.status == 401:
-        flash("401 - Unauthorized: User cannot coonekt to Kubernetes", "danger")
-    elif error.status == 403:
-        flash("403 - Forbidden: User cannot %s" % action, "danger")
     else:
-        flash(error, "danger")
+        try:
+            if error.status == 401:
+                flash("401 - Unauthorized: User cannot coonekt to Kubernetes", "danger")
+            elif error.status == 403:
+                flash("403 - Forbidden: User cannot %s" % action, "danger")
+        except:
+            logger.error("Exception: %s \n" % error)
+            flash("Unknown Error", "danger")
 
 def k8sClientConfigGet(username_role, user_token):
     if username_role == "Admin":
@@ -110,7 +113,7 @@ def k8sListNamespaces(username_role, user_token):
         namespace_list = ""
         return namespace_list, error
     except:
-        ErrorHandler("ConnectError", "Cannot Connect to Kubernetes")
+        ErrorHandler("DirectMessage", "Cannot Connect to Kubernetes")
         namespace_list = ""
         return namespace_list, error
 
@@ -504,7 +507,7 @@ def k8sNodesListGet(username_role, user_token):
             NODE_LIST.append(NODE_INFO)
         return NODE_LIST
     elif error == "ConnectError":
-        ErrorHandler("ConnectError", "Cannot Connect to Kubernetes")
+        ErrorHandler("DirectMessage", "Cannot Connect to Kubernetes")
         return NODE_LIST
     else:
         ErrorHandler(error, "get node list")
@@ -961,6 +964,92 @@ def k8sRoleBindingListGet(username_role, user_token, ns):
     except:
         return ROLE_BINDING_LIST
 
+def k8sRoleBindingGet(obeject_name, namespace):
+    k8sClientConfigGet("Admin", None)
+    with k8s_client.ApiClient() as api_client:
+        api_instance = k8s_client.RbacAuthorizationV1Api(api_client)
+        pretty = 'true'
+    try:
+        api_response = api_instance.read_namespaced_role_binding(
+            obeject_name, namespace, pretty=pretty
+        )
+        return True, None
+    except ApiException as e:
+        if e.status == 404:
+            return False, None
+        else:
+            logger.error("Exception when testing NamespacedRoleBinding - %s in %s: %s\n" % (obeject_name, namespace, e))
+            return None, e
+    except:
+        logger.error("Unknow Error")
+        return None, "Unknow Error"
+
+def k8sRoleBindingCreate(user_role, namespace, username):
+    k8sClientConfigGet("Admin", None)
+    with k8s_client.ApiClient() as api_client:
+        api_instance = k8s_client.RbacAuthorizationV1Api(api_client)
+        pretty = 'true'
+        field_manager = 'KubeDash'
+        if email_check(username):
+            user = username.split("@")[0]
+        else:
+            user = username
+        obeject_name = user + "___" + "kubedash" + "___" + user_role
+        body = k8s_client.V1RoleBinding(
+            api_version = "rbac.authorization.k8s.io/v1",
+            kind = "RoleBinding",
+            metadata = k8s_client.V1ObjectMeta(
+                name = obeject_name,
+                namespace = namespace
+            ),
+            role_ref = k8s_client.V1RoleRef(
+                api_group = "rbac.authorization.k8s.io",
+                kind = "ClusterRole",
+                name = "template-namespaced-resources___" + user_role,
+            ),
+            subjects = [
+                k8s_client.V1Subject(
+                    api_group = "rbac.authorization.k8s.io",
+                    kind = "User",
+                    name = username,
+                    namespace = namespace,
+                )
+            ]
+        )
+    try:
+        api_response = api_instance.create_namespaced_role_binding(
+            namespace, body, pretty=pretty, field_manager=field_manager
+        )
+        return True, None
+    except ApiException as e:
+        if e.status != 404:
+            logger.error("Exception when creating RoleBinding - %s in %s: %s\n" % (obeject_name, namespace, e))
+            return True, e
+        else:
+            return False, None
+
+
+def k8sRoleBindingAdd(user_role, username, user_namespaces, user_all_namespaces):
+    if email_check(username):
+        user = username.split("@")[0]
+    else:
+        user = username
+    obeject_name = user + "___" + "kubedash" + "___" + user_role
+    if user_all_namespaces:
+        namespace_list = k8sNamespaceListGet("Admin", None)
+    else:
+        namespace_list = user_namespaces
+    for namespace in namespace_list:
+        is_rolebinding_exists, error = k8sRoleBindingGet(obeject_name, namespace)
+        if error:
+            ErrorHandler(error, "get RoleBinding %s" % obeject_name)
+        else:
+            if is_rolebinding_exists:
+                ErrorHandler("DirectMessage", "RoleBinding %s alredy exists in %s namespace" % (obeject_name, namespace))
+                logger.info("RoleBinding %s alredy exists" % obeject_name) # WARNING
+            else:
+                k8sRoleBindingCreate(user_role, namespace, username)
+
 ##############################################################
 ## Cluster Role
 ##############################################################
@@ -1027,6 +1116,84 @@ def k8sClusterRoleBindingListGet(username_role, user_token):
     except:
         return CLUSTER_ROLE_BINDING_LIST
 
+def k8sClusterRoleBindingGet(obeject_name):
+    k8sClientConfigGet("Admin", None)
+    with k8s_client.ApiClient() as api_client:
+        api_instance = k8s_client.RbacAuthorizationV1Api(api_client)
+        pretty = 'true'
+    try:
+        api_response = api_instance.read_cluster_role_binding(
+            obeject_name, pretty=pretty
+        )
+        return True, None
+    except ApiException as e:
+        if e.status == 404:
+            return False, None
+        else:
+            logger.error("Exception when testing ClusterRoleBinding - %s: %s\n" % (obeject_name, e))
+            return None, e
+    except:
+        logger.error("Unknow Error")
+        return None, "Unknow Error"
+
+def k8sClusterRoleBindingCreate(user_cluster_role, username):
+    k8sClientConfigGet("Admin", None)
+    with k8s_client.ApiClient() as api_client:
+        api_instance = k8s_client.RbacAuthorizationV1Api(api_client)
+        pretty = 'true'
+        field_manager = 'KubeDash'
+        if email_check(username):
+            user = username.split("@")[0]
+        else:
+            user = username
+        obeject_name = user + "___" + "kubedash" + "___" + user_cluster_role
+        body = k8s_client.V1ClusterRoleBinding(
+            api_version = "rbac.authorization.k8s.io/v1",
+            kind = "ClusterRoleBinding",
+            metadata = k8s_client.V1ObjectMeta(
+                name = obeject_name,
+            ),
+            role_ref = k8s_client.V1RoleRef(
+                api_group = "rbac.authorization.k8s.io",
+                kind = "ClusterRole",
+                name = "template-cluster-resources___" + user_cluster_role,
+            ),
+            subjects = [
+                k8s_client.V1Subject(
+                    api_group = "rbac.authorization.k8s.io",
+                    kind = "User",
+                    name = username,
+                )
+            ]
+        )
+    try:
+        pi_response = api_instance.create_cluster_role_binding(
+            body, pretty=pretty, field_manager=field_manager
+        )
+        flash("User Role Created Successfully", "success")
+    except ApiException as e:
+        if e.status != 404:
+            logger.error("Exception when creating ClusterRoleBinding - %s: %s\n" % (user_cluster_role, e))
+        else:
+            logger.info("ClusterRoleBinding %s alredy exists" % obeject_name) # WARNING
+
+
+def k8sClusterRoleBindingAdd(user_cluster_role, username):
+    if email_check(username):
+        user = username.split("@")[0]
+    else:
+        user = username
+    obeject_name = user + "___" + "kubedash" + "___" + user_cluster_role
+    is_clusterrolebinding_exists, error = k8sClusterRoleBindingGet(obeject_name)
+    if error:
+        ErrorHandler(error, "get ClusterRoleBinding %s" % obeject_name)
+    else:
+        if is_clusterrolebinding_exists:
+            ErrorHandler("DirectMessage", "ClusterRoleBinding %s alredy exists" % obeject_name)
+            logger.info("ClusterRoleBinding %s alredy exists" % obeject_name) # WARNING
+        else:
+            k8sClusterRoleBindingCreate(user_cluster_role, username)
+
 
 ##############################################################
 ## Helm Charts
@@ -1072,5 +1239,5 @@ def k8sHelmChartListGet(username_role, user_token, namespace):
 #        ErrorHandler(error, "get helm release")
 #        return HAS_CHART, CHART_LIST
 #    except:
-#        ErrorHandler("ConnectError", "Cannot Connect to Kubernetes")
+#        ErrorHandler("DirectMessage", "Cannot Connect to Kubernetes")
 #        return HAS_CHART, CHART_LIST
