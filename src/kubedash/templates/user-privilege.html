@@ -1,0 +1,154 @@
+{% extends "base.html" %}
+
+{% block header %}
+    <link href="{{ url_for('static',filename='/vendor/datatables/dataTables.bootstrap4.min.css') }}" rel="stylesheet" >
+    <link href="{{ url_for('static',filename='/vendor/google/material-icons.css') }}" rel="stylesheet" >
+    <link href="{{ url_for('static',filename='/vendor/select/select2.min.css') }}" rel="stylesheet" >
+{% endblock %}
+
+{% block content %}
+{% if get_flashed_messages() %}
+{% for category, message in get_flashed_messages(with_categories=true) %}
+<div class="alert alert-{{category}} alert-dismissible fade show" role="alert">
+  {{ message }}
+  <button type="button" class="close" data-dismiss="alert" aria-label="Close">
+    <span aria-hidden="true">&times;</span>
+  </button>
+</div>
+{% endfor %}
+{% endif %}
+
+<!-- Page Heading -->
+<nav class="navbar navbar-light bg-light row"></nav>
+
+<!-- DataTales Example -->
+<div class="card shadow mb-4">
+    <div class="card-header py-3">
+        <h5 class="m-0 font-weight-bold text-primary">User: {{ username }}</h5>
+    </div>
+    <div class="card-body">
+        <div class="form-group">
+            <h5 class="modal-title mt-2 mb-2">Privileges</h5>
+            <form action="" method="POST">
+                <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+                <div class="bg-gray-100  border rounded py-3 px-4 mb-3" >
+                    <!-- front -->
+                    <div class="form-row">
+                        <div class="form-group col-md-4">
+                            <label for="user_namespaced_role_1">TEMPLATE</label>
+                            <select class="form-control" aria-label="Select template" id="user_namespaced_role_1" name="user_namespaced_role_1">
+                                <option value=None>None</option>
+                                {% for user_role in user_role_template_list %}
+                                <option value="{{ user_role }}">{{ user_role }}</option>
+                                {% endfor %}
+                            </select>
+                        </div>
+                        <div class="form-group col-md-4">
+                            <label for="user_namespaces_1">
+                                <span class="pr-1">*</span>
+                                NAMESPACES
+                            </label>
+                            <select class="form-control select2" multiple="multiple" style="width: 100%;" id="user_namespaces_1" name="user_namespaces_1"></select>
+                            <div class="form-check">
+                                <input class="form-check-input" type="checkbox" value="" id="flexCheckDefault" name="user_all_namespaces_1">
+                                <label class="form-check-label" for="flexCheckDefault" value="True">all Namespaces</label>
+                            </div>
+                        </div>
+                    </div>
+                    <!-- hidden -->
+                    <hr id="hiddenHR" style="display: none;">
+                    <div id="hiddenDIV" style="display: none;">
+                        <div class="form-row">
+                            <div class="form-group col-md-4">
+                                <label for="user_namespaced_role_2">TEMPLATE</label>
+                                <select class="form-control" aria-label="Select template" id="user_namespaced_role_2" name="user_namespaced_role_2">
+                                    <option value=None>None</option>
+                                    {% for user_role in user_role_template_list %}
+                                    <option value="{{ user_role }}">{{ user_role }}</option>
+                                    {% endfor %}
+                                </select>
+                            </div>
+                            <div class="form-group col-md-4">
+                                <label for="user_namespaces_2">
+                                    <span class="pr-1">*</span>
+                                    NAMESPACES
+                                </label>
+                                <select class="form-control select2" multiple="multiple" style="width: 100%;" id="user_namespaces_2" name="user_namespaces_2"></select>
+                                <div class="form-check">
+                                    <input class="form-check-input" type="checkbox" value="" id="flexCheckDefault" name="user_all_namespaces_2">
+                                    <label class="form-check-label" for="flexCheckDefault" value="True">all Namespaces</label>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                    <!-- buttons -->
+                    <hr>
+                    <button class="py-2 px-6 btn btn-outline-secondary" type="button" onclick="unHide()" id="addBTN">add</button>
+                </div>
+                <div class="block uppercase font-bold mb-2">access to cluster resources (non-namespaced):</div>
+                <div class="form-group col-md-4">
+                    <select class="form-control" aria-label="Select template" name="user_cluster_role">
+                        <option value=None>None</option>
+                        {% for user_clusterRole in user_clusterRole_template_list %}
+                        <option value="{{ user_clusterRole }}">{{ user_clusterRole }}</option>
+                        {% endfor %}
+                    </select>
+                </div>
+                <hr>
+                <input class="form-control" name="username" type="hidden" value="{{ username }}">
+                <button type="submit" class="btn btn-primary" >Save</button>
+            </form>
+        </div>
+    </div>
+</div>
+{% endblock %}
+
+{% block scripts %}
+    <script src="{{ url_for('static',filename='/vendor/select/select2.full.min.js') }}"></script>
+    <script>
+        const namespaceList = {{namespace_list | tojson}};
+        $('.select2').select2({
+            data: namespaceList,
+            tags: true,
+            maximumSelectionLength: 10,
+            tokenSeparators: [',', ' '],
+            placeholder: "Select namespaces",
+        });
+        function unHide() {
+            var x = document.getElementById("hiddenDIV");
+            if (x.style.display === "none") {
+              x.style.display = "block";
+              $('.select2').select2({
+                data: namespaceList,
+                tags: true,
+                maximumSelectionLength: 10,
+                tokenSeparators: [',', ' '],
+                placeholder: "Select namespaces",
+              });
+            } else {
+              x.style.display = "none";
+            }
+            var y = document.getElementById("hiddenHR");
+            if (y.style.display === "none") {
+              y.style.display = "block";
+            } else {
+              y.style.display = "none";
+            }
+            if ( document.getElementById("addBTN").classList.contains('btn-outline-secondary') ) {
+              document.getElementById("addBTN").classList.remove('btn-outline-secondary');
+              document.getElementById("addBTN").classList.add('btn-outline-danger');
+              document.getElementById("addBTN").innerHTML = 'delete';
+            } else {
+              document.getElementById("addBTN").classList.remove('btn-outline-danger');
+              document.getElementById("addBTN").classList.add('btn-outline-secondary');
+              document.getElementById("addBTN").innerHTML = 'add';
+            }
+          };
+    </script>
+    <!-- Page level plugins -->
+    <script src="{{ url_for('static',filename='vendor/datatables/jquery.dataTables.js') }}"></script>
+    <script src="{{ url_for('static',filename='vendor/datatables/dataTables.bootstrap4.min.js') }}"></script>
+
+    <!-- Page level custom scripts -->
+    <script src="{{ url_for('static',filename='js/demo/datatables-demo.js') }}"></script>
+{% endblock %}

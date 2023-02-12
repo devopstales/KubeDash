@@ -251,10 +251,22 @@
     border: 0;
 }
 
+.btn.btn-primary.btn-just-icon {
+  color: #4e73df;
+}
+
+.btn.btn-secondary.btn-just-icon {
+  color: #717384;
+}
+
 .btn.btn-success.btn-just-icon {
     color: #4caf50;
 }
 
 .btn.btn-danger.btn-just-icon {
     color: #f44336;
+}
+
+.btn.btn-info.btn-just-icon {
+  color: #36b9cc;
 }

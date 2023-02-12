@@ -112,50 +112,11 @@ def users():
         UserUpdate(username, role)
         flash("User Updated Successfully", "success")
 
-        user_cluster_role = request.form.get('user_cluster_role')
-        user_namespaced_role_1 = request.form.get('user_namespaced_role_1')
-        user_all_namespaces_1 = request.form.get('user_all_namespaces_1')
-        user_namespaces_1 = request.form.getlist('user_namespaces_1')
-        user_namespaced_role_2 = request.form.get('user_namespaced_role_2')
-        user_all_namespaces_2 = request.form.get('user_all_namespaces_2')
-        user_namespaces_2 = request.form.getlist('user_namespaces_2')
-
-        if "user_cluster_role":
-            k8sClusterRoleBindingAdd(user_cluster_role, username)
-
-        if user_namespaced_role_1:
-            if user_all_namespaces_1:
-                k8sRoleBindingAdd(user_namespaced_role_1, username, None, user_all_namespaces_1)
-            else:
-                k8sRoleBindingAdd(user_namespaced_role_1, username, user_namespaces_1, user_all_namespaces_1)
-
-        if user_namespaced_role_2:
-            print("0: %s" % user_namespaces_2) # debug 0
-            if user_all_namespaces_2:
-                k8sRoleBindingAdd(user_namespaced_role_2, username, None, user_all_namespaces_2)
-            else:
-                k8sRoleBindingAdd(user_namespaced_role_2, username, user_namespaces_2, user_all_namespaces_2)
-
-
     users = User.query
-    if session['user_type'] == "OpenID":
-        user_token = session['oauth_token']
-    else:
-        user_token = None
-    namespace_list = k8sNamespaceListGet(session['user_role'], user_token)
-    user_clusterRole_template_list = k8sUserClusterRoleTemplateListGet(session['user_role'], user_token)
-    user_role_template_list = k8sUserRoleTemplateListGet(session['user_role'], user_token)
-    
-    if not bool(user_clusterRole_template_list) or not bool(user_role_template_list):
-        from functions.k8s import k8sClusterRolesAdd
-        k8sClusterRolesAdd()
 
     return render_template(
         'users.html',
         users = users,
-        namespace_list = namespace_list,
-        user_clusterRole_template_list = user_clusterRole_template_list,
-        user_role_template_list = user_role_template_list,
     )
 
 @app.route('/users/add', methods=['GET', 'POST'])
@@ -190,6 +151,58 @@ def users_delete():
         UserDelete(username)
         flash("User Deleted Successfully", "success")
         return redirect(url_for('users'))
+    else:
+        return redirect(url_for('login'))
+
+@app.route('/users/privilege', methods=['POST'])
+@login_required
+def users_privilege():
+    if request.method == 'POST':
+        username = request.form['username']
+
+        user_cluster_role = request.form.get('user_cluster_role')
+        user_namespaced_role_1 = request.form.get('user_namespaced_role_1')
+        user_all_namespaces_1 = request.form.get('user_all_namespaces_1')
+        user_namespaces_1 = request.form.getlist('user_namespaces_1')
+        user_namespaced_role_2 = request.form.get('user_namespaced_role_2')
+        user_all_namespaces_2 = request.form.get('user_all_namespaces_2')
+        user_namespaces_2 = request.form.getlist('user_namespaces_2')
+
+        if user_cluster_role:
+            k8sClusterRoleBindingAdd(user_cluster_role, username)
+
+        if user_namespaced_role_1:
+            if user_all_namespaces_1:
+                k8sRoleBindingAdd(user_namespaced_role_1, username, None, user_all_namespaces_1)
+            else:
+                k8sRoleBindingAdd(user_namespaced_role_1, username, user_namespaces_1, user_all_namespaces_1)
+
+        if user_namespaced_role_2:
+            print("0: %s" % user_namespaces_2) # debug 0
+            if user_all_namespaces_2:
+                k8sRoleBindingAdd(user_namespaced_role_2, username, None, user_all_namespaces_2)
+            else:
+                k8sRoleBindingAdd(user_namespaced_role_2, username, user_namespaces_2, user_all_namespaces_2)
+
+        if session['user_type'] == "OpenID":
+            user_token = session['oauth_token']
+        else:
+            user_token = None
+        namespace_list = k8sNamespaceListGet(session['user_role'], user_token) #
+        user_role_template_list = k8sUserRoleTemplateListGet(session['user_role'], user_token)
+        user_clusterRole_template_list = k8sUserClusterRoleTemplateListGet(session['user_role'], user_token)
+
+        if not bool(user_clusterRole_template_list) or not bool(user_role_template_list):
+            from functions.k8s import k8sClusterRolesAdd
+            k8sClusterRolesAdd()
+
+        return render_template(
+            'user-privilege.html',
+            username = username,
+            user_role_template_list = user_role_template_list,
+            namespace_list = namespace_list,
+            user_clusterRole_template_list = user_clusterRole_template_list,
+        )
     else:
         return redirect(url_for('login'))
 
