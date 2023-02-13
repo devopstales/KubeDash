@@ -5,6 +5,7 @@ from flask import Flask
 from flask_sqlalchemy import SQLAlchemy
 from flask_login import LoginManager
 from flask_wtf.csrf import CSRFProtect
+from flask_talisman import Talisman
 
 ## the cli client use http not https
 os.environ['OAUTHLIB_INSECURE_TRANSPORT'] = '1'
@@ -15,7 +16,29 @@ SQL_PATH = "sqlite.db"
 
 # FLASK
 app = Flask(__name__, static_url_path='', static_folder='static')
-app.secret_key = 'development'
+
+# secure
+csp = {
+    'font-src': [
+        '\'self\'',
+        '*.gstatic.com'
+    ],
+    'style-src': [
+        '\'self\'',
+        'fonts.googleapis.com',
+    ],
+}
+talisman = Talisman(app, content_security_policy=csp)
+app.config.update(
+    DEBUG = True,
+    SECRET_KEY = "J0vb4r7Hi5cCksCovC6GNVXPj",
+    SESSION_COOKIE_SECURE = True,
+    REMEMBER_COOKIE_SECURE = True,
+    SESSION_COOKIE_HTTPONLY = True,
+    REMEMBER_COOKIE_HTTPONLY = True,
+    SESSION_COOKIE_SAMESITE = "Lax",
+    PERMANENT_SESSION_LIFETIME = 600,
+)
 
 
 # DB

@@ -97,6 +97,7 @@ def logout():
         session.pop('username', None)
     if "oauth_token" in session:
         session.pop('oauth_token')
+    session.clear()
     return redirect(url_for('login'))
 
 ##############################################################
