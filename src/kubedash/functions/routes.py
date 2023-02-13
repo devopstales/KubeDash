@@ -13,6 +13,14 @@ from werkzeug.security import check_password_hash
 from itsdangerous import base64_encode, base64_decode
 
 ##############################################################
+## Custom jinja2 filter
+##############################################################
+from functions.jinja2_decoders import j2_b64decode, j2_b64encode
+
+app.add_template_filter(j2_b64decode)
+app.add_template_filter(j2_b64encode)
+
+##############################################################
 ## health
 ##############################################################
 
@@ -386,6 +394,7 @@ def k8s_config():
             k8sServerDelete(k8s_context)
 
     k8s_servers, k8s_config_list_length = k8sServerConfigList()
+    print(k8s_servers) # debug
 
     return render_template(
         'k8s.html.j2',
