@@ -1,8 +1,8 @@
-{% extends "base.html" %}
+{% extends "base.html.j2" %}
 {% block header %}
 <!-- highlight js -->
-<link rel="stylesheet" href="{{ url_for('static',filename='an-old-hope.min.css') }}">
-<script src="{{ url_for('static',filename='highlight.min.js') }}"></script>
+<link rel="stylesheet" href="{{ url_for('static',filename='/vendor/highlightjs/an-old-hope.min.css') }}">
+<script src="{{ url_for('static',filename='/vendor/highlightjs/highlight.min.js') }}"></script>
 <script>hljs.highlightAll();</script>
 {% endblock %}
 
