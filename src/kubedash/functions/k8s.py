@@ -1,13 +1,12 @@
 #!/usr/bin/env python3
 
-from __main__ import db
+from __main__ import db, app
 from flask_login import UserMixin
 from flask import flash
 from itsdangerous import base64_decode
 import kubernetes.config as k8s_config
 import kubernetes.client as k8s_client
 from kubernetes.client.rest import ApiException
-from functions.logger import logger
 import zlib, json
 from datetime import datetime
 from functions.user import email_check
@@ -65,17 +64,15 @@ def k8sServerConfigUpdate(k8s_context_old, k8s_server_url, k8s_context, k8s_serv
 ## Kubernetes Config
 ##############################################################
 def ErrorHandler(error, action):
-    if error == "DirectMessage":
-        flash(action, "danger")
+    if 'status' in error:
+        if error.status == 401:
+            flash("401 - Unauthorized: User cannot connect to Kubernetes", "danger")
+        elif error.status == 403:
+            flash("403 - Forbidden: User cannot %s" % action, "danger")
     else:
-        try:
-            if error.status == 401:
-                flash("401 - Unauthorized: User cannot coonekt to Kubernetes", "danger")
-            elif error.status == 403:
-                flash("403 - Forbidden: User cannot %s" % action, "danger")
-        except:
-            logger.error("Exception: %s \n" % error)
-            flash("Unknown Error", "danger")
+        flash(action, "danger")
+        app.logger.error("Exception: %s \n" % action)
+
 
 def k8sClientConfigGet(username_role, user_token):
     if username_role == "Admin":
@@ -106,31 +103,31 @@ def k8sClientConfigGet(username_role, user_token):
 def k8sListNamespaces(username_role, user_token):
     k8sClientConfigGet(username_role, user_token)
     try:
-        namespace_list = k8s_client.CoreV1Api().list_namespace()
+        namespace_list = k8s_client.CoreV1Api().list_namespace(_request_timeout=1)
         return namespace_list, None
     except ApiException as error:
-        ErrorHandler(error, "get cluster roles")
+        ErrorHandler(error, "list namespaces")
         namespace_list = ""
         return namespace_list, error
-    except:
-        ErrorHandler("DirectMessage", "Cannot Connect to Kubernetes")
+    except Exception as error:
+        ErrorHandler("CannotConnect", "k8sListNamespaces: %s" % error)
         namespace_list = ""
-        return namespace_list, error
+        return namespace_list, "CannotConnect"
 
 def k8sNamespaceListGet(username_role, user_token):
     k8sClientConfigGet(username_role, user_token)
     namespace_list = []
     try:
         namespaces, error = k8sListNamespaces(username_role, user_token)
-        if error is None:
+        if not error:
             for ns in namespaces.items:
                 namespace_list.append(ns.metadata.name)
             return namespace_list
         else:
-            ErrorHandler(error, "get namespace list")
-            return namespace_list
-    except:
-        return namespace_list
+            return namespace_list, error
+    except Exception as error:
+        ErrorHandler("CannotConnect", "k8sNamespaceListGet: %s" % error)
+        return namespace_list, None
 
 def k8sNamespacesGet(username_role, user_token):
     k8sClientConfigGet(username_role, user_token)
@@ -148,9 +145,8 @@ def k8sNamespacesGet(username_role, user_token):
                 NAMESPACE_LIST.append(NAMESPACE_DADTA)
             return NAMESPACE_LIST
         else:
-            ErrorHandler(error, "list namespaces")
             return NAMESPACE_LIST
-    except:
+    except Exception as error:
         return NAMESPACE_LIST
 
 def k8sNamespaceCreate(username_role, user_token, ns_name):
@@ -244,7 +240,7 @@ def k8sClusterRoleGet(name):
         return True, None
     except ApiException as e:
         if e.status != 404:
-            logger.error("Exception when testing ClusterRole - %s : %s\n" % (name, e))
+            app.logger.error("Exception when testing ClusterRole - %s : %s\n" % (name, e))
             return True, e
         else:
             return False, None
@@ -264,7 +260,7 @@ def k8sClusterRoleCreate(name, body):
         return True
     except ApiException as e:
         if e.status != 404:
-            logger.error("Exception when testing ClusterRole - %s : %s\n" % (name, e))
+            app.logger.error("Exception when testing ClusterRole - %s : %s\n" % (name, e))
             return False
         else:
             return False
@@ -430,10 +426,10 @@ def k8sClusterRolesAdd():
             continue
         else:
             if is_clusterrole_exists:
-                logger.info("ClusterRole %s already exists" % name) # WARNING
+                app.logger.info("ClusterRole %s already exists" % name) # WARNING
             else:
                 k8sClusterRoleCreate(name, roleVars[role])
-                logger.info("ClusterRole %s created" % name) # WARNING
+                app.logger.info("ClusterRole %s created" % name) # WARNING
 
     for role in namespaced_role_list:
         name = "template-namespaced-resources___" + role
@@ -442,10 +438,10 @@ def k8sClusterRolesAdd():
             continue
         else:
             if is_clusterrole_exists:
-                logger.info("ClusterRole %s already exists" % name) # WARNING
+                app.logger.info("ClusterRole %s already exists" % name) # WARNING
             else:
                 k8sClusterRoleCreate(name, roleVars[role])
-                logger.info("ClusterRole %s created" % name) # WARNING
+                app.logger.info("ClusterRole %s created" % name) # WARNING
 
 ##############################################################
 ## Kubernetes Nodes
@@ -455,12 +451,14 @@ def k8sListNodes(username_role, user_token):
     k8sClientConfigGet(username_role, user_token)
     node_list = list()
     try:
-        node_list = k8s_client.CoreV1Api().list_node()
+        node_list = k8s_client.CoreV1Api().list_node(_request_timeout=1)
         return node_list, None
     except ApiException as error:
+        ErrorHandler(error, "list nodes")
         return node_list, error
-    except:
-        return node_list, "ConnectError"
+    except Exception as error:
+        ErrorHandler("CannotConnect", "k8sListNodes: %s" % error)
+        return node_list, "CannotConnect"
 
 def k8sNodesListGet(username_role, user_token):
     k8sClientConfigGet(username_role, user_token)
@@ -506,11 +504,7 @@ def k8sNodesListGet(username_role, user_token):
                 NODE_INFO['role'] = "Worker"
             NODE_LIST.append(NODE_INFO)
         return NODE_LIST
-    elif error == "ConnectError":
-        ErrorHandler("DirectMessage", "Cannot Connect to Kubernetes")
-        return NODE_LIST
     else:
-        ErrorHandler(error, "get node list")
         return NODE_LIST
 
 ##############################################################
@@ -978,10 +972,10 @@ def k8sRoleBindingGet(obeject_name, namespace):
         if e.status == 404:
             return False, None
         else:
-            logger.error("Exception when testing NamespacedRoleBinding - %s in %s: %s\n" % (obeject_name, namespace, e))
+            app.logger.error("Exception when testing NamespacedRoleBinding - %s in %s: %s\n" % (obeject_name, namespace, e))
             return None, e
     except:
-        logger.error("Unknow Error")
+        app.logger.error("Unknow Error")
         return None, "Unknow Error"
 
 def k8sRoleBindingCreate(user_role, namespace, username):
@@ -1023,7 +1017,7 @@ def k8sRoleBindingCreate(user_role, namespace, username):
         return True, None
     except ApiException as e:
         if e.status != 404:
-            logger.error("Exception when creating RoleBinding - %s in %s: %s\n" % (obeject_name, namespace, e))
+            app.logger.error("Exception when creating RoleBinding - %s in %s: %s\n" % (obeject_name, namespace, e))
             return True, e
         else:
             return False, None
@@ -1045,8 +1039,8 @@ def k8sRoleBindingAdd(user_role, username, user_namespaces, user_all_namespaces)
             ErrorHandler(error, "get RoleBinding %s" % obeject_name)
         else:
             if is_rolebinding_exists:
-                ErrorHandler("DirectMessage", "RoleBinding %s alredy exists in %s namespace" % (obeject_name, namespace))
-                logger.info("RoleBinding %s alredy exists" % obeject_name) # WARNING
+                ErrorHandler("CannotConnect", "RoleBinding %s alredy exists in %s namespace" % (obeject_name, namespace))
+                app.logger.info("RoleBinding %s alredy exists" % obeject_name) # WARNING
             else:
                 k8sRoleBindingCreate(user_role, namespace, username)
 
@@ -1130,10 +1124,10 @@ def k8sClusterRoleBindingGet(obeject_name):
         if e.status == 404:
             return False, None
         else:
-            logger.error("Exception when testing ClusterRoleBinding - %s: %s\n" % (obeject_name, e))
+            app.logger.error("Exception when testing ClusterRoleBinding - %s: %s\n" % (obeject_name, e))
             return None, e
     except:
-        logger.error("Unknow Error")
+        app.logger.error("Unknow Error")
         return None, "Unknow Error"
 
 def k8sClusterRoleBindingCreate(user_cluster_role, username):
@@ -1173,9 +1167,9 @@ def k8sClusterRoleBindingCreate(user_cluster_role, username):
         flash("User Role Created Successfully", "success")
     except ApiException as e:
         if e.status != 404:
-            logger.error("Exception when creating ClusterRoleBinding - %s: %s\n" % (user_cluster_role, e))
+            app.logger.error("Exception when creating ClusterRoleBinding - %s: %s\n" % (user_cluster_role, e))
         else:
-            logger.info("ClusterRoleBinding %s alredy exists" % obeject_name) # WARNING
+            app.logger.info("ClusterRoleBinding %s alredy exists" % obeject_name) # WARNING
 
 
 def k8sClusterRoleBindingAdd(user_cluster_role, username):
@@ -1189,8 +1183,8 @@ def k8sClusterRoleBindingAdd(user_cluster_role, username):
         ErrorHandler(error, "get ClusterRoleBinding %s" % obeject_name)
     else:
         if is_clusterrolebinding_exists:
-            ErrorHandler("DirectMessage", "ClusterRoleBinding %s alredy exists" % obeject_name)
-            logger.info("ClusterRoleBinding %s alredy exists" % obeject_name) # WARNING
+            ErrorHandler("CannotConnect", "ClusterRoleBinding %s alredy exists" % obeject_name)
+            app.logger.info("ClusterRoleBinding %s alredy exists" % obeject_name) # WARNING
         else:
             k8sClusterRoleBindingCreate(user_cluster_role, username)
 
@@ -1204,40 +1198,40 @@ def k8sHelmChartListGet(username_role, user_token, namespace):
     HAS_CHART = False
     CHART_LIST = {}
     CHART_DATA = list()
-#    try:
-    secret_list = k8s_client.CoreV1Api().list_namespaced_secret(namespace)
-    for secret in secret_list.items:
+    try:
+        secret_list = k8s_client.CoreV1Api().list_namespaced_secret(namespace, _request_timeout=1)
+        for secret in secret_list.items:
 
-        if secret.type == 'helm.sh/release.v1':
-            base64_secret_data = str(base64_decode(secret.data['release']), 'UTF-8')
-            secret_data = json.loads(zlib.decompress(base64_decode(base64_secret_data), 16 + zlib.MAX_WBITS).decode('utf-8'))
-            # updated = datetime.strptime(secret_data['info']['last_deployed'], '%Y-%m-%dT%H:%M:%S.%f%z')
-            # updated.strftime("%Y-%m-%d %H:%M")
-            if secret_data['chart']['metadata']['icon']:
-                CHART_DATA.append({
-                    'icon': secret_data['chart']['metadata']['icon'],
-                    'status': secret_data['info']['status'],
-                    'chart': secret_data['chart']['metadata']['name'] + "-" + secret_data['chart']['metadata']['version'],
-                    'appVersion': secret_data['chart']['metadata']['appVersion'],
-                    'revision': secret_data['version'],
-                    'updated': secret_data['info']['last_deployed'],
-                })
-            else:
-                CHART_DATA.append({
-                    'icon': None,
-                    'status': secret_data['info']['status'],
-                    'chart': secret_data['chart']['metadata']['name'] + "-" + secret_data['chart']['metadata']['version'],
-                    'appVersion': secret_data['chart']['metadata']['appVersion'],
-                    'revision': secret_data['version'],
-                    'updated': secret_data['info']['last_deployed'],
-                })
-            HAS_CHART = True
-            CHART_LIST.update({secret_data['name']: CHART_DATA})
-        
-    return HAS_CHART, CHART_LIST
-#    except ApiException as error:
-#        ErrorHandler(error, "get helm release")
-#        return HAS_CHART, CHART_LIST
-#    except:
-#        ErrorHandler("DirectMessage", "Cannot Connect to Kubernetes")
-#        return HAS_CHART, CHART_LIST
+            if secret.type == 'helm.sh/release.v1':
+                base64_secret_data = str(base64_decode(secret.data['release']), 'UTF-8')
+                secret_data = json.loads(zlib.decompress(base64_decode(base64_secret_data), 16 + zlib.MAX_WBITS).decode('utf-8'))
+                # updated = datetime.strptime(secret_data['info']['last_deployed'], '%Y-%m-%dT%H:%M:%S.%f%z')
+                # updated.strftime("%Y-%m-%d %H:%M")
+                if secret_data['chart']['metadata']['icon']:
+                    CHART_DATA.append({
+                        'icon': secret_data['chart']['metadata']['icon'],
+                        'status': secret_data['info']['status'],
+                        'chart': secret_data['chart']['metadata']['name'] + "-" + secret_data['chart']['metadata']['version'],
+                        'appVersion': secret_data['chart']['metadata']['appVersion'],
+                        'revision': secret_data['version'],
+                        'updated': secret_data['info']['last_deployed'],
+                    })
+                else:
+                    CHART_DATA.append({
+                        'icon': None,
+                        'status': secret_data['info']['status'],
+                        'chart': secret_data['chart']['metadata']['name'] + "-" + secret_data['chart']['metadata']['version'],
+                        'appVersion': secret_data['chart']['metadata']['appVersion'],
+                        'revision': secret_data['version'],
+                        'updated': secret_data['info']['last_deployed'],
+                    })
+                HAS_CHART = True
+                CHART_LIST.update({secret_data['name']: CHART_DATA})
+            
+        return HAS_CHART, CHART_LIST
+    except ApiException as error:
+        ErrorHandler(error, "get helm release")
+        return HAS_CHART, CHART_LIST
+    except:
+        ErrorHandler("CannotConnect", "Cannot Connect to Kubernetes")
+        return HAS_CHART, CHART_LIST

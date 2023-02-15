@@ -618,8 +618,11 @@ def statefulsets():
     else:
         user_token = None
 
-    statefulset_list = k8sStatefulSetsGet(session['user_role'], user_token, session['ns_select'])
-    namespace_list = k8sNamespaceListGet(session['user_role'], user_token)
+    namespace_list, error = k8sNamespaceListGet(session['user_role'], user_token)
+    if not error:
+        statefulset_list = k8sStatefulSetsGet(session['user_role'], user_token, session['ns_select'])
+    else:
+        statefulset_list = []
 
     return render_template(
         'statefulsets.html.j2',
@@ -646,8 +649,11 @@ def daemonsets():
     else:
         user_token = None
 
-    daemonset_list = k8sDaemonSetsGet(session['user_role'], user_token, session['ns_select'])
-    namespace_list = k8sNamespaceListGet(session['user_role'], user_token)
+    namespace_list, error = k8sNamespaceListGet(session['user_role'], user_token)
+    if not error:
+        daemonset_list = k8sDaemonSetsGet(session['user_role'], user_token, session['ns_select'])
+    else:
+        daemonset_list = []
 
     return render_template(
         'daemonsets.html.j2',
@@ -674,8 +680,11 @@ def deployments():
     else:
         user_token = None
 
-    deployments_list = k8sDeploymentsGet(session['user_role'], user_token, session['ns_select'])
-    namespace_list = k8sNamespaceListGet(session['user_role'], user_token)
+    namespace_list, error = k8sNamespaceListGet(session['user_role'], user_token)
+    if not error:
+        deployments_list = k8sDeploymentsGet(session['user_role'], user_token, session['ns_select'])
+    else:
+        deployments_list = []
 
     return render_template(
         'deployments.html.j2',
@@ -702,8 +711,11 @@ def replicasets():
     else:
         user_token = None
 
-    replicaset_list = k8sReplicaSetsGet(session['user_role'], user_token, session['ns_select'])
-    namespace_list = k8sNamespaceListGet(session['user_role'], user_token)
+    namespace_list, error = k8sNamespaceListGet(session['user_role'], user_token)
+    if not error:
+        replicaset_list = k8sReplicaSetsGet(session['user_role'], user_token, session['ns_select'])
+    else:
+        replicaset_list = []
 
     return render_template(
         'replicasets.html.j2',
@@ -726,8 +738,12 @@ def pods():
     else:
         user_token = None
 
-    has_report, pod_list = k8sPodListVulnsGet(session['user_role'], user_token, session['ns_select'])
-    namespace_list = k8sNamespaceListGet(session['user_role'], user_token)
+    namespace_list, error = k8sNamespaceListGet(session['user_role'], user_token)
+    if not error:
+        has_report, pod_list = k8sPodListVulnsGet(session['user_role'], user_token, session['ns_select'])
+    else:
+        pod_list = []
+        has_report = None
 
     return render_template(
         'pods.html.j2',
@@ -898,8 +914,13 @@ def charts():
     if request.method == 'POST':
         session['ns_select'] = request.form.get('ns_select')
 
-    namespace_list = k8sNamespaceListGet(session['user_role'], user_token)
-    has_chart, chart_list = k8sHelmChartListGet(session['user_role'], user_token, session['ns_select'])
+
+    namespace_list, error = k8sNamespaceListGet(session['user_role'], user_token)
+    if not error:
+        has_chart, chart_list = k8sHelmChartListGet(session['user_role'], user_token, session['ns_select'])
+    else:
+        chart_list = []
+        has_chart = None
 
     return render_template(
         'charts.html.j2',
