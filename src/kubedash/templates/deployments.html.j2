@@ -29,6 +29,7 @@
                     <tr>
                       <th>Status</th>
                       <th>Name</th>
+                      <th>Labels</th>
                     </tr>
                   </thead>
                   <tbody>
@@ -40,6 +41,12 @@
                     {% endif %}
                         <td>{{ d.status }}</td>
                         <td>{{ d.name }}</td>
+                        <td>
+                        {% for label in d.labels %} 
+                            <span style="font-size: 85%" class="badge badge-secondary">{{ label }}</span>
+                            {% if not loop.last %}<br>{% endif %}
+                        {% endfor %}
+                        </td>
                       </tr>
                     {% endfor %}
                   </tbody>

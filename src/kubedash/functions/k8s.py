@@ -122,12 +122,12 @@ def k8sNamespaceListGet(username_role, user_token):
         if not error:
             for ns in namespaces.items:
                 namespace_list.append(ns.metadata.name)
-            return namespace_list
+            return namespace_list, None
         else:
             return namespace_list, error
     except Exception as error:
         ErrorHandler("CannotConnect", "k8sNamespaceListGet: %s" % error)
-        return namespace_list, None
+        return namespace_list, "CannotConnect"
 
 def k8sNamespacesGet(username_role, user_token):
     k8sClientConfigGet(username_role, user_token)
@@ -139,9 +139,12 @@ def k8sNamespacesGet(username_role, user_token):
                 NAMESPACE_DADTA = {
                     "name": "",
                     "status": "",
+                    "labels": list()
                 }
                 NAMESPACE_DADTA['name'] = ns.metadata.name
                 NAMESPACE_DADTA['status'] = ns.status.__dict__['_phase']
+                for key, value in ns.metadata.labels.items():
+                    NAMESPACE_DADTA['labels'].append(key + "=" + value)
                 NAMESPACE_LIST.append(NAMESPACE_DADTA)
             return NAMESPACE_LIST
         else:
@@ -592,11 +595,14 @@ def k8sDeploymentsGet(username_role, user_token, ns):
             DEPLOYMENT_DATA = {
                 "name": d.metadata.name,
                 "status": "",
+                "labels": list(),
             }
             if d.status.ready_replicas and d.status.replicas:
                 DEPLOYMENT_DATA['status'] = "%s/%s" % (d.status.ready_replicas, d.status.replicas)
             else:
                 DEPLOYMENT_DATA['status'] = "0/0"
+            for key, value in d.metadata.labels.items():
+                DEPLOYMENT_DATA['labels'].append(key + "=" + value)
             DEPLOYMENT_LIST.append(DEPLOYMENT_DATA)
         return DEPLOYMENT_LIST
     except ApiException as error:
