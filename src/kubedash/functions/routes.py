@@ -369,7 +369,7 @@ def index():
     session['oauth_state'] = state
     return redirect(authorization_url)
 
-@app.route('/k8s-config', methods=['GET', 'POST'])
+@app.route('/cluster-config', methods=['GET', 'POST'])
 @login_required
 def k8s_config():
     if request.method == 'POST':
@@ -397,7 +397,7 @@ def k8s_config():
     print(k8s_servers) # debug
 
     return render_template(
-        'k8s.html.j2',
+        'clusters.html.j2',
         k8s_servers = k8s_servers,
         k8s_config_list_length = k8s_config_list_length,
     )
@@ -796,8 +796,11 @@ def service_accounts():
         session['ns_select'] = request.form.get('ns_select')
         sa_select = request.form.get('sa_select')
 
-    namespace_list = k8sNamespaceListGet(session['user_role'], user_token)
-    service_accounts = k8sSaListGet(session['user_role'], user_token, session['ns_select'])
+    namespace_list, error = k8sNamespaceListGet(session['user_role'], user_token)
+    if not error:
+        service_accounts = k8sSaListGet(session['user_role'], user_token, session['ns_select'])
+    else:
+        service_accounts = list()
 
     return render_template(
         'service-accounts.html.j2',
@@ -823,8 +826,11 @@ def roles():
         session['ns_select'] = request.form.get('ns_select')
         role_select = request.form.get('role_select')
 
-    namespace_list = k8sNamespaceListGet(session['user_role'], user_token)
-    roles = k8sRoleListGet(session['user_role'], user_token, session['ns_select'])
+    namespace_list, error = k8sNamespaceListGet(session['user_role'], user_token)
+    if not error:
+        roles = k8sRoleListGet(session['user_role'], user_token, session['ns_select'])
+    else:
+        roles = list()
 
     return render_template(
         'roles.html.j2',
@@ -848,8 +854,11 @@ def role_bindings():
     if request.method == 'POST':
         session['ns_select'] = request.form.get('ns_select')
 
-    namespace_list = k8sNamespaceListGet(session['user_role'], user_token)
-    role_bindings = k8sRoleBindingListGet(session['user_role'], user_token, session['ns_select'])
+    namespace_list, error = k8sNamespaceListGet(session['user_role'], user_token)
+    if not error:
+        role_bindings = k8sRoleBindingListGet(session['user_role'], user_token, session['ns_select'])
+    else:
+        role_bindings = list()
 
     return render_template(
         'role-bindings.html.j2',
