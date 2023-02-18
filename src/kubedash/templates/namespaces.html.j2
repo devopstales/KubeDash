@@ -6,29 +6,23 @@
 {% endblock %}
 
 {% block content %}
-{% if get_flashed_messages() %}
-{% for category, message in get_flashed_messages(with_categories=true) %}
-<div class="alert alert-{{category}} alert-dismissible fade show" role="alert">
-  {{ message }}
-  <button type="button" class="close" data-dismiss="alert" aria-label="Close">
-    <span aria-hidden="true">&times;</span>
-  </button>
-</div>
-{% endfor %}
-{% endif %}
-
 <!-- Page Heading -->
-<nav class="navbar navbar-light bg-light row">
-  <div class="col">
-    <button type="button" class="btn btn-success float-right col-1 me-lg-4" onclick="reload()">Reload</button>
-  </div>
-  <!-- Button trigger modal add -->
-  {% if session['user_role'] == "Admin" %}
-  <button type="button" class="btn btn-success float-right col-1 me-lg-4" data-toggle="modal" data-target="#modaladd">
-    New
-  </button>
-  {% endif %}
-
+<nav aria-label="breadcrumb">
+  <ol class="breadcrumb">
+    <li class="breadcrumb-item">Cluster</li>
+    <li class="breadcrumb-item active" aria-current="page">Namespaces</li>
+    <div class="col">
+      <a class="card-link float-right" data-toggle="collapse" href="#" onclick="reload()">
+        <i class="material-icons">refresh</i>
+      </a>
+      <!-- Button trigger modal add -->
+      {% if session['user_role'] == "Admin" %}
+      <a data-toggle="#modaladd" data-toggle="modal" class="float-right" id="modaladdNav" href="#" onclick='$("#modaladd").modal()'>
+        <i class="material-icons">add</i>
+      </a>
+      {% endif %}
+    </div>
+  </ol>
   <!-- Modal Add User -->
   <div class="modal fade" id="modaladd" tabindex="-1" role="dialog" aria-labelledby="modaladdLabel" aria-hidden="true">
     <div class="modal-dialog" role="document">
@@ -58,6 +52,8 @@
   </div>
   <!-- Modal Add User -->
 </nav>
+
+
 
 <!-- DataTales -->
 <div class="card shadow mb-4">
@@ -125,10 +121,4 @@
 
     <!-- Page level custom scripts -->
     <script src="{{ url_for('static',filename='js/demo/datatables-demo.js') }}"></script>
-
-    <script type="text/javascript">
-      function reload() {
-        location.reload(true);
-      };
-    </script>
 {% endblock %}

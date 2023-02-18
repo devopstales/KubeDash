@@ -61,7 +61,7 @@ def k8sServerConfigUpdate(k8s_context_old, k8s_server_url, k8s_context, k8s_serv
         db.session.commit()
 
 ##############################################################
-## Kubernetes Config
+## Kubernetes Client Config
 ##############################################################
 def ErrorHandler(error, action):
     if 'status' in error:

@@ -20,6 +20,8 @@
     <!-- Custom styles for this template-->
     <link href="{{ url_for('static',filename='/css/sb-admin-2.min.css') }}" rel="stylesheet">
 
+    <link href="{{ url_for('static',filename='/vendor/google/material-icons.css') }}" rel="stylesheet" >
+
     <!-- child template -->
     {% block header %}{% endblock %}
 
@@ -197,9 +199,9 @@
                     <div class="bg-white py-2 collapse-inner rounded">
                         <a class="collapse-item" href="/users">Users & Roles</a>
                         {% if session['user_role'] == "Admin" %}
-                        <a class="collapse-item" href="/sso-config">SSO Settings</a>
+                        <a class="collapse-item" href="/sso-config">SSO Configuration</a>
                         <!-- LDAP/AD -->
-                        <a class="collapse-item" href="/k8s-config">Kubernetes Integration</a>
+                        <a class="collapse-item" href="/cluster-config">Cluster Configuration</a>
                         {% endif %}
 			<a class="collapse-item" href="/export">Download Client Config</a>
                     </div>
@@ -456,6 +458,17 @@
                 <!-- Begin Page Content -->
                 <div class="container-fluid">
 
+                    {% if get_flashed_messages() %}
+                    {% for category, message in get_flashed_messages(with_categories=true) %}
+                    <div class="alert alert-{{category}} alert-dismissible fade show" role="alert">
+                    {{ message }}
+                    <button type="button" class="close" data-dismiss="alert" aria-label="Close">
+                        <span aria-hidden="true">&times;</span>
+                    </button>
+                    </div>
+                    {% endfor %}
+                    {% endif %}
+
                     <!-- Page Content -->
                     {% block content %}{% endblock %}
                     <!-- child template -->
@@ -506,7 +519,7 @@
             </div>
         </div>
     </div>
-    <script>
+    <script type="text/javascript">
         function setClipboard(value) {
             var tempInput = document.createElement("input");
             tempInput.style = "position: absolute; left: -1000px; top: -1000px";
@@ -516,6 +529,10 @@
             document.execCommand("copy");
             document.body.removeChild(tempInput);
         }
+    
+        function reload() {
+            location.reload(true);
+        };
     </script>
 
     <!-- Bootstrap core JavaScript-->
