@@ -1241,3 +1241,136 @@ def k8sHelmChartListGet(username_role, user_token, namespace):
     except:
         ErrorHandler("CannotConnect", "Cannot Connect to Kubernetes")
         return HAS_CHART, CHART_LIST
+    
+##############################################################
+## Helm Charts
+##############################################################
+
+def parse_quantity(quantity):
+    """
+    Parse kubernetes canonical form quantity like 200Mi to a decimal number.
+    Supported SI suffixes:
+    base1024: Ki | Mi | Gi | Ti | Pi | Ei
+    base1000: n | u | m | "" | k | M | G | T | P | E
+    See https://github.com/kubernetes/apimachinery/blob/master/pkg/api/resource/quantity.go
+    Input:
+    quantity: string. kubernetes canonical form quantity
+    Returns:
+    Decimal
+    Raises:
+    ValueError on invalid or unknown input
+    """
+    if isinstance(quantity, (int, float, Decimal)):
+        return Decimal(quantity)
+
+    exponents = {"n": -3, "u": -2, "m": -1, "K": 1, "k": 1, "M": 2,
+                 "G": 3, "T": 4, "P": 5, "E": 6}
+
+    quantity = str(quantity)
+    number = quantity
+    suffix = None
+    if len(quantity) >= 2 and quantity[-1] == "i":
+        if quantity[-2] in exponents:
+            number = quantity[:-2]
+            suffix = quantity[-2:]
+    elif len(quantity) >= 1 and quantity[-1] in exponents:
+        number = quantity[:-1]
+        suffix = quantity[-1:]
+
+    try:
+        number = Decimal(number)
+    except InvalidOperation:
+        raise ValueError("Invalid number format: {}".format(number))
+
+    if suffix is None:
+        return number
+
+    if suffix.endswith("i"):
+        base = 1024
+    elif len(suffix) == 1:
+        base = 1000
+    else:
+        raise ValueError("{} has unknown suffix".format(quantity))
+
+    # handle SI inconsistency
+    if suffix == "ki":
+        raise ValueError("{} has unknown suffix".format(quantity))
+
+    if suffix[0] not in exponents:
+        raise ValueError("{} has unknown suffix".format(quantity))
+
+    exponent = Decimal(exponents[suffix[0]])
+    return number * (base ** exponent)
+
+def calPercent(x, y, integer = False):
+    """
+    Percentage of 4 out of 19: 4 / 19 * 100
+    """
+    percent = x / y * 100
+   
+    if integer:
+        return int(percent)
+    return percent
+
+def k8sGetNodeMetric():
+    k8sClientConfigGet("Admin", None)
+    node_list = k8s_client.CoreV1Api().list_node()
+    pod_list = k8s_client.CoreV1Api().list_pod_for_all_namespaces()
+    totalPodAllocatable = float()
+    totalPodCurrent = int()
+    clusterMetric = []
+
+    for node in node_list.items:
+        tmpPodCount = int()
+        tmpCpuLimit = float()
+        tmpMemoryLimit = float()
+        tmpCpuRequest = float()
+        tmpMemoryRequest = float()
+        for pod in pod_list.items:
+            if pod.spec.node_name == node.metadata.name and pod.status.phase == 'Running':
+                tmpPodCount += 1
+                for container in pod.spec.containers:
+                    if container.resources.limits:
+                        if 'cpu' in container.resources.limits:
+                            tmpCpuLimit += float(parse_quantity(container.resources.limits['cpu']))
+                        if 'memory' in container.resources.limits:
+                            tmpMemoryLimit += float(parse_quantity(container.resources.limits['memory']))
+                    if container.resources.requests:
+                        if 'cpu' in container.resources.requests:
+                            #print("base: %s" % container.resources.requests['cpu'])
+                            #print("convert: %s" % float(parse_quantity(container.resources.requests['cpu'])))
+                            tmpCpuRequest += float(parse_quantity(container.resources.requests['cpu']))
+                        if 'memory' in container.resources.requests:
+                            tmpMemoryRequest += float(parse_quantity(container.resources.requests['memory']))
+
+        totalPodAllocatable += float(node.status.allocatable['pods'])
+        node_mem_capacity = float(parse_quantity(node.status.capacity['memory']))
+        node_mem_allocatable = float(parse_quantity(node.status.allocatable['memory']))
+        clusterMetric.append({
+            "name": node.metadata.name,
+            "cpu": {
+                "capacity": int(node.status.capacity['cpu']),
+                "allocatable": int(node.status.allocatable['cpu']),
+                "allocatablePercentage": calPercent(int(node.status.allocatable['cpu']), int(node.status.capacity['cpu']), True),
+                "requests": tmpCpuRequest,
+                "requestsPercent": calPercent(tmpCpuRequest, int(node.status.capacity['cpu']), True),
+                "limits": tmpCpuLimit,
+                "limitsPercent": calPercent(tmpCpuLimit, int(node.status.capacity['cpu']), True),
+            },
+            "memory": {
+                "capacity": node_mem_capacity,
+                "allocatable": node_mem_allocatable,
+                "allocatablePercentage": calPercent(node_mem_allocatable, node_mem_capacity, True),
+                "requests": tmpMemoryRequest,
+                "requestsPercent": calPercent(tmpMemoryRequest, node_mem_capacity, True),
+                "limits": tmpMemoryLimit,
+                "limitsPercent": calPercent(tmpMemoryLimit, node_mem_capacity, True),
+            },
+            "pod_count": {
+                "current": tmpPodCount,
+                "allocatable": totalPodAllocatable,
+                "allocatablePercentage": calPercent(tmpPodCount, totalPodAllocatable, True),
+            },
+            # clusterTotals
+        })
+    print(clusterMetric)
