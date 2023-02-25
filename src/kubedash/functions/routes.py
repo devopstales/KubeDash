@@ -211,9 +211,14 @@ def users_privilege():
             user_token = session['oauth_token']
         else:
             user_token = None
-        namespace_list = k8sNamespaceListGet(session['user_role'], user_token) #
-        user_role_template_list = k8sUserRoleTemplateListGet(session['user_role'], user_token)
-        user_clusterRole_template_list = k8sUserClusterRoleTemplateListGet(session['user_role'], user_token)
+
+        namespace_list, error = k8sNamespaceListGet(session['user_role'], user_token)
+        if not error:
+            user_role_template_list = k8sUserRoleTemplateListGet(session['user_role'], user_token)
+            user_clusterRole_template_list = k8sUserClusterRoleTemplateListGet(session['user_role'], user_token)
+        else:
+            user_role_template_list = []
+            user_clusterRole_template_list = []
 
         if not bool(user_clusterRole_template_list) or not bool(user_role_template_list):
             from functions.k8s import k8sClusterRolesAdd
