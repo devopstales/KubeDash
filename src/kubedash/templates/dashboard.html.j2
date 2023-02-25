@@ -1,0 +1,99 @@
+{% extends "base.html.j2" %}
+
+{% block header %}
+    <link href="{{ url_for('static',filename='/vendor/google/material-icons.css') }}" rel="stylesheet" >
+{% endblock %}
+
+{% block content %}
+<nav aria-label="breadcrumb">
+  <ol class="breadcrumb">
+    <li class="breadcrumb-item">Dashboard</li>
+    <div class="col">
+      <a class="card-link float-right" data-toggle="collapse" href="#" onclick="reload()">
+        <i class="material-icons">refresh</i>
+      </a>
+    </div>
+  </ol>
+</nav>
+
+<div class="card shadow mb-4">
+    <div class="card-header py-3">
+        <h6 class="m-0 font-weight-bold text-primary">Cluster Metrics</h6>
+    </div>
+    <div class="card-body">
+        <div class="row">
+             {% for CPUkey, CPUvalue in cluster_metrics.clusterTotals.cpu.items() %}
+             {% for RAMkey, RAMvalue in cluster_metrics.clusterTotals.memory.items() %}
+             {% if "Percentage" in CPUkey and "Percentage" in RAMkey and CPUkey == RAMkey %}
+            <div class="col">
+                <div>
+                    <canvas id="chart-{{ CPUkey }}-{{ RAMkey }}" cpu-percent="{{ CPUvalue }}" ram-percent="{{ RAMvalue }}" width="300" height="300"></canvas>
+                </div>
+                <div>
+                    CPU: {{ cluster_metrics.clusterTotals.cpu.get((CPUkey | split_uppercase)[0]) |round(1) }} COR <br>
+                    Memory: {{ cluster_metrics.clusterTotals.memory.get((RAMkey | split_uppercase)[0]) / 1024 / 1024 / 1024 |round|int  }} GB<br>
+                </div>
+            </div>
+             {% endif %}
+             {% endfor %}
+             {% endfor %}
+        </div>
+    </div>
+</div>
+
+{% endblock %}
+
+{% block scripts %}
+    <!-- Page level plugins -->
+    <script src="vendor/chart.js/Chart.min.js"></script>
+    {% for CPUkey, CPUvalue in cluster_metrics.clusterTotals.cpu.items() %}
+    {% for RAMkey, RAMvalue in cluster_metrics.clusterTotals.memory.items() %}
+    {% if "Percentage" in CPUkey and "Percentage" in RAMkey and CPUkey == RAMkey %}
+    <script>
+        var ctx = document.getElementById('chart-{{ CPUkey }}-{{ RAMkey }}');
+        var CPUpercent = ctx.getAttribute('cpu-percent');
+        var CPUpercentReturn = (100 - CPUpercent)
+        if (CPUpercentReturn <= 0) {
+            CPUpercentReturn = 0
+        }
+        var RAMpercent = ctx.getAttribute('ram-percent');
+        var RAMpercentReturn = (100 - RAMpercent)
+        if (RAMpercentReturn <= 0) {
+            RAMpercentReturn = 0
+        }
+        new Chart(ctx, {
+            type: 'doughnut',
+            data: {
+                labels: ['% Complete'],
+                labels: ['{{ key }}', "All"],
+                datasets: [{
+                    backgroundColor: ['#00baa6', '#ededed'],
+                    data: [CPUpercent, CPUpercentReturn],
+                    borderWidth: [0, 0]
+                },
+                {
+                    backgroundColor: ['#36A2EB', '#ededed'],
+                    data: [RAMpercent, RAMpercentReturn],
+                    borderWidth: [0, 0]
+                }]
+            },
+            options: {
+                maintainAspectRatio: false,
+                cutoutPercentage: 65,
+                tooltips: {
+                    caretPadding: 10,
+                },
+                legend: {
+                    display: false,
+                },
+                title: {
+                        display: true,
+                        text: '{{ CPUkey }}'
+                },
+            }
+        });
+    </script>
+    {% endif %}
+    {% endfor %}
+    {% endfor %}
+{% endblock %}

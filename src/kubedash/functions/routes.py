@@ -15,10 +15,11 @@ from itsdangerous import base64_encode, base64_decode
 ##############################################################
 ## Custom jinja2 filter
 ##############################################################
-from functions.jinja2_decoders import j2_b64decode, j2_b64encode
+from functions.jinja2_decoders import j2_b64decode, j2_b64encode, split_uppercase
 
 app.add_template_filter(j2_b64decode)
 app.add_template_filter(j2_b64encode)
+app.add_template_filter(split_uppercase)
 
 ##############################################################
 ## health
@@ -65,7 +66,7 @@ def login():
                 flash('Cannot connect to identity provider!', "warning")
 
         if "username" in session:
-            return redirect(url_for('users'))
+            return redirect(url_for('dashboard'))
         else:
             return render_template(
                 'login.html.j2',
@@ -95,7 +96,7 @@ def login_post():
         session['user_role'] = role.name
         session['user_type'] = user.user_type
         session['ns_select'] = "default"
-        return redirect(url_for('users'))
+        return redirect(url_for('dashboard'))
 
 @app.route('/logout')
 @login_required
@@ -107,6 +108,19 @@ def logout():
         session.pop('oauth_token')
     session.clear()
     return redirect(url_for('login'))
+
+##############################################################
+## Dashboard
+##############################################################
+
+@app.route('/dashboard')
+@login_required
+def dashboard():
+    cluster_metrics = k8sGetNodeMetric()
+    return render_template(
+        'dashboard.html.j2',
+        cluster_metrics = cluster_metrics
+    )   
 
 ##############################################################
 ## Users and Privileges
@@ -350,7 +364,7 @@ def callback():
         session['ns_select'] = "default"
 
         login_user(user)
-        return redirect(url_for('users'))
+        return redirect(url_for('dashboard'))
 
 ##############################################################
 ## Kubectl config
