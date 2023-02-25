@@ -27,8 +27,8 @@
             <table class="table table-bordered" id="dataTable" width="100%" cellspacing="0">
                 <thead>
                     <tr>
-                      <th>Status</th>
                       <th>Name</th>
+                      <th>Status</th>
                       <th>Labels</th>
                     </tr>
                   </thead>
@@ -39,8 +39,8 @@
                     {% else %}
                       <tr>
                     {% endif %}
-                        <td>{{ d.status }}</td>
                         <td>{{ d.name }}</td>
+                        <td>{{ d.status }}</td>
                         <td>
                         {% for label in d.labels %} 
                             <span style="font-size: 85%" class="badge badge-secondary">{{ label }}</span>
