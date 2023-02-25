@@ -10,6 +10,7 @@ from kubernetes.client.rest import ApiException
 import zlib, json
 from datetime import datetime
 from functions.user import email_check
+from decimal import Decimal, InvalidOperation
 
 ##############################################################
 ## Kubernetes Config
@@ -1318,7 +1319,18 @@ def k8sGetNodeMetric():
     pod_list = k8s_client.CoreV1Api().list_pod_for_all_namespaces()
     totalPodAllocatable = float()
     totalPodCurrent = int()
-    clusterMetric = []
+    tmpTotalCpuCapacity = int()
+    tmpTotalMemoryCapacity = int()
+    tmpTotalCpuAllocatable = int()
+    tmpTotalMenoryAllocatable = int()
+    tmpTotalCpuLimit = float()
+    tmpTotalMemoryLimit = float()
+    tmpTotalCpuRequest = float()
+    tmpTotalMemoryRequest = float()
+    clusterMetric = {
+        "nodes": [],
+        "clusterTotals": {}
+    }
 
     for node in node_list.items:
         tmpPodCount = int()
@@ -1346,7 +1358,7 @@ def k8sGetNodeMetric():
         totalPodAllocatable += float(node.status.allocatable['pods'])
         node_mem_capacity = float(parse_quantity(node.status.capacity['memory']))
         node_mem_allocatable = float(parse_quantity(node.status.allocatable['memory']))
-        clusterMetric.append({
+        clusterMetric["nodes"].append({
             "name": node.metadata.name,
             "cpu": {
                 "capacity": int(node.status.capacity['cpu']),
@@ -1373,4 +1385,34 @@ def k8sGetNodeMetric():
             },
             # clusterTotals
         })
-    print(clusterMetric)
+        tmpTotalCpuAllocatable += int(node.status.allocatable['cpu'])
+        tmpTotalMenoryAllocatable += node_mem_allocatable
+        tmpTotalCpuCapacity += int(node.status.capacity['cpu'])
+        tmpTotalMemoryCapacity += node_mem_capacity
+        tmpTotalCpuLimit += tmpCpuLimit
+        tmpTotalMemoryLimit += tmpMemoryLimit
+        tmpTotalCpuRequest += tmpCpuRequest
+        tmpTotalMemoryRequest += tmpMemoryRequest
+    clusterMetric["clusterTotals"] = {
+            "cpu": {
+                "capacity": tmpTotalCpuCapacity,
+                "allocatable": tmpTotalCpuAllocatable,
+                "allocatablePercentage": calPercent(tmpTotalCpuAllocatable, tmpTotalCpuCapacity, True),
+                "requests": tmpTotalCpuRequest,
+                "requestsPercentage": calPercent(tmpTotalCpuRequest, tmpTotalCpuCapacity, True),
+                "limits": tmpTotalCpuLimit,
+                "limitsPercentage": calPercent(tmpTotalCpuLimit, tmpTotalCpuCapacity, True),
+            },
+            "memory": {
+                "capacity": tmpTotalMemoryCapacity,
+                "allocatable": tmpTotalMenoryAllocatable,
+                "allocatablePercentage": calPercent(tmpTotalMenoryAllocatable, tmpTotalMemoryCapacity, True),
+                "requests": tmpTotalMemoryRequest,
+                "requestsPercentage": calPercent(tmpTotalMemoryRequest, tmpTotalMemoryCapacity, True),
+                "limits": tmpTotalMemoryLimit,
+                "limitsPercentage":  calPercent(tmpTotalMemoryLimit, tmpTotalMemoryCapacity, True),
+            },
+    }
+    #json_formatted_str = json.dumps(clusterMetric, indent=2)
+    #print(json_formatted_str)
+    return(clusterMetric)
