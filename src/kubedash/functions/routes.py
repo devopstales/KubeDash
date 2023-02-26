@@ -771,7 +771,7 @@ def pods():
         namespaces = namespace_list,
     )
 
-@app.route('/pod-data', methods=['GET', 'POST'])
+@app.route('/pods/data', methods=['GET', 'POST'])
 @login_required
 def pods_data():
     if request.method == 'POST':
@@ -858,6 +858,36 @@ def roles():
         namespaces = namespace_list,
     )
 
+@app.route("/roles/data", methods=['GET', 'POST'])
+@login_required
+def role_data():
+    if request.method == 'POST':
+        session['ns_select'] = request.form.get('ns_select')
+        r_name = request.form.get('r_name')
+        
+        if session['user_type'] == "OpenID":
+            user_token = session['oauth_token']
+        else:
+            user_token = None
+        
+        namespace_list, error = k8sNamespaceListGet(session['user_role'], user_token)
+        print("ns: %s" % namespace_list)
+        if not error:
+            roles = k8sRoleListGet(session['user_role'], user_token, session['ns_select'])
+            print("roles: %s" % roles)
+        else:
+            roles = list()
+            print("error: %s" % error)
+
+        return render_template(
+            'role-data.html.j2',
+            namespace_list = namespace_list,
+            roles = roles,
+            r_name = r_name,
+        )
+    else:
+        return redirect(url_for('login'))
+
 ##############################################################
 ##  Role Binding
 ##############################################################
@@ -908,6 +938,26 @@ def cluster_roles():
         cluster_roles = cluster_roles,
         cluster_role_select = cluster_role_select,
     )
+
+@app.route("/cluster-roles/data", methods=['GET', 'POST'])
+@login_required
+def cluster_role_data():
+    if request.method == 'POST':
+        cr_name = request.form.get('cr_name')
+        if session['user_type'] == "OpenID":
+            user_token = session['oauth_token']
+        else:
+            user_token = None
+        cluster_roles = k8sClusterRoleListGet(session['user_role'], user_token)
+
+
+        return render_template(
+            'cluster-role-data.html.j2',
+            cluster_roles = cluster_roles,
+            cr_name = cr_name,
+        )
+    else:
+        return redirect(url_for('login'))
 
 ##############################################################
 ## Cluster Role Bindings

@@ -38,13 +38,26 @@
                       <tr>
                         <td>{{ crb.name }}</td>
                         <td>
-                            {% for role_name in crb.role %}
-                                <form action="/cluster-roles" method="POST">
+                            {% for crbr in crb.role %}
+                              {% for crbr_type, crbr_name in crbr.items() %}
+                                {% if crbr_type == "Role" %}
+                                  <form action="/roles/data" method="POST">
+                                      <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+                                      <input type="hidden" name="ns_select" value="{{ session['ns_select'] }}" />
+                                      <input type="hidden" name="r_name" value="{{ crbr_name }}" />
+                                      <a href="javascript:;" onclick="parentNode.submit();">{{ crbr_name }}</a>
+                                  </form>
+                                {% elif crbr_type == "ClusterRole" %}
+                                  <form action="/cluster-roles/data" method="POST">
                                     <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
-                                    <input type="hidden" name="cluster_role_select" value="{{ role_name }}" />
-                                    <a href="javascript:;" onclick="parentNode.submit();">{{ role_name }}</a>
-                                </form>
+                                    <input type="hidden" name="cr_name" value="{{ crbr_name }}" />
+                                    <a href="javascript:;" onclick="parentNode.submit();">{{ crbr_name }}</a>
+                                  </form>
+                                {% else %}
+                                  {{ crbr_name }}
+                                {% endif %}
                                 {% if not loop.last %}<br>{% endif %}
+                                {% endfor %}
                             {% endfor %}
                         </td>
                         <td>

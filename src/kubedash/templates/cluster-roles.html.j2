@@ -39,7 +39,13 @@
                     {% else %}
                       <tr>
                     {% endif %}
-                        <td>{{ cr.name }}</td>
+                        <td>
+                          <form action="/cluster-roles/data" method="POST">
+                            <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+                            <input type="hidden" name="cr_name" value="{{ cr.name }}" />
+                            <a href="javascript:;" onclick="parentNode.submit();">{{ cr.name }}</a>
+                          </form>
+                        </td>
                         <td>
                           {% if cr.labels %}
                           {% for lb_key, lb_value in cr.labels.items() %}

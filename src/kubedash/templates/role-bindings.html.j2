@@ -8,7 +8,7 @@
 <nav aria-label="breadcrumb">
   <ol class="breadcrumb">
     <li class="breadcrumb-item">Security</li>
-    <li class="breadcrumb-item active" aria-current="page">RoleBindings</li>
+    <li class="breadcrumb-item active" aria-current="page">Role Bindings</li>
     <div class="col">
       <a class="card-link float-right" data-toggle="collapse" href="#" onclick="reload()">
         <i class="material-icons">refresh</i>
@@ -41,16 +41,16 @@
                             {% for rbr in rb.role %}
                               {% for rbr_type, rbr_name in rbr.items() %}
                                 {% if rbr_type == "Role" %}
-                                  <form action="/roles" method="POST">
+                                  <form action="/roles/data" method="POST">
                                       <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
                                       <input type="hidden" name="ns_select" value="{{ session['ns_select'] }}" />
-                                      <input type="hidden" name="role_select" value="{{ rbr_name }}" />
+                                      <input type="hidden" name="r_name" value="{{ rbr_name }}" />
                                       <a href="javascript:;" onclick="parentNode.submit();">{{ rbr_name }}</a>
                                   </form>
                                 {% elif rbr_type == "ClusterRole" %}
-                                  <form action="/cluster-roles" method="POST">
+                                  <form action="/cluster-roles/data" method="POST">
                                     <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
-                                    <input type="hidden" name="cluster_role_select" value="{{ rbr_name }}" />
+                                    <input type="hidden" name="cr_name" value="{{ rbr_name }}" />
                                     <a href="javascript:;" onclick="parentNode.submit();">{{ rbr_name }}</a>
                                   </form>
                                 {% else %}
