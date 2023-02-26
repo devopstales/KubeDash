@@ -40,7 +40,12 @@
                       <tr>
                     {% endif %}
                         <td>
-                          {{ r.name }}
+                          <form action="/roles/data" method="POST">
+                            <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+                            <input type="hidden" name="ns_select" value="{{ session['ns_select'] }}" />
+                            <input type="hidden" name="r_name" value="{{ r.name }}" />
+                            <a href="javascript:;" onclick="parentNode.submit();">{{ r.name }}</a>
+                          </form>
                         </td>
                         <td>
                           {% if r.labels %}

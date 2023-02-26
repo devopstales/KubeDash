@@ -1097,9 +1097,9 @@ def k8sClusterRoleBindingListGet(username_role, user_token):
             }
             if type(crb.role_ref) == list:
                 for role in crb.role_ref:
-                    CLUSTER_ROLE_BINDING_INFO['role'].append(role.name)
+                    CLUSTER_ROLE_BINDING_INFO['role'].append({role.kind: role.name})
             else:
-                CLUSTER_ROLE_BINDING_INFO['role'].append(crb.role_ref.name)
+                CLUSTER_ROLE_BINDING_INFO['role'].append({crb.role_ref.kind: crb.role_ref.name})
             if crb.subjects:
                 for obj in crb.subjects:
                     if obj.kind == "User":
