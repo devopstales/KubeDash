@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 
-from __main__ import db, app
+from kubedash import db, app
 from flask_login import UserMixin
 from flask import flash
 from itsdangerous import base64_decode
@@ -1315,10 +1315,7 @@ def calPercent(x, y, integer = False):
 
 def k8sGetNodeMetric():
     k8sClientConfigGet("Admin", None)
-    node_list = k8s_client.CoreV1Api().list_node()
-    pod_list = k8s_client.CoreV1Api().list_pod_for_all_namespaces()
     totalPodAllocatable = float()
-    totalPodCurrent = int()
     tmpTotalCpuCapacity = int()
     tmpTotalMemoryCapacity = int()
     tmpTotalCpuAllocatable = int()
@@ -1331,88 +1328,143 @@ def k8sGetNodeMetric():
         "nodes": [],
         "clusterTotals": {}
     }
+    try:
+        node_list = k8s_client.CoreV1Api().list_node()
+        pod_list = k8s_client.CoreV1Api().list_pod_for_all_namespaces()
 
-    for node in node_list.items:
-        tmpPodCount = int()
-        tmpCpuLimit = float()
-        tmpMemoryLimit = float()
-        tmpCpuRequest = float()
-        tmpMemoryRequest = float()
-        for pod in pod_list.items:
-            if pod.spec.node_name == node.metadata.name and pod.status.phase == 'Running':
-                tmpPodCount += 1
-                for container in pod.spec.containers:
-                    if container.resources.limits:
-                        if 'cpu' in container.resources.limits:
-                            tmpCpuLimit += float(parse_quantity(container.resources.limits['cpu']))
-                        if 'memory' in container.resources.limits:
-                            tmpMemoryLimit += float(parse_quantity(container.resources.limits['memory']))
-                    if container.resources.requests:
-                        if 'cpu' in container.resources.requests:
-                            #print("base: %s" % container.resources.requests['cpu'])
-                            #print("convert: %s" % float(parse_quantity(container.resources.requests['cpu'])))
-                            tmpCpuRequest += float(parse_quantity(container.resources.requests['cpu']))
-                        if 'memory' in container.resources.requests:
-                            tmpMemoryRequest += float(parse_quantity(container.resources.requests['memory']))
+        for node in node_list.items:
+            tmpPodCount = int()
+            tmpCpuLimit = float()
+            tmpMemoryLimit = float()
+            tmpCpuRequest = float()
+            tmpMemoryRequest = float()
+            for pod in pod_list.items:
+                if pod.spec.node_name == node.metadata.name and pod.status.phase == 'Running':
+                    tmpPodCount += 1
+                    for container in pod.spec.containers:
+                        if container.resources.limits:
+                            if 'cpu' in container.resources.limits:
+                                tmpCpuLimit += float(parse_quantity(container.resources.limits['cpu']))
+                            if 'memory' in container.resources.limits:
+                                tmpMemoryLimit += float(parse_quantity(container.resources.limits['memory']))
+                        if container.resources.requests:
+                            if 'cpu' in container.resources.requests:
+                                #print("base: %s" % container.resources.requests['cpu'])
+                                #print("convert: %s" % float(parse_quantity(container.resources.requests['cpu'])))
+                                tmpCpuRequest += float(parse_quantity(container.resources.requests['cpu']))
+                            if 'memory' in container.resources.requests:
+                                tmpMemoryRequest += float(parse_quantity(container.resources.requests['memory']))
 
-        totalPodAllocatable += float(node.status.allocatable['pods'])
-        node_mem_capacity = float(parse_quantity(node.status.capacity['memory']))
-        node_mem_allocatable = float(parse_quantity(node.status.allocatable['memory']))
-        clusterMetric["nodes"].append({
-            "name": node.metadata.name,
-            "cpu": {
-                "capacity": int(node.status.capacity['cpu']),
-                "allocatable": int(node.status.allocatable['cpu']),
-                "allocatablePercentage": calPercent(int(node.status.allocatable['cpu']), int(node.status.capacity['cpu']), True),
-                "requests": tmpCpuRequest,
-                "requestsPercent": calPercent(tmpCpuRequest, int(node.status.capacity['cpu']), True),
-                "limits": tmpCpuLimit,
-                "limitsPercent": calPercent(tmpCpuLimit, int(node.status.capacity['cpu']), True),
-            },
-            "memory": {
-                "capacity": node_mem_capacity,
-                "allocatable": node_mem_allocatable,
-                "allocatablePercentage": calPercent(node_mem_allocatable, node_mem_capacity, True),
-                "requests": tmpMemoryRequest,
-                "requestsPercent": calPercent(tmpMemoryRequest, node_mem_capacity, True),
-                "limits": tmpMemoryLimit,
-                "limitsPercent": calPercent(tmpMemoryLimit, node_mem_capacity, True),
-            },
-            "pod_count": {
-                "current": tmpPodCount,
-                "allocatable": totalPodAllocatable,
-                "allocatablePercentage": calPercent(tmpPodCount, totalPodAllocatable, True),
-            },
-            # clusterTotals
-        })
-        tmpTotalCpuAllocatable += int(node.status.allocatable['cpu'])
-        tmpTotalMenoryAllocatable += node_mem_allocatable
-        tmpTotalCpuCapacity += int(node.status.capacity['cpu'])
-        tmpTotalMemoryCapacity += node_mem_capacity
-        tmpTotalCpuLimit += tmpCpuLimit
-        tmpTotalMemoryLimit += tmpMemoryLimit
-        tmpTotalCpuRequest += tmpCpuRequest
-        tmpTotalMemoryRequest += tmpMemoryRequest
-    clusterMetric["clusterTotals"] = {
-            "cpu": {
-                "capacity": tmpTotalCpuCapacity,
-                "allocatable": tmpTotalCpuAllocatable,
-                "allocatablePercentage": calPercent(tmpTotalCpuAllocatable, tmpTotalCpuCapacity, True),
-                "requests": tmpTotalCpuRequest,
-                "requestsPercentage": calPercent(tmpTotalCpuRequest, tmpTotalCpuCapacity, True),
-                "limits": tmpTotalCpuLimit,
-                "limitsPercentage": calPercent(tmpTotalCpuLimit, tmpTotalCpuCapacity, True),
-            },
-            "memory": {
-                "capacity": tmpTotalMemoryCapacity,
-                "allocatable": tmpTotalMenoryAllocatable,
-                "allocatablePercentage": calPercent(tmpTotalMenoryAllocatable, tmpTotalMemoryCapacity, True),
-                "requests": tmpTotalMemoryRequest,
-                "requestsPercentage": calPercent(tmpTotalMemoryRequest, tmpTotalMemoryCapacity, True),
-                "limits": tmpTotalMemoryLimit,
-                "limitsPercentage":  calPercent(tmpTotalMemoryLimit, tmpTotalMemoryCapacity, True),
-            },
-    }
-    #json_formatted_str = json.dumps(clusterMetric, indent=2)
-    #print(json_formatted_str)
-    return(clusterMetric)
+            totalPodAllocatable += float(node.status.allocatable['pods'])
+            node_mem_capacity = float(parse_quantity(node.status.capacity['memory']))
+            node_mem_allocatable = float(parse_quantity(node.status.allocatable['memory']))
+            clusterMetric["nodes"].append({
+                "name": node.metadata.name,
+                "cpu": {
+                    "capacity": int(node.status.capacity['cpu']),
+                    "allocatable": int(node.status.allocatable['cpu']),
+                    "allocatablePercentage": calPercent(int(node.status.allocatable['cpu']), int(node.status.capacity['cpu']), True),
+                    "requests": tmpCpuRequest,
+                    "requestsPercent": calPercent(tmpCpuRequest, int(node.status.capacity['cpu']), True),
+                    "limits": tmpCpuLimit,
+                    "limitsPercent": calPercent(tmpCpuLimit, int(node.status.capacity['cpu']), True),
+                },
+                "memory": {
+                    "capacity": node_mem_capacity,
+                    "allocatable": node_mem_allocatable,
+                    "allocatablePercentage": calPercent(node_mem_allocatable, node_mem_capacity, True),
+                    "requests": tmpMemoryRequest,
+                    "requestsPercent": calPercent(tmpMemoryRequest, node_mem_capacity, True),
+                    "limits": tmpMemoryLimit,
+                    "limitsPercent": calPercent(tmpMemoryLimit, node_mem_capacity, True),
+                },
+                "pod_count": {
+                    "current": tmpPodCount,
+                    "allocatable": totalPodAllocatable,
+                    "allocatablePercentage": calPercent(tmpPodCount, totalPodAllocatable, True),
+                },
+                # clusterTotals
+            })
+            tmpTotalCpuAllocatable += int(node.status.allocatable['cpu'])
+            tmpTotalMenoryAllocatable += node_mem_allocatable
+            tmpTotalCpuCapacity += int(node.status.capacity['cpu'])
+            tmpTotalMemoryCapacity += node_mem_capacity
+            tmpTotalCpuLimit += tmpCpuLimit
+            tmpTotalMemoryLimit += tmpMemoryLimit
+            tmpTotalCpuRequest += tmpCpuRequest
+            tmpTotalMemoryRequest += tmpMemoryRequest
+        clusterMetric["clusterTotals"] = {
+                "cpu": {
+                    "capacity": tmpTotalCpuCapacity,
+                    "allocatable": tmpTotalCpuAllocatable,
+                    "allocatablePercentage": calPercent(tmpTotalCpuAllocatable, tmpTotalCpuCapacity, True),
+                    "requests": tmpTotalCpuRequest,
+                    "requestsPercentage": calPercent(tmpTotalCpuRequest, tmpTotalCpuCapacity, True),
+                    "limits": tmpTotalCpuLimit,
+                    "limitsPercentage": calPercent(tmpTotalCpuLimit, tmpTotalCpuCapacity, True),
+                },
+                "memory": {
+                    "capacity": tmpTotalMemoryCapacity,
+                    "allocatable": tmpTotalMenoryAllocatable,
+                    "allocatablePercentage": calPercent(tmpTotalMenoryAllocatable, tmpTotalMemoryCapacity, True),
+                    "requests": tmpTotalMemoryRequest,
+                    "requestsPercentage": calPercent(tmpTotalMemoryRequest, tmpTotalMemoryCapacity, True),
+                    "limits": tmpTotalMemoryLimit,
+                    "limitsPercentage":  calPercent(tmpTotalMemoryLimit, tmpTotalMemoryCapacity, True),
+                },
+        }
+        #json_formatted_str = json.dumps(clusterMetric, indent=2)
+        #print(json_formatted_str)
+        return clusterMetric
+    except ApiException as error:
+        ErrorHandler(error, "get cluster role bindings list")
+        clusterMetric = {
+            "nodes": [],
+            "clusterTotals": {
+                "cpu": {
+                    "capacity": 0,
+                    "allocatable": 0,
+                    "allocatablePercentage": 0,
+                    "requests": 0,
+                    "requestsPercentage": 0,
+                    "limits": 0,
+                    "limitsPercentage": 0,
+                },
+                "memory": {
+                    "capacity": 0,
+                    "allocatable": 0,
+                    "allocatablePercentage": 0,
+                    "requests": 0,
+                    "requestsPercentage": 0,
+                    "limits": 0,
+                    "limitsPercentage": 0,
+                },
+            }
+        }
+        return clusterMetric
+    except:
+        ErrorHandler("CannotConnect", "Cannot Connect to Kubernetes")
+        clusterMetric = {
+            "nodes": [],
+            "clusterTotals": {
+                "cpu": {
+                    "capacity": 0,
+                    "allocatable": 0,
+                    "allocatablePercentage": 0,
+                    "requests": 0,
+                    "requestsPercentage": 0,
+                    "limits": 0,
+                    "limitsPercentage": 0,
+                },
+                "memory": {
+                    "capacity": 0,
+                    "allocatable": 0,
+                    "allocatablePercentage": 0,
+                    "requests": 0,
+                    "requestsPercentage": 0,
+                    "limits": 0,
+                    "limitsPercentage": 0,
+                },
+            }
+        }
+        return clusterMetric

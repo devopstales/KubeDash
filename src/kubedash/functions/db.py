@@ -2,7 +2,7 @@
 
 class dbCreate():
     from functions.user import UserCreate, RoleCreate
-    from __main__ import db, app
+    from kubedash import db, app
     from sqlalchemy_utils import database_exists
 
     # Roles

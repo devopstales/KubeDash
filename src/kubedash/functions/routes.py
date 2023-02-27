@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 
-from __main__ import app
+from kubedash import app
 import requests, json, yaml
 from functions.user import email_check, User, Role, UsersRoles, UserCreate, UserUpdate, \
     UserDelete, UserCreateSSO
