@@ -9,6 +9,9 @@ test*
 docker/*.py
 docker/*/*.py
 
+# enable tests
+!tests
+
 # mkdocs documentation
 /site
 
