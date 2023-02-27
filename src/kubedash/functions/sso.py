@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 
-from __main__ import db
+from kubedash import db
 from flask_login import UserMixin
 from sqlalchemy.ext.mutable import MutableList
 from sqlalchemy import PickleType
