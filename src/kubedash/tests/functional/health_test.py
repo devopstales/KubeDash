@@ -20,4 +20,3 @@ def test_dashboard__logged_in(client):
         client.post("/", data={"username": "pytest", "password": "pytest"}, follow_redirects=True)
         res = client.get('/dashboard')
         assert res.status_code == 200
-
