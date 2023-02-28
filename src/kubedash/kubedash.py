@@ -58,8 +58,9 @@ csrf.init_app(app)
 # import routes
 import functions.routes
 
+# init db
+from functions.db import init_db
+init_db(SQL_PATH)
+
 if __name__== "__main__":
-    if not os.path.exists(SQL_PATH):
-        from functions.db import dbCreate
-        dbCreate()
     app.run(port=8000,debug=True, use_reloader=False)
