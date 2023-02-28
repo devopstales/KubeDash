@@ -3,7 +3,7 @@
 from kubedash import db
 from flask_login import UserMixin
 from sqlalchemy.ext.mutable import MutableList
-from sqlalchemy import PickleType
+from sqlalchemy import PickleType, inspect
 from requests_oauthlib import OAuth2Session
 
 ##############################################################
@@ -47,7 +47,11 @@ def SSOServerUpdate(oauth_server_uri_old, oauth_server_uri, client_id, client_se
         db.session.commit()
 
 def SSOSererGet():
-    return Openid.query.get(1)
+    inspector = inspect(db.engine)
+    if inspector.has_table("openid"):
+        return Openid.query.get(1)
+    else:
+        return None
 
 def get_auth_server_info():
     ssoServer = SSOSererGet()
