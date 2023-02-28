@@ -1,6 +1,6 @@
 #!/bin/bash
 
-export FLASK_APP=kubedash.py
+export FLASK_APP=kubedash
 export FLASK_DEBUG=1
 export TEMPLATES_AUTO_RELOAD=1
 
