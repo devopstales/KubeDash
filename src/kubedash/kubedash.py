@@ -1,23 +1,13 @@
 #!/usr/bin/env python3
 
-import os, logging
 from flask import Flask
-from flask_sqlalchemy import SQLAlchemy
-from flask_login import LoginManager
-from flask_wtf.csrf import CSRFProtect
 from flask_talisman import Talisman
+from sqlalchemy_utils import database_exists
 
-## the cli client use http not https
-os.environ['OAUTHLIB_INSECURE_TRANSPORT'] = '1'
-logging.captureWarnings(True)
+from functions.components import db, login_manager, csrf
+from functions.routes import main
+from functions.user import User, UserCreate, RoleCreate
 
-# VARIABLES
-SQL_PATH = "sqlite.db"
-
-# FLASK
-app = Flask(__name__, static_url_path='', static_folder='static')
-
-# secure
 csp = {
     'font-src': [
         '\'self\'',
@@ -28,39 +18,67 @@ csp = {
         'fonts.googleapis.com',
     ],
 }
-talisman = Talisman(app, content_security_policy=csp)
-app.config.update(
-    DEBUG = True,
-    SECRET_KEY = "J0vb4r7Hi5cCksCovC6GNVXPj",
-    SESSION_COOKIE_SECURE = True,
-    REMEMBER_COOKIE_SECURE = True,
-    SESSION_COOKIE_HTTPONLY = True,
-    REMEMBER_COOKIE_HTTPONLY = True,
-    SESSION_COOKIE_SAMESITE = "Lax",
-    PERMANENT_SESSION_LIFETIME = 600,
-)
+
+# Roles
+roles = [
+    "Admin",
+    "User",
+]
+
+import os, logging
+## the cli client use http not https
+os.environ['OAUTHLIB_INSECURE_TRANSPORT'] = '1'
+logging.captureWarnings(True)
+
+def db_init():
+    for r in roles:
+        RoleCreate(r)
+    UserCreate("admin", "admin", None, "Local", "Admin")
+
+def create_app(database_uri="sqlite:///sqlite.db"):
+    app = Flask(__name__, static_url_path='', static_folder='static')
+    app.config["SQLALCHEMY_DATABASE_URI"] = database_uri
+    app.config['SQLALCHEMY_TRACK_MODIFICATIONS'] = True
+    app.config["SECRET_KEY"] = "FesC9cBSuxakv9yN0vBY"
+    app.config.update(
+        DEBUG = True,
+        SESSION_COOKIE_SECURE = True,
+        REMEMBER_COOKIE_SECURE = True,
+        SESSION_COOKIE_HTTPONLY = True,
+        REMEMBER_COOKIE_HTTPONLY = True,
+        SESSION_COOKIE_SAMESITE = "Lax",
+        PERMANENT_SESSION_LIFETIME = 600,
+    )
+
+    db.init_app(app)
+    if not database_exists(database_uri):
+        with app.app_context():
+            db.create_all()
+            db_init()
+    else:
+        db_init()
 
 
-# DB
-app.config['SQLALCHEMY_DATABASE_URI'] = "sqlite:///"+SQL_PATH
-app.config['SQLALCHEMY_TRACK_MODIFICATIONS'] = True
-db = SQLAlchemy(app)
+    login_manager.init_app(app)
+    login_manager.login_view = "login"
+    login_manager.session_protection = "strong"
 
-# LoginManager
-login_manager = LoginManager(app)
-login_manager.login_view = "login"
-login_manager.session_protection = "strong"
+    csrf.init_app(app)
 
-# csrf
-csrf = CSRFProtect()
-csrf.init_app(app)
+    talisman = Talisman(app, content_security_policy=csp)
 
-# import routes
-import functions.routes
+    ##############################################################
+    ## Custom jinja2 filter
+    ##############################################################
+    from functions.jinja2_decoders import j2_b64decode, j2_b64encode, split_uppercase
 
-# init db
-from functions.db import init_db
-init_db(SQL_PATH)
+    app.add_template_filter(j2_b64decode)
+    app.add_template_filter(j2_b64encode)
+    app.add_template_filter(split_uppercase)
 
-if __name__== "__main__":
-    app.run(port=8000,debug=True, use_reloader=False)
+    @login_manager.user_loader
+    def load_user(user_id):
+        return User.query.get(user_id)
+    
+    app.register_blueprint(main)
+    return app
