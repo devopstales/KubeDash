@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-
+import os
 class dbCreate():
     from functions.user import UserCreate, RoleCreate
     from kubedash import db, app
@@ -21,3 +21,8 @@ class dbCreate():
             for r in roles:
                 RoleCreate(r)
             UserCreate("admin", "admin", None, "Local", "Admin")
+
+def init_db(SQL_PATH):
+    if not os.path.exists(SQL_PATH):
+        from functions.db import dbCreate
+        dbCreate()

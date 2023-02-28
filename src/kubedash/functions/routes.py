@@ -299,10 +299,10 @@ def callback():
             flash('Access denied.', "danger")
         else:
             flash('Error encountered.', "danger")
-    if 'code' not in request.args and 'state' not in request.args:
+    ssoServer = SSOSererGet()
+    if ('code' not in request.args and 'state' not in request.args) or not ssoServer:
         return redirect(url_for('login'))
     else:
-        ssoServer = SSOSererGet()
         auth_server_info, oauth = get_auth_server_info()
         token_url = auth_server_info["token_endpoint"]
         userinfo_url = auth_server_info["userinfo_endpoint"]
