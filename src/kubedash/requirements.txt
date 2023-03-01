@@ -9,3 +9,7 @@ requests_oauthlib>=1.3.1
 kubernetes>=25.3.0
 pytest>=7.2.1
 pytest-order
+pytest-flask
+responses
+pytest-playwright
+selenium
