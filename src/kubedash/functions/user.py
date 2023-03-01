@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 
-from kubedash import db, login_manager
+from functions.components import db, login_manager
 import re
 from flask_login import UserMixin
 from werkzeug.security import generate_password_hash
