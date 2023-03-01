@@ -1,7 +1,15 @@
 [project]
-name = "pyproject"
+name = "KubeDash"
+version = "0.1.0"
+description = "KubeDash is a kubernetes Dashboard"
+license = "Apache-2.0"
+authors = [
+    "devopstales <devopstales2@gmail.com>",
+]
+
 
 [tool.pytest.ini_options]
 filterwarnings = [
-    "ignore::urllib3.exceptions.InsecureRequestWarning"
+    "ignore::urllib3.exceptions.InsecureRequestWarning",
+    "ignore::DeprecationWarning"
 ]

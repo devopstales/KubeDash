@@ -1,15 +1,13 @@
 import pytest, logging
 from flask.testing import FlaskClient
-from kubedash import app
+from kubedash import create_app
 
 TEST_SQL_PATH = "pytest.db"
 
 @pytest.fixture(scope='module')
 def flask_app():
+    app = create_app("testing")
     with app.app_context():
-        app.config['TESTING'] = True
-        app.config['WTF_CSRF_ENABLED'] = False
-        app.config['SQLALCHEMY_DATABASE_URI'] = "sqlite:///"+TEST_SQL_PATH
         yield app
 
 @pytest.fixture(scope='module')
