@@ -24,6 +24,7 @@ __pycache__/
 __pypackages__/
 *.py[cod]
 *$py.class
+*screenshots
 
 # Distribution / packaging
 .Python

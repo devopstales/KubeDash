@@ -11,5 +11,6 @@ authors = [
 [tool.pytest.ini_options]
 filterwarnings = [
     "ignore::urllib3.exceptions.InsecureRequestWarning",
-    "ignore::DeprecationWarning"
+    "ignore::DeprecationWarning",
 ]
+live_server_scope = "function"

@@ -1,6 +1,6 @@
-from selenium import webdriver
-import time
-
+#from selenium import webdriver
+#import time
+#
 #def test_lambdatest_google():
 #    driver = webdriver.Chrome()
 #    driver.maximize_window()
