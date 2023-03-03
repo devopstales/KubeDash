@@ -1279,7 +1279,7 @@ def k8sRoleBindingAdd(user_role, username, user_namespaces, user_all_namespaces)
         user = username
     obeject_name = user + "___" + "kubedash" + "___" + user_role
     if user_all_namespaces:
-        namespace_list = k8sNamespaceListGet("Admin", None)
+        namespace_list, error = k8sNamespaceListGet("Admin", None)
     else:
         namespace_list = user_namespaces
     for namespace in namespace_list:
@@ -1492,3 +1492,59 @@ def k8sHelmChartListGet(username_role, user_token, namespace):
         ErrorHandler("CannotConnect", "Cannot Connect to Kubernetes")
         return HAS_CHART, CHART_LIST
  
+##############################################################
+## User Priviliges
+##############################################################
+
+
+def k8sUserPriviligeList(username_role="Admin", user_token=None, user="balazs.paldi@shiwaforce.com"):
+    ROLE_LIST = []
+    CLUSTER_ROLE_LIST = []
+    USER_ROLES = []
+    USER_CLUSTER_ROLES = []
+
+    k8sClientConfigGet(username_role, user_token)
+
+    namespaces, error = k8sNamespaceListGet(username_role, user_token)
+    if not error:
+        for ns in namespaces:
+            role_binding_list = k8s_client.RbacAuthorizationV1Api().list_namespaced_role_binding(ns)
+            for rb in role_binding_list.items:
+                for obj in rb.subjects:
+                    if obj.kind == "User" and obj.name == user:
+                        if rb.role_ref.kind == "ClusterRole":
+                            CLUSTER_ROLE_LIST.append(rb.role_ref.name)
+                        elif rb.role_ref.kind == "Role":
+                            ROLE_LIST.append([rb.role_ref.namespace, rb.role_ref.name])
+
+    cluster_role_bindings = k8s_client.RbacAuthorizationV1Api().list_cluster_role_binding()
+    for crb in cluster_role_bindings.items:
+        if crb.subjects:
+            for obj in crb.subjects:
+                if obj.kind == "User" and obj.name == user:
+                    CLUSTER_ROLE_LIST.append(crb.role_ref.name)
+
+    ROLE_LIST.append(["kube-system", "kube-proxy"])
+
+    for r in ROLE_LIST:
+        with k8s_client.ApiClient() as api_client:
+            api_instance = k8s_client.RbacAuthorizationV1Api(api_client)
+            pretty = 'true'
+        try:
+            ROLE = api_instance.read_namespaced_role(r[1], r[0], pretty=pretty)
+            for rr in ROLE.rules:
+                USER_ROLES.append({r[1]: rr})
+        except:
+            continue
+    
+    for cr in CLUSTER_ROLE_LIST:
+        with k8s_client.ApiClient() as api_client:
+            api_instance = k8s_client.RbacAuthorizationV1Api(api_client)
+            pretty = 'true'
+        try:
+            CLUSTER_ROLE = api_instance.read_cluster_role(cr, pretty=pretty)
+            for crr in CLUSTER_ROLE.rules:
+                USER_CLUSTER_ROLES.append(crr)
+        except:
+            continue
+    return USER_CLUSTER_ROLES, USER_ROLES
