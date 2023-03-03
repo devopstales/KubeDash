@@ -223,7 +223,24 @@ def users_privilege():
         )
     else:
         return redirect(url_for('main.login'))
-    
+
+@main.route('/users/privileges/admin')
+@login_required
+def users_privilege_list():
+    username = "balazs.paldi@shiwaforce.com"
+    if session['user_type'] == "OpenID":
+        user_token = session['oauth_token']
+    else:
+        user_token = None
+    user_cluster_roles, user_roles = k8sUserPriviligeList(session['user_role'], user_token, username)
+    return render_template(
+        'user-privileges.html.j2',
+        username = username,
+        user_cluster_roles = user_cluster_roles,
+        user_roles = user_roles,
+    )
+
+
 ##############################################################
 ## SSO Settings
 ##############################################################
