@@ -16,7 +16,7 @@ class DevelopmentConfig(Config):
     """
     Development configurations
     """
-    SQLALCHEMY_ECHO = True
+    #SQLALCHEMY_ECHO = True
     SQLALCHEMY_DATABASE_URI = "sqlite:///development.db"
 
 class ProductionConfig(Config):
