@@ -104,12 +104,23 @@
                 <tbody>
                   {% for user in users %}
                   <tr>
-                    {% if user.username == session['username'] %}
+                    {% if session['user_role'] == "Admin" and user.username != "admin" %}
                     <td>
-                      <a href="/users/privileges/{{ user.username }}">{{ user.username }}</a>
+                      <form action="/users/privileges" method="POST">
+                        <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+                        <input type="hidden"  name="username" value="{{ user.username }}"/>
+                        <a href="javascript:;" onclick="parentNode.submit();">{{ user.username }}</a>
+                      </form>
                     </td>
+                    {% elif user.username == session['username'] and user.username != "admin" %}
+                    <td>
+                      <form action="/users/privileges" method="POST">
+                        <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+                        <input type="hidden"  name="username" value="{{ user.username }}"/>
+                        <a href="javascript:;" onclick="parentNode.submit();">{{ user.username }}</a>
+                      </form>                    </td>
                     {% else %}
-                    <td>{{ user.username }}</td>
+                      <td>{{ user.username }}</td>
                     {% endif %}
                     <td>{{ user.email }}</td>
                     <td>{{ session['user_role'] }}</td>
@@ -130,7 +141,7 @@
                             </button>
                             {% endif %}
                         </form>
-                        <form action="/users/privilege" method="POST">
+                        <form action="/users/privileges/edit" method="POST">
                           <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
                           <input type="hidden"  name="username" value="{{ user.username }}"/>
                           <button type="submit" rel="tooltip" class="btn btn-secondary btn-just-icon btn-sm" value="upvote">

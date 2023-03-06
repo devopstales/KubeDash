@@ -39,7 +39,7 @@
                     </button>
                 </div>
                 <div class="modal-body">
-                    <form action="/k8s-config" method="POST">
+                    <form action="/cluster-config" method="POST">
                         <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
                         <input type="hidden" name="request_type" value="create" />
                         <div class="form-group">
@@ -125,7 +125,7 @@
                 </button>
             </div>
             <div class="modal-body">
-                <form action="/k8s-config" method="POST">
+                <form action="/cluster-config" method="POST">
                     <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
                     <input type="hidden" name="request_type" value="edit" />
                     <input type="hidden" name="k8s_context_old" value="{{ server.k8s_context }}" />
