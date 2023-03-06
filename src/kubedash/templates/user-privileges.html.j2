@@ -42,7 +42,11 @@
                         <td>
                             {% if ucr.api_groups %}
                             {% for ag in ucr.api_groups %}
-                                {{ ag }}{% if not loop.last %}<br>{% endif %}
+                                {% if arg|length %}
+                                    {{ ag }}{% if not loop.last %}<br>{% endif %}
+                                {% else %}
+                                    " "{% if not loop.last %}<br>{% endif %}
+                                {% endif %}
                             {% endfor %}
                             {% else %}
                                 {{ ucr.api_groups }}
@@ -78,13 +82,51 @@
                     </tr>    
                     {% endfor%}
                     {% for ur in user_roles %}
+                    {% for ns, priv in ur.items() %}
                     <tr>
-                        <td>{{ ur }}</td>
-                        <td></td>
-                        <td></td>
-                        <td></td>
-                        <td></td>
+                        <td>{{ ns }}</td>
+                        <td>
+                            {% if priv.api_groups %}
+                            {% for ag in priv.api_groups %}
+                                {% if arg|length %}
+                                    {{ ag }}{% if not loop.last %}<br>{% endif %}
+                                {% else %}
+                                    " "{% if not loop.last %}<br>{% endif %}
+                                {% endif %}
+                            {% endfor %}
+                            {% else %}
+                                {{ priv.api_groups }}
+                            {% endif %}
+                        </td>
+                        <td>
+                            {% if priv.resource_names %}
+                            {% for rn in priv.resource_names %}
+                                {{ rn }}{% if not loop.last %}<br>{% endif %}
+                            {% endfor %}
+                            {% else %}
+                                {{ priv.resource_names }}
+                            {% endif %}
+                        </td>
+                        <td>
+                            {% if priv.resources %}
+                            {% for r in priv.resources %}
+                                {{ r }}{% if not loop.last %}<br>{% endif %}
+                            {% endfor %}
+                            {% else %}
+                                {{ priv.resources }}
+                            {% endif %}
+                        </td>
+                        <td>
+                            {% if priv.verbs %}
+                            {% for v in priv.verbs %}
+                                {{ v }}{% if not loop.last %}<br>{% endif %}
+                            {% endfor %}
+                            {% else %}
+                                {{ priv.verbs }}
+                            {% endif %}
+                        </td>
                     </tr>
+                    {% endfor%}
                     {% endfor%}
                   </tbody>
             </table>

@@ -302,8 +302,6 @@ def k8sGetNodeMetric():
                                 tmpMemoryLimit += float(parse_quantity(container.resources.limits['memory']))
                         if container.resources.requests:
                             if 'cpu' in container.resources.requests:
-                                #print("base: %s" % container.resources.requests['cpu'])
-                                #print("convert: %s" % float(parse_quantity(container.resources.requests['cpu'])))
                                 tmpCpuRequest += float(parse_quantity(container.resources.requests['cpu']))
                             if 'memory' in container.resources.requests:
                                 tmpMemoryRequest += float(parse_quantity(container.resources.requests['memory']))
@@ -1523,8 +1521,6 @@ def k8sUserPriviligeList(username_role="Admin", user_token=None, user="balazs.pa
             for obj in crb.subjects:
                 if obj.kind == "User" and obj.name == user:
                     CLUSTER_ROLE_LIST.append(crb.role_ref.name)
-
-    ROLE_LIST.append(["kube-system", "kube-proxy"])
 
     for r in ROLE_LIST:
         with k8s_client.ApiClient() as api_client:

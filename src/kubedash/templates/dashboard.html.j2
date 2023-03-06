@@ -30,8 +30,8 @@
                     <canvas id="chart-{{ CPUkey }}-{{ RAMkey }}" cpu-percent="{{ CPUvalue }}" ram-percent="{{ RAMvalue }}" width="300" height="300"></canvas>
                 </div>
                 <div>
-                    CPU: {{ cluster_metrics.clusterTotals.cpu.get((CPUkey | split_uppercase)[0]) |round(1) }} COR <br>
-                    Memory: {{ cluster_metrics.clusterTotals.memory.get((RAMkey | split_uppercase)[0]) / 1024 / 1024 / 1024 |round|int  }} GB<br>
+                    CPU: {{ cluster_metrics.clusterTotals.cpu.capacity }} / {{ (cluster_metrics.clusterTotals.cpu.get((CPUkey | split_uppercase)[0])) |round(1) }} COR <br>
+                    Memory: {{ (cluster_metrics.clusterTotals.memory.capacity / 1024 / 1024 / 1024) |round(1) }} / {{ (cluster_metrics.clusterTotals.memory.get((RAMkey | split_uppercase)[0]) / 1024 / 1024 / 1024) |round(1) }} GB<br>
                 </div>
             </div>
              {% endif %}
