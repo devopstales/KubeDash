@@ -12,6 +12,7 @@ from kubernetes.client.rest import ApiException
 
 from functions.components import db
 from functions.user import email_check
+from functions.logger import logger
 
 ##############################################################
 ## Helper Functions
@@ -91,7 +92,7 @@ def ErrorHandler(error, action):
             flash("403 - Forbidden: User cannot %s" % action, "danger")
     else:
         flash(action, "danger")
-        #app.logger.error("Exception: %s \n" % action)
+        logger.error("Exception: %s \n" % action)
         print("Exception: %s \n" % action)
 
 ##############################################################
@@ -474,8 +475,8 @@ def k8sClusterRoleGet(name):
         return True, None
     except ApiException as e:
         if e.status != 404:
-            #app.logger.error("Exception when testing ClusterRole - %s : %s\n" % (name, e))
-            print("Exception when testing ClusterRole - %s : %s\n" % (name, e))
+            logger.error("Exception when testing ClusterRole - %s : %s\n" % (name, e))
+            # print("Exception when testing ClusterRole - %s : %s\n" % (name, e))
             return True, e
         else:
             return False, None
@@ -495,8 +496,8 @@ def k8sClusterRoleCreate(name, body):
         return True
     except ApiException as e:
         if e.status != 404:
-            #app.logger.error("Exception when testing ClusterRole - %s : %s\n" % (name, e))
-            print("Exception when testing ClusterRole - %s : %s\n" % (name, e))
+            logger.error("Exception when testing ClusterRole - %s : %s\n" % (name, e))
+            # print("Exception when testing ClusterRole - %s : %s\n" % (name, e))
             return False
         else:
             return False
@@ -662,11 +663,11 @@ def k8sClusterRolesAdd():
             continue
         else:
             if is_clusterrole_exists:
-                #app.logger.info("ClusterRole %s already exists" % name) # WARNING
-                print("ClusterRole %s already exists" % name)
+                logger.info("ClusterRole %s already exists" % name) # WARNING
+                # print("ClusterRole %s already exists" % name)
             else:
                 k8sClusterRoleCreate(name, roleVars[role])
-                #app.logger.info("ClusterRole %s created" % name) # WARNING
+                # logger.info("ClusterRole %s created" % name) # WARNING
                 print("ClusterRole %s created" % name)
 
     for role in namespaced_role_list:
@@ -676,12 +677,12 @@ def k8sClusterRolesAdd():
             continue
         else:
             if is_clusterrole_exists:
-                #app.logger.info("ClusterRole %s already exists" % name) # WARNING
-                print("ClusterRole %s already exists" % name)
+                logger.info("ClusterRole %s already exists" % name) # WARNING
+                # print("ClusterRole %s already exists" % name)
             else:
                 k8sClusterRoleCreate(name, roleVars[role])
-                #app.logger.info("ClusterRole %s created" % name) # WARNING
-                print("ClusterRole %s created" % name)
+                logger.info("ClusterRole %s created" % name) # WARNING
+                # print("ClusterRole %s created" % name)
 
 ##############################################################
 ## Kubernetes Nodes
@@ -1216,12 +1217,12 @@ def k8sRoleBindingGet(obeject_name, namespace):
         if e.status == 404:
             return False, None
         else:
-            #app.logger.error("Exception when testing NamespacedRoleBinding - %s in %s: %s\n" % (obeject_name, namespace, e))
-            print("Exception when testing NamespacedRoleBinding - %s in %s: %s\n" % (obeject_name, namespace, e))
+            logger.error("Exception when testing NamespacedRoleBinding - %s in %s: %s\n" % (obeject_name, namespace, e))
+            # print("Exception when testing NamespacedRoleBinding - %s in %s: %s\n" % (obeject_name, namespace, e))
             return None, e
     except:
-        #app.logger.error("Unknow Error")
-        print("Unknow Error")
+        logger.error("Unknow Error")
+        # print("Unknow Error")
         return None, "Unknow Error"
 
 def k8sRoleBindingCreate(user_role, namespace, username):
@@ -1263,8 +1264,8 @@ def k8sRoleBindingCreate(user_role, namespace, username):
         return True, None
     except ApiException as e:
         if e.status != 404:
-            #app.logger.error("Exception when creating RoleBinding - %s in %s: %s\n" % (obeject_name, namespace, e))
-            print("Exception when creating RoleBinding - %s in %s: %s\n" % (obeject_name, namespace, e))
+            logger.error("Exception when creating RoleBinding - %s in %s: %s\n" % (obeject_name, namespace, e))
+            # print("Exception when creating RoleBinding - %s in %s: %s\n" % (obeject_name, namespace, e))
             return True, e
         else:
             return False, None
@@ -1287,8 +1288,8 @@ def k8sRoleBindingAdd(user_role, username, user_namespaces, user_all_namespaces)
         else:
             if is_rolebinding_exists:
                 ErrorHandler("CannotConnect", "RoleBinding %s alredy exists in %s namespace" % (obeject_name, namespace))
-                #app.logger.info("RoleBinding %s alredy exists" % obeject_name) # WARNING
-                print("RoleBinding %s alredy exists" % obeject_name)
+                logger.info("RoleBinding %s alredy exists" % obeject_name) # WARNING
+                # print("RoleBinding %s alredy exists" % obeject_name)
             else:
                 k8sRoleBindingCreate(user_role, namespace, username)
 
@@ -1373,12 +1374,12 @@ def k8sClusterRoleBindingGet(obeject_name):
         if e.status == 404:
             return False, None
         else:
-            #app.logger.error("Exception when testing ClusterRoleBinding - %s: %s\n" % (obeject_name, e))
-            print("Exception when testing ClusterRoleBinding - %s: %s\n" % (obeject_name, e))
+            logger.error("Exception when testing ClusterRoleBinding - %s: %s\n" % (obeject_name, e))
+            # print("Exception when testing ClusterRoleBinding - %s: %s\n" % (obeject_name, e))
             return None, e
     except:
-        #app.logger.error("Unknow Error")
-        print("Unknow Error")
+        logger.error("Unknow Error")
+        # print("Unknow Error")
         return None, "Unknow Error"
 
 def k8sClusterRoleBindingCreate(user_cluster_role, username):
@@ -1418,11 +1419,11 @@ def k8sClusterRoleBindingCreate(user_cluster_role, username):
         flash("User Role Created Successfully", "success")
     except ApiException as e:
         if e.status != 404:
-            #app.logger.error("Exception when creating ClusterRoleBinding - %s: %s\n" % (user_cluster_role, e))
-            print("Exception when creating ClusterRoleBinding - %s: %s\n" % (user_cluster_role, e))
+            logger.error("Exception when creating ClusterRoleBinding - %s: %s\n" % (user_cluster_role, e))
+            # print("Exception when creating ClusterRoleBinding - %s: %s\n" % (user_cluster_role, e))
         else:
-            #app.logger.info("ClusterRoleBinding %s alredy exists" % obeject_name) # WARNING
-            print("ClusterRoleBinding %s alredy exists" % obeject_name)
+            logger.info("ClusterRoleBinding %s alredy exists" % obeject_name) # WARNING
+            # print("ClusterRoleBinding %s alredy exists" % obeject_name)
 
 
 def k8sClusterRoleBindingAdd(user_cluster_role, username):
@@ -1437,8 +1438,8 @@ def k8sClusterRoleBindingAdd(user_cluster_role, username):
     else:
         if is_clusterrolebinding_exists:
             ErrorHandler("CannotConnect", "ClusterRoleBinding %s alredy exists" % obeject_name)
-            #app.logger.info("ClusterRoleBinding %s alredy exists" % obeject_name) # WARNING
-            print("ClusterRoleBinding %s alredy exists" % obeject_name)
+            logger.info("ClusterRoleBinding %s alredy exists" % obeject_name) # WARNING
+            # print("ClusterRoleBinding %s alredy exists" % obeject_name)
         else:
             k8sClusterRoleBindingCreate(user_cluster_role, username)
 
