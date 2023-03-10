@@ -1,4 +1,4 @@
-import requests, json, yaml
+import requests, json, yaml, logging
 from flask import Blueprint, jsonify, render_template, session, flash, redirect, url_for, request, Response
 from flask_login import login_user, login_required, logout_user
 from werkzeug.security import check_password_hash
@@ -9,6 +9,7 @@ from functions.user import User, UsersRoles, Role, email_check, UserUpdate, User
 from functions.k8s import *
 
 main = Blueprint("main", __name__)
+logger = logging.getLogger(__name__)
 
 ##############################################################
 ## health

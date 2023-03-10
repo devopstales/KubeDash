@@ -35,12 +35,19 @@ def db_init():
 def create_app(config_name="development"):
     app = Flask(__name__, static_url_path='', static_folder='static')
 
+    import logging
+    global logger
+    logger=logging.getLogger()
+    logging.basicConfig(
+            level="INFO",
+            format='[%(asctime)s] %(name)s        %(levelname)s %(message)s'
+        )
+
     if os.getenv('FLASK_CONFIG') == "production":
         config_name = "production"
-        os.environ['LOGGING_LEVEL'] = "INFO"
     else:
-        os.environ['LOGGING_LEVEL'] = "INFO"
         os.environ['OAUTHLIB_INSECURE_TRANSPORT'] = '1'
+        logging.captureWarnings(True)
 
     app.config.from_object(app_config[config_name])
 
