@@ -1,5 +1,6 @@
 #!/usr/bin/env python3
 
+import logging
 from functions.components import db
 from flask_login import UserMixin
 from sqlalchemy.ext.mutable import MutableList
@@ -9,6 +10,8 @@ from requests_oauthlib import OAuth2Session
 ##############################################################
 ## functions
 ##############################################################
+
+logger = logging.getLogger(__name__)
 
 class Openid(UserMixin, db.Model):
     __tablename__ = 'openid'
