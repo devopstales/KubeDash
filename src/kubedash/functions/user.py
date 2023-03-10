@@ -1,13 +1,15 @@
 #!/usr/bin/env python3
 
 from functions.components import db, login_manager
-import re
+import re, logging
 from flask_login import UserMixin
 from werkzeug.security import generate_password_hash
 
 ##############################################################
 ## functions
 ##############################################################
+
+logger = logging.getLogger(__name__)
 
 def email_check(email):
     regex = r'\b[A-Za-z0-9._%+-]+@[A-Za-z0-9.-]+\.[A-Z|a-z]{2,}\b'
