@@ -27,11 +27,6 @@ roles = [
     "User",
 ]
 
-import os, logging
-## the cli client use http not https
-os.environ['OAUTHLIB_INSECURE_TRANSPORT'] = '1'
-logging.captureWarnings(True)
-
 def db_init():
     for r in roles:
         RoleCreate(r)
@@ -42,6 +37,10 @@ def create_app(config_name="development"):
 
     if os.getenv('FLASK_CONFIG') == "production":
         config_name = "production"
+        os.environ['LOGGING_LEVEL'] = "INFO"
+    else:
+        os.environ['LOGGING_LEVEL'] = "INFO"
+        os.environ['OAUTHLIB_INSECURE_TRANSPORT'] = '1'
 
     app.config.from_object(app_config[config_name])
 
