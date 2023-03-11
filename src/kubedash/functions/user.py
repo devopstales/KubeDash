@@ -57,8 +57,12 @@ def RoleCreate(name):
         db.session.add(role_data)
         db.session.commit()
 
-def UserCreate(username, password, email, user_type, role=None, tokens=None):
+def UserTest(username):
     user = User.query.filter_by(username=username).first()
+    return user
+
+def UserCreate(username, password, email, user_type, role=None, tokens=None):
+    user = UserTest(username)
     if not user:
         if password is None:
             user = User(
