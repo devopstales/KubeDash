@@ -7,7 +7,7 @@ from flask_healthz import healthz, HealthError
 from sqlalchemy_utils import database_exists
 
 from functions.components import db, login_manager, csrf
-from functions.routes import main
+from functions.routes import routes
 from functions.user import UserCreate, RoleCreate, UserTest
 from config import app_config
 
@@ -67,32 +67,12 @@ def create_app(config_name="development"):
             db_init()
 
     login_manager.init_app(app)
-    login_manager.login_view = "main.login"
+    login_manager.login_view = "routes.login"
     login_manager.session_protection = "strong"
 
     csrf.init_app(app)
 
     talisman = Talisman(app, content_security_policy=csp)
-    ##############################################################
-    ## Liveness and redyes probe
-    ##############################################################
-    app.register_blueprint(healthz, url_prefix="/healthz")
-
-    def liveness():
-        pass
-
-    def readiness():
-        try:
-            connect_database()
-        except Exception:
-            raise HealthError("Can't connect to the database")
-        
-    app.config.update(
-        HEALTHZ = {
-            "live": "app.liveness",
-            "ready": "app.readiness",
-        }
-    )
     ##############################################################
     ## Custom jinja2 filter
     ##############################################################
@@ -102,7 +82,7 @@ def create_app(config_name="development"):
     app.add_template_filter(j2_b64encode)
     app.add_template_filter(split_uppercase)
     
-    app.register_blueprint(main)
+    app.register_blueprint(routes)
     return app
 
 app = create_app()

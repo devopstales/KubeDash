@@ -8,24 +8,24 @@ from functions.sso import SSOSererGet, get_auth_server_info, SSOServerUpdate, SS
 from functions.user import User, UsersRoles, Role, email_check, UserUpdate, UserCreate, UserDelete, UserCreateSSO
 from functions.k8s import *
 
-main = Blueprint("main", __name__)
+routes = Blueprint("routes", __name__)
 logger = logging.getLogger(__name__)
 
 ##############################################################
 ## health
 ##############################################################
 
-@main.route('/ping', methods=['GET'])
+@routes.route('/ping', methods=['GET'])
 def test():
     return 'pong'
 
-@main.route('/health', methods=['GET'])
+@routes.route('/health', methods=['GET'])
 def health():
     resp = jsonify(health="healthy")
     resp.status_code = 200
     return resp
 
-@main.errorhandler(404)
+@routes.errorhandler(404)
 def page_not_found(e):
     return render_template('404.html.j2'), 404
 
@@ -33,7 +33,7 @@ def page_not_found(e):
 ## Login
 ##############################################################
 
-@main.route('/')
+@routes.route('/')
 def login():
         is_sso_enabled = False
         is_ldap_enabled = False
@@ -56,7 +56,7 @@ def login():
                 flash('Cannot connect to identity provider!', "warning")
 
         if "username" in session:
-            return redirect(url_for('main.dashboard'))
+            return redirect(url_for('routes.dashboard'))
         else:
             return render_template(
                 'login.html.j2',
@@ -65,7 +65,7 @@ def login():
                 auth_url = authorization_url
             )
         
-@main.route('/', methods=['POST'])
+@routes.route('/', methods=['POST'])
 def login_post():
     username = request.form.get('username')
     password = request.form.get('password')
@@ -77,7 +77,7 @@ def login_post():
     # take the user supplied password, hash it, and compare it to the hashed password in database
     if not user or not check_password_hash(user.password_hash, password):
         flash('Please check your login details and try again.', "warning")
-        return redirect(url_for('main.login')) # if user doesn't exist or password is wrong, reload the page
+        return redirect(url_for('routes.login')) # if user doesn't exist or password is wrong, reload the page
     else:
         user_role = UsersRoles.query.filter_by(user_id=user.id).first()
         role = Role.query.filter_by(id=user_role.role_id).first()
@@ -86,10 +86,10 @@ def login_post():
         session['user_role'] = role.name
         session['user_type'] = user.user_type
         session['ns_select'] = "default"
-        return redirect(url_for('main.dashboard'))
+        return redirect(url_for('routes.dashboard'))
 
 
-@main.route('/logout')
+@routes.route('/logout')
 @login_required
 def logout():
     logout_user()
@@ -98,13 +98,13 @@ def logout():
     if "oauth_token" in session:
         session.pop('oauth_token')
     session.clear()
-    return redirect(url_for('main.login'))
+    return redirect(url_for('routes.login'))
 
 ##############################################################
 ## Dashboard
 ##############################################################
 
-@main.route('/dashboard')
+@routes.route('/dashboard')
 @login_required
 def dashboard():
     cluster_metrics = k8sGetNodeMetric()
@@ -117,7 +117,7 @@ def dashboard():
 ## Users and Privileges
 ##############################################################
 
-@main.route('/users', methods=['GET', 'POST'])
+@routes.route('/users', methods=['GET', 'POST'])
 @login_required
 def users():
     if request.method == 'POST':
@@ -133,7 +133,7 @@ def users():
         users = users,
     )
 
-@main.route('/users/add', methods=['GET', 'POST'])
+@routes.route('/users/add', methods=['GET', 'POST'])
 @login_required
 def users_add():
     if request.method == 'POST':
@@ -145,30 +145,30 @@ def users_add():
         email_test = bool(email_check(email))
         if not email_test:
             flash("Email is not valid", "danger")
-            return redirect(url_for('main.users'))
+            return redirect(url_for('routes.users'))
         
         elif not len(password) >= 8:
             flash("Password must be 8 character in length", "danger")
-            return redirect(url_for('main.users'))
+            return redirect(url_for('routes.users'))
         else:
             UserCreate(username, password, email, "Local", None, role)
             flash("User Created Successfully", "success")
-            return redirect(url_for('main.users'))
+            return redirect(url_for('routes.users'))
     else:
-        return redirect(url_for('main.login'))
+        return redirect(url_for('routes.login'))
     
-@main.route('/users/delete', methods=['GET', 'POST'])
+@routes.route('/users/delete', methods=['GET', 'POST'])
 @login_required
 def users_delete():
     if request.method == 'POST':
         username = request.form['username']
         UserDelete(username)
         flash("User Deleted Successfully", "success")
-        return redirect(url_for('main.users'))
+        return redirect(url_for('routes.users'))
     else:
-        return redirect(url_for('main.login'))
+        return redirect(url_for('routes.login'))
     
-@main.route('/users/privileges', methods=['POST'])
+@routes.route('/users/privileges', methods=['POST'])
 @login_required
 def users_privilege_list():
     if request.method == 'POST':
@@ -185,9 +185,9 @@ def users_privilege_list():
             user_roles = user_roles,
         )
     else:
-        return redirect(url_for('main.login'))
+        return redirect(url_for('routes.login'))
 
-@main.route('/users/privileges/edit', methods=['POST'])
+@routes.route('/users/privileges/edit', methods=['POST'])
 @login_required
 def users_privileges_edit():
     if request.method == 'POST':
@@ -242,13 +242,13 @@ def users_privileges_edit():
             user_clusterRole_template_list = user_clusterRole_template_list,
         )
     else:
-        return redirect(url_for('main.login'))
+        return redirect(url_for('routes.login'))
 
 ##############################################################
 ## SSO Settings
 ##############################################################
 
-@main.route('/sso-config', methods=['GET', 'POST'])
+@routes.route('/sso-config', methods=['GET', 'POST'])
 @login_required
 def sso_config():
     if request.method == 'POST':
@@ -302,7 +302,7 @@ def sso_config():
                 scope  = ssoServer.scope,
             )
         
-@main.route("/callback", methods=["GET"])
+@routes.route("/callback", methods=["GET"])
 def callback():
     if 'error' in request.args:
         if request.args.get('error') == 'access_denied':
@@ -311,7 +311,7 @@ def callback():
             flash('Error encountered.', "danger")
     ssoServer = SSOSererGet()
     if ('code' not in request.args and 'state' not in request.args) or not ssoServer:
-        return redirect(url_for('main.login'))
+        return redirect(url_for('routes.login'))
     else:
         auth_server_info, oauth = get_auth_server_info()
         token_url = auth_server_info["token_endpoint"]
@@ -379,13 +379,13 @@ def callback():
         session['ns_select'] = "default"
 
         login_user(user)
-        return redirect(url_for('main.dashboard'))
+        return redirect(url_for('routes.dashboard'))
     
 ##############################################################
 ## Kubectl config
 ##############################################################
 
-@main.route('/dtlogin')
+@routes.route('/dtlogin')
 def index():
     auth_server_info, oauth = get_auth_server_info()
     auth_url = auth_server_info["authorization_endpoint"]
@@ -398,7 +398,7 @@ def index():
     session['oauth_state'] = state
     return redirect(authorization_url)
 
-@main.route('/cluster-config', methods=['GET', 'POST'])
+@routes.route('/cluster-config', methods=['GET', 'POST'])
 @login_required
 def k8s_config():
     if request.method == 'POST':
@@ -431,7 +431,7 @@ def k8s_config():
         k8s_config_list_length = k8s_config_list_length,
     )
 
-@main.route('/export')
+@routes.route('/export')
 @login_required
 def export():
     user = User.query.filter_by(username=session['username'], user_type = "OpenID").first()
@@ -479,7 +479,7 @@ def export():
             k8s_server_ca = k8s_server_ca
         )
 
-@main.route("/get-file")
+@routes.route("/get-file")
 def get_file():
     ssoServer = SSOSererGet()
     k8sConfig = k8sServerConfigGet()
@@ -554,7 +554,7 @@ def get_file():
 ## Nodes
 ##############################################################
 
-@main.route("/nodes", methods=['GET', 'POST'])
+@routes.route("/nodes", methods=['GET', 'POST'])
 @login_required
 def nodes():
     tr_select = None
@@ -579,7 +579,7 @@ def nodes():
 ## Namespaces
 ##############################################################
 
-@main.route("/namespaces")
+@routes.route("/namespaces")
 @login_required
 def namespaces():
     if session['user_type'] == "OpenID":
@@ -594,7 +594,7 @@ def namespaces():
         namespace_list = namespace_list,
     )
 
-@main.route("/namespaces/create", methods=['GET', 'POST'])
+@routes.route("/namespaces/create", methods=['GET', 'POST'])
 @login_required
 def namespaces_create():
     if request.method == 'POST':
@@ -606,11 +606,11 @@ def namespaces_create():
             user_token = None
 
         k8sNamespaceCreate(session['user_role'], user_token, namespace)
-        return redirect(url_for('main.namespaces'))
+        return redirect(url_for('routes.namespaces'))
     else:
-        return redirect(url_for('main.namespaces'))
+        return redirect(url_for('routes.namespaces'))
     
-@main.route("/namespaces/delete", methods=['GET', 'POST'])
+@routes.route("/namespaces/delete", methods=['GET', 'POST'])
 @login_required
 def namespaces_delete():
     if request.method == 'POST':
@@ -622,9 +622,9 @@ def namespaces_delete():
             user_token = None
 
         k8sNamespaceDelete(session['user_role'], user_token, namespace)
-        return redirect(url_for('main.namespaces'))
+        return redirect(url_for('routes.namespaces'))
     else:
-        return redirect(url_for('main.namespaces'))
+        return redirect(url_for('routes.namespaces'))
 
 ##############################################################
 ## Workloads
@@ -632,7 +632,7 @@ def namespaces_delete():
 ## Statefullsets
 ##############################################################
 
-@main.route("/statefulsets", methods=['GET', 'POST'])
+@routes.route("/statefulsets", methods=['GET', 'POST'])
 @login_required
 def statefulsets():
     tr_select = None
@@ -663,7 +663,7 @@ def statefulsets():
 ## Daemonsets
 ##############################################################
 
-@main.route("/daemonsets", methods=['GET', 'POST'])
+@routes.route("/daemonsets", methods=['GET', 'POST'])
 @login_required
 def daemonsets():
     tr_select = None
@@ -694,7 +694,7 @@ def daemonsets():
 ## Deployments
 ##############################################################
 
-@main.route("/deployments", methods=['GET', 'POST'])
+@routes.route("/deployments", methods=['GET', 'POST'])
 @login_required
 def deployments():
     tr_select = None
@@ -725,7 +725,7 @@ def deployments():
 ## ReplicaSets
 ##############################################################
 
-@main.route("/replicasets", methods=['GET', 'POST'])
+@routes.route("/replicasets", methods=['GET', 'POST'])
 @login_required
 def replicasets():
     tr_select = None
@@ -756,7 +756,7 @@ def replicasets():
 ## Pods
 ##############################################################
 
-@main.route("/pods", methods=['GET', 'POST'])
+@routes.route("/pods", methods=['GET', 'POST'])
 @login_required
 def pods():
     if request.method == 'POST':
@@ -781,7 +781,7 @@ def pods():
         namespaces = namespace_list,
     )
 
-@main.route('/pods/data', methods=['GET', 'POST'])
+@routes.route('/pods/data', methods=['GET', 'POST'])
 @login_required
 def pods_data():
     if request.method == 'POST':
@@ -804,7 +804,7 @@ def pods_data():
             pod_vulns = pod_vulns,
         )
     else:
-        return redirect(url_for('main.login'))
+        return redirect(url_for('routes.login'))
     
 ##############################################################
 ## Security
@@ -812,7 +812,7 @@ def pods_data():
 ## Service Account
 ##############################################################
 
-@main.route("/service-accounts", methods=['GET', 'POST'])
+@routes.route("/service-accounts", methods=['GET', 'POST'])
 @login_required
 def service_accounts():
     sa_select = None
@@ -842,7 +842,7 @@ def service_accounts():
 ##  Role
 ##############################################################
 
-@main.route("/roles", methods=['GET', 'POST'])
+@routes.route("/roles", methods=['GET', 'POST'])
 @login_required
 def roles():
     role_select = None
@@ -868,7 +868,7 @@ def roles():
         namespaces = namespace_list,
     )
 
-@main.route("/roles/data", methods=['GET', 'POST'])
+@routes.route("/roles/data", methods=['GET', 'POST'])
 @login_required
 def role_data():
     if request.method == 'POST':
@@ -896,13 +896,13 @@ def role_data():
             r_name = r_name,
         )
     else:
-        return redirect(url_for('main.login'))
+        return redirect(url_for('routes.login'))
     
 ##############################################################
 ##  Role Binding
 ##############################################################
 
-@main.route("/role-bindings", methods=['GET', 'POST'])
+@routes.route("/role-bindings", methods=['GET', 'POST'])
 @login_required
 def role_bindings():
     if session['user_type'] == "OpenID":
@@ -929,7 +929,7 @@ def role_bindings():
 ## Cluster Role
 ##############################################################
 
-@main.route("/cluster-roles", methods=['GET', 'POST'])
+@routes.route("/cluster-roles", methods=['GET', 'POST'])
 @login_required
 def cluster_roles():
     cluster_role_select = None
@@ -949,7 +949,7 @@ def cluster_roles():
         cluster_role_select = cluster_role_select,
     )
 
-@main.route("/cluster-roles/data", methods=['GET', 'POST'])
+@routes.route("/cluster-roles/data", methods=['GET', 'POST'])
 @login_required
 def cluster_role_data():
     if request.method == 'POST':
@@ -967,13 +967,13 @@ def cluster_role_data():
             cr_name = cr_name,
         )
     else:
-        return redirect(url_for('main.login'))
+        return redirect(url_for('routes.login'))
     
 ##############################################################
 ## Cluster Role Bindings
 ##############################################################
 
-@main.route("/cluster-role-bindings")
+@routes.route("/cluster-role-bindings")
 @login_required
 def cluster_role_bindings():
     if session['user_type'] == "OpenID":
@@ -991,7 +991,7 @@ def cluster_role_bindings():
 ## Helm Charts
 ##############################################################
 
-@main.route('/charts', methods=['GET', 'POST'])
+@routes.route('/charts', methods=['GET', 'POST'])
 @login_required
 def charts():
     if session['user_type'] == "OpenID":
