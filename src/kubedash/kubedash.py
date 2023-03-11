@@ -107,5 +107,26 @@ def create_app(config_name="development"):
 
 app = create_app()
 
+##############################################################
+## Liveness and redyes probe
+##############################################################
+app.register_blueprint(healthz, url_prefix="/healthz")
+
+def liveness():
+    pass
+
+def readiness():
+    try:
+        connect_database()
+    except Exception:
+        raise HealthError("Can't connect to the database")
+    
+app.config.update(
+    HEALTHZ = {
+        "live":  app.name + ".liveness",
+        "ready":  app.name + ".readiness",
+    }
+)
+
 if __name__ == '__main__':
     app.run(port=8000)

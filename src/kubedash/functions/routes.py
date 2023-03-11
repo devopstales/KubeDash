@@ -338,8 +338,7 @@ def callback():
 ## Kubectl config
         k8sConfig = k8sServerConfigGet()
         if k8sConfig is None:
-            #app.logger.error ("Kubectl Integration is not configured.")
-            print("Kubectl Integration is not configured.")
+            logger.error ("Kubectl Integration is not configured.")
         else:
             # add /info for k8s plugin
             # test /info anf send answer if is dtlogin
@@ -355,13 +354,10 @@ def callback():
                     "client_secret": ssoServer.client_secret,
                     }
                 )
-                #app.logger.info("Config sent to client")
-                #app.logger.info("Answer from clinet: %s" % x.text)
-                print("Config sent to client")
-                print("Answer from clinet: %s" % x.text)
+                logger.info("Config sent to client")
+                logger.info("Answer from clinet: %s" % x.text)
             except:
-                #app.logger.error ("Kubectl print back error")
-                print("Kubectl print back error")
+                logger.error ("Kubectl print back error")
 
         email = user_data['email']
         username = user_data["preferred_username"]
