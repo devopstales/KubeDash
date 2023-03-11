@@ -73,7 +73,26 @@ def create_app(config_name="development"):
     csrf.init_app(app)
 
     talisman = Talisman(app, content_security_policy=csp)
+    ##############################################################
+    ## Liveness and redyes probe
+    ##############################################################
+    app.register_blueprint(healthz, url_prefix="/healthz")
 
+    def liveness():
+        pass
+
+    def readiness():
+        try:
+            connect_database()
+        except Exception:
+            raise HealthError("Can't connect to the database")
+        
+    app.config.update(
+        HEALTHZ = {
+            "live": "app.liveness",
+            "ready": "app.readiness",
+        }
+    )
     ##############################################################
     ## Custom jinja2 filter
     ##############################################################
