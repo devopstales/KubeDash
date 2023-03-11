@@ -86,15 +86,18 @@ def calPercent(x, y, integer = False):
     return percent
 
 def ErrorHandler(error, action):
-    if 'status' in error:
-        if error.status == 401:
-            flash("401 - Unauthorized: User cannot connect to Kubernetes", "danger")
-        elif error.status == 403:
-            flash("403 - Forbidden: User cannot %s" % action, "danger")
+    if hasattr(error, '__iter__'):
+        if 'status' in error:
+            if error.status == 401:
+                flash("401 - Unauthorized: User cannot connect to Kubernetes", "danger")
+            elif error.status == 403:
+                flash("403 - Forbidden: User cannot %s" % action, "danger")
+        else:
+            flash(action, "danger")
+            logger.error("Exception: %s \n" % action)
     else:
         flash(action, "danger")
         logger.error("Exception: %s \n" % action)
-        print("Exception: %s \n" % action)
 
 ##############################################################
 ## Kubernetes Config
@@ -244,9 +247,12 @@ def k8sNamespaceDelete(username_role, user_token, ns_name):
 def k8sClientConfigGet(username_role, user_token):
     if username_role == "Admin":
         if os.getenv('FLASK_CONFIG') == "production":
-            k8s_config.load_incluster_config()
-        else:
             k8s_config.load_kube_config()
+        else:
+            try:
+                k8s_config.load_incluster_config()
+            except k8s_config.ConfigException as error:
+                ErrorHandler(error, "Could not configure kubernetes python client")
     elif username_role == "User":
         k8sConfig = k8sServerConfigGet()
         k8s_server_url = k8sConfig.k8s_server_url
@@ -371,7 +377,7 @@ def k8sGetNodeMetric():
         #print(json_formatted_str)
         return clusterMetric
     except ApiException as error:
-        ErrorHandler(error, "get cluster role bindings list")
+        ErrorHandler(error, "Cannot Connect to Kubernetes")
         clusterMetric = {
             "nodes": [],
             "clusterTotals": {
