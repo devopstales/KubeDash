@@ -8,6 +8,7 @@ from sqlalchemy_utils import database_exists
 
 from functions.components import db, login_manager, csrf
 from functions.routes import routes
+from functions.commands import commands
 from functions.user import UserCreate, RoleCreate, UserTest
 from config import app_config
 
@@ -83,6 +84,7 @@ def create_app(config_name="development"):
     app.add_template_filter(split_uppercase)
     
     app.register_blueprint(routes)
+    app.register_blueprint(commands)
     return app
 
 app = create_app()
