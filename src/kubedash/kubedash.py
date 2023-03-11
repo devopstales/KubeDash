@@ -3,11 +3,12 @@
 import os
 from flask import Flask
 from flask_talisman import Talisman
+from flask_healthz import healthz, HealthError
 from sqlalchemy_utils import database_exists
 
 from functions.components import db, login_manager, csrf
 from functions.routes import main
-from functions.user import UserCreate, RoleCreate
+from functions.user import UserCreate, RoleCreate, UserTest
 from config import app_config
 
 csp = {
@@ -32,6 +33,13 @@ def db_init():
         RoleCreate(r)
     UserCreate("admin", "admin", None, "Local", "Admin")
 
+def connect_database():
+    user = UserTest('Admin')
+    if user:
+        return True
+    else:
+        return False
+
 def create_app(config_name="development"):
     app = Flask(__name__, static_url_path='', static_folder='static')
 
@@ -48,6 +56,7 @@ def create_app(config_name="development"):
     else:
         os.environ['OAUTHLIB_INSECURE_TRANSPORT'] = '1'
         logging.captureWarnings(True)
+    logger.info("Running in %s mode" % config_name)
 
     app.config.from_object(app_config[config_name])
 
@@ -56,8 +65,6 @@ def create_app(config_name="development"):
         with app.app_context():
             db.create_all()
             db_init()
-    else:
-        db_init()
 
     login_manager.init_app(app)
     login_manager.login_view = "main.login"
@@ -80,6 +87,27 @@ def create_app(config_name="development"):
     return app
 
 app = create_app()
+
+##############################################################
+## Liveness and redyes probe
+##############################################################
+app.register_blueprint(healthz, url_prefix="/healthz")
+
+def liveness():
+    pass
+
+def readiness():
+    try:
+        connect_database()
+    except Exception:
+        raise HealthError("Can't connect to the database")
+    
+app.config.update(
+    HEALTHZ = {
+        "live":  app.name + ".liveness",
+        "ready":  app.name + ".readiness",
+    }
+)
 
 if __name__ == '__main__':
     app.run(port=8000)
