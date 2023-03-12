@@ -10,7 +10,7 @@ class Config(object):
     REMEMBER_COOKIE_HTTPONLY = True
     SESSION_COOKIE_SAMESITE = "Lax"
     PERMANENT_SESSION_LIFETIME = 600
-    SECRET_KEY = "FesC9cBSuxakv9yN0vBY"
+    SECRET_KEY = "develop"
 
 class DevelopmentConfig(Config):
     """
