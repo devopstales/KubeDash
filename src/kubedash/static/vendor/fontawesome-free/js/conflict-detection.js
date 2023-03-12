@@ -559,6 +559,7 @@
       function md5(string, key, raw) {
         if (!key) {
           if (!raw) {
+            // file deepcode ignore InsecureHash: <please specify a reason of ignoring this>
             return hexMD5(string);
           }
 

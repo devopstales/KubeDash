@@ -56,6 +56,7 @@ def create_app(config_name="development"):
         config_name = "production"
     else:
         os.environ['OAUTHLIB_INSECURE_TRANSPORT'] = '1'
+        app.config['SECRET_KEY'] = os.urandom(12).hex()
         logging.captureWarnings(True)
     logger.info("Running in %s mode" % config_name)
 
