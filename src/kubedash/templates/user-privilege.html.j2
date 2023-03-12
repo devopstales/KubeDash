@@ -58,8 +58,8 @@
                         </div>
                     </div>
                     <!-- hidden -->
-                    <hr id="hiddenHR" style="display: none;">
-                    <div id="hiddenDIV" style="display: none;">
+                    <hr id="hiddenHR" hidden=true>
+                    <div id="hiddenDIV" hidden=true>
                         <div class="form-row">
                             <div class="form-group col-md-4">
                                 <label for="user_namespaced_role_2">TEMPLATE</label>
@@ -118,8 +118,8 @@
         });
         function unHide() {
             var x = document.getElementById("hiddenDIV");
-            if (x.style.display === "none") {
-              x.style.display = "block";
+            if (x.hidden === true) {
+              x.hidden=false;
               $('.select2').select2({
                 data: namespaceList,
                 tags: true,
@@ -128,13 +128,13 @@
                 placeholder: "Select namespaces",
               });
             } else {
-              x.style.display = "none";
+              x.hidden=true;
             }
             var y = document.getElementById("hiddenHR");
-            if (y.style.display === "none") {
-              y.style.display = "block";
+            if (y.hidden === true) {
+              y.hidden=false;
             } else {
-              y.style.display = "none";
+              y.hidden=true;
             }
             if ( document.getElementById("addBTN").classList.contains('btn-outline-secondary') ) {
               document.getElementById("addBTN").classList.remove('btn-outline-secondary');

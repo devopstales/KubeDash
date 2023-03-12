@@ -5,7 +5,7 @@ from werkzeug.security import check_password_hash
 from itsdangerous import base64_encode, base64_decode
 
 from functions.sso import SSOSererGet, get_auth_server_info, SSOServerUpdate, SSOServerCreate
-from functions.user import User, UsersRoles, Role, email_check, UserUpdate, UserCreate, UserDelete, UserCreateSSO
+from functions.user import User, UsersRoles, Role, email_check, UserUpdate, UserCreate, UserDelete, UserCreateSSO, UserUpdatePassword
 from functions.k8s import *
 
 routes = Blueprint("routes", __name__)
@@ -108,6 +108,10 @@ def logout():
 @login_required
 def dashboard():
     cluster_metrics = k8sGetNodeMetric()
+    username = session['username']
+    user = User.query.filter_by(username="admin", user_type = "Local").first()
+    if username == "admin" and check_password_hash(user.password_hash, "admin"):
+        flash('<a href="/profile">You should change the default password!</a>', "warning")
     return render_template(
         'dashboard.html.j2',
         cluster_metrics = cluster_metrics
@@ -116,6 +120,33 @@ def dashboard():
 ##############################################################
 ## Users and Privileges
 ##############################################################
+
+@routes.route('/profile', methods=['GET', 'POST'])
+@login_required
+def profile():
+    username = session['username']
+    user = User.query.filter_by(username=username).first()
+    user_role = UsersRoles.query.filter_by(user_id=user.id).first()
+    role = Role.query.filter_by(id=user_role.role_id).first()
+
+    if request.method == 'POST':
+        old_password = request.form['old_password']
+        new_password = request.form['new_password']
+        if check_password_hash(user.password_hash, old_password):
+            print(new_password)
+            updated = UserUpdatePassword(username, new_password)
+            if updated:
+                flash("User Updated Successfully", "success")
+            else:
+                flash("Can't update user", "danger")
+        else:
+            flash("Wrong Current Password", "danger")
+
+    return render_template(
+        'profile.html.j2',
+        user = user,
+        user_role = role.name,
+    )
 
 @routes.route('/users', methods=['GET', 'POST'])
 @login_required

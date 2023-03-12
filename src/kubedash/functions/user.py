@@ -100,3 +100,12 @@ def UserDelete(username):
 
 def UserCreateSSO(username, email, tokens, user_type):
     UserCreate(username, None, email, user_type, "User", tokens)
+
+def UserUpdatePassword(username, password):
+        user = User.query.filter_by(username=username).first()
+        if user:
+            user.password_hash = generate_password_hash(password, method='sha256')
+            db.session.commit()
+            return True
+        else:
+            return False
