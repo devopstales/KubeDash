@@ -62,8 +62,8 @@ def create_app(config_name="development"):
 
     app.config.from_object(app_config[config_name])
 
-    db.init_app(app)
     if not database_exists("sqlite:///"+config_name+".db"):
+        db.init_app(app)
         with app.app_context():
             db.create_all()
             db_init()

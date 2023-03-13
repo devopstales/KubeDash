@@ -194,13 +194,15 @@ def k8sNamespacesGet(username_role, user_token):
                 }
                 NAMESPACE_DADTA['name'] = ns.metadata.name
                 NAMESPACE_DADTA['status'] = ns.status.__dict__['_phase']
-                for key, value in ns.metadata.labels.items():
-                    NAMESPACE_DADTA['labels'].append(key + "=" + value)
+                if ns.metadata.labels:
+                    for key, value in ns.metadata.labels.items():
+                        NAMESPACE_DADTA['labels'].append(key + "=" + value)
                 NAMESPACE_LIST.append(NAMESPACE_DADTA)
             return NAMESPACE_LIST
         else:
             return NAMESPACE_LIST
     except Exception as error:
+        ErrorHandler("CannotConnect", "k8sNamespacesGet: %s" % error)
         return NAMESPACE_LIST
     
 def k8sNamespaceCreate(username_role, user_token, ns_name):
@@ -246,9 +248,9 @@ def k8sNamespaceDelete(username_role, user_token, ns_name):
 
 def k8sClientConfigGet(username_role, user_token):
     if username_role == "Admin":
-        if os.getenv('FLASK_CONFIG') == "production":
+        try:
             k8s_config.load_kube_config()
-        else:
+        except:
             try:
                 k8s_config.load_incluster_config()
             except k8s_config.ConfigException as error:
@@ -1453,24 +1455,23 @@ def k8sHelmChartListGet(username_role, user_token, namespace):
             if secret.type == 'helm.sh/release.v1':
                 base64_secret_data = str(base64_decode(secret.data['release']), 'UTF-8')
                 secret_data = json.loads(zlib.decompress(base64_decode(base64_secret_data), 16 + zlib.MAX_WBITS).decode('utf-8'))
-                if secret_data['chart']['metadata']['icon']:
-                    CHART_DATA.append({
-                        'icon': secret_data['chart']['metadata']['icon'],
-                        'status': secret_data['info']['status'],
-                        'chart': secret_data['chart']['metadata']['name'] + "-" + secret_data['chart']['metadata']['version'],
-                        'appVersion': secret_data['chart']['metadata']['appVersion'],
-                        'revision': secret_data['version'],
-                        'updated': secret_data['info']['last_deployed'],
-                    })
+                if 'icon' in secret_data['chart']['metadata']:
+                    helm_icon = secret_data['chart']['metadata']['icon']
                 else:
-                    CHART_DATA.append({
-                        'icon': None,
-                        'status': secret_data['info']['status'],
-                        'chart': secret_data['chart']['metadata']['name'] + "-" + secret_data['chart']['metadata']['version'],
-                        'appVersion': secret_data['chart']['metadata']['appVersion'],
-                        'revision': secret_data['version'],
-                        'updated': secret_data['info']['last_deployed'],
-                    })
+                    helm_icon = None
+                if 'appVersion' in secret_data['chart']['metadata']:
+                    helm_api_version = secret_data['chart']['metadata']['appVersion']
+                else:
+                    helm_api_version = None
+
+                CHART_DATA.append({
+                    'icon': helm_icon,
+                    'status': secret_data['info']['status'],
+                    'chart': secret_data['chart']['metadata']['name'] + "-" + secret_data['chart']['metadata']['version'],
+                    'appVersion': helm_api_version,
+                    'revision': secret_data['version'],
+                    'updated': secret_data['info']['last_deployed'],
+                })
                 HAS_CHART = True
                 CHART_LIST.update({secret_data['name']: CHART_DATA})
             
