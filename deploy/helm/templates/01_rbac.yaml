@@ -1,0 +1,46 @@
+apiVersion: v1
+kind: ServiceAccount
+metadata:
+  name: {{ include "kubedash.serviceAccountName" . }}
+  labels:
+    app: kubedash
+    {{- include "kubedash.labels" . | nindent 4 }}
+  {{- with .Values.serviceAccount.annotations }}
+  annotations:
+    {{- toYaml . | nindent 4 }}
+  {{- end }}
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRole
+metadata:
+  name: {{ include "kubedash.serviceAccountName" . }}
+  labels:
+    app: kubedash
+    {{- include "kubedash.labels" . | nindent 4 }}
+rules:
+- apiGroups:
+  - '*'
+  resources:
+  - '*'
+  verbs:
+  - '*'
+- nonResourceURLs:
+  - '*'
+  verbs:
+  - '*'
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRoleBinding
+metadata:
+  name: {{ include "kubedash.serviceAccountName" . }}
+  labels:
+    app: kubedash
+    {{- include "kubedash.labels" . | nindent 4 }}
+roleRef:
+  apiGroup: rbac.authorization.k8s.io
+  kind: ClusterRole
+  name: {{ include "kubedash.serviceAccountName" . }}
+subjects:
+- kind: ServiceAccount
+  name: {{ include "kubedash.serviceAccountName" . }}
+  namespace: {{ .Release.Namespace }}
