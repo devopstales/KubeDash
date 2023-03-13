@@ -1,0 +1,19 @@
+apiVersion: v1
+kind: Service
+metadata:
+  labels:
+    app: kubedash
+  name: kubedash-ui
+  namespace: kubedash
+spec:
+  ports:
+  - name: http
+    port: 8000
+    protocol: TCP
+    targetPort: 8000
+  selector:
+    app: kubedash
+  sessionAffinity: None
+  type: ClusterIP
+status:
+  loadBalancer: {}
