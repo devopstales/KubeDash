@@ -1,0 +1,40 @@
+TimeZone: "CET"
+logLevel: "INFO"
+flaskConfig: "production" #or development
+
+serviceAccount:
+  create: true
+  name: "kubedash-admin"
+
+image:
+  repository: devopstales/kubedash
+  tag: 0.1-devel
+  pullPolicy: Always
+
+podSecurityContext:
+  runAsNonRoot: true
+  runAsUser: 10001
+
+containerSecurityContext:
+  allowPrivilegeEscalation: false
+  capabilities:
+    drop: ["all"]
+
+ingress:
+  enabled: true
+  url: "kubedash.mydomain.intra"
+  annotations:
+    nginx.ingress.kubernetes.io/proxy-body-size: "10m"
+    kubernetes.io/ingress.class: nginx
+  tls:
+    enabled: true
+    tlsSecret: ""
+    certManager:
+      enabled: false
+      clusterIssuer: "letsencrypt"
+  whitelist:
+    enabled: false
+    ips: []
+  
+route:
+  enabled: false
