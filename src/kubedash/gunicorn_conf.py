@@ -1,7 +1,7 @@
 import os
 
 # Gunicorn config variables
-bind = "0.0.0.0:80"
+bind = "0.0.0.0:8000"
 loglevel = "info"
 errorlog = "-"  # stderr
 accesslog = "-"  # stdout

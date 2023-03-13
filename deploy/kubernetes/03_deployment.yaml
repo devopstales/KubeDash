@@ -1,0 +1,45 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: kubedash-ui
+  namespace: kubedash
+spec:
+  selector:
+    matchLabels:
+      app: kubedash
+  template:
+    metadata:
+      labels:
+        app: kubedash
+    spec:
+      serviceAccountName: kubedash-admin
+      securityContext:
+        runAsNonRoot: true
+        runAsUser: 10001
+      containers:
+      - name: kubedash
+        image: devopstales/kubedash:0.1-devel
+        imagePullPolicy: Always
+        securityContext:
+          allowPrivilegeEscalation: false
+          capabilities:
+            drop: ["all"]
+        env:
+          - name: FLASK_CONFIG
+            value: "development"
+        livenessProbe:
+          httpGet:
+            path: /healthz/live
+            port: 8000
+          initialDelaySeconds: 5
+          timeoutSeconds: 1
+        readinessProbe:
+          httpGet:
+            path: /healthz/ready
+            port: 8000
+          initialDelaySeconds: 5
+          timeoutSeconds: 1
+        ports:
+        - containerPort: 8000
+          protocol: TCP
+          name: http
