@@ -10,6 +10,7 @@ jobs:
     runs-on: ubuntu-20.04
     permissions:
       contents: write
+      packages: write
     steps:
       - name: Checkout code
         uses: actions/checkout@v3
@@ -30,6 +31,13 @@ jobs:
           username: ${{ secrets.DOCKER_USERNAME }}
           password: ${{ secrets.DOCKER_PASSWORD }}
 
+      - name: Login to GitHub Packages
+        uses: docker/login-action@v1
+        with:
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+
       - name: Prepare kubedash
         id: prep_kubedash
         run: |
@@ -48,6 +56,7 @@ jobs:
           build-args:
             ARCH=amd64/
           tags: devopstales/kubedash:${{github.ref_name}}-amd64
+            ghcr.io/devopstales/kubedash:${{github.ref_name}}-amd64
           push: true
           provenance: false
 
@@ -58,31 +67,35 @@ jobs:
           build-args:
             ARCH=arm64v8/
           tags: devopstales/kubedash:${{github.ref_name}}-arm64v8
+            ghcr.io/devopstales/kubedash:${{github.ref_name}}-arm64v8
           push: true
           provenance: false
 
-      - name: Create and push kubedash manifest images
+      - name: Create and push kubedash manifest images to dockerhub
         uses: Noelware/docker-manifest-action@master
         with:
           inputs: devopstales/kubedash:${{github.ref_name}}
           images: devopstales/kubedash:${{github.ref_name}}-amd64,devopstales/kubedash:${{github.ref_name}}-arm64v8
           push: true
 
+      - name: Create and push kubedash manifest images to github
+        uses: Noelware/docker-manifest-action@master
+        with:
+          inputs: ghcr.io/devopstales/kubedash:${{github.ref_name}}
+          images: ghcr.io/devopstales/kubedash:${{github.ref_name}}-amd64,ghcr.io/devopstales/kubedash:${{github.ref_name}}-arm64v8
+          push: true
+
   release:
     name: Create Release
     runs-on: ubuntu-20.04
+    permissions:
+      contents: write
+      pull-requests: write
     needs:
       - build-kubedash
     steps:
       - name: Create Release
         id: create_release
-        uses: actions/create-release@v1
+        uses: release-drafter/release-drafter@v5
         env:
-          GITHUB_TOKEN: ${{ secrets.GH_PAT }}
-        with:
-          tag_name: ${{github.ref_name}}
-          release_name: Release ${{github.ref_name}}
-          body: |
-            ### Changes in this Release
-          draft: true
-          prerelease: false
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
