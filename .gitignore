@@ -6,8 +6,7 @@ test*
 *manage.py
 
 # deploy
-docker/*.py
-docker/*/*.py
+docker/kubedash/kubedash
 
 # enable tests
 !tests
