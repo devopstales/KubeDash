@@ -123,7 +123,15 @@
                       <td>{{ user.username }}</td>
                     {% endif %}
                     <td>{{ user.email }}</td>
-                    <td>{{ session['user_role'] }}</td>
+                    {% for ur in user_role %}
+                      {% if ur.user_id == user.id %}
+                        {% for r in roles %}
+                          {% if r.id == ur.role_id %}
+                            <td>{{ r.name }}</td>
+                          {% endif %}
+                        {% endfor %}
+                      {% endif %}
+                    {% endfor %}
                     <td>{{ user.user_type }}</td>
                     <td>
                       {% if session['user_role'] == "Admin" and user.username != "admin" %}
