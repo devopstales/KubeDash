@@ -158,10 +158,14 @@ def users():
         flash("User Updated Successfully", "success")
 
     users = User.query
+    user_role = UsersRoles.query
+    roles = Role.query
 
     return render_template(
         'users.html.j2',
         users = users,
+        user_role = user_role,
+        roles = roles,
     )
 
 @routes.route('/users/add', methods=['GET', 'POST'])
