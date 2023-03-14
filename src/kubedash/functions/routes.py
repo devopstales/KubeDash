@@ -155,9 +155,11 @@ def users():
         username = request.form['username']
         role = request.form['role']
         type = request.form['type']
-        UserUpdate(username, role, type)
         if type != "Local":
-            print() # generate certificate k8sCreateUser()
+            private_key_base64, user_certificate_base64 = k8sCreateUser(username)
+            KubectlConfigStore(username, type, private_key_base64, user_certificate_base64)
+
+        UserUpdate(username, role, type)
         flash("User Updated Successfully", "success")
 
     users = User.query
@@ -194,12 +196,9 @@ def users_add():
         else:
             if type != "Local":
                 private_key_base64, user_certificate_base64 = k8sCreateUser(username)
-                KubectlConfigStore(type, private_key_base64, user_certificate_base64)
-                kubectl_config = type
-            else:
-                kubectl_config = None
+                KubectlConfigStore(username, type, private_key_base64, user_certificate_base64)
 
-            UserCreate(username, password, email, type, role, None, kubectl_config)
+            UserCreate(username, password, email, type, role, None)
             flash("User Created Successfully", "success")
             return redirect(url_for('routes.users'))
     else:
