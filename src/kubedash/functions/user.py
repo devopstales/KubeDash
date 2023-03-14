@@ -33,7 +33,7 @@ class User(UserMixin, db.Model):
                             backref=db.backref('users', lazy='dynamic'))
     user_type = db.Column(db.String(5), nullable=False)
     tokens = db.Column(db.Text, nullable=True)
-    kubectl_config = db.relationship('kubectlConfig', secondary='users_kubectl',
+    kubectl_config = db.relationship('KubectlConfig', secondary='users_kubectl',
                             backref=db.backref('users', lazy='dynamic'))
 
     def __repr__(self):
@@ -85,7 +85,7 @@ def UserCreate(username, password, email, user_type, role=None, tokens=None):
         if role:
             role_data = Role.query.filter(Role.name == role).first()
             user.roles.append(role_data)
-        kubectl = kubectlConfig.query.filter(kubectlConfig.name == username).first()
+        kubectl = KubectlConfig.query.filter(KubectlConfig.name == username).first()
         if kubectl:
             user.kubectl_config.append(kubectl)
         db.session.add(user)
@@ -94,7 +94,7 @@ def UserCreate(username, password, email, user_type, role=None, tokens=None):
 def UserUpdate(username, role, user_type):
     user = User.query.filter_by(username=username).first()
     if user:
-        kubectl = kubectlConfig.query.filter(kubectlConfig.name == username).first()
+        kubectl = KubectlConfig.query.filter(KubectlConfig.name == username).first()
         if kubectl:
             user.kubectl_config.append(kubectl)
         user.role = role
@@ -103,7 +103,16 @@ def UserUpdate(username, role, user_type):
 
 def UserDelete(username):
     user = User.query.filter_by(username=username).first()
+    user_role = UsersRoles.query.filter_by(user_id=user.id).first()
+    user_kubectl = UsersKubectl.query.filter_by(user_id=user.id).first()
+    kubectl_config = KubectlConfig.query.filter_by(name=username).first()
     if user:
+        if user_role:
+            db.session.delete(user_role)
+        if user_kubectl:
+            db.session.delete(user_kubectl)
+        if kubectl_config:
+            db.session.delete(kubectl_config)
         db.session.delete(user)
         db.session.commit()
 
@@ -119,8 +128,8 @@ def UserUpdatePassword(username, password):
         else:
             return False
         
-# Define the kubectlConfig data model
-class kubectlConfig(db.Model):
+# Define the KubectlConfig data model
+class KubectlConfig(db.Model):
     __tablename__ = 'kubectl_config'
     id = db.Column(db.Integer(), primary_key=True)
     name = db.Column(db.String(50), nullable=False, server_default=u'', unique=False)
@@ -136,9 +145,9 @@ class UsersKubectl(db.Model):
     role_id = db.Column(db.Integer(), db.ForeignKey('kubectl_config.id', ondelete='CASCADE'))
 
 def KubectlConfigStore(name, cluster, private_key_base64, user_certificate_base64):
-    kubectl = kubectlConfig.query.filter(kubectlConfig.name == name).first()
+    kubectl = KubectlConfig.query.filter_by(name=name).first()
     if not kubectl:
-        kubectl_config = kubectlConfig(
+        kubectl_config = KubectlConfig(
             name = name,
             cluster = cluster,
             private_key = private_key_base64,
