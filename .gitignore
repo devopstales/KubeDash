@@ -11,6 +11,7 @@ docker/kubedash/kubedash
 
 # enable tests
 !tests
+!database/.gitkeep
 
 # mkdocs documentation
 /site

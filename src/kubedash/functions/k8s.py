@@ -1,10 +1,13 @@
 #!/usr/bin/env python3
 
-import zlib, json, os, logging
+import zlib, json, logging, base64
 from flask import flash
 from flask_login import UserMixin
-from itsdangerous import base64_decode
+from itsdangerous import base64_decode, base64_encode
 from decimal import Decimal, InvalidOperation
+from OpenSSL import crypto
+from datetime import datetime, timezone
+
 
 import kubernetes.config as k8s_config
 import kubernetes.client as k8s_client
@@ -100,11 +103,11 @@ def ErrorHandler(error, action):
         logger.error("Exception: %s \n" % action)
 
 ##############################################################
-## Kubernetes Config
+## Kubernetes Cluster Config
 ##############################################################
 
 class k8sConfig(UserMixin, db.Model):
-    __tablename__ = 'k8s_config'
+    __tablename__ = 'k8s_cluster_config'
     id = db.Column(db.Integer, primary_key=True)
     k8s_server_url = db.Column(db.Text, unique=True, nullable=False)
     k8s_context = db.Column(db.Text, unique=True, nullable=False)
@@ -146,6 +149,14 @@ def k8sServerConfigUpdate(k8s_context_old, k8s_server_url, k8s_context, k8s_serv
         k8s.k8s_context = k8s_context
         k8s.k8s_server_ca = k8s_server_ca
         db.session.commit()
+
+def k8sServerContextsList():
+    k8s_contexts = []
+    k8s_config_list = k8sConfig.query.all()
+    for config in k8s_config_list:
+        k8s_contexts.append(config.k8s_context)
+    return k8s_contexts
+
 
 ##############################################################
 ## Kubernetes Namespace
@@ -375,8 +386,6 @@ def k8sGetNodeMetric():
                     "limitsPercentage":  calPercent(tmpTotalMemoryLimit, tmpTotalMemoryCapacity, True),
                 },
         }
-        #json_formatted_str = json.dumps(clusterMetric, indent=2)
-        #print(json_formatted_str)
         return clusterMetric
     except ApiException as error:
         ErrorHandler(error, "Cannot Connect to Kubernetes")
@@ -430,7 +439,108 @@ def k8sGetNodeMetric():
             }
         }
         return clusterMetric
-    
+
+##############################################################
+## Kubernetes User
+##############################################################
+
+def k8sCreateUserCSR(username_role, user_token, username, user_csr_base64):
+    k8sClientConfigGet(username_role, user_token)
+    with k8s_client.ApiClient() as api_client:
+        api_instance = k8s_client.CertificatesV1Api(api_client)
+        body = k8s_client.V1CertificateSigningRequest(
+            api_version = "certificates.k8s.io/v1",
+            kind = "CertificateSigningRequest",
+            metadata = k8s_client.V1ObjectMeta(
+                name = "kubedash-user-"+username,
+            ),
+            spec = k8s_client.V1CertificateSigningRequestSpec(
+                groups = ["system:authenticated"],
+                request = user_csr_base64,
+                usages = [
+                    "digital signature",
+                    "key encipherment",
+                    "client auth",
+                ],
+                signer_name = "kubernetes.io/kube-apiserver-client",
+                expiration_seconds = 315360000, # 10 years
+            ),
+        )
+    pretty = "true"
+    field_manager = 'KubeDash'
+    try:
+        api_response = api_instance.create_certificate_signing_request(body, pretty=pretty, field_manager=field_manager)
+        return True, None
+    except ApiException as e:
+        logger.error("Exception when calling CertificatesV1Api->create_certificate_signing_request: %s\n" % e)
+        return False, e
+
+def k8sApproveUserCSR(username_role, user_token, username):
+    k8sClientConfigGet(username_role, user_token)
+    certs_api = k8s_client.CertificatesV1Api()
+    csr_name = "kubedash-user-"+username
+    body = certs_api.read_certificate_signing_request_status(csr_name)
+    approval_condition = k8s_client.V1CertificateSigningRequestCondition(
+        last_update_time=datetime.now(timezone.utc).astimezone(),
+        message='This certificate was approved by KubeDash',
+        reason='KubeDash',
+        type='Approved',
+        status='True',
+    )
+    body.status.conditions = [approval_condition]
+    response = certs_api.replace_certificate_signing_request_approval(csr_name, body) 
+
+def k8sReadUserCSR(username_role, user_token, username):
+    k8sClientConfigGet(username_role, user_token)
+    with k8s_client.ApiClient() as api_client:
+        api_instance = k8s_client.CertificatesV1Api(api_client)
+        pretty = "true"
+        name = "kubedash-user-"+username
+    try:
+        response = api_response = api_instance.read_certificate_signing_request(name, pretty=pretty)
+        user_certificate_base64 = response.status.certificate
+        return user_certificate_base64
+    except ApiException as e:
+        logger.error("Exception when calling CertificatesV1Api->read_certificate_signing_request: %s\n" % e)
+
+def k8sDeleteUserCSR(username_role, user_token, username):
+    k8sClientConfigGet(username_role, user_token)
+    with k8s_client.ApiClient() as api_client:
+        api_instance = k8s_client.CertificatesV1Api(api_client)
+        pretty = "true"
+        name = "kubedash-user-"+username
+    try:
+        api_response = api_instance.delete_certificate_signing_request(name, pretty=pretty)
+    except ApiException as e:
+        logger.error("Exception when calling CertificatesV1Api->delete_certificate_signing_request: %s\n" % e)
+
+def k8sCreateUser(username, username_role='Admin', user_token=None):
+    if email_check(username):
+        user = username.split("@")[0]
+    else:
+        user = username
+    pkey = crypto.PKey()
+    pkey.generate_key(crypto.TYPE_RSA, 2048)
+
+    # private key
+    private_key = crypto.dump_privatekey(crypto.FILETYPE_PEM, pkey)
+    private_key_base64 = base64.b64encode(private_key).decode('ascii')
+
+    # Certificate Signing Request
+    req = crypto.X509Req()
+    req.get_subject().CN = user
+    req.set_pubkey(pkey)
+    req.sign(pkey, 'sha256')
+    user_csr = crypto.dump_certificate_request(crypto.FILETYPE_PEM, req)
+    user_csr_base64 = base64.b64encode(user_csr).decode('ascii')
+
+    k8sCreateUserCSR(username_role, user_token, user, user_csr_base64)
+    k8sApproveUserCSR(username_role, user_token, user)
+    user_certificate_base64 = k8sReadUserCSR(username_role, user_token, user)
+    k8sDeleteUserCSR(username_role, user_token, user)
+
+    return private_key_base64, user_certificate_base64
+
 ##############################################################
 ## Kubernetes User Role template
 ##############################################################
@@ -1488,7 +1598,7 @@ def k8sHelmChartListGet(username_role, user_token, namespace):
 ##############################################################
 
 
-def k8sUserPriviligeList(username_role="Admin", user_token=None, user="balazs.paldi@shiwaforce.com"):
+def k8sUserPriviligeList(username_role="Admin", user_token=None, user="admin"):
     ROLE_LIST = []
     CLUSTER_ROLE_LIST = []
     USER_ROLES = []
@@ -1537,3 +1647,6 @@ def k8sUserPriviligeList(username_role="Admin", user_token=None, user="balazs.pa
         except:
             continue
     return USER_CLUSTER_ROLES, USER_ROLES
+
+##############################################################
+

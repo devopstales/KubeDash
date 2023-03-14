@@ -5,7 +5,8 @@ from werkzeug.security import check_password_hash
 from itsdangerous import base64_encode, base64_decode
 
 from functions.sso import SSOSererGet, get_auth_server_info, SSOServerUpdate, SSOServerCreate
-from functions.user import User, UsersRoles, Role, email_check, UserUpdate, UserCreate, UserDelete, UserCreateSSO, UserUpdatePassword
+from functions.user import User, UsersRoles, Role, email_check, UserUpdate, UserCreate, UserDelete, \
+    UserCreateSSO, UserUpdatePassword, KubectlConfigStore    
 from functions.k8s import *
 
 routes = Blueprint("routes", __name__)
@@ -133,7 +134,6 @@ def profile():
         old_password = request.form['old_password']
         new_password = request.form['new_password']
         if check_password_hash(user.password_hash, old_password):
-            print(new_password)
             updated = UserUpdatePassword(username, new_password)
             if updated:
                 flash("User Updated Successfully", "success")
@@ -154,18 +154,23 @@ def users():
     if request.method == 'POST':
         username = request.form['username']
         role = request.form['role']
-        UserUpdate(username, role)
+        type = request.form['type']
+        UserUpdate(username, role, type)
+        if type != "Local":
+            print() # generate certificate k8sCreateUser()
         flash("User Updated Successfully", "success")
 
     users = User.query
     user_role = UsersRoles.query
     roles = Role.query
+    k8s_contect_list = k8sServerContextsList()
 
     return render_template(
         'users.html.j2',
         users = users,
         user_role = user_role,
         roles = roles,
+        k8s_contect_list = k8s_contect_list,
     )
 
 @routes.route('/users/add', methods=['GET', 'POST'])
@@ -174,6 +179,7 @@ def users_add():
     if request.method == 'POST':
         username = request.form['username']
         role = request.form['role']
+        type = request.form['type']
         password = request.form['password']
         email = request.form['email']
 
@@ -186,7 +192,14 @@ def users_add():
             flash("Password must be 8 character in length", "danger")
             return redirect(url_for('routes.users'))
         else:
-            UserCreate(username, password, email, "Local", role, None)
+            if type != "Local":
+                private_key_base64, user_certificate_base64 = k8sCreateUser(username)
+                KubectlConfigStore(type, private_key_base64, user_certificate_base64)
+                kubectl_config = type
+            else:
+                kubectl_config = None
+
+            UserCreate(username, password, email, type, role, None, kubectl_config)
             flash("User Created Successfully", "success")
             return redirect(url_for('routes.users'))
     else:
@@ -246,7 +259,6 @@ def users_privileges_edit():
                 k8sRoleBindingAdd(user_namespaced_role_1, username, user_namespaces_1, user_all_namespaces_1)
 
         if user_namespaced_role_2:
-            print("0: %s" % user_namespaces_2) # debug 0
             if user_all_namespaces_2:
                 k8sRoleBindingAdd(user_namespaced_role_2, username, None, user_all_namespaces_2)
             else:
@@ -458,7 +470,6 @@ def k8s_config():
             k8sServerDelete(k8s_context)
 
     k8s_servers, k8s_config_list_length = k8sServerConfigList()
-    print(k8s_servers) # debug
 
     return render_template(
         'clusters.html.j2',
@@ -916,13 +927,10 @@ def role_data():
             user_token = None
         
         namespace_list, error = k8sNamespaceListGet(session['user_role'], user_token)
-        print("ns: %s" % namespace_list)
         if not error:
             roles = k8sRoleListGet(session['user_role'], user_token, session['ns_select'])
-            print("roles: %s" % roles)
         else:
             roles = list()
-            print("error: %s" % error)
 
         return render_template(
             'role-data.html.j2',

@@ -107,3 +107,5 @@ jobs:
             ### Changes in this Release
           draft: true
           prerelease: false
+
+# https://github.com/orgs/community/discussions/26274
