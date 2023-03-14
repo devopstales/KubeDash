@@ -182,7 +182,7 @@ def users_add():
             flash("Password must be 8 character in length", "danger")
             return redirect(url_for('routes.users'))
         else:
-            UserCreate(username, password, email, "Local", None, role)
+            UserCreate(username, password, email, "Local", role, None)
             flash("User Created Successfully", "success")
             return redirect(url_for('routes.users'))
     else:
