@@ -13,8 +13,9 @@ help:
 #devel:	@ Build local kubedash devel image
 devel:
 	rm -rf docker/kubedash/kubedash
-	cp -r src/kubedash docker/kubedash
+	cp -r src/kubedash docker/kubedash/kubedash
 	rm -rf docker/kubedash/kubedash/instance/
+	rm -rf docker/kubedash/kubedash/database/*
 	rm -rf docker/kubedash/kubedash/tests/
 	rm -rf docker/kubedash/kubedash/.pytest_cache/
 	rm -rf docker/kubedash/kubedash/.vscode/
@@ -22,5 +23,10 @@ devel:
 	rm -rf docker/kubedash/kubedash/functions/__pycache__/
 	docker build -t devopstales/kubedash:$(VERSION)-devel docker/kubedash
 
+#devel-push: @ Push local kubedash devel image
 devel-push:
 	docker push devopstales/kubedash:$(VERSION)-devel
+
+#devel-rm: @ Delete local kubedash devel image
+devel-rm:
+	docker image rm -f devopstales/kubedash:$(VERSION)-devel
