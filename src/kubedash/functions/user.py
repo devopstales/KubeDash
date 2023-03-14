@@ -63,7 +63,7 @@ def UserTest(username):
     user = User.query.filter_by(username=username).first()
     return user
 
-def UserCreate(username, password, email, user_type, role=None, tokens=None, kubectl_config=None):
+def UserCreate(username, password, email, user_type, role=None, tokens=None):
     user = UserTest(username)
     if not user:
         if password is None:
@@ -85,8 +85,8 @@ def UserCreate(username, password, email, user_type, role=None, tokens=None, kub
         if role:
             role_data = Role.query.filter(Role.name == role).first()
             user.roles.append(role_data)
-        if kubectl_config:
-            kubectl = kubectlConfig.query.filter(kubectlConfig.name == kubectl_config).first()
+        kubectl = kubectlConfig.query.filter(kubectlConfig.name == username).first()
+        if kubectl:
             user.kubectl_config.append(kubectl)
         db.session.add(user)
         db.session.commit()
@@ -94,6 +94,9 @@ def UserCreate(username, password, email, user_type, role=None, tokens=None, kub
 def UserUpdate(username, role, user_type):
     user = User.query.filter_by(username=username).first()
     if user:
+        kubectl = kubectlConfig.query.filter(kubectlConfig.name == username).first()
+        if kubectl:
+            user.kubectl_config.append(kubectl)
         user.role = role
         user.user_type = user_type
         db.session.commit()
@@ -121,6 +124,7 @@ class kubectlConfig(db.Model):
     __tablename__ = 'kubectl_config'
     id = db.Column(db.Integer(), primary_key=True)
     name = db.Column(db.String(50), nullable=False, server_default=u'', unique=False)
+    cluster = db.Column(db.String(50), nullable=False, server_default=u'', unique=False)
     private_key = db.Column(db.Text, nullable=True)
     user_certificate = db.Column(db.Text, nullable=True)
 
@@ -131,11 +135,12 @@ class UsersKubectl(db.Model):
     user_id = db.Column(db.Integer(), db.ForeignKey('users.id', ondelete='CASCADE'))
     role_id = db.Column(db.Integer(), db.ForeignKey('kubectl_config.id', ondelete='CASCADE'))
 
-def KubectlConfigStore(name, private_key_base64, user_certificate_base64):
+def KubectlConfigStore(name, cluster, private_key_base64, user_certificate_base64):
     kubectl = kubectlConfig.query.filter(kubectlConfig.name == name).first()
     if not kubectl:
         kubectl_config = kubectlConfig(
             name = name,
+            cluster = cluster,
             private_key = private_key_base64,
             user_certificate = user_certificate_base64,
         )

@@ -1,8 +1,8 @@
 """kubectl_config table
 
-Revision ID: 9ce5d992dc50
+Revision ID: d0be67da4314
 Revises: 7253f5a7bfda
-Create Date: 2023-03-14 15:13:08.944913
+Create Date: 2023-03-14 15:49:02.495648
 
 """
 from alembic import op
@@ -10,7 +10,7 @@ import sqlalchemy as sa
 
 
 # revision identifiers, used by Alembic.
-revision = '9ce5d992dc50'
+revision = 'd0be67da4314'
 down_revision = '7253f5a7bfda'
 branch_labels = None
 depends_on = None
@@ -30,6 +30,7 @@ def upgrade():
     op.create_table('kubectl_config',
     sa.Column('id', sa.Integer(), nullable=False),
     sa.Column('name', sa.String(length=50), server_default='', nullable=False),
+    sa.Column('cluster', sa.String(length=50), server_default='', nullable=False),
     sa.Column('private_key', sa.Text(), nullable=True),
     sa.Column('user_certificate', sa.Text(), nullable=True),
     sa.PrimaryKeyConstraint('id')
