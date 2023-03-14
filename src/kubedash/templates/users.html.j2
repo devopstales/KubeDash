@@ -53,12 +53,20 @@
               <label>Password:</label>
               <input type="password" name="password" id="PassEntry" class="form-control user" placeholder="Type your password">
             </div>
-
             <div class="form-group">
               <label>Role:</label>
               <select class="form-select" aria-label="Select role" name="role">
                 <option value="User">User</option>
                 <option value="Admin">Admin</option>
+              </select>
+            </div>
+            <div class="form-group">
+              <label>Type:</label>
+              <select class="form-select" aria-label="Select role" name="type">
+                <option value="Local">Local</option>
+                {% for contect in k8s_contect_list%}
+                <option value="{{ contect }}">{{ contect }}</option>
+                {% endfor %}
               </select>
             </div>
             <div class="modal-footer">
