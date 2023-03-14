@@ -53,7 +53,30 @@ spec:
             port: 8000
           initialDelaySeconds: 5
           timeoutSeconds: 1
+{{- if .Values.persistence.enabled }}
+        volumeMounts:
+        - name: cache
+          mountPath: "/code/kubedash/database"
+{{- end }}
         ports:
         - containerPort: 8000
           protocol: TCP
           name: http
+{{- if .Values.persistence.enabled }}
+      volumes:
+      - name: cache
+        persistentVolumeClaim:
+            claimName: {{ include "kubedash.fullname" . }}-db
+{{- end }}
+{{- with .Values.nodeSelector }}
+      nodeSelector:
+        {{- . | toYaml | nindent 8 }}
+{{- end }}
+{{- with .Values.affinity }}
+      affinity:
+        {{- . | toYaml | nindent 8 }}
+{{- end }}
+{{- with .Values.tolerations }}
+      tolerations:
+        {{- . | toYaml | nindent 8 }}
+{{- end }}

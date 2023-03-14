@@ -3,12 +3,16 @@
 apiVersion: route.openshift.io/v1
 kind: Route
 metadata:
+  name: {{ include "kubedash.fullname" . }}-ingress-route
   labels:
     app: kubedash
     {{- include "kubedash.labels" . | nindent 4 }}
-  name: {{ include "kubedash.fullname" . }}-ingress-route
+  annotations:
+{{- with .Values.route.annotations }}
+{{ toYaml . | indent 4 }}
+{{- end }}
 spec:
-  host: {{ .Values.ingress.url }}
+  host: {{ .Values.route.url }}
   port:
     targetPort: 8000
   tls:
@@ -24,7 +28,7 @@ status:
     - conditions:
         - status: 'True'
           type: Admitted
-      host: {{ .Values.ingress.url }}
+      host: {{ .Values.route.url }}
       routerName: {{ include "kubedash.fullname" . }}-ingress-route
       wildcardPolicy: None
 {{- end }}
