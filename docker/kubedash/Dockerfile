@@ -6,9 +6,11 @@ ENV FLASK_CONFIG="production" \
 
 WORKDIR /code
 
-RUN apk upgrade --available && sync
+RUN apk -U upgrade && \
+    apk add --no-cache bash gcc musl-dev linux-headers
 
-COPY ./requirements.txt /code/requirements.txt
+COPY requirements.txt  /code/
+COPY entrypoint.sh /entrypoint.sh
 
 RUN pip install --no-cache-dir --upgrade -r /code/requirements.txt
 
@@ -24,4 +26,5 @@ RUN addgroup -S -g 10001 kubedash && \
 
 USER 10001:10001
 
-CMD ["gunicorn", "--conf", "gunicorn_conf.py", "kubedash:app"]
+EXPOSE 8000
+ENTRYPOINT ["/entrypoint.sh"]
