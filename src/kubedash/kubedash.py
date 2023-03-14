@@ -5,6 +5,7 @@ from flask import Flask
 from flask_talisman import Talisman
 from flask_healthz import healthz, HealthError
 from sqlalchemy_utils import database_exists
+from flask_migrate import Migrate
 
 from functions.components import db, login_manager, csrf
 from functions.routes import routes
@@ -62,10 +63,11 @@ def create_app(config_name="development"):
 
     app.config.from_object(app_config[config_name])
 
-    if not database_exists("sqlite:///"+config_name+".db"):
-        db.init_app(app)
+    migrate = Migrate(app, db)
+    db.init_app(app)
+    basedir = os.path.abspath(os.path.dirname(__file__))
+    if database_exists("sqlite:///"+basedir+"/database/"+config_name+".db"):
         with app.app_context():
-            db.create_all()
             db_init()
 
     login_manager.init_app(app)
