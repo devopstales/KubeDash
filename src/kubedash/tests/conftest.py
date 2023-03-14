@@ -10,6 +10,7 @@ def app():
 @pytest.fixture(scope='module')
 def client(app):
     ctx = app.test_request_context()
+    # file deepcode ignore DisablesCSRFProtection/test: <please specify a reason of ignoring this>
     ctx.push()
     app.test_client_class = FlaskClient
     return app.test_client()
