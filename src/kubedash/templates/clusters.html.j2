@@ -91,7 +91,7 @@
                         <td>
                             {% if session['user_role'] == "Admin" %}
                             <!-- Button trigger modal edit -->
-                            <form action="k8s-config" method="POST">
+                            <form action="/cluster-config" method="POST">
                                 <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
                                 <button type="button" class="btn btn-success btn-just-icon btn-xs" data-toggle="modal" data-target="#modaledit{{ server.k8s_context }}">
                                     <i class="material-icons">edit</i>
