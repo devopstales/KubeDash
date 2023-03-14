@@ -14,8 +14,8 @@ metadata:
     {{- end }}
     {{- if .Values.ingress.whitelist.enabled }}
     {{- $last := sub (len .Values.ingress.whitelist.ips) 1 }}
-    {{- $index, $ip := range .Values.ingress.whitelist.ips }}
-        nginx.ingress.kubernetes.io/whitelist-source-range: "{{ $apple }}{{ if ne $index $last }}, {{ end }}"
+    {{- range $index, $ip := .Values.ingress.whitelist.ips }}
+        nginx.ingress.kubernetes.io/whitelist-source-range: "{{ $ip }}{{ if ne $index $last }}, {{ end }}"
     {{- end }}
     {{- end }}
     {{- if .Values.ingress.tls.certManager.enabled }}

@@ -1,40 +1,116 @@
+# -- Time Zone in container
 TimeZone: "CET"
+# -- Log level
 logLevel: "INFO"
-flaskConfig: "production" #or development
+# -- flask environment: production or development
+flaskConfig: "production"
 
 serviceAccount:
+  # -- Enable automatic serviceAccount creation
   create: true
+  # -- Configure the name of the serviceAccount
   name: "kubedash-admin"
 
 image:
+  # -- The docker image repository to use
   repository: devopstales/kubedash
-  tag: 0.1-devel
+  # -- The docker image pull policy
   pullPolicy: Always
+  # -- The docker image tag to use
+  tag: 0.1-devel
 
+# -- list of the pos's SecurityContexts
 podSecurityContext:
   runAsNonRoot: true
   runAsUser: 10001
+  fsGroup: 10001
+  fsGroupChangePolicy: "OnRootMismatch"
 
+# -- list of the container's SecurityContexts
 containerSecurityContext:
   allowPrivilegeEscalation: false
   capabilities:
     drop: ["all"]
 
-ingress:
+persistence:
+  # -- Volumes for the pod
   enabled: true
+  # -- Volumes mode
+  accessMode: "ReadWriteOnce"
+  # -- Volumes size
+  size: "1Gi"
+  # -- Volumes annotations
+  annotations: {}
+  ## database data Persistent Volume Storage Class
+  ## If defined, storageClassName: <storageClass>
+  ## If set to "-", storageClassName: "", which disables dynamic provisioning
+  ## If undefined (the default) or set to null, no storageClassName spec is
+  ##   set, choosing the default provisioner.  (gp2 on AWS, standard on
+  ##   GKE, AWS & OpenStack)
+  ##
+  # storageClass: "-"
+
+ingress:
+  # -- Enable Ingress object creation
+  enabled: true
+  # -- URL of the Ingress object
   url: "kubedash.mydomain.intra"
+  # -- Extra annotation to the Ingress object
   annotations:
     nginx.ingress.kubernetes.io/proxy-body-size: "10m"
     kubernetes.io/ingress.class: nginx
   tls:
+    # -- Enable tls on Ingress object
     enabled: true
+    # -- Name of the secret storing tls cert
     tlsSecret: ""
     certManager:
+       # -- Enable certManager
       enabled: false
+      # -- Name of the certManager cluster issuer to use
       clusterIssuer: "letsencrypt"
   whitelist:
+    # -- Enable ip blocking on ingress
     enabled: false
+    # -- List of ips to allow communication
     ips: []
   
 route:
+  # -- Enable OpenShift Route object creation
   enabled: false
+  # -- URL of the OpenShift Route object
+  url: "kubedash.mydomain.intra"
+  # -- Extra annotation to the OpenShift Route object
+  annotations: {}
+
+## Define which Nodes the Pods are scheduled on.
+## ref: https://kubernetes.io/docs/user-guide/node-selection/
+# -- Set nodeSelector for the pod
+nodeSelector: {}
+
+## Tolerations for use with node taints
+## ref: https://kubernetes.io/docs/concepts/configuration/taint-and-toleration/
+# -- Set tolerations for the pod
+tolerations: []
+# - key: "key"
+#   operator: "Equal"
+#   value: "value"
+#   effect: "NoSchedule"
+
+## Assign custom affinity rules to the trivy operator
+## ref: https://kubernetes.io/docs/concepts/configuration/assign-pod-node/
+##
+
+## Assign custom affinity rules to the deployment
+## ref: https://kubernetes.io/docs/concepts/configuration/assign-pod-node/
+# -- Set the affinity for the pod.
+affinity: {}
+# nodeAffinity:
+#   requiredDuringSchedulingIgnoredDuringExecution:
+#     nodeSelectorTerms:
+#     - matchExpressions:
+#       - key: kubernetes.io/e2e-az-name
+#         operator: In
+#         values:
+#         - e2e-az1
+#         - e2e-az2
