@@ -16,9 +16,13 @@ docker/kubedash/kubedash
 # mkdocs documentation
 /site
 
+# macOS
+.dccache
+
 # editor
 config.json
 .DS_Store
+.vscode
 
 # Byte-compiled / optimized / DLL files
 __pycache__/
