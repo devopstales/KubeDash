@@ -1,0 +1,61 @@
+apiVersion: krew.googlecontainertools.github.com/v1alpha2
+kind: Plugin
+metadata:
+  name: login
+spec:
+  version: v1.1.0
+  homepage: https://github.com/devopstales/kube-openid-connect
+  shortDescription: Login to a cluster via openid-connect
+  description: |
+    Launches a browser to login to the cluster via DevOpsTales openid-connect-server. openid-connect-server's 
+    certificate MUST be trusted by the local system.
+
+    Run `kubectl login <openid-connect-ingress-url>`.
+    It automatically opens the browser and you can log in to the provider.
+    After authentication, it writes the token to the kubeconfig and you can access the cluster.
+  caveats: |
+    1) You need to install the openid-connect server component by helm:
+        helm repo add devopstales https://devopstales.github.io/helm-charts
+        helm repo update
+
+        kubectl create ns kubeauth
+        kubens kubeauth
+        helm upgrade --install kubelogin devopstales/kube-openid-connect -f values.yaml
+    2) You need to setup the OIDC provider at Kubernetes API server.
+        nano /etc/kubernetes/manifests/kube-apiserver.yaml
+        ...
+        command:
+        - /hyperkube
+        - apiserver
+        ...
+        - --oidc-issuer-url={{ oidcServerURL }}
+        - --oidc-client-id={{ oidcClientID }}
+        - --oidc-username-claim=email
+        - --oidc-groups-claim=groups
+        # for self sign cert or custom ca
+        #- --oidc-ca-file=/etc/kubernetes/pki/rootca.pem
+
+        systemctl restart kubelet
+    3) You need to setup role binding for users or groupe.
+  platforms:
+  - bin: kubectl-login
+    uri: https://github.com/devopstales/kube-openid-connect/releases/download/client_v1.1/kubectl-login_linux.tar.gz
+    sha256: 9ff65972af7d5ef46b642dd778145f460875426c8d253ecd2906b457b7e81559
+    selector:
+      matchLabels:
+        os: linux
+        arch: amd64
+  - bin: kubectl-login
+    uri: https://github.com/devopstales/kube-openid-connect/releases/download/client_v1.1/kubectl-login_osx.tar.gz
+    sha256: 5632a3a390eac6c3de3b8602fd61286f1c808a73860201a75dd4ea71d5a88d1b
+    selector:
+      matchLabels:
+        os: darwin
+        arch: arm64
+  - bin: kubectl-login.exe
+    uri: https://github.com/devopstales/kube-openid-connect/releases/download/client_v1.1/kubectl-login_windows.zip
+    sha256: 17f57996eac83929ab715e6b336cec2fc36f196045a4f4a78b988dd636adace2
+    selector:
+      matchLabels:
+        os: windows
+        arch: amd64

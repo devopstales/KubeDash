@@ -53,28 +53,26 @@ systemctl restart kubelet</code></pre>
   <div class="card-body">
     <h5 class="card-title">Install as Kubectl plugin.</h5><pre><code># Homebrew (macOS and Linux)
 brew tap devopstales/devopstales
-brew install kubectl-login
+brew install kubectl-kdlogin
 
 # Main Krew with differente name (macOS, Linux, Windows and ARM)
-kubectl krew install dtlogin
+kubectl krew install kdlogin
 
 # My krew repo (macOS, Linux, Windows and ARM)
 kubectl krew index add devopstales https://github.com/devopstales/krew
-kubectl krew install devopstales/login
+kubectl krew install devopstales/kdlogin
 
 # My krew repo (macOS, Linux, Windows and ARM)
 kubectl krew index add devopstales https://github.com/devopstales/krew
-kubectl krew install devopstales/login
+kubectl krew install devopstales/kdlogin
 
 # Chocolatey (Windows)
-choco install kubectl-login
+choco install kubectl-kdlogin
 
 # Binary release (Windows, macOS and Linux)
-https://github.com/devopstales/kube-openid-connect/releases</code></pre>
+https://github.com/devopstales/kubedash/releases</code></pre>
     <h5 class="card-title">Use the plugin.</h5>
-    <pre><code class="bash">$ kubectl login {{ base_uri }}/dtlogin
-# OR I sou installed from main Krew
-kubectl dtlogin {{ base_uri }}/dtlogin
+    <pre><code class="bash">$ kubectl kdlogin {{ base_uri }}/
 Configfile created with config for productioncluster to ~/.kube/config
 Happy Kubernetes interaction!</code></pre>
   </div>

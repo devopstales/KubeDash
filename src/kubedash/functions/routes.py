@@ -6,8 +6,9 @@ from itsdangerous import base64_encode, base64_decode
 
 from functions.sso import SSOSererGet, get_auth_server_info, SSOServerUpdate, SSOServerCreate
 from functions.user import User, UsersRoles, Role, email_check, UserUpdate, UserCreate, UserDelete, \
-    UserCreateSSO, UserUpdatePassword, KubectlConfigStore, KubectlConfig
+    SSOUserCreate, SSOTokenUpdate, SSOTokenGet, UserUpdatePassword, KubectlConfigStore, KubectlConfig
 from functions.k8s import *
+from functions.components import csrf
 
 routes = Blueprint("routes", __name__)
 logger = logging.getLogger(__name__)
@@ -40,6 +41,11 @@ def login():
         is_ldap_enabled = False
         authorization_url = None
 
+        if request.environ.get('HTTP_X_FORWARDED_FOR') is None:
+            remote_addr = request.remote_addr
+        else:
+            remote_addr = request.environ['HTTP_X_FORWARDED_FOR']
+
         ssoServer = SSOSererGet()
         if ssoServer is not None:
             auth_server_info, oauth = get_auth_server_info()
@@ -49,14 +55,58 @@ def login():
                     auth_url,
                     access_type="offline",  # not sure if it is actually always needed,
                                             # may be a cargo-cult from Google-based example
-                )       
+                )
                 session['oauth_state'] = state
                 is_sso_enabled = True
             else:
                 is_sso_enabled = False
                 flash('Cannot connect to identity provider!', "warning")
+                logger.error('Cannot connect to identity provider!')
 
         if "username" in session:
+            username = session["username"]
+            k8sConfig = k8sServerConfigGet()
+            if k8sConfig is None:
+                logger.error("Kubectl Integration is not configured.")
+            else:
+                logger.info("Kubectl Integration is configured.")
+                k8s_server_ca = str(base64_decode(k8sConfig.k8s_server_ca), 'UTF-8')
+                #try:
+                i = requests.get('http://%s:8080/info' % remote_addr)
+                info = i.json()
+                if info["message"] == "kdlogin":
+                    user = User.query.filter_by(username=username, user_type = "OpenID").first()
+                    user2 = KubectlConfig.query.filter_by(name=session['username']).first()
+                    if is_sso_enabled and user:
+                        token = eval(SSOTokenGet(username))
+                        x = requests.post('http://%s:8080/' % remote_addr, json={
+                                "username": username,
+                                "context": k8sConfig.k8s_context,
+                                "server": k8sConfig.k8s_server_url,
+                                "certificate-authority-data": k8s_server_ca,
+                                "client-id": ssoServer.client_id,
+                                "id-token": token.get("id_token"),
+                                "refresh-token": token.get("refresh_token"),
+                                "idp-issuer-url": ssoServer.oauth_server_uri,
+                                "client_secret": ssoServer.client_secret,
+                            }
+                        )
+                    elif user2:
+                        user_private_key = str(base64_decode(user2.private_key), 'UTF-8')
+                        user_certificate = str(base64_decode(user2.user_certificate), 'UTF-8')
+                        x = requests.post('http://%s:8080/' % remote_addr, json={
+                                "username": username,
+                                "context": k8sConfig.k8s_context,
+                                "server": k8sConfig.k8s_server_url,
+                                "certificate-authority-data": k8s_server_ca,
+                                "user-private-key": user_private_key,
+                                "user-certificate": user_certificate,
+                            }
+                        )
+                    logger.info("Config sent to client")
+                    logger.info("Answer from clinet: %s" % x.text)
+                #except:
+                #    pass
             return redirect(url_for('routes.dashboard'))
         else:
             return render_template(
@@ -72,7 +122,13 @@ def login_post():
     password = request.form.get('password')
     remember = True if request.form.get('remember') else False
 
+    if request.environ.get('HTTP_X_FORWARDED_FOR') is None:
+        remote_addr = request.remote_addr
+    else:
+        remote_addr = request.environ['HTTP_X_FORWARDED_FOR']
+
     user = User.query.filter(User.username == username, User.user_type != "OpenID").first()
+    user2 = KubectlConfig.query.filter_by(name=username).first()
 
     # check if user actually exists
     # take the user supplied password, hash it, and compare it to the hashed password in database
@@ -87,6 +143,32 @@ def login_post():
         session['user_role'] = role.name
         session['user_type'] = user.user_type
         session['ns_select'] = "default"
+
+        k8sConfig = k8sServerConfigGet()
+        if k8sConfig is None:
+            logger.error ("Kubectl Integration is not configured.")
+        else:
+            k8s_server_ca = str(base64_decode(k8sConfig.k8s_server_ca), 'UTF-8')
+            try:
+                i = requests.get('http://%s:8080/info' % remote_addr)
+                info = i.json()
+                if info["message"] == "kdlogin" and user2:
+                    user_private_key = str(base64_decode(user2.private_key), 'UTF-8')
+                    user_certificate = str(base64_decode(user2.user_certificate), 'UTF-8')
+                    x = requests.post('http://%s:8080/' % remote_addr, json={
+                            "username": username,
+                            "context": k8sConfig.k8s_context,
+                            "server": k8sConfig.k8s_server_url,
+                            "certificate-authority-data": k8s_server_ca,
+                            "user-private-key": user_private_key,
+                            "user-certificate": user_certificate,
+                        }
+                    )
+                    logger.info("Config sent to client")
+                    logger.info("Answer from clinet: %s" % x.text)
+            except:
+                pass
+
         return redirect(url_for('routes.dashboard'))
 
 
@@ -386,24 +468,27 @@ def callback():
         if k8sConfig is None:
             logger.error ("Kubectl Integration is not configured.")
         else:
-            # add /info for k8s plugin
-            # test /info anf send answer if is dtlogin
+            k8s_server_ca = str(base64_decode(k8sConfig.k8s_server_ca), 'UTF-8')
             try:
-                x = requests.post('http://%s:8080/' % remote_addr, json={
-                    "context": k8sConfig.k8s_context,
-                    "server": k8sConfig.k8s_server_url,
-                    "certificate-authority-data": k8sConfig.k8s_server_ca,
-                    "client-id": ssoServer.client_id,
-                    "id-token": token["id_token"],
-                    "refresh-token": token.get("refresh_token"),
-                    "idp-issuer-url": ssoServer.oauth_server_uri,
-                    "client_secret": ssoServer.client_secret,
-                    }
-                )
-                logger.info("Config sent to client")
-                logger.info("Answer from clinet: %s" % x.text)
+                i = requests.get('http://%s:8080/info' % remote_addr)
+                info = i.json()
+                if info["message"] == "kdlogin":
+                    x = requests.post('http://%s:8080/' % remote_addr, json={
+                            "username": user_data["preferred_username"],
+                            "context": k8sConfig.k8s_context,
+                            "server": k8sConfig.k8s_server_url,
+                            "certificate-authority-data": k8s_server_ca,
+                            "client-id": ssoServer.client_id,
+                            "id-token": token.get("id_token"),
+                            "refresh-token": token.get("refresh_token"),
+                            "idp-issuer-url": ssoServer.oauth_server_uri,
+                            "client_secret": ssoServer.client_secret,
+                        }
+                    )
+                    logger.info("Config sent to client")
+                    logger.info("Answer from clinet: %s" % x.text)
             except:
-                logger.error ("Kubectl print back error")
+                pass
 
         email = user_data['email']
         username = user_data["preferred_username"]
@@ -411,8 +496,10 @@ def callback():
         user = User.query.filter_by(username=username).first()
 
         if user is None:
-            UserCreateSSO(username, email, user_token, "OpenID")
+            SSOUserCreate(username, email, user_token, "OpenID")
             user = User.query.filter_by(username=username, user_type = "OpenID").first()
+        else:
+            SSOTokenUpdate(username, user_token)
 
         user_role = UsersRoles.query.filter_by(user_id=user.id).first()
         role = Role.query.filter_by(id=user_role.role_id).first()
@@ -431,7 +518,7 @@ def callback():
 ## Kubectl config
 ##############################################################
 
-@routes.route('/dtlogin')
+@routes.route('/kdlogin')
 def index():
     auth_server_info, oauth = get_auth_server_info()
     auth_url = auth_server_info["authorization_endpoint"]
@@ -452,7 +539,7 @@ def k8s_config():
         if request_type == "create":
             k8s_server_url = request.form['k8s_server_url']
             k8s_context = request.form['k8s_context']
-            k8s_server_ca = str(base64_encode(request.form['k8s_server_ca']), 'UTF-8')
+            k8s_server_ca = str(base64_encode(request.form['k8s_server_ca'].strip()), 'UTF-8')
 
             k8sServerConfigCreate(k8s_server_url, k8s_context, k8s_server_ca)
             flash("Kubernetes Config Updated Successfully", "success")
@@ -460,7 +547,7 @@ def k8s_config():
             k8s_server_url = request.form['k8s_server_url']
             k8s_context = request.form['k8s_context']
             k8s_context_old = request.form['k8s_context_old']
-            k8s_server_ca = str(base64_encode(request.form['k8s_server_ca']), 'UTF-8')
+            k8s_server_ca = base64_encode(request.form['k8s_server_ca'].strip())
 
             k8sServerConfigUpdate(k8s_context_old, k8s_server_url, k8s_context, k8s_server_ca)
             flash("Kubernetes Config Updated Successfully", "success")
@@ -482,58 +569,68 @@ def export():
     user = User.query.filter_by(username=session['username'], user_type = "OpenID").first()
     user2 = KubectlConfig.query.filter_by(name=session['username']).first()
     k8sConfig = k8sServerConfigGet()
-    k8s_server_ca = str(base64_decode(k8sConfig.k8s_server_ca), 'UTF-8')
-    if user:
-        ssoServer = SSOSererGet()
-        redirect_uri = ssoServer.base_uri+"/callback"
-        auth_server_info, oauth = get_auth_server_info()
+    if k8sConfig:
+        k8s_server_ca = str(base64_decode(k8sConfig.k8s_server_ca), 'UTF-8')
+        if user:
+            ssoServer = SSOSererGet()
+            redirect_uri = ssoServer.base_uri+"/callback"
+            auth_server_info, oauth = get_auth_server_info()
 
-        token_url = auth_server_info["token_endpoint"]
-        token = oauth.refresh_token(
-            token_url = token_url,
-            refresh_token = session['refresh_token'],
-            client_id = ssoServer.client_id,
-            client_secret = ssoServer.client_secret,
-            verify=False,
-            timeout=60,
-        )
+            token_url = auth_server_info["token_endpoint"]
+            token = oauth.refresh_token(
+                token_url = token_url,
+                refresh_token = session['refresh_token'],
+                client_id = ssoServer.client_id,
+                client_secret = ssoServer.client_secret,
+                verify=False,
+                timeout=60,
+            )
 
-        userinfo_url = auth_server_info["userinfo_endpoint"]
-        user_data = oauth.get(
-            userinfo_url,
-            timeout=60,
-            verify=False,
-        ).json()
+            userinfo_url = auth_server_info["userinfo_endpoint"]
+            user_data = oauth.get(
+                userinfo_url,
+                timeout=60,
+                verify=False,
+            ).json()
 
-        return render_template(
-            'export.html.j2',
-            preferred_username = user_data["preferred_username"],
-            redirect_uri = redirect_uri,
-            client_id = ssoServer.client_id,
-            client_secret = ssoServer.client_secret,
-            id_token = token["id_token"],
-            refresh_token = token.get("refresh_token"),
-            oauth_server_uri = ssoServer.oauth_server_uri,
-            context = k8sConfig.k8s_context,
-            k8s_server_url = k8sConfig.k8s_server_url,
-            k8s_server_ca = k8s_server_ca
-        )
-    elif user2:
-        return render_template(
-            'export.html.j2',
-            preferred_username = user2.name,
-            context = k8sConfig.k8s_context,
-            k8s_server_url = k8sConfig.k8s_server_url,
-            k8s_server_ca = k8s_server_ca,
-            k8s_user_private_key = user2.private_key,
-            k8s_user_certificate = user2.user_certificate,
-        )
+            return render_template(
+                'export.html.j2',
+                base_uri = ssoServer.base_uri,
+                preferred_username = user_data["preferred_username"],
+                redirect_uri = redirect_uri,
+                client_id = ssoServer.client_id,
+                client_secret = ssoServer.client_secret,
+                id_token = token["id_token"],
+                refresh_token = token.get("refresh_token"),
+                oauth_server_uri = ssoServer.oauth_server_uri,
+                context = k8sConfig.k8s_context,
+                k8s_server_url = k8sConfig.k8s_server_url,
+                k8s_server_ca = k8s_server_ca
+            )
+        elif user2:
+            return render_template(
+                'export.html.j2',
+                preferred_username = user2.name,
+                context = k8sConfig.k8s_context,
+                k8s_server_url = k8sConfig.k8s_server_url,
+                k8s_server_ca = k8s_server_ca,
+                k8s_user_private_key = user2.private_key,
+                k8s_user_certificate = user2.user_certificate,
+            )
+        else:
+            return render_template(
+                'export.html.j2',
+                preferred_username = session['username'],
+                username_role = session['user_role']
+            )
     else:
+        flash("Kubernetes Cluster is not Configured.", "danger")
         return render_template(
             'export.html.j2',
             preferred_username = session['username'],
             username_role = session['user_role']
         )
+
 
 
 @routes.route("/get-file")
