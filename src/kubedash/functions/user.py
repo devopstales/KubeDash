@@ -116,8 +116,19 @@ def UserDelete(username):
         db.session.delete(user)
         db.session.commit()
 
-def UserCreateSSO(username, email, tokens, user_type):
+def SSOUserCreate(username, email, tokens, user_type):
     UserCreate(username, None, email, user_type, "User", tokens)
+
+def SSOTokenUpdate(username, tokens):
+    user = User.query.filter_by(username=username).first()
+    if user:
+        user.tokens = tokens
+        db.session.commit()
+
+def SSOTokenGet(username):
+    user = User.query.filter_by(username=username).first()
+    if user.tokens:
+        return user.tokens
 
 def UserUpdatePassword(username, password):
         user = User.query.filter_by(username=username).first()

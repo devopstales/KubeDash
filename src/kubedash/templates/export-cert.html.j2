@@ -2,11 +2,9 @@
 <h3 class="text-center my-4" >In order to get command-line acces to the {{ context }} Kubernetes cluster, you will need to configure certificate authentication for your kubectl client.</h3>
 
 <ul class="nav nav-tabs mb-4 mx-5">
-{#
   <li class="nav-item">
     <a class="nav-link" href="#KubectlPlugin">Kubectl Plugin</a>
   </li>
-#}
   <li class="nav-item">
     <a class="nav-link active" href="#DownloadKubeconfig">Download Kubeconfig</a>
   </li>
@@ -22,10 +20,43 @@
 
 <div class="card mb-4 mx-5">
   <div class="card-header py-3">
+    <h5 class="m-0 font-weight-bold text-primary" id="KubectlPlugin">Kubectl Plugin</h5>
+  </div>
+
+  <div class="card-body">
+    <h5 class="card-title">Install as Kubectl plugin.</h5><pre><code># Homebrew (macOS and Linux)
+brew tap devopstales/devopstales
+brew install kubectl-kdlogin
+
+# Main Krew with differente name (macOS, Linux, Windows and ARM)
+kubectl krew install kdlogin
+
+# My krew repo (macOS, Linux, Windows and ARM)
+kubectl krew index add devopstales https://github.com/devopstales/krew
+kubectl krew install devopstales/kdlogin
+
+# My krew repo (macOS, Linux, Windows and ARM)
+kubectl krew index add devopstales https://github.com/devopstales/krew
+kubectl krew install devopstales/kdlogin
+
+# Chocolatey (Windows)
+choco install kubectl-kdlogin
+
+# Binary release (Windows, macOS and Linux)
+https://github.com/devopstales/kubedash/releases</code></pre>
+    <h5 class="card-title">Use the plugin.</h5>
+    <pre><code class="bash">$ kubectl kdlogin {{ base_uri }}/
+Configfile created with config for productioncluster to ~/.kube/config
+Happy Kubernetes interaction!</code></pre>
+  </div>
+</div>
+
+<div class="card mb-4 mx-5">
+  <div class="card-header py-3">
     <h5 class="m-0 font-weight-bold text-primary" id="DownloadKubeconfig">Download Kubeconfig File</h5>
   </div>
   <div class="card-body">
-    <p class="card-text">Save this file as <code>~/.kube/config</code> to enable certificate based <code>kubectl</code> authentication.</p>
+    <p class="card-text">If you didn't want to use the kubectl plugin, save this file as <code>~/.kube/config</code> to enable certificate based <code>kubectl</code> authentication.</p>
     <a href="/get-file" class="btn btn-primary">Download Config File</a>
   </div>
 </div>
