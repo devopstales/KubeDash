@@ -34,6 +34,8 @@ __pypackages__/
 # Distribution / packaging
 .Python
 build/
+*dist/{windows,linux,osx,release}
+src/*/Makefile
 
 # PyInstaller
 #  Usually these files are written by a python script from a template
