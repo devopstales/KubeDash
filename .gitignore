@@ -34,7 +34,11 @@ __pypackages__/
 # Distribution / packaging
 .Python
 build/
-*dist/{windows,linux,osx,release}
+src/kdlogin/dist/windows
+src/kdlogin/dist/linux
+src/kdlogin/dist/osx
+src/kdlogin/dist/release
+src/kdlogin/krew/
 src/*/Makefile
 
 # PyInstaller
