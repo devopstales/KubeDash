@@ -26,5 +26,5 @@ setuptools>=65.6.3
 pyOpenSSL>=23.0.0
 
 # for git-changelog
-GitPython=2.1.11
-gitdb2=3.0.1
+GitPython==2.1.11
+gitdb2==3.0.1
