@@ -1,9 +1,10 @@
-module github.com/devopstales/kubedash
+module github.com/devopstales/kubedash/src/kdlogin
 
 go 1.17
 
 require (
 	github.com/gin-gonic/gin v1.7.7
+	github.com/go-playground/validator/v10 v10.11.2
 	k8s.io/apimachinery v0.23.3
 	k8s.io/client-go v0.23.3
 	sigs.k8s.io/yaml v1.3.0
@@ -15,8 +16,6 @@ require (
 	github.com/go-logr/logr v1.2.0 // indirect
 	github.com/go-playground/locales v0.14.1 // indirect
 	github.com/go-playground/universal-translator v0.18.1 // indirect
-	github.com/go-playground/validator v9.31.0+incompatible // indirect
-	github.com/go-playground/validator/v10 v10.11.2 // indirect
 	github.com/gogo/protobuf v1.3.2 // indirect
 	github.com/golang/protobuf v1.5.2 // indirect
 	github.com/google/go-cmp v0.5.5 // indirect
