@@ -80,6 +80,7 @@ jobs:
         uses: actions/download-artifact@master
         with:
           name: kubectl-kdlogin
+          path: ${{ github.workspace }}
 
       - name: Create Release
         id: create_release
@@ -94,16 +95,21 @@ jobs:
           draft: true
           prerelease: false
 
+      - name: Test
+        run:
+          ls -laF
+          ls -laF ${{ github.ref_name }}/
+
       - name: Upload artifact and release
         uses: nanoufo/action-upload-artifacts-and-release-assets@main
         with:
           path: |
-            kubectl-kdlogin_linux.tar.gz
-            kubectl-kdlogin_linux.tar.gz.sha256
-            kubectl-kdlogin_osx.tar.gz
-            kubectl-kdlogin_osx.tar.gz.sha256
-            kubectl-kdlogin_windows.tar.gz
-            kubectl-kdlogin_windows.tar.gz.sha256
+            ${{ github.ref_name }}/kubectl-kdlogin_linux.tar.gz
+            ${{ github.ref_name }}/kubectl-kdlogin_linux.tar.gz.sha256
+            ${{ github.ref_name }}/kubectl-kdlogin_osx.tar.gz
+            ${{ github.ref_name }}/kubectl-kdlogin_osx.tar.gz.sha256
+            ${{ github.ref_name }}/kubectl-kdlogin_windows.tar.gz
+            ${{ github.ref_name }}/kubectl-kdlogin_windows.tar.gz.sha256
           if-no-files-found: error
           release-upload-url: ${{ steps.create_release.outputs.upload_url }}
         env:
