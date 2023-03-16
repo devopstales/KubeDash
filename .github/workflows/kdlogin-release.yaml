@@ -106,6 +106,7 @@ jobs:
             windows/kubectl-kdlogin_windows.tar.gz
             windows/kubectl-kdlogin_windows.tar.gz.sha256
           if-no-files-found: error
+          upload-release-files: true
           release-upload-url: ${{ steps.create_release.outputs.upload_url }}
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
