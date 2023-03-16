@@ -30,12 +30,14 @@ jobs:
 
       - name: Build
         run: |
+          cd src/kdlogin
           env CGO_ENABLED=0 go build -o dist/linux/kubectl-kdlogin main.go
           env CGO_ENABLED=0 GOOS=darwin GOARCH=amd64 go build -o dist/osx/kubectl-kdlogin main.go
           env CGO_ENABLED=0 GOOS=windows GOARCH=amd64 go build -o dist/windows/kubectl-kdlogin.exe main.go
 
       - name: Packageing
         run: |
+          cd src/kdlogin
           cp ../../LICENSE dist/linux
           cd dist/linux
           chmod +x kubectl-kdlogin
@@ -58,10 +60,12 @@ jobs:
         uses: actions/upload-artifact@master
         with:
           name: kubectl-kdlogin
-          path: dist/*/kubectl-kdlogin_*
+          path: src/kdlogin/dist/*/kubectl-kdlogin_*
 
       - name: Test with the Go CLI
-        run: go test
+        run: |
+          cd src/kdlogin
+          go test
 
   release:
     name: Create Release
