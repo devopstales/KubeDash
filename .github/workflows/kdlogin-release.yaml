@@ -96,7 +96,7 @@ jobs:
           prerelease: false
 
       - name: Test
-        run:
+        run: |
           ls -laF
           ls -laF ${{ github.ref_name }}/
 
