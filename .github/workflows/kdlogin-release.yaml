@@ -95,21 +95,16 @@ jobs:
           draft: true
           prerelease: false
 
-      - name: Test
-        run: |
-          ls -laF
-          ls -laF ${{ github.ref_name }}/
-
       - name: Upload artifact and release
         uses: nanoufo/action-upload-artifacts-and-release-assets@main
         with:
           path: |
-            ${{ github.ref_name }}/kubectl-kdlogin_linux.tar.gz
-            ${{ github.ref_name }}/kubectl-kdlogin_linux.tar.gz.sha256
-            ${{ github.ref_name }}/kubectl-kdlogin_osx.tar.gz
-            ${{ github.ref_name }}/kubectl-kdlogin_osx.tar.gz.sha256
-            ${{ github.ref_name }}/kubectl-kdlogin_windows.tar.gz
-            ${{ github.ref_name }}/kubectl-kdlogin_windows.tar.gz.sha256
+            src/kdlogin/dist/linux/kubectl-kdlogin_linux.tar.gz
+            src/kdlogin/dist/linux/kubectl-kdlogin_linux.tar.gz.sha256
+            src/kdlogin/dist/osx/kubectl-kdlogin_osx.tar.gz
+            src/kdlogin/dist/osx/kubectl-kdlogin_osx.tar.gz.sha256
+            src/kdlogin/dist/windows/kubectl-kdlogin_windows.tar.gz
+            src/kdlogin/dist/windows/kubectl-kdlogin_windows.tar.gz.sha256
           if-no-files-found: error
           release-upload-url: ${{ steps.create_release.outputs.upload_url }}
         env:
