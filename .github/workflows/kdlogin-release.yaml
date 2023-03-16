@@ -99,12 +99,12 @@ jobs:
         uses: nanoufo/action-upload-artifacts-and-release-assets@main
         with:
           path: |
-            src/kdlogin/dist/linux/kubectl-kdlogin_linux.tar.gz
-            src/kdlogin/dist/linux/kubectl-kdlogin_linux.tar.gz.sha256
-            src/kdlogin/dist/osx/kubectl-kdlogin_osx.tar.gz
-            src/kdlogin/dist/osx/kubectl-kdlogin_osx.tar.gz.sha256
-            src/kdlogin/dist/windows/kubectl-kdlogin_windows.tar.gz
-            src/kdlogin/dist/windows/kubectl-kdlogin_windows.tar.gz.sha256
+            linux/kubectl-kdlogin_linux.tar.gz
+            linux/kubectl-kdlogin_linux.tar.gz.sha256
+            osx/kubectl-kdlogin_osx.tar.gz
+            osx/kubectl-kdlogin_osx.tar.gz.sha256
+            windows/kubectl-kdlogin_windows.tar.gz
+            windows/kubectl-kdlogin_windows.tar.gz.sha256
           if-no-files-found: error
           release-upload-url: ${{ steps.create_release.outputs.upload_url }}
         env:
