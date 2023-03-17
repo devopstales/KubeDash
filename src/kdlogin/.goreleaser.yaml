@@ -42,6 +42,40 @@ brews:
     install: |
       bin.install "kubectl-kdlogin"
 
+krews:
+  - name: kdlogin
+    index:
+      owner: devopstales
+      name: krew
+    homepage: "https://devopstales.github.io"
+    short_description: "Login to a cluster via openid-connect"
+    description: |
+      Run `kubectl kdlogin <kubedash-ingress-url>`.
+      It automatically opens the browser and you can log in to the provider.
+      After authentication, it writes the token to the kubeconfig and you can access the cluster.
+    caveats: |
+      1) You need to install the kubedash server by helm:
+          helm repo add devopstales https://devopstales.github.io/helm-charts
+          helm repo update
+          kubectl create ns kubedash
+          kubens kubedash
+          helm upgrade --install kubedash devopstales/kubedash -f values.yaml
+      2) You need to setup the OIDC provider at Kubernetes API server.
+          nano /etc/kubernetes/manifests/kube-apiserver.yaml
+          ...
+          command:
+          - /hyperkube
+          - apiserver
+          ...
+          - --oidc-issuer-url=<oidcServerURL>
+          - --oidc-client-id=<oidcClientID>
+          - --oidc-username-claim=email
+          - --oidc-groups-claim=groups
+          # for self sign cert or custom ca
+          #- --oidc-ca-file=/etc/kubernetes/pki/rootca.pem
+          systemctl restart kubelet
+      3) You need to setup role binding for users or groupe.
+
 checksum:
   name_template: 'checksums.txt'
 
@@ -53,11 +87,14 @@ changelog:
       - '^test:'
       - '^ci:'
   groups:
-    - title: Features
+    - title: 'Features 🚀'
       regexp: '^.*?feat(\([[:word:]]+\))??!?:.+$'
       order: 0
-    - title: 'Bug fixes'
-      regexp: '^.*?bug(\([[:word:]]+\))??!?:.+$'
+    - title: 'Bug fixes 🐛'
+      regexp: '^.*?fix(\([[:word:]]+\))??!?:.+$'
       order: 1
+    - title: 'Changes 🛠'
+      regexp: '^.*?refactor(\([[:word:]]+\))??!?:.+$'
+      order: 2
     - title: Others
       order: 999
