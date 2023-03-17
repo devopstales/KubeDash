@@ -26,6 +26,22 @@ archives:
     - goos: windows
       format: zip
 
+brews:
+  - name: kdlogin
+    tap:
+      owner: devopstales
+      name: homebrew-devopstales
+    homepage: "https://devopstales.github.io"
+    license: "Apache 2.0"
+    description: "kubectl-kdlogin is a kubectl plugin that can be used to easily enable authentication flows via OIDC for a kubernetes cluster."
+    conflicts:
+      - login
+      - dtlogin
+      - kubectl-login
+      - oidc-login
+    install: |
+      bin.install "kubectl-kdlogin"
+
 checksum:
   name_template: 'checksums.txt'
 
@@ -35,3 +51,13 @@ changelog:
     exclude:
       - '^docs:'
       - '^test:'
+      - '^ci:'
+  groups:
+    - title: Features
+      regexp: '^.*?feat(\([[:word:]]+\))??!?:.+$'
+      order: 0
+    - title: 'Bug fixes'
+      regexp: '^.*?bug(\([[:word:]]+\))??!?:.+$'
+      order: 1
+    - title: Others
+      order: 999
