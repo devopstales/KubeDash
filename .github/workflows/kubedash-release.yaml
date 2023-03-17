@@ -105,7 +105,7 @@ jobs:
           distribution: goreleaser
           version: latest
           workdir: src/kdlogin
-          args: release -f .goreleaser.yaml --snapshot --clean
+          args: release -f .goreleaser.yaml --clean
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
       - name: test
