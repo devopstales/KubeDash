@@ -9,6 +9,4 @@ builds:
       - amd64
       - arm64
     id: "kdlogin"
-    dir: .
-    main: ./src/kdlogin
     binary: kubectl-kdlogin
