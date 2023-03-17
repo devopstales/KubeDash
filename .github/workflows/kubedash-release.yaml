@@ -1,4 +1,4 @@
-name: kubedash Release
+name: Release
 on:
   push:
     tags:
@@ -106,7 +106,8 @@ jobs:
         with:
           distribution: goreleaser
           version: latest
-          args: release -f .goreleaser.yaml --snapshot --rm-dist
+          workdir: src/kdlogin
+          args: release -f .goreleaser.yaml --snapshot --clean
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
           
