@@ -107,7 +107,7 @@ jobs:
           workdir: src/kdlogin
           args: release -f .goreleaser.yaml --clean
         env:
-          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          GITHUB_TOKEN: ${{ secrets.GH_PAT }}
       - name: test
         run: |
           ls -laF
