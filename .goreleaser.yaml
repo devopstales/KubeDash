@@ -10,5 +10,5 @@ builds:
       - arm64
     id: "kdlogin"
     dir: .
-    main: ./cmd/kdlogin
+    main: ./src/kdlogin
     binary: kubectl-kdlogin
