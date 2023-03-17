@@ -92,8 +92,6 @@ jobs:
     permissions:
       contents: write
       pull-requests: write
-#    needs:
-#      - build-kubedash
     steps:
       - uses: actions/checkout@v3
         with:
@@ -110,5 +108,11 @@ jobs:
           args: release -f .goreleaser.yaml --snapshot --clean
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+      - name: test
+        run: |
+          ls -laF
+          cd src/kdlogin
+          ls -laF
+          ls -laF dist
           
 # https://github.com/orgs/community/discussions/26274
