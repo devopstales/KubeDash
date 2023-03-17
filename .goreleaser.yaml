@@ -1,0 +1,14 @@
+project_name: kdlogin
+builds:
+  - env: [CGO_ENABLED=0]
+    goos:
+      - linux
+      - windows
+      - darwin
+    goarch:
+      - amd64
+      - arm64
+    id: "kdlogin"
+    dir: .
+    main: ./cmd/kdlogin
+    binary: kubectl-kdlogin
