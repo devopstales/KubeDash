@@ -5,86 +5,86 @@ on:
       - "*.*"
 
 jobs:
-  build-kubedash:
-    name: Build kubedash
-    runs-on: ubuntu-20.04
-    permissions:
-      contents: write
-      packages: write
-    steps:
-      - name: Checkout code
-        uses: actions/checkout@v3
-        with:
-          fetch-depth: 0
-          persist-credentials: true
-
-      - name: Set up QEMU
-        uses: docker/setup-qemu-action@v1
-
-      - name: Set up Docker Buildx
-        id: buildx
-        uses: docker/setup-buildx-action@v1
-
-      - name: Login to DockerHub
-        uses: docker/login-action@v1
-        with:
-          username: ${{ secrets.DOCKER_USERNAME }}
-          password: ${{ secrets.DOCKER_PASSWORD }}
-
-      - name: Login to GitHub Packages
-        uses: docker/login-action@v1
-        with:
-          registry: ghcr.io
-          username: ${{ github.actor }}
-          password: ${{ secrets.GITHUB_TOKEN }}
-
-      - name: Prepare kubedash
-        id: prep_kubedash
-        run: |
-          cp -r src/kubedash docker/kubedash
-          rm -rf docker/kubedash/kubedash/instance/
-          rm -rf docker/kubedash/kubedash/tests/
-          rm -rf docker/kubedash/kubedash/database/*
-          rm -rf docker/kubedash/kubedash/.pytest_cache/
-          rm -rf docker/kubedash/kubedash/.vscode/
-          rm -rf docker/kubedash/kubedash/__pycache__/
-          rm -rf docker/kubedash/kubedash/functions/__pycache__/
-
-      - name: Build amd64 kubedash
-        uses: docker/build-push-action@v3.3.0
-        with:
-          context: docker/kubedash/
-          build-args:
-            ARCH=amd64/
-          tags: devopstales/kubedash:${{github.ref_name}}-amd64,
-            ghcr.io/devopstales/kubedash:${{github.ref_name}}-amd64
-          push: true
-          provenance: false
-
-      - name: Build arm64v8 kubedash
-        uses: docker/build-push-action@v3.3.0
-        with:
-          context: docker/kubedash/
-          build-args:
-            ARCH=arm64v8/
-          tags: devopstales/kubedash:${{github.ref_name}}-arm64v8,
-            ghcr.io/devopstales/kubedash:${{github.ref_name}}-arm64v8
-          push: true
-          provenance: false
-
-      - name: Create and push kubedash manifest images to dockerhub
-        uses: Noelware/docker-manifest-action@master
-        with:
-          inputs: devopstales/kubedash:${{github.ref_name}}
-          images: devopstales/kubedash:${{github.ref_name}}-amd64,devopstales/kubedash:${{github.ref_name}}-arm64v8
-          push: true
-
-      - name: Create and push kubedash manifest images to github
-        uses: Noelware/docker-manifest-action@master
-        with:
-          inputs: ghcr.io/devopstales/kubedash:${{github.ref_name}}
-          images: ghcr.io/devopstales/kubedash:${{github.ref_name}}-amd64,ghcr.io/devopstales/kubedash:${{github.ref_name}}-arm64v8
-          push: true
+#  build-kubedash:
+#    name: Build kubedash
+#    runs-on: ubuntu-20.04
+#    permissions:
+#      contents: write
+#      packages: write
+#    steps:
+#      - name: Checkout code
+#        uses: actions/checkout@v3
+#        with:
+#          fetch-depth: 0
+#          persist-credentials: true
+#
+#      - name: Set up QEMU
+#        uses: docker/setup-qemu-action@v1
+#
+#      - name: Set up Docker Buildx
+#        id: buildx
+#        uses: docker/setup-buildx-action@v1
+#
+#      - name: Login to DockerHub
+#        uses: docker/login-action@v1
+#        with:
+#          username: ${{ secrets.DOCKER_USERNAME }}
+#          password: ${{ secrets.DOCKER_PASSWORD }}
+#
+#      - name: Login to GitHub Packages
+#        uses: docker/login-action@v1
+#        with:
+#          registry: ghcr.io
+#          username: ${{ github.actor }}
+#          password: ${{ secrets.GITHUB_TOKEN }}
+#
+#      - name: Prepare kubedash
+#        id: prep_kubedash
+#        run: |
+#          cp -r src/kubedash docker/kubedash
+#          rm -rf docker/kubedash/kubedash/instance/
+#          rm -rf docker/kubedash/kubedash/tests/
+#          rm -rf docker/kubedash/kubedash/database/*
+#          rm -rf docker/kubedash/kubedash/.pytest_cache/
+#          rm -rf docker/kubedash/kubedash/.vscode/
+#          rm -rf docker/kubedash/kubedash/__pycache__/
+#          rm -rf docker/kubedash/kubedash/functions/__pycache__/
+#
+#      - name: Build amd64 kubedash
+#        uses: docker/build-push-action@v3.3.0
+#        with:
+#          context: docker/kubedash/
+#          build-args:
+#            ARCH=amd64/
+#          tags: devopstales/kubedash:${{github.ref_name}}-amd64,
+#            ghcr.io/devopstales/kubedash:${{github.ref_name}}-amd64
+#          push: true
+#          provenance: false
+#
+#      - name: Build arm64v8 kubedash
+#        uses: docker/build-push-action@v3.3.0
+#        with:
+#          context: docker/kubedash/
+#          build-args:
+#            ARCH=arm64v8/
+#          tags: devopstales/kubedash:${{github.ref_name}}-arm64v8,
+#            ghcr.io/devopstales/kubedash:${{github.ref_name}}-arm64v8
+#          push: true
+#          provenance: false
+#
+#      - name: Create and push kubedash manifest images to dockerhub
+#        uses: Noelware/docker-manifest-action@master
+#        with:
+#          inputs: devopstales/kubedash:${{github.ref_name}}
+#          images: devopstales/kubedash:${{github.ref_name}}-amd64,devopstales/kubedash:${{github.ref_name}}-arm64v8
+#          push: true
+#
+#      - name: Create and push kubedash manifest images to github
+#        uses: Noelware/docker-manifest-action@master
+#        with:
+#          inputs: ghcr.io/devopstales/kubedash:${{github.ref_name}}
+#          images: ghcr.io/devopstales/kubedash:${{github.ref_name}}-amd64,ghcr.io/devopstales/kubedash:${{github.ref_name}}-arm64v8
+#          push: true
 
   goreleaser:
     name: Create Release
@@ -92,8 +92,8 @@ jobs:
     permissions:
       contents: write
       pull-requests: write
-    needs:
-      - build-kubedash
+#    needs:
+#      - build-kubedash
     steps:
       - uses: actions/checkout@v3
         with:
