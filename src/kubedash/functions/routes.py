@@ -71,42 +71,42 @@ def login():
             else:
                 logger.info("Kubectl Integration is configured.")
                 k8s_server_ca = str(base64_decode(k8sConfig.k8s_server_ca), 'UTF-8')
-                #try:
-                i = requests.get('http://%s:8080/info' % remote_addr)
-                info = i.json()
-                if info["message"] == "kdlogin":
-                    user = User.query.filter_by(username=username, user_type = "OpenID").first()
-                    user2 = KubectlConfig.query.filter_by(name=session['username']).first()
-                    if is_sso_enabled and user:
-                        token = eval(SSOTokenGet(username))
-                        x = requests.post('http://%s:8080/' % remote_addr, json={
-                                "username": username,
-                                "context": k8sConfig.k8s_context,
-                                "server": k8sConfig.k8s_server_url,
-                                "certificate-authority-data": k8s_server_ca,
-                                "client-id": ssoServer.client_id,
-                                "id-token": token.get("id_token"),
-                                "refresh-token": token.get("refresh_token"),
-                                "idp-issuer-url": ssoServer.oauth_server_uri,
-                                "client_secret": ssoServer.client_secret,
-                            }
-                        )
-                    elif user2:
-                        user_private_key = str(base64_decode(user2.private_key), 'UTF-8')
-                        user_certificate = str(base64_decode(user2.user_certificate), 'UTF-8')
-                        x = requests.post('http://%s:8080/' % remote_addr, json={
-                                "username": username,
-                                "context": k8sConfig.k8s_context,
-                                "server": k8sConfig.k8s_server_url,
-                                "certificate-authority-data": k8s_server_ca,
-                                "user-private-key": user_private_key,
-                                "user-certificate": user_certificate,
-                            }
-                        )
-                    logger.info("Config sent to client")
-                    logger.info("Answer from clinet: %s" % x.text)
-                #except:
-                #    pass
+                try:
+                    i = requests.get('http://%s:8080/info' % remote_addr)
+                    info = i.json()
+                    if info["message"] == "kdlogin":
+                        user = User.query.filter_by(username=username, user_type = "OpenID").first()
+                        user2 = KubectlConfig.query.filter_by(name=session['username']).first()
+                        if is_sso_enabled and user:
+                            token = eval(SSOTokenGet(username))
+                            x = requests.post('http://%s:8080/' % remote_addr, json={
+                                    "username": username,
+                                    "context": k8sConfig.k8s_context,
+                                    "server": k8sConfig.k8s_server_url,
+                                    "certificate-authority-data": k8s_server_ca,
+                                    "client-id": ssoServer.client_id,
+                                    "id-token": token.get("id_token"),
+                                    "refresh-token": token.get("refresh_token"),
+                                    "idp-issuer-url": ssoServer.oauth_server_uri,
+                                    "client_secret": ssoServer.client_secret,
+                                }
+                            )
+                        elif user2:
+                            user_private_key = str(base64_decode(user2.private_key), 'UTF-8')
+                            user_certificate = str(base64_decode(user2.user_certificate), 'UTF-8')
+                            x = requests.post('http://%s:8080/' % remote_addr, json={
+                                    "username": username,
+                                    "context": k8sConfig.k8s_context,
+                                    "server": k8sConfig.k8s_server_url,
+                                    "certificate-authority-data": k8s_server_ca,
+                                    "user-private-key": user_private_key,
+                                    "user-certificate": user_certificate,
+                                }
+                            )
+                        logger.info("Config sent to client")
+                        logger.info("Answer from clinet: %s" % x.text)
+                except:
+                    pass
             return redirect(url_for('routes.dashboard'))
         else:
             return render_template(
@@ -1218,6 +1218,60 @@ def secrets_data():
     else:
         return redirect(url_for('routes.login'))
 
+##############################################################
+## Storage
+##############################################################
+## ConfigMap
+##############################################################
+
+@routes.route("/configmaps", methods=['GET', 'POST'])
+@login_required
+def configmap():
+    if session['user_type'] == "OpenID":
+        user_token = session['oauth_token']
+    else:
+        user_token = None
+
+    if request.method == 'POST':
+        session['ns_select'] = request.form.get('ns_select')
+
+    namespace_list, error = k8sNamespaceListGet(session['user_role'], user_token)
+    if not error:
+        configmaps = k8sConfigmapListGet(session['user_role'], user_token, session['ns_select'])
+    else:
+        configmap = list()
+
+
+    return render_template(
+        'configmaps.html.j2',
+        configmaps = configmaps,
+        namespaces = namespace_list,
+    )
+
+@routes.route('/configmaps/data', methods=['GET', 'POST'])
+@login_required
+def configmap_data():
+    if request.method == 'POST':
+        configmap_name = request.form.get('configmap_name')
+        session['ns_select'] = request.form.get('ns_name')
+
+        if session['user_type'] == "OpenID":
+            user_token = session['oauth_token']
+        else:
+            user_token = None
+
+        configmaps = k8sConfigmapListGet(session['user_role'], user_token, session['ns_select'])
+        for configmap in configmaps:
+            if configmap["name"] == configmap_name:
+                configmap_data = configmap
+
+        return render_template(
+            'configmap-data.html.j2',
+            configmap_data = configmap_data,
+            namespace = session['ns_select'],
+        )
+    else:
+        return redirect(url_for('routes.login'))
 
 ##############################################################
 ## Helm Charts

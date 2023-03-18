@@ -1562,12 +1562,37 @@ def k8sSecretListGet(username_role, user_token, namespace):
             "name": secret.metadata.name,
             "type": secret.type,
             "annotations": secret.metadata.annotations,
+            "labels": secret.metadata.labels,
             "data": secret.data,
+            "created": secret.metadata.creation_timestamp,
+            "version": secret.metadata.resource_version,
         }
         SECRET_LIST.append(SECRET_DATA)
 
     return SECRET_LIST
 
+##############################################################
+## Storage
+##############################################################
+## ConfigMap
+##############################################################
+
+def k8sConfigmapListGet(username_role, user_token, namespace):
+    k8sClientConfigGet(username_role, user_token)
+    CONFIGMAP_LIST = list()
+    configmap_list = k8s_client.CoreV1Api().list_namespaced_config_map(namespace)
+    for configmap in configmap_list.items:
+        CONFIGMAP_DATA = {
+            "name": configmap.metadata.name,
+            "created": configmap.metadata.creation_timestamp,
+            "annotations": configmap.metadata.annotations,
+            "labels": configmap.metadata.labels,
+            "data": configmap.data,
+            "version": configmap.metadata.resource_version,
+        }
+        CONFIGMAP_LIST.append(CONFIGMAP_DATA)
+
+    return CONFIGMAP_LIST
 
 ##############################################################
 ## Helm Charts
