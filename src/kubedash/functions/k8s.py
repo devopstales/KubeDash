@@ -1572,6 +1572,34 @@ def k8sSecretListGet(username_role, user_token, namespace):
 ##############################################################
 ## Storage
 ##############################################################
+## Stotage Class
+##############################################################
+
+def k8sStorageClassListGet(username_role, user_token):
+    k8sClientConfigGet(username_role, user_token)
+    SC_LIST = list()
+    try:
+        storage_classes = k8s_client.StorageV1Api().list_storage_class()
+        for sc in storage_classes.items:
+            SC = {
+                "name": sc.metadata.name,
+                "created": sc.metadata.creation_timestamp,
+                "annotations": sc.metadata.annotations,
+                "labels": sc.metadata.labels,
+                "parameters": sc.parameters,
+                "provisioner": sc.provisioner,
+                "reclaim_policy": sc.reclaim_policy,
+                "volume_binding_mode": sc.volume_binding_mode,
+            }
+            SC_LIST.append(SC)
+        return SC_LIST
+    except ApiException as error:
+        ErrorHandler(error, "get cluster Stotage Class list")
+        return SC_LIST
+    except:
+        return SC_LIST   
+
+##############################################################
 ## ConfigMap
 ##############################################################
 
