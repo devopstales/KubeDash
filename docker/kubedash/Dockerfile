@@ -4,6 +4,11 @@ ARG ARCH
 ENV FLASK_CONFIG="production" \
     FLASK_APP="kubedash"
 
+LABEL org.opencontainers.image.source=https://github.com/devopstales/kubedash
+LABEL org.opencontainers.image.documentation=https://devopstales.github.io/kubedash
+LABEL org.opencontainers.image.description="General-purpose web UI for Kubernetes clusters"
+LABEL org.opencontainers.image.licenses="Apache 2.0"
+
 WORKDIR /code
 
 RUN apk -U upgrade && \
