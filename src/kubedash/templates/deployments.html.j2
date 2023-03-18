@@ -43,7 +43,7 @@
                         <td>{{ d.status }}</td>
                         <td>
                         {% for label in d.labels %} 
-                            <span style="font-size: 85%" class="badge badge-secondary">{{ label }}</span>
+                            <span class="badge badge-secondary">{{ label }}</span>
                             {% if not loop.last %}<br>{% endif %}
                         {% endfor %}
                         </td>
