@@ -1227,25 +1227,28 @@ def secrets_data():
 @routes.route("/storage-class", methods=['GET', 'POST'])
 @login_required
 def storage_class():
+    sc_select = None
     if session['user_type'] == "OpenID":
         user_token = session['oauth_token']
     else:
         user_token = None
+
+    if request.method == 'POST':
+        sc_select = request.form.get('sc_select')
 
     storage_classes = k8sStorageClassListGet(session['user_role'], user_token)
 
     return render_template(
         'storage-classes.html.j2',
         storage_classes = storage_classes,
+        sc_select = sc_select,
     )
-
 
 @routes.route('/storage-class/data', methods=['GET', 'POST'])
 @login_required
 def storage_class_data():
     if request.method == 'POST':
         sc_name = request.form.get('sc_name')
-        # sc_select
 
         if session['user_type'] == "OpenID":
             user_token = session['oauth_token']
@@ -1260,6 +1263,61 @@ def storage_class_data():
         return render_template(
             'storage-class-data.html.j2',
             sc_data = sc_data
+        )
+    else:
+        return redirect(url_for('routes.login'))
+
+##############################################################
+## Persistent Volume Claim
+##############################################################
+
+@routes.route("/pvc", methods=['GET', 'POST'])
+@login_required
+def pvc():
+    if session['user_type'] == "OpenID":
+        user_token = session['oauth_token']
+    else:
+        user_token = None
+
+    if request.method == 'POST':
+        session['ns_select'] = request.form.get('ns_select')
+
+    namespace_list, error = k8sNamespaceListGet(session['user_role'], user_token)
+    if not error:
+        pvc_list = k8sPersistentVolumeClaimListGet(session['user_role'], user_token, session['ns_select'])
+    else:
+        pvc_list = list()
+
+    return render_template(
+        'pvc.html.j2',
+        pvc_list = pvc_list,
+        namespaces = namespace_list,
+    )
+
+@routes.route('/pvc/data', methods=['GET', 'POST'])
+@login_required
+def pvc_data():
+    if request.method == 'POST':
+        pvc_name = request.form.get('pvc_name')
+
+        if session['user_type'] == "OpenID":
+            user_token = session['oauth_token']
+        else:
+            user_token = None
+
+        namespace_list, error = k8sNamespaceListGet(session['user_role'], user_token)
+        if not error:
+            pvc_list = k8sPersistentVolumeClaimListGet(session['user_role'], user_token, session['ns_select'])
+            for pvc in pvc_list:
+                if pvc["name"] == pvc_name:
+                    pvc_data = pvc
+        else:
+            pvc_list = list()
+
+        return render_template(
+            'pvc-data.html.j2',
+            pvc_data = pvc_data,
+            namespace = session['ns_select'],
         )
     else:
         return redirect(url_for('routes.login'))
