@@ -1167,6 +1167,59 @@ def cluster_role_bindings():
     )
 
 ##############################################################
+## Cluster Role Bindings
+##############################################################
+
+@routes.route("/secrets", methods=['GET', 'POST'])
+@login_required
+def secrets():
+    if session['user_type'] == "OpenID":
+        user_token = session['oauth_token']
+    else:
+        user_token = None
+
+    if request.method == 'POST':
+        session['ns_select'] = request.form.get('ns_select')
+
+    namespace_list, error = k8sNamespaceListGet(session['user_role'], user_token)
+    if not error:
+        secrets = k8sSecretListGet(session['user_role'], user_token, session['ns_select'])
+    else:
+        secrets = list()
+
+    return render_template(
+        'secrets.html.j2',
+        secrets = secrets,
+        namespaces = namespace_list,
+    )
+
+@routes.route('/secrets/data', methods=['GET', 'POST'])
+@login_required
+def secrets_data():
+    if request.method == 'POST':
+        secret_name = request.form.get('secret_name')
+        session['ns_select'] = request.form.get('ns_name')
+
+        if session['user_type'] == "OpenID":
+            user_token = session['oauth_token']
+        else:
+            user_token = None
+
+        secrets = k8sSecretListGet(session['user_role'], user_token, session['ns_select'])
+        for secret in secrets:
+            if secret["name"] == secret_name:
+                secret_data = secret
+
+        return render_template(
+            'secret-data.html.j2',
+            secret_data = secret_data,
+            namespace = session['ns_select'],
+        )
+    else:
+        return redirect(url_for('routes.login'))
+
+
+##############################################################
 ## Helm Charts
 ##############################################################
 
