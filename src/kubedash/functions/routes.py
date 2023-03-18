@@ -1221,6 +1221,50 @@ def secrets_data():
 ##############################################################
 ## Storage
 ##############################################################
+## Stotage Class
+##############################################################
+
+@routes.route("/storage-class", methods=['GET', 'POST'])
+@login_required
+def storage_class():
+    if session['user_type'] == "OpenID":
+        user_token = session['oauth_token']
+    else:
+        user_token = None
+
+    storage_classes = k8sStorageClassListGet(session['user_role'], user_token)
+
+    return render_template(
+        'storage-classes.html.j2',
+        storage_classes = storage_classes,
+    )
+
+
+@routes.route('/storage-class/data', methods=['GET', 'POST'])
+@login_required
+def storage_class_data():
+    if request.method == 'POST':
+        sc_name = request.form.get('sc_name')
+        # sc_select
+
+        if session['user_type'] == "OpenID":
+            user_token = session['oauth_token']
+        else:
+            user_token = None
+
+        storage_classes = k8sStorageClassListGet(session['user_role'], user_token)
+        for sc in storage_classes:
+            if sc["name"] == sc_name:
+                sc_data = sc
+
+        return render_template(
+            'storage-class-data.html.j2',
+            sc_data = sc_data
+        )
+    else:
+        return redirect(url_for('routes.login'))
+
+##############################################################
 ## ConfigMap
 ##############################################################
 
@@ -1239,8 +1283,7 @@ def configmap():
     if not error:
         configmaps = k8sConfigmapListGet(session['user_role'], user_token, session['ns_select'])
     else:
-        configmap = list()
-
+        configmaps = list()
 
     return render_template(
         'configmaps.html.j2',
