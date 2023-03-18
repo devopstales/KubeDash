@@ -182,7 +182,68 @@
                         {% endif %}
                         <a class="collapse-item" href="/cluster-roles">ClusterRoles</a>
                         <a class="collapse-item" href="/cluster-role-bindings">ClusterRoleBindings</a>
+                        {% if session['ns_select'] %}
+                        <form action="/secrets" method="POST">
+                            <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+                            <input type="hidden" name="ns_select" value="{{ session['ns_select'] }}" />
+                            <a class="collapse-item" href="#" onclick="event.preventDefault(); this.parentNode.submit()">Secrets</a>
+                        </form>
+                        {% else %}
                         <a class="collapse-item" href="/secrets">Secrets</a>
+                        {% endif %}
+                    </div>
+                </div>
+            </li>
+
+            <!-- Nav Item - Storage Collapse Menu -->
+            <li class="nav-item">
+                <a class="nav-link collapsed" href="#" data-toggle="collapse" data-target="#collapseStorage"
+                    aria-expanded="true" aria-controls="collapseStorage">
+                    <i class="fas fa-fw fa-folder"></i>
+                    <span>Storage</span>
+                </a>
+                <div id="collapseStorage" class="collapse" aria-labelledby="headingStorage"
+                    data-parent="#accordionSidebar">
+                    <div class="bg-white py-2 collapse-inner rounded">
+                        {% if session['ns_select'] %}
+                        <form action="/storage-class" method="POST">
+                            <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+                            <input type="hidden" name="ns_select" value="{{ session['ns_select'] }}" />
+                            <a class="collapse-item" href="#" onclick="event.preventDefault(); this.parentNode.submit()">StorageClass</a>
+                        </form>
+                        {% else %}
+                        <a class="collapse-item" href="/storage-class">ServiceAccounts</a>
+                        {% endif %}
+
+                        {% if session['ns_select'] %}
+                        <form action="/pvc" method="POST">
+                            <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+                            <input type="hidden" name="ns_select" value="{{ session['ns_select'] }}" />
+                            <a class="collapse-item" href="#" onclick="event.preventDefault(); this.parentNode.submit()">VolumeClames</a>
+                        </form>
+                        {% else %}
+                        <a class="collapse-item" href="/pvc">VolumeClames</a>
+                        {% endif %}
+
+                        {% if session['ns_select'] %}
+                        <form action="/pv" method="POST">
+                            <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+                            <input type="hidden" name="ns_select" value="{{ session['ns_select'] }}" />
+                            <a class="collapse-item" href="#" onclick="event.preventDefault(); this.parentNode.submit()">Volumes</a>
+                        </form>
+                        {% else %}
+                        <a class="collapse-item" href="/pv">Volumes</a>
+                        {% endif %}
+
+                        {% if session['ns_select'] %}
+                        <form action="/configmaps" method="POST">
+                            <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+                            <input type="hidden" name="ns_select" value="{{ session['ns_select'] }}" />
+                            <a class="collapse-item" href="#" onclick="event.preventDefault(); this.parentNode.submit()">ConfigMaps</a>
+                        </form>
+                        {% else %}
+                        <a class="collapse-item" href="/configmaps">ConfigMaps</a>
+                        {% endif %}
                     </div>
                 </div>
             </li>
