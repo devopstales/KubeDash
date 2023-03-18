@@ -57,7 +57,7 @@
                         <td>{{ no.os }}</td>
                         <td>
                           {% for taint in no.taint %}
-                          <span style="font-size: 85%" class="badge badge-secondary">{{ taint }}</span>
+                          <span class="badge badge-secondary">{{ taint }}</span>
                           {% if not loop.last %}<br>{% endif %}
                           {% endfor %}
                         </td>
