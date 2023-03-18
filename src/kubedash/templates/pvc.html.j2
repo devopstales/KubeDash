@@ -9,7 +9,7 @@
 <nav aria-label="breadcrumb">
   <ol class="breadcrumb">
     <li class="breadcrumb-item">Storage</li>
-    <li class="breadcrumb-item active" aria-current="page">Storage Class</li>
+    <li class="breadcrumb-item active" aria-current="page">Persistent Volume Claims</li>
     <div class="col">
       <a class="card-link float-right" data-toggle="collapse" href="#" onclick="reload()">
         <i class="material-icons">refresh</i>
@@ -20,39 +20,53 @@
 
 <div class="card shadow mb-4">
     <div class="card-header py-3">
-        <h6 class="m-0 font-weight-bold text-primary">Storage Classes List</h6>
+        <h6 class="m-0 font-weight-bold text-primary">Persistent Volume Claim List</h6>
     </div>
     <div class="card-body">
         <div class="table-responsive">
             <table class="table table-bordered" id="dataTable" width="100%" cellspacing="0">
                 <thead>
                     <tr>
+                      <th>Status</th>
                       <th>Name</th>
-                      <th>Reclaim Policy</th>
-                      <th>Volume Binding Mode</th>
+                      <th>StorageClass</th>
+                      <th>Volume</th>
+                      <th>Capacity</th>
                     </tr>
                   </thead>
                   <tbody>
-                    {% for sc in storage_classes %}
-                    {% if sc_select == sc.name %}
+                    {% for pvc in pvc_list %}
+                    {% if pvc_select == pvc.name %}
                       <tr class="selected" >
                     {% else %}
                       <tr>
                     {% endif %}
+                        <td>{{ pvc.status }}</td>
                         <td>
-                          <form action="/storage-class/data" method="POST">
+                          <form action="/pvc/data" method="POST">
                             <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
                             <input type="hidden" name="ns_name" value="{{ session['ns_select'] }}" />
-                            <input type="hidden" name="sc_name" value="{{ sc.name }}" />
-                            <a href="javascript:;" onclick="parentNode.submit();">{{ sc.name }}</a>
+                            <input type="hidden" name="pvc_name" value="{{ pvc.name }}" />
+                            <a href="javascript:;" onclick="parentNode.submit();">{{ pvc.name }}</a>
                           </form>
                         </td>
                         <td>
-                          {{ sc.reclaim_policy }}
+                          <form action="/storage-class" method="POST">
+                            <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+                            <input type="hidden" name="ns_name" value="{{ session['ns_select'] }}" />
+                            <input type="hidden" name="sc_select" value="{{ pvc.storage_class_name }}" />
+                            <a href="javascript:;" onclick="parentNode.submit();">{{ pvc.storage_class_name }}</a>
+                          </form>
                         </td>
                         <td>
-                          {{ sc.volume_binding_mode }}
+                          <form action="/pv" method="POST">
+                            <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+                            <input type="hidden" name="ns_name" value="{{ session['ns_select'] }}" />
+                            <input type="hidden" name="pv_name" value="{{ pvc.volume_name }}" />
+                            <a href="javascript:;" onclick="parentNode.submit();">{{ pvc.volume_name }}</a>
+                          </form>
                         </td>
+                        <td>{{ pvc.capacity }}</td>
                       </tr>
                     {% endfor %}
                   </tbody>
