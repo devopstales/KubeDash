@@ -70,7 +70,7 @@
                                 </div>
                                 <div class="p-2">
                                         <button type="button" class="btn btn-just-icon btn-xs" onclick="showPasswords('old_password')">
-                                            <i class="material-icons">visibility_off</i> 
+                                            <i id="old_password_icon" class="material-icons">visibility_off</i> 
                                         </button>
                                 </div>
                             </div>
@@ -86,7 +86,7 @@
                                 </div>
                                 <div class="p-2">
                                         <button type="button" class="btn btn-just-icon btn-xs" onclick="showPasswords('new_password')">
-                                            <i class="material-icons">visibility_off</i> 
+                                            <i id="new_password_icon" class="material-icons">visibility_off</i> 
                                         </button>
                                 </div>
                             </div>
@@ -111,7 +111,7 @@
                                     </div>
                                     <div class="m-2">
                                         <button type="button" class="btn btn-just-icon btn-xs" onclick="showPasswords('confirm_new_password')">
-                                            <i class="material-icons">visibility_off</i> 
+                                            <i id="confirm_new_password_icon" class="material-icons">visibility_off</i> 
                                         </button>
                                     </div>
                                 </div>
@@ -158,6 +158,12 @@
                 x.type = "text";
             } else {
                 x.type = "password";
+            }
+            var y = document.getElementById(element+"_icon");
+            if (y.innerHTML === "visibility_off" ) {
+                y.innerHTML = "visibility"
+            } else {
+                y.innerHTML = "visibility_off"
             }
         };
         var old_password = document.getElementById("old_password");
