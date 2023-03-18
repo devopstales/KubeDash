@@ -27,6 +27,8 @@
 <div class="card shadow mb-4">
     <div class="card-header">
         <h6 class="m-0 font-weight-bold text-primary">Storage Class Data</h6>
+    </div>
+    <div class="card-body">
         <div class="card shadow mb-4">
             <div class="card-body">
                 <div class="table-responsive">
@@ -81,26 +83,25 @@
                 </div>
             </div>
         </div>
-        <div class="card shadow mb-4">
-        
-        </div>
-    </div>
-    {% if sc_data.parameters %}
-    <div class="card-body">
+        {% if sc_data.parameters %}
         <div class="card-body">
-            <div class="table-responsive">
-                <table class="table table-bordered" id="podInfoTable" width="100%" cellspacing="0">
-                    {% for da_key, da_value in sc_data.parameters.items() %}
-                    <tr>
-                        <th>{{ da_key }}:</th>
-                        <td>{{ da_value }}</td>
-                    </tr>
-                    {% endfor %}
-                </table>
+            <div class="card shadow mb-4">
+                <div class="card-body">
+                    <div class="table-responsive">
+                        <table class="table table-bordered" id="podInfoTable" width="100%" cellspacing="0">
+                            {% for da_key, da_value in sc_data.parameters.items() %}
+                            <tr>
+                                <th>{{ da_key }}:</th>
+                                <td>{{ da_value }}</td>
+                            </tr>
+                            {% endfor %}
+                        </table>
+                    </div>
+                </div>
             </div>
         </div>
+        {% endif %}
     </div>
-    {% endif %}
 </div>
 {% endblock %}
 

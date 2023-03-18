@@ -27,6 +27,8 @@
 <div class="card shadow mb-4">
     <div class="card-header">
         <h6 class="m-0 font-weight-bold text-primary">Configmap Data</h6>
+    </div>
+    <div class="card-body">
         <div class="card shadow mb-4">
             <div class="card-body">
                 <div class="table-responsive">
@@ -87,18 +89,20 @@
     </div>
     {% if configmap_data.data %}
     <div class="card-body">
-        <div class="card-body">
-            <div class="table-responsive">
-                <table class="table table-bordered" id="podInfoTable" width="100%" cellspacing="0">
-                    {% for da_key, da_value in configmap_data.data.items() %}
-                    <tr>
-                        <th>{{ da_key }}:</th>
-                        <td>
-                            <pre><code>{% autoescape false %}{{ da_value |replace("<", "&lt;")  |replace(">", "&gt;")  }}{% endautoescape %}</code></pre>
-                        </td>
-                    </tr>
-                    {% endfor %}
-                </table>
+        <div class="card shadow mb-2">
+            <div class="card-body">
+                <div class="table-responsive">
+                    <table class="table table-bordered" id="podInfoTable" width="100%" cellspacing="0">
+                        {% for da_key, da_value in configmap_data.data.items() %}
+                        <tr>
+                            <th>{{ da_key }}:</th>
+                            <td>
+                                <pre><code>{% autoescape false %}{{ da_value |replace("<", "&lt;")  |replace(">", "&gt;")  }}{% endautoescape %}</code></pre>
+                            </td>
+                        </tr>
+                        {% endfor %}
+                    </table>
+                </div>
             </div>
         </div>
     </div>

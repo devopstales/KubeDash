@@ -1602,6 +1602,31 @@ def k8sStorageClassListGet(username_role, user_token):
         return SC_LIST   
 
 ##############################################################
+## Persistent Volume Claim
+##############################################################
+
+def k8sPersistentVolumeClaimListGet(username_role, user_token, namespace):
+    k8sClientConfigGet(username_role, user_token)
+    PVC_LIST = list()
+    persistent_volume_clames= k8s_client.CoreV1Api().list_namespaced_persistent_volume_claim(namespace)
+    for pvc in persistent_volume_clames.items:
+        PVC = {
+            "status": pvc.status.phase,
+            "name": pvc.metadata.name,
+            "created": pvc.metadata.creation_timestamp,
+            "annotations": pvc.metadata.annotations,
+            "labels": pvc.metadata.labels,
+            "access_modes": pvc.spec.access_modes,
+            "storage_class_name": pvc.spec.storage_class_name,
+            "volume_name": pvc.spec.volume_name,
+            "volume_mode": pvc.spec.volume_mode,
+            "capacity": pvc.status.capacity['storage'],
+        }
+        PVC_LIST.append(PVC)
+
+    return PVC_LIST
+
+##############################################################
 ## ConfigMap
 ##############################################################
 
