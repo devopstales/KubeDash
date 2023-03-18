@@ -1547,6 +1547,25 @@ def k8sClusterRoleBindingAdd(user_cluster_role, username):
         else:
             k8sClusterRoleBindingCreate(user_cluster_role, username)
 
+##############################################################
+## Secrets
+##############################################################
+
+def k8sSecretListGet(username_role, user_token, namespace):
+    k8sClientConfigGet(username_role, user_token)
+    SECRET_LIST = list()
+    secret_list = k8s_client.CoreV1Api().list_namespaced_secret(namespace)
+    for secret in secret_list.items:
+        SECRET_DATA = {
+            "name": secret.metadata.name,
+            "type": secret.type,
+            "annotations": secret.metadata.annotations,
+            "data": secret.data,
+        }
+        SECRET_LIST.append(SECRET_DATA)
+
+    return SECRET_LIST
+
 
 ##############################################################
 ## Helm Charts
