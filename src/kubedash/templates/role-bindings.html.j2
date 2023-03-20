@@ -76,7 +76,7 @@
                               <form action="/service-accounts" method="POST">
                                   <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
                                   <input type="hidden" name="ns_select" value="{{ rbsa_ns }}" />
-                                  <input type="hidden" name="sa_select" value="{{ rbsa_name }}" />
+                                  <input type="hidden" name="selected" value="{{ rbsa_name }}" />
                                   <a href="javascript:;" onclick="parentNode.submit();">{{ rbsa_name }}</a>
                               </form>
                               {% if not loop.last %}<br>{% endif %}

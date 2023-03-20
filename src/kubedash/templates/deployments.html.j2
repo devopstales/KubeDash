@@ -34,7 +34,7 @@
                   </thead>
                   <tbody>
                     {% for d in deployments %}
-                    {% if tr_select == d.name %}
+                    {% if selected == d.name %}
                       <tr class="selected" >
                     {% else %}
                       <tr>

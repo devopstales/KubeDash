@@ -743,10 +743,10 @@ def get_file():
 @routes.route("/nodes", methods=['GET', 'POST'])
 @login_required
 def nodes():
-    tr_select = None
+    selected = None
 
     if request.method == 'POST':
-        tr_select = request.form.get('tr_select')
+        selected = request.form.get('selected')
 
     if session['user_type'] == "OpenID":
         user_token = session['oauth_token']
@@ -758,7 +758,7 @@ def nodes():
     return render_template(
         'nodes.html.j2',
         nodes = node_data,
-        tr_select = tr_select,
+        selected = selected,
     )
 
 ##############################################################
@@ -821,11 +821,11 @@ def namespaces_delete():
 @routes.route("/statefulsets", methods=['GET', 'POST'])
 @login_required
 def statefulsets():
-    tr_select = None
+    selected = None
 
     if request.method == 'POST':
         session['ns_select'] = request.form.get('ns_select')
-        tr_select = request.form.get('tr_select')
+        selected = request.form.get('selected')
         
     if session['user_type'] == "OpenID":
         user_token = session['oauth_token']
@@ -840,7 +840,7 @@ def statefulsets():
 
     return render_template(
         'statefulsets.html.j2',
-        tr_select = tr_select,
+        selected = selected,
         statefulsets = statefulset_list,
         namespaces = namespace_list,
     )
@@ -852,11 +852,11 @@ def statefulsets():
 @routes.route("/daemonsets", methods=['GET', 'POST'])
 @login_required
 def daemonsets():
-    tr_select = None
+    selected = None
 
     if request.method == 'POST':
         session['ns_select'] = request.form.get('ns_select')
-        tr_select = request.form.get('tr_select')
+        selected = request.form.get('selected')
 
     if session['user_type'] == "OpenID":
         user_token = session['oauth_token']
@@ -873,7 +873,7 @@ def daemonsets():
         'daemonsets.html.j2',
         daemonsets = daemonset_list,
         namespaces = namespace_list,
-        tr_select = tr_select,
+        selected = selected,
     )
 
 ##############################################################
@@ -883,11 +883,11 @@ def daemonsets():
 @routes.route("/deployments", methods=['GET', 'POST'])
 @login_required
 def deployments():
-    tr_select = None
+    selected = None
 
     if request.method == 'POST':
         session['ns_select'] = request.form.get('ns_select')
-        tr_select = request.form.get('tr_select')
+        selected = request.form.get('selected')
 
     if session['user_type'] == "OpenID":
         user_token = session['oauth_token']
@@ -902,7 +902,7 @@ def deployments():
 
     return render_template(
         'deployments.html.j2',
-        tr_select = tr_select,
+        selected = selected,
         deployments = deployments_list,
         namespaces = namespace_list,
     )
@@ -914,11 +914,11 @@ def deployments():
 @routes.route("/replicasets", methods=['GET', 'POST'])
 @login_required
 def replicasets():
-    tr_select = None
+    selected = None
 
     if request.method == 'POST':
         session['ns_select'] = request.form.get('ns_select')
-        tr_select = request.form.get('tr_select')
+        selected = request.form.get('selected')
 
     if session['user_type'] == "OpenID":
         user_token = session['oauth_token']
@@ -935,7 +935,7 @@ def replicasets():
         'replicasets.html.j2',
         replicasets = replicaset_list,
         namespaces = namespace_list,
-        tr_select = tr_select,
+        selected = selected,
     )
 
 ##############################################################
@@ -972,7 +972,7 @@ def pods():
 def pods_data():
     if request.method == 'POST':
         po_name = request.form.get('po_name')
-        session['ns_select'] = request.form.get('ns_name')
+        session['ns_select'] = request.form.get('ns_select')
 
         if session['user_type'] == "OpenID":
             user_token = session['oauth_token']
@@ -1001,7 +1001,7 @@ def pods_data():
 @routes.route("/service-accounts", methods=['GET', 'POST'])
 @login_required
 def service_accounts():
-    sa_select = None
+    selected = None
     if session['user_type'] == "OpenID":
         user_token = session['oauth_token']
     else:
@@ -1009,7 +1009,7 @@ def service_accounts():
 
     if request.method == 'POST':
         session['ns_select'] = request.form.get('ns_select')
-        sa_select = request.form.get('sa_select')
+        selected = request.form.get('selected')
 
     namespace_list, error = k8sNamespaceListGet(session['user_role'], user_token)
     if not error:
@@ -1019,7 +1019,7 @@ def service_accounts():
 
     return render_template(
         'service-accounts.html.j2',
-        sa_select = sa_select,
+        selected = selected,
         service_accounts = service_accounts,
         namespaces = namespace_list,
     )
@@ -1031,7 +1031,7 @@ def service_accounts():
 @routes.route("/roles", methods=['GET', 'POST'])
 @login_required
 def roles():
-    role_select = None
+    selected = None
     if session['user_type'] == "OpenID":
         user_token = session['oauth_token']
     else:
@@ -1039,7 +1039,7 @@ def roles():
 
     if request.method == 'POST':
         session['ns_select'] = request.form.get('ns_select')
-        role_select = request.form.get('role_select')
+        selected = request.form.get('selected')
 
     namespace_list, error = k8sNamespaceListGet(session['user_role'], user_token)
     if not error:
@@ -1049,7 +1049,7 @@ def roles():
 
     return render_template(
         'roles.html.j2',
-        role_select = role_select,
+        selected = selected,
         roles = roles,
         namespaces = namespace_list,
     )
@@ -1115,21 +1115,21 @@ def role_bindings():
 @routes.route("/cluster-roles", methods=['GET', 'POST'])
 @login_required
 def cluster_roles():
-    cluster_role_select = None
+    selected = None
     if session['user_type'] == "OpenID":
         user_token = session['oauth_token']
     else:
         user_token = None
 
     if request.method == 'POST':
-        cluster_role_select = request.form.get('cluster_role_select')
+        selected = request.form.get('selected')
 
     cluster_roles = k8sClusterRoleListGet(session['user_role'], user_token)
 
     return render_template(
         'cluster-roles.html.j2',
         cluster_roles = cluster_roles,
-        cluster_role_select = cluster_role_select,
+        selected = selected,
     )
 
 @routes.route("/cluster-roles/data", methods=['GET', 'POST'])
@@ -1177,6 +1177,7 @@ def cluster_role_bindings():
 @routes.route("/secrets", methods=['GET', 'POST'])
 @login_required
 def secrets():
+    selected = None
     if session['user_type'] == "OpenID":
         user_token = session['oauth_token']
     else:
@@ -1184,6 +1185,7 @@ def secrets():
 
     if request.method == 'POST':
         session['ns_select'] = request.form.get('ns_select')
+        selected = request.form.get('selected')
 
     namespace_list, error = k8sNamespaceListGet(session['user_role'], user_token)
     if not error:
@@ -1195,6 +1197,7 @@ def secrets():
         'secrets.html.j2',
         secrets = secrets,
         namespaces = namespace_list,
+        selected = selected,
     )
 
 @routes.route('/secrets/data', methods=['GET', 'POST'])
@@ -1202,7 +1205,7 @@ def secrets():
 def secrets_data():
     if request.method == 'POST':
         secret_name = request.form.get('secret_name')
-        session['ns_select'] = request.form.get('ns_name')
+        session['ns_select'] = request.form.get('ns_select')
 
         if session['user_type'] == "OpenID":
             user_token = session['oauth_token']
@@ -1231,21 +1234,21 @@ def secrets_data():
 @routes.route("/storage-class", methods=['GET', 'POST'])
 @login_required
 def storage_class():
-    sc_select = None
+    selected = None
     if session['user_type'] == "OpenID":
         user_token = session['oauth_token']
     else:
         user_token = None
 
     if request.method == 'POST':
-        sc_select = request.form.get('sc_select')
+        selected = request.form.get('selected')
 
     storage_classes = k8sStorageClassListGet(session['user_role'], user_token)
 
     return render_template(
         'storage-classes.html.j2',
         storage_classes = storage_classes,
-        sc_select = sc_select,
+        selected = selected,
     )
 
 @routes.route('/storage-class/data', methods=['GET', 'POST'])
@@ -1278,6 +1281,7 @@ def storage_class_data():
 @routes.route("/pvc", methods=['GET', 'POST'])
 @login_required
 def pvc():
+    selected = None
     if session['user_type'] == "OpenID":
         user_token = session['oauth_token']
     else:
@@ -1285,6 +1289,7 @@ def pvc():
 
     if request.method == 'POST':
         session['ns_select'] = request.form.get('ns_select')
+        selected = request.form.get('selected')
 
     namespace_list, error = k8sNamespaceListGet(session['user_role'], user_token)
     if not error:
@@ -1299,6 +1304,7 @@ def pvc():
         pvc_list = pvc_list,
         pvc_metrics = pvc_metrics,
         namespaces = namespace_list,
+        selected = selected,
     )
 
 @routes.route('/pvc/data', methods=['GET', 'POST'])
@@ -1306,6 +1312,7 @@ def pvc():
 def pvc_data():
     if request.method == 'POST':
         pvc_name = request.form.get('pvc_name')
+        selected = request.form.get('selected')
 
         if session['user_type'] == "OpenID":
             user_token = session['oauth_token']
@@ -1325,9 +1332,37 @@ def pvc_data():
             'pvc-data.html.j2',
             pvc_data = pvc_data,
             namespace = session['ns_select'],
+            selected = selected,
         )
     else:
         return redirect(url_for('routes.login'))
+
+##############################################################
+## Persistent Volume
+##############################################################
+
+@routes.route("/pv", methods=['GET', 'POST'])
+@login_required
+def pv():
+    selected = None
+    if session['user_type'] == "OpenID":
+        user_token = session['oauth_token']
+    else:
+        user_token = None
+
+    if request.method == 'POST':
+        session['ns_select'] = request.form.get('ns_select')
+        selected = request.form.get('selected')
+
+    namespace_list, error = k8sNamespaceListGet(session['user_role'], user_token)
+    pv_list = k8sPersistentVolumeListGet(session['user_role'], user_token, session['ns_select'])
+      
+    return render_template(
+        'pv.html.j2',
+        pv_list = pv_list,
+        selected = selected,
+        namespaces = namespace_list,
+    )
 
 ##############################################################
 ## ConfigMap
@@ -1361,7 +1396,7 @@ def configmap():
 def configmap_data():
     if request.method == 'POST':
         configmap_name = request.form.get('configmap_name')
-        session['ns_select'] = request.form.get('ns_name')
+        session['ns_select'] = request.form.get('ns_select')
 
         if session['user_type'] == "OpenID":
             user_token = session['oauth_token']
@@ -1399,7 +1434,7 @@ def charts():
 
     namespace_list, error = k8sNamespaceListGet(session['user_role'], user_token)
     if not error:
-        has_chart, chart_list = k8sHelmChartListGet(session['user_role'], user_token, session['ns_select'])
+        has_chart, chart_list = k8sHelmChartListGet(session['ns_select'], user_token, session['ns_select'])
     else:
         chart_list = []
         has_chart = None

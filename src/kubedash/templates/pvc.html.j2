@@ -37,7 +37,7 @@
                   </thead>
                   <tbody>
                     {% for pvc in pvc_list %}
-                    {% if pvc_select == pvc.name %}
+                    {% if selected == pvc.name %}
                       <tr class="selected" >
                     {% else %}
                       <tr>
@@ -46,7 +46,7 @@
                         <td>
                           <form action="/pvc/data" method="POST">
                             <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
-                            <input type="hidden" name="ns_name" value="{{ session['ns_select'] }}" />
+                            <input type="hidden" name="ns_select" value="{{ session['ns_select'] }}" />
                             <input type="hidden" name="pvc_name" value="{{ pvc.name }}" />
                             <a href="javascript:;" onclick="parentNode.submit();">{{ pvc.name }}</a>
                           </form>
@@ -54,16 +54,16 @@
                         <td>
                           <form action="/storage-class" method="POST">
                             <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
-                            <input type="hidden" name="ns_name" value="{{ session['ns_select'] }}" />
-                            <input type="hidden" name="sc_select" value="{{ pvc.storage_class_name }}" />
+                            <input type="hidden" name="ns_select" value="{{ session['ns_select'] }}" />
+                            <input type="hidden" name="selected" value="{{ pvc.storage_class_name }}" />
                             <a href="javascript:;" onclick="parentNode.submit();">{{ pvc.storage_class_name }}</a>
                           </form>
                         </td>
                         <td>
                           <form action="/pv" method="POST">
                             <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
-                            <input type="hidden" name="ns_name" value="{{ session['ns_select'] }}" />
-                            <input type="hidden" name="pv_name" value="{{ pvc.volume_name }}" />
+                            <input type="hidden" name="ns_select" value="{{ session['ns_select'] }}" />
+                            <input type="hidden" name="selected" value="{{ pvc.volume_name }}" />
                             <a href="javascript:;" onclick="parentNode.submit();">{{ pvc.volume_name }}</a>
                           </form>
                         </td>

@@ -10,7 +10,7 @@
 <nav aria-label="breadcrumb">
   <ol class="breadcrumb">
     <li class="breadcrumb-item">Storage</li>
-    <li class="breadcrumb-item"><a href="/configmaps">Persistent Volume Claims</a></li>
+    <li class="breadcrumb-item"><a href="/pvc">Persistent Volume Claims</a></li>
     <li class="breadcrumb-item active" aria-current="page">{{ pvc_data.name }}</li>
     <div class="col">
       <a class="card-link float-right" data-toggle="collapse" href="#" onclick="reload()">
@@ -74,8 +74,8 @@
                     <td>
                         <form action="/storage-class" method="POST">
                             <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
-                            <input type="hidden" name="ns_name" value="{{ session['ns_select'] }}" />
-                            <input type="hidden" name="sc_select" value="{{ pvc_data.storage_class_name }}" />
+                            <input type="hidden" name="ns_select" value="{{ session['ns_select'] }}" />
+                            <input type="hidden" name="selected" value="{{ pvc_data.storage_class_name }}" />
                             <a href="javascript:;" onclick="parentNode.submit();">{{ pvc_data.storage_class_name }}</a>
                         </form>
                     </td>
@@ -85,7 +85,7 @@
                     <td>
                         <form action="/pv" method="POST">
                             <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
-                            <input type="hidden" name="ns_name" value="{{ session['ns_select'] }}" />
+                            <input type="hidden" name="ns_select" value="{{ session['ns_select'] }}" />
                             <input type="hidden" name="pv_name" value="{{ pvc_data.volume_name }}" />
                             <a href="javascript:;" onclick="parentNode.submit();">{{ pvc_data.volume_name }}</a>
                         </form>
