@@ -1289,12 +1289,15 @@ def pvc():
     namespace_list, error = k8sNamespaceListGet(session['user_role'], user_token)
     if not error:
         pvc_list = k8sPersistentVolumeClaimListGet(session['user_role'], user_token, session['ns_select'])
+        pvc_metrics = k8sPVCMetric(session['ns_select'])
     else:
         pvc_list = list()
+        pvc_metrics = list()
 
     return render_template(
         'pvc.html.j2',
         pvc_list = pvc_list,
+        pvc_metrics = pvc_metrics,
         namespaces = namespace_list,
     )
 

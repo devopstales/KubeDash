@@ -32,6 +32,7 @@
                       <th>StorageClass</th>
                       <th>Volume</th>
                       <th>Capacity</th>
+                      <th>Usage</th>
                     </tr>
                   </thead>
                   <tbody>
@@ -67,6 +68,13 @@
                           </form>
                         </td>
                         <td>{{ pvc.capacity }}</td>
+                        <td>
+                          {% for metric in pvc_metrics %}
+                          {% if metric.name == pvc.name %}
+                          {{ metric.percentageUsed|round(1) }} %
+                          {% endif %}
+                          {% endfor %}
+                        </td>
                       </tr>
                     {% endfor %}
                   </tbody>
