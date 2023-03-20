@@ -440,6 +440,32 @@ def k8sGetNodeMetric():
         }
         return clusterMetric
 
+def k8sPVCMetric():
+    k8sClientConfigGet('Admin', None)
+    PVC_LIST = list()
+
+    node_list = k8sNodesListGet("Admin", None)
+    for mode in node_list:
+        name = mode["name"]
+        try:
+            data = k8s_client.CoreV1Api().connect_get_node_proxy_with_path(name, path="stats/summary")
+            data_json = eval(data)
+            for pod in data_json["pods"]:
+                if 'volume' in pod:
+                    for volme in pod['volume']:
+                        if "pvcRef" in volme:
+                            DAT = {
+                                "name": volme['pvcRef']['name'],
+                                "capacityBytes": int(volme['capacityBytes'])/1024,
+                                "usedBytes": int(volme['usedBytes'])/1024,
+                                "availableBytes": int(volme['availableBytes'])/1024,
+                                "percentageUsed": (volme['usedBytes'] / volme['capacityBytes']  * 100),
+                            }
+                            PVC_LIST.append(DAT)
+        except:
+            continue
+    return PVC_LIST
+
 ##############################################################
 ## Kubernetes User
 ##############################################################
