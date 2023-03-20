@@ -36,7 +36,7 @@
                   </thead>
                   <tbody>
                     {% for rs in replicasets %}
-                    {% if tr_select == rs.name %}
+                    {% if selected == rs.name %}
                       <tr class="selected" >
                     {% else %}
                       <tr>
@@ -47,10 +47,10 @@
                         <td>{{ rs.ready }}</td>
                         {% if rs.owner %}
                         <td>
-                          <form action="/{{ rs.owner.split("/")[0] }}" method="POST">
+                          <form action="/{{ rs.owner.split('/')[0] }}" method="POST">
                             <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
-                            <input type="hidden" name="ns_select" value="{{ ns_select }}" />
-                            <input type="hidden" name="tr_select" value="{{ rs.owner.split("/")[1] }}" />
+                            <input type="hidden" name="ns_select" value="{{ session['ns_select'] }}" />
+                            <input type="hidden" name="selected" value="{{ rs.owner.split('/')[1] }}" />
                             <a href="javascript:;" onclick="parentNode.submit();">{{ rs.owner }}</a>
                           </form>
                         </td>

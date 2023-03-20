@@ -63,10 +63,10 @@
                                 <tr>
                                     <th>Owner:</th>
                                     <td>
-                                        <form action="/{{ pod_data.owner.split("/")[0] }}" method="POST">
+                                        <form action="/{{ pod_data.owner.split('/')[0] }}" method="POST">
                                             <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
                                             <input type="hidden" name="ns_select" value="{{ pod_data.namespace }}" />
-                                            <input type="hidden" name="tr_select" value="{{ pod_data.owner.split("/")[1] }}" />
+                                            <input type="hidden" name="selected" value="{{ pod_data.owner.split('/')[1] }}" />
                                             <a href="javascript:;" onclick="parentNode.submit();">{{ pod_data.owner }}</a>
                                         </form>
                                     </td>

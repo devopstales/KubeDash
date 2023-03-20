@@ -1654,6 +1654,46 @@ def k8sPersistentVolumeClaimListGet(username_role, user_token, namespace):
     return PVC_LIST
 
 ##############################################################
+## Persistent Volume
+##############################################################
+
+def k8sPersistentVolumeListGet(username_role, user_token, namespace):
+    k8sClientConfigGet(username_role, user_token)
+    PV_LIST = list()
+    #try:
+    pv_list = k8s_client.CoreV1Api().list_persistent_volume()
+    for pv in pv_list.items:
+        if namespace == pv.spec.claim_ref.namespace:
+            PV = {
+                "status": pv.status.phase,
+                "name": pv.metadata.name,
+                "created": pv.metadata.creation_timestamp,
+                "annotations": pv.metadata.annotations,
+                "labels": pv.metadata.labels,
+                "access_modes": pv.spec.access_modes,
+                "storage_class_name": pv.spec.storage_class_name,
+                "volume_claim_name": pv.spec.claim_ref.name,
+                "volume_claim_namespace": pv.spec.claim_ref.namespace,
+                "reclaim_policy": pv.spec.persistent_volume_reclaim_policy,
+                "volume_mode": pv.spec.volume_mode,
+                "capacity": pv.spec.capacity['storage'],
+            }
+            if pv.spec.csi:
+                PV.update({"csi_driver": pv.spec.csi.driver})
+                PV.update({"fs_type": pv.spec.csi.fs_type})
+                PV.update({"volume_attributes":  pv.spec.csi.volume_attributes})
+            if pv.spec.host_path:
+                PV.update({"host_path": pv.spec.host_path.path})
+                continue
+            PV_LIST.append(PV)
+    return PV_LIST
+    #except ApiException as error:
+    #    ErrorHandler(error, "get cluster Persistent Volume list")
+    #    return PV_LIST
+    #except:
+    #    return PV_LIST 
+
+##############################################################
 ## ConfigMap
 ##############################################################
 
@@ -1680,7 +1720,6 @@ def k8sConfigmapListGet(username_role, user_token, namespace):
 
 def k8sHelmChartListGet(username_role, user_token, namespace):
     k8sClientConfigGet(username_role, user_token)
-    logger.info("Test Logging from k8s module")
     HAS_CHART = False
     CHART_LIST = {}
     CHART_DATA = list()
