@@ -13,6 +13,7 @@ class Config(object):
     REMEMBER_COOKIE_HTTPONLY = True
     SESSION_COOKIE_SAMESITE = "Lax"
     PERMANENT_SESSION_LIFETIME = 600
+    CORS_HEADERS = 'Content-Type'
     SECRET_KEY = "develop"
 
 class DevelopmentConfig(Config):

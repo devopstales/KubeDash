@@ -8,7 +8,6 @@ from functions.sso import SSOSererGet, get_auth_server_info, SSOServerUpdate, SS
 from functions.user import User, UsersRoles, Role, email_check, UserUpdate, UserCreate, UserDelete, \
     SSOUserCreate, SSOTokenUpdate, SSOTokenGet, UserUpdatePassword, KubectlConfigStore, KubectlConfig
 from functions.k8s import *
-from functions.components import csrf
 
 routes = Blueprint("routes", __name__)
 logger = logging.getLogger(__name__)
@@ -30,6 +29,11 @@ def health():
 @routes.errorhandler(404)
 def page_not_found(e):
     return render_template('404.html.j2'), 404
+
+@routes.after_request
+def add_header(response):
+    response.headers['Access-Control-Allow-Origin'] = request.root_url.rstrip(request.root_url[-1])
+    return response
 
 ##############################################################
 ## Login
