@@ -34,7 +34,7 @@
                   </thead>
                   <tbody>
                     {% for cr in cluster_roles %}
-                    {% if cluster_role_select == cr.name %}
+                    {% if selected == cr.name %}
                       <tr class="selected" >
                     {% else %}
                       <tr>
