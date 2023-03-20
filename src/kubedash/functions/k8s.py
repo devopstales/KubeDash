@@ -440,7 +440,7 @@ def k8sGetNodeMetric():
         }
         return clusterMetric
 
-def k8sPVCMetric():
+def k8sPVCMetric(namespace):
     k8sClientConfigGet('Admin', None)
     PVC_LIST = list()
 
@@ -454,14 +454,15 @@ def k8sPVCMetric():
                 if 'volume' in pod:
                     for volme in pod['volume']:
                         if "pvcRef" in volme:
-                            DAT = {
-                                "name": volme['pvcRef']['name'],
-                                "capacityBytes": int(volme['capacityBytes'])/1024,
-                                "usedBytes": int(volme['usedBytes'])/1024,
-                                "availableBytes": int(volme['availableBytes'])/1024,
-                                "percentageUsed": (volme['usedBytes'] / volme['capacityBytes']  * 100),
-                            }
-                            PVC_LIST.append(DAT)
+                            if namespace == volme['pvcRef']['namespace']:
+                                DAT = {
+                                    "name": volme['pvcRef']['name'],
+                                    "capacityBytes": int(volme['capacityBytes'])/1024,
+                                    "usedBytes": int(volme['usedBytes'])/1024,
+                                    "availableBytes": int(volme['availableBytes'])/1024,
+                                    "percentageUsed": (volme['usedBytes'] / volme['capacityBytes']  * 100),
+                                }
+                                PVC_LIST.append(DAT)
         except:
             continue
     return PVC_LIST
