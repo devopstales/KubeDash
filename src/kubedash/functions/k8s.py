@@ -1247,6 +1247,8 @@ def k8sPodVulnsGet(username_role, user_token, ns, pod):
                             })
                         POD_VULNS.update({vr['metadata']['labels']['trivy-operator.container.name']: VULN_LIST})
                 return HAS_REPORT, POD_VULNS
+            else:
+                return False, None
 
         # PublishedDate, FixedVersion
 
