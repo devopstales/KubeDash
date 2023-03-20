@@ -35,7 +35,7 @@
                   </thead>
                   <tbody>
                     {% for ds in daemonsets %}
-                    {% if tr_select == ds.name %} 
+                    {% if selected == ds.name %} 
                       <tr class="selected" >
                     {% else %}
                       <tr>

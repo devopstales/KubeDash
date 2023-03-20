@@ -35,7 +35,7 @@
                   </thead>
                   <tbody>
                     {% for sfs in statefulsets %}
-                    {% if tr_select == sfs.name %}
+                    {% if selected == sfs.name %}
                       <tr class="selected" >
                     {% else %}
                       <tr>
