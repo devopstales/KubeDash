@@ -10,8 +10,8 @@
 <nav aria-label="breadcrumb">
   <ol class="breadcrumb">
     <li class="breadcrumb-item">Storage</li>
-    <li class="breadcrumb-item"><a href="/pvc">Persistent Volume Claims</a></li>
-    <li class="breadcrumb-item active" aria-current="page">{{ pvc_data.name }}</li>
+    <li class="breadcrumb-item"><a href="/pv">Persistent Volumes</a></li>
+    <li class="breadcrumb-item active" aria-current="page">{{ pv_data.name }}</li>
     <div class="col">
       <a class="card-link float-right" data-toggle="collapse" href="#" onclick="reload()">
         <i class="material-icons">refresh</i>
@@ -22,32 +22,28 @@
 
 <div class="card shadow mb-4">
     <div class="card-header">
-        <h6 class="m-0 font-weight-bold text-primary">Persistent Volume Claim Data</h6>
+        <h6 class="m-0 font-weight-bold text-primary">Persistent Volume Data</h6>
     </div>
     <div class="card-body">
         <div class="table-responsive">
             <table class="table table-bordered" id="podInfoTable" width="100%" cellspacing="0">
                 <tr>
                     <th>Status:</th>
-                    <td>{{ pvc_data.status }}</td>
+                    <td>{{ pv_data.status }}</td>
                 </tr>
                 <tr>
                     <th>Name:</th>
-                    <td>{{ pvc_data.name }}</td>
-                </tr>
-                <tr>
-                    <th>Namespace:</th>
-                    <td>{{ namespace }}</td>
+                    <td>{{ pv_data.name }}</td>
                 </tr>
                 <tr>
                     <th>Created:</th>
-                    <td>{{ pvc_data.created }}</td>
+                    <td>{{ pv_data.created }}</td>
                 </tr>
                 <tr>
                     <th>Annotations:</th>
                     <td>
-                        {% if pvc_data.annotations %}
-                        {% for an_key, an_value in pvc_data.annotations.items() %}
+                        {% if pv_data.annotations %}
+                        {% for an_key, an_value in pv_data.annotations.items() %}
                         {% if an_key != "kubectl.kubernetes.io/last-applied-configuration" %}
                         <span class="badge badge-secondary">{{ an_key }}: {{ an_value }}</span>
                         {% if not loop.last %}<br>{% endif %}
@@ -59,8 +55,8 @@
                 <tr>
                     <th>Labels:</th>
                     <td>
-                        {% if pvc_data.labels %}
-                        {% for an_key, an_value in pvc_data.labels.items() %}
+                        {% if pv_data.labels %}
+                        {% for an_key, an_value in pv_data.labels.items() %}
                         {% if an_key != "kubectl.kubernetes.io/last-applied-configuration" %}
                         <span class="badge badge-secondary">{{ an_key }}: {{ an_value }}</span>
                         {% if not loop.last %}<br>{% endif %}
@@ -75,36 +71,77 @@
                         <form action="/storage-class" method="POST">
                             <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
                             <input type="hidden" name="ns_select" value="{{ session['ns_select'] }}" />
-                            <input type="hidden" name="selected" value="{{ pvc_data.storage_class_name }}" />
-                            <a href="javascript:;" onclick="parentNode.submit();">{{ pvc_data.storage_class_name }}</a>
+                            <input type="hidden" name="selected" value="{{ pv_data.storage_class_name }}" />
+                            <a href="javascript:;" onclick="parentNode.submit();">{{ pv_data.storage_class_name }}</a>
                         </form>
                     </td>
                 </tr>
                 <tr>
-                    <th>Persistent Volume:</th>
+                    <th>Persistent Volume Clame:</th>
                     <td>
                         <form action="/pv" method="POST">
                             <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
                             <input type="hidden" name="ns_select" value="{{ session['ns_select'] }}" />
-                            <input type="hidden" name="pv_name" value="{{ pvc_data.volume_name }}" />
-                            <a href="javascript:;" onclick="parentNode.submit();">{{ pvc_data.volume_name }}</a>
+                            <input type="hidden" name="pv_name" value="{{ pv_data.volume_claim_name }}" />
+                            <a href="javascript:;" onclick="parentNode.submit();">{{ pv_data.volume_claim_name }}</a>
                         </form>
                     </td>
                 </tr>
                 <tr>
-                    <th>Access Mode:</th>
-                    <td>{{ pvc_data.access_modes }}</td>
+                    <th>PVC Namespace:</th>
+                    <td>{{ pv_data.volume_claim_namespace }}</td>
                 </tr>
                 <tr>
-                    <th>VolumeMode:</th>
-                    <td>{{ pvc_data.volume_mode }}</td>
+                    <th>Access Mode:</th>
+                    <td>{{ pv_data.access_modes }}</td>
+                </tr>
+                <tr>
+                    <th>Volume Mode:</th>
+                    <td>{{ pv_data.volume_mode }}</td>
+                </tr>
+                <tr>
+                    <th>Reclaim Policy:</th>
+                    <td>{{ pv_data.reclaim_policy }}</td>
                 </tr>
                 <tr>
                     <th>Capacity:</th>
-                    <td>{{ pvc_data.capacity }}</td>
+                    <td>{{ pv_data.capacity }}</td>
                 </tr>
+                {% if pv_data.host_path %}
+                <tr>
+                    <th>Local Path:</th>
+                    <td>{{ pv_data.host_path }}</td>
+                </tr>
+                {% elif pv_data.csi_driver %}
+                <tr>
+                    <th>CSI Driver:</th>
+                    <td>{{ pv_data.csi_driver }}</td>
+                </tr>
+                <tr>
+                    <th>Filesystem Type:</th>
+                    <td>{{ pv_data.fs_type }}</td>
+                </tr>
+                {% endif%}
             </table>
         </div>
+        {% if pv_data.volume_attributes %}
+        <div class="card-body">
+            <div class="card shadow mb-4">
+                <div class="card-body">
+                    <div class="table-responsive">
+                        <table class="table table-bordered" id="podInfoTable" width="100%" cellspacing="0">
+                            {% for da_key, da_value in pv_data.volume_attributes.items() %}
+                            <tr>
+                                <th>{{ da_key }}:</th>
+                                <td>{{ da_value }}</td>
+                            </tr>
+                            {% endfor %}
+                        </table>
+                    </div>
+                </div>
+            </div>
+        </div>
+        {% endif %}
     </div>
 </div>
 {% endblock %}

@@ -1311,7 +1311,6 @@ def pvc():
 @login_required
 def pvc_data():
     if request.method == 'POST':
-        pvc_name = request.form.get('pvc_name')
         selected = request.form.get('selected')
 
         if session['user_type'] == "OpenID":
@@ -1323,16 +1322,15 @@ def pvc_data():
         if not error:
             pvc_list = k8sPersistentVolumeClaimListGet(session['user_role'], user_token, session['ns_select'])
             for pvc in pvc_list:
-                if pvc["name"] == pvc_name:
+                if pvc["name"] == selected:
                     pvc_data = pvc
         else:
-            pvc_list = list()
+            pvc_data = list()
 
         return render_template(
             'pvc-data.html.j2',
             pvc_data = pvc_data,
             namespace = session['ns_select'],
-            selected = selected,
         )
     else:
         return redirect(url_for('routes.login'))
@@ -1363,6 +1361,32 @@ def pv():
         selected = selected,
         namespaces = namespace_list,
     )
+
+@routes.route('/pv/data', methods=['GET', 'POST'])
+@login_required
+def pv_data():
+    pv_data = None
+    if request.method == 'POST':
+        session['ns_select'] = request.form.get('ns_select')
+        selected = request.form.get('selected')
+
+        if session['user_type'] == "OpenID":
+            user_token = session['oauth_token']
+        else:
+            user_token = None
+
+        pv_list = k8sPersistentVolumeListGet(session['user_role'], user_token, session['ns_select'])
+        for pv in pv_list:
+            if pv["name"] == selected:
+                pv_data = pv
+
+        return render_template(
+            'pv-data.html.j2',
+            pv_data = pv_data,
+            namespace = session['ns_select'],
+        )
+    else:
+        return redirect(url_for('routes.login'))
 
 ##############################################################
 ## ConfigMap
