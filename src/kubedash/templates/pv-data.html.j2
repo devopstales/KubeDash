@@ -82,7 +82,7 @@
                         <form action="/pv" method="POST">
                             <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
                             <input type="hidden" name="ns_select" value="{{ session['ns_select'] }}" />
-                            <input type="hidden" name="pv_name" value="{{ pv_data.volume_claim_name }}" />
+                            <input type="hidden" name="selected" value="{{ pv_data.volume_claim_name }}" />
                             <a href="javascript:;" onclick="parentNode.submit();">{{ pv_data.volume_claim_name }}</a>
                         </form>
                     </td>

@@ -1395,6 +1395,7 @@ def pv_data():
 @routes.route("/configmaps", methods=['GET', 'POST'])
 @login_required
 def configmap():
+    selected = None
     if session['user_type'] == "OpenID":
         user_token = session['oauth_token']
     else:
@@ -1402,6 +1403,7 @@ def configmap():
 
     if request.method == 'POST':
         session['ns_select'] = request.form.get('ns_select')
+        selected = request.form.get('selected')
 
     namespace_list, error = k8sNamespaceListGet(session['user_role'], user_token)
     if not error:
@@ -1413,6 +1415,7 @@ def configmap():
         'configmaps.html.j2',
         configmaps = configmaps,
         namespaces = namespace_list,
+        selected = selected,
     )
 
 @routes.route('/configmaps/data', methods=['GET', 'POST'])

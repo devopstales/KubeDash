@@ -351,7 +351,14 @@
                                 <tbody>
                                     <tr>
                                         <td>{{ pod_data.owner.split("/")[0] }}</td>
-                                        <td>{{ pod_data.owner.split("/")[-1] }}</td>
+                                        <td>
+                                            <form action="/{{ pod_data.owner.split('/')[0] }}" method="POST">
+                                                <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+                                                <input type="hidden" name="ns_select" value="{{ pod_data.namespace }}" />
+                                                <input type="hidden" name="selected" value="{{ pod_data.owner.split('/')[-1] }}" />
+                                                <a href="javascript:;" onclick="parentNode.submit();">{{ pod_data.owner.split("/")[-1] }}</a>
+                                            </form>
+                                        </td>
                                         <td>{{ pod_data.namespace }}</td>
                                     </tr>
                                 </tbody>
@@ -372,7 +379,14 @@
                                     {% for key, value in dict_item.items() %}
                                     <tr>
                                         <td>ImagePullSecret</td>
-                                        <td>{{ value }}</td>
+                                        <td>
+                                            <form action="/secrets" method="POST">
+                                                <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+                                                <input type="hidden" name="ns_select" value="{{ pod_data.namespace }}" />
+                                                <input type="hidden" name="selected" value="{{ value }}" />
+                                                <a href="javascript:;" onclick="parentNode.submit();">{{ value }}</a>
+                                            </form>
+                                        </td>
                                         <td>{{ pod_data.namespace }}</td>
                                     </tr>
                                     {% endfor %}
@@ -381,7 +395,14 @@
                                 {% if pod_data.service_account %}
                                     <tr>
                                         <td>ServiceAccount</td>
-                                        <td>{{ pod_data.service_account }}</td>
+                                        <td>
+                                            <form action="/service-accounts" method="POST">
+                                                <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+                                                <input type="hidden" name="ns_select" value="{{ pod_data.namespace }}" />
+                                                <input type="hidden" name="selected" value="{{ pod_data.service_account }}" />
+                                                <a href="javascript:;" onclick="parentNode.submit();">{{ pod_data.service_account }}</a>
+                                            </form>
+                                        </td>
                                         <td>{{ pod_data.namespace }}</td>
                                     </tr>
                                 {% endif %}
@@ -389,7 +410,14 @@
                                     {% for secret in pod_data.secrets %}
                                     <tr>
                                         <td>Secret</td>
-                                        <td>{{ secret }}</td>
+                                        <td>
+                                            <form action="/secrets" method="POST">
+                                                <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+                                                <input type="hidden" name="ns_select" value="{{ pod_data.namespace }}" />
+                                                <input type="hidden" name="selected" value="{{ secret }}" />
+                                                <a href="javascript:;" onclick="parentNode.submit();">{{ secret }}</a>
+                                            </form>
+                                        </td>
                                         <td>{{ pod_data.namespace }}</td>
                                     </tr>
                                     {% endfor %}
@@ -398,7 +426,14 @@
                                     {% for cm in pod_data.cm %}
                                     <tr>
                                         <td>Configmap</td>
-                                        <td>{{ cm }}</td>
+                                        <td>
+                                            <form action="/configmaps" method="POST">
+                                                <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+                                                <input type="hidden" name="ns_select" value="{{ pod_data.namespace }}" />
+                                                <input type="hidden" name="selected" value="{{ cm }}" />
+                                                <a href="javascript:;" onclick="parentNode.submit();">{{ cm }}</a>
+                                            </form>
+                                        </td>
                                         <td>{{ pod_data.namespace }}</td>
                                     </tr>
                                     {% endfor %}
@@ -407,7 +442,14 @@
                                     {% for pvc in pod_data.pvc %}
                                     <tr>
                                         <td>PeristentVolumeClame</td>
-                                        <td>{{ pvc }}</td>
+                                        <td>
+                                            <form action="/pvc" method="POST">
+                                                <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+                                                <input type="hidden" name="ns_select" value="{{ pod_data.namespace }}" />
+                                                <input type="hidden" name="selected" value="{{ pvc }}" />
+                                                <a href="javascript:;" onclick="parentNode.submit();">{{ pvc }}</a>
+                                            </form>
+                                        </td>
                                         <td>{{ pod_data.namespace }}</td>
                                     </tr>
                                     {% endfor %}
