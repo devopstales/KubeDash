@@ -28,6 +28,7 @@
                 <thead>
                     <tr>
                       <th>Name</th>
+                      <th>Default</th>
                       <th>Reclaim Policy</th>
                       <th>Volume Binding Mode</th>
                     </tr>
@@ -36,6 +37,14 @@
                     {% for sc in storage_classes %}
                     {% if selected == sc.name %}
                       <tr class="selected" >
+                    {% elif selected == "default" %}
+                      {% for an_key, an_value in sc.annotations.items() %}
+                        {% if an_key == "storageclass.kubernetes.io/is-default-class"%}
+                          {% if an_value == "true" %}
+                            <tr class="selected" >
+                          {% endif %}
+                        {% endif %}
+                      {% endfor %}
                     {% else %}
                       <tr>
                     {% endif %}
@@ -46,6 +55,13 @@
                             <input type="hidden" name="sc_name" value="{{ sc.name }}" />
                             <a href="javascript:;" onclick="parentNode.submit();">{{ sc.name }}</a>
                           </form>
+                        </td>
+                        <td>
+                          {% for an_key, an_value in sc.annotations.items() %}
+                          {% if an_key == "storageclass.kubernetes.io/is-default-class"%}
+                          {{an_value}}
+                          {% endif %}
+                          {% endfor %}
                         </td>
                         <td>
                           {{ sc.reclaim_policy }}
