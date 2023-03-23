@@ -1,13 +1,17 @@
 {% extends "base.html.j2" %}
 
 {% block header %}
+    <link href="{{ url_for('static',filename='/vendor/datatables/dataTables.bootstrap4.min.css') }}" rel="stylesheet" >
     <link href="{{ url_for('static',filename='/vendor/google/material-icons.css') }}" rel="stylesheet" >
 {% endblock %}
 
 {% block content %}
+
 <nav aria-label="breadcrumb">
   <ol class="breadcrumb">
-    <li class="breadcrumb-item">Dashboard</li>
+    <li class="breadcrumb-item">Cluster</li>
+    <li class="breadcrumb-item"><a href="/nodes">Nodes</a></li>
+    <li class="breadcrumb-item active" aria-current="page">{{ node_data.name }}</li>
     <div class="col">
       <a class="card-link float-right" data-toggle="collapse" href="#" onclick="reload()">
         <i class="material-icons">refresh</i>
@@ -17,15 +21,12 @@
 </nav>
 
 <div class="card shadow mb-4">
-    <div class="card-header py-3">
-        <h6 class="m-0 font-weight-bold text-primary">Cluster Metrics</h6>
-    </div>
     <div class="card-body">
         <div class="row">
             <div class="col">
                 <div>
-                    <canvas id="cpu" 
-                    {% for CPUkey, CPUvalue in cluster_metrics.clusterTotals.cpu.items() %}
+                    <canvas id="cpu"
+                    {% for CPUkey, CPUvalue in node_metrics.cpu.items() %}
                         {% if 'Percent' in CPUkey %}
                             {{ CPUkey }}="{{ CPUvalue }}"
                         {% endif %}
@@ -33,7 +34,7 @@
                     width="300" height="300"></canvas>
                 </div>
                 <div>
-                {% for CPUkey, CPUvalue in cluster_metrics.clusterTotals.cpu.items() %}
+                {% for CPUkey, CPUvalue in node_metrics.cpu.items() %}
                      {% if "Percent" not in CPUkey %}
                         {{ CPUkey }}: {{ CPUvalue |round(1)}} <br>
                      {% endif %}
@@ -43,7 +44,7 @@
             <div class="col">
                 <div>
                     <canvas id="ram" 
-                    {% for RAMkey, RAMvalue in cluster_metrics.clusterTotals.memory.items() %}
+                    {% for RAMkey, RAMvalue in node_metrics.memory.items() %}
                         {% if 'Percent' in RAMkey %}
                             {{ RAMkey }}="{{ RAMvalue }}"
                         {% endif %}
@@ -51,23 +52,23 @@
                     width="300" height="300"></canvas>
                 </div>
                 <div>
-                {% for RAMkey, RAMvalue in cluster_metrics.clusterTotals.memory.items() %}
-                    {% if "Percent" not in RAMkey %}
+                {% for RAMkey, RAMvalue in node_metrics.memory.items() %}
+                     {% if "Percent" not in RAMkey %}
                         {{ RAMkey }}: {{ (RAMvalue / 1024 / 1024 / 1024) |round(1) }} <br>
-                    {% endif %}
+                     {% endif %}
                 {% endfor %}
                 </div>
             </div>
             <div class="col">
                 <div>
                     <canvas id="pod"
-                    {% for pod_key, pod_value in cluster_metrics.clusterTotals.pod_count.items() %}
+                    {% for pod_key, pod_value in node_metrics.pod_count.items() %}
                         {{ pod_key }}="{{ pod_value }}"
                     {% endfor %}
                     width="300" height="300"></canvas>
                 </div>
                 <div class="mp-10">
-                    {% for pod_key, pod_value in cluster_metrics.clusterTotals.pod_count.items() %}
+                    {% for pod_key, pod_value in node_metrics.pod_count.items() %}
                         {{ pod_key }}: {{ pod_value }} <br>
                     {% endfor %}
                 </div>
@@ -76,6 +77,99 @@
     </div>
 </div>
 
+<div class="card shadow mb-4">
+    <div class="card-header">
+        <h6 class="m-0 font-weight-bold text-primary">Node Data</h6>
+    </div>
+    <div class="card-body">
+        <div class="table-responsive">
+            <table class="table table-bordered" id="podInfoTable" width="100%" cellspacing="0">
+                <tr>
+                    <th>Status:</th>
+                    <td>{{ node_data.status }}</td>
+                </tr>
+                <tr>
+                    <th>Name:</th>
+                    <td>{{node_data.name }}</td>
+                </tr>
+                <tr>
+                    <th>Role:</th>
+                    <td>{{node_data.role }}</td>
+                </tr>
+                <tr>
+                    <th>Version:</th>
+                    <td>{{node_data.version }}</td>
+                </tr>
+                <tr>
+                    <th>Operation System:</th>
+                    <td>{{node_data.os }}</td>
+                </tr>
+                <tr>
+                    <th>Runtime:</th>
+                    <td>{{node_data.runtime }}</td>
+                </tr>
+                <tr>
+                    <th>Taints:</th>
+                    <td>
+                        {% for taint in node_data.taint %}
+                        <span class="badge badge-secondary">{{ taint }}</span>
+                        {% if not loop.last %}<br>{% endif %}
+                        {% endfor %}
+                    </td>
+                </tr>
+                <tr>
+                    <th>Labels:</th>
+                    <td>
+                        {% if node_data.labels %}
+                        {% for no_key, no_value in node_data.labels.items() %}
+                        {% if no_key != "kubectl.kubernetes.io/last-applied-configuration" %}
+                        <span class="badge badge-secondary">{{ no_key }}: {{ no_value }}</span>
+                        {% if not loop.last %}<br>{% endif %}
+                        {% endif %}
+                        {% endfor %}
+                        {% endif %}
+                    </td>
+                </tr>
+            </table>
+        </div> 
+    </div>
+</div>
+
+{% if node_data.conditions %}
+<div class="card shadow mb-4">
+    <div class="card-header">
+        <h6 class="m-0 font-weight-bold text-primary">Conditions</h6>
+    </div>
+    <div class="card-body">
+        <div class="card shadow mb-4">
+            <div class="card-body">
+                <div class="table-responsive">
+                    <table class="table table-bordered" id="podInfoTable" width="100%" cellspacing="0">
+                        <thead>
+                            <tr>
+                                <th>Type</th>
+                                <th>Status</th>
+                                <th>Reason</th>
+                                <th>Message</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                        {% for co_type, co_status, co_reason, co_message in node_data.conditions %}
+                            <tr>
+                                <td>{{ co_type }}</th>
+                                <td>{{ co_status }}</td>
+                                <td>{{ co_reason }}</th>
+                                <td>{{ co_message }}</td>
+                            </tr>
+                        {% endfor %}
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+    {% endif %}
 {% endblock %}
 
 {% block scripts %}
@@ -268,4 +362,11 @@
             }
         });
     </script>
+
+    <!-- Page level plugins -->
+    <script src="{{ url_for('static',filename='vendor/datatables/jquery.dataTables.js') }}"></script>
+    <script src="{{ url_for('static',filename='vendor/datatables/dataTables.bootstrap4.min.js') }}"></script>
+
+    <!-- Page level custom scripts -->
+    <script src="{{ url_for('static',filename='js/demo/datatables-demo.js') }}"></script>
 {% endblock %}
