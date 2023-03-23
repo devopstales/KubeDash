@@ -33,5 +33,9 @@ You can uninstall the operator with the following command:
 helm uninstall kubedash
 ```
 
+[minikube]: https://minikube.sigs.k8s.io/docs/start/
+[kind]: https://kind.sigs.k8s.io/
+[microk8s]: https://microk8s.io
+[Kubernetes playground]: https://labs.play-with-k8s.com/
 [Helm]: https://helm.sh/docs/helm/helm/#helm
 [charts]: https://helm.sh/docs/topics/charts/
