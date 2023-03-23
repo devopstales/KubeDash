@@ -3,6 +3,7 @@
 {% block header %}
     <link href="{{ url_for('static',filename='/vendor/datatables/dataTables.bootstrap4.min.css') }}" rel="stylesheet" >
     <link href="{{ url_for('static',filename='/vendor/datatables/jquery.dataTables.css') }}" rel="stylesheet" >
+    <link href="{{ url_for('static',filename='/css/sb-admin-2.custom.css') }}" rel="stylesheet" >
 {% endblock %}
 
 {% block content %}
@@ -31,9 +32,9 @@
                       <th>Name</th>
                       <th>Role</th>
                       <th>Version</th>
-                      <th>Runetime</th>
                       <th>OS</th>
-                      <th>Taints</th>
+                      <th>CPU Usage</th>
+                      <th>Memory Usage</th>
                     </tr>
                   </thead>
                   <tbody>
@@ -47,20 +48,36 @@
                     {% if no.status == "Ready" %}
                           <span class="badge badge-success">{{ no.status }}</span>
                     {% else %}
-                          <span class="badge badge-danger"></span>{{ no.status }}</span>
+                          <span class="badge badge-danger">{{ no.status }}</span>
                     {% endif %}
                         </td>
-                        <td>{{ no.name }}</td>
+                        <td>
+                          <form action="/nodes/data" method="POST">
+                            <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+                            <input type="hidden" name="no_name" value="{{ no.name }}" />
+                            <a href="javascript:;" onclick="parentNode.submit();">{{ no.name }}</a>
+                          </form>
+                        </td>
                         <td>{{ no.role }}</td>
                         <td>{{ no.version }}</td>
-                        <td>{{ no.runtime }}</td>
                         <td>{{ no.os }}</td>
+                        {% if cluster_metrics.nodes %}
+                        {% for metrics in cluster_metrics.nodes %}
+                        {% if metrics.name == no.name %}
                         <td>
-                          {% for taint in no.taint %}
-                          <span class="badge badge-secondary">{{ taint }}</span>
-                          {% if not loop.last %}<br>{% endif %}
-                          {% endfor %}
+                          <progress value="{{ metrics.cpu.usagePercent| int }}" max="100"></progress>
+                          <label for="file">{{ metrics.cpu.usagePercent| int }}%</label>
+                        </td> 
+                        <td>
+                          <progress value="{{ metrics.memory.usagePercent| int }}" max="100"></progress>
+                          <label for="file">{{ metrics.memory.usagePercent| int }}%</label>
                         </td>
+                        {% endif %}
+                        {% endfor %}
+                        {% else %}
+                        <td></td>
+                        <td></td>
+                        {% endif %}
                       </tr>
                     {% endfor %}
                   </tbody>

@@ -1,0 +1,76 @@
+/* 
+Password validation
+*/
+.valid {
+    color: green;
+    margin-bottom: 0;
+}
+
+.valid:before {
+    position: relative;
+    left: -10px;
+    content: "✔";
+}
+
+.invalid {
+    color: red;
+    margin-bottom: 0;
+}
+
+.invalid:before {
+    position: relative;
+    left: -10px;
+    content: "✖";
+}
+
+/* 
+Password hide
+*/
+.textshadow {
+    color: transparent;
+    text-shadow: 0 0 5px rgba(0,0,0,0.5);
+ }
+
+ /* 
+Progress bar
+*/
+progress {
+    /* style rules */
+    -webkit-appearance: none;
+    appearance: none;
+    border-radius: 6px;
+}
+
+progress::-webkit-progress-bar {
+    /* style rules */
+    border-radius: 6px;
+    background-color: #e6e6e6;
+}
+
+progress::-webkit-progress-value {
+    /* style rules */
+    border-radius: 6px;
+    background-color: #059bff;
+}
+
+progress::-moz-progress-bar {
+    /* style rules */
+    border-radius: 6px;
+    background-color: #059bff;
+}
+/*
+progress {
+    -webkit-appearance: none;
+    border-radius: 6px;
+}
+::-webkit-progress-value {
+    background-color: #4e73df;
+    border-radius: 6px;
+  }
+  
+  ::-moz-progress-bar {
+    background-color: #4e73df;
+    #059bff
+  }
+*/
+  
