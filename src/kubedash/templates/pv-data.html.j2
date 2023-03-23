@@ -39,6 +39,12 @@
                     <th>Created:</th>
                     <td>{{ pv_data.created }}</td>
                 </tr>
+                {% if pv_data.deleted %}
+                <tr>
+                    <th>Deleted:</th>
+                    <td>{{ pv_data.deleted }}</td>
+                </tr>
+                {% endif %}
                 <tr>
                     <th>Annotations:</th>
                     <td>

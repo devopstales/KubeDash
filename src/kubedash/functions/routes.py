@@ -194,7 +194,7 @@ def logout():
 @routes.route('/dashboard')
 @login_required
 def dashboard():
-    cluster_metrics = k8sGetNodeMetric()
+    cluster_metrics = k8sGetClusterMetric()
     username = session['username']
     user = User.query.filter_by(username="admin", user_type = "Local").first()
     if username == "admin" and check_password_hash(user.password_hash, "admin"):
@@ -754,12 +754,37 @@ def nodes():
         user_token = None
 
     node_data = k8sNodesListGet(session['user_role'], user_token)
+    cluster_metrics = k8sGetClusterMetric()
 
     return render_template(
         'nodes.html.j2',
         nodes = node_data,
         selected = selected,
+        cluster_metrics = cluster_metrics,
     )
+
+@routes.route('/nodes/data', methods=['GET', 'POST'])
+@login_required
+def nodes_data():
+    if request.method == 'POST':
+        no_name = request.form.get('no_name')
+
+        if session['user_type'] == "OpenID":
+            user_token = session['oauth_token']
+        else:
+            user_token = None
+
+        node_data = k8sNodeGet(session['user_role'], user_token, no_name)
+        node_metrics = k8sGetNodeMetric(no_name)
+
+        return render_template(
+            'node-data.html.j2',
+            no_name = no_name,
+            node_data = node_data,
+            node_metrics = node_metrics,
+        )
+    else:
+        return redirect(url_for('routes.login'))
 
 ##############################################################
 ## Namespaces
@@ -984,7 +1009,7 @@ def pods_data():
 
         return render_template(
             'pod-data.html.j2',
-            po_now = po_name,
+            po_name = po_name,
             pod_data = pod_data,
             has_report = has_report,
             pod_vulns = pod_vulns,
