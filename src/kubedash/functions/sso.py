@@ -12,6 +12,10 @@ from requests_oauthlib import OAuth2Session
 ##############################################################
 
 logger = logging.getLogger(__name__)
+logging.basicConfig(
+        level="INFO",
+        format='[%(asctime)s] %(name)s        %(levelname)s %(message)s'
+    )
 
 class Openid(UserMixin, db.Model):
     __tablename__ = 'openid'
