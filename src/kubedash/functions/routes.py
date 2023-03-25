@@ -111,7 +111,7 @@ def login():
                         logger.info("Answer from clinet: %s" % x.text)
                 except:
                     pass
-            return redirect(url_for('routes.dashboard'))
+            return redirect(url_for('routes.cluster_metrics'))
         else:
             return render_template(
                 'login.html.j2',
@@ -173,7 +173,7 @@ def login_post():
             except:
                 pass
 
-        return redirect(url_for('routes.dashboard'))
+        return redirect(url_for('routes.cluster_metrics'))
 
 
 @routes.route('/logout')
@@ -190,18 +190,45 @@ def logout():
 ##############################################################
 ## Dashboard
 ##############################################################
+## Cluster Metrics
+##############################################################
 
-@routes.route('/dashboard')
+@routes.route('/cluster-metrics')
 @login_required
-def dashboard():
+def cluster_metrics():
     cluster_metrics = k8sGetClusterMetric()
     username = session['username']
     user = User.query.filter_by(username="admin", user_type = "Local").first()
     if username == "admin" and check_password_hash(user.password_hash, "admin"):
         flash('<a href="/profile">You should change the default password!</a>', "warning")
     return render_template(
-        'dashboard.html.j2',
+        'cluster-metrics.html.j2',
         cluster_metrics = cluster_metrics
+    )
+
+@routes.route('/workload-map', methods=['GET', 'POST'])
+@login_required
+def workloads():
+    if request.method == 'POST':
+        session['ns_select'] = request.form.get('ns_select')
+
+    if session['user_type'] == "OpenID":
+        user_token = session['oauth_token']
+    else:
+        user_token = None
+
+    namespace_list, error = k8sNamespaceListGet(session['user_role'], user_token)
+    if not error:
+        nodes, edges = k8sGetPodMap(session['user_role'], user_token, session['ns_select'])
+    else:
+        nodes = []
+        edges = []
+
+    return render_template(
+        'workloads.html.j2',
+        namespaces = namespace_list,
+        nodes = nodes,
+        edges = edges,
     )
 
 ##############################################################
@@ -516,7 +543,7 @@ def callback():
         session['ns_select'] = "default"
 
         login_user(user)
-        return redirect(url_for('routes.dashboard'))
+        return redirect(url_for('routes.cluster_metrics'))
     
 ##############################################################
 ## Kubectl config
