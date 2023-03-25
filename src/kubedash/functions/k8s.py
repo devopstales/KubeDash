@@ -7,6 +7,7 @@ from itsdangerous import base64_decode, base64_encode
 from decimal import Decimal, InvalidOperation
 from OpenSSL import crypto
 from datetime import datetime, timezone
+from pyvis.network import Network
 
 
 import kubernetes.config as k8s_config
@@ -557,6 +558,51 @@ def k8sPVCMetric(namespace):
         except:
             continue
     return PVC_LIST
+
+def k8sGetPodMap(username_role, user_token, namespace):
+    k8sClientConfigGet(username_role, user_token)
+    net = Network(directed=True, layout=True)
+
+    statefulset_list = k8sStatefulSetsGet(username_role, user_token, namespace)
+    for sts in statefulset_list:
+        if int(sts["desired"]) != 0:
+            # print("sts: %s" % sts) #debug
+            net.add_node(sts["name"], label=sts["name"], shape="image", group="statefulset")
+
+    daemonset_list = k8sDaemonSetsGet(username_role, user_token, namespace)
+    for ds in daemonset_list:
+        if int(ds["desired"]) != 0:
+            # print("ds: %s" % ds) #debug
+            net.add_node(ds["name"], label=ds["name"], shape="image", group="daemonset")
+
+    deployments_list = k8sDeploymentsGet(username_role, user_token, namespace)
+    for deploy in deployments_list:
+        # print("deploy: %s" % deploy) #debug
+        if int(deploy["desired"]) != 0:
+           # print("deploy_add: %s" % deploy) #debug
+            net.add_node(deploy["name"], label=deploy["name"], shape="image", group="deployment")
+
+    replicaset_list = k8sReplicaSetsGet(username_role, user_token, namespace)
+    for rs in replicaset_list:
+        if rs["desired"] != 0:
+            # print("rs: %s" % rs) #debug
+            on_name = rs["owner"].split("/", 1)[1]
+            net.add_node(rs["name"], label=rs["name"], shape="image", group="replicaset")
+            net.add_edge(on_name, rs["name"], arrowStrikethrough=False, physics=True, valu=1000)
+
+    has_report, pod_list = k8sPodListVulnsGet(username_role, user_token, namespace)
+    for po in pod_list:
+        if po["status"] == "Running":
+            net.add_node(po["name"], label=po["name"], shape="image", group="pod")
+            if "replicationcontrollers" !=  po["owner"].split("/", 1)[0] and "jobs" != po["owner"].split("/", 1)[0]:
+                print("po: %s" % po) #debug
+                on_name = po["owner"].split("/", 1)[1]
+                net.add_edge(on_name, po["name"], arrowStrikethrough=False, physics=True, valu=1000)
+
+    nodes = net.get_network_data()[0]
+    edges = net.get_network_data()[1]
+
+    return nodes, edges
 
 ##############################################################
 ## Kubernetes User
@@ -1112,6 +1158,8 @@ def k8sDaemonSetsGet(username_role, user_token, ns):
 def k8sDeploymentsGet(username_role, user_token, ns):
     k8sClientConfigGet(username_role, user_token)
     DEPLOYMENT_LIST = list()
+    ready_replicas = 0
+    replicas = 0
     try:
         deployment_list = k8s_client.AppsV1Api().list_namespaced_deployment(ns)
         for d in deployment_list.items:
@@ -1119,11 +1167,22 @@ def k8sDeploymentsGet(username_role, user_token, ns):
                 "name": d.metadata.name,
                 "status": "",
                 "labels": list(),
+                "desired": "",
+                "updated": "",
+                "ready": "",
             }
-            if d.status.ready_replicas and d.status.replicas:
-                DEPLOYMENT_DATA['status'] = "%s/%s" % (d.status.ready_replicas, d.status.replicas)
+            if d.status.ready_replicas:
+                DEPLOYMENT_DATA['ready']  = d.status.ready_replicas
             else:
-                DEPLOYMENT_DATA['status'] = "0/0"
+                DEPLOYMENT_DATA['ready']  = 0
+            if d.status.replicas:
+                DEPLOYMENT_DATA['desired'] = d.status.replicas
+            else:
+                DEPLOYMENT_DATA['desired'] = 0
+            if d.status.updated_replicas:
+                DEPLOYMENT_DATA['updated'] = d.status.updated_replicas
+            else:
+                DEPLOYMENT_DATA['desired'] = 0
             for key, value in d.metadata.labels.items():
                 DEPLOYMENT_DATA['labels'].append(key + "=" + value)
             DEPLOYMENT_LIST.append(DEPLOYMENT_DATA)
