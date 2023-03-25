@@ -1,7 +1,8 @@
 #!/usr/bin/env python3
 
-from functions.components import db, login_manager
+from functions.components import db, login_manager, tracer
 import re, logging
+from contextlib import nullcontext
 from flask_login import UserMixin
 from werkzeug.security import generate_password_hash
 
@@ -10,6 +11,10 @@ from werkzeug.security import generate_password_hash
 ##############################################################
 
 logger = logging.getLogger(__name__)
+logging.basicConfig(
+        level="INFO",
+        format='[%(asctime)s] %(name)s        %(levelname)s %(message)s'
+    )
 
 def email_check(email):
     regex = r'\b[A-Za-z0-9._%+-]+@[A-Za-z0-9.-]+\.[A-Z|a-z]{2,}\b'
@@ -53,71 +58,100 @@ class UsersRoles(db.Model):
     role_id = db.Column(db.Integer(), db.ForeignKey('roles.id', ondelete='CASCADE'))
 
 def RoleCreate(name):
-    role = Role.query.filter(Role.name == name).first()
-    if not role:
-        role_data = Role(name=name)
-        db.session.add(role_data)
-        db.session.commit()
+    with tracer.start_as_current_span("create-role") if tracer else nullcontext() as span:
+        role = Role.query.filter(Role.name == name).first()
+        if not role:
+            if span.is_recording():
+                span.set_attribute("role.name", name)
+            role_data = Role(name=name)
+            db.session.add(role_data)
+            db.session.commit()
 
 def UserTest(username):
-    user = User.query.filter_by(username=username).first()
-    return user
+    with tracer.start_as_current_span("test-user") if tracer else nullcontext() as span:
+        user = User.query.filter_by(username=username).first()
+        return user
 
 def UserCreate(username, password, email, user_type, role=None, tokens=None):
-    user = UserTest(username)
-    if not user:
-        if password is None:
-            user = User(
-                username       = username,
-                password_hash  = None,
-                email          = email,
-                user_type      = user_type,
-                tokens         = tokens,
-            )
-        else:
-            user = User(
-                username       = username,
-                password_hash  = generate_password_hash(password, method='sha256'),
-                email          = email,
-                user_type      = user_type,
-                tokens         = tokens,
-            )
-        if role:
-            role_data = Role.query.filter(Role.name == role).first()
-            user.roles.append(role_data)
-        kubectl = KubectlConfig.query.filter(KubectlConfig.name == username).first()
-        if kubectl:
-            user.kubectl_config.append(kubectl)
-        db.session.add(user)
-        db.session.commit()
+    with tracer.start_as_current_span("create-user") if tracer else nullcontext() as span:
+        user = UserTest(username)
+        if not user:
+            if span.is_recording():
+                span.set_attribute("enduser.name", username)
+                span.set_attribute("enduser.type", user_type)
+                if email:
+                    span.set_attribute("enduser.email", email)
+            if password is None:
+                user = User(
+                    username       = username,
+                    password_hash  = None,
+                    email          = email,
+                    user_type      = user_type,
+                    tokens         = tokens,
+                )
+            else:
+                user = User(
+                    username       = username,
+                    password_hash  = generate_password_hash(password, method='sha256'),
+                    email          = email,
+                    user_type      = user_type,
+                    tokens         = tokens,
+                )
+            if role:
+                if span.is_recording():
+                    span.set_attribute("enduser.role", role)
+                role_data = Role.query.filter(Role.name == role).first()
+                user.roles.append(role_data)
+            kubectl = KubectlConfig.query.filter(KubectlConfig.name == username).first()
+            if kubectl:
+                user.kubectl_config.append(kubectl)
+            db.session.add(user)
+            db.session.commit()
 
 def UserUpdate(username, role, user_type):
-    user = User.query.filter_by(username=username).first()
-    if user:
-        kubectl = KubectlConfig.query.filter(KubectlConfig.name == username).first()
-        if kubectl:
-            user.kubectl_config.append(kubectl)
-        user.role = role
-        user.user_type = user_type
-        db.session.commit()
+    with tracer.start_as_current_span("update-user") if tracer else nullcontext() as span:
+        user = User.query.filter_by(username=username).first()
+        if user:
+            kubectl = KubectlConfig.query.filter(KubectlConfig.name == username).first()
+            if kubectl:
+                user.kubectl_config.append(kubectl)
+            if span.is_recording():
+                span.set_attribute("enduser.name", username)
+                span.set_attribute("enduser.role", role)
+                span.set_attribute("enduser.type", user_type)
+            user.role = role
+            user.user_type = user_type
+            db.session.commit()
 
 def UserDelete(username):
-    user = User.query.filter_by(username=username).first()
-    user_role = UsersRoles.query.filter_by(user_id=user.id).first()
-    user_kubectl = UsersKubectl.query.filter_by(user_id=user.id).first()
-    kubectl_config = KubectlConfig.query.filter_by(name=username).first()
-    if user:
-        if user_role:
-            db.session.delete(user_role)
-        if user_kubectl:
-            db.session.delete(user_kubectl)
-        if kubectl_config:
-            db.session.delete(kubectl_config)
-        db.session.delete(user)
-        db.session.commit()
+    with tracer.start_as_current_span("delete-user") if tracer else nullcontext() as span:
+        user = User.query.filter_by(username=username).first()
+        user_role = UsersRoles.query.filter_by(user_id=user.id).first()
+        role = Role.query.filter_by(id=user_role.role_id).first()
+        user_kubectl = UsersKubectl.query.filter_by(user_id=user.id).first()
+        kubectl_config = KubectlConfig.query.filter_by(name=username).first()
+        if user:
+            if span.is_recording():
+                span.set_attribute("enduser.name", username)
+                span.set_attribute("enduser.role", role.name)
+                span.set_attribute("enduser.type", user.user_type)
+            if user_role:
+                db.session.delete(user_role)
+            if user_kubectl:
+                db.session.delete(user_kubectl)
+            if kubectl_config:
+                db.session.delete(kubectl_config)
+            db.session.delete(user)
+            db.session.commit()
 
 def SSOUserCreate(username, email, tokens, user_type):
-    UserCreate(username, None, email, user_type, "User", tokens)
+    with tracer.start_as_current_span("create-user-sso") if tracer else nullcontext() as span:
+        if span.is_recording():
+            span.set_attribute("enduser.name", username)
+            span.set_attribute("enduser.type", user_type)
+            if email:
+                span.set_attribute("enduser.email", email)
+        UserCreate(username, None, email, user_type, "User", tokens)
 
 def SSOTokenUpdate(username, tokens):
     user = User.query.filter_by(username=username).first()
