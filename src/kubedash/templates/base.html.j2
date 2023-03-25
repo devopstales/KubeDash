@@ -48,9 +48,17 @@
 
             <!-- Nav Item - Dashboard -->
             <li class="nav-item">
-                <a class="nav-link" href="/dashboard">
+                <a class="nav-link collapsed" href="#" data-toggle="collapse" data-target="#collapseDashoard"
+                    aria-expanded="true" aria-controls="collapseDashoard">
                     <i class="fas fa-fw fa-tachometer-alt"></i>
-                    <span>Dashboard</span></a>
+                    <span>Dashoard</span>
+                </a>
+                <div id="collapseDashoard" class="collapse" aria-labelledby="headingTwo" data-parent="#accordionSidebar">
+                    <div class="bg-white py-2 collapse-inner rounded">
+                        <a class="collapse-item" href="/cluster-metrics">Cluster Metrics</a>
+                        <a class="collapse-item" href="/workload-map">Workload Map</a>
+                    </div>
+                </div>
             </li>
 
             <!-- Divider -->

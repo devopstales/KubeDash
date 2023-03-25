@@ -1,0 +1,345 @@
+{% extends "base.html.j2" %}
+
+{% block header %}
+    <meta charset="utf-8">
+
+    <link rel="stylesheet" href="{{ url_for('static',filename='/vendor/pyvis/vis-9.1.2/vis-network.css') }}">
+    <link rel="stylesheet" href="{{ url_for('static',filename='/vendor/pyvis/vis-9.1.2/vis-network.custom.css') }}">
+    <link href="{{ url_for('static',filename='/vendor/pyvis/tom-select/tom-select.css') }}" rel="stylesheet">
+{% endblock %}
+
+{% block content %}
+
+{% if get_flashed_messages() %}
+  {% for category, message in get_flashed_messages(with_categories=true) %}
+  <div class="alert alert-{{category}} alert-dismissible fade show" role="alert">
+    {{ message }}
+    <button type="button" class="close" data-dismiss="alert" aria-label="Close">
+      <span aria-hidden="true">&times;</span>
+    </button>
+  </div>
+  {% endfor %}
+{% endif %}
+
+<nav aria-label="breadcrumb">
+  <ol class="breadcrumb">
+    <li class="breadcrumb-item active">Workloads</li>
+    <div class="col">
+      <a class="card-link float-right" data-toggle="collapse" href="#" onclick="reload()">
+        <i class="material-icons">refresh</i>
+      </a>
+    </div>
+  </ol>
+</nav>
+
+<div class="card shadow mb-4">
+    <div class="card-header py-3">
+        <h6 class="m-0 font-weight-bold text-primary">Workloads</h6>
+    </div>
+    <div class="card-body">
+        <div class="card">
+              <div id="filter-menu" class="card-header">
+                <div class="row no-gutters">
+                  <div class="col-3 pb-2">
+                    <select
+                            class="form-select"
+                            aria-label="Default select example"
+                            onchange="updateFilter(value, 'item')"
+                            id="select-item"
+                        >
+                        <option value="">Select a network item</option>
+                        <option value="edge">edge</option>
+                        <option value="node">node</option>
+                    </select>
+                  </div>
+                  <div class="col-3 pb-2">
+                    <select
+                            class="form-select"
+                            aria-label="Default select example"
+                            onchange="updateFilter(value, 'property')"
+                            id="select-property"
+                        >
+                        <option value="">Select a property...</option>
+                    </select>
+                  </div>
+                  <div class="col-3 pb-2">
+                    <select
+                            class="form-select"
+                            aria-label="Default select example"
+                            id="select-value"
+                        >
+                        <option value="">Select value(s)...</option>
+                    </select>
+                  </div>
+                  <div class="col-1 pb-2">
+                    <button type="button" class="btn btn-primary btn-block" onclick="highlightFilter(filter);">Filter</button>
+                  </div>
+                  <div class="col-2 pb-2">
+                    <button type="button" class="btn btn-primary btn-block" onclick="clearFilter(true)">Reset Selection</button>
+                  </div>
+                </div>
+              </div>
+            <div id="mynetwork" class="card-body"></div>
+        </div>
+        <!-- <div id="config"></div> -->
+    </div>
+</div>
+{% endblock %}
+
+{% block scripts %}
+    <script src="{{ url_for('static',filename='/vendor/pyvis/bindings/utils.js') }}"></script>
+    <script src="{{ url_for('static',filename='/vendor/pyvis/vis-9.1.2/vis-network.min.js') }}"></script>
+    <script src="{{ url_for('static',filename='/vendor/pyvis/tom-select/tom-select.complete.min.js') }}"></script>
+
+  <script type="text/javascript">
+    // initialize global variables.
+    var edges;
+    var nodes;
+    var allNodes;
+    var allEdges;
+    var nodeColors;
+    var originalNodes;
+    var network;
+    var container;
+    var options, data;
+    var filter = {
+        item : '',
+        property : '',
+        value : []
+    };
+
+    // explicitly using onItemAdd and this function as we need to save multiple values
+    let updateValueFilter = function() {
+        return function () {
+        filter['value'].push(arguments[0])
+        }
+    }
+
+    let valueControl = new TomSelect("#select-value",{
+        maxItems: null,
+        valueField: 'id',
+        labelField: 'title',
+        searchField: 'title',
+        create: false,
+        sortField: {
+            field: "text",
+            direction: "asc"
+        },
+        onItemAdd: updateValueFilter()
+    });
+
+    let addValues = function() {
+        return function () {
+            // clear the current value options and add the selected attribute values
+            // tom-select handles duplicates
+            let selectedProperty = arguments[0];
+            valueControl.clear();
+            valueControl.clearOptions();
+            filter['value'] = []
+            if (filter['item'] === 'node') {
+                for (let each in allNodes) {
+                    valueControl.addOption({
+                        id:allNodes[each][selectedProperty],
+                        title:allNodes[each][selectedProperty]
+                    })
+                }
+            }
+            else if (filter['item'] === 'edge') {
+                for (let each in allEdges) {
+                    valueControl.addOption({
+                        id:allEdges[each][selectedProperty],
+                        title:allEdges[each][selectedProperty]
+                    })
+                }
+            }
+        }
+    };
+
+    let propControl = new TomSelect("#select-property",{
+        valueField: 'id',
+        labelField: 'title',
+        searchField: 'title',
+        create: false,
+        sortField: {
+            field: "text",
+            direction: "asc"
+        },
+        onItemAdd: addValues()
+    });
+
+    let addProperties = function() {
+        return function () {
+            // loops through the selected network item and adds the attributes to dropdown
+            // tom-select handles duplicates
+            clearFilter(false)
+            if (arguments[0] === 'edge') {
+                for (let each in allEdges) {
+                    if (allEdges.hasOwnProperty(each)) {
+                        for (let eachProp in allEdges[each]) {
+                            if (allEdges[each].hasOwnProperty(eachProp)) {
+                                propControl.addOption({id: eachProp, title: eachProp})
+                            }
+                        }
+                    }
+                }
+            }
+            else if (arguments[0] === 'node') {
+                for (let each in allNodes) {
+                    if (allNodes.hasOwnProperty(each)) {
+                        for (let eachProp in allNodes[each]) {
+                            if (allNodes[each].hasOwnProperty(eachProp)
+                                && (eachProp !== 'hidden' && eachProp !== 'savedLabel'
+                                    && eachProp !== 'hiddenLabel')) {
+                                propControl.addOption({id: eachProp, title: eachProp})
+
+                            }
+                        }
+                    }
+                }
+            }
+        }
+    };
+
+    let itemControl = new TomSelect("#select-item",{
+        create: false,
+        sortField:{
+            field: "text",
+            direction: "asc"
+        },
+        onItemAdd: addProperties()
+    });
+
+    function clearFilter(reset) {
+        // utility function to clear all the selected filter options
+        // if reset is set to true, the existing filter will be removed
+        // else, only the dropdown options are cleared
+        propControl.clear();
+        propControl.clearOptions();
+        valueControl.clear();
+        valueControl.clearOptions();
+        filter = {
+            item : '',
+            property : '',
+            value : []
+        }
+        if (reset) {
+            itemControl.clear();
+            filterHighlight({nodes: []})
+        }
+    }
+
+    function updateFilter(value, key) {
+        // key could be 'item' or 'property' and value is as selected in dropdown
+        filter[key] = value
+    }
+
+    // This method is responsible for drawing the graph, returns the drawn network
+    function drawGraph() {
+        var container = document.getElementById('mynetwork');
+        let node = JSON.parse('{{ nodes | tojson }}');
+        let edge = JSON.parse('{{ edges | tojson }}');
+
+        // parsing and collecting nodes and edges from the python
+        nodes = new vis.DataSet(node);
+        edges = new vis.DataSet(edge);
+
+        nodeColors = {};
+        allNodes = nodes.get({ returnType: "Object" });
+        for (nodeId in allNodes) {
+          nodeColors[nodeId] = allNodes[nodeId].color;
+        }
+        allEdges = edges.get({ returnType: "Object" });
+        // adding nodes and edges to the graph
+        data = {nodes: nodes, edges: edges};
+
+        var options = {
+            "configure": {
+                "enabled": false
+            },
+            "edges": {
+                "color": {
+                    "inherit": true
+                },
+                "smooth": {
+                    "enabled": true,
+                    "type": "dynamic"
+                }
+            },
+            "groups": {
+                "daemonset": {
+                    "image": {
+                        "unselected": "{{ url_for('static',filename='/img/ds.svg') }}"
+                    },
+                    "level": 2,
+                    "shape": "image"
+                },
+                "deployment": {
+                    "image": {
+                        "unselected": "{{ url_for('static',filename='/img/ds.svg') }}"
+                    },
+                    "level": 1,
+                    "shape": "image"
+                },
+                "pod": {
+                    "image": {
+                        "unselected": "{{ url_for('static',filename='/img/pod.svg') }}"
+                    },
+                    "level": 3,
+                    "shape": "image"
+                },
+                "replicaset": {
+                    "image": {
+                        "unselected": "{{ url_for('static',filename='/img/rs.svg') }}"
+                    },
+                    "level": 2,
+                    "shape": "image"
+                },
+                "statefulset": {
+                    "image": {
+                        "unselected": "{{ url_for('static',filename='/img/sts.svg') }}"
+                    },
+                    "level": 2,
+                    "shape": "image"
+                }
+            },
+            "interaction": {
+                "zoomView": false,
+                "dragNodes": true,
+                "hideEdgesOnDrag": false,
+                "hideNodesOnDrag": false,
+                "navigationButtons": true,
+            },
+            "layout": {
+                "hierarchical": {
+                    "blockShifting": true,
+                    "edgeMinimization": true,
+                    "enabled": true,
+                    "levelSeparation": 150,
+                    "parentCentralization": true,
+                    "sortMethod": "hubsize",
+                    "treeSpacing": 200
+                },
+                "improvedLayout": true,
+                "randomSeed": 0
+            },
+            "physics": {
+                "enabled": true,
+                "stabilization": {
+                    "enabled": true,
+                    "fit": true,
+                    "iterations": 1000,
+                    "onlyDynamicEdges": false,
+                    "updateInterval": 50
+                }
+            }
+        };
+
+        // if this network requires displaying the configure window,
+        // put it in its div
+        // options.configure["container"] = document.getElementById("config");
+        network = new vis.Network(container, data, options);
+        return network;
+    }
+    drawGraph();
+  </script>
+{% endblock %}
