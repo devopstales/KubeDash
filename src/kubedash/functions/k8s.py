@@ -172,7 +172,7 @@ def k8sServerContextsList():
 
 def k8sListNamespaces(username_role, user_token):
     with tracer.start_as_current_span("list-namespaces") if tracer else nullcontext() as span:
-        if span.is_recording():
+        if tracer and span.is_recording():
             span.set_attribute("user.role", username_role)
         k8sClientConfigGet(username_role, user_token)
         try:
@@ -180,20 +180,20 @@ def k8sListNamespaces(username_role, user_token):
             return namespace_list, None
         except ApiException as error:
             ErrorHandler(error, "list namespaces")
-            if span.is_recording():
+            if tracer and span.is_recording():
                 span.set_status(Status(StatusCode.ERROR, "%s list namespaces" % error))
             namespace_list = ""
             return namespace_list, error
         except Exception as error:
             ErrorHandler("CannotConnect", "k8sListNamespaces: %s" % error)
-            if span.is_recording():
+            if tracer and span.is_recording():
                 span.set_status(Status(StatusCode.ERROR, "k8sListNamespaces: %s" % error))
             namespace_list = ""
             return namespace_list, "CannotConnect"
 
 def k8sNamespaceListGet(username_role, user_token):
     with tracer.start_as_current_span("get-namespace-list") if tracer else nullcontext() as span:
-        if span.is_recording():
+        if tracer and span.is_recording():
             span.set_attribute("user.role", username_role)
         k8sClientConfigGet(username_role, user_token)
         namespace_list = []
@@ -207,13 +207,13 @@ def k8sNamespaceListGet(username_role, user_token):
                 return namespace_list, error
         except Exception as error:
             ErrorHandler("CannotConnect", "k8sNamespaceListGet: %s" % error)
-            if span.is_recording():
+            if tracer and span.is_recording():
                 span.set_status(Status(StatusCode.ERROR, "k8sNamespaceListGet: %s" % error))
             return namespace_list, "CannotConnect"
     
 def k8sNamespacesGet(username_role, user_token):
     with tracer.start_as_current_span("get-namespace") if tracer else nullcontext() as span:
-        if span.is_recording():
+        if tracer and span.is_recording():
             span.set_attribute("user.role", username_role)
         k8sClientConfigGet(username_role, user_token)
         NAMESPACE_LIST = []
@@ -232,7 +232,7 @@ def k8sNamespacesGet(username_role, user_token):
                         for key, value in ns.metadata.labels.items():
                             NAMESPACE_DADTA['labels'].append(key + "=" + value)
                     NAMESPACE_LIST.append(NAMESPACE_DADTA)
-                    if span.is_recording():
+                    if tracer and span.is_recording():
                         span.set_attribute("namespace.name", ns.metadata.name)
                         span.set_attribute("namespace.role", ns.status.__dict__['_phase'])
                 return NAMESPACE_LIST
@@ -240,7 +240,7 @@ def k8sNamespacesGet(username_role, user_token):
                 return NAMESPACE_LIST
         except Exception as error:
             ErrorHandler("CannotConnect", "k8sNamespacesGet: %s" % error)
-            if span.is_recording():
+            if tracer and span.is_recording():
                 span.set_status(Status(StatusCode.ERROR, "k8sNamespacesGet: %s" % error))
             return NAMESPACE_LIST
     
@@ -287,21 +287,21 @@ def k8sNamespaceDelete(username_role, user_token, ns_name):
 
 def k8sClientConfigGet(username_role, user_token):
     with tracer.start_as_current_span("load-client-configs") if tracer else nullcontext() as span:
-        if span.is_recording():
+        if tracer and span.is_recording():
             span.set_attribute("user.role", username_role)
         if username_role == "Admin":
             try:
                 k8s_config.load_kube_config()
-                if span.is_recording():
+                if tracer and span.is_recording():
                     span.set_attribute("client.config", "local")
             except Exception as error:
                 try:
                     k8s_config.load_incluster_config()
-                    if span.is_recording():
+                    if tracer and span.is_recording():
                         span.set_attribute("client.config", "incluster")
                 except k8s_config.ConfigException as error:
                     ErrorHandler(error, "Could not configure kubernetes python client")
-                    if span.is_recording():
+                    if tracer and span.is_recording():
                         span.set_status(Status(StatusCode.ERROR, "Could not configure kubernetes python client: %s" % error))
         elif username_role == "User":
             k8sConfig = k8sServerConfigGet()
@@ -319,7 +319,7 @@ def k8sClientConfigGet(username_role, user_token):
             configuration.debug = False
             configuration.api_key_prefix['authorization'] = 'Bearer'
             configuration.api_key["authorization"] = str(user_token["id_token"])
-            if span.is_recording():
+            if tracer and span.is_recording():
                 span.set_attribute("client.config", "oidc")
             k8s_client.Configuration.set_default(configuration)
 
@@ -486,12 +486,12 @@ def k8sGetClusterMetric():
             return clusterMetric
         except ApiException as error:
             ErrorHandler(error, "Cannot Connect to Kubernetes")
-            if span.is_recording():
+            if tracer and span.is_recording():
                 span.set_status(Status(StatusCode.ERROR, "Cannot Connect to Kubernetes: %s" % error))
             return bad_clusterMetric
         except Exception as error:
             ErrorHandler("CannotConnect", "Cannot Connect to Kubernetes")
-            if span.is_recording():
+            if tracer and span.is_recording():
                 span.set_status(Status(StatusCode.ERROR, "Cannot Connect to Kubernetes: %s" % error))
             return bad_clusterMetric
 
