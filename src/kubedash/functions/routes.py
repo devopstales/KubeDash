@@ -9,6 +9,10 @@ from functions.user import User, UsersRoles, Role, email_check, UserUpdate, User
     SSOUserCreate, SSOTokenUpdate, SSOTokenGet, UserUpdatePassword, KubectlConfigStore, KubectlConfig
 from functions.k8s import *
 
+from functions.components import tracer
+from opentelemetry import trace
+from opentelemetry.trace.status import Status, StatusCode
+
 routes = Blueprint("routes", __name__)
 logger = logging.getLogger(__name__)
 logging.basicConfig(
@@ -22,7 +26,13 @@ logging.basicConfig(
 
 @routes.route('/ping', methods=['GET'])
 def test():
-    return 'pong'
+    with tracer.start_as_current_span("ping-pong", 
+                                        attributes={ 
+                                            "http.route": "/ping",
+                                            "http.method": "GET",
+                                        }
+                                    ) if tracer else nullcontext() as span:
+        return 'pong'
 
 @routes.route('/health', methods=['GET'])
 def health():
@@ -200,40 +210,64 @@ def logout():
 @routes.route('/cluster-metrics')
 @login_required
 def cluster_metrics():
-    cluster_metrics = k8sGetClusterMetric()
-    username = session['username']
-    user = User.query.filter_by(username="admin", user_type = "Local").first()
-    if username == "admin" and check_password_hash(user.password_hash, "admin"):
-        flash('<a href="/profile">You should change the default password!</a>', "warning")
-    return render_template(
-        'cluster-metrics.html.j2',
-        cluster_metrics = cluster_metrics
-    )
+    with tracer.start_as_current_span("workload-map", 
+                                        attributes={ 
+                                            "http.route": "/cluster-metrics",
+                                            "http.method": request.method,
+                                        }
+                                    ) if tracer else nullcontext() as span:
+        cluster_metrics = k8sGetClusterMetric()
+        username = session['username']
+        user = User.query.filter_by(username="admin", user_type = "Local").first()
+        if username == "admin" and check_password_hash(user.password_hash, "admin"):
+            flash('<a href="/profile">You should change the default password!</a>', "warning")
+            if span.is_recording():
+                span.add_event("log", {
+                    "log.severity": "warning",
+                    "log.message": "You should change the default password!",
+                })
+        return render_template(
+            'cluster-metrics.html.j2',
+            cluster_metrics = cluster_metrics
+        )
 
 @routes.route('/workload-map', methods=['GET', 'POST'])
 @login_required
 def workloads():
-    if request.method == 'POST':
-        session['ns_select'] = request.form.get('ns_select')
+    with tracer.start_as_current_span("workload-map", 
+                                        attributes={ 
+                                            "http.route": "/workload-map",
+                                            "http.method": request.method,
+                                        }
+                                    ) if tracer else nullcontext() as span:
+        if request.method == 'POST':
+            session['ns_select'] = request.form.get('ns_select')
+            if span.is_recording():
+                span.set_attribute("namespace.selected", request.form.get('ns_select'))
 
-    if session['user_type'] == "OpenID":
-        user_token = session['oauth_token']
-    else:
-        user_token = None
 
-    namespace_list, error = k8sNamespaceListGet(session['user_role'], user_token)
-    if not error:
-        nodes, edges = k8sGetPodMap(session['user_role'], user_token, session['ns_select'])
-    else:
-        nodes = []
-        edges = []
+        if session['user_type'] == "OpenID":
+            user_token = session['oauth_token']
+        else:
+            user_token = None
 
-    return render_template(
-        'workloads.html.j2',
-        namespaces = namespace_list,
-        nodes = nodes,
-        edges = edges,
-    )
+        namespace_list, error = k8sNamespaceListGet(session['user_role'], user_token)
+        if not error:
+            nodes, edges = k8sGetPodMap(session['user_role'], user_token, session['ns_select'])
+        else:
+            nodes = []
+            edges = []
+
+        if span.is_recording():
+            span.set_attribute("workloads.nodes", nodes)
+            span.set_attribute("workloads.edges", edges)
+
+        return render_template(
+            'workloads.html.j2',
+            namespaces = namespace_list,
+            nodes = nodes,
+            edges = edges,
+        )
 
 ##############################################################
 ## Users and Privileges

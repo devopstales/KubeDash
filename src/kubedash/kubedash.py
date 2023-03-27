@@ -13,6 +13,9 @@ from functions.commands import commands
 from functions.user import UserCreate, RoleCreate, UserTest
 from config import app_config
 
+from opentelemetry.instrumentation.flask import FlaskInstrumentor
+from opentelemetry.instrumentation.sqlalchemy import SQLAlchemyInstrumentor
+
 csp = {
     'font-src': [
         '\'self\'',
@@ -62,12 +65,14 @@ def create_app(config_name="development"):
     logger.info("Running in %s mode" % config_name)
 
     app.config.from_object(app_config[config_name])
+    # FlaskInstrumentor().instrument_app(app)
 
     migrate = Migrate(app, db)
     db.init_app(app)
     basedir = os.path.abspath(os.path.dirname(__file__))
     if database_exists("sqlite:///"+basedir+"/database/"+config_name+".db"):
         with app.app_context():
+            SQLAlchemyInstrumentor().instrument(engine=db.engine)
             db_init()
 
     login_manager.init_app(app)

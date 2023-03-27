@@ -8,13 +8,15 @@ from decimal import Decimal, InvalidOperation
 from OpenSSL import crypto
 from datetime import datetime, timezone
 from pyvis.network import Network
-
+from contextlib import nullcontext
 
 import kubernetes.config as k8s_config
 import kubernetes.client as k8s_client
 from kubernetes.client.rest import ApiException
 
-from functions.components import db
+from functions.components import db, tracer
+from opentelemetry import trace
+from opentelemetry.trace.status import Status, StatusCode
 from functions.user import email_check
 
 ##############################################################
@@ -122,8 +124,9 @@ class k8sConfig(UserMixin, db.Model):
         return '<Kubernetes Server URL %r>' % self.k8s_server_url
 
 def k8sServerConfigGet():
-    k8s_config_list = k8sConfig.query.get(1)
-    return k8s_config_list
+    with tracer.start_as_current_span("list-cluster-configs") if tracer else nullcontext() as span:
+        k8s_config_list = k8sConfig.query.get(1)
+        return k8s_config_list
 
 def k8sServerConfigList():
     k8s_config_list = k8sConfig.query
@@ -168,58 +171,78 @@ def k8sServerContextsList():
 ##############################################################
 
 def k8sListNamespaces(username_role, user_token):
-    (username_role, user_token)
-    try:
-        namespace_list = k8s_client.CoreV1Api().list_namespace(_request_timeout=1)
-        return namespace_list, None
-    except ApiException as error:
-        ErrorHandler(error, "list namespaces")
-        namespace_list = ""
-        return namespace_list, error
-    except Exception as error:
-        ErrorHandler("CannotConnect", "k8sListNamespaces: %s" % error)
-        namespace_list = ""
-        return namespace_list, "CannotConnect"
+    with tracer.start_as_current_span("list-namespaces") if tracer else nullcontext() as span:
+        if span.is_recording():
+            span.set_attribute("user.role", username_role)
+        k8sClientConfigGet(username_role, user_token)
+        try:
+            namespace_list = k8s_client.CoreV1Api().list_namespace(_request_timeout=1)
+            return namespace_list, None
+        except ApiException as error:
+            ErrorHandler(error, "list namespaces")
+            if span.is_recording():
+                span.set_status(Status(StatusCode.ERROR, "%s list namespaces" % error))
+            namespace_list = ""
+            return namespace_list, error
+        except Exception as error:
+            ErrorHandler("CannotConnect", "k8sListNamespaces: %s" % error)
+            if span.is_recording():
+                span.set_status(Status(StatusCode.ERROR, "k8sListNamespaces: %s" % error))
+            namespace_list = ""
+            return namespace_list, "CannotConnect"
 
 def k8sNamespaceListGet(username_role, user_token):
-    k8sClientConfigGet(username_role, user_token)
-    namespace_list = []
-    try:
-        namespaces, error = k8sListNamespaces(username_role, user_token)
-        if not error:
-            for ns in namespaces.items:
-                namespace_list.append(ns.metadata.name)
-            return namespace_list, None
-        else:
-            return namespace_list, error
-    except Exception as error:
-        ErrorHandler("CannotConnect", "k8sNamespaceListGet: %s" % error)
-        return namespace_list, "CannotConnect"
+    with tracer.start_as_current_span("get-namespace-list") if tracer else nullcontext() as span:
+        if span.is_recording():
+            span.set_attribute("user.role", username_role)
+        k8sClientConfigGet(username_role, user_token)
+        namespace_list = []
+        try:
+            namespaces, error = k8sListNamespaces(username_role, user_token)
+            if not error:
+                for ns in namespaces.items:
+                    namespace_list.append(ns.metadata.name)
+                return namespace_list, None
+            else:
+                return namespace_list, error
+        except Exception as error:
+            ErrorHandler("CannotConnect", "k8sNamespaceListGet: %s" % error)
+            if span.is_recording():
+                span.set_status(Status(StatusCode.ERROR, "k8sNamespaceListGet: %s" % error))
+            return namespace_list, "CannotConnect"
     
 def k8sNamespacesGet(username_role, user_token):
-    k8sClientConfigGet(username_role, user_token)
-    NAMESPACE_LIST = []
-    try:
-        namespaces, error = k8sListNamespaces(username_role, user_token)
-        if error is None:
-            for ns in namespaces.items:
-                NAMESPACE_DADTA = {
-                    "name": "",
-                    "status": "",
-                    "labels": list()
-                }
-                NAMESPACE_DADTA['name'] = ns.metadata.name
-                NAMESPACE_DADTA['status'] = ns.status.__dict__['_phase']
-                if ns.metadata.labels:
-                    for key, value in ns.metadata.labels.items():
-                        NAMESPACE_DADTA['labels'].append(key + "=" + value)
-                NAMESPACE_LIST.append(NAMESPACE_DADTA)
+    with tracer.start_as_current_span("get-namespace") if tracer else nullcontext() as span:
+        if span.is_recording():
+            span.set_attribute("user.role", username_role)
+        k8sClientConfigGet(username_role, user_token)
+        NAMESPACE_LIST = []
+        try:
+            namespaces, error = k8sListNamespaces(username_role, user_token)
+            if error is None:
+                for ns in namespaces.items:
+                    NAMESPACE_DADTA = {
+                        "name": "",
+                        "status": "",
+                        "labels": list() 
+                    }
+                    NAMESPACE_DADTA['name'] = ns.metadata.name
+                    NAMESPACE_DADTA['status'] = ns.status.__dict__['_phase']
+                    if ns.metadata.labels:
+                        for key, value in ns.metadata.labels.items():
+                            NAMESPACE_DADTA['labels'].append(key + "=" + value)
+                    NAMESPACE_LIST.append(NAMESPACE_DADTA)
+                    if span.is_recording():
+                        span.set_attribute("namespace.name", ns.metadata.name)
+                        span.set_attribute("namespace.role", ns.status.__dict__['_phase'])
+                return NAMESPACE_LIST
+            else:
+                return NAMESPACE_LIST
+        except Exception as error:
+            ErrorHandler("CannotConnect", "k8sNamespacesGet: %s" % error)
+            if span.is_recording():
+                span.set_status(Status(StatusCode.ERROR, "k8sNamespacesGet: %s" % error))
             return NAMESPACE_LIST
-        else:
-            return NAMESPACE_LIST
-    except Exception as error:
-        ErrorHandler("CannotConnect", "k8sNamespacesGet: %s" % error)
-        return NAMESPACE_LIST
     
 def k8sNamespaceCreate(username_role, user_token, ns_name):
     k8sClientConfigGet(username_role, user_token)
@@ -242,7 +265,7 @@ def k8sNamespaceCreate(username_role, user_token, ns_name):
         flash("Namespace Created Successfully", "success")
     except ApiException as error:
         ErrorHandler(error, "create namespace")
-    except:
+    except Exception as error:
         return
 
 def k8sNamespaceDelete(username_role, user_token, ns_name):
@@ -255,7 +278,7 @@ def k8sNamespaceDelete(username_role, user_token, ns_name):
         flash("Namespace Deleted Successfully", "success")
     except ApiException as error:
         ErrorHandler(error, "create namespace")
-    except:
+    except Exception as error:
         return
 
 ##############################################################
@@ -263,198 +286,214 @@ def k8sNamespaceDelete(username_role, user_token, ns_name):
 ##############################################################
 
 def k8sClientConfigGet(username_role, user_token):
-    if username_role == "Admin":
-        try:
-            k8s_config.load_kube_config()
-        except:
+    with tracer.start_as_current_span("load-client-configs") if tracer else nullcontext() as span:
+        if span.is_recording():
+            span.set_attribute("user.role", username_role)
+        if username_role == "Admin":
             try:
-                k8s_config.load_incluster_config()
-            except k8s_config.ConfigException as error:
-                ErrorHandler(error, "Could not configure kubernetes python client")
-    elif username_role == "User":
-        k8sConfig = k8sServerConfigGet()
-        k8s_server_url = k8sConfig.k8s_server_url
-        k8s_server_ca = str(base64_decode(k8sConfig.k8s_server_ca), 'UTF-8')
-        if k8s_server_ca:
-            file = open("CA.crt", "w+")
-            file.write( k8s_server_ca )
-            file.close 
+                k8s_config.load_kube_config()
+                if span.is_recording():
+                    span.set_attribute("client.config", "local")
+            except Exception as error:
+                try:
+                    k8s_config.load_incluster_config()
+                    if span.is_recording():
+                        span.set_attribute("client.config", "incluster")
+                except k8s_config.ConfigException as error:
+                    ErrorHandler(error, "Could not configure kubernetes python client")
+                    if span.is_recording():
+                        span.set_status(Status(StatusCode.ERROR, "Could not configure kubernetes python client: %s" % error))
+        elif username_role == "User":
+            k8sConfig = k8sServerConfigGet()
+            k8s_server_url = k8sConfig.k8s_server_url
+            k8s_server_ca = str(base64_decode(k8sConfig.k8s_server_ca), 'UTF-8')
+            if k8s_server_ca:
+                file = open("CA.crt", "w+")
+                file.write( k8s_server_ca )
+                file.close 
 
-        configuration = k8s_client.Configuration()
-        configuration.host = k8s_server_url
-        configuration.verify_ssl = True
-        configuration.ssl_ca_cert = 'CA.crt'
-        configuration.debug = False
-        configuration.api_key_prefix['authorization'] = 'Bearer'
-        configuration.api_key["authorization"] = str(user_token["id_token"])
-        k8s_client.Configuration.set_default(configuration)
+            configuration = k8s_client.Configuration()
+            configuration.host = k8s_server_url
+            configuration.verify_ssl = True
+            configuration.ssl_ca_cert = 'CA.crt'
+            configuration.debug = False
+            configuration.api_key_prefix['authorization'] = 'Bearer'
+            configuration.api_key["authorization"] = str(user_token["id_token"])
+            if span.is_recording():
+                span.set_attribute("client.config", "oidc")
+            k8s_client.Configuration.set_default(configuration)
 
 ##############################################################
 ## Metrics
 ##############################################################
 
 def k8sGetClusterMetric():
-    k8sClientConfigGet("Admin", None)
-    tmpTotalPodCount = float()
-    totalTotalPodAllocatable = float()
-    totalPodAllocatable = float()
-    tmpTotalCpuCapacity = int()
-    tmpTotalMemoryCapacity = int()
-    tmpTotalCpuAllocatable = int()
-    tmpTotalMenoryAllocatable = int()
-    tmpTotalCpuLimit = float()
-    tmpTotalMemoryLimit = float()
-    tmpTotalCpuRequest = float()
-    tmpTotalMemoryRequest = float()
-    total_node_mem_usage = float()
-    total_node_cpu_usage = float()
-    clusterMetric = {
-        "nodes": [],
-        "clusterTotals": {}
-    }
-    bad_clusterMetric = {
-        "nodes": [],
-        "clusterTotals": {
-            "cpu": {
-                "capacity": 0,
-                "allocatable": 0,
-                "allocatablePercent": 0,
-                "requests": 0,
-                "requestsPercent": 0,
-                "limits": 0,
-                "limitsPercent": 0,
-                "usage": 0,
-                "usagePercent": 0,
-            },
-            "memory": {
-                "capacity": 0,
-                "allocatable": 0,
-                "allocatablePercent": 0,
-                "requests": 0,
-                "requestsPercent": 0,
-                "limits": 0,
-                "limitsPercent": 0,
-                "usage": 0,
-                "usagePercent": 0,
-            },
-            "pod_count": {
-                "current": 0,
-                "allocatable": 0,
-            },
+    with tracer.start_as_current_span("get-cluster-metrics") if tracer else nullcontext() as span:
+        k8sClientConfigGet("Admin", None)
+        tmpTotalPodCount = float()
+        totalTotalPodAllocatable = float()
+        totalPodAllocatable = float()
+        tmpTotalCpuCapacity = int()
+        tmpTotalMemoryCapacity = int()
+        tmpTotalCpuAllocatable = int()
+        tmpTotalMenoryAllocatable = int()
+        tmpTotalCpuLimit = float()
+        tmpTotalMemoryLimit = float()
+        tmpTotalCpuRequest = float()
+        tmpTotalMemoryRequest = float()
+        total_node_mem_usage = float()
+        total_node_cpu_usage = float()
+        clusterMetric = {
+            "nodes": [],
+            "clusterTotals": {}
         }
-    }
-    try:
-        node_list = k8s_client.CoreV1Api().list_node()
-        pod_list = k8s_client.CoreV1Api().list_pod_for_all_namespaces()
+        bad_clusterMetric = {
+            "nodes": [],
+            "clusterTotals": {
+                "cpu": {
+                    "capacity": 0,
+                    "allocatable": 0,
+                    "allocatablePercent": 0,
+                    "requests": 0,
+                    "requestsPercent": 0,
+                    "limits": 0,
+                    "limitsPercent": 0,
+                    "usage": 0,
+                    "usagePercent": 0,
+                },
+                "memory": {
+                    "capacity": 0,
+                    "allocatable": 0,
+                    "allocatablePercent": 0,
+                    "requests": 0,
+                    "requestsPercent": 0,
+                    "limits": 0,
+                    "limitsPercent": 0,
+                    "usage": 0,
+                    "usagePercent": 0,
+                },
+                "pod_count": {
+                    "current": 0,
+                    "allocatable": 0,
+                },
+            }
+        }
         try:
-            k8s_nodes = k8s_client.CustomObjectsApi().list_cluster_custom_object("metrics.k8s.io", "v1beta1", "nodes")
-        except:
-            k8s_nodes = None
-            flash("Metrics Server is not installed. If you want to see usage date please install Metrics Server.", "warning")
-        for node in node_list.items:
-            tmpPodCount = int()
-            tmpCpuLimit = float()
-            tmpMemoryLimit = float()
-            tmpCpuRequest = float()
-            tmpMemoryRequest = float()
-            for pod in pod_list.items:
-                if pod.spec.node_name == node.metadata.name and pod.status.phase == "Running":
-                    tmpPodCount += 1
-                    for container in pod.spec.containers:
-                        if container.resources.limits:
-                            if "cpu" in container.resources.limits:
-                                tmpCpuLimit += float(parse_quantity(container.resources.limits["cpu"]))
-                            if "memory" in container.resources.limits:
-                                tmpMemoryLimit += float(parse_quantity(container.resources.limits["memory"]))
-                        if container.resources.requests:
-                            if "cpu" in container.resources.requests:
-                                tmpCpuRequest += float(parse_quantity(container.resources.requests["cpu"]))
-                            if "memory" in container.resources.requests:
-                                tmpMemoryRequest += float(parse_quantity(container.resources.requests["memory"]))
-            totalPodAllocatable += float(node.status.allocatable["pods"])
-            node_mem_capacity = float(parse_quantity(node.status.capacity["memory"]))
-            node_mem_allocatable = float(parse_quantity(node.status.allocatable["memory"]))
-            if k8s_nodes:
-                for stats in k8s_nodes['items']:
-                    if stats['metadata']['name'] == node.metadata.name:
-                        node_mem_usage = float(parse_quantity(stats['usage']['memory']))
-                        node_cpu_usage = float(parse_quantity(stats['usage']['cpu']))
-            else:
-                node_mem_usage = 0
-                node_cpu_usage = 0
-            clusterMetric["nodes"].append({
-                "name": node.metadata.name,
-                "cpu": {
-                    "capacity": node.status.capacity["cpu"],
-                    "allocatable": node.status.allocatable["cpu"],
-                    "requests": tmpCpuRequest,
-                    "requestsPercent": calPercent(tmpCpuRequest, int(node.status.capacity["cpu"]), True),
-                    "limits": tmpCpuLimit,
-                    "limitsPercent": calPercent(tmpCpuLimit, int(node.status.capacity["cpu"]), True),
-                    "usage": node_cpu_usage,
-                    "usagePercent": calPercent(node_cpu_usage, int(node.status.capacity["cpu"]), True),
-                },
-                "memory": {
-                    "capacity": node_mem_capacity,
-                    "allocatable": node_mem_allocatable,
-                    "requests": tmpMemoryRequest,
-                    "requestsPercent": calPercent(tmpMemoryRequest, node_mem_capacity, True),
-                    "limits": tmpMemoryLimit,
-                    "limitsPercent": calPercent(tmpMemoryLimit, node_mem_capacity, True),
-                    "usage": node_mem_usage,
-                    "usagePercent": calPercent(node_mem_usage, node_mem_capacity, True),
-                },
-                "pod_count": {
-                    "current": tmpPodCount,
-                    "allocatable": totalPodAllocatable,
-                },
-            })
-            tmpTotalPodCount += tmpPodCount
-            totalTotalPodAllocatable += totalPodAllocatable
-            tmpTotalCpuAllocatable += int(node.status.allocatable["cpu"])
-            tmpTotalMenoryAllocatable += node_mem_allocatable
-            tmpTotalCpuCapacity += int(node.status.capacity["cpu"])
-            tmpTotalMemoryCapacity += node_mem_capacity
-            tmpTotalCpuLimit += tmpCpuLimit
-            tmpTotalMemoryLimit += tmpMemoryLimit
-            tmpTotalCpuRequest += tmpCpuRequest
-            tmpTotalMemoryRequest += tmpMemoryRequest
-            total_node_mem_usage += node_mem_usage
-            total_node_cpu_usage += node_cpu_usage
-        # clusterTotals
-        clusterMetric["clusterTotals"] = {
-                "cpu": {
-                    "capacity": tmpTotalCpuCapacity,
-                    "allocatable": tmpTotalCpuAllocatable,
-                    "requests": tmpTotalCpuRequest,
-                    "requestsPercent": calPercent(tmpTotalCpuRequest, tmpTotalCpuAllocatable, True),
-                    "limits": tmpTotalCpuLimit,
-                    "limitsPercent": calPercent(tmpTotalCpuLimit, tmpTotalCpuAllocatable, True),
-                    "usage": total_node_cpu_usage,
-                    "usagePercent": calPercent(total_node_cpu_usage, tmpTotalCpuAllocatable, True),
-                },
-                "memory": {
-                    "capacity": tmpTotalMemoryCapacity,
-                    "allocatable": tmpTotalMenoryAllocatable,
-                    "requests": tmpTotalMemoryRequest,
-                    "requestsPercent": calPercent(tmpTotalMemoryRequest, tmpTotalMenoryAllocatable, True),
-                    "limits": tmpTotalMemoryLimit,
-                    "limitsPercent":  calPercent(tmpTotalMemoryLimit, tmpTotalMenoryAllocatable, True),
-                    "usage": total_node_mem_usage,
-                    "usagePercent": calPercent(total_node_mem_usage, tmpTotalMenoryAllocatable, True),
-                },
-                "pod_count": {
-                    "current": tmpTotalPodCount,
-                    "allocatable": totalTotalPodAllocatable,
-                },
-        }
-        return clusterMetric
-    except ApiException as error:
-        ErrorHandler(error, "Cannot Connect to Kubernetes")
-        return bad_clusterMetric
-    except:
-        ErrorHandler("CannotConnect", "Cannot Connect to Kubernetes")
-        return bad_clusterMetric
+            node_list = k8s_client.CoreV1Api().list_node(_request_timeout=1)
+            pod_list = k8s_client.CoreV1Api().list_pod_for_all_namespaces(_request_timeout=1)
+            try:
+                k8s_nodes = k8s_client.CustomObjectsApi().list_cluster_custom_object("metrics.k8s.io", "v1beta1", "nodes", _request_timeout=1)
+            except Exception as error:
+                k8s_nodes = None
+                flash("Metrics Server is not installed. If you want to see usage date please install Metrics Server.", "warning")
+            for node in node_list.items:
+                tmpPodCount = int()
+                tmpCpuLimit = float()
+                tmpMemoryLimit = float()
+                tmpCpuRequest = float()
+                tmpMemoryRequest = float()
+                for pod in pod_list.items:
+                    if pod.spec.node_name == node.metadata.name and pod.status.phase == "Running":
+                        tmpPodCount += 1
+                        for container in pod.spec.containers:
+                            if container.resources.limits:
+                                if "cpu" in container.resources.limits:
+                                    tmpCpuLimit += float(parse_quantity(container.resources.limits["cpu"]))
+                                if "memory" in container.resources.limits:
+                                    tmpMemoryLimit += float(parse_quantity(container.resources.limits["memory"]))
+                            if container.resources.requests:
+                                if "cpu" in container.resources.requests:
+                                    tmpCpuRequest += float(parse_quantity(container.resources.requests["cpu"]))
+                                if "memory" in container.resources.requests:
+                                    tmpMemoryRequest += float(parse_quantity(container.resources.requests["memory"]))
+                totalPodAllocatable += float(node.status.allocatable["pods"])
+                node_mem_capacity = float(parse_quantity(node.status.capacity["memory"]))
+                node_mem_allocatable = float(parse_quantity(node.status.allocatable["memory"]))
+                if k8s_nodes:
+                    for stats in k8s_nodes['items']:
+                        if stats['metadata']['name'] == node.metadata.name:
+                            node_mem_usage = float(parse_quantity(stats['usage']['memory']))
+                            node_cpu_usage = float(parse_quantity(stats['usage']['cpu']))
+                else:
+                    node_mem_usage = 0
+                    node_cpu_usage = 0
+                clusterMetric["nodes"].append({
+                    "name": node.metadata.name,
+                    "cpu": {
+                        "capacity": node.status.capacity["cpu"],
+                        "allocatable": node.status.allocatable["cpu"],
+                        "requests": tmpCpuRequest,
+                        "requestsPercent": calPercent(tmpCpuRequest, int(node.status.capacity["cpu"]), True),
+                        "limits": tmpCpuLimit,
+                        "limitsPercent": calPercent(tmpCpuLimit, int(node.status.capacity["cpu"]), True),
+                        "usage": node_cpu_usage,
+                        "usagePercent": calPercent(node_cpu_usage, int(node.status.capacity["cpu"]), True),
+                    },
+                    "memory": {
+                        "capacity": node_mem_capacity,
+                        "allocatable": node_mem_allocatable,
+                        "requests": tmpMemoryRequest,
+                        "requestsPercent": calPercent(tmpMemoryRequest, node_mem_capacity, True),
+                        "limits": tmpMemoryLimit,
+                        "limitsPercent": calPercent(tmpMemoryLimit, node_mem_capacity, True),
+                        "usage": node_mem_usage,
+                        "usagePercent": calPercent(node_mem_usage, node_mem_capacity, True),
+                    },
+                    "pod_count": {
+                        "current": tmpPodCount,
+                        "allocatable": totalPodAllocatable,
+                    },
+                })
+                tmpTotalPodCount += tmpPodCount
+                totalTotalPodAllocatable += totalPodAllocatable
+                tmpTotalCpuAllocatable += int(node.status.allocatable["cpu"])
+                tmpTotalMenoryAllocatable += node_mem_allocatable
+                tmpTotalCpuCapacity += int(node.status.capacity["cpu"])
+                tmpTotalMemoryCapacity += node_mem_capacity
+                tmpTotalCpuLimit += tmpCpuLimit
+                tmpTotalMemoryLimit += tmpMemoryLimit
+                tmpTotalCpuRequest += tmpCpuRequest
+                tmpTotalMemoryRequest += tmpMemoryRequest
+                total_node_mem_usage += node_mem_usage
+                total_node_cpu_usage += node_cpu_usage
+            # clusterTotals
+            clusterMetric["clusterTotals"] = {
+                    "cpu": {
+                        "capacity": tmpTotalCpuCapacity,
+                        "allocatable": tmpTotalCpuAllocatable,
+                        "requests": tmpTotalCpuRequest,
+                        "requestsPercent": calPercent(tmpTotalCpuRequest, tmpTotalCpuAllocatable, True),
+                        "limits": tmpTotalCpuLimit,
+                        "limitsPercent": calPercent(tmpTotalCpuLimit, tmpTotalCpuAllocatable, True),
+                        "usage": total_node_cpu_usage,
+                        "usagePercent": calPercent(total_node_cpu_usage, tmpTotalCpuAllocatable, True),
+                    },
+                    "memory": {
+                        "capacity": tmpTotalMemoryCapacity,
+                        "allocatable": tmpTotalMenoryAllocatable,
+                        "requests": tmpTotalMemoryRequest,
+                        "requestsPercent": calPercent(tmpTotalMemoryRequest, tmpTotalMenoryAllocatable, True),
+                        "limits": tmpTotalMemoryLimit,
+                        "limitsPercent":  calPercent(tmpTotalMemoryLimit, tmpTotalMenoryAllocatable, True),
+                        "usage": total_node_mem_usage,
+                        "usagePercent": calPercent(total_node_mem_usage, tmpTotalMenoryAllocatable, True),
+                    },
+                    "pod_count": {
+                        "current": tmpTotalPodCount,
+                        "allocatable": totalTotalPodAllocatable,
+                    },
+            }
+            return clusterMetric
+        except ApiException as error:
+            ErrorHandler(error, "Cannot Connect to Kubernetes")
+            if span.is_recording():
+                span.set_status(Status(StatusCode.ERROR, "Cannot Connect to Kubernetes: %s" % error))
+            return bad_clusterMetric
+        except Exception as error:
+            ErrorHandler("CannotConnect", "Cannot Connect to Kubernetes")
+            if span.is_recording():
+                span.set_status(Status(StatusCode.ERROR, "Cannot Connect to Kubernetes: %s" % error))
+            return bad_clusterMetric
 
 def k8sGetNodeMetric(node_name):
     k8sClientConfigGet("Admin", None)
@@ -464,7 +503,7 @@ def k8sGetNodeMetric(node_name):
         pod_list = k8s_client.CoreV1Api().list_pod_for_all_namespaces()
         try:
             k8s_nodes = k8s_client.CustomObjectsApi().list_cluster_custom_object("metrics.k8s.io", "v1beta1", "nodes")
-        except:
+        except Exception as error:
             k8s_nodes = None
             flash("Metrics Server is not installed. If you want to see usage date please install Metrics Server.", "warning")
         for node in node_list.items:
@@ -532,7 +571,7 @@ def k8sGetNodeMetric(node_name):
     except ApiException as error:
         ErrorHandler(error, "Cannot Connect to Kubernetes")
         return None
-    except:
+    except Exception as error:
         ErrorHandler("CannotConnect", "Cannot Connect to Kubernetes")
         return None
 
@@ -559,7 +598,7 @@ def k8sPVCMetric(namespace):
                                     "percentageUsed": (volme['usedBytes'] / volme['capacityBytes']  * 100),
                                 }
                                 PVC_LIST.append(DAT)
-        except:
+        except Exception as error:
             continue
     return PVC_LIST
 
@@ -727,7 +766,7 @@ def k8sUserClusterRoleTemplateListGet(username_role, user_token):
             return CLUSTER_ROLE_LIST
     except ApiException as error:
         ErrorHandler(error, "get cluster roles")
-    except:
+    except Exception as error:
         return
     
 def k8sUserRoleTemplateListGet(username_role, user_token):
@@ -744,7 +783,7 @@ def k8sUserRoleTemplateListGet(username_role, user_token):
             return CLUSTER_ROLE_LIST
     except ApiException as error:
         ErrorHandler(error, "get cluster roles")
-    except:
+    except Exception as error:
         return
     
 ##############################################################
@@ -767,7 +806,7 @@ def k8sClusterRoleGet(name):
             return True, e
         else:
             return False, None
-    except:
+    except Exception as error:
         return False, None
     
 def k8sClusterRoleCreate(name, body):
@@ -787,7 +826,7 @@ def k8sClusterRoleCreate(name, body):
             return False
         else:
             return False
-    except:
+    except Exception as error:
         return False
     
 def k8sClusterRolesAdd():
@@ -1116,7 +1155,7 @@ def k8sStatefulSetsGet(username_role, user_token, ns):
     except ApiException as error:
         ErrorHandler(error, "get statefullsets list")
         return STATEFULSET_LIST
-    except:
+    except Exception as error:
         return STATEFULSET_LIST
 
 ##############################################################
@@ -1152,7 +1191,7 @@ def k8sDaemonSetsGet(username_role, user_token, ns):
     except ApiException as error:
         ErrorHandler(error, "get daemonsets list")
         return DAEMONSET_LIST
-    except:
+    except Exception as error:
         return DAEMONSET_LIST
 
 ##############################################################
@@ -1194,7 +1233,7 @@ def k8sDeploymentsGet(username_role, user_token, ns):
     except ApiException as error:
         ErrorHandler(error, "get deployments list")
         return DEPLOYMENT_LIST
-    except:
+    except Exception as error:
         return DEPLOYMENT_LIST
 
 ##############################################################
@@ -1234,7 +1273,7 @@ def k8sReplicaSetsGet(username_role, user_token, ns):
     except ApiException as error:
         ErrorHandler(error, "get replicasets list")
         return REPLICASET_LIST
-    except:
+    except Exception as error:
         return REPLICASET_LIST
 
 ##############################################################
@@ -1367,7 +1406,7 @@ def k8sPodGet(username_role, user_token, ns, po):
     except ApiException as error:
         ErrorHandler(error, "get pods in this namespace")
         return POD_DATA
-    except:
+    except Exception as error:
         return POD_DATA
 
 def k8sPodListVulnsGet(username_role, user_token, ns):
@@ -1379,12 +1418,12 @@ def k8sPodListVulnsGet(username_role, user_token, ns):
     except ApiException as error:
         ErrorHandler(error, "get cluster roles")
         return HAS_REPORT, POD_VULN_LIST
-    except:
+    except Exception as error:
         return HAS_REPORT, POD_VULN_LIST
     try:
         vulnerabilityreport_list = k8s_client.CustomObjectsApi().list_namespaced_custom_object("trivy-operator.devopstales.io", "v1", ns, "vulnerabilityreports")
         HAS_REPORT = True
-    except:
+    except Exception as error:
         vulnerabilityreport_list = False
 
     for pod in pod_list.items:
@@ -1426,11 +1465,11 @@ def k8sPodVulnsGet(username_role, user_token, ns, pod):
     except ApiException as error:
         ErrorHandler(error, "get cluster roles")
         return HAS_REPORT, POD_VULNS
-    except:
+    except Exception as error:
         return HAS_REPORT, POD_VULNS
     try:
         vulnerabilityreport_list = k8s_client.CustomObjectsApi().list_namespaced_custom_object("trivy-operator.devopstales.io", "v1", ns, "vulnerabilityreports")
-    except:
+    except Exception as error:
         vulnerabilityreport_list = None
 
     for po in pod_list.items:
@@ -1488,7 +1527,7 @@ def k8sSaListGet(username_role, user_token, ns):
     except ApiException as error:
         ErrorHandler(error, "get service account list")
         return SA_LIST
-    except:
+    except Exception as error:
         return SA_LIST
 
 ##############################################################
@@ -1512,7 +1551,7 @@ def k8sRoleListGet(username_role, user_token, ns):
     except ApiException as error:
         ErrorHandler(error, "get roles list")
         return ROLE_LIST
-    except:
+    except Exception as error:
         return ROLE_LIST
 
 ##############################################################
@@ -1549,7 +1588,7 @@ def k8sRoleBindingListGet(username_role, user_token, ns):
     except ApiException as error:
         ErrorHandler(error, "get role bindings list")
         return ROLE_BINDING_LIST
-    except:
+    except Exception as error:
         return ROLE_BINDING_LIST
 
 def k8sRoleBindingGet(obeject_name, namespace):
@@ -1568,7 +1607,7 @@ def k8sRoleBindingGet(obeject_name, namespace):
         else:
             logger.error("Exception when testing NamespacedRoleBinding - %s in %s: %s\n" % (obeject_name, namespace, e))
             return None, e
-    except:
+    except Exception as error:
         logger.error("Unknow Error")
         return None, "Unknow Error"
 
@@ -1663,7 +1702,7 @@ def k8sClusterRoleListGet(username_role, user_token):
     except ApiException as error:
         ErrorHandler(error, "get cluster role list")
         return CLUSTER_ROLE_LIST
-    except:
+    except Exception as error:
         return CLUSTER_ROLE_LIST
 
 ##############################################################
@@ -1702,7 +1741,7 @@ def k8sClusterRoleBindingListGet(username_role, user_token):
     except ApiException as error:
         ErrorHandler(error, "get cluster role bindings list")
         return CLUSTER_ROLE_BINDING_LIST
-    except:
+    except Exception as error:
         return CLUSTER_ROLE_BINDING_LIST
 
 def k8sClusterRoleBindingGet(obeject_name):
@@ -1721,7 +1760,7 @@ def k8sClusterRoleBindingGet(obeject_name):
         else:
             logger.error("Exception when testing ClusterRoleBinding - %s: %s\n" % (obeject_name, e))
             return None, e
-    except:
+    except Exception as error:
         logger.error("Unknow Error")
         return None, "Unknow Error"
 
@@ -1831,7 +1870,7 @@ def k8sStorageClassListGet(username_role, user_token):
     except ApiException as error:
         ErrorHandler(error, "get cluster Stotage Class list")
         return SC_LIST
-    except:
+    except Exception as error:
         return SC_LIST   
 
 ##############################################################
@@ -1899,7 +1938,7 @@ def k8sPersistentVolumeListGet(username_role, user_token, namespace):
     except ApiException as error:
         ErrorHandler(error, "get cluster Persistent Volume list")
         return PV_LIST
-    except:
+    except Exception as error:
         return PV_LIST 
 
 ##############################################################
@@ -1963,7 +2002,7 @@ def k8sHelmChartListGet(username_role, user_token, namespace):
     except ApiException as error:
         ErrorHandler(error, "get helm release")
         return HAS_CHART, CHART_LIST
-    except:
+    except Exception as error:
         ErrorHandler("CannotConnect", "Cannot Connect to Kubernetes")
         return HAS_CHART, CHART_LIST
  
@@ -2018,7 +2057,7 @@ def k8sUserPriviligeList(username_role="Admin", user_token=None, user="admin"):
             CLUSTER_ROLE = api_instance.read_cluster_role(cr, pretty=pretty)
             for crr in CLUSTER_ROLE.rules:
                 USER_CLUSTER_ROLES.append(crr)
-        except:
+        except Exception as error:
             continue
     return USER_CLUSTER_ROLES, USER_ROLES
 
