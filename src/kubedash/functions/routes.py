@@ -221,7 +221,7 @@ def cluster_metrics():
         user = User.query.filter_by(username="admin", user_type = "Local").first()
         if username == "admin" and check_password_hash(user.password_hash, "admin"):
             flash('<a href="/profile">You should change the default password!</a>', "warning")
-            if span.is_recording():
+            if tracer and span.is_recording():
                 span.add_event("log", {
                     "log.severity": "warning",
                     "log.message": "You should change the default password!",
@@ -242,7 +242,7 @@ def workloads():
                                     ) if tracer else nullcontext() as span:
         if request.method == 'POST':
             session['ns_select'] = request.form.get('ns_select')
-            if span.is_recording():
+            if tracer and span.is_recording():
                 span.set_attribute("namespace.selected", request.form.get('ns_select'))
 
 
@@ -258,7 +258,7 @@ def workloads():
             nodes = []
             edges = []
 
-        if span.is_recording():
+        if tracer and span.is_recording():
             span.set_attribute("workloads.nodes", nodes)
             span.set_attribute("workloads.edges", edges)
 
