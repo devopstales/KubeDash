@@ -9,16 +9,25 @@ from functions.user import User, UsersRoles, Role, email_check, UserUpdate, User
     SSOUserCreate, SSOTokenUpdate, SSOTokenGet, UserUpdatePassword, KubectlConfigStore, KubectlConfig
 from functions.k8s import *
 
-from functions.components import tracer
-from opentelemetry import trace
+from functions.components import tracer, socketio
+from threading import Lock
+from flask_socketio import emit
 from opentelemetry.trace.status import Status, StatusCode
+
+##############################################################
+## Helpers
+##############################################################
 
 routes = Blueprint("routes", __name__)
 logger = logging.getLogger(__name__)
+
 logging.basicConfig(
         level="INFO",
         format='[%(asctime)s] %(name)s        %(levelname)s %(message)s'
     )
+
+thread = None
+thread_lock = Lock()
 
 ##############################################################
 ## health
@@ -48,7 +57,6 @@ def page_not_found(e):
 def add_header(response):
     response.headers['Access-Control-Allow-Origin'] = request.root_url.rstrip(request.root_url[-1])
     return response
-
 ##############################################################
 ## Login
 ##############################################################
@@ -1081,7 +1089,28 @@ def pods_data():
         )
     else:
         return redirect(url_for('routes.login'))
-    
+
+##############################################################
+## Pod Logs
+##############################################################
+
+@routes.route('/pods/logs', methods=['POST'])
+def pods_logs():
+    if request.method == 'POST':
+        session['ns_select'] = request.form.get('ns_select')
+        session['po_name'] = request.form.get('po_name')
+        return render_template('pod-logs.html.j2', po_name=session['po_name'], async_mode=socketio.async_mode)
+    else:
+        return redirect(url_for('routes.login'))
+
+@socketio.on("connect", namespace="/log")
+def connect():
+    global thread
+    with thread_lock:
+        if thread is None:
+            thread = socketio.start_background_task(k8sPodLogsStream, "Admin", None, session['ns_select'], session['po_name'])
+    emit('response', {'data': 'Connected'}, namespace="/log")
+
 ##############################################################
 ## Security
 ##############################################################
