@@ -7,7 +7,7 @@ from flask_healthz import healthz, HealthError
 from sqlalchemy_utils import database_exists
 from flask_migrate import Migrate
 
-from functions.components import db, login_manager, csrf
+from functions.components import db, login_manager, csrf, socketio
 from functions.routes import routes
 from functions.commands import commands
 from functions.user import UserCreate, RoleCreate, UserTest
@@ -24,6 +24,7 @@ csp = {
     'style-src': [
         '\'self\'',
         'fonts.googleapis.com',
+        '*.cloudflare.com',
     ],
 }
 
@@ -81,6 +82,8 @@ def create_app(config_name="development"):
 
     csrf.init_app(app)
 
+    socketio.init_app(app, async_mode=None)
+
     talisman = Talisman(app, content_security_policy=csp)
     ##############################################################
     ## Custom jinja2 filter
@@ -119,5 +122,4 @@ app.config.update(
 )
 
 if __name__ == '__main__':
-    # app.run(port=8000, use_reloader=False)
-    app.run(port=8000)
+    socketio.run(app, port=8000)
