@@ -1,0 +1,62 @@
+{% extends "base.html.j2" %}
+
+{% block header %}
+    <link href="{{ url_for('static',filename='/vendor/google/material-icons.css') }}" rel="stylesheet" />
+    <link href="{{ url_for('static',filename='/vendor/xterm.js-4.11.0/xterm.css') }}" rel="stylesheet" />
+{% endblock %}
+
+{% block content %}
+
+<nav aria-label="breadcrumb">
+  <ol class="breadcrumb">
+    <li class="breadcrumb-item">Workloads</li>
+    <li class="breadcrumb-item"><a href="/pods">Pods</a></li>
+    <li class="breadcrumb-item" aria-current="page">{{ po_name }}</li>
+    <li class="breadcrumb-item active" aria-current="page">Logs</li>
+    <div class="col">
+      <a class="card-link float-right" data-toggle="collapse" href="#" onclick="reload()">
+        <i class="material-icons">refresh</i>
+      </a>
+    </div>
+  </ol>
+</nav>
+
+<div class="card shadow mb-4">
+    <div class="card-header">
+        <h6 class="m-0 font-weight-bold text-primary">Pod Logs</h6>
+    </div>
+    <div class="card-body">
+        <div id="terminal"></div>
+    </div>
+</div>
+{% endblock %}
+
+{% block scripts %}
+    <script src="{{ url_for('static',filename='/vendor/socket.io-4.0.1/socket.io.min.js') }}"></script>
+    <script src="{{ url_for('static',filename='/vendor/xterm.js-4.11.0/xterm-addon-fit.js') }}"></script>
+    <script src="{{ url_for('static',filename='/vendor/xterm.js-4.11.0/xterm-addon-web-links.js') }}"></script>
+    <script src="{{ url_for('static',filename='/vendor/xterm.js-4.11.0/xterm-addon-search.js') }}"></script>
+    <script src="{{ url_for('static',filename='/vendor/xterm.js-4.11.0/xterm.js') }}"></script>
+    <script>
+        $(document).ready(function() {
+            const term = new Terminal({
+              cursorBlink: true,
+              macOptionIsMeta: true,
+              scrollback: true,
+            });
+            const fit = new FitAddon.FitAddon();
+            term.loadAddon(fit);
+            term.loadAddon(new WebLinksAddon.WebLinksAddon());
+            term.loadAddon(new SearchAddon.SearchAddon());
+
+            term.open(document.getElementById('terminal'));
+            fit.fit();
+
+            const socket = io.connect('/log');
+
+            socket.on('response', function(msg) {
+                term.write(msg.data + "\r\n");
+            });
+        });
+    </script>
+{% endblock %}

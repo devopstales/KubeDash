@@ -13,8 +13,10 @@ from contextlib import nullcontext
 import kubernetes.config as k8s_config
 import kubernetes.client as k8s_client
 from kubernetes.client.rest import ApiException
+from kubernetes import watch
 
-from functions.components import db, tracer
+from functions.components import db, tracer, socketio
+
 from opentelemetry import trace
 from opentelemetry.trace.status import Status, StatusCode
 from functions.user import email_check
@@ -392,6 +394,8 @@ def k8sGetClusterMetric():
                 tmpMemoryLimit = float()
                 tmpCpuRequest = float()
                 tmpMemoryRequest = float()
+                node_mem_usage = 0
+                node_cpu_usage = 0
                 for pod in pod_list.items:
                     if pod.spec.node_name == node.metadata.name and pod.status.phase == "Running":
                         tmpPodCount += 1
@@ -414,9 +418,6 @@ def k8sGetClusterMetric():
                         if stats['metadata']['name'] == node.metadata.name:
                             node_mem_usage = float(parse_quantity(stats['usage']['memory']))
                             node_cpu_usage = float(parse_quantity(stats['usage']['cpu']))
-                else:
-                    node_mem_usage = 0
-                    node_cpu_usage = 0
                 clusterMetric["nodes"].append({
                     "name": node.metadata.name,
                     "cpu": {
@@ -512,6 +513,8 @@ def k8sGetNodeMetric(node_name):
             tmpMemoryLimit = float()
             tmpCpuRequest = float()
             tmpMemoryRequest = float()
+            node_mem_usage = 0
+            node_cpu_usage = 0
             if node.metadata.name == node_name:
                 for pod in pod_list.items:
                     if pod.spec.node_name == node.metadata.name and pod.status.phase == "Running":
@@ -535,9 +538,6 @@ def k8sGetNodeMetric(node_name):
                         if stats['metadata']['name'] == node.metadata.name:
                             node_mem_usage = float(parse_quantity(stats['usage']['memory']))
                             node_cpu_usage = float(parse_quantity(stats['usage']['cpu']))
-                else:
-                    node_mem_usage = 0
-                    node_cpu_usage = 0
                 node_metric = {
                     "name": node.metadata.name,
                     "cpu": {
@@ -609,26 +609,21 @@ def k8sGetPodMap(username_role, user_token, namespace):
     statefulset_list = k8sStatefulSetsGet(username_role, user_token, namespace)
     for sts in statefulset_list:
         if int(sts["desired"]) != 0:
-            # print("sts: %s" % sts) #debug
             net.add_node(sts["name"], label=sts["name"], shape="image", group="statefulset")
 
     daemonset_list = k8sDaemonSetsGet(username_role, user_token, namespace)
     for ds in daemonset_list:
         if int(ds["desired"]) != 0:
-            # print("ds: %s" % ds) #debug
             net.add_node(ds["name"], label=ds["name"], shape="image", group="daemonset")
 
     deployments_list = k8sDeploymentsGet(username_role, user_token, namespace)
     for deploy in deployments_list:
-        # print("deploy: %s" % deploy) #debug
         if int(deploy["desired"]) != 0:
-           # print("deploy_add: %s" % deploy) #debug
             net.add_node(deploy["name"], label=deploy["name"], shape="image", group="deployment")
 
     replicaset_list = k8sReplicaSetsGet(username_role, user_token, namespace)
     for rs in replicaset_list:
         if rs["desired"] != 0:
-            # print("rs: %s" % rs) #debug
             on_name = rs["owner"].split("/", 1)[1]
             net.add_node(rs["name"], label=rs["name"], shape="image", group="replicaset")
             net.add_edge(on_name, rs["name"], arrowStrikethrough=False, physics=True, valu=1000)
@@ -638,7 +633,6 @@ def k8sGetPodMap(username_role, user_token, namespace):
         if po["status"] == "Running":
             net.add_node(po["name"], label=po["name"], shape="image", group="pod")
             if "replicationcontrollers" !=  po["owner"].split("/", 1)[0] and "jobs" != po["owner"].split("/", 1)[0]:
-                print("po: %s" % po) #debug
                 on_name = po["owner"].split("/", 1)[1]
                 net.add_edge(on_name, po["name"], arrowStrikethrough=False, physics=True, valu=1000)
 
@@ -1496,6 +1490,16 @@ def k8sPodVulnsGet(username_role, user_token, ns, pod):
                 return False, None
 
         # PublishedDate, FixedVersion
+##############################################################
+## Pod Logs
+##############################################################
+
+def k8sPodLogsStream(username_role, user_token, namespace, pod_name):
+    k8sClientConfigGet(username_role, user_token)
+    w = watch.Watch()
+    for line in w.stream(k8s_client.CoreV1Api().read_namespaced_pod_log, name=pod_name, namespace=namespace):
+        socketio.emit('response',
+                            {'data': str(line)}, namespace="/log")
 
 ##############################################################
 ## Security
