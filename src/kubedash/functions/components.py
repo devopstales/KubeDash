@@ -2,6 +2,7 @@ import logging, socket
 from flask_login import LoginManager
 from flask_sqlalchemy import SQLAlchemy
 from flask_wtf.csrf import CSRFProtect
+from flask_socketio import SocketIO
 
 from opentelemetry import trace
 from opentelemetry.sdk.resources import Resource
@@ -18,6 +19,7 @@ logging.basicConfig(
 login_manager = LoginManager()
 db = SQLAlchemy()
 csrf = CSRFProtect()
+socketio = SocketIO()
 
 endpoint="http://127.0.0.1:4318"+"/v1/traces"
 # what other attributes ?
