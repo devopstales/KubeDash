@@ -58,19 +58,11 @@ progress::-moz-progress-bar {
     border-radius: 6px;
     background-color: #059bff;
 }
-/*
-progress {
-    -webkit-appearance: none;
-    border-radius: 6px;
-}
-::-webkit-progress-value {
-    background-color: #4e73df;
-    border-radius: 6px;
-  }
-  
-  ::-moz-progress-bar {
-    background-color: #4e73df;
-    #059bff
-  }
+
+ /* 
+Progress bar
 */
-  
+
+.form-post {
+    display: inline;
+}
