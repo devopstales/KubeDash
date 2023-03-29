@@ -19,7 +19,7 @@
           <a href="javascript:;" onclick="parentNode.submit();">{{ po_name }}</a>
       </form>
     </li>
-    <li class="breadcrumb-item active" aria-current="page">Logs</li>
+    <li class="breadcrumb-item active" aria-current="page">Shell</li>
     <div class="col">
       <a class="card-link float-right" data-toggle="collapse" href="#" onclick="reload()">
         <i class="material-icons">refresh</i>
@@ -30,7 +30,7 @@
 
 <div class="card shadow mb-4">
     <div class="card-header">
-        <h6 class="m-0 font-weight-bold text-primary">Pod Logs</h6>
+        <h6 class="m-0 font-weight-bold text-primary">Pod Shell</h6>
     </div>
     <div class="card-body">
         <div id="terminal"></div>
@@ -59,10 +59,18 @@
             term.open(document.getElementById('terminal'));
             fit.fit();
 
-            const socket = io.connect('/log');
+            term.onKey(e => {
+                //console.log("pressed key", e.key)
+                //console.log("event", e.domEvent)
+                socket.emit("exec-input", {"input": e.key})
+            });
 
-            socket.on('response', function(msg) {
-                term.write(msg.data + "\r\n");
+            const socket = io.connect('/exec');
+
+            socket.on("response", function(msg){
+                console.log("response", msg)
+                //term.write(msg.data + "\r\n");
+                term.write(msg.output)
             });
         });
     </script>

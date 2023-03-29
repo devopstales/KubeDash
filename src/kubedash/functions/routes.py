@@ -11,7 +11,6 @@ from functions.k8s import *
 
 from functions.components import tracer, socketio
 from threading import Lock
-from flask_socketio import emit
 from opentelemetry.trace.status import Status, StatusCode
 
 ##############################################################
@@ -1099,7 +1098,11 @@ def pods_logs():
     if request.method == 'POST':
         session['ns_select'] = request.form.get('ns_select')
         session['po_name'] = request.form.get('po_name')
-        return render_template('pod-logs.html.j2', po_name=session['po_name'], async_mode=socketio.async_mode)
+        return render_template(
+            'pod-logs.html.j2', 
+            po_name=session['po_name'], 
+            async_mode=socketio.async_mode
+        )
     else:
         return redirect(url_for('routes.login'))
 
@@ -1109,7 +1112,41 @@ def connect():
     with thread_lock:
         if thread is None:
             thread = socketio.start_background_task(k8sPodLogsStream, "Admin", None, session['ns_select'], session['po_name'])
-    emit('response', {'data': 'Connected'}, namespace="/log")
+    socketio.emit('response', {'data': 'Connected'}, namespace="/log")
+
+##############################################################
+## Pod Exec
+##############################################################
+
+@routes.route('/pods/exec', methods=['POST'])
+def pods_exec():
+    if request.method == 'POST':
+        session['ns_select'] = request.form.get('ns_select')
+        session['po_name'] = request.form.get('po_name')
+        return render_template(
+            'pod-exec.html.j2', 
+            po_name=session['po_name'], 
+            async_mode=socketio.async_mode
+        )
+    else:
+        return redirect(url_for('routes.login'))
+
+@socketio.on("exec-input", namespace="/exec")
+def exec_input(data):
+    """write to the child pty. The pty sees this as if you are typing in a real
+    terminal.
+    """
+    wsclient.write_stdin(data["input"].encode())
+
+@socketio.on("connect", namespace="/exec")
+def connect():
+    global thread
+    global wsclient
+    wsclient = k8sPodExecSocket("Admin", None, session['ns_select'], session['po_name'])
+    with thread_lock:
+        if thread is None:
+            socketio.start_background_task(k8sPodExecStream, wsclient)
+    socketio.emit("response", {"output":  'Connected'}, namespace="/exec")
 
 ##############################################################
 ## Security

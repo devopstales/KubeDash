@@ -13,14 +13,22 @@
     <li class="breadcrumb-item"><a href="/pods">Pods</a></li>
     <li class="breadcrumb-item active" aria-current="page">{{ pod_data.name }}</li>
     <div class="col">
-        <a class="card-link float-right" data-toggle="collapse" href="#" onclick="reload()">
+        <a class="card-link float-right pr-1" data-toggle="collapse" href="#" onclick="reload()">
             <i class="material-icons">refresh</i>
         </a>
-        <form action="/pods/logs" method="POST">
+        <form action="/pods/exec" method="POST" class="form-post">
             <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
             <input type="hidden" name="ns_select" value="{{ session['ns_select'] }}" />
             <input type="hidden" name="po_name" value="{{ po_name }}" />
-            <a class="card-link float-right" data-toggle="collapse" href="javascript:;" onclick="parentNode.submit();">
+            <a class="card-link float-right pr-1" data-toggle="collapse" href="javascript:;" onclick="parentNode.submit();">
+                <i class="material-icons">input</i>
+            </a>
+        </form>
+        <form action="/pods/logs" method="POST" class="form-post">
+            <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+            <input type="hidden" name="ns_select" value="{{ session['ns_select'] }}" />
+            <input type="hidden" name="po_name" value="{{ po_name }}" />
+            <a class="card-link float-right pr-1" data-toggle="collapse" href="javascript:;" onclick="parentNode.submit();">
                 <i class="material-icons">list</i>
             </a>
         </form>

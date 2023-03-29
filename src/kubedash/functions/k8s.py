@@ -12,6 +12,7 @@ from contextlib import nullcontext
 
 import kubernetes.config as k8s_config
 import kubernetes.client as k8s_client
+from kubernetes.stream import stream
 from kubernetes.client.rest import ApiException
 from kubernetes import watch
 
@@ -1500,6 +1501,32 @@ def k8sPodLogsStream(username_role, user_token, namespace, pod_name):
     for line in w.stream(k8s_client.CoreV1Api().read_namespaced_pod_log, name=pod_name, namespace=namespace):
         socketio.emit('response',
                             {'data': str(line)}, namespace="/log")
+
+##############################################################
+## Pod Exec
+##############################################################
+
+def k8sPodExecSocket(username_role, user_token, namespace, pod_name):
+    k8sClientConfigGet(username_role, user_token)
+    wsclient = stream(k8s_client.CoreV1Api().connect_get_namespaced_pod_exec,
+            pod_name,
+            namespace,
+            command=['/bin/sh'],
+            stderr=True, stdin=True,
+            stdout=True, tty=True,
+            _preload_content=False)
+    return wsclient
+
+def k8sPodExecStream(wsclient):
+    while True:
+        socketio.sleep(0.01)
+        wsclient.update(timeout=1)
+        """Read from wsclient"""
+        output = wsclient.read_all()
+        if output:
+            """write back to socket"""
+            socketio.emit(
+                "response", {"output": output}, namespace="/exec")
 
 ##############################################################
 ## Security
