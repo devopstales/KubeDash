@@ -12,7 +12,7 @@
     <title>KubeDash</title>
 
     <!-- Custom fonts for this template-->
-    <link href="{{ url_for('static',filename='/vendor/fontawesome-free/css/all.min.css') }}" rel="stylesheet" type="text/css">
+    <link href="{{ url_for('static',filename='/vendor/fontawesome-free-6.4.0-web/css/all.css') }}" rel="stylesheet" type="text/css">
     <link
         href="https://fonts.googleapis.com/css?family=Nunito:200,200i,300,300i,400,400i,600,600i,700,700i,800,800i,900,900i"
         rel="stylesheet">
@@ -73,7 +73,7 @@
             <li class="nav-item">
                 <a class="nav-link collapsed" href="#" data-toggle="collapse" data-target="#collapseCluster"
                     aria-expanded="true" aria-controls="collapseCluster">
-                    <i class="fas fa-fw fa-cog"></i>
+                    <i class="fas fa-fw fa-circle-nodes"></i>
                     <span>Cluster</span>
                 </a>
                 <div id="collapseCluster" class="collapse" aria-labelledby="headingTwo" data-parent="#accordionSidebar">
@@ -88,7 +88,7 @@
             <li class="nav-item">
                 <a class="nav-link collapsed" href="#" data-toggle="collapse" data-target="#collapseWorkloads"
                     aria-expanded="true" aria-controls="collapseWorkloads">
-                    <i class="fas fa-fw fa-wrench"></i>
+                    <i class="fas fa-fw fa-cubes"></i>
                     <span>Workloads</span>
                 </a>
                 <div id="collapseWorkloads" class="collapse" aria-labelledby="headingWorkloads"
@@ -150,7 +150,7 @@
             <li class="nav-item">
                 <a class="nav-link collapsed" href="#" data-toggle="collapse" data-target="#collapseSecurity"
                     aria-expanded="true" aria-controls="collapseSecurity">
-                    <i class="fas fa-fw fa-folder"></i>
+                    <i class="fas fa-fw fa-shield"></i>
                     <span>Security</span>
                 </a>
                 <div id="collapseSecurity" class="collapse" aria-labelledby="headingSecurity"
@@ -203,11 +203,28 @@
                 </div>
             </li>
 
+            <!-- Nav Item - Ingress Collapse Menu -->
+            <li class="nav-item">
+                <a class="nav-link collapsed" href="#" data-toggle="collapse" data-target="#collapseIngress"
+                    aria-expanded="true" aria-controls="collapseIngress">
+                    <i class="fas fa-fw fa-sitemap"></i>
+                    <span>Ingress</span>
+                </a>
+                <div id="collapseIngress" class="collapse" aria-labelledby="headingIngress"
+                    data-parent="#accordionSidebar">
+                    <div class="bg-white py-2 collapse-inner rounded">
+                        <a class="collapse-item" href="/ingress-class">Ingress Class</a>
+                        <a class="collapse-item" href="/ingress">Ingress </a>
+                        <a class="collapse-item" href="/services">Services</a>
+                    </div>
+                </div>
+            </li>
+
             <!-- Nav Item - Storage Collapse Menu -->
             <li class="nav-item">
                 <a class="nav-link collapsed" href="#" data-toggle="collapse" data-target="#collapseStorage"
                     aria-expanded="true" aria-controls="collapseStorage">
-                    <i class="fas fa-fw fa-folder"></i>
+                    <i class="fas fa-fw fa-database"></i>
                     <span>Storage</span>
                 </a>
                 <div id="collapseStorage" class="collapse" aria-labelledby="headingStorage"
@@ -260,7 +277,7 @@
             <li class="nav-item">
                 <a class="nav-link collapsed" href="#" data-toggle="collapse" data-target="#collapseSettings"
                     aria-expanded="true" aria-controls="collapseSettings">
-                    <i class="fas fa-fw fa-folder"></i>
+                    <i class="fas fa-fw fa-cog"></i>
                     <span>Settings</span>
                 </a>
                 <div id="collapseSettings" class="collapse" aria-labelledby="headingSettings"
@@ -283,8 +300,8 @@
             <!-- Nav Item - Charts -->
             <li class="nav-item">
                 <a class="nav-link" href="/charts">
-                    <i class="fas fa-fw fa-chart-area"></i>
-                    <span>Charts</span></a>
+                    <i class="fa-sharp fa-solid fa-helmet-safety"></i>
+                    <span>Helm Charts</span></a>
             </li>
 
             <!-- Divider -->

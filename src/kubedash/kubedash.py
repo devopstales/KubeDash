@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 
-import os
+import os, logging
 from flask import Flask
 from flask_talisman import Talisman
 from flask_healthz import healthz, HealthError
@@ -34,6 +34,18 @@ roles = [
     "User",
 ]
 
+class NoHealth(logging.Filter):
+    def filter(self, record):
+        return 'GET /health' not in record.getMessage()
+    
+class NoSocketIoGet(logging.Filter):
+    def filter(self, record):
+        return 'GET /socket.io' not in record.getMessage()
+    
+class NoSocketIoPost(logging.Filter):
+    def filter(self, record):
+        return 'POST /socket.io' not in record.getMessage()
+
 def db_init():
     for r in roles:
         RoleCreate(r)
@@ -49,7 +61,6 @@ def connect_database():
 def create_app(config_name="development"):
     app = Flask(__name__, static_url_path='', static_folder='static')
 
-    import logging
     global logger
     logger=logging.getLogger()
     logging.basicConfig(
@@ -120,6 +131,10 @@ app.config.update(
         "ready":  app.name + ".readiness",
     }
 )
+
+logging.getLogger("werkzeug").addFilter(NoHealth())
+logging.getLogger("werkzeug").addFilter(NoSocketIoGet())
+logging.getLogger("werkzeug").addFilter(NoSocketIoPost())
 
 if __name__ == '__main__':
     socketio.run(app, port=8000)

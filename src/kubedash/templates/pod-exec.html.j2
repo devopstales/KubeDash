@@ -60,17 +60,18 @@
             fit.fit();
 
             term.onKey(e => {
-                //console.log("pressed key", e.key)
-                //console.log("event", e.domEvent)
                 socket.emit("exec-input", {"input": e.key})
             });
 
             const socket = io.connect('/exec');
 
             socket.on("response", function(msg){
-                console.log("response", msg)
-                //term.write(msg.data + "\r\n");
                 term.write(msg.output)
+            });
+
+            socket.on("connect", () => {
+              socket.send("{{ po_name }}");
+              term.reset();
             });
         });
     </script>

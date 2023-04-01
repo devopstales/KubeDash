@@ -64,6 +64,11 @@
             socket.on('response', function(msg) {
                 term.write(msg.data + "\r\n");
             });
+
+            socket.on("connect", () => {
+              socket.send("{{ po_name }}");
+              term.reset();
+            });
         });
     </script>
 {% endblock %}
