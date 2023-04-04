@@ -13,16 +13,16 @@ nav:
       - Configuration: installation/configuration.md
       - Platforms: installation/platforms.md
     - Functions:
-      - Authentication: functions/authentication.md
       - Features: functions/features.md
+      - Authentication: functions/authentication.md
       - Setting up Kubernetes Clusters in KubeDash: functions/k8s-api.md
-      - User management: functions/users.md
       - Edit Kubernetes Roles and Role bindings: functions/rbac.md
     - Integrations:
       - trivy-operator: integrations/trivy-operator.md
+      - HelmChart: integrations/helm.md
     - Contributing: contributing.md
     - FAQ:
-      - technical: gaq/technical.md
+      - technical: faq/technical.md
 
 theme:
   name: material
