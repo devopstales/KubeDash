@@ -61,7 +61,7 @@ def RoleCreate(name):
     with tracer.start_as_current_span("create-role") if tracer else nullcontext() as span:
         role = Role.query.filter(Role.name == name).first()
         if not role:
-            if span.is_recording():
+            if tracer and span.is_recording():
                 span.set_attribute("role.name", name)
             role_data = Role(name=name)
             db.session.add(role_data)
@@ -76,7 +76,7 @@ def UserCreate(username, password, email, user_type, role=None, tokens=None):
     with tracer.start_as_current_span("create-user") if tracer else nullcontext() as span:
         user = UserTest(username)
         if not user:
-            if span.is_recording():
+            if tracer and span.is_recording():
                 span.set_attribute("enduser.name", username)
                 span.set_attribute("enduser.type", user_type)
                 if email:
@@ -98,7 +98,7 @@ def UserCreate(username, password, email, user_type, role=None, tokens=None):
                     tokens         = tokens,
                 )
             if role:
-                if span.is_recording():
+                if tracer and span.is_recording():
                     span.set_attribute("enduser.role", role)
                 role_data = Role.query.filter(Role.name == role).first()
                 user.roles.append(role_data)
@@ -115,7 +115,7 @@ def UserUpdate(username, role, user_type):
             kubectl = KubectlConfig.query.filter(KubectlConfig.name == username).first()
             if kubectl:
                 user.kubectl_config.append(kubectl)
-            if span.is_recording():
+            if tracer and span.is_recording():
                 span.set_attribute("enduser.name", username)
                 span.set_attribute("enduser.role", role)
                 span.set_attribute("enduser.type", user_type)
@@ -131,7 +131,7 @@ def UserDelete(username):
         user_kubectl = UsersKubectl.query.filter_by(user_id=user.id).first()
         kubectl_config = KubectlConfig.query.filter_by(name=username).first()
         if user:
-            if span.is_recording():
+            if tracer and span.is_recording():
                 span.set_attribute("enduser.name", username)
                 span.set_attribute("enduser.role", role.name)
                 span.set_attribute("enduser.type", user.user_type)
@@ -146,7 +146,7 @@ def UserDelete(username):
 
 def SSOUserCreate(username, email, tokens, user_type):
     with tracer.start_as_current_span("create-user-sso") if tracer else nullcontext() as span:
-        if span.is_recording():
+        if tracer and span.is_recording():
             span.set_attribute("enduser.name", username)
             span.set_attribute("enduser.type", user_type)
             if email:
