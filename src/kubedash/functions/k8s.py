@@ -1118,6 +1118,8 @@ def k8sNodeGet(username_role, user_token, no_name):
         return NODE_INFO
 
 ##############################################################
+# Workloads
+##############################################################
 ## StatefulSets
 ##############################################################
 
@@ -1529,7 +1531,100 @@ def k8sPodExecStream(wsclient):
                 "response", {"output": output}, namespace="/exec")
 
 ##############################################################
-## Security
+# Network
+##############################################################
+## Ingresses Class
+##############################################################
+
+def k8sIngressClassGet(username_role, user_token,):
+    k8sClientConfigGet(username_role, user_token)
+    ING_LIST = list()
+    try:
+        ingress_class_list = k8s_client.NetworkingV1beta1Api().list_ingress_class()
+        for ic in ingress_class_list.items:
+            ING_INFO = {
+                "name": ic.metadata.name,
+                "created": ic.metadata.creation_timestamp,
+                "annotations": ic.metadata.annotations,
+                "labels": ic.metadata.labels,
+                "controller": ic.spec.controller,
+                "parameters": ic.spec.parameters,
+            }
+            ING_LIST.append(ING_INFO)
+        return ING_LIST
+    except ApiException as error:
+        ErrorHandler(error, "get ingress class list")
+        return ING_LIST
+    except Exception as error:
+        return ING_LIST
+
+##############################################################
+## Ingress
+##############################################################
+
+def k8sIngressListGet(username_role, user_token, ns):
+    k8sClientConfigGet(username_role, user_token)
+    ING_LIST = list()
+    try:
+        ingress_list = k8s_client.NetworkingV1beta1Api().list_namespaced_ingress(ns)
+        for ingress in ingress_list.items:
+            ig = ingress.status.load_balancer.ingress
+            rules = ingress.spec.rules
+            ING_INFO = {
+                "name": ingress.metadata.name,
+                "ingress-class": ingress.spec.ingress_class_name,
+                "rules":rules,
+                "created": ingress.metadata.creation_timestamp,
+                "annotations": ingress.metadata.annotations,
+                "labels": ingress.metadata.labels,
+                "tls": ingress.spec.tls,
+                "status": ig.status.phase,
+            }
+            if ig:
+                ING_INFO["endpoint"] = ig[0].ip
+            if rules:
+                HOSTS = list()
+                for rule in rules:
+                    HOSTS.append(rule.host)
+                ING_INFO["hosts"] = HOSTS
+            ING_LIST.append(ING_INFO)
+        return ING_LIST
+    except ApiException as error:
+        ErrorHandler(error, "get ingress list")
+        return ING_LIST
+    except Exception as error:
+        return ING_LIST
+    
+##############################################################
+## Network Policy
+##############################################################
+
+def k8sNetworkPolicyListGet(username_role, user_token, ns):
+    k8sClientConfigGet(username_role, user_token)
+    POLICY_LIST = list()
+    try:
+        policy_list = k8s_client.NetworkingV1beta1Api().list_namespaced_network_policy(ns)
+        for policy in policy_list.items:
+            POLICY_INFO = {
+                "name": policy.metadata.name,
+                "created": policy.metadata.creation_timestamp,
+                "annotations": policy.metadata.annotations,
+                "labels": policy.metadata.labels,
+                "policy_type": policy.spec.policy_type,
+                "egress": policy.spec.egress,
+                "ingress": policy.spec.ingress,
+                "pod_selector": policy.spec.pod_selector,
+            }
+            POLICY_LIST.append(POLICY_INFO)
+        return POLICY_LIST
+    except ApiException as error:
+        ErrorHandler(error, "get network policy list")
+        return POLICY_LIST
+    except Exception as error:
+        return POLICY_LIST
+
+##############################################################
+# Security
 ##############################################################
 ## Service Account
 ##############################################################
@@ -1875,7 +1970,7 @@ def k8sSecretListGet(username_role, user_token, namespace):
     return SECRET_LIST
 
 ##############################################################
-## Storage
+# Storage
 ##############################################################
 ## Stotage Class
 ##############################################################
@@ -2018,13 +2113,25 @@ def k8sHelmChartListGet(username_role, user_token, namespace):
                 else:
                     helm_api_version = None
 
+                # Get the Kubernetes resources for the release
+                chart_name = secret_data['chart']['metadata']['name']
+                release_name = secret_data['name']
+                label_selector = f"app.kubernetes.io/instance={release_name},app.kubernetes.io/name={chart_name}"
+                pod_list = k8s_client.CoreV1Api().list_namespaced_pod(namespace, label_selector=label_selector).items
+                svc_list = k8s_client.CoreV1Api().list_namespaced_service(namespace, label_selector=label_selector).items
+                deployment_list = k8s_client.AppsV1Api().list_namespaced_deployment(namespace, label_selector=label_selector).items
+
                 CHART_DATA.append({
                     'icon': helm_icon,
                     'status': secret_data['info']['status'],
-                    'chart': secret_data['chart']['metadata']['name'] + "-" + secret_data['chart']['metadata']['version'],
+                    'chart': chart_name + "-" + secret_data['chart']['metadata']['version'],
                     'appVersion': helm_api_version,
                     'revision': secret_data['version'],
                     'updated': secret_data['info']['last_deployed'],
+                    "pods": [pod.metadata.name for pod in pod_list],
+                    "services": [svc.metadata.name for svc in svc_list],
+                    "deployments": [deployment.metadata.name for deployment in deployment_list],
+                    "templates": secret_data["chart"]['templates'],
                 })
                 HAS_CHART = True
                 CHART_LIST.update({secret_data['name']: CHART_DATA})
