@@ -13,13 +13,13 @@
         <link rel="canonical" href="https://devopstales.github.io/kubedash/1.0/functions/authentication/">
       
       
-        <link rel="prev" href="../../installation/platforms/">
+        <link rel="prev" href="../features/">
       
       
-        <link rel="next" href="../features/">
+        <link rel="next" href="../k8s-api/">
       
       <link rel="icon" href="../../assets/images/favicon.png">
-      <meta name="generator" content="mkdocs-1.4.2, mkdocs-material-9.1.2">
+      <meta name="generator" content="mkdocs-1.4.2, mkdocs-material-9.1.5">
     
     
       
@@ -27,7 +27,7 @@
       
     
     
-      <link rel="stylesheet" href="../../assets/stylesheets/main.7bf56d0a.min.css">
+      <link rel="stylesheet" href="../../assets/stylesheets/main.7a7fce14.min.css">
       
         
         <link rel="stylesheet" href="../../assets/stylesheets/palette.a0c5b2b5.min.css">
@@ -71,7 +71,7 @@
     <div data-md-component="skip">
       
         
-        <a href="#authorization" class="md-skip">
+        <a href="#first-log-in" class="md-skip">
           Skip to content
         </a>
       
@@ -339,6 +339,20 @@
               
   
   
+  
+    <li class="md-nav__item">
+      <a href="../features/" class="md-nav__link">
+        Features
+      </a>
+    </li>
+  
+
+            
+          
+            
+              
+  
+  
     
   
   
@@ -346,8 +360,6 @@
       
       <input class="md-nav__toggle md-toggle" type="checkbox" id="__toc">
       
-      
-        
       
       
         <label class="md-nav__link md-nav__link--active" for="__toc">
@@ -364,8 +376,6 @@
 <nav class="md-nav md-nav--secondary" aria-label="Table of contents">
   
   
-  
-    
   
   
     <label class="md-nav__title" for="__toc">
@@ -402,7 +412,7 @@
 </li>
       
         <li class="md-nav__item">
-  <a href="#authorization_1" class="md-nav__link">
+  <a href="#authorization" class="md-nav__link">
     Authorization
   </a>
   
@@ -413,39 +423,12 @@
     Role-Based Access Control (RBAC)
   </a>
   
-    <nav class="md-nav" aria-label="Role-Based Access Control (RBAC)">
-      <ul class="md-nav__list">
-        
-          <li class="md-nav__item">
-  <a href="#edit-kubernetes-roles-and-role-bindings" class="md-nav__link">
-    Edit Kubernetes Roles and Role bindings
-  </a>
-  
-</li>
-        
-      </ul>
-    </nav>
-  
 </li>
       
     </ul>
   
 </nav>
       
-    </li>
-  
-
-            
-          
-            
-              
-  
-  
-  
-    <li class="md-nav__item">
-      <a href="../features/" class="md-nav__link">
-        Features
-      </a>
     </li>
   
 
@@ -471,21 +454,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../users.md" class="md-nav__link">
-        User management
-      </a>
-    </li>
-  
-
-            
-          
-            
-              
-  
-  
-  
-    <li class="md-nav__item">
-      <a href="../rbac.md" class="md-nav__link">
+      <a href="../rbac/" class="md-nav__link">
         Edit Kubernetes Roles and Role bindings
       </a>
     </li>
@@ -536,6 +505,20 @@
     <li class="md-nav__item">
       <a href="../../integrations/trivy-operator/" class="md-nav__link">
         trivy-operator
+      </a>
+    </li>
+  
+
+            
+          
+            
+              
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../integrations/helm/" class="md-nav__link">
+        HelmChart
       </a>
     </li>
   
@@ -598,7 +581,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../../gaq/technical.md" class="md-nav__link">
+      <a href="../../faq/technical/" class="md-nav__link">
         technical
       </a>
     </li>
@@ -628,8 +611,6 @@
 <nav class="md-nav md-nav--secondary" aria-label="Table of contents">
   
   
-  
-    
   
   
     <label class="md-nav__title" for="__toc">
@@ -666,7 +647,7 @@
 </li>
       
         <li class="md-nav__item">
-  <a href="#authorization_1" class="md-nav__link">
+  <a href="#authorization" class="md-nav__link">
     Authorization
   </a>
   
@@ -676,19 +657,6 @@
   <a href="#role-based-access-control-rbac" class="md-nav__link">
     Role-Based Access Control (RBAC)
   </a>
-  
-    <nav class="md-nav" aria-label="Role-Based Access Control (RBAC)">
-      <ul class="md-nav__list">
-        
-          <li class="md-nav__item">
-  <a href="#edit-kubernetes-roles-and-role-bindings" class="md-nav__link">
-    Edit Kubernetes Roles and Role bindings
-  </a>
-  
-</li>
-        
-      </ul>
-    </nav>
   
 </li>
       
@@ -707,12 +675,13 @@
                   
 
 
-<h1 id="authorization">Authorization</h1>
-<p>After installation, the system administrator should configure KubeDash to configure authentication.</p>
+  <h1>Authentication</h1>
+
 <h2 id="first-log-in">First Log In</h2>
 <p>To log in for the first time the default user and password is <code>admin</code> <code>admin</code>. After you log into the web-ui you will alert to change the default admin password.</p>
+<p><img alt="First Login" src="../../img/KubeDash_1.0_pic_03.png" /></p>
 <h2 id="authentication">Authentication</h2>
-<p>One of the key features that KubeDash adds to Kubernetes is centralized user authentication. This feature allows to set up local users and/or connect to an external Oath2 authentication provider. By connecting to an external authentication provider, you can leverage that provider's user and groups.</p>
+<p>One of the key features that KubeDash adds to Kubernetes is centralized user management. This feature allows to set up local users and/or connect to an external Oath2 authentication provider. By connecting to an external authentication provider, you can leverage that provider's user and groups.</p>
 <h3 id="configure-oauth2-provider">Configure Oauth2 provider</h3>
 <p>To add an oauth2 provider to KubeDash go to <code>Settings &gt; SSO Configuration</code>:</p>
 <table>
@@ -741,13 +710,12 @@
 </tr>
 </tbody>
 </table>
-<h2 id="authorization_1">Authorization</h2>
+<p><img alt="Configure Oauth2 provider" src="../../img/KubeDash_1.0_pic_07_sso_config.png" /></p>
+<h2 id="authorization">Authorization</h2>
 <p>Once an user logged in to KubeDash the their access rights within the system, is determined by the user's role. There i two role in KubeDash User and Admin. This role determinate what you can configure in KubeDash. </p>
 <h2 id="role-based-access-control-rbac">Role-Based Access Control (RBAC)</h2>
 <p>From kubernetes perspective all of your privileges are determined by Role-Based Access Control (RBAC). The KubeDash Admin role allow you to use the KubeDash pod's cluster-admin ServiceAccount for the interactions with the kubernetes API. </p>
-<p>With the Local role KubeDash use your Oath2 token for the same purpose, so you have the same privileges as in the cli. </p>
-<h3 id="edit-kubernetes-roles-and-role-bindings">Edit Kubernetes Roles and Role bindings</h3>
-<p>If you have enough privileges you can edit the roles and role bindings in the cluster.</p>
+<p>With the Local role KubeDash use your Oath2 token for the same purpose, so you have the same privileges as in the cli.</p>
 
 
 
@@ -783,7 +751,7 @@
     <script id="__config" type="application/json">{"base": "../..", "features": [], "search": "../../assets/javascripts/workers/search.208ed371.min.js", "translations": {"clipboard.copied": "Copied to clipboard", "clipboard.copy": "Copy to clipboard", "search.result.more.one": "1 more on this page", "search.result.more.other": "# more on this page", "search.result.none": "No matching documents", "search.result.one": "1 matching document", "search.result.other": "# matching documents", "search.result.placeholder": "Type to start searching", "search.result.term.missing": "Missing", "select.version": "Select version"}, "version": {"default": "latest", "method": "mike", "provider": "mike"}}</script>
     
     
-      <script src="../../assets/javascripts/bundle.fc8c2696.min.js"></script>
+      <script src="../../assets/javascripts/bundle.407015b8.min.js"></script>
       
     
   </body>

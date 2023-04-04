@@ -2,52 +2,62 @@
 <urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9">
     <url>
          <loc>https://devopstales.github.io/kubedash/1.0/</loc>
-         <lastmod>2023-03-13</lastmod>
+         <lastmod>2023-04-04</lastmod>
          <changefreq>daily</changefreq>
     </url>
     <url>
          <loc>https://devopstales.github.io/kubedash/1.0/contributing/</loc>
-         <lastmod>2023-03-13</lastmod>
+         <lastmod>2023-04-04</lastmod>
          <changefreq>daily</changefreq>
     </url>
     <url>
          <loc>https://devopstales.github.io/kubedash/1.0/faq/technical/</loc>
-         <lastmod>2023-03-13</lastmod>
+         <lastmod>2023-04-04</lastmod>
          <changefreq>daily</changefreq>
     </url>
     <url>
          <loc>https://devopstales.github.io/kubedash/1.0/functions/authentication/</loc>
-         <lastmod>2023-03-13</lastmod>
+         <lastmod>2023-04-04</lastmod>
          <changefreq>daily</changefreq>
     </url>
     <url>
          <loc>https://devopstales.github.io/kubedash/1.0/functions/features/</loc>
-         <lastmod>2023-03-13</lastmod>
+         <lastmod>2023-04-04</lastmod>
          <changefreq>daily</changefreq>
     </url>
     <url>
          <loc>https://devopstales.github.io/kubedash/1.0/functions/k8s-api/</loc>
-         <lastmod>2023-03-13</lastmod>
+         <lastmod>2023-04-04</lastmod>
+         <changefreq>daily</changefreq>
+    </url>
+    <url>
+         <loc>https://devopstales.github.io/kubedash/1.0/functions/rbac/</loc>
+         <lastmod>2023-04-04</lastmod>
          <changefreq>daily</changefreq>
     </url>
     <url>
          <loc>https://devopstales.github.io/kubedash/1.0/installation/configuration/</loc>
-         <lastmod>2023-03-13</lastmod>
+         <lastmod>2023-04-04</lastmod>
          <changefreq>daily</changefreq>
     </url>
     <url>
          <loc>https://devopstales.github.io/kubedash/1.0/installation/installation/</loc>
-         <lastmod>2023-03-13</lastmod>
+         <lastmod>2023-04-04</lastmod>
          <changefreq>daily</changefreq>
     </url>
     <url>
          <loc>https://devopstales.github.io/kubedash/1.0/installation/platforms/</loc>
-         <lastmod>2023-03-13</lastmod>
+         <lastmod>2023-04-04</lastmod>
+         <changefreq>daily</changefreq>
+    </url>
+    <url>
+         <loc>https://devopstales.github.io/kubedash/1.0/integrations/helm/</loc>
+         <lastmod>2023-04-04</lastmod>
          <changefreq>daily</changefreq>
     </url>
     <url>
          <loc>https://devopstales.github.io/kubedash/1.0/integrations/trivy-operator/</loc>
-         <lastmod>2023-03-13</lastmod>
+         <lastmod>2023-04-04</lastmod>
          <changefreq>daily</changefreq>
     </url>
 </urlset>

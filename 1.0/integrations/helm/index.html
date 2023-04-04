@@ -10,20 +10,20 @@
       
       
       
-        <link rel="canonical" href="https://devopstales.github.io/kubedash/1.0/integrations/trivy-operator/">
+        <link rel="canonical" href="https://devopstales.github.io/kubedash/1.0/integrations/helm/">
       
       
-        <link rel="prev" href="../../functions/rbac/">
+        <link rel="prev" href="../trivy-operator/">
       
       
-        <link rel="next" href="../helm/">
+        <link rel="next" href="../../contributing/">
       
       <link rel="icon" href="../../assets/images/favicon.png">
       <meta name="generator" content="mkdocs-1.4.2, mkdocs-material-9.1.5">
     
     
       
-        <title>trivy-operator - KubeDash</title>
+        <title>HelmChart - KubeDash</title>
       
     
     
@@ -71,7 +71,7 @@
     <div data-md-component="skip">
       
         
-        <a href="#trivy-operator-integration" class="md-skip">
+        <a href="#helmchart" class="md-skip">
           Skip to content
         </a>
       
@@ -110,7 +110,7 @@
         <div class="md-header__topic" data-md-component="header-topic">
           <span class="md-ellipsis">
             
-              trivy-operator
+              HelmChart
             
           </span>
         </div>
@@ -430,6 +430,20 @@
               
   
   
+  
+    <li class="md-nav__item">
+      <a href="../trivy-operator/" class="md-nav__link">
+        trivy-operator
+      </a>
+    </li>
+  
+
+            
+          
+            
+              
+  
+  
     
   
   
@@ -442,23 +456,9 @@
       
       
       <a href="./" class="md-nav__link md-nav__link--active">
-        trivy-operator
-      </a>
-      
-    </li>
-  
-
-            
-          
-            
-              
-  
-  
-  
-    <li class="md-nav__item">
-      <a href="../helm/" class="md-nav__link">
         HelmChart
       </a>
+      
     </li>
   
 
@@ -567,8 +567,14 @@
                   
 
 
-<h1 id="trivy-operator-integration">trivy-operator integration</h1>
-<p>KubeDash can integrate with <a href="https://devopstales.github.io/trivy-operator/">trivy-operator</a>. Kubdash automatically detects the <a href="https://devopstales.github.io/trivy-operator/latest/crds/vulnerability-report/">VulnerabilityReport</a> Custom Resource Objects created by trivy-operator and show the vulnerability at the Pod's page. </p>
+<h1 id="helmchart">HelmChart</h1>
+<p>KubeDash offers a UI-driven way to view the installed Helm charts, see their revision history and corresponding k8s resources.</p>
+<p>Key capabilities of the tool:</p>
+<ul>
+<li>See all installed charts and their revision history</li>
+<li>Browse k8s resources resulting from the chart</li>
+</ul>
+<p><img alt="HelmChart" src="../../img/KubeDash_1.0_pic_02.png" /></p>
 
 
 

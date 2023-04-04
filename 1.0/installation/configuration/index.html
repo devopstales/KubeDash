@@ -19,7 +19,7 @@
         <link rel="next" href="../platforms/">
       
       <link rel="icon" href="../../assets/images/favicon.png">
-      <meta name="generator" content="mkdocs-1.4.2, mkdocs-material-9.1.2">
+      <meta name="generator" content="mkdocs-1.4.2, mkdocs-material-9.1.5">
     
     
       
@@ -27,7 +27,7 @@
       
     
     
-      <link rel="stylesheet" href="../../assets/stylesheets/main.7bf56d0a.min.css">
+      <link rel="stylesheet" href="../../assets/stylesheets/main.7a7fce14.min.css">
       
         
         <link rel="stylesheet" href="../../assets/stylesheets/palette.a0c5b2b5.min.css">
@@ -382,8 +382,8 @@
   
   
     <li class="md-nav__item">
-      <a href="../../functions/authentication/" class="md-nav__link">
-        Authentication
+      <a href="../../functions/features/" class="md-nav__link">
+        Features
       </a>
     </li>
   
@@ -396,8 +396,8 @@
   
   
     <li class="md-nav__item">
-      <a href="../../functions/features/" class="md-nav__link">
-        Features
+      <a href="../../functions/authentication/" class="md-nav__link">
+        Authentication
       </a>
     </li>
   
@@ -424,21 +424,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../../functions/users.md" class="md-nav__link">
-        User management
-      </a>
-    </li>
-  
-
-            
-          
-            
-              
-  
-  
-  
-    <li class="md-nav__item">
-      <a href="../../functions/rbac.md" class="md-nav__link">
+      <a href="../../functions/rbac/" class="md-nav__link">
         Edit Kubernetes Roles and Role bindings
       </a>
     </li>
@@ -489,6 +475,20 @@
     <li class="md-nav__item">
       <a href="../../integrations/trivy-operator/" class="md-nav__link">
         trivy-operator
+      </a>
+    </li>
+  
+
+            
+          
+            
+              
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../integrations/helm/" class="md-nav__link">
+        HelmChart
       </a>
     </li>
   
@@ -551,7 +551,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../../gaq/technical.md" class="md-nav__link">
+      <a href="../../faq/technical/" class="md-nav__link">
         technical
       </a>
     </li>
@@ -672,139 +672,175 @@
 <td>TimeZone</td>
 <td>string</td>
 <td><code>"CET"</code></td>
-<td></td>
+<td>Time Zone in container</td>
 </tr>
 <tr>
-<td>containerSecurityContext.allowPrivilegeEscalation</td>
-<td>bool</td>
-<td><code>false</code></td>
-<td></td>
+<td>affinity</td>
+<td>object</td>
+<td><code>{}</code></td>
+<td>Set the affinity for the pod.</td>
 </tr>
 <tr>
-<td>containerSecurityContext.capabilities.drop[0]</td>
-<td>string</td>
-<td><code>"all"</code></td>
-<td></td>
+<td>containerSecurityContext</td>
+<td>object</td>
+<td><code>{"allowPrivilegeEscalation":false,"capabilities":{"drop":["all"]}}</code></td>
+<td>list of the container's SecurityContexts</td>
 </tr>
 <tr>
 <td>flaskConfig</td>
 <td>string</td>
 <td><code>"production"</code></td>
-<td></td>
+<td>flask environment: production or development</td>
 </tr>
 <tr>
 <td>image.pullPolicy</td>
 <td>string</td>
 <td><code>"Always"</code></td>
-<td></td>
+<td>The docker image pull policy</td>
 </tr>
 <tr>
 <td>image.repository</td>
 <td>string</td>
 <td><code>"devopstales/kubedash"</code></td>
-<td></td>
+<td>The docker image repository to use</td>
 </tr>
 <tr>
 <td>image.tag</td>
 <td>string</td>
 <td><code>"0.1-devel"</code></td>
-<td></td>
+<td>The docker image tag to use</td>
 </tr>
 <tr>
-<td>ingress.annotations."kubernetes.io/ingress.class"</td>
-<td>string</td>
-<td><code>"nginx"</code></td>
-<td></td>
-</tr>
-<tr>
-<td>ingress.annotations."nginx.ingress.kubernetes.io/proxy-body-size"</td>
-<td>string</td>
-<td><code>"10m"</code></td>
-<td></td>
+<td>ingress.annotations</td>
+<td>object</td>
+<td><code>{"kubernetes.io/ingress.class":"nginx","nginx.ingress.kubernetes.io/proxy-body-size":"10m"}</code></td>
+<td>Extra annotation to the Ingress object</td>
 </tr>
 <tr>
 <td>ingress.enabled</td>
 <td>bool</td>
 <td><code>true</code></td>
-<td></td>
+<td>Enable Ingress object creation</td>
 </tr>
 <tr>
 <td>ingress.tls.certManager.clusterIssuer</td>
 <td>string</td>
 <td><code>"letsencrypt"</code></td>
-<td></td>
+<td>Name of the certManager cluster issuer to use</td>
 </tr>
 <tr>
 <td>ingress.tls.certManager.enabled</td>
 <td>bool</td>
 <td><code>false</code></td>
-<td></td>
+<td>Enable certManager</td>
 </tr>
 <tr>
 <td>ingress.tls.enabled</td>
 <td>bool</td>
 <td><code>true</code></td>
-<td></td>
+<td>Enable tls on Ingress object</td>
 </tr>
 <tr>
 <td>ingress.tls.tlsSecret</td>
 <td>string</td>
 <td><code>""</code></td>
-<td></td>
+<td>Name of the secret storing tls cert</td>
 </tr>
 <tr>
 <td>ingress.url</td>
 <td>string</td>
 <td><code>"kubedash.mydomain.intra"</code></td>
-<td></td>
+<td>URL of the Ingress object</td>
 </tr>
 <tr>
 <td>ingress.whitelist.enabled</td>
 <td>bool</td>
 <td><code>false</code></td>
-<td></td>
+<td>Enable ip blocking on ingress</td>
 </tr>
 <tr>
 <td>ingress.whitelist.ips</td>
 <td>list</td>
 <td><code>[]</code></td>
-<td></td>
+<td>List of ips to allow communication</td>
 </tr>
 <tr>
 <td>logLevel</td>
 <td>string</td>
 <td><code>"INFO"</code></td>
-<td></td>
+<td>Log level</td>
 </tr>
 <tr>
-<td>podSecurityContext.runAsNonRoot</td>
+<td>nodeSelector</td>
+<td>object</td>
+<td><code>{}</code></td>
+<td>Set nodeSelector for the pod</td>
+</tr>
+<tr>
+<td>persistence.accessMode</td>
+<td>string</td>
+<td><code>"ReadWriteOnce"</code></td>
+<td>Volumes mode</td>
+</tr>
+<tr>
+<td>persistence.annotations</td>
+<td>object</td>
+<td><code>{}</code></td>
+<td>Volumes annotations</td>
+</tr>
+<tr>
+<td>persistence.enabled</td>
 <td>bool</td>
 <td><code>true</code></td>
-<td></td>
+<td>Volumes for the pod</td>
 </tr>
 <tr>
-<td>podSecurityContext.runAsUser</td>
-<td>int</td>
-<td><code>10001</code></td>
-<td></td>
+<td>persistence.size</td>
+<td>string</td>
+<td><code>"1Gi"</code></td>
+<td>Volumes size</td>
+</tr>
+<tr>
+<td>podSecurityContext</td>
+<td>object</td>
+<td><code>{"fsGroup":10001,"fsGroupChangePolicy":"OnRootMismatch","runAsNonRoot":true,"runAsUser":10001}</code></td>
+<td>list of the pos's SecurityContexts</td>
+</tr>
+<tr>
+<td>route.annotations</td>
+<td>object</td>
+<td><code>{}</code></td>
+<td>Extra annotation to the OpenShift Route object</td>
 </tr>
 <tr>
 <td>route.enabled</td>
 <td>bool</td>
 <td><code>false</code></td>
-<td></td>
+<td>Enable OpenShift Route object creation</td>
+</tr>
+<tr>
+<td>route.url</td>
+<td>string</td>
+<td><code>"kubedash.mydomain.intra"</code></td>
+<td>URL of the OpenShift Route object</td>
 </tr>
 <tr>
 <td>serviceAccount.create</td>
 <td>bool</td>
 <td><code>true</code></td>
-<td></td>
+<td>Enable automatic serviceAccount creation</td>
 </tr>
 <tr>
 <td>serviceAccount.name</td>
 <td>string</td>
 <td><code>"kubedash-admin"</code></td>
-<td></td>
+<td>Configure the name of the serviceAccount</td>
+</tr>
+<tr>
+<td>tolerations</td>
+<td>list</td>
+<td><code>[]</code></td>
+<td>Set tolerations for the pod</td>
 </tr>
 </tbody>
 </table>
@@ -843,7 +879,7 @@
     <script id="__config" type="application/json">{"base": "../..", "features": [], "search": "../../assets/javascripts/workers/search.208ed371.min.js", "translations": {"clipboard.copied": "Copied to clipboard", "clipboard.copy": "Copy to clipboard", "search.result.more.one": "1 more on this page", "search.result.more.other": "# more on this page", "search.result.none": "No matching documents", "search.result.one": "1 matching document", "search.result.other": "# matching documents", "search.result.placeholder": "Type to start searching", "search.result.term.missing": "Missing", "select.version": "Select version"}, "version": {"default": "latest", "method": "mike", "provider": "mike"}}</script>
     
     
-      <script src="../../assets/javascripts/bundle.fc8c2696.min.js"></script>
+      <script src="../../assets/javascripts/bundle.407015b8.min.js"></script>
       
     
   </body>
