@@ -8,8 +8,8 @@
 {% block content %}
 <nav aria-label="breadcrumb">
   <ol class="breadcrumb">
-    <li class="breadcrumb-item">Security</li>
-    <li class="breadcrumb-item active" aria-current="page">Secets</li>
+    <li class="breadcrumb-item">Network</li>
+    <li class="breadcrumb-item active" aria-current="page">Ingress</li>
     <div class="col">
       <a class="card-link float-right" data-toggle="collapse" href="#" onclick="reload()">
         <i class="material-icons">refresh</i>
@@ -20,7 +20,7 @@
 
 <div class="card shadow mb-4">
     <div class="card-header py-3">
-        <h6 class="m-0 font-weight-bold text-primary">Secet List</h6>
+        <h6 class="m-0 font-weight-bold text-primary">Ingress List</h6>
     </div>
     <div class="card-body">
         <div class="table-responsive">
@@ -28,25 +28,33 @@
                 <thead>
                     <tr>
                       <th>Name</th>
-                      <th>Type</th>
+                      <th>IngressClass</th>
+                      <th>Hostname</th>
                     </tr>
                   </thead>
                   <tbody>
-                    {% for secret in secrets %}
-                    {% if selected == secret.name %}
+                    {% for i in ingresses %}
+                    {% if selected == i.name %}
                       <tr class="selected" >
                     {% else %}
                       <tr>
                     {% endif %}
                         <td>
-                          <form action="/secrets/data" method="POST">
+                          <form action="/ingress/data" method="POST">
                             <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
                             <input type="hidden" name="ns_select" value="{{ session['ns_select'] }}" />
-                            <input type="hidden" name="secret_name" value="{{ secret.name }}" />
-                            <a href="javascript:;" onclick="parentNode.submit();">{{ secret.name }}</a>
+                            <input type="hidden" name="i_name" value="{{ i.name }}" />
+                            <a href="javascript:;" onclick="parentNode.submit();">{{ i.name }}</a>
                           </form>
                         </td>
-                        <td>{{ secret.type }}</td>
+                        <td>
+                            {{ i.ingressClass }}
+                        </td>
+                        <td>
+                          {% for host in i.hosts %}
+                            {{ host }}{% if not loop.last %}<br>{% endif %}
+                          {% endfor %}
+                        </td>
                       </tr>
                     {% endfor %}
                   </tbody>
@@ -54,7 +62,6 @@
         </div>
     </div>
 </div>
-
 {% endblock %}
 
 {% block scripts %}
