@@ -1467,6 +1467,60 @@ def ingresses_class_data():
         return redirect(url_for('routes.login'))
 
 ##############################################################
+## Ingresses
+##############################################################
+
+@routes.route("/ingress", methods=['GET', 'POST'])
+@login_required
+def ingresses():
+    selected = None
+    if session['user_type'] == "OpenID":
+        user_token = session['oauth_token']
+    else:
+        user_token = None
+
+    if request.method == 'POST':
+        session['ns_select'] = request.form.get('ns_select')
+        selected = request.form.get('selected')
+
+    
+
+    namespace_list, error = k8sNamespaceListGet(session['user_role'], user_token)
+    ingresses = k8sIngressListGet(session['user_role'], user_token, session['ns_select'])
+    print("route: %s" % ingresses)
+
+    return render_template(
+        'ingress.html.j2',
+        namespaces = namespace_list,
+        ingresses = ingresses,
+        selected = selected,
+    )
+
+@routes.route('/ingress/data', methods=['GET', 'POST'])
+@login_required
+def ingresses_data():
+    if request.method == 'POST':
+
+        i_name = request.form.get('i_name')
+
+        if session['user_type'] == "OpenID":
+            user_token = session['oauth_token']
+        else:
+            user_token = None
+
+        ingresses = k8sIngressListGet(session['user_role'], user_token, session['ns_select'])
+        for i in ingresses:
+            if i["name"] == i_name:
+                i_data = i
+
+        return render_template(
+            'ingress-data.html.j2',
+            i_data = i_data
+        )
+    else:
+        return redirect(url_for('routes.login'))
+
+##############################################################
 ## Storage
 ##############################################################
 ## Stotage Class
