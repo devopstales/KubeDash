@@ -858,6 +858,7 @@ def nodes_data():
 
         node_data = k8sNodeGet(session['user_role'], user_token, no_name)
         node_metrics = k8sGetNodeMetric(no_name)
+        print("route: %s " % node_metrics)
 
         return render_template(
             'node-data.html.j2',
@@ -1412,6 +1413,55 @@ def secrets_data():
             'secret-data.html.j2',
             secret_data = secret_data,
             namespace = session['ns_select'],
+        )
+    else:
+        return redirect(url_for('routes.login'))
+
+##############################################################
+# Network
+##############################################################
+## Ingresses Class
+##############################################################
+
+@routes.route("/ingress-class", methods=['GET', 'POST'])
+@login_required
+def ingresses_class():
+    selected = None
+    if session['user_type'] == "OpenID":
+        user_token = session['oauth_token']
+    else:
+        user_token = None
+
+    if request.method == 'POST':
+        selected = request.form.get('selected')
+
+    ingresses_classes = k8sIngressClassListGet(session['user_role'], user_token)
+
+    return render_template(
+        'ingress-classes.html.j2',
+        ingresses_classes = ingresses_classes,
+        selected = selected,
+    )
+
+@routes.route('/ingress-class/data', methods=['GET', 'POST'])
+@login_required
+def ingresses_class_data():
+    if request.method == 'POST':
+        ic_name = request.form.get('ic_name')
+
+        if session['user_type'] == "OpenID":
+            user_token = session['oauth_token']
+        else:
+            user_token = None
+
+        ingresses_classes = k8sIngressClassListGet(session['user_role'], user_token)
+        for ic in ingresses_classes:
+            if ic["name"] == ic_name:
+                ic_data = ic
+
+        return render_template(
+            'ingress-class-data.html.j2',
+            ic_data = ic_data
         )
     else:
         return redirect(url_for('routes.login'))
