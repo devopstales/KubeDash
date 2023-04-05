@@ -25,7 +25,7 @@
         <div class="row">
             <div class="col">
                 <div>
-		  {% if cluster_metrics and cluster_metrics.cpu %}
+		  {% if node_metrics and node_metrics.cpu %}
                     <canvas id="cpu"
                     {% for CPUkey, CPUvalue in node_metrics.cpu.items() %}
                         {% if 'Percent' in CPUkey %}
@@ -45,7 +45,7 @@
             </div>
             <div class="col">
                 <div>
-                  {% if cluster_metrics and cluster_metrics.memory %}
+                  {% if node_metrics and node_metrics.memory %}
                     <canvas id="ram" 
                     {% for RAMkey, RAMvalue in node_metrics.memory.items() %}
                         {% if 'Percent' in RAMkey %}
@@ -65,7 +65,7 @@
             </div>
             <div class="col">
                 <div>
-                  {% if cluster_metrics and cluster_metrics.pod_count %}
+                  {% if node_metrics and node_metrics.pod_count %}
                     <canvas id="pod"
                     {% for pod_key, pod_value in node_metrics.pod_count.items() %}
                         {{ pod_key }}="{{ pod_value }}"
