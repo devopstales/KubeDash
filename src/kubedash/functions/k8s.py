@@ -1885,24 +1885,24 @@ def k8sSecretListGet(username_role, user_token, namespace):
 def k8sIngressClassListGet(username_role, user_token,):
     k8sClientConfigGet(username_role, user_token)
     ING_LIST = list()
-    #try:
-    ingress_class_list = k8s_client.NetworkingV1Api().list_ingress_class()
-    for ic in ingress_class_list.items:
-        ING_INFO = {
-            "name": ic.metadata.name,
-            "created": ic.metadata.creation_timestamp,
-            "annotations": ic.metadata.annotations,
-            "labels": ic.metadata.labels,
-            "controller": ic.spec.controller,
-            "parameters": ic.spec.parameters.to_dict(),
-        }
-        ING_LIST.append(ING_INFO)
-    return ING_LIST
-    #except ApiException as error:
-    #    ErrorHandler(error, "get ingress class list")
-    #    return ING_LIST
-    #except Exception as error:
-    #    return ING_LIST
+    try:
+        ingress_class_list = k8s_client.NetworkingV1Api().list_ingress_class()
+        for ic in ingress_class_list.items:
+            ING_INFO = {
+                "name": ic.metadata.name,
+                "created": ic.metadata.creation_timestamp,
+                "annotations": ic.metadata.annotations,
+                "labels": ic.metadata.labels,
+                "controller": ic.spec.controller,
+                "parameters": ic.spec.parameters.to_dict(),
+            }
+            ING_LIST.append(ING_INFO)
+        return ING_LIST
+    except ApiException as error:
+        ErrorHandler(error, "get ingress class list")
+        return ING_LIST
+    except Exception as error:
+        return ING_LIST
 
 ##############################################################
 ## Ingress
@@ -1911,35 +1911,38 @@ def k8sIngressClassListGet(username_role, user_token,):
 def k8sIngressListGet(username_role, user_token, ns):
     k8sClientConfigGet(username_role, user_token)
     ING_LIST = list()
-    try:
-        ingress_list = k8s_client.NetworkingV1Api().list_namespaced_ingress(ns)
-        for ingress in ingress_list.items:
-            ig = ingress.status.load_balancer.ingress
-            rules = ingress.spec.rules
-            ING_INFO = {
-                "name": ingress.metadata.name,
-                "ingress-class": ingress.spec.ingress_class_name,
-                "rules":rules,
-                "created": ingress.metadata.creation_timestamp,
-                "annotations": ingress.metadata.annotations,
-                "labels": ingress.metadata.labels,
-                "tls": ingress.spec.tls,
-                "status": ig.status.phase,
-            }
-            if ig:
-                ING_INFO["endpoint"] = ig[0].ip
-            if rules:
-                HOSTS = list()
-                for rule in rules:
-                    HOSTS.append(rule.host)
-                ING_INFO["hosts"] = HOSTS
-            ING_LIST.append(ING_INFO)
-        return ING_LIST
-    except ApiException as error:
-        ErrorHandler(error, "get ingress list")
-        return ING_LIST
-    except Exception as error:
-        return ING_LIST
+    #try:
+    ingress_list = k8s_client.NetworkingV1Api().list_namespaced_ingress(ns)
+    for ingress in ingress_list.items:
+        ig = ingress.status.load_balancer.ingress
+        rules = list()
+        for rule in ingress.spec.rules:
+            for r in rule.http.paths:
+                rules.append(r.to_dict())
+        ING_INFO = {
+            "name": ingress.metadata.name,
+            "ingressClass": ingress.spec.ingress_class_name,
+            "rules": rules,
+            "created": ingress.metadata.creation_timestamp,
+            "annotations": ingress.metadata.annotations,
+            "labels": ingress.metadata.labels,
+            "tls": ingress.spec.tls,
+            "status": ingress.status,
+        }
+        if ig:
+            ING_INFO["endpoint"] = ig[0].ip
+        if rules:
+            HOSTS = list()
+            for rule in ingress.spec.rules:
+                HOSTS.append(rule.host)
+            ING_INFO["hosts"] = HOSTS
+        ING_LIST.append(ING_INFO)
+    return ING_LIST
+    #except ApiException as error:
+    #    ErrorHandler(error, "get ingress list")
+    #    return ING_LIST
+    #except Exception as error:
+    #    return ING_LIST
     
 ##############################################################
 ## Network Policy
