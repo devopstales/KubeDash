@@ -858,7 +858,6 @@ def nodes_data():
 
         node_data = k8sNodeGet(session['user_role'], user_token, no_name)
         node_metrics = k8sGetNodeMetric(no_name)
-        print("route: %s " % node_metrics)
 
         return render_template(
             'node-data.html.j2',
@@ -1487,7 +1486,6 @@ def ingresses():
 
     namespace_list, error = k8sNamespaceListGet(session['user_role'], user_token)
     ingresses = k8sIngressListGet(session['user_role'], user_token, session['ns_select'])
-    print("route: %s" % ingresses)
 
     return render_template(
         'ingress.html.j2',
@@ -1516,6 +1514,63 @@ def ingresses_data():
         return render_template(
             'ingress-data.html.j2',
             i_data = i_data
+        )
+    else:
+        return redirect(url_for('routes.login'))
+
+##############################################################
+# Service
+##############################################################
+
+@routes.route("/services", methods=['GET', 'POST'])
+@login_required
+def services():
+    selected = None
+    if session['user_type'] == "OpenID":
+        user_token = session['oauth_token']
+    else:
+        user_token = None
+
+    if request.method == 'POST':
+        session['ns_select'] = request.form.get('ns_select')
+        selected = request.form.get('selected')
+
+    namespace_list, error = k8sNamespaceListGet(session['user_role'], user_token)
+    services = k8sServiceListGet(session['user_role'], user_token, session['ns_select'])
+
+    return render_template(
+      'services.html.j2',
+        services = services,
+        namespaces = namespace_list,
+        selected = selected,
+    )
+
+@routes.route('/services/data', methods=['GET', 'POST'])
+@login_required
+def services_data():
+    pod_list = None
+    if request.method == 'POST':
+        service_name = request.form.get('service_name')
+        session['ns_select'] = request.form.get('ns_select')
+
+        if session['user_type'] == "OpenID":
+            user_token = session['oauth_token']
+        else:
+            user_token = None
+
+        services = k8sServiceListGet(session['user_role'], user_token, session['ns_select'])
+        for service in services:
+            if service["name"] == service_name:
+                service_data = service
+        if service_data["selector"]:
+            pod_list = k8sPodSelectorListGet(session['user_role'], user_token, session['ns_select'], service_data["selector"])
+            print("route: %s" % pod_list)
+
+        return render_template(
+          'service-data.html.j2',
+            service_data = service_data,
+            namespace = session['ns_select'],
+            pod_list = pod_list,
         )
     else:
         return redirect(url_for('routes.login'))

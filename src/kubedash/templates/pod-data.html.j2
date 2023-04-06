@@ -74,7 +74,14 @@
                                 </tr>
                                 <tr>
                                     <th>Node:</th>
-                                    <td>{{ pod_data.node }}</td>
+                                    <td>
+                                        <form action="/nodes" method="POST">
+                                            <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+                                            <input type="hidden" name="ns_select" value="{{ pod_data.namespace }}" />
+                                            <input type="hidden" name="selected" value="{{ pod_data.node }}" />
+                                            <a href="javascript:;" onclick="parentNode.submit();">{{ pod_data.node }}</a>
+                                        </form>
+                                    </td>
                                 </tr>
                                 <tr>
                                     <th>Owner:</th>
