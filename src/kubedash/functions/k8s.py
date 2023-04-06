@@ -1911,38 +1911,38 @@ def k8sIngressClassListGet(username_role, user_token,):
 def k8sIngressListGet(username_role, user_token, ns):
     k8sClientConfigGet(username_role, user_token)
     ING_LIST = list()
-    #try:
-    ingress_list = k8s_client.NetworkingV1Api().list_namespaced_ingress(ns)
-    for ingress in ingress_list.items:
-        ig = ingress.status.load_balancer.ingress
-        rules = list()
-        for rule in ingress.spec.rules:
-            for r in rule.http.paths:
-                rules.append(r.to_dict())
-        ING_INFO = {
-            "name": ingress.metadata.name,
-            "ingressClass": ingress.spec.ingress_class_name,
-            "rules": rules,
-            "created": ingress.metadata.creation_timestamp,
-            "annotations": ingress.metadata.annotations,
-            "labels": ingress.metadata.labels,
-            "tls": ingress.spec.tls,
-            "status": ingress.status,
-        }
-        if ig:
-            ING_INFO["endpoint"] = ig[0].ip
-        if rules:
-            HOSTS = list()
+    try:
+        ingress_list = k8s_client.NetworkingV1Api().list_namespaced_ingress(ns)
+        for ingress in ingress_list.items:
+            ig = ingress.status.load_balancer.ingress
+            rules = list()
             for rule in ingress.spec.rules:
-                HOSTS.append(rule.host)
-            ING_INFO["hosts"] = HOSTS
-        ING_LIST.append(ING_INFO)
-    return ING_LIST
-    #except ApiException as error:
-    #    ErrorHandler(error, "get ingress list")
-    #    return ING_LIST
-    #except Exception as error:
-    #    return ING_LIST
+                for r in rule.http.paths:
+                    rules.append(r.to_dict())
+            ING_INFO = {
+                "name": ingress.metadata.name,
+                "ingressClass": ingress.spec.ingress_class_name,
+                "rules": rules,
+                "created": ingress.metadata.creation_timestamp,
+                "annotations": ingress.metadata.annotations,
+                "labels": ingress.metadata.labels,
+                "tls": ingress.spec.tls,
+                "status": ingress.status,
+            }
+            if ig:
+                ING_INFO["endpoint"] = ig[0].ip
+            if rules:
+                HOSTS = list()
+                for rule in ingress.spec.rules:
+                    HOSTS.append(rule.host)
+                ING_INFO["hosts"] = HOSTS
+            ING_LIST.append(ING_INFO)
+        return ING_LIST
+    except ApiException as error:
+        ErrorHandler(error, "get ingress list")
+        return ING_LIST
+    except Exception as error:
+        return ING_LIST
     
 ##############################################################
 ## Network Policy
@@ -1952,7 +1952,7 @@ def k8sNetworkPolicyListGet(username_role, user_token, ns):
     k8sClientConfigGet(username_role, user_token)
     POLICY_LIST = list()
     try:
-        policy_list = k8s_client.NetworkingV1beta1Api().list_namespaced_network_policy(ns)
+        policy_list = k8s_client.NetworkingV1Api().list_namespaced_network_policy(ns)
         for policy in policy_list.items:
             POLICY_INFO = {
                 "name": policy.metadata.name,
@@ -1971,6 +1971,68 @@ def k8sNetworkPolicyListGet(username_role, user_token, ns):
         return POLICY_LIST
     except Exception as error:
         return POLICY_LIST
+
+##############################################################
+# Service
+##############################################################
+
+def k8sServiceListGet(username_role, user_token, ns):
+    k8sClientConfigGet(username_role, user_token)
+    SERVICE_LIST = list()
+    try:
+        service_list = k8s_client.CoreV1Api().list_namespaced_service(ns)
+        for service in service_list.items:
+            SERVICE_INFO = {
+                "name": service.metadata.name,
+                "type": service.spec.type,
+                "created": service.metadata.creation_timestamp,
+                "annotations": service.metadata.annotations,
+                "labels": service.metadata.labels,
+                "selector": service.spec.selector,
+                "ports": service.spec.ports,
+                "cluster_ip": service.spec.cluster_ip,
+            }
+            if service.spec.type == "LoadBalancer":
+                SERVICE_INFO["external_ip"] = service.status.load_balancer.ingress[0].ip
+            else:
+                SERVICE_INFO["external_ip"] = None
+            SERVICE_LIST.append(SERVICE_INFO)
+        return SERVICE_LIST
+    except ApiException as error:
+        ErrorHandler(error, "get service list")
+        return SERVICE_LIST
+    except Exception as error:
+        return SERVICE_LIST
+
+def k8sPodSelectorListGet(username_role, user_token, ns, selectors):
+    k8sClientConfigGet(username_role, user_token)
+    POD_LIST = list()
+    label_selector = ""
+    for i, (key, value) in enumerate(selectors.items()):
+        if i == len(selectors) - 1:
+            label_selector  = label_selector + f"{key}={value}"
+        else:
+            label_selector  = label_selector + f"{key}={value},"
+    #try:
+    pod_list = k8s_client.CoreV1Api().list_namespaced_pod(ns, label_selector=label_selector)
+    for pod in pod_list.items:
+        print(pod) # DEBUG
+        POD_INFO = {
+            "status": pod.status.phase,
+            "name": pod.metadata.name,
+            "pod_ip": pod.status.pod_ip,
+            "node_name": pod.spec.node_name,
+        }
+        if pod.metadata.owner_references:
+            for owner in pod.metadata.owner_references:
+                POD_INFO['owner'] = "%ss/%s" % (owner.kind.lower(), owner.name)
+        POD_LIST.append(POD_INFO)
+    return POD_LIST
+    #except ApiException as error:
+    #    ErrorHandler(error, "get pod selector list")
+    #    return PVC_LIST
+    #except Exception as error:
+    #    return PVC_LIST
 
 ##############################################################
 # Storage
