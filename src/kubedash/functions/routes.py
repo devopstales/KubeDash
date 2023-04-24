@@ -5,26 +5,24 @@ from flask_socketio import disconnect
 from werkzeug.security import check_password_hash
 from itsdangerous import base64_encode, base64_decode
 
+from functions.helper_functions import get_logger, email_check
 from functions.sso import SSOSererGet, get_auth_server_info, SSOServerUpdate, SSOServerCreate
-from functions.user import User, UsersRoles, Role, email_check, UserUpdate, UserCreate, UserDelete, \
+from functions.user import User, UsersRoles, Role, UserUpdate, UserCreate, UserDelete, \
     SSOUserCreate, SSOTokenUpdate, SSOTokenGet, UserUpdatePassword, KubectlConfigStore, KubectlConfig
 from functions.k8s import *
+from functions.registry import *
 
 from functions.components import tracer, socketio
 from threading import Lock
 from opentelemetry.trace.status import Status, StatusCode
+
 
 ##############################################################
 ## Helpers
 ##############################################################
 
 routes = Blueprint("routes", __name__)
-logger = logging.getLogger(__name__)
-
-logging.basicConfig(
-        level="INFO",
-        format='[%(asctime)s] %(name)s        %(levelname)s %(message)s'
-    )
+logger = get_logger(__name__)
 
 thread = None
 thread_lock = Lock()
@@ -61,6 +59,14 @@ def health():
 @routes.errorhandler(404)
 def page_not_found(e):
     return render_template('404.html.j2'), 404
+
+@routes.errorhandler(400)
+def page_not_found(e):
+    logger.error(e.description)
+    return render_template(
+        '400.html.j2',
+        description = e.description,
+        ), 400
 
 @routes.after_request
 def add_header(response):
@@ -1419,7 +1425,7 @@ def secrets_data():
 ##############################################################
 # Network
 ##############################################################
-## Ingresses Class
+## Ingress Class
 ##############################################################
 
 @routes.route("/ingress-class", methods=['GET', 'POST'])
@@ -1564,7 +1570,6 @@ def services_data():
                 service_data = service
         if service_data["selector"]:
             pod_list = k8sPodSelectorListGet(session['user_role'], user_token, session['ns_select'], service_data["selector"])
-            print("route: %s" % pod_list)
 
         return render_template(
           'service-data.html.j2',
@@ -1792,6 +1797,140 @@ def configmap_data():
         )
     else:
         return redirect(url_for('routes.login'))
+
+##############################################################
+## OCI Registry
+##############################################################
+
+@routes.route("/registry", methods=['GET', 'POST'])
+@login_required
+def registry():
+    selected = None
+    registry_server_auth_user = None
+    registry_server_auth_pass = None
+    registry_server_auth = False
+    if request.method == 'POST':
+        selected = request.form.get('selected')
+        request_type = request.form['request_type']
+        if request_type == "create":
+            registry_server_tls = request.form.get('registry_server_tls') in ['True']
+            insecure_tls = request.form.get('insecure_tls') in ['True']
+            registry_server_url = request.form.get('registry_server_url')
+            registry_server_port = request.form.get('registry_server_port')
+            if request.form.get('registry_server_auth_user') and request.form.get('registry_server_auth_pass'):
+                registry_server_auth_user = request.form.get('registry_server_auth_user')
+                registry_server_auth_pass = request.form.get('registry_server_auth_pass') # bas64 encoded
+                registry_server_auth = True
+
+            RegistryServerCreate(registry_server_url, registry_server_port, registry_server_auth, 
+                        registry_server_tls, insecure_tls, registry_server_auth_user, 
+                        registry_server_auth_pass)
+            flash("Registry Created Successfully", "success")
+        elif request_type == "edit":
+            registry_server_tls = request.form.get('registry_server_tls') in ['True']
+            insecure_tls = request.form.get('insecure_tls') in ['True']
+            registry_server_url = request.form.get('registry_server_url')
+            registry_server_url_old = request.form.get('registry_server_url_old')
+            registry_server_port = request.form.get('registry_server_port')
+            registry_server_auth = request.form.get('registry_server_auth')
+            if request.form.get('registry_server_auth_user') and request.form.get('registry_server_auth_pass'):
+                registry_server_auth_user = request.form.get('registry_server_auth_user')
+                registry_server_auth_pass = request.form.get('registry_server_auth_pass')
+                registry_server_auth = True
+
+            RegistryServerUpdate(registry_server_url, registry_server_url_old, registry_server_port, 
+                        registry_server_auth, registry_server_tls, insecure_tls, registry_server_auth_user, 
+                        registry_server_auth_pass)
+            flash("Registry Updated Successfully", "success")
+        elif request_type == "delete":
+            registry_server_url = request.form.get('registry_server_url')
+
+            RegistryServerDelete(registry_server_url)
+            flash("Registry Deleted Successfully", "success")
+
+    registries = RegistryServerListGet()
+
+    return render_template(
+      'registry.html.j2',
+        registries = registries,
+        selected = selected,
+    )
+
+@routes.route("/image/list", methods=['GET', 'POST'])
+@login_required
+def image_list():
+    selected = None
+    if request.method == 'POST':
+        selected = request.form.get('selected')
+        session['registry_server_url'] = request.form.get('registry_server_url')
+
+    image_list = RegistryGetRepositories(session['registry_server_url'])
+    # print(image_list) # DEBUG
+
+    return render_template(
+        'registry-image-list.html.j2',
+        image_list = image_list,
+        selected = selected,
+    )
+    
+@routes.route("/image/tags", methods=['GET', 'POST'])
+@login_required
+def image_tags():
+    selected = None
+    if request.method == 'POST':
+        selected = request.form.get('selected')
+        if 'image_name' in request.form:
+            session['image_name'] = request.form.get('image_name')
+
+    tag_list = RegistryGetTags(session['registry_server_url'], session['image_name'])
+    print(tag_list) # DEBUG
+
+    return render_template(
+        'registry-image-tag-list.html.j2',
+        tag_list = tag_list,
+        selected = selected,
+        image_name = session['image_name'],
+    )
+
+@routes.route("/image/tag/delete", methods=['GET', 'POST'])
+@login_required
+def image_tag_delete():
+    if request.method == 'POST':
+        tag_name = request.form.get('tag_name')
+        image_name = request.form.get('image_name')
+        RegistryDeleteTag(session['registry_server_url'], image_name, tag_name)
+        return redirect(url_for('routes.image_tags'), code=307)
+    else:
+        return redirect(url_for('routes.login'))
+
+@routes.route("/image/data", methods=['GET', 'POST'])
+@login_required
+def image_data():
+    if request.method == 'POST':
+        if 'tag_name' in request.form:
+            session['tag_name'] = request.form.get('tag_name')
+
+    tag_data = RegistryGetManifest(session['registry_server_url'], session['image_name'], session['tag_name'])
+    #print(tag_data) # DEBUG
+
+    return render_template(
+        'registry-image-tag-data.html.j2',
+        tag_data = tag_data,
+        image_name = session['image_name'],
+        tag_name = session['tag_name'],
+    )
+
+
+
+"""
+image: Image name, Format, Tags, Architecture
+tags:  Tag name, Size, LAyers, Created
+tag data: Entrypoint, Labels, ExposedPorts,
+---
+image: Image name, Format, Tags, Architecture
+tags:  Tag name, Size, pull command, Vulnability, Signed, Author, Created
+
+"""
 
 ##############################################################
 ## Helm Charts

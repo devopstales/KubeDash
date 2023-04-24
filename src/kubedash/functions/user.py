@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 
+from functions.helper_functions import get_logger, email_check
 from functions.components import db, login_manager, tracer
-import re, logging
 from contextlib import nullcontext
 from flask_login import UserMixin
 from werkzeug.security import generate_password_hash
@@ -10,18 +10,7 @@ from werkzeug.security import generate_password_hash
 ## functions
 ##############################################################
 
-logger = logging.getLogger(__name__)
-logging.basicConfig(
-        level="INFO",
-        format='[%(asctime)s] %(name)s        %(levelname)s %(message)s'
-    )
-
-def email_check(email):
-    regex = r'\b[A-Za-z0-9._%+-]+@[A-Za-z0-9.-]+\.[A-Z|a-z]{2,}\b'
-    if(re.fullmatch(regex, email)):
-        return True
-    else:
-        return False
+logger = get_logger(__name__)
 
 @login_manager.user_loader
 def load_user(user_id):
