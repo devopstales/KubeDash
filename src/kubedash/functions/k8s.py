@@ -1474,18 +1474,24 @@ def k8sPodVulnsGet(username_role, user_token, ns, pod):
         if po.metadata.name == pod:
             if vulnerabilityreport_list is not None:
                 for vr in vulnerabilityreport_list['items']:
+                    fixedVersion = None
+                    publishedDate = None
                     if vr['metadata']['labels']['trivy-operator.pod.name'] == po.metadata.name:
                         HAS_REPORT = True
                         VULN_LIST = list()
                         for vuln in vr['report']['vulnerabilities']:
+                            if 'fixedVersion' in vuln:
+                                fixedVersion = vuln['fixedVersion']
+                            if 'publishedDate' in vuln:
+                                publishedDate = vuln['publishedDate']
                             VULN_LIST.append({
                                 "vulnerabilityID": vuln['vulnerabilityID'],
                                 "severity": vuln['severity'],
                                 "score": vuln['score'],
                                 "resource": vuln['resource'],
                                 "installedVersion": vuln['installedVersion'],
-                                #"fixedVersion": vuln['fixedVersion'],
-                                #"publishedDate": vuln['publishedDate'],
+                                "fixedVersion": fixedVersion,
+                                "publishedDate": publishedDate,
                             })
                         POD_VULNS.update({vr['metadata']['labels']['trivy-operator.container.name']: VULN_LIST})
                 return HAS_REPORT, POD_VULNS
