@@ -1,13 +1,9 @@
-import logging
 from flask import Blueprint
 from functions.user import UserCreate, UserDelete
+from functions.helper_functions import get_logger
 
 commands = Blueprint("commands", __name__)
-logger = logging.getLogger(__name__)
-logging.basicConfig(
-        level="INFO",
-        format='[%(asctime)s] %(name)s        %(levelname)s %(message)s'
-    )
+logger = get_logger(__name__)
 
 @commands.cli.command('reset-password')
 def reset_password():

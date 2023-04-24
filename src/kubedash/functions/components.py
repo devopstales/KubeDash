@@ -1,8 +1,10 @@
-import logging, socket
+import socket
 from flask_login import LoginManager
 from flask_sqlalchemy import SQLAlchemy
 from flask_wtf.csrf import CSRFProtect
 from flask_socketio import SocketIO
+
+from functions.helper_functions import get_logger
 
 from opentelemetry import trace
 from opentelemetry.sdk.resources import Resource
@@ -10,11 +12,7 @@ from opentelemetry.sdk.trace import TracerProvider
 from opentelemetry.sdk.trace.export import BatchSpanProcessor
 from opentelemetry.exporter.otlp.proto.http.trace_exporter import OTLPSpanExporter
 
-logger = logging.getLogger(__name__)
-logging.basicConfig(
-        level="INFO",
-        format='[%(asctime)s] %(name)s        %(levelname)s %(message)s'
-    )
+logger = get_logger(__name__)
 
 login_manager = LoginManager()
 db = SQLAlchemy()

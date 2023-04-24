@@ -1,0 +1,81 @@
+{% extends "base.html.j2" %}
+
+{% block header %}
+    <link href="{{ url_for('static',filename='/vendor/datatables/dataTables.bootstrap4.min.css') }}" rel="stylesheet" >
+    <link href="{{ url_for('static',filename='/vendor/datatables/jquery.dataTables.css') }}" rel="stylesheet" >
+    <link href="{{ url_for('static',filename='/vendor/google/material-icons.css') }}" rel="stylesheet" >
+{% endblock %}
+
+{% block content %}
+<nav aria-label="breadcrumb">
+  <ol class="breadcrumb">
+    <li class="breadcrumb-item"><a href="/registry">OCI Registrys</a></li>
+    <li class="breadcrumb-item" aria-current="page"><a href="/image/list">Images</a></li>
+    <li class="breadcrumb-item active" aria-current="page">{{ image_name }}</li>
+    <div class="col">
+      <a class="card-link float-right" data-toggle="collapse" href="#" onclick="reload()">
+        <i class="material-icons">refresh</i>
+      </a>
+    </div>
+  </ol>
+</nav>
+
+<div class="card shadow mb-4">
+    <div class="card-header py-3">
+        <h6 class="m-0 font-weight-bold text-primary">Tag List</h6>
+    </div>
+    <div class="card-body">
+        <div class="table-responsive">
+            <table class="table table-bordered" id="dataTable" width="100%" cellspacing="0">
+                <thead>
+                    <tr>
+                      <th>Tags</th>
+                      <th>Action</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    {% for tag in tag_list.tags %}
+                    {% if selected == tag %}
+                      <tr class="selected" >
+                    {% else %}
+                      <tr>
+                    {% endif %}
+                        <td>
+                          <form action="/image/data" method="POST">
+                            <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+                            <input type="hidden" name="tag_name" value="{{ tag }}" />
+                            <a href="javascript:;" onclick="parentNode.submit();">{{ tag }}</a>
+                          </form>
+                        </td>
+                        <td>
+                            {% if session['user_role'] == "Admin" %}
+                            <!-- Button trigger modal edit -->
+                            <form action="/image/tag/delete" method="POST">
+                                <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+                                <input type="hidden" name="image_name" value="{{ image_name }}" />
+                                <input type="hidden" name="tag_name" value="{{ tag }}" />
+                                <button type="submit" rel="tooltip" class="btn btn-danger btn-just-icon btn-sm" value="upvote">
+                                    <i class="material-icons">delete</i>
+                                </button>
+                            </form>
+                            {% endif %}
+                        </td>
+                    </tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+
+        </div>
+    </div>
+</div>
+
+{% endblock %}
+
+{% block scripts %}
+    <!-- Page level plugins -->
+    <script src="{{ url_for('static',filename='vendor/datatables/jquery.dataTables.js') }}"></script>
+    <script src="{{ url_for('static',filename='vendor/datatables/dataTables.bootstrap4.min.js') }}"></script>
+
+    <!-- Page level custom scripts -->
+    <script src="{{ url_for('static',filename='js/demo/datatables-demo.js') }}"></script>
+{% endblock %}
