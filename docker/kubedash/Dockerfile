@@ -1,13 +1,24 @@
 ARG ARCH
 FROM ${ARCH}python:3.11-alpine
 ARG ARCH
+# Metadata params
+ARG VERSION
+ARG BUILD_DATE
+
 ENV FLASK_CONFIG="production" \
     FLASK_APP="kubedash"
 
-LABEL org.opencontainers.image.source=https://github.com/devopstales/kubedash
-LABEL org.opencontainers.image.documentation=https://devopstales.github.io/kubedash
-LABEL org.opencontainers.image.description="General-purpose web UI for Kubernetes clusters"
-LABEL org.opencontainers.image.licenses="Apache 2.0"
+# https://github.com/opencontainers/image-spec/blob/main/annotations.md#back-compatibility-with-label-schema
+LABEL org.opencontainers.image.vendor="devopstales" \
+      org.opencontainers.image.authors="devopstales" \
+      org.opencontainers.imeg.url="https://devopstales.github.io" \
+      org.opencontainers.image.licenses="Apache 2.0" \
+      org.opencontainers.image.title="kubedash" \
+      org.opencontainers.image.version=${VERSION} \
+      org.opencontainers.image.description="General-purpose web UI for Kubernetes clusters" \
+      org.opencontainers.image.source="https://github.com/devopstales/kubedash" \
+      org.opencontainers.image.documentation="https://devopstales.github.io/kubedash" \
+      org.opencontainers.image.created=${BUILD_DATE}
 
 WORKDIR /code
 
