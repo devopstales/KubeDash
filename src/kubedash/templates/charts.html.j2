@@ -41,15 +41,15 @@
           {% for rd in release %}
           {% if loop.last %}
           <tr>
-            {% if rd.icon is not none %}
+            {% if rd.icon %}
             <td><img src="{{ rd.icon }}" width="50" height="50"> </td>
             {% else %}
             <td><img src="/img/helm-icon-color.svg" width="50" height="50"> </td>
             {% endif %}
             <td>{{ name }}</td>
             <td>{{ rd.status }}</td>
-            <td>{{ rd.chart }}</td>
-            <td>{{ rd.appVersion }}</td>
+            <td>{{ rd.chart_name }}-{{ rd.chart_version }}</td>
+            <td>{{ rd.app_version }}</td>
             <td>{{ rd.revision }}</td>
             <td>{{ rd.updated }}</td>
           </tr>
