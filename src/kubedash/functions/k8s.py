@@ -1484,8 +1484,8 @@ def k8sPodVulnsGet(username_role, user_token, ns, pod):
                                 "score": vuln['score'],
                                 "resource": vuln['resource'],
                                 "installedVersion": vuln['installedVersion'],
-                                #"publishedDate": vuln['publishedDate'],
                                 #"fixedVersion": vuln['fixedVersion'],
+                                #"publishedDate": vuln['publishedDate'],
                             })
                         POD_VULNS.update({vr['metadata']['labels']['trivy-operator.container.name']: VULN_LIST})
                 return HAS_REPORT, POD_VULNS

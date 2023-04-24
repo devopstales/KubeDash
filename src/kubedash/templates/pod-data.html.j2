@@ -59,6 +59,7 @@
             </li>
         </ul>
         <div class="tab-content" id="nav-tabContent">
+            <!-- pod -->
             <div class="tab-pane fade show active" id="nav-pod" role="tabpanel" aria-labelledby="nav-pod-tab">
                 <div class="card shadow mb-4">
                     <div class="card-body">
@@ -121,194 +122,204 @@
                     </div>
                 </div>
             </div>
+            <!-- containers -->
             <div class="tab-pane fade" id="nav-containers" role="tabpanel" aria-labelledby="nav-profile-tab">
                 <div id="accordion">
-                <div class="card shadow mb-4">
-                    <div class="card-body">
-                        {% if pod_data.init_containers %}
-                        <h3>Init Containers</h3>
-                        
-                        <div class="table-responsive">
-                            <table class="table table-bordered" id="initContainersTable" width="100%" cellspacing="0">
-                                <thead>
-                                    <tr>
-                                        {% if has_report %}
-                                        <th style="width:5%"></th>
-                                        {% endif %}
-                                        <th>State</th>
-                                        <th>Name</th>
-                                        <th>Image</th>
-                                        <th>Restarts</th>
-                                    </tr>
-                                </thead>
-                                <tbody>
-                                    {% for ic in pod_data.init_containers %}
-                                    <tr>
-                                        {% if has_report %}
-                                        <td>
-                                            <a class="card-link" data-toggle="collapse" href="#intVulnList{{ ic.name }}">
-                                                <i class="material-icons">expand_more</i>
-                                            </a>
-                                        </td>
-                                        {% endif %}
-                                        {% if ic.ready == "Completed" %}
-                                        <td><span class="badge badge-secondary">{{ ic.ready }}</span></td>
-                                        {% elif ic.ready == "ImagePullBackOff" or ic.ready == "ErrImagePull" %}
-                                        <td><span class="badge badge-danger">{{ ic.ready }}</span></td>
-                                        {% else %}
-                                        <td>{{ ic.ready }}</td>
-                                        {% endif %}
-                                        <td>{{ ic.name }}</td>
-                                        <td>{{ ic.image }}</td>
-                                        <td>{{ ic.restarts }}</td>
-                                    </tr>
-                                    {% endfor %}
-                                </tbody>
-                            </table>
-                        </div>
-                        {% endif %}
-                        <h3>Containers</h3>
-                        <div class="table-responsive">
-                            <table class="table table-bordered" id="containersTable" width="100%" cellspacing="0">
-                                <thead>
-                                    <tr>
-                                        {% if has_report %}
-                                        <th style="width:5%"></th>
-                                        {% endif %}
-                                        <th>State</th>
-                                        <th>Name</th>
-                                        <th>Image</th>
-                                        <th>Restarts</th>
-                                    </tr>
-                                </thead>
-                                <tbody>
-                                    {% for c in pod_data.containers %}
-                                    <tr>
-                                        {% if has_report %}
-                                        <td>
-                                            <a class="card-link" data-toggle="collapse" href="#vulnList-{{ c.name }}">
-                                                <i class="material-icons">expand_more</i>
-                                            </a>
-                                        </td>
-                                        {% endif %}
-                                        {% if c.ready == "Running"%}
-                                        <td><span class="badge badge-success">{{ c.ready }}</span></td>
-                                        {% elif c.ready == "ImagePullBackOff" %}
-                                        <td><span class="badge badge-danger">{{ c.ready }}</span></td>
-                                        {% elif c.ready == "PodInitializing"%}
-                                        <td><span class="badge badge-secondary">{{ c.ready }}</span></td>
-                                        {% else %}
-                                        <td>{{ c.ready }}</td>
-                                        {% endif %}
-                                        <td>{{ c.name }}</td>
-                                        <td>{{ c.image }}</td>
-                                        <td>{{ c.restarts }}</td>
-                                    </tr>
-                                    {% endfor %}
-                                </tbody>
-                            </table>
+                    <div class="card shadow mb-4">
+                        <div class="card-body">
+                            {% if pod_data.init_containers %}
+                            <h3>Init Containers</h3>
+                            
+                            <div class="table-responsive">
+                                <table class="table table-bordered" id="initContainersTable" width="100%" cellspacing="0">
+                                    <thead>
+                                        <tr>
+                                            {% if has_report %}
+                                            <th style="width:5%"></th>
+                                            {% endif %}
+                                            <th>State</th>
+                                            <th>Name</th>
+                                            <th>Image</th>
+                                            <th>Restarts</th>
+                                        </tr>
+                                    </thead>
+                                    <tbody>
+                                        {% for ic in pod_data.init_containers %}
+                                        <tr>
+                                            {% if has_report %}
+                                            <td>
+                                                <a class="card-link" data-toggle="collapse" href="#intVulnList{{ ic.name }}">
+                                                    <i class="material-icons">expand_more</i>
+                                                </a>
+                                            </td>
+                                            {% endif %}
+                                            {% if ic.ready == "Completed" %}
+                                            <td><span class="badge badge-secondary">{{ ic.ready }}</span></td>
+                                            {% elif ic.ready == "ImagePullBackOff" or ic.ready == "ErrImagePull" %}
+                                            <td><span class="badge badge-danger">{{ ic.ready }}</span></td>
+                                            {% else %}
+                                            <td>{{ ic.ready }}</td>
+                                            {% endif %}
+                                            <td>{{ ic.name }}</td>
+                                            <td>{{ ic.image }}</td>
+                                            <td>{{ ic.restarts }}</td>
+                                        </tr>
+                                        {% endfor %}
+                                    </tbody>
+                                </table>
+                            </div>
+                            {% endif %}
+                            <h3>Containers</h3>
+                            <div class="table-responsive">
+                                <table class="table table-bordered" id="containersTable" width="100%" cellspacing="0">
+                                    <thead>
+                                        <tr>
+                                            {% if has_report %}
+                                            <th style="width:5%"></th>
+                                            {% endif %}
+                                            <th>State</th>
+                                            <th>Name</th>
+                                            <th>Image</th>
+                                            <th>Restarts</th>
+                                        </tr>
+                                    </thead>
+                                    <tbody>
+                                        {% for c in pod_data.containers %}
+                                        <tr>
+                                            {% if has_report %}
+                                            <td>
+                                                <a class="card-link" data-toggle="collapse" href="#vulnList-{{ c.name }}">
+                                                    <i class="material-icons">expand_more</i>
+                                                </a>
+                                            </td>
+                                            {% endif %}
+                                            {% if c.ready == "Running"%}
+                                            <td><span class="badge badge-success">{{ c.ready }}</span></td>
+                                            {% elif c.ready == "ImagePullBackOff" %}
+                                            <td><span class="badge badge-danger">{{ c.ready }}</span></td>
+                                            {% elif c.ready == "PodInitializing"%}
+                                            <td><span class="badge badge-secondary">{{ c.ready }}</span></td>
+                                            {% else %}
+                                            <td>{{ c.ready }}</td>
+                                            {% endif %}
+                                            <td>{{ c.name }}</td>
+                                            <td>{{ c.image }}</td>
+                                            <td>{{ c.restarts }}</td>
+                                        </tr>
+                                        {% endfor %}
+                                    </tbody>
+                                </table>
+                            </div>
                         </div>
                     </div>
-                </div>
-                {% if has_report %}
-                <!-- vulnTable -->
-                <div class="card shadow mb-4">
-                    <div class="card-body">
-                        {% for c in pod_data.containers %}
-                        {% if loop.first %}
-                        <div id="vulnList-{{ c.name }}" class="collapse show" data-parent="#accordion">
-                        {% else %}
-                        <div id="vulnList-{{ c.name }}" class="collapse" data-parent="#accordion"></div>
-                        {% endif %}
-                            <h2>Container: {{ c.name }}</h2>
-                            <table id="vulnTable{{ c.name }}" class="table table-striped table-bordered" style="width:100%">
-                                <thead>
-                                    <tr>
-                                        <th>ID</th>
-                                        <th>Severity</th>
-                                        <th>Score</th>
-                                        <th>Package</th>
-                                        <th>Installed Version</th>
-                                    </tr>
-                                </thead>
-                                <tbody>
-                                    {% for po, vuls in pod_vulns.items() %}
-                                    {% if po == c.name %}
-                                    {% for v in vuls %}
-                                    <tr>
-                                        <td>
-                                            <a href="https://avd.aquasec.com/nvd/{{ v.vulnerabilityID | lower }}" rel="noopener noreferrer" target="_blank">{{ v.vulnerabilityID }}</a>
-                                        </td>
-                                        {% if v.severity == "CRITICAL" %}
-                                        <td><span class="badge badge-danger">{{ v.severity }}</span></td>
-                                        {% elif v.severity == "HIGH" %}
-                                        <td><span class="badge badge-warning">{{ v.severity }}</span></td>
-                                        {% elif v.severity == "MEDIUM" %}
-                                        <td><span class="badge badge-primary">{{ v.severity }}</span></td>
-                                        {% elif v.severity == "LOW" %}
-                                        <td><span class="badge badge-secondary">{{ v.severity }}</span></td>
-                                        {% else %}
-                                        <td>{{ v.severity }}</td>
+                    {% if has_report %}
+                    <!-- vulnTable -->
+                    <div class="card shadow mb-4">
+                        <div class="card-body">
+                            {% for c in pod_data.containers %}
+                            {% if loop.first %}
+                            <div id="vulnList-{{ c.name }}" class="collapse show" data-parent="#accordion">
+                            {% else %}
+                            <div id="vulnList-{{ c.name }}" class="collapse" data-parent="#accordion">
+                            {% endif %}
+                                <h2>Container: {{ c.name }}</h2>
+                                <table id="vulnTable{{ c.name }}" class="table table-striped table-bordered" style="width:100%">
+                                    <thead>
+                                        <tr>
+                                            <th>ID</th>
+                                            <th>Severity</th>
+                                            <th>Score</th>
+                                            <th>Package</th>
+                                            <th>Installed Version</th>
+                                            <th>Fixes Version</th>
+                                            <th>Published</th>
+                                        </tr>
+                                    </thead>
+                                    <tbody>
+                                        {% for po, vuls in pod_vulns.items() %}
+                                        {% if po == c.name %}
+                                        {% for v in vuls %}
+                                        <tr>
+                                            <td>
+                                                <a href="https://avd.aquasec.com/nvd/{{ v.vulnerabilityID | lower }}" rel="noopener noreferrer" target="_blank">{{ v.vulnerabilityID }}</a>
+                                            </td>
+                                            {% if v.severity == "CRITICAL" %}
+                                            <td><span class="badge badge-danger">{{ v.severity }}</span></td>
+                                            {% elif v.severity == "HIGH" %}
+                                            <td><span class="badge badge-warning">{{ v.severity }}</span></td>
+                                            {% elif v.severity == "MEDIUM" %}
+                                            <td><span class="badge badge-primary">{{ v.severity }}</span></td>
+                                            {% elif v.severity == "LOW" %}
+                                            <td><span class="badge badge-secondary">{{ v.severity }}</span></td>
+                                            {% else %}
+                                            <td>{{ v.severity }}</td>
+                                            {% endif %}
+                                            <td>{{ v.score }}</td>
+                                            <td>{{ v.resource }}</td>
+                                            <td>{{ v.installedVersion }}</td>
+                                            <td>{{ v.fixedVersion }}</td>
+                                            <td>{{ v.publishedDate }}</td>
+                                        </tr>
+                                        {% endfor %}
                                         {% endif %}
-                                        <td>{{ v.score }}</td>
-                                        <td>{{ v.resource }}</td>
-                                        <td>{{ v.installedVersion }}</td>
-                                    </tr>
-                                    {% endfor %}
-                                    {% endif %}
-                                    {% endfor %}
-                                </tbody>
-                            </table>
-                        </div>
-                        {% endfor %}
-                        {% for ic in pod_data.init_containers %}
-                        <div id="intVulnList{{ ic.name }}" class="collapse" data-parent="#accordion">
-                            <h2>Init Container: {{ ic.name }}</h2>
-                            <table id="intVulnTable{{ ic.name }}" class="table table-striped table-bordered" style="width:100%">
-                                <thead>
-                                    <tr>
-                                        <th>ID</th>
-                                        <th>Severity</th>
-                                        <th>Score</th>
-                                        <th>Package</th>
-                                        <th>Installed Version</th>
-                                    </tr>
-                                </thead>
-                                <tbody>
-                                    {% for po, vuls in pod_vulns.items() %}
-                                    {% if po == ic.name %}
-                                    {% for v in vuls %}
-                                    <tr>
-                                        <td>
-                                            <a href="https://avd.aquasec.com/nvd/{{ v.vulnerabilityID | lower }}" rel="noopener noreferrer" target="_blank">{{ v.vulnerabilityID }}</a>
-                                        </td>
-                                        {% if v.severity == "CRITICAL" %}
-                                        <td><span class="badge badge-danger">{{ v.severity }}</span></td>
-                                        {% elif v.severity == "HIGH" %}
-                                        <td><span class="badge badge-warning">{{ v.severity }}</span></td>
-                                        {% elif v.severity == "MEDIUM" %}
-                                        <td><span class="badge badge-primary">{{ v.severity }}</span></td>
-                                        {% elif v.severity == "LOW" %}
-                                        <td><span class="badge badge-secondary">{{ v.severity }}</span></td>
-                                        {% else %}
-                                        <td>{{ v.severity }}</td>
+                                        {% endfor %}
+                                    </tbody>
+                                </table>
+                            </div>
+                            {% endfor %}
+                            {% for ic in pod_data.init_containers %}
+                            <div id="intVulnList{{ ic.name }}" class="collapse" data-parent="#accordion">
+                                <h2>Init Container: {{ ic.name }}</h2>
+                                <table id="intVulnTable{{ ic.name }}" class="table table-striped table-bordered" style="width:100%">
+                                    <thead>
+                                        <tr>
+                                            <th>ID</th>
+                                            <th>Severity</th>
+                                            <th>Score</th>
+                                            <th>Package</th>
+                                            <th>Installed Version</th>
+                                            <th>Fixes Version</th>
+                                            <th>Published</th>
+                                        </tr>
+                                    </thead>
+                                    <tbody>
+                                        {% for po, vuls in pod_vulns.items() %}
+                                        {% if po == ic.name %}
+                                        {% for v in vuls %}
+                                        <tr>
+                                            <td>
+                                                <a href="https://avd.aquasec.com/nvd/{{ v.vulnerabilityID | lower }}" rel="noopener noreferrer" target="_blank">{{ v.vulnerabilityID }}</a>
+                                            </td>
+                                            {% if v.severity == "CRITICAL" %}
+                                            <td><span class="badge badge-danger">{{ v.severity }}</span></td>
+                                            {% elif v.severity == "HIGH" %}
+                                            <td><span class="badge badge-warning">{{ v.severity }}</span></td>
+                                            {% elif v.severity == "MEDIUM" %}
+                                            <td><span class="badge badge-primary">{{ v.severity }}</span></td>
+                                            {% elif v.severity == "LOW" %}
+                                            <td><span class="badge badge-secondary">{{ v.severity }}</span></td>
+                                            {% else %}
+                                            <td>{{ v.severity }}</td>
+                                            {% endif %}
+                                            <td>{{ v.score }}</td>
+                                            <td>{{ v.resource }}</td>
+                                            <td>{{ v.installedVersion }}</td>
+                                            <td>{{ v.fixedVersion }}</td>
+                                            <td>{{ v.publishedDate }}</td>
+                                        </tr>
+                                        {% endfor %}
                                         {% endif %}
-                                        <td>{{ v.score }}</td>
-                                        <td>{{ v.resource }}</td>
-                                        <td>{{ v.installedVersion }}</td>
-                                    </tr>
-                                    {% endfor %}
-                                    {% endif %}
-                                    {% endfor %}
-                                </tbody>
-                            </table>
+                                        {% endfor %}
+                                    </tbody>
+                                </table>
+                            </div>
+                            {% endfor %}
                         </div>
-                        {% endfor %}
                     </div>
-                </div>
-                {% endif %}
+                    {% endif %}
                 </div>
             </div>
+            <!-- conditions -->
             <div class="tab-pane fade" id="nav-conditions" role="tabpanel" aria-labelledby="nav-conditions-tab">
                 <div class="card shadow mb-4">
                     <div class="card-body">
@@ -335,6 +346,7 @@
                     </div>
                 </div>
             </div>
+            <!-- security -->
             <div class="tab-pane fade" id="nav-security" role="tabpanel" aria-labelledby="nav-security-tab">
                 <div class="card shadow mb-4">
                     <div class="card-body">
@@ -360,6 +372,7 @@
                     </div>
                 </div>
             </div>
+            <!-- resources -->
             <div class="tab-pane fade" id="nav-resources" role="tabpanel" aria-labelledby="nav-resources-tab">
                 <div class="card shadow mb-4">
                     <div class="card-body">
@@ -483,9 +496,9 @@
                     </div>
                 </div>
             </div>
+            <!-- END -->
         </div>
     </div>
-
 </div>
 {% endblock %}
 
