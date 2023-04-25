@@ -4,6 +4,7 @@ import urllib, base64, requests, json
 from functions.components import db
 from functions.helper_functions import get_logger, ErrorHandler, find_values_in_json
 from flask_login import UserMixin
+from sqlalchemy import inspect
 
 ##############################################################
 ## Helper Functions
@@ -64,10 +65,10 @@ def registry_request(registry_server_url, url_path, header="application/vnd.oci.
     
 def get_image_sbom_vulns(registry_server_url, image, tag):
     vulnerabilities = None
-    rd, links = registry_request(registry_server_url, image+'/manifests/'+tag)
+    rd, links = registry_request(registry_server_url, f"{image}/manifests/{tag}")
     if rd.status_code == 200:
         digest = rd.json()["layers"][0]['digest']
-        rb, links = registry_request(registry_server_url, image+'/blobs/'+digest)
+        rb, links = registry_request(registry_server_url, f"{image}/blobs/{digest}")
         jb = rb.json()
         sbom_vulnerabilities = jb["scanner"]["result"]["Results"][0]["Vulnerabilities"]
         if sbom_vulnerabilities:
@@ -103,7 +104,7 @@ def RegistryGetRepositories(registry_server_url):
 
 def RegistryGetTags(registry_server_url, image):
     registry_base_url = get_base_url(registry_server_url)
-    r, links = registry_request(registry_server_url, image + '/tags/list')
+    r, links = registry_request(registry_server_url, f"{image}/tags/list")
     j = r.json()
     tags = {
         'registry': registry_base_url,
@@ -114,7 +115,7 @@ def RegistryGetTags(registry_server_url, image):
 
 def RegistryGetManifest(registry_server_url, image, tag):
     registry_base_url = get_base_url(registry_server_url)
-    r, links = registry_request(registry_server_url, image + '/manifests/' + tag)
+    r, links = registry_request(registry_server_url, f"{image}/manifests/{tag}")
     j = r.json()
     #print(json.dumps(j, indent=2))
 
@@ -126,7 +127,7 @@ def RegistryGetManifest(registry_server_url, image, tag):
     created_label = None
     manifest['signed'] = False
 
-    rh, links = registry_request(registry_server_url, image+'/manifests/'+tag, "application/vnd.docker.distribution.manifest.v2+json")
+    rh, links = registry_request(registry_server_url, f"{image}/manifests/{tag}", "application/vnd.docker.distribution.manifest.v2+json")
     if 'Docker-Content-Digest' in rh.headers:
         image_digest = rh.headers['Docker-Content-Digest']
         image_tags = RegistryGetTags(registry_server_url, image)
@@ -226,7 +227,7 @@ def RegistryGetManifest(registry_server_url, image, tag):
             # Helm Chart
             if media_type == "application/vnd.cncf.helm.config.v1+json":
                 digest = j["config"]["digest"]
-                r2, links = registry_request(registry_server_url, image+'/blobs/'+digest)
+                r2, links = registry_request(registry_server_url, f"{image}/blobs/{digest}")
                 j2 = r2.json()
                 if "name" in j2:
                     manifest["helm_name"] = j2["name"]
@@ -252,7 +253,7 @@ def RegistryGetManifest(registry_server_url, image, tag):
     if created_label:
         manifest["created"] = created_label
 
-    print(json.dumps(manifest, indent=2))
+    #print(json.dumps(manifest, indent=2))
     return manifest
 
 ##############################################################
@@ -260,7 +261,7 @@ def RegistryGetManifest(registry_server_url, image, tag):
 ##############################################################
 class Registry(UserMixin, db.Model):
     __tablename__ = 'registry'
-    id = db.Column(db.Integer, primary_key=True)
+    id = db.Column(db.Integer, unique=True, primary_key=True)
     registry_server_url = db.Column(db.Text, unique=True, nullable=False)
     registry_server_port = db.Column(db.Text, nullable=False)
     registry_server_auth = db.Column(db.Boolean, nullable=False)
@@ -276,6 +277,27 @@ class Registry(UserMixin, db.Model):
             "registry_server_tls": self.registry_server_tls,
             "insecure_tls": self.insecure_tls,
             "registry_server_auth_token": self.registry_server_auth_token,
+        }
+        return str(return_data)
+    
+class RegistryEvents(UserMixin, db.Model):
+    __tablename__ = 'registry_events'
+    id = db.Column(db.Integer, unique=True, primary_key=True)
+    action = db.Column(db.String(4), unique=False, nullable=False)
+    repository = db.Column(db.String(100), unique=False, nullable=False)
+    tag = db.Column(db.String(100), unique=False, nullable=False)
+    ip = db.Column(db.String(15), unique=False, nullable=False)
+    user = db.Column(db.String(50), unique=False, nullable=False)
+    created = db.Column(db.DateTime, unique=False, nullable=False)
+
+    def __repr__(self):
+        return_data = {
+            "action": self.action,
+            "repository": self.repository,
+            "tag": self.tag,
+            "ip": self.ip,
+            "user": self.user,
+            "created": self.created,
         }
         return str(return_data)
 
@@ -297,7 +319,7 @@ def RegistryServerCreate(registry_server_url, registry_server_port, registry_ser
         )
         if registry_server_auth:
             usrPass = registry_server_auth_user + ":" + registry_server_auth_pass
-            registry.registry_server_auth_token = base64.b64encode(usrPass)
+            registry.registry_server_auth_token = base64.b64encode(usrPass).decode('utf8')
         db.session.add(registry)
         db.session.commit()
 
@@ -313,7 +335,7 @@ def RegistryServerUpdate(registry_server_url, registry_server_url_old, registry_
         registry.insecure_tls = insecure_tls
         if registry_server_auth:
             usrPass = registry_server_auth_user + ":" + registry_server_auth_pass
-            registry.registry_server_auth_token = base64.b64encode(usrPass)
+            registry.registry_server_auth_token = base64.b64encode(usrPass).decode('utf8')
         db.session.commit()
 
 def RegistryServerListGet():
@@ -336,23 +358,34 @@ def RegistryServerDelete(registry_server_url):
         db.session.delete(registry)
         db.session.commit()
 
+def RegistryDeleteTag(registry_server_url, image, tag):
+    rd, links = registry_request(registry_server_url, f"{image}/manifests/{tag}")
+    if rd.status_code == 200:
+        digest = rd.json()["layers"][0]['digest']
+        try:
+            response, links = registry_request(registry_server_url, f"{image}/manifests/{digest}", "DELETE")
+            if response.status_code != 200:
+                ErrorHandler(logger, "Not Supported", response.json()["errors"][0]["message"])
+        except urllib.error.HTTPError as e:
+            ErrorHandler(logger, "Not Supported", e.message)
+    else:
+        ErrorHandler(logger, "Not Supported", rd.reason)
+ 
+# https://stackoverflow.com/questions/71576754/delete-tags-from-a-private-docker-registry
+# https://stackoverflow.com/questions/40770594/upload-a-container-to-registry-v2-using-api-2-5-1
+# https://docs.docker.com/registry/spec/api/#pushing-a-layer
 
-
-
-# https://python.plainenglish.io/build-your-own-docker-registry-ui-with-pythons-flask-e06a8f51c541 
-# https://github.com/brennerm/docker-registry-frontend/blob/93fe4bec031534938f362f1dccfb876806efeb69/docker_registry_frontend/registry.py#L170
-# ui:
-## https://github.com/betonr/repo-d
-## https://github.com/Quiq/docker-registry-ui
-# tagmap
-# https://github.com/arkii/docker-registry-ui
-
-# https://github.com/distribution/distribution/issues/1566#issuecomment-224999363
-def RegistryDeleteTag(registry_server_url, repo, tag):
-    try:
-        response, links = registry_request(registry_server_url, f"{repo}/manifests/{tag}", "DELETE")
-        if response.status_code != 200:
-            ErrorHandler(logger, "Not Supported", response.json()["errors"][0]["message"])
-    except urllib.error.HTTPError as e:
-        ErrorHandler(logger, "Not Supported", e.message)
-        
+def RegistryEventCreate(evet_action, evet_repository, 
+                        evet_tag, evet_ip, evet_user, evet_created):
+    inspector = inspect(db.engine)
+    if inspector.has_table("registry_events"):
+        registry_event = RegistryEvents(
+            action = evet_action,
+            repository = evet_repository,
+            tag = evet_tag,
+            ip = evet_ip,
+            user = evet_user,
+            created = evet_created,
+        )
+        db.session.add(registry_event)
+        db.session.commit()
