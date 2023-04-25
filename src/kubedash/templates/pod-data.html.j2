@@ -198,9 +198,9 @@
                                             {% elif c.ready == "ImagePullBackOff" %}
                                             <td><span class="badge badge-danger">{{ c.ready }}</span></td>
                                             {% elif c.ready == "PodInitializing"%}
-                                            <td><span class="badge badge-secondary">{{ c.ready }}</span></td>
+                                            <td><span class="badge badge-info">{{ c.ready }}</span></td>
                                             {% else %}
-                                            <td>{{ c.ready }}</td>
+                                            <td><span class="badge badge-secondary">{{ c.ready }}</span></td>
                                             {% endif %}
                                             <td>{{ c.name }}</td>
                                             <td>{{ c.image }}</td>
@@ -250,9 +250,9 @@
                                             {% elif v.severity == "MEDIUM" %}
                                             <td><span class="badge badge-primary">{{ v.severity }}</span></td>
                                             {% elif v.severity == "LOW" %}
-                                            <td><span class="badge badge-secondary">{{ v.severity }}</span></td>
+                                            <td><span class="badge badge-info">{{ v.severity }}</span></td>
                                             {% else %}
-                                            <td>{{ v.severity }}</td>
+                                            <td><span class="badge badge-secondary">{{ v.severity }}</span></td>
                                             {% endif %}
                                             <td>{{ v.score }}</td>
                                             <td>{{ v.resource }}</td>
@@ -297,9 +297,9 @@
                                             {% elif v.severity == "MEDIUM" %}
                                             <td><span class="badge badge-primary">{{ v.severity }}</span></td>
                                             {% elif v.severity == "LOW" %}
-                                            <td><span class="badge badge-secondary">{{ v.severity }}</span></td>
+                                            <td><span class="badge badge-info">{{ v.severity }}</span></td>
                                             {% else %}
-                                            <td>{{ v.severity }}</td>
+                                            <td><span class="badge badge-secondary">{{ v.severity }}</span></td>
                                             {% endif %}
                                             <td>{{ v.score }}</td>
                                             <td>{{ v.resource }}</td>
