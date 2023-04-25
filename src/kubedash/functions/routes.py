@@ -1865,7 +1865,6 @@ def image_list():
         session['registry_server_url'] = request.form.get('registry_server_url')
 
     image_list = RegistryGetRepositories(session['registry_server_url'])
-    # print(image_list) # DEBUG
 
     return render_template(
         'registry-image-list.html.j2',
@@ -1883,7 +1882,6 @@ def image_tags():
             session['image_name'] = request.form.get('image_name')
 
     tag_list = RegistryGetTags(session['registry_server_url'], session['image_name'])
-    print(tag_list) # DEBUG
 
     return render_template(
         'registry-image-tag-list.html.j2',
@@ -1911,7 +1909,6 @@ def image_data():
             session['tag_name'] = request.form.get('tag_name')
 
     tag_data = RegistryGetManifest(session['registry_server_url'], session['image_name'], session['tag_name'])
-    #print(tag_data) # DEBUG
 
     return render_template(
         'registry-image-tag-data.html.j2',

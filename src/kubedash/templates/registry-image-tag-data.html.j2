@@ -342,9 +342,9 @@
                                             {% elif v.severity == "MEDIUM" %}
                                             <td><span class="badge badge-primary">{{ v.severity }}</span></td>
                                             {% elif v.severity == "LOW" %}
-                                            <td><span class="badge badge-secondary">{{ v.severity }}</span></td>
+                                            <td><span class="badge badge-info">{{ v.severity }}</span></td>
                                             {% else %}
-                                            <td>{{ v.severity }}</td>
+                                            <td><span class="badge badge-secondary">{{ v.severity }}</span></td>
                                             {% endif %}
                                             <td>{{ v.score }}</td>
                                             <td>{{ v.resource }}</td>
