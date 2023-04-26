@@ -1814,8 +1814,8 @@ def registry():
         selected = request.form.get('selected')
         request_type = request.form['request_type']
         if request_type == "create":
-            registry_server_tls = request.form.get('registry_server_tls') in ['True']
-            insecure_tls = request.form.get('insecure_tls') in ['True']
+            registry_server_tls = request.form.get('registry_server_tls_register_value') in ['True']
+            insecure_tls = request.form.get('insecure_tls_register_value') in ['True']
             registry_server_url = request.form.get('registry_server_url')
             registry_server_port = request.form.get('registry_server_port')
             if request.form.get('registry_server_auth_user') and request.form.get('registry_server_auth_pass'):
@@ -1828,8 +1828,8 @@ def registry():
                         registry_server_auth_pass)
             flash("Registry Created Successfully", "success")
         elif request_type == "edit":
-            registry_server_tls = request.form.get('registry_server_tls') in ['True']
-            insecure_tls = request.form.get('insecure_tls') in ['True']
+            registry_server_tls = request.form.get('registry_server_tls_edit_value') in ['True']
+            insecure_tls = request.form.get('insecure_tls_edit_value') in ['True']
             registry_server_url = request.form.get('registry_server_url')
             registry_server_url_old = request.form.get('registry_server_url_old')
             registry_server_port = request.form.get('registry_server_port')

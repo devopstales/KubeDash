@@ -124,14 +124,19 @@
                                 {% if tag_data.format == "Docker" %}
                                     <tr>
                                         <th>Entrypoint</th>
-                                        <td>{{ tag_data.entrypoint }}</td>
+                                        <td>
+                                        {% if tag_data.entrypoint %}
+                                            {% for item in tag_data.entrypoint %}
+                                                {{ item }}{% if not loop.last %} {% endif %}
+                                            {% endfor %}
+                                        {% endif %}
+                                        </td>
                                     </tr>
                                     <tr>
                                         <th>CMD</th>
                                         <td>
-                                            
                                             {% for item in tag_data.cmd %}
-                                                {{ item }}{% if not loop.last %} {% endif %}
+                                               {{ item }}{% if not loop.last %} {% endif %}
                                             {% endfor %}
                                         </td>
                                     </tr>
@@ -160,9 +165,11 @@
                                     <tr>
                                         <th>Volumes</th>
                                         <td>
+                                        {% if tag_data.volumes %}
                                             {% for item in tag_data.volumes %}
                                                 {{ item }}{% if not loop.last %}<br>{% endif %}
                                             {% endfor %}
+                                        {% endif %}
                                         </td>
                                     </tr>
                                     <tr>
