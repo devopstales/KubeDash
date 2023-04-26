@@ -262,7 +262,7 @@ def RegistryGetManifest(registry_server_url, image, tag):
 ##############################################################
 class Registry(UserMixin, db.Model):
     __tablename__ = 'registry'
-    id = db.Column(db.Integer, unique=True, primary_key=True)
+    id = db.Column(db.Integer, primary_key=True)
     registry_server_url = db.Column(db.Text, unique=True, nullable=False)
     registry_server_port = db.Column(db.Text, nullable=False)
     registry_server_auth = db.Column(db.Boolean, nullable=False)
@@ -286,9 +286,10 @@ class RegistryEvents(UserMixin, db.Model):
     id = db.Column(db.Integer, unique=True, primary_key=True)
     action = db.Column(db.String(4), unique=False, nullable=False)
     repository = db.Column(db.String(100), unique=False, nullable=False)
-    tag = db.Column(db.String(100), unique=False, nullable=False)
+    tag = db.Column(db.String(100), unique=False, nullable=True)
+    digest = db.Column(db.String(100), unique=False, nullable=False)
     ip = db.Column(db.String(15), unique=False, nullable=False)
-    user = db.Column(db.String(50), unique=False, nullable=False)
+    user = db.Column(db.String(50), unique=False, nullable=True)
     created = db.Column(db.DateTime, unique=False, nullable=False)
 
     def __repr__(self):
@@ -376,17 +377,18 @@ def RegistryDeleteTag(registry_server_url, image, tag):
 # https://stackoverflow.com/questions/40770594/upload-a-container-to-registry-v2-using-api-2-5-1
 # https://docs.docker.com/registry/spec/api/#pushing-a-layer
 
-def RegistryEventCreate(evet_action, evet_repository, 
-                        evet_tag, evet_ip, evet_user, evet_created):
+def RegistryEventCreate(event_action, event_repository, 
+                        event_tag, event_digest, event_ip, event_user, event_created):
     inspector = inspect(db.engine)
     if inspector.has_table("registry_events"):
         registry_event = RegistryEvents(
-            action = evet_action,
-            repository = evet_repository,
-            tag = evet_tag,
-            ip = evet_ip,
-            user = evet_user,
-            created = evet_created,
+            action = event_action,
+            repository = event_repository,
+            tag = event_tag,
+            digest = event_digest,
+            ip = event_ip,
+            user = event_user,
+            created = event_created,
         )
         db.session.add(registry_event)
         db.session.commit()
