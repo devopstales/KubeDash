@@ -1,6 +1,7 @@
 #!/usr/bin/env python3
 
-import urllib, base64, requests, json
+import urllib, requests, json
+from itsdangerous import base64_encode, base64_decode
 from functions.components import db
 from functions.helper_functions import get_logger, ErrorHandler, find_values_in_json
 from flask_login import UserMixin
@@ -41,7 +42,7 @@ def get_request_options(registry_server_url):
             verify = False         
 
         if registry.registry_server_auth:
-            headers["Authorization"]="Basic" + base64.b64decode(registry.registry_server_auth_token)
+            headers["Authorization"]="Basic "+str(registry.registry_server_auth_token)
 
     return verify, headers
 
@@ -51,17 +52,17 @@ def registry_request(registry_server_url, url_path, header="application/vnd.oci.
     verify, headers = get_request_options(registry_server_url)
     headers["Accept"]=header
 
-    try:
-        r = requests.request(url=api_url, method=method, headers=headers, verify=verify)
-        if r.status_code == 401:
-            raise Exception('Return Code was 401, Authentication required / not successful!')
+    #try:
+    r = requests.request(url=api_url, method=method, headers=headers, verify=verify)
+    if r.status_code == 401:
+        raise Exception('Return Code was 401, Authentication required / not successful!')
+    else:
+        if r.links:
+            return r, r.links['next']['url']
         else:
-            if r.links:
-                return r, r.links['next']['url']
-            else:
-                return r, None
-    except requests.RequestException:
-        raise Exception("Problem during docker registry connection")
+            return r, None
+    #except requests.RequestException:
+    #    raise Exception("Problem during docker registry connection")
     
 def get_image_sbom_vulns(registry_server_url, image, tag):
     vulnerabilities = None
@@ -169,7 +170,7 @@ def RegistryGetManifest(registry_server_url, image, tag):
                     manifest["cmd"] = json_history["config"]["Cmd"]
                 if "Entrypoint" in json_history["config"]:
                     manifest["entrypoint"] = json_history["config"]["Entrypoint"]
-                if "Labels" in json_history["config"]:
+                if "Labels" in json_history["config"] and json_history["config"]["Labels"]:
                     manifest["labels"] = json_history["config"]["Labels"]
                     for l_key, l_value in json_history["config"]["Labels"].items():
                         if l_key == "maintainer":
@@ -319,7 +320,7 @@ def RegistryServerCreate(registry_server_url, registry_server_port, registry_ser
         )
         if registry_server_auth:
             usrPass = registry_server_auth_user + ":" + registry_server_auth_pass
-            registry.registry_server_auth_token = base64.b64encode(usrPass).decode('utf8')
+            registry.registry_server_auth_token = str(base64_encode(usrPass), "UTF-8")
         db.session.add(registry)
         db.session.commit()
 
@@ -335,7 +336,7 @@ def RegistryServerUpdate(registry_server_url, registry_server_url_old, registry_
         registry.insecure_tls = insecure_tls
         if registry_server_auth:
             usrPass = registry_server_auth_user + ":" + registry_server_auth_pass
-            registry.registry_server_auth_token = base64.b64encode(usrPass).decode('utf8')
+            registry.registry_server_auth_token = str(base64_encode(usrPass), "UTF-8")
         db.session.commit()
 
 def RegistryServerListGet():
