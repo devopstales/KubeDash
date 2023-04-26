@@ -4,6 +4,7 @@ from flask_login import login_user, login_required, logout_user, current_user
 from flask_socketio import disconnect
 from werkzeug.security import check_password_hash
 from itsdangerous import base64_encode, base64_decode
+from datetime import datetime
 
 from functions.helper_functions import get_logger, email_check
 from functions.sso import SSOSererGet, get_auth_server_info, SSOServerUpdate, SSOServerCreate
@@ -12,7 +13,7 @@ from functions.user import User, UsersRoles, Role, UserUpdate, UserCreate, UserD
 from functions.k8s import *
 from functions.registry import *
 
-from functions.components import tracer, socketio
+from functions.components import tracer, socketio, csrf
 from threading import Lock
 from opentelemetry.trace.status import Status, StatusCode
 
@@ -1917,17 +1918,22 @@ def image_data():
         tag_name = session['tag_name'],
     )
 
+@routes.route("/registry/events", methods=['POST'])
+@csrf.exempt
+def registry_events():
+    events = request.json["events"]
+    for event in events:
+        timestamp = datetime.now()
+        try:
+            actor = event["actor"]["name"]
+        except KeyError:
+            actor = None
+        if "tag" in event["target"]:
+            RegistryEventCreate(event["action"], event["target"]["repository"], 
+                event["target"]["tag"], event["target"]["digest"], event["request"]["addr"].split(":")[0], actor, timestamp)
 
-
-"""
-image: Image name, Format, Tags, Architecture
-tags:  Tag name, Size, LAyers, Created
-tag data: Entrypoint, Labels, ExposedPorts,
----
-image: Image name, Format, Tags, Architecture
-tags:  Tag name, Size, pull command, Vulnability, Signed, Author, Created
-
-"""
+    resp = jsonify(success=True)
+    return resp
 
 ##############################################################
 ## Helm Charts
