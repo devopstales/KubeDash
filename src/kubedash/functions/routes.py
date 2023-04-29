@@ -1910,10 +1910,12 @@ def image_data():
             session['tag_name'] = request.form.get('tag_name')
 
     tag_data = RegistryGetManifest(session['registry_server_url'], session['image_name'], session['tag_name'])
+    tag_events = RegistryGetEvent(session['image_name'], session['tag_name'])
 
     return render_template(
         'registry-image-tag-data.html.j2',
         tag_data = tag_data,
+        tag_events = tag_events,
         image_name = session['image_name'],
         tag_name = session['tag_name'],
     )
@@ -1929,7 +1931,8 @@ def registry_events():
         except KeyError:
             actor = None
         if "tag" in event["target"]:
-            RegistryEventCreate(event["action"], event["target"]["repository"], 
+            if event["request"]["useragent"] != "KubeDash":
+                RegistryEventCreate(event["action"], event["target"]["repository"], 
                 event["target"]["tag"], event["target"]["digest"], event["request"]["addr"].split(":")[0], actor, timestamp)
 
     resp = jsonify(success=True)
