@@ -392,3 +392,10 @@ def RegistryEventCreate(event_action, event_repository,
         )
         db.session.add(registry_event)
         db.session.commit()
+
+def RegistryGetEvent(repository, tag):
+    registry_events = None
+    inspector = inspect(db.engine)
+    if inspector.has_table("registry_events"):
+        registry_events = RegistryEvents.query.filter_by(repository=repository, tag=tag).all()
+    return registry_events
