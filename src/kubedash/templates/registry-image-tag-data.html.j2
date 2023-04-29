@@ -46,6 +46,11 @@
                 <a class="nav-link" id="nav-vuln-tab" data-toggle="tab" href="#nav-vuln" role="tab" aria-controls="nav-vuln" aria-selected="false" data-toggle="tab">Vulnerabilities</a>
             </li>
             {% endif %}
+            {% if tag_events %}
+            <li class="nav-item">
+                <a class="nav-link" id="nav-events-tab" data-toggle="tab" href="#nav-events" role="tab" aria-controls="nav-events" aria-selected="false" data-toggle="tab">Events</a>
+            </li>
+            {% endif %}
         </ul>
         <div class="tab-content" id="nav-tabContent">
             <div class="tab-pane fade show active" id="nav-info" role="tabpanel" aria-labelledby="nav-info-tab">
@@ -366,6 +371,37 @@
                 </div>
             </div>
             <!-- -->
+            <div class="tab-pane fade" id="nav-events" role="tabpanel" aria-labelledby="nav-events-tab">
+                <div id="accordion">
+                    <div class="card shadow mb-4">
+                        <div class="card-body">
+                            <h3>Event Log</h3>
+                            <div class="table-responsive">
+                                <table class="table table-bordered" id="infoInfoTable" width="100%" cellspacing="0">
+                                    <thead>
+                                        <tr>
+                                            <th>Action</th>
+                                            <th>IP Adress</th>
+                                            <th>User</th>
+                                            <th>Time</th>
+                                        </tr>
+                                    </thead>
+                                    <tbody>
+                                        {% for e in tag_events %}
+                                        <tr>
+                                            <td>{{ e.action }}</td>
+                                            <td>{{ e.ip }}</td>
+                                            <td>{{ e.user }}</td>
+                                            <td>{{ e.created }}</td>
+                                        </tr>
+                                        {% endfor %}
+                                    </tbody>
+                                </table>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
         </div>
     </div>
 </div>
