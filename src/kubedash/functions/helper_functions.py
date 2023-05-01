@@ -28,6 +28,9 @@ def ErrorHandler(logger, error, action):
         flash(action, "danger")
         logger.error("Exception: %s \n" % action)
 
+def ResponseHandler(message, status):
+    flash(message, status)
+
 def email_check(email):
     regex = r'\b[A-Za-z0-9._%+-]+@[A-Za-z0-9.-]+\.[A-Z|a-z]{2,}\b'
     if(re.fullmatch(regex, email)):
