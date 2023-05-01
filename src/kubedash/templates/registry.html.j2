@@ -58,12 +58,12 @@
                         <div class="custom-control custom-switch">
                             <input type="checkbox" class="custom-control-input" id="registry_server_tls_register" onclick="checkbox('registry_server_tls_register')" checked>
                             <label class="custom-control-label" for="registry_server_tls_register">TLS</label>
-                            <input type="text" name="registry_server_tls_register_value" id="registry_server_tls_register_value" value="True">
+                            <input type="hidden" name="registry_server_tls_register_value" id="registry_server_tls_register_value" value="True">
                         </div>
                         <div class="custom-control custom-switch">
                             <input type="checkbox" class="custom-control-input" id="insecure_tls_register" onclick="checkbox('insecure_tls_register')">
                             <label class="custom-control-label" for="insecure_tls_register">Insecure TLS</label>
-                            <input type="text" name="insecure_tls_register_value" id="insecure_tls_register_value" value="False">
+                            <input type="hidden" name="insecure_tls_register_value" id="insecure_tls_register_value" value="False">
                         </div>
                         <div class="modal-footer">
                             <div class="form-group mt-2">
@@ -151,6 +151,7 @@
                 <form action="/registry" method="POST">
                     <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
                     <input type="hidden" name="request_type" value="edit" />
+                    <input type="hidden" name="registry_server_url_old" value="{{ server.registry_server_url }}" />
                     <div class="form-group">
                         <label for="registry_server_url">Registry Hostname</label>
                         <input type="text" class="form-control" id="registry_server_url" name="registry_server_url" value="{{ server.registry_server_url }}">
@@ -168,14 +169,14 @@
                         <input type="password" class="form-control" id="registry_server_auth_pass" name="registry_server_auth_pass" value="{{ server.registry_server_auth_pass|replace('None','') }}">
                     </div>
                     <div class="custom-control custom-switch">
-                        <input type="checkbox" class="custom-control-input" id="registry_server_tls_edit" onclick="checkbox('registry_server_tls_edit')" checked>
+                        <input type="checkbox" class="custom-control-input" id="registry_server_tls_edit" onclick="checkbox('registry_server_tls_edit')" {% if server.registry_server_tls %}checked{% endif %}>
                         <label class="custom-control-label" for="registry_server_tls_edit">TLS</label>
-                        <input type="hidden" name="registry_server_tls_edit_value" id="registry_server_tls_edit_value" value="True">
+                        <input type="hidden" name="registry_server_tls_edit_value" id="registry_server_tls_edit_value" value="{{ server.registry_server_tls }}">
                     </div>
                     <div class="custom-control custom-switch">
-                        <input type="checkbox" class="custom-control-input" id="insecure_tls_edit" onclick="checkbox('insecure_tls_edit')">
+                        <input type="checkbox" class="custom-control-input" id="insecure_tls_edit" onclick="checkbox('insecure_tls_edit')" {% if server.insecure_tls %}checked{% endif %}>
                         <label class="custom-control-label" for="insecure_tls_edit">Insecure TLS</label>
-                        <input type="hidden" name="insecure_tls_edit_value" id="insecure_tls_edit_value" value="False">
+                        <input type="hidden" name="insecure_tls_edit_value" id="insecure_tls_edit_value" value="{{ server.insecure_tls }}">
                     </div>
                     <div class="modal-footer">
                         <div class="form-group mt-2">

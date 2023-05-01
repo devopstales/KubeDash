@@ -434,12 +434,13 @@ def RegistryServerUpdate(registry_server_url, registry_server_url_old, registry_
     if registry:
         registry.registry_server_url = registry_server_url
         registry.registry_server_port = registry_server_port
-        registry.registry_server_auth = registry_server_auth
         registry.registry_server_tls = registry_server_tls
         registry.insecure_tls = insecure_tls
         if registry_server_auth:
+            registry.registry_server_auth = registry_server_auth
             usrPass = registry_server_auth_user + ":" + registry_server_auth_pass
             registry.registry_server_auth_token = str(base64_encode(usrPass), "UTF-8")
+        print(registry.insecure_tls)
         db.session.commit()
 
 def RegistryServerListGet():
