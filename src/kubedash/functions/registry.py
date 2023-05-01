@@ -1,11 +1,12 @@
 #!/usr/bin/env python3
 
-import urllib, requests, json
+import  requests, json, hashlib
 from itsdangerous import base64_encode, base64_decode
 from functions.components import db
-from functions.helper_functions import get_logger, ErrorHandler, find_values_in_json
+from functions.helper_functions import get_logger, ErrorHandler, ResponseHandler, find_values_in_json
 from flask_login import UserMixin
 from sqlalchemy import inspect
+from datetime import datetime
 
 ##############################################################
 ## Helper Functions
@@ -35,34 +36,49 @@ def get_request_options(registry_server_url):
     headers = {
         "Cache-Control": "no-cache",
         "User-Agent": "KubeDash",
-        "Content-type": "application/x-www-form-urlencoded",
+        "Content-Type": "application/x-www-form-urlencoded",
     }
     if registry:
         if registry.insecure_tls:
-            verify = False         
+            verify = False
+            import urllib3
+            urllib3.disable_warnings()
 
         if registry.registry_server_auth:
             headers["Authorization"]="Basic "+str(registry.registry_server_auth_token)
 
     return verify, headers
 
-def registry_request(registry_server_url, url_path, header="application/vnd.oci.image.manifest.v1+json", method='GET'):
+def registry_request(registry_server_url, url_path, header=None, method='GET', data=None):
     registry_base_url = get_base_url(registry_server_url)
     api_url = registry_base_url + '/v2/' + url_path
+    logger.debug("%s %s" % (method, api_url)) # DEBUG
     verify, headers = get_request_options(registry_server_url)
-    headers["Accept"]=header
-
-    #try:
-    r = requests.request(url=api_url, method=method, headers=headers, verify=verify)
-    if r.status_code == 401:
-        raise Exception('Return Code was 401, Authentication required / not successful!')
+    if header:
+        header_name = header.split(':',1)[0]
+        header_value = header.split(':',1)[-1]
+        headers[header_name] = header_value
     else:
-        if r.links:
-            return r, r.links['next']['url']
+        headers["Accept"] = "application/vnd.oci.image.manifest.v1+json"
+
+    # Debugging
+    #proxies = {
+    #'http': 'http://127.0.0.1:8080',
+    #'https': 'http://127.0.0.1:8080',
+    #}
+
+    try:
+        r = requests.request(url=api_url, method=method, headers=headers, verify=verify, data=data) # proxies=proxies
+        if r.status_code == 401:
+            ErrorHandler(logger, "Registry Error", 'Return Code was 401, Authentication required / not successful!')
+            raise Exception()
         else:
-            return r, None
-    #except requests.RequestException:
-    #    raise Exception("Problem during docker registry connection")
+            if r.links:
+                return r, r.links['next']['url']
+            else:
+                return r, None
+    except requests.RequestException:
+        ErrorHandler(logger, "Registry Error", 'Problem during docker registry connection')
     
 def get_image_sbom_vulns(registry_server_url, image, tag):
     vulnerabilities = None
@@ -128,7 +144,7 @@ def RegistryGetManifest(registry_server_url, image, tag):
     created_label = None
     manifest['signed'] = False
 
-    rh, links = registry_request(registry_server_url, f"{image}/manifests/{tag}", "application/vnd.docker.distribution.manifest.v2+json")
+    rh, links = registry_request(registry_server_url, f"{image}/manifests/{tag}", "Accept:application/vnd.docker.distribution.manifest.v2+json")
     if 'Docker-Content-Digest' in rh.headers:
         image_digest = rh.headers['Docker-Content-Digest']
         image_tags = RegistryGetTags(registry_server_url, image)
@@ -257,6 +273,92 @@ def RegistryGetManifest(registry_server_url, image, tag):
     #print(json.dumps(manifest, indent=2))
     return manifest
 
+def RegistryDeleteTag(registry_server_url, image, tag):
+    dummy_hash = "sha256:44136fa355b3678a1146ad16f7e8649e94fb4fc21fe77e8310c060f61caaff8a"
+    r, links = registry_request(registry_server_url, f"{image}/manifests/{tag}", None, "DELETE")
+    if r.status_code == 200:
+        ResponseHandler(f"Tag {tag} deleted successfully", "success")
+    elif r.status_code == 400:
+        r2, links = registry_request(registry_server_url, f"{image}/blobs/uploads/?mount={dummy_hash}", None, "POST")
+        LOCATION = r2.headers["Location"].split("/")[-1]
+        if r2.status_code == 202:
+            dummy_json = "{}"
+            r3, links = registry_request(registry_server_url, f"{image}/blobs/uploads/{LOCATION}&digest={dummy_hash}", "Content-Type:application/octet-stream", "PUT", dummy_json)
+            if r3.status_code == 201:
+                manifest_json = {
+                    "created": datetime.now().strftime("%Y-%m-%dT%H:%M:%S.%f"),
+                    "architecture": "amd64",
+                    "os": "linux",
+                    "config":{
+                        "Labels":{
+                            "delete-date": datetime.now().strftime("%Y-%m-%dT%H:%M:%S.%f"),
+                            "delete-tag": tag,
+                        }
+                    },
+                    "rootfs": {
+                        "type":"layers",
+                        "diff_ids":["sha256:44136fa355b3678a1146ad16f7e8649e94fb4fc21fe77e8310c060f61caaff8a"],
+                    },
+                    "history": [
+                        {
+                            "created": datetime.now().strftime("%Y-%m-%dT%H:%M:%S.%f"),
+                            "created_by":"# regclient",
+                            "comment":"scratch blob",
+                        }
+                    ],
+                }
+                formatted_manifest_json = json.dumps(manifest_json, sort_keys = True).encode("utf-8")
+                manifest_json_hash = hashlib.sha256(formatted_manifest_json).hexdigest().lower()
+                r4, links = registry_request(registry_server_url, f"{image}/blobs/uploads/?mount=sha256:{manifest_json_hash}", None, "POST")
+                if r4.status_code == 202:
+                    LOCATION2 = r4.headers["Location"].split("/")[-1]
+                    r5, links = registry_request(registry_server_url, f"{image}/blobs/uploads/{LOCATION2}&digest=sha256:{manifest_json_hash}", "Content-Type:application/octet-stream", "PUT", formatted_manifest_json)
+                    if r5.status_code == 201:
+                        manifest_json2 = {
+                            "schemaVersion":2,
+                            "mediaType":"application/vnd.docker.distribution.manifest.v2+json",
+                            "config":{
+                                "mediaType":"application/vnd.docker.container.image.v1+json",
+                                "size":418,
+                                "digest": f"sha256:{manifest_json_hash}",
+                                "layers":[
+                                    {
+                                        "mediaType":"application/vnd.docker.image.rootfs.diff.tar.gzip",
+                                        "size":2,
+                                        "digest":"sha256:44136fa355b3678a1146ad16f7e8649e94fb4fc21fe77e8310c060f61caaff8a",
+                                    }
+                                ],
+                            },
+                        }
+                        formatted_manifest_json2 = json.dumps(manifest_json2, sort_keys = True).encode("utf-8")
+                        r6, links = registry_request(registry_server_url, f"{image}/manifests/{tag}", "Content-Type:application/vnd.docker.distribution.manifest.v2+json", "PUT", formatted_manifest_json2)
+                        if r6.status_code == 201:
+                            image_digest = r6.headers['Docker-Content-Digest']
+                            r7, links = registry_request(registry_server_url, f"{image}/manifests/{image_digest}", None, "DELETE")
+                            if r7.status_code == 202:
+                                ResponseHandler(f"Tag {tag} deleted successfully", "info")
+                            else:
+                                ErrorHandler(logger, "Cannot Delete Tag", "Cannot Delete Tag: (r7) %s" % r7.json()["errors"][0]["message"])
+                                logger.debug("r7: %s %s" % (r7.status_code, r7.reason)) # DEBUG
+                        else:
+                            ErrorHandler(logger, "Cannot Delete Tag", "Cannot Delete Tag: (r6) %s" % r6.json()["errors"][0]["message"])
+                            logger.debug("r6: %s %s" % (r6.status_code, r6.reason)) # DEBUG
+                    else:
+                        ErrorHandler(logger, "Cannot Delete Tag", "Cannot Delete Tag: (r5) %s" % r5.json()["errors"][0]["message"])
+                        logger.debug("r5: %s %s" % (r5.status_code, r5.reason)) # DEBUG
+                else:
+                    ErrorHandler(logger, "Cannot Delete Tag", "Cannot Delete Tag: (r4) %s" % r4.json()["errors"][0]["message"])
+                    logger.debug("r4: %s %s" % (r4.status_code, r4.reason)) # DEBUG
+            else:
+                ErrorHandler(logger, "Cannot Delete Tag", "Cannot Delete Tag: (r3) %s" % r3.json()["errors"][0]["message"])
+                logger.debug("r3: %s %s" % (r3.status_code, r3.reason)) # DEBUG
+        else:
+            ErrorHandler(logger, "Cannot Delete Tag", "Cannot Delete Tag: (r2) %s" % r2.json()["errors"][0]["message"])
+            logger.debug("r2: %s %s" % (r2.status_code, r2.reason)) # DEBUG
+    else:
+        ErrorHandler(logger, "Cannot Delete Tag", "Cannot Delete Tag: (r1) %s" % r.json()["errors"][0]["message"])
+        logger.debug("r1: %s %s" % (r.status_code, r.reason)) # DEBUG
+
 ##############################################################
 ## Database Models
 ##############################################################
@@ -359,23 +461,6 @@ def RegistryServerDelete(registry_server_url):
     if registry:
         db.session.delete(registry)
         db.session.commit()
-
-def RegistryDeleteTag(registry_server_url, image, tag):
-    rd, links = registry_request(registry_server_url, f"{image}/manifests/{tag}")
-    if rd.status_code == 200:
-        digest = rd.json()["layers"][0]['digest']
-        try:
-            response, links = registry_request(registry_server_url, f"{image}/manifests/{digest}", "DELETE")
-            if response.status_code != 200:
-                ErrorHandler(logger, "Not Supported", response.json()["errors"][0]["message"])
-        except urllib.error.HTTPError as e:
-            ErrorHandler(logger, "Not Supported", e.message)
-    else:
-        ErrorHandler(logger, "Not Supported", rd.reason)
- 
-# https://stackoverflow.com/questions/71576754/delete-tags-from-a-private-docker-registry
-# https://stackoverflow.com/questions/40770594/upload-a-container-to-registry-v2-using-api-2-5-1
-# https://docs.docker.com/registry/spec/api/#pushing-a-layer
 
 def RegistryEventCreate(event_action, event_repository, 
                         event_tag, event_digest, event_ip, event_user, event_created):
