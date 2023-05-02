@@ -9,5 +9,3 @@ $ kubectl -n kubedash exec $(kubectl -n kubedash get pods -l app=kubedash | grep
 New password for default administrator (admin):
 <new_password>
 ```
-
-## How can I enable debug logging?
