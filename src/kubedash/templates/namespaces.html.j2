@@ -99,10 +99,12 @@
                         {% if session['user_role'] == "Admin" %}
                         <!-- Button trigger modal -->
                         <form action="/namespaces/delete" method="post">
+			{#
                           <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
                           <button type="button" class="btn btn-success btn-just-icon btn-xs" data-toggle="modal" data-bs-target="#modaledit" data-ns="{{ ns.name }}">
                               <i class="material-icons">edit</i>
                           </button>
+			#}
                           <input type="hidden"  name="namespace" value="{{ ns.name }}"/>
                           <button type="submit" rel="tooltip" class="btn btn-danger btn-just-icon btn-sm" value="upvote">
                               <i class="material-icons">delete</i>
