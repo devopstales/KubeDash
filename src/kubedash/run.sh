@@ -7,4 +7,4 @@ export KUBECONFIG=/etc/rancher/k3s/k3s.yaml
 
 flask db upgrade
 
-flask run --host 0.0.0.0 --port 8000
+flask run --host 0.0.0.0 --port 8800
