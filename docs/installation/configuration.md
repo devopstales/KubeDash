@@ -13,7 +13,7 @@ serviceAccount:
 
 image:
   repository: devopstales/kubedash
-  tag: 0.1
+  tag: 2.0
   pullPolicy: Always
 
 podSecurityContext:
@@ -58,7 +58,7 @@ The following tables lists configurable parameters of the trivy-operator chart a
 | flaskConfig | string | `"production"` | flask environment: production or development |
 | image.pullPolicy | string | `"Always"` | The docker image pull policy |
 | image.repository | string | `"devopstales/kubedash"` | The docker image repository to use |
-| image.tag | string | `"0.1-devel"` | The docker image tag to use |
+| image.tag | string | `"2.0"` | The docker image tag to use |
 | ingress.annotations | object | `{"kubernetes.io/ingress.class":"nginx","nginx.ingress.kubernetes.io/proxy-body-size":"10m"}` | Extra annotation to the Ingress object |
 | ingress.enabled | bool | `true` | Enable Ingress object creation |
 | ingress.tls.certManager.clusterIssuer | string | `"letsencrypt"` | Name of the certManager cluster issuer to use |
