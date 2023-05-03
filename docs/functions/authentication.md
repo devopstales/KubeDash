@@ -6,11 +6,12 @@ To log in for the first time the default user and password is `admin` `admin`. A
 
 ## Authentication
 
-One of the key features that KubeDash adds to Kubernetes is centralized user management. This feature allows to set up local users and/or connect to an external Oath2 authentication provider. By connecting to an external authentication provider, you can leverage that provider's user and groups.
+One of the key features that KubeDash adds to Kubernetes is centralized user management. This feature allows to set up local users and/or connect to an external OIDC authentication provider. By connecting to an external authentication provider, you can leverage that provider's user and groups.
 
-### Configure Oauth2 provider
+![First Login](../img/KubeDash_1.1_pic_02_login.png)
+### Configure OIDC provider
 
-To add an oauth2 provider to KubeDash go to `Settings > SSO Configuration`:
+To add an OIDC provider to KubeDash go to `Settings > SSO Configuration`:
 
 | Parameter | Description |
 |-----------|-------------|
@@ -19,7 +20,7 @@ To add an oauth2 provider to KubeDash go to `Settings > SSO Configuration`:
 | Identity Provider Client ID | The `Client ID` of your IdP client. |
 | Identity Provider Client Secret | The generated `Secret` of your IdP client.  |
 
-![Configure Oauth2 provider](../img/KubeDash_1.0_pic_07_sso_config.png)
+![Configure OIDC provider](../img/KubeDash_1.0_pic_07_sso_config.png)
 
 ## Authorization
 
@@ -29,4 +30,4 @@ Once an user logged in to KubeDash the their access rights within the system, is
 
 From kubernetes perspective all of your privileges are determined by Role-Based Access Control (RBAC). The KubeDash Admin role allow you to use the KubeDash pod's cluster-admin ServiceAccount for the interactions with the kubernetes API. 
 
-With the Local role KubeDash use your Oath2 token for the same purpose, so you have the same privileges as in the cli.
+With the Local role KubeDash use your OIDC token for the same purpose, so you have the same privileges as in the cli.
