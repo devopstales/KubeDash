@@ -4,7 +4,7 @@ Within KubDash, each person authenticates as a **user**, which is a login that g
 
 ## Edit Kubernetes Roles and Role bindings
 
-KuDash enables a super-easy and user-friendly RBAC management for Kubernetes. If you are looking for a simple and intuitive way of managing your users within a Kubernetes cluster, this is the right place. 
+KuDash enables a super-easy and user-friendly RBAC management for Kubernetes. If you are looking for a simple and intuitive way of managing your users within a Kubernetes cluster, this is the right place.
 
 With KuDash, you can create users, assign namespaces/permissions, and distribute Kubeconfig YAML files via a nice and easy web UI.
 

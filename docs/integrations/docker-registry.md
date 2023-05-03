@@ -81,7 +81,7 @@ notifications:
         - application/octet-stream
 ```
 
-![Events](../img/KubeDash_2.0_registry_pic_06.png)
+![Events](../img/KubeDash_2.0_registry_pic_09.png)
 
 ## Image Tagging
 
@@ -109,4 +109,4 @@ cosign attach sbom --sbom image.sbom \
 registry.mydomain.intra:5000/registry-imega-test:1.0
 ```
 
-![Vulnerability from SBOM](../img/KubeDash_2.0_registry_pic_09.png)
+![Vulnerability from SBOM](../img/KubeDash_2.0_registry_pic_06.png)

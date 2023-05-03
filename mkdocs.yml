@@ -19,6 +19,7 @@ nav:
       - Management User Roles: functions/rbac.md
       - Connect a Kubernetes Cluster: functions/k8s-api.md
     - Integrations:
+      - Kubectl Plugin: integrations/kubectl-plugin.md
       - docker-registry: integrations/docker-registry.md
       - trivy-operator: integrations/trivy-operator.md
       - HelmChart: integrations/helm.md
