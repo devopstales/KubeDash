@@ -15,9 +15,9 @@ nav:
     - Functions:
       - Features: functions/features.md
       - Authentication: functions/authentication.md
-      - User Management: functions/users.md
-      - Setting up Kubernetes Clusters in KubeDash: functions/k8s-api.md
-      - Edit Kubernetes Roles and Role bindings: functions/rbac.md
+      - Management Users: functions/users.md
+      - Management User Roles: functions/rbac.md
+      - Connect a Kubernetes Cluster: functions/k8s-api.md
     - Integrations:
       - docker-registry: integrations/docker-registry.md
       - trivy-operator: integrations/trivy-operator.md
@@ -26,10 +26,25 @@ nav:
     - FAQ:
       - technical: faq/technical.md
 
+# Documentation and theme
 theme:
   name: material
   language: "en"
+  palette:
+    # Palette toggle for light mode
+    - scheme: default
+      toggle:
+        icon: material/weather-night
+        name: Switch to dark mode
+    # Palette toggle for dark mode
+    - scheme: slate
+      toggle:
+        icon: material/weather-sunny
+        name: Switch to light mode
+  features:
+    - navigation.expand
 
+# Extensions
 markdown_extensions:
   - pymdownx.highlight
   - pymdownx.superfences
@@ -50,3 +65,4 @@ extra:
 plugins:
   - search
   - macros
+  - glightbox
