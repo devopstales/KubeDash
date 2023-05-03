@@ -15,9 +15,11 @@ nav:
     - Functions:
       - Features: functions/features.md
       - Authentication: functions/authentication.md
+      - User Management: functions/users.md
       - Setting up Kubernetes Clusters in KubeDash: functions/k8s-api.md
       - Edit Kubernetes Roles and Role bindings: functions/rbac.md
     - Integrations:
+      - docker-registry: integrations/docker-registry.md
       - trivy-operator: integrations/trivy-operator.md
       - HelmChart: integrations/helm.md
     - Contributing: contributing.md
