@@ -1776,6 +1776,8 @@ def k8sClusterRoleBindingAdd(user_cluster_role, username):
             k8sClusterRoleBindingCreate(user_cluster_role, username)
 
 ##############################################################
+# Security
+##############################################################
 ## Secrets
 ##############################################################
 
@@ -1796,6 +1798,28 @@ def k8sSecretListGet(username_role, user_token, namespace):
         SECRET_LIST.append(SECRET_DATA)
 
     return SECRET_LIST
+
+##############################################################
+## Network Policies
+##############################################################
+
+def k8sPolicyListGet(username_role, user_token, ns_name):
+    POLICY_LIST = list()
+    k8sClientConfigGet(username_role, user_token)
+    policies = k8s_client.NetworkingV1Api().list_namespaced_network_policy(ns_name)
+    for p in policies.items:
+        POLICY_DATA = {
+            "name": p.metadata.name,
+            "namespace": p.metadata.namespace,
+            "annotations": p.metadata.annotations,
+            "labels": p.metadata.labels,
+            "pod_selector": p.spec.pod_selector,
+            "policy_types": p.spec.policy_types,
+            "imgress_rules": eval(str(p.spec.ingress)),
+            "egress_rules": eval(str(p.spec.egress)),
+        }
+        POLICY_LIST.append(POLICY_DATA)
+    return POLICY_LIST
 
 ##############################################################
 # Network
