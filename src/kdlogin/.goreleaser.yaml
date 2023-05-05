@@ -26,6 +26,28 @@ archives:
     - goos: windows
       format: zip
 
+chocolateys:
+  - name: kubectl-login
+    owners: devopstales
+    authors: devopstales
+    title: "kubectl-login (CLI)"
+    project_url: "https://devopstales.github.io"
+    icon_url: "https://cdn.jsdelivr.net/gh/devopstales/helm-charts@master/icons/kubectl-login.png"
+    url_template: "https://github.com/devopstales/KubeDash/releases/download/{{ .Tag }}/{{ .ArtifactName }}"
+    copyright: 2023 devopstales
+    license_url: "https://github.com/devopstales/KubeDash/blob/main/LICENSE"
+    require_license_acceptance: false
+    project_source_url: "https://github.com/devopstales/KubeDash"
+    docs_url: "https://devopstales.github.io/KubeDash/"
+    bug_tracker_url: "https://github.com/devopstales/KubeDash/issues"
+    tags: "kubectl-login kubernetes kubelogin authentication oidc cli foss cross-platform KubeDash"
+    summary: "Kubernetes OIDC authentication"
+    description: |
+      kubectl-login is a kubectl plugin that can be used to easily enable authentication flows via OIDC for a kubernetes cluster. Usage: ```kubectl login kubedash_url```
+    release_notes: "https://github.com/devopstales/KubeDash/releases/tag/{{ .Version }}"
+    api_key: '{{ .Env.CHOCO_TOKEN }}'
+    skip_publish: true
+
 brews:
   - name: kdlogin
     tap:
