@@ -290,178 +290,6 @@ def workloads():
         )
 
 ##############################################################
-## Users and Privileges
-##############################################################
-
-@routes.route('/profile', methods=['GET', 'POST'])
-@login_required
-def profile():
-    username = session['username']
-    user = User.query.filter_by(username=username).first()
-    user_role = UsersRoles.query.filter_by(user_id=user.id).first()
-    role = Role.query.filter_by(id=user_role.role_id).first()
-
-    if request.method == 'POST':
-        old_password = request.form['old_password']
-        new_password = request.form['new_password']
-        if check_password_hash(user.password_hash, old_password):
-            updated = UserUpdatePassword(username, new_password)
-            if updated:
-                flash("User Updated Successfully", "success")
-            else:
-                flash("Can't update user", "danger")
-        else:
-            flash("Wrong Current Password", "danger")
-
-    return render_template(
-        'profile.html.j2',
-        user = user,
-        user_role = role.name,
-    )
-
-@routes.route('/users', methods=['GET', 'POST'])
-@login_required
-def users():
-    if request.method == 'POST':
-        username = request.form['username']
-        role = request.form['role']
-        type = request.form['type']
-        if type != "Local":
-            private_key_base64, user_certificate_base64 = k8sCreateUser(username)
-            KubectlConfigStore(username, type, private_key_base64, user_certificate_base64)
-
-        UserUpdate(username, role, type)
-        flash("User Updated Successfully", "success")
-
-    users = User.query
-    user_role = UsersRoles.query
-    roles = Role.query
-    k8s_contect_list = k8sServerContextsList()
-
-    return render_template(
-        'users.html.j2',
-        users = users,
-        user_role = user_role,
-        roles = roles,
-        k8s_contect_list = k8s_contect_list,
-    )
-
-@routes.route('/users/add', methods=['GET', 'POST'])
-@login_required
-def users_add():
-    if request.method == 'POST':
-        username = request.form['username']
-        role = request.form['role']
-        type = request.form['type']
-        password = request.form['password']
-        email = request.form['email']
-
-        email_test = bool(email_check(email))
-        if not email_test:
-            flash("Email is not valid", "danger")
-            return redirect(url_for('routes.users'))
-        
-        elif not len(password) >= 8:
-            flash("Password must be 8 character in length", "danger")
-            return redirect(url_for('routes.users'))
-        else:
-            if type != "Local":
-                private_key_base64, user_certificate_base64 = k8sCreateUser(username)
-                KubectlConfigStore(username, type, private_key_base64, user_certificate_base64)
-
-            UserCreate(username, password, email, type, role, None)
-            flash("User Created Successfully", "success")
-            return redirect(url_for('routes.users'))
-    else:
-        return redirect(url_for('routes.login'))
-    
-@routes.route('/users/delete', methods=['GET', 'POST'])
-@login_required
-def users_delete():
-    if request.method == 'POST':
-        username = request.form['username']
-        UserDelete(username)
-        flash("User Deleted Successfully", "success")
-        return redirect(url_for('routes.users'))
-    else:
-        return redirect(url_for('routes.login'))
-    
-@routes.route('/users/privileges', methods=['POST'])
-@login_required
-def users_privilege_list():
-    if request.method == 'POST':
-        username = request.form['username']
-        if session['user_type'] == "OpenID":
-            user_token = session['oauth_token']
-        else:
-            user_token = None
-        user_cluster_roles, user_roles = k8sUserPriviligeList(session['user_role'], user_token, username)
-        return render_template(
-            'user-privileges.html.j2',
-            username = username,
-            user_cluster_roles = user_cluster_roles,
-            user_roles = user_roles,
-        )
-    else:
-        return redirect(url_for('routes.login'))
-
-@routes.route('/users/privileges/edit', methods=['POST'])
-@login_required
-def users_privileges_edit():
-    if request.method == 'POST':
-        username = request.form['username']
-
-        user_cluster_role = request.form.get('user_cluster_role')
-        user_namespaced_role_1 = request.form.get('user_namespaced_role_1')
-        user_all_namespaces_1 = request.form.get('user_all_namespaces_1')
-        user_namespaces_1 = request.form.getlist('user_namespaces_1')
-        user_namespaced_role_2 = request.form.get('user_namespaced_role_2')
-        user_all_namespaces_2 = request.form.get('user_all_namespaces_2')
-        user_namespaces_2 = request.form.getlist('user_namespaces_2')
-
-        if user_cluster_role:
-            k8sClusterRoleBindingAdd(user_cluster_role, username)
-
-        if user_namespaced_role_1:
-            if user_all_namespaces_1:
-                k8sRoleBindingAdd(user_namespaced_role_1, username, None, user_all_namespaces_1)
-            else:
-                k8sRoleBindingAdd(user_namespaced_role_1, username, user_namespaces_1, user_all_namespaces_1)
-
-        if user_namespaced_role_2:
-            if user_all_namespaces_2:
-                k8sRoleBindingAdd(user_namespaced_role_2, username, None, user_all_namespaces_2)
-            else:
-                k8sRoleBindingAdd(user_namespaced_role_2, username, user_namespaces_2, user_all_namespaces_2)
-
-        if session['user_type'] == "OpenID":
-            user_token = session['oauth_token']
-        else:
-            user_token = None
-
-        namespace_list, error = k8sNamespaceListGet(session['user_role'], user_token)
-        if not error:
-            user_role_template_list = k8sUserRoleTemplateListGet(session['user_role'], user_token)
-            user_clusterRole_template_list = k8sUserClusterRoleTemplateListGet(session['user_role'], user_token)
-        else:
-            user_role_template_list = []
-            user_clusterRole_template_list = []
-
-        if not bool(user_clusterRole_template_list) or not bool(user_role_template_list):
-            from functions.k8s import k8sClusterRolesAdd
-            k8sClusterRolesAdd()
-
-        return render_template(
-            'user-privilege.html.j2',
-            username = username,
-            user_role_template_list = user_role_template_list,
-            namespace_list = namespace_list,
-            user_clusterRole_template_list = user_clusterRole_template_list,
-        )
-    else:
-        return redirect(url_for('routes.login'))
-
-##############################################################
 ## SSO Settings
 ##############################################################
 
@@ -1192,7 +1020,179 @@ def exec_input(data):
     wsclient.write_stdin(data["input"].encode())
 
 ##############################################################
-## Security
+## Users
+##############################################################
+## Users and Privileges
+##############################################################
+
+@routes.route('/profile', methods=['GET', 'POST'])
+@login_required
+def profile():
+    username = session['username']
+    user = User.query.filter_by(username=username).first()
+    user_role = UsersRoles.query.filter_by(user_id=user.id).first()
+    role = Role.query.filter_by(id=user_role.role_id).first()
+
+    if request.method == 'POST':
+        old_password = request.form['old_password']
+        new_password = request.form['new_password']
+        if check_password_hash(user.password_hash, old_password):
+            updated = UserUpdatePassword(username, new_password)
+            if updated:
+                flash("User Updated Successfully", "success")
+            else:
+                flash("Can't update user", "danger")
+        else:
+            flash("Wrong Current Password", "danger")
+
+    return render_template(
+        'profile.html.j2',
+        user = user,
+        user_role = role.name,
+    )
+
+@routes.route('/users', methods=['GET', 'POST'])
+@login_required
+def users():
+    if request.method == 'POST':
+        username = request.form['username']
+        role = request.form['role']
+        type = request.form['type']
+        if type != "Local":
+            private_key_base64, user_certificate_base64 = k8sCreateUser(username)
+            KubectlConfigStore(username, type, private_key_base64, user_certificate_base64)
+
+        UserUpdate(username, role, type)
+        flash("User Updated Successfully", "success")
+
+    users = User.query
+    user_role = UsersRoles.query
+    roles = Role.query
+    k8s_contect_list = k8sServerContextsList()
+
+    return render_template(
+        'users.html.j2',
+        users = users,
+        user_role = user_role,
+        roles = roles,
+        k8s_contect_list = k8s_contect_list,
+    )
+
+@routes.route('/users/add', methods=['GET', 'POST'])
+@login_required
+def users_add():
+    if request.method == 'POST':
+        username = request.form['username']
+        role = request.form['role']
+        type = request.form['type']
+        password = request.form['password']
+        email = request.form['email']
+
+        email_test = bool(email_check(email))
+        if not email_test:
+            flash("Email is not valid", "danger")
+            return redirect(url_for('routes.users'))
+        
+        elif not len(password) >= 8:
+            flash("Password must be 8 character in length", "danger")
+            return redirect(url_for('routes.users'))
+        else:
+            if type != "Local":
+                private_key_base64, user_certificate_base64 = k8sCreateUser(username)
+                KubectlConfigStore(username, type, private_key_base64, user_certificate_base64)
+
+            UserCreate(username, password, email, type, role, None)
+            flash("User Created Successfully", "success")
+            return redirect(url_for('routes.users'))
+    else:
+        return redirect(url_for('routes.login'))
+    
+@routes.route('/users/delete', methods=['GET', 'POST'])
+@login_required
+def users_delete():
+    if request.method == 'POST':
+        username = request.form['username']
+        UserDelete(username)
+        flash("User Deleted Successfully", "success")
+        return redirect(url_for('routes.users'))
+    else:
+        return redirect(url_for('routes.login'))
+    
+@routes.route('/users/privileges', methods=['POST'])
+@login_required
+def users_privilege_list():
+    if request.method == 'POST':
+        username = request.form['username']
+        if session['user_type'] == "OpenID":
+            user_token = session['oauth_token']
+        else:
+            user_token = None
+        user_cluster_roles, user_roles = k8sUserPriviligeList(session['user_role'], user_token, username)
+        return render_template(
+            'user-privileges.html.j2',
+            username = username,
+            user_cluster_roles = user_cluster_roles,
+            user_roles = user_roles,
+        )
+    else:
+        return redirect(url_for('routes.login'))
+
+@routes.route('/users/privileges/edit', methods=['POST'])
+@login_required
+def users_privileges_edit():
+    if request.method == 'POST':
+        username = request.form['username']
+
+        user_cluster_role = request.form.get('user_cluster_role')
+        user_namespaced_role_1 = request.form.get('user_namespaced_role_1')
+        user_all_namespaces_1 = request.form.get('user_all_namespaces_1')
+        user_namespaces_1 = request.form.getlist('user_namespaces_1')
+        user_namespaced_role_2 = request.form.get('user_namespaced_role_2')
+        user_all_namespaces_2 = request.form.get('user_all_namespaces_2')
+        user_namespaces_2 = request.form.getlist('user_namespaces_2')
+
+        if user_cluster_role:
+            k8sClusterRoleBindingAdd(user_cluster_role, username)
+
+        if user_namespaced_role_1:
+            if user_all_namespaces_1:
+                k8sRoleBindingAdd(user_namespaced_role_1, username, None, user_all_namespaces_1)
+            else:
+                k8sRoleBindingAdd(user_namespaced_role_1, username, user_namespaces_1, user_all_namespaces_1)
+
+        if user_namespaced_role_2:
+            if user_all_namespaces_2:
+                k8sRoleBindingAdd(user_namespaced_role_2, username, None, user_all_namespaces_2)
+            else:
+                k8sRoleBindingAdd(user_namespaced_role_2, username, user_namespaces_2, user_all_namespaces_2)
+
+        if session['user_type'] == "OpenID":
+            user_token = session['oauth_token']
+        else:
+            user_token = None
+
+        namespace_list, error = k8sNamespaceListGet(session['user_role'], user_token)
+        if not error:
+            user_role_template_list = k8sUserRoleTemplateListGet(session['user_role'], user_token)
+            user_clusterRole_template_list = k8sUserClusterRoleTemplateListGet(session['user_role'], user_token)
+        else:
+            user_role_template_list = []
+            user_clusterRole_template_list = []
+
+        if not bool(user_clusterRole_template_list) or not bool(user_role_template_list):
+            from functions.k8s import k8sClusterRolesAdd
+            k8sClusterRolesAdd()
+
+        return render_template(
+            'user-privilege.html.j2',
+            username = username,
+            user_role_template_list = user_role_template_list,
+            namespace_list = namespace_list,
+            user_clusterRole_template_list = user_clusterRole_template_list,
+        )
+    else:
+        return redirect(url_for('routes.login'))
+
 ##############################################################
 ## Service Account
 ##############################################################
@@ -1370,7 +1370,9 @@ def cluster_role_bindings():
     )
 
 ##############################################################
-## Cluster Role Bindings
+# Security
+##############################################################
+## Secrets
 ##############################################################
 
 @routes.route("/secrets", methods=['GET', 'POST'])
@@ -1419,6 +1421,61 @@ def secrets_data():
         return render_template(
             'secret-data.html.j2',
             secret_data = secret_data,
+            namespace = session['ns_select'],
+        )
+    else:
+        return redirect(url_for('routes.login'))
+    
+##############################################################
+## Network Policies
+##############################################################
+
+@routes.route('/policies', methods=['GET', 'POST'])
+@login_required
+def policies_list():
+    selected = None
+    if session['user_type'] == "OpenID":
+        user_token = session['oauth_token']
+    else:
+        user_token = None
+
+    if request.method == 'POST':
+        session['ns_select'] = request.form.get('ns_select')
+        selected = request.form.get('selected')
+
+    namespace_list, error = k8sNamespaceListGet(session['user_role'], user_token)
+    if not error:
+        policies = k8sPolicyListGet(session['user_role'], user_token, session['ns_select'])
+    else:
+        policies = list()
+
+    return render_template(
+        'policies.html.j2',
+        policies = policies,
+        namespaces = namespace_list,
+        selected = selected,
+    )
+
+@routes.route('/policies/data', methods=['GET', 'POST'])
+@login_required
+def policies_data():
+    if request.method == 'POST':
+        policy_name = request.form.get('policy_name')
+        session['ns_select'] = request.form.get('ns_select')
+
+        if session['user_type'] == "OpenID":
+            user_token = session['oauth_token']
+        else:
+            user_token = None
+
+        policies =  k8sPolicyListGet(session['user_role'], user_token, session['ns_select'])
+        for policy in policies:
+            if policy["name"] == policy_name:
+                policy_data = policy
+
+        return render_template(
+            'policy-data.html.j2',
+            policy_data = policy_data,
             namespace = session['ns_select'],
         )
     else:
