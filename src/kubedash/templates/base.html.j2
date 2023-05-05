@@ -337,6 +337,7 @@
                     </button>
 
                     <!-- Topbar Namespace -->
+                    <!--
                     <nav class="navbar navbar-light bg-light row">
                         <form name="add" method="POST" class="form-inline row row-cols-1 mr-auto ml-md-0 mw-100">
                           <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
@@ -358,6 +359,13 @@
                           </div>
                         </form>
                     </nav>
+                    -->
+
+                     <!-- Dark Switcher -->
+                    <div class="custom-control custom-switch">
+                        <input type="checkbox" class="custom-control-input" id="dark-css-toggle">
+                        <label class="custom-control-label" for="dark-css-toggle">Dark Switch</label>
+                    </div>
 
                     <!-- Topbar Navbar -->
                     <ul class="navbar-nav ml-auto">
@@ -541,6 +549,8 @@
             location.reload(true);
         };
     </script>
+
+    <script defer language="javascript" type="text/javascript"  src="{{ url_for('static',filename='/js/dark.js') }}"></script>
 
     <!-- Bootstrap core JavaScript-->
     <script src="{{ url_for('static',filename='/vendor/jquery/jquery.min.js') }}"></script>
