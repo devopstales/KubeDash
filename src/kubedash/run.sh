@@ -3,7 +3,7 @@
 export FLASK_APP=kubedash
 export FLASK_DEBUG=1
 export TEMPLATES_AUTO_RELOAD=1
-export KUBECONFIG=/etc/rancher/k3s/k3s.yaml
+#export KUBECONFIG=/etc/rancher/k3s/k3s.yaml
 
 flask db upgrade
 
