@@ -1033,6 +1033,26 @@ def k8sNodeGet(username_role, user_token, no_name):
         return NODE_INFO
 
 ##############################################################
+## HPA
+##############################################################
+
+def k8sHPAListGet(username_role, user_token, ns_name):
+    HPA_LIST = list()
+    k8sClientConfigGet("admin", None)
+    hpas = k8s_client.AutoscalingV1Api().list_namespaced_horizontal_pod_autoscaler(ns_name)
+    for hpa in hpas.items:
+        HPA_DATA = {
+            "name": hpa.metadata.name,
+            "namespace": hpa.metadata.namespace,
+            "annotations": hpa.metadata.annotations,
+            "labels": hpa.metadata.labels,
+            "spec": hpa.spec,
+            "status": hpa.status,
+        }
+        HPA_LIST.append(HPA_DATA)
+    return HPA_LIST
+
+##############################################################
 # Workloads
 ##############################################################
 ## StatefulSets
@@ -1820,6 +1840,29 @@ def k8sPolicyListGet(username_role, user_token, ns_name):
         }
         POLICY_LIST.append(POLICY_DATA)
     return POLICY_LIST
+
+##############################################################
+## Priority ClassList
+##############################################################
+
+def k8sPriorityClassList(username_role, user_token):
+    PC_LIST = list()
+    k8sClientConfigGet(username_role, user_token)
+
+    pcs = k8s_client.SchedulingV1Api().list_priority_class()
+    for cs in pcs.items:
+        PCS_DATA = {
+            "name": cs.metadata.name,
+            "annotations": cs.metadata.annotations,
+            "labels": cs.metadata.labels,
+            "creation": cs.metadata.creation_timestamp,
+            "preemption_policy": cs.preemption_policy,
+            "value": cs.value,
+            "description": cs.description,
+            "global_default": cs.global_default,
+        }
+        PC_LIST.append(PCS_DATA)
+    return PC_LIST
 
 ##############################################################
 # Network
