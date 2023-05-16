@@ -755,7 +755,38 @@ def namespaces_delete():
         return redirect(url_for('routes.namespaces'))
 
 ##############################################################
-## Workloads
+## HPA
+##############################################################
+
+@routes.route("/hpa", methods=['GET', 'POST'])
+@login_required
+def hpa():
+    selected = None
+
+    if request.method == 'POST':
+        session['ns_select'] = request.form.get('ns_select')
+        selected = request.form.get('selected')
+
+    if session['user_type'] == "OpenID":
+        user_token = session['oauth_token']
+    else:
+        user_token = None
+
+    namespace_list, error = k8sNamespaceListGet(session['user_role'], user_token)
+    if not error:
+        hpas = k8sHPAListGet(session['user_role'], user_token, session['ns_select'])
+    else:
+        hpas = []
+
+    return render_template(
+        'hpa.html.j2',
+        selected = selected,
+        hpas = hpas,
+        namespaces = namespace_list,
+    )
+
+##############################################################
+# Workloads
 ##############################################################
 ## Statefullsets
 ##############################################################
@@ -1475,6 +1506,54 @@ def policies_data():
         return render_template(
             'policy-data.html.j2',
             policy_data = policy_data,
+            namespace = session['ns_select'],
+        )
+    else:
+        return redirect(url_for('routes.login'))
+
+##############################################################
+## PriorityClass
+##############################################################
+@routes.route('/priorityclass', methods=['GET', 'POST'])
+@login_required
+def priorityclass_list():
+    selected = None
+    if session['user_type'] == "OpenID":
+        user_token = session['oauth_token']
+    else:
+        user_token = None
+
+    if request.method == 'POST':
+        selected = request.form.get('selected')
+
+    priorityclass = k8sPriorityClassList(session['user_role'], user_token)
+
+    return render_template(
+        'priorityclass.html.j2',
+        priorityclass = priorityclass,
+        selected = selected,
+    )
+
+@routes.route('/priorityclass/data', methods=['GET', 'POST'])
+@login_required
+def priorityclass_data():
+    if request.method == 'POST':
+        pc_name = request.form.get('pc_name')
+        session['ns_select'] = request.form.get('ns_select')
+
+        if session['user_type'] == "OpenID":
+            user_token = session['oauth_token']
+        else:
+            user_token = None
+
+        priorityclass = k8sPriorityClassList(session['user_role'], user_token)
+        for pc in priorityclass:
+            if pc["name"] == pc_name:
+                pc_data = pc
+
+        return render_template(
+            'priorityclass-data.html.j2',
+            pc_data = pc_data,
             namespace = session['ns_select'],
         )
     else:
