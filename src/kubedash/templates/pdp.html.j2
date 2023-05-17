@@ -3,13 +3,14 @@
 {% block header %}
     <link href="{{ url_for('static',filename='/vendor/datatables/dataTables.bootstrap4.min.css') }}" rel="stylesheet" >
     <link href="{{ url_for('static',filename='/vendor/datatables/jquery.dataTables.css') }}" rel="stylesheet" >
+    <link href="{{ url_for('static',filename='/css/sb-admin-2.custom.css') }}" rel="stylesheet" >
 {% endblock %}
 
 {% block content %}
 <nav aria-label="breadcrumb">
   <ol class="breadcrumb">
-    <li class="breadcrumb-item">Workloads</li>
-    <li class="breadcrumb-item active" aria-current="page">Deployments</li>
+    <li class="breadcrumb-item">Cluster</li>
+    <li class="breadcrumb-item active" aria-current="page">Pod Disruption Budget</li>
     <div class="col">
       <a class="card-link float-right" data-toggle="collapse" href="#" onclick="reload()">
         <i class="material-icons">refresh</i>
@@ -20,7 +21,7 @@
 
 <div class="card shadow mb-4">
     <div class="card-header py-3">
-        <h6 class="m-0 font-weight-bold text-primary">Deployments List</h6>
+        <h6 class="m-0 font-weight-bold text-primary">Pod Disruption Budget List</h6>
     </div>
     <div class="card-body">
         <div class="table-responsive">
@@ -28,25 +29,30 @@
                 <thead>
                     <tr>
                       <th>Name</th>
-                      <th>Status</th>
-                      <th>Labels</th>
+                      <th>Namespace</th>
+                      <th>Min Available</th>
+                      <th>Max Unavailable</th>
+                      <th>Allowed Disruptions</th>
                     </tr>
                   </thead>
                   <tbody>
-                    {% for d in deployments %}
-                    {% if selected == d.name %}
+                    {% for pdp in pdps %}
+                    {% if selected == pdp.name %} 
                       <tr class="selected" >
                     {% else %}
                       <tr>
                     {% endif %}
-                        <td>{{ d.name }}</td>
-                        <td>{{ d.desired }}/{{ d.ready }}</td>
                         <td>
-                        {% for label in d.labels %} 
-                            <span class="badge badge-secondary">{{ label }}</span>
-                            {% if not loop.last %}<br>{% endif %}
-                        {% endfor %}
+                          <form action="/pod_disruption_budget/data" method="POST">
+                            <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+                            <input type="hidden" name="pdp_name" value="{{ pdp.name }}" />
+                            <a href="javascript:;" onclick="parentNode.submit();">{{ pdp.name }}</a>
+                          </form>
                         </td>
+                        <td>{{ pdp.namespace }}</td>
+                        <td>{{ pdp.min_available }}</td>
+                        <td>{{ pdp.max_unavailable }}</td>
+                        <td>{{ pdp.status.disruptions_allowed }}</td>
                       </tr>
                     {% endfor %}
                   </tbody>
