@@ -1,0 +1,146 @@
+{% extends "base.html.j2" %}
+
+{% block header %}
+    <link href="{{ url_for('static',filename='/vendor/datatables/dataTables.bootstrap4.min.css') }}" rel="stylesheet" >
+    <link href="{{ url_for('static',filename='/vendor/google/material-icons.css') }}" rel="stylesheet" >
+{% endblock %}
+
+{% block content %}
+
+<nav aria-label="breadcrumb">
+  <ol class="breadcrumb">
+    <li class="breadcrumb-item">Cluster</li>
+    <li class="breadcrumb-item"><a href="/pod_disruption_budget">Pod Disruption</a></li>
+    <li class="breadcrumb-item active" aria-current="page">{{ pdp_data.name }}</li>
+    <div class="col">
+        <a class="card-link float-right pr-1" data-toggle="collapse" href="#" onclick="reload()">
+            <i class="material-icons">refresh</i>
+        </a>
+    </div>
+  </ol>
+</nav>
+
+<div class="card shadow mb-4">
+    <div class="card-header">
+        <h6 class="m-0 font-weight-bold text-primary">Pod Disruption Data</h6>
+    </div>
+    <div class="card-body">
+        <div class="tab-content" id="nav-tabContent">
+            <!-- policy -->
+                <div class="card shadow mb-4">
+                    <div class="card-body">
+                        <div class="table-responsive">
+                            <table class="table table-bordered" id="policyInfoTable" width="100%" cellspacing="0">
+                                <tr>
+                                    <th>Name:</th>
+                                    <td>{{ pdp_data.name }}</td>
+                                </tr>
+                                <tr>
+                                    <th>Namespace:</th>
+                                    <td>{{ pdp_data.namespace }}</td>
+                                </tr>
+                                <tr>
+                                    <th>Creation:</th>
+                                    <td>{{ pdp_data.creation_timestamp }}</td>
+                                </tr>
+                                <tr>
+                                    <th>Annotations:</th>
+                                    <td>
+                                        {% if pdp_data.annotations %}
+                                        {% for an_key, an_value in pdp_data.annotations.items() %}
+                                        {% if an_key != "kubectl.kubernetes.io/last-applied-configuration" %}
+                                        {% if an_key != "autoscaling.alpha.kubernetes.io/conditions" %}
+                                        <span class="badge badge-tag badge-secondary">{{ an_key }}: {{ an_value }}</span>
+                                        {% if not loop.last %}<br>{% endif %}
+                                        {% endif %}
+                                        {% endif %}
+                                        {% endfor %}
+                                        {% endif %}
+                                    </td>
+                                </tr>
+                                <tr>
+                                    <th>Labels:</th>
+                                    <td>
+                                        {% if pdp_data.labels %}
+                                        {% for an_key, an_value in pdp_data.labels.items() %}
+                                        {% if an_key != "kubectl.kubernetes.io/last-applied-configuration" %}
+                                        <span class="badge badge-tag badge-secondary">{{ an_key }}: {{ an_value }}</span>
+                                        {% if not loop.last %}<br>{% endif %}
+                                        {% endif %}
+                                        {% endfor %}
+                                        {% endif %}
+                                    </td>
+                                </tr>
+                                <tr>
+                                    <th>Selector:</th>
+                                    <td>{{ pdp_data.selector }}</td>
+                                </tr>
+                                <tr>
+                                    <th>Eviction Policy:</th>
+                                    <td>{{ pdp_data.unhealthy_pod_eviction_policy }}</td>
+                                </tr>
+                                <tr>
+                                    <th>Status:</th>
+                                    <td>
+                                    Allowed disruptions: {{ pdp_data.status.disruptions_allowed }}<br>
+                                    Current: {{ pdp_data.status.current_healthy }}<br>
+                                    Desired: {% if pdp_data.min_available %}{{ pdp_data.min_available }}{% else %}0{% endif %}<br>
+                                    </td>
+                                </tr>
+                            </table>
+                        </div>
+                    </div>
+                </div>
+        </div>
+    </div>
+</div>
+
+<div class="card shadow mb-4">
+    <div class="card-header">
+        <h6 class="m-0 font-weight-bold text-primary">Conditions</h6>
+    </div>
+    <div class="card-body">
+        <div class="tab-content" id="nav-tabContent">
+            <!-- policy -->
+                <div class="card shadow mb-4">
+                    <div class="card-body">
+                        <div class="table-responsive">
+                            <table class="table table-bordered" id="policyInfoTable" width="100%" cellspacing="0">
+                            <thead>
+                                <tr>
+                                {% for condition in pdp_data.conditions %}
+                                <tr>
+                                    {% for key, value in condition.items() %}
+                                    <th>{{ key }}</th>
+                                    {% endfor %}
+                                </tr>
+                                {% endfor %}
+                                </tr>
+                            </thead>
+                            <tbody>
+                                {% for condition in pdp_data.conditions %}
+                                <tr>
+                                    {% for key, value in condition.items() %}
+                                    <td>{{ value }}</td>
+                                    {% endfor %}
+                                </tr>
+                                {% endfor %}
+                            </tbody>
+                            </table>
+                        </div>
+                    </div>
+                </div>
+        </div>
+    </div>
+</div>
+{% endblock %}
+
+{% block scripts %}
+
+    <!-- Page level plugins -->
+    <script src="{{ url_for('static',filename='vendor/datatables/jquery.dataTables.js') }}"></script>
+    <script src="{{ url_for('static',filename='vendor/datatables/dataTables.bootstrap4.min.js') }}"></script>
+
+    <!-- Page level custom scripts -->
+    <script src="{{ url_for('static',filename='js/demo/datatables-demo.js') }}"></script>
+{% endblock %}
