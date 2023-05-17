@@ -763,7 +763,7 @@ def namespaces_delete():
 ## HPA
 ##############################################################
 
-@routes.route("/hpa", methods=['GET', 'POST'])
+@routes.route("/horizontal_pod_autoscaler", methods=['GET', 'POST'])
 @login_required
 def hpa():
     selected = None
@@ -789,6 +789,211 @@ def hpa():
         hpas = hpas,
         namespaces = namespace_list,
     )
+
+@routes.route('/horizontal_pod_autoscaler/data', methods=['GET', 'POST'])
+@login_required
+def hpa_data():
+    if request.method == 'POST':
+        hpa_name = request.form.get('hpa_name')
+
+        if session['user_type'] == "OpenID":
+            user_token = session['oauth_token']
+        else:
+            user_token = None
+
+        hpas = k8sHPAListGet(session['user_role'], user_token, session['ns_select'])
+        hpa_data = None
+        for hpa in hpas:
+            if hpa["name"] == hpa_name:
+                hpa_data = hpa
+
+        if hpa_data:
+            return render_template(
+                'hpa-data.html.j2',
+                hpa_data = hpa_data,
+            )
+        else:
+                flash("Cannot iterate NamespaceList", "danger")
+                return redirect(url_for('routes.hpa'))
+    else:
+        return redirect(url_for('routes.login'))
+
+##############################################################
+## Pod Disruption Budget
+##############################################################
+
+@routes.route("/pod_disruption_budget", methods=['GET', 'POST'])
+@login_required
+def pdp():
+    selected = None
+
+    if request.method == 'POST':
+        session['ns_select'] = request.form.get('ns_select')
+        selected = request.form.get('selected')
+
+    if session['user_type'] == "OpenID":
+        user_token = session['oauth_token']
+    else:
+        user_token = None
+
+    namespace_list, error = k8sNamespaceListGet(session['user_role'], user_token)
+    if not error:
+        pdps = k8sPodDisruptionBudgetListGet(session['user_role'], user_token, session['ns_select'])
+    else:
+        pdps = []
+
+    return render_template(
+        'pdp.html.j2',
+        selected = selected,
+        pdps = pdps,
+        namespaces = namespace_list,
+    )
+
+@routes.route('/pod_disruption_budget/data', methods=['GET', 'POST'])
+@login_required
+def pdp_data():
+    if request.method == 'POST':
+        pdp_name = request.form.get('pdp_name')
+
+        if session['user_type'] == "OpenID":
+            user_token = session['oauth_token']
+        else:
+            user_token = None
+
+        pdps = k8sPodDisruptionBudgetListGet(session['user_role'], user_token, session['ns_select'])
+        pdp_data = None
+        for pdp in pdps:
+            if pdp["name"] == pdp_name:
+                pdp_data = pdp
+
+        if pdp_data:
+            return render_template(
+                'pdp-data.html.j2',
+                pdp_data = pdp_data,
+            )
+        else:
+                flash("Cannot iterate PodDisruptionBudgetList", "danger")
+                return redirect(url_for('routes.pdp'))
+    else:
+        return redirect(url_for('routes.login'))
+
+##############################################################
+# Resource Quota
+##############################################################
+
+@routes.route("/resource_quota", methods=['GET', 'POST'])
+@login_required
+def resource_quota():
+    selected = None
+
+    if request.method == 'POST':
+        session['ns_select'] = request.form.get('ns_select')
+        selected = request.form.get('selected')
+
+    if session['user_type'] == "OpenID":
+        user_token = session['oauth_token']
+    else:
+        user_token = None
+
+    namespace_list, error = k8sNamespaceListGet(session['user_role'], user_token)
+    if not error:
+        quotas = k8sQuotaListGet(session['user_role'], user_token, session['ns_select'])
+    else:
+        quotas = []
+
+    return render_template(
+        'resource_quota.html.j2',
+        selected = selected,
+        quotas = quotas,
+        namespaces = namespace_list,
+    )
+
+@routes.route('/resource_quota/data', methods=['GET', 'POST'])
+@login_required
+def resource_quota_data():
+    if request.method == 'POST':
+        quota_name = request.form.get('quota_name')
+
+        if session['user_type'] == "OpenID":
+            user_token = session['oauth_token']
+        else:
+            user_token = None
+
+        quotas = k8sQuotaListGet(session['user_role'], user_token, session['ns_select'])
+        quota_data = None
+        for quota in quotas:
+            if quota["name"] == quota_name:
+                quota_data = quota
+
+        if quota_data:
+            return render_template(
+                'resource_quota-data.html.j2',
+                quota_data = quota_data,
+            )
+        else:
+                flash("Cannot iterate ResourceQuotaList", "danger")
+                return redirect(url_for('routes.resource_quota'))
+    else:
+        return redirect(url_for('routes.login'))
+
+##############################################################
+# Limit Range
+##############################################################
+
+@routes.route("/limit_range", methods=['GET', 'POST'])
+@login_required
+def limit_range():
+    selected = None
+
+    if request.method == 'POST':
+        session['ns_select'] = request.form.get('ns_select')
+        selected = request.form.get('selected')
+
+    if session['user_type'] == "OpenID":
+        user_token = session['oauth_token']
+    else:
+        user_token = None
+
+    namespace_list, error = k8sNamespaceListGet(session['user_role'], user_token)
+    if not error:
+        limits = k8sLimitRangeListGet(session['user_role'], user_token, session['ns_select'])
+    else:
+        limits = []
+
+    return render_template(
+        'limit_range.html.j2',
+        selected = selected,
+        limits = limits,
+        namespaces = namespace_list,
+    )
+
+@routes.route('/limit_range/data', methods=['GET', 'POST'])
+@login_required
+def limit_range_data():
+    if request.method == 'POST':
+        limit_name = request.form.get('limit_name')
+
+        if session['user_type'] == "OpenID":
+            user_token = session['oauth_token']
+        else:
+            user_token = None
+
+        limits = k8sLimitRangeListGet(session['user_role'], user_token, session['ns_select'])
+        quota_data = None
+        for limit in limits:
+            if limit["name"] == limit_name:
+                limit_data = limit
+
+        if limit_data:
+            return render_template(
+                'limit_range-data.html.j2',
+                limit_data = limit_data,
+            )
+        else:
+                flash("Cannot iterate Limit Range", "danger")
+                return redirect(url_for('routes.resource_quota'))
+    else:
+        return redirect(url_for('routes.login'))
 
 ##############################################################
 # Workloads
@@ -1445,15 +1650,20 @@ def secrets_data():
             user_token = None
 
         secrets = k8sSecretListGet(session['user_role'], user_token, session['ns_select'])
+        secret_data = None
         for secret in secrets:
             if secret["name"] == secret_name:
                 secret_data = secret
-
-        return render_template(
-            'secret-data.html.j2',
-            secret_data = secret_data,
-            namespace = session['ns_select'],
-        )
+        
+        if secret_data:
+            return render_template(
+                'secret-data.html.j2',
+                secret_data = secret_data,
+                namespace = session['ns_select'],
+            )
+        else:
+                flash("Cannot iterate SecretList", "danger")
+                return redirect(url_for('routes.secrets'))
     else:
         return redirect(url_for('routes.login'))
     
@@ -1500,15 +1710,20 @@ def policies_data():
             user_token = None
 
         policies =  k8sPolicyListGet(session['user_role'], user_token, session['ns_select'])
+        policy_data = None
         for policy in policies:
             if policy["name"] == policy_name:
                 policy_data = policy
 
-        return render_template(
-            'policy-data.html.j2',
-            policy_data = policy_data,
-            namespace = session['ns_select'],
-        )
+        if policy_data:
+            return render_template(
+                'policy-data.html.j2',
+                policy_data = policy_data,
+                namespace = session['ns_select'],
+            )
+        else:
+                flash("Cannot iterate PolicyList", "danger")
+                return redirect(url_for('routes.policies_list'))
     else:
         return redirect(url_for('routes.login'))
 
@@ -1548,15 +1763,20 @@ def priorityclass_data():
             user_token = None
 
         priorityclass = k8sPriorityClassList(session['user_role'], user_token)
+        pc_data = None
         for pc in priorityclass:
             if pc["name"] == pc_name:
                 pc_data = pc
 
-        return render_template(
-            'priorityclass-data.html.j2',
-            pc_data = pc_data,
-            namespace = session['ns_select'],
-        )
+        if pc_data:
+            return render_template(
+                'priorityclass-data.html.j2',
+                pc_data = pc_data,
+                namespace = session['ns_select'],
+            )
+        else:
+                flash("Cannot iterate PriorityClassList", "danger")
+                return redirect(url_for('routes.priorityclass_list'))
     else:
         return redirect(url_for('routes.login'))
 
@@ -1598,14 +1818,19 @@ def ingresses_class_data():
             user_token = None
 
         ingresses_classes = k8sIngressClassListGet(session['user_role'], user_token)
+        ic_data = None
         for ic in ingresses_classes:
             if ic["name"] == ic_name:
                 ic_data = ic
 
-        return render_template(
-            'ingress-class-data.html.j2',
-            ic_data = ic_data
-        )
+        if ic_data:
+            return render_template(
+                'ingress-class-data.html.j2',
+                ic_data = ic_data
+            )
+        else:
+                flash("Cannot iterate IngressClassList", "danger")
+                return redirect(url_for('routes.ingresses_class'))
     else:
         return redirect(url_for('routes.login'))
 
@@ -1651,14 +1876,19 @@ def ingresses_data():
             user_token = None
 
         ingresses = k8sIngressListGet(session['user_role'], user_token, session['ns_select'])
+        i_data = None
         for i in ingresses:
             if i["name"] == i_name:
                 i_data = i
 
-        return render_template(
-            'ingress-data.html.j2',
-            i_data = i_data
-        )
+        if i_data:
+            return render_template(
+                'ingress-data.html.j2',
+                i_data = i_data
+            )
+        else:
+                flash("Cannot iterate IngressList", "danger")
+                return redirect(url_for('routes.ingresses'))
     else:
         return redirect(url_for('routes.login'))
 
@@ -1756,14 +1986,19 @@ def storage_class_data():
             user_token = None
 
         storage_classes = k8sStorageClassListGet(session['user_role'], user_token)
+        sc_data = None
         for sc in storage_classes:
             if sc["name"] == sc_name:
                 sc_data = sc
 
-        return render_template(
-            'storage-class-data.html.j2',
-            sc_data = sc_data
-        )
+        if sc_data:
+            return render_template(
+                'storage-class-data.html.j2',
+                sc_data = sc_data
+            )
+        else:
+                flash("Cannot iterate StorageClassList", "danger")
+                return redirect(url_for('routes.storage_class'))
     else:
         return redirect(url_for('routes.login'))
 
@@ -1814,17 +2049,20 @@ def pvc_data():
         namespace_list, error = k8sNamespaceListGet(session['user_role'], user_token)
         if not error:
             pvc_list = k8sPersistentVolumeClaimListGet(session['user_role'], user_token, session['ns_select'])
+            pvc_data = None
             for pvc in pvc_list:
                 if pvc["name"] == selected:
                     pvc_data = pvc
-        else:
-            pvc_data = list()
 
-        return render_template(
-            'pvc-data.html.j2',
-            pvc_data = pvc_data,
-            namespace = session['ns_select'],
-        )
+        if pvc_data:
+            return render_template(
+                'pvc-data.html.j2',
+                pvc_data = pvc_data,
+                namespace = session['ns_select'],
+            )
+        else:
+                    flash("Cannot iterate PersistentVolumeClaimList", "danger")
+                    return redirect(url_for('routes.pvc'))
     else:
         return redirect(url_for('routes.login'))
 
@@ -1869,15 +2107,20 @@ def pv_data():
             user_token = None
 
         pv_list = k8sPersistentVolumeListGet(session['user_role'], user_token, session['ns_select'])
+        pv_data = None
         for pv in pv_list:
             if pv["name"] == selected:
                 pv_data = pv
 
-        return render_template(
-            'pv-data.html.j2',
-            pv_data = pv_data,
-            namespace = session['ns_select'],
-        )
+        if pv_data:
+            return render_template(
+                'pv-data.html.j2',
+                pv_data = pv_data,
+                namespace = session['ns_select'],
+            )
+        else:
+                flash("Cannot iterate PersistentVolumeList", "danger")
+                return redirect(url_for('routes.pv'))
     else:
         return redirect(url_for('routes.login'))
 
@@ -1924,15 +2167,20 @@ def configmap_data():
             user_token = None
 
         configmaps = k8sConfigmapListGet(session['user_role'], user_token, session['ns_select'])
+        configmap_data = None
         for configmap in configmaps:
             if configmap["name"] == configmap_name:
                 configmap_data = configmap
 
-        return render_template(
-            'configmap-data.html.j2',
-            configmap_data = configmap_data,
-            namespace = session['ns_select'],
-        )
+        if configmap_data:
+            return render_template(
+                'configmap-data.html.j2',
+                configmap_data = configmap_data,
+                namespace = session['ns_select'],
+            )
+        else:
+                flash("Cannot iterate ConfigmapList", "danger")
+                return redirect(url_for('routes.configmap'))
     else:
         return redirect(url_for('routes.login'))
 
