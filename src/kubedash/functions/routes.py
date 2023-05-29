@@ -1956,7 +1956,7 @@ def services_data():
 @routes.route("/storage-class", methods=['GET', 'POST'])
 @login_required
 def storage_class():
-    selected = None
+    selected = "default"
     if session['user_type'] == "OpenID":
         user_token = session['oauth_token']
     else:
@@ -1998,6 +1998,58 @@ def storage_class_data():
         else:
                 flash("Cannot iterate StorageClassList", "danger")
                 return redirect(url_for('routes.storage_class'))
+    else:
+        return redirect(url_for('routes.login'))
+
+##############################################################
+## SnapshotClass
+##############################################################
+
+@routes.route("/snapshot-class", methods=['GET', 'POST'])
+@login_required
+def snapshot_class():
+    selected = "default"
+    if session['user_type'] == "OpenID":
+        user_token = session['oauth_token']
+    else:
+        user_token = None
+
+    if request.method == 'POST':
+        selected = request.form.get('selected')
+
+    snapshot_classes = k8sSnapshotClassListGet(session['user_role'], user_token)
+
+    return render_template(
+        'snapshot-classes.html.j2',
+        snapshot_classes = snapshot_classes,
+        selected = selected,
+    )
+
+@routes.route('/snapshot-class/data', methods=['GET', 'POST'])
+@login_required
+def snapshot_class_data():
+    if request.method == 'POST':
+        sc_name = request.form.get('sc_name')
+
+        if session['user_type'] == "OpenID":
+            user_token = session['oauth_token']
+        else:
+            user_token = None
+
+        snapshot_classes = k8sSnapshotClassListGet(session['user_role'], user_token)
+        sc_data = None
+        for sc in snapshot_classes:
+            if sc["name"] == sc_name:
+                sc_data = sc
+
+        if sc_data:
+            return render_template(
+                'snapshot-classes-data.html.j2',
+                sc_data = sc_data
+            )
+        else:
+                flash("Cannot iterate SnapshotClassList", "danger")
+                return redirect(url_for('routes.snapshot_classes'))
     else:
         return redirect(url_for('routes.login'))
 
