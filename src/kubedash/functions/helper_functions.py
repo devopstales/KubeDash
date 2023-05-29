@@ -1,4 +1,4 @@
-import logging, re, time
+import logging, re, time, six
 from flask import flash, json
 from decimal import Decimal, InvalidOperation
 
@@ -37,7 +37,19 @@ def email_check(email):
         return True
     else:
         return False
-    
+
+def var_test(var):
+    if isinstance(var, bool):
+        resp = var
+    elif isinstance(var, six.string_types):
+        if var.lower() in ['true']:
+            resp = True
+        else:
+            resp = False
+    else:
+        resp = False
+    return resp
+
 def parse_quantity(quantity):
     """
     Parse kubernetes canonical form quantity like 200Mi to a decimal number.
