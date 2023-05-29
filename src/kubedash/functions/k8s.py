@@ -1085,9 +1085,10 @@ def k8sPodDisruptionBudgetListGet(username_role, user_token, ns_name):
                 "selector": pdb.spec.selector.match_labels,
                 "max_unavailable": pdb.spec.max_unavailable,
                 "min_available": pdb.spec.min_available,
-                "unhealthy_pod_eviction_policy": pdb.spec.unhealthy_pod_eviction_policy,
                 "status": pdb.status,
             }
+            if "unhealthy_pod_eviction_policy" in pdb.spec.to_dict():
+                PDB_DATA["unhealthy_pod_eviction_policy"] =  pdb.spec.unhealthy_pod_eviction_policy,
             conditions = pdb.status.conditions
             condition_list = list()
             for condition in conditions:
@@ -2165,11 +2166,12 @@ def k8sStorageClassListGet(username_role, user_token):
                 "created": sc.metadata.creation_timestamp,
                 "annotations": sc.metadata.annotations,
                 "labels": sc.metadata.labels,
-                "parameters": sc.parameters,
                 "provisioner": sc.provisioner,
                 "reclaim_policy": sc.reclaim_policy,
                 "volume_binding_mode": sc.volume_binding_mode,
             }
+            if "parameters" in sc:
+                SC["parameters"] = sc.parameters
             SC_LIST.append(SC)
         return SC_LIST
     except ApiException as error:
@@ -2177,7 +2179,37 @@ def k8sStorageClassListGet(username_role, user_token):
         return SC_LIST
     except Exception as error:
         ErrorHandler(logger, "error", error)
-        return SC_LIST   
+        return SC_LIST
+    
+##############################################################
+## SnapshotClass
+##############################################################
+
+def k8sSnapshotClassListGet(username_role, user_token):
+    k8sClientConfigGet(username_role, user_token)
+    SC_LIST = list()
+    try:
+        snapshot_classes = k8s_client.CustomObjectsApi().list_cluster_custom_object("snapshot.storage.k8s.io", "v1", "volumesnapshotclasses", _request_timeout=1)
+        for sc in snapshot_classes["items"]:
+            SC = {
+                "name": sc["metadata"]["name"],
+                "created": sc["metadata"]["creationTimestamp"],
+                "annotations": sc["metadata"]["annotations"],
+                "driver": sc["driver"],
+                "deletion_policy": sc["deletionPolicy"],
+            }
+            if "labels" in sc["metadata"]:
+                SC["labels"] = sc["metadata"]["labels"]
+            if "parameters" in sc:
+                SC["parameters"] = sc["parameters"]
+            SC_LIST.append(SC)
+        return SC_LIST
+    except ApiException as error:
+        ErrorHandler(logger, error, "get cluster Snapshot Class list")
+        return SC_LIST
+    except Exception as error:
+        ErrorHandler(logger, "error", error)
+        return SC_LIST
 
 ##############################################################
 ## Persistent Volume Claim

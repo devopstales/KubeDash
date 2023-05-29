@@ -9,7 +9,7 @@
 <nav aria-label="breadcrumb">
   <ol class="breadcrumb">
     <li class="breadcrumb-item">Storage</li>
-    <li class="breadcrumb-item active" aria-current="page">Storage Class</li>
+    <li class="breadcrumb-item active" aria-current="page">Snapshot Class</li>
     <div class="col">
       <a class="card-link float-right" data-toggle="collapse" href="#" onclick="reload()">
         <i class="material-icons">refresh</i>
@@ -20,7 +20,7 @@
 
 <div class="card shadow mb-4">
     <div class="card-header py-3">
-        <h6 class="m-0 font-weight-bold text-primary">Storage Classes List</h6>
+        <h6 class="m-0 font-weight-bold text-primary">Snapshot Classes List</h6>
     </div>
     <div class="card-body">
         <div class="table-responsive">
@@ -29,19 +29,19 @@
                     <tr>
                       <th>Name</th>
                       <th>Default</th>
-                      <th>Reclaim Policy</th>
-                      <th>Volume Binding Mode</th>
+                      <th>Deletion Policy</th>
+                      <th>Driver</th>
                     </tr>
                   </thead>
                   <tbody>
-                    {% for sc in storage_classes %}
+                    {% for sc in snapshot_classes %}
                     {% if selected == sc.name %}
                       <tr class="selected" >
                     {% else %}
                       <tr>
                     {% endif %}
                         <td>
-                          <form action="/storage-class/data" method="POST">
+                          <form action="/snapshot-class/data" method="POST">
                             <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
                             <input type="hidden" name="ns_select" value="{{ session['ns_select'] }}" />
                             <input type="hidden" name="sc_name" value="{{ sc.name }}" />
@@ -50,16 +50,16 @@
                         </td>
                         <td>
                           {% for an_key, an_value in sc.annotations.items() %}
-                          {% if an_key == "storageclass.kubernetes.io/is-default-class"%}
+                          {% if an_key == "snapshot.storage.kubernetes.io/is-default-class"%}
                           {{an_value}}
                           {% endif %}
                           {% endfor %}
                         </td>
                         <td>
-                          {{ sc.reclaim_policy }}
+                          {{ sc.deletion_policy }}
                         </td>
                         <td>
-                          {{ sc.volume_binding_mode }}
+                          {{ sc.driver }}
                         </td>
                       </tr>
                     {% endfor %}
