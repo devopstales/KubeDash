@@ -11,6 +11,8 @@ jobs:
     permissions:
       contents: write
       packages: write
+      id-token: write
+      security-events: write
     steps:
       - name: Get current date
         id: date
@@ -98,7 +100,8 @@ jobs:
           cosign sign --key cosign.key --yes \
             -a "workflow=${{ github.workflow }}" \
             -a "repo=${{ github.repository }}" \
-          devopstales/kubedash:${{github.ref_name}}
+            -a "ref=${{ github.sha }}" \
+            devopstales/kubedash:${{github.ref_name}}
         env:
           COSIGN_PASSWORD: ${{ secrets.COSIGN_PASSWORD }}
 
@@ -107,6 +110,7 @@ jobs:
           cosign sign --key cosign.key --yes \
             -a "workflow=${{ github.workflow }}" \
             -a "repo=${{ github.repository }}" \
+            -a "ref=${{ github.sha }}" \
             devopstales/kubedash:${{github.ref_name}}-amd64
         env:
           COSIGN_PASSWORD: ${{ secrets.COSIGN_PASSWORD }}
@@ -116,6 +120,7 @@ jobs:
           cosign sign --key cosign.key --yes \
             -a "workflow=${{ github.workflow }}" \
             -a "repo=${{ github.repository }}" \
+            -a "ref=${{ github.sha }}" \
             devopstales/kubedash:${{github.ref_name}}-arm64v8
         env:
           COSIGN_PASSWORD: ${{ secrets.COSIGN_PASSWORD }}
@@ -132,6 +137,7 @@ jobs:
           cosign sign --key cosign.key --yes \
             -a "workflow=${{ github.workflow }}" \
             -a "repo=${{ github.repository }}" \
+            -a "ref=${{ github.sha }}" \
             ghcr.io/devopstales/kubedash:${{github.ref_name}}
         env:
           COSIGN_PASSWORD: ${{ secrets.COSIGN_PASSWORD }}
@@ -141,6 +147,7 @@ jobs:
           cosign sign --key cosign.key --yes \
             -a "workflow=${{ github.workflow }}" \
             -a "repo=${{ github.repository }}" \
+            -a "ref=${{ github.sha }}" \
             ghcr.io/devopstales/kubedash:${{github.ref_name}}-amd64
         env:
           COSIGN_PASSWORD: ${{ secrets.COSIGN_PASSWORD }}
@@ -150,6 +157,7 @@ jobs:
           cosign sign --key cosign.key --yes \
             -a "workflow=${{ github.workflow }}" \
             -a "repo=${{ github.repository }}" \
+            -a "ref=${{ github.sha }}" \
             ghcr.io/devopstales/kubedash:${{github.ref_name}}-arm64v8
         env:
           COSIGN_PASSWORD: ${{ secrets.COSIGN_PASSWORD }}
