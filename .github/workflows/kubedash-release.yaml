@@ -61,10 +61,10 @@ jobs:
         uses: docker/build-push-action@v3.3.0
         with:
           context: docker/kubedash/
-          build-args:
-            ARCH=amd64/
-            VERSION=${{github.ref_name}}
-            BUILD_DATE=${{ steps.date.outputs.date }}
+          build-args: |
+            "ARCH=amd64/"
+            "VERSION=${{github.ref_name}}"
+            "BUILD_DATE=${{ steps.date.outputs.date }}"
           tags: devopstales/kubedash:${{github.ref_name}}-amd64,
             ghcr.io/devopstales/kubedash:${{github.ref_name}}-amd64
           push: true
@@ -74,10 +74,10 @@ jobs:
         uses: docker/build-push-action@v3.3.0
         with:
           context: docker/kubedash/
-          build-args:
-            ARCH=arm64v8/
-            VERSION=${{github.ref_name}}
-            BUILD_DATE=${{ steps.date.outputs.date }}
+          build-args: |
+            "ARCH=arm64v8/"
+            "VERSION=${{github.ref_name}}"
+            "BUILD_DATE=${{ steps.date.outputs.date }}"
           tags: devopstales/kubedash:${{github.ref_name}}-arm64v8,
             ghcr.io/devopstales/kubedash:${{github.ref_name}}-arm64v8
           push: true
