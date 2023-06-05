@@ -20,7 +20,7 @@ pybase64>=1.2.3
 pyvis>=0.3.2
 # socket
 flask_socketio>=5.3.2
-event_websocket>=0.10.1
+gevent-websocket>=0.10.1
 eventlet>=0.33.3
 
 # security
