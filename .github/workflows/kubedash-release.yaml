@@ -90,20 +90,35 @@ jobs:
           images: devopstales/kubedash:${{github.ref_name}}-amd64,devopstales/kubedash:${{github.ref_name}}-arm64v8
           push: true
 
-      - name: Sign the images
-        run: cosign sign devopstales/kubedash:${{github.ref_name}}
-        env:
-          COSIGN_EXPERIMENTAL: 1
+      - name: Write signing key to disk
+        run: echo "${{ secrets.COSIGN_PRIVATE_KEY }}" > cosign.key
 
       - name: Sign the images
-        run: cosign sign devopstales/kubedash:${{github.ref_name}}-amd64
+        run: |
+          cosign sign --key cosign.key \
+            -a "workflow=${{ github.workflow }}" \
+            -a "repo=${{ github.repository }}"
+          devopstales/kubedash:${{github.ref_name}}
         env:
-          COSIGN_EXPERIMENTAL: 1
+          COSIGN_PASSWORD: ${{ secrets.COSIGN_PASSWORD }}
 
       - name: Sign the images
-        run: cosign sign devopstales/kubedash:${{github.ref_name}}-arm64v8
+        run: |
+          cosign sign --key cosign.key \
+            -a "workflow=${{ github.workflow }}" \
+            -a "repo=${{ github.repository }}"
+            devopstales/kubedash:${{github.ref_name}}-amd64
         env:
-          COSIGN_EXPERIMENTAL: 1
+          COSIGN_PASSWORD: ${{ secrets.COSIGN_PASSWORD }}
+
+      - name: Sign the images
+        run: |
+          cosign sign --key cosign.key \
+            -a "workflow=${{ github.workflow }}" \
+            -a "repo=${{ github.repository }}"
+            devopstales/kubedash:${{github.ref_name}}-arm64v8
+        env:
+          COSIGN_PASSWORD: ${{ secrets.COSIGN_PASSWORD }}
 
       - name: Create and push kubedash manifest images to github
         uses: Noelware/docker-manifest-action@master
@@ -113,16 +128,28 @@ jobs:
           push: true
 
       - name: Sign the images
-        run: cosign sign ghcr.io/devopstales/kubedash:${{github.ref_name}}
+        run: |
+          cosign sign --key cosign.key \
+            -a "workflow=${{ github.workflow }}" \
+            -a "repo=${{ github.repository }}"
+            ghcr.io/devopstales/kubedash:${{github.ref_name}}
         env:
-          COSIGN_EXPERIMENTAL: 1
+          COSIGN_PASSWORD: ${{ secrets.COSIGN_PASSWORD }}
 
       - name: Sign the images
-        run: cosign sign ghcr.io/devopstales/kubedash:${{github.ref_name}}-amd64
+        run: |
+          cosign sign --key cosign.key \
+            -a "workflow=${{ github.workflow }}" \
+            -a "repo=${{ github.repository }}"
+            ghcr.io/devopstales/kubedash:${{github.ref_name}}-amd64
         env:
-          COSIGN_EXPERIMENTAL: 1
+          COSIGN_PASSWORD: ${{ secrets.COSIGN_PASSWORD }}
 
       - name: Sign the images
-        run: cosign sign ghcr.io/devopstales/kubedash:${{github.ref_name}}-arm64v8
+        run: |
+          cosign sign --key cosign.key \
+            -a "workflow=${{ github.workflow }}" \
+            -a "repo=${{ github.repository }}"
+            ghcr.io/devopstales/kubedash:${{github.ref_name}}-arm64v8
         env:
-          COSIGN_EXPERIMENTAL: 1
+          COSIGN_PASSWORD: ${{ secrets.COSIGN_PASSWORD }}
