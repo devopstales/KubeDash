@@ -538,9 +538,18 @@ def callback():
         token_url = auth_server_info["token_endpoint"]
         userinfo_url = auth_server_info["userinfo_endpoint"]
 
+        if (
+            request.url.startswith("http://") and
+            request.environ["HTTP_X_FORWARDED_PROTO"] == "https"
+        ):
+            request_url = request.url.replace("http", "https")
+        else:
+            request_url = request.url
+        print("Request URL %s" % request_url)
+
         token = oauth.fetch_token(
             token_url,
-            authorization_response = request.url,
+            authorization_response = request_url,
             client_secret = ssoServer.client_secret,
             timeout = 60,
             verify = False,
