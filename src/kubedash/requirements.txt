@@ -20,7 +20,7 @@ pybase64>=1.2.3
 pyvis>=0.3.2
 # socket
 flask_socketio>=5.3.2
-event_websocket>=0.10.1
+gevent-websocket>=0.10.1
 eventlet>=0.33.3
 
 # security
@@ -45,5 +45,6 @@ pytest-playwright>=0.3.1
 selenium>=4.8.2
 
 # for git-changelog
-GitPython==2.1.11
+GitPython==3.1.30
 gitdb2==3.0.1
+ipython>=8.10.0 # not directly required, pinned by Snyk to avoid a vulnerability

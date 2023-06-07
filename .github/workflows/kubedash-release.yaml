@@ -11,7 +11,13 @@ jobs:
     permissions:
       contents: write
       packages: write
+      id-token: write
+      security-events: write
     steps:
+      - name: Get current date
+        id: date
+        run: echo "::set-output name=date::$(date +'%Y-%m-%d')"
+
       - name: Checkout code
         uses: actions/checkout@v3
         with:
@@ -57,8 +63,10 @@ jobs:
         uses: docker/build-push-action@v3.3.0
         with:
           context: docker/kubedash/
-          build-args:
-            ARCH=amd64/
+          build-args: |
+            "ARCH=amd64/"
+            "VERSION=${{github.ref_name}}"
+            "BUILD_DATE=${{ steps.date.outputs.date }}"
           tags: devopstales/kubedash:${{github.ref_name}}-amd64,
             ghcr.io/devopstales/kubedash:${{github.ref_name}}-amd64
           push: true
@@ -68,8 +76,10 @@ jobs:
         uses: docker/build-push-action@v3.3.0
         with:
           context: docker/kubedash/
-          build-args:
-            ARCH=arm64v8/
+          build-args: |
+            "ARCH=arm64v8/"
+            "VERSION=${{github.ref_name}}"
+            "BUILD_DATE=${{ steps.date.outputs.date }}"
           tags: devopstales/kubedash:${{github.ref_name}}-arm64v8,
             ghcr.io/devopstales/kubedash:${{github.ref_name}}-arm64v8
           push: true
@@ -82,20 +92,38 @@ jobs:
           images: devopstales/kubedash:${{github.ref_name}}-amd64,devopstales/kubedash:${{github.ref_name}}-arm64v8
           push: true
 
-      - name: Sign the images
-        run: cosign sign devopstales/kubedash:${{github.ref_name}}
-        env:
-          COSIGN_EXPERIMENTAL: 1
+      - name: Write signing key to disk
+        run: echo "${{ secrets.COSIGN_PRIVATE_KEY }}" > cosign.key
 
       - name: Sign the images
-        run: cosign sign devopstales/kubedash:${{github.ref_name}}-amd64
+        run: |
+          cosign sign --key cosign.key --yes \
+            -a "workflow=${{ github.workflow }}" \
+            -a "repo=${{ github.repository }}" \
+            -a "ref=${{ github.sha }}" \
+            devopstales/kubedash:${{github.ref_name}}
         env:
-          COSIGN_EXPERIMENTAL: 1
+          COSIGN_PASSWORD: ${{ secrets.COSIGN_PASSWORD }}
 
       - name: Sign the images
-        run: cosign sign devopstales/kubedash:${{github.ref_name}}-arm64v8
+        run: |
+          cosign sign --key cosign.key --yes \
+            -a "workflow=${{ github.workflow }}" \
+            -a "repo=${{ github.repository }}" \
+            -a "ref=${{ github.sha }}" \
+            devopstales/kubedash:${{github.ref_name}}-amd64
         env:
-          COSIGN_EXPERIMENTAL: 1
+          COSIGN_PASSWORD: ${{ secrets.COSIGN_PASSWORD }}
+
+      - name: Sign the images
+        run: |
+          cosign sign --key cosign.key --yes \
+            -a "workflow=${{ github.workflow }}" \
+            -a "repo=${{ github.repository }}" \
+            -a "ref=${{ github.sha }}" \
+            devopstales/kubedash:${{github.ref_name}}-arm64v8
+        env:
+          COSIGN_PASSWORD: ${{ secrets.COSIGN_PASSWORD }}
 
       - name: Create and push kubedash manifest images to github
         uses: Noelware/docker-manifest-action@master
@@ -105,16 +133,46 @@ jobs:
           push: true
 
       - name: Sign the images
-        run: cosign sign ghcr.io/devopstales/kubedash:${{github.ref_name}}
+        run: |
+          cosign sign --key cosign.key --yes \
+            -a "workflow=${{ github.workflow }}" \
+            -a "repo=${{ github.repository }}" \
+            -a "ref=${{ github.sha }}" \
+            ghcr.io/devopstales/kubedash:${{github.ref_name}}
         env:
-          COSIGN_EXPERIMENTAL: 1
+          COSIGN_PASSWORD: ${{ secrets.COSIGN_PASSWORD }}
 
       - name: Sign the images
-        run: cosign sign ghcr.io/devopstales/kubedash:${{github.ref_name}}-amd64
+        run: |
+          cosign sign --key cosign.key --yes \
+            -a "workflow=${{ github.workflow }}" \
+            -a "repo=${{ github.repository }}" \
+            -a "ref=${{ github.sha }}" \
+            ghcr.io/devopstales/kubedash:${{github.ref_name}}-amd64
         env:
-          COSIGN_EXPERIMENTAL: 1
+          COSIGN_PASSWORD: ${{ secrets.COSIGN_PASSWORD }}
 
       - name: Sign the images
-        run: cosign sign ghcr.io/devopstales/kubedash:${{github.ref_name}}-arm64v8
+        run: |
+          cosign sign --key cosign.key --yes \
+            -a "workflow=${{ github.workflow }}" \
+            -a "repo=${{ github.repository }}" \
+            -a "ref=${{ github.sha }}" \
+            ghcr.io/devopstales/kubedash:${{github.ref_name}}-arm64v8
         env:
-          COSIGN_EXPERIMENTAL: 1
+          COSIGN_PASSWORD: ${{ secrets.COSIGN_PASSWORD }}
+
+      - name: Run Trivy vulnerability scanner
+        uses: aquasecurity/trivy-action@master
+        with:
+          image-ref: ghcr.io/devopstales/kubedash:${{github.ref_name}}
+          format: 'sarif'
+          output: 'trivy-results.sarif'
+        env:
+          TRIVY_USERNAME: ${{ github.actor }}
+          TRIVY_PASSWORD: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Upload Trivy scan results to GitHub Security tab
+        uses: github/codeql-action/upload-sarif@v2
+        with:
+          sarif_file: 'trivy-results.sarif'

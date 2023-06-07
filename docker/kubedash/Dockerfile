@@ -1,7 +1,8 @@
 ARG ARCH
+ARG VERSION
+ARG BUILD_DATE
 FROM ${ARCH}python:3.11-alpine
 ARG ARCH
-# Metadata params
 ARG VERSION
 ARG BUILD_DATE
 
@@ -28,7 +29,9 @@ RUN apk -U upgrade && \
 COPY requirements.txt  /code/
 COPY entrypoint.sh /entrypoint.sh
 
-RUN pip install --no-cache-dir --upgrade -r /code/requirements.txt
+RUN apk --update add gcc build-base freetype-dev libpng-dev openblas-dev libffi-dev && \
+    pip install --no-cache-dir --upgrade -r /code/requirements.txt && \
+    apk del gcc build-base freetype-dev libpng-dev openblas-dev libffi-dev
 
 COPY ./kubedash /code/kubedash
 

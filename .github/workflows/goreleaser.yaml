@@ -34,5 +34,5 @@ jobs:
           cd src/kdlogin
           ls -laF
           ls -laF dist
-          
+
 # https://github.com/orgs/community/discussions/26274
