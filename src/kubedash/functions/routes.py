@@ -1129,7 +1129,7 @@ def pods_logs():
         session['ns_select'] = request.form.get('ns_select')
         return render_template(
             'pod-logs.html.j2', 
-            po_name=session['po_name'], 
+            po_name = request.form.get('po_name'), 
             async_mode=socketio.async_mode
         )
     else:
