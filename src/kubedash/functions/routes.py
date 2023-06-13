@@ -1127,10 +1127,11 @@ logging.getLogger('engineio').setLevel(logging.ERROR)
 def pods_logs():
     if request.method == 'POST':
         session['ns_select'] = request.form.get('ns_select')
+        print("async_mode: %s" % socketio.async_mode)
         return render_template(
             'pod-logs.html.j2', 
             po_name = request.form.get('po_name'), 
-            async_mode=socketio.async_mode
+            async_mode = socketio.async_mode
         )
     else:
         return redirect(url_for('routes.login'))
@@ -1162,6 +1163,7 @@ def message(data):
 def pods_exec():
     if request.method == 'POST':
         session['ns_select'] = request.form.get('ns_select')
+        print("async_mode: %s" % socketio.async_mode)
         return render_template(
             'pod-exec.html.j2', 
             po_name = request.form.get('po_name'),
