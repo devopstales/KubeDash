@@ -10,4 +10,4 @@ echo "Start Migration"
 flask db upgrade
 
 echo "Start Gunicorn"
-gunicorn --conf gunicorn_conf.py kubedash:app
+gunicorn --worker-class eventlet --conf gunicorn_conf.py kubedash:app
