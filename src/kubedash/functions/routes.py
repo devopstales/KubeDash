@@ -14,7 +14,6 @@ from functions.k8s import *
 from functions.registry import *
 
 from functions.components import tracer, socketio, csrf
-from threading import Lock
 from opentelemetry.trace.status import Status, StatusCode
 
 
@@ -24,9 +23,6 @@ from opentelemetry.trace.status import Status, StatusCode
 
 routes = Blueprint("routes", __name__)
 logger = get_logger(__name__)
-
-thread = None
-thread_lock = Lock()
 
 def authenticated_only(f):
     @functools.wraps(f)
@@ -1149,10 +1145,6 @@ def message(data):
     else:
         user_token = None
 
-    #global thread
-    #with thread_lock:
-    #    if thread is None:
-    #        thread = socketio.start_background_task(k8sPodLogsStream, session['user_role'], user_token, session['ns_select'], data)
     socketio.start_background_task(k8sPodLogsStream, session['user_role'], user_token, session['ns_select'], data)
 
 ##############################################################
@@ -1189,10 +1181,6 @@ def message(data):
     global wsclient
     wsclient = k8sPodExecSocket(session['user_role'], user_token, session['ns_select'], data)
 
-    #global thread
-    #with thread_lock:
-    #    if thread is None:
-    #        socketio.start_background_task(k8sPodExecStream, wsclient)
     socketio.start_background_task(k8sPodExecStream, wsclient)
 
 @socketio.on("exec-input", namespace="/exec")
