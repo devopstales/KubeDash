@@ -3,7 +3,7 @@
 #export FLASK_DEBUG=1
 #export TEMPLATES_AUTO_RELOAD=1
 #export KUBECONFIG=/etc/rancher/k3s/k3s.yaml
-export FLASK_CONFIG="production"
+#export FLASK_CONFIG="production" # redirect to https
 export FLASK_APP="kubedash"
 
 USER=$(id -u)
@@ -15,4 +15,4 @@ flask db upgrade
 
 echo "Start Gunicorn"
 #flask run --host=0.0.0.0 --port=8000
-gunicorn --worker-class eventlet --conf gunicorn_conf.py kubedash:app
+gunicorn --conf gunicorn_conf.py kubedash:app

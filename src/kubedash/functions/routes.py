@@ -364,6 +364,7 @@ def callback():
 
         if (
             request.url.startswith("http://") and
+            "HTTP_X_FORWARDED_PROTO" in request.environ and
             request.environ["HTTP_X_FORWARDED_PROTO"] == "https"
         ):
             request_url = request.url.replace("http", "https")
