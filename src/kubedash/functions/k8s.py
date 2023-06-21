@@ -1470,8 +1470,9 @@ def k8sPodListVulnsGet(username_role, user_token, ns):
         vulnerabilityreport_list = k8s_client.CustomObjectsApi().list_namespaced_custom_object("trivy-operator.devopstales.io", "v1", ns, "vulnerabilityreports")
         HAS_REPORT = True
     except Exception as error:
-        ErrorHandler(logger, "error", error)
-        vulnerabilityreport_list = False
+        vulnerabilityreport_list = None
+        if error.status != 404:
+            ErrorHandler(logger, "error", error)
 
     for pod in pod_list.items:
         POD_VULN_SUM = {
@@ -1518,8 +1519,9 @@ def k8sPodVulnsGet(username_role, user_token, ns, pod):
     try:
         vulnerabilityreport_list = k8s_client.CustomObjectsApi().list_namespaced_custom_object("trivy-operator.devopstales.io", "v1", ns, "vulnerabilityreports")
     except Exception as error:
-        ErrorHandler(logger, "error", error)
         vulnerabilityreport_list = None
+        if error.status != 404:
+            ErrorHandler(logger, "error", error)
 
     for po in pod_list.items:
         POD_VULNS = {}
