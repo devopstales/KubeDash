@@ -14,7 +14,6 @@ from functions.k8s import *
 from functions.registry import *
 
 from functions.components import tracer, socketio, csrf
-from threading import Lock
 from opentelemetry.trace.status import Status, StatusCode
 
 
@@ -24,9 +23,6 @@ from opentelemetry.trace.status import Status, StatusCode
 
 routes = Blueprint("routes", __name__)
 logger = get_logger(__name__)
-
-thread = None
-thread_lock = Lock()
 
 def authenticated_only(f):
     @functools.wraps(f)
@@ -368,6 +364,7 @@ def callback():
 
         if (
             request.url.startswith("http://") and
+            "HTTP_X_FORWARDED_PROTO" in request.environ and
             request.environ["HTTP_X_FORWARDED_PROTO"] == "https"
         ):
             request_url = request.url.replace("http", "https")
@@ -1094,6 +1091,31 @@ def deployments():
         namespaces = namespace_list,
     )
 
+@routes.route('/deployments/data', methods=['GET', 'POST'])
+@login_required
+def deployments_data():
+    if request.method == 'POST':
+        deployment_name = request.form.get('deployment_name')
+        session['ns_select'] = request.form.get('ns_select')
+
+        if session['user_type'] == "OpenID":
+            user_token = session['oauth_token']
+        else:
+            user_token = None
+
+        deployments_list = k8sDeploymentsGet(session['user_role'], user_token, session['ns_select'])
+        deployment_data = None
+        for deployment in deployments_list:
+            if deployment["name"] == deployment_name:
+                deployment_data = deployment
+
+        return render_template(
+            'deployment-data.html.j2',
+            deployment_data = deployment_data,
+        )
+    else:
+        return redirect(url_for('routes.login'))
+
 ##############################################################
 ## ReplicaSets
 ##############################################################
@@ -1191,10 +1213,11 @@ logging.getLogger('engineio').setLevel(logging.ERROR)
 def pods_logs():
     if request.method == 'POST':
         session['ns_select'] = request.form.get('ns_select')
+        logger.info("async_mode: %s" % socketio.async_mode)
         return render_template(
             'pod-logs.html.j2', 
-            po_name=session['po_name'], 
-            async_mode=socketio.async_mode
+            po_name = request.form.get('po_name'), 
+            async_mode = socketio.async_mode
         )
     else:
         return redirect(url_for('routes.login'))
@@ -1212,10 +1235,7 @@ def message(data):
     else:
         user_token = None
 
-    global thread
-    with thread_lock:
-        if thread is None:
-            thread = socketio.start_background_task(k8sPodLogsStream, session['user_role'], user_token, session['ns_select'], data)
+    socketio.start_background_task(k8sPodLogsStream, session['user_role'], user_token, session['ns_select'], data)
 
 ##############################################################
 ## Pod Exec
@@ -1226,6 +1246,7 @@ def message(data):
 def pods_exec():
     if request.method == 'POST':
         session['ns_select'] = request.form.get('ns_select')
+        logger.info("async_mode: %s" % socketio.async_mode)
         return render_template(
             'pod-exec.html.j2', 
             po_name = request.form.get('po_name'),
@@ -1250,10 +1271,7 @@ def message(data):
     global wsclient
     wsclient = k8sPodExecSocket(session['user_role'], user_token, session['ns_select'], data)
 
-    global thread
-    with thread_lock:
-        if thread is None:
-            socketio.start_background_task(k8sPodExecStream, wsclient)
+    socketio.start_background_task(k8sPodExecStream, wsclient)
 
 @socketio.on("exec-input", namespace="/exec")
 @authenticated_only
