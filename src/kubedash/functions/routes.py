@@ -1029,6 +1029,31 @@ def statefulsets():
         namespaces = namespace_list,
     )
 
+@routes.route('/statefulsets/data', methods=['GET', 'POST'])
+@login_required
+def statefulsets_data():
+    if request.method == 'POST':
+        statefulset_name = request.form.get('statefulset_name')
+        session['ns_select'] = request.form.get('ns_select')
+
+        if session['user_type'] == "OpenID":
+            user_token = session['oauth_token']
+        else:
+            user_token = None
+
+        statefulset_list = k8sStatefulSetsGet(session['user_role'], user_token, session['ns_select'])
+        statefulset_data = None
+        for statefulset in statefulset_list:
+            if statefulset["name"] == statefulset_name:
+                statefulset_data = statefulset
+
+        return render_template(
+            'statefulsets-data.html.j2',
+            statefulset_data = statefulset_data,
+        )
+    else:
+        return redirect(url_for('routes.login'))
+
 ##############################################################
 ## Daemonsets
 ##############################################################

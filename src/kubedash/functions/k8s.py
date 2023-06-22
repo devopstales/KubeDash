@@ -1176,9 +1176,26 @@ def k8sStatefulSetsGet(username_role, user_token, ns):
         for sfs in statefulset_list.items:
             STATEFULSET_DATA = {
                 "name": sfs.metadata.name,
+                "namespace": ns,
+                "labels": list(),
+                "replicas": sfs.spec.replicas,
+                # status
                 "desired": "",
                 "current": "",
                 "ready": "",
+                # Environment variables
+                "environment_variables": [],
+                # Security
+                "security_context": sfs.spec.template.spec.security_context.to_dict(),
+                # Containers
+                "containers": list(),
+                "init_containers": list(),
+                #  Related Resources
+                "image_pull_secrets": list(),
+                "service_account": "",
+                "pvc": list(),
+                "cm": list(),
+                "secrets": list(),
             }
             if sfs.status.replicas:
                 STATEFULSET_DATA['desired'] = sfs.status.replicas
@@ -1192,6 +1209,58 @@ def k8sStatefulSetsGet(username_role, user_token, ns):
                 STATEFULSET_DATA['ready'] = sfs.status.ready_replicas
             else:
                 STATEFULSET_DATA['ready'] = 0
+            if sfs.metadata.labels:
+                for key, value in sfs.metadata.labels.items():
+                    STATEFULSET_DATA['labels'].append(key + "=" + value)
+            if sfs.spec.template.spec.image_pull_secrets:
+                for ips in sfs.spec.template.spec.image_pull_secrets:
+                    STATEFULSET_DATA['image_pull_secrets'].append(ips.to_dict())
+            if sfs.spec.template.spec.service_account_name:
+                STATEFULSET_DATA['service_account'] = sfs.spec.template.spec.service_account_name
+            if sfs.spec.template.spec.volumes:
+                for v in sfs.spec.template.spec.volumes:
+                    if v.persistent_volume_claim:
+                        STATEFULSET_DATA['pvc'].append(v.persistent_volume_claim.claim_name)
+                    if v.config_map:
+                        STATEFULSET_DATA['cm'].append(v.config_map.name)
+                    if v.secret:
+                        STATEFULSET_DATA['secrets'].append(v.secret.secret_name)
+            for c in sfs.spec.template.spec.containers:
+                if c.env:
+                    for e in c.env:
+                        ed = e.to_dict()
+                        env_name = None
+                        env_value = None
+                        for name, val in ed.items():
+                            if "value_from" in name and val is not None:
+                                for key, value in val.items():
+                                    if "secret_key_ref" in key and value:
+                                        for n, v in value.items():
+                                            if "name" in n:
+                                                if v not in STATEFULSET_DATA['secrets']:
+                                                    STATEFULSET_DATA['secrets'].append(v)
+                            elif "name" in name and val is not None:
+                                env_name = val
+                            elif "value" in name and val is not None:
+                                env_value = val
+
+                        if env_name and env_value is not None:
+                            STATEFULSET_DATA['environment_variables'].append({
+                                env_name: env_value
+                            })
+                CONTAINERS = {
+                    "name": c.name,
+                    "image": c.image,
+                }
+                STATEFULSET_DATA['containers'].append(CONTAINERS)
+            if sfs.spec.template.spec.init_containers:
+                for ic in sfs.spec.template.spec.init_containers:
+                    CONTAINERS = {
+                        "name": ic.name,
+                        "image": ic.image,
+                    }
+                    STATEFULSET_DATA['init_containers'].append(CONTAINERS)
+
             STATEFULSET_LIST.append(STATEFULSET_DATA)
         return STATEFULSET_LIST
     except ApiException as error:
