@@ -1250,10 +1250,29 @@ def k8sDeploymentsGet(username_role, user_token, ns):
         for d in deployment_list.items:
             DEPLOYMENT_DATA = {
                 "name": d.metadata.name,
+                "namespace": ns,
                 "labels": list(),
+                "selectors": list(),
+                "replicas": d.spec.replicas,
+                # status
                 "desired": "",
                 "updated": "",
                 "ready": "",
+                # Environment variables
+                "environment_variables": [],
+                # Security
+                "security_context": d.spec.template.spec.security_context.to_dict(),
+                # Conditions
+                "conditions": d.status.conditions,
+                # Containers
+                "containers": list(),
+                "init_containers": list(),
+                #  Related Resources
+                "image_pull_secrets": list(),
+                "service_account": list(),
+                "pvc": list(),
+                "cm": list(),
+                "secrets": list(),
             }
             if d.status.ready_replicas:
                 DEPLOYMENT_DATA['ready']  = d.status.ready_replicas
@@ -1270,6 +1289,58 @@ def k8sDeploymentsGet(username_role, user_token, ns):
             if d.metadata.labels:
                 for key, value in d.metadata.labels.items():
                     DEPLOYMENT_DATA['labels'].append(key + "=" + value)
+            selectors = d.spec.selector.to_dict()
+            DEPLOYMENT_DATA['selectors'] = selectors['match_labels']
+            if d.spec.template.spec.image_pull_secrets:
+                for ips in d.spec.template.spec.image_pull_secrets:
+                    DEPLOYMENT_DATA['image_pull_secrets'].append(ips.to_dict())
+            if d.spec.template.spec.service_account_name:
+                for ips in d.spec.template.spec.service_account_name:
+                    DEPLOYMENT_DATA['service_account'].append(ips.to_dict())
+            if d.spec.template.spec.volumes:
+                for v in d.spec.template.spec.volumes:
+                    if v.persistent_volume_claim:
+                        DEPLOYMENT_DATA['pvc'].append(v.persistent_volume_claim.claim_name)
+                    if v.config_map:
+                        DEPLOYMENT_DATA['cm'].append(v.config_map.name)
+                    if v.secret:
+                        DEPLOYMENT_DATA['secrets'].append(v.secret.secret_name)
+            for c in d.spec.template.spec.containers:
+                if c.env:
+                    for e in c.env:
+                        ed = e.to_dict()
+                        env_name = None
+                        env_value = None
+                        for name, val in ed.items():
+                            if "value_from" in name and val is not None:
+                                for key, value in val.items():
+                                    if "secret_key_ref" in key and value:
+                                        for n, v in value.items():
+                                            if "name" in n:
+                                                if v not in DEPLOYMENT_DATA['secrets']:
+                                                    DEPLOYMENT_DATA['secrets'].append(v)
+                            elif "name" in name and val is not None:
+                                env_name = val
+                            elif "value" in name and val is not None:
+                                env_value = val
+
+                        if env_name and env_value is not None:
+                            DEPLOYMENT_DATA['environment_variables'].append({
+                                env_name: env_value
+                            })
+                CONTAINERS = {
+                    "name": c.name,
+                    "image": c.image,
+                }
+                DEPLOYMENT_DATA['containers'].append(CONTAINERS)
+            if d.spec.template.spec.init_containers:
+                for ic in d.spec.template.spec.init_containers:
+                    CONTAINERS = {
+                        "name": ic.name,
+                        "image": ic.image,
+                    }
+                    DEPLOYMENT_DATA['init_containers'].append(CONTAINERS)
+
             DEPLOYMENT_LIST.append(DEPLOYMENT_DATA)
         return DEPLOYMENT_LIST
     except ApiException as error:
@@ -1360,6 +1431,8 @@ def k8sPodGet(username_role, user_token, ns, po):
             "priority": pod_data.spec.priority,
             "priority_class_name": pod_data.spec.priority_class_name,
             "runtime_class_name": pod_data.spec.runtime_class_name,
+            # Environment variables
+            "environment_variables": [],
             # Containers
             "containers": list(),
             "init_containers": list(),
@@ -1387,13 +1460,25 @@ def k8sPodGet(username_role, user_token, ns, po):
             if c.env:
                 for e in c.env:
                     ed = e.to_dict()
+                    env_name = None
+                    env_value = None
                     for name, val in ed.items():
                         if "value_from" in name and val is not None:
                             for key, value in val.items():
                                 if "secret_key_ref" in key and value:
                                     for n, v in value.items():
                                         if "name" in n:
-                                            POD_DATA['secrets'].append(v)
+                                            if v not in POD_DATA['secrets']:
+                                                POD_DATA['secrets'].append(v)
+                        elif "name" in name and val is not None:
+                            env_name = val
+                        elif "value" in name and val is not None:
+                            env_value = val
+
+                    if env_name and env_value is not None:
+                        POD_DATA['environment_variables'].append({
+                            env_name: env_value
+                        })
             for cs in pod_data.status.container_statuses:
                 if cs.name == c.name:
                     if cs.ready:
@@ -1470,8 +1555,9 @@ def k8sPodListVulnsGet(username_role, user_token, ns):
         vulnerabilityreport_list = k8s_client.CustomObjectsApi().list_namespaced_custom_object("trivy-operator.devopstales.io", "v1", ns, "vulnerabilityreports")
         HAS_REPORT = True
     except Exception as error:
-        ErrorHandler(logger, "error", error)
-        vulnerabilityreport_list = False
+        vulnerabilityreport_list = None
+        if error.status != 404:
+            ErrorHandler(logger, "error", error)
 
     for pod in pod_list.items:
         POD_VULN_SUM = {
@@ -1518,8 +1604,9 @@ def k8sPodVulnsGet(username_role, user_token, ns, pod):
     try:
         vulnerabilityreport_list = k8s_client.CustomObjectsApi().list_namespaced_custom_object("trivy-operator.devopstales.io", "v1", ns, "vulnerabilityreports")
     except Exception as error:
-        ErrorHandler(logger, "error", error)
         vulnerabilityreport_list = None
+        if error.status != 404:
+            ErrorHandler(logger, "error", error)
 
     for po in pod_list.items:
         POD_VULNS = {}
