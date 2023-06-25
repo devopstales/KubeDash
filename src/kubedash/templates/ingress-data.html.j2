@@ -100,7 +100,13 @@
                 <tbody>
                 {% for rule in i_data.rules %}
                     <tr>
-                        <td>{{ i_data.hosts[0] }}</td>
+                        <td>
+                            {% if i_data.tls[0] %}
+                            <a href="https://{{ i_data.hosts[0] }}" target="_blank">{{ i_data.hosts[0] }}</a>
+                            {% else %}
+                            <a href="http://{{ i_data.hosts[0] }}" target="_blank">{{ i_data.hosts[0] }}</a>
+                            {% endif %}
+                        </td>
                         <td>{{ rule.path }}</td>
                         <td>{{ rule.path_type }}</td>
                         <td>
@@ -111,7 +117,15 @@
                                 <a href="javascript:;" onclick="parentNode.submit();">{{ rule.backend.service.name }}</a>
                             </form>
                         </td>
-                        <td>{{ rule.backend.service.port.number }}</td>
+                        <td>
+                            {% if rule.backend.service.port.number %}
+                              {{ rule.backend.service.port.number }}
+                            {% elif rule.backend.service.port.name %}
+                              {{ rule.backend.service.port.name }}
+                            {% else %}
+                              None
+                            {% endif %}
+                        </td>
                         {% if i_data.tls[0] %}
                         <td>
                             <form action="/secrets" method="POST">
