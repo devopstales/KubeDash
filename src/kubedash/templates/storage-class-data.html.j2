@@ -14,7 +14,7 @@
 <nav aria-label="breadcrumb">
   <ol class="breadcrumb">
     <li class="breadcrumb-item">Storage</li>
-    <li class="breadcrumb-item"><a href="/configmaps">Storage Class</a></li>
+    <li class="breadcrumb-item"><a href="/storage-class">Storage Class</a></li>
     <li class="breadcrumb-item active" aria-current="page">{{ sc_data.name }}</li>
     <div class="col">
       <a class="card-link float-right" data-toggle="collapse" href="#" onclick="reload()">
@@ -84,19 +84,20 @@
             </div>
         </div>
         {% if sc_data.parameters %}
-        <div class="card-body">
-            <div class="card shadow mb-4">
-                <div class="card-body">
-                    <div class="table-responsive">
-                        <table class="table table-bordered" id="podInfoTable" width="100%" cellspacing="0">
-                            {% for da_key, da_value in sc_data.parameters.items() %}
-                            <tr>
-                                <th>{{ da_key }}:</th>
-                                <td>{{ da_value }}</td>
-                            </tr>
-                            {% endfor %}
-                        </table>
-                    </div>
+        <div class="card shadow mb-4">
+            <div class="card-header">
+                Storage Class Parameters
+            </div>
+            <div class="card-body">
+                <div class="table-responsive">
+                    <table class="table table-bordered" id="podInfoTable" width="100%" cellspacing="0">
+                        {% for da_key, da_value in sc_data.parameters.items() %}
+                        <tr>
+                            <th>{{ da_key }}:</th>
+                            <td>{{ da_value }}</td>
+                        </tr>
+                        {% endfor %}
+                    </table>
                 </div>
             </div>
         </div>

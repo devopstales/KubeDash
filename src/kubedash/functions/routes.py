@@ -2012,7 +2012,7 @@ def storage_class():
     if session['user_type'] == "OpenID":
         user_token = session['oauth_token']
     else:
-        user_token = None
+        user_token = None 
 
     if request.method == 'POST':
         selected = request.form.get('selected')
@@ -2226,6 +2226,10 @@ def pv_data():
                 return redirect(url_for('routes.pv'))
     else:
         return redirect(url_for('routes.login'))
+
+##############################################################
+## Volume Snapshot
+##############################################################
 
 ##############################################################
 ## ConfigMap

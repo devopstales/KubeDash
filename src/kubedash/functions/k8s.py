@@ -2316,18 +2316,18 @@ def k8sStorageClassListGet(username_role, user_token):
     SC_LIST = list()
     try:
         storage_classes = k8s_client.StorageV1Api().list_storage_class()
-        for sc in storage_classes.items:
+        for sc in storage_classes.to_dict()["items"]:
             SC = {
-                "name": sc.metadata.name,
-                "created": sc.metadata.creation_timestamp,
-                "annotations": sc.metadata.annotations,
-                "labels": sc.metadata.labels,
-                "provisioner": sc.provisioner,
-                "reclaim_policy": sc.reclaim_policy,
-                "volume_binding_mode": sc.volume_binding_mode,
+                "name": sc["metadata"]["name"],
+                "created": sc["metadata"]["creation_timestamp"],
+                "annotations": sc["metadata"]["annotations"],
+                "labels": sc["metadata"]["labels"],
+                "provisioner": sc["provisioner"],
+                "reclaim_policy": sc["reclaim_policy"],
+                "volume_binding_mode": sc["volume_binding_mode"],
             }
             if "parameters" in sc:
-                SC["parameters"] = sc.parameters
+                SC["parameters"] = sc["parameters"]
             SC_LIST.append(SC)
         return SC_LIST
     except ApiException as error:
@@ -2441,6 +2441,10 @@ def k8sPersistentVolumeListGet(username_role, user_token, namespace):
     except Exception as error:
         ErrorHandler(logger, "error", error)
         return PV_LIST 
+
+##############################################################
+## Volume Snapshot
+##############################################################
 
 ##############################################################
 ## ConfigMap
