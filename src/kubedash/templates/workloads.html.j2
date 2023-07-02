@@ -32,57 +32,35 @@
   </ol>
 </nav>
 
-<div class="card shadow mb-4">
-    <div class="card-header py-3">
-        <h6 class="m-0 font-weight-bold text-primary">Workloads</h6>
-    </div>
-    <div class="card-body">
-        <div class="card">
-              <div id="filter-menu" class="card-header">
-                <div class="row no-gutters">
-                  <div class="col-3 pb-2">
-                    <select
-                            class="form-select"
-                            aria-label="Default select example"
-                            onchange="updateFilter(value, 'item')"
-                            id="select-item"
-                        >
-                        <option value="">Select a network item</option>
-                        <option value="edge">edge</option>
-                        <option value="node">node</option>
-                    </select>
-                  </div>
-                  <div class="col-3 pb-2">
-                    <select
-                            class="form-select"
-                            aria-label="Default select example"
-                            onchange="updateFilter(value, 'property')"
-                            id="select-property"
-                        >
-                        <option value="">Select a property...</option>
-                    </select>
-                  </div>
-                  <div class="col-3 pb-2">
-                    <select
-                            class="form-select"
-                            aria-label="Default select example"
-                            id="select-value"
-                        >
-                        <option value="">Select value(s)...</option>
-                    </select>
-                  </div>
-                  <div class="col-1 pb-2">
-                    <button type="button" class="btn btn-primary btn-block" onclick="highlightFilter(filter);">Filter</button>
-                  </div>
-                  <div class="col-2 pb-2">
-                    <button type="button" class="btn btn-primary btn-block" onclick="clearFilter(true)">Reset Selection</button>
-                  </div>
-                </div>
-              </div>
-            <div id="mynetwork" class="card-body"></div>
+<div class="card">
+        <div id="filter-menu" class="card-header">
+        <div class="row no-gutters">
+            <div class="col-3">
+                <select class="form-select" aria-label="Default select example" onchange="updateFilter(value, 'item')" id="select-item" >
+                    <option value="">Select a network item</option>
+                    <option value="edge">edge</option>
+                    <option value="node">node</option>
+                </select>
+            </div>
+            <div class="col-3 pl-2">
+                <select class="form-select" aria-label="Default select example" onchange="updateFilter(value, 'property')" id="select-property" >
+                    <option value="">Select a property...</option>
+                </select>
+            </div>
+            <div class="col-3 pl-2">
+                <select class="form-select" aria-label="Default select example" id="select-value" >
+                    <option value="">Select value(s)...</option>
+                </select>
+            </div>
+            <div class="col-1 pl-2">
+              <button type="button" class="btn btn-primary btn-block" onclick="highlightFilter(filter);">Filter</button>
+            </div>
+            <div class="col-2 pl-2">
+              <button type="button" class="btn btn-primary btn-block" onclick="clearFilter(true)">Reset Selection</button>
+            </div>
         </div>
-        <!-- <div id="config"></div> -->
-    </div>
+        </div>
+    <div id="mynetwork" class="card-body"></div>
 </div>
 {% endblock %}
 

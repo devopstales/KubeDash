@@ -258,6 +258,8 @@
                             <input type="hidden" name="ns_select" value="{{ session['ns_select'] }}" />
                             <a class="collapse-item" href="#" onclick="event.preventDefault(); this.parentNode.submit()">VolumeClames</a>
                         </form>
+                        <a class="collapse-item" href="/pv">Volumes</a>
+                        <a class="collapse-item" href="/Volumesnapshots">VolumeSnapshot</a>
                         <form action="/configmaps" method="POST">
                             <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
                             <input type="hidden" name="ns_select" value="{{ session['ns_select'] }}" />
@@ -265,10 +267,10 @@
                         </form>
                         {% else %}
                         <a class="collapse-item" href="/pvc">VolumeClames</a>
+                        <a class="collapse-item" href="/pv">Volumes</a>
+                        <a class="collapse-item" href="/Volumesnapshots">VolumeSnapshot</a>
                         <a class="collapse-item" href="/configmaps">ConfigMaps</a>
                         {% endif %}
-                        <a class="collapse-item" href="/pv">Volumes</a>
-                        <a class="collapse-item" href="/vs">VolumeSnapshot</a>
                     </div>
                 </div>
             </li>
