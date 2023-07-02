@@ -93,7 +93,7 @@ def create_app(config_name="development"):
 
     csrf.init_app(app)
 
-    socketio.init_app(app, async_mode=None)
+    socketio.init_app(app)
 
     talisman = Talisman(app, content_security_policy=csp)
     ##############################################################
