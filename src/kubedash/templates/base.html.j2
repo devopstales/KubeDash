@@ -259,7 +259,7 @@
                             <a class="collapse-item" href="#" onclick="event.preventDefault(); this.parentNode.submit()">VolumeClames</a>
                         </form>
                         <a class="collapse-item" href="/pv">Volumes</a>
-                        <a class="collapse-item" href="/Volumesnapshots">VolumeSnapshot</a>
+                        <a class="collapse-item" href="/volumesnapshots">VolumeSnapshot</a>
                         <form action="/configmaps" method="POST">
                             <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
                             <input type="hidden" name="ns_select" value="{{ session['ns_select'] }}" />
@@ -268,7 +268,7 @@
                         {% else %}
                         <a class="collapse-item" href="/pvc">VolumeClames</a>
                         <a class="collapse-item" href="/pv">Volumes</a>
-                        <a class="collapse-item" href="/Volumesnapshots">VolumeSnapshot</a>
+                        <a class="collapse-item" href="/volumesnapshots">VolumeSnapshot</a>
                         <a class="collapse-item" href="/configmaps">ConfigMaps</a>
                         {% endif %}
                     </div>

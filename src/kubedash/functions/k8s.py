@@ -735,9 +735,7 @@ def k8sClusterRoleCreate(name, body):
     except ApiException as e:
         if e.status != 404:
             logger.error("Exception when testing ClusterRole - %s : %s\n" % (name, e))
-            return False
-        else:
-            return False
+        return False
     except Exception as error:
         return False
     
@@ -1097,7 +1095,8 @@ def k8sPodDisruptionBudgetListGet(username_role, user_token, ns_name):
             PDB_LIST.append(PDB_DATA)
         return PDB_LIST
     except ApiException as error:
-        ErrorHandler(logger, error, "get DisruptionBudgetList")
+        if error.status != 404:
+            ErrorHandler(logger, error, "get DisruptionBudgetList")
         return PDB_LIST
     except Exception as error:
         ErrorHandler(logger, "error", error)
@@ -2361,7 +2360,8 @@ def k8sSnapshotClassListGet(username_role, user_token):
             SC_LIST.append(SC)
         return SC_LIST
     except ApiException as error:
-        ErrorHandler(logger, error, "get cluster Snapshot Class list")
+        if error.status != 404:
+            ErrorHandler(logger, error, "get cluster Snapshot Class list")
         return SC_LIST
     except Exception as error:
         ErrorHandler(logger, "error", error)
@@ -2445,6 +2445,35 @@ def k8sPersistentVolumeListGet(username_role, user_token, namespace):
 ##############################################################
 ## Volume Snapshot
 ##############################################################
+
+def k8sPersistentVolumeSnapshotListGet(username_role, user_token):
+    k8sClientConfigGet(username_role, user_token)
+    PVS_LIST = list()
+    try:
+        snapshot_list = k8s_client.CustomObjectsApi().list_cluster_custom_object("snapshot.storage.k8s.io", "v1", "volumesnapshots", _request_timeout=1)
+        for pvs in snapshot_list["items"]:
+            PVS = {
+            "name": pvs["metadata"]["name"],
+            "annotations": pvs["metadata"]["annotations"],
+            "created": pvs["metadata"]["creationTimestamp"],
+            "pvc": pvs["spec"]["source"]["persistentVolumeClaimName"],
+            "volume_snapshot_class": pvs["spec"]["volumeSnapshotClassName"],
+            "volume_snapshot_content": pvs["status"]["boundVolumeSnapshotContentName"],
+            "snapshot_creation_time": pvs["status"]["creationTime"],
+            "status": pvs["status"]["readyToUse"],
+            "restore_size": pvs["status"]["restoreSize"],
+            }
+            if "labels" in pvs["metadata"]:
+                PVS["labels"] = pvs["metadata"]["labels"]
+            PVS_LIST.append(PVS)
+        return PVS_LIST
+    except ApiException as error:
+        if error.status != 404:
+            ErrorHandler(logger, error, "get Volume Snapshot list")
+        return PVS_LIST
+    except Exception as error:
+        ErrorHandler(logger, "error", error)
+        return PVS_LIST
 
 ##############################################################
 ## ConfigMap
