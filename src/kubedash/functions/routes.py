@@ -2187,7 +2187,11 @@ def pv():
         selected = request.form.get('selected')
 
     namespace_list, error = k8sNamespaceListGet(session['user_role'], user_token)
-    pv_list = k8sPersistentVolumeListGet(session['user_role'], user_token, session['ns_select'])
+    if not error:
+        pv_list = k8sPersistentVolumeListGet(session['user_role'], user_token, session['ns_select'])
+    else:
+        pv_list = []
+        namespace_list = []
       
     return render_template(
         'pv.html.j2',
@@ -2230,6 +2234,26 @@ def pv_data():
 ##############################################################
 ## Volume Snapshot
 ##############################################################
+
+@routes.route("/volumesnapshots", methods=['GET', 'POST'])
+@login_required
+def volumesnapshots():
+    selected = None
+    if session['user_type'] == "OpenID":
+        user_token = session['oauth_token']
+    else:
+        user_token = None
+
+    if request.method == 'POST':
+        selected = request.form.get('selected')
+
+    snapshot_list = k8sPersistentVolumeSnapshotListGet(session['user_role'], user_token)
+      
+    return render_template(
+        'volumesnapshots.html.j2',
+        snapshot_list = snapshot_list,
+        selected = selected,
+    )
 
 ##############################################################
 ## ConfigMap
