@@ -1617,15 +1617,17 @@ def k8sPodListVulnsGet(username_role, user_token, ns):
         ErrorHandler(logger, error, "get cluster roles")
         return HAS_REPORT, POD_VULN_LIST
     except Exception as error:
-        ErrorHandler(logger, "error", error)
+        ERROR = "pod_list exeption: %s" % error
+        ErrorHandler(logger, "error", ERROR)
         return HAS_REPORT, POD_VULN_LIST
     try:
         vulnerabilityreport_list = k8s_client.CustomObjectsApi().list_namespaced_custom_object("trivy-operator.devopstales.io", "v1", ns, "vulnerabilityreports")
         HAS_REPORT = True
     except Exception as error:
         vulnerabilityreport_list = None
+        ERROR = "vulnerabilityreport_list exeption: %s" % error
         if error.status != 404:
-            ErrorHandler(logger, "error", error)
+            ErrorHandler(logger, "error", ERROR)
 
     for pod in pod_list.items:
         POD_VULN_SUM = {
