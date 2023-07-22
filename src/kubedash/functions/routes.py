@@ -53,17 +53,25 @@ def health():
     resp.status_code = 200
     return resp
 
-@routes.errorhandler(404)
-def page_not_found(e):
+@routes.app_errorhandler(404)
+def handle_404(e):
     return render_template('404.html.j2'), 404
 
-@routes.errorhandler(400)
-def page_not_found(e):
+@routes.app_errorhandler(400)
+def handle_400(e):
     logger.error(e.description)
     return render_template(
         '400.html.j2',
         description = e.description,
         ), 400
+
+@routes.app_errorhandler(500)
+def handle_500(e):
+    logger.error(e.description)
+    return render_template(
+        '400.html.j2',
+        description = e.description,
+        ), 500
 
 @routes.after_request
 def add_header(response):

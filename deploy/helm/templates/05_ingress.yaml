@@ -8,7 +8,7 @@ metadata:
     app: kubedash
     {{- include "kubedash.labels" . | nindent 4 }}
   annotations:
-    nginx.ingress.kubernetes.io/rewrite-target: /$1
+    {{- if eq .Values.ingress.ingressClassName "nginx" }}
     {{- if .Values.ingress.tls.enabled }}
     nginx.ingress.kubernetes.io/ssl-redirect: "true"
     {{- end }}
@@ -18,13 +18,17 @@ metadata:
         nginx.ingress.kubernetes.io/whitelist-source-range: "{{ $ip }}{{ if ne $index $last }}, {{ end }}"
     {{- end }}
     {{- end }}
+    {{- end }}
     {{- if .Values.ingress.tls.certManager.enabled }}
+    {{- if .Values.ingress.tls.certManager.clusterIssuer }}
     cert-manager.io/cluster-issuer: "{{ .Values.ingress.tls.certManager.clusterIssuer }}"
+    {{- end }}
     {{- end }}
 {{- with .Values.ingress.annotations }}
 {{ toYaml . | indent 4 }}
 {{- end }}
 spec:
+  ingressClassName: {{ .Values.ingress.ingressClassName }}
 {{- if .Values.ingress.tls.enabled }}
   tls:
   - hosts:
@@ -39,7 +43,7 @@ spec:
     - host: "{{ .Values.ingress.url }}"
       http:
         paths:
-          - path: /(.*)
+          - path: /
             pathType: Prefix
             backend:
               service:
