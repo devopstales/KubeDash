@@ -9,5 +9,6 @@ export USER=$USER
 echo "Start Migration"
 flask db upgrade
 
-echo "Start Gunicorn"
-gunicorn --worker-class eventlet --conf gunicorn_conf.py kubedash:app
+echo "Start Applications"
+#gunicorn --worker-class eventlet --conf gunicorn_conf.py kubedash:app
+python3 kubedash.py
