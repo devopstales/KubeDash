@@ -15,6 +15,7 @@ flask db upgrade
 
 mkdir -p /tmp/kubedash
 
-echo "Start Gunicorn"
-flask run --host=127.0.0.1 --port=8000
+echo "Start Application"
+#flask run --host=127.0.0.1 --port=8000
 #gunicorn --worker-class eventlet --conf gunicorn_conf.py kubedash:app
+python3 kubedash.py

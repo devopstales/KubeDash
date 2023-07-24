@@ -7,6 +7,9 @@ from flask_healthz import healthz, HealthError
 from sqlalchemy_utils import database_exists
 from flask_migrate import Migrate
 
+import eventlet
+import eventlet.wsgi
+
 from functions.components import db, login_manager, csrf, socketio
 from functions.routes import routes
 from functions.commands import commands
@@ -137,4 +140,5 @@ logging.getLogger("werkzeug").addFilter(NoSocketIoGet())
 logging.getLogger("werkzeug").addFilter(NoSocketIoPost())
 
 if __name__ == '__main__':
-    socketio.run(app, port=8000)
+    #socketio.run(app, port=8000)
+    eventlet.wsgi.server(eventlet.listen(('', 8000)), app)
