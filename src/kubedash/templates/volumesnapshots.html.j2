@@ -27,7 +27,7 @@
             <table class="table table-bordered" id="dataTable" width="100%" cellspacing="0">
                 <thead>
                     <tr>
-                      <th>Status</th>
+                      <th>Usable</th>
                       <th>Name</th>
                       <th>SnapshotClass</th>
                       <th>VolumeClaim</th>
@@ -35,31 +35,30 @@
                     </tr>
                   </thead>
                   <tbody>
-                    {% for pv in snapshot_list %}
+                    {% for vs in snapshot_list %}
                     {% if selected == vs.name %}
                       <tr class="selected" >
                     {% else %}
                       <tr>
                     {% endif %}
-                    {% if vs.status == "Bound" %}
+                    {% if vs.status %}
                         <td>
                           <span class="badge badge-success badge-tag">{{ vs.status }}</span>
                         </td>
-                    {% elif  vs.status == "Terminating" %}
+                    {% else %}
                         <td>
                           <span class="badge badge-danger badge-tag">{{ vs.status }}</span>
                         </td>
-                    {% else %}
-                        <td>
-                          <span class="badge badge-warning badge-tag">{{ vs.status }}</span>
-                        </td>
                     {% endif %}
                         <td>
-                          <form action="/volumesnapshot/data" method="POST">
+                          {# 
+                            <form action="/volumesnapshot/data" method="POST">
                             <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
                             <input type="hidden" name="ns_select" value="{{ session['ns_select'] }}" />
                             <input type="hidden" name="selected" value="{{ vs.name }}" />
                             <a href="javascript:;" onclick="parentNode.submit();">{{ vs.name }}</a>
+                          #}
+                          {{ vs.name }}
                           </form>
                         </td>
                         <td>

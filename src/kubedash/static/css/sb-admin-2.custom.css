@@ -74,3 +74,12 @@ Badge styles
 .badge-tag {
     font-size: 87%;
 }
+
+/* 
+Input spinnes
+*/
+
+.spinner {
+    width: 30px;
+    text-align: center;
+}

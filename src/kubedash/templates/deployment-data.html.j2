@@ -3,6 +3,7 @@
 {% block header %}
     <link href="{{ url_for('static',filename='/vendor/datatables/dataTables.bootstrap4.min.css') }}" rel="stylesheet" >
     <link href="{{ url_for('static',filename='/vendor/google/material-icons.css') }}" rel="stylesheet" >
+    <link href="{{ url_for('static',filename='/css/sb-admin-2.custom.css') }}" rel="stylesheet" >
 {% endblock %}
 
 {% block content %}
@@ -62,7 +63,24 @@
                                 </tr>
                                 <tr>
                                     <th>Replicas:</th>
+                                {% if session['user_role'] == "Admin" %}
+                                    <td>
+                                        <div class="input-group">
+                                            <div class="input-group-prepend">
+                                              <button id="ctrl__button--decrement" class="btn btn-outline-danger" type="button">-</button>
+                                            </div>
+                                            <input type="text" class="spinner" id="spinner" readonly="readonly" 
+                                                value="{{ deployment_data.replicas }}"  k8s_type="deployments" 
+                                                csrf_token="{{ csrf_token() }}" selected="{{ deployment_data.name }}"
+                                                namespace="{{ deployment_data.namespace }}">
+                                            <div class="input-group-append">
+                                                <button id="ctrl__button--increment" class="btn btn-outline-success" type="button">+</button>
+                                              </div>
+                                          </div>
+                                    </td>
+                                {% else %}
                                     <td>{{ deployment_data.replicas }}</td>
+                                {% endif %}
                                 </tr>
                                 <tr>
                                     <th>Lables:</th>
@@ -76,10 +94,12 @@
                                 <tr>
                                     <th>Selectors:</th>
                                     <td>
+                                        {% if deployment_data.selectors %}
                                         {% for key, value in deployment_data.selectors.items() %}
                                             <span class="badge badge-secondary">{{ key }}: {{ value }}</span>
                                             {% if not loop.last %}<br>{% endif %}
                                         {% endfor %}
+                                        {% endif %}
                                     </td>
                                 </tr>
                             </table>
@@ -152,10 +172,12 @@
                                 <tbody>
                                     {% for variables in deployment_data.environment_variables %}
                                     <tr>
+                                        {% if variables %}
                                         {% for key, var in variables.items() %}
                                             <td>{{ key }}</td>
                                             <td>{{ var }}</td>
                                         {% endfor %}
+                                        {% endif %}
                                     </tr>
                                     {% endfor %}
                                 </tbody>
@@ -206,12 +228,14 @@
                                     </tr>
                                 </thead>
                                 <tbody>
+                                {% if deployment_data.security_context %}
                                 {% for item in deployment_data.security_context.items() %}
                                     <tr>
                                         <td>{{ item[0] }}</td>
                                         <td>{{ item[1] }}</td>
                                     </tr>
                                 {% endfor%}
+                                {% endif %}
                                 </tbody>
                             </table>
                         </div>
@@ -345,6 +369,9 @@
         });
     </script>
     {% endfor %}
+
+    <!-- Custom input spinner -->
+    <script id="spinner" src="{{ url_for('static',filename='/vendor/custom-input-spinner/inputt-spinner.js') }}" ></script>
 
     <!-- Page level plugins -->
     <script src="{{ url_for('static',filename='vendor/datatables/jquery.dataTables.js') }}"></script>

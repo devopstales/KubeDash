@@ -3,9 +3,18 @@
 {% block header %}
     <link href="{{ url_for('static',filename='/vendor/datatables/dataTables.bootstrap4.min.css') }}" rel="stylesheet" >
     <link href="{{ url_for('static',filename='/vendor/google/material-icons.css') }}" rel="stylesheet" >
+    <link href="{{ url_for('static',filename='/css/sb-admin-2.custom.css') }}" rel="stylesheet" >
 {% endblock %}
 
 {% block content %}
+{% if scale %}
+<div class="alert alert-{{status_type}} alert-dismissible fade show" role="alert">
+    {{ status_message }}
+    <button type="button" class="close" data-dismiss="alert" aria-label="Close">
+        <span aria-hidden="true">&times;</span>
+    </button>
+    </div>
+{% endif %}
 
 <nav aria-label="breadcrumb">
   <ol class="breadcrumb">
@@ -59,7 +68,24 @@
                                 </tr>
                                 <tr>
                                     <th>Replicas:</th>
+                                {% if session['user_role'] == "Admin" %}
+                                    <td>
+                                        <div class="input-group">
+                                            <div class="input-group-prepend">
+                                              <button id="ctrl__button--decrement" class="btn btn-outline-danger" type="button">-</button>
+                                            </div>
+                                            <input type="text" class="spinner" id="spinner" readonly="readonly"
+                                                value="{{ statefulset_data.replicas }}"  k8s_type="statefulsets" 
+                                                csrf_token="{{ csrf_token() }}" selected="{{ statefulset_data.name }}"
+                                                namespace="{{ statefulset_data.namespace }}">
+                                            <div class="input-group-append">
+                                                <button id="ctrl__button--increment" class="btn btn-outline-success" type="button">+</button>
+                                              </div>
+                                          </div>
+                                    </td>
+                                {% else %}
                                     <td>{{ statefulset_data.replicas }}</td>
+                                {% endif %}
                                 </tr>
                                 <tr>
                                     <th>Lables:</th>
@@ -304,6 +330,9 @@
         });
     </script>
     {% endfor %}
+
+    <!-- Custom input spinner -->
+    <script id="spinner" src="{{ url_for('static',filename='/vendor/custom-input-spinner/inputt-spinner.js') }}" ></script>
 
     <!-- Page level plugins -->
     <script src="{{ url_for('static',filename='vendor/datatables/jquery.dataTables.js') }}"></script>
