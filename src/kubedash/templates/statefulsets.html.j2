@@ -44,7 +44,7 @@
                           <form action="/statefulsets/data" method="POST">
                             <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
                             <input type="hidden" name="ns_select" value="{{ session['ns_select'] }}" />
-                            <input type="hidden" name="statefulset_name" value="{{ sfs.name }}" />
+                            <input type="hidden" name="selected" value="{{ sfs.name }}" />
                             <a href="javascript:;" onclick="parentNode.submit();">{{ sfs.name }}</a>
                           </form>
                         </td>

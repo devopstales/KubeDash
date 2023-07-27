@@ -1275,6 +1275,24 @@ def k8sStatefulSetsGet(username_role, user_token, ns):
         ErrorHandler(logger, "error", ERROR)
         return STATEFULSET_LIST
 
+def k8sStatefulSetPatchReplica(username_role, user_token, ns, name, replicas):
+    k8sClientConfigGet(username_role, user_token)
+    try:
+        api_response = k8s_client.AppsV1Api().patch_namespaced_stateful_set_scale(
+                name, ns, 
+                [{'op': 'replace', 'path': '/spec/replicas', 'value': int(replicas)}]
+            )
+        flash("StatefulSet: %s patched to replicas %s" % (name, replicas), "success")
+        logger.info("StatefulSet: %s patched to replicas %s" % (name, replicas))
+        return True
+    except ApiException as error:
+        ErrorHandler(logger, error, "ERROR: %s patch StatefulSet Replica" % name)
+        return False
+    except Exception as error:
+        ERROR = "k8sStatefulSetPatchReplica: %s" % error
+        ErrorHandler(logger, "error", ERROR)
+        return False
+
 ##############################################################
 ## DaemonSets
 ##############################################################
@@ -1370,8 +1388,7 @@ def k8sDeploymentsGet(username_role, user_token, ns):
                 for ips in d.spec.template.spec.image_pull_secrets:
                     DEPLOYMENT_DATA['image_pull_secrets'].append(ips.to_dict())
             if d.spec.template.spec.service_account_name:
-                for ips in d.spec.template.spec.service_account_name:
-                    DEPLOYMENT_DATA['service_account'].append(ips.to_dict())
+                DEPLOYMENT_DATA['service_account'] = d.spec.template.spec.service_account_name
             if d.spec.template.spec.volumes:
                 for v in d.spec.template.spec.volumes:
                     if v.persistent_volume_claim:
@@ -1425,6 +1442,24 @@ def k8sDeploymentsGet(username_role, user_token, ns):
         ERROR = "k8sDeploymentsGet: %s" % error
         ErrorHandler(logger, "error", ERROR)
         return DEPLOYMENT_LIST
+    
+def k8sDeploymentsPatchReplica(username_role, user_token, ns, name, replicas):
+    k8sClientConfigGet(username_role, user_token)
+    try:
+        api_response = k8s_client.AppsV1Api().patch_namespaced_deployment_scale(
+                name, ns, 
+                [{'op': 'replace', 'path': '/spec/replicas', 'value': int(replicas)}]
+            )
+        flash("Deployment: %s patched to replicas %s" % (name, replicas), "success")
+        logger.info("Deployment: %s patched to replicas %s" % (name, replicas))
+        return True
+    except ApiException as error:
+        ErrorHandler(logger, error, "ERROR: %s patch Deployments Replica" % name)
+        return False
+    except Exception as error:
+        ERROR = "k8sDeploymentsPatchReplica: %s" % error
+        ErrorHandler(logger, "error", ERROR)
+        return False
 
 ##############################################################
 ## ReplicaSets

@@ -1033,7 +1033,7 @@ def statefulsets():
 @login_required
 def statefulsets_data():
     if request.method == 'POST':
-        statefulset_name = request.form.get('statefulset_name')
+        selected = request.form.get('selected')
         session['ns_select'] = request.form.get('ns_select')
 
         if session['user_type'] == "OpenID":
@@ -1044,13 +1044,49 @@ def statefulsets_data():
         statefulset_list = k8sStatefulSetsGet(session['user_role'], user_token, session['ns_select'])
         statefulset_data = None
         for statefulset in statefulset_list:
-            if statefulset["name"] == statefulset_name:
+            if statefulset["name"] == selected:
                 statefulset_data = statefulset
 
         return render_template(
             'statefulsets-data.html.j2',
             statefulset_data = statefulset_data,
         )
+    else:
+        if session['statefulset_name']:
+            if session['user_type'] == "OpenID":
+                user_token = session['oauth_token']
+            else:
+                user_token = None
+
+            statefulset_list = k8sStatefulSetsGet(session['user_role'], user_token, session['ns_select'])
+            statefulset_data = None
+            for statefulset in statefulset_list:
+                if statefulset["name"] == session['statefulset_name']:
+                    statefulset_data = statefulset
+
+            session.pop('statefulset_name', None)
+
+            return render_template(
+                'statefulsets-data.html.j2',
+                statefulset_data = statefulset_data,
+            )
+        else:
+            return redirect(url_for('routes.login'))
+        
+@routes.route('/statefulsets/scale', methods=['GET', 'POST'])
+@login_required
+def statefulsets_scale():
+    if request.method == 'POST':
+        replicas = request.form.get('replica_number')
+        session['statefulset_name'] = request.form.get('selected')
+
+        if session['user_type'] == "OpenID":
+            user_token = session['oauth_token']
+        else:
+            user_token = None
+
+        scale_status = k8sStatefulSetPatchReplica(session['user_role'], user_token, session['ns_select'], session['statefulset_name'], replicas)
+        return redirect(url_for('routes.statefulsets_data'))
     else:
         return redirect(url_for('routes.login'))
 
@@ -1120,7 +1156,7 @@ def deployments():
 @login_required
 def deployments_data():
     if request.method == 'POST':
-        deployment_name = request.form.get('deployment_name')
+        selected = request.form.get('selected')
         session['ns_select'] = request.form.get('ns_select')
 
         if session['user_type'] == "OpenID":
@@ -1131,13 +1167,49 @@ def deployments_data():
         deployments_list = k8sDeploymentsGet(session['user_role'], user_token, session['ns_select'])
         deployment_data = None
         for deployment in deployments_list:
-            if deployment["name"] == deployment_name:
+            if deployment["name"] == selected:
                 deployment_data = deployment
 
         return render_template(
             'deployment-data.html.j2',
             deployment_data = deployment_data,
         )
+    else:
+        if session['deployment_name']:
+            if session['user_type'] == "OpenID":
+                user_token = session['oauth_token']
+            else:
+                user_token = None
+            
+            deployments_list = k8sDeploymentsGet(session['user_role'], user_token, session['ns_select'])
+            deployment_data = None
+            for deployment in deployments_list:
+                if deployment["name"] == session['deployment_name']:
+                    deployment_data = deployment
+
+            session.pop('deployment_name', None)
+
+            return render_template(
+                'deployment-data.html.j2',
+                deployment_data = deployment_data,
+            )
+        else:
+            return redirect(url_for('routes.login'))
+    
+@routes.route('/deployments/scale', methods=['GET', 'POST'])
+@login_required
+def deployments_scale():
+    if request.method == 'POST':
+        replicas = request.form.get('replica_number')
+        session['deployment_name'] = request.form.get('selected')
+
+        if session['user_type'] == "OpenID":
+            user_token = session['oauth_token']
+        else:
+            user_token = None
+
+        scale_status = k8sDeploymentsPatchReplica(session['user_role'], user_token, session['ns_select'], session['deployment_name'], replicas)
+        return redirect(url_for('routes.deployments_data'))
     else:
         return redirect(url_for('routes.login'))
 
