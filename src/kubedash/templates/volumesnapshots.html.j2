@@ -9,7 +9,7 @@
 <nav aria-label="breadcrumb">
   <ol class="breadcrumb">
     <li class="breadcrumb-item">Storage</li>
-    <li class="breadcrumb-item active" aria-current="page">Configmap</li>
+    <li class="breadcrumb-item active" aria-current="page">Volume Snapshot</li>
     <div class="col">
       <a class="card-link float-right" data-toggle="collapse" href="#" onclick="reload()">
         <i class="material-icons">refresh</i>
@@ -20,53 +20,65 @@
 
 <div class="card shadow mb-4">
     <div class="card-header py-3">
-        <h6 class="m-0 font-weight-bold text-primary">Configmaps List</h6>
+        <h6 class="m-0 font-weight-bold text-primary">Volume Snapshot List</h6>
     </div>
     <div class="card-body">
         <div class="table-responsive">
             <table class="table table-bordered" id="dataTable" width="100%" cellspacing="0">
                 <thead>
                     <tr>
+                      <th>Status</th>
                       <th>Name</th>
-                      <th>Annotations</th>
-                      <th>Labels</th>
+                      <th>SnapshotClass</th>
+                      <th>VolumeClaim</th>
+                      <th>RestorSize</th>
                     </tr>
                   </thead>
                   <tbody>
-                    {% for configmap in configmaps %}
-                    {% if selected == configmap.name %}
+                    {% for pv in snapshot_list %}
+                    {% if selected == vs.name %}
                       <tr class="selected" >
                     {% else %}
                       <tr>
                     {% endif %}
+                    {% if vs.status == "Bound" %}
                         <td>
-                          <form action="/configmaps/data" method="POST">
+                          <span class="badge badge-success badge-tag">{{ vs.status }}</span>
+                        </td>
+                    {% elif  vs.status == "Terminating" %}
+                        <td>
+                          <span class="badge badge-danger badge-tag">{{ vs.status }}</span>
+                        </td>
+                    {% else %}
+                        <td>
+                          <span class="badge badge-warning badge-tag">{{ vs.status }}</span>
+                        </td>
+                    {% endif %}
+                        <td>
+                          <form action="/volumesnapshot/data" method="POST">
                             <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
                             <input type="hidden" name="ns_select" value="{{ session['ns_select'] }}" />
-                            <input type="hidden" name="configmap_name" value="{{ configmap.name }}" />
-                            <a href="javascript:;" onclick="parentNode.submit();">{{ configmap.name }}</a>
+                            <input type="hidden" name="selected" value="{{ vs.name }}" />
+                            <a href="javascript:;" onclick="parentNode.submit();">{{ vs.name }}</a>
                           </form>
                         </td>
                         <td>
-                          {% if configmap.annotations %}
-                          {% for an_key, an_value in configmap.annotations.items() %}
-                          {% if an_key != "kubectl.kubernetes.io/last-applied-configuration" %}
-                          <span class="badge badge-secondary">{{ an_key }}: {{ an_value }}</span>
-                          {% if not loop.last %}<br>{% endif %}
-                          {% endif %}
-                          {% endfor %}
-                          {% endif %}
+                          <form action="/snapshot-class" method="POST">
+                            <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+                            <input type="hidden" name="ns_select" value="{{ session['ns_select'] }}" />
+                            <input type="hidden" name="selected" value="{{ vs.volume_snapshot_class }}" />
+                            <a href="javascript:;" onclick="parentNode.submit();">{{ vs.volume_snapshot_class }}</a>
+                          </form>
                         </td>
                         <td>
-                          {% if configmap.labels %}
-                          {% for an_key, an_value in configmap.labels.items() %}
-                          {% if an_key != "kubectl.kubernetes.io/last-applied-configuration" %}
-                          <span class="badge badge-secondary">{{ an_key }}: {{ an_value }}</span>
-                          {% if not loop.last %}<br>{% endif %}
-                          {% endif %}
-                          {% endfor %}
-                          {% endif %}
+                          <form action="/pvc" method="POST">
+                            <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+                            <input type="hidden" name="ns_select" value="{{ session['ns_select'] }}" />
+                            <input type="hidden" name="selected" value="{{ vs.pvc }}" />
+                            <a href="javascript:;" onclick="parentNode.submit();">{{ vs.pvc }}</a>
+                          </form>
                         </td>
+                        <td>{{ vs.restore_size }}</td>
                       </tr>
                     {% endfor %}
                   </tbody>

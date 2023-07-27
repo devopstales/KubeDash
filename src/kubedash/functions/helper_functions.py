@@ -22,10 +22,10 @@ def ErrorHandler(logger, error, action):
             elif error.status == 403:
                 flash("403 - Forbidden: User cannot %s" % action, "danger")
         else:
-            flash(action, "danger")
+            flash("Exception: %s" % action, "danger")
             logger.error("Exception: %s \n" % action)
     else:
-        flash(action, "danger")
+        flash("Exception: %s" % action, "danger")
         logger.error("Exception: %s \n" % action)
 
 def ResponseHandler(message, status):

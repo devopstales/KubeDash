@@ -43,15 +43,15 @@
                     {% endif %}
                     {% if pv.status == "Bound" %}
                         <td>
-                          <span class="badge badge-success">{{ pv.status }}</span>
+                          <span class="badge badge-success badge-tag">{{ pv.status }}</span>
                         </td>
                     {% elif  pv.status == "Terminating" %}
                         <td>
-                          <span class="badge badge-danger">{{ pv.status }}</span>
+                          <span class="badge badge-danger badge-tag">{{ pv.status }}</span>
                         </td>
                     {% else %}
                         <td>
-                          <span class="badge badge-warning">{{ pv.status }}</span>
+                          <span class="badge badge-warning badge-tag">{{ pv.status }}</span>
                         </td>
                     {% endif %}
                         <td>

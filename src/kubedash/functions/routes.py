@@ -54,11 +54,11 @@ def health():
     return resp
 
 @routes.errorhandler(404)
-def page_not_found(e):
+def page_not_found404(e):
     return render_template('404.html.j2'), 404
 
 @routes.errorhandler(400)
-def page_not_found(e):
+def page_not_found400(e):
     logger.error(e.description)
     return render_template(
         '400.html.j2',
