@@ -10,7 +10,7 @@ from flask_migrate import Migrate
 import eventlet
 import eventlet.wsgi
 
-from functions.components import db, login_manager, csrf, socketio
+from functions.components import db, sess, login_manager, csrf, socketio
 from functions.routes import routes
 from functions.commands import commands
 from functions.user import UserCreate, RoleCreate, UserTest
@@ -62,8 +62,10 @@ def connect_database():
         return False
 
 def create_app(config_name="development"):
+    """Init App"""
     app = Flask(__name__, static_url_path='', static_folder='static')
 
+    """Init Logger"""
     global logger
     logger=logging.getLogger()
     logging.basicConfig(
@@ -71,6 +73,7 @@ def create_app(config_name="development"):
             format='[%(asctime)s] %(name)s        %(levelname)s %(message)s'
         )
 
+    """App config"""
     if os.getenv('FLASK_CONFIG') == "production":
         config_name = "production"
         app.config['SECRET_KEY'] = os.urandom(12).hex()
@@ -80,8 +83,15 @@ def create_app(config_name="development"):
     logger.info("Running in %s mode" % config_name)
 
     app.config.from_object(app_config[config_name])
+    app.config['SESSION_SQLALCHEMY'] = db
+
+    """Init FlaskInstrumentor"""
     # FlaskInstrumentor().instrument_app(app)
 
+    """Init session"""
+    sess.init_app(app)
+
+    """Init DB"""
     migrate = Migrate(app, db)
     db.init_app(app)
     basedir = os.path.abspath(os.path.dirname(__file__))
@@ -90,14 +100,18 @@ def create_app(config_name="development"):
             SQLAlchemyInstrumentor().instrument(engine=db.engine)
             db_init()
 
+    """Init Logging managger"""
     login_manager.init_app(app)
     login_manager.login_view = "routes.login"
     login_manager.session_protection = "strong"
 
+    """Init CSRF"""
     csrf.init_app(app)
 
+    """Init SocketIO"""
     socketio.init_app(app)
 
+    """Init Talisman"""
     talisman = Talisman(app, content_security_policy=csp)
     ##############################################################
     ## Custom jinja2 filter
