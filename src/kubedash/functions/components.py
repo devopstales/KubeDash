@@ -2,6 +2,7 @@ import socket, os
 from urllib.parse import urlparse
 from flask_login import LoginManager
 from flask_sqlalchemy import SQLAlchemy
+from flask_session import Session
 from flask_wtf.csrf import CSRFProtect
 from flask_socketio import SocketIO
 
@@ -17,6 +18,7 @@ logger = get_logger(__name__)
 
 login_manager = LoginManager()
 db = SQLAlchemy()
+sess = Session()
 csrf = CSRFProtect()
 socketio = SocketIO()
 tracer = None
