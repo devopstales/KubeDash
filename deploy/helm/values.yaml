@@ -32,6 +32,26 @@ containerSecurityContext:
   capabilities:
     drop: ["all"]
 
+oidc:
+  # -- Enable oidc authentication
+  enabled: true
+  provider:
+    # -- oidc issuer url
+    oidcUrl: "https://sso.mydomain.intra/auth/realms/k8s"
+    # -- oidc scope
+    oidcScopes: "openid email"
+    # -- oidc client id
+    oidcClientId: ""
+    # -- oidc client secret
+    oidcSecret: ""
+  secret:
+    # -- Name of the secret storing OIDC_CLIENT_ID and OIDC_SECRET.
+    name: "skooner-oidc"
+    # -- Secret must provide the following variables: OIDC_CLIENT_ID and OIDC_SECRET.
+    useExistingSecret: false
+
+
+
 persistence:
   # -- Volumes for the pod
   enabled: true

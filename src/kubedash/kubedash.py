@@ -11,9 +11,11 @@ import eventlet
 import eventlet.wsgi
 
 from functions.components import db, sess, login_manager, csrf, socketio
+from functions.helper_functions import string2list
 from functions.routes import routes
 from functions.commands import commands
 from functions.user import UserCreate, RoleCreate, UserTest
+from functions.sso import SSOServerTest, SSOServerCreate, SSOServerUpdate
 from config import app_config
 
 from opentelemetry.instrumentation.flask import FlaskInstrumentor
@@ -60,6 +62,23 @@ def connect_database():
         return True
     else:
         return False
+    
+def oidc_init():
+    # https://github.com/requests/requests-oauthlib/issues/387
+    os.environ['OAUTHLIB_RELAX_TOKEN_SCOPE'] = "1"
+    OIDC_ISSUER_URL = os.environ.get('OIDC_ISSUER_URL', None)
+    OIDC_CLIENT_ID = os.environ.get('OIDC_CLIENT_ID', None)
+    OIDC_SECRET = os.environ.get('OIDC_SECRET', None)
+    OIDC_SCOPE = os.environ.get('OIDC_SCOPE', None)
+    OIDC_CALLBACK_URL = os.environ.get('OIDC_CALLBACK_URL', None)
+    if OIDC_ISSUER_URL and OIDC_CLIENT_ID and OIDC_SECRET and OIDC_SCOPE and OIDC_CALLBACK_URL:
+        oidc_test, OIDC_ISSUER_URL_OLD = SSOServerTest()
+        if oidc_test:
+            SSOServerUpdate(OIDC_ISSUER_URL_OLD, OIDC_ISSUER_URL, OIDC_CLIENT_ID, OIDC_SECRET, OIDC_CALLBACK_URL, string2list(OIDC_SCOPE))
+            logger.info("OIDC Provider updated")
+        else:
+            SSOServerCreate(OIDC_ISSUER_URL, OIDC_CLIENT_ID, OIDC_SECRET, OIDC_CALLBACK_URL, string2list(OIDC_SCOPE))
+            logger.info("OIDC Provider created")
 
 def create_app(config_name="development"):
     """Init App"""
@@ -99,6 +118,7 @@ def create_app(config_name="development"):
         with app.app_context():
             SQLAlchemyInstrumentor().instrument(engine=db.engine)
             db_init()
+            oidc_init()
 
     """Init Logging managger"""
     login_manager.init_app(app)

@@ -50,6 +50,10 @@ def var_test(var):
         resp = False
     return resp
 
+def string2list(string):
+    list = string.split()
+    return list
+
 def parse_quantity(quantity):
     """
     Parse kubernetes canonical form quantity like 200Mi to a decimal number.
