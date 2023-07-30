@@ -65,10 +65,27 @@ def page_not_found400(e):
         description = e.description,
         ), 400
 
+@routes.errorhandler(500)
+def page_not_found500(e):
+    logger.error(e.description)
+    return render_template(
+        '500.html.j2',
+        description = e.description,
+        ), 500
+
+
 @routes.after_request
 def add_header(response):
     response.headers['Access-Control-Allow-Origin'] = request.root_url.rstrip(request.root_url[-1])
     return response
+
+@routes.after_request
+def adding_header_content(head):
+    head.headers["Cache-Control"] = "no-cache, no-store, must-revalidate"
+    head.headers["Pragma"] = "no-cache"
+    head.headers["Expires"] = "0"
+    head.headers['Cache-Control'] = 'public, max-age=0'
+    return head
 ##############################################################
 ## Login
 ##############################################################
@@ -721,7 +738,15 @@ def namespaces():
     else:
         user_token = None
 
-    namespace_list = k8sNamespacesGet(session['user_role'], user_token)
+    ns_list = k8sNamespacesGet(session['user_role'], user_token)
+    namespace_list = []
+    for namespace in ns_list:
+        WORKLOAD_LIST = k8sWorkloadList(session['user_role'], user_token, namespace["name"])
+        namespace["live"] = 0
+        for WORKLOAD in WORKLOAD_LIST:
+            if WORKLOAD["replicas"] > 0:
+                namespace["live"] += WORKLOAD["replicas"]
+        namespace_list.append(namespace)
 
     return render_template(
         'namespaces.html.j2',
@@ -756,6 +781,43 @@ def namespaces_delete():
             user_token = None
 
         k8sNamespaceDelete(session['user_role'], user_token, namespace)
+        return redirect(url_for('routes.namespaces'))
+    else:
+        return redirect(url_for('routes.namespaces'))
+
+@routes.route("/namespaces/scale", methods=['GET', 'POST'])
+@login_required
+def namespaces_scale():
+    if request.method == 'POST':
+        namespace = request.form['namespace']
+        action = request.form['action']
+
+        if session['user_type'] == "OpenID":
+            user_token = session['oauth_token']
+        else:
+            user_token = None
+
+        WORKLOAD_LIST = k8sWorkloadList(session['user_role'], user_token, namespace)
+        for WORKLOAD in WORKLOAD_LIST:
+            if action == "down":
+                if WORKLOAD["type"] == "statefulset":
+                    k8sStatefulSetPatchAnnotation(session['user_role'], user_token, WORKLOAD["namespace"], WORKLOAD["name"], WORKLOAD["replicas"])
+                    k8sStatefulSetPatchReplica(session['user_role'], user_token, WORKLOAD["namespace"], WORKLOAD["name"], 0)
+                if WORKLOAD["type"] == "deployment":
+                    k8sDeploymentsPatchAnnotation(session['user_role'], user_token, WORKLOAD["namespace"], WORKLOAD["name"], WORKLOAD["replicas"])
+                    k8sDeploymentsPatchReplica(session['user_role'], user_token, WORKLOAD["namespace"], WORKLOAD["name"], 0)
+                if WORKLOAD["type"] == "daemonset":
+                    body = {"spec": {"template": {"spec": {"nodeSelector": {"non-existing": "true"}}}}}
+                    k8sDaemonsetPatch(session['user_role'], user_token, WORKLOAD["namespace"], WORKLOAD["name"], body)
+            else:
+                if WORKLOAD["type"] == "statefulset":
+                    k8sStatefulSetPatchReplica(session['user_role'], user_token, WORKLOAD["namespace"], WORKLOAD["name"], WORKLOAD["original-replicas"])
+                if WORKLOAD["type"] == "deployment":
+                    k8sDeploymentsPatchReplica(session['user_role'], user_token, WORKLOAD["namespace"], WORKLOAD["name"], WORKLOAD["original-replicas"])
+                if WORKLOAD["type"] == "daemonset":
+                    body = [{"op": "remove", "path": "/spec/template/spec/nodeSelector/non-existing"}]
+                    k8sDaemonsetPatch(session['user_role'], user_token, WORKLOAD["namespace"], WORKLOAD["name"], body)
+
         return redirect(url_for('routes.namespaces'))
     else:
         return redirect(url_for('routes.namespaces'))
@@ -1052,41 +1114,22 @@ def statefulsets_data():
             statefulset_data = statefulset_data,
         )
     else:
-        if session['statefulset_name']:
-            if session['user_type'] == "OpenID":
-                user_token = session['oauth_token']
-            else:
-                user_token = None
-
-            statefulset_list = k8sStatefulSetsGet(session['user_role'], user_token, session['ns_select'])
-            statefulset_data = None
-            for statefulset in statefulset_list:
-                if statefulset["name"] == session['statefulset_name']:
-                    statefulset_data = statefulset
-
-            session.pop('statefulset_name', None)
-
-            return render_template(
-                'statefulsets-data.html.j2',
-                statefulset_data = statefulset_data,
-            )
-        else:
-            return redirect(url_for('routes.login'))
+        return redirect(url_for('routes.login'))
         
 @routes.route('/statefulsets/scale', methods=['GET', 'POST'])
 @login_required
 def statefulsets_scale():
     if request.method == 'POST':
         replicas = request.form.get('replica_number')
-        session['statefulset_name'] = request.form.get('selected')
+        selected = request.form.get('selected')
 
         if session['user_type'] == "OpenID":
             user_token = session['oauth_token']
         else:
             user_token = None
 
-        scale_status = k8sStatefulSetPatchReplica(session['user_role'], user_token, session['ns_select'], session['statefulset_name'], replicas)
-        return redirect(url_for('routes.statefulsets_data'))
+        scale_status = k8sStatefulSetPatchReplica(session['user_role'], user_token, session['ns_select'], selected, replicas)
+        return redirect(url_for('routes.statefulsets_data'), code=307)
     else:
         return redirect(url_for('routes.login'))
 
@@ -1120,6 +1163,57 @@ def daemonsets():
         namespaces = namespace_list,
         selected = selected,
     )
+
+@routes.route('/daemonsets/data', methods=['GET', 'POST'])
+@login_required
+def daemonsets_data():
+    if request.method == 'POST':
+        session['ns_select'] = request.form.get('ns_select')
+        selected = request.form.get('selected')
+
+        if session['user_type'] == "OpenID":
+            user_token = session['oauth_token']
+        else:
+            user_token = None
+
+        daemonset_list = k8sDaemonSetsGet(session['user_role'], user_token, session['ns_select'])
+        daemonset_data = None
+        for daemonset in daemonset_list:
+            if daemonset["name"] == selected:
+                daemonset_data = daemonset
+
+        return render_template(
+            'daemonsets-data.html.j2',
+            daemonset_data = daemonset_data,
+        )
+    else:
+        return redirect(url_for('routes.login'))
+    
+@routes.route('/daemonset/scale', methods=['GET', 'POST'])
+@login_required
+def daemonsets_scale():
+    if request.method == 'POST':
+        replicas = request.form.get('replica_number')
+        selected = request.form.get('selected')
+
+        if session['user_type'] == "OpenID":
+            user_token = session['oauth_token']
+        else:
+            user_token = None
+
+        if replicas == str(0):
+            body = {"spec": {"template": {"spec": {"nodeSelector": {"non-existing": "true"}}}}}
+        elif replicas == str(1):
+            body = [{"op": "remove", "path": "/spec/template/spec/nodeSelector/non-existing"}]
+        else:
+            body = None
+
+        if body is not None:
+            scale_status = k8sDaemonsetPatch(session['user_role'], user_token, session['ns_select'], selected, body)
+
+        return redirect(url_for('routes.daemonsets_data'), code=307)
+    else:
+        return redirect(url_for('routes.login'))
 
 ##############################################################
 ## Deployments
@@ -1175,41 +1269,22 @@ def deployments_data():
             deployment_data = deployment_data,
         )
     else:
-        if session['deployment_name']:
-            if session['user_type'] == "OpenID":
-                user_token = session['oauth_token']
-            else:
-                user_token = None
-            
-            deployments_list = k8sDeploymentsGet(session['user_role'], user_token, session['ns_select'])
-            deployment_data = None
-            for deployment in deployments_list:
-                if deployment["name"] == session['deployment_name']:
-                    deployment_data = deployment
-
-            session.pop('deployment_name', None)
-
-            return render_template(
-                'deployment-data.html.j2',
-                deployment_data = deployment_data,
-            )
-        else:
-            return redirect(url_for('routes.login'))
+        return redirect(url_for('routes.login'))
     
 @routes.route('/deployments/scale', methods=['GET', 'POST'])
 @login_required
 def deployments_scale():
     if request.method == 'POST':
         replicas = request.form.get('replica_number')
-        session['deployment_name'] = request.form.get('selected')
+        selected = request.form.get('selected')
 
         if session['user_type'] == "OpenID":
             user_token = session['oauth_token']
         else:
             user_token = None
 
-        scale_status = k8sDeploymentsPatchReplica(session['user_role'], user_token, session['ns_select'], session['deployment_name'], replicas)
-        return redirect(url_for('routes.deployments_data'))
+        scale_status = k8sDeploymentsPatchReplica(session['user_role'], user_token, session['ns_select'], selected, replicas)
+        return redirect(url_for('routes.deployments_data'), code=307)
     else:
         return redirect(url_for('routes.login'))
 

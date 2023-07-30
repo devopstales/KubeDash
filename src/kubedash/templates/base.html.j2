@@ -368,11 +368,11 @@
                     </button>
 
                     <!-- Topbar Namespace -->
+                    {% if namespaces %}
                     <nav class="navbar navbar-light bg-light row">
                         <form name="add" method="POST" class="form-inline row row-cols-1 mr-auto ml-md-0 mw-100">
                           <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
                           <div class="input-group">
-                            {% if namespaces %}
                             <select name= "ns_select" class="custom-select" id="inputGroupSelect04" aria-label="Select Namespace">
                                 {% for ns in namespaces %}
                                 {% if ns == session['ns_select'] %}
@@ -385,10 +385,10 @@
                             <div class="input-group-append">
                               <button type="submit" class="btn btn-primary" type="button">Submit</button>
                             </div>
-                            {% endif %}
                           </div>
                         </form>
                     </nav>
+                    {% endif %}
 
                     <!-- Topbar Navbar -->
                     <ul class="navbar-nav ml-auto">

@@ -17,6 +17,7 @@ from opentelemetry.exporter.otlp.proto.http.trace_exporter import OTLPSpanExport
 logger = get_logger(__name__)
 
 login_manager = LoginManager()
+login_manager.login_message_category = "warning"
 db = SQLAlchemy()
 sess = Session()
 csrf = CSRFProtect()

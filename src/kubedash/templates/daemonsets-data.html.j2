@@ -7,20 +7,12 @@
 {% endblock %}
 
 {% block content %}
-{% if scale %}
-<div class="alert alert-{{status_type}} alert-dismissible fade show" role="alert">
-    {{ status_message }}
-    <button type="button" class="close" data-dismiss="alert" aria-label="Close">
-        <span aria-hidden="true">&times;</span>
-    </button>
-    </div>
-{% endif %}
 
 <nav aria-label="breadcrumb">
   <ol class="breadcrumb">
     <li class="breadcrumb-item">Workloads</li>
-    <li class="breadcrumb-item"><a href="/statefulsets">Statefulsets</a></li>
-    <li class="breadcrumb-item active" aria-current="page">{{ statefulset_data.name }}</li>
+    <li class="breadcrumb-item"><a href="/daemonsets">Daemonsets</a></li>
+    <li class="breadcrumb-item active" aria-current="page">{{ daemonset_data.name }}</li>
     <div class="col">
         <a class="card-link float-right pr-1" data-toggle="collapse" href="#" onclick="reload()">
             <i class="material-icons">refresh</i>
@@ -31,12 +23,12 @@
 
 <div class="card shadow mb-4">
     <div class="card-header">
-        <h6 class="m-0 font-weight-bold text-primary">Deployment Data</h6>
+        <h6 class="m-0 font-weight-bold text-primary">Daemonset Data</h6>
     </div>
     <div class="card-body">
         <ul class="nav nav-tabs" id="nav-tab" role="tablist">
             <li class="nav-item">
-                <a class="nav-link active" id="nav-deploy-tab" data-toggle="tab" href="#nav-deploy" role="tab" aria-controls="nav-deploy" aria-selected="true" data-toggle="tab">Deployment</a>
+                <a class="nav-link active" id="nav-daemonset-tab" data-toggle="tab" href="#nav-daemonset" role="tab" aria-controls="nav-daemonset" aria-selected="true" data-toggle="tab">Deployment</a>
             </li>
             <li class="nav-item">
                 <a class="nav-link" id="nav-containers-tab" data-toggle="tab" href="#nav-containers" role="tab" aria-controls="nav-containers" aria-selected="false" data-toggle="tab">Containers</a>
@@ -52,19 +44,19 @@
             </li>
         </ul>
         <div class="tab-content" id="nav-tabContent">
-            <!-- deploy -->
-            <div class="tab-pane fade show active" id="nav-deploy" role="tabpanel" aria-labelledby="nav-deploy-tab">
+            <!-- daemonset -->
+            <div class="tab-pane fade show active" id="nav-daemonset" role="tabpanel" aria-labelledby="nav-daemonset-tab">
                 <div class="card shadow mb-4">
                     <div class="card-body">
                         <div class="table-responsive">
-                            <table class="table table-bordered" id="deployInfoTable" width="100%" cellspacing="0">
+                            <table class="table table-bordered" id="daemonsetInfoTable" width="100%" cellspacing="0">
                                 <tr>
                                     <th>Namespace:</th>
-                                    <td>{{ statefulset_data.namespace }}</td>
+                                    <td>{{ daemonset_data.namespace }}</td>
                                 </tr>
                                 <tr>
                                     <th>Name:</th>
-                                    <td>{{ statefulset_data.name }}</td>
+                                    <td>{{ daemonset_data.name }}</td>
                                 </tr>
                                 <tr>
                                     <th>Replicas:</th>
@@ -74,23 +66,23 @@
                                             <div class="input-group-prepend">
                                               <button id="ctrl__button--decrement" class="btn btn-outline-danger" type="button">-</button>
                                             </div>
-                                            <input type="text" class="spinner" id="spinner" readonly="readonly"
-                                                value="{{ statefulset_data.replicas }}"  k8s_type="statefulsets" 
-                                                csrf_token="{{ csrf_token() }}" selected="{{ statefulset_data.name }}"
-                                                namespace="{{ statefulset_data.namespace }}">
+                                            <input type="text" class="spinner" id="spinner" readonly="readonly" 
+                                                value="{{ daemonset_data.desired }}"  k8s_type="daemonset" 
+                                                csrf_token="{{ csrf_token() }}" selected="{{ daemonset_data.name }}"
+                                                namespace="{{ daemonset_data.namespace }}">
                                             <div class="input-group-append">
                                                 <button id="ctrl__button--increment" class="btn btn-outline-success" type="button">+</button>
                                               </div>
                                           </div>
                                     </td>
                                 {% else %}
-                                    <td>{{ statefulset_data.replicas }}</td>
+                                    <td>{{ daemonset_data.desired }}</td>
                                 {% endif %}
                                 </tr>
                                 <tr>
                                     <th>Annotations:</th>
                                     <td>
-                                        {% for annotation in statefulset_data.annotations %} 
+                                        {% for annotation in daemonset_data.annotations %} 
                                             <span class="badge badge-tag badge-secondary">{{ annotation }}</span>
                                             {% if not loop.last %}<br>{% endif %}
                                         {% endfor %}
@@ -99,7 +91,7 @@
                                 <tr>
                                     <th>Lables:</th>
                                     <td>
-                                        {% for label in statefulset_data.labels %} 
+                                        {% for label in daemonset_data.labels %} 
                                             <span class="badge badge-tag badge-secondary">{{ label }}</span>
                                             {% if not loop.last %}<br>{% endif %}
                                         {% endfor %}
@@ -108,8 +100,8 @@
                                 <tr>
                                     <th>Selectors:</th>
                                     <td>
-                                        {% if statefulset_data.selectors %}
-                                        {% for key, value in statefulset_data.selectors.items() %}
+                                        {% if daemonset_data.selectors %}
+                                        {% for key, value in daemonset_data.selectors.items() %}
                                             <span class="badge badge-tag badge-secondary">{{ key }}: {{ value }}</span>
                                             {% if not loop.last %}<br>{% endif %}
                                         {% endfor %}
@@ -126,7 +118,7 @@
                 <div id="accordion">
                     <div class="card shadow mb-4">
                         <div class="card-body">
-                            {% if statefulset_data.init_containers %}
+                            {% if daemonset_data.init_containers %}
                             <h3>Init Containers</h3>
                             
                             <div class="table-responsive">
@@ -138,7 +130,7 @@
                                         </tr>
                                     </thead>
                                     <tbody>
-                                        {% for ic in statefulset_data.init_containers %}
+                                        {% for ic in daemonset_data.init_containers %}
                                         <tr>
                                             <td>{{ ic.name }}</td>
                                             <td>{{ ic.image }}</td>
@@ -158,7 +150,7 @@
                                         </tr>
                                     </thead>
                                     <tbody>
-                                        {% for c in statefulset_data.containers %}
+                                        {% for c in daemonset_data.containers %}
                                         <tr>
                                             <td>{{ c.name }}</td>
                                             <td>{{ c.image }}</td>
@@ -184,12 +176,14 @@
                                     </tr>
                                 </thead>
                                 <tbody>
-                                    {% for variables in statefulset_data.environment_variables %}
+                                    {% for variables in daemonset_data.environment_variables %}
                                     <tr>
+                                        {% if variables %}
                                         {% for key, var in variables.items() %}
                                             <td>{{ key }}</td>
                                             <td>{{ var }}</td>
                                         {% endfor %}
+                                        {% endif %}
                                     </tr>
                                     {% endfor %}
                                 </tbody>
@@ -211,12 +205,14 @@
                                     </tr>
                                 </thead>
                                 <tbody>
-                                {% for item in statefulset_data.security_context.items() %}
+                                {% if daemonset_data.security_context %}
+                                {% for item in daemonset_data.security_context.items() %}
                                     <tr>
                                         <td>{{ item[0] }}</td>
                                         <td>{{ item[1] }}</td>
                                     </tr>
                                 {% endfor%}
+                                {% endif %}
                                 </tbody>
                             </table>
                         </div>
@@ -237,83 +233,83 @@
                                     <th>Namespace</th>
                                 </thead>
                                 <tbody>
-                                {% if statefulset_data.image_pull_secrets %}
-                                    {% for dict_item in statefulset_data.image_pull_secrets %}
+                                {% if daemonset_data.image_pull_secrets %}
+                                    {% for dict_item in daemonset_data.image_pull_secrets %}
                                     {% for key, value in dict_item.items() %}
                                     <tr>
                                         <td>ImagePullSecret</td>
                                         <td>
                                             <form action="/secrets" method="POST">
                                                 <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
-                                                <input type="hidden" name="ns_select" value="{{ statefulset_data.namespace }}" />
+                                                <input type="hidden" name="ns_select" value="{{ daemonset_data.namespace }}" />
                                                 <input type="hidden" name="selected" value="{{ value }}" />
                                                 <a href="javascript:;" onclick="parentNode.submit();">{{ value }}</a>
                                             </form>
                                         </td>
-                                        <td>{{ statefulset_data.namespace }}</td>
+                                        <td>{{ daemonset_data.namespace }}</td>
                                     </tr>
                                     {% endfor %}
                                     {% endfor %}
                                 {% endif %}
-                                {% if statefulset_data.service_account %}
+                                {% if daemonset_data.service_account %}
                                     <tr>
                                         <td>ServiceAccount</td>
                                         <td>
                                             <form action="/service-accounts" method="POST">
                                                 <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
-                                                <input type="hidden" name="ns_select" value="{{ statefulset_data.namespace }}" />
-                                                <input type="hidden" name="selected" value="{{ statefulset_data.service_account }}" />
-                                                <a href="javascript:;" onclick="parentNode.submit();">{{ statefulset_data.service_account }}</a>
+                                                <input type="hidden" name="ns_select" value="{{ daemonset_data.namespace }}" />
+                                                <input type="hidden" name="selected" value="{{ daemonset_data.service_account }}" />
+                                                <a href="javascript:;" onclick="parentNode.submit();">{{ daemonset_data.service_account }}</a>
                                             </form>
                                         </td>
-                                        <td>{{ statefulset_data.namespace }}</td>
+                                        <td>{{ daemonset_data.namespace }}</td>
                                     </tr>
                                 {% endif %}
-                                {% if statefulset_data.secrets %}
-                                    {% for secret in statefulset_data.secrets %}
+                                {% if daemonset_data.secrets %}
+                                    {% for secret in daemonset_data.secrets %}
                                     <tr>
                                         <td>Secret</td>
                                         <td>
                                             <form action="/secrets" method="POST">
                                                 <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
-                                                <input type="hidden" name="ns_select" value="{{ statefulset_data.namespace }}" />
+                                                <input type="hidden" name="ns_select" value="{{ daemonset_data.namespace }}" />
                                                 <input type="hidden" name="selected" value="{{ secret }}" />
                                                 <a href="javascript:;" onclick="parentNode.submit();">{{ secret }}</a>
                                             </form>
                                         </td>
-                                        <td>{{ statefulset_data.namespace }}</td>
+                                        <td>{{ daemonset_data.namespace }}</td>
                                     </tr>
                                     {% endfor %}
                                 {% endif %}
-                                {% if statefulset_data.cm %}
-                                    {% for cm in statefulset_data.cm %}
+                                {% if daemonset_data.cm %}
+                                    {% for cm in daemonset_data.cm %}
                                     <tr>
                                         <td>Configmap</td>
                                         <td>
                                             <form action="/configmaps" method="POST">
                                                 <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
-                                                <input type="hidden" name="ns_select" value="{{ statefulset_data.namespace }}" />
+                                                <input type="hidden" name="ns_select" value="{{ daemonset_data.namespace }}" />
                                                 <input type="hidden" name="selected" value="{{ cm }}" />
                                                 <a href="javascript:;" onclick="parentNode.submit();">{{ cm }}</a>
                                             </form>
                                         </td>
-                                        <td>{{ statefulset_data.namespace }}</td>
+                                        <td>{{ daemonset_data.namespace }}</td>
                                     </tr>
                                     {% endfor %}
                                 {% endif %}
-                                {% if statefulset_data.pvc %}
-                                    {% for pvc in statefulset_data.pvc %}
+                                {% if daemonset_data.pvc %}
+                                    {% for pvc in daemonset_data.pvc %}
                                     <tr>
                                         <td>PeristentVolumeClame</td>
                                         <td>
                                             <form action="/pvc" method="POST">
                                                 <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
-                                                <input type="hidden" name="ns_select" value="{{ statefulset_data.namespace }}" />
+                                                <input type="hidden" name="ns_select" value="{{ daemonset_data.namespace }}" />
                                                 <input type="hidden" name="selected" value="{{ pvc }}" />
                                                 <a href="javascript:;" onclick="parentNode.submit();">{{ pvc }}</a>
                                             </form>
                                         </td>
-                                        <td>{{ statefulset_data.namespace }}</td>
+                                        <td>{{ daemonset_data.namespace }}</td>
                                     </tr>
                                     {% endfor %}
                                 {% endif %}
@@ -330,7 +326,7 @@
 {% endblock %}
 
 {% block scripts %}
-    {% for c in statefulset_data.containers %}
+    {% for c in daemonset_data.containers %}
     <script>
         $(document).ready(function () {
             $('#vulnTable{{ c.name }}').DataTable({
@@ -340,7 +336,7 @@
         });
     </script>
     {% endfor %}
-    {% for ic in statefulset_data.init_containers %}
+    {% for ic in daemonset_data.init_containers %}
     <script>
         $(document).ready(function () {
             $('#intVulnTable{{ ic.name }}').DataTable({
@@ -352,7 +348,7 @@
     {% endfor %}
 
     <!-- Custom input spinner -->
-    <script id="spinner" src="{{ url_for('static',filename='/vendor/custom-input-spinner/inputt-spinner.js') }}" ></script>
+    <script id="spinner" src="{{ url_for('static',filename='/vendor/custom-input-spinner/inputt-spinner-ds.js') }}" ></script>
 
     <!-- Page level plugins -->
     <script src="{{ url_for('static',filename='vendor/datatables/jquery.dataTables.js') }}"></script>
