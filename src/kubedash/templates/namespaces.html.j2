@@ -6,6 +6,8 @@
 {% endblock %}
 
 {% block content %}
+{{ reload }}
+
 <!-- Page Heading -->
 <nav aria-label="breadcrumb">
   <ol class="breadcrumb">
@@ -96,21 +98,35 @@
                           {% if not loop.last %}<br>{% endif %}
                       {% endfor %}
                       <td>
-                        {% if session['user_role'] == "Admin" %}
-                        <!-- Button trigger modal -->
-                        <form action="/namespaces/delete" method="post">
-			{#
-                          <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
-                          <button type="button" class="btn btn-success btn-just-icon btn-xs" data-toggle="modal" data-bs-target="#modaledit" data-ns="{{ ns.name }}">
-                              <i class="material-icons">edit</i>
-                          </button>
-			#}
-                          <input type="hidden"  name="namespace" value="{{ ns.name }}"/>
-                          <button type="submit" rel="tooltip" class="btn btn-danger btn-just-icon btn-sm" value="upvote">
-                              <i class="material-icons">delete</i>
-                          </button>
-                        </form>  
-                        {% endif %}
+                        <div class="form-row">
+                          {% if session['user_role'] == "Admin" %}
+                          <!-- Button trigger modal -->
+                          <form action="/namespaces/delete" method="post">
+                            <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+                            <input type="hidden"  name="namespace" value="{{ ns.name }}"/>
+                            <button type="submit" rel="tooltip" class="btn btn-danger btn-just-icon btn-sm" value="upvote">
+                                <i class="material-icons">delete</i>
+                            </button>
+                          </form>  
+                          {% endif %}
+                          {% if ns.name != "kube-system" %}
+                          {% if ns.live == 0 %}
+                          <form action="/namespaces/scale" method="post">
+                            <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+                            <input type="hidden"  name="namespace" value="{{ ns.name }}"/>
+                            <input type="hidden"  name="action" value="up"/>
+                            <button class="btn btn-outline-success" type="submit">turn on</button>
+                          </form>
+                          {% else %}
+                          <form action="/namespaces/scale" method="post">
+                            <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+                            <input type="hidden"  name="namespace" value="{{ ns.name }}"/>
+                            <input type="hidden"  name="action" value="down"/>
+                            <button class="btn btn-outline-warning" type="submit">turn off</button>
+                          </form>
+                          {% endif %}
+                          {% endif %}
+                        </div>
                       </td>
                     </tr>
                   {% endfor %}

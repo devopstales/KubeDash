@@ -34,7 +34,7 @@
                 <a class="nav-link" id="nav-containers-tab" data-toggle="tab" href="#nav-containers" role="tab" aria-controls="nav-containers" aria-selected="false" data-toggle="tab">Containers</a>
             </li>
             <li class="nav-item">
-                <a class="nav-link" id="nav-environment-tab" data-toggle="tab" href="#nav-environment" role="tab" aria-controls="nav-environment" aria-selected="false" data-toggle="tab">Environment</a>
+                <a class="nav-link" id="nav-variables-tab" data-toggle="tab" href="#nav-variables" role="tab" aria-controls="nav-variables" aria-selected="false" data-toggle="tab">Variables</a>
             </li>
             <li class="nav-item">
                 <a class="nav-link" id="nav-conditions-tab" data-toggle="tab" href="#nav-conditions" role="tab" aria-controls="nav-conditions" aria-selected="false" data-toggle="tab">Conditions</a>
@@ -83,10 +83,19 @@
                                 {% endif %}
                                 </tr>
                                 <tr>
+                                    <th>Annotations:</th>
+                                    <td>
+                                        {% for annotation in deployment_data.annotations %} 
+                                            <span class="badge badge-tag badge-secondary">{{ annotation }}</span>
+                                            {% if not loop.last %}<br>{% endif %}
+                                        {% endfor %}
+                                    </td>
+                                </tr>
+                                <tr>
                                     <th>Lables:</th>
                                     <td>
                                         {% for label in deployment_data.labels %} 
-                                            <span class="badge badge-secondary">{{ label }}</span>
+                                            <span class="badge badge-tag badge-secondary">{{ label }}</span>
                                             {% if not loop.last %}<br>{% endif %}
                                         {% endfor %}
                                     </td>
@@ -96,7 +105,7 @@
                                     <td>
                                         {% if deployment_data.selectors %}
                                         {% for key, value in deployment_data.selectors.items() %}
-                                            <span class="badge badge-secondary">{{ key }}: {{ value }}</span>
+                                            <span class="badge badge-tag badge-secondary">{{ key }}: {{ value }}</span>
                                             {% if not loop.last %}<br>{% endif %}
                                         {% endfor %}
                                         {% endif %}
@@ -157,8 +166,8 @@
                     </div>
                 </div>
             </div>
-            <!-- Environment -->
-            <div class="tab-pane fade" id="nav-environment" role="tabpanel" aria-labelledby="nav-environment-tab">
+            <!-- Variables -->
+            <div class="tab-pane fade" id="nav-variables" role="tabpanel" aria-labelledby="nav-variables-tab">
                 <div class="card shadow mb-4">
                     <div class="card-body">
                         <div class="table-responsive">

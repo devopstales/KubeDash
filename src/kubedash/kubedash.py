@@ -174,6 +174,8 @@ logging.getLogger("werkzeug").addFilter(NoSocketIoGet())
 logging.getLogger("werkzeug").addFilter(NoSocketIoPost())
 
 if __name__ == '__main__':
-    app.config['SEND_FILE_MAX_AGE_DEFAULT'] = 0
-    # socketio.run(app, port=8000)
-    eventlet.wsgi.server(eventlet.listen(('', 8000)), app)
+    if os.getenv('FLASK_CONFIG') == "production":
+        eventlet.wsgi.server(eventlet.listen(('', 8000)), app, debug=False)
+    else:
+        eventlet.wsgi.server(eventlet.listen(('', 8000)), app, debug=True)
+    

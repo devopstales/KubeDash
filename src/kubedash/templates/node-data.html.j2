@@ -3,6 +3,7 @@
 {% block header %}
     <link href="{{ url_for('static',filename='/vendor/datatables/dataTables.bootstrap4.min.css') }}" rel="stylesheet" >
     <link href="{{ url_for('static',filename='/vendor/google/material-icons.css') }}" rel="stylesheet" >
+    <link href="{{ url_for('static',filename='/css/sb-admin-2.custom.css') }}" rel="stylesheet" >
 {% endblock %}
 
 {% block content %}
@@ -94,9 +95,9 @@
                     <th>Status:</th>
                     <td>
                         {% if node_data.status == "Ready" %}
-                            <span class="badge badge-success">{{ node_data.status }}</span>
+                            <span class="badge badge-tag badge-success">{{ node_data.status }}</span>
                         {% else %}
-                            <span class="badge badge-danger">{{ node_data.status }}</span>
+                            <span class="badge badge-tag badge-danger">{{ node_data.status }}</span>
                         {% endif %}
                     </td>
                 </tr>
@@ -167,7 +168,7 @@
                     <th>Taints:</th>
                     <td>
                         {% for taint in node_data.taint %}
-                        <span class="badge badge-tag badge-secondary">{{ taint }}</span>
+                        <span class="badge badge-tag badge-tag badge-secondary">{{ taint }}</span>
                         {% if not loop.last %}<br>{% endif %}
                         {% endfor %}
                     </td>
@@ -178,7 +179,7 @@
                         {% if node_data.labels %}
                         {% for no_key, no_value in node_data.labels.items() %}
                         {% if no_key != "kubectl.kubernetes.io/last-applied-configuration" %}
-                        <span class="badge badge-tag badge-secondary">{{ no_key }}: {{ no_value }}</span>
+                        <span class="badge badge-tag badge-tag badge-secondary">{{ no_key }}: {{ no_value }}</span>
                         {% if not loop.last %}<br>{% endif %}
                         {% endif %}
                         {% endfor %}
@@ -209,10 +210,16 @@
                             </tr>
                         </thead>
                         <tbody>
-                        {% for co_type, co_status, co_reason, co_message in node_data.conditions %}
+                        {% for co_type, co_status, co_reason, co_message in node_data.conditions|reverse %}
                             <tr>
                                 <td>{{ co_type }}</th>
-                                <td>{{ co_status }}</td>
+                                <td>
+                                {% if co_status == "True" %}
+                                    <span class="badge badge-tag badge-success">{{ co_status }}</span>
+                                {% else %}
+                                    <span class="badge badge-tag badge-danger">{{ co_status }}</span>
+                                {% endif %}
+                                </td>
                                 <td>{{ co_reason }}</th>
                                 <td>{{ co_message }}</td>
                             </tr>

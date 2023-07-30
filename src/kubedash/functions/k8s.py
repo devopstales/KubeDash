@@ -201,6 +201,54 @@ def k8sNamespaceDelete(username_role, user_token, ns_name):
         ERROR = "k8sNamespaceDelete: %s" % error
         ErrorHandler(logger, "error", ERROR)
 
+def k8sWorkloadList(username_role, user_token, namespace):
+    k8sClientConfigGet(username_role, user_token)
+    WORKLOAD_LIST = []
+
+    deployments_list = k8sDeploymentsGet(username_role, user_token, namespace)
+    for deploy in deployments_list:
+        original_replicas = 0
+        for annotation in deploy["annotations"]:
+            ANNOTATIONS = annotation.split("=")
+            if ANNOTATIONS[0] == "kubedash.devopstales.io/original-replicas":
+                original_replicas = ANNOTATIONS[1]
+        WORKLOAD = {
+            "type": "deployment",
+            "name": deploy["name"],
+            "namespace": deploy["namespace"],
+            "replicas": deploy["desired"],
+            "original-replicas": original_replicas,
+        }
+        WORKLOAD_LIST.append(WORKLOAD)
+
+    statefulset_list = k8sStatefulSetsGet(username_role, user_token, namespace)
+    for statefulset in statefulset_list:
+        original_replicas = 0
+        for annotation in statefulset["annotations"]:
+            ANNOTATIONS = annotation.split("=")
+            if ANNOTATIONS[0] == "kubedash.devopstales.io/original-replicas":
+                original_replicas = ANNOTATIONS[1]
+        WORKLOAD = {
+            "type": "statefulset",
+            "name": statefulset["name"],
+            "namespace": statefulset["namespace"],
+            "replicas": statefulset["desired"],
+            "original-replicas": original_replicas,
+        }
+        WORKLOAD_LIST.append(WORKLOAD)
+
+    daemonset_list = k8sDaemonSetsGet(username_role, user_token, namespace)
+    for daemonset in daemonset_list:
+        WORKLOAD = {
+            "type": "daemonset",
+            "name": daemonset["name"],
+            "namespace": daemonset["namespace"],
+            "replicas": daemonset["desired"],
+        }
+        WORKLOAD_LIST.append(WORKLOAD)
+
+    return WORKLOAD_LIST
+
 ##############################################################
 ## Kubernetes Client Config
 ##############################################################
@@ -1181,9 +1229,11 @@ def k8sStatefulSetsGet(username_role, user_token, ns):
             STATEFULSET_DATA = {
                 "name": sfs.metadata.name,
                 "namespace": ns,
+                "annotations": list(),
                 "labels": list(),
-                "replicas": sfs.spec.replicas,
+                "selectors": list(),
                 # status
+                "replicas": sfs.spec.replicas,
                 "desired": "",
                 "current": "",
                 "ready": "",
@@ -1213,9 +1263,15 @@ def k8sStatefulSetsGet(username_role, user_token, ns):
                 STATEFULSET_DATA['ready'] = sfs.status.ready_replicas
             else:
                 STATEFULSET_DATA['ready'] = 0
+            if sfs.metadata.annotations:
+                for key, value in sfs.metadata.annotations.items():
+                    if key != "kubectl.kubernetes.io/last-applied-configuration":
+                        STATEFULSET_DATA["annotations"].append(key + "=" + value)
             if sfs.metadata.labels:
                 for key, value in sfs.metadata.labels.items():
                     STATEFULSET_DATA['labels'].append(key + "=" + value)
+            selectors = sfs.spec.selector.to_dict()
+            STATEFULSET_DATA['selectors'] = selectors['match_labels']
             if sfs.spec.template.spec.image_pull_secrets:
                 for ips in sfs.spec.template.spec.image_pull_secrets:
                     STATEFULSET_DATA['image_pull_secrets'].append(ips.to_dict())
@@ -1278,18 +1334,48 @@ def k8sStatefulSetsGet(username_role, user_token, ns):
 def k8sStatefulSetPatchReplica(username_role, user_token, ns, name, replicas):
     k8sClientConfigGet(username_role, user_token)
     try:
+        body = [
+            {
+                'op': 'replace', 
+                'path': '/spec/replicas', 
+                'value': int(replicas)
+            }
+        ]
         api_response = k8s_client.AppsV1Api().patch_namespaced_stateful_set_scale(
-                name, ns, 
-                [{'op': 'replace', 'path': '/spec/replicas', 'value': int(replicas)}]
+                name, ns, body
             )
         flash("StatefulSet: %s patched to replicas %s" % (name, replicas), "success")
         logger.info("StatefulSet: %s patched to replicas %s" % (name, replicas))
         return True
     except ApiException as error:
-        ErrorHandler(logger, error, "ERROR: %s patch StatefulSet Replica" % name)
+        ErrorHandler(logger, error, "ERROR: %s patch StatefulSet Replica: %s" % (name, error))
         return False
     except Exception as error:
         ERROR = "k8sStatefulSetPatchReplica: %s" % error
+        ErrorHandler(logger, "error", ERROR)
+        return False
+
+def k8sStatefulSetPatchAnnotation(username_role, user_token, ns, name, replicas):
+    k8sClientConfigGet(username_role, user_token)
+    try:
+        body = [
+            {
+                'op': 'add', 
+                'path': '/metadata/annotations/kubedash.devopstales.io~1original-replicas', 
+                "value": str(replicas)
+            }
+        ]
+        api_response = k8s_client.AppsV1Api().patch_namespaced_stateful_set(
+                name, ns, body
+            )
+        flash("StatefulSet: %s Annotation patched" % name, "success")
+        logger.info("StatefulSet: %s Annotation patched" % name)
+        return True
+    except ApiException as error:
+        ErrorHandler(logger, error, "ERROR: %s patch StatefulSet Annotation: %s" % (name, error))
+        return False
+    except Exception as error:
+        ERROR = "k8sStatefulSetPatchAnnotation: %s" % error
         ErrorHandler(logger, "error", ERROR)
         return False
 
@@ -1305,10 +1391,38 @@ def k8sDaemonSetsGet(username_role, user_token, ns):
         for ds in daemonset_list.items:
             DAEMONSET_DATA = {
                 "name": ds.metadata.name,
+                "namespace": ns,
+                # labels
+                "annotations": list(),
+                "labels": list(),
+                "selectors": list(),
+                # status
                 "desired": "",
                 "current": "",
                 "ready": "",
+                # Environment variables
+                "environment_variables": [],
+                # Security
+                "security_context": ds.spec.template.spec.security_context.to_dict(),
+                # Containers
+                "containers": list(),
+                "init_containers": list(),
+                #  Related Resources
+                "image_pull_secrets": list(),
+                "service_account": list(),
+                "pvc": list(),
+                "cm": list(),
+                "secrets": list(),
             }
+            if ds.metadata.labels:
+                for key, value in ds.metadata.labels.items():
+                    DAEMONSET_DATA['labels'].append(key + "=" + value)
+            if ds.metadata.annotations:
+                for key, value in ds.metadata.annotations.items():
+                    if key != "kubectl.kubernetes.io/last-applied-configuration":
+                        DAEMONSET_DATA["annotations"].append(key + "=" + value)
+            selectors = ds.spec.selector.to_dict()
+            DAEMONSET_DATA['selectors'] = selectors['match_labels']
             if ds.status.desired_number_scheduled:
                 DAEMONSET_DATA['desired'] = ds.status.desired_number_scheduled
             else:
@@ -1321,6 +1435,54 @@ def k8sDaemonSetsGet(username_role, user_token, ns):
                 DAEMONSET_DATA['ready'] = ds.status.number_ready
             else:
                 DAEMONSET_DATA['ready'] = 0
+            if ds.spec.template.spec.image_pull_secrets:
+                for ips in ds.spec.template.spec.image_pull_secrets:
+                    DAEMONSET_DATA['image_pull_secrets'].append(ips.to_dict())
+            if ds.spec.template.spec.service_account_name:
+                DAEMONSET_DATA['service_account'] = ds.spec.template.spec.service_account_name
+            if ds.spec.template.spec.volumes:
+                for v in ds.spec.template.spec.volumes:
+                    if v.persistent_volume_claim:
+                        DAEMONSET_DATA['pvc'].append(v.persistent_volume_claim.claim_name)
+                    if v.config_map:
+                        DAEMONSET_DATA['cm'].append(v.config_map.name)
+                    if v.secret:
+                        DAEMONSET_DATA['secrets'].append(v.secret.secret_name)
+            for c in ds.spec.template.spec.containers:
+                if c.env:
+                    for e in c.env:
+                        ed = e.to_dict()
+                        env_name = None
+                        env_value = None
+                        for name, val in ed.items():
+                            if "value_from" in name and val is not None:
+                                for key, value in val.items():
+                                    if "secret_key_ref" in key and value:
+                                        for n, v in value.items():
+                                            if "name" in n:
+                                                if v not in DAEMONSET_DATA['secrets']:
+                                                    DAEMONSET_DATA['secrets'].append(v)
+                            elif "name" in name and val is not None:
+                                env_name = val
+                            elif "value" in name and val is not None:
+                                env_value = val
+
+                        if env_name and env_value is not None:
+                            DAEMONSET_DATA['environment_variables'].append({
+                                env_name: env_value
+                            })
+                CONTAINERS = {
+                    "name": c.name,
+                    "image": c.image,
+                }
+                DAEMONSET_DATA['containers'].append(CONTAINERS)
+            if ds.spec.template.spec.init_containers:
+                for ic in ds.spec.template.spec.init_containers:
+                    CONTAINERS = {
+                        "name": ic.name,
+                        "image": ic.image,
+                    }
+                    DAEMONSET_DATA['init_containers'].append(CONTAINERS)
             DAEMONSET_LIST.append(DAEMONSET_DATA)
         return DAEMONSET_LIST
     except ApiException as error:
@@ -1330,6 +1492,23 @@ def k8sDaemonSetsGet(username_role, user_token, ns):
         ERROR = "k8sDaemonSetsGet: %s" % error
         ErrorHandler(logger, "error", ERROR)
         return DAEMONSET_LIST
+
+def k8sDaemonsetPatch(username_role, user_token, ns, name, body):
+    k8sClientConfigGet(username_role, user_token)
+    try:
+        api_response = k8s_client.AppsV1Api().patch_namespaced_daemon_set(
+                name, ns, body
+            )
+        flash("Daemonset: %s patched to replicas" % name, "success")
+        logger.info("Deployment: %s patched to replicas" % name)
+        return True
+    except ApiException as error:
+        ErrorHandler(logger, error, "ERROR: %s patch Daemonset Replica: %s" % (name, error))
+        return False
+    except Exception as error:
+        ERROR = "k8sDaemonsetPatch: %s" % error
+        ErrorHandler(logger, "error", ERROR)
+        return False
 
 ##############################################################
 ## Deployments
@@ -1343,6 +1522,7 @@ def k8sDeploymentsGet(username_role, user_token, ns):
         for d in deployment_list.items:
             DEPLOYMENT_DATA = {
                 "name": d.metadata.name,
+                "annotations": list(),
                 "namespace": ns,
                 "labels": list(),
                 "selectors": list(),
@@ -1382,6 +1562,10 @@ def k8sDeploymentsGet(username_role, user_token, ns):
             if d.metadata.labels:
                 for key, value in d.metadata.labels.items():
                     DEPLOYMENT_DATA['labels'].append(key + "=" + value)
+            if d.metadata.annotations:
+                for key, value in d.metadata.annotations.items():
+                    if key != "kubectl.kubernetes.io/last-applied-configuration":
+                        DEPLOYMENT_DATA["annotations"].append(key + "=" + value)
             selectors = d.spec.selector.to_dict()
             DEPLOYMENT_DATA['selectors'] = selectors['match_labels']
             if d.spec.template.spec.image_pull_secrets:
@@ -1446,18 +1630,48 @@ def k8sDeploymentsGet(username_role, user_token, ns):
 def k8sDeploymentsPatchReplica(username_role, user_token, ns, name, replicas):
     k8sClientConfigGet(username_role, user_token)
     try:
+        body = [
+            {
+                'op': 'replace', 
+                'path': '/spec/replicas', 
+                'value': int(replicas)
+            }
+        ]
         api_response = k8s_client.AppsV1Api().patch_namespaced_deployment_scale(
-                name, ns, 
-                [{'op': 'replace', 'path': '/spec/replicas', 'value': int(replicas)}]
+                name, ns, body
             )
         flash("Deployment: %s patched to replicas %s" % (name, replicas), "success")
         logger.info("Deployment: %s patched to replicas %s" % (name, replicas))
         return True
     except ApiException as error:
-        ErrorHandler(logger, error, "ERROR: %s patch Deployments Replica" % name)
+        ErrorHandler(logger, error, "ERROR: %s patch Deployments Replica: %s" % (name, error))
         return False
     except Exception as error:
         ERROR = "k8sDeploymentsPatchReplica: %s" % error
+        ErrorHandler(logger, "error", ERROR)
+        return False
+    
+def k8sDeploymentsPatchAnnotation(username_role, user_token, ns, name, replicas):
+    k8sClientConfigGet(username_role, user_token)
+    try:
+        body = [
+            {
+                'op': 'add', 
+                'path': '/metadata/annotations/kubedash.devopstales.io~1original-replicas', 
+                "value": str(replicas)
+            }
+        ]
+        api_response = k8s_client.AppsV1Api().patch_namespaced_deployment(
+                name, ns, body
+            )
+        flash("Deployment: %s Annotation patched" % name, "success")
+        logger.info("Deployment: %s Annotation patched" % name)
+        return True
+    except ApiException as error:
+        ErrorHandler(logger, error, "ERROR: %s patch Deployments Annotation: %s" % (name, error))
+        return False
+    except Exception as error:
+        ERROR = "k8sDeploymentsPatchAnnotation: %s" % error
         ErrorHandler(logger, "error", ERROR)
         return False
 
