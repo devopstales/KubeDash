@@ -140,5 +140,5 @@ logging.getLogger("werkzeug").addFilter(NoSocketIoGet())
 logging.getLogger("werkzeug").addFilter(NoSocketIoPost())
 
 if __name__ == '__main__':
-    #socketio.run(app, port=8000)
+    os.environ['OAUTHLIB_RELAX_TOKEN_SCOPE'] = "1"
     eventlet.wsgi.server(eventlet.listen(('', 8000)), app)
