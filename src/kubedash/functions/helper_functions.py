@@ -1,5 +1,5 @@
-import logging, re, time, six
-from flask import flash, json
+import logging, re, time, six, json, yaml
+from flask import flash
 from decimal import Decimal, InvalidOperation
 
 ##############################################################
@@ -19,13 +19,27 @@ def ErrorHandler(logger, error, action):
         if 'status' in error:
             if error.status == 401:
                 flash("401 - Unauthorized: User cannot connect to Kubernetes", "danger")
+                logger.error("401 - Unauthorized: User cannot connect to Kubernetes")
             elif error.status == 403:
                 flash("403 - Forbidden: User cannot %s" % action, "danger")
+                logger.error("403 - Forbidden: User cannot %s" % action)
         else:
             flash("Exception: %s" % action, "danger")
             logger.error("Exception: %s \n" % action)
     else:
         flash("Exception: %s" % action, "danger")
+        logger.error("Exception: %s \n" % action)
+
+def NoGlashErrorHandler(logger, error, action):
+    if hasattr(error, '__iter__'):
+        if 'status' in error:
+            if error.status == 401:
+                logger.error("401 - Unauthorized: User cannot connect to Kubernetes")
+            elif error.status == 403:
+                logger.error("403 - Forbidden: User cannot %s" % action)
+        else:
+            logger.error("Exception: %s \n" % action)
+    else:
         logger.error("Exception: %s \n" % action)
 
 def ResponseHandler(message, status):
@@ -53,6 +67,29 @@ def var_test(var):
 def string2list(string):
     list = string.split()
     return list
+
+def json2yaml(json_input):
+    json_values = json.dumps(json_input)
+    yaml_data = yaml.safe_load(json_values)
+    yaml_formatted_data = yaml.dump(yaml_data)
+    return yaml_formatted_data
+
+def format_json(json_input):
+    josn_formatted_data = json.dumps(json_input, indent=2)
+    return josn_formatted_data
+
+def find_values_in_json(id, json_repr):
+    results = list()
+
+    def _decode_dict(a_dict):
+        try:
+            results.append(a_dict[id])
+        except KeyError:
+            pass
+        return a_dict
+
+    json.loads(json_repr, object_hook=_decode_dict) # Return value ignored.
+    return results
 
 def parse_quantity(quantity):
     """
@@ -110,7 +147,7 @@ def parse_quantity(quantity):
     exponent = Decimal(exponents[suffix[0]])
     return number * (base ** exponent)
 
-def calPercent(x, y, integer = False):
+def calcPercent(x, y, integer = False):
     """
     Percentage of 4 out of 19: 4 / 19 * 100
     """
@@ -119,19 +156,6 @@ def calPercent(x, y, integer = False):
     if integer:
         return int(percent)
     return percent
-
-def find_values_in_json(id, json_repr):
-    results = list()
-
-    def _decode_dict(a_dict):
-        try:
-            results.append(a_dict[id])
-        except KeyError:
-            pass
-        return a_dict
-
-    json.loads(json_repr, object_hook=_decode_dict) # Return value ignored.
-    return results
 
 class cache_request_with_timeout:
     DEFAULT_TIMEOUT = 60

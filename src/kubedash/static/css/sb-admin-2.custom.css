@@ -61,10 +61,31 @@ progress::-moz-progress-bar {
 
  /* 
 Xtermjs styles
+
+    width: 100%;
+    height: calc(100% - 50px)
 */
 
 .form-post {
     display: inline;
+}
+
+.terminalBody {
+    display: inline;
+    width: calc(100% - 15px);
+    height: calc(100% - 50px);
+}
+
+span.status {
+    font-size: small;
+}
+
+span.connected {
+    background-color: lightgreen;
+}
+
+span.disconnected {
+    background-color: #ff8383;
 }
 
 /*
@@ -82,4 +103,11 @@ Input spinnes
 .spinner {
     width: 30px;
     text-align: center;
+}
+
+/*
+Code output
+*/
+code {
+    max-height: 1000px;
 }

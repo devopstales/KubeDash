@@ -1,3 +1,4 @@
+# syntax = docker/dockerfile:1.2
 ARG ARCH
 ARG VERSION
 ARG BUILD_DATE
@@ -23,25 +24,24 @@ LABEL org.opencontainers.image.vendor="devopstales" \
 
 WORKDIR /code
 
-RUN apk -U upgrade && \
-    apk add --no-cache bash gcc musl-dev linux-headers
+RUN addgroup -S -g 10001 kubedash && \
+    adduser -S -u 10001 kubedash -G kubedash && \
+    mkdir /tmp/kubedash && \
+    chown -R kubedash:kubedash /tmp/kubedash
 
 COPY requirements.txt  /code/
 COPY entrypoint.sh /entrypoint.sh
 
-RUN apk --update add gcc build-base freetype-dev libpng-dev openblas-dev libffi-dev && \
-    pip install --no-cache-dir --upgrade -r /code/requirements.txt && \
+RUN apk -U upgrade && \
+    apk add --no-cache bash gcc musl-dev linux-headers && \
+    apk --update add gcc build-base freetype-dev libpng-dev openblas-dev libffi-dev
+
+RUN pip install --no-cache-dir -r /code/requirements.txt && \
     apk del gcc build-base freetype-dev libpng-dev openblas-dev libffi-dev
 
-COPY ./kubedash /code/kubedash
+COPY --chown=kubedash:kubedash ./kubedash /code/kubedash
 
 WORKDIR /code/kubedash
-
-RUN addgroup -S -g 10001 kubedash && \
-    adduser -S -u 10001 kubedash -G kubedash && \
-    mkdir /tmp/kubedash && \
-    chown -R kubedash:kubedash /tmp/kubedash && \
-    chown -R kubedash:kubedash /code/kubedash
 
 USER 10001:10001
 

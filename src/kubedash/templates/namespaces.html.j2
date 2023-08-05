@@ -2,6 +2,7 @@
 
 {% block header %}
     <link href="{{ url_for('static',filename='/vendor/datatables/dataTables.bootstrap4.min.css') }}" rel="stylesheet" >
+    <link href="{{ url_for('static',filename='/vendor/datatables/jquery.dataTables.css') }}" rel="stylesheet" >
     <link href="{{ url_for('static',filename='/vendor/google/material-icons.css') }}" rel="stylesheet" >
 {% endblock %}
 
@@ -83,7 +84,11 @@
                 </tfoot>
                 <tbody>
                     {% for ns in namespace_list %}
-                    <tr>
+                    {% if selected == ns.name %}
+                      <tr class="selected" >
+                    {% else %}
+                      <tr>
+                    {% endif %}
                       <td>
                       {% if ns.status == "Active" %}
                         <span class="badge badge-success">{{ ns.status }}</span>

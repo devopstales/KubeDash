@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 
-import zlib, json, base64
+import zlib, json, base64, yaml
 from flask import flash
 from flask_login import UserMixin
 from itsdangerous import base64_decode, base64_encode
@@ -19,7 +19,8 @@ from functions.components import db, tracer, socketio
 
 from opentelemetry import trace
 from opentelemetry.trace.status import Status, StatusCode
-from functions.helper_functions import get_logger, ErrorHandler, email_check, calPercent, parse_quantity
+from functions.helper_functions import get_logger, ErrorHandler, NoGlashErrorHandler, email_check, calcPercent, \
+parse_quantity, json2yaml
 
 ##############################################################
 ## Helper Functions
@@ -390,21 +391,21 @@ def k8sGetClusterMetric():
                         "capacity": node.status.capacity["cpu"],
                         "allocatable": node.status.allocatable["cpu"],
                         "requests": tmpCpuRequest,
-                        "requestsPercent": calPercent(tmpCpuRequest, int(node.status.capacity["cpu"]), True),
+                        "requestsPercent": calcPercent(tmpCpuRequest, int(node.status.capacity["cpu"]), True),
                         "limits": tmpCpuLimit,
-                        "limitsPercent": calPercent(tmpCpuLimit, int(node.status.capacity["cpu"]), True),
+                        "limitsPercent": calcPercent(tmpCpuLimit, int(node.status.capacity["cpu"]), True),
                         "usage": node_cpu_usage,
-                        "usagePercent": calPercent(node_cpu_usage, int(node.status.capacity["cpu"]), True),
+                        "usagePercent": calcPercent(node_cpu_usage, int(node.status.capacity["cpu"]), True),
                     },
                     "memory": {
                         "capacity": node_mem_capacity,
                         "allocatable": node_mem_allocatable,
                         "requests": tmpMemoryRequest,
-                        "requestsPercent": calPercent(tmpMemoryRequest, node_mem_capacity, True),
+                        "requestsPercent": calcPercent(tmpMemoryRequest, node_mem_capacity, True),
                         "limits": tmpMemoryLimit,
-                        "limitsPercent": calPercent(tmpMemoryLimit, node_mem_capacity, True),
+                        "limitsPercent": calcPercent(tmpMemoryLimit, node_mem_capacity, True),
                         "usage": node_mem_usage,
-                        "usagePercent": calPercent(node_mem_usage, node_mem_capacity, True),
+                        "usagePercent": calcPercent(node_mem_usage, node_mem_capacity, True),
                     },
                     "pod_count": {
                         "current": tmpPodCount,
@@ -429,21 +430,21 @@ def k8sGetClusterMetric():
                         "capacity": tmpTotalCpuCapacity,
                         "allocatable": tmpTotalCpuAllocatable,
                         "requests": tmpTotalCpuRequest,
-                        "requestsPercent": calPercent(tmpTotalCpuRequest, tmpTotalCpuAllocatable, True),
+                        "requestsPercent": calcPercent(tmpTotalCpuRequest, tmpTotalCpuAllocatable, True),
                         "limits": tmpTotalCpuLimit,
-                        "limitsPercent": calPercent(tmpTotalCpuLimit, tmpTotalCpuAllocatable, True),
+                        "limitsPercent": calcPercent(tmpTotalCpuLimit, tmpTotalCpuAllocatable, True),
                         "usage": total_node_cpu_usage,
-                        "usagePercent": calPercent(total_node_cpu_usage, tmpTotalCpuAllocatable, True),
+                        "usagePercent": calcPercent(total_node_cpu_usage, tmpTotalCpuAllocatable, True),
                     },
                     "memory": {
                         "capacity": tmpTotalMemoryCapacity,
                         "allocatable": tmpTotalMenoryAllocatable,
                         "requests": tmpTotalMemoryRequest,
-                        "requestsPercent": calPercent(tmpTotalMemoryRequest, tmpTotalMenoryAllocatable, True),
+                        "requestsPercent": calcPercent(tmpTotalMemoryRequest, tmpTotalMenoryAllocatable, True),
                         "limits": tmpTotalMemoryLimit,
-                        "limitsPercent":  calPercent(tmpTotalMemoryLimit, tmpTotalMenoryAllocatable, True),
+                        "limitsPercent":  calcPercent(tmpTotalMemoryLimit, tmpTotalMenoryAllocatable, True),
                         "usage": total_node_mem_usage,
-                        "usagePercent": calPercent(total_node_mem_usage, tmpTotalMenoryAllocatable, True),
+                        "usagePercent": calcPercent(total_node_mem_usage, tmpTotalMenoryAllocatable, True),
                     },
                     "pod_count": {
                         "current": tmpTotalPodCount,
@@ -510,21 +511,21 @@ def k8sGetNodeMetric(node_name):
                         "capacity":  int(node.status.capacity["cpu"]),
                         "allocatable":  int(node.status.allocatable["cpu"]),
                         "requests": tmpCpuRequest,
-                        "requestsPercent": calPercent(tmpCpuRequest, int(node.status.capacity["cpu"]), True),
+                        "requestsPercent": calcPercent(tmpCpuRequest, int(node.status.capacity["cpu"]), True),
                         "limits": tmpCpuLimit,
-                        "limitsPercent": calPercent(tmpCpuLimit, int(node.status.capacity["cpu"]), True),
+                        "limitsPercent": calcPercent(tmpCpuLimit, int(node.status.capacity["cpu"]), True),
                         "usage": node_cpu_usage,
-                        "usagePercent": calPercent(node_cpu_usage, int(node.status.capacity["cpu"]), True),
+                        "usagePercent": calcPercent(node_cpu_usage, int(node.status.capacity["cpu"]), True),
                     },
                     "memory": {
                         "capacity": node_mem_capacity,
                         "allocatable": node_mem_allocatable,
                         "requests": tmpMemoryRequest,
-                        "requestsPercent": calPercent(tmpMemoryRequest, node_mem_capacity, True),
+                        "requestsPercent": calcPercent(tmpMemoryRequest, node_mem_capacity, True),
                         "limits": tmpMemoryLimit,
-                        "limitsPercent": calPercent(tmpMemoryLimit, node_mem_capacity, True),
+                        "limitsPercent": calcPercent(tmpMemoryLimit, node_mem_capacity, True),
                         "usage": node_mem_usage,
-                        "usagePercent": calPercent(node_mem_usage, node_mem_capacity, True),
+                        "usagePercent": calcPercent(node_mem_usage, node_mem_capacity, True),
                     },
                     "pod_count": {
                         "current": tmpPodCount,
@@ -600,9 +601,10 @@ def k8sGetPodMap(username_role, user_token, namespace):
     for po in pod_list:
         if po["status"] == "Running":
             net.add_node(po["name"], label=po["name"], shape="image", group="pod")
-            if "replicationcontrollers" !=  po["owner"].split("/", 1)[0] and "jobs" != po["owner"].split("/", 1)[0]:
-                on_name = po["owner"].split("/", 1)[1]
-                net.add_edge(on_name, po["name"], arrowStrikethrough=False, physics=True, valu=1000)
+            if po["owner"]:
+                if "replicationcontrollers" !=  po["owner"].split("/", 1)[0] and "jobs" != po["owner"].split("/", 1)[0]:
+                    on_name = po["owner"].split("/", 1)[1]
+                    net.add_edge(on_name, po["name"], arrowStrikethrough=False, physics=True, valu=1000)
 
     nodes = net.get_network_data()[0]
     edges = net.get_network_data()[1]
@@ -1927,7 +1929,7 @@ def k8sPodVulnsGet(username_role, user_token, ns, pod):
     try:
         pod_list = k8s_client.CoreV1Api().list_namespaced_pod(ns)
     except ApiException as error:
-        ErrorHandler(logger, error, "get cluster roles")
+        ErrorHandler(logger, error, "get pod")
         return HAS_REPORT, POD_VULNS
     except Exception as error:
         ERROR = "k8sPodVulnsGet: %s" % error
@@ -1970,23 +1972,56 @@ def k8sPodVulnsGet(username_role, user_token, ns, pod):
             else:
                 return False, None
 
-        # PublishedDate, FixedVersion
+def k8sPodGetContainers(username_role, user_token, namespace, pod_name):
+    k8sClientConfigGet(username_role, user_token)
+    POD_CONTAINER_LIST = list()
+    POD_INIT_CONTAINER_LIST = list()
+    try:
+        pod_data = k8s_client.CoreV1Api().read_namespaced_pod(pod_name, namespace)
+        for c in  pod_data.spec.containers:
+            for cs in pod_data.status.container_statuses:
+                if cs.name == c.name:
+                    if cs.ready:
+                        POD_CONTAINER_LIST.append(c.name)
+        if pod_data.spec.init_containers:
+            for ic in pod_data.spec.init_containers:
+                for ics in pod_data.status.init_container_statuses:
+                    if ics.name == ic.name:
+                        if ics.ready:
+                            POD_INIT_CONTAINER_LIST.append(ic.name)
+
+        return POD_CONTAINER_LIST, POD_INIT_CONTAINER_LIST
+    except ApiException as error:
+        ErrorHandler(logger, error, "get pod")
+        return POD_CONTAINER_LIST, POD_INIT_CONTAINER_LIST
+    except Exception as error:
+        ERROR = "k8sPodGetContainers: %s" % error
+        ErrorHandler(logger, "error", ERROR)
+        return POD_CONTAINER_LIST, POD_INIT_CONTAINER_LIST
+
+
 ##############################################################
 ## Pod Logs
 ##############################################################
 
-def k8sPodLogsStream(username_role, user_token, namespace, pod_name):
+def k8sPodLogsStream(username_role, user_token, namespace, pod_name, container):
     k8sClientConfigGet(username_role, user_token)
-    w = watch.Watch()
-    for line in w.stream(
-            k8s_client.CoreV1Api().read_namespaced_pod_log, 
-            name=pod_name, 
-            namespace=namespace,
-            # container=container,
-            tail_lines=100
-        ):
-        socketio.emit('response',
-                            {'data': str(line)}, namespace="/log")
+    try:
+        w = watch.Watch()
+        for line in w.stream(
+                k8s_client.CoreV1Api().read_namespaced_pod_log, 
+                name=pod_name, 
+                namespace=namespace,
+                container=container,
+                tail_lines=100,
+            ):
+            socketio.emit('response',
+                                {'data': str(line)}, namespace="/log")
+    except ApiException as error:
+            NoGlashErrorHandler(logger, error, "get logStream")
+    except Exception as error:
+        ERROR = "k8sPodLogsStream: %s" % error
+        NoGlashErrorHandler(logger, "error", ERROR)
 
 ##############################################################
 ## Pod Exec
@@ -2811,29 +2846,42 @@ def k8sHelmChartListGet(username_role, user_token, namespace):
                 chart_name = secret_data['chart']['metadata']['name']
                 release_name = secret_data['name']
                 label_selector = f"app.kubernetes.io/instance={release_name}"
-                pod_list = k8s_client.CoreV1Api().list_namespaced_pod(namespace, label_selector=label_selector).items
                 deployment_list = k8s_client.AppsV1Api().list_namespaced_deployment(namespace, label_selector=label_selector).items
                 daemonset_list = k8s_client.AppsV1Api().list_namespaced_daemon_set(namespace, label_selector=label_selector).items
+                stateful_set_list = k8s_client.AppsV1Api().list_namespaced_stateful_set(namespace, label_selector=label_selector).items
                 svc_list = k8s_client.CoreV1Api().list_namespaced_service(namespace, label_selector=label_selector).items
+                ingress_list = k8s_client.NetworkingV1Api().list_namespaced_ingress(namespace, label_selector=label_selector).items
+                sa_list =  k8s_client.CoreV1Api().list_namespaced_service_account(namespace, label_selector=label_selector).items
                 secret_list = k8s_client.CoreV1Api().list_namespaced_secret(namespace, label_selector=label_selector).items
                 configma_list = k8s_client.CoreV1Api().list_namespaced_config_map(namespace, label_selector=label_selector).items
+                pvc_list =  k8s_client.CoreV1Api().list_namespaced_persistent_volume_claim(namespace, label_selector=label_selector).items
+                dependencies = None
+                if "lock" in secret_data['chart']:
+                    if secret_data['chart']["lock"] and "dependencies" in secret_data['chart']["lock"]:
+                        dependencies = secret_data['chart']["lock"]["dependencies"]
 
                 CHART_DATA.append({
-                    'icon': helm_icon,
-                    'status': secret_data['info']['status'],
-                    'release_name': release_name,
-                    'chart_name': chart_name,
-                    'chart_version': secret_data['chart']['metadata']['version'],
-                    'app_version': helm_api_version,
+                    'icon': helm_icon, # X
+                    'status': secret_data['info']['status'], # X
+                    'release_name': release_name, # X
+                    'chart_name': chart_name, # X
+                    'chart_version': secret_data['chart']['metadata']['version'], # X
+                    'app_version': helm_api_version, # X
                     'revision': secret_data['version'],
-                    'updated': secret_data['info']['last_deployed'],
-                    "pods": [pod.metadata.name for pod in pod_list],
+                    'updated': secret_data['info']['last_deployed'], # X
+                    # Resources
                     "deployments": [deployment.metadata.name for deployment in deployment_list],
                     "daemonset": [daemonset.metadata.name for daemonset in daemonset_list],
+                    "statefulsets": [ss.metadata.name for ss in stateful_set_list],
                     "services": [svc.metadata.name for svc in svc_list],
+                    "ingresses": [ingress.metadata.name for ingress in ingress_list],
                     "secrets": [secret.metadata.name for secret in secret_list],
                     "configmaps": [configmap.metadata.name for configmap in configma_list],
-                    "templates": secret_data["chart"]['templates'],
+                    "service_accounts": [sa.metadata.name for sa in sa_list],
+                    "persistent_volume_claims": [pvc.metadata.name for pvc in pvc_list],
+                    "values": json2yaml(secret_data['chart']["values"]),
+                    #"manifests": secret_data["manifest"],
+                    #"dependencies": dependencies
                 })
                 HAS_CHART = True
         for chart in CHART_DATA:
@@ -2846,7 +2894,8 @@ def k8sHelmChartListGet(username_role, user_token, namespace):
         ErrorHandler(logger, error, "get helm release")
         return HAS_CHART, CHART_LIST
     except Exception as error:
-        ErrorHandler(logger, "CannotConnect", "Cannot Connect to Kubernetes")
+        ERROR = "k8sHelmChartListGet: %s" % error
+        ErrorHandler(logger, "error", ERROR)
         return HAS_CHART, CHART_LIST
  
 ##############################################################
