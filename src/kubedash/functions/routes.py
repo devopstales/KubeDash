@@ -73,7 +73,6 @@ def page_not_found500(e):
         description = e.description,
         ), 500
 
-
 @routes.after_request
 def add_header(response):
     response.headers['Access-Control-Allow-Origin'] = request.root_url.rstrip(request.root_url[-1])
@@ -387,7 +386,7 @@ def callback():
             request_url = request.url.replace("http", "https")
         else:
             request_url = request.url
-        print("Request URL %s" % request_url)
+        logger.info("Request URL %s" % request_url)
 
         token = oauth.fetch_token(
             token_url,
@@ -730,13 +729,17 @@ def nodes_data():
 ## Namespaces
 ##############################################################
 
-@routes.route("/namespaces")
+@routes.route("/namespaces", methods=['GET', 'POST'])
 @login_required
 def namespaces():
+    selected = None
     if session['user_type'] == "OpenID":
         user_token = session['oauth_token']
     else:
         user_token = None
+
+    if request.method == 'POST':
+        selected = request.form.get('selected')
 
     ns_list = k8sNamespacesGet(session['user_role'], user_token)
     namespace_list = []
@@ -750,6 +753,7 @@ def namespaces():
 
     return render_template(
         'namespaces.html.j2',
+        selected = selected,
         namespace_list = namespace_list,
     )
 
@@ -1384,11 +1388,31 @@ logging.getLogger('engineio').setLevel(logging.ERROR)
 @login_required
 def pods_logs():
     if request.method == 'POST':
-        session['ns_select'] = request.form.get('ns_select')
+        po_name = request.form.get('po_name')
+        if request.form.get('ns_select'):
+            session['ns_select'] = request.form.get('ns_select')
+
+        if session['user_type'] == "OpenID":
+            user_token = session['oauth_token']
+        else:
+            user_token = None
+
         logger.info("async_mode: %s" % socketio.async_mode)
+        pod_containers, pod_init_containers = k8sPodGetContainers(session['user_role'], user_token, session['ns_select'], po_name)
+        if request.form.get('container_select'):
+            container_select = request.form.get('container_select')
+        else:
+            if pod_containers:
+                container_select = pod_containers[0]
+            else:
+                container_select = None
+
         return render_template(
             'pod-logs.html.j2', 
-            po_name = request.form.get('po_name'), 
+            po_name = po_name,
+            container_select = container_select,
+            pod_containers = pod_containers,
+            pod_init_containers = pod_init_containers,
             async_mode = socketio.async_mode
         )
     else:
@@ -1396,18 +1420,18 @@ def pods_logs():
 
 @socketio.on("connect", namespace="/log")
 @authenticated_only
-def connect():
-    socketio.emit('response', {'data': 'Connected'}, namespace="/log")
+def log_connect():
+    socketio.emit('response', {'data': ''}, namespace="/log")
 
 @socketio.on("message", namespace="/log")
 @authenticated_only
-def message(data):
+def log_message(po_name, container):
     if session['user_type'] == "OpenID":
         user_token = session['oauth_token']
     else:
         user_token = None
 
-    socketio.start_background_task(k8sPodLogsStream, session['user_role'], user_token, session['ns_select'], data)
+    socketio.start_background_task(k8sPodLogsStream, session['user_role'], user_token, session['ns_select'], po_name, container)
 
 ##############################################################
 ## Pod Exec
@@ -2619,7 +2643,7 @@ def charts():
 
     namespace_list, error = k8sNamespaceListGet(session['user_role'], user_token)
     if not error:
-        has_chart, chart_list = k8sHelmChartListGet(session['ns_select'], user_token, session['ns_select'])
+        has_chart, chart_list = k8sHelmChartListGet(session['user_role'], user_token, session['ns_select'])
     else:
         chart_list = []
         has_chart = None
@@ -2630,3 +2654,31 @@ def charts():
         has_chart = has_chart,
         chart_list = chart_list,
     )
+
+@routes.route('/charts/data', methods=['GET', 'POST'])
+@login_required
+def charts_data():
+    if request.method == 'POST':
+        selected = request.form.get('selected')
+
+        if session['user_type'] == "OpenID":
+            user_token = session['oauth_token']
+        else:
+            user_token = None
+
+        has_chart, chart_list = k8sHelmChartListGet(session['user_role'], user_token, session['ns_select'])
+        chart_data = None
+        chart_name = None
+        for name, release in chart_list.items():
+            if name == selected:
+                chart_name = name
+                chart_data = release
+
+        return render_template(
+            'chart-data.html.j2',
+            chart_name = chart_name,
+            chart_data = chart_data,
+        )
+    else:
+        return redirect(url_for('routes.login'))
+    

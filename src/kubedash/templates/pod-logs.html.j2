@@ -3,7 +3,6 @@
 {% block header %}
     <link href="{{ url_for('static',filename='/vendor/google/material-icons.css') }}" rel="stylesheet" />
     <link href="{{ url_for('static',filename='/vendor/xterm.js-4.11.0/xterm.css') }}" rel="stylesheet" />
-    <link href="{{ url_for('static',filename='/css/sb-admin-2.custom.css') }}" rel="stylesheet" >
 {% endblock %}
 
 {% block content %}
@@ -28,13 +27,41 @@
   </ol>
 </nav>
 
-<div class="card shadow mb-4">
-    <div class="card-header">
-        <h6 class="m-0 font-weight-bold text-primary">Pod Logs</h6>
+<div class="card">
+    <div id="filter-menu" class="card-header">
+      <div class="row justify-content-between">
+        <div class="col-3">
+          <span>Status: <span id="status">connecting...</span></span>
+        </div>
+        <form name="add" method="POST" class="col-3">
+          <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+          <input type="hidden" name="po_name" value="{{ po_name }}">
+          <div class="input-group">
+              <select name= "container_select" class="custom-select" id="containers" aria-label="Select Container">
+                {% for container in pod_init_containers %}
+                {% if container == container_select %}
+                <option value="{{ container }}" selected>{{ container }}</option>
+                {% else %}
+                <option value="{{ container }}">{{ container }}</option>
+                {% endif %}
+                {% endfor %}
+                <option disabled>-----------</option>
+                {% for container in pod_containers %}
+                {% if container == container_select %}
+                <option value="{{ container }}" selected>{{ container }}</option>
+                {% else %}
+                <option value="{{ container }}">{{ container }}</option>
+                {% endif %}
+                {% endfor %}
+              </select>
+            <div class="input-group-append">
+              <button type="submit" class="btn btn-primary" type="button">Submit</button>
+            </div>
+          </div>
+        </form>
+      </div>
     </div>
-    <div class="card-body">
-        <div id="terminal"></div>
-    </div>
+    <div id="terminal" class="card-body terminalBody"></div>
 </div>
 {% endblock %}
 
@@ -45,30 +72,41 @@
     <script src="{{ url_for('static',filename='/vendor/xterm.js-4.11.0/xterm-addon-search.js') }}"></script>
     <script src="{{ url_for('static',filename='/vendor/xterm.js-4.11.0/xterm.js') }}"></script>
     <script>
-        $(document).ready(function() {
-            const term = new Terminal({
-              cursorBlink: true,
-              macOptionIsMeta: true,
-              scrollback: true,
-            });
-            const fit = new FitAddon.FitAddon();
-            term.loadAddon(fit);
-            term.loadAddon(new WebLinksAddon.WebLinksAddon());
-            term.loadAddon(new SearchAddon.SearchAddon());
+      const term = new Terminal({
+        cursorBlink: true,
+        macOptionIsMeta: true,
+        scrollback: true,
+      });
 
-            term.open(document.getElementById('terminal'));
-            fit.fit();
+      // https://github.com/xtermjs/xterm.js/issues/2941
+      const fit = new FitAddon.FitAddon();
+      term.loadAddon(fit);
+      term.loadAddon(new WebLinksAddon.WebLinksAddon());
+      term.loadAddon(new SearchAddon.SearchAddon());
 
-            const socket = io.connect('/log');
+      term.open(document.getElementById("terminal"));
+      fit.fit();
+      //console.log(`size: ${term.cols} columns, ${term.rows} rows`);
+      term.writeln("Welcome to kubedash!");
 
-            socket.on('response', function(msg) {
-                term.write(msg.data + "\r\n");
-            });
+      const socket = io.connect('/log');
+      const status = document.getElementById("status");
+      //var containers = document.getElementById("containers");
+      //var container = containers.value;
 
-            socket.on("connect", () => {
-              socket.send("{{ po_name }}");
-              term.reset();
-            });
-        });
+      socket.on("connect", () => {
+        socket.send("{{ po_name }}", "{{ container_select}}");
+        term.reset();
+        status.innerHTML = '<span class="connected">connected</span>';
+      });
+
+      socket.on('response', function(msg) {
+          term.write(msg.data + "\r\n");
+      });
+
+      socket.on("disconnect", () => {
+        status.innerHTML =
+          '<span class="disconnected">disconnected</span>';
+      });
     </script>
 {% endblock %}

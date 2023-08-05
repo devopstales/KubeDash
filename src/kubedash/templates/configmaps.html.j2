@@ -28,8 +28,7 @@
                 <thead>
                     <tr>
                       <th>Name</th>
-                      <th>Annotations</th>
-                      <th>Labels</th>
+                      <th>Created</th>
                     </tr>
                   </thead>
                   <tbody>
@@ -48,24 +47,7 @@
                           </form>
                         </td>
                         <td>
-                          {% if configmap.annotations %}
-                          {% for an_key, an_value in configmap.annotations.items() %}
-                          {% if an_key != "kubectl.kubernetes.io/last-applied-configuration" %}
-                          <span class="badge badge-secondary">{{ an_key }}: {{ an_value }}</span>
-                          {% if not loop.last %}<br>{% endif %}
-                          {% endif %}
-                          {% endfor %}
-                          {% endif %}
-                        </td>
-                        <td>
-                          {% if configmap.labels %}
-                          {% for an_key, an_value in configmap.labels.items() %}
-                          {% if an_key != "kubectl.kubernetes.io/last-applied-configuration" %}
-                          <span class="badge badge-secondary">{{ an_key }}: {{ an_value }}</span>
-                          {% if not loop.last %}<br>{% endif %}
-                          {% endif %}
-                          {% endfor %}
-                          {% endif %}
+                          {{ configmap.created }}
                         </td>
                       </tr>
                     {% endfor %}
