@@ -81,7 +81,7 @@ def UserCreate(username, password, email, user_type, role=None, tokens=None):
             else:
                 user = User(
                     username       = username,
-                    password_hash  = generate_password_hash(password, method='sha256'),
+                    password_hash  = generate_password_hash(password, method='scrypt'),
                     email          = email,
                     user_type      = user_type,
                     tokens         = tokens,
@@ -156,7 +156,7 @@ def SSOTokenGet(username):
 def UserUpdatePassword(username, password):
         user = User.query.filter_by(username=username).first()
         if user:
-            user.password_hash = generate_password_hash(password, method='sha256')
+            user.password_hash = generate_password_hash(password, method='scrypt')
             db.session.commit()
             return True
         else:
