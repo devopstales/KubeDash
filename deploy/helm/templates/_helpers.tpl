@@ -31,6 +31,14 @@ Create chart name and version as used by the chart label.
 {{- end }}
 
 {{/*
+Selector labels
+*/}}
+{{- define "kubedash.selectorLabels" -}}
+app.kubernetes.io/name: {{ include "kubedash.name" . }}
+app.kubernetes.io/instance: {{ .Release.Name }}
+{{- end }}
+
+{{/*
 Common labels
 */}}
 {{- define "kubedash.labels" -}}
@@ -40,14 +48,7 @@ helm.sh/chart: {{ include "kubedash.chart" . }}
 app.kubernetes.io/version: {{ .Chart.AppVersion | quote }}
 {{- end }}
 app.kubernetes.io/managed-by: {{ .Release.Service }}
-{{- end }}
-
-{{/*
-Selector labels
-*/}}
-{{- define "kubedash.selectorLabels" -}}
-app.kubernetes.io/name: {{ include "kubedash.name" . }}
-app.kubernetes.io/instance: {{ .Release.Name }}
+app.kubernetes.io/part-of: {{ .Chart.Name }}
 {{- end }}
 
 {{/*

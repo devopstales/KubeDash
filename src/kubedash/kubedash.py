@@ -16,6 +16,8 @@ from functions.routes import routes
 from functions.commands import commands
 from functions.user import UserCreate, RoleCreate, UserTest
 from functions.sso import SSOServerTest, SSOServerCreate, SSOServerUpdate
+from functions.k8s import k8sServerConfigGet, k8sServerConfigCreate, k8sServerConfigUpdate, \
+k8sUserRoleTemplateListGet, k8sUserClusterRoleTemplateListGet, k8sClusterRolesAdd
 from config import app_config
 
 from opentelemetry.instrumentation.flask import FlaskInstrumentor
@@ -80,6 +82,27 @@ def oidc_init():
             SSOServerCreate(OIDC_ISSUER_URL, OIDC_CLIENT_ID, OIDC_SECRET, OIDC_CALLBACK_URL, string2list(OIDC_SCOPE))
             logger.info("OIDC Provider created")
 
+def k8s_config_int():
+    K8S_CLUSTER_NAME = os.environ.get('K8S_CLUSTER_NAME', "k8s-main")
+    K8S_API_SERVER = os.environ.get('K8S_API_SERVER', None)
+    K8S_API_CA = os.environ.get('K8S_API_CA', None) # base64 encoded
+    if K8S_API_SERVER and K8S_API_CA:
+        k8sConfig = k8sServerConfigGet()
+        if k8sConfig is None:
+            k8sServerConfigCreate(K8S_API_SERVER, K8S_CLUSTER_NAME, K8S_API_CA)
+            logger.info("Kubernetes Config created")
+        else:
+            k8sServerConfigUpdate(k8sConfig.k8s_context, K8S_API_SERVER, K8S_CLUSTER_NAME, K8S_API_CA)
+            logger.info("Kubernetes Config updated")
+
+def k8s_roles_init():
+    user_role_template_list = k8sUserRoleTemplateListGet("Admin", None)
+    user_clusterRole_template_list = k8sUserClusterRoleTemplateListGet("Admin", None)
+
+    if not bool(user_clusterRole_template_list) or not bool(user_role_template_list):
+        logger.info("Kubernetes Roles created")
+        k8sClusterRolesAdd()
+
 def create_app(config_name="development"):
     """Init App"""
     app = Flask(__name__, static_url_path='', static_folder='static')
@@ -119,6 +142,8 @@ def create_app(config_name="development"):
             SQLAlchemyInstrumentor().instrument(engine=db.engine)
             db_init()
             oidc_init()
+            k8s_config_int()
+            k8s_roles_init()
 
     """Init Logging managger"""
     login_manager.init_app(app)
