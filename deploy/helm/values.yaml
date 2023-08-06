@@ -19,6 +19,9 @@ image:
   # -- The docker image tag to use
   tag: 0.1-devel
 
+# -- pullsecrets
+imagePullSecrets: []
+
 # -- list of the pos's SecurityContexts
 podSecurityContext:
   runAsNonRoot: true
@@ -46,10 +49,25 @@ oidc:
     oidcSecret: ""
   secret:
     # -- Name of the secret storing OIDC_CLIENT_ID and OIDC_SECRET.
-    name: "skooner-oidc"
+    name: "kubedash-oidc"
     # -- Secret must provide the following variables: OIDC_CLIENT_ID and OIDC_SECRET.
     useExistingSecret: false
 
+# -- k8s connection information.
+cluster:
+  # -- k8s api url
+  name: "k8s-cluster"
+  # -- k8s api url
+  apiUrl: "https://kubernetes.mydomain.intra:6443"
+  # `apiServer` is the url for kubectl
+  #   This is typically  https://api.fqdn
+  # -- k8s ca cert
+  caCert: |-
+    -----BEGIN CERTIFICATE-----
+    cert data here
+    -----END CERTIFICATE-----
+  # `caCrt` is the public / CA cert for the cluster
+  # cat /etc/kubernetes/pki/apiserver.crt
 
 
 persistence:
@@ -73,12 +91,13 @@ persistence:
 ingress:
   # -- Enable Ingress object creation
   enabled: true
+  # -- Ingress class name
+  className: "nginx"
   # -- URL of the Ingress object
   url: "kubedash.mydomain.intra"
   # -- Extra annotation to the Ingress object
   annotations:
     nginx.ingress.kubernetes.io/proxy-body-size: "10m"
-    kubernetes.io/ingress.class: nginx
   tls:
     # -- Enable tls on Ingress object
     enabled: true

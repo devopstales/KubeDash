@@ -274,23 +274,26 @@ def k8sClientConfigGet(username_role, user_token):
                         span.set_status(Status(StatusCode.ERROR, "Could not configure kubernetes python client: %s" % error))
         elif username_role == "User":
             k8sConfig = k8sServerConfigGet()
-            k8s_server_url = k8sConfig.k8s_server_url
-            k8s_server_ca = str(base64_decode(k8sConfig.k8s_server_ca), 'UTF-8')
-            if k8s_server_ca:
-                file = open("CA.crt", "w+")
-                file.write( k8s_server_ca )
-                file.close 
+            if k8sConfig is None:
+                logger.error("Kubectl Integration is not configured.")
+            else:
+                k8s_server_url = k8sConfig.k8s_server_url
+                k8s_server_ca = str(base64_decode(k8sConfig.k8s_server_ca), 'UTF-8')
+                if k8s_server_ca:
+                    file = open("CA.crt", "w+")
+                    file.write( k8s_server_ca )
+                    file.close 
 
-            configuration = k8s_client.Configuration()
-            configuration.host = k8s_server_url
-            configuration.verify_ssl = True
-            configuration.ssl_ca_cert = 'CA.crt'
-            configuration.debug = False
-            configuration.api_key_prefix['authorization'] = 'Bearer'
-            configuration.api_key["authorization"] = str(user_token["id_token"])
-            if tracer and span.is_recording():
-                span.set_attribute("client.config", "oidc")
-            k8s_client.Configuration.set_default(configuration)
+                configuration = k8s_client.Configuration()
+                configuration.host = k8s_server_url
+                configuration.verify_ssl = True
+                configuration.ssl_ca_cert = 'CA.crt'
+                configuration.debug = False
+                configuration.api_key_prefix['authorization'] = 'Bearer'
+                configuration.api_key["authorization"] = str(user_token["id_token"])
+                if tracer and span.is_recording():
+                    span.set_attribute("client.config", "oidc")
+                k8s_client.Configuration.set_default(configuration)
 
 ##############################################################
 ## Metrics
@@ -633,7 +636,7 @@ def k8sCreateUserCSR(username_role, user_token, username, user_csr_base64):
                     "key encipherment",
                     "client auth",
                 ],
-                signer_name = "kubernetes.io/kube-apiserver-client",
+                signer_name = "kubernetes.io/kubedash-apiserver-client",
                 expiration_seconds = 315360000, # 10 years
             ),
         )
@@ -723,8 +726,8 @@ def k8sUserClusterRoleTemplateListGet(username_role, user_token):
         cluster_roles = k8s_client.RbacAuthorizationV1Api().list_cluster_role()
         try:
             for cr in cluster_roles.items:
-                if "template-cluster-resources___" in cr.metadata.name:
-                    CLUSTER_ROLE_LIST.append(cr.metadata.name.split("___")[-1])
+                if "template-cluster-resources---" in cr.metadata.name:
+                    CLUSTER_ROLE_LIST.append(cr.metadata.name.split("---")[-1])
             return CLUSTER_ROLE_LIST
         except:
             return CLUSTER_ROLE_LIST
@@ -740,8 +743,8 @@ def k8sUserRoleTemplateListGet(username_role, user_token):
         cluster_roles = k8s_client.RbacAuthorizationV1Api().list_cluster_role()
         try:
             for cr in cluster_roles.items:
-                if "template-namespaced-resources___" in cr.metadata.name:
-                    CLUSTER_ROLE_LIST.append(cr.metadata.name.split("___")[-1])
+                if "template-namespaced-resources---" in cr.metadata.name:
+                    CLUSTER_ROLE_LIST.append(cr.metadata.name.split("---")[-1])
             return CLUSTER_ROLE_LIST
         except:
             return CLUSTER_ROLE_LIST
@@ -796,7 +799,7 @@ def k8sClusterRolesAdd():
             api_version = "rbac.authorization.k8s.io/v1",
             kind = "ClusterRole",
             metadata = k8s_client.V1ObjectMeta(
-                name = "template-cluster-resources___admin"
+                name = "template-cluster-resources---admin"
             ),
             rules = [
                 k8s_client.V1PolicyRule(
@@ -837,7 +840,7 @@ def k8sClusterRolesAdd():
             api_version = "rbac.authorization.k8s.io/v1",
             kind = "ClusterRole",
             metadata = k8s_client.V1ObjectMeta(
-                name = "template-cluster-resources___reader"
+                name = "template-cluster-resources---reader"
             ),
             rules = [
                 k8s_client.V1PolicyRule(
@@ -878,7 +881,7 @@ def k8sClusterRolesAdd():
             api_version = "rbac.authorization.k8s.io/v1",
             kind = "ClusterRole",
             metadata = k8s_client.V1ObjectMeta(
-                name = "template-namespaced-resources___developer"
+                name = "template-namespaced-resources---developer"
             ),
             rules = [
                 k8s_client.V1PolicyRule(
@@ -910,7 +913,7 @@ def k8sClusterRolesAdd():
             api_version = "rbac.authorization.k8s.io/v1",
             kind = "ClusterRole",
             metadata = k8s_client.V1ObjectMeta(
-                name = "template-namespaced-resources___deployer"
+                name = "template-namespaced-resources---deployer"
             ),
             rules = [
                 k8s_client.V1PolicyRule(
@@ -929,7 +932,7 @@ def k8sClusterRolesAdd():
             api_version = "rbac.authorization.k8s.io/v1",
             kind = "ClusterRole",
             metadata = k8s_client.V1ObjectMeta(
-                name = "template-namespaced-resources___operation"
+                name = "template-namespaced-resources---operation"
             ),
             rules = [
                 k8s_client.V1PolicyRule(
@@ -944,7 +947,7 @@ def k8sClusterRolesAdd():
     roleVars = locals()
 
     for role in cluster_role_list:
-        name = "template-cluster-resources___" + role
+        name = "template-cluster-resources---" + role
         is_clusterrole_exists, error = k8sClusterRoleGet(name)
         if error:
             continue
@@ -956,7 +959,7 @@ def k8sClusterRolesAdd():
                 logger.info("ClusterRole %s created" % name) # WARNING
 
     for role in namespaced_role_list:
-        name = "template-namespaced-resources___" + role
+        name = "template-namespaced-resources---" + role
         is_clusterrole_exists, error = k8sClusterRoleGet(name)
         if error:
             continue
@@ -2181,7 +2184,7 @@ def k8sRoleBindingCreate(user_role, namespace, username):
             user = username.split("@")[0]
         else:
             user = username
-        obeject_name = user + "___" + "kubedash" + "___" + user_role
+        obeject_name = user + "---" + "kubedash" + "---" + user_role
         body = k8s_client.V1RoleBinding(
             api_version = "rbac.authorization.k8s.io/v1",
             kind = "RoleBinding",
@@ -2192,7 +2195,7 @@ def k8sRoleBindingCreate(user_role, namespace, username):
             role_ref = k8s_client.V1RoleRef(
                 api_group = "rbac.authorization.k8s.io",
                 kind = "ClusterRole",
-                name = "template-namespaced-resources___" + user_role,
+                name = "template-namespaced-resources---" + user_role,
             ),
             subjects = [
                 k8s_client.V1Subject(
@@ -2221,7 +2224,7 @@ def k8sRoleBindingAdd(user_role, username, user_namespaces, user_all_namespaces)
         user = username.split("@")[0]
     else:
         user = username
-    obeject_name = user + "___" + "kubedash" + "___" + user_role
+    obeject_name = user + "---" + "kubedash" + "---" + user_role
     if user_all_namespaces:
         namespace_list, error = k8sNamespaceListGet("Admin", None)
     else:
@@ -2339,7 +2342,7 @@ def k8sClusterRoleBindingCreate(user_cluster_role, username):
             user = username.split("@")[0]
         else:
             user = username
-        obeject_name = user + "___" + "kubedash" + "___" + user_cluster_role
+        obeject_name = user + "---" + "kubedash" + "---" + user_cluster_role
         body = k8s_client.V1ClusterRoleBinding(
             api_version = "rbac.authorization.k8s.io/v1",
             kind = "ClusterRoleBinding",
@@ -2349,7 +2352,7 @@ def k8sClusterRoleBindingCreate(user_cluster_role, username):
             role_ref = k8s_client.V1RoleRef(
                 api_group = "rbac.authorization.k8s.io",
                 kind = "ClusterRole",
-                name = "template-cluster-resources___" + user_cluster_role,
+                name = "template-cluster-resources---" + user_cluster_role,
             ),
             subjects = [
                 k8s_client.V1Subject(
@@ -2375,7 +2378,7 @@ def k8sClusterRoleBindingAdd(user_cluster_role, username):
         user = username.split("@")[0]
     else:
         user = username
-    obeject_name = user + "___" + "kubedash" + "___" + user_cluster_role
+    obeject_name = user + "---" + "kubedash" + "---" + user_cluster_role
     is_clusterrolebinding_exists, error = k8sClusterRoleBindingGet(obeject_name)
     if error:
         ErrorHandler(logger, error, "get ClusterRoleBinding %s" % obeject_name)
