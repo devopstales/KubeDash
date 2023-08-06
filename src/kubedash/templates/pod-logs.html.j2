@@ -91,8 +91,6 @@
 
       const socket = io.connect('/log');
       const status = document.getElementById("status");
-      //var containers = document.getElementById("containers");
-      //var container = containers.value;
 
       socket.on("connect", () => {
         socket.send("{{ po_name }}", "{{ container_select}}");

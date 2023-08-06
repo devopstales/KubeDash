@@ -39,20 +39,31 @@
                     </button>
                 </div>
                 <div class="modal-body">
-                    <form action="/cluster-config" method="POST">
+                    <!-- <form onsubmit="return validateClusterForm('ClusterAdd')" -->
+                    <form name="ClusterAdd" onsubmit="return validateClusterForm('ClusterAdd')" action="/cluster-config" method="POST">
                         <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
                         <input type="hidden" name="request_type" value="create" />
                         <div class="form-group">
                             <label for="k8s_context">Kubernetes Config Context</label>
-                            <input type="text" class="form-control" id="k8s_context" name= "k8s_context" placeholder="Server Context">
+                            <input type="text" class="form-control" id="k8s_context" name= "k8s_context" placeholder="Server Context" required>
                         </div>
                         <div class="form-group">
                             <label for="k8s_server_url">Kubernetes API URL</label>
-                            <input type="text" class="form-control" id="k8s_server_url" name= "k8s_server_url" placeholder="URL">
+                            <input type="text" class="form-control" id="k8s_server_url" name="k8s_server_url" placeholder="URL" required>
                         </div>
                         <div class="form-group">
-                            <label for="k8s_server_ca">Kubernetes CA Certificate</label>
-                            <textarea class="form-control" id="k8s_server_ca" name= "k8s_server_ca" rows="3"></textarea>
+                            <label for="k8s_server_ca">
+                                Kubernetes API CA Certificate 
+                                <a class="card-link float-right" data-toggle="collapse" href="#">
+                                    <i class="material-icons"
+                                        data-toggle="CertTooltip" 
+                                        title="Where is this CA?"
+                                        data-content="cat /etc/kubernetes/pki/apiserver.crt">
+                                        info
+                                    </i>
+                                </a>
+                            </label>
+                            <textarea class="form-control" id="k8s_server_ca" name= "k8s_server_ca" rows="3" required></textarea>
                         </div>
                         <div class="modal-footer">
                             <div class="form-group mt-2">
@@ -125,7 +136,8 @@
                 </button>
             </div>
             <div class="modal-body">
-                <form action="/cluster-config" method="POST">
+                <!-- <form onsubmit="return validateClusterForm('ClusterEdit')" -->
+                <form name="ClusterEdit" onsubmit="return validateClusterForm('ClusterEdit')" action="/cluster-config" method="POST">
                     <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
                     <input type="hidden" name="request_type" value="edit" />
                     <input type="hidden" name="k8s_context_old" value="{{ server.k8s_context }}" />
@@ -138,7 +150,17 @@
                         <input type="text" class="form-control" id="k8s_server_url" name= "k8s_server_url" value="{{ server.k8s_server_url }}">
                     </div>
                     <div class="form-group">
-                        <label for="k8s_server_ca">Kubernetes CA Certificate</label>
+                        <label for="k8s_server_ca">
+                            Kubernetes API CA Certificate
+                            <a class="card-link float-right" data-toggle="collapse" href="#">
+                                <i class="material-icons"
+                                    data-toggle="CertTooltip" 
+                                    title="Where is this CA?"
+                                    data-content="cat /etc/kubernetes/pki/apiserver.crt">
+                                    info
+                                </i>
+                            </a>
+                        </label>
                         <textarea class="form-control" id="k8s_server_ca" name= "k8s_server_ca" rows="3">{{ server.k8s_server_ca | j2_b64decode }}</textarea>
                     </div>
                     <div class="modal-footer">
@@ -164,5 +186,53 @@
            responsive: true
         });
     });
+    $(document).ready(function(){
+    $('[data-toggle="CertTooltip"]').popover({
+        container: 'body'
+    });   
+    });
+    function isValidUrl(string) {
+        try {
+            new URL(string);
+            return true;
+        } catch (err) {
+            return false;
+        }
+    };
+
+    function validateClusterForm(element) {
+        let k8s_context = document.forms[element]["k8s_context"];
+        let k8s_server_url = document.forms[element]["k8s_server_url"];
+        let k8s_server_ca = document.forms[element]["k8s_server_ca"];
+        var k8s_server_url_valid = Node
+        var k8s_server_ca_valid = Node
+
+        // test url
+        if (isValidUrl(k8s_server_url.value)){
+            k8s_context.classList.add("is-valid");
+            k8s_server_url.classList.add("is-valid");
+            k8s_server_url_valid = true;
+        } else {
+            k8s_context.classList.add("is-valid");
+            k8s_server_url.classList.add("is-invalid");
+            k8s_server_url_valid = false;
+        }
+
+        // test if certificate
+        if (k8s_server_ca.value.includes("cert") || k8s_server_ca.value.includes("pem")){
+            k8s_server_ca.classList.add("is-valid");
+            k8s_server_ca_valid = true;
+        } else {
+            k8s_server_ca.classList.add("is-invalid");
+            k8s_server_ca_valid = false;
+        }
+        
+        // finale validation
+        if (k8s_server_ca_valid && k8s_server_url_valid) {
+            return true;
+        } else {
+            return false;
+        }
+    };
 </script>
 {% endblock %}

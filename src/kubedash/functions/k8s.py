@@ -2027,11 +2027,12 @@ def k8sPodLogsStream(username_role, user_token, namespace, pod_name, container):
 ## Pod Exec
 ##############################################################
 
-def k8sPodExecSocket(username_role, user_token, namespace, pod_name):
+def k8sPodExecSocket(username_role, user_token, namespace, pod_name, container):
     k8sClientConfigGet(username_role, user_token)
     wsclient = stream(k8s_client.CoreV1Api().connect_get_namespaced_pod_exec,
             pod_name,
             namespace,
+            container=container,
             command=['/bin/sh'],
             stderr=True, stdin=True,
             stdout=True, tty=True,
@@ -2041,7 +2042,7 @@ def k8sPodExecSocket(username_role, user_token, namespace, pod_name):
 def k8sPodExecStream(wsclient):
     while True:
         socketio.sleep(0.01)
-        wsclient.update(timeout=1)
+        wsclient.update(timeout=5)
         """Read from wsclient"""
         output = wsclient.read_all()
         if output:
