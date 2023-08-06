@@ -1441,11 +1441,30 @@ def log_message(po_name, container):
 @login_required
 def pods_exec():
     if request.method == 'POST':
-        session['ns_select'] = request.form.get('ns_select')
+        po_name = request.form.get('po_name')
+        if request.form.get('ns_select'):
+            session['ns_select'] = request.form.get('ns_select')
+
+        if session['user_type'] == "OpenID":
+            user_token = session['oauth_token']
+        else:
+            user_token = None
+
         logger.info("async_mode: %s" % socketio.async_mode)
+        pod_containers, pod_init_containers = k8sPodGetContainers(session['user_role'], user_token, session['ns_select'], po_name)
+        if request.form.get('container_select'):
+            container_select = request.form.get('container_select')
+        else:
+            if pod_containers:
+                container_select = pod_containers[0]
+            else:
+                container_select = None
+
         return render_template(
             'pod-exec.html.j2', 
-            po_name = request.form.get('po_name'),
+            po_name = po_name,
+            container_select = container_select,
+            pod_containers = pod_containers,
             async_mode = socketio.async_mode
         )
     else:
@@ -1454,18 +1473,18 @@ def pods_exec():
 @socketio.on("connect", namespace="/exec")
 @authenticated_only
 def connect():
-    socketio.emit("response", {"output":  'Connected' + "\r\n"}, namespace="/exec")
+    socketio.emit("response", {"output":  ''}, namespace="/exec")
 
 @socketio.on("message", namespace="/exec")
 @authenticated_only
-def message(data):
+def message(po_name, container):
     if session['user_type'] == "OpenID":
         user_token = session['oauth_token']
     else:
         user_token = None
 
     global wsclient
-    wsclient = k8sPodExecSocket(session['user_role'], user_token, session['ns_select'], data)
+    wsclient = k8sPodExecSocket(session['user_role'], user_token, session['ns_select'], po_name, container)
 
     socketio.start_background_task(k8sPodExecStream, wsclient)
 
@@ -1475,7 +1494,13 @@ def exec_input(data):
     """write to the child pty. The pty sees this as if you are typing in a real
     terminal.
     """
-    wsclient.write_stdin(data["input"].encode())
+    try:
+        wsclient.write_stdin(data["input"].encode())
+    except ApiException as error:
+            NoGlashErrorHandler(logger, error, "exec_input")
+    except Exception as error:
+        ERROR = "exec_input: %s" % error
+        NoGlashErrorHandler(logger, "error", ERROR)
 
 ##############################################################
 ## Users
@@ -1504,7 +1529,7 @@ def profile():
             flash("Wrong Current Password", "danger")
 
     return render_template(
-        'profile.html.j2',
+        'uer-profile.html.j2',
         user = user,
         user_role = role.name,
     )
