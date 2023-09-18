@@ -45,6 +45,6 @@ pytest-playwright>=0.3.1
 selenium>=4.8.2
 
 # for git-changelog
-GitPython==3.1.32
+GitPython==3.1.36
 gitdb2==3.0.1
 ipython>=8.10.0 # not directly required, pinned by Snyk to avoid a vulnerability
