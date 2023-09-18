@@ -35,6 +35,19 @@ containerSecurityContext:
   capabilities:
     drop: ["all"]
 
+externalDatabase:
+  enabled: false
+  host: ""
+  port: 5432
+  database: ""
+  user: ""
+  password: ""
+  secret:
+    # -- Name of the secret storing EXTERNAL_DATABASE_PASSWORD.
+    name: "kubedash-postgresql"
+    # -- Secret must provide the following variables: EXTERNAL_DATABASE_PASSWORD.
+    useExistingSecret: false
+
 oidc:
   # -- Enable oidc authentication
   enabled: true
@@ -68,7 +81,6 @@ cluster:
     -----END CERTIFICATE-----
   # `caCrt` is the public / CA cert for the cluster
   # cat /etc/kubernetes/pki/apiserver.crt
-
 
 persistence:
   # -- Volumes for the pod

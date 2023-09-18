@@ -5,6 +5,7 @@ from flask import Flask
 from flask_talisman import Talisman
 from flask_healthz import healthz, HealthError
 from sqlalchemy_utils import database_exists
+from sqlalchemy import create_engine, inspect
 from flask_migrate import Migrate
 
 import eventlet
@@ -14,7 +15,7 @@ from functions.components import db, sess, login_manager, csrf, socketio
 from functions.helper_functions import string2list
 from functions.routes import routes
 from functions.commands import commands
-from functions.user import UserCreate, RoleCreate, UserTest
+from functions.user import UserCreate, RoleCreate, UserTest, User
 from functions.sso import SSOServerTest, SSOServerCreate, SSOServerUpdate
 from functions.k8s import k8sServerConfigGet, k8sServerConfigCreate, k8sServerConfigUpdate, \
 k8sUserRoleTemplateListGet, k8sUserClusterRoleTemplateListGet, k8sClusterRolesAdd
@@ -61,6 +62,13 @@ def db_init():
 def connect_database():
     user = UserTest('Admin')
     if user:
+        return True
+    else:
+        return False
+    
+def init_db_test(SQLALCHEMY_DATABASE_URI):
+    engine = create_engine(SQLALCHEMY_DATABASE_URI)
+    if inspect(engine).has_table("alembic_version"):
         return True
     else:
         return False
@@ -130,20 +138,38 @@ def create_app(config_name="development"):
     """Init FlaskInstrumentor"""
     # FlaskInstrumentor().instrument_app(app)
 
+    """Database mode"""
+    EXTERNAL_DATABASE_ENABLED = os.getenv('EXTERNAL_DATABASE_ENABLED', "False")
+    if EXTERNAL_DATABASE_ENABLED == "True":
+        SQLALCHEMY_DATABASE_HOST = os.environ.get('EXTERNAL_DATABASE_HOST', "localhost")
+        SQLALCHEMY_DATABASE_USER = os.environ.get('EXTERNAL_DATABASE_USER', "kubedash")
+        SQLALCHEMY_DATABASE_PASSWORD = os.environ.get('EXTERNAL_DATABASE_PASSWORD', None)
+        SQLALCHEMY_DATABASE_DB = os.environ.get('EXTERNAL_DATABASE_DB', "kubedash")
+        if SQLALCHEMY_DATABASE_USER and SQLALCHEMY_DATABASE_PASSWORD and SQLALCHEMY_DATABASE_HOST and SQLALCHEMY_DATABASE_DB:
+            SQLALCHEMY_DATABASE_URI = "postgresql://%s:%s@%s/%s" % (SQLALCHEMY_DATABASE_USER, SQLALCHEMY_DATABASE_PASSWORD, SQLALCHEMY_DATABASE_HOST, SQLALCHEMY_DATABASE_DB)
+            app.config['SQLALCHEMY_DATABASE_URI'] = SQLALCHEMY_DATABASE_URI
+        else:
+            basedir = os.path.abspath(os.path.dirname(__file__))
+            SQLALCHEMY_DATABASE_URI = "sqlite:///"+basedir+"/database/"+config_name+".db"
+    else:
+        basedir = os.path.abspath(os.path.dirname(__file__))
+        SQLALCHEMY_DATABASE_URI = "sqlite:///"+basedir+"/database/"+config_name+".db"
+
+
     """Init session"""
     sess.init_app(app)
 
     """Init DB"""
     migrate = Migrate(app, db)
     db.init_app(app)
-    basedir = os.path.abspath(os.path.dirname(__file__))
-    if database_exists("sqlite:///"+basedir+"/database/"+config_name+".db"):
+    if database_exists(SQLALCHEMY_DATABASE_URI):
         with app.app_context():
-            SQLAlchemyInstrumentor().instrument(engine=db.engine)
-            db_init()
-            oidc_init()
-            k8s_config_int()
-            k8s_roles_init()
+            if init_db_test(SQLALCHEMY_DATABASE_URI):
+                SQLAlchemyInstrumentor().instrument(engine=db.engine)
+                db_init()
+                oidc_init()
+                k8s_config_int()
+                k8s_roles_init()
 
     """Init Logging managger"""
     login_manager.init_app(app)
