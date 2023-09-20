@@ -11,6 +11,9 @@ from flask_migrate import Migrate
 import eventlet
 import eventlet.wsgi
 
+import eventlet
+import eventlet.wsgi
+
 from functions.components import db, sess, login_manager, csrf, socketio
 from functions.helper_functions import string2list
 from functions.routes import routes

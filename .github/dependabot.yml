@@ -9,6 +9,14 @@ updates:
     directory: "src/kubedash" # Location of package manifests
     schedule:
       interval: "weekly"
+  - package-ecosystem: "pip" # See documentation for possible values
+    directory: "docker/kubedash" # Location of package manifests
+    schedule:
+      interval: "weekly"
+  - package-ecosystem: "pip" # See documentation for possible values
+    directory: "docs/build" # Location of package manifests
+    schedule:
+      interval: "weekly"
   - package-ecosystem: "gomod" # See documentation for possible values
     directory: "src/kdlogin" # Location of package manifests
     schedule:

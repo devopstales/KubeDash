@@ -38,9 +38,11 @@ def NoGlashErrorHandler(logger, error, action):
             elif error.status == 403:
                 logger.error("403 - Forbidden: User cannot %s" % action)
         else:
+            flash(action, "danger")
             logger.error("Exception: %s \n" % action)
     else:
-        logger.error("Exception: %s \n" % action)
+        flash("Exception: %s" % action, "danger")
+        logger.error("Exception: %s" % action)
 
 def ResponseHandler(message, status):
     flash(message, status)
