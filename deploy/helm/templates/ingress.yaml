@@ -8,7 +8,6 @@ metadata:
     app: kubedash
     {{- include "kubedash.labels" . | nindent 4 }}
   annotations:
-    nginx.ingress.kubernetes.io/rewrite-target: /$1
     {{- if .Values.ingress.tls.enabled }}
     nginx.ingress.kubernetes.io/ssl-redirect: "true"
     {{- end }}
@@ -18,6 +17,20 @@ metadata:
         nginx.ingress.kubernetes.io/whitelist-source-range: "{{ $ip }}{{ if ne $index $last }}, {{ end }}"
     {{- end }}
     {{- end }}
+    nginx.ingress.kubernetes.io/proxy-body-size: 10m
+    nginx.ingress.kubernetes.io/proxy-read-timeout: "3600"
+    nginx.ingress.kubernetes.io/proxy-send-timeout: "3600"
+    nginx.ingress.kubernetes.io/server-snippets: |
+      location / {
+        proxy_set_header Upgrade $http_upgrade;
+        proxy_http_version 1.1;
+        proxy_set_header X-Forwarded-Host $http_host;
+        proxy_set_header X-Forwarded-Proto $scheme;
+        proxy_set_header X-Forwarded-For $remote_addr;
+        proxy_set_header Host $host;
+        proxy_set_header Connection "upgrade";
+        proxy_cache_bypass $http_upgrade;
+      }
     {{- if .Values.ingress.tls.certManager.enabled }}
     cert-manager.io/cluster-issuer: "{{ .Values.ingress.tls.certManager.clusterIssuer }}"
     {{- end }}
@@ -42,7 +55,7 @@ spec:
     - host: "{{ .Values.ingress.url }}"
       http:
         paths:
-          - path: /(.*)
+          - path: /
             pathType: Prefix
             backend:
               service:

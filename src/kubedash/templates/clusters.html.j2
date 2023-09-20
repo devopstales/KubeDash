@@ -219,14 +219,15 @@
             k8s_server_url_valid = false;
         }
 
+        k8s_server_ca_valid = true;
         // test if certificate
-        if (k8s_server_ca.value.includes("cert") || k8s_server_ca.value.includes("pem")){
-            k8s_server_ca.classList.add("is-valid");
-            k8s_server_ca_valid = true;
-        } else {
-            k8s_server_ca.classList.add("is-invalid");
-            k8s_server_ca_valid = false;
-        }
+        //if (k8s_server_ca.value.includes("cert") || k8s_server_ca.value.includes("pem")){
+        //    k8s_server_ca.classList.add("is-valid");
+        //    k8s_server_ca_valid = true;
+        //} else {
+        //    k8s_server_ca.classList.add("is-invalid");
+        //    k8s_server_ca_valid = false;
+        //}
         
         // finale validation
         if (k8s_server_ca_valid && k8s_server_url_valid) {
