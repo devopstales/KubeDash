@@ -28,6 +28,10 @@ RUN addgroup -S -g 10001 kubedash && \
     adduser -S -u 10001 kubedash -G kubedash && \
     mkdir /tmp/kubedash && \
     chown -R kubedash:kubedash /tmp/kubedash
+RUN addgroup -S -g 10001 kubedash && \
+    adduser -S -u 10001 kubedash -G kubedash && \
+    mkdir /tmp/kubedash && \
+    chown -R kubedash:kubedash /tmp/kubedash
 
 COPY requirements.txt  /code/
 COPY entrypoint.sh /entrypoint.sh

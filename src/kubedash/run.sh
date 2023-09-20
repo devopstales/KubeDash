@@ -2,7 +2,10 @@
 
 export FLASK_DEBUG=1
 export TEMPLATES_AUTO_RELOAD=1
+export FLASK_DEBUG=1
+export TEMPLATES_AUTO_RELOAD=1
 #export KUBECONFIG=/etc/rancher/k3s/k3s.yaml
+#export FLASK_CONFIG="production" # redirect to https
 #export FLASK_CONFIG="production" # redirect to https
 export FLASK_APP="kubedash"
 
