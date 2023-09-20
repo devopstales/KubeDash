@@ -16,3 +16,9 @@ sources:
   - https://github.com/devopstales/kubedash
   - https://github.com/devopstales/helm-charts
 deprecated: false
+
+dependencies:
+- name: postgresql-ha
+  version: "15.4.0"
+  repository: "https://charts.bitnami.com/bitnami"
+  condition: postgresqlha.enabled

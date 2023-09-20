@@ -33,8 +33,8 @@ pyOpenSSL>=23.0.0
 ipython>=8.10.0 # not directly required, pinned by Snyk to avoid a vulnerability
 
 # telemetry
-opentelemetry-sdk==1.19.0
-opentelemetry-api==1.19.0
-opentelemetry-exporter-otlp-proto-http==1.19.0
+opentelemetry-sdk==1.20.0
+opentelemetry-api==1.20.0
+opentelemetry-exporter-otlp-proto-http==1.20.0
 opentelemetry-instrumentation-sqlalchemy
 opentelemetry-instrumentation-flask

@@ -37,11 +37,13 @@ COPY requirements.txt  /code/
 COPY entrypoint.sh /entrypoint.sh
 
 RUN apk -U upgrade && \
+    apk add --no-cache postgresql-libs && \
     apk add --no-cache bash gcc musl-dev linux-headers && \
-    apk --update add gcc build-base freetype-dev libpng-dev openblas-dev libffi-dev
+    apk add --no-cache --virtual .build-deps gcc build-base freetype-dev libpng-dev openblas-dev libffi-dev musl-dev postgresql-dev
 
 RUN pip install --no-cache-dir -r /code/requirements.txt && \
-    apk del gcc build-base freetype-dev libpng-dev openblas-dev libffi-dev
+    apk del gcc build-base freetype-dev libpng-dev openblas-dev libffi-dev musl-dev postgresql-dev && \
+    apk --purge del .build-deps
 
 COPY --chown=kubedash:kubedash ./kubedash /code/kubedash
 

@@ -1,20 +1,8 @@
-{{ if .Values.oidc.enabled }}
+
 apiVersion: v1
 kind: ConfigMap
 metadata:
-  name: {{ include "kubedash.fullname" . }}-oidc-config
-  labels:
-    app: kubedash
-    {{- include "kubedash.labels" . | nindent 4 }}
-data:
-  OIDC_ISSUER_URL: {{ .Values.oidc.provider.oidcUrl | quote}}
-  OIDC_SCOPE: {{ .Values.oidc.provider.oidcScopes | quote}}
-  OIDC_CALLBACK_URL: {{ .Values.oidc.provider.oidcSecret | quote}}
----
-apiVersion: v1
-kind: ConfigMap
-metadata:
-  name: {{ include "kubedash.fullname" . }}-k8s-cluster-config
+  name: {{ include "kubedash.fullname" . }}-config
   labels:
     app: kubedash
     {{- include "kubedash.labels" . | nindent 4 }}
@@ -22,6 +10,15 @@ data:
   K8S_CLUSTER_NAME: {{ .Values.cluster.name | quote }}
   K8S_API_SERVER: {{ .Values.cluster.apiUrl | quote }}
   K8S_API_CA: {{ .Values.cluster.caCert | b64enc | quote }}
+{{ if .Values.externalDatabase.enabled }}
+  EXTERNAL_DATABASE_ENABLED: {{ .Values.externalDatabase.enabled | quote }}
+  EXTERNAL_DATABASE_HOST: {{ .Values.externalDatabase.host | quote }}
+  EXTERNAL_DATABASE_DB: {{ .Values.externalDatabase.database | quote }}
+{{ end }}
+{{ if .Values.oidc.enabled }}
+  OIDC_ISSUER_URL: {{ .Values.oidc.provider.oidcUrl | quote}}
+  OIDC_SCOPE: {{ .Values.oidc.provider.oidcScopes | quote}}
+  OIDC_CALLBACK_URL: {{ .Values.oidc.provider.oidcSecret | quote}}
 {{ if not .Values.oidc.secret.useExistingSecret }}
 ---
 apiVersion: v1
@@ -34,5 +31,20 @@ metadata:
 data:
   OIDC_CLIENT_ID: {{ .Values.oidc.provider.oidcClientId | b64enc | quote }}
   OIDC_SECRET: {{ .Values.oidc.provider.oidcSecret | b64enc | quote }}
+{{ end }}
+{{ if .Values.externalDatabase.enabled }}
+{{ if not .Values.externalDatabase.secret.useExistingSecret }}
+---
+apiVersion: v1
+kind: Secret
+metadata:
+  name: {{ .Values.externalDatabase.secret.name }}
+  labels:
+    app: kubedash
+    {{- include "kubedash.labels" . | nindent 4 }}
+data:
+  EXTERNAL_DATABASE_USER: {{ .Values.externalDatabase.user | b64enc | quote }}
+  EXTERNAL_DATABASE_PASSWORD: {{ .Values.externalDatabase.password | b64enc | quote }}
+{{ end }}
 {{ end }}
 {{ end }}
