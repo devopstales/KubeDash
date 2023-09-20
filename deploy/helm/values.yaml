@@ -22,32 +22,62 @@ image:
 # -- pullsecrets
 imagePullSecrets: []
 
-# -- list of the pos's SecurityContexts
-podSecurityContext:
-  runAsNonRoot: true
-  runAsUser: 10001
-  fsGroup: 10001
-  fsGroupChangePolicy: "OnRootMismatch"
+# -- replica number - for multiple replicas you need to enable externalDatabase support
+replicas: 1
 
-# -- list of the container's SecurityContexts
-containerSecurityContext:
-  allowPrivilegeEscalation: false
-  capabilities:
-    drop: ["all"]
-
+# -- enable external postgresql support
 externalDatabase:
   enabled: false
   host: ""
   port: 5432
-  database: ""
-  user: ""
-  password: ""
+  database: "kubedash"
+  user: "kubedash-user"
+  password: "kubedash-pass"
   secret:
     # -- Name of the secret storing EXTERNAL_DATABASE_PASSWORD.
     name: "kubedash-postgresql"
     # -- Secret must provide the following variables: EXTERNAL_DATABASE_PASSWORD.
     useExistingSecret: false
 
+# -- deploy HA postgresql
+postgresqlha:
+  enabled: true
+  rbac:
+    create: true
+  persistence:
+    enabled: true
+    storageClass: default
+  postgresql:
+    database: "kubedash"
+    username: "kubedash-user"
+    password: "kubedash-pass"
+    repmgrPassword: "change-me"
+    postgresPassword: "change-me"
+  pgpool:
+    adminPassword: "change-me"
+  metrics:
+    enabled: true
+    serviceMonitor:
+      enabled: true
+# https://artifacthub.io/packages/helm/bitnami/postgresql-ha
+
+# -- k8s connection information.
+cluster:
+  # -- k8s api url
+  name: "k8s-cluster"
+  # -- k8s api url
+  apiUrl: "https://kubernetes.mydomain.intra:6443"
+  # `apiServer` is the url for kubectl
+  #   This is typically  https://api.fqdn
+  # -- k8s ca cert
+  caCert: |-
+    -----BEGIN CERTIFICATE-----
+    cert data here
+    -----END CERTIFICATE-----
+  # `caCrt` is the public / CA cert for the cluster
+  # cat /etc/kubernetes/pki/apiserver.crt
+
+# -- oidc connection information
 oidc:
   # -- Enable oidc authentication
   enabled: true
@@ -65,22 +95,6 @@ oidc:
     name: "kubedash-oidc"
     # -- Secret must provide the following variables: OIDC_CLIENT_ID and OIDC_SECRET.
     useExistingSecret: false
-
-# -- k8s connection information.
-cluster:
-  # -- k8s api url
-  name: "k8s-cluster"
-  # -- k8s api url
-  apiUrl: "https://kubernetes.mydomain.intra:6443"
-  # `apiServer` is the url for kubectl
-  #   This is typically  https://api.fqdn
-  # -- k8s ca cert
-  caCert: |-
-    -----BEGIN CERTIFICATE-----
-    cert data here
-    -----END CERTIFICATE-----
-  # `caCrt` is the public / CA cert for the cluster
-  # cat /etc/kubernetes/pki/apiserver.crt
 
 persistence:
   # -- Volumes for the pod
@@ -133,6 +147,19 @@ route:
   url: "kubedash.mydomain.intra"
   # -- Extra annotation to the OpenShift Route object
   annotations: {}
+
+# -- list of the pos's SecurityContexts
+podSecurityContext:
+  runAsNonRoot: true
+  runAsUser: 10001
+  fsGroup: 10001
+  fsGroupChangePolicy: "OnRootMismatch"
+
+# -- list of the container's SecurityContexts
+containerSecurityContext:
+  allowPrivilegeEscalation: false
+  capabilities:
+    drop: ["all"]
 
 ## Define which Nodes the Pods are scheduled on.
 ## ref: https://kubernetes.io/docs/user-guide/node-selection/

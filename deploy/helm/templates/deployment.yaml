@@ -7,7 +7,7 @@ metadata:
     {{- include "kubedash.labels" . | nindent 4 }}
     checksum/config: {{ include (print $.Template.BasePath "/configmap.yaml") . |  sha256sum | trunc 63 }}
 spec:
-  replicas: 1
+  replicas: {{ .Values.replicas }}
   strategy:
     type: Recreate
   selector:
@@ -20,8 +20,6 @@ spec:
         app: kubedash
         {{- include "kubedash.labels" . | nindent 8 }}
         checksum/config: {{ include (print $.Template.BasePath "/configmap.yaml") . |  sha256sum | trunc 63 }}
-      annotations:
-        checksum/config: {{ include (print $.Template.BasePath "/configmap.yaml") . | sha256sum | trunc 63 }}
     spec:
       {{- with .Values.imagePullSecrets }}
       imagePullSecrets:
@@ -44,6 +42,17 @@ spec:
 {{- if or (eq .Values.logLevel "DEBUG") (eq .Values.logLevel "HIGH") }}
           - name: VERBOSE_LOG
             value: "True"
+{{- end }}
+        envFrom:
+          - configMapRef: 
+              name: {{ include "kubedash.fullname" . }}-config
+{{- if .Values.oidc.enabled }}
+          - secretRef:
+              name: {{ .Values.oidc.secret.name }}
+{{- end }}
+{{- if .Values.externalDatabase.enabled }}
+          - secretRef:
+              name: {{ .Values.externalDatabase.secret.name }}
 {{- end }}
         livenessProbe:
           httpGet:
