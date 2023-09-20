@@ -2694,10 +2694,11 @@ def charts_data():
         has_chart, chart_list = k8sHelmChartListGet(session['user_role'], user_token, session['ns_select'])
         chart_data = None
         chart_name = None
-        for name, release in chart_list.items():
-            if name == selected:
-                chart_name = name
-                chart_data = release
+        if has_chart:
+            for name, release in chart_list.items():
+                if name == selected:
+                    chart_name = name
+                    chart_data = release
 
         return render_template(
             'chart-data.html.j2',

@@ -6,10 +6,6 @@
 version: 2
 updates:
   - package-ecosystem: "pip" # See documentation for possible values
-    directory: "src/kubedash" # Location of package manifests
-    schedule:
-      interval: "weekly"
-  - package-ecosystem: "pip" # See documentation for possible values
     directory: "docker/kubedash" # Location of package manifests
     schedule:
       interval: "weekly"

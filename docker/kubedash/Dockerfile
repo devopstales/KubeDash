@@ -28,13 +28,8 @@ RUN addgroup -S -g 10001 kubedash && \
     adduser -S -u 10001 kubedash -G kubedash && \
     mkdir /tmp/kubedash && \
     chown -R kubedash:kubedash /tmp/kubedash
-RUN addgroup -S -g 10001 kubedash && \
-    adduser -S -u 10001 kubedash -G kubedash && \
-    mkdir /tmp/kubedash && \
-    chown -R kubedash:kubedash /tmp/kubedash
 
 COPY requirements.txt  /code/
-COPY entrypoint.sh /entrypoint.sh
 
 RUN apk -U upgrade && \
     apk add --no-cache postgresql-libs && \
@@ -42,9 +37,10 @@ RUN apk -U upgrade && \
     apk add --no-cache --virtual .build-deps gcc build-base freetype-dev libpng-dev openblas-dev libffi-dev musl-dev postgresql-dev
 
 RUN pip install --no-cache-dir -r /code/requirements.txt && \
-    apk del gcc build-base freetype-dev libpng-dev openblas-dev libffi-dev musl-dev postgresql-dev && \
+    apk del gcc build-base freetype-dev libpng-dev openblas-dev libffi-dev musl-dev postgresql-dev llvm14-libs && \
     apk --purge del .build-deps
 
+COPY entrypoint.sh /entrypoint.sh
 COPY --chown=kubedash:kubedash ./kubedash /code/kubedash
 
 WORKDIR /code/kubedash

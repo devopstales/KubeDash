@@ -773,7 +773,7 @@ def k8sClusterRoleGet(name):
         pretty = 'true'
     try:
         api_response = api_instance.read_cluster_role(
-            name, pretty=pretty
+            name, pretty=pretty, _request_timeout=5
         )
         return True, None
     except ApiException as e:
@@ -793,7 +793,7 @@ def k8sClusterRoleCreate(name, body):
         field_manager = 'KubeDash'
     try:
         api_response = api_instance.create_cluster_role(
-            body, pretty=pretty, field_manager=field_manager
+            body, pretty=pretty, field_manager=field_manager, _request_timeout=5
         )
         return True
     except ApiException as e:
@@ -1961,12 +1961,14 @@ def k8sPodVulnsGet(username_role, user_token, ns, pod):
         return HAS_REPORT, POD_VULNS
     try:
         vulnerabilityreport_list = k8s_client.CustomObjectsApi().list_namespaced_custom_object("trivy-operator.devopstales.io", "v1", ns, "vulnerabilityreports")
-    except Exception as error:
-        ErrorHandler(logger, "error", error)
+    except ApiException as error:
         vulnerabilityreport_list = None
         if error.status != 404:
             ERROR = "k8sPodVulnsGet: %s" % error
             ErrorHandler(logger, "error", ERROR)
+    except Exception as error:
+        ErrorHandler(logger, "error", error)
+        vulnerabilityreport_list = None
 
     for po in pod_list.items:
         POD_VULNS = {}
@@ -2920,7 +2922,7 @@ def k8sHelmChartListGet(username_role, user_token, namespace):
                     "service_accounts": [sa.metadata.name for sa in sa_list],
                     "persistent_volume_claims": [pvc.metadata.name for pvc in pvc_list],
                     "values": json2yaml(secret_data['chart']["values"]),
-                    #"manifests": secret_data["manifest"],
+                    "manifests": secret_data["manifest"],
                     #"dependencies": dependencies
                 })
                 HAS_CHART = True
