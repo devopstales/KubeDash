@@ -38,3 +38,4 @@ opentelemetry-instrumentation-sqlalchemy
 opentelemetry-instrumentation-flask
 ipython>=8.10.0 # not directly required, pinned by Snyk to avoid a vulnerability
 setuptools>=65.5.1 # not directly required, pinned by Snyk to avoid a vulnerability
+gevent>=23.9.0 # not directly required, pinned by Snyk to avoid a vulnerability
