@@ -48,3 +48,4 @@ selenium>=4.8.2
 GitPython==3.1.36
 gitdb2==3.0.1
 ipython>=8.10.0 # not directly required, pinned by Snyk to avoid a vulnerability
+gevent>=23.9.0 # not directly required, pinned by Snyk to avoid a vulnerability
