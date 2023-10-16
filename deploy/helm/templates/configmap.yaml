@@ -33,6 +33,8 @@ data:
   OIDC_SECRET: {{ .Values.oidc.provider.oidcSecret | b64enc | quote }}
 {{ end }}
 {{ if .Values.externalDatabase.enabled }}
+{{ end }}
+{{ end }}
 {{ if not .Values.externalDatabase.secret.useExistingSecret }}
 ---
 apiVersion: v1
@@ -45,6 +47,4 @@ metadata:
 data:
   EXTERNAL_DATABASE_USER: {{ .Values.externalDatabase.user | b64enc | quote }}
   EXTERNAL_DATABASE_PASSWORD: {{ .Values.externalDatabase.password | b64enc | quote }}
-{{ end }}
-{{ end }}
 {{ end }}

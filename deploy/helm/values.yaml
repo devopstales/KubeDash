@@ -40,13 +40,13 @@ externalDatabase:
     useExistingSecret: false
 
 # -- deploy HA postgresql
-postgresqlha:
-  enabled: true
+postgresql-ha:
+  enabled: false
   rbac:
     create: true
   persistence:
     enabled: true
-    storageClass: default
+#    storageClass: default
   postgresql:
     database: "kubedash"
     username: "kubedash-user"
@@ -54,12 +54,20 @@ postgresqlha:
     repmgrPassword: "change-me"
     postgresPassword: "change-me"
   pgpool:
+    replicaCount: 2
     adminPassword: "change-me"
   metrics:
     enabled: true
     serviceMonitor:
-      enabled: true
+      enabled: false
 # https://artifacthub.io/packages/helm/bitnami/postgresql-ha
+
+# -- enable metrics-server
+metrics-server:
+  enabled: true
+  args:
+    - --kubelet-preferred-address-types=InternalIP
+    - --kubelet-insecure-tls
 
 # -- k8s connection information.
 cluster:
@@ -80,7 +88,7 @@ cluster:
 # -- oidc connection information
 oidc:
   # -- Enable oidc authentication
-  enabled: true
+  enabled: false
   provider:
     # -- oidc issuer url
     oidcUrl: "https://sso.mydomain.intra/auth/realms/k8s"
