@@ -18,7 +18,11 @@ sources:
 deprecated: false
 
 dependencies:
-- name: postgresql-ha
-  version: "15.4.0"
-  repository: "https://charts.bitnami.com/bitnami"
-  condition: postgresqlha.enabled
+  - name: postgresql-ha
+    version: ">=11.9.4"
+    repository: "https://charts.bitnami.com/bitnami"
+    condition: postgresql-ha.enabled
+  - name: metrics-server
+    version: 3.8.4
+    repository: https://kubernetes-sigs.github.io/metrics-server/
+    condition: metrics-server.enabled

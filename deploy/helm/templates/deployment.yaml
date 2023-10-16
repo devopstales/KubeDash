@@ -9,7 +9,14 @@ metadata:
 spec:
   replicas: {{ .Values.replicas }}
   strategy:
-    type: Recreate
+    type: RollingUpdate
+    rollingUpdate:
+      maxSurge: "100%"
+{{- if gt .Values.replicas 1.0 }}
+      maxUnavailable: "50%"
+{{- else }}
+      maxUnavailable: "100%"
+{{- end }}
   selector:
     matchLabels:
       app: kubedash
