@@ -6,6 +6,18 @@ from decimal import Decimal, InvalidOperation
 ## Helper Functions
 ##############################################################
 
+def var_test(var):
+    if isinstance(var, bool):
+        resp = var
+    elif isinstance(var, six.string_types):
+        if var.lower() in ['true']:
+            resp = True
+        else:
+            resp = False
+    else:
+        resp = False
+    return resp
+
 def get_logger(name):
     logger = logging.getLogger(name)
     logging.basicConfig(

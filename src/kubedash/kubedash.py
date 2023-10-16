@@ -15,7 +15,7 @@ import eventlet
 import eventlet.wsgi
 
 from functions.components import db, sess, login_manager, csrf, socketio
-from functions.helper_functions import string2list
+from functions.helper_functions import string2list, var_test
 from functions.routes import routes
 from functions.commands import commands
 from functions.user import UserCreate, RoleCreate, UserTest, User
@@ -142,8 +142,8 @@ def create_app(config_name="development"):
     # FlaskInstrumentor().instrument_app(app)
 
     """Database mode"""
-    EXTERNAL_DATABASE_ENABLED = os.getenv('EXTERNAL_DATABASE_ENABLED', "False")
-    if EXTERNAL_DATABASE_ENABLED == "True":
+    EXTERNAL_DATABASE_ENABLED = var_test(os.getenv('EXTERNAL_DATABASE_ENABLED', "False"))
+    if EXTERNAL_DATABASE_ENABLED:
         SQLALCHEMY_DATABASE_HOST = os.environ.get('EXTERNAL_DATABASE_HOST', "localhost")
         SQLALCHEMY_DATABASE_USER = os.environ.get('EXTERNAL_DATABASE_USER', "kubedash")
         SQLALCHEMY_DATABASE_PASSWORD = os.environ.get('EXTERNAL_DATABASE_PASSWORD', None)
