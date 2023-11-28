@@ -42,9 +42,10 @@ pytest-order>=1.0.1
 pytest-flask>=1.2.0
 responses>=0.22.0
 pytest-playwright>=0.3.1
-selenium>=4.8.2
+selenium>=4.15.1
 
 # for git-changelog
 GitPython==3.1.36
 gitdb2==3.0.1
 ipython>=8.10.0 # not directly required, pinned by Snyk to avoid a vulnerability
+werkzeug>=2.3.8 # not directly required, pinned by Snyk to avoid a vulnerability
