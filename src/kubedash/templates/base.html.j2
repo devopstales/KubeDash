@@ -330,18 +330,24 @@
             <!-- Divider -->
             <hr class="sidebar-divider">
 
-            <!-- Nav Item - Registrys -->
+            <!-- Nav Item - Plugins -->
             <li class="nav-item">
-                <a class="nav-link" href="/registry">
-                    <i class="fa-brands fa-docker"></i>
-                    <span>OCI Registrys</span></a>
-            </li>
-
-            <!-- Nav Item - Charts -->
-            <li class="nav-item">
-                <a class="nav-link" href="/charts">
-                    <i class="fa-sharp fa-solid fa-helmet-safety"></i>
-                    <span>Helm Charts</span></a>
+                <a class="nav-link collapsed" href="#" data-toggle="collapse" data-target="#collapsePlugins"
+                   aria-expanded="true" aria-controls="collapsePlugins">
+                    <i class="fas fa-fw fa-cog"></i>
+                    <span>Plugins</span>
+                </a>
+                <div id="collapsePlugins" class="collapse" aria-labelledby="headingPlugins"
+                    data-parent="#accordionSidebar">
+                    <div class="bg-white py-2 collapse-inner rounded">
+                        {% if config.plugins["registry"] %}
+                        <a class="collapse-item" href="/registry">OCI Registrys</a>
+                        {% endif %}
+                        {% if config.plugins["helm"] %}
+                        <a class="collapse-item" href="/charts">Helm Charts</a>
+                        {% endif %}
+                    </div>
+                </div>
             </li>
 
             <!-- Divider -->
