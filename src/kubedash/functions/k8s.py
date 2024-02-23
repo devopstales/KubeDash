@@ -258,6 +258,8 @@ def k8sWorkloadList(username_role, user_token, namespace):
 ##############################################################
 
 def k8sClientConfigGet(username_role, user_token):
+    import urllib3
+    urllib3.disable_warnings()
     with tracer.start_as_current_span("load-client-configs") if tracer else nullcontext() as span:
         if tracer and span.is_recording():
             span.set_attribute("user.role", username_role)
