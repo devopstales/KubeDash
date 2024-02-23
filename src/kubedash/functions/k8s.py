@@ -287,7 +287,7 @@ def k8sClientConfigGet(username_role, user_token):
                 if k8s_server_ca:
                     file = open("CA.crt", "w+")
                     file.write( k8s_server_ca )
-                    file.close 
+                    file.close
 
                 configuration = k8s_client.Configuration()
                 configuration.host = k8s_server_url
@@ -998,7 +998,7 @@ def k8sListNodes(username_role, user_token):
     except Exception as error:
         ErrorHandler(logger, "CannotConnect", "k8sListNodes: %s" % error)
         return node_list, "CannotConnect"
-    
+
 def k8sNodesListGet(username_role, user_token):
     k8sClientConfigGet(username_role, user_token)
     nodes, error = k8sListNodes(username_role, user_token)
