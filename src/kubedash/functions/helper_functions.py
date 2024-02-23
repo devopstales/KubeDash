@@ -24,6 +24,7 @@ def get_logger(name):
             level="INFO",
             format='[%(asctime)s] %(name)s        %(levelname)s %(message)s'
         )
+    logging.captureWarnings(True)
     return logger
 
 def ErrorHandler(logger, error, action):
