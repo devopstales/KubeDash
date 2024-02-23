@@ -212,13 +212,23 @@
                         {% for co_type, co_status, co_reason, co_message in node_data.conditions|reverse %}
                             <tr>
                                 <td>{{ co_type }}</th>
-                                <td>
-                                {% if co_status == "True" %}
-                                    <span class="badge badge-tag badge-success">{{ co_status }}</span>
+                                {% if co_type == "Ready" %}
+                                    <td>
+                                    {% if co_status == "True" %}
+                                        <span class="badge badge-tag badge-success">{{ co_status }}</span>
+                                    {% else %}
+                                        <span class="badge badge-tag badge-danger">{{ co_status }}</span>
+                                    {% endif %}
+                                    </td>
                                 {% else %}
-                                    <span class="badge badge-tag badge-danger">{{ co_status }}</span>
+                                    <td>
+                                    {% if co_status == "True" %}
+                                        <span class="badge badge-tag badge-danger">{{ co_status }}</span>
+                                    {% else %}
+                                        <span class="badge badge-tag badge-success">{{ co_status }}</span>
+                                    {% endif %}
+                                    </td>
                                 {% endif %}
-                                </td>
                                 <td>{{ co_reason }}</th>
                                 <td>{{ co_message }}</td>
                             </tr>
