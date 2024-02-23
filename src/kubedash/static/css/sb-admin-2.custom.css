@@ -111,3 +111,21 @@ Code output
 code {
     max-height: 1000px;
 }
+
+/*
+Docker registry notags
+*/
+
+h2.center {
+    text-align: center;
+}
+
+h4.center {
+    text-align: center;
+}
+
+img.center {
+    display: block;
+    margin-left: auto;
+    margin-right: auto;
+}
