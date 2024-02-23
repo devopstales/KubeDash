@@ -203,6 +203,14 @@ def create_app(config_name="development"):
 app = create_app()
 
 ##############################################################
+## Plugin configs
+##############################################################
+app.config["plugins"] = {
+        "registry": var_test(os.getenv('PLUGIN_REGISTRY_ENABLED', "False")),
+        "helm": var_test(os.getenv('PLUGIN_HELM_ENABLED', "True")),
+    }
+
+##############################################################
 ## Liveness and redyes probe
 ##############################################################
 app.register_blueprint(healthz, url_prefix="/healthz")
