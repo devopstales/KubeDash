@@ -38,10 +38,10 @@ def ErrorHandler(logger, error, action):
                 logger.error("403 - Forbidden: User cannot %s" % action)
         else:
             flash("Exception: %s" % action, "danger")
-            logger.error("Exception: %s \n" % action)
+            logger.error("Exception: %s \n" % error)
     else:
         flash("Exception: %s" % action, "danger")
-        logger.error("Exception: %s \n" % action)
+        logger.error("Exception: %s \n" % error)
 
 def NoGlashErrorHandler(logger, error, action):
     if hasattr(error, '__iter__'):
