@@ -1529,7 +1529,7 @@ def profile():
             flash("Wrong Current Password", "danger")
 
     return render_template(
-        'uer-profile.html.j2',
+        'user-profile.html.j2',
         user = user,
         user_role = role.name,
     )
