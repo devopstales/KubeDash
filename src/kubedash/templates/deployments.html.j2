@@ -39,11 +39,18 @@
                     {% else %}
                       <tr>
                     {% endif %}
-                        <td>{{ d.name }}</td>
+                        <td>
+                          <form action="/deployments/data" method="POST">
+                            <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+                            <input type="hidden" name="ns_select" value="{{ session['ns_select'] }}" />
+                            <input type="hidden" name="selected" value="{{ d.name }}" />
+                            <a href="javascript:;" onclick="parentNode.submit();">{{ d.name }}</a>
+                          </form>
+                        </td>
                         <td>{{ d.desired }}/{{ d.ready }}</td>
                         <td>
                         {% for label in d.labels %} 
-                            <span class="badge badge-secondary">{{ label }}</span>
+                            <span class="badge badge-tag badge-secondary">{{ label }}</span>
                             {% if not loop.last %}<br>{% endif %}
                         {% endfor %}
                         </td>

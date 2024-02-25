@@ -8,7 +8,16 @@ metadata:
     app: kubedash
     {{- include "kubedash.labels" . | nindent 4 }}
   annotations:
-    {{- if eq .Values.ingress.ingressClassName "nginx" }}
+    {{- if .Values.ingress.tls.enabled }}
+    nginx.ingress.kubernetes.io/ssl-redirect: "true"
+    {{- end }}
+    {{- if .Values.ingress.whitelist.enabled }}
+    {{- $last := sub (len .Values.ingress.whitelist.ips) 1 }}
+    {{- range $index, $ip := .Values.ingress.whitelist.ips }}
+        nginx.ingress.kubernetes.io/whitelist-source-range: "{{ $ip }}{{ if ne $index $last }}, {{ end }}"
+    {{- end }}
+    {{- end }}
+    nginx.ingress.kubernetes.io/proxy-body-size: 10m
     nginx.ingress.kubernetes.io/proxy-read-timeout: "3600"
     nginx.ingress.kubernetes.io/proxy-send-timeout: "3600"
     nginx.ingress.kubernetes.io/server-snippets: |
@@ -22,26 +31,16 @@ metadata:
         proxy_set_header Connection "upgrade";
         proxy_cache_bypass $http_upgrade;
       }
-    {{- if .Values.ingress.tls.enabled }}
-    nginx.ingress.kubernetes.io/ssl-redirect: "true"
-    {{- end }}
-    {{- if .Values.ingress.whitelist.enabled }}
-    {{- $last := sub (len .Values.ingress.whitelist.ips) 1 }}
-    {{- range $index, $ip := .Values.ingress.whitelist.ips }}
-        nginx.ingress.kubernetes.io/whitelist-source-range: "{{ $ip }}{{ if ne $index $last }}, {{ end }}"
-    {{- end }}
-    {{- end }}
-    {{- end }}
     {{- if .Values.ingress.tls.certManager.enabled }}
-    {{- if .Values.ingress.tls.certManager.clusterIssuer }}
     cert-manager.io/cluster-issuer: "{{ .Values.ingress.tls.certManager.clusterIssuer }}"
-    {{- end }}
     {{- end }}
 {{- with .Values.ingress.annotations }}
 {{ toYaml . | indent 4 }}
 {{- end }}
 spec:
-  ingressClassName: {{ .Values.ingress.ingressClassName }}
+  {{- if and .Values.ingress.className (semverCompare ">=1.18-0" .Capabilities.KubeVersion.GitVersion) }}
+  ingressClassName: {{ .Values.ingress.className }}
+  {{- end }}
 {{- if .Values.ingress.tls.enabled }}
   tls:
   - hosts:

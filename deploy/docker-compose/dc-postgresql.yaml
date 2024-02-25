@@ -1,0 +1,22 @@
+version: '3'
+
+services:
+  postgresql:
+    image: postgres:13.12
+    environment:
+      POSTGRES_DB: kubedash
+      POSTGRES_USER: kubedash
+      POSTGRES_PASSWORD: kubedash
+      PGDATA: /var/lib/postgresql/data/pgdata
+      TZ: Europe/Budapest
+    volumes:
+      - postgresql-data:/var/lib/postgresql/data
+    ports:
+      - 5432:5432
+    logging:
+      options:
+        max-size: "10k"
+        max-file: "3"
+
+volumes:
+  postgresql-data: {}

@@ -5,15 +5,20 @@ from flask import Flask
 from flask_talisman import Talisman
 from flask_healthz import healthz, HealthError
 from sqlalchemy_utils import database_exists
+from sqlalchemy import create_engine, inspect
 from flask_migrate import Migrate
 
 import eventlet
 import eventlet.wsgi
 
-from functions.components import db, login_manager, csrf, socketio
+from functions.components import db, sess, login_manager, csrf, socketio
+from functions.helper_functions import string2list, var_test
 from functions.routes import routes
 from functions.commands import commands
-from functions.user import UserCreate, RoleCreate, UserTest
+from functions.user import UserCreate, RoleCreate, UserTest, User
+from functions.sso import SSOServerTest, SSOServerCreate, SSOServerUpdate
+from functions.k8s import k8sServerConfigGet, k8sServerConfigCreate, k8sServerConfigUpdate, \
+k8sUserRoleTemplateListGet, k8sUserClusterRoleTemplateListGet, k8sClusterRolesAdd
 from config import app_config
 
 from opentelemetry.instrumentation.flask import FlaskInstrumentor
@@ -60,10 +65,57 @@ def connect_database():
         return True
     else:
         return False
+    
+def init_db_test(SQLALCHEMY_DATABASE_URI):
+    engine = create_engine(SQLALCHEMY_DATABASE_URI)
+    if inspect(engine).has_table("alembic_version"):
+        return True
+    else:
+        return False
+    
+def oidc_init():
+    # https://github.com/requests/requests-oauthlib/issues/387
+    os.environ['OAUTHLIB_RELAX_TOKEN_SCOPE'] = "1"
+    OIDC_ISSUER_URL = os.environ.get('OIDC_ISSUER_URL', None)
+    OIDC_CLIENT_ID = os.environ.get('OIDC_CLIENT_ID', None)
+    OIDC_SECRET = os.environ.get('OIDC_SECRET', None)
+    OIDC_SCOPE = os.environ.get('OIDC_SCOPE', None)
+    OIDC_CALLBACK_URL = os.environ.get('OIDC_CALLBACK_URL', None)
+    if OIDC_ISSUER_URL and OIDC_CLIENT_ID and OIDC_SECRET and OIDC_SCOPE and OIDC_CALLBACK_URL:
+        oidc_test, OIDC_ISSUER_URL_OLD = SSOServerTest()
+        if oidc_test:
+            SSOServerUpdate(OIDC_ISSUER_URL_OLD, OIDC_ISSUER_URL, OIDC_CLIENT_ID, OIDC_SECRET, OIDC_CALLBACK_URL, string2list(OIDC_SCOPE))
+            logger.info("OIDC Provider updated")
+        else:
+            SSOServerCreate(OIDC_ISSUER_URL, OIDC_CLIENT_ID, OIDC_SECRET, OIDC_CALLBACK_URL, string2list(OIDC_SCOPE))
+            logger.info("OIDC Provider created")
+
+def k8s_config_int():
+    K8S_CLUSTER_NAME = os.environ.get('K8S_CLUSTER_NAME', "k8s-main")
+    K8S_API_SERVER = os.environ.get('K8S_API_SERVER', None)
+    K8S_API_CA = os.environ.get('K8S_API_CA', None) # base64 encoded
+    if K8S_API_SERVER and K8S_API_CA:
+        k8sConfig = k8sServerConfigGet()
+        if k8sConfig is None:
+            k8sServerConfigCreate(K8S_API_SERVER, K8S_CLUSTER_NAME, K8S_API_CA)
+            logger.info("Kubernetes Config created")
+        else:
+            k8sServerConfigUpdate(k8sConfig.k8s_context, K8S_API_SERVER, K8S_CLUSTER_NAME, K8S_API_CA)
+            logger.info("Kubernetes Config updated")
+
+def k8s_roles_init():
+    user_role_template_list = k8sUserRoleTemplateListGet("Admin", None)
+    user_clusterRole_template_list = k8sUserClusterRoleTemplateListGet("Admin", None)
+
+    if not bool(user_clusterRole_template_list) or not bool(user_role_template_list):
+        logger.info("Kubernetes Roles created")
+        k8sClusterRolesAdd()
 
 def create_app(config_name="development"):
+    """Init App"""
     app = Flask(__name__, static_url_path='', static_folder='static')
 
+    """Init Logger"""
     global logger
     logger=logging.getLogger()
     logging.basicConfig(
@@ -71,6 +123,7 @@ def create_app(config_name="development"):
             format='[%(asctime)s] %(name)s        %(levelname)s %(message)s'
         )
 
+    """App config"""
     if os.getenv('FLASK_CONFIG') == "production":
         config_name = "production"
         app.config['SECRET_KEY'] = os.urandom(12).hex()
@@ -80,24 +133,56 @@ def create_app(config_name="development"):
     logger.info("Running in %s mode" % config_name)
 
     app.config.from_object(app_config[config_name])
+    app.config['SESSION_SQLALCHEMY'] = db
+
+    """Init FlaskInstrumentor"""
     # FlaskInstrumentor().instrument_app(app)
 
+    """Database mode"""
+    EXTERNAL_DATABASE_ENABLED = var_test(os.getenv('EXTERNAL_DATABASE_ENABLED', "False"))
+    if EXTERNAL_DATABASE_ENABLED:
+        SQLALCHEMY_DATABASE_HOST = os.environ.get('EXTERNAL_DATABASE_HOST', "localhost")
+        SQLALCHEMY_DATABASE_USER = os.environ.get('EXTERNAL_DATABASE_USER', "kubedash")
+        SQLALCHEMY_DATABASE_PASSWORD = os.environ.get('EXTERNAL_DATABASE_PASSWORD', None)
+        SQLALCHEMY_DATABASE_DB = os.environ.get('EXTERNAL_DATABASE_DB', "kubedash")
+        if SQLALCHEMY_DATABASE_USER and SQLALCHEMY_DATABASE_PASSWORD and SQLALCHEMY_DATABASE_HOST and SQLALCHEMY_DATABASE_DB:
+            SQLALCHEMY_DATABASE_URI = "postgresql://%s:%s@%s/%s" % (SQLALCHEMY_DATABASE_USER, SQLALCHEMY_DATABASE_PASSWORD, SQLALCHEMY_DATABASE_HOST, SQLALCHEMY_DATABASE_DB)
+            app.config['SQLALCHEMY_DATABASE_URI'] = SQLALCHEMY_DATABASE_URI
+        else:
+            basedir = os.path.abspath(os.path.dirname(__file__))
+            SQLALCHEMY_DATABASE_URI = "sqlite:///"+basedir+"/database/"+config_name+".db"
+    else:
+        basedir = os.path.abspath(os.path.dirname(__file__))
+        SQLALCHEMY_DATABASE_URI = "sqlite:///"+basedir+"/database/"+config_name+".db"
+
+
+    """Init session"""
+    sess.init_app(app)
+
+    """Init DB"""
     migrate = Migrate(app, db)
     db.init_app(app)
-    basedir = os.path.abspath(os.path.dirname(__file__))
-    if database_exists("sqlite:///"+basedir+"/database/"+config_name+".db"):
+    if database_exists(SQLALCHEMY_DATABASE_URI):
         with app.app_context():
-            SQLAlchemyInstrumentor().instrument(engine=db.engine)
-            db_init()
+            if init_db_test(SQLALCHEMY_DATABASE_URI):
+                SQLAlchemyInstrumentor().instrument(engine=db.engine)
+                db_init()
+                oidc_init()
+                k8s_config_int()
+                k8s_roles_init()
 
+    """Init Logging managger"""
     login_manager.init_app(app)
     login_manager.login_view = "routes.login"
     login_manager.session_protection = "strong"
 
+    """Init CSRF"""
     csrf.init_app(app)
 
-    socketio.init_app(app, async_mode=None)
+    """Init SocketIO"""
+    socketio.init_app(app)
 
+    """Init Talisman"""
     talisman = Talisman(app, content_security_policy=csp)
     ##############################################################
     ## Custom jinja2 filter
@@ -115,6 +200,14 @@ def create_app(config_name="development"):
 app = create_app()
 
 ##############################################################
+## Plugin configs
+##############################################################
+app.config["plugins"] = {
+        "registry": var_test(os.getenv('PLUGIN_REGISTRY_ENABLED', "False")),
+        "helm": var_test(os.getenv('PLUGIN_HELM_ENABLED', "True")),
+    }
+
+##############################################################
 ## Liveness and redyes probe
 ##############################################################
 app.register_blueprint(healthz, url_prefix="/healthz")
@@ -127,7 +220,7 @@ def readiness():
         connect_database()
     except Exception:
         raise HealthError("Can't connect to the database")
-    
+
 app.config.update(
     HEALTHZ = {
         "live":  app.name + ".liveness",
@@ -140,5 +233,8 @@ logging.getLogger("werkzeug").addFilter(NoSocketIoGet())
 logging.getLogger("werkzeug").addFilter(NoSocketIoPost())
 
 if __name__ == '__main__':
-    os.environ['OAUTHLIB_RELAX_TOKEN_SCOPE'] = "1"
-    eventlet.wsgi.server(eventlet.listen(('', 8000)), app)
+    if os.getenv('FLASK_CONFIG') == "production":
+        eventlet.wsgi.server(eventlet.listen(('', 8000)), app, debug=False)
+    else:
+        eventlet.wsgi.server(eventlet.listen(('', 8000)), app, debug=True)
+

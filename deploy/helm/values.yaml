@@ -19,18 +19,90 @@ image:
   # -- The docker image tag to use
   tag: 2.0.0
 
-# -- list of the pos's SecurityContexts
-podSecurityContext:
-  runAsNonRoot: true
-  runAsUser: 10001
-  fsGroup: 10001
-  fsGroupChangePolicy: "OnRootMismatch"
+# -- pullsecrets
+imagePullSecrets: []
 
-# -- list of the container's SecurityContexts
-containerSecurityContext:
-  allowPrivilegeEscalation: false
-  capabilities:
-    drop: ["all"]
+# -- replica number - for multiple replicas you need to enable externalDatabase support
+replicas: 1
+
+# -- enable external postgresql support
+externalDatabase:
+  enabled: false
+  host: ""
+  port: 5432
+  database: "kubedash"
+  user: "kubedash-user"
+  password: "kubedash-pass"
+  secret:
+    # -- Name of the secret storing EXTERNAL_DATABASE_PASSWORD.
+    name: "kubedash-postgresql"
+    # -- Secret must provide the following variables: EXTERNAL_DATABASE_PASSWORD.
+    useExistingSecret: false
+
+# -- deploy HA postgresql
+postgresql-ha:
+  enabled: false
+  rbac:
+    create: true
+  persistence:
+    enabled: true
+#    storageClass: default
+  postgresql:
+    database: "kubedash"
+    username: "kubedash-user"
+    password: "kubedash-pass"
+    repmgrPassword: "change-me"
+    postgresPassword: "change-me"
+  pgpool:
+    replicaCount: 2
+    adminPassword: "change-me"
+  metrics:
+    enabled: true
+    serviceMonitor:
+      enabled: false
+# https://artifacthub.io/packages/helm/bitnami/postgresql-ha
+
+# -- enable metrics-server
+metrics-server:
+  enabled: true
+  args:
+    - --kubelet-preferred-address-types=InternalIP
+    - --kubelet-insecure-tls
+
+# -- k8s connection information.
+cluster:
+  # -- k8s api url
+  name: "k8s-cluster"
+  # -- k8s api url
+  apiUrl: "https://kubernetes.mydomain.intra:6443"
+  # `apiServer` is the url for kubectl
+  #   This is typically  https://api.fqdn
+  # -- k8s ca cert
+  caCert: |-
+    -----BEGIN CERTIFICATE-----
+    cert data here
+    -----END CERTIFICATE-----
+  # `caCrt` is the public / CA cert for the cluster
+  # cat /etc/kubernetes/pki/apiserver.crt
+
+# -- oidc connection information
+oidc:
+  # -- Enable oidc authentication
+  enabled: false
+  provider:
+    # -- oidc issuer url
+    oidcUrl: "https://sso.mydomain.intra/auth/realms/k8s"
+    # -- oidc scope
+    oidcScopes: "openid email"
+    # -- oidc client id
+    oidcClientId: ""
+    # -- oidc client secret
+    oidcSecret: ""
+  secret:
+    # -- Name of the secret storing OIDC_CLIENT_ID and OIDC_SECRET.
+    name: "kubedash-oidc"
+    # -- Secret must provide the following variables: OIDC_CLIENT_ID and OIDC_SECRET.
+    useExistingSecret: false
 
 persistence:
   # -- Volumes for the pod
@@ -53,8 +125,8 @@ persistence:
 ingress:
   # -- Enable Ingress object creation
   enabled: true
-  # -- Ingress class
-  ingressClassName: nginx
+  # -- Ingress class name
+  className: "nginx"
   # -- URL of the Ingress object
   url: "kubedash.mydomain.intra"
   # -- Extra annotation to the Ingress object
@@ -83,6 +155,19 @@ route:
   url: "kubedash.mydomain.intra"
   # -- Extra annotation to the OpenShift Route object
   annotations: {}
+
+# -- list of the pos's SecurityContexts
+podSecurityContext:
+  runAsNonRoot: true
+  runAsUser: 10001
+  fsGroup: 10001
+  fsGroupChangePolicy: "OnRootMismatch"
+
+# -- list of the container's SecurityContexts
+containerSecurityContext:
+  allowPrivilegeEscalation: false
+  capabilities:
+    drop: ["all"]
 
 ## Define which Nodes the Pods are scheduled on.
 ## ref: https://kubernetes.io/docs/user-guide/node-selection/

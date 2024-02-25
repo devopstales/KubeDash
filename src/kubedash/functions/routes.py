@@ -9,7 +9,8 @@ from datetime import datetime
 from functions.helper_functions import get_logger, email_check
 from functions.sso import SSOSererGet, get_auth_server_info, SSOServerUpdate, SSOServerCreate
 from functions.user import User, UsersRoles, Role, UserUpdate, UserCreate, UserDelete, \
-    SSOUserCreate, SSOTokenUpdate, SSOTokenGet, UserUpdatePassword, KubectlConfigStore, KubectlConfig
+    SSOUserCreate, SSOTokenUpdate, SSOTokenGet, SSOGroupCreateFromList, SSOGroupsList, SSOGroupsMemberList, \
+    UserUpdatePassword, KubectlConfigStore, KubectlConfig
 from functions.k8s import *
 from functions.registry import *
 
@@ -53,23 +54,23 @@ def health():
     resp.status_code = 200
     return resp
 
-@routes.app_errorhandler(404)
-def handle_404(e):
+@routes.errorhandler(404)
+def page_not_found404(e):
     return render_template('404.html.j2'), 404
 
-@routes.app_errorhandler(400)
-def handle_400(e):
+@routes.errorhandler(400)
+def page_not_found400(e):
     logger.error(e.description)
     return render_template(
         '400.html.j2',
         description = e.description,
         ), 400
 
-@routes.app_errorhandler(500)
-def handle_500(e):
+@routes.errorhandler(500)
+def page_not_found500(e):
     logger.error(e.description)
     return render_template(
-        '400.html.j2',
+        '500.html.j2',
         description = e.description,
         ), 500
 
@@ -77,6 +78,14 @@ def handle_500(e):
 def add_header(response):
     response.headers['Access-Control-Allow-Origin'] = request.root_url.rstrip(request.root_url[-1])
     return response
+
+@routes.after_request
+def adding_header_content(head):
+    head.headers["Cache-Control"] = "no-cache, no-store, must-revalidate"
+    head.headers["Pragma"] = "no-cache"
+    head.headers["Expires"] = "0"
+    head.headers['Cache-Control'] = 'public, max-age=0'
+    return head
 ##############################################################
 ## Login
 ##############################################################
@@ -372,12 +381,13 @@ def callback():
 
         if (
             request.url.startswith("http://") and
+            "HTTP_X_FORWARDED_PROTO" in request.environ and
             request.environ["HTTP_X_FORWARDED_PROTO"] == "https"
         ):
             request_url = request.url.replace("http", "https")
         else:
             request_url = request.url
-        print("Request URL %s" % request_url)
+        logger.info("Request URL %s" % request_url)
 
         token = oauth.fetch_token(
             token_url,
@@ -423,6 +433,7 @@ def callback():
                     logger.info("Answer from clinet: %s" % x.text)
             except:
                 pass
+## Kubectl config end
 
         email = user_data['email']
         username = user_data["preferred_username"]
@@ -431,9 +442,11 @@ def callback():
 
         if user is None:
             SSOUserCreate(username, email, user_token, "OpenID")
+            SSOGroupCreateFromList(username, user_data["groups"])
             user = User.query.filter_by(username=username, user_type = "OpenID").first()
         else:
             SSOTokenUpdate(username, user_token)
+            SSOGroupCreateFromList(username, user_data["groups"])
 
         user_role = UsersRoles.query.filter_by(user_id=user.id).first()
         role = Role.query.filter_by(id=user_role.role_id).first()
@@ -720,18 +733,31 @@ def nodes_data():
 ## Namespaces
 ##############################################################
 
-@routes.route("/namespaces")
+@routes.route("/namespaces", methods=['GET', 'POST'])
 @login_required
 def namespaces():
+    selected = None
     if session['user_type'] == "OpenID":
         user_token = session['oauth_token']
     else:
         user_token = None
 
-    namespace_list = k8sNamespacesGet(session['user_role'], user_token)
+    if request.method == 'POST':
+        selected = request.form.get('selected')
+
+    ns_list = k8sNamespacesGet(session['user_role'], user_token)
+    namespace_list = []
+    for namespace in ns_list:
+        WORKLOAD_LIST = k8sWorkloadList(session['user_role'], user_token, namespace["name"])
+        namespace["live"] = 0
+        for WORKLOAD in WORKLOAD_LIST:
+            if WORKLOAD["replicas"] > 0:
+                namespace["live"] += WORKLOAD["replicas"]
+        namespace_list.append(namespace)
 
     return render_template(
         'namespaces.html.j2',
+        selected = selected,
         namespace_list = namespace_list,
     )
 
@@ -763,6 +789,43 @@ def namespaces_delete():
             user_token = None
 
         k8sNamespaceDelete(session['user_role'], user_token, namespace)
+        return redirect(url_for('routes.namespaces'))
+    else:
+        return redirect(url_for('routes.namespaces'))
+
+@routes.route("/namespaces/scale", methods=['GET', 'POST'])
+@login_required
+def namespaces_scale():
+    if request.method == 'POST':
+        namespace = request.form['namespace']
+        action = request.form['action']
+
+        if session['user_type'] == "OpenID":
+            user_token = session['oauth_token']
+        else:
+            user_token = None
+
+        WORKLOAD_LIST = k8sWorkloadList(session['user_role'], user_token, namespace)
+        for WORKLOAD in WORKLOAD_LIST:
+            if action == "down":
+                if WORKLOAD["type"] == "statefulset":
+                    k8sStatefulSetPatchAnnotation(session['user_role'], user_token, WORKLOAD["namespace"], WORKLOAD["name"], WORKLOAD["replicas"])
+                    k8sStatefulSetPatchReplica(session['user_role'], user_token, WORKLOAD["namespace"], WORKLOAD["name"], 0)
+                if WORKLOAD["type"] == "deployment":
+                    k8sDeploymentsPatchAnnotation(session['user_role'], user_token, WORKLOAD["namespace"], WORKLOAD["name"], WORKLOAD["replicas"])
+                    k8sDeploymentsPatchReplica(session['user_role'], user_token, WORKLOAD["namespace"], WORKLOAD["name"], 0)
+                if WORKLOAD["type"] == "daemonset":
+                    body = {"spec": {"template": {"spec": {"nodeSelector": {"non-existing": "true"}}}}}
+                    k8sDaemonsetPatch(session['user_role'], user_token, WORKLOAD["namespace"], WORKLOAD["name"], body)
+            else:
+                if WORKLOAD["type"] == "statefulset":
+                    k8sStatefulSetPatchReplica(session['user_role'], user_token, WORKLOAD["namespace"], WORKLOAD["name"], WORKLOAD["original-replicas"])
+                if WORKLOAD["type"] == "deployment":
+                    k8sDeploymentsPatchReplica(session['user_role'], user_token, WORKLOAD["namespace"], WORKLOAD["name"], WORKLOAD["original-replicas"])
+                if WORKLOAD["type"] == "daemonset":
+                    body = [{"op": "remove", "path": "/spec/template/spec/nodeSelector/non-existing"}]
+                    k8sDaemonsetPatch(session['user_role'], user_token, WORKLOAD["namespace"], WORKLOAD["name"], body)
+
         return redirect(url_for('routes.namespaces'))
     else:
         return redirect(url_for('routes.namespaces'))
@@ -1036,6 +1099,48 @@ def statefulsets():
         namespaces = namespace_list,
     )
 
+@routes.route('/statefulsets/data', methods=['GET', 'POST'])
+@login_required
+def statefulsets_data():
+    if request.method == 'POST':
+        selected = request.form.get('selected')
+        session['ns_select'] = request.form.get('ns_select')
+
+        if session['user_type'] == "OpenID":
+            user_token = session['oauth_token']
+        else:
+            user_token = None
+
+        statefulset_list = k8sStatefulSetsGet(session['user_role'], user_token, session['ns_select'])
+        statefulset_data = None
+        for statefulset in statefulset_list:
+            if statefulset["name"] == selected:
+                statefulset_data = statefulset
+
+        return render_template(
+            'statefulsets-data.html.j2',
+            statefulset_data = statefulset_data,
+        )
+    else:
+        return redirect(url_for('routes.login'))
+        
+@routes.route('/statefulsets/scale', methods=['GET', 'POST'])
+@login_required
+def statefulsets_scale():
+    if request.method == 'POST':
+        replicas = request.form.get('replica_number')
+        selected = request.form.get('selected')
+
+        if session['user_type'] == "OpenID":
+            user_token = session['oauth_token']
+        else:
+            user_token = None
+
+        scale_status = k8sStatefulSetPatchReplica(session['user_role'], user_token, session['ns_select'], selected, replicas)
+        return redirect(url_for('routes.statefulsets_data'), code=307)
+    else:
+        return redirect(url_for('routes.login'))
+
 ##############################################################
 ## Daemonsets
 ##############################################################
@@ -1067,6 +1172,57 @@ def daemonsets():
         selected = selected,
     )
 
+@routes.route('/daemonsets/data', methods=['GET', 'POST'])
+@login_required
+def daemonsets_data():
+    if request.method == 'POST':
+        session['ns_select'] = request.form.get('ns_select')
+        selected = request.form.get('selected')
+
+        if session['user_type'] == "OpenID":
+            user_token = session['oauth_token']
+        else:
+            user_token = None
+
+        daemonset_list = k8sDaemonSetsGet(session['user_role'], user_token, session['ns_select'])
+        daemonset_data = None
+        for daemonset in daemonset_list:
+            if daemonset["name"] == selected:
+                daemonset_data = daemonset
+
+        return render_template(
+            'daemonsets-data.html.j2',
+            daemonset_data = daemonset_data,
+        )
+    else:
+        return redirect(url_for('routes.login'))
+    
+@routes.route('/daemonset/scale', methods=['GET', 'POST'])
+@login_required
+def daemonsets_scale():
+    if request.method == 'POST':
+        replicas = request.form.get('replica_number')
+        selected = request.form.get('selected')
+
+        if session['user_type'] == "OpenID":
+            user_token = session['oauth_token']
+        else:
+            user_token = None
+
+        if replicas == str(0):
+            body = {"spec": {"template": {"spec": {"nodeSelector": {"non-existing": "true"}}}}}
+        elif replicas == str(1):
+            body = [{"op": "remove", "path": "/spec/template/spec/nodeSelector/non-existing"}]
+        else:
+            body = None
+
+        if body is not None:
+            scale_status = k8sDaemonsetPatch(session['user_role'], user_token, session['ns_select'], selected, body)
+
+        return redirect(url_for('routes.daemonsets_data'), code=307)
+    else:
+        return redirect(url_for('routes.login'))
+
 ##############################################################
 ## Deployments
 ##############################################################
@@ -1097,6 +1253,48 @@ def deployments():
         deployments = deployments_list,
         namespaces = namespace_list,
     )
+
+@routes.route('/deployments/data', methods=['GET', 'POST'])
+@login_required
+def deployments_data():
+    if request.method == 'POST':
+        selected = request.form.get('selected')
+        session['ns_select'] = request.form.get('ns_select')
+
+        if session['user_type'] == "OpenID":
+            user_token = session['oauth_token']
+        else:
+            user_token = None
+
+        deployments_list = k8sDeploymentsGet(session['user_role'], user_token, session['ns_select'])
+        deployment_data = None
+        for deployment in deployments_list:
+            if deployment["name"] == selected:
+                deployment_data = deployment
+
+        return render_template(
+            'deployment-data.html.j2',
+            deployment_data = deployment_data,
+        )
+    else:
+        return redirect(url_for('routes.login'))
+    
+@routes.route('/deployments/scale', methods=['GET', 'POST'])
+@login_required
+def deployments_scale():
+    if request.method == 'POST':
+        replicas = request.form.get('replica_number')
+        selected = request.form.get('selected')
+
+        if session['user_type'] == "OpenID":
+            user_token = session['oauth_token']
+        else:
+            user_token = None
+
+        scale_status = k8sDeploymentsPatchReplica(session['user_role'], user_token, session['ns_select'], selected, replicas)
+        return redirect(url_for('routes.deployments_data'), code=307)
+    else:
+        return redirect(url_for('routes.login'))
 
 ##############################################################
 ## ReplicaSets
@@ -1194,11 +1392,31 @@ logging.getLogger('engineio').setLevel(logging.ERROR)
 @login_required
 def pods_logs():
     if request.method == 'POST':
-        session['ns_select'] = request.form.get('ns_select')
+        po_name = request.form.get('po_name')
+        if request.form.get('ns_select'):
+            session['ns_select'] = request.form.get('ns_select')
+
+        if session['user_type'] == "OpenID":
+            user_token = session['oauth_token']
+        else:
+            user_token = None
+
         logger.info("async_mode: %s" % socketio.async_mode)
+        pod_containers, pod_init_containers = k8sPodGetContainers(session['user_role'], user_token, session['ns_select'], po_name)
+        if request.form.get('container_select'):
+            container_select = request.form.get('container_select')
+        else:
+            if pod_containers:
+                container_select = pod_containers[0]
+            else:
+                container_select = None
+
         return render_template(
             'pod-logs.html.j2', 
-            po_name = request.form.get('po_name'), 
+            po_name = po_name,
+            container_select = container_select,
+            pod_containers = pod_containers,
+            pod_init_containers = pod_init_containers,
             async_mode = socketio.async_mode
         )
     else:
@@ -1206,18 +1424,18 @@ def pods_logs():
 
 @socketio.on("connect", namespace="/log")
 @authenticated_only
-def connect():
-    socketio.emit('response', {'data': 'Connected'}, namespace="/log")
+def log_connect():
+    socketio.emit('response', {'data': ''}, namespace="/log")
 
 @socketio.on("message", namespace="/log")
 @authenticated_only
-def message(data):
+def log_message(po_name, container):
     if session['user_type'] == "OpenID":
         user_token = session['oauth_token']
     else:
         user_token = None
 
-    socketio.start_background_task(k8sPodLogsStream, session['user_role'], user_token, session['ns_select'], data)
+    socketio.start_background_task(k8sPodLogsStream, session['user_role'], user_token, session['ns_select'], po_name, container)
 
 ##############################################################
 ## Pod Exec
@@ -1227,11 +1445,30 @@ def message(data):
 @login_required
 def pods_exec():
     if request.method == 'POST':
-        session['ns_select'] = request.form.get('ns_select')
+        po_name = request.form.get('po_name')
+        if request.form.get('ns_select'):
+            session['ns_select'] = request.form.get('ns_select')
+
+        if session['user_type'] == "OpenID":
+            user_token = session['oauth_token']
+        else:
+            user_token = None
+
         logger.info("async_mode: %s" % socketio.async_mode)
+        pod_containers, pod_init_containers = k8sPodGetContainers(session['user_role'], user_token, session['ns_select'], po_name)
+        if request.form.get('container_select'):
+            container_select = request.form.get('container_select')
+        else:
+            if pod_containers:
+                container_select = pod_containers[0]
+            else:
+                container_select = None
+
         return render_template(
             'pod-exec.html.j2', 
-            po_name = request.form.get('po_name'),
+            po_name = po_name,
+            container_select = container_select,
+            pod_containers = pod_containers,
             async_mode = socketio.async_mode
         )
     else:
@@ -1240,18 +1477,18 @@ def pods_exec():
 @socketio.on("connect", namespace="/exec")
 @authenticated_only
 def connect():
-    socketio.emit("response", {"output":  'Connected' + "\r\n"}, namespace="/exec")
+    socketio.emit("response", {"output":  ''}, namespace="/exec")
 
 @socketio.on("message", namespace="/exec")
 @authenticated_only
-def message(data):
+def message(po_name, container):
     if session['user_type'] == "OpenID":
         user_token = session['oauth_token']
     else:
         user_token = None
 
     global wsclient
-    wsclient = k8sPodExecSocket(session['user_role'], user_token, session['ns_select'], data)
+    wsclient = k8sPodExecSocket(session['user_role'], user_token, session['ns_select'], po_name, container)
 
     socketio.start_background_task(k8sPodExecStream, wsclient)
 
@@ -1261,7 +1498,13 @@ def exec_input(data):
     """write to the child pty. The pty sees this as if you are typing in a real
     terminal.
     """
-    wsclient.write_stdin(data["input"].encode())
+    try:
+        wsclient.write_stdin(data["input"].encode())
+    except ApiException as error:
+            NoGlashErrorHandler(logger, error, "exec_input")
+    except Exception as error:
+        ERROR = "exec_input: %s" % error
+        NoGlashErrorHandler(logger, "error", ERROR)
 
 ##############################################################
 ## Users
@@ -1290,7 +1533,7 @@ def profile():
             flash("Wrong Current Password", "danger")
 
     return render_template(
-        'profile.html.j2',
+        'user-profile.html.j2',
         user = user,
         user_role = role.name,
     )
@@ -1396,19 +1639,19 @@ def users_privileges_edit():
         user_namespaces_2 = request.form.getlist('user_namespaces_2')
 
         if user_cluster_role:
-            k8sClusterRoleBindingAdd(user_cluster_role, username)
+            k8sClusterRoleBindingAdd(user_cluster_role, username, None)
 
         if user_namespaced_role_1:
             if user_all_namespaces_1:
-                k8sRoleBindingAdd(user_namespaced_role_1, username, None, user_all_namespaces_1)
+                k8sRoleBindingAdd(user_namespaced_role_1, username, None, None, user_all_namespaces_1)
             else:
-                k8sRoleBindingAdd(user_namespaced_role_1, username, user_namespaces_1, user_all_namespaces_1)
+                k8sRoleBindingAdd(user_namespaced_role_1, username, None, user_namespaces_1, user_all_namespaces_1)
 
         if user_namespaced_role_2:
             if user_all_namespaces_2:
-                k8sRoleBindingAdd(user_namespaced_role_2, username, None, user_all_namespaces_2)
+                k8sRoleBindingAdd(user_namespaced_role_2, username, None, None, user_all_namespaces_2)
             else:
-                k8sRoleBindingAdd(user_namespaced_role_2, username, user_namespaces_2, user_all_namespaces_2)
+                k8sRoleBindingAdd(user_namespaced_role_2, username, None, user_namespaces_2, user_all_namespaces_2)
 
         if session['user_type'] == "OpenID":
             user_token = session['oauth_token']
@@ -1428,8 +1671,113 @@ def users_privileges_edit():
             k8sClusterRolesAdd()
 
         return render_template(
-            'user-privilege.html.j2',
+            'user-privilege-edit.html.j2',
             username = username,
+            user_role_template_list = user_role_template_list,
+            namespace_list = namespace_list,
+            user_clusterRole_template_list = user_clusterRole_template_list,
+        )
+    else:
+        return redirect(url_for('routes.login'))
+
+##############################################################
+## Groups
+##############################################################
+
+@routes.route("/groups", methods=['GET', 'POST'])
+@login_required
+def groups():
+    selected = None
+    if session['user_type'] == "OpenID":
+        user_token = session['oauth_token']
+    else:
+        user_token = None
+
+    if request.method == 'POST':
+        selected = request.form.get('selected')
+
+    groupe_list = SSOGroupsList()
+
+    return render_template(
+        'groups.html.j2',
+        selected = selected,
+        groupe_list = groupe_list,
+    )
+
+@routes.route("/groups/privilege", methods=['GET', 'POST'])
+@login_required
+def groups_privilege():
+    if session['user_type'] == "OpenID":
+        user_token = session['oauth_token']
+    else:
+        user_token = None
+
+    if request.method == 'POST':
+        group_name = request.form['group_name']
+
+    groupe_member_list = SSOGroupsMemberList(group_name)    
+
+    # TODO: privileges and members
+    group_cluster_role_binding = k8sClusterRoleBindingGroupGet(group_name, session['user_role'], user_token)
+    group_role_binding = k8sRoleBindingGroupGet(group_name, session['user_role'], user_token)
+
+    return render_template(
+        'group-privileges.html.j2',
+        group_name = group_name,
+        groupe_member_list = groupe_member_list,
+        group_role_binding = group_role_binding,
+        group_cluster_role_binding = group_cluster_role_binding,
+    )
+
+@routes.route("/groups/privilege/edit", methods=['POST'])
+@login_required
+def groups_mapping():
+    if request.method == 'POST':
+        group_name = request.form['group_name']
+
+        user_cluster_role = request.form.get('user_cluster_role')
+        user_namespaced_role_1 = request.form.get('user_namespaced_role_1')
+        user_all_namespaces_1 = request.form.get('user_all_namespaces_1')
+        user_namespaces_1 = request.form.getlist('user_namespaces_1')
+        user_namespaced_role_2 = request.form.get('user_namespaced_role_2')
+        user_all_namespaces_2 = request.form.get('user_all_namespaces_2')
+        user_namespaces_2 = request.form.getlist('user_namespaces_2')
+
+        if user_cluster_role:
+            k8sClusterRoleBindingAdd(user_cluster_role, None, group_name)
+
+        if user_namespaced_role_1:
+            if user_all_namespaces_1:
+                k8sRoleBindingAdd(user_namespaced_role_1, None, group_name, None, user_all_namespaces_1)
+            else:
+                k8sRoleBindingAdd(user_namespaced_role_1, None, group_name, user_namespaces_1, user_all_namespaces_1)
+
+        if user_namespaced_role_2:
+            if user_all_namespaces_2:
+                k8sRoleBindingAdd(user_namespaced_role_2, None, group_name, None, user_all_namespaces_2)
+            else:
+                k8sRoleBindingAdd(user_namespaced_role_2, None, group_name, user_namespaces_2, user_all_namespaces_2)
+
+        if session['user_type'] == "OpenID":
+            user_token = session['oauth_token']
+        else:
+            user_token = None
+
+        namespace_list, error = k8sNamespaceListGet(session['user_role'], user_token)
+        if not error:
+            user_role_template_list = k8sUserRoleTemplateListGet(session['user_role'], user_token)
+            user_clusterRole_template_list = k8sUserClusterRoleTemplateListGet(session['user_role'], user_token)
+        else:
+            user_role_template_list = []
+            user_clusterRole_template_list = []
+
+        if not bool(user_clusterRole_template_list) or not bool(user_role_template_list):
+            from functions.k8s import k8sClusterRolesAdd
+            k8sClusterRolesAdd()
+
+        return render_template(
+            'group-privilege-edit.html.j2',
+            group_name = group_name,
             user_role_template_list = user_role_template_list,
             namespace_list = namespace_list,
             user_clusterRole_template_list = user_clusterRole_template_list,
@@ -1538,6 +1886,7 @@ def role_bindings():
 
     if request.method == 'POST':
         session['ns_select'] = request.form.get('ns_select')
+        rb_name = request.form.get('rb_name')
 
     namespace_list, error = k8sNamespaceListGet(session['user_role'], user_token)
     if not error:
@@ -1549,6 +1898,7 @@ def role_bindings():
         'role-bindings.html.j2',
         role_bindings = role_bindings,
         namespaces = namespace_list,
+        rb_name = rb_name,
     )
 
 ##############################################################
@@ -1599,18 +1949,23 @@ def cluster_role_data():
 ## Cluster Role Bindings
 ##############################################################
 
-@routes.route("/cluster-role-bindings")
+@routes.route("/cluster-role-bindings", methods=["GET", "POST"])
 @login_required
 def cluster_role_bindings():
+    crb_name = None
     if session['user_type'] == "OpenID":
         user_token = session['oauth_token']
     else:
         user_token = None
 
+    if request.method == 'POST':
+        crb_name = request.form.get('crb_name')
+
     cluster_role_bindings = k8sClusterRoleBindingListGet(session['user_role'], user_token)
     return render_template(
         'cluster-role-bindings.html.j2',
         cluster_role_bindings = cluster_role_bindings,
+        crb_name = crb_name,
     )
 
 ##############################################################
@@ -1969,7 +2324,7 @@ def storage_class():
     if session['user_type'] == "OpenID":
         user_token = session['oauth_token']
     else:
-        user_token = None
+        user_token = None 
 
     if request.method == 'POST':
         selected = request.form.get('selected')
@@ -2144,7 +2499,11 @@ def pv():
         selected = request.form.get('selected')
 
     namespace_list, error = k8sNamespaceListGet(session['user_role'], user_token)
-    pv_list = k8sPersistentVolumeListGet(session['user_role'], user_token, session['ns_select'])
+    if not error:
+        pv_list = k8sPersistentVolumeListGet(session['user_role'], user_token, session['ns_select'])
+    else:
+        pv_list = []
+        namespace_list = []
       
     return render_template(
         'pv.html.j2',
@@ -2183,6 +2542,30 @@ def pv_data():
                 return redirect(url_for('routes.pv'))
     else:
         return redirect(url_for('routes.login'))
+
+##############################################################
+## Volume Snapshot
+##############################################################
+
+@routes.route("/volumesnapshots", methods=['GET', 'POST'])
+@login_required
+def volumesnapshots():
+    selected = None
+    if session['user_type'] == "OpenID":
+        user_token = session['oauth_token']
+    else:
+        user_token = None
+
+    if request.method == 'POST':
+        selected = request.form.get('selected')
+
+    snapshot_list = k8sPersistentVolumeSnapshotListGet(session['user_role'], user_token)
+      
+    return render_template(
+        'volumesnapshots.html.j2',
+        snapshot_list = snapshot_list,
+        selected = selected,
+    )
 
 ##############################################################
 ## ConfigMap
@@ -2401,7 +2784,7 @@ def charts():
 
     namespace_list, error = k8sNamespaceListGet(session['user_role'], user_token)
     if not error:
-        has_chart, chart_list = k8sHelmChartListGet(session['ns_select'], user_token, session['ns_select'])
+        has_chart, chart_list = k8sHelmChartListGet(session['user_role'], user_token, session['ns_select'])
     else:
         chart_list = []
         has_chart = None
@@ -2412,3 +2795,32 @@ def charts():
         has_chart = has_chart,
         chart_list = chart_list,
     )
+
+@routes.route('/charts/data', methods=['GET', 'POST'])
+@login_required
+def charts_data():
+    if request.method == 'POST':
+        selected = request.form.get('selected')
+
+        if session['user_type'] == "OpenID":
+            user_token = session['oauth_token']
+        else:
+            user_token = None
+
+        has_chart, chart_list = k8sHelmChartListGet(session['user_role'], user_token, session['ns_select'])
+        chart_data = None
+        chart_name = None
+        if has_chart:
+            for name, release in chart_list.items():
+                if name == selected:
+                    chart_name = name
+                    chart_data = release
+
+        return render_template(
+            'chart-data.html.j2',
+            chart_name = chart_name,
+            chart_data = chart_data,
+        )
+    else:
+        return redirect(url_for('routes.login'))
+    

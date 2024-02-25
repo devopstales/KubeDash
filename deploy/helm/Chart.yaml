@@ -16,3 +16,13 @@ sources:
   - https://github.com/devopstales/kubedash
   - https://github.com/devopstales/helm-charts
 deprecated: false
+
+dependencies:
+  - name: postgresql-ha
+    version: ">=11.9.4"
+    repository: "https://charts.bitnami.com/bitnami"
+    condition: postgresql-ha.enabled
+  - name: metrics-server
+    version: 3.8.4
+    repository: https://kubernetes-sigs.github.io/metrics-server/
+    condition: metrics-server.enabled

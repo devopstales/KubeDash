@@ -1,3 +1,4 @@
+# syntax = docker/dockerfile:1.2
 ARG ARCH
 ARG VERSION
 ARG BUILD_DATE
@@ -29,15 +30,19 @@ RUN addgroup -S -g 10001 kubedash && \
     chown -R kubedash:kubedash /tmp/kubedash
 
 COPY requirements.txt  /code/
+
+RUN apk add --no-cache postgresql-libs && \
+    apk add --no-cache bash gcc musl-dev linux-headers && \
+    apk add --no-cache --virtual .build-deps gcc build-base freetype-dev libpng-dev openblas-dev libffi-dev musl-dev postgresql-dev
+
+RUN apk -U upgrade
+
+RUN pip install --no-cache-dir -r /code/requirements.txt
+
+RUN apk del gcc build-base freetype-dev libpng-dev openblas-dev libffi-dev musl-dev postgresql-dev llvm14-libs && \
+    apk --purge del .build-deps
+
 COPY entrypoint.sh /entrypoint.sh
-
-RUN apk -U upgrade && \
-    apk add --no-cache bash gcc musl-dev linux-headers
-
-RUN apk --update add gcc build-base freetype-dev libpng-dev openblas-dev libffi-dev && \
-    pip install --no-cache-dir -r /code/requirements.txt && \
-    apk del gcc build-base freetype-dev libpng-dev openblas-dev libffi-dev
-
 COPY --chown=kubedash:kubedash ./kubedash /code/kubedash
 
 WORKDIR /code/kubedash

@@ -40,7 +40,14 @@
                     {% else %}
                       <tr>
                     {% endif %}
-                        <td>{{ ds.name }}</td>
+                        <td>
+                          <form action="/daemonsets/data" method="POST">
+                            <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+                            <input type="hidden" name="ns_select" value="{{ session['ns_select'] }}" />
+                            <input type="hidden" name="selected" value="{{ ds.name }}" />
+                            <a href="javascript:;" onclick="parentNode.submit();">{{ ds.name }}</a>
+                          </form>
+                        </td>
                         <td>{{ ds.desired }}</td>
                         <td>{{ ds.current }}</td>
                         <td>{{ ds.ready }}</td>
