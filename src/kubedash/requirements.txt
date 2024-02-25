@@ -55,3 +55,4 @@ selenium>=4.15.1
 # for git-changelog
 GitPython==3.1.42
 gitdb2==3.0.1
+gevent>=23.9.0 # not directly required, pinned by Snyk to avoid a vulnerability
