@@ -9,7 +9,8 @@ from datetime import datetime
 from functions.helper_functions import get_logger, email_check
 from functions.sso import SSOSererGet, get_auth_server_info, SSOServerUpdate, SSOServerCreate
 from functions.user import User, UsersRoles, Role, UserUpdate, UserCreate, UserDelete, \
-    SSOUserCreate, SSOTokenUpdate, SSOTokenGet, UserUpdatePassword, KubectlConfigStore, KubectlConfig
+    SSOUserCreate, SSOTokenUpdate, SSOTokenGet, SSOGroupCreateFromList, SSOGroupsList, SSOGroupsMemberList, \
+    UserUpdatePassword, KubectlConfigStore, KubectlConfig
 from functions.k8s import *
 from functions.registry import *
 
@@ -432,6 +433,7 @@ def callback():
                     logger.info("Answer from clinet: %s" % x.text)
             except:
                 pass
+## Kubectl config end
 
         email = user_data['email']
         username = user_data["preferred_username"]
@@ -440,9 +442,11 @@ def callback():
 
         if user is None:
             SSOUserCreate(username, email, user_token, "OpenID")
+            SSOGroupCreateFromList(username, user_data["groups"])
             user = User.query.filter_by(username=username, user_type = "OpenID").first()
         else:
             SSOTokenUpdate(username, user_token)
+            SSOGroupCreateFromList(username, user_data["groups"])
 
         user_role = UsersRoles.query.filter_by(user_id=user.id).first()
         role = Role.query.filter_by(id=user_role.role_id).first()
@@ -1635,19 +1639,19 @@ def users_privileges_edit():
         user_namespaces_2 = request.form.getlist('user_namespaces_2')
 
         if user_cluster_role:
-            k8sClusterRoleBindingAdd(user_cluster_role, username)
+            k8sClusterRoleBindingAdd(user_cluster_role, username, None)
 
         if user_namespaced_role_1:
             if user_all_namespaces_1:
-                k8sRoleBindingAdd(user_namespaced_role_1, username, None, user_all_namespaces_1)
+                k8sRoleBindingAdd(user_namespaced_role_1, username, None, None, user_all_namespaces_1)
             else:
-                k8sRoleBindingAdd(user_namespaced_role_1, username, user_namespaces_1, user_all_namespaces_1)
+                k8sRoleBindingAdd(user_namespaced_role_1, username, None, user_namespaces_1, user_all_namespaces_1)
 
         if user_namespaced_role_2:
             if user_all_namespaces_2:
-                k8sRoleBindingAdd(user_namespaced_role_2, username, None, user_all_namespaces_2)
+                k8sRoleBindingAdd(user_namespaced_role_2, username, None, None, user_all_namespaces_2)
             else:
-                k8sRoleBindingAdd(user_namespaced_role_2, username, user_namespaces_2, user_all_namespaces_2)
+                k8sRoleBindingAdd(user_namespaced_role_2, username, None, user_namespaces_2, user_all_namespaces_2)
 
         if session['user_type'] == "OpenID":
             user_token = session['oauth_token']
@@ -1667,8 +1671,113 @@ def users_privileges_edit():
             k8sClusterRolesAdd()
 
         return render_template(
-            'user-privilege.html.j2',
+            'user-privilege-edit.html.j2',
             username = username,
+            user_role_template_list = user_role_template_list,
+            namespace_list = namespace_list,
+            user_clusterRole_template_list = user_clusterRole_template_list,
+        )
+    else:
+        return redirect(url_for('routes.login'))
+
+##############################################################
+## Groups
+##############################################################
+
+@routes.route("/groups", methods=['GET', 'POST'])
+@login_required
+def groups():
+    selected = None
+    if session['user_type'] == "OpenID":
+        user_token = session['oauth_token']
+    else:
+        user_token = None
+
+    if request.method == 'POST':
+        selected = request.form.get('selected')
+
+    groupe_list = SSOGroupsList()
+
+    return render_template(
+        'groups.html.j2',
+        selected = selected,
+        groupe_list = groupe_list,
+    )
+
+@routes.route("/groups/privilege", methods=['GET', 'POST'])
+@login_required
+def groups_privilege():
+    if session['user_type'] == "OpenID":
+        user_token = session['oauth_token']
+    else:
+        user_token = None
+
+    if request.method == 'POST':
+        group_name = request.form['group_name']
+
+    groupe_member_list = SSOGroupsMemberList(group_name)    
+
+    # TODO: privileges and members
+    group_cluster_role_binding = k8sClusterRoleBindingGroupGet(group_name, session['user_role'], user_token)
+    group_role_binding = k8sRoleBindingGroupGet(group_name, session['user_role'], user_token)
+
+    return render_template(
+        'group-privileges.html.j2',
+        group_name = group_name,
+        groupe_member_list = groupe_member_list,
+        group_role_binding = group_role_binding,
+        group_cluster_role_binding = group_cluster_role_binding,
+    )
+
+@routes.route("/groups/privilege/edit", methods=['POST'])
+@login_required
+def groups_mapping():
+    if request.method == 'POST':
+        group_name = request.form['group_name']
+
+        user_cluster_role = request.form.get('user_cluster_role')
+        user_namespaced_role_1 = request.form.get('user_namespaced_role_1')
+        user_all_namespaces_1 = request.form.get('user_all_namespaces_1')
+        user_namespaces_1 = request.form.getlist('user_namespaces_1')
+        user_namespaced_role_2 = request.form.get('user_namespaced_role_2')
+        user_all_namespaces_2 = request.form.get('user_all_namespaces_2')
+        user_namespaces_2 = request.form.getlist('user_namespaces_2')
+
+        if user_cluster_role:
+            k8sClusterRoleBindingAdd(user_cluster_role, None, group_name)
+
+        if user_namespaced_role_1:
+            if user_all_namespaces_1:
+                k8sRoleBindingAdd(user_namespaced_role_1, None, group_name, None, user_all_namespaces_1)
+            else:
+                k8sRoleBindingAdd(user_namespaced_role_1, None, group_name, user_namespaces_1, user_all_namespaces_1)
+
+        if user_namespaced_role_2:
+            if user_all_namespaces_2:
+                k8sRoleBindingAdd(user_namespaced_role_2, None, group_name, None, user_all_namespaces_2)
+            else:
+                k8sRoleBindingAdd(user_namespaced_role_2, None, group_name, user_namespaces_2, user_all_namespaces_2)
+
+        if session['user_type'] == "OpenID":
+            user_token = session['oauth_token']
+        else:
+            user_token = None
+
+        namespace_list, error = k8sNamespaceListGet(session['user_role'], user_token)
+        if not error:
+            user_role_template_list = k8sUserRoleTemplateListGet(session['user_role'], user_token)
+            user_clusterRole_template_list = k8sUserClusterRoleTemplateListGet(session['user_role'], user_token)
+        else:
+            user_role_template_list = []
+            user_clusterRole_template_list = []
+
+        if not bool(user_clusterRole_template_list) or not bool(user_role_template_list):
+            from functions.k8s import k8sClusterRolesAdd
+            k8sClusterRolesAdd()
+
+        return render_template(
+            'group-privilege-edit.html.j2',
+            group_name = group_name,
             user_role_template_list = user_role_template_list,
             namespace_list = namespace_list,
             user_clusterRole_template_list = user_clusterRole_template_list,
@@ -1777,6 +1886,7 @@ def role_bindings():
 
     if request.method == 'POST':
         session['ns_select'] = request.form.get('ns_select')
+        rb_name = request.form.get('rb_name')
 
     namespace_list, error = k8sNamespaceListGet(session['user_role'], user_token)
     if not error:
@@ -1788,6 +1898,7 @@ def role_bindings():
         'role-bindings.html.j2',
         role_bindings = role_bindings,
         namespaces = namespace_list,
+        rb_name = rb_name,
     )
 
 ##############################################################
@@ -1838,18 +1949,23 @@ def cluster_role_data():
 ## Cluster Role Bindings
 ##############################################################
 
-@routes.route("/cluster-role-bindings")
+@routes.route("/cluster-role-bindings", methods=["GET", "POST"])
 @login_required
 def cluster_role_bindings():
+    crb_name = None
     if session['user_type'] == "OpenID":
         user_token = session['oauth_token']
     else:
         user_token = None
 
+    if request.method == 'POST':
+        crb_name = request.form.get('crb_name')
+
     cluster_role_bindings = k8sClusterRoleBindingListGet(session['user_role'], user_token)
     return render_template(
         'cluster-role-bindings.html.j2',
         cluster_role_bindings = cluster_role_bindings,
+        crb_name = crb_name,
     )
 
 ##############################################################
