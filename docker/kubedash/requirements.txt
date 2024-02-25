@@ -43,3 +43,4 @@ setuptools==67.8.0
 ipython==8.14.0 # not directly required, pinned by Snyk to avoid a vulnerability
 pyOpenSSL==24.0.0
 cryptography==42.0.4
+gevent>=23.9.0 # not directly required, pinned by Snyk to avoid a vulnerability
