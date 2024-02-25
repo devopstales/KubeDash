@@ -18,7 +18,7 @@ Flask_WTF==1.1.1
 # web security
 flask_talisman==1.0.0
 # kubernetes
-kubernetes==26.1.0
+kubernetes==29.0.0
 flask_healthz==0.0.3
 pybase64==1.2.3
 # graphwiz
