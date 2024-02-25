@@ -24,7 +24,7 @@ pybase64==1.2.3
 # graphwiz
 pyvis==0.3.2
 # socket
-flask_socketio==5.3.4
+flask_socketio==5.3.6
 gevent-websocket==0.10.1
 eventlet==0.35.2
 
