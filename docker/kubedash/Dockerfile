@@ -31,13 +31,15 @@ RUN addgroup -S -g 10001 kubedash && \
 
 COPY requirements.txt  /code/
 
-RUN apk -U upgrade && \
-    apk add --no-cache postgresql-libs && \
+RUN apk add --no-cache postgresql-libs && \
     apk add --no-cache bash gcc musl-dev linux-headers && \
     apk add --no-cache --virtual .build-deps gcc build-base freetype-dev libpng-dev openblas-dev libffi-dev musl-dev postgresql-dev
 
-RUN pip install --no-cache-dir -r /code/requirements.txt && \
-    apk del gcc build-base freetype-dev libpng-dev openblas-dev libffi-dev musl-dev postgresql-dev llvm14-libs && \
+RUN apk -U upgrade
+
+RUN pip install --no-cache-dir -r /code/requirements.txt
+
+RUN apk del gcc build-base freetype-dev libpng-dev openblas-dev libffi-dev musl-dev postgresql-dev llvm14-libs && \
     apk --purge del .build-deps
 
 COPY entrypoint.sh /entrypoint.sh

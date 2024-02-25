@@ -11,9 +11,6 @@ from flask_migrate import Migrate
 import eventlet
 import eventlet.wsgi
 
-import eventlet
-import eventlet.wsgi
-
 from functions.components import db, sess, login_manager, csrf, socketio
 from functions.helper_functions import string2list, var_test
 from functions.routes import routes
@@ -223,7 +220,7 @@ def readiness():
         connect_database()
     except Exception:
         raise HealthError("Can't connect to the database")
-    
+
 app.config.update(
     HEALTHZ = {
         "live":  app.name + ".liveness",
@@ -240,4 +237,4 @@ if __name__ == '__main__':
         eventlet.wsgi.server(eventlet.listen(('', 8000)), app, debug=False)
     else:
         eventlet.wsgi.server(eventlet.listen(('', 8000)), app, debug=True)
-    
+
