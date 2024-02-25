@@ -2,12 +2,13 @@
 
 {% block header %}
     <link href="{{ url_for('static',filename='/vendor/datatables/dataTables.bootstrap4.min.css') }}" rel="stylesheet" >
+    <link href="{{ url_for('static',filename='/vendor/datatables/jquery.dataTables.css') }}" rel="stylesheet" >
 {% endblock %}
 
 {% block content %}
 <nav aria-label="breadcrumb">
   <ol class="breadcrumb">
-    <li class="breadcrumb-item">User Management</li>
+    <li class="breadcrumb-item">Cluster Permissions</li>
     <li class="breadcrumb-item active" aria-current="page">ClusterRoleBindings</li>
     <div class="col">
       <a class="card-link float-right" data-toggle="collapse" href="#" onclick="reload()">
@@ -35,7 +36,11 @@
                   </thead>
                   <tbody>
                     {% for crb in cluster_role_bindings %}
+                    {% if crb_name == crb.name %}
+                      <tr class="selected" >
+                    {% else %}
                       <tr>
+                    {% endif %}
                         <td>{{ crb.name }}</td>
                         <td>
                             {% for crbr in crb.role %}
