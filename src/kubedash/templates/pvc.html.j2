@@ -42,7 +42,19 @@
                     {% else %}
                       <tr>
                     {% endif %}
-                        <td>{{ pvc.status }}</td>
+                    {% if pvc.status == "Bound" %}
+                        <td>
+                          <span class="badge badge-success badge-tag">{{ pvc.status }}</span>
+                        </td>
+                    {% elif  pvc.status == "Terminating" %}
+                        <td>
+                          <span class="badge badge-danger badge-tag">{{ pvc.status }}</span>
+                        </td>
+                    {% else %}
+                        <td>
+                          <span class="badge badge-warning badge-tag">{{ pvc.status }}</span>
+                        </td>
+                    {% endif %}
                         <td>
                           <form action="/pvc/data" method="POST">
                             <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">

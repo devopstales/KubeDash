@@ -5,10 +5,18 @@ metadata:
   labels:
     app: kubedash
     {{- include "kubedash.labels" . | nindent 4 }}
+    checksum/config: {{ include (print $.Template.BasePath "/configmap.yaml") . |  sha256sum | trunc 63 }}
 spec:
-  replicas: 1
+  replicas: {{ .Values.replicas }}
   strategy:
-    type: Recreate
+    type: RollingUpdate
+    rollingUpdate:
+      maxSurge: "100%"
+{{- if gt .Values.replicas 1.0 }}
+      maxUnavailable: "50%"
+{{- else }}
+      maxUnavailable: "100%"
+{{- end }}
   selector:
     matchLabels:
       app: kubedash
@@ -18,6 +26,7 @@ spec:
       labels:
         app: kubedash
         {{- include "kubedash.labels" . | nindent 8 }}
+        checksum/config: {{ include (print $.Template.BasePath "/configmap.yaml") . |  sha256sum | trunc 63 }}
     spec:
       {{- with .Values.imagePullSecrets }}
       imagePullSecrets:
@@ -41,6 +50,17 @@ spec:
           - name: VERBOSE_LOG
             value: "True"
 {{- end }}
+        envFrom:
+          - configMapRef: 
+              name: {{ include "kubedash.fullname" . }}-config
+{{- if .Values.oidc.enabled }}
+          - secretRef:
+              name: {{ .Values.oidc.secret.name }}
+{{- end }}
+{{- if .Values.externalDatabase.enabled }}
+          - secretRef:
+              name: {{ .Values.externalDatabase.secret.name }}
+{{- end }}
         livenessProbe:
           httpGet:
             path: /healthz/live
@@ -53,8 +73,8 @@ spec:
             port: 8000
           initialDelaySeconds: 5
           timeoutSeconds: 1
-{{- if .Values.persistence.enabled }}
         volumeMounts:
+{{- if .Values.persistence.enabled }}
         - name: cache
           mountPath: "/code/kubedash/database"
 {{- end }}
@@ -62,8 +82,8 @@ spec:
         - containerPort: 8000
           protocol: TCP
           name: http
-{{- if .Values.persistence.enabled }}
       volumes:
+{{- if .Values.persistence.enabled }}
       - name: cache
         persistentVolumeClaim:
             claimName: {{ include "kubedash.fullname" . }}-db

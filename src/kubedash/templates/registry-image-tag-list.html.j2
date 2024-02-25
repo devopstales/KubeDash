@@ -26,6 +26,7 @@
     </div>
     <div class="card-body">
         <div class="table-responsive">
+        {% if tag_list.tags %}
             <table class="table table-bordered" id="dataTable" width="100%" cellspacing="0">
                 <thead>
                     <tr>
@@ -35,36 +36,44 @@
                 </thead>
                 <tbody>
                     {% for tag in tag_list.tags %}
-                    {% if selected == tag %}
-                      <tr class="selected" >
-                    {% else %}
-                      <tr>
-                    {% endif %}
-                        <td>
-                          <form action="/image/data" method="POST">
-                            <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
-                            <input type="hidden" name="tag_name" value="{{ tag }}" />
-                            <a href="javascript:;" onclick="parentNode.submit();">{{ tag }}</a>
-                          </form>
-                        </td>
-                        <td>
-                            {% if session['user_role'] == "Admin" %}
-                            <!-- Button trigger modal edit -->
-                            <form action="/image/tag/delete" method="POST">
+                        {% if selected == tag %}
+                          <tr class="selected" >
+                        {% else %}
+                          <tr>
+                        {% endif %}
+                            <td>
+                              <form action="/image/data" method="POST">
                                 <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
-                                <input type="hidden" name="image_name" value="{{ image_name }}" />
                                 <input type="hidden" name="tag_name" value="{{ tag }}" />
-                                <button type="submit" rel="tooltip" class="btn btn-danger btn-just-icon btn-sm" value="upvote">
-                                    <i class="material-icons">delete</i>
-                                </button>
-                            </form>
-                            {% endif %}
-                        </td>
-                    </tr>
+                                <a href="javascript:;" onclick="parentNode.submit();">{{ tag }}</a>
+                              </form>
+                            </td>
+                            <td>
+                                {% if session['user_role'] == "Admin" %}
+                                <!-- Button trigger modal edit -->
+                                <form action="/image/tag/delete" method="POST">
+                                    <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+                                    <input type="hidden" name="image_name" value="{{ image_name }}" />
+                                    <input type="hidden" name="tag_name" value="{{ tag }}" />
+                                    <button type="submit" rel="tooltip" class="btn btn-danger btn-just-icon btn-sm" value="upvote">
+                                        <i class="material-icons">delete</i>
+                                    </button>
+                                </form>
+                                {% endif %}
+                            </td>
+                        </tr>
                     {% endfor %}
                 </tbody>
             </table>
-
+        {% else %}
+          <tr>
+            <td>
+              <img class="center" src="{{ url_for('static',filename='/img/blank-tags.png') }}">
+              <h2 class="center">No Tags</h2>
+              <h4 class="center">No tags are available at the moment.</h4>
+            </td>
+          </tr>
+        {% endif %}
         </div>
     </div>
 </div>

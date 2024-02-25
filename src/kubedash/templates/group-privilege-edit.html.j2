@@ -9,9 +9,9 @@
 {% block content %}
 <nav aria-label="breadcrumb">
   <ol class="breadcrumb">
-    <li class="breadcrumb-item">Settings</li>
-    <li class="breadcrumb-item"><a href="/users">Users and Roles</a></li>
-    <li class="breadcrumb-item active" aria-current="page">{{ username }}</li>
+    <li class="breadcrumb-item">User Management</li>
+    <li class="breadcrumb-item"><a href="/groups">Groups</a></li>
+    <li class="breadcrumb-item active" aria-current="page">{{ group_name }}</li>
     <div class="col">
       <a class="card-link float-right" data-toggle="collapse" href="#" onclick="reload()">
         <i class="material-icons">refresh</i>
@@ -26,7 +26,7 @@
 <!-- DataTales Example -->
 <div class="card shadow mb-4">
     <div class="card-header py-3">
-        <h5 class="m-0 font-weight-bold text-primary">User: {{ username }}</h5>
+        <h5 class="m-0 font-weight-bold text-primary">Group: {{ group_name }}</h5>
     </div>
     <div class="card-body">
         <div class="form-group">
@@ -97,7 +97,7 @@
                     </select>
                 </div>
                 <hr>
-                <input class="form-control" name="username" type="hidden" value="{{ username }}">
+                <input class="form-control" name="group_name" type="hidden" value="{{ group_name }}">
                 <button type="submit" class="btn btn-primary" >Save</button>
             </form>
         </div>

@@ -11,6 +11,9 @@
 
     <title>KubeDash</title>
 
+    <!-- favicon -->
+    <link rel="shortcut icon" href="{{ url_for('static',filename='/favicon.ico') }}">
+
     <!-- Custom fonts for this template-->
     <link href="{{ url_for('static',filename='/vendor/fontawesome-free-6.4.0-web/css/all.css') }}" rel="stylesheet" type="text/css">
     <link
@@ -37,7 +40,7 @@
         <ul class="navbar-nav bg-gradient-primary sidebar sidebar-dark accordion" id="accordionSidebar">
 
             <!-- Sidebar - Brand -->
-            <a class="sidebar-brand d-flex align-items-center justify-content-center" href="#">
+            <a class="sidebar-brand d-flex align-items-center justify-content-center" href="/cluster-metrics">
                 <div class="sidebar-brand-icon rotate-n-15">
                     <i class="fas fa-laugh-wink"></i>
                 </div>
@@ -69,6 +72,23 @@
             <div class="sidebar-heading">
                 Interface
             </div>
+
+            <!-- Nav Item - User Management Collapse Menu -->
+            <li class="nav-item">
+                <a class="nav-link collapsed" href="#" data-toggle="collapse" data-target="#collapseUsers"
+                    aria-expanded="true" aria-controls="collapseUsers">
+                    <i class="fas fa-fw fa-user-shield"></i>
+                    <span>User Management</span>
+                </a>
+                <div id="collapseUsers" class="collapse" aria-labelledby="headingUsers"
+                    data-parent="#accordionSidebar">
+                    <div class="bg-white py-2 collapse-inner rounded">
+                        <a class="collapse-item" href="/users">Users</a>
+                        <a class="collapse-item" href="/groups">Groups</a>
+                    </div>
+                </div>
+            </li>
+
 
             <!-- Nav Item - Cluster Collapse Menu -->
             <li class="nav-item">
@@ -112,18 +132,16 @@
                 </div>
             </li>
 
-            <!-- Nav Item - Roles Collapse Menu -->
+            <!-- Nav Item - Cluster Permissions Collapse Menu -->
             <li class="nav-item">
                 <a class="nav-link collapsed" href="#" data-toggle="collapse" data-target="#collapseRoles"
                     aria-expanded="true" aria-controls="collapseRoles">
                     <i class="fas fa-fw fa-user-shield"></i>
-                    <span>Users and Roles</span>
+                    <span>Cluster Permissions</span>
                 </a>
                 <div id="collapseRoles" class="collapse" aria-labelledby="headingRoles"
                     data-parent="#accordionSidebar">
                     <div class="bg-white py-2 collapse-inner rounded">
-                        <a class="collapse-item" href="/users">Users & Roles</a>
-                        <!-- -->
                         {% if session['ns_select'] %}
                         <form action="/service-accounts" method="POST">
                             <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
@@ -258,6 +276,8 @@
                             <input type="hidden" name="ns_select" value="{{ session['ns_select'] }}" />
                             <a class="collapse-item" href="#" onclick="event.preventDefault(); this.parentNode.submit()">VolumeClames</a>
                         </form>
+                        <a class="collapse-item" href="/pv">Volumes</a>
+                        <a class="collapse-item" href="/volumesnapshots">VolumeSnapshot</a>
                         <form action="/configmaps" method="POST">
                             <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
                             <input type="hidden" name="ns_select" value="{{ session['ns_select'] }}" />
@@ -265,10 +285,10 @@
                         </form>
                         {% else %}
                         <a class="collapse-item" href="/pvc">VolumeClames</a>
+                        <a class="collapse-item" href="/pv">Volumes</a>
+                        <a class="collapse-item" href="/volumesnapshots">VolumeSnapshot</a>
                         <a class="collapse-item" href="/configmaps">ConfigMaps</a>
                         {% endif %}
-                        <a class="collapse-item" href="/pv">Volumes</a>
-                        {# <a class="collapse-item" href="/vs">VolumeSnapshot</a> #}
                     </div>
                 </div>
             </li>
@@ -314,8 +334,7 @@
                     data-parent="#accordionSidebar">
                     <div class="bg-white py-2 collapse-inner rounded">
                         {% if session['user_role'] == "Admin" %}
-                        <a class="collapse-item" href="/sso-config">SSO Configuration</a>
-                        <!-- LDAP/AD -->
+                        <a class="collapse-item" href="/sso-config">Auth Provider</a>
                         <a class="collapse-item" href="/cluster-config">Cluster Configuration</a>
                         {% endif %}
 			            <a class="collapse-item" href="/export">Download Client Config</a>
@@ -326,18 +345,24 @@
             <!-- Divider -->
             <hr class="sidebar-divider">
 
-            <!-- Nav Item - Registrys -->
+            <!-- Nav Item - Plugins -->
             <li class="nav-item">
-                <a class="nav-link" href="/registry">
-                    <i class="fa-brands fa-docker"></i>
-                    <span>OCI Registrys</span></a>
-            </li>
-
-            <!-- Nav Item - Charts -->
-            <li class="nav-item">
-                <a class="nav-link" href="/charts">
-                    <i class="fa-sharp fa-solid fa-helmet-safety"></i>
-                    <span>Helm Charts</span></a>
+                <a class="nav-link collapsed" href="#" data-toggle="collapse" data-target="#collapsePlugins"
+                   aria-expanded="true" aria-controls="collapsePlugins">
+                    <i class="fas fa-fw fa-cog"></i>
+                    <span>Plugins</span>
+                </a>
+                <div id="collapsePlugins" class="collapse" aria-labelledby="headingPlugins"
+                    data-parent="#accordionSidebar">
+                    <div class="bg-white py-2 collapse-inner rounded">
+                        {% if config.plugins["registry"] %}
+                        <a class="collapse-item" href="/registry">OCI Registrys</a>
+                        {% endif %}
+                        {% if config.plugins["helm"] %}
+                        <a class="collapse-item" href="/charts">Helm Charts</a>
+                        {% endif %}
+                    </div>
+                </div>
             </li>
 
             <!-- Divider -->
@@ -366,11 +391,11 @@
                     </button>
 
                     <!-- Topbar Namespace -->
+                    {% if namespaces %}
                     <nav class="navbar navbar-light bg-light row">
                         <form name="add" method="POST" class="form-inline row row-cols-1 mr-auto ml-md-0 mw-100">
                           <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
                           <div class="input-group">
-                            {% if namespaces %}
                             <select name= "ns_select" class="custom-select" id="inputGroupSelect04" aria-label="Select Namespace">
                                 {% for ns in namespaces %}
                                 {% if ns == session['ns_select'] %}
@@ -383,10 +408,10 @@
                             <div class="input-group-append">
                               <button type="submit" class="btn btn-primary" type="button">Submit</button>
                             </div>
-                            {% endif %}
                           </div>
                         </form>
                     </nav>
+                    {% endif %}
 
                     <!-- Topbar Navbar -->
                     <ul class="navbar-nav ml-auto">
@@ -470,14 +495,16 @@
                                     <i class="fas fa-user fa-sm fa-fw mr-2 text-gray-400"></i>
                                     Profile
                                 </a>
-                                <a class="dropdown-item" href="#">
+                                <a class="dropdown-item" href="/export">
                                     <i class="fas fa-cogs fa-sm fa-fw mr-2 text-gray-400"></i>
-                                    Settings
+                                    Download KubeConfig
                                 </a>
+                                {#
                                 <a class="dropdown-item" href="#">
                                     <i class="fas fa-list fa-sm fa-fw mr-2 text-gray-400"></i>
                                     Activity Log
                                 </a>
+                                #}
                                 <div class="dropdown-divider"></div>
                                 <a class="dropdown-item" href="#" data-toggle="modal" data-target="#logoutModal">
                                     <i class="fas fa-sign-out-alt fa-sm fa-fw mr-2 text-gray-400"></i>
@@ -496,7 +523,7 @@
 
                     {% if get_flashed_messages() %}
                     {% for category, message in get_flashed_messages(with_categories=true) %}
-                    <div class="alert alert-{{category}} alert-dismissible fade show" role="alert">
+                    <div id="flashMessage" class="alert alert-{{category}} alert-dismissible fade show" role="alert">
                     {{ message }}
                     <button type="button" class="close" data-dismiss="alert" aria-label="Close">
                         <span aria-hidden="true">&times;</span>
@@ -519,7 +546,7 @@
             <footer class="sticky-footer bg-white">
                 <div class="container my-auto">
                     <div class="copyright text-center my-auto">
-                        <span>Copyright &copy; DevOpsTales - KubeDash 2022</span>
+                        <span>Copyright &copy; DevOpsTales - KubeDash 2023</span>
                     </div>
                 </div>
             </footer>
@@ -569,6 +596,11 @@
         function reload() {
             location.reload(true);
         };
+    </script>
+    <script type="text/javascript">
+        setTimeout(function() {
+            $('#flashMessage').fadeOut('fast');
+        }, 30000);
     </script>
 
     <!-- Bootstrap core JavaScript-->

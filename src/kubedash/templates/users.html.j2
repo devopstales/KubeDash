@@ -8,8 +8,8 @@
 {% block content %}
 <nav aria-label="breadcrumb">
   <ol class="breadcrumb">
-    <li class="breadcrumb-item">Settings</li>
-    <li class="breadcrumb-item active" aria-current="page">Users and Roles</li>
+    <li class="breadcrumb-item">User Management</li>
+    <li class="breadcrumb-item active" aria-current="page">Users</li>
     <div class="col">
       <a class="card-link float-right" data-toggle="collapse" href="#" onclick="reload()">
         <i class="material-icons">refresh</i>
@@ -54,7 +54,7 @@
               <input type="password" name="password" id="PassEntry" class="form-control user" placeholder="Type your password">
             </div>
             <div class="form-group">
-              <label>Role:</label>
+              <label>Permission:</label>
               <select class="form-select" aria-label="Select role" name="role">
                 <option value="User">User</option>
                 <option value="Admin">Admin</option>
@@ -95,7 +95,7 @@
                     <tr>
                       <th>Username</th>
                       <th>Email</th>
-                      <th>Role</th>
+                      <th>Permission</th>
                       <th>Type</th>
                       <th>Action</th>
                     </tr>
@@ -104,7 +104,7 @@
                     <tr>
                       <th>Username</th>
                       <th>Email</th>
-                      <th>Role</th>
+                      <th>Permission</th>
                       <th>Type</th>
                       <th>Action</th>
                     </tr>
@@ -126,7 +126,8 @@
                         <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
                         <input type="hidden"  name="username" value="{{ user.username }}"/>
                         <a href="javascript:;" onclick="parentNode.submit();">{{ user.username }}</a>
-                      </form>                    </td>
+                      </form>
+                    </td>
                     {% else %}
                       <td>{{ user.username }}</td>
                     {% endif %}

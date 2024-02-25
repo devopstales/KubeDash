@@ -48,7 +48,15 @@
                           </form>
                         </td>
                         <td>
-                            {{ i.ingressClass }}
+                            {% if i.ingressClass %}
+                              <form action="/ingress-class" method="POST">
+                                <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+                                <input type="hidden" name="selected" value="{{ i.ingressClass }}" />
+                                <a href="javascript:;" onclick="parentNode.submit();">{{ i.ingressClass }}</a>
+                              </form>
+                            {% else %}
+                              {{ i.ingressClass }}
+                            {% endif %}
                         </td>
                         <td>
                           {% for host in i.hosts %}

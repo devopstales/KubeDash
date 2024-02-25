@@ -5,6 +5,8 @@ from functions.components import db, login_manager, tracer
 from contextlib import nullcontext
 from flask_login import UserMixin
 from werkzeug.security import generate_password_hash
+from datetime import datetime
+from pytz import timezone
 
 ##############################################################
 ## functions
@@ -21,13 +23,16 @@ class User(UserMixin, db.Model):
     __tablename__ = 'users'
     id = db.Column(db.Integer, primary_key=True)
     username = db.Column(db.String(80), unique=True, nullable=False)
-    password_hash = db.Column(db.String(120), nullable=True)
+    password_hash = db.Column(db.String(300), nullable=True)
     email = db.Column(db.String(80), unique=True, nullable=True)
-    roles = db.relationship('Role', secondary='users_roles',
-                            backref=db.backref('users', lazy='dynamic'))
     user_type = db.Column(db.String(5), nullable=False)
     tokens = db.Column(db.Text, nullable=True)
+
+    roles = db.relationship('Role', secondary='users_roles',
+                            backref=db.backref('users', lazy='dynamic'))
     kubectl_config = db.relationship('KubectlConfig', secondary='users_kubectl',
+                            backref=db.backref('users', lazy='dynamic'))
+    sso_groups = db.relationship('SSOGroups', secondary='sso_user_group_mapping',
                             backref=db.backref('users', lazy='dynamic'))
 
     def __repr__(self):
@@ -81,7 +86,7 @@ def UserCreate(username, password, email, user_type, role=None, tokens=None):
             else:
                 user = User(
                     username       = username,
-                    password_hash  = generate_password_hash(password, method='sha256'),
+                    password_hash  = generate_password_hash(password, method='scrypt'),
                     email          = email,
                     user_type      = user_type,
                     tokens         = tokens,
@@ -156,12 +161,15 @@ def SSOTokenGet(username):
 def UserUpdatePassword(username, password):
         user = User.query.filter_by(username=username).first()
         if user:
-            user.password_hash = generate_password_hash(password, method='sha256')
+            user.password_hash = generate_password_hash(password, method='scrypt')
             db.session.commit()
             return True
         else:
             return False
         
+########################################################################
+# KubectlConfig
+########################################################################
 # Define the KubectlConfig data model
 class KubectlConfig(db.Model):
     __tablename__ = 'kubectl_config'
@@ -189,3 +197,66 @@ def KubectlConfigStore(name, cluster, private_key_base64, user_certificate_base6
         )
         db.session.add(kubectl_config)
         db.session.commit()
+
+########################################################################
+# SSO Groups
+########################################################################
+
+class SSOGroups(db.Model):
+    __tablename__ = 'sso_groups'
+    id = db.Column(db.Integer(), primary_key=True)
+    name = db.Column(db.String(50), nullable=False, server_default=u'', unique=True)
+    created = db.Column(db.DateTime, default=datetime.now().astimezone(timezone('Europe/Budapest')), nullable=False)
+
+class SSOUserGroups(db.Model):
+    __tablename__ = 'sso_user_group_mapping'
+    id = db.Column(db.Integer(), primary_key=True)
+    user_id = db.Column(db.Integer(), db.ForeignKey('users.id', ondelete='CASCADE'))
+    group_id = db.Column(db.Integer(), db.ForeignKey('sso_groups.id', ondelete='CASCADE'))
+
+def SSOGroupCreateFromList(username, groups):
+    for group in groups:
+        SSOGroupsCreate(username, group)
+
+def SSOGroupsCreate(username, groups_name):
+    user = User.query.filter_by(username=username).first()
+    sso_group_data = SSOGroups(
+        name = groups_name
+    )
+    sso_groups = SSOGroups.query.filter_by(name=groups_name).first()
+    if not sso_groups:
+        db.session.add(sso_group_data)
+        db.session.commit()
+        user.sso_groups.append(sso_group_data)
+    else:
+        sso_user = SSOUserGroups.query.filter(
+            SSOUserGroups.group_id == sso_groups.id,
+            SSOUserGroups.user_id == user.id
+        ).first()
+        if not sso_user:
+            user.sso_groups.append(sso_group_data)
+
+def SSOGroupsList():
+    sso_groups = SSOGroups.query.all()
+    sso_group_list = list()
+    for group in sso_groups:
+        group_data = {
+            "name":    group.name,
+            "created": group.created,
+        }
+        sso_group_list.append(group_data)
+    return sso_group_list
+
+def SSOGroupsMemberList(sso_group):
+    sso_group_data = SSOGroups.query.filter(SSOGroups.name == sso_group).first()
+    sso_users = SSOUserGroups.query.filter(SSOUserGroups.group_id == sso_group_data.id).all()
+    user_list = list()
+    for sso_user in sso_users:
+        user = User.query.filter(User.id == sso_user.user_id).first()
+        user_data = {
+            "name": user.username,
+            "email": user.email,
+            "type": user.user_type,
+        }
+        user_list.append(user_data)
+    return user_list
