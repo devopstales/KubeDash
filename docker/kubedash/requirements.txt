@@ -39,7 +39,7 @@ opentelemetry-instrumentation-flask==0.44b0
 
 # security
 gunicorn==21.2.0
-certifi==2023.7.22
+certifi==2024.2.2
 setuptools==67.8.0
 pyOpenSSL==24.0.0
 cryptography==42.0.4
