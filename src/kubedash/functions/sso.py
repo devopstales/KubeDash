@@ -1,7 +1,9 @@
 #!/usr/bin/env python3
 
+import json
 from functions.helper_functions import get_logger
 from functions.components import db
+from functions.user import SSOTokenUpdate
 from flask_login import UserMixin
 from sqlalchemy.ext.mutable import MutableList
 from sqlalchemy import PickleType, inspect
@@ -81,3 +83,39 @@ def get_auth_server_info():
     except:
         auth_server_info = None
     return auth_server_info, oauth
+
+def get_user_token(session):
+    if session['user_type'] == "OpenID":
+        """Refreshing an OAuth 2 token using a refresh token.
+        """
+        ssoServer = SSOSererGet()
+        auth_server_info, oauth = get_auth_server_info()
+
+        # Get OAuth2Session
+        oauth = OAuth2Session(
+            ssoServer.client_id,
+            redirect_uri = ssoServer.base_uri+"/callback",
+            scope = ssoServer.scope
+        )
+
+        # Use OAuth2Session to refresh tokens
+        token_new = oauth.refresh_token(
+            token_url = auth_server_info["token_endpoint"],
+            refresh_token = session['refresh_token'],
+            client_id = ssoServer.client_id,
+            client_secret = ssoServer.client_secret,
+            verify=False,
+            timeout=60,
+        )
+
+        # Store Updated Token Data in User session
+        session['oauth_token']   = token_new
+        session['refresh_token'] = token_new.get("refresh_token")
+
+        # Store Updated Token Data in DB
+        SSOTokenUpdate(session['username'], json.dumps(token_new))
+
+        user_token = session['oauth_token']
+    else:
+        user_token = None
+    return user_token
