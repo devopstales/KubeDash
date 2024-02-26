@@ -3,8 +3,8 @@ apiVersion: v2
 name: kubedash
 description: "KubeDash is a general purpose, web-based UI for Kubernetes clusters."
 type: application
-version: 1.0.0
-appVersion: "1.0.0"
+version: 3.0.0
+appVersion: "3.0.0"
 kubeVersion: ">=1.19.x-0"
 keywords:
   - kubedash

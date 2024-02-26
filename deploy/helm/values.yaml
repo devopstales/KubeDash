@@ -17,7 +17,7 @@ image:
   # -- The docker image pull policy
   pullPolicy: Always
   # -- The docker image tag to use
-  tag: 2.0.0
+  tag: 3.0.0
 
 # -- pullsecrets
 imagePullSecrets: []
@@ -83,7 +83,7 @@ cluster:
     cert data here
     -----END CERTIFICATE-----
   # `caCrt` is the public / CA cert for the cluster
-  # cat /etc/kubernetes/pki/apiserver.crt
+  # cat /etc/kubernetes/pki/ca.crt
 
 # -- oidc connection information
 oidc:
@@ -103,6 +103,15 @@ oidc:
     name: "kubedash-oidc"
     # -- Secret must provide the following variables: OIDC_CLIENT_ID and OIDC_SECRET.
     useExistingSecret: false
+
+# -- enable plugins
+plugins:
+  registryUi:
+    # -- Enable registry UI plugin with set PLUGIN_REGISTRY_ENABLED
+    enabled: false
+  helmDashboard:
+    # -- Enable helm dashboard plugin with set PLUGIN_HELM_ENABLED
+    enabled: true
 
 persistence:
   # -- Volumes for the pod
