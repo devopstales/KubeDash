@@ -235,9 +235,9 @@ def SSOGroupsCreate(user_name, group_name):
         if user and not group:
             if tracer and span.is_recording():
                 span.set_attribute("group.name", group_name)
-                span.set_attribute("user.name", group_name)
+                span.set_attribute("user.name", user_name)
             group = SSOGroups(name = group_name)
-            user.sso_groups.append(group)
+            logger.debug("SSOGroupsCreate: Create %s group" % group_name)
             db.session.add(group)
             db.session.commit()
 
@@ -245,10 +245,12 @@ def SSOGroupsUpdate(user_name, group_name):
     with tracer.start_as_current_span("update-sso-group") if tracer else nullcontext() as span:
         group = SSOGroupTest(group_name)
         user = UserTest(user_name)
-        if user and group:
+        user_not_member = SSOUserGroups.query.filter(SSOUserGroups.group_id == group.id).filter(SSOUserGroups.user_id == user.id).all()
+        if user and group and not user_not_member:
             if tracer and span.is_recording():
                 span.set_attribute("group.name", group_name)
-                span.set_attribute("user.name", group_name)
+                span.set_attribute("user.name", user_name)
+            logger.debug("SSOGroupsUpdate: Add %s user to %s group" % (user_name, group_name))
             user.sso_groups.append(group)
 
 def SSOGroupsList():
