@@ -9,9 +9,11 @@ from datetime import datetime
 from functions.helper_functions import get_logger, email_check
 from functions.sso import SSOSererGet, get_auth_server_info, SSOServerUpdate, SSOServerCreate, \
     get_user_token
-from functions.user import User, UsersRoles, Role, UserUpdate, UserCreate, UserDelete, \
-    SSOUserCreate, SSOTokenUpdate, SSOTokenGet, SSOGroupCreateFromList, SSOGroupsList, SSOGroupsMemberList, \
-    UserUpdatePassword, KubectlConfigStore, KubectlConfig
+from functions.user import User, UsersRoles, Role, \
+    UserUpdate, UserCreate, UserDelete, UserUpdatePassword, \
+    SSOUserCreate, SSOTokenUpdate, SSOTokenGet, SSOGroupCreateFromList, SSOGroupsList, \
+    SSOGroupsMemberList, SSOGroupsUpdateFromList, \
+    KubectlConfigStore, KubectlConfig
 from functions.k8s import *
 from functions.registry import *
 
@@ -443,7 +445,7 @@ def callback():
             user = User.query.filter_by(username=username, user_type = "OpenID").first()
         else:
             SSOTokenUpdate(username, user_token)
-            SSOGroupCreateFromList(username, user_data["groups"])
+            SSOGroupsUpdateFromList(username, user_data["groups"])
 
         user_role = UsersRoles.query.filter_by(user_id=user.id).first()
         role = Role.query.filter_by(id=user_role.role_id).first()

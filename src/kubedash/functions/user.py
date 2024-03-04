@@ -96,7 +96,8 @@ def UserCreate(username, password, email, user_type, role=None, tokens=None):
                     span.set_attribute("enduser.role", role)
                 role_data = Role.query.filter(Role.name == role).first()
                 user.roles.append(role_data)
-            kubectl = KubectlConfig.query.filter(KubectlConfig.name == username).first()
+            with db.session.no_autoflush:
+                kubectl = KubectlConfig.query.filter(KubectlConfig.name == username).first()
             if kubectl:
                 user.kubectl_config.append(kubectl)
             db.session.add(user)
@@ -218,23 +219,37 @@ def SSOGroupCreateFromList(username, groups):
     for group in groups:
         SSOGroupsCreate(username, group)
 
-def SSOGroupsCreate(username, groups_name):
-    user = User.query.filter_by(username=username).first()
-    sso_group_data = SSOGroups(
-        name = groups_name
-    )
-    sso_groups = SSOGroups.query.filter_by(name=groups_name).first()
-    if not sso_groups:
-        db.session.add(sso_group_data)
-        db.session.commit()
-        user.sso_groups.append(sso_group_data)
-    else:
-        sso_user = SSOUserGroups.query.filter(
-            SSOUserGroups.group_id == sso_groups.id,
-            SSOUserGroups.user_id == user.id
-        ).first()
-        if not sso_user:
-            user.sso_groups.append(sso_group_data)
+def SSOGroupsUpdateFromList(username, groups):
+    for group in groups:
+        SSOGroupsUpdate(username, group)
+
+def SSOGroupTest(group_name):
+    with tracer.start_as_current_span("test-sso-group") if tracer else nullcontext() as span:
+        group = SSOGroups.query.filter_by(name=group_name).first()
+        return group
+
+def SSOGroupsCreate(user_name, group_name):
+    with tracer.start_as_current_span("create-sso-group") if tracer else nullcontext() as span:
+        group = SSOGroupTest(group_name)
+        user = UserTest(user_name)
+        if user and not group:
+            if tracer and span.is_recording():
+                span.set_attribute("group.name", group_name)
+                span.set_attribute("user.name", group_name)
+            group = SSOGroups(name = group_name)
+            user.sso_groups.append(group)
+            db.session.add(group)
+            db.session.commit()
+
+def SSOGroupsUpdate(user_name, group_name):
+    with tracer.start_as_current_span("update-sso-group") if tracer else nullcontext() as span:
+        group = SSOGroupTest(group_name)
+        user = UserTest(user_name)
+        if user and group:
+            if tracer and span.is_recording():
+                span.set_attribute("group.name", group_name)
+                span.set_attribute("user.name", group_name)
+            user.sso_groups.append(group)
 
 def SSOGroupsList():
     sso_groups = SSOGroups.query.all()
