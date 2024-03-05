@@ -31,7 +31,7 @@ externalDatabase:
   host: ""
   port: 5432
   database: "kubedash"
-  user: "kubedash-user"
+  username: "kubedash-user"
   password: "kubedash-pass"
   secret:
     # -- Name of the secret storing EXTERNAL_DATABASE_PASSWORD.
@@ -40,7 +40,7 @@ externalDatabase:
     useExistingSecret: false
 
 # -- deploy HA postgresql
-postgresql-ha:
+postgresqlHa:
   enabled: false
   rbac:
     create: true
@@ -63,8 +63,8 @@ postgresql-ha:
 # https://artifacthub.io/packages/helm/bitnami/postgresql-ha
 
 # -- enable metrics-server
-metrics-server:
-  enabled: true
+metricsServer:
+  enabled: false
   args:
     - --kubelet-preferred-address-types=InternalIP
     - --kubelet-insecure-tls
@@ -83,7 +83,7 @@ cluster:
     cert data here
     -----END CERTIFICATE-----
   # `caCrt` is the public / CA cert for the cluster
-  # cat /etc/kubernetes/pki/apiserver.crt
+  # cat /etc/kubernetes/pki/ca.crt
 
 # -- oidc connection information
 oidc:
@@ -103,6 +103,15 @@ oidc:
     name: "kubedash-oidc"
     # -- Secret must provide the following variables: OIDC_CLIENT_ID and OIDC_SECRET.
     useExistingSecret: false
+
+# -- enable plugins
+plugins:
+  registryUi:
+    # -- Enable registry UI plugin with set PLUGIN_REGISTRY_ENABLED
+    enabled: false
+  helmDashboard:
+    # -- Enable helm dashboard plugin with set PLUGIN_HELM_ENABLED
+    enabled: true
 
 persistence:
   # -- Volumes for the pod
@@ -132,6 +141,19 @@ ingress:
   # -- Extra annotation to the Ingress object
   annotations:
     nginx.ingress.kubernetes.io/proxy-body-size: "10m"
+    nginx.ingress.kubernetes.io/proxy-read-timeout: "3600"
+    nginx.ingress.kubernetes.io/proxy-send-timeout: "3600"
+    nginx.ingress.kubernetes.io/server-snippets: |
+      location / {
+        proxy_set_header Upgrade $http_upgrade;
+        proxy_http_version 1.1;
+        proxy_set_header X-Forwarded-Host $http_host;
+        proxy_set_header X-Forwarded-Proto $scheme;
+        proxy_set_header X-Forwarded-For $remote_addr;
+        proxy_set_header Host $host;
+        proxy_set_header Connection "upgrade";
+        proxy_cache_bypass $http_upgrade;
+      }
   tls:
     # -- Enable tls on Ingress object
     enabled: true

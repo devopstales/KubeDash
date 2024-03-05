@@ -1,0 +1,13 @@
+Thank you for installing {{ .Chart.Name }}.
+
+Your release is named {{ .Release.Name }}.
+
+Login to the application URL with admin / admin:
+{{- if .Values.ingress.enabled }}
+   http{{ if $.Values.ingress.tls }}s{{ end }}://{{ $.Values.ingress.url }}
+{{- else if .Values.route.enabled }}
+   http://{{ $.Values.route.url }}
+{{- end }}
+
+To learn more about the release, try:
+   Check the documentation: https://devopstales.github.io/KubeDash/1.0/

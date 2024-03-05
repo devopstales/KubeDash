@@ -1,9 +1,9 @@
 dependencies:
 - name: postgresql-ha
   repository: https://charts.bitnami.com/bitnami
-  version: 11.9.4
+  version: 13.4.5
 - name: metrics-server
   repository: https://kubernetes-sigs.github.io/metrics-server/
   version: 3.8.4
-digest: sha256:fb1f375438175c5239a6b8486a0788d664516edce1bdcb8a977fdaba2184dadc
-generated: "2023-09-21T14:36:25.816434+02:00"
+digest: sha256:8b742b0b83b5f6ec8469884285f97fcc2d253b421211d144cf1f617cff963203
+generated: "2024-03-05T11:12:34.381423+01:00"
