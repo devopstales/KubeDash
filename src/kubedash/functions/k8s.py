@@ -99,7 +99,7 @@ def k8sListNamespaces(username_role, user_token):
             return namespace_list, None
         except ApiException as error:
             if error.status != 404:
-                ErrorHandler(logger, error, "list namespaces")
+                ErrorHandler(logger, error, "list namespaces - %s " % error.status)
             if tracer and span.is_recording():
                 span.set_status(Status(StatusCode.ERROR, "%s list namespaces" % error))
             namespace_list = ""
@@ -185,7 +185,7 @@ def k8sNamespaceCreate(username_role, user_token, ns_name):
         flash("Namespace Created Successfully", "success")
     except ApiException as error:
         if error.status != 404:
-            ErrorHandler(logger, error, "create namespace")
+            ErrorHandler(logger, error, "create namespace - %s " % error.status)
     except Exception as error:
         ERROR = "k8sNamespaceCreate: %s" % error
         ErrorHandler(logger, "error", ERROR)
@@ -200,7 +200,7 @@ def k8sNamespaceDelete(username_role, user_token, ns_name):
         flash("Namespace Deleted Successfully", "success")
     except ApiException as error:
         if error.status != 404:
-            ErrorHandler(logger, error, "create namespace")
+            ErrorHandler(logger, error, "create namespace - %s " % error.status)
     except Exception as error:
         ERROR = "k8sNamespaceDelete: %s" % error
         ErrorHandler(logger, "error", ERROR)
@@ -462,7 +462,7 @@ def k8sGetClusterMetric():
             return clusterMetric
         except ApiException as error:
             if error.status != 404:
-                ErrorHandler(logger, error, "Cannot Connect to Kubernetes")
+                ErrorHandler(logger, error, "Cannot Connect to Kubernetes - %s " % error.status)
             if tracer and span.is_recording():
                 span.set_status(Status(StatusCode.ERROR, "Cannot Connect to Kubernetes: %s" % error))
             return bad_clusterMetric
@@ -546,7 +546,7 @@ def k8sGetNodeMetric(node_name):
                 return None
     except ApiException as error:
         if error.status != 404:
-            ErrorHandler(logger, error, "Cannot Connect to Kubernetes")
+            ErrorHandler(logger, error, "Cannot Connect to Kubernetes - %s " % error.status)
         return None
     except Exception as error:
         ErrorHandler(logger, "CannotConnect", "Cannot Connect to Kubernetes")
@@ -577,7 +577,7 @@ def k8sPVCMetric(namespace):
         return PVC_LIST
     except ApiException as error:
         if error.status != 404:
-            ErrorHandler(logger, error, "get Persistent Volume Claim Metrics")
+            ErrorHandler(logger, error, "get Persistent Volume Claim Metrics - %s" % error.status)
         return PVC_LIST
     except Exception as error:
         return PVC_LIST
@@ -741,7 +741,7 @@ def k8sUserClusterRoleTemplateListGet(username_role, user_token):
             return CLUSTER_ROLE_LIST
     except ApiException as error:
         if error.status != 404:
-            ErrorHandler(logger, error, "get cluster roles")
+            ErrorHandler(logger, error, "get cluster roles - %s" % error.status)
     except Exception as error:
         return
     
@@ -759,7 +759,7 @@ def k8sUserRoleTemplateListGet(username_role, user_token):
             return CLUSTER_ROLE_LIST
     except ApiException as error:
         if error.status != 404:
-            ErrorHandler(logger, error, "get cluster roles")
+            ErrorHandler(logger, error, "get cluster roles - %s" % error.status)
         return CLUSTER_ROLE_LIST
     except Exception as error:
         return CLUSTER_ROLE_LIST
@@ -993,7 +993,7 @@ def k8sListNodes(username_role, user_token):
         return node_list, None
     except ApiException as error:
         if error.status != 404:
-            ErrorHandler(logger, error, "list nodes")
+            ErrorHandler(logger, error, "list nodes - %s " % error.status)
         return node_list, error
     except Exception as error:
         ErrorHandler(logger, "CannotConnect", "k8sListNodes: %s" % error)
@@ -1127,7 +1127,7 @@ def k8sHPAListGet(username_role, user_token, ns_name):
         return HPA_LIST
     except ApiException as error:
         if error.status != 404:
-            ErrorHandler(logger, error, "get Horizontal Pod Autoscaler list")
+            ErrorHandler(logger, error, "get Horizontal Pod Autoscaler list - %s" % error.status)
         return HPA_LIST
     except Exception as error:
         return HPA_LIST
@@ -1164,7 +1164,7 @@ def k8sPodDisruptionBudgetListGet(username_role, user_token, ns_name):
         return PDB_LIST
     except ApiException as error:
         if error.status != 404:
-            ErrorHandler(logger, error, "get DisruptionBudgetList")
+            ErrorHandler(logger, error, "get DisruptionBudgetList - %s" % error.status)
         return PDB_LIST
     except Exception as error:
         ERROR = "k8sPodDisruptionBudgetListGet: %s" % error
@@ -1198,7 +1198,7 @@ def k8sQuotaListGet(username_role, user_token, ns_name):
         return RQ_LIST
     except ApiException as error:
         if error.status != 404:
-            ErrorHandler(logger, error, "get resource quota list")
+            ErrorHandler(logger, error, "get resource quota list - %s" % error.status)
         return RQ_LIST
     except Exception as error:
         ERROR = "k8sQuotaListGet: %s" % error
@@ -1227,7 +1227,7 @@ def k8sLimitRangeListGet(username_role, user_token, ns_name):
         return LR_LIST
     except ApiException as error:
         if error.status != 404:
-            ErrorHandler(logger, error, "get Limit Range list")
+            ErrorHandler(logger, error, "get Limit Range list - %s" % error.status)
         return LR_LIST
     except Exception as error:
         ERROR = "k8sLimitRangeListGet: %s" % error
@@ -1345,7 +1345,7 @@ def k8sStatefulSetsGet(username_role, user_token, ns):
         return STATEFULSET_LIST
     except ApiException as error:
         if error.status != 404:
-            ErrorHandler(logger, error, "get statefullsets list")
+            ErrorHandler(logger, error, "get statefullsets list - %s" % error.status)
         return STATEFULSET_LIST
     except Exception as error:
         ERROR = "k8sStatefulSetsGet: %s" % error
@@ -1508,7 +1508,7 @@ def k8sDaemonSetsGet(username_role, user_token, ns):
         return DAEMONSET_LIST
     except ApiException as error:
         if error.status != 404:
-            ErrorHandler(logger, error, "get daemonsets list")
+            ErrorHandler(logger, error, "get daemonsets list - %s" % error.status)
         return DAEMONSET_LIST
     except Exception as error:
         ERROR = "k8sDaemonSetsGet: %s" % error
@@ -1643,7 +1643,7 @@ def k8sDeploymentsGet(username_role, user_token, ns):
         return DEPLOYMENT_LIST
     except ApiException as error:
         if error.status != 404:
-            ErrorHandler(logger, error, "get deployments list")
+            ErrorHandler(logger, error, "get deployments list - %s" % error.status)
         return DEPLOYMENT_LIST
     except Exception as error:
         ERROR = "k8sDeploymentsGet: %s" % error
@@ -1734,7 +1734,7 @@ def k8sReplicaSetsGet(username_role, user_token, ns):
         return REPLICASET_LIST
     except ApiException as error:
         if error.status != 404:
-            ErrorHandler(logger, error, "get replicasets list")
+            ErrorHandler(logger, error, "get replicasets list - %s" % error.status)
         return REPLICASET_LIST
     except Exception as error:
         ERROR = "k8sReplicaSetsGet: %s" % error
@@ -1764,7 +1764,7 @@ def k8sPodListGet(username_role, user_token, ns):
         return POD_LIST
     except ApiException as error:
         if error.status != 404:
-            ErrorHandler(logger, error, "get pod list")
+            ErrorHandler(logger, error, "get pod list - %s" % error.status)
         return POD_LIST
 
 def k8sPodGet(username_role, user_token, ns, po):
@@ -1886,7 +1886,7 @@ def k8sPodGet(username_role, user_token, ns, po):
         return POD_DATA
     except ApiException as error:
         if error.status != 404:
-            ErrorHandler(logger, error, "get pods in this namespace")
+            ErrorHandler(logger, error, "get pods in this namespace - %s" % error.status)
         return POD_DATA
     except Exception as error:
         ERROR = "k8sPodGet: %s" % error
@@ -1901,7 +1901,7 @@ def k8sPodListVulnsGet(username_role, user_token, ns):
         pod_list = k8s_client.CoreV1Api().list_namespaced_pod(ns)
     except ApiException as error:
         if error.status != 404:
-            ErrorHandler(logger, error, "get cluster roles")
+            ErrorHandler(logger, error, "get cluster roles - %s" % error.status)
         return HAS_REPORT, POD_VULN_LIST
     except Exception as error:
         ERROR = "k8sPodListVulnsGet: %s" % error
@@ -1955,7 +1955,7 @@ def k8sPodVulnsGet(username_role, user_token, ns, pod):
         pod_list = k8s_client.CoreV1Api().list_namespaced_pod(ns)
     except ApiException as error:
         if error.status != 404:
-            ErrorHandler(logger, error, "get cluster roles")
+            ErrorHandler(logger, error, "get cluster roles - %s" % error.status)
         return HAS_REPORT, POD_VULNS
     except Exception as error:
         ERROR = "k8sPodVulnsGet: %s" % error
@@ -2021,7 +2021,7 @@ def k8sPodGetContainers(username_role, user_token, namespace, pod_name):
 
         return POD_CONTAINER_LIST, POD_INIT_CONTAINER_LIST
     except ApiException as error:
-        ErrorHandler(logger, error, "get pod")
+        ErrorHandler(logger, error, "get pod - %s" % error.status)
         return POD_CONTAINER_LIST, POD_INIT_CONTAINER_LIST
     except Exception as error:
         ERROR = "k8sPodGetContainers: %s" % error
@@ -2047,7 +2047,7 @@ def k8sPodLogsStream(username_role, user_token, namespace, pod_name, container):
             socketio.emit('response',
                                 {'data': str(line)}, namespace="/log")
     except ApiException as error:
-            NoGlashErrorHandler(logger, error, "get logStream")
+            NoGlashErrorHandler(logger, error, "get logStream - %s" % error.status)
     except Exception as error:
         ERROR = "k8sPodLogsStream: %s" % error
         NoGlashErrorHandler(logger, "error", ERROR)
@@ -2108,7 +2108,7 @@ def k8sSaListGet(username_role, user_token, ns):
         return SA_LIST
     except ApiException as error:
         if error.status != 404:
-            ErrorHandler(logger, error, "get service account list")
+            ErrorHandler(logger, error, "get service account list - %s" % error.status)
         return SA_LIST
     except Exception as error:
         ERROR = "k8sSaListGet: %s" % error
@@ -2135,7 +2135,7 @@ def k8sRoleListGet(username_role, user_token, ns):
         return ROLE_LIST
     except ApiException as error:
         if error.status != 404:
-            ErrorHandler(logger, error, "get roles list")
+            ErrorHandler(logger, error, "get roles list - %s" % error.status)
         return ROLE_LIST
     except Exception as error:
         ERROR = "k8sRoleListGet: %s" % error
@@ -2172,15 +2172,15 @@ def k8sRoleBindingListGet(username_role, user_token, ns):
                 elif obj.kind == "ServiceAccount":
                     ROLE_BINDING_INFO['ServiceAccount'].append({obj.name: obj.namespace})
             ROLE_BINDING_LIST.append(ROLE_BINDING_INFO)    
-        return ROLE_BINDING_LIST
+        return ROLE_BINDING_LIST, None
     except ApiException as error:
         if error.status != 404:
-            ErrorHandler(logger, error, "get role bindings list")
-        return ROLE_BINDING_LIST
+            ErrorHandler(logger, error, "get role bindings list - %s" % error.status)
+        return ROLE_BINDING_LIST, error
     except Exception as error:
         ERROR = "k8sRoleBindingListGet: %s" % error
         ErrorHandler(logger, "error", ERROR)
-        return ROLE_BINDING_LIST
+        return ROLE_BINDING_LIST, error
 
 def k8sRoleBindingGet(obeject_name, namespace):
     k8sClientConfigGet("Admin", None)
@@ -2207,12 +2207,16 @@ def k8sRoleBindingGroupGet(group_name, username_role, user_token):
     k8sClientConfigGet(username_role, user_token)
     group_role_binding = list()
     namespace_list, error = k8sNamespaceListGet("Admin", None)
-    for ns in namespace_list:
-        role_binding_list = k8sRoleBindingListGet(username_role, user_token, ns)
-        for role_binding in role_binding_list:
-            if group_name in role_binding["group"]:
-                role_binding["namespace"] = ns
-                group_role_binding.append(role_binding)
+    if not error:
+        for ns in namespace_list:
+            role_binding_list, error = k8sRoleBindingListGet(username_role, user_token, ns)
+            if not error:
+                for role_binding in role_binding_list:
+                    if group_name in role_binding["group"]:
+                        role_binding["namespace"] = ns
+                        group_role_binding.append(role_binding)
+            else:
+                break
     return group_role_binding
 
 def k8sRoleBindingCreate(user_role, namespace, username, group_name):
@@ -2294,7 +2298,7 @@ def k8sRoleBindingAdd(user_role, username, group_name, user_namespaces, user_all
     for namespace in namespace_list:
         is_rolebinding_exists, error = k8sRoleBindingGet(obeject_name, namespace)
         if error:
-            ErrorHandler(logger, error, "get RoleBinding %s" % obeject_name)
+            ErrorHandler(logger, error, "get RoleBinding %s - %s" % (obeject_name, error.status))
         else:
             if is_rolebinding_exists:
                 ErrorHandler(logger, "CannotConnect", "RoleBinding %s alredy exists in %s namespace" % (obeject_name, namespace))
@@ -2326,7 +2330,7 @@ def k8sClusterRoleListGet(username_role, user_token):
             return CLUSTER_ROLE_LIST
     except ApiException as error:
         if error.status != 404:
-            ErrorHandler(logger, error, "get cluster role list")
+            ErrorHandler(logger, error, "get cluster role list - %s" % error.status)
         return CLUSTER_ROLE_LIST
     except Exception as error:
         ERROR = "k8sClusterRoleListGet: %s" % error
@@ -2365,15 +2369,15 @@ def k8sClusterRoleBindingListGet(username_role, user_token):
                         CLUSTER_ROLE_BINDING_INFO["ServiceAccount"].append({obj.name: obj.namespace})
 
             CLUSTER_ROLE_BINDING_LIST.append(CLUSTER_ROLE_BINDING_INFO)
-        return CLUSTER_ROLE_BINDING_LIST
+        return CLUSTER_ROLE_BINDING_LIST, None
     except ApiException as error:
         if error.status != 404:
-            ErrorHandler(logger, error, "get cluster role bindings list")
-        return CLUSTER_ROLE_BINDING_LIST
+            ErrorHandler(logger, error, "get cluster role bindings list - %s" % error.status)
+        return CLUSTER_ROLE_BINDING_LIST, error
     except Exception as error:
         ERROR = "k8sClusterRoleBindingListGet: %s" % error
         ErrorHandler(logger, "error", ERROR)
-        return CLUSTER_ROLE_BINDING_LIST
+        return CLUSTER_ROLE_BINDING_LIST, error
 
 def k8sClusterRoleBindingGet(obeject_name):
     k8sClientConfigGet("Admin", None)
@@ -2398,11 +2402,12 @@ def k8sClusterRoleBindingGet(obeject_name):
     
 def k8sClusterRoleBindingGroupGet(group_name, username_role, user_token):
     k8sClientConfigGet(username_role, user_token)
-    cluster_role_binding_list = k8sClusterRoleBindingListGet(username_role, user_token)
+    cluster_role_binding_list, error = k8sClusterRoleBindingListGet(username_role, user_token)
     group_cluster_role_binding = list()
-    for cluster_role_binding in cluster_role_binding_list:
-        if group_name in cluster_role_binding["group"]:
-            group_cluster_role_binding.append(cluster_role_binding)
+    if not error:
+        for cluster_role_binding in cluster_role_binding_list:
+            if group_name in cluster_role_binding["group"]:
+                group_cluster_role_binding.append(cluster_role_binding)
     return group_cluster_role_binding
 
 def k8sClusterRoleBindingCreate(user_cluster_role, username, group_name):
@@ -2472,7 +2477,7 @@ def k8sClusterRoleBindingAdd(user_cluster_role, username, group_name):
 
     is_clusterrolebinding_exists, error = k8sClusterRoleBindingGet(obeject_name)
     if error:
-        ErrorHandler(logger, error, "get ClusterRoleBinding %s" % obeject_name)
+        ErrorHandler(logger, error, "get ClusterRoleBinding %s - %s" % (obeject_name, error.status))
     else:
         if is_clusterrolebinding_exists:
             ErrorHandler(logger, "CannotConnect", "ClusterRoleBinding %s alredy exists" % obeject_name)
@@ -2574,7 +2579,7 @@ def k8sIngressClassListGet(username_role, user_token,):
         return ING_LIST
     except ApiException as error:
         if error.status != 404:
-            ErrorHandler(logger, error, "get ingress class list")
+            ErrorHandler(logger, error, "get ingress class list - %s" % error.status)
         return ING_LIST
     except Exception as error:
         ERROR = "k8sIngressClassListGet: %s" % error
@@ -2617,7 +2622,7 @@ def k8sIngressListGet(username_role, user_token, ns):
         return ING_LIST
     except ApiException as error:
         if error.status != 404:
-            ErrorHandler(logger, error, "get ingress list")
+            ErrorHandler(logger, error, "get ingress list - %s" % error.status)
         return ING_LIST
     except Exception as error:
         ERROR = "k8sIngressListGet: %s" % error
@@ -2648,7 +2653,7 @@ def k8sNetworkPolicyListGet(username_role, user_token, ns):
         return POLICY_LIST
     except ApiException as error:
         if error.status != 404:
-            ErrorHandler(logger, error, "get network policy list")
+            ErrorHandler(logger, error, "get network policy list - %s" % error.status)
         return POLICY_LIST
     except Exception as error:
         ERROR = "k8sNetworkPolicyListGet: %s" % error
@@ -2683,7 +2688,7 @@ def k8sServiceListGet(username_role, user_token, ns):
         return SERVICE_LIST
     except ApiException as error:
         if error.status != 404:
-            ErrorHandler(logger, error, "get service list")
+            ErrorHandler(logger, error, "get service list - %s" % error.status)
         return SERVICE_LIST
     except Exception as error:
         ERROR = "k8sServiceListGet: %s" % error
@@ -2715,7 +2720,7 @@ def k8sPodSelectorListGet(username_role, user_token, ns, selectors):
         return POD_LIST
     except ApiException as error:
         if error.status != 404:
-            ErrorHandler(logger, error, "get pod selector list")
+            ErrorHandler(logger, error, "get pod selector list - %s" % error.status)
         return POD_LIST
     except Exception as error:
         ERROR = "k8sPodSelectorListGet: %s" % error
@@ -2748,7 +2753,7 @@ def k8sStorageClassListGet(username_role, user_token):
             SC_LIST.append(SC)
         return SC_LIST
     except ApiException as error:
-        ErrorHandler(logger, error, "get cluster Stotage Class list")
+        ErrorHandler(logger, error, "get cluster Stotage Class list - %s" % error.status)
         return SC_LIST
     except Exception as error:
         ERROR = "k8sStorageClassListGet: %s" % error
@@ -2780,9 +2785,7 @@ def k8sSnapshotClassListGet(username_role, user_token):
         return SC_LIST
     except ApiException as error:
         if error.status != 404:
-            ErrorHandler(logger, error, "get cluster Snapshot Class list")
-        if error.status != 404:
-            ErrorHandler(logger, error, "get cluster Snapshot Class list")
+            ErrorHandler(logger, error, "get cluster Snapshot Class list - %s" % error.status)
         return SC_LIST
     except Exception as error:
         ERROR = "k8sSnapshotClassListGet: %s" % error
@@ -2815,7 +2818,7 @@ def k8sPersistentVolumeClaimListGet(username_role, user_token, namespace):
         return PVC_LIST
     except ApiException as error:
         if error.status != 404:
-            ErrorHandler(logger, error, "get Persistent Volume ClaimList list")
+            ErrorHandler(logger, error, "get Persistent Volume ClaimList list - %s" % error.status)
         return PVC_LIST
     except Exception as error:
         ERROR = "k8sPersistentVolumeClaimListGet: %s" % error
@@ -2861,7 +2864,7 @@ def k8sPersistentVolumeListGet(username_role, user_token, namespace):
         return PV_LIST
     except ApiException as error:
         if error.status != 404:
-            ErrorHandler(logger, error, "get cluster Persistent Volume list")
+            ErrorHandler(logger, error, "get cluster Persistent Volume list - %s" % error.status)
         return PV_LIST
     except Exception as error:
         ERROR = "k8sPersistentVolumeListGet: %s" % error
@@ -2894,7 +2897,7 @@ def k8sPersistentVolumeSnapshotListGet(username_role, user_token):
             PVS_LIST.append(PVS)
         return PVS_LIST
     except ApiException as error:
-        ErrorHandler(logger, error, "get Volume Snapshot list")
+        ErrorHandler(logger, error, "get Volume Snapshot list - %s" % error.status)
         return PVS_LIST
     except Exception as error:
         ERROR = "k8sPersistentVolumeSnapshotListGet: %s" % error
@@ -2996,7 +2999,7 @@ def k8sHelmChartListGet(username_role, user_token, namespace):
         return HAS_CHART, CHART_LIST
     except ApiException as error:
         if error.status != 404:
-            ErrorHandler(logger, error, "get helm release")
+            ErrorHandler(logger, error, "get helm release - %s" % error.status)
         return HAS_CHART, CHART_LIST
     except Exception as error:
         ERROR = "k8sHelmChartListGet: %s" % error
