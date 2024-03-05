@@ -205,7 +205,12 @@ app = create_app()
 app.config["plugins"] = {
         "registry": var_test(os.getenv('PLUGIN_REGISTRY_ENABLED', "False")),
         "helm": var_test(os.getenv('PLUGIN_HELM_ENABLED', "True")),
+        "gateway_api": var_test(os.getenv('PLUGIN_GATEWAY_API_ENABLED', "False")),
     }
+
+if app.config["plugins"]["gateway_api"]:
+    from plugins.gateway_api import gateway_api
+    app.register_blueprint(gateway_api)
 
 ##############################################################
 ## Liveness and redyes probe
