@@ -2364,7 +2364,7 @@ def k8sClusterRoleBindingListGet(username_role, user_token):
                     elif obj.kind == "ServiceAccount":
                         CLUSTER_ROLE_BINDING_INFO["ServiceAccount"].append({obj.name: obj.namespace})
 
-                    CLUSTER_ROLE_BINDING_LIST.append(CLUSTER_ROLE_BINDING_INFO)
+            CLUSTER_ROLE_BINDING_LIST.append(CLUSTER_ROLE_BINDING_INFO)
         return CLUSTER_ROLE_BINDING_LIST
     except ApiException as error:
         if error.status != 404:
