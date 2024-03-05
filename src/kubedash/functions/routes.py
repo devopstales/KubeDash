@@ -1753,7 +1753,7 @@ def role_bindings():
 
     namespace_list, error = k8sNamespaceListGet(session['user_role'], user_token)
     if not error:
-        role_bindings = k8sRoleBindingListGet(session['user_role'], user_token, session['ns_select'])
+        role_bindings, error = k8sRoleBindingListGet(session['user_role'], user_token, session['ns_select'])
     else:
         role_bindings = list()
 
@@ -1815,7 +1815,7 @@ def cluster_role_bindings():
     if request.method == 'POST':
         crb_name = request.form.get('crb_name')
 
-    cluster_role_bindings = k8sClusterRoleBindingListGet(session['user_role'], user_token)
+    cluster_role_bindings, error = k8sClusterRoleBindingListGet(session['user_role'], user_token)
     return render_template(
         'cluster-role-bindings.html.j2',
         cluster_role_bindings = cluster_role_bindings,
