@@ -1,4 +1,3 @@
-
 apiVersion: v1
 kind: ConfigMap
 metadata:
@@ -15,10 +14,19 @@ data:
   EXTERNAL_DATABASE_HOST: {{ .Values.externalDatabase.host | quote }}
   EXTERNAL_DATABASE_DB: {{ .Values.externalDatabase.database | quote }}
 {{ end }}
+{{ if .Values.postgresqlHa.enabled }}
+  EXTERNAL_DATABASE_ENABLED: {{ .Values.postgresqlHa.enabled | quote }}
+  EXTERNAL_DATABASE_HOST: "{{ .Release.Name }}-pgpool"
+  EXTERNAL_DATABASE_DB: {{ .Values.postgresqlHa.database | quote }}
+{{ end }}
 {{ if .Values.oidc.enabled }}
   OIDC_ISSUER_URL: {{ .Values.oidc.provider.oidcUrl | quote}}
   OIDC_SCOPE: {{ .Values.oidc.provider.oidcScopes | quote}}
-  OIDC_CALLBACK_URL: {{ .Values.oidc.provider.oidcSecret | quote}}
+  {{ if .Values.ingress.tls.enabled }}
+  OIDC_CALLBACK_URL: "https://{{ .Values.ingress.url}}"
+  {{ else }}
+  OIDC_CALLBACK_URL: "http://{{ .Values.ingress.url}}"
+  {{ end }}
 {{ if not .Values.oidc.secret.useExistingSecret }}
 ---
 apiVersion: v1
@@ -32,9 +40,8 @@ data:
   OIDC_CLIENT_ID: {{ .Values.oidc.provider.oidcClientId | b64enc | quote }}
   OIDC_SECRET: {{ .Values.oidc.provider.oidcSecret | b64enc | quote }}
 {{ end }}
+{{ end }}
 {{ if .Values.externalDatabase.enabled }}
-{{ end }}
-{{ end }}
 {{ if not .Values.externalDatabase.secret.useExistingSecret }}
 ---
 apiVersion: v1
@@ -45,6 +52,20 @@ metadata:
     app: kubedash
     {{- include "kubedash.labels" . | nindent 4 }}
 data:
-  EXTERNAL_DATABASE_USER: {{ .Values.externalDatabase.user | b64enc | quote }}
+  EXTERNAL_DATABASE_USER: {{ .Values.externalDatabase.username | b64enc | quote }}
   EXTERNAL_DATABASE_PASSWORD: {{ .Values.externalDatabase.password | b64enc | quote }}
+{{ end }}
+{{ end }}
+{{ if .Values.postgresqlHa.enabled }}
+---
+apiVersion: v1
+kind: Secret
+metadata:
+  name: {{ .Values.externalDatabase.secret.name }}
+  labels:
+    app: kubedash
+    {{- include "kubedash.labels" . | nindent 4 }}
+data:
+  EXTERNAL_DATABASE_USER: {{ .Values.postgresqlHa.postgresql.username | b64enc | quote }}
+  EXTERNAL_DATABASE_PASSWORD: {{ .Values.postgresqlHa.postgresql.password | b64enc | quote }}
 {{ end }}
