@@ -4,7 +4,7 @@ name: kubedash
 description: "KubeDash is a general purpose, web-based UI for Kubernetes clusters."
 type: application
 version: 3.0.0
-appVersion: "3.0.0"
+appVersion: "2.0.0"
 kubeVersion: ">=1.19.x-0"
 keywords:
   - kubedash
@@ -21,8 +21,8 @@ dependencies:
   - name: postgresql-ha
     version: ">=11.9.4"
     repository: "https://charts.bitnami.com/bitnami"
-    condition: postgresql-ha.enabled
+    condition: postgresqlHa.enabled
   - name: metrics-server
     version: 3.8.4
     repository: https://kubernetes-sigs.github.io/metrics-server/
-    condition: metrics-server.enabled
+    condition: metricsServer.enabled

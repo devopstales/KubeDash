@@ -50,6 +50,14 @@ spec:
           - name: VERBOSE_LOG
             value: "True"
 {{- end }}
+{{- if .Values.plugins.registryUi.enabled }}
+          - name: PLUGIN_REGISTRY_ENABLED
+            value: "True"
+{{- end }}
+{{- if .Values.plugins.helmDashboard.enabled }}
+          - name: PLUGIN_HELM_ENABLED
+            value: "True"
+{{- end }}
         envFrom:
           - configMapRef: 
               name: {{ include "kubedash.fullname" . }}-config
@@ -60,14 +68,6 @@ spec:
 {{- if .Values.externalDatabase.enabled }}
           - secretRef:
               name: {{ .Values.externalDatabase.secret.name }}
-{{- end }}
-{{- if .Values.plugins.registryUi.enabled }}
-          - name: PLUGIN_REGISTRY_ENABLED
-            value: "True"
-{{- end }}
-{{- if .Values.plugins.helmDashboard.enabled }}
-          - name: PLUGIN_HELM_ENABLED
-            value: "True"
 {{- end }}
         livenessProbe:
           httpGet:
