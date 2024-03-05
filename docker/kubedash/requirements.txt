@@ -9,7 +9,7 @@ pytz==2023.3.post1
 psycopg2==2.9.7
 SQLAlchemy==2.0.17
 sqlalchemy_utils==0.41.1
-flask_migrate==4.0.5
+flask_migrate==4.0.4
 flask_sqlalchemy==3.0.5
 # login
 flask_login==0.6.2
@@ -42,7 +42,7 @@ gunicorn==21.2.0
 certifi==2024.2.2
 setuptools==67.8.0
 pyOpenSSL==24.0.0
-cryptography==42.0.5
+cryptography==42.0.4
 ipython==8.14.0 # not directly required, pinned by Snyk to avoid a vulnerability
 gevent>=23.9.0 # not directly required, pinned by Snyk to avoid a vulnerability
 requests>=2.31.0 # not directly required, pinned by Snyk to avoid a vulnerability
