@@ -9,7 +9,7 @@ pytz==2023.3.post1
 psycopg2==2.9.7
 SQLAlchemy==2.0.17
 sqlalchemy_utils==0.41.1
-flask_migrate==4.0.4
+flask_migrate==4.0.5
 flask_sqlalchemy==3.0.5
 # login
 flask_login==0.6.2
