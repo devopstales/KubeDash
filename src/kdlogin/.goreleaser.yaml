@@ -50,7 +50,7 @@ archives:
 
 brews:
   - name: kdlogin
-    tap:
+    repository:
       owner: devopstales
       name: homebrew-devopstales
     homepage: "https://devopstales.github.io"
@@ -66,7 +66,7 @@ brews:
 
 krews:
   - name: kdlogin
-    index:
+    repository:
       owner: devopstales
       name: krew
     homepage: "https://devopstales.github.io"
