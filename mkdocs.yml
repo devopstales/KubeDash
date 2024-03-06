@@ -13,10 +13,9 @@ nav:
       - Configuration: installation/configuration.md
       - Platforms: installation/platforms.md
     - Functions:
-      - Features: functions/features.md
       - Authentication: functions/authentication.md
-      - Management Users: functions/users.md
-      - Management User Roles: functions/rbac.md
+      - User Management: functions/users.md
+      - Manage Privileges: functions/rbac.md
       - Connect a Kubernetes Cluster: functions/k8s-api.md
     - Integrations:
       - Kubectl Plugin: integrations/kubectl-plugin.md
