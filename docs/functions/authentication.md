@@ -2,7 +2,7 @@
 
 To log in for the first time the default user and password is `admin` `admin`. After you log into the web-ui you will alert to change the default admin password.
 
-![First Login](../img/KubeDash_1.0_pic_03.png)
+![First Login](../img/KubeDash_3.0_pic_03.png)
 
 ## Authentication
 
@@ -11,7 +11,7 @@ One of the key features that KubeDash adds to Kubernetes is centralized user man
 ![First Login](../img/KubeDash_1.1_pic_02_login.png)
 ### Configure OIDC provider
 
-To add an OIDC provider to KubeDash go to `Settings > SSO Configuration`:
+To add an OIDC provider to KubeDash go to `Settings > Auth Provider`:
 
 | Parameter | Description |
 |-----------|-------------|
