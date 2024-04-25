@@ -5,6 +5,7 @@
 test*
 *.crt
 *manage.py
+src/kubedash/run.sh
 
 # deploy
 docker/kubedash/kubedash
