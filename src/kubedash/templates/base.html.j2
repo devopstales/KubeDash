@@ -361,6 +361,9 @@
                         {% if config.plugins["helm"] %}
                         <a class="collapse-item" href="/charts">Helm Charts</a>
                         {% endif %}
+                        {% if config.plugins["cert_manager"] %}
+                        <a class="collapse-item" href="/cert-manager">Cert-Manager</a>
+                        {% endif %}
                     </div>
                 </div>
             </li>

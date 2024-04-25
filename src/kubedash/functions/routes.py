@@ -266,6 +266,7 @@ def cluster_metrics():
                     "log.severity": "warning",
                     "log.message": "You should change the default password!",
                 })
+
         return render_template(
             'cluster-metrics.html.j2',
             cluster_metrics = cluster_metrics

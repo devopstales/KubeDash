@@ -206,11 +206,23 @@ app.config["plugins"] = {
         "registry": var_test(os.getenv('PLUGIN_REGISTRY_ENABLED', "False")),
         "helm": var_test(os.getenv('PLUGIN_HELM_ENABLED', "True")),
         "gateway_api": var_test(os.getenv('PLUGIN_GATEWAY_API_ENABLED', "False")),
+        "cert_manager": var_test(os.getenv('PLUGIN_CERT_MANAGER_ENABLED', "False")),
     }
+
+"""Plugin Logging"""
+logger.info("Starting Plugins:")
+logger.info("	registry:	%s" % app.config["plugins"]["registry"])
+logger.info("	helm:		%s" % app.config["plugins"]["helm"])
+logger.info("	gateway_api:	%s" % app.config["plugins"]["gateway_api"])
+logger.info("	cert_manager:	%s" % app.config["plugins"]["cert_manager"])
 
 if app.config["plugins"]["gateway_api"]:
     from plugins.gateway_api import gateway_api
     app.register_blueprint(gateway_api)
+
+if app.config["plugins"]["cert_manager"]:
+    from plugins.cert_manager import cm_routes
+    app.register_blueprint(cm_routes)
 
 ##############################################################
 ## Liveness and redyes probe
