@@ -57,38 +57,6 @@ def health():
     resp.status_code = 200
     return resp
 
-@routes.errorhandler(404)
-def page_not_found404(e):
-    return render_template('404.html.j2'), 404
-
-@routes.errorhandler(400)
-def page_not_found400(e):
-    logger.error(e.description)
-    return render_template(
-        '400.html.j2',
-        description = e.description,
-        ), 400
-
-@routes.errorhandler(500)
-def page_not_found500(e):
-    logger.error(e.description)
-    return render_template(
-        '500.html.j2',
-        description = e.description,
-        ), 500
-
-@routes.after_request
-def add_header(response):
-    response.headers['Access-Control-Allow-Origin'] = request.root_url.rstrip(request.root_url[-1])
-    return response
-
-@routes.after_request
-def adding_header_content(head):
-    head.headers["Cache-Control"] = "no-cache, no-store, must-revalidate"
-    head.headers["Pragma"] = "no-cache"
-    head.headers["Expires"] = "0"
-    head.headers['Cache-Control'] = 'public, max-age=0'
-    return head
 ##############################################################
 ## Login
 ##############################################################

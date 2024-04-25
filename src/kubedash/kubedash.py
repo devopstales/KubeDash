@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 
 import os, logging
-from flask import Flask
+from flask import Flask, render_template, request
 from flask_talisman import Talisman
 from flask_healthz import healthz, HealthError
 from sqlalchemy_utils import database_exists
@@ -31,6 +31,8 @@ csp = {
     ],
     'style-src': [
         '\'self\'',
+        '\'unsafe-inline\'',
+        '\'unsafe-eval\'',
         'fonts.googleapis.com',
         '*.cloudflare.com',
     ],
@@ -41,6 +43,40 @@ roles = [
     "Admin",
     "User",
 ]
+
+class localFlask(Flask):
+    def process_response(self, response):
+        response.headers['server'] = "KubeDash 3.1"
+
+        # CORS
+        response.headers['Access-Control-Allow-Origin'] = request.root_url.rstrip(request.root_url[-1])
+        response.headers['X-Permitted-Cross-Domain-Policies'] = "none"
+        response.headers['Cross-Origin-Resource-Policy'] = "same-origin"
+        response.headers['Cross-Origin-Embedder-Policy'] = "require-corp"
+        response.headers['Cross-Origin-Opener-Policy']   = "same-origin"
+        response.headers['Cross-Origin-Resource-Policy'] = "same-origin"
+
+        response.headers['Referrer-Policy'] = "no-referrer"
+        response.headers['Clear-Site-Data'] = "*"
+
+        # XSS
+        response.headers['X-XSS-Protection'] = 0
+
+        # HSTS
+        if os.getenv('FLASK_CONFIG') == "production":
+            response.headers['Strict-Transport-Security'] = "max-age=31536000; includeSubDomains; preload"
+
+        # CSP
+        response.headers['X-Frame-Options'] = "deny"
+        response.headers['X-Content-Type-Options'] = "nosniff"
+
+        # Cache
+        response.headers["Cache-Control"] = "no-store, max-age=0"
+        response.headers["Pragma"] = "no-cache" # Deprecated
+        response.headers["Expires"] = "0"
+
+        super(localFlask, self).process_response(response)
+        return(response)
 
 class NoHealth(logging.Filter):
     def filter(self, record):
@@ -113,7 +149,7 @@ def k8s_roles_init():
 
 def create_app(config_name="development"):
     """Init App"""
-    app = Flask(__name__, static_url_path='', static_folder='static')
+    app = localFlask(__name__, static_url_path='', static_folder='static')
 
     """Init Logger"""
     global logger
@@ -244,6 +280,40 @@ app.config.update(
         "ready":  app.name + ".readiness",
     }
 )
+
+##############################################################
+## Error Pages
+##############################################################
+
+@app.errorhandler(404)
+def page_not_found404(e):
+    logger.error(e.description)
+    return render_template('404.html.j2'), 404
+
+@app.errorhandler(404)
+def page_not_found404(e):
+    logger.error(e.description)
+    return render_template('404.html.j2'), 404
+
+@app.errorhandler(400)
+def page_not_found400(e):
+    logger.error(e.description)
+    return render_template(
+        '400.html.j2',
+        description = e.description,
+        ), 400
+
+@app.errorhandler(500)
+def page_not_found500(e):
+    logger.error(e.description)
+    return render_template(
+        '500.html.j2',
+        description = e.description,
+        ), 500
+
+##############################################################
+## Error Pages
+##############################################################
 
 logging.getLogger("werkzeug").addFilter(NoHealth())
 logging.getLogger("werkzeug").addFilter(NoSocketIoGet())
