@@ -1908,12 +1908,32 @@ def k8sPodListVulnsGet(username_role, user_token, ns):
         ErrorHandler(logger, "error", ERROR)
         return HAS_REPORT, POD_VULN_LIST
     try:
-        vulnerabilityreport_list = k8s_client.CustomObjectsApi().list_namespaced_custom_object("trivy-operator.devopstales.io", "v1", ns, "vulnerabilityreports")
+        api_group = "trivy-operator.devopstales.io"
+        api_version = "v1"
+        api_plural = "vulnerabilityreports"
+        vulnerabilityreport_list = k8s_client.CustomObjectsApi().list_namespaced_custom_object(api_group, api_version, ns, api_plural, _request_timeout=5)
         HAS_REPORT = True
     except Exception as error:
         vulnerabilityreport_list = None
         ERROR = "vulnerabilityreport_list exeption: %s" % error
-        if error.status != 404:
+        #####################################################
+        # aquasecurity trivy operator functions
+        #####################################################
+        if error.status == 404:
+            try:
+                api_group = "aquasecurity.github.io"
+                api_version = "v1alpha1"
+                api_plural = "vulnerabilityreports"
+                vulnerabilityreport_list = k8s_client.CustomObjectsApi().list_namespaced_custom_object(api_group, api_version, ns, api_plural, _request_timeout=5)
+                HAS_REPORT = True
+            except Exception as error2:
+                vulnerabilityreport_list = None
+                ERROR = "vulnerabilityreport_list exeption: %s" % error2
+                if error2.status != 404:
+                    ERROR = "k8sPodListVulnsGet: %s" % error2
+                ErrorHandler(logger, "error", ERROR)
+        #####################################################
+        else:
             ERROR = "k8sPodListVulnsGet: %s" % error
             ErrorHandler(logger, "error", ERROR)
 
@@ -1929,17 +1949,26 @@ def k8sPodListVulnsGet(username_role, user_token, ns):
             "low": 0,
             "scan_status": None,
         }
+
         if pod.metadata.owner_references:
             for owner in pod.metadata.owner_references:
                 POD_VULN_SUM['owner'] = "%ss/%s" % (owner.kind.lower(), owner.name)
         
         if vulnerabilityreport_list:
             for vr in vulnerabilityreport_list['items']:
-                if vr['metadata']['labels']['trivy-operator.pod.name'] == pod.metadata.name:
-                    POD_VULN_SUM['critical'] += vr['report']['summary']['criticalCount']
-                    POD_VULN_SUM['high'] += vr['report']['summary']['highCount']
-                    POD_VULN_SUM['medium'] += vr['report']['summary']['mediumCount']
-                    POD_VULN_SUM['low'] += vr['report']['summary']['lowCount']
+                if 'trivy-operator.pod.name' in vr['metadata']['labels']:
+                    if vr['metadata']['labels']['trivy-operator.pod.name'] == pod.metadata.name:
+                        POD_VULN_SUM['critical'] += vr['report']['summary']['criticalCount']
+                        POD_VULN_SUM['high'] += vr['report']['summary']['highCount']
+                        POD_VULN_SUM['medium'] += vr['report']['summary']['mediumCount']
+                        POD_VULN_SUM['low'] += vr['report']['summary']['lowCount']
+                elif 'trivy-operator.resource.kind' in vr['metadata']['labels']:
+                    if  vr['metadata']['labels']['trivy-operator.resource.kind'] == pod.metadata.owner_references[0].kind and \
+                        vr['metadata']['labels']['trivy-operator.resource.name'] == pod.metadata.owner_references[0].name:
+                            POD_VULN_SUM['critical'] += vr['report']['summary']['criticalCount']
+                            POD_VULN_SUM['high'] += vr['report']['summary']['highCount']
+                            POD_VULN_SUM['medium'] += vr['report']['summary']['mediumCount']
+                            POD_VULN_SUM['low'] += vr['report']['summary']['lowCount']
 
         if POD_VULN_SUM['critical'] > 0 or POD_VULN_SUM['high'] > 0 or POD_VULN_SUM['medium'] > 0 or POD_VULN_SUM['low'] > 0:
             POD_VULN_SUM['scan_status'] = "OK"
@@ -1961,11 +1990,33 @@ def k8sPodVulnsGet(username_role, user_token, ns, pod):
         ERROR = "k8sPodVulnsGet: %s" % error
         ErrorHandler(logger, "error", ERROR)
         return HAS_REPORT, POD_VULNS
+    
     try:
-        vulnerabilityreport_list = k8s_client.CustomObjectsApi().list_namespaced_custom_object("trivy-operator.devopstales.io", "v1", ns, "vulnerabilityreports")
+        api_group = "trivy-operator.devopstales.io"
+        api_version = "v1"
+        api_plural = "vulnerabilityreports"
+        vulnerabilityreport_list = k8s_client.CustomObjectsApi().list_namespaced_custom_object(api_group, api_version, ns, api_plural, _request_timeout=5)
     except ApiException as error:
-        vulnerabilityreport_list = None
-        if error.status != 404:
+        #####################################################
+        # aquasecurity trivy operator functions
+        #####################################################
+        if error.status == 404:
+            try:
+                api_group = "aquasecurity.github.io"
+                api_version = "v1alpha1"
+                api_plural = "vulnerabilityreports"
+                vulnerabilityreport_list = k8s_client.CustomObjectsApi().list_namespaced_custom_object(api_group, api_version, ns, api_plural, _request_timeout=5)
+            except ApiException as error2:
+                vulnerabilityreport_list = None
+                if error2.status != 404:
+                    ERROR = "k8sPodVulnsGet: %s" % error2
+                    ErrorHandler(logger, "error", ERROR)
+            except Exception as error2:
+                ErrorHandler(logger, "error", error2)
+                vulnerabilityreport_list = None
+        #####################################################
+        else:
+            vulnerabilityreport_list = None
             ERROR = "k8sPodVulnsGet: %s" % error
             ErrorHandler(logger, "error", ERROR)
     except Exception as error:
@@ -1979,24 +2030,45 @@ def k8sPodVulnsGet(username_role, user_token, ns, pod):
                 for vr in vulnerabilityreport_list['items']:
                     fixedVersion = None
                     publishedDate = None
-                    if vr['metadata']['labels']['trivy-operator.pod.name'] == po.metadata.name:
-                        HAS_REPORT = True
-                        VULN_LIST = list()
-                        for vuln in vr['report']['vulnerabilities']:
-                            if 'fixedVersion' in vuln:
-                                fixedVersion = vuln['fixedVersion']
-                            if 'publishedDate' in vuln:
-                                publishedDate = vuln['publishedDate']
-                            VULN_LIST.append({
-                                "vulnerabilityID": vuln['vulnerabilityID'],
-                                "severity": vuln['severity'],
-                                "score": vuln['score'],
-                                "resource": vuln['resource'],
-                                "installedVersion": vuln['installedVersion'],
-                                "fixedVersion": fixedVersion,
-                                "publishedDate": publishedDate,
-                            })
-                        POD_VULNS.update({vr['metadata']['labels']['trivy-operator.container.name']: VULN_LIST})
+                    if 'trivy-operator.pod.name' in vr['metadata']['labels']:
+                        if vr['metadata']['labels']['trivy-operator.pod.name'] == po.metadata.name:
+                            HAS_REPORT = True
+                            VULN_LIST = list()
+                            for vuln in vr['report']['vulnerabilities']:
+                                if 'fixedVersion' in vuln:
+                                    fixedVersion = vuln['fixedVersion']
+                                if 'publishedDate' in vuln:
+                                    publishedDate = vuln['publishedDate']
+                                VULN_LIST.append({
+                                    "vulnerabilityID": vuln['vulnerabilityID'],
+                                    "severity": vuln['severity'],
+                                    "score": vuln['score'],
+                                    "resource": vuln['resource'],
+                                    "installedVersion": vuln['installedVersion'],
+                                    "fixedVersion": fixedVersion,
+                                    "publishedDate": publishedDate,
+                                })
+                            POD_VULNS.update({vr['metadata']['labels']['trivy-operator.container.name']: VULN_LIST})
+                    elif 'trivy-operator.resource.kind' in vr['metadata']['labels']:
+                        if  vr['metadata']['labels']['trivy-operator.resource.kind'] == po.metadata.owner_references[0].kind and \
+                            vr['metadata']['labels']['trivy-operator.resource.name'] == po.metadata.owner_references[0].name:
+                                HAS_REPORT = True
+                                VULN_LIST = list()
+                                for vuln in vr['report']['vulnerabilities']:
+                                    if 'fixedVersion' in vuln:
+                                        fixedVersion = vuln['fixedVersion']
+                                    if 'publishedDate' in vuln:
+                                        publishedDate = vuln['publishedDate']
+                                    VULN_LIST.append({
+                                        "vulnerabilityID": vuln['vulnerabilityID'],
+                                        "severity": vuln['severity'],
+                                        "score": vuln['score'],
+                                        "resource": vuln['resource'],
+                                        "installedVersion": vuln['installedVersion'],
+                                        "fixedVersion": fixedVersion,
+                                        "publishedDate": publishedDate,
+                                    })
+                                POD_VULNS.update({vr['metadata']['labels']['trivy-operator.container.name']: VULN_LIST})
                 return HAS_REPORT, POD_VULNS
             else:
                 return False, None
@@ -2995,7 +3067,6 @@ def k8sHelmChartListGet(username_role, user_token, namespace):
             if chart['release_name'] not in CHART_LIST.keys():
                 CHART_LIST[chart['release_name']] = list()
             CHART_LIST[chart['release_name']].append(chart)
-        # print(json.dumps(CHART_LIST, indent=2)) # DEBUG
         return HAS_CHART, CHART_LIST
     except ApiException as error:
         if error.status != 404:

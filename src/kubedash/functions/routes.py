@@ -20,7 +20,6 @@ from functions.registry import *
 from functions.components import tracer, socketio, csrf
 from opentelemetry.trace.status import Status, StatusCode
 
-
 ##############################################################
 ## Helpers
 ##############################################################
