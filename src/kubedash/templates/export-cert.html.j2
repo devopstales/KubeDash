@@ -26,7 +26,7 @@
   <div class="card-body">
     <h5 class="card-title">Install as Kubectl plugin.</h5><pre><code># Homebrew (macOS and Linux)
 brew tap devopstales/devopstales
-brew install kubectl-kdlogin
+brew install devopstales/devopstales/kubectl-login
 
 # My krew repo (macOS, Linux, Windows and ARM)
 kubectl krew index add devopstales https://github.com/devopstales/krew
@@ -62,13 +62,13 @@ Happy Kubernetes interaction!</code></pre>
     <p class="card-text">If you want to maintain your existing <code>~/.kube/config</code> file you can run the following commands to add your user to the file: </p>
     <pre><code class="bash"># Create the k8s server ca pem
 echo "{{ k8s_server_ca }}
-" \ > k8s-server-ca.pem
+" \ > ~/.kube/{{ context }}-server-ca.pem
 
 # Add your server to kubectl config
 kubectl config set-cluster {{ context }} \
 --server={{ k8s_server_url }} \
 --user={{ preferred_username }} \
---certificate-authority=k8s-server-ca.pem
+--certificate-authority={{ context }}-server-ca.pem
 
 # Create the k8s user private key pem
 echo "{{ k8s_user_private_key }}
