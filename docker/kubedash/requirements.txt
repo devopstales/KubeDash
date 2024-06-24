@@ -21,7 +21,7 @@ flask_talisman==1.1.0
 # kubernetes
 kubernetes==26.1.0
 flask_healthz==1.0.1
-pybase64==1.2.3
+pybase64==1.3.2
 # graphwiz
 pyvis==0.3.2
 # socket
