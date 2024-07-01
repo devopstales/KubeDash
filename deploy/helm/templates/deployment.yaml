@@ -59,8 +59,6 @@ spec:
             value: "True"
 {{- end }}
         envFrom:
-          - configMapRef: 
-              name: {{ include "kubedash.fullname" . }}-config
 {{- if .Values.oidc.enabled }}
           - secretRef:
               name: {{ .Values.oidc.secret.name }}
@@ -68,6 +66,10 @@ spec:
 {{- if .Values.externalDatabase.enabled }}
           - secretRef:
               name: {{ .Values.externalDatabase.secret.name }}
+{{- end }}
+{{- if .Values.useConfigFile }}
+          - configMapRef: 
+              name: {{ include "kubedash.fullname" . }}-config
 {{- end }}
         livenessProbe:
           httpGet:
@@ -81,20 +83,31 @@ spec:
             port: 8000
           initialDelaySeconds: 5
           timeoutSeconds: 1
+        ports:
+        - containerPort: 8000
+          protocol: TCP
+          name: http
         volumeMounts:
 {{- if .Values.persistence.enabled }}
         - name: cache
           mountPath: "/code/kubedash/database"
 {{- end }}
-        ports:
-        - containerPort: 8000
-          protocol: TCP
-          name: http
+{{- if .Values.useConfigFile }}
+        - mountPath: /code/kubedash/kubedash.ini
+          name: kubedash-ini
+          subPath: kubedash.ini
+{{- end }}
       volumes:
 {{- if .Values.persistence.enabled }}
       - name: cache
         persistentVolumeClaim:
             claimName: {{ include "kubedash.fullname" . }}-db
+{{- end }}
+{{- if .Values.useConfigFile }}
+      - configMap:
+          defaultMode: 420
+          name: {{ include "kubedash.fullname" . }}-kubedash-ini
+        name: kubedash-ini
 {{- end }}
 {{- with .Values.nodeSelector }}
       nodeSelector:

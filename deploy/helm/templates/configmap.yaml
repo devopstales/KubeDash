@@ -1,3 +1,89 @@
+{{ if .Values.useConfigFile }}
+---
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: {{ include "kubedash.fullname" . }}-kubedash-ini
+  labels:
+    app: kubedash
+    {{- include "kubedash.labels" . | nindent 4 }}
+data:
+  kubedash.ini: |-
+    ##################### KubeDash Configuration Defaults #####################
+    [DEFAULT]
+    # possible values : production, development
+    app_mode = production
+
+    #################################### Database ############################
+    [database]
+    # You can configure the database connection by specifying type, host, name, user and password
+    # as separate properties or as on string using the url property.
+
+    # Either "postgres" or "sqlite3", it's your choice
+    {{ if .Values.externalDatabase.enabled }}
+    type = postgres
+    host = {{ .Values.externalDatabase.host | quote }}
+    name = {{ .Values.externalDatabase.database | quote }}
+    user = root
+    # If the password contains # or ; you have to wrap it with quotes. Ex "#password;"
+    password = {{ .Values.externalDatabase.password | b64enc | quote }}
+    {{ else if .Values.postgresqlHa.enabled }}
+    type = postgres
+    host = "{{ .Release.Name }}-pgpool"
+    name = {{ .Values.postgresqlHa.database | quote }}
+    user = root
+    # If the password contains # or ; you have to wrap it with triple quotes. Ex "#password;"
+    password = {{ .Values.postgresqlHa.postgresql.password | b64enc | quote }}
+    {{ else }}
+    type = sqlite3
+    {{ end }}
+
+    {{ if .Values.oidc.enabled }}
+    #################################### SSO Settings ###########################
+    [sso_settings]
+
+    issuer_url = {{ .Values.oidc.provider.oidcUrl | quote}}
+
+    client_id = {{ .Values.oidc.provider.oidcClientId | b64enc | quote }}
+
+    secret = {{ .Values.oidc.provider.oidcSecret | b64enc | quote }}
+
+    scope = {{ .Values.oidc.provider.oidcScopes | quote}}
+
+    {{ if .Values.ingress.tls.enabled }}
+    callback_url = "https://{{ .Values.ingress.url}}"
+    {{ else }}
+    callback_url = "http://{{ .Values.ingress.url}}"
+    {{ end}}
+    {{ end }}
+    #################################### K8S ###########################
+    [k8s]
+
+    # kubernetes cluster name
+    cluster_name = {{ .Values.cluster.name | quote }}
+
+    # kubernetes api server url
+    api_server = {{ .Values.cluster.apiUrl | quote }}
+
+    # base64 encoded ca certificate
+    api_ca = {{ .Values.cluster.caCert | b64enc | quote }}
+
+    #################################### Plugin Settings ###########################
+    [plugin_settings]
+
+    # enable registry plugin
+    registry = true
+
+    # enable helm plugin
+    helm = true
+
+    # enable gateway api plugin
+    gateway_api = true
+
+    # enable cert-manager plugin
+    cert_manager = true
+{{ else }}
+---
 apiVersion: v1
 kind: ConfigMap
 metadata:
@@ -68,4 +154,5 @@ metadata:
 data:
   EXTERNAL_DATABASE_USER: {{ .Values.postgresqlHa.postgresql.username | b64enc | quote }}
   EXTERNAL_DATABASE_PASSWORD: {{ .Values.postgresqlHa.postgresql.password | b64enc | quote }}
+{{ end }}
 {{ end }}

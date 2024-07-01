@@ -90,10 +90,26 @@ class NoSocketIoPost(logging.Filter):
     def filter(self, record):
         return 'POST /socket.io' not in record.getMessage()
 
-def db_init():
+def config_parser():
+    if os.path.isfile("kubedash.ini"):
+        import configparser
+
+        config = configparser.ConfigParser()
+        config.sections()
+        config.read('kubedash.ini')
+        return False, config
+    else:
+        logger.warning("No local config file")
+        return True
+
+def db_init(error, config):
     for r in roles:
         RoleCreate(r)
-    UserCreate("admin", "admin", None, "Local", "Admin")
+    if error:
+        UserCreate("admin", "admin", None, "Local", "Admin")
+    else:
+        admin_password = config.get('security', 'admin_password', fallback="admin")
+        UserCreate("admin", admin_password, None, "Local", "Admin")
 
 def connect_database():
     user = UserTest('Admin')
@@ -109,14 +125,22 @@ def init_db_test(SQLALCHEMY_DATABASE_URI):
     else:
         return False
     
-def oidc_init():
+def oidc_init(error, config):
     # https://github.com/requests/requests-oauthlib/issues/387
     os.environ['OAUTHLIB_RELAX_TOKEN_SCOPE'] = "1"
-    OIDC_ISSUER_URL = os.environ.get('OIDC_ISSUER_URL', None)
-    OIDC_CLIENT_ID = os.environ.get('OIDC_CLIENT_ID', None)
-    OIDC_SECRET = os.environ.get('OIDC_SECRET', None)
-    OIDC_SCOPE = os.environ.get('OIDC_SCOPE', None)
-    OIDC_CALLBACK_URL = os.environ.get('OIDC_CALLBACK_URL', None)
+    if not error:
+        OIDC_ISSUER_URL   = config.get('sso_settings', 'issuer_url', fallback=None)
+        OIDC_CLIENT_ID    = config.get('sso_settings', 'client_id', fallback=None)
+        OIDC_SECRET       = config.get('sso_settings', 'secret', fallback=None)
+        OIDC_SCOPE        = config.get('sso_settings', 'scope', fallback=None)
+        OIDC_CALLBACK_URL = config.get('sso_settings', 'callback_url', fallback=None)
+    else:
+        OIDC_ISSUER_URL   = os.environ.get('OIDC_ISSUER_URL', None)
+        OIDC_CLIENT_ID    = os.environ.get('OIDC_CLIENT_ID', None)
+        OIDC_SECRET       = os.environ.get('OIDC_SECRET', None)
+        OIDC_SCOPE        = os.environ.get('OIDC_SCOPE', None)
+        OIDC_CALLBACK_URL = os.environ.get('OIDC_CALLBACK_URL', None)
+
     if OIDC_ISSUER_URL and OIDC_CLIENT_ID and OIDC_SECRET and OIDC_SCOPE and OIDC_CALLBACK_URL:
         oidc_test, OIDC_ISSUER_URL_OLD = SSOServerTest()
         if oidc_test:
@@ -126,10 +150,16 @@ def oidc_init():
             SSOServerCreate(OIDC_ISSUER_URL, OIDC_CLIENT_ID, OIDC_SECRET, OIDC_CALLBACK_URL, string2list(OIDC_SCOPE))
             logger.info("OIDC Provider created")
 
-def k8s_config_int():
-    K8S_CLUSTER_NAME = os.environ.get('K8S_CLUSTER_NAME', "k8s-main")
-    K8S_API_SERVER = os.environ.get('K8S_API_SERVER', None)
-    K8S_API_CA = os.environ.get('K8S_API_CA', None) # base64 encoded
+def k8s_config_int(error, config):
+    if not error:
+        K8S_CLUSTER_NAME = config.get('k8s', 'cluster_name', fallback="k8s-main")
+        K8S_API_SERVER   = config.get('k8s', 'api_server', fallback=None)
+        K8S_API_CA       = config.get('k8s', 'api_ca', fallback=None)
+    else:
+        K8S_CLUSTER_NAME = os.environ.get('K8S_CLUSTER_NAME', "k8s-main")
+        K8S_API_SERVER   = os.environ.get('K8S_API_SERVER', None)
+        K8S_API_CA       = os.environ.get('K8S_API_CA', None) # base64 encoded
+
     if K8S_API_SERVER and K8S_API_CA:
         k8sConfig = k8sServerConfigGet()
         if k8sConfig is None:
@@ -158,14 +188,43 @@ def create_app(config_name="development"):
             level="INFO",
             format='[%(asctime)s] %(name)s        %(levelname)s %(message)s'
         )
-
-    """App config"""
-    if os.getenv('FLASK_CONFIG') == "production":
-        config_name = "production"
+    
+    """Parse Configfile"""
+    error, config = config_parser()
+    if not error:
+        """App config"""
+        config_name = config.get('DEFAULT', 'app_mode', fallback='development')
         app.config['SECRET_KEY'] = os.urandom(12).hex()
+
+        """Database mode"""
+        database_type = config.get('database', 'type', fallback='none')
+        if database_type == 'postgres':
+            EXTERNAL_DATABASE_ENABLED = True
+        else:
+            EXTERNAL_DATABASE_ENABLED = False
+
+        if EXTERNAL_DATABASE_ENABLED:
+            SQLALCHEMY_DATABASE_HOST     = config.get('database', 'host', fallback='localhost')
+            SQLALCHEMY_DATABASE_DB       = config.get('database', 'name', fallback='kubedash')
+            SQLALCHEMY_DATABASE_USER     = config.get('database', 'user', fallback='kubedash')
+            SQLALCHEMY_DATABASE_PASSWORD = config.get('database', 'password', fallback=None)
     else:
-        os.environ['OAUTHLIB_INSECURE_TRANSPORT'] = '1'
-        logging.captureWarnings(True)
+        """App config"""
+        if os.getenv('FLASK_CONFIG') == "production":
+            config_name = "production"
+            app.config['SECRET_KEY'] = os.urandom(12).hex()
+        else:
+            os.environ['OAUTHLIB_INSECURE_TRANSPORT'] = '1'
+            logging.captureWarnings(True)
+
+        """Database mode"""
+        EXTERNAL_DATABASE_ENABLED = var_test(os.getenv('EXTERNAL_DATABASE_ENABLED', "False"))
+        if EXTERNAL_DATABASE_ENABLED:
+            SQLALCHEMY_DATABASE_HOST     = os.environ.get('EXTERNAL_DATABASE_HOST', "localhost")
+            SQLALCHEMY_DATABASE_DB       = os.environ.get('EXTERNAL_DATABASE_DB', "kubedash")
+            SQLALCHEMY_DATABASE_USER     = os.environ.get('EXTERNAL_DATABASE_USER', "kubedash")
+            SQLALCHEMY_DATABASE_PASSWORD = os.environ.get('EXTERNAL_DATABASE_PASSWORD', None)
+
     logger.info("Running in %s mode" % config_name)
 
     app.config.from_object(app_config[config_name])
@@ -175,12 +234,7 @@ def create_app(config_name="development"):
     # FlaskInstrumentor().instrument_app(app)
 
     """Database mode"""
-    EXTERNAL_DATABASE_ENABLED = var_test(os.getenv('EXTERNAL_DATABASE_ENABLED', "False"))
     if EXTERNAL_DATABASE_ENABLED:
-        SQLALCHEMY_DATABASE_HOST = os.environ.get('EXTERNAL_DATABASE_HOST', "localhost")
-        SQLALCHEMY_DATABASE_USER = os.environ.get('EXTERNAL_DATABASE_USER', "kubedash")
-        SQLALCHEMY_DATABASE_PASSWORD = os.environ.get('EXTERNAL_DATABASE_PASSWORD', None)
-        SQLALCHEMY_DATABASE_DB = os.environ.get('EXTERNAL_DATABASE_DB', "kubedash")
         if SQLALCHEMY_DATABASE_USER and SQLALCHEMY_DATABASE_PASSWORD and SQLALCHEMY_DATABASE_HOST and SQLALCHEMY_DATABASE_DB:
             SQLALCHEMY_DATABASE_URI = "postgresql://%s:%s@%s/%s" % (SQLALCHEMY_DATABASE_USER, SQLALCHEMY_DATABASE_PASSWORD, SQLALCHEMY_DATABASE_HOST, SQLALCHEMY_DATABASE_DB)
             app.config['SQLALCHEMY_DATABASE_URI'] = SQLALCHEMY_DATABASE_URI
@@ -190,7 +244,6 @@ def create_app(config_name="development"):
     else:
         basedir = os.path.abspath(os.path.dirname(__file__))
         SQLALCHEMY_DATABASE_URI = "sqlite:///"+basedir+"/database/"+config_name+".db"
-
 
     """Init session"""
     sess.init_app(app)
@@ -202,9 +255,9 @@ def create_app(config_name="development"):
         with app.app_context():
             if init_db_test(SQLALCHEMY_DATABASE_URI):
                 SQLAlchemyInstrumentor().instrument(engine=db.engine)
-                db_init()
-                oidc_init()
-                k8s_config_int()
+                db_init(error, config)
+                oidc_init(error, config)
+                k8s_config_int(error, config)
                 k8s_roles_init()
 
     """Init Logging managger"""
@@ -238,12 +291,21 @@ app = create_app()
 ##############################################################
 ## Plugin configs
 ##############################################################
-app.config["plugins"] = {
-        "registry": var_test(os.getenv('PLUGIN_REGISTRY_ENABLED', "False")),
-        "helm": var_test(os.getenv('PLUGIN_HELM_ENABLED', "True")),
-        "gateway_api": var_test(os.getenv('PLUGIN_GATEWAY_API_ENABLED', "False")),
-        "cert_manager": var_test(os.getenv('PLUGIN_CERT_MANAGER_ENABLED', "False")),
-    }
+error, config = config_parser()
+if error:
+    app.config["plugins"] = {
+            "registry":     var_test(os.getenv('PLUGIN_REGISTRY_ENABLED', "False")),
+            "helm":         var_test(os.getenv('PLUGIN_HELM_ENABLED', "True")),
+            "gateway_api":  var_test(os.getenv('PLUGIN_GATEWAY_API_ENABLED', "False")),
+            "cert_manager": var_test(os.getenv('PLUGIN_CERT_MANAGER_ENABLED', "False")),
+        }
+else:
+    app.config["plugins"] = {
+            "registry":     config.getboolean('plugin_settings', 'registry', fallback=False),
+            "helm":         config.getboolean('plugin_settings', 'helm', fallback=True),
+            "gateway_api":  config.getboolean('plugin_settings', 'gateway_api', fallback=False),
+            "cert_manager": config.getboolean('plugin_settings', 'cert_manager', fallback=True),
+        }
 
 """Plugin Logging"""
 logger.info("Starting Plugins:")
