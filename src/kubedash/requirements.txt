@@ -52,7 +52,7 @@ gitdb2==3.0.1
 # security
 gunicorn==22.0.0
 certifi==2024.2.2
-setuptools==67.8.0
+setuptools==70.0.0
 pyOpenSSL==24.0.0
 cryptography==42.0.8
 ipython==8.14.0 # not directly required, pinned by Snyk to avoid a vulnerability
