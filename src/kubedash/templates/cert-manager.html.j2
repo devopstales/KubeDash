@@ -44,7 +44,6 @@
                 <div id="accordion">
                     <div class="card shadow mb-4">
                         <div class="card-body">
-                            <!-- <h2>Cluster Issuer</h2> -->
                             <div class="table-responsive">
                                 <table class="table table-bordered display" id="cluster_issuerTable" width="100%" cellspacing="0">
                                     <thead>
@@ -87,7 +86,6 @@
                 <div class="card shadow mb-4">
                     <div class="card-body">
                         <div class="table-responsive">
-                            <!-- <h2>Issuer</h2> -->
                             <table class="table table-bordered" id="issuerTable" width="100%" cellspacing="0">
                                 <thead>
                                     <tr>
@@ -127,7 +125,6 @@
             <div class="tab-pane fade" id="nav-certificate_request" role="tabpanel" aria-labelledby="nav-certificate_request-tab">
                 <div class="card shadow mb-4">
                     <div class="card-body">
-                        <!-- <h2>Certificate Request</h2> -->
                         <div class="table-responsive">
                             <table class="table table-bordered" id="certificate_requestTable" width="100%" cellspacing="0">
                                 <thead>
@@ -157,7 +154,7 @@
                                             </form>
                                         </td>
                                         <td>
-                                            <a href="javascript:;" onclick="cammMyTab('{{ certificate_request.issuer_type}}', '{{ certificate_request.issuer }}')">{{ certificate_request.issuer }}</a>
+                                            <a href="javascript:;" onclick="goToTab('{{ certificate_request.issuer_type}}', '{{ certificate_request.issuer }}')">{{ certificate_request.issuer }}</a>
                                         </td>
                                         <td>
                                             {{ certificate_request.owner_type }}/{{ certificate_request.owner }}
@@ -257,7 +254,7 @@ $(document).ready( function () {
   $('#certificateTable').DataTable();
 } );
 
-function cammMyTab(issuer_type, element_name) {
+function goToTab(issuer_type, element_name) {
     if (issuer_type == "ClusterIssuer") {
         $('#nav-cluster_issuer-tab').tab('show');
         var rows = document.getElementById("cluster_issuerTable").getElementsByTagName("tr");
@@ -265,9 +262,7 @@ function cammMyTab(issuer_type, element_name) {
             var cells = rows[i].cells
             var object_name = cells[1].id
             if (object_name == element_name) {
-                //rows[i].setAttribute("class", "selected");
                 rows[i].classList.toggle('selected');
-                console.log(rows[i]);
             }
         }
     } 
@@ -278,9 +273,7 @@ function cammMyTab(issuer_type, element_name) {
             var cells = rows[i].cells
             var object_name = cells[1].id
             if (object_name == element_name) {
-                //rows[i].setAttribute("class", "selected");
                 rows[i].classList.toggle('selected');
-                console.log(rows[i]);
             }
         }
     }

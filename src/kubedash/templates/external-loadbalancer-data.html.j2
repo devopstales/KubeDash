@@ -1,0 +1,111 @@
+{% extends "base.html.j2" %}
+
+{% block header %}
+    <link href="{{ url_for('static',filename='/vendor/datatables/dataTables.bootstrap4.min.css') }}" rel="stylesheet" >
+    <link href="{{ url_for('static',filename='/vendor/google/material-icons.css') }}" rel="stylesheet" >
+    <link href="{{ url_for('static',filename='/vendor/datatables/jquery.dataTables.css') }}" rel="stylesheet" >
+{% endblock %}
+
+{% block content %}
+<nav aria-label="breadcrumb">
+  <ol class="breadcrumb">
+    <li class="breadcrumb-item">Plugins</li>
+    <li class="breadcrumb-item" aria-current="page">External LoadBalancer</li>
+    <li class="breadcrumb-item"><a href="/external-loadbalancer">{{ object_type }}</a></li>
+    <li class="breadcrumb-item active" aria-current="page">{{ object_data.name }}</li>
+    <div class="col">
+      <a class="card-link float-right" data-toggle="collapse" href="#" onclick="reload()">
+        <i class="material-icons">refresh</i>
+      </a>
+    </div>
+  </ol>
+</nav>
+
+<div class="card shadow mb-4">
+    <div class="card-header">
+        <h6 class="m-0 font-weight-bold text-primary">{{ object_type }} Objects</h6>
+    </div>
+    <div class="card-body">
+        <div class="table-responsive">
+            <table class="table table-bordered" id="lbInfoTable" width="100%" cellspacing="0">
+                {{ object_data }}
+                <tr>
+                    <th>Name:</th>
+                    <td>{{ object_data.name }}</td>
+                </tr>
+                <tr>
+                    <th>Type:</th>
+                    <td>{{ object_data.type }}</td>
+                </tr>
+                {% if object_type == "ipaddresspool" %}
+                <tr>
+                    <th>Addresses:</th>
+                    <td>
+                        {% for address in object_data.addresses %}
+                        {{ address }}<br>
+                        {% endfor %}
+                    </td>
+                </tr>
+                <tr>
+                    <th>Auto assign:</th>
+                    <td>{{ object_data.autoAssign }}</td>
+                </tr>
+                <tr>
+                    <th>Avoid buggy IPs:</th>
+                    <td>{{ object_data.avoidBuggyIPs }}</td>
+                </tr>
+                {% if object_data.ServiceAllocation_namespaces is defined %}
+                <tr>
+                    <th>Allocation Namespaces:</th>
+                    <td>{{ object_data.ServiceAllocation_namespaces }}</td>
+                </tr>
+                {% endif %}
+                {% if object_data.ServiceAllocation_namespaceSelectors is defined %}
+                <tr>
+                    <th>Allocation Namespace Selectors:</th>
+                    <td>{{ object_data.ServiceAllocation_namespaceSelectors }}</td>
+                </tr>
+                {% endif %}
+                {% if object_data.ServiceAllocation_serviceSelectors is defined %}
+                <tr>
+                    <th>Allocation Service Selectors:</th>
+                    <td>{{ object_data.ServiceAllocation_serviceSelectors }}</td>
+                </tr>
+                {% endif %}
+                {% elif object_type == "l2advertisement" %}
+                <tr>
+                    <th>IP Address Pools:</th>
+                    <td>
+                        {% for address in object_data.ipAddressPools %}
+                        {{ address }}<br>
+                        {% endfor %}
+                    </td>
+                </tr>
+                {% if object_data.ipAddressPoolSelectors is defined %}
+                <tr>
+                    <th>IP Address Pool Selectors:</th>
+                    <td>{{ object_data.ipAddressPoolSelectors }}</td>
+                </tr>
+                {% endif %}
+                {% if object_data.nodeSelectors is defined %}
+                <tr>
+                    <th>Node Selectors:</th>
+                    <td>{{ object_data.nodeSelectors }}</td>
+                </tr>
+                {% endif %}
+                {% endif %}
+            </table>
+        </div>
+    </div>
+</div>
+{% endblock %}
+
+{% block scripts %}
+
+    <!-- Page level plugins -->
+    <script src="{{ url_for('static',filename='vendor/datatables/jquery.dataTables.js') }}"></script>
+    <script src="{{ url_for('static',filename='vendor/datatables/dataTables.bootstrap4.min.js') }}"></script>
+
+    <!-- Page level custom scripts -->
+    <script src="{{ url_for('static',filename='js/demo/datatables-demo.js') }}"></script>
+{% endblock %}
