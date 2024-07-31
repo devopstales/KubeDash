@@ -101,7 +101,7 @@ def config_parser():
         return False, config
     else:
         logger.warning("No local config file")
-        return True
+        return True, None
 
 def db_init(error, config):
     for r in roles:
@@ -303,17 +303,19 @@ app = create_app()
 error, config = config_parser()
 if error:
     app.config["plugins"] = {
-            "registry":     var_test(os.getenv('PLUGIN_REGISTRY_ENABLED', "False")),
-            "helm":         var_test(os.getenv('PLUGIN_HELM_ENABLED', "True")),
-            "gateway_api":  var_test(os.getenv('PLUGIN_GATEWAY_API_ENABLED', "False")),
-            "cert_manager": var_test(os.getenv('PLUGIN_CERT_MANAGER_ENABLED', "False")),
+            "registry":              var_test(os.getenv('PLUGIN_REGISTRY_ENABLED', "False")),
+            "helm":                  var_test(os.getenv('PLUGIN_HELM_ENABLED', "True")),
+            "gateway_api":           var_test(os.getenv('PLUGIN_GATEWAY_API_ENABLED', "False")),
+            "cert_manager":          var_test(os.getenv('PLUGIN_CERT_MANAGER_ENABLED', "False")),
+            "external_loadbalancer": var_test(os.getenv('PLUGIN_EXT_LOADBALANCER_ENABLED', "False")),
         }
 else:
     app.config["plugins"] = {
-            "registry":     config.getboolean('plugin_settings', 'registry', fallback=False),
-            "helm":         config.getboolean('plugin_settings', 'helm', fallback=True),
-            "gateway_api":  config.getboolean('plugin_settings', 'gateway_api', fallback=False),
-            "cert_manager": config.getboolean('plugin_settings', 'cert_manager', fallback=True),
+            "registry":              config.getboolean('plugin_settings', 'registry', fallback=False),
+            "helm":                  config.getboolean('plugin_settings', 'helm', fallback=True),
+            "gateway_api":           config.getboolean('plugin_settings', 'gateway_api', fallback=False),
+            "cert_manager":          config.getboolean('plugin_settings', 'cert_manager', fallback=True),
+            "external_loadbalancer": config.getboolean('plugin_settings', 'external_loadbalancer', fallback=True),
         }
 
 """Plugin Logging"""
