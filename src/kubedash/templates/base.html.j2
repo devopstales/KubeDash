@@ -364,6 +364,9 @@
                         {% if config.plugins["cert_manager"] %}
                         <a class="collapse-item" href="/cert-manager">Cert-Manager</a>
                         {% endif %}
+                        {% if config.plugins["external_loadbalancer"] %}
+                        <a class="collapse-item" href="/external-loadbalancer">External LoadBalancer</a>
+                        {% endif %}
                     </div>
                 </div>
             </li>
@@ -549,7 +552,7 @@
             <footer class="sticky-footer bg-white">
                 <div class="container my-auto">
                     <div class="copyright text-center my-auto">
-                        <span>Copyright &copy; DevOpsTales - KubeDash 2023</span>
+                        <span>Copyright &copy; 2021-204 DevOpsTales - KubeDash {{ kubedash_version }}</span>
                     </div>
                 </div>
             </footer>

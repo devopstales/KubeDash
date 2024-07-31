@@ -44,6 +44,7 @@ roles = [
     "User",
 ]
 
+
 class localFlask(Flask):
     def process_response(self, response):
         response.headers['server'] = "KubeDash 3.1"
@@ -181,6 +182,14 @@ def create_app(config_name="development"):
     """Init App"""
     app = localFlask(__name__, static_url_path='', static_folder='static')
 
+    """App Version"""
+    global kubedash_version
+    kubedash_version = os.getenv('KUBEDASH_VERSION')
+    app.jinja_env.globals['kubedash_version'] = kubedash_version
+    print("######################################################################")
+    print("# KubeDash %s " % kubedash_version)
+    print("######################################################################")
+
     """Init Logger"""
     global logger
     logger=logging.getLogger()
@@ -308,11 +317,14 @@ else:
         }
 
 """Plugin Logging"""
-logger.info("Starting Plugins:")
-logger.info("	registry:	%s" % app.config["plugins"]["registry"])
+logger.info("###########################")
+logger.info(" Starting Plugins:")
+logger.info(" 	registry:	%s" % app.config["plugins"]["registry"])
 logger.info("	helm:		%s" % app.config["plugins"]["helm"])
 logger.info("	gateway_api:	%s" % app.config["plugins"]["gateway_api"])
 logger.info("	cert_manager:	%s" % app.config["plugins"]["cert_manager"])
+logger.info("	ext_lb: 	%s" % app.config["plugins"]["external_loadbalancer"])
+logger.info("###########################")
 
 if app.config["plugins"]["gateway_api"]:
     from plugins.gateway_api import gateway_api
@@ -321,6 +333,10 @@ if app.config["plugins"]["gateway_api"]:
 if app.config["plugins"]["cert_manager"]:
     from plugins.cert_manager import cm_routes
     app.register_blueprint(cm_routes)
+
+if app.config["plugins"]["external_loadbalancer"]:
+    from plugins.external_loadbalancer import exlb_routes
+    app.register_blueprint(exlb_routes)
 
 ##############################################################
 ## Liveness and redyes probe

@@ -8,6 +8,7 @@ export USER=$USER
 
 echo "Start Migration"
 flask db upgrade
+echo "${KUBEDASH_VERSION} > /code/kubedash/app-release"
 
 echo "Start Applications"
 flask run --host=0.0.0.0 --port=8000
