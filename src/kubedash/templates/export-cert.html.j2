@@ -68,7 +68,8 @@ echo "{{ k8s_server_ca }}
 kubectl config set-cluster {{ context }} \
 --server={{ k8s_server_url }} \
 --user={{ preferred_username }} \
---certificate-authority={{ context }}-server-ca.pem
+--certificate-authority=k8s-server-ca.pem \
+--embed-certs
 
 # Create the k8s user private key pem
 echo "{{ k8s_user_private_key }}

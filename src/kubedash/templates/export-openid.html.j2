@@ -68,7 +68,8 @@ echo "{{ k8s_server_ca }}
 kubectl config set-cluster {{ context }} \
 --server={{ k8s_server_url }} \
 --user={{ preferred_username }} \
---certificate-authority={{ context }}-server-ca.pem
+--certificate-authority=k8s-server-ca.pem \
+--embed-certs
 
 # Add your user to kubectl config
 kubectl config set-credentials "{{ preferred_username }}" \
@@ -81,7 +82,10 @@ kubectl config set-credentials "{{ preferred_username }}" \
 
 # Associate your user with an existing cluster
 kubectl config set-context {{ context }} --cluster {{ context }} --user="{{ preferred_username }}"
-kubectl config use-context {{ context }}</code></pre>
+kubectl config use-context {{ context }}
+
+# Delete the certificate files
+rm -f k8s-server-ca.pem</code></pre>
   </div>
 </div>
 
