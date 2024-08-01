@@ -3,10 +3,13 @@
 
 <ul class="nav nav-tabs mb-4 mx-5">
   <li class="nav-item">
-    <a class="nav-link active" href="#KubectlPlugin">Kubectl Plugin</a>
+    <a class="nav-link active" href="#DownloadKubeconfig">Download Kubeconfig</a>
   </li>
   <li class="nav-item">
-    <a class="nav-link" href="#DownloadKubeconfig">Download Kubeconfig</a>
+    <a class="nav-link" href="#DownloadKubectl">Download Kubectl</a>
+  </li>
+  <li class="nav-item">
+    <a class="nav-link" href="#KubectlPlugin">Kubectl Plugin</a>
   </li>
   <li class="nav-item"></li>
     <a class="nav-link" href="#lAdvanced">Manual Config</a>
@@ -17,6 +20,37 @@
 </ul>
 
 <div data-spy="scroll" data-target="#list" data-offset="0" class="scrollspy"></div>
+
+<div class="card mb-4 mx-5">
+  <div class="card-header py-3">
+    <h5 class="m-0 font-weight-bold text-primary" id="DownloadKubeconfig">Download Kubeconfig File</h5>
+  </div>
+  <div class="card-body">
+    <p class="card-text">If you didn't want to use the kubectl plugin, save this file as <code>~/.kube/config</code> to enable certificate based <code>kubectl</code> authentication.</p>
+    <a href="/get-file" class="btn btn-primary">Download Config File</a>
+  </div>
+</div>
+
+<div class="card mb-4 mx-5">
+  <div class="card-header py-3">
+    <h5 class="m-0 font-weight-bold text-primary" id="DownloadKubectl">Download Kubectl</h5>
+  </div>
+
+  <div class="card-body">
+    <h5 class="card-title">Install as Kubectl</h5><pre><code># Install kubectl binary with curl on Linux
+curl -LO "https://dl.k8s.io/release/$(curl -L -s https://dl.k8s.io/release/stable.txt)/bin/linux/amd64/kubectl"
+chmod +x ./kubectl
+sudo mv ./kubectl /usr/local/bin/kubectl
+ 
+# Install kubectl binary with curl on macOS
+curl -LO "https://dl.k8s.io/release/$(curl -L -s https://dl.k8s.io/release/stable.txt)/bin/darwin/amd64/kubectl"
+chmod +x ./kubectl
+sudo mv ./kubectl /usr/local/bin/kubectl
+ 
+# Install kubectl on Windows 
+curl.exe -LO "https://dl.k8s.io/release/v1.30.0/bin/windows/amd64/kubectl.exe"</code></pre>
+  </div>
+</div>
 
 <div class="card mb-4 mx-5">
   <div class="card-header py-3">
@@ -44,16 +78,6 @@ Happy Kubernetes interaction!</code></pre>
   </div>
 </div>
 
-<div class="card mb-4 mx-5">
-  <div class="card-header py-3">
-    <h5 class="m-0 font-weight-bold text-primary" id="DownloadKubeconfig">Download Kubeconfig File</h5>
-  </div>
-  <div class="card-body">
-    <p class="card-text">If you didn't want to use the kubectl plugin, save this file as <code>~/.kube/config</code> to enable certificate based <code>kubectl</code> authentication.</p>
-    <a href="/get-file" class="btn btn-primary">Download Config File</a>
-  </div>
-</div>
-
 <div class="card mx-5 mb-5">
   <div class="card-header py-3">
     <h5 class="m-0 font-weight-bold text-primary" id="lAdvanced">Authenticate Manually</h5>
@@ -67,30 +91,30 @@ echo "{{ k8s_server_ca }}
 # Add your server to kubectl config
 kubectl config set-cluster {{ context }} \
 --server={{ k8s_server_url }} \
---user={{ preferred_username }} \
---certificate-authority=k8s-server-ca.pem \
+--user={{ context }}--{{ preferred_username }} \
+--certificate-authority={{ context }}-server-ca.pem \
 --embed-certs
 
 # Create the k8s user private key pem
 echo "{{ k8s_user_private_key }}
-" \ >  k8s-user-key.pem
+" \ >  {{ context }}-user-key.pem
 
 # Create the k8s user certificate pem
 echo "{{ k8s_user_certificate }}
-" \ >  k8s-user-cert.pem
+" \ >  {{ context }}-user-cert.pem
 
 # Add your user to kubectl config
-kubectl config set-credentials "{{ preferred_username }}" \
---client-certificate=k8s-user-cert.pem \
---client-key=k8s-user-key.pem \
+kubectl config set-credentials "{{ context }}--{{ preferred_username }}" \
+--client-certificate={{ context }}-user-cert.pem \
+--client-key={{ context }}-user-key.pem \
 --embed-certs=true
 
 # Associate your user with an existing cluster
-kubectl config set-context {{ context }} --cluster {{ context }} --user="{{ preferred_username }}"
+kubectl config set-context {{ context }} --cluster {{ context }} --user="{{ context }}--{{ preferred_username }}"
 kubectl config use-context {{ context }}
 
 # Delete the certificate files
-rm -f k8s-server-ca.pem k8s-user-key.pem k8s-user-cert.pem</code></pre>
+rm -f {{ context }}-server-ca.pem {{ context }}-user-cert.pem {{ context }}-user-key.pem</code></pre>
   </div>
 </div>
 
