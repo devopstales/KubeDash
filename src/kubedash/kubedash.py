@@ -327,6 +327,8 @@ logger.info("	gateway_api:	%s" % app.config["plugins"]["gateway_api"])
 logger.info("	cert_manager:	%s" % app.config["plugins"]["cert_manager"])
 logger.info("	ext_lb: 	%s" % app.config["plugins"]["external_loadbalancer"])
 logger.info("###########################")
+print("######################################################################")
+
 
 if app.config["plugins"]["gateway_api"]:
     from plugins.gateway_api import gateway_api

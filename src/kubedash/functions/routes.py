@@ -398,6 +398,9 @@ def callback():
                     )
                     logger.info("Config sent to client")
                     logger.info("Answer from clinet: %s" % x.text)
+                else:
+                    logger.warning("NO config sent to client")
+                    logger.warning("Missing header")
             except:
                 pass
 ## Kubectl config end
@@ -718,6 +721,19 @@ def namespaces():
         selected = selected,
         namespace_list = namespace_list,
     )
+
+@routes.route("/namespaces/data", methods=['GET', 'POST'])
+@login_required
+def namespaces_data():
+    if request.method == 'POST':
+        namespace = request.form['ns_data']
+
+        return render_template(
+            'namespaces-data.html.j2',
+            ns_data = eval(namespace),
+        )
+    else:
+        return redirect(url_for('routes.namespaces'))
 
 @routes.route("/namespaces/create", methods=['GET', 'POST'])
 @login_required

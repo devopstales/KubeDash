@@ -142,15 +142,19 @@ def k8sNamespacesGet(username_role, user_token):
             if error is None:
                 for ns in namespaces.items:
                     NAMESPACE_DADTA = {
-                        "name": "",
-                        "status": "",
-                        "labels": list() 
+                        "name": None,
+                        "status": None,
+                        "labels": list(),
+                        "annotations": list(),
+                        "created": None,
                     }
                     NAMESPACE_DADTA['name'] = ns.metadata.name
                     NAMESPACE_DADTA['status'] = ns.status.__dict__['_phase']
+                    NAMESPACE_DADTA['created'] = ns.metadata.creation_timestamp.strftime('%Y-%m-%d %H:%M:%S')
                     if ns.metadata.labels:
-                        for key, value in ns.metadata.labels.items():
-                            NAMESPACE_DADTA['labels'].append(key + "=" + value)
+                        NAMESPACE_DADTA['labels'] = ns.metadata.labels
+                    if ns.metadata.annotations:
+                        NAMESPACE_DADTA['annotations'] = ns.metadata.annotations
                     NAMESPACE_LIST.append(NAMESPACE_DADTA)
                     if tracer and span.is_recording():
                         span.set_attribute("namespace.name", ns.metadata.name)

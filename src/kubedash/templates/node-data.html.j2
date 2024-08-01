@@ -224,6 +224,8 @@
                                     <td>
                                     {% if co_status == "True" %}
                                         <span class="badge badge-tag badge-danger">{{ co_status }}</span>
+                                    {% elif co_status == "Unknown" %}
+                                        <span class="badge badge-tag badge-danger">{{ co_status }}</span>
                                     {% else %}
                                         <span class="badge badge-tag badge-success">{{ co_status }}</span>
                                     {% endif %}
