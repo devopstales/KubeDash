@@ -1062,6 +1062,7 @@ def k8sNodeGet(username_role, user_token, no_name):
         "pod_cidr": "",
         "runtime": "",
         "taint": list(),
+        "annotations": "",
         "labels": "",
         "conditions": {},
     }
@@ -1077,6 +1078,7 @@ def k8sNodeGet(username_role, user_token, no_name):
                         else:
                             NODE_INFO["taint"].append(t.key + "=")
                 NODE_INFO['role'] = None
+                NODE_INFO['annotations'] = no.metadata.annotations
                 NODE_INFO['labels'] = no.metadata.labels
                 NODE_INFO['pod_cidr'] = no.spec.pod_cidr
                 NODE_INFO['os'] = no.status.node_info.os_image
@@ -1121,6 +1123,7 @@ def k8sHPAListGet(username_role, user_token, ns_name):
                 "labels": hpa.metadata.labels,
                 "spec": hpa.spec,
                 "status": hpa.status,
+                "created": hpa.metadata.creation_timestamp.strftime('%Y-%m-%d %H:%M:%S'),
             }
             for key, value in hpa.metadata.annotations.items():
                 if key == "autoscaling.alpha.kubernetes.io/conditions":
@@ -1156,6 +1159,7 @@ def k8sPodDisruptionBudgetListGet(username_role, user_token, ns_name):
                 "max_unavailable": pdb.spec.max_unavailable,
                 "min_available": pdb.spec.min_available,
                 "status": pdb.status,
+                "created": pdb.metadata.creation_timestamp.strftime('%Y-%m-%d %H:%M:%S'),
             }
             if "unhealthy_pod_eviction_policy" in pdb.spec.to_dict():
                 PDB_DATA["unhealthy_pod_eviction_policy"] =  pdb.spec.unhealthy_pod_eviction_policy,
@@ -1194,6 +1198,7 @@ def k8sQuotaListGet(username_role, user_token, ns_name):
                 "status": rq.status,
                 "selectors": None,
                 "scope": rq.spec.scopes,
+                "created": rq.metadata.creation_timestamp.strftime('%Y-%m-%d %H:%M:%S'),
             }
             if rq.spec.scope_selector:
                 for expressions in rq.spec.scope_selector.match_expressions:
@@ -1226,6 +1231,7 @@ def k8sLimitRangeListGet(username_role, user_token, ns_name):
                 "annotations": lr.metadata.annotations,
                 "labels": lr.metadata.labels,
                 "limits": lr.spec.limits,
+                "created": lr.metadata.creation_timestamp.strftime('%Y-%m-%d %H:%M:%S'),
             }
             LR_LIST.append(LR_DATA)
         return LR_LIST
@@ -1274,7 +1280,9 @@ def k8sStatefulSetsGet(username_role, user_token, ns):
                 "pvc": list(),
                 "cm": list(),
                 "secrets": list(),
+                "created": None,
             }
+            STATEFULSET_DATA['created'] = sfs.metadata.creation_timestamp.strftime('%Y-%m-%d %H:%M:%S')
             if sfs.status.replicas:
                 STATEFULSET_DATA['desired'] = sfs.status.replicas
             else:
@@ -1288,12 +1296,9 @@ def k8sStatefulSetsGet(username_role, user_token, ns):
             else:
                 STATEFULSET_DATA['ready'] = 0
             if sfs.metadata.annotations:
-                for key, value in sfs.metadata.annotations.items():
-                    if key != "kubectl.kubernetes.io/last-applied-configuration":
-                        STATEFULSET_DATA["annotations"].append(key + "=" + value)
+                STATEFULSET_DATA['annotations'] = sfs.metadata.labels
             if sfs.metadata.labels:
-                for key, value in sfs.metadata.labels.items():
-                    STATEFULSET_DATA['labels'].append(key + "=" + value)
+                STATEFULSET_DATA['labels'] = sfs.metadata.labels
             selectors = sfs.spec.selector.to_dict()
             STATEFULSET_DATA['selectors'] = selectors['match_labels']
             if sfs.spec.template.spec.image_pull_secrets:
@@ -1438,14 +1443,13 @@ def k8sDaemonSetsGet(username_role, user_token, ns):
                 "pvc": list(),
                 "cm": list(),
                 "secrets": list(),
+                "created": None,
             }
+            DAEMONSET_DATA['created'] = ds.metadata.creation_timestamp.strftime('%Y-%m-%d %H:%M:%S')
             if ds.metadata.labels:
-                for key, value in ds.metadata.labels.items():
-                    DAEMONSET_DATA['labels'].append(key + "=" + value)
+                DAEMONSET_DATA['labels'] = ds.metadata.labels
             if ds.metadata.annotations:
-                for key, value in ds.metadata.annotations.items():
-                    if key != "kubectl.kubernetes.io/last-applied-configuration":
-                        DAEMONSET_DATA["annotations"].append(key + "=" + value)
+                DAEMONSET_DATA['annotations'] = ds.metadata.annotations
             selectors = ds.spec.selector.to_dict()
             DAEMONSET_DATA['selectors'] = selectors['match_labels']
             if ds.status.desired_number_scheduled:
@@ -1572,7 +1576,9 @@ def k8sDeploymentsGet(username_role, user_token, ns):
                 "pvc": list(),
                 "cm": list(),
                 "secrets": list(),
+                "created": None,
             }
+            DEPLOYMENT_DATA['created'] = d.metadata.creation_timestamp.strftime('%Y-%m-%d %H:%M:%S')
             if d.status.ready_replicas:
                 DEPLOYMENT_DATA['ready']  = d.status.ready_replicas
             else:
@@ -1586,12 +1592,9 @@ def k8sDeploymentsGet(username_role, user_token, ns):
             else:
                 DEPLOYMENT_DATA['desired'] = 0
             if d.metadata.labels:
-                for key, value in d.metadata.labels.items():
-                    DEPLOYMENT_DATA['labels'].append(key + "=" + value)
+                DEPLOYMENT_DATA['labels'] = d.metadata.labels
             if d.metadata.annotations:
-                for key, value in d.metadata.annotations.items():
-                    if key != "kubectl.kubernetes.io/last-applied-configuration":
-                        DEPLOYMENT_DATA["annotations"].append(key + "=" + value)
+                DEPLOYMENT_DATA["annotations"] = d.metadata.annotations
             selectors = d.spec.selector.to_dict()
             DEPLOYMENT_DATA['selectors'] = selectors['match_labels']
             if d.spec.template.spec.image_pull_secrets:
@@ -1780,6 +1783,7 @@ def k8sPodGet(username_role, user_token, ns, po):
             # main
             "name": po,
             "namespace": ns,
+            "annotations": list(),
             "labels": list(),
             "owner": "",
             "node": pod_data.spec.node_name,
@@ -1801,13 +1805,13 @@ def k8sPodGet(username_role, user_token, ns, po):
             "security_context": pod_data.spec.security_context.to_dict(),
             # Conditions
             "conditions": list(),
+            "created": None,
         }
+        POD_DATA['created'] = pod_data.metadata.creation_timestamp.strftime('%Y-%m-%d %H:%M:%S')
         if pod_data.metadata.labels:
-            for key, value in pod_data.metadata.labels.items():
-                label = {
-                    key: value
-                }
-                POD_DATA['labels'].append(label)
+            POD_DATA['labels'] = pod_data.metadata.labels
+        if pod_data.metadata.annotations:
+            POD_DATA['annotations'] = pod_data.metadata.annotations
         if pod_data.metadata.owner_references:
             for owner in pod_data.metadata.owner_references:
                 POD_DATA['owner'] = "%ss/%s" % (owner.kind.lower(), owner.name)
@@ -2206,6 +2210,7 @@ def k8sRoleListGet(username_role, user_token, ns):
                 "annotations": role.metadata.annotations,
                 "labels": role.metadata.labels,
                 "rules": role.rules,
+                "created": role.metadata.creation_timestamp.strftime('%Y-%m-%d %H:%M:%S'),
             }
             ROLE_LIST.append(ROLE_INFO)
         return ROLE_LIST
@@ -2234,6 +2239,7 @@ def k8sRoleBindingListGet(username_role, user_token, ns):
             "user": list(),
             "group": list(),
             "ServiceAccount": list(),
+            "created": rb.metadata.creation_timestamp.strftime('%Y-%m-%d %H:%M:%S'),
             }
             if type(rb.role_ref) == list:
                 for role in rb.role_ref:
@@ -2399,6 +2405,7 @@ def k8sClusterRoleListGet(username_role, user_token):
                     "annotations": cr.metadata.annotations,
                     "labels": cr.metadata.labels,
                     "rules": cr.rules,
+                    "created": cr.metadata.creation_timestamp.strftime('%Y-%m-%d %H:%M:%S'),
                 }
                 CLUSTER_ROLE_LIST.append(CLUSTER_ROLE_DATA)
             return CLUSTER_ROLE_LIST
@@ -2429,6 +2436,7 @@ def k8sClusterRoleBindingListGet(username_role, user_token):
             "user": list(),
             "group": list(),
             "ServiceAccount": list(),
+            "created": crb.metadata.creation_timestamp.strftime('%Y-%m-%d %H:%M:%S'),
             }
             if type(crb.role_ref) == list:
                 for role in crb.role_ref:
@@ -2578,7 +2586,7 @@ def k8sSecretListGet(username_role, user_token, namespace):
             "annotations": secret.metadata.annotations,
             "labels": secret.metadata.labels,
             "data": secret.data,
-            "created": secret.metadata.creation_timestamp,
+            "created": secret.metadata.creation_timestamp.strftime('%Y-%m-%d %H:%M:%S'),
             "version": secret.metadata.resource_version,
         }
         SECRET_LIST.append(SECRET_DATA)
@@ -2603,6 +2611,7 @@ def k8sPolicyListGet(username_role, user_token, ns_name):
             "policy_types": p.spec.policy_types,
             "imgress_rules": eval(str(p.spec.ingress)),
             "egress_rules": eval(str(p.spec.egress)),
+            "created": p.metadata.creation_timestamp.strftime('%Y-%m-%d %H:%M:%S'),
         }
         POLICY_LIST.append(POLICY_DATA)
     return POLICY_LIST
@@ -2644,7 +2653,7 @@ def k8sIngressClassListGet(username_role, user_token,):
         for ic in ingress_class_list.items:
             ING_INFO = {
                 "name": ic.metadata.name,
-                "created": ic.metadata.creation_timestamp,
+                "created": ic.metadata.creation_timestamp.strftime('%Y-%m-%d %H:%M:%S'),
                 "annotations": ic.metadata.annotations,
                 "labels": ic.metadata.labels,
                 "controller": ic.spec.controller,
@@ -2681,7 +2690,7 @@ def k8sIngressListGet(username_role, user_token, ns):
                 "name": ingress.metadata.name,
                 "ingressClass": ingress.spec.ingress_class_name,
                 "rules": rules,
-                "created": ingress.metadata.creation_timestamp,
+                "created": ingress.metadata.creation_timestamp.strftime('%Y-%m-%d %H:%M:%S'),
                 "annotations": ingress.metadata.annotations,
                 "labels": ingress.metadata.labels,
                 "tls": ingress.spec.tls,
@@ -2717,7 +2726,7 @@ def k8sNetworkPolicyListGet(username_role, user_token, ns):
         for policy in policy_list.items:
             POLICY_INFO = {
                 "name": policy.metadata.name,
-                "created": policy.metadata.creation_timestamp,
+                "created": policy.metadata.creation_timestamp.strftime('%Y-%m-%d %H:%M:%S'),
                 "annotations": policy.metadata.annotations,
                 "labels": policy.metadata.labels,
                 "policy_type": policy.spec.policy_type,
@@ -2749,7 +2758,7 @@ def k8sServiceListGet(username_role, user_token, ns):
             SERVICE_INFO = {
                 "name": service.metadata.name,
                 "type": service.spec.type,
-                "created": service.metadata.creation_timestamp,
+                "created": service.metadata.creation_timestamp.strftime('%Y-%m-%d %H:%M:%S'),
                 "annotations": service.metadata.annotations,
                 "labels": service.metadata.labels,
                 "selector": service.spec.selector,
@@ -2817,7 +2826,7 @@ def k8sStorageClassListGet(username_role, user_token):
         for sc in storage_classes.to_dict()["items"]:
             SC = {
                 "name": sc["metadata"]["name"],
-                "created": sc["metadata"]["creation_timestamp"],
+                "created": sc["metadata"]["creation_timestamp"].strftime('%Y-%m-%d %H:%M:%S'),
                 "annotations": sc["metadata"]["annotations"],
                 "labels": sc["metadata"]["labels"],
                 "provisioner": sc["provisioner"],
@@ -2848,7 +2857,7 @@ def k8sSnapshotClassListGet(username_role, user_token):
         for sc in snapshot_classes["items"]:
             SC = {
                 "name": sc["metadata"]["name"],
-                "created": sc["metadata"]["creationTimestamp"],
+                "created": sc["metadata"]["creationTimestamp"].strftime('%Y-%m-%d %H:%M:%S'),
                 "annotations": sc["metadata"]["annotations"],
                 "driver": sc["driver"],
                 "deletion_policy": sc["deletionPolicy"],
@@ -2881,7 +2890,7 @@ def k8sPersistentVolumeClaimListGet(username_role, user_token, namespace):
             PVC = {
                 "status": pvc.status.phase,
                 "name": pvc.metadata.name,
-                "created": pvc.metadata.creation_timestamp,
+                "created": pvc.metadata.creation_timestamp.strftime('%Y-%m-%d %H:%M:%S'),
                 "annotations": pvc.metadata.annotations,
                 "labels": pvc.metadata.labels,
                 "access_modes": pvc.spec.access_modes,
@@ -2915,7 +2924,7 @@ def k8sPersistentVolumeListGet(username_role, user_token, namespace):
                 PV = {
                     "status": pv.status.phase,
                     "name": pv.metadata.name,
-                    "created": pv.metadata.creation_timestamp,
+                    "created": pv.metadata.creation_timestamp.strftime('%Y-%m-%d %H:%M:%S'),
                     "annotations": pv.metadata.annotations,
                     "labels": pv.metadata.labels,
                     "access_modes": pv.spec.access_modes,
@@ -2960,7 +2969,7 @@ def k8sPersistentVolumeSnapshotListGet(username_role, user_token):
             PVS = {
             "name": pvs["metadata"]["name"],
             "annotations": pvs["metadata"]["annotations"],
-            "created": pvs["metadata"]["creationTimestamp"],
+            "created": pvs["metadata"]["creationTimestamp"].strftime('%Y-%m-%d %H:%M:%S'),
             "pvc": pvs["spec"]["source"]["persistentVolumeClaimName"],
             "volume_snapshot_class": pvs["spec"]["volumeSnapshotClassName"],
             "volume_snapshot_content": pvs["status"]["boundVolumeSnapshotContentName"],
@@ -2991,7 +3000,7 @@ def k8sConfigmapListGet(username_role, user_token, namespace):
     for configmap in configmap_list.items:
         CONFIGMAP_DATA = {
             "name": configmap.metadata.name,
-            "created": configmap.metadata.creation_timestamp,
+            "created": configmap.metadata.creation_timestamp.strftime('%Y-%m-%d %H:%M:%S'),
             "annotations": configmap.metadata.annotations,
             "labels": configmap.metadata.labels,
             "data": configmap.data,

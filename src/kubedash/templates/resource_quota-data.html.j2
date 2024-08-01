@@ -36,6 +36,10 @@
                                     <td>{{ quota_data.name }}</td>
                                 </tr>
                                 <tr>
+                                    <th>Created:</th>
+                                    <td>{{ quota_data.created }}</td>
+                                </tr>
+                                <tr>
                                     <th>Namespace:</th>
                                     <td>{{ quota_data.namespace }}</td>
                                 </tr>
@@ -43,14 +47,25 @@
                                     <th>Creation:</th>
                                     <td>{{ quota_data.creation_timestamp }}</td>
                                 </tr>
-                                <tr>
                                     <th>Selectors:</th>
                                     <td>
                                         {% if quota_data.selectors %}
-                                        {% for key, value in quota_data.selectors.items() %}
-                                        <span class="badge badge-tag badge-secondary">{{ key }}: {{ value }}</span>
-                                        {% if not loop.last %}<br>{% endif %}
-                                        {% endfor %}
+                                        <table class="table table-bordered" id="selectorsTable" width="100%" cellspacing="0">
+                                            <thead>
+                                                <tr>
+                                                    <th width="50%">Key</th>
+                                                    <th width="50%">Value</th>
+                                                </tr>
+                                            </thead>
+                                            <tbody>
+                                            {% for key, value in quota_data.selectors.items() %}
+                                                <tr>
+                                                    <td width="50%">{{ key }}</td>
+                                                    <td width="50%">{{ value }}</td>
+                                                </tr>
+                                            {% endfor %}
+                                            </tbody>
+                                        </table>
                                         {% endif %}
                                     </td>
                                 </tr>
@@ -58,10 +73,10 @@
                                     <th>Scopes:</th>
                                     <td>
                                         {% if quota_data.scope %}
-                                        {% for scope in quota_data.scope %}
-                                        <span class="badge badge-tag badge-secondary">{{ scope }}</span>
-                                        {% if not loop.last %}<br>{% endif %}
-                                        {% endfor %}
+                                            {% for scope in quota_data.scope %}
+                                                <span class="badge badge-tag badge-secondary">{{ scope }}</span>
+                                                {% if not loop.last %}<br>{% endif %}
+                                            {% endfor %}
                                         {% endif %}
                                     </td>
                                 </tr>
@@ -69,27 +84,47 @@
                                     <th>Annotations:</th>
                                     <td>
                                         {% if quota_data.annotations %}
-                                        {% for an_key, an_value in quota_data.annotations.items() %}
-                                        {% if an_key != "kubectl.kubernetes.io/last-applied-configuration" %}
-                                        {% if an_key != "autoscaling.alpha.kubernetes.io/conditions" %}
-                                        <span class="badge badge-tag badge-secondary">{{ an_key }}: {{ an_value }}</span>
-                                        {% if not loop.last %}<br>{% endif %}
-                                        {% endif %}
-                                        {% endif %}
-                                        {% endfor %}
+                                        <table class="table table-bordered" id="annotationTable" width="100%" cellspacing="0">
+                                            <thead>
+                                                <tr>
+                                                    <th width="50%">Key</th>
+                                                    <th width="50%">Value</th>
+                                                </tr>
+                                            </thead>
+                                            <tbody>
+                                            {% for key, value in quota_data.annotations.items() %}
+                                                <tr>
+                                                {% if key != "kubectl.kubernetes.io/last-applied-configuration" %}
+                                                    <td width="50%">{{ key }}</td>
+                                                    <td width="50%">{{ value }}</td>
+                                                {% endif %}
+                                                </tr>
+                                            {% endfor %}
+                                            </tbody>
+                                        </table>
                                         {% endif %}
                                     </td>
                                 </tr>
-                                <tr>
-                                    <th>Labels:</th>
+                               <tr>
+                                    <th>Lables:</th>
                                     <td>
                                         {% if quota_data.labels %}
-                                        {% for an_key, an_value in quota_data.labels.items() %}
-                                        {% if an_key != "kubectl.kubernetes.io/last-applied-configuration" %}
-                                        <span class="badge badge-tag badge-secondary">{{ an_key }}: {{ an_value }}</span>
-                                        {% if not loop.last %}<br>{% endif %}
-                                        {% endif %}
-                                        {% endfor %}
+                                        <table class="table table-bordered" id="labelsTable" width="100%" cellspacing="0">
+                                            <thead>
+                                                <tr>
+                                                    <th width="50%">Key</th>
+                                                    <th width="50%">Value</th>
+                                                </tr>
+                                            </thead>
+                                            <tbody>
+                                            {% for key, value in quota_data.labels.items() %}
+                                                <tr>
+                                                    <td width="50%">{{ key }}</td>
+                                                    <td width="50%">{{ value }}</td>
+                                                </tr>
+                                            {% endfor %}
+                                            </tbody>
+                                        </table>
                                         {% endif %}
                                     </td>
                                 </tr>

@@ -36,6 +36,10 @@
                                     <td>{{ pdp_data.name }}</td>
                                 </tr>
                                 <tr>
+                                    <th>Created:</th>
+                                    <td>{{ pdp_data.created }}</td>
+                                </tr>
+                                <tr>
                                     <th>Namespace:</th>
                                     <td>{{ pdp_data.namespace }}</td>
                                 </tr>
@@ -47,27 +51,47 @@
                                     <th>Annotations:</th>
                                     <td>
                                         {% if pdp_data.annotations %}
-                                        {% for an_key, an_value in pdp_data.annotations.items() %}
-                                        {% if an_key != "kubectl.kubernetes.io/last-applied-configuration" %}
-                                        {% if an_key != "autoscaling.alpha.kubernetes.io/conditions" %}
-                                        <span class="badge badge-tag badge-secondary">{{ an_key }}: {{ an_value }}</span>
-                                        {% if not loop.last %}<br>{% endif %}
-                                        {% endif %}
-                                        {% endif %}
-                                        {% endfor %}
+                                        <table class="table table-bordered" id="annotationTable" width="100%" cellspacing="0">
+                                            <thead>
+                                                <tr>
+                                                    <th width="50%">Key</th>
+                                                    <th width="50%">Value</th>
+                                                </tr>
+                                            </thead>
+                                            <tbody>
+                                            {% for key, value in pdp_data.annotations.items() %}
+                                                <tr>
+                                                {% if key != "kubectl.kubernetes.io/last-applied-configuration" %}
+                                                    <td width="50%">{{ key }}</td>
+                                                    <td width="50%">{{ value }}</td>
+                                                {% endif %}
+                                                </tr>
+                                            {% endfor %}
+                                            </tbody>
+                                        </table>
                                         {% endif %}
                                     </td>
                                 </tr>
-                                <tr>
-                                    <th>Labels:</th>
+                               <tr>
+                                    <th>Lables:</th>
                                     <td>
                                         {% if pdp_data.labels %}
-                                        {% for an_key, an_value in pdp_data.labels.items() %}
-                                        {% if an_key != "kubectl.kubernetes.io/last-applied-configuration" %}
-                                        <span class="badge badge-tag badge-secondary">{{ an_key }}: {{ an_value }}</span>
-                                        {% if not loop.last %}<br>{% endif %}
-                                        {% endif %}
-                                        {% endfor %}
+                                        <table class="table table-bordered" id="labelsTable" width="100%" cellspacing="0">
+                                            <thead>
+                                                <tr>
+                                                    <th width="50%">Key</th>
+                                                    <th width="50%">Value</th>
+                                                </tr>
+                                            </thead>
+                                            <tbody>
+                                            {% for key, value in pdp_data.labels.items() %}
+                                                <tr>
+                                                    <td width="50%">{{ key }}</td>
+                                                    <td width="50%">{{ value }}</td>
+                                                </tr>
+                                            {% endfor %}
+                                            </tbody>
+                                        </table>
                                         {% endif %}
                                     </td>
                                 </tr>
