@@ -1,6 +1,7 @@
 #!/usr/bin/env python3
 
 import os, logging
+from werkzeug.middleware.proxy_fix import ProxyFix
 from flask import Flask, render_template, request
 from flask_talisman import Talisman
 from flask_healthz import healthz, HealthError
@@ -181,6 +182,12 @@ def k8s_roles_init():
 def create_app(config_name="development"):
     """Init App"""
     app = localFlask(__name__, static_url_path='', static_folder='static')
+
+    if config_name == "production":
+      """Tell Flask it is Behind a Proxy"""
+      app.wsgi_app = ProxyFix(
+        app.wsgi_app, x_for=1, x_proto=1, x_host=1, x_prefix=1
+      )
 
     """App Version"""
     global kubedash_version

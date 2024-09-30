@@ -1,5 +1,5 @@
 codeSHELL=/bin/bash -o pipefail
-export VERSION=3.0.0
+export VERSION=3.0.1
 
 .ONESHELL: # Applies to every targets in the file!
 .PHONY:	all

@@ -1,5 +1,19 @@
 # syntax = docker/dockerfile:1.2
 ARG ARCH
+FROM ${ARCH}python:3.11-alpine AS builder
+
+WORKDIR /code
+COPY requirements.txt  /code/
+RUN apk add --no-cache postgresql-libs && \
+    apk add --no-cache bash gcc musl-dev linux-headers && \
+    apk add --no-cache --virtual .build-deps gcc build-base freetype-dev libpng-dev openblas-dev libffi-dev musl-dev postgresql-dev
+RUN apk -U upgrade
+RUN pip install --no-cache-dir --target=/code/requirements -r /code/requirements.txt
+
+
+
+# main Contaiber
+ARG ARCH
 ARG VERSION
 ARG BUILD_DATE
 FROM ${ARCH}python:3.11-alpine
@@ -22,27 +36,16 @@ LABEL org.opencontainers.image.vendor="devopstales" \
       org.opencontainers.image.documentation="https://devopstales.github.io/kubedash" \
       org.opencontainers.image.created=${BUILD_DATE}
 
-WORKDIR /code
 
 RUN addgroup -S -g 10001 kubedash && \
     adduser -S -u 10001 kubedash -G kubedash && \
     mkdir /tmp/kubedash && \
     chown -R kubedash:kubedash /tmp/kubedash
 
-COPY requirements.txt  /code/
-
-RUN apk add --no-cache postgresql-libs && \
-    apk add --no-cache bash gcc musl-dev linux-headers && \
-    apk add --no-cache --virtual .build-deps gcc build-base freetype-dev libpng-dev openblas-dev libffi-dev musl-dev postgresql-dev
-
 RUN apk -U upgrade
 
-RUN pip install --no-cache-dir -r /code/requirements.txt
-
-RUN apk del gcc build-base freetype-dev libpng-dev openblas-dev libffi-dev musl-dev postgresql-dev llvm14-libs && \
-    apk --purge del .build-deps
-
 COPY entrypoint.sh /entrypoint.sh
+COPY --from=builder /code/requirements /usr/local/lib/python3.11/site-packages/
 COPY --chown=kubedash:kubedash ./kubedash /code/kubedash
 
 WORKDIR /code/kubedash
