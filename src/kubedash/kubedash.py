@@ -8,6 +8,7 @@ from flask_healthz import healthz, HealthError
 from sqlalchemy_utils import database_exists
 from sqlalchemy import create_engine, inspect
 from flask_migrate import Migrate
+from itsdangerous import base64_encode
 
 import eventlet
 import eventlet.wsgi
@@ -156,13 +157,23 @@ def k8s_config_int(error, config):
     if not error:
         K8S_CLUSTER_NAME = config.get('k8s', 'cluster_name', fallback="k8s-main")
         K8S_API_SERVER   = config.get('k8s', 'api_server', fallback=None)
-        K8S_API_CA       = config.get('k8s', 'api_ca', fallback=None)
+        try:
+            K8S_API_CA       = config.get('k8s', 'api_ca', fallback=None)
     else:
         K8S_CLUSTER_NAME = os.environ.get('K8S_CLUSTER_NAME', "k8s-main")
         K8S_API_SERVER   = os.environ.get('K8S_API_SERVER', None)
-        K8S_API_CA       = os.environ.get('K8S_API_CA', None) # base64 encoded
+        try:
+            K8S_API_CA       = os.environ.get('K8S_API_CA', None) # base64 encoded
 
-    if K8S_API_SERVER and K8S_API_CA:
+    if K8S_API_SERVER:
+        try:
+            K8S_API_CA
+        except NameError:
+            with open("/var/run/secrets/kubernetes.io/serviceaccount/ca.crt", 'w') as cert_file:
+                cert_file_data = cert_file.read()
+                base64_encoded_data = str(base64_encode(cert_file_data), "UTF-8")
+                K8S_API_CA = base64_encoded_data
+
         k8sConfig = k8sServerConfigGet()
         if k8sConfig is None:
             k8sServerConfigCreate(K8S_API_SERVER, K8S_CLUSTER_NAME, K8S_API_CA)
