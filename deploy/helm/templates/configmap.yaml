@@ -63,8 +63,10 @@ data:
     # kubernetes api server url
     api_server = {{ .Values.cluster.apiUrl | quote }}
 
+    {{ if .Values.cluster.caCert }}
     # base64 encoded ca certificate
     api_ca = {{ .Values.cluster.caCert | b64enc | quote }}
+    {{ end }}
 
     #################################### Plugin Settings ###########################
     [plugin_settings]

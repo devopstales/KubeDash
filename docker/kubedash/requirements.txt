@@ -1,9 +1,11 @@
 # flask
-flask==2.3.2
+flask==3.0.0
 Werkzeug==3.0.3
 Jinja2==3.1.4
 dnspython==2.6.1
 pytz==2023.3.post1
+# config
+configparser==7.0.0
 
 # database
 psycopg2==2.9.7
@@ -12,10 +14,10 @@ sqlalchemy_utils==0.41.1
 flask_migrate==4.0.5
 flask_sqlalchemy==3.0.5
 # login
-flask_login==0.6.2
+flask_login==0.6.3
 flask_session==0.8.0
 requests_oauthlib==2.0.0
-Flask_WTF==1.1.1
+Flask_WTF==1.2.1
 # web security
 flask_talisman==1.1.0
 # kubernetes
@@ -36,6 +38,9 @@ opentelemetry-exporter-otlp-proto-http==1.23.0
 opentelemetry-semantic-conventions==0.44b0
 opentelemetry-instrumentation-sqlalchemy==0.44b0
 opentelemetry-instrumentation-flask==0.44b0
+# monitoring
+#prometheus_client==0.20.0
+prometheus-flask-exporter==0.23.1
 
 # security
 gunicorn==23.0.0

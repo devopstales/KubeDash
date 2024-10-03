@@ -17,7 +17,7 @@ from functions.user import User, UsersRoles, Role, \
 from functions.k8s import *
 from functions.registry import *
 
-from prometheus_client import generate_latest, Gauge
+from prometheus_client import generate_latest
 
 from functions.components import tracer, socketio, csrf
 from opentelemetry.trace.status import Status, StatusCode
@@ -60,16 +60,6 @@ def test():
 def metrics():
     return generate_latest()
 
-METRIC_APP_VERSION = Gauge(
-    'app_version',
-    'Application Version')
-
-"""App Version"""
-global kubedash_version
-kubedash_version = os.getenv('KUBEDASH_VERSION', "???")
-
-METRIC_APP_VERSION.set(kubedash_version)
-
 ##############################################################
 ## Login
 ##############################################################
@@ -89,6 +79,7 @@ def login():
         if ssoServer is not None:
             auth_server_info, oauth = get_auth_server_info()
             if auth_server_info is not None:
+                print(auth_server_info)
                 auth_url = auth_server_info["authorization_endpoint"]
                 authorization_url, state = oauth.authorization_url(
                     auth_url,

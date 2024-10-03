@@ -23,7 +23,7 @@ from functions.k8s import k8sServerConfigGet, k8sServerConfigCreate, k8sServerCo
 k8sUserRoleTemplateListGet, k8sUserClusterRoleTemplateListGet, k8sClusterRolesAdd
 from config import app_config
 
-from prometheus_client import Gauge
+from prometheus_client import Gauge, Info
 
 from opentelemetry.instrumentation.flask import FlaskInstrumentor
 from opentelemetry.instrumentation.sqlalchemy import SQLAlchemyInstrumentor
@@ -51,13 +51,13 @@ roles = [
     "User",
 ]
 
-"""App Version"""
-global kubedash_version
-kubedash_version = os.getenv('KUBEDASH_VERSION', "???")
-
 ##############################################################
 ## Promatehus Endpoint
 ##############################################################
+
+METRIC_APP_VERSION = Info(
+    'app_version',
+    'Application Version')
 
 METRIC_DB_CONNECTION = Gauge(
     'app_databse_connection',
@@ -265,6 +265,8 @@ def create_app(config_name="development"):
     global kubedash_version
     kubedash_version = os.getenv('KUBEDASH_VERSION')
     app.jinja_env.globals['kubedash_version'] = kubedash_version
+
+    METRIC_APP_VERSION.info({'version': kubedash_version})
     print("######################################################################")
     print("# KubeDash %s " % kubedash_version)
     print("######################################################################")
@@ -336,9 +338,6 @@ def create_app(config_name="development"):
         SQLALCHEMY_DATABASE_URI = "sqlite:///"+basedir+"/database/"+config_name+".db"
         database_type = 'sqlite'
 
-    """Init session"""
-    sess.init_app(app)
-
     """Init DB"""
     migrate = Migrate(app, db)
     db.init_app(app)
@@ -350,6 +349,9 @@ def create_app(config_name="development"):
                 oidc_init(error, config)
                 k8s_config_int(error, config)
                 k8s_roles_init()
+
+    """Init session"""
+    sess.init_app(app)
 
     """Init Logging managger"""
     login_manager.init_app(app)
@@ -363,7 +365,10 @@ def create_app(config_name="development"):
     socketio.init_app(app)
 
     """Init Talisman"""
-    talisman = Talisman(app, content_security_policy=csp)
+    if config_name == "production":
+        talisman = Talisman(app, content_security_policy=csp)
+    else:
+        talisman = Talisman(app, content_security_policy=None, force_https=False)
     ##############################################################
     ## Custom jinja2 filter
     ##############################################################
@@ -437,11 +442,13 @@ def readiness():
         connect_database()
     except Exception:
         raise HealthError("Can't connect to the database")
+    # test k8s connection
+    # test sso connection
 
 app.config.update(
     HEALTHZ = {
-        "live":  app.name + ".liveness",
-        "ready":  app.name + ".readiness",
+        "live": app.name + ".liveness",
+        "ready": app.name + ".readiness",
     }
 )
 

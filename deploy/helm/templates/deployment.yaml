@@ -73,13 +73,13 @@ spec:
 {{- end }}
         livenessProbe:
           httpGet:
-            path: /healthz/live
+            path: /api/health/live
             port: 8000
           initialDelaySeconds: 5
           timeoutSeconds: 1
         readinessProbe:
           httpGet:
-            path: /healthz/ready
+            path: /api/health/ready
             port: 8000
           initialDelaySeconds: 5
           timeoutSeconds: 1
