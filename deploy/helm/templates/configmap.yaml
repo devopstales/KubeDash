@@ -19,20 +19,18 @@ data:
     # You can configure the database connection by specifying type, host, name, user and password
     # as separate properties or as on string using the url property.
 
-    # Either "postgres" or "sqlite3", it's your choice
+    # Either postgres or sqlite3, it's your choice
     {{ if .Values.externalDatabase.enabled }}
     type = postgres
     host = {{ .Values.externalDatabase.host | quote }}
     name = {{ .Values.externalDatabase.database | quote }}
     user = root
-    # If the password contains # or ; you have to wrap it with quotes. Ex "#password;"
     password = {{ .Values.externalDatabase.password | b64enc | quote }}
     {{ else if .Values.postgresqlHa.enabled }}
     type = postgres
-    host = "{{ .Release.Name }}-pgpool"
+    host = {{ .Release.Name }}-pgpool
     name = {{ .Values.postgresqlHa.database | quote }}
     user = root
-    # If the password contains # or ; you have to wrap it with triple quotes. Ex "#password;"
     password = {{ .Values.postgresqlHa.postgresql.password | b64enc | quote }}
     {{ else }}
     type = sqlite3
@@ -51,9 +49,9 @@ data:
     scope = {{ .Values.oidc.provider.oidcScopes | quote}}
 
     {{ if .Values.ingress.tls.enabled }}
-    callback_url = "https://{{ .Values.ingress.url}}"
+    callback_url = https://{{ .Values.ingress.url}}
     {{ else }}
-    callback_url = "http://{{ .Values.ingress.url}}"
+    callback_url = http://{{ .Values.ingress.url}}
     {{ end}}
     {{ end }}
     #################################### K8S ###########################

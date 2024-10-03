@@ -16,9 +16,9 @@ import (
 	"os/signal"
 	"time"
 
-	"github.com/go-playground/validator/v10"
 	"github.com/gin-gonic/gin"
 	"github.com/gin-gonic/gin/binding"
+	"github.com/go-playground/validator/v10"
 	pkgruntime "k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/client-go/tools/clientcmd"
 	"sigs.k8s.io/yaml"
@@ -30,7 +30,7 @@ import (
 const (
 	kubeConfigEnvName         = "KUBECONFIG"
 	kubeConfigDefaultFilename = "~/.kube/config"
-	AppVersion = "0.1"
+	AppVersion                = "1.2"
 )
 
 type RequestOIDC struct {
@@ -158,8 +158,8 @@ func callback(c *gin.Context) {
 
 	// Debug
 	/*
-	body, _ := ioutil.ReadAll(c.Request.Body)
-	println(string(body))
+		body, _ := ioutil.ReadAll(c.Request.Body)
+		println(string(body))
 	*/
 
 	c.ShouldBindBodyWith(&requestOIDC, binding.JSON)
@@ -172,16 +172,16 @@ func callback(c *gin.Context) {
 		} else {
 			// Debug
 			/*
-			println("Get Cert Type Response") // Debug
-			fmt.Println(string(requestCert.ClientKeyData)) // Debug
+				println("Get Cert Type Response") // Debug
+				fmt.Println(string(requestCert.ClientKeyData)) // Debug
 			*/
 			requestConfig, context = createValidTestConfigCert(requestCert)
 		}
 	} else {
 		// Debug
 		/*
-		println("Get OIDC Type Response") // Debug
-		fmt.Println(string(requestOIDC.ClientID)) // Debug
+			println("Get OIDC Type Response") // Debug
+			fmt.Println(string(requestOIDC.ClientID)) // Debug
 		*/
 		requestConfig, context = createValidTestConfigOIDC(requestOIDC)
 	}
@@ -191,11 +191,14 @@ func callback(c *gin.Context) {
 	var kubeconfig string
 	fileExist, kubeconfig = GetKubeConfig()
 
-	if fileExist == true {
-		configOverrides, _ := ioutil.TempFile("", "")
-		defer os.Remove(configOverrides.Name())
+	if fileExist {
+		configOverrides, err := ioutil.TempFile("", "kubeconfig-*")
+		if err != nil {
+			log.Fatal(err)
+		}
+		// fmt.Println(configOverrides.Name()) // Debug
 
-		// Write to file the config
+		// Write config to the file
 		clientcmd.WriteToFile(requestConfig, configOverrides.Name())
 
 		// merge files
@@ -219,9 +222,15 @@ func callback(c *gin.Context) {
 		//fmt.Println(string(output)) // Debug
 		// Write to file
 		WriteToFile(string(output), context)
-	} else {
-		configOverrides, _ := ioutil.TempFile("", "")
+
+		// Delete temp file
 		defer os.Remove(configOverrides.Name())
+	} else {
+		configOverrides, err := ioutil.TempFile("", "kubeconfig-*")
+		if err != nil {
+			log.Fatal(err)
+		}
+		// fmt.Println(configOverrides.Name()) // Debug
 
 		// Write to file the config
 		clientcmd.WriteToFile(requestConfig, configOverrides.Name())
@@ -247,9 +256,11 @@ func callback(c *gin.Context) {
 		//fmt.Println(string(output)) // Debug
 		// Write to file
 		WriteToFile(string(output), context)
+
+		// Delete temp file
+		defer os.Remove(configOverrides.Name())
 	}
 	c.JSON(200, "Client Get Data")
-	return
 }
 
 func GetKubeConfig() (bool, string) {
@@ -285,7 +296,7 @@ func GetKubeConfig() (bool, string) {
 		}
 	} else {
 		// test if kubeConfigEnvName exists
-		if _, err := os.Stat(kubeConfigFileName); os.IsNotExist(err) {
+		if _, err := os.Stat(ConfigFilename); os.IsNotExist(err) {
 			// file does not exist
 			fileExist = false
 		} else {
@@ -380,5 +391,6 @@ func WriteToFile(content string, context string) {
 	}
 	fmt.Printf("Configfile created with config for %s to %s\n", context, filename)
 	fmt.Println("Happy Kubernetes interaction!")
-	fmt.Println("(Press CTRL+C to quit)")
+	// fmt.Println("(Press CTRL+C to quit)")
+	os.Exit(0)
 }

@@ -1,4 +1,4 @@
-import requests, json, yaml, logging, functools
+import requests, json, yaml, logging, functools, os
 from flask import Blueprint, jsonify, render_template, session, flash, redirect, url_for, request, Response
 from flask_login import login_user, login_required, logout_user, current_user
 from flask_socketio import disconnect
@@ -16,6 +16,8 @@ from functions.user import User, UsersRoles, Role, \
     KubectlConfigStore, KubectlConfig
 from functions.k8s import *
 from functions.registry import *
+
+from prometheus_client import generate_latest, Gauge
 
 from functions.components import tracer, socketio, csrf
 from opentelemetry.trace.status import Status, StatusCode
@@ -37,24 +39,36 @@ def authenticated_only(f):
     return wrapped
 
 ##############################################################
-## health
+## API
 ##############################################################
 
-@routes.route('/ping', methods=['GET'])
+@routes.route('/api/ping', methods=['GET'])
 def test():
     with tracer.start_as_current_span("ping-pong", 
                                         attributes={ 
-                                            "http.route": "/ping",
+                                            "http.route": "/api/ping",
                                             "http.method": "GET",
                                         }
                                     ) if tracer else nullcontext() as span:
         return 'pong'
 
-@routes.route('/health', methods=['GET'])
-def health():
-    resp = jsonify(health="healthy")
-    resp.status_code = 200
-    return resp
+##############################################################
+## Promatehus Endpoint
+##############################################################
+
+@routes.route('/metrics')
+def metrics():
+    return generate_latest()
+
+METRIC_APP_VERSION = Gauge(
+    'app_version',
+    'Application Version')
+
+"""App Version"""
+global kubedash_version
+kubedash_version = os.getenv('KUBEDASH_VERSION', "???")
+
+METRIC_APP_VERSION.set(kubedash_version)
 
 ##############################################################
 ## Login

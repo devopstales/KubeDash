@@ -23,9 +23,14 @@ from functions.k8s import k8sServerConfigGet, k8sServerConfigCreate, k8sServerCo
 k8sUserRoleTemplateListGet, k8sUserClusterRoleTemplateListGet, k8sClusterRolesAdd
 from config import app_config
 
+from prometheus_client import Gauge
+
 from opentelemetry.instrumentation.flask import FlaskInstrumentor
 from opentelemetry.instrumentation.sqlalchemy import SQLAlchemyInstrumentor
 
+##############################################################
+## VAriables
+##############################################################
 csp = {
     'font-src': [
         '\'self\'',
@@ -46,10 +51,39 @@ roles = [
     "User",
 ]
 
+"""App Version"""
+global kubedash_version
+kubedash_version = os.getenv('KUBEDASH_VERSION', "???")
+
+##############################################################
+## Promatehus Endpoint
+##############################################################
+
+METRIC_DB_CONNECTION = Gauge(
+    'app_databse_connection',
+    'Database Info',
+    ['external', 'type']
+)
+
+METRIC_OIDC_CONFIG_UPDATE = Gauge(
+    'oidc_config_update',
+    "OIDC Config Update",
+    ['issuer', 'client_id'],
+)
+
+METRIC_K8S_CONFIG_UPDATE = Gauge(
+    'k8s_config_update',
+    "K8S Config Update",
+    ['cluster_name', 'api'],
+)
+
+##############################################################
+## Helper Functions
+##############################################################
 
 class localFlask(Flask):
     def process_response(self, response):
-        response.headers['server'] = "KubeDash 3.1"
+        response.headers['server'] = "KubeDash " + kubedash_version
 
         # CORS
         response.headers['Access-Control-Allow-Origin'] = request.root_url.rstrip(request.root_url[-1])
@@ -81,10 +115,19 @@ class localFlask(Flask):
         super(localFlask, self).process_response(response)
         return(response)
 
+"""Exclude requests logging"""
+class NoPing(logging.Filter):
+    def filter(self, record):
+        return 'GET /api/ping' not in record.getMessage()
+    
 class NoHealth(logging.Filter):
     def filter(self, record):
-        return 'GET /health' not in record.getMessage()
-    
+        return 'GET /api/health' not in record.getMessage()
+
+class NoMetrics(logging.Filter):
+    def filter(self, record):
+        return 'GET /metrics' not in record.getMessage()
+   
 class NoSocketIoGet(logging.Filter):
     def filter(self, record):
         return 'GET /socket.io' not in record.getMessage()
@@ -93,8 +136,10 @@ class NoSocketIoPost(logging.Filter):
     def filter(self, record):
         return 'POST /socket.io' not in record.getMessage()
 
+"""Load kubedash.ini config file"""
 def config_parser():
     if os.path.isfile("kubedash.ini"):
+        logger.info("Reading config file")
         import configparser
 
         config = configparser.ConfigParser()
@@ -121,11 +166,13 @@ def connect_database():
     else:
         return False
     
-def init_db_test(SQLALCHEMY_DATABASE_URI):
+def init_db_test(SQLALCHEMY_DATABASE_URI, EXTERNAL_DATABASE_ENABLED, database_type):
     engine = create_engine(SQLALCHEMY_DATABASE_URI)
     if inspect(engine).has_table("alembic_version"):
+        METRIC_DB_CONNECTION.labels(EXTERNAL_DATABASE_ENABLED, database_type).set(1.0)
         return True
     else:
+        METRIC_DB_CONNECTION.labels(EXTERNAL_DATABASE_ENABLED, database_type).set(0.0)
         return False
     
 def oidc_init(error, config):
@@ -149,9 +196,11 @@ def oidc_init(error, config):
         if oidc_test:
             SSOServerUpdate(OIDC_ISSUER_URL_OLD, OIDC_ISSUER_URL, OIDC_CLIENT_ID, OIDC_SECRET, OIDC_CALLBACK_URL, string2list(OIDC_SCOPE))
             logger.info("OIDC Provider updated")
+            METRIC_OIDC_CONFIG_UPDATE.labels(OIDC_ISSUER_URL, OIDC_CLIENT_ID).set(1)
         else:
             SSOServerCreate(OIDC_ISSUER_URL, OIDC_CLIENT_ID, OIDC_SECRET, OIDC_CALLBACK_URL, string2list(OIDC_SCOPE))
             logger.info("OIDC Provider created")
+            METRIC_OIDC_CONFIG_UPDATE.labels(OIDC_ISSUER_URL, OIDC_CLIENT_ID).set(0)
 
 def k8s_config_int(error, config):
     if not error:
@@ -159,11 +208,15 @@ def k8s_config_int(error, config):
         K8S_API_SERVER   = config.get('k8s', 'api_server', fallback=None)
         try:
             K8S_API_CA       = config.get('k8s', 'api_ca', fallback=None)
+        except Exception:
+            pass
     else:
         K8S_CLUSTER_NAME = os.environ.get('K8S_CLUSTER_NAME', "k8s-main")
         K8S_API_SERVER   = os.environ.get('K8S_API_SERVER', None)
         try:
             K8S_API_CA       = os.environ.get('K8S_API_CA', None) # base64 encoded
+        except Exception:
+            pass
 
     if K8S_API_SERVER:
         try:
@@ -178,9 +231,13 @@ def k8s_config_int(error, config):
         if k8sConfig is None:
             k8sServerConfigCreate(K8S_API_SERVER, K8S_CLUSTER_NAME, K8S_API_CA)
             logger.info("Kubernetes Config created")
+            METRIC_K8S_CONFIG_UPDATE.labels(K8S_CLUSTER_NAME, K8S_API_SERVER).set(0)
         else:
             k8sServerConfigUpdate(k8sConfig.k8s_context, K8S_API_SERVER, K8S_CLUSTER_NAME, K8S_API_CA)
             logger.info("Kubernetes Config updated")
+            METRIC_K8S_CONFIG_UPDATE.labels(K8S_CLUSTER_NAME, K8S_API_SERVER).set(1)
+    else:
+        logger.error("Missing Kubernetes Config: K8S_API_SERVER, K8S_API_CA")
 
 def k8s_roles_init():
     user_role_template_list = k8sUserRoleTemplateListGet("Admin", None)
@@ -189,6 +246,10 @@ def k8s_roles_init():
     if not bool(user_clusterRole_template_list) or not bool(user_role_template_list):
         logger.info("Kubernetes Roles created")
         k8sClusterRolesAdd()
+
+##############################################################
+## Main App creation Function
+##############################################################
 
 def create_app(config_name="development"):
     """Init App"""
@@ -229,7 +290,7 @@ def create_app(config_name="development"):
             EXTERNAL_DATABASE_ENABLED = True
         else:
             EXTERNAL_DATABASE_ENABLED = False
-
+        
         if EXTERNAL_DATABASE_ENABLED:
             SQLALCHEMY_DATABASE_HOST     = config.get('database', 'host', fallback='localhost')
             SQLALCHEMY_DATABASE_DB       = config.get('database', 'name', fallback='kubedash')
@@ -265,12 +326,15 @@ def create_app(config_name="development"):
         if SQLALCHEMY_DATABASE_USER and SQLALCHEMY_DATABASE_PASSWORD and SQLALCHEMY_DATABASE_HOST and SQLALCHEMY_DATABASE_DB:
             SQLALCHEMY_DATABASE_URI = "postgresql://%s:%s@%s/%s" % (SQLALCHEMY_DATABASE_USER, SQLALCHEMY_DATABASE_PASSWORD, SQLALCHEMY_DATABASE_HOST, SQLALCHEMY_DATABASE_DB)
             app.config['SQLALCHEMY_DATABASE_URI'] = SQLALCHEMY_DATABASE_URI
+            database_type = 'postgres'
         else:
             basedir = os.path.abspath(os.path.dirname(__file__))
             SQLALCHEMY_DATABASE_URI = "sqlite:///"+basedir+"/database/"+config_name+".db"
+            database_type = 'sqlite'
     else:
         basedir = os.path.abspath(os.path.dirname(__file__))
         SQLALCHEMY_DATABASE_URI = "sqlite:///"+basedir+"/database/"+config_name+".db"
+        database_type = 'sqlite'
 
     """Init session"""
     sess.init_app(app)
@@ -280,7 +344,7 @@ def create_app(config_name="development"):
     db.init_app(app)
     if database_exists(SQLALCHEMY_DATABASE_URI):
         with app.app_context():
-            if init_db_test(SQLALCHEMY_DATABASE_URI):
+            if init_db_test(SQLALCHEMY_DATABASE_URI, EXTERNAL_DATABASE_ENABLED, database_type):
                 SQLAlchemyInstrumentor().instrument(engine=db.engine)
                 db_init(error, config)
                 oidc_init(error, config)
@@ -363,7 +427,7 @@ if app.config["plugins"]["external_loadbalancer"]:
 ##############################################################
 ## Liveness and redyes probe
 ##############################################################
-app.register_blueprint(healthz, url_prefix="/healthz")
+app.register_blueprint(healthz, url_prefix="/api/health")
 
 def liveness():
     pass
@@ -415,7 +479,9 @@ def page_not_found500(e):
 ## Error Pages
 ##############################################################
 
+logging.getLogger("werkzeug").addFilter(NoMetrics())
 logging.getLogger("werkzeug").addFilter(NoHealth())
+logging.getLogger("werkzeug").addFilter(NoPing())
 logging.getLogger("werkzeug").addFilter(NoSocketIoGet())
 logging.getLogger("werkzeug").addFilter(NoSocketIoPost())
 
