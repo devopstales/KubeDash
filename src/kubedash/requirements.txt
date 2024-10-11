@@ -42,18 +42,6 @@ opentelemetry-instrumentation-flask==0.44b0
 #prometheus_client==0.20.0
 prometheus-flask-exporter==0.23.1
 
-# test
-pytest>=7.2.1
-pytest-order>=1.0.1
-pytest-flask>=1.2.0
-responses>=0.22.0
-pytest-playwright>=0.3.1
-selenium>=4.15.1
-
-# for git-changelog
-GitPython==3.1.42
-gitdb2==3.0.1
-
 # security
 gunicorn==23.0.0
 certifi==2024.07.04

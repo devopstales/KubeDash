@@ -14,4 +14,4 @@ def client(app):
     ctx.push()
     app.test_client_class = FlaskClient
     return app.test_client()
-    
+
