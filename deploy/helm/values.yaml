@@ -78,10 +78,10 @@ cluster:
   # `apiServer` is the url for kubectl
   #   This is typically  https://api.fqdn
   # -- k8s ca cert
-  caCert: |-
-    -----BEGIN CERTIFICATE-----
-    cert data here
-    -----END CERTIFICATE-----
+  #caCert: |-
+  #  -----BEGIN CERTIFICATE-----
+  #  cert data here
+  #  -----END CERTIFICATE-----
   # `caCrt` is the public / CA cert for the cluster
   # cat /etc/kubernetes/pki/ca.crt
 

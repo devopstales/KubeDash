@@ -3,6 +3,8 @@ kubedash/.vscode
 kubedash/database/*
 kubedash/tests
 kubedash/run.sh
+kubedash/kubedash.ini
+kubedash/requirements.txt
 __pycache__
 *.pyc
 *.pyo

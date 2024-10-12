@@ -43,16 +43,19 @@ class k8sConfig(UserMixin, db.Model):
         return '<Kubernetes Server URL %r>' % self.k8s_server_url
 
 def k8sServerConfigGet():
+    """Get Actual Kubernetes Server Config from DB"""
     with tracer.start_as_current_span("list-cluster-configs") if tracer else nullcontext() as span:
         k8s_config_list = k8sConfig.query.get(1)
         return k8s_config_list
 
 def k8sServerConfigList():
+    """List Kubernetes Server configuration from db"""
     k8s_config_list = k8sConfig.query
     k8s_config_list_length = k8sConfig.query.count()
     return k8s_config_list, k8s_config_list_length
 
 def k8sServerConfigCreate(k8s_server_url, k8s_context, k8s_server_ca):
+    """Add Kubernetes Server configuration to db"""
     k8s = k8sConfig.query.filter_by(k8s_server_url=k8s_server_url).first()
     k8s_data = k8sConfig(
         k8s_server_url = k8s_server_url,
@@ -64,12 +67,14 @@ def k8sServerConfigCreate(k8s_server_url, k8s_context, k8s_server_ca):
         db.session.commit()
 
 def k8sServerDelete(k8s_context):
+    """Delete Kubernetes Server configuration from db"""
     k8s = k8sConfig.query.filter_by(k8s_context=k8s_context).first()
     if k8s:
         db.session.delete(k8s)
         db.session.commit()
 
 def k8sServerConfigUpdate(k8s_context_old, k8s_server_url, k8s_context, k8s_server_ca):
+    """Update Kubernetes Server configuration in db"""
     k8s = k8sConfig.query.filter_by(k8s_context=k8s_context_old).first()
     if k8s:
         k8s.k8s_server_url = k8s_server_url

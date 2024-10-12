@@ -150,14 +150,11 @@ def config_parser():
         logger.warning("No local config file")
         return True, None
 
-def db_init(error, config):
+def db_init(config):
     for r in roles:
         RoleCreate(r)
-    if error:
-        UserCreate("admin", "admin", None, "Local", "Admin")
-    else:
-        admin_password = config.get('security', 'admin_password', fallback="admin")
-        UserCreate("admin", admin_password, None, "Local", "Admin")
+    admin_password = config.get('security', 'admin_password', fallback="admin")
+    UserCreate("admin", admin_password, None, "Local", "Admin")
 
 def connect_database():
     user = UserTest('Admin')
@@ -175,21 +172,14 @@ def init_db_test(SQLALCHEMY_DATABASE_URI, EXTERNAL_DATABASE_ENABLED, database_ty
         METRIC_DB_CONNECTION.labels(EXTERNAL_DATABASE_ENABLED, database_type).set(0.0)
         return False
     
-def oidc_init(error, config):
+def oidc_init(config):
     # https://github.com/requests/requests-oauthlib/issues/387
     os.environ['OAUTHLIB_RELAX_TOKEN_SCOPE'] = "1"
-    if not error:
-        OIDC_ISSUER_URL   = config.get('sso_settings', 'issuer_url', fallback=None)
-        OIDC_CLIENT_ID    = config.get('sso_settings', 'client_id', fallback=None)
-        OIDC_SECRET       = config.get('sso_settings', 'secret', fallback=None)
-        OIDC_SCOPE        = config.get('sso_settings', 'scope', fallback=None)
-        OIDC_CALLBACK_URL = config.get('sso_settings', 'callback_url', fallback=None)
-    else:
-        OIDC_ISSUER_URL   = os.environ.get('OIDC_ISSUER_URL', None)
-        OIDC_CLIENT_ID    = os.environ.get('OIDC_CLIENT_ID', None)
-        OIDC_SECRET       = os.environ.get('OIDC_SECRET', None)
-        OIDC_SCOPE        = os.environ.get('OIDC_SCOPE', None)
-        OIDC_CALLBACK_URL = os.environ.get('OIDC_CALLBACK_URL', None)
+    OIDC_ISSUER_URL   = config.get('sso_settings', 'issuer_url', fallback=None)
+    OIDC_CLIENT_ID    = config.get('sso_settings', 'client_id', fallback=None)
+    OIDC_SECRET       = config.get('sso_settings', 'secret', fallback=None)
+    OIDC_SCOPE        = config.get('sso_settings', 'scope', fallback=None)
+    OIDC_CALLBACK_URL = config.get('sso_settings', 'callback_url', fallback=None)
 
     if OIDC_ISSUER_URL and OIDC_CLIENT_ID and OIDC_SECRET and OIDC_SCOPE and OIDC_CALLBACK_URL:
         oidc_test, OIDC_ISSUER_URL_OLD = SSOServerTest()
@@ -202,31 +192,18 @@ def oidc_init(error, config):
             logger.info("OIDC Provider created")
             METRIC_OIDC_CONFIG_UPDATE.labels(OIDC_ISSUER_URL, OIDC_CLIENT_ID).set(0)
 
-def k8s_config_int(error, config):
-    if not error:
-        K8S_CLUSTER_NAME = config.get('k8s', 'cluster_name', fallback="k8s-main")
-        K8S_API_SERVER   = config.get('k8s', 'api_server', fallback=None)
-        try:
-            K8S_API_CA       = config.get('k8s', 'api_ca', fallback=None)
-        except Exception:
-            pass
-    else:
-        K8S_CLUSTER_NAME = os.environ.get('K8S_CLUSTER_NAME', "k8s-main")
-        K8S_API_SERVER   = os.environ.get('K8S_API_SERVER', None)
-        try:
-            K8S_API_CA       = os.environ.get('K8S_API_CA', None) # base64 encoded
-        except Exception:
-            pass
+def k8s_config_int(config):
+    K8S_CLUSTER_NAME = config.get('k8s', 'cluster_name', fallback="k8s-main")
+    K8S_API_SERVER   = config.get('k8s', 'api_server', fallback=None)
+
+    K8S_API_CA       = config.get('k8s', 'api_ca', fallback=None)
+    if K8S_API_CA is None:
+        with open("/var/run/secrets/kubernetes.io/serviceaccount/ca.crt", 'r') as cert_file:
+            cert_file_data = cert_file.read()
+            base64_encoded_data = str(base64_encode(cert_file_data), "UTF-8")
+            K8S_API_CA = base64_encoded_data
 
     if K8S_API_SERVER:
-        try:
-            K8S_API_CA
-        except NameError:
-            with open("/var/run/secrets/kubernetes.io/serviceaccount/ca.crt", 'w') as cert_file:
-                cert_file_data = cert_file.read()
-                base64_encoded_data = str(base64_encode(cert_file_data), "UTF-8")
-                K8S_API_CA = base64_encoded_data
-
         k8sConfig = k8sServerConfigGet()
         if k8sConfig is None:
             k8sServerConfigCreate(K8S_API_SERVER, K8S_CLUSTER_NAME, K8S_API_CA)
@@ -286,6 +263,14 @@ def create_app(config_name="development"):
         config_name = config.get('DEFAULT', 'app_mode', fallback='development')
         app.config['SECRET_KEY'] = os.urandom(12).hex()
 
+        app.config["plugins"] = {
+                "registry":              config.getboolean('plugin_settings', 'registry', fallback=False),
+                "helm":                  config.getboolean('plugin_settings', 'helm', fallback=True),
+                "gateway_api":           config.getboolean('plugin_settings', 'gateway_api', fallback=False),
+                "cert_manager":          config.getboolean('plugin_settings', 'cert_manager', fallback=True),
+                "external_loadbalancer": config.getboolean('plugin_settings', 'external_loadbalancer', fallback=True),
+            }
+
         """Database mode"""
         database_type = config.get('database', 'type', fallback='none')
         if database_type == 'postgres':
@@ -299,21 +284,7 @@ def create_app(config_name="development"):
             SQLALCHEMY_DATABASE_USER     = config.get('database', 'user', fallback='kubedash')
             SQLALCHEMY_DATABASE_PASSWORD = config.get('database', 'password', fallback=None)
     else:
-        """App config"""
-        if os.getenv('FLASK_CONFIG') == "production":
-            config_name = "production"
-            app.config['SECRET_KEY'] = os.urandom(12).hex()
-        else:
-            os.environ['OAUTHLIB_INSECURE_TRANSPORT'] = '1'
-            logging.captureWarnings(True)
-
-        """Database mode"""
-        EXTERNAL_DATABASE_ENABLED = var_test(os.getenv('EXTERNAL_DATABASE_ENABLED', "False"))
-        if EXTERNAL_DATABASE_ENABLED:
-            SQLALCHEMY_DATABASE_HOST     = os.environ.get('EXTERNAL_DATABASE_HOST', "localhost")
-            SQLALCHEMY_DATABASE_DB       = os.environ.get('EXTERNAL_DATABASE_DB', "kubedash")
-            SQLALCHEMY_DATABASE_USER     = os.environ.get('EXTERNAL_DATABASE_USER', "kubedash")
-            SQLALCHEMY_DATABASE_PASSWORD = os.environ.get('EXTERNAL_DATABASE_PASSWORD', None)
+        logger.error("Error parsing application config")
 
     logger.info("Running in %s mode" % config_name)
 
@@ -345,9 +316,9 @@ def create_app(config_name="development"):
         with app.app_context():
             if init_db_test(SQLALCHEMY_DATABASE_URI, EXTERNAL_DATABASE_ENABLED, database_type):
                 SQLAlchemyInstrumentor().instrument(engine=db.engine)
-                db_init(error, config)
-                oidc_init(error, config)
-                k8s_config_int(error, config)
+                db_init(config)
+                oidc_init(config)
+                k8s_config_int(config)
                 k8s_roles_init()
 
     """Init session"""
@@ -387,24 +358,6 @@ app = create_app()
 ##############################################################
 ## Plugin configs
 ##############################################################
-error, config = config_parser()
-if error:
-    app.config["plugins"] = {
-            "registry":              var_test(os.getenv('PLUGIN_REGISTRY_ENABLED', "False")),
-            "helm":                  var_test(os.getenv('PLUGIN_HELM_ENABLED', "True")),
-            "gateway_api":           var_test(os.getenv('PLUGIN_GATEWAY_API_ENABLED', "False")),
-            "cert_manager":          var_test(os.getenv('PLUGIN_CERT_MANAGER_ENABLED', "False")),
-            "external_loadbalancer": var_test(os.getenv('PLUGIN_EXT_LOADBALANCER_ENABLED', "False")),
-        }
-else:
-    app.config["plugins"] = {
-            "registry":              config.getboolean('plugin_settings', 'registry', fallback=False),
-            "helm":                  config.getboolean('plugin_settings', 'helm', fallback=True),
-            "gateway_api":           config.getboolean('plugin_settings', 'gateway_api', fallback=False),
-            "cert_manager":          config.getboolean('plugin_settings', 'cert_manager', fallback=True),
-            "external_loadbalancer": config.getboolean('plugin_settings', 'external_loadbalancer', fallback=True),
-        }
-
 """Plugin Logging"""
 logger.info("###########################")
 logger.info(" Starting Plugins:")

@@ -90,8 +90,7 @@ def login():
                 is_sso_enabled = True
             else:
                 is_sso_enabled = False
-                flash('Cannot connect to identity provider!', "warning")
-                logger.error('Cannot connect to identity provider!')
+                flash('Cannot connect to identity provider!', "error")
 
         if "username" in session:
             username = session["username"]

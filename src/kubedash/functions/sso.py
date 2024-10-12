@@ -80,8 +80,10 @@ def get_auth_server_info():
             verify=False,
             timeout=1
         ).json()
-    except:
+    except Exception as error:
         auth_server_info = None
+        logger.error('Cannot connect to identity provider: %s ' % error)
+
     return auth_server_info, oauth
 
 def get_user_token(session):

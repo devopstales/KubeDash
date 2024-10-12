@@ -1,4 +1,3 @@
-{{ if .Values.useConfigFile }}
 ---
 apiVersion: v1
 kind: ConfigMap
@@ -6,32 +5,27 @@ metadata:
   name: {{ include "kubedash.fullname" . }}-kubedash-ini
   labels:
     app: kubedash
-    {{- include "kubedash.labels" . | nindent 4 }}
+    {{ include "kubedash.labels" . | nindent 4 }}
 data:
   kubedash.ini: |-
     ##################### KubeDash Configuration Defaults #####################
     [DEFAULT]
-    # possible values : production, development
     app_mode = production
 
     #################################### Database ############################
     [database]
-    # You can configure the database connection by specifying type, host, name, user and password
-    # as separate properties or as on string using the url property.
-
-    # Either postgres or sqlite3, it's your choice
     {{ if .Values.externalDatabase.enabled }}
     type = postgres
-    host = {{ .Values.externalDatabase.host | quote }}
-    name = {{ .Values.externalDatabase.database | quote }}
+    host = {{ .Values.externalDatabase.host }}
+    name = {{ .Values.externalDatabase.database }}
     user = root
-    password = {{ .Values.externalDatabase.password | b64enc | quote }}
+    password = {{ .Values.externalDatabase.password | b64enc }}
     {{ else if .Values.postgresqlHa.enabled }}
     type = postgres
     host = {{ .Release.Name }}-pgpool
-    name = {{ .Values.postgresqlHa.database | quote }}
+    name = {{ .Values.postgresqlHa.postgresql.database }}
     user = root
-    password = {{ .Values.postgresqlHa.postgresql.password | b64enc | quote }}
+    password = {{ .Values.postgresqlHa.postgresql.password | b64enc }}
     {{ else }}
     type = sqlite3
     {{ end }}
@@ -40,119 +34,31 @@ data:
     #################################### SSO Settings ###########################
     [sso_settings]
 
-    issuer_url = {{ .Values.oidc.provider.oidcUrl | quote}}
+    issuer_url = {{ .Values.oidc.provider.oidcUrl}}
 
-    client_id = {{ .Values.oidc.provider.oidcClientId | b64enc | quote }}
+    client_id = {{ .Values.oidc.provider.oidcClientId }}
 
-    secret = {{ .Values.oidc.provider.oidcSecret | b64enc | quote }}
+    secret = {{ .Values.oidc.provider.oidcSecret }}
 
-    scope = {{ .Values.oidc.provider.oidcScopes | quote}}
+    scope = {{ .Values.oidc.provider.oidcScopes}}
 
     {{ if .Values.ingress.tls.enabled }}
-    callback_url = https://{{ .Values.ingress.url}}
+    callback_url = https://{{ .Values.ingress.url }}
     {{ else }}
-    callback_url = http://{{ .Values.ingress.url}}
-    {{ end}}
+    callback_url = http://{{ .Values.ingress.url }}
+    {{ end }}
     {{ end }}
     #################################### K8S ###########################
     [k8s]
-
-    # kubernetes cluster name
-    cluster_name = {{ .Values.cluster.name | quote }}
-
-    # kubernetes api server url
-    api_server = {{ .Values.cluster.apiUrl | quote }}
-
+    cluster_name = {{ .Values.cluster.name }}
+    api_server = {{ .Values.cluster.apiUrl }}
     {{ if .Values.cluster.caCert }}
-    # base64 encoded ca certificate
-    api_ca = {{ .Values.cluster.caCert | b64enc | quote }}
+    api_ca = {{ .Values.cluster.caCert | b64enc }}
     {{ end }}
 
     #################################### Plugin Settings ###########################
     [plugin_settings]
-
-    # enable registry plugin
     registry = true
-
-    # enable helm plugin
     helm = true
-
-    # enable gateway api plugin
     gateway_api = true
-
-    # enable cert-manager plugin
     cert_manager = true
-{{ else }}
----
-apiVersion: v1
-kind: ConfigMap
-metadata:
-  name: {{ include "kubedash.fullname" . }}-config
-  labels:
-    app: kubedash
-    {{- include "kubedash.labels" . | nindent 4 }}
-data:
-  K8S_CLUSTER_NAME: {{ .Values.cluster.name | quote }}
-  K8S_API_SERVER: {{ .Values.cluster.apiUrl | quote }}
-  K8S_API_CA: {{ .Values.cluster.caCert | b64enc | quote }}
-{{ if .Values.externalDatabase.enabled }}
-  EXTERNAL_DATABASE_ENABLED: {{ .Values.externalDatabase.enabled | quote }}
-  EXTERNAL_DATABASE_HOST: {{ .Values.externalDatabase.host | quote }}
-  EXTERNAL_DATABASE_DB: {{ .Values.externalDatabase.database | quote }}
-{{ end }}
-{{ if .Values.postgresqlHa.enabled }}
-  EXTERNAL_DATABASE_ENABLED: {{ .Values.postgresqlHa.enabled | quote }}
-  EXTERNAL_DATABASE_HOST: "{{ .Release.Name }}-pgpool"
-  EXTERNAL_DATABASE_DB: {{ .Values.postgresqlHa.database | quote }}
-{{ end }}
-{{ if .Values.oidc.enabled }}
-  OIDC_ISSUER_URL: {{ .Values.oidc.provider.oidcUrl | quote}}
-  OIDC_SCOPE: {{ .Values.oidc.provider.oidcScopes | quote}}
-  {{ if .Values.ingress.tls.enabled }}
-  OIDC_CALLBACK_URL: "https://{{ .Values.ingress.url}}"
-  {{ else }}
-  OIDC_CALLBACK_URL: "http://{{ .Values.ingress.url}}"
-  {{ end }}
-{{ if not .Values.oidc.secret.useExistingSecret }}
----
-apiVersion: v1
-kind: Secret
-metadata:
-  name: {{ .Values.oidc.secret.name }}
-  labels:
-    app: kubedash
-    {{- include "kubedash.labels" . | nindent 4 }}
-data:
-  OIDC_CLIENT_ID: {{ .Values.oidc.provider.oidcClientId | b64enc | quote }}
-  OIDC_SECRET: {{ .Values.oidc.provider.oidcSecret | b64enc | quote }}
-{{ end }}
-{{ end }}
-{{ if .Values.externalDatabase.enabled }}
-{{ if not .Values.externalDatabase.secret.useExistingSecret }}
----
-apiVersion: v1
-kind: Secret
-metadata:
-  name: {{ .Values.externalDatabase.secret.name }}
-  labels:
-    app: kubedash
-    {{- include "kubedash.labels" . | nindent 4 }}
-data:
-  EXTERNAL_DATABASE_USER: {{ .Values.externalDatabase.username | b64enc | quote }}
-  EXTERNAL_DATABASE_PASSWORD: {{ .Values.externalDatabase.password | b64enc | quote }}
-{{ end }}
-{{ end }}
-{{ if .Values.postgresqlHa.enabled }}
----
-apiVersion: v1
-kind: Secret
-metadata:
-  name: {{ .Values.externalDatabase.secret.name }}
-  labels:
-    app: kubedash
-    {{- include "kubedash.labels" . | nindent 4 }}
-data:
-  EXTERNAL_DATABASE_USER: {{ .Values.postgresqlHa.postgresql.username | b64enc | quote }}
-  EXTERNAL_DATABASE_PASSWORD: {{ .Values.postgresqlHa.postgresql.password | b64enc | quote }}
-{{ end }}
-{{ end }}
