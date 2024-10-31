@@ -4,16 +4,16 @@ from flask import Blueprint, render_template, request, session
 from flask_login import login_required
 from kubernetes.client.rest import ApiException
 import kubernetes.client as k8s_client
-from functions.k8s import k8sClientConfigGet
-from functions.helper_functions import get_logger, ErrorHandler
-from functions.sso import get_user_token
+from lib_functions.k8s import k8sClientConfigGet
+from lib_functions.helper_functions import get_logger, ErrorHandler
+from lib_functions.sso import get_user_token
 
 ##############################################################
-## Helper Functions
+## variables
 ##############################################################
 
 gateway_api = Blueprint("gateway_api", __name__)
-logger = get_logger(__name__)
+logger = get_logger(__name__.split(".")[1])
 
 ##############################################################
 # Get Gateway API 1.0

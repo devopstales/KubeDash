@@ -15,18 +15,19 @@ from kubernetes.stream import stream
 from kubernetes.client.rest import ApiException
 from kubernetes import watch
 
-from functions.components import db, tracer, socketio
+from lib_functions.components import db, socketio
+from lib_functions.opentelemetry import tracer
 
 from opentelemetry import trace
 from opentelemetry.trace.status import Status, StatusCode
-from functions.helper_functions import get_logger, ErrorHandler, NoGlashErrorHandler, email_check, calcPercent, \
+from lib_functions.helper_functions import get_logger, ErrorHandler, NoFlashErrorHandler, email_check, calcPercent, \
 parse_quantity, json2yaml
 
 ##############################################################
 ## Helper Functions
 ##############################################################
 
-logger = get_logger(__name__)
+logger = get_logger(__name__.split(".")[1])
 
 ##############################################################
 ## Kubernetes Cluster Config
@@ -43,19 +44,34 @@ class k8sConfig(UserMixin, db.Model):
         return '<Kubernetes Server URL %r>' % self.k8s_server_url
 
 def k8sServerConfigGet():
-    """Get Actual Kubernetes Server Config from DB"""
+    """Get Actual Kubernetes Server Config from DB
+    
+    Returns:
+        k8s_config (k8sConfig): Actual Kubernetes Server Config
+    """
     with tracer.start_as_current_span("list-cluster-configs") if tracer else nullcontext() as span:
         k8s_config_list = k8sConfig.query.get(1)
         return k8s_config_list
 
 def k8sServerConfigList():
-    """List Kubernetes Server configuration from db"""
+    """List Kubernetes Server configuration from db
+    
+    Returns:
+        k8s_config_list (list): List of Kubernetes Server Configs
+        k8s_config_list_length (int): Length of Kubernetes Server Configs
+    """
     k8s_config_list = k8sConfig.query
     k8s_config_list_length = k8sConfig.query.count()
     return k8s_config_list, k8s_config_list_length
 
 def k8sServerConfigCreate(k8s_server_url, k8s_context, k8s_server_ca):
-    """Add Kubernetes Server configuration to db"""
+    """Add Kubernetes Server configuration to db
+    
+    Args:
+        k8s_server_url (string): Kubernetes Server URL
+        k8s_context (string): Kubernetes Context
+        k8s_server_ca (string): Kubernetes Server CA
+    """
     k8s = k8sConfig.query.filter_by(k8s_server_url=k8s_server_url).first()
     k8s_data = k8sConfig(
         k8s_server_url = k8s_server_url,
@@ -67,14 +83,24 @@ def k8sServerConfigCreate(k8s_server_url, k8s_context, k8s_server_ca):
         db.session.commit()
 
 def k8sServerDelete(k8s_context):
-    """Delete Kubernetes Server configuration from db"""
+    """Delete Kubernetes Server configuration from db
+    
+    Args:
+        k8s_context (string): Kubernetes Context"""
     k8s = k8sConfig.query.filter_by(k8s_context=k8s_context).first()
     if k8s:
         db.session.delete(k8s)
         db.session.commit()
 
 def k8sServerConfigUpdate(k8s_context_old, k8s_server_url, k8s_context, k8s_server_ca):
-    """Update Kubernetes Server configuration in db"""
+    """Update Kubernetes Server configuration in db
+    
+    Args:
+        k8s_context_old (string): Old Kubernetes Context
+        k8s_context (string): New Kubernetes Context
+        k8s_server_url (string): URL os the k8s server
+        k8s_server_ca (string): Root CA of the k8s server
+    """
     k8s = k8sConfig.query.filter_by(k8s_context=k8s_context_old).first()
     if k8s:
         k8s.k8s_server_url = k8s_server_url
@@ -83,6 +109,11 @@ def k8sServerConfigUpdate(k8s_context_old, k8s_server_url, k8s_context, k8s_serv
         db.session.commit()
 
 def k8sServerContextsList():
+    """List K8S server contexts from database
+    
+    Return:
+        k8s_contexts (list[dict]): List of k8s contexts objects
+    """
     k8s_contexts = []
     k8s_config_list = k8sConfig.query.all()
     for config in k8s_config_list:
@@ -95,6 +126,16 @@ def k8sServerContextsList():
 ##############################################################
 
 def k8sListNamespaces(username_role, user_token):
+    """List Kubernetes namespaces
+
+    Args:
+        username_role (str): Role of the current user
+        user_token (str): Auth token of the current user
+
+    Return:
+        namespace_list (list): List of the namespaces
+        error (str): Error message if any
+    """
     with tracer.start_as_current_span("list-namespaces") if tracer else nullcontext() as span:
         if tracer and span.is_recording():
             span.set_attribute("user.role", username_role)
@@ -267,6 +308,12 @@ def k8sWorkloadList(username_role, user_token, namespace):
 ##############################################################
 
 def k8sClientConfigGet(username_role, user_token):
+    """Get a Kubernetes client configuration
+    
+    Args:
+        username_role (string): The role to get the client configuration
+        user_token (string): The user_token to get the client configuration
+    """
     import urllib3
     urllib3.disable_warnings()
     with tracer.start_as_current_span("load-client-configs") if tracer else nullcontext() as span:
@@ -755,6 +802,14 @@ def k8sUserClusterRoleTemplateListGet(username_role, user_token):
         return
     
 def k8sUserRoleTemplateListGet(username_role, user_token):
+    """Get User Role Template list from Kubernets API
+    
+    Args:
+        username_role (string): The username role
+        user_token (string): The user token
+    
+    Returns:
+        CLUSTER_ROLE_LIST (list[dictionary]): The list of user roles templates"""
     k8sClientConfigGet(username_role, user_token)
     CLUSTER_ROLE_LIST = list()
     try:
@@ -2132,10 +2187,10 @@ def k8sPodLogsStream(username_role, user_token, namespace, pod_name, container):
             socketio.emit('response',
                                 {'data': str(line)}, namespace="/log")
     except ApiException as error:
-            NoGlashErrorHandler(logger, error, "get logStream - %s" % error.status)
+            NoFlashErrorHandler(logger, error, "get logStream - %s" % error.status)
     except Exception as error:
         ERROR = "k8sPodLogsStream: %s" % error
-        NoGlashErrorHandler(logger, "error", ERROR)
+        NoFlashErrorHandler(logger, "error", ERROR)
 
 ##############################################################
 ## Pod Exec

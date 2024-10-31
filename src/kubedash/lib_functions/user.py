@@ -1,7 +1,9 @@
 #!/usr/bin/env python3
 
-from functions.helper_functions import get_logger, email_check
-from functions.components import db, login_manager, tracer
+from lib_functions.helper_functions import get_logger, email_check
+from lib_functions.components import db, login_manager
+from lib_functions.opentelemetry import tracer
+
 from contextlib import nullcontext
 from flask_login import UserMixin
 from werkzeug.security import generate_password_hash
@@ -9,13 +11,25 @@ from datetime import datetime
 from pytz import timezone
 
 ##############################################################
+## variables
+##############################################################
+
+logger = get_logger(__name__.split(".")[1])
+
+##############################################################
 ## functions
 ##############################################################
 
-logger = get_logger(__name__)
-
 @login_manager.user_loader
 def load_user(user_id):
+    """Load user by ID.
+    
+    Args:
+        user_id (string): User ID
+        
+    Returns:
+        user (User): User object
+    """
     return User.query.get(int(user_id))
 
 # Define the User data model.
@@ -53,6 +67,11 @@ class UsersRoles(db.Model):
     role_id = db.Column(db.Integer(), db.ForeignKey('roles.id', ondelete='CASCADE'))
 
 def RoleCreate(name):
+    """Create role in database
+    
+    Args:
+        name (string): Role name
+    """
     with tracer.start_as_current_span("create-role") if tracer else nullcontext() as span:
         role = Role.query.filter(Role.name == name).first()
         if not role:
@@ -63,11 +82,32 @@ def RoleCreate(name):
             db.session.commit()
 
 def UserTest(username):
+    """Check if user exists in database
+    
+    Args:
+        username (string): User name
+        
+    Returns:
+        user (User): user object
+    """
     with tracer.start_as_current_span("test-user") if tracer else nullcontext() as span:
         user = User.query.filter_by(username=username).first()
         return user
 
 def UserCreate(username, password, email, user_type, role=None, tokens=None):
+    """Create user in database
+    
+    Args:
+        username (string): User name
+        password (string): User password (optional)
+        email (string): User email (optional)
+        user_type (string): User type (Local or OpenID)
+        role (string): User role (optional)
+        tokens (string): User tokens (optional)
+
+    Returns:
+        user (User): User object
+    """
     with tracer.start_as_current_span("create-user") if tracer else nullcontext() as span:
         user = UserTest(username)
         if not user:
@@ -105,6 +145,13 @@ def UserCreate(username, password, email, user_type, role=None, tokens=None):
             db.session.commit()
 
 def UserUpdate(username, role, user_type):
+    """Update user in database
+    
+    Args:
+        username (string): User name
+        role (string): User role
+        user_type (string): User type
+    """
     with tracer.start_as_current_span("update-user") if tracer else nullcontext() as span:
         user = User.query.filter_by(username=username).first()
         if user:
@@ -120,6 +167,11 @@ def UserUpdate(username, role, user_type):
             db.session.commit()
 
 def UserDelete(username):
+    """Delete user from database
+    
+    Args:
+        username (string): User name
+    """
     with tracer.start_as_current_span("delete-user") if tracer else nullcontext() as span:
         user = User.query.filter_by(username=username).first()
         user_role = UsersRoles.query.filter_by(user_id=user.id).first()
@@ -141,6 +193,14 @@ def UserDelete(username):
             db.session.commit()
 
 def SSOUserCreate(username, email, tokens, user_type):
+    """Create user in database using SSO tokens
+    
+    Args:
+        username (string): User name
+        email (string): User email (optional)
+        tokens (string): User tokens
+        user_type (string): User type (Local or OpenID)
+    """
     with tracer.start_as_current_span("create-user-sso") if tracer else nullcontext() as span:
         if tracer and span.is_recording():
             span.set_attribute("enduser.name", username)
@@ -150,24 +210,47 @@ def SSOUserCreate(username, email, tokens, user_type):
         UserCreate(username, None, email, user_type, "User", tokens)
 
 def SSOTokenUpdate(username, tokens):
+    """Update user tokens in database
+    
+    Args:
+        username (string): User name
+        tokens (string): User tokens
+    """
     user = User.query.filter_by(username=username).first()
     if user:
         user.tokens = tokens
         db.session.commit()
 
 def SSOTokenGet(username):
+    """Get user tokens from database
+    
+    Args:
+        username (string): User name
+        
+    Returns_
+        tokens (string): User tokens
+    """
     user = User.query.filter_by(username=username).first()
     if user.tokens:
         return user.tokens
 
 def UserUpdatePassword(username, password):
-        user = User.query.filter_by(username=username).first()
-        if user:
-            user.password_hash = generate_password_hash(password, method='scrypt')
-            db.session.commit()
-            return True
-        else:
-            return False
+    """Update user password in database
+    
+    Args:
+        username (string): User name
+        password (string): User password
+    
+    Returns:
+        bool: True if password updated, False otherwise
+    """
+    user = User.query.filter_by(username=username).first()
+    if user:
+        user.password_hash = generate_password_hash(password, method='scrypt')
+        db.session.commit()
+        return True
+    else:
+        return False
         
 ########################################################################
 # KubectlConfig
@@ -189,6 +272,12 @@ class UsersKubectl(db.Model):
     role_id = db.Column(db.Integer(), db.ForeignKey('kubectl_config.id', ondelete='CASCADE'))
 
 def KubectlConfigStore(name, cluster, private_key_base64, user_certificate_base64):
+    """Store kubectl config in database
+    
+    Args:
+        name (string): Kubectl config name
+        cluster (string): Kubectl cluster name
+    """
     kubectl = KubectlConfig.query.filter_by(name=name).first()
     if not kubectl:
         kubectl_config = KubectlConfig(
@@ -217,19 +306,45 @@ class SSOUserGroups(db.Model):
     group_id = db.Column(db.Integer(), db.ForeignKey('sso_groups.id', ondelete='CASCADE'))
 
 def SSOGroupCreateFromList(username, groups):
+    """Create a new SSOUserGroups object from a list of SSOUserGroups
+    
+    Args:
+        username (string): User name
+        groups (list of strings): List of SSO group names
+    """
     for group in groups:
         SSOGroupsCreate(username, group)
 
 def SSOGroupsUpdateFromList(username, groups):
+    """Update SSOUserGroups object from a list of SSOUserGroups
+    
+    Args:
+        username (string): User name
+        groups (list of strings): List of SSO group names
+    """
     for group in groups:
         SSOGroupsUpdate(username, group)
 
 def SSOGroupTest(group_name):
+    """ Test SSOGroup is exist in database
+    
+    Args:
+        group_name (string): SSO group name
+        
+    Returns:
+        group (SSOGroups): SSOGroups object
+    """
     with tracer.start_as_current_span("test-sso-group") if tracer else nullcontext() as span:
         group = SSOGroups.query.filter_by(name=group_name).first()
         return group
 
 def SSOGroupsCreate(user_name, group_name):
+    """Create a new SSOGroup in database
+    
+    Args:
+        user_name (string): User name
+        group_name (string): SSO group name
+    """
     with tracer.start_as_current_span("create-sso-group") if tracer else nullcontext() as span:
         group = SSOGroupTest(group_name)
         user = UserTest(user_name)
@@ -243,6 +358,12 @@ def SSOGroupsCreate(user_name, group_name):
             db.session.commit()
 
 def SSOGroupsUpdate(user_name, group_name):
+    """Update SSOUserGroups object in database
+    
+    Args:
+        user_name (string): User name
+        group_name (string): SSO group name
+    """
     with tracer.start_as_current_span("update-sso-group") if tracer else nullcontext() as span:
         group = SSOGroupTest(group_name)
         user = UserTest(user_name)
@@ -255,6 +376,11 @@ def SSOGroupsUpdate(user_name, group_name):
             user.sso_groups.append(group)
 
 def SSOGroupsList():
+    """List all SSO groups in database
+    
+    Returns:
+        list of dictionaries: List of SSO group data
+    """
     sso_groups = SSOGroups.query.all()
     sso_group_list = list()
     for group in sso_groups:
@@ -266,6 +392,14 @@ def SSOGroupsList():
     return sso_group_list
 
 def SSOGroupsMemberList(sso_group):
+    """List all users in a specific SSO group in database
+    
+    Args:
+        sso_group (string): SSO group name
+        
+    Returns:
+        user_list (list[dict]): List of user_data
+    """
     sso_group_data = SSOGroups.query.filter(SSOGroups.name == sso_group).first()
     sso_users = SSOUserGroups.query.filter(SSOUserGroups.group_id == sso_group_data.id).all()
     user_list = list()

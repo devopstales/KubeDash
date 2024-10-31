@@ -1,12 +1,21 @@
 import logging, re, time, six, json, yaml
 from flask import flash
 from decimal import Decimal, InvalidOperation
+from logging import Logger
 
 ##############################################################
 ## Helper Functions
 ##############################################################
 
-def var_test(var):
+def bool_var_test(var) -> bool:
+    """Check if a variable is a valid boolean value
+    
+    Args:
+        var (any): The variable to check.
+    
+    Returns:
+        bool: True if the variable is a valid boolean value, False otherwise.
+    """
     if isinstance(var, bool):
         resp = var
     elif isinstance(var, six.string_types):
@@ -18,7 +27,15 @@ def var_test(var):
         resp = False
     return resp
 
-def get_logger(name):
+def get_logger(name: str) -> Logger:
+    """Generate a Logger for the given module name
+    
+    Args:
+        name (str): The module name for which to generate the Logger.
+
+    Returns:
+        logger (Logger): A Logger for the given module name.
+    """
     logger = logging.getLogger(name)
     logging.basicConfig(
             level="INFO",
@@ -28,6 +45,13 @@ def get_logger(name):
     return logger
 
 def ErrorHandler(logger, error, action):
+    """Handle errors and flash messages
+    
+    Args:
+        logger (Logger): The Logger for the module.
+        error (str): The error to handle.
+        action (str): The action being performed.
+    """
     if hasattr(error, '__iter__'):
         if 'status' in error:
             if error.status == 401:
@@ -43,7 +67,14 @@ def ErrorHandler(logger, error, action):
         flash("Exception: %s" % action, "danger")
         logger.error("Exception: %s %s \n" % (action, error))
 
-def NoGlashErrorHandler(logger, error, action):
+def NoFlashErrorHandler(logger, error, action):
+    """Handle errors without flash messages
+    
+    Args:
+        logger (Logger): The Logger for the module.
+        error (str): The error to handle.
+        action (str): The action being performed.
+    """
     if hasattr(error, '__iter__'):
         if 'status' in error:
             if error.status == 401:
@@ -58,6 +89,12 @@ def NoGlashErrorHandler(logger, error, action):
         logger.error("Exception: %s" % action)
 
 def ResponseHandler(message, status):
+    """Flash a message
+    
+    Args:
+        message (str): The message to be displayed
+        status (str): The status of the message (e.g., "success", "danger", etc.)
+    """
     flash(message, status)
 
 def email_check(email):
@@ -67,33 +104,54 @@ def email_check(email):
     else:
         return False
 
-def var_test(var):
-    if isinstance(var, bool):
-        resp = var
-    elif isinstance(var, six.string_types):
-        if var.lower() in ['true']:
-            resp = True
-        else:
-            resp = False
-    else:
-        resp = False
-    return resp
+def string2list(string: str) -> list:
+    """Function to converst string to list
+    
+    Args:
+        string (str): The string to be converted
 
-def string2list(string):
+    Returns:
+        list (list): The list of elements in the string.
+    """
     list = string.split()
     return list
 
-def json2yaml(json_input):
+def json2yaml(json_input: json) -> yaml:
+    """Function to convert JSON to YAML
+    
+    Args:
+        json_input (dict): The JSON data to be converted
+
+    Returns:
+        yaml_formatted_data (str): The YAML formatted data.
+    """
     json_values = json.dumps(json_input)
     yaml_data = yaml.safe_load(json_values)
     yaml_formatted_data = yaml.dump(yaml_data)
     return yaml_formatted_data
 
-def format_json(json_input):
+def format_json(json_input: json) -> str:
+    """Function to format JSON to a human-readable string
+    
+    Args:
+        json_input (dict): The JSON data to be formatted
+
+    Returns:
+        josn_formatted_data (str): The formatted JSON data.
+    """
     josn_formatted_data = json.dumps(json_input, indent=2)
     return josn_formatted_data
 
-def find_values_in_json(id, json_repr):
+def find_values_in_json(id: int, json_repr) -> list:
+    """Find values in JSON
+    
+    Args:
+        id (int): The ID to search for in the JSON.
+        json_repr (str): The JSON data as a string.
+
+    Returns:
+        list: A list of values found in the JSON with the given ID.
+    """
     results = list()
 
     def _decode_dict(a_dict):
@@ -106,19 +164,22 @@ def find_values_in_json(id, json_repr):
     json.loads(json_repr, object_hook=_decode_dict) # Return value ignored.
     return results
 
-def parse_quantity(quantity):
+def parse_quantity(quantity: str):
     """
     Parse kubernetes canonical form quantity like 200Mi to a decimal number.
     Supported SI suffixes:
     base1024: Ki | Mi | Gi | Ti | Pi | Ei
     base1000: n | u | m | "" | k | M | G | T | P | E
     See https://github.com/kubernetes/apimachinery/blob/master/pkg/api/resource/quantity.go
-    Input:
-    quantity: string. kubernetes canonical form quantity
+
+    Args:
+        quantity: string. kubernetes canonical form quantity
+    
     Returns:
-    Decimal
+        Decimal
+    
     Raises:
-    ValueError on invalid or unknown input
+        ValueError on invalid or unknown input
     """
     if isinstance(quantity, (int, float, Decimal)):
         return Decimal(quantity)
@@ -163,8 +224,7 @@ def parse_quantity(quantity):
     return number * (base ** exponent)
 
 def calcPercent(x, y, integer = False):
-    """
-    Percentage of 4 out of 19: 4 / 19 * 100
+    """Calculate the percentage.
     """
     percent = x / y * 100
    
@@ -173,6 +233,9 @@ def calcPercent(x, y, integer = False):
     return percent
 
 class cache_request_with_timeout:
+    """
+    A decorator that caches the result of a function for a specified timeout.
+    """
     DEFAULT_TIMEOUT = 60
 
     def __init__(self, timeout=None):

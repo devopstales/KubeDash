@@ -1,90 +1,366 @@
 #!/usr/bin/env python3
 
-import os, logging
-from werkzeug.middleware.proxy_fix import ProxyFix
 from flask import Flask, render_template, request
-from flask_talisman import Talisman
-from flask_healthz import healthz, HealthError
-from sqlalchemy_utils import database_exists
-from sqlalchemy import create_engine, inspect
-from flask_migrate import Migrate
-from itsdangerous import base64_encode
+import logging, os
 
-import eventlet
-import eventlet.wsgi
-
-from functions.components import db, sess, login_manager, csrf, socketio
-from functions.helper_functions import string2list, var_test
-from functions.routes import routes
-from functions.commands import commands
-from functions.user import UserCreate, RoleCreate, UserTest, User
-from functions.sso import SSOServerTest, SSOServerCreate, SSOServerUpdate
-from functions.k8s import k8sServerConfigGet, k8sServerConfigCreate, k8sServerConfigUpdate, \
-k8sUserRoleTemplateListGet, k8sUserClusterRoleTemplateListGet, k8sClusterRolesAdd
-from config import app_config
-
-from prometheus_client import Gauge, Info
+from lib_functions.components import db, sess, login_manager, csrf, socketio
+from lib_functions.helper_functions import bool_var_test
 
 from opentelemetry.instrumentation.flask import FlaskInstrumentor
 from opentelemetry.instrumentation.sqlalchemy import SQLAlchemyInstrumentor
 
-##############################################################
-## VAriables
-##############################################################
-csp = {
-    'font-src': [
-        '\'self\'',
-        '*.gstatic.com'
-    ],
-    'style-src': [
-        '\'self\'',
-        '\'unsafe-inline\'',
-        '\'unsafe-eval\'',
-        'fonts.googleapis.com',
-        '*.cloudflare.com',
-    ],
-}
-
-# Roles
-roles = [
-    "Admin",
-    "User",
-]
-
-##############################################################
-## Promatehus Endpoint
-##############################################################
-
-METRIC_APP_VERSION = Info(
-    'app_version',
-    'Application Version')
-
-METRIC_DB_CONNECTION = Gauge(
-    'app_databse_connection',
-    'Database Info',
-    ['external', 'type']
-)
-
-METRIC_OIDC_CONFIG_UPDATE = Gauge(
-    'oidc_config_update',
-    "OIDC Config Update",
-    ['issuer', 'client_id'],
-)
-
-METRIC_K8S_CONFIG_UPDATE = Gauge(
-    'k8s_config_update',
-    "K8S Config Update",
-    ['cluster_name', 'api'],
-)
+separator_long = "##############################################################################"
+separator_short = "###############################"
 
 ##############################################################
 ## Helper Functions
 ##############################################################
 
-class localFlask(Flask):
-    def process_response(self, response):
-        response.headers['server'] = "KubeDash " + kubedash_version
+def initialize_app_logging(app: Flask):
+    """Initialize Flask app logging
+    Args:
+        app (Flask): Flask app object
+    """
+    from lib_functions.logfilters import NoMetrics, NoHealth, NoPing, \
+        NoSocketIoGet, NoSocketIoPost
 
+    logging.basicConfig(
+            level="INFO",
+            format='[%(asctime)s] %(name)s        %(levelname)s %(message)s'
+        )
+    print(separator_long)
+    app.logger.info("Initialize logging")
+
+    logging.getLogger("werkzeug").addFilter(NoMetrics())
+    logging.getLogger("werkzeug").addFilter(NoHealth())
+    logging.getLogger("werkzeug").addFilter(NoPing())
+    logging.getLogger("werkzeug").addFilter(NoSocketIoGet())
+    logging.getLogger("werkzeug").addFilter(NoSocketIoPost())
+   
+def initialize_app_confifuration(app: Flask, external_config_name: str) -> bool:
+    """Initialize the configuration and return error if missing
+
+    Args:
+        app (Flask): Flask app object
+        external_config_name (str): The name of the external configuration file
+
+    Returns:
+        error (bool): A flag used to represent if the config initialization failed
+    """
+
+    if os.path.isfile("kubedash.ini"):
+        app.logger.info("Reading Config file")
+        from lib_functions.config import app_config
+        import configparser
+
+        config_ini = configparser.ConfigParser()
+        config_ini.sections()
+        config_ini.read('kubedash.ini')
+        app.config['kubedash.ini'] = config_ini
+
+        if external_config_name is not None:
+            config_name = external_config_name
+        else:
+            config_name = config_ini.get('DEFAULT', 'app_mode', fallback='development')
+        
+        app.config.from_object(app_config[config_name])
+        app.config['ENV'] = config_name
+        return False
+    else:
+        app.logger.error("Missing Local Configfile")
+        return True
+
+def initialize_app_version(app: Flask):
+    """Initialize the application version
+
+    Args:
+        app (Flask): Flask app object
+    """
+    app.logger.info("Initializing app version")
+    app_version = os.getenv('KUBEDASH_VERSION', default=None)
+
+    if app_version:
+        if app.config['ENV'] == 'production':
+            kubedash_version = os.getenv('KUBEDASH_VERSION')
+        elif app.config['ENV'] == 'development':
+            kubedash_version = os.getenv('KUBEDASH_VERSION') + '-devel'
+        elif app.config['ENV'] == 'testing':
+            kubedash_version = "testing"
+    elif app.config['ENV'] == 'testing':
+            kubedash_version = "testing"
+    else:
+        kubedash_version = "Unknown"
+
+    app.config['VERSION'] = kubedash_version
+    app.jinja_env.globals['kubedash_version'] = kubedash_version
+
+    """Prometheus endpoint"""
+    from lib_functions.prometheus import METRIC_APP_VERSION
+    METRIC_APP_VERSION.info({'version': kubedash_version})
+
+    print(separator_long)
+    print("# KubeDash %s " % kubedash_version)
+    print(separator_long)
+    app.logger.info("Running in %s mode" % app.config['ENV'])
+
+def initialize_app_tracing(app: Flask):
+    """Initialize OpenTelemetry tracing
+    
+    Args:
+        app (Flask): Flask instance
+
+    Returns:
+        jager_enable (global): True if tracing is enabled
+    """
+    global jager_enable
+    jager_enable = bool_var_test(app.config['kubedash.ini'].getboolean('monitoring', 'jager_enabled', fallback=False))
+    if jager_enable:
+        from lib_functions.opentelemetry import init_opentelemetry_exporter
+        jager_base_url = app.config['kubedash.ini'].get('monitoring', 'jager_http_endpoint')
+        init_opentelemetry_exporter(jager_base_url)
+
+def initialize_app_plugins(app: Flask):
+    """Initialize Plugins
+
+    Args:
+        app (Flask): Flask app object
+    """
+    app.logger.info("Initialize Plugins")
+
+    app.config["plugins"] = {
+            "registry":              app.config['kubedash.ini'].getboolean('plugin_settings', 'registry', fallback=False),
+            "helm":                  app.config['kubedash.ini'].getboolean('plugin_settings', 'helm', fallback=True),
+            "gateway_api":           app.config['kubedash.ini'].getboolean('plugin_settings', 'gateway_api', fallback=False),
+            "cert_manager":          app.config['kubedash.ini'].getboolean('plugin_settings', 'cert_manager', fallback=True),
+            "external_loadbalancer": app.config['kubedash.ini'].getboolean('plugin_settings', 'external_loadbalancer', fallback=True),
+        }
+    
+    """Plugin Logging"""
+    app.logger.info(separator_short)
+    app.logger.info(" Starting Plugins:")
+    app.logger.info("	registry:	%s" % app.config["plugins"]["registry"])
+    app.logger.info("	helm:		%s" % app.config["plugins"]["helm"])
+    app.logger.info("	gateway_api:	%s" % app.config["plugins"]["gateway_api"])
+    app.logger.info("	cert_manager:	%s" % app.config["plugins"]["cert_manager"])
+    app.logger.info("	ext_lb: 	%s" % app.config["plugins"]["external_loadbalancer"])
+    app.logger.info(separator_short)
+
+    """Register Plugin Blueprints"""
+    if bool_var_test(app.config["plugins"]["gateway_api"]):
+        from lib_plugins.gateway_api import gateway_api
+        app.register_blueprint(gateway_api)
+
+    if bool_var_test(app.config["plugins"]["cert_manager"]):
+        from lib_plugins.cert_manager import cm_routes
+        app.register_blueprint(cm_routes)
+
+    if bool_var_test(app.config["plugins"]["external_loadbalancer"]):
+        from lib_plugins.external_loadbalancer import exlb_routes
+        app.register_blueprint(exlb_routes)
+
+def initialize_app_database(app: Flask):
+    """Initialize the database
+
+    Args:
+        app (Flask): Flask app object
+    """
+    app.logger.info(separator_short)
+    app.logger.info("Initialize Database")
+
+    database_type = app.config['kubedash.ini'].get('database', 'type', fallback=None)
+    if database_type == 'postgres':
+        EXTERNAL_DATABASE_ENABLED = True
+    else:
+        EXTERNAL_DATABASE_ENABLED = False
+    
+    if EXTERNAL_DATABASE_ENABLED:
+        SQLALCHEMY_DATABASE_HOST     = app.config['kubedash.ini'].get('database', 'host', fallback='localhost')
+        SQLALCHEMY_DATABASE_DB       = app.config['kubedash.ini'].get('database', 'name', fallback='kubedash')
+        SQLALCHEMY_DATABASE_USER     = app.config['kubedash.ini'].get('database', 'user', fallback='kubedash')
+        SQLALCHEMY_DATABASE_PASSWORD = app.config['kubedash.ini'].get('database', 'password', fallback=None)
+
+    app.config['SESSION_SQLALCHEMY'] = db
+
+    """Database mode"""
+    if app.config['ENV'] == 'testing':
+        basedir = os.path.abspath(os.path.dirname(__file__))
+        SQLALCHEMY_DATABASE_URI = "sqlite:///"+basedir+"/database/"+ app.config['ENV'] +".db"
+    elif EXTERNAL_DATABASE_ENABLED and SQLALCHEMY_DATABASE_USER and SQLALCHEMY_DATABASE_PASSWORD and SQLALCHEMY_DATABASE_HOST and SQLALCHEMY_DATABASE_DB:
+        SQLALCHEMY_DATABASE_URI = "postgresql://%s:%s@%s/%s" % \
+            (SQLALCHEMY_DATABASE_USER, SQLALCHEMY_DATABASE_PASSWORD, SQLALCHEMY_DATABASE_HOST, SQLALCHEMY_DATABASE_DB)
+    else:
+        basedir = os.path.abspath(os.path.dirname(__file__))
+        SQLALCHEMY_DATABASE_URI = "sqlite:///"+basedir+"/database/"+ app.config['ENV'] +".db"
+    
+    app.config['SQLALCHEMY_DATABASE_URI'] = SQLALCHEMY_DATABASE_URI
+
+    """Plugin Logging"""
+    app.logger.info(separator_short)
+    app.logger.info(" Starting Database:")
+    app.logger.info("	Type:	%s" % database_type)
+    app.logger.info(separator_short)
+
+    """Init DB"""
+    import flask_migrate
+    from sqlalchemy_utils import database_exists
+    from lib_functions.init_functions import init_db_test, db_init, oidc_init, k8s_config_int, k8s_roles_init
+
+    migrate = flask_migrate.Migrate(app, db)
+    db.init_app(app)
+    if database_exists(SQLALCHEMY_DATABASE_URI):
+        with app.app_context():
+            #flask_migrate.upgrade()
+            if init_db_test(SQLALCHEMY_DATABASE_URI, EXTERNAL_DATABASE_ENABLED, database_type):
+                if jager_enable:
+                    SQLAlchemyInstrumentor().instrument(engine=db.engine)
+                db_init(app.config['kubedash.ini'])
+            oidc_init(app.config['kubedash.ini'])
+            k8s_config_int(app.config['kubedash.ini'])
+            k8s_roles_init()
+
+def initialize_blueprints(app: Flask):
+    """Initialize blueprints"""
+    from lib_routes.main import main
+    from lib_routes.accounts import accounts
+    from lib_routes.api import api
+    from lib_routes.dashboard import dashboard
+    from lib_routes.helm import helm
+    from lib_routes.limits import limits
+    from lib_routes.metrics import metrics
+    from lib_routes.namespaces import namespaces
+    from lib_routes.networks import networks
+    from lib_routes.nodes import nodes
+    from lib_routes.pods import pods
+    from lib_routes.registry import registry
+    from lib_routes.security import security
+    from lib_routes.sso import sso
+    from lib_routes.storages import storages
+    from lib_routes.workloads import workloads
+
+
+    from lib_functions.commands import commands
+
+    app.logger.info("Initialize blueprints")
+    app.logger.info(separator_short)
+
+    app.register_blueprint(main)
+    app.register_blueprint(accounts)
+    app.register_blueprint(dashboard)
+    app.register_blueprint(helm)
+    app.register_blueprint(limits)
+    app.register_blueprint(metrics)
+    app.register_blueprint(namespaces)
+    app.register_blueprint(networks)
+    app.register_blueprint(nodes)
+    app.register_blueprint(pods)
+    app.register_blueprint(registry)
+    app.register_blueprint(security)
+    app.register_blueprint(sso)
+    app.register_blueprint(storages)
+    app.register_blueprint(workloads)
+    app.register_blueprint(api)
+
+    """Liveness and readiness probe"""
+    from flask_healthz import healthz
+    from lib_functions.init_functions import connect_database
+    app.register_blueprint(healthz, url_prefix="/api/health")
+
+    app.config.update(
+        HEALTHZ = {
+            "live":  "lib_routes.api.liveness",
+            "ready": "lib_routes.api.readiness",
+        }
+    )
+
+    app.register_blueprint(commands)
+    app.logger.info(separator_short)
+
+def add_custom_jinja2_filters(app: Flask):
+    """Add custom Jinja2 filers."""
+    app.logger.info("Adding custom Jinja2 filters")
+
+    from lib_functions.jinja2_decoders import j2_b64decode, j2_b64encode, split_uppercase
+
+    app.add_template_filter(j2_b64decode)
+    app.add_template_filter(j2_b64encode)
+    app.add_template_filter(split_uppercase)
+
+def initialize_app_session_and_socket(app: Flask):
+    """Initialize session and socketIO"""
+    app.logger.info("Initialize Session and SocketIO")
+
+    sess.init_app(app)
+    socketio.init_app(app)
+
+def initialize_app_security(app: Flask):
+    """Initialize application security options:
+
+    Configs:
+    - Login Manager
+    - Tell Flask it is Behind a Proxy:
+    - Content Security Policy - CSP
+    - Cross-site request forgery - CSRF
+    - cross origin resource sharing - CORS
+
+    Args:
+        app (Flask): Flask app object
+    """
+    app.logger.info("Initializing app Security")
+
+    """Init Logging managger"""
+    login_manager.init_app(app)
+    login_manager.login_view = "routes.login"
+    login_manager.session_protection = "strong"
+
+    from flask_talisman import Talisman
+    csp = {
+        'font-src': [
+            '\'self\'',
+            '*.gstatic.com'
+        ],
+        'style-src': [
+            '\'self\'',
+            '\'unsafe-inline\'',
+            '\'unsafe-eval\'',
+            'fonts.googleapis.com',
+            '*.cloudflare.com',
+        ],
+    }
+
+    hsts = {
+        'max-age': 31536000,
+        'includeSubDomains': True
+    }
+
+    app.config['SECRET_KEY'] = os.urandom(12).hex()
+    # add rootCA folder # MissingImplementation
+
+    if app.config['ENV'] == 'production':
+        from werkzeug.middleware.proxy_fix import ProxyFix
+        """Tell Flask it is Behind a Proxy"""
+        app.wsgi_app = ProxyFix(
+          app.wsgi_app, x_for=1, x_proto=1, x_host=1, x_prefix=1
+        )
+        """Init Talisman"""
+        talisman = Talisman(app)
+        talisman.force_https = True
+        talisman.strict_transport_security = hsts
+    else:
+        """Init Talisman"""
+        talisman = Talisman(app)
+        talisman.force_https = False
+
+    talisman.content_security_policy = csp
+    talisman.x_xss_protection = True
+    talisman.session_cookie_secure = True
+    talisman.session_cookie_samesite = 'Lax'
+
+    """Init CSRF"""
+    csrf.init_app(app)
+
+    @app.after_request
+    def set_security_headers(response):
+        """Add security headers for response"""
         # CORS
         response.headers['Access-Control-Allow-Origin'] = request.root_url.rstrip(request.root_url[-1])
         response.headers['X-Permitted-Cross-Domain-Policies'] = "none"
@@ -92,362 +368,84 @@ class localFlask(Flask):
         response.headers['Cross-Origin-Embedder-Policy'] = "require-corp"
         response.headers['Cross-Origin-Opener-Policy']   = "same-origin"
         response.headers['Cross-Origin-Resource-Policy'] = "same-origin"
-
-        response.headers['Referrer-Policy'] = "no-referrer"
+        response.headers["Access-Control-Max-Age"] = "600"
         response.headers['Clear-Site-Data'] = "*"
-
-        # XSS
-        response.headers['X-XSS-Protection'] = 0
-
-        # HSTS
-        if os.getenv('FLASK_CONFIG') == "production":
-            response.headers['Strict-Transport-Security'] = "max-age=31536000; includeSubDomains; preload"
-
-        # CSP
-        response.headers['X-Frame-Options'] = "deny"
-        response.headers['X-Content-Type-Options'] = "nosniff"
 
         # Cache
         response.headers["Cache-Control"] = "no-store, max-age=0"
         response.headers["Pragma"] = "no-cache" # Deprecated
         response.headers["Expires"] = "0"
 
-        super(localFlask, self).process_response(response)
-        return(response)
+        return response
 
-"""Exclude requests logging"""
-class NoPing(logging.Filter):
-    def filter(self, record):
-        return 'GET /api/ping' not in record.getMessage()
+def initialize_app_error_pages(app: Flask):
+    """Initialize error pages pl 40x 50x"""
+
+    @app.errorhandler(404)
+    def page_not_found404(e):
+        app.logger.error(e.description)
+        return render_template('404.html.j2'), 404
+
+    @app.errorhandler(404)
+    def page_not_found404(e):
+        app.logger.error(e.description)
+        return render_template('404.html.j2'), 404
+
+    @app.errorhandler(400)
+    def page_not_found400(e):
+        app.logger.error(e.description)
+        return render_template(
+            '400.html.j2',
+            description = e.description,
+            ), 400
+
+    @app.errorhandler(500)
+    def page_not_found500(e):
+        app.logger.error(e.description)
+        return render_template(
+            '500.html.j2',
+            description = e.description,
+            ), 500
     
-class NoHealth(logging.Filter):
-    def filter(self, record):
-        return 'GET /api/health' not in record.getMessage()
-
-class NoMetrics(logging.Filter):
-    def filter(self, record):
-        return 'GET /metrics' not in record.getMessage()
-   
-class NoSocketIoGet(logging.Filter):
-    def filter(self, record):
-        return 'GET /socket.io' not in record.getMessage()
-    
-class NoSocketIoPost(logging.Filter):
-    def filter(self, record):
-        return 'POST /socket.io' not in record.getMessage()
-
-"""Load kubedash.ini config file"""
-def config_parser():
-    if os.path.isfile("kubedash.ini"):
-        logger.info("Reading config file")
-        import configparser
-
-        config = configparser.ConfigParser()
-        config.sections()
-        config.read('kubedash.ini')
-        return False, config
-    else:
-        logger.warning("No local config file")
-        return True, None
-
-def db_init(config):
-    for r in roles:
-        RoleCreate(r)
-    admin_password = config.get('security', 'admin_password', fallback="admin")
-    UserCreate("admin", admin_password, None, "Local", "Admin")
-
-def connect_database():
-    user = UserTest('Admin')
-    if user:
-        return True
-    else:
-        return False
-    
-def init_db_test(SQLALCHEMY_DATABASE_URI, EXTERNAL_DATABASE_ENABLED, database_type):
-    engine = create_engine(SQLALCHEMY_DATABASE_URI)
-    if inspect(engine).has_table("alembic_version"):
-        METRIC_DB_CONNECTION.labels(EXTERNAL_DATABASE_ENABLED, database_type).set(1.0)
-        return True
-    else:
-        METRIC_DB_CONNECTION.labels(EXTERNAL_DATABASE_ENABLED, database_type).set(0.0)
-        return False
-    
-def oidc_init(config):
-    # https://github.com/requests/requests-oauthlib/issues/387
-    os.environ['OAUTHLIB_RELAX_TOKEN_SCOPE'] = "1"
-    OIDC_ISSUER_URL   = config.get('sso_settings', 'issuer_url', fallback=None)
-    OIDC_CLIENT_ID    = config.get('sso_settings', 'client_id', fallback=None)
-    OIDC_SECRET       = config.get('sso_settings', 'secret', fallback=None)
-    OIDC_SCOPE        = config.get('sso_settings', 'scope', fallback=None)
-    OIDC_CALLBACK_URL = config.get('sso_settings', 'callback_url', fallback=None)
-
-    if OIDC_ISSUER_URL and OIDC_CLIENT_ID and OIDC_SECRET and OIDC_SCOPE and OIDC_CALLBACK_URL:
-        oidc_test, OIDC_ISSUER_URL_OLD = SSOServerTest()
-        if oidc_test:
-            SSOServerUpdate(OIDC_ISSUER_URL_OLD, OIDC_ISSUER_URL, OIDC_CLIENT_ID, OIDC_SECRET, OIDC_CALLBACK_URL, string2list(OIDC_SCOPE))
-            logger.info("OIDC Provider updated")
-            METRIC_OIDC_CONFIG_UPDATE.labels(OIDC_ISSUER_URL, OIDC_CLIENT_ID).set(1)
-        else:
-            SSOServerCreate(OIDC_ISSUER_URL, OIDC_CLIENT_ID, OIDC_SECRET, OIDC_CALLBACK_URL, string2list(OIDC_SCOPE))
-            logger.info("OIDC Provider created")
-            METRIC_OIDC_CONFIG_UPDATE.labels(OIDC_ISSUER_URL, OIDC_CLIENT_ID).set(0)
-
-def k8s_config_int(config):
-    K8S_CLUSTER_NAME = config.get('k8s', 'cluster_name', fallback="k8s-main")
-    K8S_API_SERVER   = config.get('k8s', 'api_server', fallback=None)
-
-    K8S_API_CA       = config.get('k8s', 'api_ca', fallback=None)
-    if K8S_API_CA is None:
-        with open("/var/run/secrets/kubernetes.io/serviceaccount/ca.crt", 'r') as cert_file:
-            cert_file_data = cert_file.read()
-            base64_encoded_data = str(base64_encode(cert_file_data), "UTF-8")
-            K8S_API_CA = base64_encoded_data
-
-    if K8S_API_SERVER:
-        k8sConfig = k8sServerConfigGet()
-        if k8sConfig is None:
-            k8sServerConfigCreate(K8S_API_SERVER, K8S_CLUSTER_NAME, K8S_API_CA)
-            logger.info("Kubernetes Config created")
-            METRIC_K8S_CONFIG_UPDATE.labels(K8S_CLUSTER_NAME, K8S_API_SERVER).set(0)
-        else:
-            k8sServerConfigUpdate(k8sConfig.k8s_context, K8S_API_SERVER, K8S_CLUSTER_NAME, K8S_API_CA)
-            logger.info("Kubernetes Config updated")
-            METRIC_K8S_CONFIG_UPDATE.labels(K8S_CLUSTER_NAME, K8S_API_SERVER).set(1)
-    else:
-        logger.error("Missing Kubernetes Config: K8S_API_SERVER, K8S_API_CA")
-
-def k8s_roles_init():
-    user_role_template_list = k8sUserRoleTemplateListGet("Admin", None)
-    user_clusterRole_template_list = k8sUserClusterRoleTemplateListGet("Admin", None)
-
-    if not bool(user_clusterRole_template_list) or not bool(user_role_template_list):
-        logger.info("Kubernetes Roles created")
-        k8sClusterRolesAdd()
-
-##############################################################
+#############################################################
 ## Main App creation Function
-##############################################################
+#############################################################
 
-def create_app(config_name="development"):
-    """Init App"""
-    app = localFlask(__name__, static_url_path='', static_folder='static')
+def create_app(external_config_name=None):
+    """Initialize Flask app object
 
-    if config_name == "production":
-      """Tell Flask it is Behind a Proxy"""
-      app.wsgi_app = ProxyFix(
-        app.wsgi_app, x_for=1, x_proto=1, x_host=1, x_prefix=1
-      )
+    Args:
+        external_config_name (str, optional): Name of the configuration file. Defaults to None.
 
-    """App Version"""
-    global kubedash_version
-    kubedash_version = os.getenv('KUBEDASH_VERSION')
-    app.jinja_env.globals['kubedash_version'] = kubedash_version
+    Returns:
+        app (Flask): Flask app object
+    """
+    app = Flask(__name__, static_url_path='', static_folder='static')
 
-    METRIC_APP_VERSION.info({'version': kubedash_version})
-    print("######################################################################")
-    print("# KubeDash %s " % kubedash_version)
-    print("######################################################################")
-
-    """Init Logger"""
-    global logger
-    logger=logging.getLogger()
-    logging.basicConfig(
-            level="INFO",
-            format='[%(asctime)s] %(name)s        %(levelname)s %(message)s'
-        )
-    
-    """Parse Configfile"""
-    error, config = config_parser()
+    initialize_app_logging(app)
+    if external_config_name is not None:
+        error = initialize_app_confifuration(app, external_config_name)
+    else:
+        error = initialize_app_confifuration(app, None)
     if not error:
-        """App config"""
-        config_name = config.get('DEFAULT', 'app_mode', fallback='development')
-        app.config['SECRET_KEY'] = os.urandom(12).hex()
+        initialize_app_version(app)
+        initialize_app_tracing(app)
+        initialize_app_database(app)
+        initialize_app_plugins(app)
+        initialize_blueprints(app)
+        initialize_app_session_and_socket(app)
+        add_custom_jinja2_filters(app)
+        initialize_app_security(app)
+        initialize_app_error_pages(app)
+    print(separator_long)
 
-        app.config["plugins"] = {
-                "registry":              config.getboolean('plugin_settings', 'registry', fallback=False),
-                "helm":                  config.getboolean('plugin_settings', 'helm', fallback=True),
-                "gateway_api":           config.getboolean('plugin_settings', 'gateway_api', fallback=False),
-                "cert_manager":          config.getboolean('plugin_settings', 'cert_manager', fallback=True),
-                "external_loadbalancer": config.getboolean('plugin_settings', 'external_loadbalancer', fallback=True),
-            }
+    #if jager_enable:
+    #    FlaskInstrumentor
 
-        """Database mode"""
-        database_type = config.get('database', 'type', fallback='none')
-        if database_type == 'postgres':
-            EXTERNAL_DATABASE_ENABLED = True
-        else:
-            EXTERNAL_DATABASE_ENABLED = False
-        
-        if EXTERNAL_DATABASE_ENABLED:
-            SQLALCHEMY_DATABASE_HOST     = config.get('database', 'host', fallback='localhost')
-            SQLALCHEMY_DATABASE_DB       = config.get('database', 'name', fallback='kubedash')
-            SQLALCHEMY_DATABASE_USER     = config.get('database', 'user', fallback='kubedash')
-            SQLALCHEMY_DATABASE_PASSWORD = config.get('database', 'password', fallback=None)
-    else:
-        logger.error("Error parsing application config")
-
-    logger.info("Running in %s mode" % config_name)
-
-    app.config.from_object(app_config[config_name])
-    app.config['SESSION_SQLALCHEMY'] = db
-
-    """Init FlaskInstrumentor"""
-    # FlaskInstrumentor().instrument_app(app)
-
-    """Database mode"""
-    if EXTERNAL_DATABASE_ENABLED:
-        if SQLALCHEMY_DATABASE_USER and SQLALCHEMY_DATABASE_PASSWORD and SQLALCHEMY_DATABASE_HOST and SQLALCHEMY_DATABASE_DB:
-            SQLALCHEMY_DATABASE_URI = "postgresql://%s:%s@%s/%s" % (SQLALCHEMY_DATABASE_USER, SQLALCHEMY_DATABASE_PASSWORD, SQLALCHEMY_DATABASE_HOST, SQLALCHEMY_DATABASE_DB)
-            app.config['SQLALCHEMY_DATABASE_URI'] = SQLALCHEMY_DATABASE_URI
-            database_type = 'postgres'
-        else:
-            basedir = os.path.abspath(os.path.dirname(__file__))
-            SQLALCHEMY_DATABASE_URI = "sqlite:///"+basedir+"/database/"+config_name+".db"
-            database_type = 'sqlite'
-    else:
-        basedir = os.path.abspath(os.path.dirname(__file__))
-        SQLALCHEMY_DATABASE_URI = "sqlite:///"+basedir+"/database/"+config_name+".db"
-        database_type = 'sqlite'
-
-    """Init DB"""
-    migrate = Migrate(app, db)
-    db.init_app(app)
-    if database_exists(SQLALCHEMY_DATABASE_URI):
-        with app.app_context():
-            if init_db_test(SQLALCHEMY_DATABASE_URI, EXTERNAL_DATABASE_ENABLED, database_type):
-                SQLAlchemyInstrumentor().instrument(engine=db.engine)
-                db_init(config)
-                oidc_init(config)
-                k8s_config_int(config)
-                k8s_roles_init()
-
-    """Init session"""
-    sess.init_app(app)
-
-    """Init Logging managger"""
-    login_manager.init_app(app)
-    login_manager.login_view = "routes.login"
-    login_manager.session_protection = "strong"
-
-    """Init CSRF"""
-    csrf.init_app(app)
-
-    """Init SocketIO"""
-    socketio.init_app(app)
-
-    """Init Talisman"""
-    if config_name == "production":
-        talisman = Talisman(app, content_security_policy=csp)
-    else:
-        talisman = Talisman(app, content_security_policy=None, force_https=False)
-    ##############################################################
-    ## Custom jinja2 filter
-    ##############################################################
-    from functions.jinja2_decoders import j2_b64decode, j2_b64encode, split_uppercase
-
-    app.add_template_filter(j2_b64decode)
-    app.add_template_filter(j2_b64encode)
-    app.add_template_filter(split_uppercase)
-    
-    app.register_blueprint(routes)
-    app.register_blueprint(commands)
     return app
 
+##############################################################
+## Main Application variable for WSGI Like Gunicorn
+##############################################################
+
 app = create_app()
-
-##############################################################
-## Plugin configs
-##############################################################
-"""Plugin Logging"""
-logger.info("###########################")
-logger.info(" Starting Plugins:")
-logger.info(" 	registry:	%s" % app.config["plugins"]["registry"])
-logger.info("	helm:		%s" % app.config["plugins"]["helm"])
-logger.info("	gateway_api:	%s" % app.config["plugins"]["gateway_api"])
-logger.info("	cert_manager:	%s" % app.config["plugins"]["cert_manager"])
-logger.info("	ext_lb: 	%s" % app.config["plugins"]["external_loadbalancer"])
-logger.info("###########################")
-print("######################################################################")
-
-
-if app.config["plugins"]["gateway_api"]:
-    from plugins.gateway_api import gateway_api
-    app.register_blueprint(gateway_api)
-
-if app.config["plugins"]["cert_manager"]:
-    from plugins.cert_manager import cm_routes
-    app.register_blueprint(cm_routes)
-
-if app.config["plugins"]["external_loadbalancer"]:
-    from plugins.external_loadbalancer import exlb_routes
-    app.register_blueprint(exlb_routes)
-
-##############################################################
-## Liveness and redyes probe
-##############################################################
-app.register_blueprint(healthz, url_prefix="/api/health")
-
-def liveness():
-    pass
-
-def readiness():
-    try:
-        connect_database()
-    except Exception:
-        raise HealthError("Can't connect to the database")
-    # test k8s connection
-    # test sso connection
-
-app.config.update(
-    HEALTHZ = {
-        "live": app.name + ".liveness",
-        "ready": app.name + ".readiness",
-    }
-)
-
-##############################################################
-## Error Pages
-##############################################################
-
-@app.errorhandler(404)
-def page_not_found404(e):
-    logger.error(e.description)
-    return render_template('404.html.j2'), 404
-
-@app.errorhandler(404)
-def page_not_found404(e):
-    logger.error(e.description)
-    return render_template('404.html.j2'), 404
-
-@app.errorhandler(400)
-def page_not_found400(e):
-    logger.error(e.description)
-    return render_template(
-        '400.html.j2',
-        description = e.description,
-        ), 400
-
-@app.errorhandler(500)
-def page_not_found500(e):
-    logger.error(e.description)
-    return render_template(
-        '500.html.j2',
-        description = e.description,
-        ), 500
-
-##############################################################
-## Error Pages
-##############################################################
-
-logging.getLogger("werkzeug").addFilter(NoMetrics())
-logging.getLogger("werkzeug").addFilter(NoHealth())
-logging.getLogger("werkzeug").addFilter(NoPing())
-logging.getLogger("werkzeug").addFilter(NoSocketIoGet())
-logging.getLogger("werkzeug").addFilter(NoSocketIoPost())
-
-if __name__ == '__main__':
-    if os.getenv('FLASK_CONFIG') == "production":
-        eventlet.wsgi.server(eventlet.listen(('', 8000)), app, debug=False)
-    else:
-        eventlet.wsgi.server(eventlet.listen(('', 8000)), app, debug=True)
-

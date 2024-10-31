@@ -3,21 +3,25 @@
 from flask import Blueprint, render_template, request, session, redirect, url_for
 from flask_login import login_required
 
-from functions.helper_functions import get_logger, ErrorHandler
-from functions.sso import get_user_token
+from lib_functions.helper_functions import get_logger, ErrorHandler
+from lib_functions.sso import get_user_token
 
 from kubernetes.client.rest import ApiException
 import kubernetes.client as k8s_client
-from functions.k8s import k8sClientConfigGet
-from functions.k8s import k8sNamespaceListGet
+from lib_functions.k8s import k8sClientConfigGet
+from lib_functions.k8s import k8sNamespaceListGet
 import ast
 
 ##############################################################
-## Helper Functions
+## variables
 ##############################################################
 
 cm_routes = Blueprint("cert_manager", __name__)
-logger = get_logger(__name__)
+logger = get_logger(__name__.split(".")[1])
+
+#############################################################
+## Helper Functions
+##############################################################
 
 def GenerateIssuerData(k8s_objects, k8s_object_list):
     for k8s_object in k8s_objects['items']:

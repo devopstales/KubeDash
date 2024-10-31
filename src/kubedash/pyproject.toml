@@ -13,4 +13,5 @@ filterwarnings = [
     "ignore::urllib3.exceptions.InsecureRequestWarning",
     "ignore::DeprecationWarning",
 ]
+pythonpath = "."
 live_server_scope = "function"

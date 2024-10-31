@@ -2,8 +2,8 @@
 
 import  requests, json, hashlib
 from itsdangerous import base64_encode, base64_decode
-from functions.components import db
-from functions.helper_functions import get_logger, ErrorHandler, ResponseHandler, find_values_in_json
+from lib_functions.components import db
+from lib_functions.helper_functions import get_logger, ErrorHandler, ResponseHandler
 from flask_login import UserMixin
 from sqlalchemy import inspect
 from datetime import datetime
@@ -12,11 +12,19 @@ from datetime import datetime
 ## Helper Functions
 ##############################################################
 
-logger = get_logger(__name__)
+logger = get_logger(__name__.split(".")[1])
 
 ##############################################################
 
-def get_base_url(registry_server_url):
+def get_base_url(registry_server_url: str) -> str:
+    """Generate URL for registry server
+    
+    Args:
+        registry_server_url (str): The URL of the registry server.
+        
+    Returns:
+        registry_base_url (str): The base URL for the registry server
+    """
     registry = RegistrySererGet(registry_server_url)
     if registry:
         registry_url = registry.registry_server_url
@@ -30,7 +38,16 @@ def get_base_url(registry_server_url):
     else:
         return None
 
-def get_request_options(registry_server_url):
+def get_request_options(registry_server_url: str):
+    """Get verify and headers for registry server request
+    
+    Args:
+        registry_server_url (str): The URL of the registry server.
+
+    Returns:
+        verify (bool): Verify SSL certificate for the registry server.
+        headers (dict): Headers for the registry server request.
+    """
     registry = RegistrySererGet(registry_server_url)
     verify = True
     headers = {
@@ -49,7 +66,20 @@ def get_request_options(registry_server_url):
 
     return verify, headers
 
-def registry_request(registry_server_url, url_path, header=None, method='GET', data=None):
+def registry_request(registry_server_url: str, url_path, header=None, method='GET', data=None):
+    """Make a request to the registry server
+    
+    Args:
+        registry_server_url (str): The URL of the registry server.
+        url_path (str): The URL path to the resource.
+        header (str): Header for the request.
+        method (str): The HTTP method like GET or POST
+        data (dict): Data for the POST request.
+    
+    Returns:
+        response (requests.Response): The response from the registry server.
+        next_url (str): The URL for the next page of results.
+    """
     registry_base_url = get_base_url(registry_server_url)
     api_url = registry_base_url + '/v2/' + url_path
     logger.debug("%s %s" % (method, api_url)) # DEBUG
@@ -81,7 +111,17 @@ def registry_request(registry_server_url, url_path, header=None, method='GET', d
         ErrorHandler(logger, "Registry Error", 'Problem during docker registry connection: %s' % error)
         return None, None
     
-def get_image_sbom_vulns(registry_server_url, image, tag):
+def get_image_sbom_vulns(registry_server_url, image, tag) -> list:
+    """Get the SBOM vulnerabilities for an image and tag
+    
+    Args:
+        registry_server_url (str): The URL of the registry server.
+        image (str): The name of the image.
+        tag (str): The tag of the image.
+
+    Returns:
+        vulnerabilities (list): List of vulnerabilities in dict found for the image and tag.
+    """
     vulnerabilities = None
     rd, links = registry_request(registry_server_url, f"{image}/manifests/{tag}")
     if rd.status_code == 200:
@@ -109,7 +149,15 @@ def get_image_sbom_vulns(registry_server_url, image, tag):
 ##############################################################
 ## Registry Data Functions
 ##############################################################
-def RegistryGetRepositories(registry_server_url):
+def RegistryGetRepositories(registry_server_url: str) -> list:
+    """Get all repositories from the registry server
+    
+    Args:
+        registry_server_url (str): The URL of the registry server.
+    
+    Returns:
+        repositories (list): List of repositories from the registry server.
+    """
     repositories = list()
     r, links = registry_request(registry_server_url, '_catalog?n=100')
     if r:
@@ -122,7 +170,18 @@ def RegistryGetRepositories(registry_server_url):
                 repositories.extend(j['repositories'])
     return repositories
 
-def RegistryGetTags(registry_server_url, image):
+def RegistryGetTags(registry_server_url: str, image: str) -> dict:
+    """Get all tags for an image from the registry server
+    
+    Args:
+        registry_server_url (str): The URL of the registry server.
+        image (str): The name of the image.
+
+    Returns:
+        tags (dict): Dictionary containing the image name and a list of tags.
+    """
+    # TODO: Implement caching for tags to improve performance and reduce API calls.
+    #       Store the tags in a database and update them periodically.
     tags = {}
     registry_base_url = get_base_url(registry_server_url)
     r, links = registry_request(registry_server_url, f"{image}/tags/list")
@@ -135,7 +194,19 @@ def RegistryGetTags(registry_server_url, image):
         }
     return tags
 
-def RegistryGetManifest(registry_server_url, image, tag):
+def RegistryGetManifest(registry_server_url, image, tag) -> list[dict]:
+    """Get the manifest for an image and tag
+    
+    Args:
+        registry_server_url (str): The URL of the registry server.
+        image (str): The name of the image.
+        tag (str): The tag of the image.
+
+    Returns:
+        manifest (dict): Dictionary containing the image name, tag, and manifest details.
+    """
+    # TODO: Implement caching for manifests to improve performance and reduce API calls.
+    #       Store the manifests in a database and update them periodically.
     manifest = list()
     registry_base_url = get_base_url(registry_server_url)
     r, links = registry_request(registry_server_url, f"{image}/manifests/{tag}")
@@ -281,7 +352,14 @@ def RegistryGetManifest(registry_server_url, image, tag):
         #print(json.dumps(manifest, indent=2))
     return manifest
 
-def RegistryDeleteTag(registry_server_url, image, tag):
+def RegistryDeleteTag(registry_server_url: str, image: str, tag: str):
+    """ Delete a specific tag from a Docker registry.
+
+    Args:
+        registry_server_url (str): The URL of the Docker registry server.
+        image (str): The name of the image.
+        tag (str): The name of the tag to delete.
+    """
     dummy_hash = "sha256:44136fa355b3678a1146ad16f7e8649e94fb4fc21fe77e8310c060f61caaff8a"
     r, links = registry_request(registry_server_url, f"{image}/manifests/{tag}", None, "DELETE")
     if r and r.status_code == 200:
@@ -423,6 +501,17 @@ class RegistryEvents(UserMixin, db.Model):
 def RegistryServerCreate(registry_server_url, registry_server_port, registry_server_auth=False, 
                         registry_server_tls=False, insecure_tls=False, registry_server_auth_user=None, 
                         registry_server_auth_pass=None):
+    """Create a new registry server object in database
+    
+    Args:
+        registry_server_url (str):  Url of the registry server
+        registry_server_port (str): Port of the registry server
+        registry_server_auth (bool): Enable or disable aithentication for registry server
+        registry_server_tls (bool): Use http or https in url
+        insecure_tls (bool): Disable SSL certificate validation
+        registry_server_auth_user (str): User to use for authentication
+        registry_server_auth_pass (str): Password for authentication
+    """
     registry = Registry.query.filter_by(registry_server_url=registry_server_url).first()
     if registry is None:
         registry = Registry(
@@ -441,6 +530,17 @@ def RegistryServerCreate(registry_server_url, registry_server_port, registry_ser
 def RegistryServerUpdate(registry_server_url, registry_server_url_old, registry_server_port, registry_server_auth=False, 
                          registry_server_tls=False, insecure_tls=False, registry_server_auth_user=None, 
                         registry_server_auth_pass=None):
+    """Update registry server object in database
+    
+    Args:
+        registry_server_url (str):  Url of the registry server
+        registry_server_port (str): Port of the registry server
+        registry_server_auth (bool): Enable or disable aithentication for registry server
+        registry_server_tls (bool): Use http or https in url
+        insecure_tls (bool): Disable SSL certificate validation
+        registry_server_auth_user (str): User to use for authentication
+        registry_server_auth_pass (str): Password for authentication
+    """
     registry = Registry.query.filter_by(registry_server_url=registry_server_url_old).first()
     if registry:
         registry.registry_server_url = registry_server_url
@@ -454,7 +554,12 @@ def RegistryServerUpdate(registry_server_url, registry_server_url_old, registry_
         print(registry.insecure_tls)
         db.session.commit()
 
-def RegistryServerListGet():
+def RegistryServerListGet() -> list:
+    """Get all registry servers from database
+    
+    Returns:
+        registrys (list): list of Registry objects
+    """
     registrys = Registry.query.all()
     if registrys:
         return registrys
@@ -462,6 +567,14 @@ def RegistryServerListGet():
         return list()
 
 def RegistrySererGet(registry_server_url):
+    """Get registry server object from database
+    
+    Args:
+        registry_server_url (str):  Url of the registry server
+
+    Returns:
+        registry (Registry): Registry object or None if not found
+    """
     registry = Registry.query.filter_by(registry_server_url=registry_server_url).first()
     if registry:
         return registry
@@ -469,6 +582,11 @@ def RegistrySererGet(registry_server_url):
         return None
 
 def RegistryServerDelete(registry_server_url):
+    """Delete registry server object from database
+    
+    Args:
+        registry_server_url (str):  Url of the registry server
+    """
     registry = Registry.query.filter_by(registry_server_url=registry_server_url).first()
     if registry:
         db.session.delete(registry)
@@ -476,6 +594,17 @@ def RegistryServerDelete(registry_server_url):
 
 def RegistryEventCreate(event_action, event_repository, 
                         event_tag, event_digest, event_ip, event_user, event_created):
+    """Create event object forregistry in database
+    
+    Args:
+        event_action (str): Action of the event
+        event_repository (str): Repository of the event
+        event_tag (str): Inage tag
+        event_digest (str): Digest of the image
+        event_ip (str): Source IP address of the event
+        event_user (str): User who initiated the event
+        event_created (datetime): Time when the event occurred
+    """
     inspector = inspect(db.engine)
     if inspector.has_table("registry_events"):
         registry_event = RegistryEvents(
@@ -491,6 +620,15 @@ def RegistryEventCreate(event_action, event_repository,
         db.session.commit()
 
 def RegistryGetEvent(repository, tag):
+    """Get all events for a given repository and tag
+    
+    Args:
+        repository (str): Repository of the event
+        tag (str): Inage tag
+
+    Returns:
+        registry_events (list): List of RegistryEvents objects
+    """
     registry_events = None
     inspector = inspect(db.engine)
     if inspector.has_table("registry_events"):

@@ -1,19 +1,23 @@
 #!/usr/bin/env python3
 
 import json
-from functions.helper_functions import get_logger
-from functions.components import db
-from functions.user import SSOTokenUpdate
+from lib_functions.helper_functions import get_logger
+from lib_functions.components import db
+from lib_functions.user import SSOTokenUpdate
 from flask_login import UserMixin
 from sqlalchemy.ext.mutable import MutableList
 from sqlalchemy import PickleType, inspect
 from requests_oauthlib import OAuth2Session
 
 ##############################################################
-## functions
+## variables
 ##############################################################
 
-logger = get_logger(__name__)
+logger = get_logger(__name__.split(".")[1])
+
+##############################################################
+## functions
+##############################################################
 
 class Openid(UserMixin, db.Model):
     __tablename__ = 'openid'
@@ -28,6 +32,14 @@ class Openid(UserMixin, db.Model):
         return '<Server URL %r>' % self.oauth_server_uri
 
 def SSOServerCreate(oauth_server_uri, client_id, client_secret, base_uri, scopes):
+    """Create a SSOServer instance in database
+    
+    Args:
+        oauth_server_uri (string): URL of the oauth server
+        client_id (string): Client ID for the oauth client
+        client_secret (string): Client secret for the oauth client
+        base_uri (string): Base URI for the oauth server redirect
+        scopes (list): List of scopes for the oauth client"""
     sso = Openid.query.filter_by(oauth_server_uri=oauth_server_uri).first()
     sso_data = Openid(
         oauth_server_uri = oauth_server_uri,
@@ -42,6 +54,11 @@ def SSOServerCreate(oauth_server_uri, client_id, client_secret, base_uri, scopes
         db.session.commit()
 
 def SSOServerTest():
+    """Test SSOServer
+    
+    Returns:
+        bool: True if the SSO server exists, False otherwise
+    """
     sso = Openid.query.get(1)
     if sso:
         return True, sso.oauth_server_uri
@@ -49,6 +66,17 @@ def SSOServerTest():
         return False, None
 
 def SSOServerUpdate(oauth_server_uri_old, oauth_server_uri, client_id, client_secret, base_uri, scope):
+    """Update a SSOServer instance in database
+    
+    Args:
+        oauth_server_uri_old (string): Old URL of the oauth server
+        oauth_server_uri (string): New URL of the oauth server
+        client_id (string): Client ID for the oauth client
+        client_secret (string): Client secret for the oauth client
+        base_uri (string): Base URI for the oauth server redirect
+        scope (list): List of scopes for the oauth client
+    """
+
     sso = Openid.query.filter_by(oauth_server_uri=oauth_server_uri_old).first()
     if sso:
         sso.oauth_server_uri = oauth_server_uri
@@ -59,6 +87,11 @@ def SSOServerUpdate(oauth_server_uri_old, oauth_server_uri, client_id, client_se
         db.session.commit()
 
 def SSOSererGet():
+    """Get a SSOServer instance from database
+    
+    Returns:
+        Openid: SSOServer instance or None if not found
+    """
     inspector = inspect(db.engine)
     if inspector.has_table("openid"):
         return Openid.query.get(1)
@@ -66,6 +99,11 @@ def SSOSererGet():
         return None
 
 def get_auth_server_info():
+    """Get OAuth2Session and Auth Server Info
+    
+    Returns:
+        tuple: auth_server_info (dict), oauth (OAuth2Session)
+    """
     ssoServer = SSOSererGet()
     redirect_uri = ssoServer.base_uri+"/callback"
     oauth = OAuth2Session(
@@ -87,6 +125,14 @@ def get_auth_server_info():
     return auth_server_info, oauth
 
 def get_user_token(session):
+    """Get user token from session
+
+    Args:
+        session: session
+    
+    Returns:
+        string: user token or None if not found in session
+    """
     if session['user_type'] == "OpenID":
         """Refreshing an OAuth 2 token using a refresh token.
         """

@@ -1,12 +1,7 @@
 import socket, os
 from urllib.parse import urlparse
-from flask_login import LoginManager
-from flask_sqlalchemy import SQLAlchemy
-from flask_session import Session
-from flask_wtf.csrf import CSRFProtect
-from flask_socketio import SocketIO
 
-from functions.helper_functions import get_logger
+from lib_functions.helper_functions import get_logger
 
 from opentelemetry import trace
 from opentelemetry.sdk.resources import Resource
@@ -14,20 +9,24 @@ from opentelemetry.sdk.trace import TracerProvider
 from opentelemetry.sdk.trace.export import BatchSpanProcessor
 from opentelemetry.exporter.otlp.proto.http.trace_exporter import OTLPSpanExporter
 
-logger = get_logger(__name__)
+##############################################################
+## Helpers
+##############################################################
 
-login_manager = LoginManager()
-login_manager.login_message_category = "warning"
-db = SQLAlchemy()
-sess = Session()
-csrf = CSRFProtect()
-socketio = SocketIO()
+logger = get_logger(__name__.split(".")[1])
 tracer = None
-jager_url = os.environ.get('JAEGER_HTTP_ENDPOINT', None) # "http://127.0.0.1:4318"
 
-if jager_url:
-    endpoint=jager_url+"/v1/traces"
-    # what other attributes ?
+##############################################################
+## OTEL Functions
+##############################################################
+
+def init_opentelemetry_exporter(jager_base_url: str):
+    """Initialize the opentelemetry exporter
+    
+    Args:
+        jager_base_url (str): The base URL of Jaher HTTP client
+    """
+    endpoint=jager_base_url+"/v1/traces"
     resource = Resource(attributes={
         "service.name": "KubeDash",
         "service.instance.id": "2193801",
@@ -36,8 +35,8 @@ if jager_url:
     })
 
     sock = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
-    urlparse = urlparse(jager_url)
-    result = sock.connect_ex((urlparse.hostname, urlparse.port))
+    url = urlparse(jager_base_url)
+    result = sock.connect_ex((url.hostname, url.port))
 
     if result == 0:
         trace.set_tracer_provider(TracerProvider(resource=resource))

@@ -1,0 +1,24 @@
+from flask_login import LoginManager
+from flask_sqlalchemy import SQLAlchemy
+from flask_session import Session
+from flask_wtf.csrf import CSRFProtect
+from flask_socketio import SocketIO
+
+from lib_functions.helper_functions import get_logger
+
+##############################################################
+## Helpers
+##############################################################
+
+logger = get_logger(__name__.split(".")[1])
+
+##############################################################
+## Initialize modules
+##############################################################
+
+login_manager = LoginManager()
+login_manager.login_message_category = "warning"
+db = SQLAlchemy()
+sess = Session()
+csrf = CSRFProtect()
+socketio = SocketIO()

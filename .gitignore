@@ -1,8 +1,9 @@
 # custom
+CA.crt
+.venv/
 *instance/
 *database/
 *neo4j/
-test*
 *.crt
 *manage.py
 src/kubedash/run.sh
@@ -14,6 +15,7 @@ docker/kubedash/kubedash
 # enable tests
 !tests
 !database/.gitkeep
+!.venv/.gitkeep
 
 # mkdocs documentation
 /site
