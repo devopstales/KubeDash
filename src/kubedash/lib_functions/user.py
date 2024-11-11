@@ -1,14 +1,14 @@
 #!/usr/bin/env python3
 
-from lib_functions.helper_functions import get_logger, email_check
-from lib_functions.components import db, login_manager
-from lib_functions.opentelemetry import tracer
+from lib_functions.helper_functions import get_logger, email_check # type: ignore
+from lib_functions.components import db, login_manager # type: ignore
+from lib_functions.opentelemetry import tracer # type: ignore
 
 from contextlib import nullcontext
-from flask_login import UserMixin
-from werkzeug.security import generate_password_hash
+from flask_login import UserMixin # type: ignore
+from werkzeug.security import generate_password_hash # type: ignore
 from datetime import datetime
-from pytz import timezone
+from pytz import timezone # type: ignore
 
 ##############################################################
 ## variables

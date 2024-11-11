@@ -55,8 +55,8 @@ api_ca = LS0tLS1CRUdJTiBDRVJUSUZJQ0FURS0tLS0tCk1JSUMvakNDQWVhZ0F3SUJBZ0lCQURBTkJ
 #################################### Monitoring Settings ###########################
 [monitoring]
 
-jager_enabled = false
-jager_http_endpoint = http://127.0.0.1:4318
+jaeger_enabled = false
+jaeger_http_endpoint = http://127.0.0.1:4318
 
 #################################### Plugin Settings ###########################
 [plugin_settings]

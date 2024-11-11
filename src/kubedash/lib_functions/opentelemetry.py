@@ -20,13 +20,13 @@ tracer = None
 ## OTEL Functions
 ##############################################################
 
-def init_opentelemetry_exporter(jager_base_url: str):
-    """Initialize the opentelemetry exporter
+def init_opentelemetry_exporter(jaeger_base_url: str):
+    """Initialize the OpenTelemetry exporter
     
     Args:
-        jager_base_url (str): The base URL of Jaher HTTP client
+        jaeger_base_url (str): The base URL of jaeger HTTP client
     """
-    endpoint=jager_base_url+"/v1/traces"
+    endpoint=jaeger_base_url+"/v1/traces"
     resource = Resource(attributes={
         "service.name": "KubeDash",
         "service.instance.id": "2193801",
@@ -35,7 +35,7 @@ def init_opentelemetry_exporter(jager_base_url: str):
     })
 
     sock = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
-    url = urlparse(jager_base_url)
+    url = urlparse(jaeger_base_url)
     result = sock.connect_ex((url.hostname, url.port))
 
     if result == 0:

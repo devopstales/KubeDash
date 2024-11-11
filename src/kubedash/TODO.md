@@ -5,4 +5,4 @@
 * pytest
 * opentelemetry instrumentors
   * tracing
-  * oben jager from UI
+  * oben jaeger from UI
