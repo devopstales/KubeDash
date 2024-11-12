@@ -358,7 +358,7 @@ def SSOGroupsCreate(user_name, group_name):
             db.session.commit()
 
 def SSOGroupsUpdate(user_name, group_name):
-    """Update SSOUserGroups object in database
+    """Update SSOUserGroups object in database.
     
     Args:
         user_name (string): User name
@@ -367,11 +367,21 @@ def SSOGroupsUpdate(user_name, group_name):
     with tracer.start_as_current_span("update-sso-group") if tracer else nullcontext() as span:
         group = SSOGroupTest(group_name)
         user = UserTest(user_name)
-        user_not_member = SSOUserGroups.query.filter(SSOUserGroups.group_id == group.id).filter(SSOUserGroups.user_id == user.id).all()
+        try:
+          user_not_member = SSOUserGroups.query.filter(SSOUserGroups.group_id == group.id).filter(SSOUserGroups.user_id == user.id).all()
+        except:
+          user_not_member = None
         if user and group and not user_not_member:
             if tracer and span.is_recording():
                 span.set_attribute("group.name", group_name)
                 span.set_attribute("user.name", user_name)
+            logger.debug("SSOGroupsUpdate: Add %s user to %s group" % (user_name, group_name))
+            user.sso_groups.append(group)
+        elif user and not group:
+            if tracer and span.is_recording():
+                span.set_attribute("group.name", group_name)
+                span.set_attribute("user.name", user_name)
+            SSOGroupsCreate(user_name, group_name)
             logger.debug("SSOGroupsUpdate: Add %s user to %s group" % (user_name, group_name))
             user.sso_groups.append(group)
 
