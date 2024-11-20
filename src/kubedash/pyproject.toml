@@ -12,6 +12,7 @@ authors = [
 filterwarnings = [
     "ignore::urllib3.exceptions.InsecureRequestWarning",
     "ignore::DeprecationWarning",
+    "ignore::sqlalchemy.exc.SAWarning",
 ]
 pythonpath = "."
 live_server_scope = "function"

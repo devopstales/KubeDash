@@ -26,7 +26,7 @@ logger = get_logger(__name__.split(".")[1])
 ## Helper Functions
 ##############################################################
 
-def db_init(config: configparser.ConfigParser):
+def db_init_roles(config: configparser.ConfigParser):
     """Create Roles and Users in the database
     
     Args:

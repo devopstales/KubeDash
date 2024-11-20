@@ -1,13 +1,13 @@
 #!/usr/bin/env python3
 
-from flask import Flask, render_template, request # type: ignore
+from flask import Flask, render_template, request 
 import logging, os
 
-from lib_functions.components import db, sess, login_manager, csrf, socketio # type: ignore
-from lib_functions.helper_functions import bool_var_test # type: ignore
+from lib_functions.components import db, sess, login_manager, csrf, socketio 
+from lib_functions.helper_functions import bool_var_test 
 
-from opentelemetry.instrumentation.flask import FlaskInstrumentor # type: ignore
-from opentelemetry.instrumentation.sqlalchemy import SQLAlchemyInstrumentor # type: ignore
+from opentelemetry.instrumentation.flask import FlaskInstrumentor 
+from opentelemetry.instrumentation.sqlalchemy import SQLAlchemyInstrumentor 
 
 separator_long = "##############################################################################"
 separator_short = "###############################"
@@ -21,8 +21,8 @@ def initialize_app_logging(app: Flask):
     Args:
         app (Flask): Flask app object
     """
-    from lib_functions.logfilters import NoMetrics, NoHealth, NoPing, # type: ignore \
-        NoSocketIoGet, NoSocketIoPost # type: ignore
+    from lib_functions.logfilters import NoMetrics, NoHealth, NoPing,  \
+        NoSocketIoGet, NoSocketIoPost 
 
     logging.basicConfig(
             level="INFO",
@@ -34,8 +34,8 @@ def initialize_app_logging(app: Flask):
     logging.getLogger("werkzeug").addFilter(NoMetrics())
     logging.getLogger("werkzeug").addFilter(NoHealth())
     logging.getLogger("werkzeug").addFilter(NoPing())
-    logging.getLogger("werkzeug").addFilter(NoSocketIoGet()) # type: ignore
-    logging.getLogger("werkzeug").addFilter(NoSocketIoPost()) # type: ignore
+    logging.getLogger("werkzeug").addFilter(NoSocketIoGet()) 
+    logging.getLogger("werkzeug").addFilter(NoSocketIoPost()) 
    
 def initialize_app_confifuration(app: Flask, external_config_name: str) -> bool:
     """Initialize the configuration and return error if missing
@@ -50,7 +50,7 @@ def initialize_app_confifuration(app: Flask, external_config_name: str) -> bool:
 
     if os.path.isfile("kubedash.ini"):
         app.logger.info("Reading Config file")
-        from lib_functions.config import app_config # type: ignore
+        from lib_functions.config import app_config 
         import configparser
 
         config_ini = configparser.ConfigParser()
@@ -95,7 +95,7 @@ def initialize_app_version(app: Flask):
     app.jinja_env.globals['kubedash_version'] = kubedash_version
 
     """Prometheus endpoint"""
-    from lib_functions.prometheus import METRIC_APP_VERSION # type: ignore
+    from lib_functions.prometheus import METRIC_APP_VERSION 
     METRIC_APP_VERSION.info({'version': kubedash_version})
 
     print(separator_long)
@@ -115,7 +115,7 @@ def initialize_app_tracing(app: Flask):
     global jaeger_enable
     jaeger_enable = bool_var_test(app.config['kubedash.ini'].getboolean('monitoring', 'jaeger_enabled', fallback=False))
     if jaeger_enable:
-        from lib_functions.opentelemetry import init_opentelemetry_exporter # type: ignore
+        from lib_functions.opentelemetry import init_opentelemetry_exporter 
         jaeger_base_url = app.config['kubedash.ini'].get('monitoring', 'jaeger_http_endpoint')
         init_opentelemetry_exporter(jaeger_base_url)
 
@@ -147,15 +147,15 @@ def initialize_app_plugins(app: Flask):
 
     """Register Plugin Blueprints"""
     if bool_var_test(app.config["plugins"]["gateway_api"]):
-        from lib_plugins.gateway_api import gateway_api # type: ignore
+        from lib_plugins.gateway_api import gateway_api 
         app.register_blueprint(gateway_api)
 
     if bool_var_test(app.config["plugins"]["cert_manager"]):
-        from lib_plugins.cert_manager import cm_routes # type: ignore
+        from lib_plugins.cert_manager import cm_routes 
         app.register_blueprint(cm_routes)
 
     if bool_var_test(app.config["plugins"]["external_loadbalancer"]):
-        from lib_plugins.external_loadbalancer import exlb_routes # type: ignore
+        from lib_plugins.external_loadbalancer import exlb_routes 
         app.register_blueprint(exlb_routes)
 
 def initialize_app_database(app: Flask):
@@ -181,6 +181,9 @@ def initialize_app_database(app: Flask):
 
     app.config['SESSION_SQLALCHEMY'] = db
 
+    # Fix: https://github.com/pallets-eco/flask-session/issues?q=is%3Aissue+%27Already+defined+in+this+MetaData+Instance%27
+    db.metadata.clear()
+
     """Database mode"""
     if app.config['ENV'] == 'testing':
         basedir = os.path.abspath(os.path.dirname(__file__))
@@ -201,44 +204,42 @@ def initialize_app_database(app: Flask):
     app.logger.info(separator_short)
 
     """Init DB"""
-    import flask_migrate # type: ignore
-    from sqlalchemy_utils import database_exists # type: ignore
-    from lib_functions.init_functions import init_db_test, db_init, oidc_init, k8s_config_int, k8s_roles_init # type: ignore
+    import flask_migrate 
+    from sqlalchemy_utils import database_exists 
+    from lib_functions.init_functions import init_db_test, db_init_roles, oidc_init, k8s_config_int, k8s_roles_init 
 
     migrate = flask_migrate.Migrate(app, db)
     db.init_app(app)
     if database_exists(SQLALCHEMY_DATABASE_URI):
         with app.app_context():
-            #flask_migrate.upgrade()
             if init_db_test(SQLALCHEMY_DATABASE_URI, EXTERNAL_DATABASE_ENABLED, database_type):
                 if jaeger_enable:
                     SQLAlchemyInstrumentor().instrument(engine=db.engine)
-                db_init(app.config['kubedash.ini'])
+                db_init_roles(app.config['kubedash.ini'])
             oidc_init(app.config['kubedash.ini'])
             k8s_config_int(app.config['kubedash.ini'])
             k8s_roles_init()
 
 def initialize_blueprints(app: Flask):
     """Initialize blueprints"""
-    from lib_routes.main import main # type: ignore
-    from lib_routes.accounts import accounts # type: ignore
-    from lib_routes.api import api # type: ignore
-    from lib_routes.dashboard import dashboard # type: ignore
-    from lib_routes.helm import helm # type: ignore
-    from lib_routes.limits import limits # type: ignore
-    from lib_routes.metrics import metrics # type: ignore
-    from lib_routes.namespaces import namespaces # type: ignore
-    from lib_routes.networks import networks # type: ignore
-    from lib_routes.nodes import nodes # type: ignore
-    from lib_routes.pods import pods # type: ignore
-    from lib_routes.registry import registry # type: ignore
-    from lib_routes.security import security # type: ignore
-    from lib_routes.sso import sso # type: ignore
-    from lib_routes.storages import storages # type: ignore
-    from lib_routes.workloads import workloads # type: ignore
+    from lib_routes.main import main 
+    from lib_routes.accounts import accounts 
+    from lib_routes.api import api 
+    from lib_routes.dashboard import dashboard 
+    from lib_routes.helm import helm 
+    from lib_routes.limits import limits 
+    from lib_routes.metrics import metrics 
+    from lib_routes.namespaces import namespaces 
+    from lib_routes.networks import networks 
+    from lib_routes.nodes import nodes 
+    from lib_routes.pods import pods 
+    from lib_routes.registry import registry 
+    from lib_routes.security import security 
+    from lib_routes.sso import sso 
+    from lib_routes.storages import storages 
+    from lib_routes.workloads import workloads 
 
-
-    from lib_functions.commands import commands # type: ignore
+    from lib_functions.commands import commands 
 
     app.logger.info("Initialize blueprints")
     app.logger.info(separator_short)
@@ -261,8 +262,8 @@ def initialize_blueprints(app: Flask):
     app.register_blueprint(api)
 
     """Liveness and readiness probe"""
-    from flask_healthz import healthz # type: ignore
-    from lib_functions.init_functions import connect_database # type: ignore
+    from flask_healthz import healthz 
+    from lib_functions.init_functions import connect_database 
     app.register_blueprint(healthz, url_prefix="/api/health")
 
     app.config.update(
@@ -279,7 +280,7 @@ def add_custom_jinja2_filters(app: Flask):
     """Add custom Jinja2 filers."""
     app.logger.info("Adding custom Jinja2 filters")
 
-    from lib_functions.jinja2_decoders import j2_b64decode, j2_b64encode, split_uppercase # type: ignore
+    from lib_functions.jinja2_decoders import j2_b64decode, j2_b64encode, split_uppercase 
 
     app.add_template_filter(j2_b64decode)
     app.add_template_filter(j2_b64encode)
@@ -309,10 +310,10 @@ def initialize_app_security(app: Flask):
 
     """Init Logging managger"""
     login_manager.init_app(app)
-    login_manager.login_view = "routes.login"
+    login_manager.login_view = "main.login"
     login_manager.session_protection = "strong"
 
-    from flask_talisman import Talisman # type: ignore
+    from flask_talisman import Talisman 
     csp = {
         'font-src': [
             '\'self\'',
@@ -336,7 +337,7 @@ def initialize_app_security(app: Flask):
     # add rootCA folder # MissingImplementation
 
     if app.config['ENV'] == 'production':
-        from werkzeug.middleware.proxy_fix import ProxyFix # type: ignore
+        from werkzeug.middleware.proxy_fix import ProxyFix 
         """Tell Flask it is Behind a Proxy"""
         app.wsgi_app = ProxyFix(
           app.wsgi_app, x_for=1, x_proto=1, x_host=1, x_prefix=1

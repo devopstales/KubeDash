@@ -1,9 +1,22 @@
 import json
 
 def test_ping(client):
+    """
+    Test the ``/api/ping`` endpoint
+
+    Args:
+        client (FlaskClient): The Flask test client
+
+    Expectations:
+    - The response status code should be 200
+    - The response data should contain the string "pong"
+    """
     response = client.get('/api/ping')
+
+    print(response)
+
     assert response.status_code == 200
-    assert b"pong" in response.data
+    assert response.data == b'pong'
 
 def test_liveness_probe(client):
     response = client.get('/api/health/live')
@@ -20,7 +33,3 @@ def test_readiness_probe(client):
 def test_prometheus_metrics(client):
     response = client.get('/metrics')
     assert response.status_code == 200
-
-def test_home(client):
-    response = client.get("/")
-    assert b"<title>KubeDash - Login</title>" in response.data

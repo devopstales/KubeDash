@@ -243,4 +243,4 @@ def cert_manager_data():
             object_type = object_type,
         )
     else:
-        return redirect(url_for('routes.login'))
+        return redirect(url_for('main.login'))

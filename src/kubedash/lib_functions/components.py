@@ -6,6 +6,8 @@ from flask_socketio import SocketIO
 
 from lib_functions.helper_functions import get_logger
 
+from flask_session import Session
+
 ##############################################################
 ## Helpers
 ##############################################################

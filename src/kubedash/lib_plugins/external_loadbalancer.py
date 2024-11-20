@@ -519,4 +519,4 @@ def external_loadbalancer_data():
         )
 
     else:
-        return redirect(url_for('routes.login'))
+        return redirect(url_for('main.login'))

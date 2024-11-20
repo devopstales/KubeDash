@@ -36,7 +36,6 @@ def login():
         if ssoServer is not None:
             auth_server_info, oauth = get_auth_server_info()
             if auth_server_info is not None:
-                print(auth_server_info)
                 auth_url = auth_server_info["authorization_endpoint"]
                 authorization_url, state = oauth.authorization_url(
                     auth_url,
@@ -93,7 +92,7 @@ def login():
                         logger.info("Answer from clinet: %s" % x.text)
                 except:
                     pass
-            return redirect(url_for('main.cluster_metrics'))
+            return redirect(url_for('dashboard.cluster_metrics'))
         else:
             return render_template(
                 'login.html.j2',
@@ -155,7 +154,7 @@ def login_post():
             except:
                 pass
 
-        return redirect(url_for('main.cluster_metrics'))
+        return redirect(url_for('dashboard.cluster_metrics'))
 
 
 @main.route('/logout')
