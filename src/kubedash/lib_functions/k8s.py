@@ -2208,16 +2208,37 @@ def k8sPodExecSocket(username_role, user_token, namespace, pod_name, container):
             _preload_content=False)
     return wsclient
 
-def k8sPodExecStream(wsclient):
+def k8sPodExecStream(wsclient, username_role, user_token, namespace, pod_name, container):
     while True:
         socketio.sleep(0.01)
-        wsclient.update(timeout=5)
-        """Read from wsclient"""
-        output = wsclient.read_all()
-        if output:
-            """write back to socket"""
-            socketio.emit(
-                "response", {"output": output}, namespace="/exec")
+        try:
+            wsclient.update(timeout=5)
+
+            """Read from wsclient"""
+            output = wsclient.read_all()
+            if output:
+                """write back to socket"""
+                socketio.emit(
+                    "response", {"output": output}, namespace="/exec")
+        #except:
+        #    try:
+        #        print("Failed to read")
+        #        wsclient = k8sPodExecSocket(username_role, user_token, namespace, pod_name, container)
+        #
+        #        """Read from wsclient"""
+        #        output = wsclient.read_all()
+        #        if output:
+        #            """write back to socket"""
+        #            socketio.emit(
+        #                "response", {"output": output}, namespace="/exec")
+        #            
+        #    except Exception as error:
+        #        # Show disconnected status on the UI
+        #        logger.error("k8sPodExecStream: %s" % error)
+
+        except Exception as error:
+            # Show disconnected status on the UI
+            logger.error("k8sPodExecStream: %s" % error)
 
 ##############################################################
 # Security

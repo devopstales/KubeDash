@@ -8,6 +8,18 @@ To log in for the first time the default user and password is `admin` `admin`. A
 
 One of the key features that KubeDash adds to Kubernetes is centralized user management. This feature allows to set up local users and/or connect to an external OIDC authentication provider. By connecting to an external authentication provider, you can leverage that provider's user and groups.
 
+### Reset Admin Password
+
+You can reset the admin password of the application from commandline:
+
+```bash
+kubectl exec -it kubedash-bd959b784-ldd4t bash
+$ flask cli reset-password
+New password for default administrator (admin): admin
+admin
+User Updated Successfully
+```
+
 ![First Login](../img/KubeDash_1.1_pic_02_login.png)
 ### Configure OIDC provider
 

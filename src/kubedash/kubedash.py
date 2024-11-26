@@ -1,10 +1,10 @@
 #!/usr/bin/env python3
 
-from flask import Flask, render_template, request 
-import logging, os
+from flask import Flask, render_template, request
+import sys, logging, os
 
 from lib_functions.components import db, sess, login_manager, csrf, socketio 
-from lib_functions.helper_functions import bool_var_test 
+from lib_functions.helper_functions import bool_var_test, get_logger
 
 from opentelemetry.instrumentation.flask import FlaskInstrumentor 
 from opentelemetry.instrumentation.sqlalchemy import SQLAlchemyInstrumentor 
@@ -23,13 +23,12 @@ def initialize_app_logging(app: Flask):
     """
     from lib_functions.logfilters import NoMetrics, NoHealth, NoPing,  \
         NoSocketIoGet, NoSocketIoPost 
+    
+    logger = get_logger(__name__)
 
-    logging.basicConfig(
-            level="INFO",
-            format='[%(asctime)s] %(name)s        %(levelname)s %(message)s'
-        )
-    print(separator_long)
-    app.logger.info("Initialize logging")
+    if sys.argv[1] != 'cli' or sys.argv[1] != 'db':
+        print(separator_long)
+        app.logger.info("Initialize logging")
 
     logging.getLogger("werkzeug").addFilter(NoMetrics())
     logging.getLogger("werkzeug").addFilter(NoHealth())
@@ -239,7 +238,6 @@ def initialize_blueprints(app: Flask):
     from lib_routes.storages import storages 
     from lib_routes.workloads import workloads 
 
-    from lib_functions.commands import commands 
 
     app.logger.info("Initialize blueprints")
     app.logger.info(separator_short)
@@ -273,8 +271,13 @@ def initialize_blueprints(app: Flask):
         }
     )
 
-    app.register_blueprint(commands)
     app.logger.info(separator_short)
+
+def initialize_commands(app: Flask):
+    """Initialize commands"""
+    from lib_functions.commands import cli 
+    app.register_blueprint(cli)
+
 
 def add_custom_jinja2_filters(app: Flask):
     """Add custom Jinja2 filers."""
@@ -424,21 +427,33 @@ def create_app(external_config_name=None):
     app = Flask(__name__, static_url_path='', static_folder='static')
 
     initialize_app_logging(app)
+
     if external_config_name is not None:
         error = initialize_app_confifuration(app, external_config_name)
     else:
         error = initialize_app_confifuration(app, None)
+
+    # manage cli commands
     if not error:
-        initialize_app_version(app)
-        initialize_app_tracing(app)
-        initialize_app_database(app)
-        initialize_app_plugins(app)
-        initialize_blueprints(app)
-        initialize_app_session_and_socket(app)
-        add_custom_jinja2_filters(app)
-        initialize_app_security(app)
-        initialize_app_error_pages(app)
-    print(separator_long)
+        if sys.argv[1] == 'cli':
+            initialize_app_tracing(app)
+            initialize_app_database(app)
+            initialize_commands(app)
+        elif sys.argv[1] == 'db':
+            initialize_app_tracing(app)
+            initialize_app_database(app)
+        else:
+            initialize_app_version(app)
+            initialize_app_tracing(app)
+            initialize_app_database(app)
+            initialize_app_plugins(app)
+            initialize_blueprints(app)
+            initialize_app_session_and_socket(app)
+            add_custom_jinja2_filters(app)
+            initialize_app_security(app)
+            initialize_app_error_pages(app)
+
+            print(separator_long)
 
     #if jaeger_enable:
     #    FlaskInstrumentor

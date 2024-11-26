@@ -156,6 +156,7 @@ def pods_exec():
             po_name = po_name,
             container_select = container_select,
             pod_containers = pod_containers,
+            pod_init_containers = pod_init_containers,  # Not used in this context, but kept for completeness.
             async_mode = socketio.async_mode
         )
     else:
@@ -174,12 +175,13 @@ def message(po_name, container):
     global wsclient
     wsclient = k8sPodExecSocket(session['user_role'], user_token, session['ns_select'], po_name, container)
 
-    socketio.start_background_task(k8sPodExecStream, wsclient)
+    socketio.start_background_task(k8sPodExecStream, wsclient, session['user_role'], user_token, session['ns_select'], po_name, container)
 
 @socketio.on("exec-input", namespace="/exec")
 @authenticated_only
 def exec_input(data):
-    """write to the child pty. The pty sees this as if you are typing in a real
+    """
+    Write to the child pty. The pty sees this as if you are typing in a real
     terminal.
     """
     try:

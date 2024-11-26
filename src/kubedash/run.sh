@@ -6,10 +6,9 @@ export USER=$USER
 # App
 #export K8S_CLUSTER_NAME=
 export KUBEDASH_VERSION="3.1"
+export FLASK_APP="kubedash"
 export FLASK_DEBUG=1
 export TEMPLATES_AUTO_RELOAD=1
-export FLASK_APP="kubedash"
-#export FLASK_CONFIG="production" # redirect to https
 
 
 mkdir -p /tmp/kubedash

@@ -1,4 +1,4 @@
-import logging, re, time, six, json, yaml
+import logging, re, time, six, json, yaml, sys
 from flask import flash
 from decimal import Decimal, InvalidOperation
 from logging import Logger
@@ -37,11 +37,16 @@ def get_logger(name: str) -> Logger:
         logger (Logger): A Logger for the given module name.
     """
     logger = logging.getLogger(name)
-    logging.basicConfig(
-            level="INFO",
-            format='[%(asctime)s] %(name)s        %(levelname)s %(message)s'
-        )
-    logging.captureWarnings(True)
+
+    if sys.argv[1] == 'cli' or sys.argv[1] == 'db':
+        log = logging.getLogger('werkzeug')
+        log.disabled = True
+    else:
+        logging.basicConfig(
+                level="INFO",
+                format='[%(asctime)s] %(name)s        %(levelname)s %(message)s'
+            )
+        logging.captureWarnings(True)
     return logger
 
 def ErrorHandler(logger, error, action):
