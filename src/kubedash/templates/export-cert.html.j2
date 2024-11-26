@@ -48,7 +48,7 @@ chmod +x ./kubectl
 sudo mv ./kubectl /usr/local/bin/kubectl
  
 # Install kubectl on Windows 
-curl.exe -LO "https://dl.k8s.io/release/v1.30.0/bin/windows/amd64/kubectl.exe"</code></pre>
+curl.exe -LO "https://dl.k8s.io/release/$(curl.exe -L -s https://dl.k8s.io/release/stable.txt)/bin/windows/amd64/kubectl.exe"</code></pre>
   </div>
 </div>
 
@@ -65,9 +65,6 @@ brew install devopstales/devopstales/kubectl-login
 # My krew repo (macOS, Linux, Windows and ARM)
 kubectl krew index add devopstales https://github.com/devopstales/krew
 kubectl krew install devopstales/kdlogin
-
-# Chocolatey (Windows)
-choco install kubectl-kdlogin
 
 # Binary release (Windows, macOS and Linux)
 https://github.com/devopstales/kubedash/releases</code></pre>
@@ -91,7 +88,7 @@ echo "{{ k8s_server_ca }}
 # Add your server to kubectl config
 kubectl config set-cluster {{ context }} \
 --server={{ k8s_server_url }} \
---user={{ context }}--{{ preferred_username }} \
+--user={{ context }} \
 --certificate-authority={{ context }}-server-ca.pem \
 --embed-certs
 
@@ -104,13 +101,13 @@ echo "{{ k8s_user_certificate }}
 " \ >  {{ context }}-user-cert.pem
 
 # Add your user to kubectl config
-kubectl config set-credentials "{{ context }}--{{ preferred_username }}" \
+kubectl config set-credentials "{{ context }}" \
 --client-certificate={{ context }}-user-cert.pem \
 --client-key={{ context }}-user-key.pem \
---embed-certs=true
+--embed-certs
 
 # Associate your user with an existing cluster
-kubectl config set-context {{ context }} --cluster {{ context }} --user="{{ context }}--{{ preferred_username }}"
+kubectl config set-context {{ context }} --cluster {{ context }} --user="{{ context }}"
 kubectl config use-context {{ context }}
 
 # Delete the certificate files
