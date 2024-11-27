@@ -340,15 +340,17 @@ def k8sClientConfigGet(username_role, user_token):
             else:
                 k8s_server_url = k8sConfig.k8s_server_url
                 k8s_server_ca = str(base64_decode(k8sConfig.k8s_server_ca), 'UTF-8')
+                configuration = k8s_client.Configuration()
                 if k8s_server_ca:
                     file = open("CA.crt", "w+")
                     file.write( k8s_server_ca )
                     file.close
-
-                configuration = k8s_client.Configuration()
+                    configuration.ssl_ca_cert = 'CA.crt'
+                else:
+                    configuration.ssl_ca_cert = "/var/run/secrets/kubernetes.io/serviceaccount/ca.crt"
+                
                 configuration.host = k8s_server_url
                 configuration.verify_ssl = True
-                configuration.ssl_ca_cert = 'CA.crt'
                 configuration.debug = False
                 configuration.api_key_prefix['authorization'] = 'Bearer'
                 configuration.api_key["authorization"] = str(user_token["id_token"])

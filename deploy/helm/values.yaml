@@ -78,6 +78,7 @@ cluster:
   # `apiServer` is the url for kubectl
   #   This is typically  https://api.fqdn
   # -- k8s ca cert
+  # IMPORTANT: If you dose not set the caCert option, the app will read from the pod
   #caCert: |-
   #  -----BEGIN CERTIFICATE-----
   #  cert data here
