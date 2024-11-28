@@ -6,7 +6,8 @@ import sys, logging, os
 from lib_functions.components import db, sess, login_manager, csrf, socketio 
 from lib_functions.helper_functions import bool_var_test, get_logger
 
-from opentelemetry.instrumentation.flask import FlaskInstrumentor 
+from opentelemetry.instrumentation.flask import FlaskInstrumentor
+from opentelemetry.instrumentation.requests import RequestsInstrumentor
 from opentelemetry.instrumentation.sqlalchemy import SQLAlchemyInstrumentor 
 
 separator_long = "##############################################################################"
@@ -112,7 +113,9 @@ def initialize_app_tracing(app: Flask):
         jaeger_enable (global): True if tracing is enabled
     """
     global jaeger_enable
-    jaeger_enable = bool_var_test(app.config['kubedash.ini'].getboolean('monitoring', 'jaeger_enabled', fallback=False))
+    #print(app.config['kubedash.ini'].sections())
+    #print(app.config['kubedash.ini'].items('monitoring'))
+    jaeger_enable = bool_var_test(app.config['kubedash.ini'].get('monitoring', 'jaeger_enabled'))
     if jaeger_enable:
         from lib_functions.opentelemetry import init_opentelemetry_exporter 
         jaeger_base_url = app.config['kubedash.ini'].get('monitoring', 'jaeger_http_endpoint')
@@ -124,6 +127,7 @@ def initialize_app_plugins(app: Flask):
     Args:
         app (Flask): Flask app object
     """
+    app.logger.info(separator_short)
     app.logger.info("Initialize Plugins")
 
     app.config["plugins"] = {
@@ -142,7 +146,6 @@ def initialize_app_plugins(app: Flask):
     app.logger.info("	gateway_api:	%s" % app.config["plugins"]["gateway_api"])
     app.logger.info("	cert_manager:	%s" % app.config["plugins"]["cert_manager"])
     app.logger.info("	ext_lb: 	%s" % app.config["plugins"]["external_loadbalancer"])
-    app.logger.info(separator_short)
 
     """Register Plugin Blueprints"""
     if bool_var_test(app.config["plugins"]["gateway_api"]):
@@ -213,7 +216,11 @@ def initialize_app_database(app: Flask):
         with app.app_context():
             if init_db_test(SQLALCHEMY_DATABASE_URI, EXTERNAL_DATABASE_ENABLED, database_type):
                 if jaeger_enable:
-                    SQLAlchemyInstrumentor().instrument(engine=db.engine)
+                    SQLAlchemyInstrumentor().instrument(
+                        engine=db.engine,
+                        enable_commenter=True,
+                        commenter_options={}
+                    )
                 db_init_roles(app.config['kubedash.ini'])
             oidc_init(app.config['kubedash.ini'])
             k8s_config_int(app.config['kubedash.ini'])
@@ -238,9 +245,8 @@ def initialize_blueprints(app: Flask):
     from lib_routes.storages import storages 
     from lib_routes.workloads import workloads 
 
-
-    app.logger.info("Initialize blueprints")
     app.logger.info(separator_short)
+    app.logger.info("Initialize blueprints")
 
     app.register_blueprint(main)
     app.register_blueprint(accounts)
@@ -270,6 +276,10 @@ def initialize_blueprints(app: Flask):
             "ready": "lib_routes.api.readiness",
         }
     )
+
+    """Swagger-UI"""
+    from lib_routes.api import swaggerui_blueprint
+    app.register_blueprint(swaggerui_blueprint)
 
     app.logger.info(separator_short)
 
@@ -455,8 +465,13 @@ def create_app(external_config_name=None):
 
             print(separator_long)
 
-    #if jaeger_enable:
-    #    FlaskInstrumentor
+    if jaeger_enable:
+        FlaskInstrumentor().instrument_app(
+            app,
+            enable_commenter=True,
+            commenter_options={}
+        )
+        RequestsInstrumentor().instrument()
 
     return app
 
