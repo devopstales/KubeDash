@@ -1,0 +1,12 @@
+services:
+
+  jaeger:
+    image: jaegertracing/all-in-one:latest
+    ports:
+      - "16686:16686"  # jaeger-query: UI
+      - "14269:14269"  # jaeger-collector
+      - "4317:4317"    # otlp grpc
+      - "4318:4318"    # otlp http
+    environment:
+      - COLLECTOR_OTLP_ENABLED=true
+      - LOG_LEVEL=debug

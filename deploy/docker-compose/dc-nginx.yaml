@@ -9,3 +9,5 @@ services:
       - $PWD/../../deploy/docker-compose/config/nginx-kubedash.conf:/etc/nginx/conf.d/nginx-kubedash.conf
       - $PWD/../../deploy/docker-compose/config/kubedash.k3s.intra.pem:/etc/nginx/kubedash.k3s.intra.pem
       - $PWD/../../deploy/docker-compose/config/kubedash.k3s.intra-key.pem:/etc/nginx/kubedash.k3s.intra-key.pem
+    extra_hosts:
+      - "host.docker.internal:host-gateway"
