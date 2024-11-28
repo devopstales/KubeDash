@@ -1,6 +1,7 @@
 from flask import Blueprint
 from contextlib import nullcontext
 from flask_healthz import HealthError
+from flask_swagger_ui import get_swaggerui_blueprint
 
 from lib_functions.init_functions import connect_database
 from lib_functions.helper_functions import get_logger
@@ -15,6 +16,18 @@ logger = get_logger(__name__.split(".")[1])
 
 ##############################################################
 ## API
+##############################################################
+
+swaggerui_blueprint = get_swaggerui_blueprint(
+    base_url = '/api',
+    api_url  = '/static/swagger.json',
+    config   = {
+        'app_name': "Kubedash"
+    },
+)
+
+##############################################################
+## API ping
 ##############################################################
 
 @api.route('/api/ping', methods=['GET'])
@@ -33,11 +46,14 @@ def ping():
 ##############################################################
 
 def liveness():
-    """Liveness probe api endpoint"""
+    """
+    Liveness probe api endpoint: /api/health/live
+    """
     pass
 
 def readiness():
-    """Rediness probe api endpoint.
+    """
+    Rediness probe api endpoint: /api/health/ready
     
     Checks
     -----
