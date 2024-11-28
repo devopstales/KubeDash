@@ -16,7 +16,6 @@ from kubernetes.client.rest import ApiException
 from kubernetes import watch
 
 from lib_functions.components import db, socketio
-from lib_functions.opentelemetry import tracer
 
 from opentelemetry import trace
 from opentelemetry.trace.status import Status, StatusCode
@@ -28,6 +27,8 @@ parse_quantity, json2yaml
 ##############################################################
 
 logger = get_logger(__name__.split(".")[1])
+
+tracer = trace.get_tracer(__name__)
 
 ##############################################################
 ## Kubernetes Cluster Config
@@ -49,8 +50,10 @@ def k8sServerConfigGet():
     Returns:
         k8s_config (k8sConfig): Actual Kubernetes Server Config
     """
-    with tracer.start_as_current_span("list-cluster-configs") if tracer else nullcontext() as span:
+    with tracer.start_as_current_span("list-cluster-configs") as span:
         k8s_config_list = k8sConfig.query.get(1)
+        if tracer and span.is_recording():
+            span.set_attribute("k8s.cluster", k8s_config_list.k8s_context)
         return k8s_config_list
 
 def k8sServerConfigList():
@@ -316,7 +319,7 @@ def k8sClientConfigGet(username_role, user_token):
     """
     import urllib3
     urllib3.disable_warnings()
-    with tracer.start_as_current_span("load-client-configs") if tracer else nullcontext() as span:
+    with tracer.start_as_current_span("load-client-configs") as span:
         if tracer and span.is_recording():
             span.set_attribute("user.role", username_role)
         if username_role == "Admin":
@@ -363,7 +366,7 @@ def k8sClientConfigGet(username_role, user_token):
 ##############################################################
 
 def k8sGetClusterMetric():
-    with tracer.start_as_current_span("get-cluster-metrics") if tracer else nullcontext() as span:
+    with tracer.start_as_current_span("get-cluster-metrics") as span:
         k8sClientConfigGet("Admin", None)
         tmpTotalPodCount = float()
         totalTotalPodAllocatable = float()
