@@ -15,7 +15,7 @@ from lib_functions.k8s import k8sServerConfigGet
 ##############################################################
 
 main = Blueprint("main", __name__)
-logger = get_logger(__name__.split(".")[1])
+logger = get_logger()
 
 ##############################################################
 ## Login

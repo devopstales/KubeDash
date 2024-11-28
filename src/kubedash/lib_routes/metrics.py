@@ -9,7 +9,7 @@ from prometheus_client import generate_latest
 ##############################################################
 
 metrics = Blueprint("metrics", __name__)
-logger = get_logger(__name__.split(".")[1])
+logger = get_logger()
 
 ##############################################################
 ## Promatehus Endpoint

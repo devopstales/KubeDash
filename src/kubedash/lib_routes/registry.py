@@ -15,7 +15,7 @@ from lib_functions.components import csrf
 ##############################################################
 
 registry = Blueprint("registry", __name__)
-logger = get_logger(__name__.split(".")[1])
+logger = get_logger()
 
 ##############################################################
 ## OCI Registry

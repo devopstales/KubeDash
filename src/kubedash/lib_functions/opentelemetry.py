@@ -13,7 +13,7 @@ from opentelemetry.exporter.otlp.proto.http.trace_exporter import OTLPSpanExport
 ## Helpers
 ##############################################################
 
-logger = get_logger(__name__.split(".")[1])
+logger = get_logger()
 tracer = None
 
 ##############################################################
@@ -46,6 +46,6 @@ def init_opentelemetry_exporter(jaeger_base_url: str):
             )
         )
         tracer = trace.get_tracer(__name__)
-        logger.info("Jaeger endpoint connection established")
+        logger.info("Jaeger connection established")
     else:
-        logger.error("Cannot Connect to Jaeger endpoint %s" % endpoint)
+        logger.error("Cannot Connect to Jaeger %s" % endpoint)

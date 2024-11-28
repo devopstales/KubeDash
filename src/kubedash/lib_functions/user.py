@@ -14,7 +14,7 @@ from pytz import timezone # type: ignore
 ## variables
 ##############################################################
 
-logger = get_logger(__name__.split(".")[1])
+logger = get_logger()
 
 ##############################################################
 ## functions

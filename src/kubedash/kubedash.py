@@ -10,8 +10,8 @@ from opentelemetry.instrumentation.flask import FlaskInstrumentor
 from opentelemetry.instrumentation.requests import RequestsInstrumentor
 from opentelemetry.instrumentation.sqlalchemy import SQLAlchemyInstrumentor 
 
-separator_long = "##############################################################################"
-separator_short = "###############################"
+separator_long = "###################################################################################"
+separator_short = "#######################################"
 
 ##############################################################
 ## Helper Functions
@@ -25,7 +25,7 @@ def initialize_app_logging(app: Flask):
     from lib_functions.logfilters import NoMetrics, NoHealth, NoPing,  \
         NoSocketIoGet, NoSocketIoPost 
     
-    logger = get_logger(__name__)
+    logger = get_logger()
 
     if sys.argv[1] != 'cli' or sys.argv[1] != 'db':
         print(separator_long)
@@ -98,8 +98,19 @@ def initialize_app_version(app: Flask):
     from lib_functions.prometheus import METRIC_APP_VERSION 
     METRIC_APP_VERSION.info({'version': kubedash_version})
 
+    LOGO = f"""   /$$   /$$           /$$                 /$$$$$$$                      /$$      
+  | $$  /$$/          | $$                | $$__  $$                    | $$      
+  | $$ /$$/  /$$   /$$| $$$$$$$   /$$$$$$ | $$  \ $$  /$$$$$$   /$$$$$$$| $$$$$$$ 
+  | $$$$$/  | $$  | $$| $$__  $$ /$$__  $$| $$  | $$ |____  $$ /$$_____/| $$__  $$
+  | $$  $$  | $$  | $$| $$  \ $$| $$$$$$$$| $$  | $$  /$$$$$$$|  $$$$$$ | $$  \ $$
+  | $$\  $$ | $$  | $$| $$  | $$| $$_____/| $$  | $$ /$$__  $$ \____  $$| $$  | $$
+  | $$ \  $$|  $$$$$$/| $$$$$$$/|  $$$$$$$| $$$$$$$/|  $$$$$$$ /$$$$$$$/| $$  | $$
+  |__/  \__/ \______/ |_______/  \_______/|_______/  \_______/|_______/ |__/  |__/
+   version: {kubedash_version} """
+
     print(separator_long)
-    print("# KubeDash %s " % kubedash_version)
+    #print("# KubeDash %s " % kubedash_version)
+    print(LOGO)
     print(separator_long)
     app.logger.info("Running in %s mode" % app.config['ENV'])
 
@@ -121,13 +132,19 @@ def initialize_app_tracing(app: Flask):
         jaeger_base_url = app.config['kubedash.ini'].get('monitoring', 'jaeger_http_endpoint')
         init_opentelemetry_exporter(jaeger_base_url)
 
+        FlaskInstrumentor().instrument_app(
+            app,
+            enable_commenter=True,
+            commenter_options={}
+        )
+        RequestsInstrumentor().instrument()
+
 def initialize_app_plugins(app: Flask):
     """Initialize Plugins
 
     Args:
         app (Flask): Flask app object
     """
-    app.logger.info(separator_short)
     app.logger.info("Initialize Plugins")
 
     app.config["plugins"] = {
@@ -146,6 +163,7 @@ def initialize_app_plugins(app: Flask):
     app.logger.info("	gateway_api:	%s" % app.config["plugins"]["gateway_api"])
     app.logger.info("	cert_manager:	%s" % app.config["plugins"]["cert_manager"])
     app.logger.info("	ext_lb: 	%s" % app.config["plugins"]["external_loadbalancer"])
+    app.logger.info(separator_short)
 
     """Register Plugin Blueprints"""
     if bool_var_test(app.config["plugins"]["gateway_api"]):
@@ -166,7 +184,6 @@ def initialize_app_database(app: Flask):
     Args:
         app (Flask): Flask app object
     """
-    app.logger.info(separator_short)
     app.logger.info("Initialize Database")
 
     database_type = app.config['kubedash.ini'].get('database', 'type', fallback=None)
@@ -245,7 +262,6 @@ def initialize_blueprints(app: Flask):
     from lib_routes.storages import storages 
     from lib_routes.workloads import workloads 
 
-    app.logger.info(separator_short)
     app.logger.info("Initialize blueprints")
 
     app.register_blueprint(main)
@@ -280,8 +296,6 @@ def initialize_blueprints(app: Flask):
     """Swagger-UI"""
     from lib_routes.api import swaggerui_blueprint
     app.register_blueprint(swaggerui_blueprint)
-
-    app.logger.info(separator_short)
 
 def initialize_commands(app: Flask):
     """Initialize commands"""
@@ -464,14 +478,6 @@ def create_app(external_config_name=None):
             initialize_app_error_pages(app)
 
             print(separator_long)
-
-    if jaeger_enable:
-        FlaskInstrumentor().instrument_app(
-            app,
-            enable_commenter=True,
-            commenter_options={}
-        )
-        RequestsInstrumentor().instrument()
 
     return app
 

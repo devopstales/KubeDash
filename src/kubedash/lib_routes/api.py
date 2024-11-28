@@ -12,7 +12,7 @@ from lib_functions.opentelemetry import tracer
 ##############################################################
 
 api = Blueprint("api", __name__)
-logger = get_logger(__name__.split(".")[1])
+logger = get_logger()
 
 ##############################################################
 ## API

@@ -17,7 +17,7 @@ import ast
 ##############################################################
 
 cm_routes = Blueprint("cert_manager", __name__)
-logger = get_logger(__name__.split(".")[1])
+logger = get_logger()
 
 #############################################################
 ## Helper Functions

@@ -17,7 +17,7 @@ from contextlib import nullcontext
 ##############################################################
 
 dashboard = Blueprint("dashboard", __name__)
-logger = get_logger(__name__.split(".")[1])
+logger = get_logger()
 
 tracer = trace.get_tracer(__name__)
 

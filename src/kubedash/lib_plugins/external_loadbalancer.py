@@ -16,7 +16,7 @@ import ast
 ##############################################################
 
 exlb_routes = Blueprint("external_loadbalancer", __name__)
-logger = get_logger(__name__.split(".")[1])
+logger = get_logger()
 
 ##############################################################
 ## Helper Functions

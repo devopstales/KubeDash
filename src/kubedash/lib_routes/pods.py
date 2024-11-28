@@ -18,7 +18,7 @@ from lib_functions.components import socketio
 ##############################################################
 
 pods = Blueprint("pods", __name__)
-logger = get_logger(__name__.split(".")[1])
+logger = get_logger()
 
 def authenticated_only(f):
     """Test Current user is authenticated"""

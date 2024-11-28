@@ -12,7 +12,7 @@ from flask_session import Session
 ## Helpers
 ##############################################################
 
-logger = get_logger(__name__.split(".")[1])
+logger = get_logger()
 
 ##############################################################
 ## Initialize modules

@@ -27,24 +27,26 @@ def bool_var_test(var) -> bool:
         resp = False
     return resp
 
-def get_logger(name: str) -> Logger:
+def get_logger() -> Logger:
     """Generate a Logger for the given module name
-    
-    Args:
-        name (str): The module name for which to generate the Logger.
 
     Returns:
         logger (Logger): A Logger for the given module name.
     """
-    logger = logging.getLogger(name)
+    logger = logging.getLogger("kubedash")
 
     if sys.argv[1] == 'cli' or sys.argv[1] == 'db':
         log = logging.getLogger('werkzeug')
         log.disabled = True
+        logging.basicConfig(
+                level="INFO",
+                format='[%(asctime)s] [%(name)s] [%(levelname)s] %(message)s'
+            )
+        logging.captureWarnings(True)
     else:
         logging.basicConfig(
                 level="INFO",
-                format='[%(asctime)s] %(name)s        %(levelname)s %(message)s'
+                format='[%(asctime)s] [%(name)s] [%(levelname)s] %(message)s'
             )
         logging.captureWarnings(True)
     return logger

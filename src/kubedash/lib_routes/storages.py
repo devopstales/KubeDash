@@ -13,7 +13,7 @@ from lib_functions.helper_functions import get_logger
 ##############################################################
 
 storages = Blueprint("storages", __name__)
-logger = get_logger(__name__.split(".")[1])
+logger = get_logger()
 
 ##############################################################
 ## Storage

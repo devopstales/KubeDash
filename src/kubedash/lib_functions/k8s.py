@@ -26,7 +26,7 @@ parse_quantity, json2yaml
 ## Helper Functions
 ##############################################################
 
-logger = get_logger(__name__.split(".")[1])
+logger = get_logger()
 
 tracer = trace.get_tracer(__name__)
 
@@ -139,7 +139,7 @@ def k8sListNamespaces(username_role, user_token):
         namespace_list (list): List of the namespaces
         error (str): Error message if any
     """
-    with tracer.start_as_current_span("list-namespaces") if tracer else nullcontext() as span:
+    with tracer.start_as_current_span("list-namespaces") as span:
         if tracer and span.is_recording():
             span.set_attribute("user.role", username_role)
         k8sClientConfigGet(username_role, user_token)
@@ -161,7 +161,7 @@ def k8sListNamespaces(username_role, user_token):
             return namespace_list, "CannotConnect"
 
 def k8sNamespaceListGet(username_role, user_token):
-    with tracer.start_as_current_span("get-namespace-list") if tracer else nullcontext() as span:
+    with tracer.start_as_current_span("get-namespace-list") as span:
         if tracer and span.is_recording():
             span.set_attribute("user.role", username_role)
         k8sClientConfigGet(username_role, user_token)
@@ -181,7 +181,7 @@ def k8sNamespaceListGet(username_role, user_token):
             return namespace_list, "CannotConnect"
     
 def k8sNamespacesGet(username_role, user_token):
-    with tracer.start_as_current_span("get-namespace") if tracer else nullcontext() as span:
+    with tracer.start_as_current_span("get-namespace") as span:
         if tracer and span.is_recording():
             span.set_attribute("user.role", username_role)
         k8sClientConfigGet(username_role, user_token)

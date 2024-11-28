@@ -18,7 +18,7 @@ from lib_functions.k8s import k8sServerConfigGet, k8sServerConfigCreate, \
 ##############################################################
 
 sso = Blueprint("sso", __name__)
-logger = get_logger(__name__.split(".")[1])
+logger = get_logger()
 
 ##############################################################
 ## SSO Settings

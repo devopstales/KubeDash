@@ -20,7 +20,7 @@ from lib_functions.user import User, UsersRoles, Role, \
 ##############################################################
 
 accounts = Blueprint("accounts", __name__)
-logger = get_logger(__name__.split(".")[1])
+logger = get_logger()
 
 ##############################################################
 ## Users

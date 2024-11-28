@@ -12,7 +12,7 @@ from datetime import datetime
 ## Helper Functions
 ##############################################################
 
-logger = get_logger(__name__.split(".")[1])
+logger = get_logger()
 
 ##############################################################
 

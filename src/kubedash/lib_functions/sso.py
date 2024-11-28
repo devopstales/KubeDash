@@ -13,7 +13,7 @@ from requests_oauthlib import OAuth2Session
 ## variables
 ##############################################################
 
-logger = get_logger(__name__.split(".")[1])
+logger = get_logger()
 
 ##############################################################
 ## functions

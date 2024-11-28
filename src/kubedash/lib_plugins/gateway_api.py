@@ -13,7 +13,7 @@ from lib_functions.sso import get_user_token
 ##############################################################
 
 gateway_api = Blueprint("gateway_api", __name__)
-logger = get_logger(__name__.split(".")[1])
+logger = get_logger()
 
 ##############################################################
 # Get Gateway API 1.0
