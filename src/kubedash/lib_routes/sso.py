@@ -177,7 +177,7 @@ def callback():
         session['ns_select'] = "default"
 
         login_user(user)
-        return redirect(url_for('sso.cluster_metrics'))
+        return redirect(url_for('dashboard.cluster_metrics'))
     
 ##############################################################
 ## Kubectl config
