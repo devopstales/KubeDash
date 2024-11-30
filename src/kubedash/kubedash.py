@@ -6,6 +6,7 @@ import sys, logging, os
 from lib_functions.components import db, sess, login_manager, csrf, socketio 
 from lib_functions.helper_functions import bool_var_test, get_logger
 
+from opentelemetry.instrumentation.logging import LoggingInstrumentor
 from opentelemetry.instrumentation.flask import FlaskInstrumentor
 from opentelemetry.instrumentation.requests import RequestsInstrumentor
 from opentelemetry.instrumentation.sqlalchemy import SQLAlchemyInstrumentor 
@@ -28,7 +29,6 @@ def initialize_app_logging(app: Flask):
     logger = get_logger()
 
     if sys.argv[1] != 'cli' or sys.argv[1] != 'db':
-        print(separator_long)
         app.logger.info("Initialize logging")
 
     logging.getLogger("werkzeug").addFilter(NoMetrics())
@@ -48,6 +48,8 @@ def initialize_app_confifuration(app: Flask, external_config_name: str) -> bool:
         error (bool): A flag used to represent if the config initialization failed
     """
 
+    global jaeger_enable
+
     if os.path.isfile("kubedash.ini"):
         app.logger.info("Reading Config file")
         from lib_functions.config import app_config 
@@ -65,6 +67,11 @@ def initialize_app_confifuration(app: Flask, external_config_name: str) -> bool:
         
         app.config.from_object(app_config[config_name])
         app.config['ENV'] = config_name
+
+        #print(app.config['kubedash.ini'].sections())
+        #print(app.config['kubedash.ini'].items('monitoring'))
+        jaeger_enable = bool_var_test(app.config['kubedash.ini'].get('monitoring', 'jaeger_enabled'))
+        
         return False
     else:
         app.logger.error("Missing Local Configfile")
@@ -98,7 +105,8 @@ def initialize_app_version(app: Flask):
     from lib_functions.prometheus import METRIC_APP_VERSION 
     METRIC_APP_VERSION.info({'version': kubedash_version})
 
-    LOGO = f"""   /$$   /$$           /$$                 /$$$$$$$                      /$$      
+    LOGO = f"""
+   /$$   /$$           /$$                 /$$$$$$$                      /$$      
   | $$  /$$/          | $$                | $$__  $$                    | $$      
   | $$ /$$/  /$$   /$$| $$$$$$$   /$$$$$$ | $$  \ $$  /$$$$$$   /$$$$$$$| $$$$$$$ 
   | $$$$$/  | $$  | $$| $$__  $$ /$$__  $$| $$  | $$ |____  $$ /$$_____/| $$__  $$
@@ -106,10 +114,10 @@ def initialize_app_version(app: Flask):
   | $$\  $$ | $$  | $$| $$  | $$| $$_____/| $$  | $$ /$$__  $$ \____  $$| $$  | $$
   | $$ \  $$|  $$$$$$/| $$$$$$$/|  $$$$$$$| $$$$$$$/|  $$$$$$$ /$$$$$$$/| $$  | $$
   |__/  \__/ \______/ |_______/  \_______/|_______/  \_______/|_______/ |__/  |__/
-   version: {kubedash_version} """
+   version: {kubedash_version}
+"""
 
     print(separator_long)
-    #print("# KubeDash %s " % kubedash_version)
     print(LOGO)
     print(separator_long)
     app.logger.info("Running in %s mode" % app.config['ENV'])
@@ -123,21 +131,11 @@ def initialize_app_tracing(app: Flask):
     Returns:
         jaeger_enable (global): True if tracing is enabled
     """
-    global jaeger_enable
-    #print(app.config['kubedash.ini'].sections())
-    #print(app.config['kubedash.ini'].items('monitoring'))
-    jaeger_enable = bool_var_test(app.config['kubedash.ini'].get('monitoring', 'jaeger_enabled'))
+
     if jaeger_enable:
         from lib_functions.opentelemetry import init_opentelemetry_exporter 
         jaeger_base_url = app.config['kubedash.ini'].get('monitoring', 'jaeger_http_endpoint')
         init_opentelemetry_exporter(jaeger_base_url)
-
-        FlaskInstrumentor().instrument_app(
-            app,
-            enable_commenter=True,
-            commenter_options={}
-        )
-        RequestsInstrumentor().instrument()
 
 def initialize_app_plugins(app: Flask):
     """Initialize Plugins
@@ -232,12 +230,7 @@ def initialize_app_database(app: Flask):
     if database_exists(SQLALCHEMY_DATABASE_URI):
         with app.app_context():
             if init_db_test(SQLALCHEMY_DATABASE_URI, EXTERNAL_DATABASE_ENABLED, database_type):
-                if jaeger_enable:
-                    SQLAlchemyInstrumentor().instrument(
-                        engine=db.engine,
-                        enable_commenter=True,
-                        commenter_options={}
-                    )
+                SQLAlchemyInstrumentor().instrument(engine=db.engine)
                 db_init_roles(app.config['kubedash.ini'])
             oidc_init(app.config['kubedash.ini'])
             k8s_config_int(app.config['kubedash.ini'])
@@ -450,22 +443,30 @@ def create_app(external_config_name=None):
     """
     app = Flask(__name__, static_url_path='', static_folder='static')
 
-    initialize_app_logging(app)
+    # instrument app
+    FlaskInstrumentor().instrument_app(app)
+    RequestsInstrumentor().instrument()
+    LoggingInstrumentor().instrument(set_logging_format=True)
 
+    print(separator_long)
     if external_config_name is not None:
         error = initialize_app_confifuration(app, external_config_name)
     else:
         error = initialize_app_confifuration(app, None)
+
+    initialize_app_logging(app)
 
     # manage cli commands
     if not error:
         if sys.argv[1] == 'cli':
             initialize_app_tracing(app)
             initialize_app_database(app)
+            print(separator_long)
             initialize_commands(app)
         elif sys.argv[1] == 'db':
             initialize_app_tracing(app)
             initialize_app_database(app)
+            print(separator_long)
         else:
             initialize_app_version(app)
             initialize_app_tracing(app)

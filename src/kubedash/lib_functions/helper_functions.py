@@ -33,22 +33,27 @@ def get_logger() -> Logger:
     Returns:
         logger (Logger): A Logger for the given module name.
     """
-    logger = logging.getLogger("kubedash")
+
+    # base config
+    logging.basicConfig(
+            level="INFO",
+            format='[%(asctime)s] [%(name)s] [%(levelname)s] %(message)s'
+        )
+    logging.captureWarnings(True)
+
+    # get logger instance
+    logger = logging.getLogger()
 
     if sys.argv[1] == 'cli' or sys.argv[1] == 'db':
         log = logging.getLogger('werkzeug')
         log.disabled = True
-        logging.basicConfig(
-                level="INFO",
-                format='[%(asctime)s] [%(name)s] [%(levelname)s] %(message)s'
-            )
-        logging.captureWarnings(True)
+
+        formatter = logging.Formatter('[%(asctime)s] [{}] [%(levelname)s] %(message)s'.format(sys.argv[1]))
+        logger.handlers[0].setFormatter(formatter)
     else:
-        logging.basicConfig(
-                level="INFO",
-                format='[%(asctime)s] [%(name)s] [%(levelname)s] %(message)s'
-            )
-        logging.captureWarnings(True)
+        formatter =logging.Formatter('[%(asctime)s] [kubedash] [%(levelname)s] %(message)s')
+        logger.handlers[0].setFormatter(formatter)
+
     return logger
 
 def ErrorHandler(logger, error, action):

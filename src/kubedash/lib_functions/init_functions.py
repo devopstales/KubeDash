@@ -30,7 +30,8 @@ def db_init_roles(config: configparser.ConfigParser):
     """Create Roles and Users in the database
     
     Args:
-        config (configparser.ConfigParser): Configuration"""
+        config (configparser.ConfigParser): Configuration
+    """
     for r in roles:
         RoleCreate(r)
     admin_password = config.get('security', 'admin_password', fallback="admin")
@@ -122,7 +123,8 @@ def k8s_config_int(config: configparser.ConfigParser):
         logger.error("Missing Kubernetes Config: K8S_API_SERVER, K8S_API_CA")
 
 def k8s_roles_init():
-    """Create Kubernetes Roles and ClusterRoles in K8S.
+    """
+    Create Kubernetes Roles and ClusterRoles in K8S.
     """
     user_role_template_list = k8sUserRoleTemplateListGet("Admin", None)
     user_clusterRole_template_list = k8sUserClusterRoleTemplateListGet("Admin", None)
