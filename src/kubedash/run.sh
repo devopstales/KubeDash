@@ -28,12 +28,17 @@ echo "Start Nginx Proxy in Docker Compose"
 docker compose -f ../../deploy/docker-compose/dc-nginx.yaml down
 docker compose -f ../../deploy/docker-compose/dc-nginx.yaml up -d
 
+echo ""
 echo "Start Migration"
+echo ""
 flask db upgrade
 
+echo ""
 echo "Start Applications: KubeDash ${KUBEDASH_VERSION}"
+echo ""
 #flask run --host=0.0.0.0 --port=8000
 gunicorn --worker-class eventlet --conf gunicorn_conf.py kubedash:app
+#opentelemetry-instrument gunicorn --worker-class eventlet --conf gunicorn_conf.py kubedash:app
 
 #trap ctrl_c INT
 #function ctrl_c() {

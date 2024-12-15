@@ -5,6 +5,8 @@ from flask import Blueprint, request, session, flash, \
     render_template, redirect, url_for, Response
 from flask_login import login_user, login_required
 
+from opentelemetry import trace
+
 from lib_functions.helper_functions import get_logger
 from lib_functions.user import User, Role, UsersRoles, KubectlConfig, SSOUserCreate, SSOTokenUpdate, \
     SSOGroupCreateFromList, SSOGroupsUpdateFromList
@@ -19,6 +21,8 @@ from lib_functions.k8s import k8sServerConfigGet, k8sServerConfigCreate, \
 
 sso = Blueprint("sso", __name__)
 logger = get_logger()
+
+tracer = trace.get_tracer(__name__)
 
 ##############################################################
 ## SSO Settings

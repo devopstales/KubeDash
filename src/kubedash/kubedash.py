@@ -444,7 +444,9 @@ def create_app(external_config_name=None):
     app = Flask(__name__, static_url_path='', static_folder='static')
 
     # instrument app
-    FlaskInstrumentor().instrument_app(app)
+    FlaskInstrumentor().instrument_app(app,
+        exclude_urls="/vendor/*,/css/*,/scss/*,/js/*,/img/*,/static/*,/favicon.ico"
+    )
     RequestsInstrumentor().instrument()
     LoggingInstrumentor().instrument(set_logging_format=True)
 

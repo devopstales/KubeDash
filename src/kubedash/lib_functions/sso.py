@@ -8,12 +8,14 @@ from flask_login import UserMixin
 from sqlalchemy.ext.mutable import MutableList
 from sqlalchemy import PickleType, inspect
 from requests_oauthlib import OAuth2Session
+from opentelemetry import trace
 
 ##############################################################
 ## variables
 ##############################################################
 
 logger = get_logger()
+tracer = trace.get_tracer(__name__)
 
 ##############################################################
 ## functions
@@ -86,16 +88,28 @@ def SSOServerUpdate(oauth_server_uri_old, oauth_server_uri, client_id, client_se
         sso.scope = scope
         db.session.commit()
 
+@tracer.start_as_current_span("get_logger")
 def SSOSererGet():
     """Get a SSOServer instance from database
     
     Returns:
         Openid: SSOServer instance or None if not found
     """
+    span = trace.get_current_span()
     inspector = inspect(db.engine)
     if inspector.has_table("openid"):
+        if tracer and span.is_recording():
+            span.add_event("log", {
+                "log.severity": "info",
+                "log.message": "openid exists",
+            })
         return Openid.query.get(1)
     else:
+        if tracer and span.is_recording():
+            span.add_event("log", {
+                "log.severity": "error",
+                "log.message": "openid is missing",
+            })
         return None
 
 def get_auth_server_info():

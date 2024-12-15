@@ -23,8 +23,10 @@ flask_cors==5.0.0
 flask_talisman==1.1.0
 # kubernetes
 kubernetes==26.1.0
-flask_healthz==1.0.1
 pybase64==1.4.0
+# API
+flask_healthz==1.0.1
+flask-swagger-ui==4.11.1
 # graphwiz
 pyvis==0.3.2
 # socket
@@ -34,12 +36,15 @@ eventlet==0.35.2
 gunicorn==23.0.0
 
 # telemetry
-opentelemetry-sdk==1.23.0
-opentelemetry-api==1.23.0
-opentelemetry-exporter-otlp-proto-http==1.23.0
-opentelemetry-semantic-conventions==0.44b0
-opentelemetry-instrumentation-sqlalchemy==0.44b0
-opentelemetry-instrumentation-flask==0.44b0
+opentelemetry-sdk==1.28.2
+opentelemetry-api==1.28.2
+opentelemetry-exporter-otlp-proto-http==1.28.2
+opentelemetry-semantic-conventions==0.49b2
+opentelemetry-instrumentation-sqlalchemy==0.49b2
+opentelemetry-instrumentation-flask==0.49b2
+opentelemetry-instrumentation-logging==0.49b2
+opentelemetry-instrumentation-requests==0.49b2
+
 # monitoring
 prometheus-flask-exporter==0.23.1
 

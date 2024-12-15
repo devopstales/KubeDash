@@ -2,6 +2,13 @@ import logging, re, time, six, json, yaml, sys
 from flask import flash
 from decimal import Decimal, InvalidOperation
 from logging import Logger
+from opentelemetry import trace
+
+##############################################################
+## Helpers
+##############################################################
+
+tracer = trace.get_tracer(__name__)
 
 ##############################################################
 ## Helper Functions
@@ -27,12 +34,14 @@ def bool_var_test(var) -> bool:
         resp = False
     return resp
 
+@tracer.start_as_current_span("get_logger")
 def get_logger() -> Logger:
     """Generate a Logger for the given module name
 
     Returns:
         logger (Logger): A Logger for the given module name.
     """
+    span = trace.get_current_span()
 
     # base config
     logging.basicConfig(
@@ -50,9 +59,15 @@ def get_logger() -> Logger:
 
         formatter = logging.Formatter('[%(asctime)s] [{}] [%(levelname)s] %(message)s'.format(sys.argv[1]))
         logger.handlers[0].setFormatter(formatter)
+
+        if tracer and span.is_recording():
+            span.set_attribute("run.mode", sys.argv[1])
     else:
         formatter =logging.Formatter('[%(asctime)s] [kubedash] [%(levelname)s] %(message)s')
         logger.handlers[0].setFormatter(formatter)
+
+        if tracer and span.is_recording():
+            span.set_attribute("run.mode", "server")
 
     return logger
 
