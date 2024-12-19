@@ -28,7 +28,7 @@ def initialize_app_logging(app: Flask):
     
     logger = get_logger()
 
-    if sys.argv[1] != 'cli' or sys.argv[1] != 'db':
+    if sys.argv[1] != 'cli' and sys.argv[1] != 'db':
         app.logger.info("Initialize logging")
 
     logging.getLogger("werkzeug").addFilter(NoMetrics())
@@ -232,9 +232,11 @@ def initialize_app_database(app: Flask):
             if init_db_test(SQLALCHEMY_DATABASE_URI, EXTERNAL_DATABASE_ENABLED, database_type):
                 SQLAlchemyInstrumentor().instrument(engine=db.engine)
                 db_init_roles(app.config['kubedash.ini'])
-            oidc_init(app.config['kubedash.ini'])
-            k8s_config_int(app.config['kubedash.ini'])
-            k8s_roles_init()
+            if sys.argv[1] != 'cli' and sys.argv[1] != 'db':
+                print("|"+sys.argv[1]+"|")
+                oidc_init(app.config['kubedash.ini'])
+                k8s_config_int(app.config['kubedash.ini'])
+                k8s_roles_init()
 
 def initialize_blueprints(app: Flask):
     """Initialize blueprints"""

@@ -12,14 +12,18 @@
       "imageRegistry": "devopstales"
     },
     {
-      "name": "Run on Kubernetes - Cloud Build",
-      "profile": "cloudbuild",
-      "type": "cloudcode.kubernetes",
+      "name": "Run in vemv with gunicorn",
+      "type": "python",
       "request": "launch",
-      "skaffoldConfig": "${workspaceFolder}/skaffold.yaml",
-      "watch": true,
-      "cleanUp": true,
-      "portForward": true
-    }
+      "program": "${workspaceFolder}/.venv/bin/gunicorn",
+      "gevent": true,
+      "args": ["--worker-class", "eventlet", "--conf", "gunicorn_conf.py", "kubedash:app"],
+      "postDebugTask": "killdebugger",
+      "env": {
+          "KUBEDASH_VERSION": "3.1",
+          "FLASK_APP": "kubedash:app",
+          "FLASK_DEBUG": "1"
+      }
+  }
   ]
 }

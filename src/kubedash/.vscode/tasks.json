@@ -7,6 +7,11 @@
           "command": "python",
           "args": ["-m", "pylint", "kubedash.py"],
           "problemMatcher": []
-      }
+      },
+      {
+        "label": "killdebugger",
+        "type": "shell",
+        "command": "lsof -t -i tcp:8000 | xargs kill -9"
+    }
   ]
 }

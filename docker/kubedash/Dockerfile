@@ -1,6 +1,6 @@
 # syntax = docker/dockerfile:1.2
 ARG ARCH
-FROM ${ARCH}python:3.11-alpine AS builder
+FROM ${ARCH}python:3.11-alpine3.20 AS builder
 
 WORKDIR /code
 COPY requirements.txt  /code/
@@ -14,7 +14,7 @@ RUN pip install --no-cache-dir --target=/app/requirements -r /code/requirements.
 ARG ARCH
 ARG VERSION
 ARG BUILD_DATE
-FROM ${ARCH}python:3.11-alpine
+FROM ${ARCH}python:3.11-alpine3.20
 ARG ARCH
 ARG VERSION
 ARG BUILD_DATE
