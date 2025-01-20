@@ -99,23 +99,24 @@
                 </a>
                 <div id="collapseCluster" class="collapse" aria-labelledby="headingTwo" data-parent="#accordionSidebar">
                     <div class="bg-white py-2 collapse-inner rounded">
-                        <a class="collapse-item" href="/nodes">Nodes</a>
                         <a class="collapse-item" href="/namespaces">Namespaces</a>
+                        <a class="collapse-item" href="/nodes">Nodes</a>
+                        <a class="collapse-item" href="#">CRDs</a>
                         {% if session['ns_select'] %}
                         <form action="/horizontal_pod_autoscaler" method="POST">
                             <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
                             <input type="hidden" name="ns_select" value="{{ session['ns_select'] }}" />
-                            <a class="collapse-item" href="#" onclick="event.preventDefault(); this.parentNode.submit()">Horizontal Pod Autoscaler</a>
-                        </form>
-                        <form action="/pod_disruption_budget" method="POST">
-                            <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
-                            <input type="hidden" name="ns_select" value="{{ session['ns_select'] }}" />
-                            <a class="collapse-item" href="#" onclick="event.preventDefault(); this.parentNode.submit()">Pod Disruption Budget</a>
+                            <a class="collapse-item" href="#" onclick="event.preventDefault(); this.parentNode.submit()">HPAs</a>
                         </form>
                         <form action="/resource_quota" method="POST">
                             <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
                             <input type="hidden" name="ns_select" value="{{ session['ns_select'] }}" />
                             <a class="collapse-item" href="#" onclick="event.preventDefault(); this.parentNode.submit()">Resource Quota</a>
+                        </form>
+                        <form action="/pod_disruption_budget" method="POST">
+                            <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+                            <input type="hidden" name="ns_select" value="{{ session['ns_select'] }}" />
+                            <a class="collapse-item" href="#" onclick="event.preventDefault(); this.parentNode.submit()">Pod Disruption Budget</a>
                         </form>
                         <form action="/limit_range" method="POST">
                             <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
@@ -123,11 +124,12 @@
                             <a class="collapse-item" href="#" onclick="event.preventDefault(); this.parentNode.submit()">Limit Range</a>
                         </form>
                         {% else %}
-                        <a class="collapse-item" href="/horizontal_pod_autoscaler">Horizontal Pod Autoscaler</a>
-                        <a class="collapse-item" href="/pod_disruption_budget">Pod Disruption Budget</a>
+                        <a class="collapse-item" href="/horizontal_pod_autoscaler">HPAs</a>
                         <a class="collapse-item" href="/resource_quota">Resource Quota</a>
+                        <a class="collapse-item" href="/pod_disruption_budget">Pod Disruption Budget</a>
                         <a class="collapse-item" href="/limit_range">Limit Range</a>
                         {% endif %}
+                        <a class="collapse-item" href="#">Runetime Class</a>
                     </div>
                 </div>
             </li>
@@ -552,7 +554,7 @@
             <footer class="sticky-footer bg-white">
                 <div class="container my-auto">
                     <div class="copyright text-center my-auto">
-                        <span>Copyright &copy; 2021-204 DevOpsTales - KubeDash {{ kubedash_version }}</span>
+                        <span>Copyright &copy; 2021-2025 DevOpsTales - KubeDash {{ kubedash_version }}</span>
                     </div>
                 </div>
             </footer>

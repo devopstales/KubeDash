@@ -1,0 +1,21 @@
+apiVersion: policy/v1
+kind: PodDisruptionBudget
+metadata:
+  name: zk-pdb-1
+  namespace: network-testing
+spec:
+  minAvailable: 2
+  selector:
+    matchLabels:
+      app: zookeeper
+---
+apiVersion: policy/v1
+kind: PodDisruptionBudget
+metadata:
+  name: zk-pdb-2
+  namespace: network-testing
+spec:
+  selector:
+    matchLabels:
+      app: zookeeper
+  maxUnavailable: 1

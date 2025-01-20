@@ -57,7 +57,7 @@
                     {% for po in pods %}
                       <tr>
                         <td>
-                        {% if po.status == "Running" %}
+                        {% if po.status == "Running" %} 
                           <span class="badge badge-success">{{ po.status }}</span>
                         {% elif po.status == "Pending" %}
                           <span class="badge badge-warning">{{ po.status }}</span>

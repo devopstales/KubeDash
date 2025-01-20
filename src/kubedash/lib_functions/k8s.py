@@ -1846,6 +1846,8 @@ def k8sPodGet(username_role, user_token, ns, po):
             # main
             "name": po,
             "namespace": ns,
+            "status": pod_data.status.phase,
+            "restarts": pod_data.status.container_statuses[0].restart_count,
             "annotations": list(),
             "labels": list(),
             "owner": "",

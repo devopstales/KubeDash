@@ -1,5 +1,38 @@
 # TODO
 
+* cache K8S Api resoults in redis [!]
+  * https://levelup.gitconnected.com/api-caching-with-redis-flask-and-kubernetes-a20ac2a11a8b
+* dashboard events list
+* store user selected ns persist
+* Show user groups on user panel.
+* Cluster / CRDs [!]
+* Cluster / Runetime Class [!]
+* POD data: [!]
+  * events
+  * Priority Class as link
+  * Runetime Class as link
+* move plugins to plugins folder:
+  * registry
+  * helm
+    * helm-controller
+      * https://github.com/k3s-io/helm-controller/releases
+  * trivy-operator
+  * external loadbalancer [!]
+    * metallb objects
+    * cilium objects
+  * application catalog [!]
+    * config store in db
+    * config panel for URLS
+    * integration links on dashboard
+    * application catalog menu
+      * namespace list
+      * metadata list
+      * app data menu
+        * show metadata links
+    * Hierarchical Namespaces
+      * https://kubernetes.io/blog/2020/08/14/introducing-hierarchical-namespaces/
+    * FluxCD
+      * Show objects and status
 * gunicorn
   * termibal, and log           [X]
 * socket auto reconnect         [ ]
@@ -33,8 +66,3 @@
     * cert_manager.py           [ ]
     * external_loadbalancer.py  [ ]
     * gateway_api.py            [ ]
-* move plugins to plugins folder:
-  * registry
-  * helm
-  * trivy-operator
-* Show user groups on user panel.

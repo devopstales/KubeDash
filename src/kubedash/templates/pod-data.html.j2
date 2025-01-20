@@ -74,6 +74,24 @@
                                     <td>{{ pod_data.name }}</td>
                                 </tr>
                                 <tr>
+                                    <th>Status:</th>
+                                    <td>
+                                    {% if pod_data.status == "Running" %} 
+                                    <span class="badge badge-success">{{ pod_data.status }}</span>
+                                    {% elif pod_data.status == "Pending" %}
+                                    <span class="badge badge-warning">{{ pod_data.status }}</span>
+                                    {% elif pod_data.status == "Succeeded" %}
+                                    <span class="badge badge-secondary">{{ pod_data.status }}</span>
+                                    {% else %}
+                                    <span class="badge badge-info">{{ pod_data.status }}</span>
+                                    {% endif %}
+                                    </td>
+                                </tr>
+                                <tr>
+                                    <th>Restarts:</th>
+                                    <td>{{ pod_data.restarts }}</td>
+                                </tr>
+                                <tr>
                                     <th>Created:</th>
                                     <td>{{ pod_data.created }}</td>
                                 </tr>
