@@ -62,13 +62,16 @@ jaeger_http_endpoint = http://127.0.0.1:4318
 [plugin_settings]
 
 # enable registry plugin
-registry = true
+registry = false
 
 # enable helm plugin
 helm = true
 
-# enable gateway api plugin
-gateway_api = true
-
 # enable cert-manager plugin
 cert_manager = true
+
+# enable external loadbalancer plugin (cilium, metallb)
+external_loadbalancer = false
+
+# enable gateway api plugin
+gateway_api = false

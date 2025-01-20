@@ -1,16 +1,19 @@
 #!/usr/bin/env python3
 
-from flask import Blueprint, request, session,render_template, redirect, url_for
+from flask import Blueprint, render_template, request, session, redirect, url_for
 from flask_login import login_required
-
-import zlib, json
-from itsdangerous import base64_decode
-import kubernetes.client as k8s_client
-from kubernetes.client.rest import ApiException
 
 from lib_functions.sso import get_user_token
 from lib_functions.k8s import k8sNamespaceListGet, k8sClientConfigGet
-from lib_functions.helper_functions import get_logger, ErrorHandler, json2yaml
+from lib_functions.helper_functions import ErrorHandler, json2yaml
+
+from lib_functions.helper_functions import get_logger
+
+import zlib, json, yaml
+from itsdangerous import base64_decode, base64_encode
+
+import kubernetes.client as k8s_client
+from kubernetes.client.rest import ApiException
 
 ##############################################################
 ## variables
@@ -19,13 +22,8 @@ from lib_functions.helper_functions import get_logger, ErrorHandler, json2yaml
 helm = Blueprint("helm", __name__)
 logger = get_logger()
 
-#############################################################
-## Helper Functions
 ##############################################################
-
-
-##############################################################
-## Helm Charts functions
+# Helm Functions
 ##############################################################
 
 def k8sHelmChartListGet(username_role, user_token, namespace):
@@ -103,9 +101,9 @@ def k8sHelmChartListGet(username_role, user_token, namespace):
         ERROR = "k8sHelmChartListGet: %s" % error
         ErrorHandler(logger, "error", ERROR)
         return HAS_CHART, CHART_LIST
- 
+
 ##############################################################
-## Helm Charts routes
+# Helm Routes
 ##############################################################
 
 @helm.route('/charts', methods=['GET', 'POST'])

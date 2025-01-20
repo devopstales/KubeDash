@@ -21,7 +21,7 @@
 
 <div class="card shadow mb-4">
     <div class="card-header">
-        <h6 class="m-0 font-weight-bold text-primary">External LoadBalancer Objects</h6>
+        <h6 class="m-0 font-weight-bold text-primary">LoadBalancer Objects</h6>
     </div>
     <div class="card-body">
         <ul class="nav nav-tabs" id="nav-tab" role="tablist">
@@ -47,6 +47,7 @@
                     <div class="card shadow mb-4">
                         <div class="card-body">
                             <div class="table-responsive">
+                                {{ ipaddresspool_list }} <!-- DEBUG -->
                                 <table class="table table-bordered display" id="ipaddresspoolTable" width="100%" cellspacing="0">
                                     <thead>
                                         <tr>
