@@ -19,7 +19,18 @@
   * trivy-operator
   * external loadbalancer [!]
     * metallb objects
+      * ipaddresspools    [X]
+        * data: link back to specific tab
+      * l2advertisements
+        * data: link back to specific tab
+      * bgpadvertisements
+        * data: link back to specific tab
+      * bgppeers
     * cilium objects
+      * ciliumloadbalancerippools
+      * ciliuml2announcementpolicies
+      * ciliumbgppeeringpolicies
+
   * application catalog [!]
     * config store in db
     * config panel for URLS

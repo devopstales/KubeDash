@@ -37,7 +37,7 @@ echo ""
 echo "Start Applications: KubeDash ${KUBEDASH_VERSION}"
 echo ""
 #flask run --host=0.0.0.0 --port=8000
-gunicorn --worker-class eventlet --conf gunicorn_conf.py kubedash:app
+gunicorn --worker-class eventlet --conf gunicorn_conf.py kubedash:app --reload
 #opentelemetry-instrument gunicorn --worker-class eventlet --conf gunicorn_conf.py kubedash:app
 
 #trap ctrl_c INT

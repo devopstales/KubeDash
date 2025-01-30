@@ -47,6 +47,13 @@ def l2advertisementsTest(namespace):
 def bgpadvertisementsTest(namespace):
     k8s_object_error, k8s_object_list = bgpadvertisementsGet(namespace)
     if k8s_object_error:
+        return list()
+    else:
+        return k8s_object_list
+    
+def bgppeersTest(namespace):
+    k8s_object_error, k8s_object_list = bgppeersGet(session['ns_select'])
+    if k8s_object_error:
         k8s_object_error, k8s_object_list = ciliumbgppeeringpoliciesGet(namespace)
         if k8s_object_error:
             return list()
@@ -54,6 +61,7 @@ def bgpadvertisementsTest(namespace):
             return k8s_object_list
     else:
         return k8s_object_list
+
 ##############################################################
 # exLB Functions MetalLB
 ##############################################################
@@ -88,14 +96,14 @@ def ipaddresspoolsGet(namespace):
             k8s_object_error = False
         return k8s_object_error, k8s_object_list
     except ApiException as error:
-        if error.status != 404:
+        if error.status == 404:
+            return True, k8s_object_list
+        else:
             ErrorHandler(logger, error, "get %s" % api_plural)
-        k8s_object_error = True
-        return k8s_object_error, k8s_object_list
+            return True, k8s_object_list
     except Exception as error:
         ErrorHandler(logger, "ipaddresspoolsGet", "Cannot Connect to Kubernetes")
-        k8s_object_error = True
-        return k8s_object_error, k8s_object_list
+        return True, k8s_object_list
 
 """l2advertisements.metallb.io"""
 def l2advertisementsGet(namespace):
@@ -104,7 +112,7 @@ def l2advertisementsGet(namespace):
     api_version = "v1beta1"
     api_plural = "l2advertisements"
     k8s_object_list = list()
-    k8s_object_error = None
+    k8s_object_error = False
     try:
         k8s_objects = k8s_client.CustomObjectsApi().list_namespaced_custom_object(api_group, api_version, namespace, api_plural, _request_timeout=5)
         for k8s_object in k8s_objects['items']:
@@ -123,14 +131,14 @@ def l2advertisementsGet(namespace):
             k8s_object_error = False
         return k8s_object_error, k8s_object_list
     except ApiException as error:
-        if error.status != 404:
+        if error.status == 404:
+            return True, k8s_object_list
+        else:
             ErrorHandler(logger, error, "get %s" % api_plural)
-            k8s_object_error = True
-            return k8s_object_error, k8s_object_list
+            return True, k8s_object_list
     except Exception as error:
         ErrorHandler(logger, "l2advertisementsGet", "Cannot Connect to Kubernetes")
-        k8s_object_error = True
-        return k8s_object_error, k8s_object_list
+        return True, k8s_object_list
 
 """communities.metallb.io"""
 def communitiesGet(namespace):
@@ -150,7 +158,9 @@ def communitiesGet(namespace):
             k8s_object_list.append(k8s_object_data)
         return k8s_object_list
     except ApiException as error:
-        if error.status != 404:
+        if error.status == 404:
+            return k8s_object_list
+        else:
             ErrorHandler(logger, error, "get %s" % api_plural)
             return k8s_object_list
     except Exception as error:
@@ -171,6 +181,7 @@ def bgppeersGet(namespace):
                 "type": "metallb",
                 "name": k8s_object['metadata']['name'],
                 "myASN": k8s_object['spec']['myASN'],
+                "peerASN": k8s_object['spec']['peerASN'],
                 "peerAddress": k8s_object['spec']['peerAddress'],
             }
             if 'sourceAddress' in k8s_object['spec']:
@@ -203,14 +214,14 @@ def bgppeersGet(namespace):
         k8s_object_error = False
         return k8s_object_error, k8s_object_list
     except ApiException as error:
-        if error.status != 404:
+        if error.status == 404:
+            return True, k8s_object_list
+        else:
             ErrorHandler(logger, error, "get %s" % api_plural)
-            k8s_object_error = True
-            return k8s_object_error, k8s_object_list
+            return True, k8s_object_list
     except Exception as error:
         ErrorHandler(logger, "bgppeersGet", "Cannot Connect to Kubernetes")
-        k8s_object_error = True
-        return k8s_object_error, k8s_object_list
+        return True, k8s_object_list
 
 """bgpadvertisements.metallb.io"""
 def bgpadvertisementsGet(namespace):
@@ -247,14 +258,14 @@ def bgpadvertisementsGet(namespace):
             k8s_object_error = False
         return k8s_object_error, k8s_object_list
     except ApiException as error:
-        if error.status != 404:
+        if error.status == 404:            
+            return True, k8s_object_list
+        else:
             ErrorHandler(logger, error, "get %s" % api_plural)
-            k8s_object_error = True
-            return k8s_object_error, k8s_object_list
+            return True, k8s_object_list
     except Exception as error:
         ErrorHandler(logger, "bgpadvertisementsGet", "Cannot Connect to Kubernetes")
-        k8s_object_error = True
-        return k8s_object_error, k8s_object_list
+        return True, k8s_object_list
 
 """bfdprofiles.metallb.io"""
 def bfdprofilesGet(username_role, user_token, namespace):
@@ -287,7 +298,9 @@ def bfdprofilesGet(username_role, user_token, namespace):
                 k8s_object_data["minimumTtl"] = k8s_object['spec']['minimumTtl']
         return k8s_object_list
     except ApiException as error:
-        if error.status != 404:
+        if error.status == 404:
+            return k8s_object_list
+        else:
             ErrorHandler(logger, error, "get %s" % api_plural)
             return k8s_object_list
     except Exception as error:
@@ -310,12 +323,12 @@ def ciliumloadbalancerippoolsGet(namespace):
     k8s_object_list = list()
     k8s_object_error = None
     try:
-        k8s_objects = k8s_client.CustomObjectsApi().list_namespaced_custom_object(api_group, api_version, namespace, api_plural, _request_timeout=5)
+        k8s_objects = k8s_client.CustomObjectsApi().list_cluster_custom_object(api_group, api_version, api_plural, _request_timeout=5)
         for k8s_object in k8s_objects['items']:
             k8s_object_data = {
                 "type": "cilium",
                 "name": k8s_object['metadata']['name'],
-                "blocks": k8s_object['spec']['blocks'],
+                "blocks": k8s_object['spec']['cidrs'],
             }
             if 'allowFirstLastIPs' in k8s_object['spec']:
                 k8s_object_data["allowFirstLastIPs"] = k8s_object['spec']['allowFirstLastIPs']
@@ -335,14 +348,14 @@ def ciliumloadbalancerippoolsGet(namespace):
             k8s_object_error = False
         return k8s_object_error, k8s_object_list
     except ApiException as error:
-        if error.status != 404:
+        if error.status == 404:
+            return True, k8s_object_list
+        else:
             ErrorHandler(logger, error, "get %s" % api_plural)
-            k8s_object_error = True
-            return k8s_object_error, k8s_object_list
+            return True, k8s_object_list
     except Exception as error:
         ErrorHandler(logger, "ciliumloadbalancerippoolsGet", "Cannot Connect to Kubernetes")
-        k8s_object_error = True
-        return k8s_object_error, k8s_object_list
+        return True, k8s_object_list
 
 """ciliuml2announcementpolicies.cilium.io"""
 def ciliuml2announcementpoliciesGet(namespace):
@@ -353,7 +366,7 @@ def ciliuml2announcementpoliciesGet(namespace):
     k8s_object_list = list()
     k8s_object_error = None
     try:
-        k8s_objects = k8s_client.CustomObjectsApi().list_namespaced_custom_object(api_group, api_version, namespace, api_plural, _request_timeout=5)
+        k8s_objects = k8s_client.CustomObjectsApi().list_cluster_custom_object(api_group, api_version, api_plural, _request_timeout=5)
         for k8s_object in k8s_objects['items']:
             k8s_object_data = {
                 "type": "cilium",
@@ -369,20 +382,18 @@ def ciliuml2announcementpoliciesGet(namespace):
                 k8s_object_data["externalIPs"] = k8s_object['spec']['externalIPs']
             if 'loadBalancerIPs' in k8s_object['spec']:
                 k8s_object_data["loadBalancerIPs"] = k8s_object['spec']['loadBalancerIPs']
-            if 'conditions' in k8s_object['status']:
-                k8s_object_data["status"] = k8s_object['status']['conditions']
             k8s_object_list.append(k8s_object_data)
             k8s_object_error = False
         return k8s_object_error, k8s_object_list
     except ApiException as error:
-        if error.status != 404:
+        if error.status == 404:
+            return True, k8s_object_list
+        else:
             ErrorHandler(logger, error, "get %s" % api_plural)
-            k8s_object_error = True
-            return k8s_object_error, k8s_object_list
+            return True, k8s_object_list
     except Exception as error:
         ErrorHandler(logger, "ciliuml2announcementpoliciesGet", "Cannot Connect to Kubernetes")
-        k8s_object_error = True
-        return k8s_object_error, k8s_object_list
+        return True, k8s_object_list
 
 """ciliumbgppeeringpolicies.cilium.io"""
 def ciliumbgppeeringpoliciesGet(namespace):
@@ -393,7 +404,7 @@ def ciliumbgppeeringpoliciesGet(namespace):
     k8s_object_list = list()
     k8s_object_error = None
     try:
-        k8s_objects = k8s_client.CustomObjectsApi().list_namespaced_custom_object(api_group, api_version, namespace, api_plural, _request_timeout=5)
+        k8s_objects = k8s_client.CustomObjectsApi().list_cluster_custom_object(api_group, api_version, api_plural, _request_timeout=5)
         for k8s_object in k8s_objects['items']:
             k8s_object_data = {
                 "type": "cilium",
@@ -452,14 +463,14 @@ def ciliumbgppeeringpoliciesGet(namespace):
             k8s_object_error = False
         return k8s_object_error, k8s_object_list
     except ApiException as error:
-        if error.status != 404:
+        if error.status == 404:
+            return True, k8s_object_list
+        else:
             ErrorHandler(logger, error, "get %s" % api_plural)
-            k8s_object_error = True
-            return k8s_object_error, k8s_object_list
+            return True, k8s_object_list
     except Exception as error:
         ErrorHandler(logger, "ciliumbgppeeringpoliciesGet", "Cannot Connect to Kubernetes")
-        k8s_object_error = True
-        return k8s_object_error, k8s_object_list
+        return True, k8s_object_list
 
 ##############################################################
 # exLB Routes
@@ -472,7 +483,8 @@ def external_loadbalancer():
     user_token = get_user_token(session)
 
     if request.method == 'POST':
-        session['ns_select'] = request.form.get('ns_select')
+        if request.form.get('ns_select'):
+            session['ns_select'] = request.form.get('ns_select')
         selected = request.form.get('selected')
 
     namespace_list, error = k8sNamespaceListGet(session['user_role'], user_token)
@@ -480,10 +492,10 @@ def external_loadbalancer():
         ipaddresspool_list = ipaddresspoolTest(session['ns_select'])
         l2advertisement_list = l2advertisementsTest(session['ns_select'])
         bgpadvertisement_list = bgpadvertisementsTest(session['ns_select'])
-        k8s_object_error, bgppeers_list = bgppeersGet(session['ns_select'])
-        if k8s_object_error:
-            bgppeers_list = list()
+        bgppeers_list = bgppeersTest(session['ns_select'])
+
     else:
+        bgppeers_list = list()
         ipaddresspool_list = list()
         l2advertisement_list = list()
         bgpadvertisement_list = list()
@@ -505,7 +517,8 @@ def external_loadbalancer_data():
     user_token = get_user_token(session)
 
     if request.method == 'POST':
-        session['ns_select'] = request.form.get('ns_select')
+        if request.form.get('ns_select'):
+            session['ns_select'] = request.form.get('ns_select')
         selected = request.form.get('selected')
         object_type = request.form.get('object_type')
         object_data_str = request.form.get('object_data')

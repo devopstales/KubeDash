@@ -2,7 +2,7 @@ apiVersion: metallb.io/v1beta1
 kind: IPAddressPool
 metadata:
   name: ippool-ns-service-alloc-sample
-  namespace: network-testing
+  namespace: ingress-system
 spec:
   addresses:
     - 192.168.20.0/24
@@ -15,6 +15,7 @@ spec:
     namespaceSelectors:
       - matchLabels:
           foo: bar
+          test: elek
     serviceSelectors:
       - matchExpressions:
           - {key: app, operator: In, values: [bar]}
@@ -23,7 +24,7 @@ apiVersion: metallb.io/v1beta1
 kind: BGPAdvertisement
 metadata:
   name: local
-  namespace: network-testing
+  namespace: ingress-system
 spec:
   ipAddressPools:
   - ippool-ns-service-alloc-sample
@@ -35,8 +36,8 @@ spec:
 apiVersion: metallb.io/v1beta1
 kind: BGPAdvertisement
 metadata:
-  name: external
-  namespace: network-testing
+  name: external1
+  namespace: ingress-system
 spec:
   localPref: 100
   ipAddressPools:
@@ -47,7 +48,7 @@ apiVersion: metallb.io/v1beta2
 kind: BGPPeer
 metadata:
   name: example2
-  namespace: network-testing
+  namespace: ingress-system
 spec:
   myASN: 64512
   peerASN: 64512
@@ -64,3 +65,20 @@ spec:
     - key: kubernetes.io/hostname
       operator: In
       values: [hostA, hostB]
+---
+apiVersion: metallb.io/v1beta1
+kind: L2Advertisement
+metadata:
+  name: l2advertisement
+  namespace: ingress-system
+spec:
+  ipAddressPools:
+  - ippool-ns-service-alloc-sample
+  interfaces:
+  - eth0
+  - eth1
+  nodeSelectors:
+  - matchLabels:
+      kubernetes.io/hostname: NodeA
+  - matchLabels:
+      kubernetes.io/hostname: NodeB
