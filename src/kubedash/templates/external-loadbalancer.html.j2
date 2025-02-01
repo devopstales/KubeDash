@@ -47,7 +47,6 @@
                     <div class="card shadow mb-4">
                         <div class="card-body">
                             <div class="table-responsive">
-                                {{ ipaddresspool_list }}
                                 <table class="table table-bordered display" id="ipaddresspoolTable" width="100%" cellspacing="0">
                                     <thead>
                                         <tr>
@@ -71,7 +70,15 @@
                                           <td>
                                             {% if ipaddresspool.type == "cilium" %}
                                                 {% for address in ipaddresspool.blocks %}
-                                                {{ address }}<br>
+                                                    {% for key, value in address.items() %}
+                                                        {% if key == "start"%}
+                                                            {{ value }} -
+                                                        {% elif key == "stop"%}
+                                                            {{ value }}<br>
+                                                        {% elif key == "cidr"%}
+                                                            {{ value }}<br>
+                                                        {% endif %}
+                                                    {% endfor %}
                                                 {% endfor %}
                                             {% else %}
                                                 {% for address in ipaddresspool.addresses %}
@@ -94,7 +101,6 @@
                 <div class="card shadow mb-4">
                     <div class="card-body">
                         <div class="table-responsive">
-                            {{ l2advertisement_list }}
                             <table class="table table-bordered" id="l2advertisementTable" width="100%" cellspacing="0">
                                 <thead>
                                     <tr>
@@ -136,7 +142,6 @@
                     <div class="card shadow mb-4">
                         <div class="card-body">
                             <div class="table-responsive">
-                                {{ bgppeers_list }}
                                 <table class="table table-bordered" id="bgppeersTable" width="100%" cellspacing="0">
                                     <thead>
                                         <tr>
@@ -184,7 +189,6 @@
                 <div class="card shadow mb-4">
                     <div class="card-body">
                         <div class="table-responsive">
-                            {{ bgpadvertisement_list }}
                             <table class="table table-bordered" id="bgpadvertisementTable" width="100%" cellspacing="0">
                                 <thead>
                                     <tr>

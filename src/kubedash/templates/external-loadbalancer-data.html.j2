@@ -29,7 +29,6 @@
     <div class="card-body">
         <div class="table-responsive">
             <table class="table table-bordered" id="lbInfoTable" width="100%" cellspacing="0">
-                {{ object_data }}
                 <tr>
                     <th>Name:</th>
                     <td>{{ object_data.name }}</td>
@@ -42,18 +41,44 @@
                 <tr>
                     <th>Addresses:</th>
                     <td>
+                    {% if object_data.type == "cilium" %}
+                        <table class="table table-bordered" id="lbInfoTable" cellspacing="0">
+                        {% for address in object_data.blocks %}
+                        <tr>
+                            {% for key, value in address.items() %}
+                                {% if key == "start"%}
+                                    <td>{{ value }} -
+                                {% elif key == "stop"%}
+                                    {{ value }}</td>
+                                {% elif key == "cidr"%}
+                                    <td>{{ value }}</td>
+                                {% endif %}
+                            {% endfor %}
+                        </tr>
+                        {% endfor %}
+                        </table>
+                    {% else %}
                         {% for address in object_data.addresses %}
                         {{ address }}<br>
                         {% endfor %}
+                    {% endif %}
                     </td>
                 </tr>
+                {% if object_data.type != "cilium" %}
                 <tr>
                     <th>Auto assign:</th>
                     <td>{{ object_data.autoAssign }}</td>
                 </tr>
+                {% endif %}
                 <tr>
                     <th>Avoid buggy IPs:</th>
-                    <td>{{ object_data.avoidBuggyIPs }}</td>
+                    <td>
+                    {% if object_data.type == "cilium" %}
+                        {{ object_data.allowFirstLastIPs }}
+                    {% else %}
+                        {{ object_data.avoidBuggyIPs }}
+                    {% endif %}
+                    </td>
                 </tr>
                 {% if object_data.ServiceAllocation_namespaces is defined %}
                 <tr>
@@ -70,7 +95,7 @@
                     <th>Allocation Namespace Selectors:</th>
                     <td>
                         <h6>Labels:</h6>
-                        <table class="table table-bordered" id="lbInfoTable" width="100%" cellspacing="0">
+                        <table class="table table-bordered" id="lbInfoTable" cellspacing="0">
                             {% for selector in object_data.ServiceAllocation_namespaceSelectors %}
                                 {% for key, value in selector.matchLabels.items() %}
                                 <tr>
@@ -85,10 +110,9 @@
                 {% endif %}
                 {% if object_data.ServiceAllocation_serviceSelectors is defined %}
                 <tr>
-                    <th>Allocation Service Selectors:</th>
                     <td>
                         <h6>Service Selectors</h6>
-                        <table class="table table-bordered" id="lbInfoTable" width="100%" cellspacing="0">
+                        <table class="table table-bordered" id="lbInfoTable" cellspacing="0">
                             {% for selector in object_data.ServiceAllocation_serviceSelectors %}
                                 {% for expressions in selector.matchExpressions %}
                                 <tr>
@@ -102,7 +126,23 @@
                     </td>
                 </tr>
                 {% endif %}
+                {% if object_data.serviceSelector is defined %}
+                <tr>
+                    <th>Allocation Service Selectors:</th>
+                    <td>
+                        <table class="table table-bordered" id="lbInfoTable" cellspacing="0">
+                            <tr>
+                            {% for key, value in object_data.serviceSelector.matchLabels.items() %}
+                                <td>{{ key }}</td>
+                                <td>{{ value }}</td>
+                            {% endfor %}
+                            </tr>
+                        </table>
+                    </td>
+                </tr>
+                {% endif %}
                 {% elif object_type == "l2advertisement" %}
+                {% if object_data.type != 'cilium' %}
                 <tr>
                     <th>IP Address Pools:</th>
                     <td>
@@ -117,6 +157,32 @@
                         {% endfor %}
                     </td>
                 </tr>
+                {% else %}
+                <tr>
+                    <th>Interfaces:</th>
+                    <td>
+                        {% for interface in object_data.interfaces %}
+                        {{ interface }}<br>
+                        {% endfor %}
+                    </td>
+                </tr>
+                {% if object_data.nodeSelector is defined %}
+                <tr>
+                    <th>Node Selectors:</th>
+                    <td>
+                        <h6>Node Labels</h6>
+                        <table class="table table-bordered" id="lbInfoTable" cellspacing="0">
+                            <tr>
+                            {% for key, value in object_data.nodeSelector.matchLabels.items() %}
+                                <td>{{ key }}</td>
+                                <td>{{ value }}</td>
+                            {% endfor %}
+                            </tr>
+                        </table>
+                    </td>
+                </tr>
+                {% endif %}
+                {% endif %}
                 {% if object_data.ipAddressPoolSelectors is defined %}
                 <tr>
                     <th>IP Address Pool Selectors:</th>
@@ -132,22 +198,50 @@
                 {% elif object_type == "bgppeers" %}
                 <tr>
                     <th>My ASN:</th>
-                    <td>{{ object_data.myASN }}</td>
+                    {% if object_data.type == "cilium" %}
+                        <td>
+                        {% for router in object_data.virtual_routers %}
+                        {{ router.localASN }}<br>
+                        {% endfor %}
+                        </td>
+                    {% else %}
+                        <td>{{ object_data.myASN }}</td>
+                    {% endif %}
                 </tr>
                 <tr>
                     <th>Peer Address:</th>
-                    <td>{{ object_data.peerAddress }}</td>
+                    {% if object_data.type == "cilium" %}
+                    <td>
+                        {% for router in object_data.virtual_routers %}
+                            {% for neighbor in router.neighbors %}
+                                {{ neighbor.peerAddress }}<br>
+                            {% endfor %}
+                        {% endfor %}
+                    </td>
+                    {% else %}
+                        <td>{{ object_data.peerAddress }}</td>
+                    {% endif %}
                 </tr>
                 <tr>
                     <th>Peer ASN:</th>
-                    <td>{{ object_data.peerASN }}</td>
+                     {% if object_data.type == "cilium" %}
+                    <td>
+                        {% for router in object_data.virtual_routers %}
+                            {% for neighbor in router.neighbors %}
+                                {{ neighbor.peerASN }}<br>
+                            {% endfor %}
+                        {% endfor %}
+                    </td>
+                     {% else %}
+                        <td>{{ object_data.peerASN }}</td>
+                    {% endif %}
                 </tr>
                 {% if object_data.nodeSelectors is defined %}
                 <tr>
                     <th>Node Selectors:</th>
                     <td>
                         <h6>Node Selectors</h6>
-                        <table class="table table-bordered" id="lbInfoTable" width="100%" cellspacing="0">
+                        <table class="table table-bordered" id="lbInfoTable" cellspacing="0">
                         {% for selector in object_data.nodeSelectors %}
                             {% for expressions in selector.matchExpressions %}
                             <tr>
@@ -157,6 +251,22 @@
                             </tr>
                             {% endfor %}
                         {% endfor %}
+                        </table>
+                    </td>
+                </tr>
+                {% endif %}
+                {% if object_data.nodeSelector is defined %}
+                <tr>
+                    <th>Node Selectors:</th>
+                    <td>
+                        <h6>Node Labels</h6>
+                        <table class="table table-bordered" id="lbInfoTable" cellspacing="0">
+                            <tr>
+                            {% for key, value in object_data.nodeSelector.matchLabels.items() %}
+                                <td>{{ key }}</td>
+                                <td>{{ value }}</td>
+                            {% endfor %}
+                            </tr>
                         </table>
                     </td>
                 </tr>

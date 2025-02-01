@@ -9,7 +9,7 @@ from lib_functions.k8s import k8sClientConfigGet, k8sNamespaceListGet
 
 from kubernetes.client.rest import ApiException
 import kubernetes.client as k8s_client
-import ast
+import ast, json
 
 ##############################################################
 ## variables
@@ -322,40 +322,42 @@ def ciliumloadbalancerippoolsGet(namespace):
     api_plural = "ciliumloadbalancerippools"
     k8s_object_list = list()
     k8s_object_error = None
-    try:
-        k8s_objects = k8s_client.CustomObjectsApi().list_cluster_custom_object(api_group, api_version, api_plural, _request_timeout=5)
-        for k8s_object in k8s_objects['items']:
-            k8s_object_data = {
-                "type": "cilium",
-                "name": k8s_object['metadata']['name'],
-                "blocks": k8s_object['spec']['cidrs'],
-            }
-            if 'allowFirstLastIPs' in k8s_object['spec']:
-                k8s_object_data["allowFirstLastIPs"] = k8s_object['spec']['allowFirstLastIPs']
-            if 'disabled' in k8s_object['spec']:
-                k8s_object_data["disabled"] = k8s_object['spec']['disabled']
-            if 'ipAddressPoolSelectors' in k8s_object['spec']:
-                k8s_object_data["ipAddressPoolSelectors"] = k8s_object['spec']['ipAddressPoolSelectors']
-            if 'serviceSelector' in k8s_object['spec']:
-                k8s_object_data["serviceSelector"] = k8s_object['spec']['serviceSelector']
-            if 'ipFamilyPolicy' in k8s_object['spec']:
-                k8s_object_data["ipFamilyPolicy"] = k8s_object['spec']['ipFamilyPolicy']
-            if 'ipFamilies' in k8s_object['spec']:
-                k8s_object_data["ipFamilies"] = k8s_object['spec']['ipFamilies']
-            if 'conditions' in k8s_object['status']:
-                k8s_object_data["status"] = k8s_object['status']['conditions']
-            k8s_object_list.append(k8s_object_data)
-            k8s_object_error = False
-        return k8s_object_error, k8s_object_list
-    except ApiException as error:
-        if error.status == 404:
-            return True, k8s_object_list
+    #try:
+    k8s_objects = k8s_client.CustomObjectsApi().list_cluster_custom_object(api_group, api_version, api_plural, _request_timeout=5)
+    for k8s_object in k8s_objects['items']:
+        k8s_object_data = {
+            "type": "cilium",
+            "name": k8s_object['metadata']['name'],
+            "blocks": k8s_object['spec']['cidrs'],
+        }
+        if 'allowFirstLastIPs' in k8s_object['spec']:
+            k8s_object_data["allowFirstLastIPs"] = k8s_object['spec']['allowFirstLastIPs']
         else:
-            ErrorHandler(logger, error, "get %s" % api_plural)
-            return True, k8s_object_list
-    except Exception as error:
-        ErrorHandler(logger, "ciliumloadbalancerippoolsGet", "Cannot Connect to Kubernetes")
-        return True, k8s_object_list
+            k8s_object_data["allowFirstLastIPs"] = False
+        if 'disabled' in k8s_object['spec']:
+            k8s_object_data["disabled"] = k8s_object['spec']['disabled']
+        if 'ipAddressPoolSelectors' in k8s_object['spec']:
+            k8s_object_data["ipAddressPoolSelectors"] = k8s_object['spec']['ipAddressPoolSelectors']
+        if 'serviceSelector' in k8s_object['spec']:
+            k8s_object_data["serviceSelector"] = k8s_object['spec']['serviceSelector']
+        if 'ipFamilyPolicy' in k8s_object['spec']:
+            k8s_object_data["ipFamilyPolicy"] = k8s_object['spec']['ipFamilyPolicy']
+        if 'ipFamilies' in k8s_object['spec']:
+            k8s_object_data["ipFamilies"] = k8s_object['spec']['ipFamilies']
+        if 'conditions' in k8s_object['status']:
+            k8s_object_data["status"] = k8s_object['status']['conditions']
+        k8s_object_list.append(k8s_object_data)
+        k8s_object_error = False
+    return k8s_object_error, k8s_object_list
+    #except ApiException as error:
+    #    if error.status == 404:
+    #        return True, k8s_object_list
+    #    else:
+    #        ErrorHandler(logger, error, "get %s" % api_plural)
+    #        return True, k8s_object_list
+    #except Exception as error:
+    #    ErrorHandler(logger, "ciliumloadbalancerippoolsGet", "Cannot Connect to Kubernetes")
+    #    return True, k8s_object_list
 
 """ciliuml2announcementpolicies.cilium.io"""
 def ciliuml2announcementpoliciesGet(namespace):

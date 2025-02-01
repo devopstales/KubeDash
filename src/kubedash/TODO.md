@@ -21,15 +21,15 @@
     * metallb objects
       * ipaddresspools    [X]
         * data: link back to specific tab
-      * l2advertisements
+      * l2advertisements  [X]
         * data: link back to specific tab
-      * bgpadvertisements
+      * bgpadvertisements  [X]
         * data: link back to specific tab
       * bgppeers
     * cilium objects
-      * ciliumloadbalancerippools
-      * ciliuml2announcementpolicies
-      * ciliumbgppeeringpolicies
+      * ciliumloadbalancerippools     [X]
+      * ciliuml2announcementpolicies  [X]
+      * ciliumbgppeeringpolicies      [X]
 
   * application catalog [!]
     * config store in db

@@ -9,6 +9,7 @@ export KUBEDASH_VERSION="3.1"
 export FLASK_APP="kubedash"
 export FLASK_DEBUG=1
 export TEMPLATES_AUTO_RELOAD=1
+export FLASK_ENV=development
 
 
 mkdir -p /tmp/kubedash

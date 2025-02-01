@@ -63,7 +63,10 @@ def initialize_app_confifuration(app: Flask, external_config_name: str) -> bool:
         if external_config_name is not None:
             config_name = external_config_name
         else:
-            config_name = config_ini.get('DEFAULT', 'app_mode', fallback='development')
+            if 'FLASK_ENV' in os.environ:
+                config_name = os.environ['FLASK_ENV']
+            else:
+                config_name = config_ini.get('DEFAULT', 'app_mode', fallback='development')
         
         app.config.from_object(app_config[config_name])
         app.config['ENV'] = config_name
@@ -366,20 +369,22 @@ def initialize_app_security(app: Flask):
         )
         """Init Talisman"""
         talisman = Talisman(app)
-        talisman.force_https = True
+        talisman.force_https = False
         talisman.strict_transport_security = hsts
+
     else:
         """Init Talisman"""
         talisman = Talisman(app)
         talisman.force_https = False
+        
+        
+    """Init CSRF"""
+    csrf.init_app(app)
 
     talisman.content_security_policy = csp
     talisman.x_xss_protection = True
     talisman.session_cookie_secure = True
     talisman.session_cookie_samesite = 'Lax'
-
-    """Init CSRF"""
-    csrf.init_app(app)
 
     @app.after_request
     def set_security_headers(response):
