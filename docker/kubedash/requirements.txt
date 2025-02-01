@@ -1,7 +1,7 @@
 # flask
 flask==3.0.3
 Werkzeug==3.0.3
-Jinja2==3.1.4
+Jinja2==3.1.5
 dnspython==2.6.1
 pytz==2023.3.post1
 
@@ -33,7 +33,7 @@ eventlet==0.36.1
 opentelemetry-sdk==1.23.0
 opentelemetry-api==1.23.0
 opentelemetry-exporter-otlp-proto-http==1.25.0
-opentelemetry-semantic-conventions==0.46b0
+opentelemetry-semantic-conventions==0.50b0
 opentelemetry-instrumentation-sqlalchemy==0.46b0
 opentelemetry-instrumentation-flask==0.46b0
 
