@@ -167,6 +167,10 @@ def initialize_app_plugins(app: Flask):
     app.logger.info(separator_short)
 
     """Register Plugin Blueprints"""
+    if bool_var_test(app.config["plugins"]["helm"]):
+        from lib_plugins.helm import helm 
+        app.register_blueprint(helm)
+        
     if bool_var_test(app.config["plugins"]["registry"]):
         from lib_plugins.registry import registry 
         app.register_blueprint(registry)
@@ -251,7 +255,6 @@ def initialize_blueprints(app: Flask):
     from lib_routes.accounts import accounts 
     from lib_routes.api import api 
     from lib_routes.dashboard import dashboard 
-    from lib_routes.helm import helm 
     from lib_routes.limits import limits 
     from lib_routes.metrics import metrics 
     from lib_routes.namespaces import namespaces 
@@ -268,7 +271,6 @@ def initialize_blueprints(app: Flask):
     app.register_blueprint(main)
     app.register_blueprint(accounts)
     app.register_blueprint(dashboard)
-    app.register_blueprint(helm)
     app.register_blueprint(limits)
     app.register_blueprint(metrics)
     app.register_blueprint(namespaces)
