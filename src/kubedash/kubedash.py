@@ -167,6 +167,10 @@ def initialize_app_plugins(app: Flask):
     app.logger.info(separator_short)
 
     """Register Plugin Blueprints"""
+    if bool_var_test(app.config["plugins"]["registry"]):
+        from lib_plugins.registry import registry 
+        app.register_blueprint(registry)
+    
     if bool_var_test(app.config["plugins"]["gateway_api"]):
         from lib_plugins.gateway_api import gateway_api 
         app.register_blueprint(gateway_api)
@@ -236,7 +240,7 @@ def initialize_app_database(app: Flask):
                 SQLAlchemyInstrumentor().instrument(engine=db.engine)
                 db_init_roles(app.config['kubedash.ini'])
             if sys.argv[1] != 'cli' and sys.argv[1] != 'db':
-                print("|"+sys.argv[1]+"|")
+                #print("|"+sys.argv[1]+"|") # debug
                 oidc_init(app.config['kubedash.ini'])
                 k8s_config_int(app.config['kubedash.ini'])
                 k8s_roles_init()
@@ -254,7 +258,6 @@ def initialize_blueprints(app: Flask):
     from lib_routes.networks import networks 
     from lib_routes.nodes import nodes 
     from lib_routes.pods import pods 
-    from lib_routes.registry import registry 
     from lib_routes.security import security 
     from lib_routes.sso import sso 
     from lib_routes.storages import storages 
@@ -272,7 +275,6 @@ def initialize_blueprints(app: Flask):
     app.register_blueprint(networks)
     app.register_blueprint(nodes)
     app.register_blueprint(pods)
-    app.register_blueprint(registry)
     app.register_blueprint(security)
     app.register_blueprint(sso)
     app.register_blueprint(storages)
