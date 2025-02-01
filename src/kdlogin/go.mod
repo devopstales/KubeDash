@@ -5,10 +5,10 @@ toolchain go1.22.5
 
 require (
 	github.com/gin-gonic/gin v1.10.0
-	github.com/go-playground/validator/v10 v10.22.0
-	k8s.io/apimachinery v0.32.0
-	k8s.io/client-go v0.32.0
-	sigs.k8s.io/yaml v1.4.0
+	github.com/go-playground/validator/v10 v10.23.0
+	k8s.io/apimachinery v0.30.2
+	k8s.io/client-go v0.30.2
+	sigs.k8s.io/yaml v1.3.0
 )
 
 require (
