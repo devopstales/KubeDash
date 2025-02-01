@@ -1,6 +1,6 @@
 [project]
 name = "KubeDash"
-version = "0.1.0"
+version = "3.1.0"
 description = "KubeDash is a kubernetes Dashboard"
 license = "Apache-2.0"
 authors = [
