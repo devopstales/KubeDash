@@ -485,7 +485,7 @@ def external_loadbalancer():
     user_token = get_user_token(session)
 
     if request.method == 'POST':
-        if request.form.get('ns_select'):
+        if request.form.get('ns_select', None):
             session['ns_select'] = request.form.get('ns_select')
         selected = request.form.get('selected')
 
@@ -519,7 +519,7 @@ def external_loadbalancer_data():
     user_token = get_user_token(session)
 
     if request.method == 'POST':
-        if request.form.get('ns_select'):
+        if request.form.get('ns_select', None):
             session['ns_select'] = request.form.get('ns_select')
         selected = request.form.get('selected')
         object_type = request.form.get('object_type')

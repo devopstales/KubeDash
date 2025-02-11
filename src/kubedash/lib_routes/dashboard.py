@@ -65,9 +65,10 @@ def workloads():
         span.set_attribute("http.method", request.method)
 
     if request.method == 'POST':
-        session['ns_select'] = request.form.get('ns_select')
-        if tracer and span.is_recording():
-            span.set_attribute("namespace.selected", request.form.get('ns_select'))
+        if request.form.get('ns_select', None):
+            session['ns_select'] = request.form.get('ns_select')
+            if tracer and span.is_recording():
+                span.set_attribute("namespace.selected", request.form.get('ns_select'))
 
 
     user_token = get_user_token(session)

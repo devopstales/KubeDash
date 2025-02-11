@@ -112,7 +112,8 @@ def charts():
     user_token = get_user_token(session)
 
     if request.method == 'POST':
-        session['ns_select'] = request.form.get('ns_select')
+        if request.form.get('ns_select', None):
+            session['ns_select'] = request.form.get('ns_select')
 
 
     namespace_list, error = k8sNamespaceListGet(session['user_role'], user_token)

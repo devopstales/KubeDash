@@ -38,7 +38,8 @@ def authenticated_only(f):
 @login_required
 def pod_list():
     if request.method == 'POST':
-        session['ns_select'] = request.form.get('ns_select')
+        if request.form.get('ns_select', None):
+            session['ns_select'] = request.form.get('ns_select')
 
     user_token = get_user_token(session)
 
@@ -61,7 +62,8 @@ def pod_list():
 def pods_data():
     if request.method == 'POST':
         po_name = request.form.get('po_name')
-        session['ns_select'] = request.form.get('ns_select')
+        if request.form.get('ns_select', None):
+            session['ns_select'] = request.form.get('ns_select')
 
         user_token = get_user_token(session)
 
@@ -90,7 +92,7 @@ logging.getLogger('engineio').setLevel(logging.ERROR)
 def pods_logs():
     if request.method == 'POST':
         po_name = request.form.get('po_name')
-        if request.form.get('ns_select'):
+        if request.form.get('ns_select', None):
             session['ns_select'] = request.form.get('ns_select')
 
         user_token = get_user_token(session)
@@ -136,7 +138,7 @@ def log_message(po_name, container):
 def pods_exec():
     if request.method == 'POST':
         po_name = request.form.get('po_name')
-        if request.form.get('ns_select'):
+        if request.form.get('ns_select', None):
             session['ns_select'] = request.form.get('ns_select')
 
         user_token = get_user_token(session)

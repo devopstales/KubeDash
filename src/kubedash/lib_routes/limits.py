@@ -24,7 +24,8 @@ def hpa():
     selected = None
 
     if request.method == 'POST':
-        session['ns_select'] = request.form.get('ns_select')
+        if request.form.get('ns_select', None):
+            session['ns_select'] = request.form.get('ns_select')
         selected = request.form.get('selected')
 
     user_token = get_user_token(session)
@@ -76,7 +77,8 @@ def pdp():
     user_token = get_user_token(session)
 
     if request.method == 'POST':
-        session['ns_select'] = request.form.get('ns_select')
+        if request.form.get('ns_select', None):
+            session['ns_select'] = request.form.get('ns_select')
         selected = request.form.get('selected')
 
     namespace_list, error = k8sNamespaceListGet(session['user_role'], user_token)
@@ -127,7 +129,8 @@ def resource_quota():
     user_token = get_user_token(session)
 
     if request.method == 'POST':
-        session['ns_select'] = request.form.get('ns_select')
+        if request.form.get('ns_select', None):
+            session['ns_select'] = request.form.get('ns_select')
         selected = request.form.get('selected')
 
     namespace_list, error = k8sNamespaceListGet(session['user_role'], user_token)
@@ -178,7 +181,8 @@ def limit_range():
     user_token = get_user_token(session)
 
     if request.method == 'POST':
-        session['ns_select'] = request.form.get('ns_select')
+        if request.form.get('ns_select', None):
+            session['ns_select'] = request.form.get('ns_select')
         selected = request.form.get('selected')
 
     namespace_list, error = k8sNamespaceListGet(session['user_role'], user_token)

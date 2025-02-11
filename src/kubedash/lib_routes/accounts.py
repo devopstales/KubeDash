@@ -295,7 +295,8 @@ def service_accounts():
     user_token = get_user_token(session)
 
     if request.method == 'POST':
-        session['ns_select'] = request.form.get('ns_select')
+        if request.form.get('ns_select', None):
+            session['ns_select'] = request.form.get('ns_select')
         selected = request.form.get('selected')
 
     namespace_list, error = k8sNamespaceListGet(session['user_role'], user_token)
@@ -322,7 +323,8 @@ def roles():
     user_token = get_user_token(session)
 
     if request.method == 'POST':
-        session['ns_select'] = request.form.get('ns_select')
+        if request.form.get('ns_select', None):
+            session['ns_select'] = request.form.get('ns_select')
         selected = request.form.get('selected')
 
     namespace_list, error = k8sNamespaceListGet(session['user_role'], user_token)
@@ -342,7 +344,8 @@ def roles():
 @login_required
 def role_data():
     if request.method == 'POST':
-        session['ns_select'] = request.form.get('ns_select')
+        if request.form.get('ns_select', None):
+            session['ns_select'] = request.form.get('ns_select')
         r_name = request.form.get('r_name')
         
         user_token = get_user_token(session)
@@ -372,7 +375,8 @@ def role_bindings():
     user_token = get_user_token(session)
 
     if request.method == 'POST':
-        session['ns_select'] = request.form.get('ns_select')
+        if request.form.get('ns_select', None):
+            session['ns_select'] = request.form.get('ns_select')
         rb_name = request.form.get('rb_name')
 
     namespace_list, error = k8sNamespaceListGet(session['user_role'], user_token)

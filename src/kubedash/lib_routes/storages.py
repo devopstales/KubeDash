@@ -118,7 +118,8 @@ def pvc():
     user_token = get_user_token(session)
 
     if request.method == 'POST':
-        session['ns_select'] = request.form.get('ns_select')
+        if request.form.get('ns_select', None):
+            session['ns_select'] = request.form.get('ns_select')
         selected = request.form.get('selected')
 
     namespace_list, error = k8sNamespaceListGet(session['user_role'], user_token)
@@ -175,7 +176,8 @@ def pv():
     user_token = get_user_token(session)
 
     if request.method == 'POST':
-        session['ns_select'] = request.form.get('ns_select')
+        if request.form.get('ns_select', None):
+            session['ns_select'] = request.form.get('ns_select')
         selected = request.form.get('selected')
 
     namespace_list, error = k8sNamespaceListGet(session['user_role'], user_token)
@@ -197,7 +199,8 @@ def pv():
 def pv_data():
     pv_data = None
     if request.method == 'POST':
-        session['ns_select'] = request.form.get('ns_select')
+        if request.form.get('ns_select', None):
+            session['ns_select'] = request.form.get('ns_select')
         selected = request.form.get('selected')
         user_token = get_user_token(session)
 
@@ -251,7 +254,8 @@ def configmap():
     user_token = get_user_token(session)
 
     if request.method == 'POST':
-        session['ns_select'] = request.form.get('ns_select')
+        if request.form.get('ns_select', None):
+            session['ns_select'] = request.form.get('ns_select')
         selected = request.form.get('selected')
 
     namespace_list, error = k8sNamespaceListGet(session['user_role'], user_token)
@@ -272,7 +276,8 @@ def configmap():
 def configmap_data():
     if request.method == 'POST':
         configmap_name = request.form.get('configmap_name')
-        session['ns_select'] = request.form.get('ns_select')
+        if request.form.get('ns_select', None):
+            session['ns_select'] = request.form.get('ns_select')
 
         user_token = get_user_token(session)
 

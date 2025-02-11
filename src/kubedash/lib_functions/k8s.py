@@ -2984,21 +2984,22 @@ def k8sPersistentVolumeClaimListGet(username_role, user_token, namespace):
     k8sClientConfigGet(username_role, user_token)
     PVC_LIST = list()
     try:
-        persistent_volume_clames= k8s_client.CoreV1Api().list_namespaced_persistent_volume_claim(namespace, _request_timeout=5)
-        for pvc in persistent_volume_clames.items:
-            PVC = {
-                "status": pvc.status.phase,
-                "name": pvc.metadata.name,
-                "created": pvc.metadata.creation_timestamp.strftime('%Y-%m-%d %H:%M:%S'),
-                "annotations": pvc.metadata.annotations,
-                "labels": pvc.metadata.labels,
-                "access_modes": pvc.spec.access_modes,
-                "storage_class_name": pvc.spec.storage_class_name,
-                "volume_name": pvc.spec.volume_name,
-                "volume_mode": pvc.spec.volume_mode,
-                "capacity": pvc.status.capacity['storage'],
-            }
-            PVC_LIST.append(PVC)
+        persistent_volume_clames = k8s_client.CoreV1Api().list_namespaced_persistent_volume_claim(namespace, _request_timeout=5)
+        if persistent_volume_clames:
+            for pvc in persistent_volume_clames.items:
+                PVC = {
+                    "status": pvc.status.phase,
+                    "name": pvc.metadata.name,
+                    "created": pvc.metadata.creation_timestamp.strftime('%Y-%m-%d %H:%M:%S'),
+                    "annotations": pvc.metadata.annotations,
+                    "labels": pvc.metadata.labels,
+                    "access_modes": pvc.spec.access_modes,
+                    "storage_class_name": pvc.spec.storage_class_name,
+                    "volume_name": pvc.spec.volume_name,
+                    "volume_mode": pvc.spec.volume_mode,
+                    "capacity": pvc.status.capacity['storage'],
+                }
+                PVC_LIST.append(PVC)
         return PVC_LIST
     except ApiException as error:
         if error.status != 404:
@@ -3018,33 +3019,34 @@ def k8sPersistentVolumeListGet(username_role, user_token, namespace):
     PV_LIST = list()
     try:
         pv_list = k8s_client.CoreV1Api().list_persistent_volume(_request_timeout=5)
-        for pv in pv_list.items:
-            if namespace == pv.spec.claim_ref.namespace:
-                PV = {
-                    "status": pv.status.phase,
-                    "name": pv.metadata.name,
-                    "created": pv.metadata.creation_timestamp.strftime('%Y-%m-%d %H:%M:%S'),
-                    "annotations": pv.metadata.annotations,
-                    "labels": pv.metadata.labels,
-                    "access_modes": pv.spec.access_modes,
-                    "storage_class_name": pv.spec.storage_class_name,
-                    "volume_claim_name": pv.spec.claim_ref.name,
-                    "volume_claim_namespace": pv.spec.claim_ref.namespace,
-                    "reclaim_policy": pv.spec.persistent_volume_reclaim_policy,
-                    "volume_mode": pv.spec.volume_mode,
-                    "capacity": pv.spec.capacity['storage'],
-                }
-                if pv.metadata.deletion_timestamp:
-                    PV.update({"status": "Terminating"})
-                    PV.update({"deleted": pv.metadata.deletion_timestamp})
-                if pv.spec.csi:
-                    PV.update({"csi_driver": pv.spec.csi.driver})
-                    PV.update({"fs_type": pv.spec.csi.fs_type})
-                    PV.update({"volume_attributes":  pv.spec.csi.volume_attributes})
-                if pv.spec.host_path:
-                    PV.update({"host_path": pv.spec.host_path.path})
-                    continue
-                PV_LIST.append(PV)
+        if pv_list:
+            for pv in pv_list.items:
+                if namespace == pv.spec.claim_ref.namespace:
+                    PV = {
+                        "status": pv.status.phase,
+                        "name": pv.metadata.name,
+                        "created": pv.metadata.creation_timestamp.strftime('%Y-%m-%d %H:%M:%S'),
+                        "annotations": pv.metadata.annotations,
+                        "labels": pv.metadata.labels,
+                        "access_modes": pv.spec.access_modes,
+                        "storage_class_name": pv.spec.storage_class_name,
+                        "volume_claim_name": pv.spec.claim_ref.name,
+                        "volume_claim_namespace": pv.spec.claim_ref.namespace,
+                        "reclaim_policy": pv.spec.persistent_volume_reclaim_policy,
+                        "volume_mode": pv.spec.volume_mode,
+                        "capacity": pv.spec.capacity['storage'],
+                    }
+                    if pv.metadata.deletion_timestamp:
+                        PV.update({"status": "Terminating"})
+                        PV.update({"deleted": pv.metadata.deletion_timestamp})
+                    if pv.spec.csi:
+                        PV.update({"csi_driver": pv.spec.csi.driver})
+                        PV.update({"fs_type": pv.spec.csi.fs_type})
+                        PV.update({"volume_attributes":  pv.spec.csi.volume_attributes})
+                    if pv.spec.host_path:
+                        PV.update({"host_path": pv.spec.host_path.path})
+                        continue
+                    PV_LIST.append(PV)
         return PV_LIST
     except ApiException as error:
         if error.status != 404:
@@ -3069,21 +3071,22 @@ def k8sPersistentVolumeSnapshotListGet(username_role, user_token):
             "volumesnapshots", 
             _request_timeout=5
         )
-        for pvs in snapshot_list["items"]:
-            PVS = {
-            "name": pvs["metadata"]["name"],
-            "annotations": pvs["metadata"]["annotations"],
-            "created": pvs["metadata"]["creationTimestamp"].strftime('%Y-%m-%d %H:%M:%S'),
-            "pvc": pvs["spec"]["source"]["persistentVolumeClaimName"],
-            "volume_snapshot_class": pvs["spec"]["volumeSnapshotClassName"],
-            "volume_snapshot_content": pvs["status"]["boundVolumeSnapshotContentName"],
-            "snapshot_creation_time": pvs["status"]["creationTime"],
-            "status": pvs["status"]["readyToUse"],
-            "restore_size": pvs["status"]["restoreSize"],
-            }
-            if "labels" in pvs["metadata"]:
-                PVS["labels"] = pvs["metadata"]["labels"]
-            PVS_LIST.append(PVS)
+        if snapshot_list:
+            for pvs in snapshot_list["items"]:
+                PVS = {
+                "name": pvs["metadata"]["name"],
+                "annotations": pvs["metadata"]["annotations"],
+                "created": pvs["metadata"]["creationTimestamp"].strftime('%Y-%m-%d %H:%M:%S'),
+                "pvc": pvs["spec"]["source"]["persistentVolumeClaimName"],
+                "volume_snapshot_class": pvs["spec"]["volumeSnapshotClassName"],
+                "volume_snapshot_content": pvs["status"]["boundVolumeSnapshotContentName"],
+                "snapshot_creation_time": pvs["status"]["creationTime"],
+                "status": pvs["status"]["readyToUse"],
+                "restore_size": pvs["status"]["restoreSize"],
+                }
+                if "labels" in pvs["metadata"]:
+                    PVS["labels"] = pvs["metadata"]["labels"]
+                PVS_LIST.append(PVS)
         return PVS_LIST
     except ApiException as error:
         ErrorHandler(logger, error, "get Volume Snapshot list - %s" % error.status)
@@ -3101,16 +3104,17 @@ def k8sConfigmapListGet(username_role, user_token, namespace):
     k8sClientConfigGet(username_role, user_token)
     CONFIGMAP_LIST = list()
     configmap_list = k8s_client.CoreV1Api().list_namespaced_config_map(namespace, _request_timeout=5)
-    for configmap in configmap_list.items:
-        CONFIGMAP_DATA = {
-            "name": configmap.metadata.name,
-            "created": configmap.metadata.creation_timestamp.strftime('%Y-%m-%d %H:%M:%S'),
-            "annotations": configmap.metadata.annotations,
-            "labels": configmap.metadata.labels,
-            "data": configmap.data,
-            "version": configmap.metadata.resource_version,
-        }
-        CONFIGMAP_LIST.append(CONFIGMAP_DATA)
+    if configmap_list:
+        for configmap in configmap_list.items:
+            CONFIGMAP_DATA = {
+                "name": configmap.metadata.name,
+                "created": configmap.metadata.creation_timestamp.strftime('%Y-%m-%d %H:%M:%S'),
+                "annotations": configmap.metadata.annotations,
+                "labels": configmap.metadata.labels,
+                "data": configmap.data,
+                "version": configmap.metadata.resource_version,
+            }
+            CONFIGMAP_LIST.append(CONFIGMAP_DATA)
 
     return CONFIGMAP_LIST
 
