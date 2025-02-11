@@ -55,7 +55,7 @@ def init_db_test(SQLALCHEMY_DATABASE_URI, EXTERNAL_DATABASE_ENABLED, DATABASE_TY
     Args:
         SQLALCHEMY_DATABASE_URI (str): Database URI
         EXTERNAL_DATABASE_ENABLED (bool): Flag indicating if external database is enabled
-        DATABASE_TYPE (str): Type of database (e.g., 'postgres', 'mysql')
+        DATABASE_TYPE (str): Type of database (e.g., 'postgres')
     
     Returns:
         bool: A flag indicating if the database initialization was successful
