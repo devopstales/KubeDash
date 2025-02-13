@@ -165,8 +165,8 @@ def initialize_app_plugins(app: Flask):
             "registry":              app.config['kubedash.ini'].getboolean('plugin_settings', 'registry', fallback=False),
             "helm":                  app.config['kubedash.ini'].getboolean('plugin_settings', 'helm', fallback=True),
             "gateway_api":           app.config['kubedash.ini'].getboolean('plugin_settings', 'gateway_api', fallback=False),
-            "cert_manager":          app.config['kubedash.ini'].getboolean('plugin_settings', 'cert_manager', fallback=True),
-            "external_loadbalancer": app.config['kubedash.ini'].getboolean('plugin_settings', 'external_loadbalancer', fallback=True),
+            "cert_manager":          app.config['kubedash.ini'].getboolean('plugin_settings', 'cert_manager', fallback=False),
+            "external_loadbalancer": app.config['kubedash.ini'].getboolean('plugin_settings', 'external_loadbalancer', fallback=False),
         }
     
     """Plugin Logging"""

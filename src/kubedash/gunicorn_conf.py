@@ -12,3 +12,10 @@ graceful_timeout = 120
 timeout = 120
 keepalive = 5
 threads = 100
+
+def pre_request(worker, req):
+    if req.path == '/api/health/live':
+        return
+    elif req.path == '/api/health/ready':
+        return
+    worker.log.debug("%s %s" % (req.method, req.path))

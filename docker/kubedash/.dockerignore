@@ -5,7 +5,17 @@ kubedash/tests
 kubedash/run.sh
 kubedash/kubedash.ini
 kubedash/requirements.txt
+kubedash/.devcontainer
+kubedash/.skaffold.yaml
+kubedash/.venv
+kubedash/kubedash.ini.example
+kubedash/.pytest_cache
+kubedash/*.md
+kubedash/*.sh
+*.sh
+!entrypoint.sh
 __pycache__
+*.md
 *.pyc
 *.pyo
 *.pyd

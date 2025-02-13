@@ -1,5 +1,5 @@
 codeSHELL=/bin/bash -o pipefail
-export VERSION=3.1
+export VERSION=3.1.0
 
 .ONESHELL: # Applies to every targets in the file!
 .PHONY:	all
@@ -15,16 +15,11 @@ help:
 kubedash-build:
 	rm -rf docker/kubedash/kubedash
 	cp -r src/kubedash docker/kubedash/kubedash
-	rm -rf docker/kubedash/kubedash/instance/
-	rm -rf docker/kubedash/kubedash/database/*
-	rm -rf docker/kubedash/kubedash/tests/
-	rm -rf docker/kubedash/kubedash/.pytest_cache/
-	rm -rf docker/kubedash/kubedash/.vscode/
-	rm -rf docker/kubedash/kubedash/__pycache__/
-	rm -rf docker/kubedash/kubedash/functions/__pycache__/
 	rm -f docker/kubedash/requirements.txt
 	cp docker/kubedash/kubedash/requirements.txt docker/kubedash/requirements.txt
-	docker build -t devopstales/kubedash:$(VERSION)-devel docker/kubedash
+	rm -f docker/kubedash/gunicorn_conf.py
+	cp docker/kubedash/kubedash/gunicorn_conf.py docker/kubedash/gunicorn_conf.py
+	docker build --build-arg VERSION=$(VERSION)-devel -t devopstales/kubedash:$(VERSION)-devel docker/kubedash
 
 #kubedash-push: @ Push local kubedash devel image
 kubedash-push:

@@ -108,12 +108,19 @@ oidc:
 # -- enable plugins
 plugins:
   registryUi:
-    # -- Enable registry UI plugin with set PLUGIN_REGISTRY_ENABLED
+    # -- Enable registry UI plugin
     enabled: false
   helmDashboard:
-    # -- Enable helm dashboard plugin with set PLUGIN_HELM_ENABLED
+    # -- Enable helm dashboard plugin
     enabled: true
+  certManager:
+    # -- Enable helm dashboard plugin
+    enabled: false
+  externalLoadbalancer:
+    # -- Enable external loadbalancer plugin
+    enabled: false
 
+# -- enable persistence
 persistence:
   # -- Volumes for the pod
   enabled: true

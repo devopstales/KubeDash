@@ -12,6 +12,12 @@ data:
     [DEFAULT]
     app_mode = production
 
+    #################################### Security ############################
+    [security]
+
+    # default admin password, can be changed before first start of grafana, or in profile settings
+    admin_password = admin
+
     #################################### Database ############################
     [database]
     {{ if .Values.externalDatabase.enabled }}
@@ -56,9 +62,16 @@ data:
     api_ca = {{ .Values.cluster.caCert | b64enc }}
     {{ end }}
 
+    #################################### Monitoring Settings ###########################
+    [monitoring]
+
+    jaeger_enabled = false
+    jaeger_http_endpoint = http://127.0.0.1:4318
+
     #################################### Plugin Settings ###########################
     [plugin_settings]
-    registry = true
-    helm = true
-    gateway_api = true
-    cert_manager = true
+    registry = {{ .Values.plugins.registryUi.enabled }}
+    helm = {{ .Values.plugins.helmDashboard.enabled }}
+    gateway_api = false
+    cert_manager = {{ .Values.plugins.certManager.enabled }}
+    external_loadbalancer = {{ .Values.plugins.externalLoadbalancer.enabled }}

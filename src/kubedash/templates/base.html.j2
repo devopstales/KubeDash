@@ -155,8 +155,8 @@
                     <div class="bg-white py-2 collapse-inner rounded">
                         <a class="collapse-item" href="/namespaces">Namespaces</a>
                         <a class="collapse-item" href="/nodes">Nodes</a>
-                        <a class="collapse-item" href="#">CRDs</a>
-                        <a class="collapse-item" href="#">Runetime Class</a>
+                        <!-- <a class="collapse-item" href="#">CRDs</a>
+                        <a class="collapse-item" href="#">Runetime Class</a> -->
                     </div>
                 </div>
             </li>
@@ -322,11 +322,11 @@
                             <input type="hidden" name="ns_select" value="{{ session['ns_select'] }}" />
                             <a class="collapse-item" href="#" onclick="event.preventDefault(); this.parentNode.submit()">HPAs</a>
                         </form>
-                        <form action="/#" method="POST">
+                        <!-- <form action="/#" method="POST">
                             <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
                             <input type="hidden" name="ns_select" value="{{ session['ns_select'] }}" />
                             <a class="collapse-item" href="#" onclick="event.preventDefault(); this.parentNode.submit()">VPAs</a>
-                        </form>
+                        </form> -->
                         <form action="/pod_disruption_budget" method="POST">
                             <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
                             <input type="hidden" name="ns_select" value="{{ session['ns_select'] }}" />
@@ -400,10 +400,10 @@
                         <a class="collapse-item" href="/charts">Helm Charts</a>
                         {% endif %}
                         {% if config.plugins["cert_manager"] %}
-                        <a class="collapse-item" href="/cert-manager">Cert-Manager</a>
+                        <a class="collapse-item" href="/cert-manager">Cert-Manager (Beta)</a>
                         {% endif %}
                         {% if config.plugins["external_loadbalancer"] %}
-                        <a class="collapse-item" href="/external-loadbalancer">External LoadBalancer</a>
+                        <a class="collapse-item" href="/external-loadbalancer">LoadBalancer (Beta)</a>
                         {% endif %}
                     </div>
                 </div>
