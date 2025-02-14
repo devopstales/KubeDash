@@ -2,7 +2,7 @@
 
 To log in for the first time the default user and password is `admin` `admin`. After you log into the web-ui you will alert to change the default admin password.
 
-![First Login](../img/KubeDash_1.0_pic_03.png)
+![First Login](../img/KubeDash_3.0_pic_03.png)
 
 ## Authentication
 
@@ -43,3 +43,5 @@ Once an user logged in to KubeDash the their access rights within the system, is
 From kubernetes perspective all of your privileges are determined by Role-Based Access Control (RBAC). The KubeDash Admin role allow you to use the KubeDash pod's cluster-admin ServiceAccount for the interactions with the kubernetes API. 
 
 With the Local role KubeDash use your OIDC token for the same purpose, so you have the same privileges as in the cli.
+
+You can manage Roles from the KubDash UI. See in the next section for more information.

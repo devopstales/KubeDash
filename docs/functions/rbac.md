@@ -10,6 +10,14 @@ With KuDash, you can create users, assign namespaces/permissions, and distribute
 
 ![Kubernetes Roles and Role bindings](../img/KubeDash_1.1_pic_01_rbac.png)
 
-The application allows us to define and select permission-templates and associate them with all the users you might want to create. This defining can be done, within a namespace or globally. The template system is an abstraction over Cluster-Roles, RoleBinding, and ClusterRolesBindigs. A template is a ClusterRole with a prefix `template-namespaced-resources___` for example `template-namespaced-resources___developer` 
+The application allows us to define and select permission-templates and associate them with all the users you might want to create. This configuration can be applied, within a namespace or globally. The template system is an abstraction over Cluster-Roles, RoleBinding, and ClusterRolesBindigs. A template is a ClusterRole with a prefix `template-namespaced-resources---` for example `template-namespaced-resources---developer` 
 
-You can create your own templates by creating a clusterRole starting with the `template-namespaced-resources___` prefix. KubeDash will automatically detect your custom templates.
+The fallowing ClusterRoles are the default templates:
+
+* `template-cluster-resources—--admin` - Custer Admin privilege to use in cluster role bindings.
+* `template-cluster-resources—--reader` - Cluster Read only privilege to use in cluster role bindings.
+* `template-namespaced-resources—--deployer` - Deployer privilege for technical users to use in cluster role bindings.
+* `template-namespaced-resources—--developer` - Developer  privilege for developers to use in role bindings.
+* `template-namespaced-resources—--operation` - Namespace Admin privilege to use in role bindings.
+
+You can create your own templates by creating a clusterRole starting with the `template-namespaced-resources---` prefix. KubeDash will automatically detect your custom templates.
