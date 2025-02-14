@@ -19,6 +19,7 @@ docker/kubedash/kubedash
 
 # mkdocs documentation
 /site
+docs/.venv
 
 # macOS
 .dccache

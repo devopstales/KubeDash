@@ -1,0 +1,82 @@
+version: '3'
+
+env:
+  VERSION: "3.1.0"
+  DATE: 
+    sh: date "+%Y.%m.%d"
+
+tasks:
+  default:
+    desc: "Print Help"
+    cmds:
+      - "task --list-all"
+
+  kubedash-build:
+    desc: "Build Kubedash docker image"
+    cmds:
+      - rm -rf docker/kubedash/kubedash
+      - cp -r src/kubedash docker/kubedash/kubedash
+      - rm -f docker/kubedash/requirements.txt
+      - cp docker/kubedash/kubedash/requirements.txt docker/kubedash/requirements.txt
+      - rm -f docker/kubedash/gunicorn_conf.py
+      - cp docker/kubedash/kubedash/gunicorn_conf.py docker/kubedash/gunicorn_conf.py
+      - docker build --build-arg BUILD_DATE={{.DATE}} --build-arg VERSION={{.VERSION}}-devel -t devopstales/kubedash:{{.VERSION}}-devel docker/kubedash
+
+  kubedash-scan:
+    desc: "Scan Kubedash Dockerfile for vulnerabilities"
+    cmds:
+      - trivy -q i devopstales/kubedash:{{.VERSION}}-devel --scanners vuln
+
+  kubedash-push:
+    desc: "Push Kubedash docker image"
+    cmds:
+      - docker push devopstales/kubedash:{{.VERSION}}-devel
+
+  kubedash-rm:
+    desc: "Remove Kubedash docker image"
+    cmds:
+      - docker rmi devopstales/kubedash:{{.VERSION}}-devel
+
+  kdlogin-build:
+    desc: "Build kubectl-kdlogin"
+    dir: 'src/kdlogin'
+    cmds:
+      - go mod tidy
+      - sed -i "s|AppVersion = .*|AppVersion = \"{{.VERSION}}\"|" main.go
+      - rm -rf dist/{windows,linux,osx,release}
+      - rm -f dist/choco/*.nupkg
+      - env CGO_ENABLED=0 go build -o dist/linux/kubectl-kdlogin main.go
+      - env CGO_ENABLED=0 GOOS=darwin GOARCH=amd64 go build -o dist/osx/kubectl-kdlogin main.go
+      - env CGO_ENABLED=0 GOOS=windows GOARCH=amd64 go build -o dist/windows/kubectl-kdlogin.exe main.go
+    status:
+      - test -f dist/linux/kubectl-kdlogin
+      - test -f dist/osx/kubectl-kdlogin
+      - test -f dist/windows/kubectl-kdlogin.exe
+
+  kdlogin-scan:
+   desc: "Scan kubectl-kdlogin for vulnerabilities"
+   dir: 'src/kdlogin'
+   cmds:
+     - trivy -q fs .
+
+  kdlogin-rm:
+    desc: "Remove kubectl-kdlogin"
+    dir: 'src/kdlogin'
+    cmds:
+      - rm -rf dist/{windows,linux,osx,release}
+      - rm -f dist/choco/*.nupkg
+
+  docs-gen:
+    desc: "Generate documentation"
+    dir: 'docs'
+    cmds:
+      - python3.11 -m venv .venv
+      - source .venv/bin/activate
+      - pip3 install -r build/requirements.txt
+      - mkdocs build
+
+  helm-docs:
+   desc: "Generate Helm Chart documentation"
+   dir: 'deploy/helm'
+   cmds:
+    - helm-docs

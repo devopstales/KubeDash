@@ -30,7 +30,7 @@ import (
 const (
 	kubeConfigEnvName         = "KUBECONFIG"
 	kubeConfigDefaultFilename = "~/.kube/config"
-	AppVersion                = "1.2"
+	AppVersion = "3.1.0"
 )
 
 type RequestOIDC struct {

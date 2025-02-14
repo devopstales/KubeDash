@@ -30,7 +30,7 @@ kubedash-rm:
 	docker image rm -f devopstales/kubedash:$(VERSION)-devel
 
 #kdlogin-build: @ Build kdlogin binaris with go
-kdlogin-build: |
+kdlogin-build:
 	cd src/kdlogin
 	go mod tidy
 	sed -i "s|AppVersion = .*|AppVersion = \"${VERSION}\"|" main.go

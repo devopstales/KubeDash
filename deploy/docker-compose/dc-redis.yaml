@@ -1,0 +1,11 @@
+services:
+  my-redis-docker-service:
+    image: redis:latest
+    healthcheck:
+      test: ["CMD-SHELL", "redis-cli ping | grep PONG"]
+      interval: 1s
+      timeout: 3s
+      retries: 5
+    ports:
+      - 6379:6379
+    command: ["redis-server"]
