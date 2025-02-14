@@ -669,14 +669,14 @@ def k8sGetPodMap(username_role, user_token, namespace):
             net.add_node(rs["name"], label=rs["name"], shape="image", group="replicaset")
             net.add_edge(on_name, rs["name"], arrowStrikethrough=False, physics=True, valu=1000)
 
-    has_report, pod_list = k8sPodListVulnsGet(username_role, user_token, namespace)
-    for po in pod_list:
-        if po["status"] == "Running":
-            net.add_node(po["name"], label=po["name"], shape="image", group="pod")
-            if po["owner"]:
-                if "replicationcontrollers" !=  po["owner"].split("/", 1)[0] and "jobs" != po["owner"].split("/", 1)[0]:
-                    on_name = po["owner"].split("/", 1)[1]
-                    net.add_edge(on_name, po["name"], arrowStrikethrough=False, physics=True, valu=1000)
+    #has_report, pod_list = k8sPodListVulnsGet(username_role, user_token, namespace)
+    #for po in pod_list:
+    #    if po["status"] == "Running":
+    #        net.add_node(po["name"], label=po["name"], shape="image", group="pod")
+    #        if po["owner"]:
+    #            if "replicationcontrollers" !=  po["owner"].split("/", 1)[0] and "jobs" != po["owner"].split("/", 1)[0]:
+    #                on_name = po["owner"].split("/", 1)[1]
+    #                net.add_edge(on_name, po["name"], arrowStrikethrough=False, physics=True, valu=1000)
 
     nodes = net.get_network_data()[0]
     edges = net.get_network_data()[1]
@@ -2103,6 +2103,7 @@ def k8sPodVulnsGet(username_role, user_token, ns, pod):
                 for vr in vulnerabilityreport_list['items']:
                     fixedVersion = None
                     publishedDate = None
+                    vuln_scoe = None
                     if 'trivy-operator.pod.name' in vr['metadata']['labels']:
                         if vr['metadata']['labels']['trivy-operator.pod.name'] == po.metadata.name:
                             HAS_REPORT = True
@@ -2112,12 +2113,14 @@ def k8sPodVulnsGet(username_role, user_token, ns, pod):
                                     fixedVersion = vuln['fixedVersion']
                                 if 'publishedDate' in vuln:
                                     publishedDate = vuln['publishedDate']
+                                if 'score' in vuln:
+                                    vuln_scoe = vuln['score']
                                 VULN_LIST.append({
                                     "vulnerabilityID": vuln['vulnerabilityID'],
                                     "severity": vuln['severity'],
-                                    "score": vuln['score'],
                                     "resource": vuln['resource'],
                                     "installedVersion": vuln['installedVersion'],
+                                    "score": vuln_scoe,
                                     "fixedVersion": fixedVersion,
                                     "publishedDate": publishedDate,
                                 })
@@ -2132,12 +2135,14 @@ def k8sPodVulnsGet(username_role, user_token, ns, pod):
                                         fixedVersion = vuln['fixedVersion']
                                     if 'publishedDate' in vuln:
                                         publishedDate = vuln['publishedDate']
+                                    if 'score' in vuln:
+                                        vuln_scoe = vuln['score']
                                     VULN_LIST.append({
                                         "vulnerabilityID": vuln['vulnerabilityID'],
                                         "severity": vuln['severity'],
-                                        "score": vuln['score'],
                                         "resource": vuln['resource'],
                                         "installedVersion": vuln['installedVersion'],
+                                        "score": vuln_scoe,
                                         "fixedVersion": fixedVersion,
                                         "publishedDate": publishedDate,
                                     })
@@ -3141,7 +3146,7 @@ def k8sUserPriviligeList(username_role="Admin", user_token=None, user="admin"):
                         if rb.role_ref.kind == "ClusterRole":
                             CLUSTER_ROLE_LIST.append(rb.role_ref.name)
                         elif rb.role_ref.kind == "Role":
-                            ROLE_LIST.append([rb.role_ref.namespace, rb.role_ref.name])
+                            ROLE_LIST.append([ns, rb.role_ref.name])
 
     cluster_role_bindings = k8s_client.RbacAuthorizationV1Api().list_cluster_role_binding(_request_timeout=5)
     for crb in cluster_role_bindings.items:
