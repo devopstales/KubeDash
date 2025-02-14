@@ -54,17 +54,17 @@ spec:
         livenessProbe:
           httpGet:
             path: /api/health/live
-            port: 8000
+            port: 5000
           initialDelaySeconds: 5
           timeoutSeconds: 1
         readinessProbe:
           httpGet:
             path: /api/health/ready
-            port: 8000
+            port: 5000
           initialDelaySeconds: 5
           timeoutSeconds: 1
         ports:
-        - containerPort: 8000
+        - containerPort: 5000
           protocol: TCP
           name: http
         volumeMounts:

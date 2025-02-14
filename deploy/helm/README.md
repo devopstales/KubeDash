@@ -1,8 +1,8 @@
 ### KubeDash
 
-![Version: 3.0.0](https://img.shields.io/badge/Version-3.0.0-informational?style=for-the-badge)
+![Version: 3.1.0](https://img.shields.io/badge/Version-3.1.0-informational?style=for-the-badge)
 ![Type: application](https://img.shields.io/badge/Type-application-informational?style=for-the-badge)
-![AppVersion: 2.0.0](https://img.shields.io/badge/AppVersion-2.0.0-informational?style=for-the-badge)
+![AppVersion: 3.1.0](https://img.shields.io/badge/AppVersion-3.1.0-informational?style=for-the-badge)
 
 ![Alpine Linux 3.15.0](https://img.shields.io/badge/alpine_linux_3.15.0-0D597F?style=for-the-badge&logo=alpine-linux&logoColor=white)
 ![Helm](https://img.shields.io/badge/helm-0F1689?style=for-the-badge&logo=helm&logoColor=white)
@@ -25,9 +25,8 @@ The following tables lists configurable parameters of the KubeDash chart and the
 |-----|------|---------|-------------|
 | TimeZone | string | `"CET"` | Time Zone in container |
 | affinity | object | `{}` | Set the affinity for the pod. |
-| cluster | object | `{"apiUrl":"https://kubernetes.mydomain.intra:6443","caCert":"-----BEGIN CERTIFICATE-----\ncert data here\n-----END CERTIFICATE-----","name":"k8s-cluster"}` | k8s connection information. |
+| cluster | object | `{"apiUrl":"https://kubernetes.mydomain.intra:6443","name":"k8s-cluster"}` | k8s connection information. |
 | cluster.apiUrl | string | `"https://kubernetes.mydomain.intra:6443"` | k8s api url |
-| cluster.caCert | string | `"-----BEGIN CERTIFICATE-----\ncert data here\n-----END CERTIFICATE-----"` | k8s ca cert |
 | cluster.name | string | `"k8s-cluster"` | k8s api url |
 | containerSecurityContext | object | `{"allowPrivilegeEscalation":false,"capabilities":{"drop":["all"]}}` | list of the container's SecurityContexts |
 | externalDatabase | object | `{"database":"kubedash","enabled":false,"host":"","password":"kubedash-pass","port":5432,"secret":{"name":"kubedash-postgresql","useExistingSecret":false},"username":"kubedash-user"}` | enable external postgresql support |
@@ -38,7 +37,7 @@ The following tables lists configurable parameters of the KubeDash chart and the
 | image.repository | string | `"devopstales/kubedash"` | The docker image repository to use |
 | image.tag | string | `"2.0.0"` | The docker image tag to use |
 | imagePullSecrets | list | `[]` | pullsecrets |
-| ingress.annotations | object | `{"nginx.ingress.kubernetes.io/proxy-body-size":"10m"}` | Extra annotation to the Ingress object |
+| ingress.annotations | object | `{"nginx.ingress.kubernetes.io/proxy-body-size":"10m","nginx.ingress.kubernetes.io/proxy-read-timeout":"3600","nginx.ingress.kubernetes.io/proxy-send-timeout":"3600","nginx.ingress.kubernetes.io/server-snippets":"location / {\n  proxy_set_header Upgrade $http_upgrade;\n  proxy_http_version 1.1;\n  proxy_set_header X-Forwarded-Host $http_host;\n  proxy_set_header X-Forwarded-Proto $scheme;\n  proxy_set_header X-Forwarded-For $remote_addr;\n  proxy_set_header Host $host;\n  proxy_set_header Connection \"upgrade\";\n  proxy_cache_bypass $http_upgrade;\n}\n"}` | Extra annotation to the Ingress object |
 | ingress.className | string | `"nginx"` | Ingress class name |
 | ingress.enabled | bool | `true` | Enable Ingress object creation |
 | ingress.tls.certManager.clusterIssuer | string | `"letsencrypt"` | Name of the certManager cluster issuer to use |
@@ -59,13 +58,16 @@ The following tables lists configurable parameters of the KubeDash chart and the
 | oidc.provider.oidcUrl | string | `"https://sso.mydomain.intra/auth/realms/k8s"` | oidc issuer url |
 | oidc.secret.name | string | `"kubedash-oidc"` | Name of the secret storing OIDC_CLIENT_ID and OIDC_SECRET. |
 | oidc.secret.useExistingSecret | bool | `false` | Secret must provide the following variables: OIDC_CLIENT_ID and OIDC_SECRET. |
+| persistence | object | `{"accessMode":"ReadWriteOnce","annotations":{},"enabled":true,"size":"1Gi"}` | enable persistence |
 | persistence.accessMode | string | `"ReadWriteOnce"` | Volumes mode |
 | persistence.annotations | object | `{}` | Volumes annotations |
 | persistence.enabled | bool | `true` | Volumes for the pod |
 | persistence.size | string | `"1Gi"` | Volumes size |
-| plugins | object | `{"helmDashboard":{"enabled":true},"registryUi":{"enabled":false}}` | enable plugins |
-| plugins.helmDashboard.enabled | bool | `true` | Enable helm dashboard plugin with set PLUGIN_HELM_ENABLED |
-| plugins.registryUi.enabled | bool | `false` | Enable registry UI plugin with set PLUGIN_REGISTRY_ENABLED |
+| plugins | object | `{"certManager":{"enabled":false},"externalLoadbalancer":{"enabled":false},"helmDashboard":{"enabled":true},"registryUi":{"enabled":false}}` | enable plugins |
+| plugins.certManager.enabled | bool | `false` | Enable helm dashboard plugin |
+| plugins.externalLoadbalancer.enabled | bool | `false` | Enable external loadbalancer plugin |
+| plugins.helmDashboard.enabled | bool | `true` | Enable helm dashboard plugin |
+| plugins.registryUi.enabled | bool | `false` | Enable registry UI plugin |
 | podSecurityContext | object | `{"fsGroup":10001,"fsGroupChangePolicy":"OnRootMismatch","runAsNonRoot":true,"runAsUser":10001}` | list of the pos's SecurityContexts |
 | postgresqlHa | object | `{"enabled":false,"metrics":{"enabled":true,"serviceMonitor":{"enabled":false}},"persistence":{"enabled":true},"pgpool":{"adminPassword":"change-me","replicaCount":2},"postgresql":{"database":"kubedash","password":"kubedash-pass","postgresPassword":"change-me","repmgrPassword":"change-me","username":"kubedash-user"},"rbac":{"create":true}}` | deploy HA postgresql |
 | replicas | int | `1` | replica number - for multiple replicas you need to enable externalDatabase support |
