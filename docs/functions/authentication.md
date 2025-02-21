@@ -23,7 +23,7 @@ User Updated Successfully
 ![First Login](../img/KubeDash_1.1_pic_02_login.png)
 ### Configure OIDC provider
 
-To add an OIDC provider to KubeDash go to `Settings > SSO Configuration`:
+To add an OIDC provider to KubeDash go to `Settings > Auth Provider`:
 
 | Parameter | Description |
 |-----------|-------------|

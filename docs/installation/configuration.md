@@ -8,47 +8,230 @@ hide:
 Create a values file for your helm deploy:
 
 ```yaml
+# -- Time Zone in container
 TimeZone: "CET"
+# -- Log level
 logLevel: "INFO"
-flaskConfig: "production" #or development
+# -- flask environment: production or development
+flaskConfig: "production"
 
 serviceAccount:
+  # -- Enable automatic serviceAccount creation
   create: true
+  # -- Configure the name of the serviceAccount
   name: "kubedash-admin"
 
 image:
+  # -- The docker image repository to use
   repository: devopstales/kubedash
-  tag: 3.0.0
+  # -- Configure the pull policy
   pullPolicy: Always
+  # -- The docker image tag to use
+  tag: 3.1.0
 
+# -- pullsecrets
+imagePullSecrets: []
+
+# -- replica number - for multiple replicas you need to enable externalDatabase support
+replicas: 1
+
+# -- enable external postgresql support
+externalDatabase:
+  enabled: false
+  host: ""
+  port: 5432
+  database: "kubedash"
+  username: "kubedash-user"
+  password: "kubedash-pass"
+  secret:
+    # -- Name of the secret storing EXTERNAL_DATABASE_PASSWORD.
+    name: "kubedash-postgresql"
+    # -- Secret must provide the following variables: EXTERNAL_DATABASE_PASSWORD.
+    useExistingSecret: false
+
+# -- deploy HA postgresql
+postgresqlHa:
+  enabled: false
+  rbac:
+    create: true
+  persistence:
+    enabled: true
+#    storageClass: default
+  postgresql:
+    database: "kubedash"
+    username: "kubedash-user"
+    password: "kubedash-pass"
+    repmgrPassword: "change-me"
+    postgresPassword: "change-me"
+  pgpool:
+    replicaCount: 2
+    adminPassword: "change-me"
+  metrics:
+    enabled: true
+    serviceMonitor:
+      enabled: false
+# https://artifacthub.io/packages/helm/bitnami/postgresql-ha
+
+# -- enable metrics-server
+metricsServer:
+  enabled: false
+  args:
+    - --kubelet-preferred-address-types=InternalIP
+    - --kubelet-insecure-tls
+
+# -- k8s connection information.
+cluster:
+  # -- k8s api url
+  name: "k8s-cluster"
+  # -- k8s api url
+  apiUrl: "https://kubernetes.mydomain.intra:6443"
+  # `apiServer` is the url for kubectl
+  #   This is typically  https://api.fqdn
+  # -- k8s ca cert
+  caCert: |-
+    -----BEGIN CERTIFICATE-----
+    cert data here
+    -----END CERTIFICATE-----
+  # `caCrt` is the public / CA cert for the cluster
+  # cat /etc/kubernetes/pki/ca.crt
+
+# -- oidc connection information
+oidc:
+  # -- Enable oidc authentication
+  enabled: false
+  provider:
+    # -- oidc issuer url
+    oidcUrl: "https://sso.mydomain.intra/auth/realms/k8s"
+    # -- oidc scope
+    oidcScopes: "openid email"
+    # -- oidc client id
+    oidcClientId: ""
+    # -- oidc client secret
+    oidcSecret: ""
+  secret:
+    # -- Name of the secret storing OIDC_CLIENT_ID and OIDC_SECRET.
+    name: "kubedash-oidc"
+    # -- Secret must provide the following variables: OIDC_CLIENT_ID and OIDC_SECRET.
+    useExistingSecret: false
+
+# -- enable plugins
+plugins:
+  registryUi:
+    # -- Enable registry UI plugin with set PLUGIN_REGISTRY_ENABLED
+    enabled: false
+  helmDashboard:
+    # -- Enable helm dashboard plugin with set PLUGIN_HELM_ENABLED
+    enabled: true
+
+persistence:
+  # -- Volumes for the pod
+  enabled: true
+  # -- Volumes mode
+  accessMode: "ReadWriteOnce"
+  # -- Volumes size
+  size: "1Gi"
+  # -- Volumes annotations
+  annotations: {}
+  ## database data Persistent Volume Storage Class
+  ## If defined, storageClassName: <storageClass>
+  ## If set to "-", storageClassName: "", which disables dynamic provisioning
+  ## If undefined (the default) or set to null, no storageClassName spec is
+  ##   set, choosing the default provisioner.  (gp2 on AWS, standard on
+  ##   GKE, AWS & OpenStack)
+  ##
+  # storageClass: "-"
+
+ingress:
+  # -- Enable Ingress object creation
+  enabled: true
+  # -- Ingress class name
+  className: "nginx"
+  # -- URL of the Ingress object
+  url: "kubedash.mydomain.intra"
+  # -- Extra annotation to the Ingress object
+  annotations:
+    nginx.ingress.kubernetes.io/proxy-body-size: "10m"
+    nginx.ingress.kubernetes.io/proxy-read-timeout: "3600"
+    nginx.ingress.kubernetes.io/proxy-send-timeout: "3600"
+    nginx.ingress.kubernetes.io/server-snippets: |
+      location / {
+        proxy_set_header Upgrade $http_upgrade;
+        proxy_http_version 1.1;
+        proxy_set_header X-Forwarded-Host $http_host;
+        proxy_set_header X-Forwarded-Proto $scheme;
+        proxy_set_header X-Forwarded-For $remote_addr;
+        proxy_set_header Host $host;
+        proxy_set_header Connection "upgrade";
+        proxy_cache_bypass $http_upgrade;
+      }
+  tls:
+    # -- Enable tls on Ingress object
+    enabled: true
+    # -- Name of the secret storing tls cert
+    tlsSecret: ""
+    certManager:
+       # -- Enable certManager
+      enabled: false
+      # -- Name of the certManager cluster issuer to use
+      clusterIssuer: "letsencrypt"
+  whitelist:
+    # -- Enable ip blocking on ingress
+    enabled: false
+    # -- List of ips to allow communication
+    ips: []
+
+route:
+  # -- Enable OpenShift Route object creation
+  enabled: false
+  # -- URL of the OpenShift Route object
+  url: "kubedash.mydomain.intra"
+  # -- Extra annotation to the OpenShift Route object
+  annotations: {}
+
+# -- list of the pos's SecurityContexts
 podSecurityContext:
   runAsNonRoot: true
   runAsUser: 10001
+  fsGroup: 10001
+  fsGroupChangePolicy: "OnRootMismatch"
 
+# -- list of the container's SecurityContexts
 containerSecurityContext:
   allowPrivilegeEscalation: false
   capabilities:
     drop: ["all"]
 
-ingress:
-  enabled: true
-  url: "kubedash.mydomain.intra"
-  annotations:
-    nginx.ingress.kubernetes.io/proxy-body-size: "10m"
-    kubernetes.io/ingress.class: nginx
-  tls:
-    enabled: true
-    tlsSecret: "mycert-tls"
-    certManager:
-      enabled: false
-      clusterIssuer: "letsencrypt"
-  whitelist:
-    enabled: false
-    ips: []
-  
-route:
-  enabled: false
+## Define which Nodes the Pods are scheduled on.
+## ref: https://kubernetes.io/docs/user-guide/node-selection/
+# -- Set nodeSelector for the pod
+nodeSelector: {}
 
+## Tolerations for use with node taints
+## ref: https://kubernetes.io/docs/concepts/configuration/taint-and-toleration/
+# -- Set tolerations for the pod
+tolerations: []
+# - key: "key"
+#   operator: "Equal"
+#   value: "value"
+#   effect: "NoSchedule"
+
+## Assign custom affinity rules to the trivy operator
+## ref: https://kubernetes.io/docs/concepts/configuration/assign-pod-node/
+##
+
+## Assign custom affinity rules to the deployment
+## ref: https://kubernetes.io/docs/concepts/configuration/assign-pod-node/
+# -- Set the affinity for the pod.
+affinity: {}
+# nodeAffinity:
+#   requiredDuringSchedulingIgnoredDuringExecution:
+#     nodeSelectorTerms:
+#     - matchExpressions:
+#       - key: kubernetes.io/e2e-az-name
+#         operator: In
+#         values:
+#         - e2e-az1
+#         - e2e-az2
 ```
 
 ## Operator Configuration
