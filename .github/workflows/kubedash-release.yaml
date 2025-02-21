@@ -50,14 +50,11 @@ jobs:
       - name: Prepare kubedash
         id: prep_kubedash
         run: |
-          cp -r src/kubedash docker/kubedash
-          rm -rf docker/kubedash/kubedash/instance/
-          rm -rf docker/kubedash/kubedash/tests/
-          rm -rf docker/kubedash/kubedash/database/*
-          rm -rf docker/kubedash/kubedash/.pytest_cache/
-          rm -rf docker/kubedash/kubedash/.vscode/
-          rm -rf docker/kubedash/kubedash/__pycache__/
-          rm -rf docker/kubedash/kubedash/functions/__pycache__/
+          cp -r src/kubedash docker/kubedash/kubedash
+          rm -f docker/kubedash/requirements.txt
+          cp docker/kubedash/kubedash/requirements.txt docker/kubedash/requirements.txt
+          rm -f docker/kubedash/gunicorn_conf.py
+          cp docker/kubedash/kubedash/gunicorn_conf.py docker/kubedash/gunicorn_conf.py
 
       - name: Build amd64 kubedash
         uses: docker/build-push-action@v3.3.0
@@ -95,7 +92,7 @@ jobs:
       - name: Write signing key to disk
         run: echo "${{ secrets.COSIGN_PRIVATE_KEY }}" > cosign.key
 
-      - name: Sign the images
+      - name: Sign the DockerHub image
         run: |
           cosign sign --key cosign.key --yes \
             -a "workflow=${{ github.workflow }}" \
@@ -105,7 +102,7 @@ jobs:
         env:
           COSIGN_PASSWORD: ${{ secrets.COSIGN_PASSWORD }}
 
-      - name: Sign the images
+      - name: Sign the DockerHub amd64 image
         run: |
           cosign sign --key cosign.key --yes \
             -a "workflow=${{ github.workflow }}" \
@@ -115,7 +112,7 @@ jobs:
         env:
           COSIGN_PASSWORD: ${{ secrets.COSIGN_PASSWORD }}
 
-      - name: Sign the images
+      - name: Sign the DockerHub arm64v8 image
         run: |
           cosign sign --key cosign.key --yes \
             -a "workflow=${{ github.workflow }}" \
@@ -132,7 +129,7 @@ jobs:
           images: ghcr.io/devopstales/kubedash:${{github.ref_name}}-amd64,ghcr.io/devopstales/kubedash:${{github.ref_name}}-arm64v8
           push: true
 
-      - name: Sign the images
+      - name: Sign the GitHub image
         run: |
           cosign sign --key cosign.key --yes \
             -a "workflow=${{ github.workflow }}" \
@@ -142,7 +139,7 @@ jobs:
         env:
           COSIGN_PASSWORD: ${{ secrets.COSIGN_PASSWORD }}
 
-      - name: Sign the images
+      - name: Sign the GitHub amd64 image
         run: |
           cosign sign --key cosign.key --yes \
             -a "workflow=${{ github.workflow }}" \
@@ -152,7 +149,7 @@ jobs:
         env:
           COSIGN_PASSWORD: ${{ secrets.COSIGN_PASSWORD }}
 
-      - name: Sign the images
+      - name: Sign the GitHub arm64v8 image
         run: |
           cosign sign --key cosign.key --yes \
             -a "workflow=${{ github.workflow }}" \
@@ -166,6 +163,7 @@ jobs:
         uses: aquasecurity/trivy-action@master
         with:
           image-ref: ghcr.io/devopstales/kubedash:${{github.ref_name}}
+          scan-type: image
           format: 'sarif'
           output: 'trivy-results.sarif'
         env:
@@ -176,3 +174,49 @@ jobs:
         uses: github/codeql-action/upload-sarif@v2
         with:
           sarif_file: 'trivy-results.sarif'
+
+      - name: Scan image in a private registry - GitHub Packages
+        uses: aquasecurity/trivy-action@master
+        with:
+          image-ref: ghcr.io/devopstales/kubedash:${{github.ref_name}}
+          scan-type: image
+          format: 'github'
+          output: 'dependency-results.sbom.json'
+          github-pat: ${{ secrets.GITHUB_TOKEN }}
+          severity: "MEDIUM,HIGH,CRITICAL"
+          scanners: "vuln"
+        env:
+          TRIVY_USERNAME: ${{ github.actor }}
+          TRIVY_PASSWORD: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Upload trivy report as a Github artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: trivy-sbom-report
+          path: '${{ github.workspace }}/dependency-results.sbom.json'
+          retention-days: 365
+
+      - name: Scan image in a private registry - DockerHub SBOM
+        uses: aquasecurity/trivy-action@master
+        with:
+          image-ref: devopstales/kubedash:${{github.ref_name}}
+          scan-type: image
+          format: 'cosign-vuln'
+          output: 'image.sbom'
+          github-pat: ${{ secrets.GITHUB_TOKEN }}
+          severity: "MEDIUM,HIGH,CRITICAL"
+          scanners: "vuln"
+        env:
+          TRIVY_USERNAME: ${{ github.actor }}
+          TRIVY_PASSWORD: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Upload trivy SBOM to DockerHub
+        run: |
+          cosign attach sbom --sbom image.sbom \
+            devopstales/kubedash:${{github.ref_name}}
+
+          cosign sign --key cosign.key --yes \
+            --attachment sbom \
+            devopstales/kubedash:${{github.ref_name}}
+        env:
+          COSIGN_PASSWORD: ${{ secrets.COSIGN_PASSWORD }}
