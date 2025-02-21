@@ -1,0 +1,84 @@
+apiVersion: metallb.io/v1beta1
+kind: IPAddressPool
+metadata:
+  name: ippool-ns-service-alloc-sample
+  namespace: ingress-system
+spec:
+  addresses:
+    - 192.168.20.0/24
+  avoidBuggyIPs: true
+  serviceAllocation:
+    priority: 50
+    namespaces:
+      - namespace-a
+      - namespace-b
+    namespaceSelectors:
+      - matchLabels:
+          foo: bar
+          test: elek
+    serviceSelectors:
+      - matchExpressions:
+          - {key: app, operator: In, values: [bar]}
+---
+apiVersion: metallb.io/v1beta1
+kind: BGPAdvertisement
+metadata:
+  name: local
+  namespace: ingress-system
+spec:
+  ipAddressPools:
+  - ippool-ns-service-alloc-sample
+  aggregationLength: 32
+  localPref: 100
+  communities:
+  - 65535:65282
+---
+apiVersion: metallb.io/v1beta1
+kind: BGPAdvertisement
+metadata:
+  name: external1
+  namespace: ingress-system
+spec:
+  localPref: 100
+  ipAddressPools:
+  - ippool-ns-service-alloc-sample
+  aggregationLength: 24
+---
+apiVersion: metallb.io/v1beta2
+kind: BGPPeer
+metadata:
+  name: example2
+  namespace: ingress-system
+spec:
+  myASN: 64512
+  peerASN: 64512
+  peerAddress: 172.30.0.3
+  peerPort: 180
+  nodeSelectors:
+  - matchLabels:
+      rack: frontend
+    matchExpressions:
+    - key: network-speed
+      operator: NotIn
+      values: [slow]
+  - matchExpressions:
+    - key: kubernetes.io/hostname
+      operator: In
+      values: [hostA, hostB]
+---
+apiVersion: metallb.io/v1beta1
+kind: L2Advertisement
+metadata:
+  name: l2advertisement
+  namespace: ingress-system
+spec:
+  ipAddressPools:
+  - ippool-ns-service-alloc-sample
+  interfaces:
+  - eth0
+  - eth1
+  nodeSelectors:
+  - matchLabels:
+      kubernetes.io/hostname: NodeA
+  - matchLabels:
+      kubernetes.io/hostname: NodeB

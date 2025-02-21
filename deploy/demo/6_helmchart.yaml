@@ -1,0 +1,8 @@
+apiVersion: helm.cattle.io/v1
+kind: HelmChart
+metadata:
+  name: nginx
+  namespace: network-testing
+spec:
+  chart: https://charts.bitnami.com/bitnami/nginx-5.1.4.tgz
+  targetNamespace: default

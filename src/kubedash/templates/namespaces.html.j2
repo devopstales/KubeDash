@@ -70,7 +70,7 @@
                     <tr>
                         <th>Status</th>
                         <th>Namespace</th>
-                        <th>Lables</th>
+                        <th>Created</th>
                         <th>Action</th>
                     </tr>
                 </thead>
@@ -78,7 +78,7 @@
                     <tr>
                         <th>Status</th>
                         <th>Namespace</th>
-                        <th>Lables</th>
+                        <th>Created</th>
                         <th>Action</th>
                     </tr>
                 </tfoot>
@@ -96,12 +96,16 @@
                         <span class="badge badge-danger">{{ ns.status }}</span>
                       {% endif %}
                       </td>
-                      <td>{{ ns.name }}</td>
                       <td>
-                      {% for label in ns.labels %} 
-                          <span class="badge badge-secondary">{{ label }}</span>
-                          {% if not loop.last %}<br>{% endif %}
-                      {% endfor %}
+                          <form action="/namespaces/data" method="POST">
+                            <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+                            <input type="hidden" name="ns_data" value="{{ ns }}" />
+                            <a href="javascript:;" onclick="parentNode.submit();">{{ ns.name }}</a>
+                          </form>
+                        
+                      </td>
+                      <td>
+                        {{ ns.created }}
                       <td>
                         <div class="form-row">
                           {% if session['user_role'] == "Admin" %}

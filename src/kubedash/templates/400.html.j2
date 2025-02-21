@@ -20,36 +20,40 @@
     
         <!-- child template -->
     </head>
-    <body>
-        <!-- Begin Page Content -->
-        <div class="container-fluid">
-            <!-- 400 Error Text -->
-            <div class="text-center">
-              <div class="error mx-auto" data-text="400">400</div>
-              <p class="lead text-gray-800 mb-5">{{ description }}</p>
-              <p class="text-gray-500 mb-0">It looks like you found a glitch in the matrix...</p>
-              <a href="/">&larr; Back to Dashboard</a>
-            </div>
+    <body id="page-top">
+
+    <!-- Topbar -->
+    <nav class="navbar navbar-expand navbar-light bg-white topbar mb-4 static-top shadow">
+    </nav>
+    <!-- End of Topbar -->
+
+    <div id="wrapper">
+      <!-- Begin Content Wrapper -->
+      <div id="content-wrapper" class="d-flex flex-column">
+        <!-- Begin Main Content -->
+        <div id="content">
+          <!-- Begin Page Content -->
+          <div class="container-fluid">
+              <!-- 404 Error Text -->
+              <div class="text-center">
+                <div class="error mx-auto" data-text="400">400</div>
+                <p class="lead text-gray-800 mb-5">{{ description }}</p>
+                <p class="text-gray-500 mb-0">It looks like you found a glitch in the matrix...</p>
+                <a href="/">&larr; Back to Dashboard</a>
+              </div>
           </div>
-          <!-- /.container-fluid -->
+          <!-- End Page Content -->
         </div>
         <!-- End of Main Content -->
-  
-        <!-- Footer -->
-        <footer class="sticky-footer bg-white">
-          <div class="container my-auto">
-            <div class="copyright text-center my-auto">
-                <span>Copyright &copy; DevOpsTales - KubeDash 2022</span>
-            </div>
-          </div>
-        </footer>
-        <!-- End of Footer -->
-  
       </div>
       <!-- End of Content Wrapper -->
-  
     </div>
     <!-- End of Page Wrapper -->
+
+    <!-- Footer -->
+    {% include 'base_booter.html.j2' %}
+    <!-- End of Footer -->
+  
   
     <!-- Scroll to Top Button-->
     <a class="scroll-to-top rounded" href="#page-top">
@@ -57,14 +61,14 @@
     </a>
   
     <!-- Bootstrap core JavaScript-->
-    <script src="static/vendor/jquery/jquery.min.js"></script>
-    <script src="static/vendor/bootstrap/js/bootstrap.bundle.min.js"></script>
-  
+    <script src="{{ url_for('static',filename='/vendor/jquery/jquery.min.js') }}"></script>
+    <script src="{{ url_for('static',filename='/vendor/bootstrap/js/bootstrap.bundle.min.js') }}"></script> 
+
     <!-- Core plugin JavaScript-->
-    <script src="static/vendor/jquery-easing/jquery.easing.min.js"></script>
-  
+    <script src="{{ url_for('static',filename='/vendor/jquery-easing/jquery.easing.min.js') }}"></script>
+
     <!-- Custom scripts for all pages-->
-    <script src="static/js/sb-admin-2.min.js"></script>
+    <script src="{{ url_for('static',filename='/js/sb-admin-2.min.js') }}"></script> 
   
     </body>
 </html>

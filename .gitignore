@@ -1,10 +1,13 @@
 # custom
+CA.crt
+.venv/
 *instance/
 *database/
 *neo4j/
-test*
 *.crt
 *manage.py
+src/kubedash/run.sh
+src/kubedash/kubedash.ini
 
 # deploy
 docker/kubedash/kubedash
@@ -12,9 +15,11 @@ docker/kubedash/kubedash
 # enable tests
 !tests
 !database/.gitkeep
+!.venv/.gitkeep
 
 # mkdocs documentation
 /site
+docs/.venv
 
 # macOS
 .dccache
@@ -22,7 +27,6 @@ docker/kubedash/kubedash
 # editor
 config.json
 .DS_Store
-.vscode
 
 # Byte-compiled / optimized / DLL files
 __pycache__/

@@ -1,5 +1,6 @@
+
 import pytest
-from functions.user import UserCreate, User, UsersRoles, Role
+from lib_functions.user import UserCreate, User, UsersRoles, Role
 from werkzeug.security import check_password_hash
 
 @pytest.mark.order("first")

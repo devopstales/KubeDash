@@ -1,32 +1,24 @@
-import responses, time
-from flask import url_for
+# https://playwright.dev/python/docs/intro
+import re
+from playwright.sync_api import Playwright, sync_playwright, expect
 
-def test_invalid_login(client):
-    client.post("/", data={"username": "test", "password": "testpassword"})
-    response = client.get("/dashboard")
-    assert response.status_code == 302
 
-@responses.activate
-def test_dashboard__not_logged_in(client):
-    res = client.get('/dashboard')
-    assert res.status_code == 302
-
-def test_dashboard__logged_in(client):
-    with client:
-        client.post("/", data={"username": "pytest", "password": "pytest"}, follow_redirects=True)
-        res = client.get('/dashboard')
-        assert res.status_code == 200
-
-def test_take_screenshot(live_server, page):
-    page.goto(url_for('main.login', _external=True))
-    page.screenshot(path="screenshots/home.png")
-
-def test_login(live_server, page):
-    page.goto(url_for('main.login', _external=True))
+def test_login(playwright: Playwright) -> None:
+    browser = playwright.firefox.launch(headless=False)
+    context = browser.new_context()
+    page = context.new_page()
+    page.goto("http://127.0.0.1:8000/")
+    page.get_by_placeholder("Username").click()
     page.get_by_placeholder("Username").fill("pytest")
+    page.get_by_placeholder("Password").click()
     page.get_by_placeholder("Password").fill("pytest")
     page.get_by_role("button", name="Sign in").click()
-    time.sleep(3)
-    page.screenshot(path="screenshots/dashboard.png")
+    expect(page.get_by_label("breadcrumb").get_by_role("listitem")).to_contain_text("Dashboard")
 
-# https://playwright.dev/docs/getting-started-vscode
+    # ---------------------
+    context.close()
+    browser.close()
+
+
+with sync_playwright() as playwright:
+    test_login(playwright)

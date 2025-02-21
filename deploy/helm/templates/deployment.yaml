@@ -50,52 +50,41 @@ spec:
           - name: VERBOSE_LOG
             value: "True"
 {{- end }}
-{{- if .Values.plugins.registryUi.enabled }}
-          - name: PLUGIN_REGISTRY_ENABLED
-            value: "True"
-{{- end }}
-{{- if .Values.plugins.helmDashboard.enabled }}
-          - name: PLUGIN_HELM_ENABLED
-            value: "True"
-{{- end }}
         envFrom:
-          - configMapRef: 
-              name: {{ include "kubedash.fullname" . }}-config
-{{- if .Values.oidc.enabled }}
-          - secretRef:
-              name: {{ .Values.oidc.secret.name }}
-{{- end }}
-{{- if .Values.externalDatabase.enabled }}
-          - secretRef:
-              name: {{ .Values.externalDatabase.secret.name }}
-{{- end }}
         livenessProbe:
           httpGet:
-            path: /healthz/live
-            port: 8000
+            path: /api/health/live
+            port: 5000
           initialDelaySeconds: 5
           timeoutSeconds: 1
         readinessProbe:
           httpGet:
-            path: /healthz/ready
-            port: 8000
+            path: /api/health/ready
+            port: 5000
           initialDelaySeconds: 5
           timeoutSeconds: 1
+        ports:
+        - containerPort: 5000
+          protocol: TCP
+          name: http
         volumeMounts:
 {{- if .Values.persistence.enabled }}
         - name: cache
           mountPath: "/code/kubedash/database"
 {{- end }}
-        ports:
-        - containerPort: 8000
-          protocol: TCP
-          name: http
+        - mountPath: /code/kubedash/kubedash.ini
+          name: kubedash-ini
+          subPath: kubedash.ini
       volumes:
 {{- if .Values.persistence.enabled }}
       - name: cache
         persistentVolumeClaim:
             claimName: {{ include "kubedash.fullname" . }}-db
 {{- end }}
+      - configMap:
+          defaultMode: 420
+          name: {{ include "kubedash.fullname" . }}-kubedash-ini
+        name: kubedash-ini
 {{- with .Values.nodeSelector }}
       nodeSelector:
         {{- . | toYaml | nindent 8 }}

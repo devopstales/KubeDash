@@ -1,0 +1,170 @@
+apiVersion: cert-manager.io/v1
+kind: ClusterIssuer
+metadata:
+  name: ci-selfsigned
+  namespace: network-testing
+spec:
+  selfSigned: { }
+---
+apiVersion: cert-manager.io/v1
+kind: Issuer
+metadata:
+  name: ci-selfsigned
+  namespace: network-testing
+spec:
+  selfSigned: { }
+---
+apiVersion: v1
+data:
+  tls.crt: LS0tLS1CRUdJTiBDRVJUSUZJQ0FURS0tLS0tCk1JSUQ3VENDQXRXZ0F3SUJBZ0lVR2J6MWRvMGJNZVMxWkt2OHo1b2g2amFMTTcwd0RRWUpLb1pJaHZjTkFRRUwKQlFBd2dZUXhDekFKQmdOVkJBWVRBa2hWTVEwd0N3WURWUVFJREFSUVpYTjBNUkV3RHdZRFZRUUhEQWhDZFdSaApjR1Z6ZERFVE1CRUdBMVVFQ2d3S1RYa2dRMjl0Y0dGdWVURUxNQWtHQTFVRUN3d0NUMVV4RWpBUUJnTlZCQU1NCkNXczRjeTVwYm5SeVlURWRNQnNHQ1NxR1NJYjNEUUVKQVJZT2NtOXZkRUJyT0hNdWFXNTBjbUV3SUJjTk1qQXcKTXpBMU1qQTFOREU0V2hnUE1qRXlNREF5TVRBeU1EVTBNVGhhTUlHRU1Rc3dDUVlEVlFRR0V3SklWVEVOTUFzRwpBMVVFQ0F3RVVHVnpkREVSTUE4R0ExVUVCd3dJUW5Wa1lYQmxjM1F4RXpBUkJnTlZCQW9NQ2sxNUlFTnZiWEJoCmJua3hDekFKQmdOVkJBc01BazlWTVJJd0VBWURWUVFEREFsck9ITXVhVzUwY21FeEhUQWJCZ2txaGtpRzl3MEIKQ1FFV0RuSnZiM1JBYXpoekxtbHVkSEpoTUlJQklqQU5CZ2txaGtpRzl3MEJBUUVGQUFPQ0FROEFNSUlCQ2dLQwpBUUVBeDlzbzN0U3k1RWcxZUZqek5CUDNVdzIzQUh6TGNQZktycldOUHhYS3pDcXhWYVRGRXM2aWZRQWNvVVo3Cm8wNlp1VzY0U3dqUnVMOEdtS0FINVNNTTF1YXlQYXpMdjg1WFR3TmF6Wm14SDVqbmdKbm1kcTRaMXdSUDJMVUUKOVMzVmZEMVhVN2t0V1p4bW1PNmdKSDhUbEtrT29uQnRYOFVDbGdsU3BIeHR0cE9yMStwRWVKU00zTUlGcy9UVQpHaVZjSUVQZG1CRDdNNVl4M2xWRjYzbjV5Nkx5U2d3YVE3T3Z3RFY5T3YrSDdWQXZmelh3WXdrcTJWcDUxYm5CClFDWU9DSis5ZWM0NS9lY1J6VzRBTnZEMmlGeG1nak85a0RjckErQm02SWwzekpaeEEwV1lxSElPUUg4dUJpNHoKUDBQVE0xNkpTOGU1b1RKSlc4UEVZUVJWd3dJREFRQUJvMU13VVRBZEJnTlZIUTRFRmdRVXBnZzRVdVRxZFpMcAo3YXZsanBpRS9lWEVnakF3SHdZRFZSMGpCQmd3Rm9BVXBnZzRVdVRxZFpMcDdhdmxqcGlFL2VYRWdqQXdEd1lEClZSMFRBUUgvQkFVd0F3RUIvekFOQmdrcWhraUc5dzBCQVFzRkFBT0NBUUVBZ0FVRlpRWkd1N3pQZVhmZStiYVUKdmhoRitiazA4enpTTzAwMzhpd2dReXFZRDAva0l5Y2IzUGozVzBHTC9UdjgxOVRjQ0pJNkRmTllYc2s5YmdMMQo3NmlOOVJqb3o2eDBteStHUjBOZVZjYlNWWDhSY3JJaEx2VFdRSGpwVTUxcEFGa1J3TjE1WXVIYUYxMVVIZC9KClVySm05ZUVRS3daTlRvR05ZTmtFdVVvYmdVRzFsOE5hc0tCU2ZTL091dXowZ3BvR1NxS1kzcTJWeXp0d2lLUEwKeFI3UEhFdkVjclNuaGpnNTZQSkpBb0pnQUdsTVgyTk9nNUlsZDhnSjRrTStiTUh1RFBPblMzajgvMFlaSTFYbgpyQ1dKZWJ2R1o5eENPWDdScG5xMU9TT1FabkJxNVc0cnMrYU9XWDBTMkM4SUxvdDZycFZPQlhPRFJlby9LTEkzClFRPT0KLS0tLS1FTkQgQ0VSVElGSUNBVEUtLS0tLQo= 
+  tls.key: LS0tLS1CRUdJTiBSU0EgUFJJVkFURSBLRVktLS0tLQpNSUlFcEFJQkFBS0NBUUVBeDlzbzN0U3k1RWcxZUZqek5CUDNVdzIzQUh6TGNQZktycldOUHhYS3pDcXhWYVRGCkVzNmlmUUFjb1VaN28wNlp1VzY0U3dqUnVMOEdtS0FINVNNTTF1YXlQYXpMdjg1WFR3TmF6Wm14SDVqbmdKbm0KZHE0WjF3UlAyTFVFOVMzVmZEMVhVN2t0V1p4bW1PNmdKSDhUbEtrT29uQnRYOFVDbGdsU3BIeHR0cE9yMStwRQplSlNNM01JRnMvVFVHaVZjSUVQZG1CRDdNNVl4M2xWRjYzbjV5Nkx5U2d3YVE3T3Z3RFY5T3YrSDdWQXZmelh3Cll3a3EyVnA1MWJuQlFDWU9DSis5ZWM0NS9lY1J6VzRBTnZEMmlGeG1nak85a0RjckErQm02SWwzekpaeEEwV1kKcUhJT1FIOHVCaTR6UDBQVE0xNkpTOGU1b1RKSlc4UEVZUVJWd3dJREFRQUJBb0lCQUN2YnJuWm9Hdkg1M3JJUQpZeDYwbXZ3QThINE01T0Jmb0gwQ25vS1BsN2VDVHZSS2VtME1KNkJpMitXUWdDVndaRS9MT21wTS95a1owcXEvCnc3dkhHMVExd0R2RXBkbnJ3RUU0clQ2ZFViOXJZTEphRTdkTHNhUDc4RUhRUjh3K1NMRkJETjcwcmowU0UzblEKTkJpT1FvL0hJYzBIK3hpZk5WZ1RwNjB0R1M2TmlrbW1nVlhta3J5RXRDWHdMVjNrZ0IyRkNsS1NYVm1jZjQzVApURU5TN2dsdTJ4RlJMVVRNMWRKeWd0K3hTV1N0WWh5V0xheWhYdmJRQ2RueXBFdUw0ekxwTytKQmE4MEk0MHRZCk4rblVUc0tMVkhyb3pBSFd5OFF4LzQ4SU5FNW5vcTFnYk9XbkpoWXVaNHM5M2hyMjcveDlid1JQMFJ6Q1RPSUkKWHZzVXRFRUNnWUVBNVJROUdUK0drcVYydnJPY0lGdUhQSCtwQ2JERjMwdDRVMVJHNEtIMFEzRllvZE5YR04zeQpUVk9ZS09HUGtWUjlFY0Z0QXpYWHJDYXlSM0ZIR0FocUIzNUd5dDdRUURKZkpDS2gzU2hQVDFUeDVqSjBqZjZDCnRNRFIrRnpGQlZKZi9GR0JJWW45bWNQK2pkTUlmdW9KUW52dHc0dnZ2OEF0QmltWVM2UnRmZk1DZ1lFQTMxZkMKTU9CRkNoTDk4VEdjZGg2aUpXNElPc0pLN3JIdm84SUJIWUdrY2xDRkhkOTVRaFZNSkhVVTJkaVA4c25WQmtnTQo0ZUIrQWJQcnQrU1FUOEJkUHJQOTUzakIyS1N0MWlyQXI5ckNIQ0hCdlJ5MWpyZC9kZU5uT1FWUForM09vSGJtCm92RDFEQXcyREc0bHBSVFBTUkJZSEVNV0VxVjQzTHVycGo1SkxQRUNnWUFvcHRUSTNEc1hYd0daaWVvVTIrazkKMVRHOEpJQ1l4WjNPdTgvd0lRMWx3b0dHQmlrWW9wcFRHcGlQK0tjdmxSeTB2K3lHZTFHUW5UVlo5RUkzZzVhOQpTYTFxWnV2eDJINkZ2UmVZVllUdGdSZUVVRVBheHVXUENnQzQ0RTJlU2lYNmNzUkZuV1ZCbWtSY0NxMGhTSXJvCkgzSHNGN011QmY1M2IzNDFQaktuL1FLQmdRRExlMHdzZFpmUkJ0NmdLZ0FQeWZjV3ZQbjRkdDRJUE10RldsTGoKekNMRUY4SkFKa04yeHFxWnFLWTNsOHdHZW9aLzg1THhGRFFaWHhBS2VjNVZLc0NKaVRseDg1NUF3RUMxR0R4Mwp1NG9RVVYwTzdDSXFCZHExMEZwU0pCbGxhYzlRZVNQR0hseFQvcWdiaVJyNUhVMkJsc2QvOEVzaTcrbCt5ZWtvClRDVWxNUUtCZ1FDMHlVRVJlczhmMW5FMnpZVTdFNGFXRWQyRmdTbEVWeTBmWEl3VEliZmlSaGZkRCtSbzBHSUIKZFdhcG9rSlYvSWo4WlVXSmN6RTNRdUJKRnAxY2lxek5od3BuV1RLMlBiNnhzK2FIeThIZGRWNWI0cXZOSDdXSgpaZHJkNlByVDJ2Tld1THd1VVZ5a2lWN1JVQ0JVV0NrTmtva1JiRXp0Y2ZWbW5VNXgyNkswTkE9PQotLS0tLUVORCBSU0EgUFJJVkFURSBLRVktLS0tLQo=
+kind: Secret
+metadata:
+  name: ca-key-pair
+  namespace: network-testing
+---
+apiVersion: cert-manager.io/v1
+kind: ClusterIssuer
+metadata:
+  name: ca-issuer
+  namespace: network-testing
+spec:
+  ca:
+    secretName: ca-key-pair
+---
+apiVersion: cert-manager.io/v1
+kind: ClusterIssuer
+metadata:
+  name: example-issuer-http01
+  namespace: network-testing
+spec:
+  acme:
+    server: https://acme-staging-v02.api.letsencrypt.org/directory
+    privateKeySecretRef:
+      name: example-issuer-account-key
+    solvers:
+    - http01:
+        ingress:
+          ingressClassName: nginx
+---
+apiVersion: cert-manager.io/v1
+kind: ClusterIssuer
+metadata:
+  name: example-issuer-dns01
+  namespace: network-testing
+spec:
+  acme:
+    email: user@example.com
+    server: https://acme-staging-v02.api.letsencrypt.org/directory
+    privateKeySecretRef:
+      name: example-issuer-account-key
+    solvers:
+    - dns01:
+        cloudDNS:
+          project: my-project
+          serviceAccountSecretRef:
+            name: prod-clouddns-svc-acct-secret
+            key: service-account.json
+---
+apiVersion: cert-manager.io/v1
+kind: ClusterIssuer
+metadata:
+  name: vault-issuer-approle
+  namespace: network-testing
+spec:
+  vault:
+    path: pki_int/sign/example-dot-com
+    server: https://vault.local
+    caBundle: LS0tLS1CRUdJTiBDRVJUSUZJQ0FURS0tLS0tCk1JSUQ3VENDQXRXZ0F3SUJBZ0lVR2J6MWRvMGJNZVMxWkt2OHo1b2g2amFMTTcwd0RRWUpLb1pJaHZjTkFRRUwKQlFBd2dZUXhDekFKQmdOVkJBWVRBa2hWTVEwd0N3WURWUVFJREFSUVpYTjBNUkV3RHdZRFZRUUhEQWhDZFdSaApjR1Z6ZERFVE1CRUdBMVVFQ2d3S1RYa2dRMjl0Y0dGdWVURUxNQWtHQTFVRUN3d0NUMVV4RWpBUUJnTlZCQU1NCkNXczRjeTVwYm5SeVlURWRNQnNHQ1NxR1NJYjNEUUVKQVJZT2NtOXZkRUJyT0hNdWFXNTBjbUV3SUJjTk1qQXcKTXpBMU1qQTFOREU0V2hnUE1qRXlNREF5TVRBeU1EVTBNVGhhTUlHRU1Rc3dDUVlEVlFRR0V3SklWVEVOTUFzRwpBMVVFQ0F3RVVHVnpkREVSTUE4R0ExVUVCd3dJUW5Wa1lYQmxjM1F4RXpBUkJnTlZCQW9NQ2sxNUlFTnZiWEJoCmJua3hDekFKQmdOVkJBc01BazlWTVJJd0VBWURWUVFEREFsck9ITXVhVzUwY21FeEhUQWJCZ2txaGtpRzl3MEIKQ1FFV0RuSnZiM1JBYXpoekxtbHVkSEpoTUlJQklqQU5CZ2txaGtpRzl3MEJBUUVGQUFPQ0FROEFNSUlCQ2dLQwpBUUVBeDlzbzN0U3k1RWcxZUZqek5CUDNVdzIzQUh6TGNQZktycldOUHhYS3pDcXhWYVRGRXM2aWZRQWNvVVo3Cm8wNlp1VzY0U3dqUnVMOEdtS0FINVNNTTF1YXlQYXpMdjg1WFR3TmF6Wm14SDVqbmdKbm1kcTRaMXdSUDJMVUUKOVMzVmZEMVhVN2t0V1p4bW1PNmdKSDhUbEtrT29uQnRYOFVDbGdsU3BIeHR0cE9yMStwRWVKU00zTUlGcy9UVQpHaVZjSUVQZG1CRDdNNVl4M2xWRjYzbjV5Nkx5U2d3YVE3T3Z3RFY5T3YrSDdWQXZmelh3WXdrcTJWcDUxYm5CClFDWU9DSis5ZWM0NS9lY1J6VzRBTnZEMmlGeG1nak85a0RjckErQm02SWwzekpaeEEwV1lxSElPUUg4dUJpNHoKUDBQVE0xNkpTOGU1b1RKSlc4UEVZUVJWd3dJREFRQUJvMU13VVRBZEJnTlZIUTRFRmdRVXBnZzRVdVRxZFpMcAo3YXZsanBpRS9lWEVnakF3SHdZRFZSMGpCQmd3Rm9BVXBnZzRVdVRxZFpMcDdhdmxqcGlFL2VYRWdqQXdEd1lEClZSMFRBUUgvQkFVd0F3RUIvekFOQmdrcWhraUc5dzBCQVFzRkFBT0NBUUVBZ0FVRlpRWkd1N3pQZVhmZStiYVUKdmhoRitiazA4enpTTzAwMzhpd2dReXFZRDAva0l5Y2IzUGozVzBHTC9UdjgxOVRjQ0pJNkRmTllYc2s5YmdMMQo3NmlOOVJqb3o2eDBteStHUjBOZVZjYlNWWDhSY3JJaEx2VFdRSGpwVTUxcEFGa1J3TjE1WXVIYUYxMVVIZC9KClVySm05ZUVRS3daTlRvR05ZTmtFdVVvYmdVRzFsOE5hc0tCU2ZTL091dXowZ3BvR1NxS1kzcTJWeXp0d2lLUEwKeFI3UEhFdkVjclNuaGpnNTZQSkpBb0pnQUdsTVgyTk9nNUlsZDhnSjRrTStiTUh1RFBPblMzajgvMFlaSTFYbgpyQ1dKZWJ2R1o5eENPWDdScG5xMU9TT1FabkJxNVc0cnMrYU9XWDBTMkM4SUxvdDZycFZPQlhPRFJlby9LTEkzClFRPT0KLS0tLS1FTkQgQ0VSVElGSUNBVEUtLS0tLQo=
+    auth:
+      appRole:
+        path: approle
+        roleId: "291b9d21-8ff5-..."
+        secretRef:
+          name: cert-manager-vault-approle
+          key: secretId
+---
+apiVersion: cert-manager.io/v1
+kind: ClusterIssuer
+metadata:
+  name: vault-issuer
+  namespace: network-testing
+spec:
+  vault:
+    path: pki_int/sign/example-dot-com
+    server: https://vault.local
+    caBundle: LS0tLS1CRUdJTiBDRVJUSUZJQ0FURS0tLS0tCk1JSUQ3VENDQXRXZ0F3SUJBZ0lVR2J6MWRvMGJNZVMxWkt2OHo1b2g2amFMTTcwd0RRWUpLb1pJaHZjTkFRRUwKQlFBd2dZUXhDekFKQmdOVkJBWVRBa2hWTVEwd0N3WURWUVFJREFSUVpYTjBNUkV3RHdZRFZRUUhEQWhDZFdSaApjR1Z6ZERFVE1CRUdBMVVFQ2d3S1RYa2dRMjl0Y0dGdWVURUxNQWtHQTFVRUN3d0NUMVV4RWpBUUJnTlZCQU1NCkNXczRjeTVwYm5SeVlURWRNQnNHQ1NxR1NJYjNEUUVKQVJZT2NtOXZkRUJyT0hNdWFXNTBjbUV3SUJjTk1qQXcKTXpBMU1qQTFOREU0V2hnUE1qRXlNREF5TVRBeU1EVTBNVGhhTUlHRU1Rc3dDUVlEVlFRR0V3SklWVEVOTUFzRwpBMVVFQ0F3RVVHVnpkREVSTUE4R0ExVUVCd3dJUW5Wa1lYQmxjM1F4RXpBUkJnTlZCQW9NQ2sxNUlFTnZiWEJoCmJua3hDekFKQmdOVkJBc01BazlWTVJJd0VBWURWUVFEREFsck9ITXVhVzUwY21FeEhUQWJCZ2txaGtpRzl3MEIKQ1FFV0RuSnZiM1JBYXpoekxtbHVkSEpoTUlJQklqQU5CZ2txaGtpRzl3MEJBUUVGQUFPQ0FROEFNSUlCQ2dLQwpBUUVBeDlzbzN0U3k1RWcxZUZqek5CUDNVdzIzQUh6TGNQZktycldOUHhYS3pDcXhWYVRGRXM2aWZRQWNvVVo3Cm8wNlp1VzY0U3dqUnVMOEdtS0FINVNNTTF1YXlQYXpMdjg1WFR3TmF6Wm14SDVqbmdKbm1kcTRaMXdSUDJMVUUKOVMzVmZEMVhVN2t0V1p4bW1PNmdKSDhUbEtrT29uQnRYOFVDbGdsU3BIeHR0cE9yMStwRWVKU00zTUlGcy9UVQpHaVZjSUVQZG1CRDdNNVl4M2xWRjYzbjV5Nkx5U2d3YVE3T3Z3RFY5T3YrSDdWQXZmelh3WXdrcTJWcDUxYm5CClFDWU9DSis5ZWM0NS9lY1J6VzRBTnZEMmlGeG1nak85a0RjckErQm02SWwzekpaeEEwV1lxSElPUUg4dUJpNHoKUDBQVE0xNkpTOGU1b1RKSlc4UEVZUVJWd3dJREFRQUJvMU13VVRBZEJnTlZIUTRFRmdRVXBnZzRVdVRxZFpMcAo3YXZsanBpRS9lWEVnakF3SHdZRFZSMGpCQmd3Rm9BVXBnZzRVdVRxZFpMcDdhdmxqcGlFL2VYRWdqQXdEd1lEClZSMFRBUUgvQkFVd0F3RUIvekFOQmdrcWhraUc5dzBCQVFzRkFBT0NBUUVBZ0FVRlpRWkd1N3pQZVhmZStiYVUKdmhoRitiazA4enpTTzAwMzhpd2dReXFZRDAva0l5Y2IzUGozVzBHTC9UdjgxOVRjQ0pJNkRmTllYc2s5YmdMMQo3NmlOOVJqb3o2eDBteStHUjBOZVZjYlNWWDhSY3JJaEx2VFdRSGpwVTUxcEFGa1J3TjE1WXVIYUYxMVVIZC9KClVySm05ZUVRS3daTlRvR05ZTmtFdVVvYmdVRzFsOE5hc0tCU2ZTL091dXowZ3BvR1NxS1kzcTJWeXp0d2lLUEwKeFI3UEhFdkVjclNuaGpnNTZQSkpBb0pnQUdsTVgyTk9nNUlsZDhnSjRrTStiTUh1RFBPblMzajgvMFlaSTFYbgpyQ1dKZWJ2R1o5eENPWDdScG5xMU9TT1FabkJxNVc0cnMrYU9XWDBTMkM4SUxvdDZycFZPQlhPRFJlby9LTEkzClFRPT0KLS0tLS1FTkQgQ0VSVElGSUNBVEUtLS0tLQo=
+    auth:
+      tokenSecretRef:
+          name: cert-manager-vault-token
+          key: token
+---
+apiVersion: cert-manager.io/v1
+kind: ClusterIssuer
+metadata:
+  name: vault-issuer-kubernetes
+  namespace: network-testing
+spec:
+  vault:
+    path: pki_int/sign/example-dot-com
+    server: https://vault.local
+    auth:
+      kubernetes:
+        role: my-app-1
+        mountPath: /v1/auth/kubernetes
+        serviceAccountRef:
+          name: vault-issuer
+---
+apiVersion: networking.k8s.io/v1
+kind: Ingress
+metadata:
+  annotations:
+    cert-manager.io/cluster-issuer: ca-issuer
+  name: ca-issuer-test
+  namespace: network-testing
+spec:
+  rules:
+  - host: example.com
+    http:
+      paths:
+      - pathType: Prefix
+        path: /
+        backend:
+          service:
+            name: myservice
+            port:
+              number: 80
+  tls:
+  - hosts:
+    - example.com
+    secretName: myingress-cert
+---
+apiVersion: cert-manager.io/v1
+kind: Certificate
+metadata:
+  name: cert-exmaple
+  namespace: network-testing
+spec:
+  secretName: cert-exmaple
+  duration: 2160h # 90d
+  renewBefore: 360h # 15d
+  subject:
+    organizations:
+    - example
+  isCA: false
+  privateKey:
+    algorithm: RSA
+    encoding: PKCS1
+    size: 2048
+  usages:
+    - server auth
+    - client auth
+  dnsNames:
+    - '*.example.com'
+    - '*.foo.example.com'
+  issuerRef:
+    name: ca-issuer
+    kind: ClusterIssuer
+    group: cert-manager.io
+---
+

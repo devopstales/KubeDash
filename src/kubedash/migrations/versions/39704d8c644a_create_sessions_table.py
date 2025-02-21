@@ -24,7 +24,8 @@ def upgrade():
     sa.Column('data', sa.LargeBinary(), nullable=True),
     sa.Column('expiry', sa.DateTime(), nullable=True),
     sa.PrimaryKeyConstraint('id'),
-    sa.UniqueConstraint('session_id')
+    sa.UniqueConstraint('session_id'),
+    if_not_exists=True
     )
     # ### end Alembic commands ###
 

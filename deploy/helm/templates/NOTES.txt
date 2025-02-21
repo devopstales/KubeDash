@@ -10,4 +10,4 @@ Login to the application URL with admin / admin:
 {{- end }}
 
 To learn more about the release, try:
-   Check the documentation: https://devopstales.github.io/KubeDash/1.0/
+   Check the documentation: https://devopstales.github.io/KubeDash/latest/

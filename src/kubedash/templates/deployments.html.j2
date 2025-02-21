@@ -29,7 +29,7 @@
                     <tr>
                       <th>Name</th>
                       <th>Status</th>
-                      <th>Labels</th>
+                      <th>Created</th>
                     </tr>
                   </thead>
                   <tbody>
@@ -48,12 +48,7 @@
                           </form>
                         </td>
                         <td>{{ d.desired }}/{{ d.ready }}</td>
-                        <td>
-                        {% for label in d.labels %} 
-                            <span class="badge badge-tag badge-secondary">{{ label }}</span>
-                            {% if not loop.last %}<br>{% endif %}
-                        {% endfor %}
-                        </td>
+                        <td>{{ d.created }}</td>
                       </tr>
                     {% endfor %}
                   </tbody>

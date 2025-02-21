@@ -173,15 +173,50 @@
                     </td>
                 </tr>
                 <tr>
-                    <th>Labels:</th>
+                    <th>Annotations:</th>
+                    <td>
+                        {% if node_data.annotations %}
+                        <table class="table table-bordered" id="annotationTable" width="100%" cellspacing="0">
+                            <thead>
+                                <tr>
+                                    <th width="50%">Key</th>
+                                    <th width="50%">Value</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                            {% for key, value in node_data.annotations.items() %}
+                                <tr>
+                                {% if key != "kubectl.kubernetes.io/last-applied-configuration" %}
+                                    <td width="50%">{{ key }}</td>
+                                    <td width="50%">{{ value }}</td>
+                                {% endif %}
+                                </tr>
+                            {% endfor %}
+                            </tbody>
+                        </table>
+                        {% endif %}
+                    </td>
+                </tr>
+                <tr>
+                    <th>Lables:</th>
                     <td>
                         {% if node_data.labels %}
-                        {% for no_key, no_value in node_data.labels.items() %}
-                        {% if no_key != "kubectl.kubernetes.io/last-applied-configuration" %}
-                        <span class="badge badge-tag badge-tag badge-secondary">{{ no_key }}: {{ no_value }}</span>
-                        {% if not loop.last %}<br>{% endif %}
-                        {% endif %}
-                        {% endfor %}
+                        <table class="table table-bordered" id="labelsTable" width="100%" cellspacing="0">
+                            <thead>
+                                <tr>
+                                    <th width="50%">Key</th>
+                                    <th width="50%">Value</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                            {% for key, value in node_data.labels.items() %}
+                                <tr>
+                                    <td width="50%">{{ key }}</td>
+                                    <td width="50%">{{ value }}</td>
+                                </tr>
+                            {% endfor %}
+                            </tbody>
+                        </table>
                         {% endif %}
                     </td>
                 </tr>
@@ -223,6 +258,8 @@
                                 {% else %}
                                     <td>
                                     {% if co_status == "True" %}
+                                        <span class="badge badge-tag badge-danger">{{ co_status }}</span>
+                                    {% elif co_status == "Unknown" %}
                                         <span class="badge badge-tag badge-danger">{{ co_status }}</span>
                                     {% else %}
                                         <span class="badge badge-tag badge-success">{{ co_status }}</span>

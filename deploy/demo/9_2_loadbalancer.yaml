@@ -1,0 +1,49 @@
+---
+apiVersion: cilium.io/v2alpha1
+kind: CiliumLoadBalancerIPPool
+metadata:
+  name: ippool-sample
+  namespace: network-testing
+spec:
+  cidrs:
+  - start: 192.168.21.200
+    stop: 192.168.21.250
+  - cidr: "10.0.10.0/24"
+  disabled: false
+  serviceSelector:
+    matchLabels:
+      color: red
+---
+apiVersion: "cilium.io/v2alpha1"
+kind: CiliumL2AnnouncementPolicy
+metadata:
+  name: policy1
+  namespace: network-testing
+spec:
+  serviceSelector:
+    matchLabels:
+      color: red
+  nodeSelector:
+    matchExpressions:
+    - key: kubernetes.io/hostname
+      operator: In
+      values: [hostA, hostB]
+  interfaces:
+  - ^eth[0-9]+
+  externalIPs: true
+  loadBalancerIPs: true
+---
+apiVersion: "cilium.io/v2alpha1"
+kind: CiliumBGPPeeringPolicy
+metadata:
+  name: rack0
+  namespace: network-testing
+spec:
+  nodeSelector:
+    matchLabels:
+      rack: rack0
+  virtualRouters:
+  - localASN: 64512
+    neighbors:
+    - peerAddress: '10.0.0.1/32'
+      peerASN: 64512

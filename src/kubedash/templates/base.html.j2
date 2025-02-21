@@ -60,7 +60,7 @@
                 <div id="collapseDashoard" class="collapse" aria-labelledby="headingTwo" data-parent="#accordionSidebar">
                     <div class="bg-white py-2 collapse-inner rounded">
                         <a class="collapse-item" href="/cluster-metrics">Cluster Metrics</a>
-                        <a class="collapse-item" href="/workload-map">Workload Map</a>
+                        <a class="collapse-item" href="/workload-map">Workload Map (Beta)</a>
                     </div>
                 </div>
             </li>
@@ -70,7 +70,7 @@
 
             <!-- Heading -->
             <div class="sidebar-heading">
-                Interface
+                Permissions
             </div>
 
             <!-- Nav Item - User Management Collapse Menu -->
@@ -85,49 +85,6 @@
                     <div class="bg-white py-2 collapse-inner rounded">
                         <a class="collapse-item" href="/users">Users</a>
                         <a class="collapse-item" href="/groups">Groups</a>
-                    </div>
-                </div>
-            </li>
-
-
-            <!-- Nav Item - Cluster Collapse Menu -->
-            <li class="nav-item">
-                <a class="nav-link collapsed" href="#" data-toggle="collapse" data-target="#collapseCluster"
-                    aria-expanded="true" aria-controls="collapseCluster">
-                    <i class="fas fa-fw fa-circle-nodes"></i>
-                    <span>Cluster</span>
-                </a>
-                <div id="collapseCluster" class="collapse" aria-labelledby="headingTwo" data-parent="#accordionSidebar">
-                    <div class="bg-white py-2 collapse-inner rounded">
-                        <a class="collapse-item" href="/nodes">Nodes</a>
-                        <a class="collapse-item" href="/namespaces">Namespaces</a>
-                        {% if session['ns_select'] %}
-                        <form action="/horizontal_pod_autoscaler" method="POST">
-                            <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
-                            <input type="hidden" name="ns_select" value="{{ session['ns_select'] }}" />
-                            <a class="collapse-item" href="#" onclick="event.preventDefault(); this.parentNode.submit()">Horizontal Pod Autoscaler</a>
-                        </form>
-                        <form action="/pod_disruption_budget" method="POST">
-                            <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
-                            <input type="hidden" name="ns_select" value="{{ session['ns_select'] }}" />
-                            <a class="collapse-item" href="#" onclick="event.preventDefault(); this.parentNode.submit()">Pod Disruption Budget</a>
-                        </form>
-                        <form action="/resource_quota" method="POST">
-                            <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
-                            <input type="hidden" name="ns_select" value="{{ session['ns_select'] }}" />
-                            <a class="collapse-item" href="#" onclick="event.preventDefault(); this.parentNode.submit()">Resource Quota</a>
-                        </form>
-                        <form action="/limit_range" method="POST">
-                            <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
-                            <input type="hidden" name="ns_select" value="{{ session['ns_select'] }}" />
-                            <a class="collapse-item" href="#" onclick="event.preventDefault(); this.parentNode.submit()">Limit Range</a>
-                        </form>
-                        {% else %}
-                        <a class="collapse-item" href="/horizontal_pod_autoscaler">Horizontal Pod Autoscaler</a>
-                        <a class="collapse-item" href="/pod_disruption_budget">Pod Disruption Budget</a>
-                        <a class="collapse-item" href="/resource_quota">Resource Quota</a>
-                        <a class="collapse-item" href="/limit_range">Limit Range</a>
-                        {% endif %}
                     </div>
                 </div>
             </li>
@@ -179,6 +136,31 @@
                 </div>
             </li>
 
+            <!-- Divider -->
+            <hr class="sidebar-divider">
+
+            <!-- Heading -->
+            <div class="sidebar-heading">
+                Interface
+            </div>
+
+            <!-- Nav Item - Cluster Collapse Menu -->
+            <li class="nav-item">
+                <a class="nav-link collapsed" href="#" data-toggle="collapse" data-target="#collapseCluster"
+                    aria-expanded="true" aria-controls="collapseCluster">
+                    <i class="fas fa-fw fa-circle-nodes"></i>
+                    <span>Cluster</span>
+                </a>
+                <div id="collapseCluster" class="collapse" aria-labelledby="headingTwo" data-parent="#accordionSidebar">
+                    <div class="bg-white py-2 collapse-inner rounded">
+                        <a class="collapse-item" href="/namespaces">Namespaces</a>
+                        <a class="collapse-item" href="/nodes">Nodes</a>
+                        <!-- <a class="collapse-item" href="#">CRDs</a> -->
+                        <!-- <a class="collapse-item" href="#">Runetime Class</a> -->
+                    </div>
+                </div>
+            </li>
+
             <!-- Nav Item - Workloads Collapse Menu -->
             <li class="nav-item">
                 <a class="nav-link collapsed" href="#" data-toggle="collapse" data-target="#collapseWorkloads"
@@ -189,45 +171,7 @@
                 <div id="collapseWorkloads" class="collapse" aria-labelledby="headingWorkloads"
                     data-parent="#accordionSidebar">
                     <div class="bg-white py-2 collapse-inner rounded">
-                        {% if session['ns_select'] %}
-                        <form action="/statefulsets" method="POST">
-                            <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
-                            <input type="hidden" name="ns_select" value="{{ session['ns_select'] }}" />
-                            <a class="collapse-item" href="#" onclick="event.preventDefault(); this.parentNode.submit()">StatefulSets</a>
-                         </form>
-                         {% else %}
-                         <a class="collapse-item" href="/statefulsets">StatefulSets</a>
-                         {% endif %}
-                        {% if session['ns_select'] %}
-                        <form action="/daemonsets" method="POST">
-                            <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
-                            <input type="hidden" name="ns_select" value="{{ session['ns_select'] }}" />
-                            <a class="collapse-item" href="#" onclick="event.preventDefault(); this.parentNode.submit()">DaemonSets</a>
-                         </form>
-                         {% else %}
-                         <a class="collapse-item" href="/daemonsets">DaemonSets</a>
-                         {% endif %}
-                         <!-- -->
-                        {% if session['ns_select'] %}
-                        <form action="/deployments" method="POST">
-                            <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
-                            <input type="hidden" name="ns_select" value="{{ session['ns_select'] }}" />
-                            <a class="collapse-item" href="#" onclick="event.preventDefault(); this.parentNode.submit()">Deployments</a>
-                         </form>
-                         {% else %}
-                         <a class="collapse-item" href="/deployments">Deployments</a>
-                         {% endif %}
-                         <!-- -->
-                        {% if session['ns_select'] %}
-                        <form action="/replicasets" method="POST">
-                            <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
-                            <input type="hidden" name="ns_select" value="{{ session['ns_select'] }}" />
-                            <a class="collapse-item" href="#" onclick="event.preventDefault(); this.parentNode.submit()">ReplicaSets</a>
-                         </form>
-                         {% else %}
-                         <a class="collapse-item" href="/replicasets">ReplicaSets</a>
-                         {% endif %}
-                         <!-- -->
+                         <!-- Pods -->
                         {% if session['ns_select'] %}
                         <form action="/pods" method="POST">
                             <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
@@ -237,11 +181,51 @@
                          {% else %}
                          <a class="collapse-item" href="/pods">Pods</a>
                          {% endif %}
+                         <!-- deployments -->
+                        {% if session['ns_select'] %}
+                        <form action="/deployments" method="POST">
+                            <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+                            <input type="hidden" name="ns_select" value="{{ session['ns_select'] }}" />
+                            <a class="collapse-item" href="#" onclick="event.preventDefault(); this.parentNode.submit()">Deployments</a>
+                         </form>
+                         {% else %}
+                         <a class="collapse-item" href="/deployments">Deployments</a>
+                         {% endif %}
+                            <!-- statefulsets -->
+                        {% if session['ns_select'] %}
+                        <form action="/statefulsets" method="POST">
+                            <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+                            <input type="hidden" name="ns_select" value="{{ session['ns_select'] }}" />
+                            <a class="collapse-item" href="#" onclick="event.preventDefault(); this.parentNode.submit()">StatefulSets</a>
+                         </form>
+                         {% else %}
+                         <a class="collapse-item" href="/statefulsets">StatefulSets</a>
+                         {% endif %}
+                            <!-- daemonsets -->
+                        {% if session['ns_select'] %}
+                        <form action="/daemonsets" method="POST">
+                            <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+                            <input type="hidden" name="ns_select" value="{{ session['ns_select'] }}" />
+                            <a class="collapse-item" href="#" onclick="event.preventDefault(); this.parentNode.submit()">DaemonSets</a>
+                         </form>
+                         {% else %}
+                         <a class="collapse-item" href="/daemonsets">DaemonSets</a>
+                         {% endif %}
+                         <!-- replicasets -->
+                        {% if session['ns_select'] %}
+                        <form action="/replicasets" method="POST">
+                            <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+                            <input type="hidden" name="ns_select" value="{{ session['ns_select'] }}" />
+                            <a class="collapse-item" href="#" onclick="event.preventDefault(); this.parentNode.submit()">ReplicaSets</a>
+                         </form>
+                         {% else %}
+                         <a class="collapse-item" href="/replicasets">ReplicaSets</a>
+                         {% endif %}
                     </div>
                 </div>
             </li>
 
-            <!-- Nav Item - Ingress Collapse Menu -->
+            <!-- Nav Item - Network Collapse Menu -->
             <li class="nav-item">
                 <a class="nav-link collapsed" href="#" data-toggle="collapse" data-target="#collapseIngress"
                     aria-expanded="true" aria-controls="collapseIngress">
@@ -251,9 +235,10 @@
                 <div id="collapseIngress" class="collapse" aria-labelledby="headingIngress"
                     data-parent="#accordionSidebar">
                     <div class="bg-white py-2 collapse-inner rounded">
-                        <a class="collapse-item" href="/ingress-class">Ingress Class</a>
-                        <a class="collapse-item" href="/ingress">Ingress </a>
                         <a class="collapse-item" href="/services">Services</a>
+                       <!-- endpoints -->
+                        <a class="collapse-item" href="/ingress">Ingress </a>
+                        <a class="collapse-item" href="/ingress-class">Ingress Class</a>
                     </div>
                 </div>
             </li>
@@ -318,7 +303,62 @@
                         <a class="collapse-item" href="/secrets">Secrets</a>
                         <a class="collapse-item" href="/policies">Network Policies</a>
                         {% endif %}
+                    </div>
+                </div>
+            </li>
+
+            <!-- Nav Item - Other Resources Collapse Menu -->
+            <li class="nav-item">
+                <a class="nav-link collapsed" href="#" data-toggle="collapse" data-target="#collapseOtherResources"
+                    aria-expanded="true" aria-controls="collapseOtherResources">
+                    <i class="fas fa-fw fa-circle-nodes"></i>
+                    <span>Other Resources</span>
+                </a>
+                <div id="collapseOtherResources" class="collapse" aria-labelledby="headingTwo" data-parent="#accordionSidebar">
+                    <div class="bg-white py-2 collapse-inner rounded">
+                        {% if session['ns_select'] %}
+                        <form action="/horizontal_pod_autoscaler" method="POST">
+                            <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+                            <input type="hidden" name="ns_select" value="{{ session['ns_select'] }}" />
+                            <a class="collapse-item" href="#" onclick="event.preventDefault(); this.parentNode.submit()">HPAs</a>
+                        </form>
+                        <!--
+                        <form action="/#" method="POST">
+                            <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+                            <input type="hidden" name="ns_select" value="{{ session['ns_select'] }}" />
+                            <a class="collapse-item" href="#" onclick="event.preventDefault(); this.parentNode.submit()">VPAs</a>
+                        </form>
+                        -->
+                        <form action="/pod_disruption_budget" method="POST">
+                            <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+                            <input type="hidden" name="ns_select" value="{{ session['ns_select'] }}" />
+                            <a class="collapse-item" href="#" onclick="event.preventDefault(); this.parentNode.submit()">Pod Disruption Budget</a>
+                        </form>
                         <a class="collapse-item" href="/priorityclass">Priority Classes</a>
+                        <!-- Divider
+                        <hr class="sidebar-divider">
+                         Divider -->
+                        <form action="/resource_quota" method="POST">
+                            <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+                            <input type="hidden" name="ns_select" value="{{ session['ns_select'] }}" />
+                            <a class="collapse-item" href="#" onclick="event.preventDefault(); this.parentNode.submit()">Resource Quota</a>
+                        </form>
+                        <form action="/limit_range" method="POST">
+                            <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+                            <input type="hidden" name="ns_select" value="{{ session['ns_select'] }}" />
+                            <a class="collapse-item" href="#" onclick="event.preventDefault(); this.parentNode.submit()">Limit Range</a>
+                        </form>
+                        {% else %}
+                        <a class="collapse-item" href="/horizontal_pod_autoscaler">HPAs</a>
+                        <a class="collapse-item" href="/#">VPAs</a>
+                        <a class="collapse-item" href="/pod_disruption_budget">Pod Disruption Budget</a>
+                        <a class="collapse-item" href="/priorityclass">Priority Classes</a>
+                        <!-- Divider 
+                        <hr class="sidebar-divider">
+                         Divider -->
+                        <a class="collapse-item" href="/resource_quota">Resource Quota</a>
+                        <a class="collapse-item" href="/limit_range">Limit Range</a>
+                        {% endif %}
                     </div>
                 </div>
             </li>
@@ -360,6 +400,12 @@
                         {% endif %}
                         {% if config.plugins["helm"] %}
                         <a class="collapse-item" href="/charts">Helm Charts</a>
+                        {% endif %}
+                        {% if config.plugins["cert_manager"] %}
+                        <a class="collapse-item" href="/cert-manager">Cert-Manager (Beta)</a>
+                        {% endif %}
+                        {% if config.plugins["external_loadbalancer"] %}
+                        <a class="collapse-item" href="/external-loadbalancer">LoadBalancer (Beta)</a>
                         {% endif %}
                     </div>
                 </div>
@@ -543,13 +589,7 @@
             <!-- End of Main Content -->
 
             <!-- Footer -->
-            <footer class="sticky-footer bg-white">
-                <div class="container my-auto">
-                    <div class="copyright text-center my-auto">
-                        <span>Copyright &copy; DevOpsTales - KubeDash 2023</span>
-                    </div>
-                </div>
-            </footer>
+            {% include 'base_booter.html.j2' %}
             <!-- End of Footer -->
 
         </div>

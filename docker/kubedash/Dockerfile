@@ -1,14 +1,27 @@
 # syntax = docker/dockerfile:1.2
 ARG ARCH
+FROM ${ARCH}python:3.11-alpine3.20 AS builder
+
+WORKDIR /code
+COPY requirements.txt  /code/
+RUN apk add --no-cache postgresql-libs && \
+    apk add --no-cache bash gcc musl-dev linux-headers && \
+    apk add --no-cache --virtual .build-deps gcc build-base freetype-dev libpng-dev openblas-dev libffi-dev musl-dev postgresql-dev
+RUN apk -U upgrade
+RUN pip install --no-cache-dir --target=/app/requirements -r /code/requirements.txt
+
+# main Contaiber
+ARG ARCH
 ARG VERSION
 ARG BUILD_DATE
-FROM ${ARCH}python:3.11-alpine
+FROM ${ARCH}python:3.11-alpine3.20
 ARG ARCH
 ARG VERSION
 ARG BUILD_DATE
 
 ENV FLASK_CONFIG="production" \
-    FLASK_APP="kubedash"
+    FLASK_APP="kubedash" \
+    KUBEDASH_VERSION=${VERSION}
 
 # https://github.com/opencontainers/image-spec/blob/main/annotations.md#back-compatibility-with-label-schema
 LABEL org.opencontainers.image.vendor="devopstales" \
@@ -22,32 +35,25 @@ LABEL org.opencontainers.image.vendor="devopstales" \
       org.opencontainers.image.documentation="https://devopstales.github.io/kubedash" \
       org.opencontainers.image.created=${BUILD_DATE}
 
-WORKDIR /code
+WORKDIR /code/kubedash
 
 RUN addgroup -S -g 10001 kubedash && \
     adduser -S -u 10001 kubedash -G kubedash && \
     mkdir /tmp/kubedash && \
     chown -R kubedash:kubedash /tmp/kubedash
 
-COPY requirements.txt  /code/
+COPY entrypoint.sh /entrypoint.sh
 
-RUN apk add --no-cache postgresql-libs && \
-    apk add --no-cache bash gcc musl-dev linux-headers && \
-    apk add --no-cache --virtual .build-deps gcc build-base freetype-dev libpng-dev openblas-dev libffi-dev musl-dev postgresql-dev
-
+RUN apk add --no-cache bash py3-setuptools
 RUN apk -U upgrade
 
-RUN pip install --no-cache-dir -r /code/requirements.txt
-
-RUN apk del gcc build-base freetype-dev libpng-dev openblas-dev libffi-dev musl-dev postgresql-dev llvm14-libs && \
-    apk --purge del .build-deps
-
-COPY entrypoint.sh /entrypoint.sh
+COPY --from=builder /app/requirements /usr/local/lib/python3.11/site-packages
 COPY --chown=kubedash:kubedash ./kubedash /code/kubedash
 
-WORKDIR /code/kubedash
+RUN touch /code/kubedash/CA.crt && chown kubedash:kubedash /code/kubedash/CA.crt
 
 USER 10001:10001
 
 EXPOSE 8000
+ENV PATH=/usr/local/lib/python3.11/site-packages/bin:$PATH
 ENTRYPOINT ["/entrypoint.sh"]

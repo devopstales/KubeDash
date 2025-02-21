@@ -1,0 +1,77 @@
+##################### KubeDash Configuration Defaults #####################
+[DEFAULT]
+# possible values : production, development
+app_mode = development
+
+#################################### Security ############################
+[security]
+
+# default admin password, can be changed before first start of grafana, or in profile settings
+admin_password = admin
+
+#################################### Database ############################
+[database]
+# You can configure the database connection by specifying type, host, name, user and password
+# as separate properties or as on string using the url property.
+
+# Either postgres or sqlite3, it's your choice
+type = sqlite3
+host = 127.0.0.1:3306
+name = kubedash
+# user = root
+# password =
+
+#################################### Cache server #############################
+[remote_cache]
+# Either redis, none default is none
+type = none
+
+# cache connectionstring options
+# redis: config like redis server e.g. `addr=127.0.0.1:6379,pool_size=100,db=0,ssl=false`. Only addr is required. ssl may be 'true', 'false', or 'insecure'.
+connstr =
+
+# prefix prepended to all the keys in the remote cache
+prefix =
+
+# This enables encryption of values stored in the remote cache
+encryption =
+
+#################################### SSO Settings ###########################
+[sso_settings]
+
+issuer_url = https://keycloak.kdev.intra/auth/realms/k8s-apps
+callback_url = https://kubedash.kdev.intra
+scope = groups email openid profile good-service
+client_id = kubedash
+secret = nkBeJzvrBxzRfGNDJENrEvwtnqczGLzk
+
+#################################### K8S ###########################
+[k8s]
+
+cluster_name = kdev
+api_server = https://127.0.0.1:42377
+api_ca = LS0tLS1CRUdJTiBDRVJUSUZJQ0FURS0tLS0tCk1JSUMvakNDQWVhZ0F3SUJBZ0lCQURBTkJna3Foa2lHOXcwQkFRc0ZBREFWTVJNd0VRWURWUVFERXdwcmRXSmwKY201bGRHVnpNQjRYRFRJME1UQXdNekV3TWpnMU1Gb1hEVE0wTVRBd01URXdNamcxTUZvd0ZURVRNQkVHQTFVRQpBeE1LYTNWaVpYSnVaWFJsY3pDQ0FTSXdEUVlKS29aSWh2Y05BUUVCQlFBRGdnRVBBRENDQVFvQ2dnRUJBTWlGCng4L2UyMUxUTXltTDh2WG9yTXgxTTB1RmJtVnRmWXB2WTE4S1JtRFk0b1RWbnMxd1l5TkhxM1FkbU0ySElnSGkKVFRLU0dHcXB4T1VxejFjaS9xRllKRW9aZHVBT1FsTFZBSUF4dENQQWxjQUZwdEIvMmRWQXJSeldaWS9ObmUwUwpPOXRtT3pnUkJzUGxOWlk3clBKeVJ0a0YzZVhmVjNwOW5CbEI3NlkzaTdRdCtZWmt6cElaR1pKOCtkeHpWSno5CjB1TnNYL0ZmY1JlU0ZLYklnTHlibERMbnZ4UW5kOTlmMk5ITUhoTDlQd2tOa3V4UWs3SkttT2Q0TnN5NDdhR0QKZkpzVHRHT1p2b0pia2Q2WHJMNDBqTytzSHdaZ3JON3BreldMMWlTZHBqUG4vUW9CcENzOFdzZWV5TDVkNjNibQo1ZC9EQjdnMXJxK3dWQlFzSEtzQ0F3RUFBYU5aTUZjd0RnWURWUjBQQVFIL0JBUURBZ0trTUE4R0ExVWRFd0VCCi93UUZNQU1CQWY4d0hRWURWUjBPQkJZRUZNZFBYRyt3dXNCcm5abk4wZ0VKd1ZWNHNrUFNNQlVHQTFVZEVRUU8KTUF5Q0NtdDFZbVZ5Ym1WMFpYTXdEUVlKS29aSWh2Y05BUUVMQlFBRGdnRUJBSTh1N1ZxeUkrWkRtamY3QzgwWAovQXNKQnQxazdmWEVycTN6N1VDTVdXOFI4VVJDdVJjVjNwTnVXZVJSSGlVdmxGdkRzRG9uTjhJY3hwa3JCOGtuCm9MMjAzSTJVYmlSaXQzcXhWSFRVTjdsQ2ltOVorT2JjUGVncTFkclVIMU1ianRGVEp3ZXkrZjltaFgzdkVwSjcKUHVBL1E3OHU1cHpKc3VpaU1FQldwSGhMYlVuM2xqN1ZZSXoyUHBOeVRQcVBMK28xMVpmeTJMMEkrVmlQaFYwQgpHWDBIOHlrVjJnYTlsY01JcGdkVmpoL1Q5bTRZQ2ZLZFRGVUVoWmVSdmFjRDJQR0hOaGYzV2o2YUtOODJ4VjcvCktnMVR4b1pid0dnNDZzOEVXTEkwQU9RVXQzck8xNzB4YXZ3cGNBbGJmRktUOUREaDR1aVVDUE9vQmFxQ3JtMEkKMGJjPQotLS0tLUVORCBDRVJUSUZJQ0FURS0tLS0tCg==
+
+#################################### Monitoring Settings ###########################
+[monitoring]
+
+jaeger_enabled = false
+jaeger_http_endpoint = http://127.0.0.1:4318
+
+#################################### Plugin Settings ###########################
+[plugin_settings]
+
+# enable registry plugin
+registry = false
+
+# enable helm plugin
+helm = true
+
+# enable cert-manager plugin
+cert_manager = true
+
+# enable external loadbalancer plugin (cilium, metallb)
+external_loadbalancer = false
+
+# enable gateway api plugin
+gateway_api = false

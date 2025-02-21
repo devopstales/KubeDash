@@ -22,7 +22,7 @@
     </div>
     <div class="card-body">
         <div class="row">
-            <div class="col">
+            <div class="col-4">
                 <div>
                     <canvas id="cpu" 
                     {% for CPUkey, CPUvalue in cluster_metrics.clusterTotals.cpu.items() %}
@@ -40,7 +40,7 @@
                 {% endfor %}
                 </div>
             </div>
-            <div class="col">
+            <div class="col-4">
                 <div>
                     <canvas id="ram" 
                     {% for RAMkey, RAMvalue in cluster_metrics.clusterTotals.memory.items() %}
@@ -58,7 +58,7 @@
                 {% endfor %}
                 </div>
             </div>
-            <div class="col">
+            <div class="col-4">
                 <div>
                     <canvas id="pod"
                     {% for pod_key, pod_value in cluster_metrics.clusterTotals.pod_count.items() %}

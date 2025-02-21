@@ -1,7 +1,7 @@
 import os
 
 # Gunicorn config variables
-bind = "127.0.0.1:8000"
+bind = "0.0.0.0:5000"
 loglevel = "info"
 errorlog = "-"  # stderr
 accesslog = "-"  # stdout
@@ -11,4 +11,11 @@ workers = 1
 graceful_timeout = 120
 timeout = 120
 keepalive = 5
-threads = 3
+threads = 100
+
+def pre_request(worker, req):
+    if req.path == '/api/health/live':
+        return
+    elif req.path == '/api/health/ready':
+        return
+    worker.log.debug("%s %s" % (req.method, req.path))
