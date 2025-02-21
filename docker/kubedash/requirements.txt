@@ -1,39 +1,39 @@
 # flask
 flask==3.0.3
-Werkzeug==3.0.3
-Jinja2==3.1.4
+Werkzeug==3.1.3
+Jinja2==3.1.5
 dnspython==2.6.1
 pytz==2023.3.post1
 
 # database
 psycopg2==2.9.7
-SQLAlchemy==2.0.29
+SQLAlchemy==2.0.38
 sqlalchemy_utils==0.41.1
 flask_migrate==4.0.7
 flask_sqlalchemy==3.0.5
 # login
 flask_login==0.6.2
 flask_session==0.8.0
-requests_oauthlib==1.3.1 
+requests_oauthlib==2.0.0 
 Flask_WTF==1.1.1
 # web security
 flask_talisman==1.1.0
 # kubernetes
 kubernetes==26.1.0
 flask_healthz==1.0.1
-pybase64==1.2.3
+pybase64==1.4.0
 # graphwiz
 pyvis==0.3.2
 # socket
 flask_socketio==5.3.4
 gevent-websocket==0.10.1
-eventlet==0.36.1
+eventlet==0.37.0
 
 # telemetry
 opentelemetry-sdk==1.23.0
 opentelemetry-api==1.23.0
 opentelemetry-exporter-otlp-proto-http==1.25.0
-opentelemetry-semantic-conventions==0.46b0
+opentelemetry-semantic-conventions==0.50b0
 opentelemetry-instrumentation-sqlalchemy==0.46b0
 opentelemetry-instrumentation-flask==0.46b0
 
@@ -42,8 +42,9 @@ gunicorn==22.0.0
 certifi==2024.2.2
 setuptools==67.8.0
 pyOpenSSL==24.1.0
-cryptography==42.0.8
-ipython==8.23.0 # not directly required, pinned by Snyk to avoid a vulnerability
+cryptography==44.0.1
+ipython==8.30.0 # not directly required, pinned by Snyk to avoid a vulnerability
 gevent>=23.9.0 # not directly required, pinned by Snyk to avoid a vulnerability
 urllib3>=2.2.2 # not directly required, pinned by Snyk to avoid a vulnerability
 requests>=2.32.0 # not directly required, pinned by Snyk to avoid a vulnerability
+zipp>=3.19.1 # not directly required, pinned by Snyk to avoid a vulnerability
