@@ -14,7 +14,6 @@ jobs:
       packages: write
       id-token: write
       security-events: write
-      constents: write
     steps:
       - name: Get current date
         id: date
