@@ -1,6 +1,6 @@
 # syntax = docker/dockerfile:1.2
-ARG ARCH
-FROM ${ARCH}python:3.11-alpine3.20 AS builder
+ARG BUILDPLATFORM=linux/amd64
+FROM --platform=$BUILDPLATFORM python:3.11-alpine3.20 AS builder
 
 WORKDIR /code
 COPY requirements.txt  /code/
@@ -11,11 +11,11 @@ RUN apk -U upgrade
 RUN pip install --no-cache-dir --target=/app/requirements -r /code/requirements.txt
 
 # main Contaiber
-ARG ARCH
+ARG BUILDPLATFORM=linux/amd64
 ARG VERSION
 ARG BUILD_DATE
-FROM ${ARCH}python:3.11-alpine3.20
-ARG ARCH
+FROM --platform=$BUILDPLATFORM python:3.11-alpine3.20
+ARG BUILDPLATFORM=linux/amd64
 ARG VERSION
 ARG BUILD_DATE
 

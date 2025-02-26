@@ -62,7 +62,7 @@ jobs:
         with:
           context: docker/kubedash/
           build-args: |
-            "ARCH=amd64/"
+            "BUILDPLATFORM=linux/amd64"
             "VERSION=${{github.ref_name}}"
             "BUILD_DATE=${{ steps.date.outputs.date }}"
           tags: devopstales/kubedash:${{github.ref_name}}-amd64,
@@ -75,7 +75,7 @@ jobs:
         with:
           context: docker/kubedash/
           build-args: |
-            "ARCH=arm64v8/"
+            "BUILDPLATFORM=linux/arm64/v8"
             "VERSION=${{github.ref_name}}"
             "BUILD_DATE=${{ steps.date.outputs.date }}"
           tags: devopstales/kubedash:${{github.ref_name}}-arm64v8,
