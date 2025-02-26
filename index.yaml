@@ -1,0 +1,33 @@
+apiVersion: v1
+entries:
+  kubedash:
+  - apiVersion: v2
+    appVersion: 3.1.0
+    created: "2025-02-26T12:47:01.548760744Z"
+    dependencies:
+    - condition: postgresqlHa.enabled
+      name: postgresql-ha
+      repository: https://charts.bitnami.com/bitnami
+      version: '>=11.9.4'
+    - condition: metricsServer.enabled
+      name: metrics-server
+      repository: https://kubernetes-sigs.github.io/metrics-server/
+      version: 3.8.4
+    description: KubeDash is a general purpose, web-based UI for Kubernetes clusters.
+    digest: fe81b9bde13a9243a21f9f8db2426d4f1c342c13bb30e9163d8744520cc50c8f
+    home: https://github.com/devopstales/kubedash
+    icon: https://raw.githubusercontent.com/devopstales/helm-charts/main/icons/kubectl-login.png
+    keywords:
+    - kubedash
+    - kubernetes dashboard
+    - trivy-operator
+    kubeVersion: '>=1.19.x-0'
+    name: kubedash
+    sources:
+    - https://github.com/devopstales/kubedash
+    - https://github.com/devopstales/helm-charts
+    type: application
+    urls:
+    - kubedash-3.1.0.tgz
+    version: 3.1.0
+generated: "2025-02-26T12:47:01.54876912Z"
