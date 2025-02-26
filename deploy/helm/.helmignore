@@ -21,3 +21,6 @@
 .idea/
 *.tmproj
 .vscode/
+
+# chart-releasser config
+cr.yaml
