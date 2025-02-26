@@ -35,7 +35,7 @@ jobs:
         with:
           skip_existing: false
           packages_with_index: true
-          charts_dir: deploy/helm
+          charts_dir: deploy/
           config: deploy/helm/cr.yaml
         env:
           CR_TOKEN: "${{ secrets.GITHUB_TOKEN }}"
