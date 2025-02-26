@@ -42,7 +42,8 @@ src/kdlogin/dist/windows
 src/kdlogin/dist/linux
 src/kdlogin/dist/osx
 src/kdlogin/dist/release
-src/kdlogin/krew/
+src/kdlogin/dist/homebrew
+src/kdlogin/dist/krew/
 src/*/Makefile
 
 # PyInstaller
