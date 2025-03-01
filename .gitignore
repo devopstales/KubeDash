@@ -11,6 +11,8 @@ src/kubedash/kubedash.ini
 
 # deploy
 docker/kubedash/kubedash
+src/kubedash/kubedash.ini
+src/kubedash/.venv
 
 # enable tests
 !tests
