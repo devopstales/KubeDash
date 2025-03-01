@@ -1,0 +1,159 @@
+{% extends "base2.html.j2" %}
+
+{% block topmenu %}
+<ul class="header-nav d-lg-flex m-3">
+    <div class="container-fluid px-4">
+      <nav aria-label="breadcrumb">
+        <ol class="breadcrumb my-0">
+          <li class="breadcrumb-item"><span>Other Resources</span></li>
+          <li class="breadcrumb-item"><a href="/other-resources/limit-range">Limit Range</a></li>
+          <li class="breadcrumb-item active"><span>VPAs</span></li>
+
+        </ol>
+      </nav>
+    </div>
+</ul>
+<ul class="header-nav ms-auto"></ul>
+<ul class="header-nav d-lg-flex">
+{% include "segments/topmenu.html.j2" %}
+{% endblock %}
+
+{% block content %}
+<div class="card shadow mb-4">
+    <div class="card-header">
+        <h6 class="m-0 font-weight-bold text-primary">Limit Range Data</h6>
+    </div>
+    <div class="card-body">
+        <div class="tab-content" id="nav-tabContent">
+            <!-- policy -->
+                <div class="card shadow mb-4">
+                    <div class="card-body">
+                        <div class="table-responsive">
+                            <table class="table table-bordered" id="policyInfoTable" width="100%" cellspacing="0">
+                                <tr>
+                                    <th>Name:</th>
+                                    <td>{{ limit_data.name }}</td>
+                                </tr>
+                                <tr>
+                                    <th>Created:</th>
+                                    <td>{{ limit_data.created }}</td>
+                                </tr>
+                                <tr>
+                                    <th>Namespace:</th>
+                                    <td>{{ limit_data.namespace }}</td>
+                                </tr>
+                                <tr>
+                                    <th>Annotations:</th>
+                                    <td>
+                                        {% if limit_data.annotations %}
+                                        <table class="table table-bordered" id="annotationTable" width="100%" cellspacing="0">
+                                            <thead>
+                                                <tr>
+                                                    <th width="50%">Key</th>
+                                                    <th width="50%">Value</th>
+                                                </tr>
+                                            </thead>
+                                            <tbody>
+                                            {% for key, value in limit_data.annotations.items() %}
+                                                <tr>
+                                                    <td width="50%">{{ key }}</td>
+                                                    <td width="50%">{{ value }}</td>
+                                                </tr>
+                                            {% endfor %}
+                                            </tbody>
+                                        </table>
+                                        {% endif %}
+                                    </td>
+                                </tr>
+                               <tr>
+                                    <th>Lables:</th>
+                                    <td>
+                                        {% if limit_data.labels %}
+                                        <table class="table table-bordered" id="labelsTable" width="100%" cellspacing="0">
+                                            <thead>
+                                                <tr>
+                                                    <th width="50%">Key</th>
+                                                    <th width="50%">Value</th>
+                                                </tr>
+                                            </thead>
+                                            <tbody>
+                                            {% for key, value in limit_data.labels.items() %}
+                                                <tr>
+                                                    <td width="50%">{{ key }}</td>
+                                                    <td width="50%">{{ value }}</td>
+                                                </tr>
+                                            {% endfor %}
+                                            </tbody>
+                                        </table>
+                                        {% endif %}
+                                    </td>
+                                </tr>
+                            </table>
+                        </div>
+                    </div>
+                </div>
+        </div>
+    </div>
+</div>
+
+<div class="card shadow mb-4">
+    <div class="card-header">
+        <h6 class="m-0 font-weight-bold text-primary">Container Limits:</h6>
+    </div>
+    <div class="card-body">
+        <div class="tab-content" id="nav-tabContent">
+            <!-- policy -->
+                <div class="card shadow mb-4">
+                    <div class="card-body">
+                        <div class="table-responsive">
+                            <table class="table table-bordered" id="policyInfoTable" width="100%" cellspacing="0">
+                                <thead>
+                                    <tr>
+                                        <th>Resource</th>
+                                        <th>Minimum</th>
+                                        <th>Maximum</th>
+                                        <th>Default Limit</th>
+                                        <th>Default Request</th>
+                                        <th>Minimum Limit Request Ratio</th>
+                                    </tr>
+                                </thead>
+                                <tbody>
+                                    {% if limit_data.limits %}
+                                    {% for item in limit_data.limits %}
+                                    <tr>
+                                        <td>cpu</td>
+                                        <td>{% if item.min.cpu %}{{ item.min.cpu }}{% else %}None{% endif %}</td>
+                                        <td>{% if item.max.cpu %}{{ item.max.cpu }}{% else %}None{% endif %}</td>
+                                        <td>{% if item.default.cpu %}{{ item.default.cpu }}{% else %}None{% endif %}</td>
+                                        <td>{% if item.default_request.cpu %}{{ item.default_request.cpu }}{% else %}None{% endif %}</td>
+                                        <td>{% if item.max_limit_request_ratio.cpu %}{{ item.max_limit_request_ratio.cpu }}{% else %}None{% endif %}</td>
+                                    </tr>
+                                    <tr>
+                                        <td>memory</td>
+                                        <td>{% if item.min.memory %}{{ item.min.memory }}{% else %}None{% endif %}</td>
+                                        <td>{% if item.max.memory %}{{ item.max.memory }}{% else %}None{% endif %}</td>
+                                        <td>{% if item.default.memory %}{{ item.default.memory }}{% else %}None{% endif %}</td>
+                                        <td>{% if item.default_request.memory %}{{ item.default_request.memory }}{% else %}None{% endif %}</td>
+                                        <td>{% if item.max_limit_request_ratio.memory %}{{ item.max_limit_request_ratio.memory }}{% else %}None{% endif %}</td>
+                                    </tr>
+                                    {% endfor %}
+                                    {% else %}
+                                    <tr>
+                                        <td></td>
+                                        <td></td>
+                                        <td></td>
+                                    </tr>
+                                    {% endif %}
+                                </tbody>
+                            </table>
+                        </div>
+                    </div>
+                </div>
+        </div>
+    </div>
+</div>
+{% endblock %}
+
+{% block add_head_css %}
+{% include "segments/datatable_snipet.html.j2" %}
+{% endblock %}

@@ -1,0 +1,575 @@
+{% extends "base2.html.j2" %}
+
+{% block topmenu %}
+<ul class="header-nav d-lg-flex m-3">
+    <div class="container-fluid px-4">
+      <nav aria-label="breadcrumb">
+        <ol class="breadcrumb my-0">
+          <li class="breadcrumb-item"><span>Workloads</span></li>
+          <li class="breadcrumb-item"><a href="/workload/pod">Pod</a></li>
+          <li class="breadcrumb-item active"><span>{{ pod_data.name }}</span></li>
+        </ol>
+      </nav>
+    </div>
+</ul>
+<ul class="header-nav ms-auto"></ul>
+  <ul class="header-nav d-lg-flex me-4">
+    <div class="container-fluid d-flex justify-content-end py-2 px-2">
+        <form action="/workload/pod/exec" method="POST" class="form-post">
+            <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+            <input type="hidden" name="ns_select" value="{{ session['ns_select'] }}" />
+            <input type="hidden" name="po_name" value="{{ po_name }}" />
+            <a class="card-link float-right pr-1" data-bs-toggle="collapse" href="javascript:;" onclick="parentNode.submit();">
+                <i class="material-icons">input</i>
+            </a>
+        </form>
+        <form action="/workload/pod/logs" method="POST" class="form-post">
+            <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+            <input type="hidden" name="ns_select" value="{{ session['ns_select'] }}" />
+            <input type="hidden" name="po_name" value="{{ po_name }}" />
+            <a class="card-link float-right pr-1" data-bs-toggle="collapse" href="javascript:;" onclick="parentNode.submit();">
+                <i class="material-icons">list</i>
+            </a>
+        </form>
+    </div>
+<ul class="header-nav d-lg-flex">
+{% include "segments/topmenu.html.j2" %}
+{% endblock %}
+
+{% block content %}
+<div class="card shadow mb-4">
+    <div class="card-header">
+        <h6 class="m-0 font-weight-bold text-primary">Pod Data</h6>
+    </div>
+    <div class="card-body">
+        <ul class="nav nav-tabs" id="nav-tab" role="tablist">
+            <li class="nav-item">
+                <a class="nav-link active" id="nav-pod-tab" data-bs-toggle="tab" href="#nav-pod" role="tab" aria-controls="nav-pod" aria-selected="true" data-bs-toggle="tab">Pod</a>
+            </li>
+            <li class="nav-item">
+                <a class="nav-link" id="nav-containers-tab" data-bs-toggle="tab" href="#nav-containers" role="tab" aria-controls="nav-containers" aria-selected="false" data-bs-toggle="tab">Containers</a>
+            </li>
+            <li class="nav-item">
+                <a class="nav-link" id="nav-conditions-tab" data-bs-toggle="tab" href="#nav-conditions" role="tab" aria-controls="nav-conditions" aria-selected="false" data-bs-toggle="tab">Conditions</a>
+            </li>
+            <li class="nav-item">
+                <a class="nav-link" id="nav-security-tab" data-bs-toggle="tab" href="#nav-security" role="tab" aria-controls="nav-security" aria-selected="false" data-bs-toggle="tab">Security Contexts</a>
+            </li>
+            <li class="nav-item">
+                <a class="nav-link" id="nav-resources-tab" data-bs-toggle="tab" href="#nav-resources" role="tab" aria-controls="nav-resources" aria-selected="false" data-bs-toggle="tab">Related Resources</a>
+            </li>
+        </ul>
+        <div class="tab-content" id="nav-tabContent">
+            <!-- pod -->
+            <div class="tab-pane fade show active" id="nav-pod" role="tabpanel" aria-labelledby="nav-pod-tab">
+                <div class="card shadow mb-4">
+                    <div class="card-body">
+                        <div class="table-responsive">
+                            <table class="table table-bordered" id="podInfoTable" width="100%" cellspacing="0">
+                                <tr>
+                                    <th>Namespace:</th>
+                                    <td>{{ pod_data.namespace }}</td>
+                                </tr>
+                                <tr>
+                                    <th>Name:</th>
+                                    <td>{{ pod_data.name }}</td>
+                                </tr>
+                                <tr>
+                                    <th>Status:</th>
+                                    <td>
+                                    {% if pod_data.status == "Running" %} 
+                                    <span class="badge text-bg-success">{{ pod_data.status }}</span>
+                                    {% elif pod_data.status == "Pending" %}
+                                    <span class="badge text-bg-warning">{{ pod_data.status }}</span>
+                                    {% elif pod_data.status == "Succeeded" %}
+                                    <span class="badge text-bg-secondary">{{ pod_data.status }}</span>
+                                    {% else %}
+                                    <span class="badge text-bg-info">{{ pod_data.status }}</span>
+                                    {% endif %}
+                                    </td>
+                                </tr>
+                                <tr>
+                                    <th>Restarts:</th>
+                                    <td>{{ pod_data.restarts }}</td>
+                                </tr>
+                                <tr>
+                                    <th>Created:</th>
+                                    <td>{{ pod_data.created }}</td>
+                                </tr>
+                                <tr>
+                                    <th>Node:</th>
+                                    <td>
+                                        <form action="/cluster/node" method="POST">
+                                            <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+                                            <input type="hidden" name="ns_select" value="{{ pod_data.namespace }}" />
+                                            <input type="hidden" name="selected" value="{{ pod_data.node }}" />
+                                            <a href="javascript:;" onclick="parentNode.submit();">{{ pod_data.node }}</a>
+                                        </form>
+                                    </td>
+                                </tr>
+                                <tr>
+                                    <th>Owner:</th>
+                                    <td>
+                                        <form action="/workload/{{ pod_data.owner.split('/')[0] }}" method="POST">
+                                            <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+                                            <input type="hidden" name="ns_select" value="{{ pod_data.namespace }}" />
+                                            <input type="hidden" name="selected" value="{{ pod_data.owner.split('/')[1] }}" />
+                                            <a href="javascript:;" onclick="parentNode.submit();">{{ pod_data.owner }}</a>
+                                        </form>
+                                    </td>
+                                </tr>
+                                <tr>
+                                    <th>Priority:</th>
+                                    <td>{{ pod_data.priority }}</td>
+                                </tr>
+                                <tr>
+                                    <th>Priority Class:</th>
+                                    <td>{{ pod_data.priority_class_name }}</td>
+                                </tr>
+                                <tr>
+                                    <th>Runetime Class:</th>
+                                    <td>{{ pod_data.runtime_class_name }}</td>
+                                </tr>
+                                <tr>
+                                    <th>Annotations:</th>
+                                    <td>
+                                        {% if pod_data.annotations %}
+                                        <table class="table table-bordered" id="annotationTable" width="100%" cellspacing="0">
+                                            <thead>
+                                                <tr>
+                                                    <th width="50%">Key</th>
+                                                    <th width="50%">Value</th>
+                                                </tr>
+                                            </thead>
+                                            <tbody>
+                                            {% for key, value in pod_data.annotations.items() %}
+                                                <tr>
+                                                    <td width="50%">{{ key }}</td>
+                                                    <td width="50%">{{ value }}</td>
+                                                </tr>
+                                            {% endfor %}
+                                            </tbody>
+                                        </table>
+                                        {% endif %}
+                                    </td>
+                                </tr>
+                               <tr>
+                                    <th>Lables:</th>
+                                    <td>
+                                        {% if pod_data.labels %}
+                                        <table class="table table-bordered" id="labelsTable" width="100%" cellspacing="0">
+                                            <thead>
+                                                <tr>
+                                                    <th width="50%">Key</th>
+                                                    <th width="50%">Value</th>
+                                                </tr>
+                                            </thead>
+                                            <tbody>
+                                            {% for key, value in pod_data.labels.items() %}
+                                                <tr>
+                                                    <td width="50%">{{ key }}</td>
+                                                    <td width="50%">{{ value }}</td>
+                                                </tr>
+                                            {% endfor %}
+                                            </tbody>
+                                        </table>
+                                        {% endif %}
+                                    </td>
+                                </tr>
+                            </table>
+                        </div>
+                    </div>
+                </div>
+            </div>
+            <!-- containers -->
+            <div class="tab-pane fade" id="nav-containers" role="tabpanel" aria-labelledby="av-containers-tab">
+                <div id="accordion">
+                    <div class="card shadow mb-4">
+                        <div class="card-body">
+                            {% if pod_data.init_containers %}
+                            <h3>Init Containers</h3>
+                            
+                            <div class="table-responsive">
+                                <table class="table table-bordered" id="initContainersTable" width="100%" cellspacing="0">
+                                    <thead>
+                                        <tr>
+                                            {% if has_report %}
+                                            <th style="width:5%"></th>
+                                            {% endif %}
+                                            <th>State</th>
+                                            <th>Name</th>
+                                            <th>Image</th>
+                                            <th>Restarts</th>
+                                        </tr>
+                                    </thead>
+                                    <tbody>
+                                        {% for ic in pod_data.init_containers %}
+                                        <tr>
+                                            {% if ic.ready == "Completed" %}
+                                            <td><span class="badge text-bg-secondary">{{ ic.ready }}</span></td>
+                                            {% elif ic.ready == "ImagePullBackOff" or ic.ready == "ErrImagePull" %}
+                                            <td><span class="badge text-bg-danger">{{ ic.ready }}</span></td>
+                                            {% else %}
+                                            <td>{{ ic.ready }}</td>
+                                            {% endif %}
+                                            <td>{{ ic.name }}</td>
+                                            <td>{{ ic.image }}</td>
+                                            <td>{{ ic.restarts }}</td>
+                                        </tr>
+                                        {% endfor %}
+                                    </tbody>
+                                </table>
+                            </div>
+                            {% endif %}
+                            <h3>Containers</h3>
+                            <div class="table-responsive">
+                                <table class="table table-bordered" id="containersTable" width="100%" cellspacing="0">
+                                    <thead>
+                                        <tr>
+                                            {% if has_report %}
+                                            <th style="width:5%"></th>
+                                            {% endif %}
+                                            <th>State</th>
+                                            <th>Name</th>
+                                            <th>Image</th>
+                                            <th>Restarts</th>
+                                        </tr>
+                                    </thead>
+                                    <tbody>
+                                        {% for c in pod_data.containers %}
+                                        <tr>
+                                            {% if c.ready == "Running"%}
+                                            <td><span class="badge text-bg-success">{{ c.ready }}</span></td>
+                                            {% elif c.ready == "ImagePullBackOff" %}
+                                            <td><span class="badge text-bg-danger">{{ c.ready }}</span></td>
+                                            {% elif c.ready == "PodInitializing"%}
+                                            <td><span class="badge text-bg-info">{{ c.ready }}</span></td>
+                                            {% else %}
+                                            <td><span class="badge text-bg-secondary">{{ c.ready }}</span></td>
+                                            {% endif %}
+                                            <td>{{ c.name }}</td>
+                                            <td>{{ c.image }}</td>
+                                            <td>{{ c.restarts }}</td>
+                                        </tr>
+                                        {% endfor %}
+                                    </tbody>
+                                </table>
+                            </div>
+                        </div>
+                    </div>
+                    <!-- vulnTable
+                    {% if has_report %}
+                    <div class="card shadow mb-4">
+                        <div class="card-body">
+                            {% for c in pod_data.containers %}
+                            {% if loop.first %}
+                            <div id="vulnList-{{ c.name }}" class="collapse show" data-parent="#accordion">
+                            {% else %}
+                            <div id="vulnList-{{ c.name }}" class="collapse" data-parent="#accordion">
+                            {% endif %}
+                                <h2>Container: {{ c.name }}</h2>
+                                <table id="vulnTable{{ c.name }}" class="table table-striped table-bordered" style="width:100%">
+                                    <thead>
+                                        <tr>
+                                            <th>ID</th>
+                                            <th>Severity</th>
+                                            <th>Score</th>
+                                            <th>Package</th>
+                                            <th>Installed Version</th>
+                                            <th>Fixes Version</th>
+                                            <th>Published</th>
+                                        </tr>
+                                    </thead>
+                                    <tbody>
+                                        {% for po, vuls in pod_vulns.items() %}
+                                        {% if po == c.name %}
+                                        {% for v in vuls %}
+                                        <tr>
+                                            <td>
+                                                <a href="https://avd.aquasec.com/nvd/{{ v.vulnerabilityID | lower }}" rel="noopener noreferrer" target="_blank">{{ v.vulnerabilityID }}</a>
+                                            </td>
+                                            {% if v.severity == "CRITICAL" %}
+                                            <td><span class="badge text-bg-danger">{{ v.severity }}</span></td>
+                                            {% elif v.severity == "HIGH" %}
+                                            <td><span class="badge text-bg-warning">{{ v.severity }}</span></td>
+                                            {% elif v.severity == "MEDIUM" %}
+                                            <td><span class="badge text-bg-primary">{{ v.severity }}</span></td>
+                                            {% elif v.severity == "LOW" %}
+                                            <td><span class="badge text-bg-info">{{ v.severity }}</span></td>
+                                            {% else %}
+                                            <td><span class="badge text-bg-secondary">{{ v.severity }}</span></td>
+                                            {% endif %}
+                                            <td>{{ v.score }}</td>
+                                            <td>{{ v.resource }}</td>
+                                            <td>{{ v.installedVersion }}</td>
+                                            <td>{{ v.fixedVersion }}</td>
+                                            <td>{{ v.publishedDate }}</td>
+                                        </tr>
+                                        {% endfor %}
+                                        {% endif %}
+                                        {% endfor %}
+                                    </tbody>
+                                </table>
+                            </div>
+                            {% endfor %}
+                            {% for ic in pod_data.init_containers %}
+                            <div id="intVulnList{{ ic.name }}" class="collapse" data-parent="#accordion">
+                                <h2>Init Container: {{ ic.name }}</h2>
+                                <table id="intVulnTable{{ ic.name }}" class="table table-striped table-bordered" style="width:100%">
+                                    <thead>
+                                        <tr>
+                                            <th>ID</th>
+                                            <th>Severity</th>
+                                            <th>Score</th>
+                                            <th>Package</th>
+                                            <th>Installed Version</th>
+                                            <th>Fixes Version</th>
+                                            <th>Published</th>
+                                        </tr>
+                                    </thead>
+                                    <tbody>
+                                        {% for po, vuls in pod_vulns.items() %}
+                                        {% if po == ic.name %}
+                                        {% for v in vuls %}
+                                        <tr>
+                                            <td>
+                                                <a href="https://avd.aquasec.com/nvd/{{ v.vulnerabilityID | lower }}" rel="noopener noreferrer" target="_blank">{{ v.vulnerabilityID }}</a>
+                                            </td>
+                                            {% if v.severity == "CRITICAL" %}
+                                            <td><span class="badge text-bg-danger">{{ v.severity }}</span></td>
+                                            {% elif v.severity == "HIGH" %}
+                                            <td><span class="badge text-bg-warning">{{ v.severity }}</span></td>
+                                            {% elif v.severity == "MEDIUM" %}
+                                            <td><span class="badge text-bg-primary">{{ v.severity }}</span></td>
+                                            {% elif v.severity == "LOW" %}
+                                            <td><span class="badge text-bg-info">{{ v.severity }}</span></td>
+                                            {% else %}
+                                            <td><span class="badge text-bg-secondary">{{ v.severity }}</span></td>
+                                            {% endif %}
+                                            <td>{{ v.score }}</td>
+                                            <td>{{ v.resource }}</td>
+                                            <td>{{ v.installedVersion }}</td>
+                                            <td>{{ v.fixedVersion }}</td>
+                                            <td>{{ v.publishedDate }}</td>
+                                        </tr>
+                                        {% endfor %}
+                                        {% endif %}
+                                        {% endfor %}
+                                    </tbody>
+                                </table>
+                            </div>
+                            {% endfor %}
+                        </div>
+                    </div>
+                    {% endif %}  -->
+                </div>
+            </div>
+            <!-- conditions -->
+            <div class="tab-pane fade" id="nav-conditions" role="tabpanel" aria-labelledby="nav-conditions-tab">
+                <div class="card shadow mb-4">
+                    <div class="card-body">
+                        <div class="table-responsive">
+                            <table class="table table-bordered" id="containersConditiosTable" width="100%" cellspacing="0">
+                                <thead>
+                                    <tr>
+                                        <th>Condition</th>
+                                        <th>State</th>
+                                    </tr>
+                                </thead>
+                            {% for dict_item in pod_data.conditions %}
+                            <tbody>
+                                    {% for key, value in dict_item.items() %}
+                                    <tr>
+                                        <td>{{ key }}</td>
+                                        <td>{{ value }}</td>
+                                    </tr>
+                                    {% endfor%}
+                                </tbody>
+                                {% endfor %}
+                            </table>
+                        </div>
+                    </div>
+                </div>
+            </div>
+            <!-- security_context -->
+            <div class="tab-pane fade" id="nav-security" role="tabpanel" aria-labelledby="nav-security-tab">
+                <div class="card shadow mb-4">
+                    <div class="card-body">
+                        <div class="table-responsive">
+                            <table class="table table-bordered" id="securityTable" width="100%" cellspacing="0">
+                                <!-- {{ pod_data.security_context }} -->
+                                <thead>
+                                    <tr>
+                                    <th>Context</th>
+                                    <th>State</th>
+                                    </tr>
+                                </thead>
+                                <tbody>
+                                {% for item in pod_data.security_context.items() %}
+                                    <tr>
+                                        <td>{{ item[0] }}</td>
+                                        <td>{{ item[1] }}</td>
+                                    </tr>
+                                {% endfor%}
+                                </tbody>
+                            </table>
+                        </div>
+                    </div>
+                </div>
+            </div>
+            <!-- resources -->
+            <div class="tab-pane fade" id="nav-resources" role="tabpanel" aria-labelledby="nav-resources-tab">
+                <div class="card shadow mb-4">
+                    <div class="card-body">
+                        <h3>Refered By</h3>
+                        <div class="table-responsive">
+                            <table class="table table-bordered" id="resourcesTable" width="100%" cellspacing="0">
+                                <thead>
+                                    <th>Type</th>
+                                    <th>Name</th>
+                                    <th>Namespace</th>
+                                </thead>
+                                <tbody>
+                                    <tr>
+                                        <td>{{ pod_data.owner.split("/")[0] }}</td>
+                                        <td>
+                                            <form action="/workload/{{ pod_data.owner.split('/')[0] }}" method="POST">
+                                                <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+                                                <input type="hidden" name="ns_select" value="{{ pod_data.namespace }}" />
+                                                <input type="hidden" name="selected" value="{{ pod_data.owner.split('/')[-1] }}" />
+                                                <a href="javascript:;" onclick="parentNode.submit();">{{ pod_data.owner.split("/")[-1] }}</a>
+                                            </form>
+                                        </td>
+                                        <td>{{ pod_data.namespace }}</td>
+                                    </tr>
+                                </tbody>
+                            </table>
+                        </div>
+                        <h3>Refers To</h3>
+                        <div class="table-responsive">
+                            <table class="table table-bordered" id="refersTable" width="100%" cellspacing="0">
+                                <!-- service account, secret, configmap, volume-->
+                                <thead>
+                                    <th>Type</th>
+                                    <th>Name</th>
+                                    <th>Namespace</th>
+                                </thead>
+                                <tbody>
+                                {% if pod_data.image_pull_secrets %}
+                                    {% for dict_item in pod_data.image_pull_secrets %}
+                                    {% for key, value in dict_item.items() %}
+                                    <tr>
+                                        <td>ImagePullSecret</td>
+                                        <td>
+                                            <form action="/security/secret" method="POST">
+                                                <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+                                                <input type="hidden" name="ns_select" value="{{ pod_data.namespace }}" />
+                                                <input type="hidden" name="selected" value="{{ value }}" />
+                                                <a href="javascript:;" onclick="parentNode.submit();">{{ value }}</a>
+                                            </form>
+                                        </td>
+                                        <td>{{ pod_data.namespace }}</td>
+                                    </tr>
+                                    {% endfor %}
+                                    {% endfor %}
+                                {% endif %}
+                                {% if pod_data.service_account %}
+                                    <tr>
+                                        <td>ServiceAccount</td>
+                                        <td>
+                                            <form action="/security/service-account" method="POST">
+                                                <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+                                                <input type="hidden" name="ns_select" value="{{ pod_data.namespace }}" />
+                                                <input type="hidden" name="selected" value="{{ pod_data.service_account }}" />
+                                                <a href="javascript:;" onclick="parentNode.submit();">{{ pod_data.service_account }}</a>
+                                            </form>
+                                        </td>
+                                        <td>{{ pod_data.namespace }}</td>
+                                    </tr>
+                                {% endif %}
+                                {% if pod_data.secrets %}
+                                    {% for secret in pod_data.secrets %}
+                                    <tr>
+                                        <td>Secret</td>
+                                        <td>
+                                            <form action="/security/secret" method="POST">
+                                                <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+                                                <input type="hidden" name="ns_select" value="{{ pod_data.namespace }}" />
+                                                <input type="hidden" name="selected" value="{{ secret }}" />
+                                                <a href="javascript:;" onclick="parentNode.submit();">{{ secret }}</a>
+                                            </form>
+                                        </td>
+                                        <td>{{ pod_data.namespace }}</td>
+                                    </tr>
+                                    {% endfor %}
+                                {% endif %}
+                                {% if pod_data.cm %}
+                                    {% for cm in pod_data.cm %}
+                                    <tr>
+                                        <td>Configmap</td>
+                                        <td>
+                                            <form action="/storage/configmap" method="POST">
+                                                <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+                                                <input type="hidden" name="ns_select" value="{{ pod_data.namespace }}" />
+                                                <input type="hidden" name="selected" value="{{ cm }}" />
+                                                <a href="javascript:;" onclick="parentNode.submit();">{{ cm }}</a>
+                                            </form>
+                                        </td>
+                                        <td>{{ pod_data.namespace }}</td>
+                                    </tr>
+                                    {% endfor %}
+                                {% endif %}
+                                {% if pod_data.pvc %}
+                                    {% for pvc in pod_data.pvc %}
+                                    <tr>
+                                        <td>PeristentVolumeClame</td>
+                                        <td>
+                                            <form action="/storage/pvc" method="POST">
+                                                <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+                                                <input type="hidden" name="ns_select" value="{{ pod_data.namespace }}" />
+                                                <input type="hidden" name="selected" value="{{ pvc }}" />
+                                                <a href="javascript:;" onclick="parentNode.submit();">{{ pvc }}</a>
+                                            </form>
+                                        </td>
+                                        <td>{{ pod_data.namespace }}</td>
+                                    </tr>
+                                    {% endfor %}
+                                {% endif %}
+                                </tbody>
+                            </table>
+                        </div>
+                    </div>
+                </div>
+            </div>
+            <!-- END -->
+        </div>
+    </div>
+</div>
+{% endblock %}
+
+{% block add_head_css %}
+{% include "segments/datatable_snipet.html.j2" %}
+{% endblock %}
+
+{% block add_tail_js %}
+    {% for c in pod_data.containers %}
+    <script>
+        $(document).ready(function () {
+            $('#vulnTable{{ c.name }}').DataTable({
+               responsive: true,
+               order: [[1, 'asc']],
+            });
+        });
+    </script>
+    {% endfor %}
+    {% for ic in pod_data.init_containers %}
+    <script>
+        $(document).ready(function () {
+            $('#intVulnTable{{ ic.name }}').DataTable({
+               responsive: true,
+               order: [[1, 'asc']],
+            });
+        });
+    </script>
+    {% endfor %}
+{% endblock%}

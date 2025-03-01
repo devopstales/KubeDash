@@ -3,9 +3,10 @@
 from flask import Flask
 import sys
 
-from lib_functions.initializers import (
+from lib.initializers import (
     initialize_app_confifuration, 
-    initialize_app_logging, 
+    initialize_app_logging,
+    initialize_error_page,
     initialize_app_tracing,
     initialize_app_database,
     initialize_app_plugins,
@@ -13,17 +14,16 @@ from lib_functions.initializers import (
     initialize_app_session_and_socket,
     add_custom_jinja2_filters,
     initialize_app_security,
-    initialize_app_error_pages,
     initialize_app_version,
     initialize_commands,
-    inicialize_instrumentors
+    inicialize_instrumentors,
 )
 
 #############################################################
 ## Variables
 #############################################################
 
-from lib_functions.initializers import (
+from lib.initializers import (
     separator_long
 )
 
@@ -52,6 +52,7 @@ def create_app(external_config_name=None):
         error = initialize_app_confifuration(app, None)
 
     initialize_app_logging(app)
+    initialize_error_page(app)
 
     # manage cli commands
     if not error:
@@ -73,7 +74,6 @@ def create_app(external_config_name=None):
             initialize_app_session_and_socket(app)
             add_custom_jinja2_filters(app)
             initialize_app_security(app)
-            initialize_app_error_pages(app)
 
             print(separator_long)
 

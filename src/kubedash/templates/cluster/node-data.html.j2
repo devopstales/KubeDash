@@ -1,0 +1,475 @@
+{% extends "base2.html.j2" %}
+
+{% block topmenu %}
+<ul class="header-nav d-lg-flex m-3">
+    <div class="container-fluid px-4">
+      <nav aria-label="breadcrumb">
+        <ol class="breadcrumb my-0">
+          <li class="breadcrumb-item"><span>Cluster</span></li>
+          <li class="breadcrumb-item"><a href="/cluster/nodes">Nodes</a></li>
+          <li class="breadcrumb-item active"><span>{{ node_data.name }}</span></li>
+        </ol>
+      </nav>
+    </div>
+</ul>
+<ul class="header-nav ms-auto"></ul>
+<ul class="header-nav d-lg-flex">
+{% include "segments/topmenu.html.j2" %}
+{% endblock %}
+
+{% block content %}
+<div class="card shadow mb-4">
+    <div class="card-body">
+        <div class="row">
+            <div class="col">
+                <div>
+		  {% if node_metrics and node_metrics.cpu %}
+                    <canvas id="cpu"
+                    {% for CPUkey, CPUvalue in node_metrics.cpu.items() %}
+                        {% if 'Percent' in CPUkey %}
+                            {{ CPUkey }}="{{ CPUvalue }}"
+                        {% endif %}
+                    {% endfor %}
+                    width="300" height="300"></canvas>
+                </div>
+                <div>
+                {% for CPUkey, CPUvalue in node_metrics.cpu.items() %}
+                     {% if "Percent" not in CPUkey %}
+                        {{ CPUkey }}: {{ CPUvalue |round(1)}} <br>
+                     {% endif %}
+                {% endfor %}
+                  {% endif %}
+                </div>
+            </div>
+            <div class="col">
+                <div>
+                  {% if node_metrics and node_metrics.memory %}
+                    <canvas id="ram" 
+                    {% for RAMkey, RAMvalue in node_metrics.memory.items() %}
+                        {% if 'Percent' in RAMkey %}
+                            {{ RAMkey }}="{{ RAMvalue }}"
+                        {% endif %}
+                    {% endfor %}
+                    width="300" height="300"></canvas>
+                </div>
+                <div>
+                {% for RAMkey, RAMvalue in node_metrics.memory.items() %}
+                     {% if "Percent" not in RAMkey %}
+                        {{ RAMkey }}: {{ (RAMvalue / 1024 / 1024 / 1024) |round(1) }} <br>
+                     {% endif %}
+                {% endfor %}
+                  {% endif %}
+                </div>
+            </div>
+            <div class="col">
+                <div>
+                  {% if node_metrics and node_metrics.pod_count %}
+                    <canvas id="pod"
+                    {% for pod_key, pod_value in node_metrics.pod_count.items() %}
+                        {{ pod_key }}="{{ pod_value }}"
+                    {% endfor %}
+                    width="300" height="300"></canvas>
+                </div>
+                <div class="mp-10">
+                    {% for pod_key, pod_value in node_metrics.pod_count.items() %}
+                        {{ pod_key }}: {{ pod_value }} <br>
+                    {% endfor %}
+                  {% endif %}
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<div class="card shadow mb-4">
+    <div class="card-header">
+        <h6 class="m-0 font-weight-bold text-primary">Node Data</h6>
+    </div>
+    <div class="card-body">
+        <div class="table-responsive">
+            <table class="table table-bordered" id="podInfoTable" width="100%" cellspacing="0">
+                <tr>
+                    <th>Status:</th>
+                    <td>
+                        {% if node_data.status == "Ready" %}
+                            <span class="badge text-bg-tag text-bg-success">{{ node_data.status }}</span>
+                        {% else %}
+                            <span class="badge text-bg-tag text-bg-danger">{{ node_data.status }}</span>
+                        {% endif %}
+                    </td>
+                </tr>
+                <tr>
+                    <th>Name:</th>
+                    <td>{{node_data.name }}</td>
+                </tr>
+                <tr>
+                    <th>Role:</th>
+                    <td>{{node_data.role }}</td>
+                </tr>
+                {% if node_data.labels %}
+                    {% set region = False %}
+                    {% set zone = False %}
+                    {% set engine = False %}
+                    {% for no_key, no_value in node_data.labels.items() %}
+                        {% if no_key == "failure-domain.beta.kubernetes.io/region" and no_value %}
+                        {% set region = True %}
+                        <tr>
+                            <th>Region:</th>
+                            <td>{{ no_value }}</td>
+                        </tr>
+                        {% elif no_key == "topology.kubernetes.io/region" and no_value and region is sameas True %}
+                        <tr>
+                            <th>Region:</th>
+                            <td>{{ no_value }}</td>
+                        </tr>
+                        {% endif %}
+                        {% if no_key == "failure-domain.beta.kubernetes.io/zone" and no_value %}
+                        {% set zone = True %}
+                        <tr>
+                            <th>Zone:</th>
+                            <td>{{ no_value }}</td>
+                        </tr>
+                        {% elif no_key == "topology.kubernetes.io/zone" and no_value and zone is sameas True %}
+                        <tr>
+                            <th>Zone:</th>
+                            <td>{{ no_value }}</td>
+                        </tr>
+                        {% endif %}
+                        {% if no_key == "beta.kubernetes.io/instance-type" and no_value %}
+                        {% set engine = True %}
+                        <tr>
+                            <th>Kubernetes Distribution:</th>
+                            <td>{{ no_value }}</td>
+                        </tr>
+                        {% elif no_key == "node.kubernetes.io/instance-type" and no_value and engine is sameas True %}
+                        <tr>
+                            <th>Kubernetes Distribution:</th>
+                            <td>{{ no_value }}</td>
+                        </tr>
+                        {% endif %}
+                    {% endfor %}
+                {% endif %}
+                <tr>
+                    <th>Version:</th>
+                    <td>{{node_data.version }}</td>
+                </tr>
+                <tr>
+                    <th>Operation System:</th>
+                    <td>{{node_data.os }}</td>
+                </tr>
+                <tr>
+                    <th>Runtime:</th>
+                    <td>{{node_data.runtime }}</td>
+                </tr>
+                <tr>
+                    <th>Taints:</th>
+                    <td>
+                        {% for taint in node_data.taint %}
+                        <span class="badge text-bg-tag text-bg-tag text-bg-secondary">{{ taint }}</span>
+                        {% if not loop.last %}<br>{% endif %}
+                        {% endfor %}
+                    </td>
+                </tr>
+                <tr>
+                    <th>Annotations:</th>
+                    <td>
+                        {% if node_data.annotations %}
+                        <table class="table table-bordered" id="annotationTable" width="100%" cellspacing="0">
+                            <thead>
+                                <tr>
+                                    <th width="50%">Key</th>
+                                    <th width="50%">Value</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                            {% for key, value in node_data.annotations.items() %}
+                                <tr>
+                                {% if key != "kubectl.kubernetes.io/last-applied-configuration" %}
+                                    <td width="50%">{{ key }}</td>
+                                    <td width="50%">{{ value }}</td>
+                                {% endif %}
+                                </tr>
+                            {% endfor %}
+                            </tbody>
+                        </table>
+                        {% endif %}
+                    </td>
+                </tr>
+                <tr>
+                    <th>Lables:</th>
+                    <td>
+                        {% if node_data.labels %}
+                        <table class="table table-bordered" id="labelsTable" width="100%" cellspacing="0">
+                            <thead>
+                                <tr>
+                                    <th width="50%">Key</th>
+                                    <th width="50%">Value</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                            {% for key, value in node_data.labels.items() %}
+                                <tr>
+                                    <td width="50%">{{ key }}</td>
+                                    <td width="50%">{{ value }}</td>
+                                </tr>
+                            {% endfor %}
+                            </tbody>
+                        </table>
+                        {% endif %}
+                    </td>
+                </tr>
+            </table>
+        </div> 
+    </div>
+</div>
+
+{% if node_data.conditions %}
+<div class="card shadow mb-4">
+    <div class="card-header">
+        <h6 class="m-0 font-weight-bold text-primary">Conditions</h6>
+    </div>
+    <div class="card-body">
+        <div class="card shadow mb-4">
+            <div class="card-body">
+                <div class="table-responsive">
+                    <table class="table table-bordered" id="podInfoTable" width="100%" cellspacing="0">
+                        <thead>
+                            <tr>
+                                <th>Type</th>
+                                <th>Status</th>
+                                <th>Reason</th>
+                                <th>Message</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                        {% for co_type, co_status, co_reason, co_message in node_data.conditions|reverse %}
+                            <tr>
+                                <td>{{ co_type }}</th>
+                                {% if co_type == "Ready" %}
+                                    <td>
+                                    {% if co_status == "True" %}
+                                        <span class="badge text-bg-tag text-bg-success">{{ co_status }}</span>
+                                    {% else %}
+                                        <span class="badge text-bg-tag text-bg-danger">{{ co_status }}</span>
+                                    {% endif %}
+                                    </td>
+                                {% else %}
+                                    <td>
+                                    {% if co_status == "True" %}
+                                        <span class="badge text-bg-tag text-bg-danger">{{ co_status }}</span>
+                                    {% elif co_status == "Unknown" %}
+                                        <span class="badge text-bg-tag text-bg-danger">{{ co_status }}</span>
+                                    {% else %}
+                                        <span class="badge text-bg-tag text-bg-success">{{ co_status }}</span>
+                                    {% endif %}
+                                    </td>
+                                {% endif %}
+                                <td>{{ co_reason }}</th>
+                                <td>{{ co_message }}</td>
+                            </tr>
+                        {% endfor %}
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+    {% endif %}
+{% endblock %}
+
+{% block add_head_css %}
+{% include "segments/datatable_snipet.html.j2" %}
+{% endblock %}
+
+{% block add_tail_js %}
+{% include "segments/chartjs_snipet.html.j2" %}
+
+    <script>
+        var ctx = document.getElementById('cpu');
+        var usagePercent = ctx.getAttribute('usagePercent');
+        var usagePercentReturn = (100 - usagePercent)
+        if (usagePercentReturn <= 0) {
+            usagePercentReturn = 0
+        }
+        var requestsPercent = ctx.getAttribute('requestsPercent');
+        var requestsPercentReturn = (100 - requestsPercent)
+        if (requestsPercentReturn <= 0) {
+            requestsPercentReturn = 0
+        }
+        var limitsPercent = ctx.getAttribute('limitsPercent');
+        var limitsPercentReturn = (100 - limitsPercent)
+        if (limitsPercentReturn <= 0) {
+            limitsPercentReturn = 0
+        }
+        new Chart(ctx, {
+            type: 'doughnut',
+            data: {
+                datasets: [
+                    {
+                        backgroundColor: ['#00baa6', '#ededed'],
+                        data: [usagePercent, usagePercentReturn],
+                        borderWidth: [0, 0]
+                    },
+                    {
+                        backgroundColor: ['#36A2EB', '#ededed'],
+                        data: [requestsPercent, requestsPercentReturn],
+                        borderWidth: [0, 0]
+                    },
+                    {
+                        backgroundColor: ['#b91d47', '#ededed'],
+                        data: [limitsPercent, limitsPercentReturn],
+                        borderWidth: [0, 0]
+                    }
+                ]
+            },
+            options: {
+                maintainAspectRatio: false,
+                cutoutPercentage: 30,
+                tooltips: {
+                    caretPadding: 10,
+                },
+                legend: {
+                    display: true,
+                    position: 'bottom',
+                    labels: {
+                        generateLabels: function() {
+                        return [
+                            {
+                                text: 'usagePercent',
+                                fillStyle: '#00baa6',
+                                strokeStyle: '#ededed'
+                            },
+                            {
+                                text: 'requestsPercent',
+                                fillStyle: '#36A2EB',
+                                strokeStyle: '#ededed'
+                            },
+                            {
+                                text: 'limitsPercent',
+                                fillStyle: '#b91d47',
+                                strokeStyle: '#ededed'
+                            }
+                        ];
+                        }
+                    }
+                },
+                title: {
+                        display: true,
+                        text: 'CPU'
+                },
+            }
+        });
+    </script>
+    <script>
+        var ctx = document.getElementById('ram');
+        var usagePercent = ctx.getAttribute('usagePercent');
+        var usagePercentReturn = (100 - usagePercent)
+        if (usagePercentReturn <= 0) {
+            usagePercentReturn = 0
+        }
+        var requestsPercent = ctx.getAttribute('requestsPercent');
+        var requestsPercentReturn = (100 - requestsPercent)
+        if (requestsPercentReturn <= 0) {
+            requestsPercentReturn = 0
+        }
+        var limitsPercent = ctx.getAttribute('limitsPercent');
+        var limitsPercentReturn = (100 - limitsPercent)
+        if (limitsPercentReturn <= 0) {
+            limitsPercentReturn = 0
+        }
+        new Chart(ctx, {
+            type: 'doughnut',
+            data: {
+                datasets: [
+                    {
+                        backgroundColor: ['#00baa6', '#ededed'],
+                        data: [usagePercent, usagePercentReturn],
+                        borderWidth: [0, 0]
+                    },
+                    {
+                        backgroundColor: ['#36A2EB', '#ededed'],
+                        data: [requestsPercent, requestsPercentReturn],
+                        borderWidth: [0, 0]
+                    },
+                    {
+                        backgroundColor: ['#b91d47', '#ededed'],
+                        data: [limitsPercent, limitsPercentReturn],
+                        borderWidth: [0, 0]
+                    }
+                ]
+            },
+            options: {
+                maintainAspectRatio: false,
+                cutoutPercentage: 30,
+                tooltips: {
+                    caretPadding: 10,
+                },
+                legend: {
+                    display: true,
+                    position: 'bottom',
+                    labels: {
+                        generateLabels: function() {
+                        return [
+                            {
+                                text: 'usagePercent',
+                                fillStyle: '#00baa6',
+                                strokeStyle: '#ededed'
+                            },
+                            {
+                                text: 'requestsPercent',
+                                fillStyle: '#36A2EB',
+                                strokeStyle: '#ededed'
+                            },
+                            {
+                                text: 'limitsPercent',
+                                fillStyle: '#b91d47',
+                                strokeStyle: '#ededed'
+                            }
+                        ];
+                        }
+                    }
+                },
+                title: {
+                        display: true,
+                        text: 'CPU'
+                },
+            }
+        });
+    </script>
+    <script>
+        var ctx = document.getElementById('pod');
+        var current = ctx.getAttribute('current');
+        var allocatable = ctx.getAttribute('allocatable');
+        var currentReturn = (allocatable - current)
+        if (currentReturn <= 0) {
+            currentReturn = 0
+        };
+        new Chart(ctx, {
+            type: 'doughnut',
+            data: {
+                labels: ["Current", "All"],
+                datasets: [{
+                        backgroundColor: ['#00baa6', '#ededed'],
+                        data: [current, currentReturn],
+                        borderWidth: [0, 0]
+                    }]
+            },
+            options: {
+                maintainAspectRatio: false,
+                cutoutPercentage: 75,
+                tooltips: {
+                    caretPadding: 10,
+                },
+                legend: {
+                    display: true,
+                    position: 'bottom',
+                },
+                title: {
+                        display: true,
+                        text: 'PODS'
+                },
+            }
+        });
+    </script>
+{% endblock %}

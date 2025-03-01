@@ -1,0 +1,166 @@
+<!DOCTYPE html>
+
+<!--
+* CoreUI - Free Bootstrap Admin Template
+* @version v5.1.1
+* @link https://coreui.io/product/free-bootstrap-admin-template/
+* Copyright (c) 2024 creativeLabs Łukasz Holeczek
+* Licensed under MIT (https://github.com/coreui/coreui-free-bootstrap-admin-template/blob/main/LICENSE)
+-->
+
+
+<html lang="en">
+  <head>
+    <meta charset="utf-8">
+    <meta http-equiv="X-UA-Compatible" content="IE=edge">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, shrink-to-fit=no">
+    <meta name="description" content="KubeDash - Open Source Kubernetes Admin Dashboard">
+    <meta name="author" content="Páldi Balázs">
+    <title>KubeDash</title>
+
+    <!-- favicon -->
+    <link rel="apple-touch-icon" sizes="57x57" href="{{ url_for('static',filename='/assets/favicon/apple-icon-57x57.png') }}">
+    <link rel="apple-touch-icon" sizes="60x60" href="{{ url_for('static',filename='/assets/favicon/apple-icon-60x60.png') }}">
+    <link rel="apple-touch-icon" sizes="72x72" href="{{ url_for('static',filename='/assets/favicon/apple-icon-72x72.png') }}">
+    <link rel="apple-touch-icon" sizes="76x76" href="{{ url_for('static',filename='/assets/favicon/apple-icon-76x76.png') }}">
+    <link rel="apple-touch-icon" sizes="114x114" href="{{ url_for('static',filename='/assets/favicon/apple-icon-114x114.png') }}">
+    <link rel="apple-touch-icon" sizes="120x120" href="{{ url_for('static',filename='/assets/favicon/apple-icon-120x120.png') }}">
+    <link rel="apple-touch-icon" sizes="144x144" href="{{ url_for('static',filename='/assets/favicon/apple-icon-144x144.png') }}">
+    <link rel="apple-touch-icon" sizes="152x152" href="{{ url_for('static',filename='/assets/favicon/apple-icon-152x152.png') }}">
+    <link rel="apple-touch-icon" sizes="180x180" href="{{ url_for('static',filename='/assets/favicon/apple-icon-180x180.png') }}">
+    <link rel="icon" type="image/png" sizes="192x192" href="{{ url_for('static',filename='/assets/favicon/android-icon-192x192.png') }}">
+    <link rel="icon" type="image/png" sizes="32x32" href="{{ url_for('static',filename='/assets/favicon/favicon-32x32.png') }}">
+    <link rel="icon" type="image/png" sizes="96x96" href="{{ url_for('static',filename='/assets/favicon/favicon-96x96.png') }}">
+    <link rel="icon" type="image/png" sizes="16x16" href="{{ url_for('static',filename='/assets/favicon/favicon-16x16.png') }}">  
+    <link rel="manifest" href="{{ url_for('static',filename='/assets/favicon/manifest.json') }}">
+
+    <meta name="msapplication-TileColor" content="#ffffff">
+    <meta name="msapplication-TileImage" content="{{ url_for('static',filename='/assets/favicon/ms-icon-144x144.png') }}">
+    <meta name="theme-color" content="#ffffff">
+
+    <!-- Vendors styles-->
+    <link rel="stylesheet" href="{{ url_for('static',filename='/vendor/simplebar/css/simplebar.css') }}">
+    <link rel="stylesheet" href="{{ url_for('static',filename='/css/vendors/simplebar.css') }}">
+
+    <!-- Main styles for this application-->
+    <link href="{{ url_for('static',filename='/css/style.css') }}" rel="stylesheet">
+    
+    <!-- We use those styles to show code examples, you should remove them in your application.-->
+    <link href="{{ url_for('static',filename='/css/examples.css') }}" rel="stylesheet">
+
+    <!-- google material icons -->
+    <link href="{{ url_for('static',filename='/vendor/google/material-icons.css') }}" rel="stylesheet" >
+
+    <!-- Datatables -->
+    <link href="{{ url_for('static',filename='/vendor/datatables@2.2.2/dataTables.dataTables.min.css') }}" rel="stylesheet" >
+
+
+    <!-- Page add_head_css -->
+    {% block add_head_css %}
+    {% endblock %}
+
+  </head>
+  <body>
+
+    <!-- menu -->
+    {% include "segments/menu.html.j2" %}
+
+    <div class="wrapper d-flex flex-column min-vh-100">
+      <header class="header header-sticky p-0 mb-4">
+      <!-- header -->
+      {% include "segments/header.html.j2" %}
+      <!-- buttom of header to use topmenu block -->
+      {% block topmenu %}{% endblock %}
+      <!-- end header -->
+      </header>
+
+      <div class="body flex-grow-1 px-4">
+          <!-- Page Content -->
+          {% block content %}
+          {% endblock %}
+      </div>
+
+      <!-- Footer -->
+      {% include "segments/footer.html.j2" %}
+    </div>
+
+    <!-- Logout Modal-->
+    <div class="modal fade" id="logoutModal" tabindex="-1" aria-labelledby="exampleModalLabel" aria-hidden="true">
+        <div class="modal-dialog">
+            <div class="modal-content">
+                <div class="modal-header">
+                    <h5 class="modal-title" id="exampleModalLabel">Ready to Leave?</h5>
+                    <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+                    <!-- <button class="btn-close" type="button" data-bs-dismiss="modal" aria-label="Close">
+                        <span aria-hidden="true">×</span>
+                    </button> -->
+                </div>
+                <div class="modal-body">Select "Logout" below if you are ready to end your current session.</div>
+                <div class="modal-footer">
+                    <button class="btn btn-secondary" type="button" data-bs-dismiss="modal">Cancel</button>
+                    <a class="btn btn-primary" href="/logout">Logout</a>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Bootstrap 5 js -->
+    <script src="{{ url_for('static',filename='/vendor/bootstrap@5.3.3/bootstrap.bundle.min.js') }}"></script>
+
+    <!-- CoreUI and necessary plugins-->
+    <script src="{{ url_for('static',filename='/vendor/@coreui/coreui/js/coreui.bundle.min.js') }}"></script>
+    <script src="{{ url_for('static',filename='/vendor/simplebar/js/simplebar.min.js') }}"></script>
+
+    <!-- We use those styles to show code examples, you should remove them in your application.-->
+    <script src="{{ url_for('static',filename='/js/config.js') }}"></script>
+    <script src="{{ url_for('static',filename='/js/color-modes.js') }}"></script>
+
+    <!-- Page level plugins -->
+    <script src="{{ url_for('static',filename='/vendor/jquery@3.7.1/js/jquery-3.7.1.js') }}"></script>
+    <script src="{{ url_for('static',filename='/vendor/datatables@2.2.2/dataTables.min.js') }}"></script>
+
+    <!-- Page level custom scripts -->
+    <script src="{{ url_for('static',filename='/vendor/datatables@2.2.2/datatables-demo.js') }}"></script>
+
+    <!-- custom scripts -->
+    <script type="text/javascript">
+        function setClipboard(value) {
+            var tempInput = document.createElement("input");
+            tempInput.style = "position: absolute; left: -1000px; top: -1000px";
+            tempInput.value = value;
+            document.body.appendChild(tempInput);
+            tempInput.select();
+            document.execCommand("copy");
+            document.body.removeChild(tempInput);
+        }
+    
+        function reload() {
+            location.reload(true);
+        };
+    </script>
+    <script type="text/javascript">
+        setTimeout(function() {
+            $('#flashMessage').fadeOut('fast');
+        }, 30000);
+    </script>
+
+    <!-- Vendors scripts -->
+    <script>
+      const header = document.querySelector('header.header');
+
+      document.addEventListener('scroll', () => {
+        if (header) {
+          header.classList.toggle('shadow-sm', document.documentElement.scrollTop > 0);
+        }
+      });
+    </script>
+
+    <!-- Page tail_js -->
+    {% block add_tail_js %}
+    {% endblock %}
+
+    <!-- Page tail -->
+    {% block tail %}
+    {% endblock %}
+  </body>
+</html>

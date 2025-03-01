@@ -1,0 +1,184 @@
+    <div class="sidebar sidebar-dark sidebar-fixed border-end" id="sidebar">
+    <div class="sidebar-header border-bottom">
+        <div class="sidebar-brand">
+            <svg class="sidebar-brand-full" width="88" height="32" alt="CoreUI Logo">
+            <use xlink:href="{{ url_for('static',filename='/assets/brand/coreui.svg') }}#full"></use>
+            </svg>
+            <svg class="sidebar-brand-narrow" width="32" height="32" alt="CoreUI Logo">
+            <use xlink:href="{{ url_for('static',filename='/assets/brand/coreui.svg') }}#signet"></use>
+            </svg>
+        </div>
+        <button class="btn-close d-lg-none" type="button" data-coreui-dismiss="offcanvas" data-coreui-theme="dark" aria-label="Close" onclick="coreui.Sidebar.getInstance(document.querySelector(&quot;#sidebar&quot;)).toggle()"></button>
+        </div>
+        <ul class="sidebar-nav" data-coreui="navigation" data-simplebar="">
+
+            <!-- Dashboard -->
+            <li class="nav-group"><a class="nav-link nav-group-toggle" href="#">
+                <svg class="nav-icon">
+                    <use xlink:href="{{ url_for('static',filename='/vendor/@coreui/icons/svg/free.svg') }}#cil-speedometer"></use>
+                </svg> Dashboard </a>
+                <ul class="nav-group-items compact">
+                    <li class="nav-item"><a class="nav-link" href="/dashboard/cluster-metric"> Cluster Metrics</a></li>
+                    <li class="nav-item"><a class="nav-link" href="/dashboard/workload-map"> Workload <span class="badge text-bg-sm bg-warning ms-auto">Beta</span></a></li>
+                </ul>
+            </li>
+
+            <!-- Divider -->
+            <div class="border-top d-none d-md-flex"></div>
+
+            <!-- Heading -->
+            <li class="nav-title">Permissions</li>
+            <!-- User Management Collapse Menu -->
+            <li class="nav-group"><a class="nav-link nav-group-toggle" href="#">
+                <svg class="nav-icon">
+                    <use xlink:href="{{ url_for('static',filename='/vendor/@coreui/icons/svg/free.svg') }}#cil-speedometer"></use>
+                </svg> User Management </a>
+                <ul class="nav-group-items compact">
+                    <li class="nav-item"><a class="nav-link" href="/user/list"> Users </a></li>
+                    <li class="nav-item"><a class="nav-link" href="/user/group"> Groups </a></li>
+                </ul>
+            </li>
+            <li class="nav-group"><a class="nav-link nav-group-toggle" href="#">
+                <svg class="nav-icon">
+                    <use xlink:href="{{ url_for('static',filename='/vendor/@coreui/icons/svg/free.svg') }}#cil-speedometer"></use>
+                </svg> Cluster Permissions </a>
+                <ul class="nav-group-items compact">
+                    <li class="nav-item"><a class="nav-link" href="/cluster-permission/service-account"> ServiceAccounts </a></li>
+                    <li class="nav-item"><a class="nav-link" href="/cluster-permission/role"> Roles </a></li>
+                    <li class="nav-item"><a class="nav-link" href="/cluster-permission/role-binding">RoleBindings</a></li>
+                    <li class="nav-item"><a class="nav-link" href="/cluster-permission/cluster-role">ClusterRoles</a></li>
+                    <li class="nav-item"><a class="nav-link" href="/cluster-permission/cluster-role-binding">ClusterRoleBindings</a></li>
+                </ul>
+            </li>
+
+            <!-- Divider -->
+            <div class="border-top d-none d-md-flex"></div>
+
+            <!-- Heading -->
+            <li class="nav-title">Interface</li>
+            <!-- Cluster Collapse Menu -->
+            <li class="nav-group"><a class="nav-link nav-group-toggle" href="#">
+                <svg class="nav-icon">
+                    <use xlink:href="{{ url_for('static',filename='/vendor/@coreui/icons/svg/free.svg') }}#cil-speedometer"></use>
+                </svg> Cluster </a>
+                <ul class="nav-group-items compact">
+                    <li class="nav-item"><a class="nav-link" href="/cluster/namespace"> Namespaces </a></li>
+                    <li class="nav-item"><a class="nav-link" href="/cluster/node"> Nodes </a></li>
+                    <!-- <li class="nav-item"><a class="nav-link" href="/cluster/crds"> CRDs </a></li> -->
+                    <!-- <li class="nav-item"><a class="nav-link" href="/cluster/runetime-class"> Runetime Class </a></li> -->
+                </ul>
+            </li>
+        <!-- Workloads Collapse Menu -->
+            <li class="nav-group"><a class="nav-link nav-group-toggle" href="#">
+                <svg class="nav-icon">
+                    <use xlink:href="{{ url_for('static',filename='/vendor/@coreui/icons/svg/free.svg') }}#cil-speedometer"></use>
+                </svg> Workloads </a>
+                <ul class="nav-group-items compact">
+                    <li class="nav-item"><a class="nav-link" href="/workload/pod"> Pods </a></li>
+                    <li class="nav-item"><a class="nav-link" href="/workload/deployment"> Deployments </a></li>
+                    <li class="nav-item"><a class="nav-link" href="/workload/statefulset"> StatefulSets </a></li>
+                    <li class="nav-item"><a class="nav-link" href="/workload/daemonset"> DaemonSets </a></li>
+                    <li class="nav-item"><a class="nav-link" href="/workload/replicaset"> ReplicaSets </a></li>
+                </ul>
+            </li>
+        <!-- Workloads Collapse Menu -->
+            <li class="nav-group"><a class="nav-link nav-group-toggle" href="#">
+                <svg class="nav-icon">
+                    <use xlink:href="{{ url_for('static',filename='/vendor/@coreui/icons/svg/free.svg') }}#cil-speedometer"></use>
+                </svg> Network </a>
+                <ul class="nav-group-items compact">
+                    <li class="nav-item"><a class="nav-link" href="/network/service"> Services </a></li>
+                    <!-- endpoints -->
+                    <li class="nav-item"><a class="nav-link" href="/network/ingress"> Ingress </a></li>
+                    <li class="nav-item"><a class="nav-link" href="/network/ingress-class"> Ingress Class </a></li>
+                    <!-- Gateways -->
+                    <!-- Gateway classes -->
+                </ul>
+            </li>
+        <!-- Storage Collapse Menu -->
+            <li class="nav-group"><a class="nav-link nav-group-toggle" href="#">
+                <svg class="nav-icon">
+                    <use xlink:href="{{ url_for('static',filename='/vendor/@coreui/icons/svg/free.svg') }}#cil-speedometer"></use>
+                </svg> Storage </a>
+                <ul class="nav-group-items compact">
+                    <li class="nav-item"><a class="nav-link" href="/storage/configmap"> ConfigMaps </a></li>
+                    <li class="nav-item"><a class="nav-link" href="/storage/pv"> Volumes </a></li>
+                    <li class="nav-item"><a class="nav-link" href="/storage/pvc"> VolumeClames </a></li>
+                    <li class="nav-item"><a class="nav-link" href="/storage/volumesnapshot"> VolumeSnapshot </a></li>
+                    <li class="nav-item"><a class="nav-link" href="/storage/storage-class"> StorageClass </a></li>
+                    <li class="nav-item"><a class="nav-link" href="/storage/snapshot-class"> SnapshotClass </a></li>
+                </ul>
+            </li>
+            <!-- Security Collapse Menu -->
+            <li class="nav-group"><a class="nav-link nav-group-toggle" href="#">
+                <svg class="nav-icon">
+                    <use xlink:href="{{ url_for('static',filename='/vendor/@coreui/icons/svg/free.svg') }}#cil-speedometer"></use>
+                </svg> Security </a>
+                <ul class="nav-group-items compact">
+                    <li class="nav-item"><a class="nav-link" href="/security/secrets"> Secrets </a></li>
+                    <li class="nav-item"><a class="nav-link" href="/security/network-policies"> Network Policies </a></li>
+                </ul>
+            </li>
+        <!-- Other Resources Collapse Menu -->
+            <li class="nav-group"><a class="nav-link nav-group-toggle" href="#">
+                <svg class="nav-icon">
+                    <use xlink:href="{{ url_for('static',filename='/vendor/@coreui/icons/svg/free.svg') }}#cil-speedometer"></use>
+                </svg> Other Resources </a>
+                <ul class="nav-group-items compact">
+                    <li class="nav-item"><a class="nav-link" href="/other-resources/horizontal-pod-autoscaler"> HPAs </a></li>
+                    <!-- <li class="nav-item"><a class="nav-link" href="/other-resources/vertical-pod-autoscaler"> VPAs </a></li> -->
+                    <li class="nav-item"><a class="nav-link" href="/other-resources/pod-disruption-budget"> Pod Disruption Budget </a></li>
+                    <li class="nav-item"><a class="nav-link" href="/other-resources/priority-class"> Priority Classes </a></li>
+                    <li class="nav-item"><a class="nav-link" href="/other-resources/resource-quota"> Resource Quota </a></li>
+                    <li class="nav-item"><a class="nav-link" href="/other-resources/limit-range"> Limit Range </a></li>
+                </ul>
+            </li>
+            <!-- Settings Collapse Menu -->
+            <li class="nav-group"><a class="nav-link nav-group-toggle" href="#">
+                <svg class="nav-icon">
+                    <use xlink:href="{{ url_for('static',filename='/vendor/@coreui/icons/svg/free.svg') }}#cil-speedometer"></use>
+                </svg> Settings </a>
+                <ul class="nav-group-items compact">
+                {% if session['user_role'] == "Admin" %}
+                    <li class="nav-item"><a class="nav-link" href="/settings/sso-config"> Auth Provider </a></li>
+                    <li class="nav-item"><a class="nav-link" href="/settings/cluster-config"> Cluster Configuration </a></li>
+                {% endif %}
+                    <li class="nav-item"><a class="nav-link" href="/settings/export"> Get KubeCong </a></li>
+                </ul>
+            </li>
+
+            <!-- Divider -->
+            <div class="border-top d-none d-md-flex"></div>
+
+        <!-- Plugins -->
+            <li class="nav-group"><a class="nav-link nav-group-toggle" href="#">
+                <svg class="nav-icon">
+                    <use xlink:href="{{ url_for('static',filename='/vendor/@coreui/icons/svg/free.svg') }}#cil-speedometer"></use>
+                </svg> Plugins </a>
+                <ul class="nav-group-items compact">
+                {% if config.plugins["registry"] %}
+                    <li class="nav-item"><a class="nav-link" href="/plugin/registry"> OCI Registry </a></li>
+                {% endif %}
+                {% if config.plugins["helm"] %}
+                    <li class="nav-item"><a class="nav-link" href="/plugin/helm-chart"> Helm Charts </a></li>
+                {% endif %}
+                {% if config.plugins["cert_manager"] %}
+                    <li class="nav-item"><a class="nav-link" href="/plugin/cert-manager"> Cert-Manager </a></li>
+                {% endif %}
+                {% if config.plugins["external_loadbalancer"] %}
+                    <li class="nav-item"><a class="nav-link" href="/plugin/loadbalancer"> LoadBalancers </a></li>
+                {% endif %}
+                </ul>
+            </li>
+
+            <!-- Divider -->
+            <div class="border-top d-none d-md-flex"></div>
+
+
+        </ul>
+        <!-- Divider -->
+        <div class="sidebar-footer border-top d-none d-md-flex">
+            <!-- Sidebar Toggler (Sidebar) -->
+            <button class="sidebar-toggler" type="button" data-coreui-toggle="unfoldable"></button>
+    </div>
+    </div>

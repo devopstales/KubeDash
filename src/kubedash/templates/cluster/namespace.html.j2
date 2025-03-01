@@ -1,0 +1,131 @@
+{% extends "base2.html.j2" %}
+
+{% block topmenu %}
+<ul class="header-nav d-lg-flex m-3">
+    <div class="container-fluid px-4">
+      <nav aria-label="breadcrumb">
+        <ol class="breadcrumb my-0">
+          <li class="breadcrumb-item"><span>Cluster</span></li>
+          <li class="breadcrumb-item active"><span>Namespaces</span></li>
+        </ol>
+      </nav>
+    </div>
+</ul>
+<ul class="header-nav ms-auto"></ul>
+<ul class="header-nav d-lg-flex">
+      <!-- Button trigger modal add -->
+      {% if session['user_role'] == "Admin" %}
+      <a data-bs-toggle="#modaladd" data-bs-toggle="modal" class="float-right" id="modaladdNav" href="#" onclick='$("#modaladd").modal()'>
+        <i class="material-icons">add</i>
+      </a>
+      {% endif %}
+{% include "segments/topmenu.html.j2" %}
+{% endblock %}
+
+{% block content %}
+<!-- DataTales -->
+<div class="card shadow mb-4">
+    <div class="card-header py-3">
+        <h6 class="m-0 font-weight-bold text-primary">Namespace List</h6>
+    </div>
+    <div class="card-body">
+        <div class="table-responsive">
+            <table class="table table-bordered" id="dataTable" width="100%" cellspacing="0">
+                <thead>
+                    <tr>
+                        <th>Status</th>
+                        <th>Namespace</th>
+                        <th>Created</th>
+                        <th>Action</th>
+                    </tr>
+                </thead>
+                <tfoot>
+                    <tr>
+                        <th>Status</th>
+                        <th>Namespace</th>
+                        <th>Created</th>
+                        <th>Action</th>
+                    </tr>
+                </tfoot>
+                <tbody>
+                    {% for ns in namespace_list %}
+                    {% if selected == ns.name %}
+                      <tr class="selected" >
+                    {% else %}
+                      <tr>
+                    {% endif %}
+                      <td>
+                      {% if ns.status == "Active" %}
+                        <span class="badge text-bg-success">{{ ns.status }}</span>
+                      {% else %}
+                        <span class="badge text-bg-danger">{{ ns.status }}</span>
+                      {% endif %}
+                      </td>
+                      <td>
+                          <form action="/cluster/namespaces/data" method="POST">
+                            <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+                            <input type="hidden" name="ns_data" value="{{ ns }}" />
+                            <input type="hidden" name="ns_select" value="{{ ns.name }}" />
+                            <a href="javascript:;" onclick="parentNode.submit();">{{ ns.name }}</a>
+                          </form>
+                        
+                      </td>
+                      <td>
+                        {{ ns.created }}
+                      <td>
+                        <div class="d-flex flex-row">
+                          {% if session['user_role'] == "Admin" %}
+                          <!-- Button trigger modal -->
+                          <form action="/cluster/namespaces/delete" method="post">
+                            <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+                            <input type="hidden"  name="namespace" value="{{ ns.name }}"/>
+                            <button type="submit" rel="tooltip" class="btn btn-danger btn-just-icon btn-sm" value="upvote">
+                                <i class="material-icons">delete</i>
+                            </button>
+                          </form>  
+                          {% endif %}
+                        </div>
+                      </td>
+                    </tr>
+                  {% endfor %}
+                </tbody>
+            </table>
+
+        </div>
+    </div>
+</div>
+
+<!-- Modal Add User -->
+  <div class="modal fade" id="modaladd" tabindex="-1" role="dialog" aria-labelledby="modaladdLabel" aria-hidden="true">
+    <div class="modal-dialog" role="document">
+      <div class="modal-content">
+        <div class="modal-header">
+          <h5 class="modal-title" id="modaladdLabel">New</h5>
+          <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+        </div>
+        <div class="modal-body">
+          <form action="/cluster/namespaces/create" method="POST">
+            <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+            <div class="form-group">
+              <label>Namespace:</label>
+              <input class="form-control user" name="namespace" type="text" placeholder="Type your username">
+            </div>
+            <div class="modal-footer">
+              <div class="form-group mt-2">
+                <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Close</button>
+                <button type="submit" class="btn btn-primary" >Add Namespace</button>
+              </div>
+            </div>
+          </form>
+        </div>
+      </div>
+    </div>
+  </div>
+<!-- Modal Add User -->
+{% endblock %}
+
+{% block add_head_css %}
+{% include "segments/chartjs_snipet.html.j2" %}
+
+{% include "segments/datatable_snipet.html.j2" %}
+{% endblock %}

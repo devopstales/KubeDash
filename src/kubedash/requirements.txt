@@ -1,63 +1,123 @@
-# flask
-flask==3.0.0
-Werkzeug==3.0.6
-Jinja2==3.1.5
-dnspython==2.6.1
-pytz==2023.3.post1
-# config
-configparser==7.0.0
-
-# database
-psycopg2==2.9.7
-SQLAlchemy==2.0.17
-sqlalchemy_utils==0.41.1
-flask_migrate==4.0.5
-flask_sqlalchemy==3.0.5
-# login
-flask_login==0.6.3
-flask_session==0.8.0
-requests_oauthlib==2.0.0
-# web security
-Flask_WTF==1.2.1
-flask_cors==5.0.0
-flask_talisman==1.1.0
-# kubernetes
-kubernetes==26.1.0
-pybase64==1.4.0
-# API
-flask_healthz==1.0.1
-flask-swagger-ui==4.11.1
-# graphwiz
-pyvis==0.3.2
-# socket
-flask_socketio==5.3.4
-gevent-websocket==0.10.1
-eventlet==0.37.0
-gunicorn==23.0.0
-
-
-# telemetry
-opentelemetry-sdk==1.28.2
-opentelemetry-api==1.28.2
-opentelemetry-exporter-otlp-proto-http==1.28.2
-opentelemetry-semantic-conventions==0.49b2
-opentelemetry-instrumentation-sqlalchemy==0.49b2
-opentelemetry-instrumentation-flask==0.49b2
-opentelemetry-instrumentation-logging==0.49b2
-opentelemetry-instrumentation-requests==0.49b2
-
-# monitoring
-prometheus-flask-exporter==0.23.1
-
-# security
-certifi==2024.07.04
-setuptools==70.0.0
-pyOpenSSL==25.0.0
-cryptography==44.0.1
-ipython==8.27.0 # not directly required, pinned by Snyk to avoid a vulnerability
-gevent==23.9.0 # not directly required, pinned by Snyk to avoid a vulnerability
-urllib3==2.2.2 # not directly required, pinned by Snyk to avoid a vulnerability
-requests==2.32.2 # not directly required, pinned by Snyk to avoid a vulnerability
-zipp==3.19.1 # not directly required, pinned by Snyk to avoid a vulnerability
-pip==23.3
-setuptools==70.0.0
+alembic==1.14.1 ; python_version >= "3.11" and python_version < "3.12"
+apiflask==2.3.2 ; python_version >= "3.11" and python_version < "3.12"
+apispec==6.8.1 ; python_version >= "3.11" and python_version < "3.12"
+asttokens==3.0.0 ; python_version >= "3.11" and python_version < "3.12"
+bidict==0.23.1 ; python_version >= "3.11" and python_version < "3.12"
+blinker==1.9.0 ; python_version >= "3.11" and python_version < "3.12"
+brotli==1.1.0 ; python_version >= "3.11" and python_version < "3.12" and platform_python_implementation == "CPython"
+brotlicffi==1.1.0.0 ; python_version >= "3.11" and python_version < "3.12" and platform_python_implementation != "CPython"
+cachelib==0.13.0 ; python_version >= "3.11" and python_version < "3.12"
+cachetools==5.5.1 ; python_version >= "3.11" and python_version < "3.12"
+certifi==2024.7.4 ; python_version >= "3.11" and python_version < "3.12"
+cffi==1.17.1 ; python_version >= "3.11" and python_version < "3.12"
+charset-normalizer==3.4.1 ; python_version >= "3.11" and python_version < "3.12"
+click==8.1.8 ; python_version >= "3.11" and python_version < "3.12"
+colorama==0.4.6 ; python_version >= "3.11" and python_version < "3.12" and platform_system == "Windows" or python_version >= "3.11" and python_version < "3.12" and sys_platform == "win32"
+configparser==7.0.0 ; python_version >= "3.11" and python_version < "3.12"
+cryptography==43.0.1 ; python_version >= "3.11" and python_version < "3.12"
+cssselect2==0.7.0 ; python_version >= "3.11" and python_version < "3.12"
+decorator==5.1.1 ; python_version >= "3.11" and python_version < "3.12"
+deprecated==1.2.18 ; python_version >= "3.11" and python_version < "3.12"
+dnspython==2.6.1 ; python_version >= "3.11" and python_version < "3.12"
+eventlet==0.35.2 ; python_version >= "3.11" and python_version < "3.12"
+executing==2.2.0 ; python_version >= "3.11" and python_version < "3.12"
+flask-cors==5.0.0 ; python_version >= "3.11" and python_version < "3.12"
+flask-httpauth==4.8.0 ; python_version >= "3.11" and python_version < "3.12"
+flask-login==0.6.3 ; python_version >= "3.11" and python_version < "3.12"
+flask-marshmallow==1.3.0 ; python_version >= "3.11" and python_version < "3.12"
+flask-migrate==4.0.5 ; python_version >= "3.11" and python_version < "3.12"
+flask-session==0.8.0 ; python_version >= "3.11" and python_version < "3.12"
+flask-socketio==5.3.4 ; python_version >= "3.11" and python_version < "3.12"
+flask-sqlalchemy==3.0.5 ; python_version >= "3.11" and python_version < "3.12"
+flask-talisman==1.1.0 ; python_version >= "3.11" and python_version < "3.12"
+flask-wtf==1.2.1 ; python_version >= "3.11" and python_version < "3.12"
+flask==3.0.0 ; python_version >= "3.11" and python_version < "3.12"
+fonttools==4.56.0 ; python_version >= "3.11" and python_version < "3.12"
+gevent-websocket==0.10.1 ; python_version >= "3.11" and python_version < "3.12"
+gevent==23.9.0 ; python_version >= "3.11" and python_version < "3.12"
+google-auth==2.38.0 ; python_version >= "3.11" and python_version < "3.12"
+googleapis-common-protos==1.66.0 ; python_version >= "3.11" and python_version < "3.12"
+greenlet==3.1.1 ; python_version >= "3.11" and python_version < "3.12"
+gunicorn==23.0.0 ; python_version >= "3.11" and python_version < "3.12"
+h11==0.14.0 ; python_version >= "3.11" and python_version < "3.12"
+html5lib==1.1 ; python_version >= "3.11" and python_version < "3.12"
+idna==3.10 ; python_version >= "3.11" and python_version < "3.12"
+importlib-metadata==8.4.0 ; python_version >= "3.11" and python_version < "3.12"
+ipython==8.27.0 ; python_version >= "3.11" and python_version < "3.12"
+itsdangerous==2.2.0 ; python_version >= "3.11" and python_version < "3.12"
+jedi==0.19.2 ; python_version >= "3.11" and python_version < "3.12"
+jinja2==3.1.4 ; python_version >= "3.11" and python_version < "3.12"
+jsonpickle==4.0.1 ; python_version >= "3.11" and python_version < "3.12"
+kubernetes==26.1.0 ; python_version >= "3.11" and python_version < "3.12"
+mako==1.3.9 ; python_version >= "3.11" and python_version < "3.12"
+markupsafe==3.0.2 ; python_version >= "3.11" and python_version < "3.12"
+marshmallow==3.26.1 ; python_version >= "3.11" and python_version < "3.12"
+matplotlib-inline==0.1.7 ; python_version >= "3.11" and python_version < "3.12"
+msgspec==0.19.0 ; python_version >= "3.11" and python_version < "3.12"
+networkx==3.4.2 ; python_version >= "3.11" and python_version < "3.12"
+oauthlib==3.2.2 ; python_version >= "3.11" and python_version < "3.12"
+opentelemetry-api==1.28.2 ; python_version >= "3.11" and python_version < "3.12"
+opentelemetry-exporter-otlp-proto-common==1.28.2 ; python_version >= "3.11" and python_version < "3.12"
+opentelemetry-exporter-otlp-proto-http==1.28.2 ; python_version >= "3.11" and python_version < "3.12"
+opentelemetry-instrumentation-flask==0.49b2 ; python_version >= "3.11" and python_version < "3.12"
+opentelemetry-instrumentation-logging==0.49b2 ; python_version >= "3.11" and python_version < "3.12"
+opentelemetry-instrumentation-requests==0.49b2 ; python_version >= "3.11" and python_version < "3.12"
+opentelemetry-instrumentation-sqlalchemy==0.49b2 ; python_version >= "3.11" and python_version < "3.12"
+opentelemetry-instrumentation-wsgi==0.49b2 ; python_version >= "3.11" and python_version < "3.12"
+opentelemetry-instrumentation==0.49b2 ; python_version >= "3.11" and python_version < "3.12"
+opentelemetry-proto==1.28.2 ; python_version >= "3.11" and python_version < "3.12"
+opentelemetry-sdk==1.28.2 ; python_version >= "3.11" and python_version < "3.12"
+opentelemetry-semantic-conventions==0.49b2 ; python_version >= "3.11" and python_version < "3.12"
+opentelemetry-util-http==0.49b2 ; python_version >= "3.11" and python_version < "3.12"
+packaging==24.2 ; python_version >= "3.11" and python_version < "3.12"
+parso==0.8.4 ; python_version >= "3.11" and python_version < "3.12"
+pexpect==4.9.0 ; python_version >= "3.11" and python_version < "3.12" and (sys_platform != "win32" and sys_platform != "emscripten")
+pillow==11.1.0 ; python_version >= "3.11" and python_version < "3.12"
+prometheus-client==0.21.1 ; python_version >= "3.11" and python_version < "3.12"
+prometheus-flask-exporter==0.23.1 ; python_version >= "3.11" and python_version < "3.12"
+prompt-toolkit==3.0.50 ; python_version >= "3.11" and python_version < "3.12"
+protobuf==5.29.3 ; python_version >= "3.11" and python_version < "3.12"
+psycopg2==2.9.7 ; python_version >= "3.11" and python_version < "3.12"
+ptyprocess==0.7.0 ; python_version >= "3.11" and python_version < "3.12" and (sys_platform != "win32" and sys_platform != "emscripten")
+pure-eval==0.2.3 ; python_version >= "3.11" and python_version < "3.12"
+pyasn1-modules==0.4.1 ; python_version >= "3.11" and python_version < "3.12"
+pyasn1==0.6.1 ; python_version >= "3.11" and python_version < "3.12"
+pybase64==1.4.0 ; python_version >= "3.11" and python_version < "3.12"
+pycparser==2.22 ; python_version >= "3.11" and python_version < "3.12"
+pydyf==0.11.0 ; python_version >= "3.11" and python_version < "3.12"
+pygments==2.19.1 ; python_version >= "3.11" and python_version < "3.12"
+pyopenssl==24.2.1 ; python_version >= "3.11" and python_version < "3.12"
+pyphen==0.17.2 ; python_version >= "3.11" and python_version < "3.12"
+python-dateutil==2.9.0.post0 ; python_version >= "3.11" and python_version < "3.12"
+python-engineio==4.11.2 ; python_version >= "3.11" and python_version < "3.12"
+python-socketio==5.12.1 ; python_version >= "3.11" and python_version < "3.12"
+pytz==2023.3.post1 ; python_version >= "3.11" and python_version < "3.12"
+pyvis==0.3.2 ; python_version >= "3.11" and python_version < "3.12"
+pyyaml==6.0.2 ; python_version >= "3.11" and python_version < "3.12"
+requests-oauthlib==2.0.0 ; python_version >= "3.11" and python_version < "3.12"
+requests==2.32.2 ; python_version >= "3.11" and python_version < "3.12"
+rsa==4.9 ; python_version >= "3.11" and python_version < "3.12"
+setuptools==70.0.0 ; python_version >= "3.11" and python_version < "3.12"
+simple-websocket==1.1.0 ; python_version >= "3.11" and python_version < "3.12"
+six==1.17.0 ; python_version >= "3.11" and python_version < "3.12"
+sqlalchemy-utils==0.41.1 ; python_version >= "3.11" and python_version < "3.12"
+sqlalchemy==2.0.17 ; python_version >= "3.11" and python_version < "3.12"
+stack-data==0.6.3 ; python_version >= "3.11" and python_version < "3.12"
+tinycss2==1.4.0 ; python_version >= "3.11" and python_version < "3.12"
+traitlets==5.14.3 ; python_version >= "3.11" and python_version < "3.12"
+typing-extensions==4.12.2 ; python_version >= "3.11" and python_version < "3.12"
+urllib3==2.2.2 ; python_version >= "3.11" and python_version < "3.12"
+watchdog==6.0.0 ; python_version >= "3.11" and python_version < "3.12"
+wcwidth==0.2.13 ; python_version >= "3.11" and python_version < "3.12"
+weasyprint==56.1 ; python_version >= "3.11" and python_version < "3.12"
+webargs==8.6.0 ; python_version >= "3.11" and python_version < "3.12"
+webencodings==0.5.1 ; python_version >= "3.11" and python_version < "3.12"
+websocket-client==1.8.0 ; python_version >= "3.11" and python_version < "3.12"
+werkzeug==3.0.3 ; python_version >= "3.11" and python_version < "3.12"
+wrapt==1.17.2 ; python_version >= "3.11" and python_version < "3.12"
+wsproto==1.2.0 ; python_version >= "3.11" and python_version < "3.12"
+wtforms==3.2.1 ; python_version >= "3.11" and python_version < "3.12"
+zipp==3.19.1 ; python_version >= "3.11" and python_version < "3.12"
+zope-event==5.0 ; python_version >= "3.11" and python_version < "3.12"
+zope-interface==7.2 ; python_version >= "3.11" and python_version < "3.12"
+zopfli==0.2.3.post1 ; python_version >= "3.11" and python_version < "3.12"

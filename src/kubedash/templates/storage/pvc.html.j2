@@ -1,0 +1,100 @@
+{% extends "base2.html.j2" %}
+
+{% block topmenu %}
+<ul class="header-nav d-lg-flex m-3">
+    <div class="container-fluid px-4">
+      <nav aria-label="breadcrumb">
+        <ol class="breadcrumb my-0">
+          <li class="breadcrumb-item"><span>Storage</span></li>
+          <li class="breadcrumb-item active"><span>PVC</span></li>
+        </ol>
+      </nav>
+    </div>
+</ul>
+<ul class="header-nav ms-auto"></ul>
+<ul class="header-nav d-lg-flex">
+{% include "segments/topmenu.html.j2" %}
+{% endblock %}
+
+{% block content %}
+<div class="card shadow mb-4">
+    <div class="card-header py-3">
+        <h6 class="m-0 font-weight-bold text-primary">Persistent Volume Claim List</h6>
+    </div>
+    <div class="card-body">
+        <div class="table-responsive">
+            <table class="table table-bordered" id="dataTable" width="100%" cellspacing="0">
+                <thead>
+                    <tr>
+                      <th>Status</th>
+                      <th>Name</th>
+                      <th>StorageClass</th>
+                      <th>Volume</th>
+                      <th>Capacity</th>
+                      <th>Usage</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {% for pvc in pvc_list %}
+                    {% if selected == pvc.name %}
+                      <tr class="selected" >
+                    {% else %}
+                      <tr>
+                    {% endif %}
+                    {% if pvc.status == "Bound" %}
+                        <td>
+                          <span class="badge text-bg-success text-bg-tag">{{ pvc.status }}</span>
+                        </td>
+                    {% elif  pvc.status == "Terminating" %}
+                        <td>
+                          <span class="badge text-bg-danger text-bg-tag">{{ pvc.status }}</span>
+                        </td>
+                    {% else %}
+                        <td>
+                          <span class="badge text-bg-warning text-bg-tag">{{ pvc.status }}</span>
+                        </td>
+                    {% endif %}
+                        <td>
+                          <form action="/storage/pvc/data" method="POST">
+                            <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+                            <input type="hidden" name="ns_select" value="{{ session['ns_select'] }}" />
+                            <input type="hidden" name="selected" value="{{ pvc.name }}" />
+                            <a href="javascript:;" onclick="parentNode.submit();">{{ pvc.name }}</a>
+                          </form>
+                        </td>
+                        <td>
+                          <form action="/storage/storage-class" method="POST">
+                            <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+                            <input type="hidden" name="ns_select" value="{{ session['ns_select'] }}" />
+                            <input type="hidden" name="selected" value="{{ pvc.storage_class_name }}" />
+                            <a href="javascript:;" onclick="parentNode.submit();">{{ pvc.storage_class_name }}</a>
+                          </form>
+                        </td>
+                        <td>
+                          <form action="/storage/pv" method="POST">
+                            <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+                            <input type="hidden" name="ns_select" value="{{ session['ns_select'] }}" />
+                            <input type="hidden" name="selected" value="{{ pvc.volume_name }}" />
+                            <a href="javascript:;" onclick="parentNode.submit();">{{ pvc.volume_name }}</a>
+                          </form>
+                        </td>
+                        <td>{{ pvc.capacity }}</td>
+                        <td>
+                          {% for metric in pvc_metrics %}
+                          {% if metric.name == pvc.name %}
+                          {{ metric.percentageUsed|round(1) }} %
+                          {% endif %}
+                          {% endfor %}
+                        </td>
+                      </tr>
+                    {% endfor %}
+                  </tbody>
+            </table>
+        </div>
+    </div>
+</div>
+{% endblock %}
+
+{% block add_head_css %}
+{% include "segments/datatable_snipet.html.j2" %}
+{% endblock %}

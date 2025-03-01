@@ -1,0 +1,337 @@
+from flask import flash
+from pyvis.network import Network
+
+from kubernetes import client as k8s_client
+from kubernetes.client.rest import ApiException
+
+from opentelemetry.trace.status import Status, StatusCode
+
+from lib.helper_functions import ErrorHandler, calcPercent, parse_quantity
+
+from . import tracer, logger
+from .server import k8sClientConfigGet
+from .node import k8sNodesListGet
+from .workload import k8sDaemonSetsGet, k8sDeploymentsGet, k8sReplicaSetsGet, k8sStatefulSetsGet
+from .security import k8sPodListVulnsGet
+
+##############################################################
+## Metrics
+##############################################################
+
+def k8sGetClusterMetric():
+    with tracer.start_as_current_span("get-cluster-metrics") as span:
+        k8sClientConfigGet("Admin", None)
+        tmpTotalPodCount = float()
+        totalTotalPodAllocatable = float()
+        totalPodAllocatable = float()
+        tmpTotalCpuCapacity = int()
+        tmpTotalMemoryCapacity = int()
+        tmpTotalCpuAllocatable = int()
+        tmpTotalMenoryAllocatable = int()
+        tmpTotalCpuLimit = float()
+        tmpTotalMemoryLimit = float()
+        tmpTotalCpuRequest = float()
+        tmpTotalMemoryRequest = float()
+        total_node_mem_usage = float()
+        total_node_cpu_usage = float()
+        clusterMetric = {
+            "nodes": [],
+            "clusterTotals": {}
+        }
+        bad_clusterMetric = {
+            "nodes": [],
+            "clusterTotals": {
+                "cpu": {
+                    "capacity": 0,
+                    "allocatable": 0,
+                    "allocatablePercent": 0,
+                    "requests": 0,
+                    "requestsPercent": 0,
+                    "limits": 0,
+                    "limitsPercent": 0,
+                    "usage": 0,
+                    "usagePercent": 0,
+                },
+                "memory": {
+                    "capacity": 0,
+                    "allocatable": 0,
+                    "allocatablePercent": 0,
+                    "requests": 0,
+                    "requestsPercent": 0,
+                    "limits": 0,
+                    "limitsPercent": 0,
+                    "usage": 0,
+                    "usagePercent": 0,
+                },
+                "pod_count": {
+                    "current": 0,
+                    "allocatable": 0,
+                },
+            }
+        }
+        try:
+            node_list = k8s_client.CoreV1Api().list_node(_request_timeout=5)
+            pod_list = k8s_client.CoreV1Api().list_pod_for_all_namespaces(_request_timeout=5)
+            try:
+                k8s_nodes = k8s_client.CustomObjectsApi().list_cluster_custom_object("metrics.k8s.io", "v1beta1", "nodes", _request_timeout=5)
+            except Exception as error:
+                k8s_nodes = None
+                flash("Metrics Server is not installed. If you want to see usage date please install Metrics Server.", "warning")
+            for node in node_list.items:
+                tmpPodCount = int()
+                tmpCpuLimit = float()
+                tmpMemoryLimit = float()
+                tmpCpuRequest = float()
+                tmpMemoryRequest = float()
+                node_mem_usage = 0
+                node_cpu_usage = 0
+                for pod in pod_list.items:
+                    if pod.spec.node_name == node.metadata.name and pod.status.phase == "Running":
+                        tmpPodCount += 1
+                        for container in pod.spec.containers:
+                            if container.resources.limits:
+                                if "cpu" in container.resources.limits:
+                                    tmpCpuLimit += float(parse_quantity(container.resources.limits["cpu"]))
+                                if "memory" in container.resources.limits:
+                                    tmpMemoryLimit += float(parse_quantity(container.resources.limits["memory"]))
+                            if container.resources.requests:
+                                if "cpu" in container.resources.requests:
+                                    tmpCpuRequest += float(parse_quantity(container.resources.requests["cpu"]))
+                                if "memory" in container.resources.requests:
+                                    tmpMemoryRequest += float(parse_quantity(container.resources.requests["memory"]))
+                totalPodAllocatable += float(node.status.allocatable["pods"])
+                node_mem_capacity = float(parse_quantity(node.status.capacity["memory"]))
+                node_mem_allocatable = float(parse_quantity(node.status.allocatable["memory"]))
+                if k8s_nodes:
+                    for stats in k8s_nodes['items']:
+                        if stats['metadata']['name'] == node.metadata.name:
+                            node_mem_usage = float(parse_quantity(stats['usage']['memory']))
+                            node_cpu_usage = float(parse_quantity(stats['usage']['cpu']))
+                clusterMetric["nodes"].append({
+                    "name": node.metadata.name,
+                    "cpu": {
+                        "capacity": node.status.capacity["cpu"],
+                        "allocatable": node.status.allocatable["cpu"],
+                        "requests": tmpCpuRequest,
+                        "requestsPercent": calcPercent(tmpCpuRequest, int(node.status.capacity["cpu"]), True),
+                        "limits": tmpCpuLimit,
+                        "limitsPercent": calcPercent(tmpCpuLimit, int(node.status.capacity["cpu"]), True),
+                        "usage": node_cpu_usage,
+                        "usagePercent": calcPercent(node_cpu_usage, int(node.status.capacity["cpu"]), True),
+                    },
+                    "memory": {
+                        "capacity": node_mem_capacity,
+                        "allocatable": node_mem_allocatable,
+                        "requests": tmpMemoryRequest,
+                        "requestsPercent": calcPercent(tmpMemoryRequest, node_mem_capacity, True),
+                        "limits": tmpMemoryLimit,
+                        "limitsPercent": calcPercent(tmpMemoryLimit, node_mem_capacity, True),
+                        "usage": node_mem_usage,
+                        "usagePercent": calcPercent(node_mem_usage, node_mem_capacity, True),
+                    },
+                    "pod_count": {
+                        "current": tmpPodCount,
+                        "allocatable": totalPodAllocatable,
+                    },
+                })
+                tmpTotalPodCount += tmpPodCount
+                totalTotalPodAllocatable += totalPodAllocatable
+                tmpTotalCpuAllocatable += int(node.status.allocatable["cpu"])
+                tmpTotalMenoryAllocatable += node_mem_allocatable
+                tmpTotalCpuCapacity += int(node.status.capacity["cpu"])
+                tmpTotalMemoryCapacity += node_mem_capacity
+                tmpTotalCpuLimit += tmpCpuLimit
+                tmpTotalMemoryLimit += tmpMemoryLimit
+                tmpTotalCpuRequest += tmpCpuRequest
+                tmpTotalMemoryRequest += tmpMemoryRequest
+                total_node_mem_usage += node_mem_usage
+                total_node_cpu_usage += node_cpu_usage
+            # clusterTotals
+            clusterMetric["clusterTotals"] = {
+                    "cpu": {
+                        "capacity": tmpTotalCpuCapacity,
+                        "allocatable": tmpTotalCpuAllocatable,
+                        "requests": tmpTotalCpuRequest,
+                        "requestsPercent": calcPercent(tmpTotalCpuRequest, tmpTotalCpuAllocatable, True),
+                        "limits": tmpTotalCpuLimit,
+                        "limitsPercent": calcPercent(tmpTotalCpuLimit, tmpTotalCpuAllocatable, True),
+                        "usage": total_node_cpu_usage,
+                        "usagePercent": calcPercent(total_node_cpu_usage, tmpTotalCpuAllocatable, True),
+                    },
+                    "memory": {
+                        "capacity": tmpTotalMemoryCapacity,
+                        "allocatable": tmpTotalMenoryAllocatable,
+                        "requests": tmpTotalMemoryRequest,
+                        "requestsPercent": calcPercent(tmpTotalMemoryRequest, tmpTotalMenoryAllocatable, True),
+                        "limits": tmpTotalMemoryLimit,
+                        "limitsPercent":  calcPercent(tmpTotalMemoryLimit, tmpTotalMenoryAllocatable, True),
+                        "usage": total_node_mem_usage,
+                        "usagePercent": calcPercent(total_node_mem_usage, tmpTotalMenoryAllocatable, True),
+                    },
+                    "pod_count": {
+                        "current": tmpTotalPodCount,
+                        "allocatable": totalTotalPodAllocatable,
+                    },
+            }
+            return clusterMetric
+        except ApiException as error:
+            if error.status != 404:
+                ErrorHandler(logger, error, "Cannot Connect to Kubernetes - %s " % error.status)
+            if tracer and span.is_recording():
+                span.set_status(Status(StatusCode.ERROR, "Cannot Connect to Kubernetes: %s" % error))
+            return bad_clusterMetric
+        except Exception as error:
+            ErrorHandler(logger, "CannotConnect", "Cannot Connect to Kubernetes")
+            if tracer and span.is_recording():
+                span.set_status(Status(StatusCode.ERROR, "Cannot Connect to Kubernetes: %s" % error))
+            return bad_clusterMetric
+
+def k8sGetNodeMetric(node_name):
+    k8sClientConfigGet("Admin", None)
+    totalPodAllocatable = float()
+    try:
+        node_list = k8s_client.CoreV1Api().list_node(_request_timeout=5)
+        pod_list = k8s_client.CoreV1Api().list_pod_for_all_namespaces(_request_timeout=5)
+        try:
+            k8s_nodes = k8s_client.CustomObjectsApi().list_cluster_custom_object("metrics.k8s.io", "v1beta1", "nodes", _request_timeout=5)
+        except Exception as error:
+            k8s_nodes = None
+            flash("Metrics Server is not installed. If you want to see usage date please install Metrics Server.", "warning")
+        for node in node_list.items:
+            tmpPodCount = int()
+            tmpCpuLimit = float()
+            tmpMemoryLimit = float()
+            tmpCpuRequest = float()
+            tmpMemoryRequest = float()
+            node_mem_usage = 0
+            node_cpu_usage = 0
+            if node.metadata.name == node_name:
+                for pod in pod_list.items:
+                    if pod.spec.node_name == node.metadata.name and pod.status.phase == "Running":
+                        tmpPodCount += 1
+                        for container in pod.spec.containers:
+                            if container.resources.limits:
+                                if "cpu" in container.resources.limits:
+                                    tmpCpuLimit += float(parse_quantity(container.resources.limits["cpu"]))
+                                if "memory" in container.resources.limits:
+                                    tmpMemoryLimit += float(parse_quantity(container.resources.limits["memory"]))
+                            if container.resources.requests:
+                                if "cpu" in container.resources.requests:
+                                    tmpCpuRequest += float(parse_quantity(container.resources.requests["cpu"]))
+                                if "memory" in container.resources.requests:
+                                    tmpMemoryRequest += float(parse_quantity(container.resources.requests["memory"]))
+                totalPodAllocatable += float(node.status.allocatable["pods"])
+                node_mem_capacity = float(parse_quantity(node.status.capacity["memory"]))
+                node_mem_allocatable = float(parse_quantity(node.status.allocatable["memory"]))
+                if k8s_nodes:
+                    for stats in k8s_nodes['items']:
+                        if stats['metadata']['name'] == node.metadata.name:
+                            node_mem_usage = float(parse_quantity(stats['usage']['memory']))
+                            node_cpu_usage = float(parse_quantity(stats['usage']['cpu']))
+                node_metric = {
+                    "name": node.metadata.name,
+                    "cpu": {
+                        "capacity":  int(node.status.capacity["cpu"]),
+                        "allocatable":  int(node.status.allocatable["cpu"]),
+                        "requests": tmpCpuRequest,
+                        "requestsPercent": calcPercent(tmpCpuRequest, int(node.status.capacity["cpu"]), True),
+                        "limits": tmpCpuLimit,
+                        "limitsPercent": calcPercent(tmpCpuLimit, int(node.status.capacity["cpu"]), True),
+                        "usage": node_cpu_usage,
+                        "usagePercent": calcPercent(node_cpu_usage, int(node.status.capacity["cpu"]), True),
+                    },
+                    "memory": {
+                        "capacity": node_mem_capacity,
+                        "allocatable": node_mem_allocatable,
+                        "requests": tmpMemoryRequest,
+                        "requestsPercent": calcPercent(tmpMemoryRequest, node_mem_capacity, True),
+                        "limits": tmpMemoryLimit,
+                        "limitsPercent": calcPercent(tmpMemoryLimit, node_mem_capacity, True),
+                        "usage": node_mem_usage,
+                        "usagePercent": calcPercent(node_mem_usage, node_mem_capacity, True),
+                    },
+                    "pod_count": {
+                        "current": tmpPodCount,
+                        "allocatable": totalPodAllocatable,
+                    },
+                }
+                return node_metric
+            else:
+                return None
+    except ApiException as error:
+        if error.status != 404:
+            ErrorHandler(logger, error, "Cannot Connect to Kubernetes - %s " % error.status)
+        return None
+    except Exception as error:
+        ErrorHandler(logger, "CannotConnect", "Cannot Connect to Kubernetes")
+        return None
+
+def k8sPVCMetric(namespace):
+    k8sClientConfigGet('Admin', None)
+    PVC_LIST = list()
+    try:
+        node_list = k8sNodesListGet("Admin", None)
+        for mode in node_list:
+            name = mode["name"]
+            data = k8s_client.CoreV1Api().connect_get_node_proxy_with_path(name, path="stats/summary", _request_timeout=5)
+            data_json = eval(data)
+            for pod in data_json["pods"]:
+                if 'volume' in pod:
+                    for volme in pod['volume']:
+                        if "pvcRef" in volme:
+                            if namespace == volme['pvcRef']['namespace']:
+                                DAT = {
+                                    "name": volme['pvcRef']['name'],
+                                    "capacityBytes": int(volme['capacityBytes'])/1024,
+                                    "usedBytes": int(volme['usedBytes'])/1024,
+                                    "availableBytes": int(volme['availableBytes'])/1024,
+                                    "percentageUsed": (volme['usedBytes'] / volme['capacityBytes']  * 100),
+                                }
+                                PVC_LIST.append(DAT)
+        return PVC_LIST
+    except ApiException as error:
+        if error.status != 404:
+            ErrorHandler(logger, error, "get Persistent Volume Claim Metrics - %s" % error.status)
+        return PVC_LIST
+    except Exception as error:
+        return PVC_LIST
+
+def k8sGetPodMap(username_role, user_token, namespace):
+    k8sClientConfigGet(username_role, user_token)
+    net = Network(directed=True, layout=True)
+
+    statefulset_list = k8sStatefulSetsGet(username_role, user_token, namespace)
+    for sts in statefulset_list:
+        if int(sts["desired"]) != 0:
+            net.add_node(sts["name"], label=sts["name"], shape="image", group="statefulset")
+
+    daemonset_list = k8sDaemonSetsGet(username_role, user_token, namespace)
+    for ds in daemonset_list:
+        if int(ds["desired"]) != 0:
+            net.add_node(ds["name"], label=ds["name"], shape="image", group="daemonset")
+
+    deployments_list = k8sDeploymentsGet(username_role, user_token, namespace)
+    for deploy in deployments_list:
+        if int(deploy["desired"]) != 0:
+            net.add_node(deploy["name"], label=deploy["name"], shape="image", group="deployment")
+
+    replicaset_list = k8sReplicaSetsGet(username_role, user_token, namespace)
+    for rs in replicaset_list:
+        if rs["desired"] != 0:
+            on_name = rs["owner"].split("/", 1)[1]
+            net.add_node(rs["name"], label=rs["name"], shape="image", group="replicaset")
+            net.add_edge(on_name, rs["name"], arrowStrikethrough=False, physics=True, valu=1000)
+
+    #has_report, pod_list = k8sPodListVulnsGet(username_role, user_token, namespace)
+    #for po in pod_list:
+    #    if po["status"] == "Running":
+    #        net.add_node(po["name"], label=po["name"], shape="image", group="pod")
+    #        if po["owner"]:
+    #            if "replicationcontrollers" !=  po["owner"].split("/", 1)[0] and "jobs" != po["owner"].split("/", 1)[0]:
+    #                on_name = po["owner"].split("/", 1)[1]
+    #                net.add_edge(on_name, po["name"], arrowStrikethrough=False, physics=True, valu=1000)
+
+    nodes = net.get_network_data()[0]
+    edges = net.get_network_data()[1]
+
+    return nodes, edges

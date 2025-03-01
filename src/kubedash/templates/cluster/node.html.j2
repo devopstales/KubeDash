@@ -1,0 +1,96 @@
+{% extends "base2.html.j2" %}
+
+{% block topmenu %}
+<ul class="header-nav d-lg-flex m-3">
+    <div class="container-fluid px-4">
+      <nav aria-label="breadcrumb">
+        <ol class="breadcrumb my-0">
+          <li class="breadcrumb-item"><span>Cluster</span></li>
+          <li class="breadcrumb-item active"><span>Nodes</span></li>
+        </ol>
+      </nav>
+    </div>
+</ul>
+<ul class="header-nav ms-auto"></ul>
+<ul class="header-nav d-lg-flex">
+{% include "segments/topmenu.html.j2" %}
+{% endblock %}
+
+{% block content %}
+<div class="card shadow mb-4">
+    <div class="card-header py-3">
+        <h6 class="m-0 font-weight-bold text-primary">Node List</h6>
+    </div>
+    <div class="card-body">
+        <div class="table-responsive">
+            <table class="table table-bordered" id="dataTable" width="100%" cellspacing="0">
+                <thead>
+                    <tr>
+                      <th>State</th>
+                      <th>Name</th>
+                      <th>Role</th>
+                      <th>Version</th>
+                      <th>IP</th>
+                      <th>OS</th>
+                      <th>CPU Usage</th>
+                      <th>Memory Usage</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {% for no in nodes %}
+                    {% if selected == no.name %} 
+                      <tr class="selected" >
+                    {% else %}
+                      <tr>
+                    {% endif %}
+                        <td>
+                    {% if no.status == "Ready" %}
+                          <span class="badge text-bg-success">{{ no.status }}</span>
+                    {% else %}
+                          <span class="badge text-bg-danger">{{ no.status }}</span>
+                    {% endif %}
+                        </td>
+                        <td>
+                          <form action="/cluster/nodes/data" method="POST">
+                            <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+                            <input type="hidden" name="no_name" value="{{ no.name }}" />
+                            <a href="javascript:;" onclick="parentNode.submit();">{{ no.name }}</a>
+                          </form>
+                        </td>
+                        <td>{{ no.role }}</td>
+                        <td>{{ no.version }}</td>
+                        <td>{{ no.ip }}</td>
+                        <td>{{ no.os }}</td>
+                        {% if cluster_metrics.nodes %}
+                        {% for metrics in cluster_metrics.nodes %}
+                        {% if metrics.name == no.name %}
+                        <td>
+                            <div class="progress position-relative" style="height: 20px;">
+                                <div class="progress-bar" role="progressbar" style="width: {{ metrics.cpu.usagePercent| int }}%" aria-valuenow="{{ metrics.cpu.usagePercent| int }}" aria-valuemin="0" aria-valuemax="100"></div>
+                                <small class="justify-content-center d-flex position-absolute w-100">{{ metrics.cpu.usagePercent| int }}%</small>
+                            </div>
+                        </td> 
+                        <td>
+                            <div class="progress position-relative" style="height: 20px;">
+                                <div class="progress-bar" role="progressbar" style="width: {{ metrics.memory.usagePercent| int }}%" aria-valuenow="{{ metrics.memory.usagePercent| int }}" aria-valuemin="0" aria-valuemax="100"></div>
+                                <small class="justify-content-center d-flex position-absolute w-100">{{ metrics.memory.usagePercent| int }}%</small>
+                            </div>
+                        </td>
+                        {% endif %}
+                        {% endfor %}
+                        {% else %}
+                        <td></td>
+                        <td></td>
+                        {% endif %}
+                      </tr>
+                    {% endfor %}
+                  </tbody>
+            </table>
+        </div>
+    </div>
+</div>
+{% endblock %}
+
+{% block add_head_css %}
+{% include "segments/datatable_snipet.html.j2" %}
+{% endblock %}

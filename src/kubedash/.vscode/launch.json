@@ -17,13 +17,19 @@
       "request": "launch",
       "program": "${workspaceFolder}/.venv/bin/gunicorn",
       "gevent": true,
-      "args": ["--worker-class", "eventlet", "--conf", "gunicorn_conf.py", "kubedash:app"],
+      "args": [
+        "--worker-class",
+        "eventlet",
+        "--conf",
+        "gunicorn_conf.py",
+        "kubedash:app"
+      ],
       "postDebugTask": "killdebugger",
       "env": {
-          "KUBEDASH_VERSION": "3.1",
-          "FLASK_APP": "kubedash:app",
-          "FLASK_DEBUG": "1"
+        "KUBEDASH_VERSION": "3.1",
+        "FLASK_APP": "kubedash:app",
+        "FLASK_DEBUG": "1"
       }
-  }
+    }
   ]
 }

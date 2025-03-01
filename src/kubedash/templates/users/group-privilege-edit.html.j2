@@ -1,0 +1,157 @@
+{% extends "base2.html.j2" %}
+
+{% block topmenu %}
+<ul class="header-nav d-lg-flex m-3">
+    <div class="container-fluid px-4">
+      <nav aria-label="breadcrumb">
+        <ol class="breadcrumb my-0">
+          <li class="breadcrumb-item"><span>User Management</span></li>
+          <li class="breadcrumb-item"><a hrep="/user/group">Groups</a></li>
+          <li class="breadcrumb-item active">{{ group_name }}</li>
+        </ol>
+      </nav>
+    </div>
+</ul>
+<ul class="header-nav ms-auto"></ul>
+{% include "segments/topmenu.html.j2" %}
+{% endblock %}
+
+{% block add_head_css %}
+{% include "segments/datatable_css.html.j2" %}
+
+    <link href="{{ url_for('static',filename='/vendor/select2@4.0.13/select2.min.css') }}" rel="stylesheet" >
+    <link href="{{ url_for('static',filename='/vendor/select2-bootstrap5-theme@1.3.0/select2-bootstrap-5-theme.css') }}" rel="stylesheet" >
+{% endblock %}
+
+{% block content %}
+<!-- DataTales Example -->
+<div class="card shadow mb-4">
+    <div class="card-header py-3">
+        <h5 class="m-0 font-weight-bold text-primary">Group: {{ group_name }}</h5>
+    </div>
+    <div class="card-body">
+        <div class="form-group">
+            <h5 class="modal-title mt-2 mb-2">Privileges</h5>
+            <form action="" method="POST">
+                <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+                <div class="bg-gray-100  border rounded py-3 px-4 mb-3" >
+                    <!-- front -->
+                    <div class="d-flex flex-row">
+                        <div class="form-group col-md-4">
+                            <label for="user_namespaced_role_1">TEMPLATE</label>
+                            <select class="form-control" aria-label="Select template" id="user_namespaced_role_1" name="user_namespaced_role_1">
+                                <option value=None>None</option>
+                                {% for user_role in user_role_template_list %}
+                                <option value="{{ user_role }}">{{ user_role }}</option>
+                                {% endfor %}
+                            </select>
+                        </div>
+                        <div class="form-group col-md-4">
+                            <label for="user_namespaces_1">
+                                NAMESPACES
+                            </label>
+                            <select class="form-select select2" id="user_namespaces_1" name="user_namespaces_1" data-placeholder="Select namespaces" multiple></select>
+                            {% for ns in namespace_list %}
+                                <option>{{ ns }}</option>
+                            {% endfor %}
+                            </select>
+                            <div class="form-check">
+                                <input class="form-check-input" type="checkbox" value="" id="flexCheckDefault" name="user_all_namespaces_1">
+                                <label class="form-check-label" for="flexCheckDefault" value="True">all Namespaces</label>
+                            </div>
+                        </div>
+                    </div>
+                    <!-- hidden -->
+                    <hr id="hiddenHR" hidden=true>
+                    <div id="hiddenDIV" hidden=true>
+                        <div class="d-flex flex-row">
+                            <div class="form-group col-md-4">
+                                <label for="user_namespaced_role_2">TEMPLATE</label>
+                                <select class="form-control" aria-label="Select template" id="user_namespaced_role_2" name="user_namespaced_role_2">
+                                    <option value=None>None</option>
+                                    {% for user_role in user_role_template_list %}
+                                    <option value="{{ user_role }}">{{ user_role }}</option>
+                                    {% endfor %}
+                                </select>
+                            </div>
+                            <div class="form-group col-md-4">
+                                <label for="user_namespaces_2">
+                                    NAMESPACES
+                                </label>
+                                <select class="form-control select2" id="user_namespaces_2" name="user_namespaces_2" data-placeholder="Select namespaces" multiple>
+                                {% for ns in namespace_list %}
+                                    <option>{{ ns }}</option>
+                                {% endfor %}
+                                </select>
+                                <div class="form-check">
+                                    <input class="form-check-input" type="checkbox" value="" id="flexCheckDefault" name="user_all_namespaces_2">
+                                    <label class="form-check-label" for="flexCheckDefault" value="True">all Namespaces</label>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                    <!-- buttons -->
+                    <hr>
+                    <button class="py-2 px-6 btn btn-outline-secondary" type="button" onclick="unHide()" id="addBTN">add</button>
+                </div>
+                <div class="block uppercase font-bold mb-2">access to cluster resources (non-namespaced):</div>
+                <div class="form-group col-md-4">
+                    <select class="form-control" aria-label="Select template" name="user_cluster_role">
+                        <option value=None>None</option>
+                        {% for user_clusterRole in user_clusterRole_template_list %}
+                        <option value="{{ user_clusterRole }}">{{ user_clusterRole }}</option>
+                        {% endfor %}
+                    </select>
+                </div>
+                <hr>
+                <input class="form-control" name="group_name" type="hidden" value="{{ group_name }}">
+                <button type="submit" class="btn btn-primary" >Save</button>
+            </form>
+        </div>
+    </div>
+</div>
+{% endblock %}
+
+{% block add_tail_js %}
+{% include "segments/datatable_js.html.j2" %}
+
+    <script src="{{ url_for('static',filename='/vendor/select2@4.0.13/select2.full.min.js') }}"></script>
+    <script>
+        $( '.select2' ).select2( {
+            theme: "bootstrap-5",
+            width: $( this ).data( 'width' ) ? $( this ).data( 'width' ) : $( this ).hasClass( 'w-100' ) ? '100%' : 'style',
+            placeholder: $( this ).data( 'placeholder' ),
+            closeOnSelect: false,
+        } );
+
+        function unHide() {
+            var x = document.getElementById("hiddenDIV");
+            if (x.hidden === true) {
+              x.hidden=false;
+                $( '.select2' ).select2( {
+                    theme: "bootstrap-5",
+                    width: $( this ).data( 'width' ) ? $( this ).data( 'width' ) : $( this ).hasClass( 'w-100' ) ? '100%' : 'style',
+                    placeholder: $( this ).data( 'placeholder' ),
+                    closeOnSelect: false,
+                } );
+            } else {
+              x.hidden=true;
+            }
+            var y = document.getElementById("hiddenHR");
+            if (y.hidden === true) {
+              y.hidden=false;
+            } else {
+              y.hidden=true;
+            }
+            if ( document.getElementById("addBTN").classList.contains('btn-outline-secondary') ) {
+              document.getElementById("addBTN").classList.remove('btn-outline-secondary');
+              document.getElementById("addBTN").classList.add('btn-outline-danger');
+              document.getElementById("addBTN").innerHTML = 'delete';
+            } else {
+              document.getElementById("addBTN").classList.remove('btn-outline-danger');
+              document.getElementById("addBTN").classList.add('btn-outline-secondary');
+              document.getElementById("addBTN").innerHTML = 'add';
+            }
+          };
+    </script>
+{% endblock %}

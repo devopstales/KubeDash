@@ -1,0 +1,176 @@
+{% extends "base2.html.j2" %}
+
+{% block topmenu %}
+<ul class="header-nav d-lg-flex m-3">
+    <div class="container-fluid px-4">
+      <nav aria-label="breadcrumb">
+        <ol class="breadcrumb my-0">
+          <li class="breadcrumb-item"><span>Network</span></li>
+          <li class="breadcrumb-item"><a href="/network/ingress">Ingress</a></li>
+          <li class="breadcrumb-item active"><span>{{ i_data.name }}</span></li>
+        </ol>
+      </nav>
+    </div>
+</ul>
+<ul class="header-nav ms-auto"></ul>
+<ul class="header-nav d-lg-flex">
+{% include "segments/topmenu.html.j2" %}
+{% endblock %}
+
+{% block content %}
+<div class="card shadow mb-4">
+    <div class="card-header">
+        <h6 class="m-0 font-weight-bold text-primary">Ingress Data</h6>
+    </div>
+    <div class="card-body">
+        <div class="table-responsive">
+            <table class="table table-bordered" id="podInfoTable" width="100%" cellspacing="0">
+                <tr>
+                    <th>Name:</th>
+                    <td>{{ i_data.name }}</td>
+                </tr>
+                <tr>
+                    <th>ingressClass:</th>
+                    <td>
+                        {% if i_data.ingressClass %}
+                            <form action="/network/ingress-class" method="POST">
+                                <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+                                <input type="hidden" name="ns_select" value="{{ session['ns_select'] }}" />
+                                <input type="hidden" name="selected" value='{{ i_data.ingressClass }}' />
+                                <a href="javascript:;" onclick="parentNode.submit();">{{ i_data.ingressClass }}</a>
+                            </form>
+                        {% else %}
+                            {{ i_data.ingressClass }}
+                        {% endif %}
+                    </td>
+                </tr>
+                <tr>
+                    <th>Created:</th>
+                    <td>{{ i_data.created }}</td>
+                </tr>
+                <tr>
+                    <th>Annotations:</th>
+                    <td>
+                        {% if i_data.annotations %}
+                        <table class="table table-bordered" id="annotationTable" width="100%" cellspacing="0">
+                            <thead>
+                                <tr>
+                                    <th width="50%">Key</th>
+                                    <th width="50%">Value</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                            {% for key, value in i_data.annotations.items() %}
+                                <tr>
+                                {% if key != "kubectl.kubernetes.io/last-applied-configuration" %}
+                                    <td width="50%">{{ key }}</td>
+                                    <td width="50%">{{ value }}</td>
+                                {% endif %}
+                                </tr>
+                            {% endfor %}
+                            </tbody>
+                        </table>
+                        {% endif %}
+                    </td>
+                </tr>
+                <tr>
+                    <th>Lables:</th>
+                    <td>
+                        {% if i_data.labels %}
+                        <table class="table table-bordered" id="labelsTable" width="100%" cellspacing="0">
+                            <thead>
+                                <tr>
+                                    <th width="50%">Key</th>
+                                    <th width="50%">Value</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                            {% for key, value in i_data.labels.items() %}
+                                <tr>
+                                    <td width="50%">{{ key }}</td>
+                                    <td width="50%">{{ value }}</td>
+                                </tr>
+                            {% endfor %}
+                            </tbody>
+                        </table>
+                        {% endif %}
+                    </td>
+                </tr>
+            </table>
+        </div>
+    </div>
+</div>
+
+{% if i_data.rules %}
+<div class="card shadow mb-4">
+    <div class="card-header">
+        <h6 class="m-0 font-weight-bold text-primary">Routs</h6>
+    </div>
+    <div class="card-body">
+        <div class="table-responsive">
+            <table class="table table-bordered" id="podInfoTable" width="100%" cellspacing="0">
+                <thead>
+                    <tr>
+                        <th>Host</th>
+                        <th>Path</th>
+                        <th>Type</th>
+                        <th>Service</th>
+                        <th>Port</th>
+                        <th>TLS</th>
+                    </tr>
+                </thead>
+                <tbody>
+                {% for rule in i_data.rules %}
+                    <tr>
+                        <td>
+                            {% if i_data.tls[0] %}
+                            <a href="https://{{ i_data.hosts[0] }}" target="_blank">{{ i_data.hosts[0] }}</a>
+                            {% else %}
+                            <a href="http://{{ i_data.hosts[0] }}" target="_blank">{{ i_data.hosts[0] }}</a>
+                            {% endif %}
+                        </td>
+                        <td>{{ rule.path }}</td>
+                        <td>{{ rule.path_type }}</td>
+                        <td>
+                            <form action="/network/service" method="POST">
+                                <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+                                <input type="hidden" name="ns_select" value="{{ session['ns_select'] }}" />
+                                <input type="hidden" name="selected" value='{{ rule.backend.service.name }}' />
+                                <a href="javascript:;" onclick="parentNode.submit();">{{ rule.backend.service.name }}</a>
+                            </form>
+                        </td>
+                        <td>
+                            {% if rule.backend.service.port.number %}
+                              {{ rule.backend.service.port.number }}
+                            {% elif rule.backend.service.port.name %}
+                              {{ rule.backend.service.port.name }}
+                            {% else %}
+                              None
+                            {% endif %}
+                        </td>
+                        {% if i_data.tls[0] %}
+                        <td>
+                            <form action="/security/secret" method="POST">
+                                <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+                                <input type="hidden" name="ns_select" value="{{ session['ns_select'] }}" />
+                                <input type="hidden" name="selected" value='{{ i_data.tls[0]["secret_name"] }}' />
+                                <a href="javascript:;" onclick="parentNode.submit();">{{ i_data.tls[0]["secret_name"] }}</a>
+                            </form>
+                        </td>
+                        {% else %}
+                        <td></td>
+                        {% endif %}
+                    </tr>
+                {% endfor %}
+                </tbody>
+            </table>
+        </div>
+    </div>
+</div>
+{% endif %}
+
+{% endblock %}
+
+{% block add_head_css %}
+{% include "segments/datatable_snipet.html.j2" %}
+{% endblock %}

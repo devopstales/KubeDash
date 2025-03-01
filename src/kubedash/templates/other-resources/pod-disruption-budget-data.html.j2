@@ -1,0 +1,160 @@
+{% extends "base2.html.j2" %}
+
+{% block topmenu %}
+<ul class="header-nav d-lg-flex m-3">
+    <div class="container-fluid px-4">
+      <nav aria-label="breadcrumb">
+        <ol class="breadcrumb my-0">
+          <li class="breadcrumb-item"><span>Other Resources</span></li>
+          <li class="breadcrumb-item"><a href="/other-resources/pod-disruption-budget">Pod Disruption Budgets</a></li>
+          <li class="breadcrumb-item active"><span>{{ pdp_data.name }}</span></li>
+        </ol>
+      </nav>
+    </div>
+</ul>
+<ul class="header-nav ms-auto"></ul>
+<ul class="header-nav d-lg-flex">
+{% include "segments/topmenu.html.j2" %}
+{% endblock %}
+
+{% block content %}
+<div class="card shadow mb-4">
+    <div class="card-header">
+        <h6 class="m-0 font-weight-bold text-primary">Pod Disruption Data</h6>
+    </div>
+    <div class="card-body">
+        <div class="tab-content" id="nav-tabContent">
+            <!-- policy -->
+                <div class="card shadow mb-4">
+                    <div class="card-body">
+                        <div class="table-responsive">
+                            <table class="table table-bordered" id="policyInfoTable" width="100%" cellspacing="0">
+                                <tr>
+                                    <th>Name:</th>
+                                    <td>{{ pdp_data.name }}</td>
+                                </tr>
+                                <tr>
+                                    <th>Created:</th>
+                                    <td>{{ pdp_data.created }}</td>
+                                </tr>
+                                <tr>
+                                    <th>Namespace:</th>
+                                    <td>{{ pdp_data.namespace }}</td>
+                                </tr>
+                                <tr>
+                                    <th>Creation:</th>
+                                    <td>{{ pdp_data.creation_timestamp }}</td>
+                                </tr>
+                                <tr>
+                                    <th>Annotations:</th>
+                                    <td>
+                                        {% if pdp_data.annotations %}
+                                        <table class="table table-bordered" id="annotationTable" width="100%" cellspacing="0">
+                                            <thead>
+                                                <tr>
+                                                    <th width="50%">Key</th>
+                                                    <th width="50%">Value</th>
+                                                </tr>
+                                            </thead>
+                                            <tbody>
+                                            {% for key, value in pdp_data.annotations.items() %}
+                                                <tr>
+                                                    <td width="50%">{{ key }}</td>
+                                                    <td width="50%">{{ value }}</td>
+ó                                                </tr>
+                                            {% endfor %}
+                                            </tbody>
+                                        </table>
+                                        {% endif %}
+                                    </td>
+                                </tr>
+                               <tr>
+                                    <th>Lables:</th>
+                                    <td>
+                                        {% if pdp_data.labels %}
+                                        <table class="table table-bordered" id="labelsTable" width="100%" cellspacing="0">
+                                            <thead>
+                                                <tr>
+                                                    <th width="50%">Key</th>
+                                                    <th width="50%">Value</th>
+                                                </tr>
+                                            </thead>
+                                            <tbody>
+                                            {% for key, value in pdp_data.labels.items() %}
+                                                <tr>
+                                                    <td width="50%">{{ key }}</td>
+                                                    <td width="50%">{{ value }}</td>
+                                                </tr>
+                                            {% endfor %}
+                                            </tbody>
+                                        </table>
+                                        {% endif %}
+                                    </td>
+                                </tr>
+                                <tr>
+                                    <th>Selector:</th>
+                                    <td>{{ pdp_data.selector }}</td>
+                                </tr>
+                                <tr>
+                                    <th>Eviction Policy:</th>
+                                    <td>{{ pdp_data.unhealthy_pod_eviction_policy }}</td>
+                                </tr>
+                                <tr>
+                                    <th>Status:</th>
+                                    <td>
+                                    Allowed disruptions: {{ pdp_data.status.disruptions_allowed }}<br>
+                                    Current: {{ pdp_data.status.current_healthy }}<br>
+                                    Desired: {% if pdp_data.min_available %}{{ pdp_data.min_available }}{% else %}0{% endif %}<br>
+                                    </td>
+                                </tr>
+                            </table>
+                        </div>
+                    </div>
+                </div>
+        </div>
+    </div>
+</div>
+
+<div class="card shadow mb-4">
+    <div class="card-header">
+        <h6 class="m-0 font-weight-bold text-primary">Conditions</h6>
+    </div>
+    <div class="card-body">
+        <div class="tab-content" id="nav-tabContent">
+            <!-- policy -->
+                <div class="card shadow mb-4">
+                    <div class="card-body">
+                        <div class="table-responsive">
+                            <table class="table table-bordered" id="policyInfoTable" width="100%" cellspacing="0">
+                            <thead>
+                                <tr>
+                                {% for condition in pdp_data.conditions %}
+                                <tr>
+                                    {% for key, value in condition.items() %}
+                                    <th>{{ key }}</th>
+                                    {% endfor %}
+                                </tr>
+                                {% endfor %}
+                                </tr>
+                            </thead>
+                            <tbody>
+                                {% for condition in pdp_data.conditions %}
+                                <tr>
+                                    {% for key, value in condition.items() %}
+                                    <td>{{ value }}</td>
+                                    {% endfor %}
+                                </tr>
+                                {% endfor %}
+                            </tbody>
+                            </table>
+                        </div>
+                    </div>
+                </div>
+        </div>
+    </div>
+</div>
+{% endblock %}
+
+{% block add_head_css %}
+{% include "segments/datatable_snipet.html.j2" %}
+{% endblock %}

@@ -1,0 +1,78 @@
+{% extends "base2.html.j2" %}
+
+{% block topmenu %}
+<ul class="header-nav d-lg-flex m-3">
+    <div class="container-fluid px-4">
+      <nav aria-label="breadcrumb">
+        <ol class="breadcrumb my-0">
+          <li class="breadcrumb-item"><span>Cluster Permissions</span></li>
+          <li class="breadcrumb-item active"><span>Roles</span></li>
+        </ol>
+      </nav>
+    </div>
+</ul>
+<ul class="header-nav ms-auto"></ul>
+<ul class="header-nav d-lg-flex">
+{% include "segments/topmenu.html.j2" %}
+{% endblock %}
+
+{% block content %}
+<div class="card shadow mb-4">
+    <div class="card-header py-3">
+        <h6 class="m-0 font-weight-bold text-primary">Roles List</h6>
+    </div>
+    <div class="card-body">
+        <div class="table-responsive">
+            <table class="table table-bordered" id="dataTable" width="100%" cellspacing="0">
+                <thead>
+                    <tr>
+                      <th>Name</th>
+                      <th>Labels</th>
+                      <th>Annotations</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {% for r in roles %}
+                    {% if selected == r.name %}
+                      <tr class="selected" >
+                    {% else %}
+                      <tr>
+                    {% endif %}
+                        <td>
+                          <form action="/cluster-permission/role/data" method="POST">
+                            <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+                            <input type="hidden" name="ns_select" value="{{ session['ns_select'] }}" />
+                            <input type="hidden" name="r_name" value="{{ r.name }}" />
+                            <a href="javascript:;" onclick="parentNode.submit();">{{ r.name }}</a>
+                          </form>
+                        </td>
+                        <td>
+                          {% if r.labels %}
+                          {% for lb_key, lb_value in r.labels.items() %}
+                          <span class="badge text-bg-secondary">{{ lb_key }}: {{ lb_value }}</span>
+                          {% if not loop.last %}<br>{% endif %}
+                          {% endfor %}
+                          {% endif %}
+                        </td>
+                        <td>
+                          {% if r.annotations %}
+                          {% for an_key, an_value in r.annotations.items() %}
+                          {% if an_key != "kubectl.kubernetes.io/last-applied-configuration" %}
+                          <span class="badge text-bg-secondary">{{ an_key }}: {{ an_value }}</span>
+                          {% if not loop.last %}<br>{% endif %}
+                          {% endif %}
+                          {% endfor %}
+                          {% endif %}
+                        </td>
+                      </tr>
+                    {% endfor %}
+                  </tbody>
+            </table>
+        </div>
+    </div>
+</div>
+{% endblock %}
+
+{% block add_head_css %}
+{% include "segments/datatable_snipet.html.j2" %}
+{% endblock %}

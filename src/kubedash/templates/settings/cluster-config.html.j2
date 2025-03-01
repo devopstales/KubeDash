@@ -1,0 +1,185 @@
+{% extends "base2.html.j2" %}
+
+{% block topmenu %}
+<ul class="header-nav d-lg-flex m-3">
+    <div class="container-fluid px-4">
+      <nav aria-label="breadcrumb">
+        <ol class="breadcrumb my-0">
+          <li class="breadcrumb-item"><span>Settings</span></li>
+          <li class="breadcrumb-item active"><span>Cluster Config</span></li>
+        </ol>
+      </nav>
+    </div>
+</ul>
+<ul class="header-nav ms-auto"></ul>
+<ul class="header-nav d-lg-flex">
+  <!-- Button trigger modal add -->
+  {% if session['user_role'] == "Admin" %}
+  {% if k8s_config_list_length == 0 %}
+  <div class="col">
+    <button class="header-toggler" type="button" data-bs-toggle="modal" data-bs-target="#modaladd">
+      <i class="material-icons">add</i>
+    </button>
+  </div>
+  {% endif %}
+  {% endif %}
+{% include "segments/topmenu.html.j2" %}
+{% endblock %}
+
+{% block content %}
+<div class="card shadow mb-4">
+    <div class="card-header py-3">
+        <h6 class="m-0 font-weight-bold text-primary">Kubernetes Server List</h6>
+    </div>
+    <div class="card-body">
+        <div class="table-responsive">
+            <table class="table table-bordered" id="dataTable" width="100%" cellspacing="0">
+                <thead>
+                    <tr>
+                      <th>Context</th>
+                      <th>URL</th>
+                      <th>Action</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    {% for server in k8s_servers %}
+                    <tr>
+                        <td>{{ server.k8s_context }}</td>
+                        <td>{{ server.k8s_server_url }}</td>
+                        <td>
+                            {% if session['user_role'] == "Admin" %}
+                            <!-- Button trigger modal edit -->
+                            <form action="/settings/cluster-config" method="POST">
+                                <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+                                <button type="button" class="btn btn-success btn-just-icon btn-xs" data-bs-toggle="modal" data-bs-target="#modaledit{{ server.k8s_context }}">
+                                    <i class="material-icons">edit</i>
+                                </button>
+                                <input type="hidden" name="request_type" value="delete" />
+                                <input type="hidden" name="k8s_context" value="{{ server.k8s_context }}" />
+                                <button type="submit" rel="tooltip" class="btn btn-danger btn-just-icon btn-sm" value="upvote">
+                                    <i class="material-icons">delete</i>
+                                </button>
+                            </form>
+                            {% endif %}
+                        </td>
+                    </tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+
+        </div>
+    </div>
+</div>
+
+<!-- Modal Add User -->
+<div class="modal fade" id="modaladd" tabindex="-1" role="dialog" aria-labelledby="modaladdLabel" aria-hidden="true">
+  <div class="modal-dialog" role="document">
+    <div class="modal-content">
+      <div class="modal-header">
+        <h5 class="modal-title" id="modaladdLabel">Create Cluster</h5>
+        <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+      </div>
+      <div class="modal-body">
+        <form name="ClusterAdd" onsubmit="return validateClusterForm('ClusterAdd')" action="/settings/cluster-config" method="POST">
+          <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+          <input type="hidden" name="request_type" value="create" />
+          <div class="form-group">
+              <label for="k8s_context">Kubernetes Config Context</label>
+              <input type="text" class="form-control" id="k8s_context" name= "k8s_context" placeholder="Server Context" required>
+          </div>
+          <div class="form-group">
+              <label for="k8s_server_url">Kubernetes API URL</label>
+              <input type="text" class="form-control" id="k8s_server_url" name="k8s_server_url" placeholder="URL" required>
+          </div>
+          <div class="form-group">
+              <label for="k8s_server_ca">
+                  Kubernetes API CA Certificate 
+                  <a class="card-link float-right" data-bs-toggle="collapse" href="#">
+                      <i class="material-icons"
+                          data-bs-toggle="CertTooltip" 
+                          title="Where is this CA?"
+                          data-bs-content="cat /etc/kubernetes/pki/ca.crt">
+                          info
+                      </i>
+                  </a>
+              </label>
+              <textarea class="form-control" id="k8s_server_ca" name= "k8s_server_ca" rows="3" required></textarea>
+          </div>
+          <div class="modal-footer">
+              <div class="form-group mt-2">
+                  <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Close</button>
+                  <button type="submit" class="btn btn-primary" >Add</button>
+              </div>
+          </div>
+        </form>
+      </div>
+    </div>
+  </div>
+</div>
+<!-- Modal Add User -->
+
+<!-- Modal Edit Config -->
+{% for server in k8s_servers %}
+<div class="modal fade" id="modaledit{{ server.k8s_context }}" tabindex="-1" role="dialog" aria-labelledby="modaleditLabel" aria-hidden="true">
+    <div class="modal-dialog">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h5 class="modal-title" id="modaleditLabel">Update Information</h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+            </div>
+            <div class="modal-body">
+                <form name="ClusterEdit" onsubmit="return validateClusterForm('ClusterEdit')" action="/cluster-config" method="POST">
+                    <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+                    <input type="hidden" name="request_type" value="edit" />
+                    <input type="hidden" name="k8s_context_old" value="{{ server.k8s_context }}" />
+                    <div class="form-group">
+                        <label for="k8s_context">Kubernetes Config Context</label>
+                        <input type="text" class="form-control" id="k8s_context" name= "k8s_context" value="{{ server.k8s_context }}">
+                    </div>
+                    <div class="form-group">
+                        <label for="k8s_server_url">Kubernetes API URL</label>
+                        <input type="text" class="form-control" id="k8s_server_url" name= "k8s_server_url" value="{{ server.k8s_server_url }}">
+                    </div>
+                    <div class="form-group">
+                        <label for="k8s_server_ca">
+                            Kubernetes API CA Certificate
+                            <a class="card-link float-right" data-bs-toggle="collapse" href="#">
+                                <i class="material-icons"
+                                    data-bs-toggle="CertTooltip" 
+                                    title="Where is this CA?"
+                                    data-bs-content="cat /etc/kubernetes/pki/apiserver.crt">
+                                    info
+                                </i>
+                            </a>
+                        </label>
+                        <textarea class="form-control" id="k8s_server_ca" name= "k8s_server_ca" rows="3">{{ server.k8s_server_ca | j2_b64decode }}</textarea>
+                    </div>
+                    <div class="modal-footer">
+                        <div class="form-group mt-2">
+                            <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Close</button>
+                            <button type="submit" class="btn btn-primary" >Add</button>
+                        </div>
+                    </div>
+                </form>
+            </div>
+        </div>
+    </div>
+</div>
+{% endfor %}
+<!-- Modal Edit User -->
+{% endblock %}
+
+{% block add_head_css %}
+{% include "segments/datatable_css.html.j2" %}
+{% endblock %}
+
+{% block add_tail_js %}
+{% include "segments/datatable_js.html.j2" %}
+    <script src="{{ url_for('static',filename='/vendor/custom/functions.js') }}"></script>
+    <script>
+        var popoverTriggerList = [].slice.call(document.querySelectorAll('[data-bs-toggle="CertTooltip"]'))
+        var popoverList = popoverTriggerList.map(function (popoverTriggerEl) {
+          return new bootstrap.Popover(popoverTriggerEl)
+        })
+    </script>
+{% endblock %}

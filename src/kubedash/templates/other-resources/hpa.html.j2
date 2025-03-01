@@ -1,0 +1,81 @@
+{% extends "base2.html.j2" %}
+
+{% block topmenu %}
+<ul class="header-nav d-lg-flex m-3">
+    <div class="container-fluid px-4">
+      <nav aria-label="breadcrumb">
+        <ol class="breadcrumb my-0">
+          <li class="breadcrumb-item"><span>Other Resources</span></li>
+          <li class="breadcrumb-item active"><span>HPAs</span></li>  </ol>
+      </nav>
+    </div>
+</ul>
+<ul class="header-nav ms-auto"></ul>
+<ul class="header-nav d-lg-flex">
+{% include "segments/topmenu.html.j2" %}
+{% endblock %}
+
+{% block content %}
+<div class="card shadow mb-4">
+    <div class="card-header py-3">
+        <h6 class="m-0 font-weight-bold text-primary">Horizontal Pod Autoscaler List</h6>
+    </div>
+    <div class="card-body">
+        <div class="table-responsive">
+            <table class="table table-bordered" id="dataTable" width="100%" cellspacing="0">
+                <thead>
+                    <tr>
+                      <th>Name</th>
+                      <th>Namespace</th>
+                      <th>Owner</th>
+                      <th>Targets</th>
+                      <th>MinReplicas</th>
+                      <th>MaxReplicas</th>
+                      <th>Replicas</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {% for hpa in hpas %}
+                    {% if selected == hpa.name %} 
+                      <tr class="selected" >
+                    {% else %}
+                      <tr>
+                    {% endif %}
+                        <td>
+                          <form action="/other-resources/horizontal-pod-autoscaler/data" method="POST">
+                            <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+                            <input type="hidden" name="hpa_name" value="{{ hpa.name }}" />
+                            <a href="javascript:;" onclick="parentNode.submit();">{{ hpa.name }}</a>
+                          </form>
+                        </td>
+                        <td>{{ hpa.namespace }}</td>
+                        <td>
+                          <form action="/workload/{{ hpa.spec.scale_target_ref.kind | lower}}s" method="POST">
+                              <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+                              <input type="hidden" name="ns_select" value="{{ hpa.namespace }}" />
+                              <input type="hidden" name="selected" value="{{ hpa.spec.scale_target_ref.name }}" />
+                              <a href="javascript:;" onclick="parentNode.submit();">{{ hpa.spec.scale_target_ref.name }}</a>
+                          </form>
+                        </td>
+                        <td>
+                          {% if hpa.status.current_cpu_utilization_percentage %}
+                            <span class="badge text-bg-tag text-bg-secondary">{{ hpa.status.current_cpu_utilization_percentage }} / {{ hpa.spec.target_cpu_utilization_percentage }} %</span>
+                          {% else %}
+                            <span class="badge text-bg-tag text-bg-secondary">UNKNOWN / {{ hpa.spec.target_cpu_utilization_percentage }} %</span>
+                          {% endif %}
+                        </td>
+                        <td>{{ hpa.spec.max_replicas }}</td>
+                        <td>{{ hpa.spec.min_replicas }}</td>
+                        <td>{{ hpa.status.current_replicas }}</td>
+                      </tr>
+                    {% endfor %}
+                  </tbody>
+            </table>
+        </div>
+    </div>
+</div>
+{% endblock %}
+
+{% block add_head_css %}
+{% include "segments/datatable_snipet.html.j2" %}
+{% endblock %}
