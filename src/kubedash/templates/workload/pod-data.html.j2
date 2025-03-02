@@ -13,7 +13,8 @@
     </div>
 </ul>
 <ul class="header-nav ms-auto"></ul>
-  <ul class="header-nav d-lg-flex me-4">
+<ul class="header-nav d-lg-flex">
+{% if pod_data.init_containers or pod_data.containers %}
     <div class="container-fluid d-flex justify-content-end py-2 px-2">
         <form action="/workload/pod/exec" method="POST" class="form-post">
             <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
@@ -23,6 +24,8 @@
                 <i class="material-icons">input</i>
             </a>
         </form>
+    </div>
+    <div class="container-fluid d-flex justify-content-end py-2 px-2">
         <form action="/workload/pod/logs" method="POST" class="form-post">
             <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
             <input type="hidden" name="ns_select" value="{{ session['ns_select'] }}" />
@@ -32,7 +35,7 @@
             </a>
         </form>
     </div>
-<ul class="header-nav d-lg-flex">
+{% endif %}
 {% include "segments/topmenu.html.j2" %}
 {% endblock %}
 
@@ -83,8 +86,10 @@
                                     <span class="badge text-bg-warning">{{ pod_data.status }}</span>
                                     {% elif pod_data.status == "Succeeded" %}
                                     <span class="badge text-bg-secondary">{{ pod_data.status }}</span>
+                                    {% elif pod_data.status == "Terminated" or pod_data.status == "CrashLoopBackOff" %}
+                                    <span class="badge text-bg-danger">{{ pod_data.status }}</span>
                                     {% else %}
-                                    <span class="badge text-bg-info">{{ pod_data.status }}</span>
+                                    <span class="badge text-bg-secondary">{{ pod_data.status }}</span>
                                     {% endif %}
                                     </td>
                                 </tr>
@@ -207,10 +212,10 @@
                                         <tr>
                                             {% if ic.ready == "Completed" %}
                                             <td><span class="badge text-bg-secondary">{{ ic.ready }}</span></td>
-                                            {% elif ic.ready == "ImagePullBackOff" or ic.ready == "ErrImagePull" %}
+                                            {% elif ic.ready == "ImagePullBackOff" or ic.ready == "ErrImagePull" or ic.ready == "Error" or ic.ready == "CrashLoopBackOff" %}
                                             <td><span class="badge text-bg-danger">{{ ic.ready }}</span></td>
                                             {% else %}
-                                            <td>{{ ic.ready }}</td>
+                                            <td><span class="badge text-bg-secondary">{{ ic.ready }}</span></td>
                                             {% endif %}
                                             <td>{{ ic.name }}</td>
                                             <td>{{ ic.image }}</td>
@@ -240,7 +245,7 @@
                                         <tr>
                                             {% if c.ready == "Running"%}
                                             <td><span class="badge text-bg-success">{{ c.ready }}</span></td>
-                                            {% elif c.ready == "ImagePullBackOff" %}
+                                            {% elif c.ready == "ImagePullBackOff" or c.ready == "ErrImagePull" or c.ready == "Error" or c.ready == "CrashLoopBackOff" %}
                                             <td><span class="badge text-bg-danger">{{ c.ready }}</span></td>
                                             {% elif c.ready == "PodInitializing"%}
                                             <td><span class="badge text-bg-info">{{ c.ready }}</span></td>

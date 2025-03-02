@@ -313,6 +313,7 @@ def k8sDeploymentsPatchAnnotation(username_role, user_token, ns, name, replicas)
 ## Pods
 ##############################################################
 
+
 def k8sPodListGet(username_role, user_token, ns):
     k8sClientConfigGet(username_role, user_token)
     POD_LIST = list()
@@ -325,6 +326,16 @@ def k8sPodListGet(username_role, user_token, ns):
                 "owner": "",
                 "pod_ip": pod.status.pod_ip,
             }
+            if pod.metadata.deletion_timestamp:
+                POD_SUM['status'] = "Terminated"
+            for c in pod.spec.containers:
+                try:
+                    for cs in pod.status.container_statuses:
+                        if cs.name == c.name:
+                            if cs.state.waiting:
+                                POD_SUM["status"] = cs.state.waiting.reason
+                except TypeError:
+                    pass
             if pod.metadata.owner_references:
                 for owner in pod.metadata.owner_references:
                     POD_SUM['owner'] = "%ss/%s" % (owner.kind.lower(), owner.name)
@@ -370,6 +381,8 @@ def k8sPodGet(username_role, user_token, ns, po):
             "conditions": list(),
             "created": None,
         }
+        if pod_data.metadata.deletion_timestamp:
+            POD_DATA['status'] = "Terminated"
         POD_DATA['created'] = pod_data.metadata.creation_timestamp.strftime('%Y-%m-%d %H:%M:%S')
         if pod_data.metadata.labels:
             POD_DATA['labels'] = pod_data.metadata.labels
@@ -415,9 +428,13 @@ def k8sPodGet(username_role, user_token, ns, po):
                         CONTAINERS = {
                             "name": c.name,
                             "image": c.image,
-                            "ready": cs.state.waiting.reason,
+                            "ready": None,
                             "restarts": cs.restart_count,
                         }
+                        if cs.state.waiting:
+                            CONTAINERS["ready"] = cs.state.waiting.reason
+                        elif cs.last_state.terminated:
+                            CONTAINERS["ready"] = cs.last_state.terminated.reason
                     POD_DATA['containers'].append(CONTAINERS)
         if pod_data.spec.init_containers:
             for ic in pod_data.spec.init_containers:
@@ -434,9 +451,13 @@ def k8sPodGet(username_role, user_token, ns, po):
                             CONTAINERS = {
                                 "name": ic.name,
                                 "image": ic.image,
-                                "ready": ics.state.waiting.reason,
+                                "ready": None,
                                 "restarts": ics.restart_count,
                             }
+                        if ic.state.waiting:
+                            CONTAINERS["ready"] = ic.state.waiting.reason
+                        elif ic.last_state.terminated:
+                            CONTAINERS["ready"] = ic.lastState.terminated.reason
                         POD_DATA['init_containers'].append(CONTAINERS)
         if pod_data.spec.image_pull_secrets:
             for ips in pod_data.spec.image_pull_secrets:

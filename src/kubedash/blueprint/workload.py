@@ -15,7 +15,7 @@ from lib.k8s.workload import k8sStatefulSetsGet, k8sStatefulSetPatchReplica, \
     k8sDaemonSetsGet, k8sDaemonsetPatch, k8sDeploymentsGet, k8sDeploymentsPatchReplica, \
     k8sReplicaSetsGet, k8sPodGet, \
     k8sPodGetContainers, k8sPodExecSocket, k8sPodLogsStream, \
-    k8sPodExecStream, NoFlashErrorHandler
+    k8sPodExecStream, NoFlashErrorHandler, k8sPodListGet
 
 from lib.helper_functions import get_logger
 
@@ -51,16 +51,12 @@ def pod_list():
     user_token = get_user_token(session)
 
     namespace_list, error = k8sNamespaceListGet(session['user_role'], user_token)
-    #if not error:
     #    has_report, pod_list = k8sPodListVulnsGet(session['user_role'], user_token, session['ns_select'])
-    #else:
-    #    pod_list = []
-    #    has_report = None
+    pod_list = k8sPodListGet(session['user_role'], user_token, session['ns_select'])
 
     return render_template(
-        'workload/pods.html.j2',
+        'workload/pod.html.j2',
         pods = pod_list,
-    #    has_report = has_report,
         namespaces = namespace_list,
     )
 
@@ -81,8 +77,6 @@ def pod_data():
             'workload/pod-data.html.j2',
             po_name = po_name,
             pod_data = pod_data,
-        #    has_report = has_report,
-        #    pod_vulns = pod_vulns,
         )
     else:
         return redirect(url_for('auth.login'))
@@ -115,7 +109,7 @@ def pod_logs():
                 container_select = None
 
         return render_template(
-            'workload/pod-logs.html.j2', 
+            'workload/pod-log.html.j2', 
             po_name = po_name,
             container_select = container_select,
             pod_containers = pod_containers,

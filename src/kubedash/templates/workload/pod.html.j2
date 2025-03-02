@@ -46,6 +46,8 @@
                         <td>
                         {% if po.status == "Running" %} 
                           <span class="badge text-bg-success">{{ po.status }}</span>
+                        {% elif po.status == "Terminated" or po.status == "CrashLoopBackOff"%}
+                          <span class="badge text-bg-danger">{{ po.status }}</span>
                         {% elif po.status == "Pending" %}
                           <span class="badge text-bg-warning">{{ po.status }}</span>
                         {% elif po.status == "Succeeded" %}
