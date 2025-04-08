@@ -11,6 +11,18 @@ tasks:
     cmds:
       - "task --list-all"
 
+  dev-up:
+    desc: "Start Dev Containers"
+    dir: 'deploy/docker-compose'
+    cmds:
+      - docker compose -f dc-nginx.yaml -f dc-postgresql.yaml -f dc-redis.yaml -f dc-neo4j.yaml up -d
+
+  dev-down:
+    desc: "Stop Dev Containers"
+    dir: 'deploy/docker-compose'
+    cmds:
+      - docker compose -f dc-nginx.yaml -f dc-postgresql.yaml -f dc-redis.yaml -f dc-neo4j.yaml down
+
   kubedash-build:
     desc: "Build Kubedash docker image"
     cmds:

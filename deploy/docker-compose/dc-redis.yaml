@@ -1,5 +1,6 @@
 services:
-  my-redis-docker-service:
+  redis:
+    container_name: kubedash-redis
     image: redis:latest
     healthcheck:
       test: ["CMD-SHELL", "redis-cli ping | grep PONG"]
