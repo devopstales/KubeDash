@@ -19,7 +19,7 @@ flask_session==0.8.0
 requests_oauthlib==2.0.0
 # web security
 Flask_WTF==1.2.1
-flask_cors==5.0.0
+flask_cors==6.0.0
 flask_talisman==1.1.0
 # kubernetes
 kubernetes==26.1.0
