@@ -11,6 +11,18 @@ tasks:
     cmds:
       - "task --list-all"
 
+  dev-up:
+    desc: "Start Dev Containers"
+    dir: 'deploy/docker-compose'
+    cmds:
+      - docker compose -f dc-nginx.yaml -f dc-postgresql.yaml -f dc-redis.yaml -f dc-neo4j.yaml up -d
+
+  dev-down:
+    desc: "Stop Dev Containers"
+    dir: 'deploy/docker-compose'
+    cmds:
+      - docker compose -f dc-nginx.yaml -f dc-postgresql.yaml -f dc-redis.yaml -f dc-neo4j.yaml down
+
   kubedash-build:
     desc: "Build Kubedash docker image"
     cmds:
@@ -23,7 +35,7 @@ tasks:
       - docker build --build-arg BUILD_DATE={{.DATE}} --build-arg VERSION={{.VERSION}}-devel -t devopstales/kubedash:{{.VERSION}}-devel docker/kubedash
 
   kubedash-scan:
-    desc: "Scan Kubedash Dockerfile for vulnerabilities"
+    desc: "Scan Kubedash docker image for vulnerabilities"
     cmds:
       - trivy -q i devopstales/kubedash:{{.VERSION}}-devel --scanners vuln
 
@@ -36,6 +48,31 @@ tasks:
     desc: "Remove Kubedash docker image"
     cmds:
       - docker rmi devopstales/kubedash:{{.VERSION}}-devel
+
+  # https://github.com/docker/buildx/issues/59#issuecomment-2612971318
+  kubedash-build-prod:
+    desc: "Build PROD Kubedash docker image"
+    cmds:
+      - |
+        rm -rf docker/kubedash/kubedash
+        cp -r src/kubedash docker/kubedash/kubedash
+        rm -f docker/kubedash/requirements.txt
+        cp docker/kubedash/kubedash/requirements.txt docker/kubedash/requirements.txt
+        rm -f docker/kubedash/gunicorn_conf.py
+        cp docker/kubedash/kubedash/gunicorn_conf.py docker/kubedash/gunicorn_conf.py
+        docker buildx build \
+          --build-arg BUILD_DATE={{.DATE}} \
+          --build-arg VERSION={{.VERSION}} \
+          -t devopstales/kubedash:{{.VERSION}} \
+          --platform linux/arm/v7,linux/arm64/v8,linux/amd64 \
+          --builder container \
+          --load docker/kubedash
+        docker image ls --tree devopstales/kubedash:3.1.0
+
+  kubedash-scan-prod:
+    desc: "Scan PROD Kubedash docker image for vulnerabilities"
+    cmds:
+      - trivy -q i devopstales/kubedash:{{.VERSION}} --scanners vuln
 
   kdlogin-build:
     desc: "Build kubectl-kdlogin"
@@ -75,8 +112,19 @@ tasks:
       - pip3 install -r build/requirements.txt
       - mkdocs build
 
+  helm-build:
+    desc: "Package Helm Chart"
+    deps:
+      - helm-docs
+    dir: 'deploy/helm'
+    cmds:
+      - helm dependency update
+      - cr package
+      - cr upload --skip-existing
+
   helm-docs:
-   desc: "Generate Helm Chart documentation"
-   dir: 'deploy/helm'
-   cmds:
-    - helm-docs
+    desc: "Generate Helm Chart documentation"
+    dir: 'deploy/helm'
+    cmds:
+     - helm-docs
+    
