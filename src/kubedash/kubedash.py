@@ -7,6 +7,7 @@ from lib.initializers import (
     initialize_app_confifuration, 
     initialize_app_logging,
     initialize_error_page,
+    initialize_app_swagger,
     initialize_app_tracing,
     initialize_app_database,
     initialize_app_plugins,
@@ -53,6 +54,7 @@ def create_app(external_config_name=None):
 
     initialize_app_logging(app)
     initialize_error_page(app)
+    initialize_app_swagger(app)
 
     # manage cli commands
     if not error:

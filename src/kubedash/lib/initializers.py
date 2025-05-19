@@ -3,7 +3,7 @@
 from flask import Flask, render_template, request
 import sys, logging, os
 
-from lib.components import db, sess, login_manager, csrf, socketio 
+from lib.components import db, sess, login_manager, csrf, socketio, api_doc
 from lib.helper_functions import bool_var_test, get_logger
 from lib.k8s.server import k8sGetClusterStatus
 
@@ -159,7 +159,6 @@ def initialize_app_version(app: Flask):
     print(separator_long)
     app.logger.info("Running in %s mode" % app.config['ENV'])
 
-
 def initialize_app_database(app: Flask, filename: str):
     """Initialize the database
 
@@ -225,6 +224,23 @@ def initialize_app_database(app: Flask, filename: str):
                 status = k8sGetClusterStatus()
                 if status:
                     k8s_roles_init()
+                    
+def initialize_app_swagger(app: Flask):
+    """Initialize Swagger UI
+
+    Args:
+        app (Flask): Flask app object
+    """
+    app.logger.info("Initialize Swagger UI")
+    app.config.update({
+        "API_TITLE": "KubeDash API",
+        "API_VERSION": "v1",
+        "OPENAPI_VERSION": "3.0.2",
+        "OPENAPI_URL_PREFIX": "/api",                       # OpenAPI served under /api/
+        "OPENAPI_SWAGGER_UI_PATH": "/swagger-ui",           # relative to URL_PREFIX → /api/swagger-ui
+        "OPENAPI_SWAGGER_UI_URL": "/api/swagger-ui-dist/",  # your local static files
+    })
+    api_doc.init_app(app)
 
 def initialize_blueprints(app: Flask):
     """Initialize blueprints"""
@@ -247,7 +263,8 @@ def initialize_blueprints(app: Flask):
     
 
     app.logger.info("Initialize blueprints")
-    app.register_blueprint(api)
+    #app.register_blueprint(api)
+    api_doc.register_blueprint(api)
     app.register_blueprint(metrics)
     
     app.register_blueprint(auth)
