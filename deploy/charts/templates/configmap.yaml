@@ -26,16 +26,33 @@ data:
     name = {{ .Values.externalDatabase.database }}
     user = root
     password = {{ .Values.externalDatabase.password | b64enc }}
-    {{ else if .Values.postgresqlHa.enabled }}
+    {{ else if .Values.postgresql.enabled }}
     type = postgres
-    host = {{ .Release.Name }}-pgpool
-    name = {{ .Values.postgresqlHa.postgresql.database }}
+    host = {{ .Release.Name }}-postgresql
+    name = {{ .Values.postgresql.postgresql.database }}
     user = root
-    password = {{ .Values.postgresqlHa.postgresql.password | b64enc }}
+    password = {{ .Values.postgresql.postgresql.password | b64enc }}
     {{ else }}
     type = sqlite3
     {{ end }}
 
+    {{ if .Values.redis.enabled }}
+    #################################### Cache server #############################
+    [remote_cache]
+    # Either redis, none default is none
+    type = redis
+
+    # cache connectionstring options
+    # redis: config like redis server e.g. `addr=127.0.0.1:6379,pool_size=100,db=0,ssl=false`. Only addr is required. ssl may be 'true', 'false', or 'insecure'.
+    connstr = addr={{ .Release.Name }}-master:6379,pool_size=100,db=0,ssl=false 
+
+    # prefix prepended to all the keys in the remote cache
+    prefix =
+
+    # This enables encryption of values stored in the remote cache
+    encryption =
+
+    {{ end }}
     {{ if .Values.oidc.enabled }}
     #################################### SSO Settings ###########################
     [sso_settings]

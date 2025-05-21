@@ -63,6 +63,25 @@ postgresql:
     replicationPassword: "change-me"
     # -- Postgresql postgres user password
     postgresPassword: "change-me"
+
+  volumePermissions:
+    # -- Enable init container to set permissions on data volume
+    enabled: false
+    securityContext:
+      runAsUser: "auto"
+
+  securityContext:
+    # -- Enable postgresql security context
+    enabled: false
+
+  shmVolume:
+    # -- Enable postgresql shared memory volume
+    chmod:
+      enabled: false
+
+  primary:
+    persistence:
+      size: 10Gi
   readReplicas:
     # -- Number of read replicas to create
     replicaCount: 0
@@ -81,6 +100,16 @@ postgresql:
 redis:
   # -- Enable redis
   enabled: true
+  # -- Redis cluster architecture
+  architecture: standalone
+  metrics:
+    # -- Enable redis metrics
+    enabled: true
+    serviceMonitor:
+      # -- Enable prometheus service monitor
+      enabled: false
+      # -- Prometheus service monitor namespace
+      namespace: "monitoring"
 
 # -- enable metrics-server
 metricsServer:
