@@ -75,6 +75,24 @@ spec:
         - mountPath: /code/kubedash/kubedash.ini
           name: kubedash-ini
           subPath: kubedash.ini
+{{- if .Values.monitoring.enabled }}
+      - name: statsd-exporter
+        image: "{{ .Values.image.statsdExporter.repository }}:{{ .Values.image.statsdExporter.tag }}"
+        imagePullPolicy: {{ .Values.image.pullPolicy }}
+        ports:
+          - containerPort: 9125
+            protocol: TCP
+            name: statsd-exporter
+          - containerPort: 9102
+            protocol: TCP
+            name: prometheus-exporter
+        args:
+          - --statsd.mapping-config=/statsd/statsd.conf
+        volumeMounts:
+          - mountPath: /statsd/statsd.conf
+            name: statsd-config
+            subPath: statsd.conf
+{{- end }}
       volumes:
 {{- if .Values.persistence.enabled }}
       - name: cache
@@ -85,6 +103,17 @@ spec:
           defaultMode: 420
           name: {{ include "kubedash.fullname" . }}-kubedash-ini
         name: kubedash-ini
+{{- if .Values.monitoring.enabled }}
+      - configMap:
+          defaultMode: 420
+          name: {{ include "kubedash.fullname" . }}-statsd-config
+        name: statsd-config
+{{- end }}
+{{- if .Values.persistence.enabled }}
+      - name: db
+        persistentVolumeClaim:
+          claimName: {{ include "kubedash.fullname" . }}-db
+{{- end }}
 {{- with .Values.nodeSelector }}
       nodeSelector:
         {{- . | toYaml | nindent 8 }}

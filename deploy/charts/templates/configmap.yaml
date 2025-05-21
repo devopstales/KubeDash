@@ -92,3 +92,36 @@ data:
     gateway_api = false
     cert_manager = {{ .Values.plugins.certManager.enabled }}
     external_loadbalancer = {{ .Values.plugins.externalLoadbalancer.enabled }}
+{{- if .Values.monitoring.enabled }}
+---
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: {{ include "kubedash.fullname" . }}-statsd-config
+  labels:
+    app: kubedash
+    {{ include "kubedash.labels" . | nindent 4 }}
+data:
+  statsd.conf: |-
+    # StatsD configuration
+    # This file is used to configure the StatsD exporter.
+    mappings:
+      - match: "*.gunicorn.request.status.*"
+        help: "gunicorn response code"
+        name: "gunicorn_response_code"
+        labels:
+          app: "$1"
+          status: "$2"
+      - match: "*.gunicorn.workers"
+        name: "gunicorn_workers"
+        labels:
+          app: "$1"
+      - match: "*.gunicorn.requests"
+        name: "gunicorn_requests"
+        labels:
+          app: "$1"
+      - match: "*.gunicorn.request.duration"
+        name: "gunicorn_request_duration"
+        labels:
+          app: "$1"
+{{ end }}

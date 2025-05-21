@@ -18,6 +18,11 @@ image:
   pullPolicy: Always
   # -- The docker image tag to use
   tag: 3.1.0
+  statsdExporter:
+    # -- The docker image repository to use
+    repository: prom/statsd-exporter
+    # -- The docker image tag to use
+    tag: v0.22.4
 
 # -- pullsecrets
 imagePullSecrets: []
@@ -44,6 +49,28 @@ externalDatabase:
     name: "kubedash-postgresql"
     # -- Secret must provide the following variables: EXTERNAL_DATABASE_PASSWORD.
     useExistingSecret: false
+
+metrics:
+  # -- Enable metrics
+  enabled: true
+  serviceMonitor:
+    # -- Enable prometheus service monitor
+    enabled: false
+    # -- Prometheus service monitor namespace
+    namespace: "monitoring"
+    # -- Prometheus service monitor labels
+    labels: {}
+    # -- Prometheus service monitor job labels
+    jobLabel: {}
+    # -- Prometheus service monitor annotations
+    annotations: {}
+    # -- Prometheus service monitor interval
+    interval: "30s"
+    # -- Prometheus service monitor scrape timeout
+    scrapeTimeout: "10s"
+    relabelings: {}
+    metricRelabelings: {}
+    honorLabels: {}
 
 # -- deploy postgresql
 postgresql:
