@@ -1,0 +1,65 @@
+apiVersion: source.toolkit.fluxcd.io/v1
+kind: GitRepository
+metadata:
+  name: podinfo
+  namespace: flux-system
+spec:
+  interval: 30s
+  ref:
+    branch: master
+  url: https://github.com/stefanprodan/podinfo
+---
+apiVersion: kustomize.toolkit.fluxcd.io/v1
+kind: Kustomization
+metadata:
+  name: podinfo
+  namespace: flux-system
+spec:
+  interval: 5m0s
+  path: ./kustomize
+  prune: true
+  sourceRef:
+    kind: GitRepository
+    name: podinfo
+  validation: client
+---
+apiVersion: source.toolkit.fluxcd.io/v1
+kind: HelmRepository
+metadata:
+  name: chartmuseum
+  namespace: flux-system
+spec:
+  url: https://chartmuseum.github.io/charts
+  interval: 10m
+---
+apiVersion: helm.toolkit.fluxcd.io/v2
+kind: HelmRelease
+metadata:
+  name: chartmuseum
+  namespace: flux-system
+spec:
+  interval: 5m
+  chart:
+    spec:
+      chart: chartmuseum
+      version: "2.14.2"
+      sourceRef:
+        kind: HelmRepository
+        name: chartmuseum
+        namespace: flux-system
+      interval: 1m
+  values:
+    env:
+      open:
+        AWS_SDK_LOAD_CONFIG: true
+        STORAGE: amazon
+        STORAGE_AMAZON_BUCKET: "bucket-name"
+        STORAGE_AMAZON_PREFIX: ""
+        STORAGE_AMAZON_REGION: "region-name"
+    serviceAccount:
+      create: true
+      annotations:
+        eks.amazonaws.com/role-arn: "role-arn"
+    securityContext:
+      enabled: true
+      fsGroup: 65534
