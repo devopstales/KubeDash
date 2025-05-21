@@ -27,40 +27,60 @@ replicas: 1
 
 # -- enable external postgresql support
 externalDatabase:
+  # -- Enable external postgresql
   enabled: false
+  # -- External postgresql host
   host: ""
+  # -- External postgresql port
   port: 5432
+  # -- External postgresql database
   database: "kubedash"
-  username: "kubedash-user"
-  password: "kubedash-pass"
+  # -- External postgresql username
+  username: "kubedash"
+  # -- External postgresql password
+  password: "kubedash"
   secret:
     # -- Name of the secret storing EXTERNAL_DATABASE_PASSWORD.
     name: "kubedash-postgresql"
     # -- Secret must provide the following variables: EXTERNAL_DATABASE_PASSWORD.
     useExistingSecret: false
 
-# -- deploy HA postgresql
-postgresqlHa:
-  enabled: false
+# -- deploy postgresql
+postgresql:
+  # -- Enable postgresql
+  enabled: true
+  
   rbac:
     create: true
-  persistence:
-    enabled: true
-#    storageClass: default
-  postgresql:
+  auth:
+    # -- Postgresql database
     database: "kubedash"
-    username: "kubedash-user"
-    password: "kubedash-pass"
-    repmgrPassword: "change-me"
+    # -- Postgresql username
+    username: "kubedash"
+    # -- Postgresql password
+    password: "kubedash"
+    # -- Postgresql replication password
+    replicationPassword: "change-me"
+    # -- Postgresql postgres user password
     postgresPassword: "change-me"
-  pgpool:
-    replicaCount: 2
-    adminPassword: "change-me"
+  readReplicas:
+    # -- Number of read replicas to create
+    replicaCount: 0
+
   metrics:
+    # -- Enable postgresql metrics
     enabled: true
     serviceMonitor:
+      # -- Enable prometheus service monitor
       enabled: false
-# https://artifacthub.io/packages/helm/bitnami/postgresql-ha
+      # -- Prometheus service monitor namespace
+      namespace: "monitoring"
+# https://artifacthub.io/packages/helm/bitnami/postgresql
+
+# -- enable redis for caching
+redis:
+  # -- Enable redis
+  enabled: true
 
 # -- enable metrics-server
 metricsServer:
