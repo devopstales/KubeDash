@@ -3,12 +3,13 @@ from flask_smorest import Blueprint
 from contextlib import nullcontext
 import swagger_ui_bundle
 
-from lib.init_functions import connect_database
-from lib.sso import SSOServerTest
-from lib.k8s.server import k8sGetClusterStatus
+from flask import Blueprint
 
 from lib.helper_functions import get_logger
+from lib.init_functions import connect_database
+from lib.k8s.server import k8sGetClusterStatus
 from lib.opentelemetry import tracer
+from lib.sso import SSOServerTest
 
 ##############################################################
 ## Helpers

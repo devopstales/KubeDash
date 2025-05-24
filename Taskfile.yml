@@ -11,6 +11,33 @@ tasks:
     cmds:
       - "task --list-all"
 
+  kubedash-requirements:
+    desc: "Generate Kubedash requirements"
+    dir: 'src/kubedash'
+    cmds:
+      - poetry export --without-hashes -f requirements.txt
+
+  kubedash-safety:
+    desc: "Safety chack Kubedash requirements"
+    dir: 'src/kubedash'
+    cmds:
+      - poetry export --without-hashes -f requirements.txt | safety check --stdin
+
+  kubedash-audit:
+    desc: "Run tests for Kubedash"
+    dir: 'src/kubedash'
+    cmds:
+      - poetry run pip-audit
+
+  kubedash-lint:
+    desc: "Lint Kubedash"
+    dir: 'src/kubedash'
+    cmds:
+      - poetry run isort .
+      - poetry run flake8 .
+      #- poetry run autoflake --remove-all-unused-imports --recursive --remove-unused-variables --in-place .
+      - poetry run black --check .
+
   kubedash-build:
     desc: "Build Kubedash docker image"
     cmds:

@@ -1,6 +1,8 @@
 #!/usr/bin/env python3
-from itsdangerous import base64_encode, base64_decode
 import re
+
+from itsdangerous import base64_decode, base64_encode
+
 
 ##############################################################
 ## base64 decode

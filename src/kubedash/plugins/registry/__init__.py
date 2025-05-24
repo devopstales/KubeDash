@@ -1,12 +1,17 @@
-from flask import Blueprint, request, session,render_template, redirect, url_for, flash, jsonify
+from datetime import datetime
+
+from flask import (Blueprint, flash, jsonify, redirect, render_template,
+                   request, session, url_for)
 from flask_login import login_required
 
-from .registry import  RegistryGetRepositories, RegistryGetTags, RegistryDeleteTag, RegistryGetManifest
-from .registry_server import RegistryServerListGet, RegistryServerCreate, RegistryServerUpdate, RegistryServerDelete, RegistryGetEvent, RegistryEventCreate
-from datetime import datetime
 from lib.components import csrf
-
 from lib.helper_functions import get_logger
+
+from .registry import (RegistryDeleteTag, RegistryGetManifest,
+                       RegistryGetRepositories, RegistryGetTags)
+from .registry_server import (RegistryEventCreate, RegistryGetEvent,
+                              RegistryServerCreate, RegistryServerDelete,
+                              RegistryServerListGet, RegistryServerUpdate)
 
 #############################################################
 ## variables

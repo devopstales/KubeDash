@@ -1,9 +1,10 @@
-import requests
 from logging import getLogger
 
-from .registry_server import RegistrySererGet
+import requests
 
 from lib.helper_functions import ErrorHandler
+
+from .registry_server import RegistrySererGet
 
 logger = getLogger(__name__)
 

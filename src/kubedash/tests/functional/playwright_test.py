@@ -1,6 +1,7 @@
 # https://playwright.dev/python/docs/intro
 import re
-from playwright.sync_api import Playwright, sync_playwright, expect
+
+from playwright.sync_api import Playwright, expect, sync_playwright
 
 
 def test_login(playwright: Playwright) -> None:

@@ -1,6 +1,7 @@
 from flask import Blueprint
-from lib.user import UserCreate, UserDelete
+
 from lib.helper_functions import get_logger
+from lib.user import UserCreate, UserDelete
 
 cli = Blueprint("cli", __name__)
 logger = get_logger()

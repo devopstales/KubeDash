@@ -1,18 +1,17 @@
 from flask import flash
-from pyvis.network import Network
-
 from kubernetes import client as k8s_client
 from kubernetes.client.rest import ApiException
-
 from opentelemetry.trace.status import Status, StatusCode
+from pyvis.network import Network
 
 from lib.helper_functions import ErrorHandler, calcPercent, parse_quantity
 
-from . import tracer, logger
-from .server import k8sClientConfigGet
+from . import logger, tracer
 from .node import k8sNodesListGet
-from .workload import k8sDaemonSetsGet, k8sDeploymentsGet, k8sReplicaSetsGet, k8sStatefulSetsGet
 from .security import k8sPodListVulnsGet
+from .server import k8sClientConfigGet
+from .workload import (k8sDaemonSetsGet, k8sDeploymentsGet, k8sReplicaSetsGet,
+                       k8sStatefulSetsGet)
 
 ##############################################################
 ## Metrics

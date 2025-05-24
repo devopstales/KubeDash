@@ -1,14 +1,16 @@
 #!/usr/bin/env python3
 
 import json
-from lib.helper_functions import get_logger
-from lib.components import db
-from lib.user import SSOTokenUpdate
+
 from flask_login import UserMixin
-from sqlalchemy.ext.mutable import MutableList
-from sqlalchemy import PickleType, inspect
-from requests_oauthlib import OAuth2Session
 from opentelemetry import trace
+from requests_oauthlib import OAuth2Session
+from sqlalchemy import PickleType, inspect
+from sqlalchemy.ext.mutable import MutableList
+
+from lib.components import db
+from lib.helper_functions import get_logger
+from lib.user import SSOTokenUpdate
 
 ##############################################################
 ## variables

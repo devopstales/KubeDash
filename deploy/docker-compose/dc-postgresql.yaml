@@ -2,6 +2,7 @@ version: '3'
 
 services:
   postgresql:
+    container_name: kubedash-postgresql
     image: postgres:13.12
     environment:
       POSTGRES_DB: kubedash

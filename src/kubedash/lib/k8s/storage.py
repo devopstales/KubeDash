@@ -1,6 +1,6 @@
 
 import kubernetes.client as k8s_client
-from kubernetes.client.exceptions import  ApiException
+from kubernetes.client.exceptions import ApiException
 
 from lib.helper_functions import ErrorHandler, trimAnnotations
 

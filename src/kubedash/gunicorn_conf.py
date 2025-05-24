@@ -1,5 +1,6 @@
-import os
 import logging
+import os
+
 from gunicorn.glogging import Logger as GunicornBaseLogger
 
 # Gunicorn config variables

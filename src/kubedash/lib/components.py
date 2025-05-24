@@ -1,13 +1,11 @@
 from flask_login import LoginManager
-from flask_sqlalchemy import SQLAlchemy
 from flask_session import Session
-from flask_wtf.csrf import CSRFProtect
 from flask_socketio import SocketIO
 from flask_smorest import Api
+from flask_sqlalchemy import SQLAlchemy
+from flask_wtf.csrf import CSRFProtect
 
 from lib.helper_functions import get_logger
-
-from flask_session import Session
 
 ##############################################################
 ## Helpers

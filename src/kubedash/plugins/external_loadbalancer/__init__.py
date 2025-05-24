@@ -2,14 +2,16 @@
 
 import ast
 
-from flask import Blueprint, render_template, request, session, redirect, url_for
+from flask import (Blueprint, redirect, render_template, request, session,
+                   url_for)
 from flask_login import login_required
 
 from lib.helper_functions import get_logger
-from lib.sso import get_user_token
 from lib.k8s.namespace import k8sNamespaceListGet
+from lib.sso import get_user_token
 
-from .helper import ipaddresspoolTest, l2advertisementsTest, bgpadvertisementsTest, bgppeersTest
+from .helper import (bgpadvertisementsTest, bgppeersTest, ipaddresspoolTest,
+                     l2advertisementsTest)
 
 ##############################################################
 ## variables

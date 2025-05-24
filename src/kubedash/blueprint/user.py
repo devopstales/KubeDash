@@ -1,21 +1,21 @@
-from flask import Blueprint, request, session,render_template, redirect, url_for, flash
+from flask import (Blueprint, flash, redirect, render_template, request,
+                   session, url_for)
 from flask_login import login_required
 from werkzeug.security import check_password_hash
 
-
-from lib.sso import get_user_token
-from lib.k8s.server import k8sServerContextsList
-from lib.k8s.namespace import k8sNamespaceListGet
+from lib.helper_functions import email_check, get_logger
 from lib.k8s.certificate import k8sCreateUser
-from lib.k8s.security import k8sUserPriviligeList, k8sClusterRoleBindingAdd, \
-    k8sRoleBindingAdd, k8sUserRoleTemplateListGet, k8sUserClusterRoleTemplateListGet, \
-    k8sClusterRoleBindingGroupGet, k8sRoleBindingGroupGet
-
-from lib.helper_functions import get_logger, email_check
-from lib.user import User, UsersRoles, Role, \
-    UserUpdate, UserCreate, UserDelete, UserUpdatePassword, \
-    SSOGroupsList, SSOGroupsMemberList,  \
-    KubectlConfigStore
+from lib.k8s.namespace import k8sNamespaceListGet
+from lib.k8s.security import (k8sClusterRoleBindingAdd,
+                              k8sClusterRoleBindingGroupGet, k8sRoleBindingAdd,
+                              k8sRoleBindingGroupGet,
+                              k8sUserClusterRoleTemplateListGet,
+                              k8sUserPriviligeList, k8sUserRoleTemplateListGet)
+from lib.k8s.server import k8sServerContextsList
+from lib.sso import get_user_token
+from lib.user import (KubectlConfigStore, Role, SSOGroupsList,
+                      SSOGroupsMemberList, User, UserCreate, UserDelete,
+                      UsersRoles, UserUpdate, UserUpdatePassword)
 
 ##############################################################
 ## Helpers

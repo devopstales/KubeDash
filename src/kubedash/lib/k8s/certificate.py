@@ -1,10 +1,9 @@
 import base64
-
 from datetime import datetime, timezone
-from OpenSSL import crypto
 
 from kubernetes import client as k8s_client
 from kubernetes.client.rest import ApiException
+from OpenSSL import crypto
 
 from lib.helper_functions import email_check
 

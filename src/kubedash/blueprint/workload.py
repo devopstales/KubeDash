@@ -1,23 +1,24 @@
-import logging, functools
+import functools
+import logging
 
+from flask import (Blueprint, redirect, render_template, request, session,
+                   url_for)
+from flask_login import current_user, login_required
+from flask_socketio import disconnect
 from kubernetes.client.rest import ApiException
 
-from flask import Blueprint, request, session,render_template, redirect, url_for
-from flask_login import login_required, current_user
-from flask_socketio import disconnect
-
 from lib.components import socketio
+from lib.helper_functions import get_logger
 from lib.k8s.namespace import k8sNamespaceListGet
 from lib.k8s.security import k8sPodListVulnsGet, k8sPodVulnsGet
-
+from lib.k8s.workload import (NoFlashErrorHandler, k8sDaemonsetPatch,
+                              k8sDaemonSetsGet, k8sDeploymentsGet,
+                              k8sDeploymentsPatchReplica, k8sPodExecSocket,
+                              k8sPodExecStream, k8sPodGet, k8sPodGetContainers,
+                              k8sPodListGet, k8sPodLogsStream,
+                              k8sReplicaSetsGet, k8sStatefulSetPatchReplica,
+                              k8sStatefulSetsGet)
 from lib.sso import get_user_token
-from lib.k8s.workload import k8sStatefulSetsGet, k8sStatefulSetPatchReplica, \
-    k8sDaemonSetsGet, k8sDaemonsetPatch, k8sDeploymentsGet, k8sDeploymentsPatchReplica, \
-    k8sReplicaSetsGet, k8sPodGet, \
-    k8sPodGetContainers, k8sPodExecSocket, k8sPodLogsStream, \
-    k8sPodExecStream, NoFlashErrorHandler, k8sPodListGet
-
-from lib.helper_functions import get_logger
 
 ##############################################################
 ## Helpers

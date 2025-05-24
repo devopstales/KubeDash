@@ -1,8 +1,7 @@
+from itsdangerous import base64_decode, base64_encode
 from sqlalchemy import inspect
 
 from lib.components import db
-
-from itsdangerous import base64_encode, base64_decode
 
 from .model import Registry, RegistryEvents
 

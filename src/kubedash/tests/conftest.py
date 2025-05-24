@@ -1,9 +1,12 @@
 
-import pytest, logging
-import flask_migrate
+import logging
 
+import flask_migrate
+import pytest
 from flask.testing import FlaskClient
+
 from kubedash import create_app
+
 
 @pytest.fixture(scope='module')
 def app():

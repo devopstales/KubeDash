@@ -1,5 +1,6 @@
 import json
 
+
 def test_ping(client):
     """
     Test the ``/api/ping`` endpoint

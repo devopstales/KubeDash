@@ -1,15 +1,17 @@
-from flask import Blueprint, request, session,render_template, redirect, url_for
+from flask import (Blueprint, redirect, render_template, request, session,
+                   url_for)
 from flask_login import login_required
 
-from lib.sso import get_user_token
-from lib.k8s.namespace import k8sNamespacesGet, k8sNamespaceCreate, k8sNamespaceDelete
-from lib.k8s.workload import k8sWorkloadList, k8sStatefulSetPatchAnnotation, k8sStatefulSetPatchReplica, \
-    k8sDeploymentsPatchAnnotation, k8sDeploymentsPatchReplica, k8sDaemonsetPatch
-
-from lib.k8s.node import k8sNodesListGet, k8sNodeGet
-from lib.k8s.metrics import k8sGetClusterMetric, k8sGetNodeMetric
-
 from lib.helper_functions import get_logger
+from lib.k8s.metrics import k8sGetClusterMetric, k8sGetNodeMetric
+from lib.k8s.namespace import (k8sNamespaceCreate, k8sNamespaceDelete,
+                               k8sNamespacesGet)
+from lib.k8s.node import k8sNodeGet, k8sNodesListGet
+from lib.k8s.workload import (k8sDaemonsetPatch, k8sDeploymentsPatchAnnotation,
+                              k8sDeploymentsPatchReplica,
+                              k8sStatefulSetPatchAnnotation,
+                              k8sStatefulSetPatchReplica, k8sWorkloadList)
+from lib.sso import get_user_token
 
 ##############################################################
 ## Helpers

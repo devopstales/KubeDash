@@ -1,16 +1,20 @@
 #!/usr/bin/env python3
 
+import logging
+import os
+import sys
+
 from flask import Flask, render_template, request
-import sys, logging, os
+
+from opentelemetry.instrumentation.flask import FlaskInstrumentor
+from opentelemetry.instrumentation.logging import LoggingInstrumentor
+from opentelemetry.instrumentation.requests import RequestsInstrumentor
+from opentelemetry.instrumentation.sqlalchemy import SQLAlchemyInstrumentor
 
 from lib.components import db, sess, login_manager, csrf, socketio, api_doc
+from lib.components import csrf, db, login_manager, sess, socketio
 from lib.helper_functions import bool_var_test, get_logger
 from lib.k8s.server import k8sGetClusterStatus
-
-from opentelemetry.instrumentation.logging import LoggingInstrumentor
-from opentelemetry.instrumentation.flask import FlaskInstrumentor
-from opentelemetry.instrumentation.requests import RequestsInstrumentor
-from opentelemetry.instrumentation.sqlalchemy import SQLAlchemyInstrumentor 
 
 separator_long = "###################################################################################"
 separator_short = "#######################################"
@@ -24,8 +28,8 @@ def initialize_app_logging(app: Flask):
     Args:
         app (Flask): Flask app object
     """
-    from lib.logfilters import NoMetrics, NoHealth, NoPing,  \
-        NoSocketIoGet, NoSocketIoPost 
+    from lib.logfilters import (NoHealth, NoMetrics, NoPing, NoSocketIoGet,
+                                NoSocketIoPost) 
     
     logger = get_logger()
     
@@ -85,8 +89,9 @@ def initialize_app_confifuration(app: Flask, external_config_name: str) -> bool:
 
     if os.path.isfile("kubedash.ini"):
         app.logger.info("Reading Config file")
-        from lib.config import app_config 
         import configparser
+
+        from lib.config import app_config
 
         config_ini = configparser.ConfigParser()
         config_ini.sections()
@@ -206,9 +211,11 @@ def initialize_app_database(app: Flask, filename: str):
     app.logger.info(separator_short)
 
     """Init DB"""
-    import flask_migrate 
-    from sqlalchemy_utils import database_exists 
-    from lib.init_functions import init_db_test, db_init_roles, oidc_init, k8s_config_int, k8s_roles_init 
+    import flask_migrate
+    from sqlalchemy_utils import database_exists
+
+    from lib.init_functions import (db_init_roles, init_db_test,
+                                    k8s_config_int, k8s_roles_init, oidc_init) 
 
     migrate = flask_migrate.Migrate(app, db)
     db.init_app(app)
@@ -245,21 +252,18 @@ def initialize_app_swagger(app: Flask):
 def initialize_blueprints(app: Flask):
     """Initialize blueprints"""
     from blueprint.api import api
-    from blueprint.metrics import metrics
-    
     from blueprint.auth import auth
-    from blueprint.settings import sso
-    
-    from blueprint.dashboard import dashboard
-    from blueprint.user import users
-    from blueprint.cluster_permission import cluster_permission
     from blueprint.cluster import cluster
-    from blueprint.workload import workload
+    from blueprint.cluster_permission import cluster_permission
+    from blueprint.dashboard import dashboard
+    from blueprint.metrics import metrics
     from blueprint.network import network
-    from blueprint.storage import storage
-    from blueprint.security import security
     from blueprint.other_resources import other_resources
-    from blueprint.settings import settings
+    from blueprint.security import security
+    from blueprint.settings import settings, sso
+    from blueprint.storage import storage
+    from blueprint.user import users
+    from blueprint.workload import workload
     
 
     app.logger.info("Initialize blueprints")

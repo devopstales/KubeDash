@@ -1,14 +1,13 @@
-from flask import Blueprint, render_template, session, flash, request
+from flask import Blueprint, flash, render_template, request, session
 from flask_login import login_required
+from opentelemetry import trace
 from werkzeug.security import check_password_hash
 
-from opentelemetry import trace
-
 from lib.helper_functions import get_logger
-from lib.user import User
-from lib.sso import get_user_token
-from lib.k8s.namespace import k8sNamespaceListGet
 from lib.k8s.metrics import k8sGetClusterMetric, k8sGetPodMap
+from lib.k8s.namespace import k8sNamespaceListGet
+from lib.sso import get_user_token
+from lib.user import User
 
 ##############################################################
 ## Helpers

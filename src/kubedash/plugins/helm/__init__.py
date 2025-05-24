@@ -1,11 +1,12 @@
 #!/usr/bin/env python3
 
-from flask import Blueprint, request, session,render_template, redirect, url_for
+from flask import (Blueprint, redirect, render_template, request, session,
+                   url_for)
 from flask_login import login_required
 
-from lib.sso import get_user_token
-from lib.k8s.namespace import k8sNamespaceListGet
 from lib.helper_functions import get_logger
+from lib.k8s.namespace import k8sNamespaceListGet
+from lib.sso import get_user_token
 
 from .functions import k8sHelmChartListGet
 

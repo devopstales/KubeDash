@@ -1,13 +1,15 @@
-import socket, os
+import os
+import socket
 from urllib.parse import urlparse
 
-from lib.helper_functions import get_logger
-
 from opentelemetry import trace
+from opentelemetry.exporter.otlp.proto.http.trace_exporter import \
+    OTLPSpanExporter
 from opentelemetry.sdk.resources import Resource
 from opentelemetry.sdk.trace import TracerProvider
 from opentelemetry.sdk.trace.export import BatchSpanProcessor
-from opentelemetry.exporter.otlp.proto.http.trace_exporter import OTLPSpanExporter
+
+from lib.helper_functions import get_logger
 
 ##############################################################
 ## Helpers

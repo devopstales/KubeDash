@@ -1,5 +1,6 @@
 import responses
 
+
 def test_home(client):
     response = client.get("/")
     assert b"<title>KubeDash - Login</title>" in response.data

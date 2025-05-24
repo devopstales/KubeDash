@@ -1,11 +1,13 @@
-from flask import Blueprint, render_template, session, request, redirect, url_for
+from flask import (Blueprint, redirect, render_template, request, session,
+                   url_for)
 from flask_login import login_required
 
-from lib.sso import get_user_token
 from lib.helper_functions import get_logger
-from lib.k8s.namespace import k8sNamespaceListGet 
-from lib.k8s.security import k8sSaListGet, k8sRoleListGet, k8sRoleBindingListGet, \
-    k8sClusterRoleListGet, k8sClusterRoleBindingListGet
+from lib.k8s.namespace import k8sNamespaceListGet
+from lib.k8s.security import (k8sClusterRoleBindingListGet,
+                              k8sClusterRoleListGet, k8sRoleBindingListGet,
+                              k8sRoleListGet, k8sSaListGet)
+from lib.sso import get_user_token
 
 ##############################################################
 ## Helpers

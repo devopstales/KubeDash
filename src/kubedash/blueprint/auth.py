@@ -1,15 +1,15 @@
 import requests
-from flask import Blueprint, render_template, session, flash, redirect, url_for, request
-from flask_login import login_user, login_required, logout_user
-from werkzeug.security import check_password_hash
+from flask import (Blueprint, flash, redirect, render_template, request,
+                   session, url_for)
+from flask_login import login_required, login_user, logout_user
 from itsdangerous import base64_decode
-
 from opentelemetry import trace
+from werkzeug.security import check_password_hash
 
 from lib.helper_functions import get_logger
-from lib.sso import SSOSererGet, get_auth_server_info
-from lib.user import User, UsersRoles, Role, KubectlConfig, SSOTokenGet
 from lib.k8s.server import k8sServerConfigGet
+from lib.sso import SSOSererGet, get_auth_server_info
+from lib.user import KubectlConfig, Role, SSOTokenGet, User, UsersRoles
 
 ##############################################################
 ## Helpers

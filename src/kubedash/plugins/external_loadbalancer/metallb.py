@@ -1,7 +1,7 @@
 from logging import getLogger
 
-from kubernetes.client.rest import ApiException
 import kubernetes.client as k8s_client
+from kubernetes.client.rest import ApiException
 
 from lib.helper_functions import ErrorHandler
 from lib.k8s.server import k8sClientConfigGet

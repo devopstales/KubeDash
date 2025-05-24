@@ -2,6 +2,7 @@ from flask_login import UserMixin
 
 from lib.components import db
 
+
 ##############################################################
 ## Database Models
 ##############################################################

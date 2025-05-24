@@ -1,6 +1,7 @@
 services:
 
   jaeger:
+    container_name: kubedash-jaeger
     image: jaegertracing/all-in-one:latest
     ports:
       - "16686:16686"  # jaeger-query: UI

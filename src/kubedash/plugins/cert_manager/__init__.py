@@ -1,15 +1,17 @@
 #!/usr/bin/env python3
 
-from flask import Blueprint, render_template, request, session, redirect, url_for
+import ast
+
+from flask import (Blueprint, redirect, render_template, request, session,
+                   url_for)
 from flask_login import login_required
 
 from lib.helper_functions import get_logger
+from lib.k8s.namespace import k8sNamespaceListGet
 from lib.sso import get_user_token
 
-from .functions import IssuerGet, ClusterIssuerGet, CertificateRequestsGet, CertificatesGet
-
-from lib.k8s.namespace import k8sNamespaceListGet
-import ast
+from .functions import (CertificateRequestsGet, CertificatesGet,
+                        ClusterIssuerGet, IssuerGet)
 
 ##############################################################
 ## variables

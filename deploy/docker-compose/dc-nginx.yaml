@@ -1,5 +1,6 @@
 services:
   nginx:
+    container_name: kubedash-proxy
     image: nginx:latest
     restart: always
     ports:

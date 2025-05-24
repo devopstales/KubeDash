@@ -1,8 +1,7 @@
 from flask import Blueprint
+from prometheus_client import generate_latest
 
 from lib.helper_functions import get_logger
-
-from prometheus_client import generate_latest
 
 ##############################################################
 ## Helpers

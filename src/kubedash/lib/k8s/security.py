@@ -1,13 +1,12 @@
 from flask import flash
-
 from kubernetes import client as k8s_client
 from kubernetes.client.rest import ApiException
 
 from lib.helper_functions import ErrorHandler, email_check, trimAnnotations
 
 from . import logger
-from .server import k8sClientConfigGet
 from .namespace import k8sNamespaceListGet
+from .server import k8sClientConfigGet
 
 ################################
 # Pod Vulnerability Assessment #

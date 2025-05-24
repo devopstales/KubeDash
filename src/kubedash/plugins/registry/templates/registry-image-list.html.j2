@@ -6,14 +6,54 @@
       <nav aria-label="breadcrumb">
         <ol class="breadcrumb my-0">
           <li class="breadcrumb-item"><span>Plugins</span></li>
-          <li class="breadcrumb-item active"><span>Registry</span></li>
+          <li class="breadcrumb-item"><a href="/plugins/registry">Registry</a></li>
           <li class="breadcrumb-item active"><span>Images</span></li>
         </ol>
       </nav>
     </div>
 </ul>
+<ul class="header-nav ms-auto"></ul>
+<ul class="header-nav d-lg-flex">
 {% include "segments/topmenu.html.j2" %}
 {% endblock %}
 
 {% block content %}
+<div class="card shadow mb-4">
+    <div class="card-header py-3">
+        <h6 class="m-0 font-weight-bold text-primary">Image List</h6>
+    </div>
+    <div class="card-body">
+        <div class="table-responsive">
+            <table class="table table-bordered" id="dataTable" width="100%" cellspacing="0">
+                <thead>
+                    <tr>
+                      <th>Image</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    {% for image in image_list %}
+                    {% if selected == image.name %}
+                      <tr class="selected" >
+                    {% else %}
+                      <tr>
+                    {% endif %}
+                        <td>
+                          <form action="/image/tags" method="POST">
+                            <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+                            <input type="hidden" name="image_name" value="{{ image }}" />
+                            <a href="javascript:;" onclick="parentNode.submit();">{{ image }}</a>
+                          </form>
+                        </td>
+                    </tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+
+        </div>
+    </div>
+</div>
+{% endblock %}
+
+{% block add_head_css %}
+{% include "segments/datatable_snipet.html.j2" %}
 {% endblock %}

@@ -1,14 +1,12 @@
 
 from flask import flash
-
 from kubernetes import client as k8s_client
 from kubernetes.client.rest import ApiException
-
 from opentelemetry.trace.status import Status, StatusCode
 
 from lib.helper_functions import ErrorHandler, trimAnnotations
 
-from . import tracer, logger
+from . import logger, tracer
 from .server import k8sClientConfigGet
 
 ##############################################################
