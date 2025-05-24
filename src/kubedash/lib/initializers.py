@@ -11,8 +11,8 @@ from opentelemetry.instrumentation.logging import LoggingInstrumentor
 from opentelemetry.instrumentation.requests import RequestsInstrumentor
 from opentelemetry.instrumentation.sqlalchemy import SQLAlchemyInstrumentor
 
-from lib.components import db, sess, login_manager, csrf, socketio, api_doc
-from lib.components import csrf, db, login_manager, sess, socketio
+from lib.components import csrf, db, migrate, login_manager, socketio, sess, api_doc
+from lib.init_functions import get_database_url
 from lib.helper_functions import bool_var_test, get_logger
 from lib.k8s.server import k8sGetClusterStatus
 
@@ -86,6 +86,7 @@ def initialize_app_confifuration(app: Flask, external_config_name: str) -> bool:
     """
 
     global jaeger_enable
+    global redis_enable
 
     if os.path.isfile("kubedash.ini"):
         app.logger.info("Reading Config file")
@@ -112,6 +113,7 @@ def initialize_app_confifuration(app: Flask, external_config_name: str) -> bool:
         #print(app.config['kubedash.ini'].sections())
         #print(app.config['kubedash.ini'].items('monitoring'))
         jaeger_enable = bool_var_test(app.config['kubedash.ini'].get('monitoring', 'jaeger_enabled'))
+        redis_enable = bool_var_test(app.config['kubedash.ini'].get('remote_cache', 'redis_enabled'))
         
         return False
     else:
@@ -164,6 +166,7 @@ def initialize_app_version(app: Flask):
     print(separator_long)
     app.logger.info("Running in %s mode" % app.config['ENV'])
 
+
 def initialize_app_database(app: Flask, filename: str):
     """Initialize the database
 
@@ -171,65 +174,46 @@ def initialize_app_database(app: Flask, filename: str):
         app (Flask): Flask app object
         filename (str): Name of the main file to find the database file
     """
-    app.logger.info("Initialize Database")
-
-    database_type = app.config['kubedash.ini'].get('database', 'type', fallback=None)
-    if database_type == 'postgres':
-        EXTERNAL_DATABASE_ENABLED = True
-    else:
-        EXTERNAL_DATABASE_ENABLED = False
+    app.logger.info("Initialize Database:")
     
-    if EXTERNAL_DATABASE_ENABLED:
-        SQLALCHEMY_DATABASE_HOST     = app.config['kubedash.ini'].get('database', 'host', fallback='localhost')
-        SQLALCHEMY_DATABASE_DB       = app.config['kubedash.ini'].get('database', 'name', fallback='kubedash')
-        SQLALCHEMY_DATABASE_USER     = app.config['kubedash.ini'].get('database', 'user', fallback='kubedash')
-        SQLALCHEMY_DATABASE_PASSWORD = app.config['kubedash.ini'].get('database', 'password', fallback=None)
-
+    """Get Database Configuration"""
+    app.logger.info("   Get Database Configuration")
     app.config['SESSION_SQLALCHEMY'] = db
-
-    # Fix: https://github.com/pallets-eco/flask-session/issues?q=is%3Aissue+%27Already+defined+in+this+MetaData+Instance%27
-    db.metadata.clear()
-
-    """Database mode"""
-    if app.config['ENV'] == 'testing':
-        basedir = os.path.abspath(os.path.dirname(filename))
-        SQLALCHEMY_DATABASE_URI = "sqlite:///"+basedir+"/database/"+ app.config['ENV'] +".db"
-    elif EXTERNAL_DATABASE_ENABLED and SQLALCHEMY_DATABASE_USER and SQLALCHEMY_DATABASE_PASSWORD and SQLALCHEMY_DATABASE_HOST and SQLALCHEMY_DATABASE_DB:
-        SQLALCHEMY_DATABASE_URI = "postgresql://%s:%s@%s/%s" % \
-            (SQLALCHEMY_DATABASE_USER, SQLALCHEMY_DATABASE_PASSWORD, SQLALCHEMY_DATABASE_HOST, SQLALCHEMY_DATABASE_DB)
-    else:
-        basedir = os.path.abspath(os.path.dirname(filename))
-        SQLALCHEMY_DATABASE_URI = "sqlite:///"+basedir+"/database/"+ app.config['ENV'] +".db"
+    app.config['SQLALCHEMY_DATABASE_URI'] = get_database_url(app, filename)
     
-    app.config['SQLALCHEMY_DATABASE_URI'] = SQLALCHEMY_DATABASE_URI
-
-    """Plugin Logging"""
-    app.logger.info("Initialize Database")
-    app.logger.info(separator_short)
-    app.logger.info(" Starting Database:")
-    app.logger.info("	Type:	%s" % database_type)
-    app.logger.info(separator_short)
-
-    """Init DB"""
-    import flask_migrate
-    from sqlalchemy_utils import database_exists
-
-    from lib.init_functions import (db_init_roles, init_db_test,
-                                    k8s_config_int, k8s_roles_init, oidc_init) 
-
-    migrate = flask_migrate.Migrate(app, db)
+    """Initialize SQLAlchemy"""
+    app.logger.info("   Initialize SQLAlchemy")
     db.init_app(app)
-    if database_exists(SQLALCHEMY_DATABASE_URI):
-        with app.app_context():
-            if init_db_test(SQLALCHEMY_DATABASE_URI, EXTERNAL_DATABASE_ENABLED, database_type):
-                SQLAlchemyInstrumentor().instrument(engine=db.engine)
-                db_init_roles(app.config['kubedash.ini'])
+    migrate.init_app(app, db)
+    
+    """Import External Database Models"""
+    app.logger.info("   Import External Database Models")
+    from plugins.registry import model
+    
+    from lib.init_functions import (
+        db_init_roles, init_db_test,
+        k8s_config_int, k8s_roles_init, oidc_init
+    ) 
+
+    with app.app_context():
+        """Initialize session"""
+        sess.init_app(app)
+         
+        """Create Tables"""
+        app.logger.info("   Create Tables")
+        app.logger.debug(f"Registered models: {db.metadata.tables.keys()}")  # Debugging output
+        #db.create_all()
+        
+        if init_db_test(app):
+            SQLAlchemyInstrumentor().instrument(engine=db.engine)
+            db_init_roles(app.config['kubedash.ini'])
+            
+            """Add Contant to Tables"""
+            app.logger.info("   Add Contant to Tables")
             if sys.argv[1] != 'cli' and sys.argv[1] != 'db':
-                #print("|"+sys.argv[1]+"|") # debug
                 oidc_init(app.config['kubedash.ini'])
                 k8s_config_int(app.config['kubedash.ini'])
-                status = k8sGetClusterStatus()
-                if status:
+                if k8sGetClusterStatus():
                     k8s_roles_init()
                     
 def initialize_app_swagger(app: Flask):
@@ -376,11 +360,9 @@ def add_custom_jinja2_filters(app: Flask):
     app.add_template_filter(j2_b64encode)
     app.add_template_filter(split_uppercase)
 
-def initialize_app_session_and_socket(app: Flask):
-    """Initialize session and socketIO"""
-    app.logger.info("Initialize Session and SocketIO")
-
-    sess.init_app(app)
+def initialize_app_socket(app: Flask):
+    """Initialize socketIO"""
+    app.logger.info("Initialize SocketIO")
     socketio.init_app(app)
 
 def initialize_app_security(app: Flask):

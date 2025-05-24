@@ -2,7 +2,7 @@
 from kubernetes import client as k8s_client
 from kubernetes.client.rest import ApiException
 
-from lib.helper_functions import ErrorHandler
+from lib.helper_functions import ErrorHandler, trimAnnotations
 
 from . import logger
 from .server import k8sClientConfigGet

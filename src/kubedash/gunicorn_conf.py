@@ -12,6 +12,7 @@ accesslog = "-"  # stdout
 access_log_format = '%(h)s %(l)s %(u)s %(t)s "%(r)s" %(s)s %(b)s "%(f)s" "%(a)s"'
 worker_tmp_dir = "/tmp/kubedash"
 workers = 1
+threads = 4
 graceful_timeout = 120
 timeout = 120
 keepalive = 5

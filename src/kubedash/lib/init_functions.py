@@ -1,6 +1,8 @@
 
 import configparser
 import os
+import string
+from flask import Flask
 
 from itsdangerous import base64_encode
 from sqlalchemy import create_engine, inspect
@@ -32,6 +34,47 @@ logger = get_logger()
 ## Helper Functions
 ##############################################################
 
+def get_database_url(app: Flask, filename: string) -> string:
+    """Get the database URL from the configuration
+    
+    Args:
+        app (Flask): Flask app object
+        filename (str): Name of the main file to find the configuration file
+    
+    Returns:
+        SQLALCHEMY_DATABASE_URI (str): Database URL
+    """
+    
+    """Get database Type"""
+    database_type = app.config['kubedash.ini'].get('database', 'type', fallback=None)
+    if database_type == 'postgres':
+        EXTERNAL_DATABASE_ENABLED = True
+    else:
+        EXTERNAL_DATABASE_ENABLED = False
+        
+    """Set Postgresql Variables"""
+    if EXTERNAL_DATABASE_ENABLED:
+        SQLALCHEMY_DATABASE_HOST     = app.config['kubedash.ini'].get('database', 'host', fallback=None)
+        SQLALCHEMY_DATABASE_DB       = app.config['kubedash.ini'].get('database', 'name', fallback=None)
+        SQLALCHEMY_DATABASE_USER     = app.config['kubedash.ini'].get('database', 'user', fallback=None)
+        SQLALCHEMY_DATABASE_PASSWORD = app.config['kubedash.ini'].get('database', 'password', fallback=None)
+        
+    """Create Database URL"""
+    basedir = os.path.abspath(os.path.dirname(filename))
+    if app.config['ENV'] == 'testing':
+        SQLALCHEMY_DATABASE_URI = "sqlite:///"+basedir+"/database/"+ app.config['ENV'] +".db"
+    elif EXTERNAL_DATABASE_ENABLED and SQLALCHEMY_DATABASE_USER and SQLALCHEMY_DATABASE_PASSWORD and SQLALCHEMY_DATABASE_HOST and SQLALCHEMY_DATABASE_DB:
+        SQLALCHEMY_DATABASE_URI = "postgresql://%s:%s@%s/%s" % \
+            (SQLALCHEMY_DATABASE_USER, SQLALCHEMY_DATABASE_PASSWORD, SQLALCHEMY_DATABASE_HOST, SQLALCHEMY_DATABASE_DB)
+    else:
+        SQLALCHEMY_DATABASE_URI = "sqlite:///"+basedir+"/database/"+ app.config['ENV'] +".db"
+        
+    return SQLALCHEMY_DATABASE_URI
+
+##############################################################
+## Init Functions
+##############################################################
+
 def db_init_roles(config: configparser.ConfigParser):
     """Create Roles and Users in the database
     
@@ -58,7 +101,7 @@ def connect_database() -> bool:
     except Exception:
         return False
 
-def init_db_test(SQLALCHEMY_DATABASE_URI, EXTERNAL_DATABASE_ENABLED, DATABASE_TYPE) -> bool:
+def init_db_test(app) -> bool:
     """Initialize the database with basic data for testing, and add results to prometheus endpoint
     
     Args:
@@ -69,12 +112,19 @@ def init_db_test(SQLALCHEMY_DATABASE_URI, EXTERNAL_DATABASE_ENABLED, DATABASE_TY
     Returns:
         bool: A flag indicating if the database initialization was successful
     """
+    SQLALCHEMY_DATABASE_URI = app.config['SQLALCHEMY_DATABASE_URI']
+    database_type = app.config['kubedash.ini'].get('database', 'type', fallback=None)
+    if database_type == 'postgres':
+        EXTERNAL_DATABASE_ENABLED = True
+    else:
+        EXTERNAL_DATABASE_ENABLED = False
+    
     engine = create_engine(SQLALCHEMY_DATABASE_URI)
     if inspect(engine).has_table("alembic_version"):
-        METRIC_DB_CONNECTION.labels(EXTERNAL_DATABASE_ENABLED, DATABASE_TYPE).set(1.0)
+        METRIC_DB_CONNECTION.labels(EXTERNAL_DATABASE_ENABLED, database_type).set(1.0)
         return True
     else:
-        METRIC_DB_CONNECTION.labels(EXTERNAL_DATABASE_ENABLED, DATABASE_TYPE).set(0.0)
+        METRIC_DB_CONNECTION.labels(EXTERNAL_DATABASE_ENABLED, database_type).set(0.0)
         return False
     
 def oidc_init(config: configparser.ConfigParser):

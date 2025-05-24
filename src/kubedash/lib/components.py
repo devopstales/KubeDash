@@ -3,6 +3,7 @@ from flask_session import Session
 from flask_socketio import SocketIO
 from flask_smorest import Api
 from flask_sqlalchemy import SQLAlchemy
+from flask_migrate import Migrate
 from flask_wtf.csrf import CSRFProtect
 
 from lib.helper_functions import get_logger
@@ -20,6 +21,7 @@ logger = get_logger()
 login_manager = LoginManager()
 login_manager.login_message_category = "warning"
 db = SQLAlchemy()
+migrate = Migrate()
 sess = Session()
 csrf = CSRFProtect()
 socketio = SocketIO()

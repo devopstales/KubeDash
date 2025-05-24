@@ -1,6 +1,5 @@
 import time
 
-
 class cache_request_with_timeout:
     """
     A decorator that caches the result of a function for a specified timeout.
@@ -26,3 +25,4 @@ class cache_request_with_timeout:
 
             return result
         return decorator
+    

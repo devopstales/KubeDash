@@ -38,7 +38,7 @@
           <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
           <input type="hidden" name="po_name" value="{{ po_name }}">
           <div class="input-group">
-              <select name= "container_select" class="form-select" id="containers" aria-label="Select Container">
+              <select name="container_select" class="form-select" id="containers" aria-label="Select Container">
                 {% for container in pod_init_containers %}
                 {% if container == container_select %}
                 <option value="{{ container }}" selected>{{ container }}</option>

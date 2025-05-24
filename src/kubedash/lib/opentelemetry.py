@@ -51,3 +51,5 @@ def init_opentelemetry_exporter(jaeger_base_url: str):
         logger.info("Jaeger connection established")
     else:
         logger.error("Cannot Connect to Jaeger %s" % endpoint)
+        
+    sock.close()

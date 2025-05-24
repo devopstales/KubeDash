@@ -51,7 +51,7 @@
                     {% endif %}
                         </td>
                         <td>
-                          <form action="/cluster/nodes/data" method="POST">
+                          <form action="/cluster/node/data" method="POST">
                             <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
                             <input type="hidden" name="no_name" value="{{ no.name }}" />
                             <a href="javascript:;" onclick="parentNode.submit();">{{ no.name }}</a>

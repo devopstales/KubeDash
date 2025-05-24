@@ -62,6 +62,7 @@ flask-smorest = "^0.46.1"
 h11 = "0.16.0"
 swagger-ui-bundle = "^1.1.0"
 flask-caching = "^2.3.1"
+plotly = "^6.0.0"
 
 
 [tool.poetry.group.dev.dependencies]

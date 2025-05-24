@@ -11,6 +11,18 @@ tasks:
     cmds:
       - "task --list-all"
 
+  docker-up:
+    desc: "Start dev containers"
+    dir: 'deploy/docker-compose'
+    cmds:
+      - docker compose -f dc-nginx.yaml -f dc-postgresql.yaml up -d
+
+  docker-down:
+    desc: "Stop dev containers"
+    dir: 'deploy/docker-compose'
+    cmds:
+      - docker compose -f dc-nginx.yaml -f dc-postgresql.yaml down
+
   kubedash-requirements:
     desc: "Generate Kubedash requirements"
     dir: 'src/kubedash'

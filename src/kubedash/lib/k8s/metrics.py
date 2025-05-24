@@ -130,6 +130,7 @@ def k8sGetClusterMetric():
                     },
                     "pod_count": {
                         "current": tmpPodCount,
+                        "currentPercent": calcPercent(tmpPodCount, totalPodAllocatable, True),
                         "allocatable": totalPodAllocatable,
                     },
                 })
@@ -169,6 +170,7 @@ def k8sGetClusterMetric():
                     },
                     "pod_count": {
                         "current": tmpTotalPodCount,
+                        "currentPercent": calcPercent(tmpTotalPodCount, totalTotalPodAllocatable, True),
                         "allocatable": totalTotalPodAllocatable,
                     },
             }
@@ -251,6 +253,7 @@ def k8sGetNodeMetric(node_name):
                     },
                     "pod_count": {
                         "current": tmpPodCount,
+                        "currentPercent": calcPercent(tmpPodCount, totalPodAllocatable, True),
                         "allocatable": totalPodAllocatable,
                     },
                 }
@@ -334,3 +337,90 @@ def k8sGetPodMap(username_role, user_token, namespace):
     edges = net.get_network_data()[1]
 
     return nodes, edges
+
+################################################################
+# New Metric Scraper functions
+################################################################
+"""
+# every sec 
+# last 11
+
+name	cl06-m101
+cpu	    478
+memory	10025209856
+storage	0
+time	2025-03-05 12:24:46
+
+'cl06-m101', 0.286842451, 9529667584.0, 0, '2025-03-08 16:39:50.105399'
+
+name	    atlassian-jira-tst-0
+namespace	atlassian-jira
+container	jira
+cpu	        41
+memory	    7323451392
+storage	    0
+time	    2025-03-05 12:24:46
+"""
+
+def getNodeMetrics():
+    """Function to get node metrics from K8S API.
+
+    Returns:
+        NODE_METRICS (list)): list of node metrics
+    """
+    k8sClientConfigGet('Admin', None)
+    NODE_METRICS = list()
+    node_metric = {
+        "name": "",
+        "cpu": "",
+        "memory": "",
+        "storage": "",
+    }
+    
+    try:
+        k8s_nodes = k8s_client.CustomObjectsApi().list_cluster_custom_object("metrics.k8s.io", "v1beta1", "nodes", _request_timeout=5)
+        for node in k8s_nodes['items']:
+            node_metric['name']    = node['metadata']['name']
+            node_metric['cpu']     = float(parse_quantity(node['usage']['cpu']))
+            node_metric['memory']  = float(parse_quantity(node['usage']['memory']))
+            node_metric['storage'] = 0
+            NODE_METRICS.append(node_metric.copy())
+            
+    except Exception as error:
+        NODE_METRICS = None
+        #flash("Metrics Server is not installed. If you want to see usage date please install Metrics Server.", "warning")
+    
+    return NODE_METRICS
+
+def getPodMetrics():
+    """Function to get pod metrics from K8S API.
+
+    Returns:
+        POD_METRICS (list): list of pod metrics
+    """
+    k8sClientConfigGet('Admin', None)
+    POD_METRICS = list()
+    pod_metric = {
+        "name": "",
+        "namespace": "",
+        "container": "",
+        "cpu": "",
+        "memory": "",
+        "storage": "",
+    }
+    try:
+        k8s_pods = k8s_client.CustomObjectsApi().list_cluster_custom_object("metrics.k8s.io", "v1beta1", "pods", _request_timeout=5)
+        for pod in k8s_pods['items']:
+            for container in pod['containers']:
+                pod_metric['name']      = pod['metadata']['name']
+                pod_metric['namespace'] = pod['metadata']['namespace']
+                pod_metric['container'] = container['name']
+                pod_metric['cpu']       = float(parse_quantity(container['usage']['cpu']))
+                pod_metric['memory']    = float(parse_quantity(container['usage']['memory']))
+                pod_metric['storage']   = 0
+                POD_METRICS.append(pod_metric.copy()) 
+    except Exception as error:
+        POD_METRICS = None
+        #flash("Metrics Server is not installed. If you want to see usage date please install Metrics Server.", "warning")
+    
+    return POD_METRICS

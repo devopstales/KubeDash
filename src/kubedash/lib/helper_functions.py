@@ -19,6 +19,66 @@ tracer = trace.get_tracer(__name__)
 ##############################################################
 ## Helper Functions
 ##############################################################
+import threading
+
+class ThreadedTicker:
+    def __init__(self, interval_sec, func, *args, **kwargs):
+        """
+        :param interval_sec: How often to run the function (in seconds)
+        :param func: The function to call repeatedly
+        :param args: Positional arguments for the function
+        :param kwargs: Keyword arguments for the function
+        """
+        self.interval = interval_sec
+        self.func = func
+        self.args = args
+        self.kwargs = kwargs
+        self._stop_event = threading.Event()
+        self._thread = threading.Thread(target=self._run, daemon=True)
+
+        # Setup logger for ThreadedTicker
+        self.logger = logging.getLogger(self.__class__.__name__)
+        self.logger.setLevel(logging.DEBUG)
+
+        # Create console handler (optional: add file handler too)
+        ch = logging.StreamHandler()
+        ch.setLevel(logging.DEBUG)
+
+        # Create formatter and add to handler
+        formatter = logging.Formatter(
+            '[%(asctime)s] [%(name)s] [%(levelname)s] %(message)s'
+        )
+        ch.setFormatter(formatter)
+
+        # Add handler to logger (if not already added)
+        if not self.logger.hasHandlers():
+            self.logger.addHandler(ch)
+
+    def start(self):
+        """Start the ticker in a separate thread."""
+        self.logger.info("Starting ticker...")
+        self._thread.start()
+
+    def stop(self):
+        """Stop the ticker loop."""
+        self.logger.info("Stopping ticker...")
+        self._stop_event.set()
+        self._thread.join()
+
+    def _run(self):
+        """Run the function repeatedly at the given interval."""
+        self.logger.debug("Ticker loop has started.")
+        while not self._stop_event.is_set():
+            try:
+                self.logger.debug("Executing scheduled function.")
+                self.func(*self.args, **self.kwargs)
+            except Exception:
+                # Log exception with traceback
+                self.logger.exception("An error occurred while executing the function:")
+            # Wait until the next tick or until stopped
+            if not self._stop_event.wait(self.interval):
+                continue
+        self.logger.debug("Ticker loop has exited.")
 
 @tracer.start_as_current_span("get_logger")
 def get_logger() -> Logger:

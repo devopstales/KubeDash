@@ -24,13 +24,7 @@
             <div class="col">
                 <div>
 		  {% if node_metrics and node_metrics.cpu %}
-                    <canvas id="cpu"
-                    {% for CPUkey, CPUvalue in node_metrics.cpu.items() %}
-                        {% if 'Percent' in CPUkey %}
-                            {{ CPUkey }}="{{ CPUvalue }}"
-                        {% endif %}
-                    {% endfor %}
-                    width="300" height="300"></canvas>
+                    <canvas id="cpu" width="300" height="300"></canvas>
                 </div>
                 <div>
                 {% for CPUkey, CPUvalue in node_metrics.cpu.items() %}
@@ -44,35 +38,27 @@
             <div class="col">
                 <div>
                   {% if node_metrics and node_metrics.memory %}
-                    <canvas id="ram" 
-                    {% for RAMkey, RAMvalue in node_metrics.memory.items() %}
-                        {% if 'Percent' in RAMkey %}
-                            {{ RAMkey }}="{{ RAMvalue }}"
-                        {% endif %}
-                    {% endfor %}
-                    width="300" height="300"></canvas>
+                    <canvas id="memory" width="300" height="300"></canvas>
                 </div>
                 <div>
-                {% for RAMkey, RAMvalue in node_metrics.memory.items() %}
+                    {% for RAMkey, RAMvalue in node_metrics.memory.items() %}
                      {% if "Percent" not in RAMkey %}
                         {{ RAMkey }}: {{ (RAMvalue / 1024 / 1024 / 1024) |round(1) }} <br>
                      {% endif %}
-                {% endfor %}
+                    {% endfor %}
                   {% endif %}
                 </div>
             </div>
             <div class="col">
                 <div>
                   {% if node_metrics and node_metrics.pod_count %}
-                    <canvas id="pod"
-                    {% for pod_key, pod_value in node_metrics.pod_count.items() %}
-                        {{ pod_key }}="{{ pod_value }}"
-                    {% endfor %}
-                    width="300" height="300"></canvas>
+                    <canvas id="pod" width="300" height="300"></canvas>
                 </div>
                 <div class="mp-10">
                     {% for pod_key, pod_value in node_metrics.pod_count.items() %}
-                        {{ pod_key }}: {{ pod_value }} <br>
+                        {% if "Percent" not in pod_key %}
+                            {{ pod_key }}: {{ pod_value }} <br>
+                        {% endif %}
                     {% endfor %}
                   {% endif %}
                 </div>
@@ -284,191 +270,288 @@
 
 {% block add_tail_js %}
 {% include "segments/chartjs_snipet.html.j2" %}
+{% include "segments/chartjs_snipet.html.j2" %}
+    <script>
+        // Function to detect Bootstrap dark mode
+        function getThemeColor() {
+            return document.documentElement.getAttribute('data-coreui-theme') === 'dark' ? '#ffffffde' : '#252b36f2';
+        }
+        // Listen for theme change and update chart title color
+        const observer = new MutationObserver(() => {
+            const themeColor = getThemeColor();
 
+            CPUChart.options.plugins.title.color = themeColor;
+            CPUChart.options.plugins.legend.labels.color = themeColor;
+            CPUChart.update();
+
+            MemoryChart.options.plugins.title.color = themeColor;
+            MemoryChart.options.plugins.legend.labels.color = themeColor;
+            MemoryChart.update();
+
+            PodChart.options.plugins.title.color = themeColor;
+            PodChart.options.plugins.legend.labels.color = themeColor;
+            PodChart.update();
+        });
+
+        observer.observe(document.documentElement, { attributes: true, attributeFilter: ['data-coreui-theme'] });
+    </script>
     <script>
-        var ctx = document.getElementById('cpu');
-        var usagePercent = ctx.getAttribute('usagePercent');
-        var usagePercentReturn = (100 - usagePercent)
-        if (usagePercentReturn <= 0) {
-            usagePercentReturn = 0
+        var usagePercent = {{ node_metrics.cpu.usagePercent }};
+        var usagePercentFree = (100 - usagePercent)
+        if (usagePercentFree <= 0) {
+            usagePercentFree = 0
         }
-        var requestsPercent = ctx.getAttribute('requestsPercent');
-        var requestsPercentReturn = (100 - requestsPercent)
-        if (requestsPercentReturn <= 0) {
-            requestsPercentReturn = 0
+        var requestsPercent = {{ node_metrics.cpu.requestsPercent }};
+        var requestsPercentFree = (100 - requestsPercent)
+        if (requestsPercentFree <= 0) {
+            requestsPercentFree = 0
         }
-        var limitsPercent = ctx.getAttribute('limitsPercent');
-        var limitsPercentReturn = (100 - limitsPercent)
-        if (limitsPercentReturn <= 0) {
-            limitsPercentReturn = 0
+        var limitsPercent = {{ node_metrics.cpu.limitsPercent }};
+        var limitsPercentFree = (100 - limitsPercent)
+        if (limitsPercentFree <= 0) {
+            limitsPercentFree = 0
         }
-        new Chart(ctx, {
+        const ctx1 = document.getElementById('cpu').getContext('2d');
+        const CPUChart = new Chart(ctx1, {
             type: 'doughnut',
             data: {
                 datasets: [
                     {
-                        backgroundColor: ['#00baa6', '#ededed'],
-                        data: [usagePercent, usagePercentReturn],
-                        borderWidth: [0, 0]
+                        label: 'CPU Usage',
+                        data: [usagePercent, usagePercentFree],
+                        backgroundColor: ['#FF6384', '#36A2EB'],
+                        hoverBackgroundColor: ['#FF4365', '#2496D1']
                     },
                     {
-                        backgroundColor: ['#36A2EB', '#ededed'],
-                        data: [requestsPercent, requestsPercentReturn],
-                        borderWidth: [0, 0]
+                        label: 'CPU Request',
+                        data: [requestsPercent, requestsPercentFree],
+                        backgroundColor: ['#FF9F40', '#4BC0C0'],
+                        hoverBackgroundColor: ['#E68935', '#3AA7A3']
                     },
                     {
-                        backgroundColor: ['#b91d47', '#ededed'],
-                        data: [limitsPercent, limitsPercentReturn],
-                        borderWidth: [0, 0]
+                        label: 'CPU Limit',
+                        data: [limitsPercent, limitsPercentFree],
+                        backgroundColor: ['#FFCD56', '#9966FF'],
+                        hoverBackgroundColor: ['#E6B94D', '#8053CC']
                     }
-                ]
+                ],
+                labels: ['Used', 'Free', 'Requests', 'Not Requested', 'Limits', 'Not Limited']
             },
             options: {
+                responsive: true,
                 maintainAspectRatio: false,
-                cutoutPercentage: 30,
-                tooltips: {
-                    caretPadding: 10,
-                },
-                legend: {
-                    display: true,
-                    position: 'bottom',
-                    labels: {
-                        generateLabels: function() {
-                        return [
-                            {
-                                text: 'usagePercent',
-                                fillStyle: '#00baa6',
-                                strokeStyle: '#ededed'
+                plugins: {
+                    title: {
+                        display: true,
+                        text: 'CPU Allocation (cores)',
+                        font: {
+                            size: 20,
+                            weight: 'bold'
+                        },
+                        color: getThemeColor(),
+                        padding: {
+                            top: 10,
+                            bottom: 20
+                        }
+                    },
+                    legend: {
+                        display: true,
+                        position: 'right',
+                        labels: {
+                            color: getThemeColor(), // Set initial legend text color
+                            usePointStyle: true, // Use circle markers in legend
+                            font: {
+                                size: 14
                             },
-                            {
-                                text: 'requestsPercent',
-                                fillStyle: '#36A2EB',
-                                strokeStyle: '#ededed'
-                            },
-                            {
-                                text: 'limitsPercent',
-                                fillStyle: '#b91d47',
-                                strokeStyle: '#ededed'
+                            generateLabels: function(chart) {
+                                let labels = [];
+                                let datasetIndex = 0;
+
+                                chart.data.datasets.forEach((dataset) => {
+                                    dataset.data.forEach((value, index) => {
+                                        labels.push({
+                                            text: chart.data.labels[datasetIndex * 2 + index],
+                                            fillStyle: dataset.backgroundColor[index],
+                                            strokeStyle: dataset.backgroundColor[index],
+                                            lineWidth: 1,
+                                            fontColor: getThemeColor(), // Dynamically set text color
+                                            hidden: isNaN(value)
+                                        });
+                                    });
+                                    datasetIndex++;
+                                });
+
+                                return labels;
                             }
-                        ];
                         }
                     }
-                },
-                title: {
-                        display: true,
-                        text: 'CPU'
-                },
+                }
             }
         });
     </script>
     <script>
-        var ctx = document.getElementById('ram');
-        var usagePercent = ctx.getAttribute('usagePercent');
-        var usagePercentReturn = (100 - usagePercent)
-        if (usagePercentReturn <= 0) {
-            usagePercentReturn = 0
+        var usagePercent = {{ node_metrics.memory.usagePercent }};
+        var usagePercentFree = (100 - usagePercent)
+        if (usagePercentFree <= 0) {
+            usagePercentFree = 0
         }
-        var requestsPercent = ctx.getAttribute('requestsPercent');
-        var requestsPercentReturn = (100 - requestsPercent)
-        if (requestsPercentReturn <= 0) {
-            requestsPercentReturn = 0
+        var requestsPercent = {{ node_metrics.memory.requestsPercent }};
+        var requestsPercentFree = (100 - requestsPercent)
+        if (requestsPercentFree <= 0) {
+            requestsPercentFree = 0
         }
-        var limitsPercent = ctx.getAttribute('limitsPercent');
-        var limitsPercentReturn = (100 - limitsPercent)
-        if (limitsPercentReturn <= 0) {
-            limitsPercentReturn = 0
+        var limitsPercent = {{ node_metrics.memory.limitsPercent }};
+        var limitsPercentFree = (100 - limitsPercent)
+        if (limitsPercentFree <= 0) {
+            limitsPercentFree = 0
         }
-        new Chart(ctx, {
+        const ctx2 = document.getElementById('memory').getContext('2d');
+        const MemoryChart = new Chart(ctx2, {
             type: 'doughnut',
             data: {
                 datasets: [
                     {
-                        backgroundColor: ['#00baa6', '#ededed'],
-                        data: [usagePercent, usagePercentReturn],
-                        borderWidth: [0, 0]
+                        label: 'Memory Usage',
+                        data: [usagePercent, usagePercentFree],
+                        backgroundColor: ['#FF6384', '#36A2EB'],
+                        hoverBackgroundColor: ['#FF4365', '#2496D1']
                     },
                     {
-                        backgroundColor: ['#36A2EB', '#ededed'],
-                        data: [requestsPercent, requestsPercentReturn],
-                        borderWidth: [0, 0]
+                        label: 'Memory Request',
+                        data: [requestsPercent, requestsPercentFree],
+                        backgroundColor: ['#FF9F40', '#4BC0C0'],
+                        hoverBackgroundColor: ['#E68935', '#3AA7A3']
                     },
                     {
-                        backgroundColor: ['#b91d47', '#ededed'],
-                        data: [limitsPercent, limitsPercentReturn],
-                        borderWidth: [0, 0]
+                        label: 'Memory Limit',
+                        data: [limitsPercent, limitsPercentFree],
+                        backgroundColor: ['#FFCD56', '#9966FF'],
+                        hoverBackgroundColor: ['#E6B94D', '#8053CC']
                     }
-                ]
+                ],
+                labels: ['Used', 'Free', 'Requests', 'Not Requested', 'Limits', 'Not Limited']
             },
             options: {
+                responsive: true,
                 maintainAspectRatio: false,
-                cutoutPercentage: 30,
-                tooltips: {
-                    caretPadding: 10,
-                },
-                legend: {
-                    display: true,
-                    position: 'bottom',
-                    labels: {
-                        generateLabels: function() {
-                        return [
-                            {
-                                text: 'usagePercent',
-                                fillStyle: '#00baa6',
-                                strokeStyle: '#ededed'
+                plugins: {
+                    title: {
+                        display: true,
+                        text: 'Memory Allocation (bytes)',
+                        font: {
+                            size: 20,
+                            weight: 'bold'
+                        },
+                        color: getThemeColor(),
+                        padding: {
+                            top: 10,
+                            bottom: 20
+                        }
+                    },
+                    legend: {
+                        display: true,
+                        position: 'right',
+                        labels: {
+                            color: getThemeColor(), // Set initial legend text color
+                            usePointStyle: true, // Use circle markers in legend
+                            font: {
+                                size: 14
                             },
-                            {
-                                text: 'requestsPercent',
-                                fillStyle: '#36A2EB',
-                                strokeStyle: '#ededed'
-                            },
-                            {
-                                text: 'limitsPercent',
-                                fillStyle: '#b91d47',
-                                strokeStyle: '#ededed'
+                            generateLabels: function(chart) {
+                                let labels = [];
+                                let datasetIndex = 0;
+
+                                chart.data.datasets.forEach((dataset) => {
+                                    dataset.data.forEach((value, index) => {
+                                        labels.push({
+                                            text: chart.data.labels[datasetIndex * 2 + index],
+                                            fillStyle: dataset.backgroundColor[index],
+                                            strokeStyle: dataset.backgroundColor[index],
+                                            lineWidth: 1,
+                                            fontColor: getThemeColor(), // Dynamically set text color
+                                            hidden: isNaN(value)
+                                        });
+                                    });
+                                    datasetIndex++;
+                                });
+
+                                return labels;
                             }
-                        ];
                         }
                     }
-                },
-                title: {
-                        display: true,
-                        text: 'CPU'
-                },
+                }
             }
         });
     </script>
     <script>
-        var ctx = document.getElementById('pod');
-        var current = ctx.getAttribute('current');
-        var allocatable = ctx.getAttribute('allocatable');
-        var currentReturn = (allocatable - current)
-        if (currentReturn <= 0) {
-            currentReturn = 0
-        };
-        new Chart(ctx, {
+        var usagePercent = {{ node_metrics.pod_count.currentPercent }};
+        var usagePercentFree = (100 - usagePercent)
+        if (usagePercentFree <= 0) {
+            usagePercentFree = 0
+        }
+        const ctx3 = document.getElementById('pod').getContext('2d');
+        const PodChart = new Chart(ctx3, {
             type: 'doughnut',
             data: {
-                labels: ["Current", "All"],
-                datasets: [{
-                        backgroundColor: ['#00baa6', '#ededed'],
-                        data: [current, currentReturn],
-                        borderWidth: [0, 0]
-                    }]
+                datasets: [
+                    {
+                        label: 'Pod Usage',
+                        data: [usagePercent, usagePercentFree],
+                        backgroundColor: ['#FF6384', '#36A2EB'],
+                        hoverBackgroundColor: ['#FF4365', '#2496D1']
+                    }
+                ],
+                labels: ['Used', 'Free']
             },
             options: {
+                responsive: true,
                 maintainAspectRatio: false,
-                cutoutPercentage: 75,
-                tooltips: {
-                    caretPadding: 10,
-                },
-                legend: {
-                    display: true,
-                    position: 'bottom',
-                },
-                title: {
+                plugins: {
+                    title: {
                         display: true,
-                        text: 'PODS'
-                },
+                        text: 'Pod Allocation',
+                        font: {
+                            size: 20,
+                            weight: 'bold'
+                        },
+                        color: getThemeColor(),
+                        padding: {
+                            top: 10,
+                            bottom: 20
+                        }
+                    },
+                    legend: {
+                        display: true,
+                        position: 'right',
+                        labels: {
+                            color: getThemeColor(), // Set initial legend text color
+                            usePointStyle: true, // Use circle markers in legend
+                            font: {
+                                size: 14
+                            },
+                            generateLabels: function(chart) {
+                                let labels = [];
+                                let datasetIndex = 0;
+
+                                chart.data.datasets.forEach((dataset) => {
+                                    dataset.data.forEach((value, index) => {
+                                        labels.push({
+                                            text: chart.data.labels[datasetIndex * 2 + index],
+                                            fillStyle: dataset.backgroundColor[index],
+                                            strokeStyle: dataset.backgroundColor[index],
+                                            lineWidth: 1,
+                                            fontColor: getThemeColor(), // Dynamically set text color
+                                            hidden: isNaN(value)
+                                        });
+                                    });
+                                    datasetIndex++;
+                                });
+
+                                return labels;
+                            }
+                        }
+                    }
+                }
             }
         });
     </script>
