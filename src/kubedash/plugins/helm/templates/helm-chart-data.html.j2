@@ -6,7 +6,7 @@
       <nav aria-label="breadcrumb">
         <ol class="breadcrumb my-0">
           <li class="breadcrumb-item"><span>Plugins</span></li>
-          <li class="breadcrumb-item"><a href="/workload/charts">Helm Charts</a></li>
+          <li class="breadcrumb-item"><a href="/plugins/helm-chart">Helm Charts</a></li>
           <li class="breadcrumb-item active"><span>{{ chart_name }}</span></li>
         </ol>
       </nav>
@@ -29,21 +29,21 @@
 
         <ul class="nav nav-tabs" id="nav-tab" role="tablist">
             <li class="nav-item">
-                <a class="nav-link active" id="nav-release-tab" data-toggle="tab" href="#nav-release" role="tab" aria-controls="nav-release" aria-selected="true" data-toggle="tab">Release</a>
+                <a class="nav-link active" id="nav-release-tab" data-bs-toggle="tab" href="#nav-release" role="tab" aria-controls="nav-release" aria-selected="true" data-bs-toggle="tab">Release</a>
             </li>
             <li class="nav-item">
-                <a class="nav-link" id="nav-values-tab" data-toggle="tab" href="#nav-values" role="tab" aria-controls="nav-values" aria-selected="false" data-toggle="tab">Values</a>
+                <a class="nav-link" id="nav-values-tab" data-bs-toggle="tab" href="#nav-values" role="tab" aria-controls="nav-values" aria-selected="false" data-bs-toggle="tab">Values</a>
             </li>
             <li class="nav-item">
-                <a class="nav-link" id="nav-manifests-tab" data-toggle="tab" href="#nav-manifests" role="tab" aria-controls="nav-manifests" aria-selected="false" data-toggle="tab">Manifests</a>
+                <a class="nav-link" id="nav-manifests-tab" data-bs-toggle="tab" href="#nav-manifests" role="tab" aria-controls="nav-manifests" aria-selected="false" data-bs-toggle="tab">Manifests</a>
             </li>
             <li class="nav-item">
-                <a class="nav-link" id="nav-resources-tab" data-toggle="tab" href="#nav-resources" role="tab" aria-controls="nav-resources" aria-selected="false" data-toggle="tab">Resources</a>
+                <a class="nav-link" id="nav-resources-tab" data-bs-toggle="tab" href="#nav-resources" role="tab" aria-controls="nav-resources" aria-selected="false" data-bs-toggle="tab">Resources</a>
             </li>
             {#
             {% if rd.dependencies %}
             <li class="nav-item">
-                <a class="nav-link" id="nav-dependencies-tab" data-toggle="tab" href="#nav-dependencies" role="tab" aria-controls="nav-dependencies" aria-selected="false" data-toggle="tab">Dependencies</a>
+                <a class="nav-link" id="nav-dependencies-tab" data-bs-toggle="tab" href="#nav-dependencies" role="tab" aria-controls="nav-dependencies" aria-selected="false" data-bs-toggle="tab">Dependencies</a>
             </li>
             {% endif %}
             #}
@@ -75,9 +75,9 @@
                                 <th>Status:</th>
                                 <td>
                                     {% if rd.status == "deployed" %}
-                                        <span class="badge badge-tag badge-success">{{ rd.status }}</span>
+                                        <span class="badge text-bg-tag text-bg-success">{{ rd.status }}</span>
                                     {% else %}
-                                        <span class="badge badge-tag badge-danger">{{ rd.status }}</span>
+                                        <span class="badge text-bg-tag text-bg-danger">{{ rd.status }}</span>
                                     {% endif %}
                                 </td>
                             </tr>
@@ -150,7 +150,7 @@
                                         <tr>
                                             <td>Deployment</td>
                                             <td>
-                                                <form action="/workload/deployment" method="POST">
+                                                <form action="/workload/deployments" method="POST">
                                                     <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
                                                     <input type="hidden" name="ns_select" value="{{ session['ns_select'] }}" />
                                                     <input type="hidden" name="selected" value="{{ deployment }}" />
@@ -163,7 +163,7 @@
                                         <tr>
                                             <td>Daemonset</td>
                                             <td>
-                                                <form action="/workload/daemonset" method="POST">
+                                                <form action="/workload/daemonsets" method="POST">
                                                     <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
                                                     <input type="hidden" name="ns_select" value="{{ session['ns_select'] }}" />
                                                     <input type="hidden" name="selected" value="{{ daemonset }}" />
@@ -176,7 +176,7 @@
                                         <tr>
                                             <td>Stateful Set</td>
                                             <td>
-                                                <form action="/workload/statefulset" method="POST">
+                                                <form action="/workload/statefulsets" method="POST">
                                                     <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
                                                     <input type="hidden" name="ns_select" value="{{ session['ns_select'] }}" />
                                                     <input type="hidden" name="selected" value="{{ ss }}" />
@@ -297,4 +297,5 @@
 
 {% block add_head_css %}
 {% include "segments/datatable_snipet.html.j2" %}
+{% include "segments/highlight_snipet.html.j2"%}
 {% endblock %}

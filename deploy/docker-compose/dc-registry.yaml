@@ -1,0 +1,10 @@
+services:
+  registry:
+    container_name: kubedash-registry
+    restart: always
+    image: registry
+    ports:
+      - 4000:5000
+    volumes:
+      - ./config/registry-config.yml:/etc/docker/registry/config.yml:ro
+      - /tmp/data:/var/lib/registry:rw

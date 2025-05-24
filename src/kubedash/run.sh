@@ -7,7 +7,7 @@ export DOCKER_COMPOSE_FILES="-f ../../deploy/docker-compose/dc-nginx.yaml"
 
 # App
 #export K8S_CLUSTER_NAME=
-export KUBEDASH_VERSION="3.1"
+export KUBEDASH_VERSION="4.0"
 export FLASK_APP="kubedash"
 export FLASK_DEBUG=1
 export TEMPLATES_AUTO_RELOAD=1

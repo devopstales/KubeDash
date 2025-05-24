@@ -1,0 +1,18 @@
+{
+    "list": [
+        {
+            "name": "cluster",
+            "host": "172.17.0.1",
+            "port": 6379,
+            "id": "0",
+            "password": "",
+            "ssh": false,
+            "sshPort": 22,
+            "cluster": false,
+            "sentinel": false,
+            "nodes": []
+        }
+    ],
+    "license": "",
+    "update": "2025-05-17T12:25:15.313Z"
+}

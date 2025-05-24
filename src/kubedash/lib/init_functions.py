@@ -47,6 +47,7 @@ def get_database_url(app: Flask, filename: string) -> string:
     
     """Get database Type"""
     database_type = app.config['kubedash.ini'].get('database', 'type', fallback=None)
+    app.logger.info("   Database Type: %s" % database_type)
     if database_type == 'postgres':
         EXTERNAL_DATABASE_ENABLED = True
     else:
@@ -69,6 +70,7 @@ def get_database_url(app: Flask, filename: string) -> string:
     else:
         SQLALCHEMY_DATABASE_URI = "sqlite:///"+basedir+"/database/"+ app.config['ENV'] +".db"
         
+    app.logger.info("   Database URI: %s" % SQLALCHEMY_DATABASE_URI)
     return SQLALCHEMY_DATABASE_URI
 
 ##############################################################

@@ -73,7 +73,7 @@ If your Registry supports sending webhook notifications in response to events ha
 notifications:
   endpoints:
     - name: kubedash
-      url: https://kubedash.mydomain.intra/registry/events
+      url: https://kubedash.mydomain.intra/plugins/registry/events
       timeout: 1s
       threshold: 5
       backoff: 10s

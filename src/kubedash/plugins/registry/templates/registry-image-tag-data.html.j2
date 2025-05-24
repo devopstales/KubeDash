@@ -27,24 +27,24 @@
     <div class="card-body">
         <ul class="nav nav-tabs" id="nav-tab" role="tablist">
             <li class="nav-item">
-                <a class="nav-link active" id="nav-info-tab" data-toggle="tab" href="#nav-info" role="tab" aria-controls="nav-info" aria-selected="true" data-toggle="tab">Info</a>
+                <a class="nav-link active" id="nav-info-tab" data-bs-toggle="tab" href="#nav-info" role="tab" aria-controls="nav-info" aria-selected="true" data-bs-toggle="tab">Info</a>
             </li>
             <li class="nav-item">
-                <a class="nav-link" id="nav-configuration-tab" data-toggle="tab" href="#nav-configuration" role="tab" aria-controls="nav-configuration" aria-selected="false" data-toggle="tab">Configuration</a>
+                <a class="nav-link" id="nav-configuration-tab" data-bs-toggle="tab" href="#nav-configuration" role="tab" aria-controls="nav-configuration" aria-selected="false" data-bs-toggle="tab">Configuration</a>
             </li>
             {% if tag_data.format == "Docker" or tag_data.media_type == "application/vnd.cncf.helm.config.v1+json" %}
             <li class="nav-item">
-                <a class="nav-link" id="nav-metadata-tab" data-toggle="tab" href="#nav-metadata" role="tab" aria-controls="nav-metadata" aria-selected="false" data-toggle="tab">Metadata</a>
+                <a class="nav-link" id="nav-metadata-tab" data-bs-toggle="tab" href="#nav-metadata" role="tab" aria-controls="nav-metadata" aria-selected="false" data-bs-toggle="tab">Metadata</a>
             </li>
             {% endif %}
             {% if tag_data.vulnerabilities %}
             <li class="nav-item">
-                <a class="nav-link" id="nav-vuln-tab" data-toggle="tab" href="#nav-vuln" role="tab" aria-controls="nav-vuln" aria-selected="false" data-toggle="tab">Vulnerabilities</a>
+                <a class="nav-link" id="nav-vuln-tab" data-bs-toggle="tab" href="#nav-vuln" role="tab" aria-controls="nav-vuln" aria-selected="false" data-bs-toggle="tab">Vulnerabilities</a>
             </li>
             {% endif %}
             {% if tag_events %}
             <li class="nav-item">
-                <a class="nav-link" id="nav-events-tab" data-toggle="tab" href="#nav-events" role="tab" aria-controls="nav-events" aria-selected="false" data-toggle="tab">Events</a>
+                <a class="nav-link" id="nav-events-tab" data-bs-toggle="tab" href="#nav-events" role="tab" aria-controls="nav-events" aria-selected="false" data-bs-toggle="tab">Events</a>
             </li>
             {% endif %}
         </ul>
@@ -344,15 +344,15 @@
                                                 <a href="https://avd.aquasec.com/nvd/{{ v.vulnerabilityID | lower }}" rel="noopener noreferrer" target="_blank">{{ v.vulnerabilityID }}</a>
                                             </td>
                                             {% if v.severity == "CRITICAL" %}
-                                            <td><span class="badge badge-danger">{{ v.severity }}</span></td>
+                                            <td><span class="badge text-bg-danger">{{ v.severity }}</span></td>
                                             {% elif v.severity == "HIGH" %}
-                                            <td><span class="badge badge-warning">{{ v.severity }}</span></td>
+                                            <td><span class="badge text-bg-warning">{{ v.severity }}</span></td>
                                             {% elif v.severity == "MEDIUM" %}
-                                            <td><span class="badge badge-primary">{{ v.severity }}</span></td>
+                                            <td><span class="badge text-bg-primary">{{ v.severity }}</span></td>
                                             {% elif v.severity == "LOW" %}
-                                            <td><span class="badge badge-info">{{ v.severity }}</span></td>
+                                            <td><span class="badge text-bg-info">{{ v.severity }}</span></td>
                                             {% else %}
-                                            <td><span class="badge badge-secondary">{{ v.severity }}</span></td>
+                                            <td><span class="badge text-bg-secondary">{{ v.severity }}</span></td>
                                             {% endif %}
                                             <td>{{ v.score }}</td>
                                             <td>{{ v.resource }}</td>

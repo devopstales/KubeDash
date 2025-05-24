@@ -10,3 +10,24 @@ services:
     ports:
       - 6379:6379
     command: ["redis-server"]
+
+  redis-ui:
+    container_name: kubedash-redis-ui
+    image: patrikx3/p3x-redis-ui
+    volumes:
+      - ./config/redis-ui.json:/settings/.p3xrs-conns.json
+    ports:
+      - 8002:7843
+
+  redis-inight:
+    container_name: kubedash-redis-insight
+    image: redis/redisinsight
+    ports:
+      - 8003:5540
+    environment:
+      - REDIS_HOST=redis
+      - REDIS_PORT=6379
+      - REDIS_PASSWORD=redispassword
+      - REDIS_DB=0
+    depends_on:
+      - redis

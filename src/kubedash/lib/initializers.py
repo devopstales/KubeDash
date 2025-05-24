@@ -105,6 +105,10 @@ def initialize_app_confifuration(app: Flask, external_config_name: str) -> bool:
     Returns:
         error (bool): A flag used to represent if the config initialization failed
     """
+    
+    app.logger.info(separator_short)
+    app.logger.info("Initializing app configuration")
+    
 
     if os.path.isfile("kubedash.ini"):
         app.logger.info("Reading Config file")
@@ -127,11 +131,20 @@ def initialize_app_confifuration(app: Flask, external_config_name: str) -> bool:
         
         app.config.from_object(app_config[config_name])
         app.config['ENV'] = config_name
+               
+        app.logger.info("Plugins:")
+        app.logger.info("	registry:	%s" % app.config['kubedash.ini'].getboolean('plugin_settings', 'registry', fallback=False))
+        app.logger.info("	helm:		%s" % app.config['kubedash.ini'].getboolean('plugin_settings', 'helm', fallback=True))
+        app.logger.info("	gateway_api:	%s" % app.config['kubedash.ini'].getboolean('plugin_settings', 'gateway_api', fallback=False))
+        app.logger.info("	cert_manager:	%s" % app.config['kubedash.ini'].getboolean('plugin_settings', 'cert_manager', fallback=True))
+        app.logger.info("	ext_lb: 	%s" % app.config['kubedash.ini'].getboolean('plugin_settings', 'external_loadbalancer', fallback=True))
+        
+        app.logger.info("Integrations:")
+        app.logger.info("	Redis:	%s" % bool_var_test(app.config['kubedash.ini'].get('remote_cache', 'redis_enabled')))
+        app.logger.info("	Jaeger:	%s" % bool_var_test(app.config['kubedash.ini'].get('monitoring', 'jaeger_enabled')))
 
-        # jaeger_enabled = bool_var_test(app.config['kubedash.ini'].get('monitoring', 'jaeger_enabled'))
-        # redis_enabled = bool_var_test(app.config['kubedash.ini'].get('remote_cache', 'redis_enabled'))
-        # short_cache_time = int(app.config['kubedash.ini'].get('remote_cache', 'short_cache_time', fallback=60))
-        # long_cache_time = int(app.config['kubedash.ini'].get('remote_cache', 'long_cache_time', fallback=900))
+        app.logger.info(separator_short)
+
         
         return False
     else:
@@ -192,10 +205,11 @@ def initialize_app_database(app: Flask, filename: str):
         app (Flask): Flask app object
         filename (str): Name of the main file to find the database file
     """
+    app.logger.info(separator_short)
     app.logger.info("Initialize Database:")
     
     """Get Database Configuration"""
-    app.logger.info("   Get Database Configuration")
+    app.logger.info("   Get Database Configuration")    
     app.config['SESSION_SQLALCHEMY'] = db
     app.config['SQLALCHEMY_DATABASE_URI'] = get_database_url(app, filename)
     
@@ -205,7 +219,7 @@ def initialize_app_database(app: Flask, filename: str):
     migrate.init_app(app, db)
     
     """Import External Database Models"""
-    app.logger.info("   Import External Database Models")
+    app.logger.info("   Import Database Models")
     from plugins.registry import model
     
     from lib.init_functions import (
@@ -228,6 +242,8 @@ def initialize_app_database(app: Flask, filename: str):
             
             """Add Contant to Tables"""
             app.logger.info("   Add Contant to Tables")
+            app.logger.info(separator_short)
+            
             if sys.argv[1] != 'cli' and sys.argv[1] != 'db':
                 oidc_init(app.config['kubedash.ini'])
                 k8s_config_int(app.config['kubedash.ini'])
@@ -316,9 +332,7 @@ def initialize_app_caching(app: Flask):
     from lib.cache import cache
     
     redis_enabled = bool_var_test(app.config['kubedash.ini'].get('remote_cache', 'redis_enabled'))
-    
-    print(redis_enabled)
-    
+        
     if redis_enabled:
         app.config['CACHE_TYPE'] = 'RedisCache'
         app.config['CACHE_REDIS_HOST'] = app.config['kubedash.ini'].get('remote_cache', 'redis_host')
@@ -398,42 +412,35 @@ def initialize_app_plugins(app: Flask):
 
     """Plugin Logging"""
     app.logger.info(separator_short)
-    app.logger.info(" Starting Plugins:")
-    #app.logger.info("	registry:	%s" % app.config["plugins"]["registry"])
-    #app.logger.info("	helm:		%s" % app.config["plugins"]["helm"])
-    #app.logger.info("	gateway_api:	%s" % app.config["plugins"]["gateway_api"])
-    #app.logger.info("	cert_manager:	%s" % app.config["plugins"]["cert_manager"])
-    #app.logger.info("	ext_lb: 	%s" % app.config["plugins"]["external_loadbalancer"])
-    #app.logger.info(separator_short)
+    app.logger.info("Starting Plugins:")
 
     """Register Plugin Blueprints"""
     if bool_var_test(app.config["plugins"]["helm"]):
-        app.logger.info("	helm")
+        app.logger.info("   Start helm")
         from plugins.helm import helm 
         app.register_blueprint(helm)
 
     if bool_var_test(app.config["plugins"]["registry"]):
-        app.logger.info("	registry")
+        app.logger.info("   Start registry")
         from plugins.registry import registry 
         app.register_blueprint(registry)
 
     if bool_var_test(app.config["plugins"]["gateway_api"]):
-        app.logger.info("	gateway_api")
+        app.logger.info("   Start gateway_api")
         from plugins.gateway_api import gateway_api 
         app.register_blueprint(gateway_api)
 
     if bool_var_test(app.config["plugins"]["cert_manager"]):
-        app.logger.info("	cert_manager")
+        app.logger.info("   Start cert_manager")
         from plugins.cert_manager import cm_routes 
         app.register_blueprint(cm_routes)
 
     if bool_var_test(app.config["plugins"]["external_loadbalancer"]):
-        app.logger.info("	external_loadbalancer")
+        app.logger.info("   Start external_loadbalancer")
         from plugins.external_loadbalancer import exlb_routes 
         app.register_blueprint(exlb_routes)
         
     app.logger.info(separator_short)
-    app.logger.info("Plugins initialized")
 
 
 def add_custom_jinja2_filters(app: Flask):

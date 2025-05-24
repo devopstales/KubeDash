@@ -2,13 +2,24 @@
 {% extends "base.html.j2" %}
 
 {% block content %}
-<div class="bg-body-tertiary min-vh-100 d-flex flex-row align-items-center">
+<div class="bg-primary min-vh-100 d-flex flex-row align-items-center">
   <div class="container">
     <div class="row justify-content-center">
       <div class="col-lg-8">
         <div class="card-group d-block d-md-flex row">
+
+        <!-- Flask Messages -->
+        {% if get_flashed_messages() %}
+        {% for category, message in get_flashed_messages(with_categories=true) %}
+        <div id="flashMessage" class="alert alert-{{category}} alert-dismissible fade show" role="alert">
+          {{ message }}
+          <button type="button" class="btn-close" data-coreui-dismiss="alert" aria-label="Close"></button>
+        </div>
+        {% endfor %}
+        {% endif %}
+
           
-          <div class="card col-md-7 p-4 mb-0">
+          <div class="card col-md-4 p-4 mb-0">
             <div class="card-body">
               <h1>Login</h1>
               <p class="text-body-secondary">Sign In to your account</p>
@@ -41,12 +52,11 @@
             </div>
           </div>
 
-          <div class="card col-md-5 text-white bg-primary py-5">
-            <div class="card-body text-center">
-              <div>
-              </div>
-            </div>
-          </div>
+          <div class="col-lg-6 d-none d-lg-block bg-login-image"></div>
+          
+        <!--
+          <div class="card col-md-5 text-white bg-primary py-5"></div>
+        -->
         </div>
       </div>
     </div>

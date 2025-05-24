@@ -34,13 +34,13 @@ class cache_request_with_timeout:
     
 
 # Cache the base template (structure/layout only)
-@cache.cached(key_prefix='base2')
+@cache.cached(key_prefix='page.base2')
 def cached_base2(app: Flask):
     with app.app_context():
         with app.test_request_context():
             return render_template('base2.html.j2')
         
-@cache.cached(key_prefix='base')
+@cache.cached(key_prefix='page.base')
 def cached_base(app: Flask):
     with app.app_context():
         with app.test_request_context():

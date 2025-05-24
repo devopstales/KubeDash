@@ -175,7 +175,7 @@
 
 {% block add_tail_js %}
 {% include "segments/datatable_js.html.j2" %}
-    <script src="{{ url_for('static',filename='/vendor/custom/functions.js') }}"></script>
+{% include "segments/functions_snipet.j2"%}
     <script>
         var popoverTriggerList = [].slice.call(document.querySelectorAll('[data-bs-toggle="CertTooltip"]'))
         var popoverList = popoverTriggerList.map(function (popoverTriggerEl) {

@@ -52,6 +52,9 @@ def RegistryServerUpdate(registry_server_url, registry_server_url_old, registry_
         registry_server_auth_user (str): User to use for authentication
         registry_server_auth_pass (str): Password for authentication
     """
+    print("registry_server_tls: %s" % registry_server_tls)
+    print("insecure_tls: %s" % insecure_tls)
+    
     registry = Registry.query.filter_by(registry_server_url=registry_server_url_old).first()
     if registry:
         registry.registry_server_url = registry_server_url

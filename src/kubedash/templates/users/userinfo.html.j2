@@ -144,12 +144,11 @@
 {% endblock %}
 
 {% block add_tail_js %}
+{% include "segments/functions_snipet.j2"%}
+
     <!-- Core plugin JavaScript-->
     <script src="{{ url_for('static',filename='/vendor/jquery-easing/jquery.easing.min.js') }}"></script>
     
-    <!-- My custom js functions -->
-    <script src="{{ url_for('static',filename='/vendor/custom/functions.js') }}"></script>
-
     <!-- https://www.jqueryscript.net/form/check-strength-password.html -->
     <script src="{{ url_for('static',filename='/vendor/check-strength-password/password-strength.js') }}"></script>
 

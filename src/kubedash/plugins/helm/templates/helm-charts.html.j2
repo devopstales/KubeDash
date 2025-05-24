@@ -51,7 +51,7 @@
             <td><img src="/img/helm-icon-color.svg" width="50" height="50"> </td>
             {% endif %}
             <td>
-              <form action="/plugins/charts/data" method="POST">
+              <form action="/plugins/helm-charts/data" method="POST">
                 <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
                 <input type="hidden" name="ns_select" value="{{ session['ns_select'] }}" />
                 <input type="hidden" name="selected" value="{{ name }}" />
@@ -60,9 +60,9 @@
             </td>
             <td>
               {% if rd.status == "deployed" %}
-                <span class="badge badge-tag badge-success">{{ rd.status }}</span>
+                <span class="badge text-bg-tag text-bg-success">{{ rd.status }}</span>
               {% else %}
-                <span class="badge badge-tag badge-danger">{{ rd.status }}</span>
+                <span class="badge text-bg-tag text-bg-danger">{{ rd.status }}</span>
               {% endif %}
             </td>
             <td>{{ rd.chart_name }}-{{ rd.chart_version }}</td>

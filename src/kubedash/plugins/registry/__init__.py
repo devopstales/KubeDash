@@ -45,6 +45,10 @@ def registry_main():
                 registry_server_auth_user = request.form.get('registry_server_auth_user')
                 registry_server_auth_pass = request.form.get('registry_server_auth_pass') # bas64 encoded
                 registry_server_auth = True
+                
+            print(request.form)
+            print("registry_server_tls: %s" % registry_server_tls)
+            print("insecure_tls: %s" % insecure_tls)
 
             RegistryServerCreate(registry_server_url, registry_server_port, registry_server_auth, 
                         registry_server_tls, insecure_tls, registry_server_auth_user, 
@@ -61,6 +65,10 @@ def registry_main():
                 registry_server_auth_user = request.form.get('registry_server_auth_user')
                 registry_server_auth_pass = request.form.get('registry_server_auth_pass')
                 registry_server_auth = True
+                
+            print(request.form)
+            print("registry_server_tls: %s" % registry_server_tls)
+            print("insecure_tls: %s" % insecure_tls)
 
             RegistryServerUpdate(registry_server_url, registry_server_url_old, registry_server_port, 
                         registry_server_auth, registry_server_tls, insecure_tls, registry_server_auth_user, 

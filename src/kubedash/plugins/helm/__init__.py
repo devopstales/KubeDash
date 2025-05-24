@@ -22,7 +22,7 @@ logger = get_logger()
 ## Helm Charts routes
 ##############################################################
 
-@helm.route('/helm-charts', methods=['GET', 'POST'])
+@helm.route('/helm-chart', methods=['GET', 'POST'])
 @login_required
 def charts():
     user_token = get_user_token(session)

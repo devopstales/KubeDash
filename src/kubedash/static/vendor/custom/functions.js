@@ -109,3 +109,32 @@ function validateClusterForm(element) {
   // finale validation
   return k8s_server_ca_valid && k8s_server_url_valid;
 };
+
+/**
+ * @param {string} element
+ * @returns {void}
+ */
+
+function showSecret(element) {
+  var x = document.getElementById(element);
+  if (x) {
+    if (x.classList.contains('textshadow')) {
+        x.classList.remove("textshadow");
+    } else {
+        x.classList.add("textshadow");
+    }
+  } else {
+    console.log("unhideElementsById: Element X not found");
+  }
+
+  var y = document.getElementById(element+"_icon");
+  if (y) {
+    if (y.innerHTML === "visibility_off" ) {
+        y.innerHTML = "visibility"
+    } else {
+        y.innerHTML = "visibility_off"
+    }
+  } else {
+    console.log("unhideElementsById: Element Y not found");
+  }
+};
