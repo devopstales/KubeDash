@@ -1,4 +1,10 @@
 import time
+from flask import Flask, render_template
+from lib.components import cache
+
+##############################################################
+## Cache request
+##############################################################
 
 class cache_request_with_timeout:
     """
@@ -26,3 +32,18 @@ class cache_request_with_timeout:
             return result
         return decorator
     
+
+# Cache the base template (structure/layout only)
+@cache.cached(key_prefix='base2')
+def cached_base2(app: Flask):
+    with app.app_context():
+        with app.test_request_context():
+            return render_template('base2.html.j2')
+        
+@cache.cached(key_prefix='base')
+def cached_base(app: Flask):
+    with app.app_context():
+        with app.test_request_context():
+            return render_template('base.html.j2')
+
+# Dynamic Home Page will uses the cached base template through inheritance

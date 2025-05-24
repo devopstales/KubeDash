@@ -40,7 +40,7 @@
                       <tr>
                     {% endif %}
                         <td>
-                          <form action="/other-resources/priorityclass/data" method="POST">
+                          <form action="/other-resource/priorityclass/data" method="POST">
                             <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
                             <input type="hidden" name="pc_name" value="{{ pc.name }}" />
                             <a href="javascript:;" onclick="parentNode.submit();">{{ pc.name }}</a>

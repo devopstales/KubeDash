@@ -222,13 +222,14 @@ def trimAnnotations(annotations: dict) -> dict:
         dict: The trimmed annotations.
     """
     trimmed_annotations = {}
-    for key, value in annotations.items():
-        if key == 'kubectl.kubernetes.io/last-applied-configuration':
-            continue
-        elif key == "autoscaling.alpha.kubernetes.io/conditions":
-            continue
-        else:
-            trimmed_annotations[key] = value
+    if annotations is not None:
+        for key, value in annotations.items():
+            if key == 'kubectl.kubernetes.io/last-applied-configuration':
+                continue
+            elif key == "autoscaling.alpha.kubernetes.io/conditions":
+                continue
+            else:
+                trimmed_annotations[key] = value
     return trimmed_annotations
 
 ##############################################################

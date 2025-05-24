@@ -22,7 +22,7 @@ logger = get_logger()
 ##############################################################
 ## Storage
 ##############################################################
-## Stotage Class
+## storage Class
 ##############################################################
 
 @storage.route("/storage-class", methods=['GET', 'POST'])
@@ -80,6 +80,7 @@ def snapshot_class():
         selected = request.form.get('selected')
 
     snapshot_classes = k8sSnapshotClassListGet(session['user_role'], user_token)
+    print(snapshot_classes)
 
     return render_template(
         'storage/snapshot-class.html.j2',
@@ -102,7 +103,7 @@ def snapshot_class_data():
 
         if sc_data:
             return render_template(
-                'storage/snapshot-classes-data.html.j2',
+                'storage/snapshot-class-data.html.j2',
                 sc_data = sc_data
             )
         else:

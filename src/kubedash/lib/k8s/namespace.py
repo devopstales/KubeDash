@@ -5,6 +5,7 @@ from kubernetes.client.rest import ApiException
 from opentelemetry.trace.status import Status, StatusCode
 
 from lib.helper_functions import ErrorHandler, trimAnnotations
+from lib.components import cache, short_cache_time, long_cache_time
 
 from . import logger, tracer
 from .server import k8sClientConfigGet
@@ -13,6 +14,7 @@ from .server import k8sClientConfigGet
 ## Kubernetes Namespace
 ##############################################################
 
+@cache.memoize(timeout=long_cache_time)
 def k8sListNamespaces(username_role, user_token):
     """List Kubernetes namespaces
 
@@ -21,7 +23,7 @@ def k8sListNamespaces(username_role, user_token):
         user_token (str): Auth token of the current user
 
     Return:
-        namespace_list (list): List of the namespaces
+        namespace_list (list): List of the namespace objects
         error (str): Error message if any
     """
     with tracer.start_as_current_span("list-namespaces") as span:
@@ -45,7 +47,18 @@ def k8sListNamespaces(username_role, user_token):
             namespace_list = ""
             return namespace_list, "CannotConnect"
 
+@cache.memoize(timeout=long_cache_time)
 def k8sNamespaceListGet(username_role, user_token):
+    """Get the list of namespaces
+
+    Args:
+        username_role (str): Role of the current user
+        user_token (str): Auth token of the current user
+        
+    Return:
+        namespace_list (list): List of the namespace names
+        error (str): Error message if any
+    """
     with tracer.start_as_current_span("get-namespace-list") as span:
         if tracer and span.is_recording():
             span.set_attribute("user.role", username_role)
@@ -65,7 +78,18 @@ def k8sNamespaceListGet(username_role, user_token):
                 span.set_status(Status(StatusCode.ERROR, "k8sNamespaceListGet: %s" % error))
             return namespace_list, "CannotConnect"
     
+@cache.memoize(timeout=long_cache_time)
 def k8sNamespacesGet(username_role, user_token):
+    """Get the list of namespaces with their details
+
+    Args:
+        username_role (str): Role of the current user
+        user_token (str): Auth token of the current user
+        
+    Return:
+        namespace_list (list): List of namespace objects with details
+        error (str): Error message if any
+    """
     with tracer.start_as_current_span("get-namespace") as span:
         if tracer and span.is_recording():
             span.set_attribute("user.role", username_role)
@@ -103,6 +127,16 @@ def k8sNamespacesGet(username_role, user_token):
         #    return NAMESPACE_LIST
     
 def k8sNamespaceCreate(username_role, user_token, ns_name):
+    """Create a namespace
+    
+    Args:
+        username_role (str): Role of the current user
+        user_token (str): Auth token of the current user
+        ns_name (str): Name of the namespace to be created
+        
+    Returns:
+        success (bool): True if namespace is created successfully, False otherwise
+    """
     k8sClientConfigGet(username_role, user_token)
     pretty = 'true'
     field_manager = 'KubeDash'
@@ -129,6 +163,15 @@ def k8sNamespaceCreate(username_role, user_token, ns_name):
         ErrorHandler(logger, "error", ERROR)
 
 def k8sNamespaceDelete(username_role, user_token, ns_name):
+    """Delete a namespace
+    
+    Args:
+        username_role (str): Role of the current user
+        user_token (str): Auth token of the current user
+        
+    Returns:
+        success (bool): True if namespace is deleted successfully, False otherwise
+    """
     k8sClientConfigGet(username_role, user_token)
     pretty = 'true'
     with k8s_client.ApiClient() as api_client:

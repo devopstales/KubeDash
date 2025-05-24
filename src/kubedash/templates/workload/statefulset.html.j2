@@ -41,7 +41,7 @@
                       <tr>
                     {% endif %}
                         <td>
-                          <form action="/workload/statefulset/data" method="POST">
+                          <form action="/workload/statefulsets/data" method="POST">
                             <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
                             <input type="hidden" name="ns_select" value="{{ session['ns_select'] }}" />
                             <input type="hidden" name="selected" value="{{ sfs.name }}" />

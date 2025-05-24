@@ -38,7 +38,7 @@
                       <tr>
                     {% endif %}
                         <td>
-                          <form action="/image/tags" method="POST">
+                          <form action="/plugins/registry/image/tags" method="POST">
                             <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
                             <input type="hidden" name="image_name" value="{{ image }}" />
                             <a href="javascript:;" onclick="parentNode.submit();">{{ image }}</a>

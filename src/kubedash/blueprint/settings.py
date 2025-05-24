@@ -167,8 +167,10 @@ def callback():
 
         if user is None:
             SSOUserCreate(username, email, user_token, "OpenID")
-            SSOGroupCreateFromList(username, user_data["groups"])
-            SSOGroupsUpdateFromList(username, user_data["groups"])
+            USER_GROUPS = user_data["groups"]
+            if USER_GROUPS:
+                SSOGroupCreateFromList(username, USER_GROUPS)
+                SSOGroupsUpdateFromList(username, USER_GROUPS)
             user = User.query.filter_by(username=username, user_type = "OpenID").first()
         else:
             SSOTokenUpdate(username, user_token)

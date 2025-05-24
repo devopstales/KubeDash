@@ -3,6 +3,7 @@ from kubernetes import client as k8s_client
 from kubernetes.client.rest import ApiException
 
 from lib.helper_functions import ErrorHandler, trimAnnotations
+from lib.components import cache, short_cache_time, long_cache_time
 
 from . import logger
 from .server import k8sClientConfigGet
@@ -11,7 +12,18 @@ from .server import k8sClientConfigGet
 ## Kubernetes Nodes
 ##############################################################
 
+@cache.memoize(timeout=long_cache_time)
 def k8sListNodes(username_role, user_token):
+    """Get a list of nodes
+    
+    Args:
+        username_role (str): Role of the current user
+        user_token (str): Auth token of the current user
+        
+    Return:
+        node_list (list): List of Node objects
+        error (str): Error message if any
+    """
     k8sClientConfigGet(username_role, user_token)
     node_list = list()
     try:
@@ -25,7 +37,18 @@ def k8sListNodes(username_role, user_token):
         ErrorHandler(logger, "CannotConnect", "k8sListNodes: %s" % error)
         return node_list, "CannotConnect"
 
+@cache.memoize(timeout=long_cache_time)
 def k8sNodesListGet(username_role, user_token):
+    """Get the list of nodes
+
+    Args:
+        username_role (str): Role of the current user
+        user_token (str): Auth token of the current user
+        
+    Return:
+        node_list (list): List of Node objects
+        error (str): Error message if any
+    """
     k8sClientConfigGet(username_role, user_token)
     nodes, error = k8sListNodes(username_role, user_token)
     NODE_LIST = []
@@ -79,7 +102,19 @@ def k8sNodesListGet(username_role, user_token):
     else:
         return NODE_LIST
     
+@cache.memoize(timeout=long_cache_time)
 def k8sNodeGet(username_role, user_token, no_name):
+    """Get a specific node
+    
+    Args:
+        username_role (str): Role of the current user
+        user_token (str): Auth token of the current user
+        no_name (str): Name of the node
+        
+    Return:
+        node_info (dict): Node details
+        error (str): Error message if any
+    """
     k8sClientConfigGet(username_role, user_token)
     nodes, error = k8sListNodes(username_role, user_token)
     NODE_INFO = {

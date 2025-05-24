@@ -6,7 +6,7 @@
       <nav aria-label="breadcrumb">
         <ol class="breadcrumb my-0">
           <li class="breadcrumb-item"><span>Other Resources</span></li>
-          <li class="breadcrumb-item"><a href="/other-resources/pod-disruption-budget">Pod Disruption Budgets</a></li>
+          <li class="breadcrumb-item"><a href="/other-resource/pod-disruption-budget">Pod Disruption Budgets</a></li>
           <li class="breadcrumb-item active"><span>{{ pdp_data.name }}</span></li>
         </ol>
       </nav>
@@ -93,11 +93,27 @@
                                 </tr>
                                 <tr>
                                     <th>Selector:</th>
-                                    <td>{{ pdp_data.selector }}</td>
+                                    <td>
+                                    {% if pdp_data.selector %}
+                                        {% for key, value in pdp_data.selector.items() %}
+                                            {{ key }}: {{ value }}{% if not loop.last %}<br>{% endif %}
+                                        {% endfor %}
+                                    {% endif %}
+                                    </td>
                                 </tr>
                                 <tr>
                                     <th>Eviction Policy:</th>
-                                    <td>{{ pdp_data.unhealthy_pod_eviction_policy }}</td>
+                                    <td>
+                                    {% if pdp_data.unhealthy_pod_eviction_policy %}
+                                        {% for policy in pdp_data.unhealthy_pod_eviction_policy %}
+                                            {% if policy is not none %}
+                                                {{policy}}{% if not loop.last %}<br>{% endif %}
+                                            {% else %}
+                                                None{% if not loop.last %}<br>{% endif %}
+                                            {% endif %}
+                                        {% endfor %}
+                                    {% endif %}
+                                    </td>
                                 </tr>
                                 <tr>
                                     <th>Status:</th>

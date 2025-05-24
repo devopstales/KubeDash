@@ -144,7 +144,7 @@ def priorityclass_list():
     priorityclass = k8sPriorityClassList(session['user_role'], user_token)
 
     return render_template(
-        'security/priorityclass.html.j2',
+        'security/priority-class.html.j2',
         priorityclass = priorityclass,
         selected = selected,
     )
@@ -167,7 +167,7 @@ def priorityclass_data():
 
         if pc_data:
             return render_template(
-                'security/priorityclass-data.html.j2',
+                'security/priority-class-data.html.j2',
                 pc_data = pc_data,
                 namespace = session['ns_select'],
             )

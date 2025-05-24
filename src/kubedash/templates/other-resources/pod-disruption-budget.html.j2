@@ -41,7 +41,7 @@
                       <tr>
                     {% endif %}
                         <td>
-                          <form action="/other-resources/pod-disruption-budget/data" method="POST">
+                          <form action="/other-resource/pod-disruption-budget/data" method="POST">
                             <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
                             <input type="hidden" name="pdp_name" value="{{ pdp.name }}" />
                             <a href="javascript:;" onclick="parentNode.submit();">{{ pdp.name }}</a>

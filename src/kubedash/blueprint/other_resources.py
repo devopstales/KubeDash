@@ -4,8 +4,12 @@ from flask_login import login_required
 
 from lib.helper_functions import get_logger
 from lib.k8s.namespace import k8sNamespaceListGet
-from lib.k8s.other import (k8sHPAListGet, k8sLimitRangeListGet,
-                           k8sPodDisruptionBudgetListGet, k8sQuotaListGet)
+from lib.k8s.other import (
+    k8sHPAListGet,
+    k8sVPAListGet,
+    k8sLimitRangeListGet,
+    k8sPodDisruptionBudgetListGet, 
+    k8sQuotaListGet)
 from lib.sso import get_user_token
 
 ##############################################################
@@ -14,6 +18,59 @@ from lib.sso import get_user_token
 
 other_resources = Blueprint("other_resources", __name__, url_prefix="/other-resource" )
 logger = get_logger()
+
+##############################################################
+## VPA
+##############################################################
+
+@other_resources.route("/vertical-pod-autoscaler", methods=['GET', 'POST'])
+@login_required
+def vpa():
+    selected = None
+    user_token = get_user_token(session)
+
+    if request.method == 'POST':
+        if request.form.get('ns_select'):
+            session['ns_select'] = request.form.get('ns_select')
+        selected = request.form.get('selected')
+
+    namespace_list, error = k8sNamespaceListGet(session['user_role'], user_token)
+    if not error:
+        vpas = k8sVPAListGet(session['user_role'], user_token, session['ns_select'])
+    else:
+        vpas = []
+
+    return render_template(
+        'other-resources/vpa.html.j2',
+        selected = selected,
+        vpas = vpas,
+        namespaces = namespace_list,
+    )
+    
+@other_resources.route('/vertical-pod-autoscaler/data', methods=['GET', 'POST'])
+@login_required
+def vpa_data():
+    if request.method == 'POST':
+        vpa_name = request.form.get('vpa_name')
+
+        user_token = get_user_token(session)
+        vpas = k8sVPAListGet(session['user_role'], user_token, session['ns_select'])
+        vpa_data = None
+        for vpa in vpas:
+            if vpa["name"] == vpa_name:
+                vpa_data = vpa
+
+        if vpa_data:
+            return render_template(
+                'other-resources/vpa-data.html.j2',
+                vpa_data = vpa_data,
+            )
+        else:
+                flash("Cannot iterate VerticalPodAutoscalerList", "danger")
+                return redirect(url_for('.vpa'))
+    else:
+        return redirect(url_for('auth.login'))
+    
 
 ##############################################################
 ## HPA
@@ -43,7 +100,7 @@ def hpa():
         namespaces = namespace_list,
     )
 
-@other_resources.route('/horizontal_pod_autoscaler/data', methods=['GET', 'POST'])
+@other_resources.route('/horizontal-pod-autoscaler/data', methods=['GET', 'POST'])
 @login_required
 def hpa_data():
     if request.method == 'POST':
@@ -110,7 +167,7 @@ def pdp_data():
 
         if pdp_data:
             return render_template(
-                'other-resources/pdp-data.html.j2',
+                'other-resources/pod-disruption-budget-data.html.j2',
                 pdp_data = pdp_data,
             )
         else:
@@ -199,7 +256,7 @@ def limit_range():
         namespaces = namespace_list,
     )
 
-@other_resources.route('/limit_range/data', methods=['GET', 'POST'])
+@other_resources.route('/limit-range/data', methods=['GET', 'POST'])
 @login_required
 def limit_range_data():
     if request.method == 'POST':

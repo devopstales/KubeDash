@@ -5,6 +5,7 @@ from opentelemetry.trace.status import Status, StatusCode
 from pyvis.network import Network
 
 from lib.helper_functions import ErrorHandler, calcPercent, parse_quantity
+from lib.components import cache, short_cache_time, long_cache_time
 
 from . import logger, tracer
 from .node import k8sNodesListGet
@@ -17,7 +18,14 @@ from .workload import (k8sDaemonSetsGet, k8sDeploymentsGet, k8sReplicaSetsGet,
 ## Metrics
 ##############################################################
 
+@cache.memoize(timeout=long_cache_time)
 def k8sGetClusterMetric():
+    """Get cluster metrics from a kubernetes cluster
+    
+    Returns:
+        clusterMetric (dict): Cluster metrics data
+        bad_clusterMetric (dict): If any error occurred, return this data instead
+    """
     with tracer.start_as_current_span("get-cluster-metrics") as span:
         k8sClientConfigGet("Admin", None)
         tmpTotalPodCount = float()
@@ -187,7 +195,16 @@ def k8sGetClusterMetric():
                 span.set_status(Status(StatusCode.ERROR, "Cannot Connect to Kubernetes: %s" % error))
             return bad_clusterMetric
 
+@cache.memoize(timeout=long_cache_time)
 def k8sGetNodeMetric(node_name):
+    """Get the node metric for a given node name from the cluster
+    
+    Args:
+        node_name (str): The name of the node
+        
+    Returns:
+        node_metric (dict): The node metric
+    """
     k8sClientConfigGet("Admin", None)
     totalPodAllocatable = float()
     try:
@@ -268,7 +285,16 @@ def k8sGetNodeMetric(node_name):
         ErrorHandler(logger, "CannotConnect", "Cannot Connect to Kubernetes")
         return None
 
+@cache.memoize(timeout=long_cache_time)
 def k8sPVCMetric(namespace):
+    """Get the Persistent Volume Claim metrics for a given namespace
+    
+    Args:
+        namespace (str): The name of the namespace
+        
+    Returns:
+        PVC_LIST (list): The list of Persistent Volume Claim metrics
+    """
     k8sClientConfigGet('Admin', None)
     PVC_LIST = list()
     try:
@@ -298,7 +324,20 @@ def k8sPVCMetric(namespace):
     except Exception as error:
         return PVC_LIST
 
+@cache.memoize(timeout=long_cache_time)
 def k8sGetPodMap(username_role, user_token, namespace):
+    """Get the Pod Map for a given username, user_token, and namespace
+    
+    Args:
+        username_role (str): The username and role of the user
+        user_token (str): The user's token
+        namespace (str): The name of the namespace
+        
+    Returns:
+        net (NetworkX.classes.digraph): The NetworkX graph representing the Pod Map
+        nodes (NetworkX.classes.digraph): The NetworkX graph representing the nodes
+        edges (NetworkX.classes.digraph): The NetworkX graph representing the edges
+    """
     k8sClientConfigGet(username_role, user_token)
     net = Network(directed=True, layout=True)
 

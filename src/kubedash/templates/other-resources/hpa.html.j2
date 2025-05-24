@@ -42,7 +42,7 @@
                       <tr>
                     {% endif %}
                         <td>
-                          <form action="/other-resources/horizontal-pod-autoscaler/data" method="POST">
+                          <form action="/other-resource/horizontal-pod-autoscaler/data" method="POST">
                             <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
                             <input type="hidden" name="hpa_name" value="{{ hpa.name }}" />
                             <a href="javascript:;" onclick="parentNode.submit();">{{ hpa.name }}</a>

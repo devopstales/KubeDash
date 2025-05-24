@@ -5,6 +5,7 @@ from flask_smorest import Api
 from flask_sqlalchemy import SQLAlchemy
 from flask_migrate import Migrate
 from flask_wtf.csrf import CSRFProtect
+from flask_caching import Cache
 
 from lib.helper_functions import get_logger
 
@@ -13,6 +14,9 @@ from lib.helper_functions import get_logger
 ##############################################################
 
 logger = get_logger()
+
+short_cache_time = 60
+long_cache_time = 900
 
 ##############################################################
 ## Initialize modules
@@ -26,3 +30,4 @@ sess = Session()
 csrf = CSRFProtect()
 socketio = SocketIO()
 api_doc = Api()
+cache = Cache()

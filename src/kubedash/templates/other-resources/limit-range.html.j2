@@ -39,7 +39,7 @@
                       <tr>
                     {% endif %}
                         <td>
-                          <form action="/other-resources/limit-range/data" method="POST">
+                          <form action="/other-resource/limit-range/data" method="POST">
                             <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
                             <input type="hidden" name="limit_name" value="{{ limit.name }}" />
                             <a href="javascript:;" onclick="parentNode.submit();">{{ limit.name }}</a>

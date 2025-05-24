@@ -43,7 +43,7 @@ def authenticated_only(f):
 ## Pods
 ##############################################################
 
-@workload.route("/pod", methods=['GET', 'POST'])
+@workload.route("/pods", methods=['GET', 'POST'])
 @login_required
 def pod_list():
     if request.method == 'POST':
@@ -61,7 +61,7 @@ def pod_list():
         namespaces = namespace_list,
     )
 
-@workload.route('/pod/data', methods=['GET', 'POST'])
+@workload.route('/pods/data', methods=['GET', 'POST'])
 @login_required
 def pod_data():
     if request.method == 'POST':
@@ -89,7 +89,7 @@ def pod_data():
 logging.getLogger('socketio').setLevel(logging.ERROR)
 logging.getLogger('engineio').setLevel(logging.ERROR)
 
-@workload.route('/pod/logs', methods=['POST'])
+@workload.route('/pods/logs', methods=['POST'])
 @login_required
 def pod_logs():
     if request.method == 'POST':
@@ -135,7 +135,7 @@ def log_message(po_name, container):
 ## Pod Exec
 ##############################################################
 
-@workload.route('/pod/exec', methods=['POST'])
+@workload.route('/pods/exec', methods=['POST'])
 @login_required
 def pod_exec():
     if request.method == 'POST':
@@ -200,7 +200,7 @@ def exec_input(data):
 ## Statefullsets
 ##############################################################
 
-@workload.route("/statefulset", methods=['GET', 'POST'])
+@workload.route("/statefulsets", methods=['GET', 'POST'])
 @login_required
 def statefulsets():
     selected = None
@@ -224,7 +224,7 @@ def statefulsets():
         namespaces = namespace_list,
     )
 
-@workload.route('/statefulset/data', methods=['GET', 'POST'])
+@workload.route('/statefulsets/data', methods=['GET', 'POST'])
 @login_required
 def statefulsets_data():
     if request.method == 'POST':
@@ -246,7 +246,7 @@ def statefulsets_data():
     else:
         return redirect(url_for('auth.login'))
         
-@workload.route('/statefulset/scale', methods=['GET', 'POST'])
+@workload.route('/statefulsets/scale', methods=['GET', 'POST'])
 @login_required
 def statefulsets_scale():
     if request.method == 'POST':
@@ -264,9 +264,9 @@ def statefulsets_scale():
 ## Daemonsets
 ##############################################################
 
-@workload.route("/daemonset", methods=['GET', 'POST'])
+@workload.route("/daemonsets", methods=['GET', 'POST'])
 @login_required
-def daemonset():
+def daemonsets():
     selected = None
     user_token = get_user_token(session)
 
@@ -288,7 +288,7 @@ def daemonset():
         selected = selected,
     )
 
-@workload.route('/daemonset/data', methods=['GET', 'POST'])
+@workload.route('/daemonsets/data', methods=['GET', 'POST'])
 @login_required
 def daemonset_data():
     if request.method == 'POST':
@@ -311,7 +311,7 @@ def daemonset_data():
     else:
         return redirect(url_for('auth.login'))
     
-@workload.route('/daemonset/scale', methods=['GET', 'POST'])
+@workload.route('/statefulsets/scale', methods=['GET', 'POST'])
 @login_required
 def daemonsets_scale():
     if request.method == 'POST':
@@ -338,9 +338,9 @@ def daemonsets_scale():
 ## Deployments
 ##############################################################
 
-@workload.route("/deployment", methods=['GET', 'POST'])
+@workload.route("/deployments", methods=['GET', 'POST'])
 @login_required
-def deployment():
+def deployments():
     selected = None
     user_token = get_user_token(session)
 
@@ -362,7 +362,7 @@ def deployment():
         namespaces = namespace_list,
     )
 
-@workload.route('/deployment/data', methods=['GET', 'POST'])
+@workload.route('/deployments/data', methods=['GET', 'POST'])
 @login_required
 def deployment_data():
     if request.method == 'POST':
@@ -385,7 +385,7 @@ def deployment_data():
     else:
         return redirect(url_for('auth.login'))
     
-@workload.route('/deployment/scale', methods=['GET', 'POST'])
+@workload.route('/deployments/scale', methods=['GET', 'POST'])
 @login_required
 def deployment_scale():
     if request.method == 'POST':
@@ -403,9 +403,9 @@ def deployment_scale():
 ## ReplicaSets
 ##############################################################
 
-@workload.route("/replicaset", methods=['GET', 'POST'])
+@workload.route("/replicasets", methods=['GET', 'POST'])
 @login_required
-def replicaset():
+def replicasets():
     selected = None
     user_token = get_user_token(session)
 

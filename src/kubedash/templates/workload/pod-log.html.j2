@@ -9,7 +9,7 @@
           <li class="breadcrumb-item"><span>Pods</span></li>
           <li class="breadcrumb-item">
             <div class="d-flex">
-              <form action="/workload/pod/data" method="POST" class="form-post">
+              <form action="/workload/pods/data" method="POST" class="form-post">
                 <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
                 <input type="hidden" name="ns_select" value="{{ session['ns_select'] }}" />
                 <input type="hidden" name="po_name" value="{{ po_name }}" />

@@ -3,6 +3,7 @@ from kubernetes import client as k8s_client
 from kubernetes.client.rest import ApiException
 
 from lib.helper_functions import ErrorHandler, email_check, trimAnnotations
+from lib.components import cache, short_cache_time, long_cache_time
 
 from . import logger
 from .namespace import k8sNamespaceListGet
@@ -12,7 +13,19 @@ from .server import k8sClientConfigGet
 # Pod Vulnerability Assessment #
 ################################
 
+@cache.memoize(timeout=long_cache_time)
 def k8sPodListVulnsGet(username_role, user_token, ns):
+    """Get a list of vulnerabilities in pods for a given namespace.
+    
+    Args:
+        username_role (str): Role of the current user
+        user_token (str): Auth token of the current user
+        ns (str): Namespace name
+        
+    Returns:
+        HAS_REPORT (bool): True if a vulnerability report exists, False otherwise
+        POD_VULN_LIST (list): List of vulnerabilities in pods
+    """
     k8sClientConfigGet(username_role, user_token)
     POD_VULN_LIST = list()
     HAS_REPORT = False
@@ -95,7 +108,20 @@ def k8sPodListVulnsGet(username_role, user_token, ns):
 
     return HAS_REPORT, POD_VULN_LIST
 
+@cache.memoize(timeout=long_cache_time)
 def k8sPodVulnsGet(username_role, user_token, ns, pod):
+    """Get vulnerability details for a specific pod in a given namespace.
+    
+    Args:
+        username_role (str): Role of the current user
+        user_token (str): Auth token of the current user
+        ns (str): Namespace name
+        pod (str): Pod name
+        
+    Returns:
+        HAS_REPORT (bool): True if a vulnerability report exists, False otherwise
+        POD_VULNS (dict): Vulnerability details for the pod
+    """
     k8sClientConfigGet(username_role, user_token)
     POD_VULNS = {}
     HAS_REPORT = False
@@ -201,7 +227,19 @@ def k8sPodVulnsGet(username_role, user_token, ns, pod):
 ## Service Account
 ##############################################################
 
+@cache.memoize(timeout=long_cache_time)
 def k8sSaListGet(username_role, user_token, ns):
+    """Get a list of Service Accounts for a given namespace.
+    
+    Args:
+        username_role (str): Role of the current user
+        user_token (str): Auth token of the current user
+        ns (str): Namespace name
+        
+    Returns:
+        SA_LIST (list): List of Service Account objects
+        ERROR (str): Error message if any
+    """
     k8sClientConfigGet(username_role, user_token)
     SA_LIST = list()
     try:
@@ -235,7 +273,19 @@ def k8sSaListGet(username_role, user_token, ns):
 ## Role
 ##############################################################
 
+@cache.memoize(timeout=long_cache_time)
 def k8sRoleListGet(username_role, user_token, ns):
+    """Get a list of Roles for a given namespace.
+    
+    Args:
+        username_role (str): Role of the current user
+        user_token (str): Auth token of the current user
+        ns (str): Namespace name
+        
+    Returns:
+        ROLE_LIST (list): List of Role objects
+        ERROR (str): Error message if any
+    """
     k8sClientConfigGet(username_role, user_token)
     ROLE_LIST = list()
     try:
@@ -263,7 +313,19 @@ def k8sRoleListGet(username_role, user_token, ns):
 ##  Role Binding
 ##############################################################
 
+@cache.memoize(timeout=long_cache_time)
 def k8sRoleBindingListGet(username_role, user_token, ns):
+    """Get a list of Role Bindings for a given namespace.
+    
+    Args:
+        username_role (str): Role of the current user
+        user_token (str): Auth token of the current user
+        ns (str): Namespace name
+        
+    Returns:
+        ROLE_BINDING_LIST (list): List of Role Binding objects
+        ERROR (str): Error message if any
+    """
     k8sClientConfigGet(username_role, user_token)
     ROLE_BINDING_LIST = list()
     try:
@@ -300,7 +362,18 @@ def k8sRoleBindingListGet(username_role, user_token, ns):
         ErrorHandler(logger, "error", ERROR)
         return ROLE_BINDING_LIST, error
 
+@cache.memoize(timeout=long_cache_time)
 def k8sRoleBindingGet(obeject_name, namespace):
+    """Get Role Binding object from Kubernetes API
+    
+    Args:
+        obeject_name (str): Name of the Role Binding object
+        namespace (str): Namespace of the Role Binding object
+        
+    Returns:
+        is_rolebinding_exists (bool): True if Role Binding exists, False otherwise
+        error (str): Error message if any
+    """
     k8sClientConfigGet("Admin", None)
     with k8s_client.ApiClient() as api_client:
         api_instance = k8s_client.RbacAuthorizationV1Api(api_client)
@@ -321,7 +394,18 @@ def k8sRoleBindingGet(obeject_name, namespace):
         ErrorHandler(logger, "error", ERROR)
         return None, "Unknow Error"
     
+@cache.memoize(timeout=long_cache_time)
 def k8sRoleBindingGroupGet(group_name, username_role, user_token):
+    """Get Role Binding objects for a given group in a given namespace.
+    
+    Args:
+        group_name (str): Name of the group
+        username_role (str): Role of the current user
+        
+    Returns:
+        group_role_binding (list): List of Role Binding objects for the given group
+        error (str): Error message if any
+    """
     k8sClientConfigGet(username_role, user_token)
     group_role_binding = list()
     namespace_list, error = k8sNamespaceListGet("Admin", None)
@@ -338,6 +422,18 @@ def k8sRoleBindingGroupGet(group_name, username_role, user_token):
     return group_role_binding
 
 def k8sRoleBindingCreate(user_role, namespace, username, group_name):
+    """Create a Role Binding object in Kubernetes API
+    
+    Args:
+        user_role (str): Role of the current user
+        namespace (str): Namespace of the Role Binding object
+        username (str): Username or email of the user
+        group_name (str): Name of the group
+        
+    Returns:
+        is_rolebinding_created (bool): True if Role Binding created successfully, False otherwise
+        error (str): Error message if any
+    """
     k8sClientConfigGet("Admin", None)
     with k8s_client.ApiClient() as api_client:
         api_instance = k8s_client.RbacAuthorizationV1Api(api_client)
@@ -398,6 +494,18 @@ def k8sRoleBindingCreate(user_role, namespace, username, group_name):
 
 
 def k8sRoleBindingAdd(user_role, username, group_name, user_namespaces, user_all_namespaces):
+    """Add a Role Binding object to Kubernetes API
+    
+    Args:
+        user_role (str): Role of the current user
+        username (str): Username or email of the user
+        group_name (str): Name of the group
+        user_namespaces (list): List of namespaces for the user
+        user_all_namespaces (bool): True if all namespaces should be included, False otherwise
+        
+    Returns:
+        None
+    """
     if username:
         if email_check(username):
             user = username.split("@")[0]
@@ -430,7 +538,18 @@ def k8sRoleBindingAdd(user_role, username, group_name, user_namespaces, user_all
 ## Kubernetes User Role template
 ##############################################################
 
+#@cache.memoize(timeout=long_cache_time) ## Debug Later
 def k8sUserClusterRoleTemplateListGet(username_role, user_token):
+    """Get User Cluster Role Template list from Kubernets API
+    
+    Args:
+        username_role (string): The username role
+        user_token (string): The user token
+        
+    Returns:
+        CLUSTER_ROLE_LIST (list[dictionary]): The list of user
+        error (string): The error message if any
+    """
     k8sClientConfigGet(username_role, user_token)
     CLUSTER_ROLE_LIST = list()
     try:
@@ -448,6 +567,7 @@ def k8sUserClusterRoleTemplateListGet(username_role, user_token):
     except Exception as error:
         return
     
+#@cache.memoize(timeout=long_cache_time) ## Debug Later
 def k8sUserRoleTemplateListGet(username_role, user_token):
     """Get User Role Template list from Kubernets API
     
@@ -479,7 +599,17 @@ def k8sUserRoleTemplateListGet(username_role, user_token):
 ## Cluster Role
 ##############################################################
 
+@cache.memoize(timeout=long_cache_time)
 def k8sClusterRoleGet(name):
+    """Get a ClusterRole
+    
+    Args:
+        name (str): Name of the ClusterRole
+        
+    Returns:
+        is_clusterrole_exists (bool): True if ClusterRole exists, False otherwise
+        error (str): Error message if any
+    """
     k8sClientConfigGet("Admin", None)
     with k8s_client.ApiClient() as api_client:
         api_instance = k8s_client.RbacAuthorizationV1Api(api_client)
@@ -497,6 +627,16 @@ def k8sClusterRoleGet(name):
         return False, None
     
 def k8sClusterRoleCreate(name, body):
+    """
+    Creates a new ClusterRole in the Kubernetes cluster.
+
+    Parameters:
+        name (str): The name of the ClusterRole to be created.
+        body (V1ClusterRole): The body of the ClusterRole to be created.
+
+    Returns:
+        bool: True if the ClusterRole is created successfully, False otherwise.
+    """
     k8sClientConfigGet("Admin", None)
     with k8s_client.ApiClient() as api_client:
         api_instance = k8s_client.RbacAuthorizationV1Api(api_client)
@@ -515,6 +655,24 @@ def k8sClusterRoleCreate(name, body):
         return False
     
 def k8sClusterRolesAdd():
+    """Add predefined ClusterRoles to the Kubernetes API.
+
+    This function creates several ClusterRoles with specific permissions for different
+    user types (admin, reader, developer, deployer, and operation). It checks if each
+    ClusterRole already exists before creating it.
+
+    The function defines the following ClusterRoles:
+    - template-cluster-resources---admin: Cluster-wide read access
+    - template-cluster-resources---reader: Cluster-wide read access
+    - template-namespaced-resources---developer: Full access to specific namespaced resources
+    - template-namespaced-resources---deployer: Full access to deployment-related resources
+    - template-namespaced-resources---operation: Full access to all resources
+
+    The function doesn't take any parameters and doesn't return any value. It logs the
+    status of each ClusterRole creation attempt.
+
+    Note: This function requires appropriate permissions to create ClusterRoles in the cluster.
+    """
     admin = k8s_client.V1ClusterRole(
             api_version = "rbac.authorization.k8s.io/v1",
             kind = "ClusterRole",
@@ -690,7 +848,31 @@ def k8sClusterRolesAdd():
                 k8sClusterRoleCreate(name, roleVars[role])
                 logger.info("ClusterRole %s created" % name) # WARNING
 
+@cache.memoize(timeout=long_cache_time)
 def k8sClusterRoleListGet(username_role, user_token):
+    """
+    Retrieve a list of ClusterRoles from the Kubernetes API.
+
+    This function fetches all ClusterRoles from the Kubernetes cluster and returns
+    them as a list of dictionaries containing relevant information about each ClusterRole.
+
+    Args:
+        username_role (str): The role of the user making the request.
+        user_token (str): The authentication token of the user making the request.
+
+    Returns:
+        list: A list of dictionaries, where each dictionary contains information about a ClusterRole.
+              Each dictionary includes the following keys:
+              - 'name': The name of the ClusterRole
+              - 'annotations': Trimmed annotations of the ClusterRole
+              - 'labels': Labels associated with the ClusterRole
+              - 'rules': Rules defined for the ClusterRole
+              - 'created': Creation timestamp of the ClusterRole
+
+    Raises:
+        ApiException: If there's an error in the Kubernetes API call (except 404 errors).
+        Exception: For any other unexpected errors during execution.
+    """
     k8sClientConfigGet(username_role, user_token)
     CLUSTER_ROLE_LIST = list()
     try:
@@ -721,7 +903,34 @@ def k8sClusterRoleListGet(username_role, user_token):
 ## Cluster Role Bindings
 ##############################################################
 
+@cache.memoize(timeout=long_cache_time)
 def k8sClusterRoleBindingListGet(username_role, user_token):
+    """
+    Retrieve a list of ClusterRoleBindings from the Kubernetes API.
+
+    This function fetches all ClusterRoleBindings from the Kubernetes cluster and returns
+    them as a list of dictionaries containing relevant information about each ClusterRoleBinding.
+
+    Args:
+        username_role (str): The role of the user making the request.
+        user_token (str): The authentication token of the user making the request.
+
+    Returns:
+        tuple: A tuple containing two elements:
+            - list: A list of dictionaries, where each dictionary contains information about a ClusterRoleBinding.
+                    Each dictionary includes the following keys:
+                    - 'name': The name of the ClusterRoleBinding
+                    - 'role': A list of dictionaries representing the roles associated with the binding
+                    - 'user': A list of users associated with the binding
+                    - 'group': A list of groups associated with the binding
+                    - 'ServiceAccount': A list of dictionaries representing the service accounts associated with the binding
+                    - 'created': The creation timestamp of the ClusterRoleBinding
+            - None or Exception: None if the operation was successful, or an Exception object if an error occurred.
+
+    Raises:
+        ApiException: If there's an error in the Kubernetes API call (except 404 errors).
+        Exception: For any other unexpected errors during execution.
+    """
     k8sClientConfigGet(username_role, user_token)
     CLUSTER_ROLE_BINDING_LIST = []
     try:
@@ -760,6 +969,7 @@ def k8sClusterRoleBindingListGet(username_role, user_token):
         ErrorHandler(logger, "error", ERROR)
         return CLUSTER_ROLE_BINDING_LIST, error
 
+@cache.memoize(timeout=long_cache_time)
 def k8sClusterRoleBindingGet(obeject_name):
     k8sClientConfigGet("Admin", None)
     with k8s_client.ApiClient() as api_client:
@@ -781,6 +991,7 @@ def k8sClusterRoleBindingGet(obeject_name):
         ErrorHandler(logger, "error", ERROR)
         return None, "Unknow Error"
     
+@cache.memoize(timeout=long_cache_time)
 def k8sClusterRoleBindingGroupGet(group_name, username_role, user_token):
     k8sClientConfigGet(username_role, user_token)
     cluster_role_binding_list, error = k8sClusterRoleBindingListGet(username_role, user_token)
@@ -870,6 +1081,7 @@ def k8sClusterRoleBindingAdd(user_cluster_role, username, group_name):
 ## User Priviliges
 ##############################################################
 
+@cache.memoize(timeout=long_cache_time)
 def k8sUserPriviligeList(username_role="Admin", user_token=None, user="admin"):
     ROLE_LIST = []
     CLUSTER_ROLE_LIST = []
@@ -925,6 +1137,7 @@ def k8sUserPriviligeList(username_role="Admin", user_token=None, user="admin"):
 ## Secrets
 ##############################################################
 
+@cache.memoize(timeout=short_cache_time)
 def k8sSecretListGet(username_role, user_token, namespace):
     k8sClientConfigGet(username_role, user_token)
     SECRET_LIST = list()
@@ -947,6 +1160,7 @@ def k8sSecretListGet(username_role, user_token, namespace):
 ## Network Policies
 ##############################################################
 
+@cache.memoize(timeout=short_cache_time)
 def k8sPolicyListGet(username_role, user_token, ns_name):
     POLICY_LIST = list()
     k8sClientConfigGet(username_role, user_token)

@@ -12,30 +12,46 @@
     </div>
 </ul>
 <ul class="header-nav ms-auto"></ul>
+<!-- Button trigger modal -->
+<button type="button" class="btn btn-success" data-bs-toggle="modal" data-bs-target="#modaladd">
+  Add Registry
+</button>
+
 <ul class="header-nav d-lg-flex">
-    {% if session['user_role'] == "Admin" %}
-    <div class="container-fluid d-flex justify-content-end py-2 px-2">
-      <button type="button" class="btn btn-success float-right col-1 me-lg-4" data-toggle="modal" data-target="#modaladd">
-        Add Registry
-      </button>
-    </div>
-    {% endif %}
 {% include "segments/topmenu.html.j2" %}
 {% endblock %}
 
 {% block content %}
+<!-- Modal -->
+<div class="modal fade" id="exampleModal" tabindex="-1" aria-labelledby="exampleModalLabel" aria-hidden="true">
+  <div class="modal-dialog">
+    <div class="modal-content">
+      <div class="modal-header">
+        <h5 class="modal-title" id="exampleModalLabel">Modal title</h5>
+        <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+      </div>
+      <div class="modal-body">
+        ...
+      </div>
+      <div class="modal-footer">
+        <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Close</button>
+        <button type="button" class="btn btn-primary">Save changes</button>
+      </div>
+    </div>
+  </div>
+</div>
+
+
 <!-- Modal Add Config -->
 <div class="modal fade" id="modaladd" tabindex="-1" role="dialog" aria-labelledby="modaladdLabel" aria-hidden="true">
   <div class="modal-dialog" role="document">
     <div class="modal-content">
       <div class="modal-header">
           <h5 class="modal-title" id="modaladdLabel">Create Registry</h5>
-          <button type="button" class="close" data-dismiss="modal" aria-label="Close">
-              <span aria-hidden="true">&times;</span>
-          </button>
+          <button type="button" class="btn-close" data-dismiss="modal" aria-label="Close"></button>
       </div>
       <div class="modal-body">
-          <form action="/registry" method="POST">
+          <form action="/plugins/registry" method="POST">
               <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
               <input type="hidden" name="request_type" value="create" />
               <div class="form-group">
@@ -66,7 +82,7 @@
               </div>
               <div class="modal-footer">
                   <div class="form-group mt-2">
-                      <button type="button" class="btn btn-secondary" data-dismiss="modal">Close</button>
+                      <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Close</button>
                       <button type="submit" class="btn btn-primary" onClick="save();" value="Add" id="add">Add</button>
                   </div>
               </div>
@@ -98,7 +114,7 @@
                     {% for server in registries %}
                     <tr>
                         <td>
-                          <form action="/image/list" method="POST">
+                          <form action="/plugins/registry/image/list" method="POST">
                             <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
                             <input type="hidden" name="registry_server_url" value="{{ server.registry_server_url }}" />
                             <a href="javascript:;" onclick="parentNode.submit();">{{ server.registry_server_url }}</a>
@@ -111,9 +127,9 @@
                         <td>
                             {% if session['user_role'] == "Admin" %}
                             <!-- Button trigger modal edit -->
-                            <form action="/registry" method="POST">
+                            <form action="/plugins/registry" method="POST">
                                 <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
-                                <button type="button" class="btn btn-success btn-just-icon btn-xs" data-toggle="modal" data-target="#modaledit-{{ server.registry_server_url|replace('.','_') }}">
+                                <button type="button" class="btn btn-success btn-just-icon btn-xs" data-bs-toggle="modal" data-bs-target="#modaledit-{{ server.registry_server_url|replace('.','_') }}">
                                     <i class="material-icons">edit</i>
                                 </button>
                                 <input type="hidden" name="request_type" value="delete" />
@@ -145,7 +161,7 @@
                 </button>
             </div>
             <div class="modal-body">
-                <form action="/registry" method="POST">
+                <form action="/plugins/registry" method="POST">
                     <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
                     <input type="hidden" name="request_type" value="edit" />
                     <input type="hidden" name="registry_server_url_old" value="{{ server.registry_server_url }}" />

@@ -80,7 +80,7 @@ def registry_main():
         selected = selected,
     )
 
-@registry.route("/image/list", methods=['GET', 'POST'])
+@registry.route("/registry/image/list", methods=['GET', 'POST'])
 @login_required
 def image_list():
     selected = None
@@ -96,7 +96,7 @@ def image_list():
         selected = selected,
     )
     
-@registry.route("/image/tags", methods=['GET', 'POST'])
+@registry.route("/registry/image/tags", methods=['GET', 'POST'])
 @login_required
 def image_tags():
     selected = None
@@ -114,7 +114,7 @@ def image_tags():
         image_name = session['image_name'],
     )
 
-@registry.route("/image/tag/delete", methods=['GET', 'POST'])
+@registry.route("/registry/image/tag/delete", methods=['GET', 'POST'])
 @login_required
 def image_tag_delete():
     if request.method == 'POST':
@@ -125,7 +125,7 @@ def image_tag_delete():
     else:
         return redirect(url_for('auth.login'))
 
-@registry.route("/image/data", methods=['GET', 'POST'])
+@registry.route("/registry/image/data", methods=['GET', 'POST'])
 @login_required
 def image_data():
     if request.method == 'POST':

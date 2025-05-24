@@ -7,7 +7,7 @@
         <ol class="breadcrumb my-0">
           <li class="breadcrumb-item"><span>Plugins</span></li>
           <li class="breadcrumb-item"><a href="/plugins/registry">Registry</a></li>
-          <li class="breadcrumb-item"><a href="/plugins/image/list">Images</a></li>
+          <li class="breadcrumb-item"><a href="/plugins/registry/image/list">Images</a></li>
           <li class="breadcrumb-item active"><span>{{ image_name }}</span></li>
         </ol>
       </nav>
@@ -41,7 +41,7 @@
                           <tr>
                         {% endif %}
                             <td>
-                              <form action="/plugins/image/data" method="POST">
+                              <form action="/plugins/registry/image/data" method="POST">
                                 <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
                                 <input type="hidden" name="tag_name" value="{{ tag }}" />
                                 <a href="javascript:;" onclick="parentNode.submit();">{{ tag }}</a>
@@ -50,7 +50,7 @@
                             <td>
                                 {% if session['user_role'] == "Admin" %}
                                 <!-- Button trigger modal edit -->
-                                <form action="/plugins/image/tag/delete" method="POST">
+                                <form action="/plugins/registry/image/tag/delete" method="POST">
                                     <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
                                     <input type="hidden" name="image_name" value="{{ image_name }}" />
                                     <input type="hidden" name="tag_name" value="{{ tag }}" />

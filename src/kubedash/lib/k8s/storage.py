@@ -1,3 +1,4 @@
+from datetime import datetime
 
 import kubernetes.client as k8s_client
 from kubernetes.client.exceptions import ApiException
@@ -8,7 +9,7 @@ from . import logger
 from .server import k8sClientConfigGet
 
 ##############################################################
-## Stotage Class
+## storage Class
 ##############################################################
 
 def k8sStorageClassListGet(username_role, user_token):
@@ -31,7 +32,7 @@ def k8sStorageClassListGet(username_role, user_token):
             SC_LIST.append(SC)
         return SC_LIST
     except ApiException as error:
-        ErrorHandler(logger, error, "get cluster Stotage Class list - %s" % error.status)
+        ErrorHandler(logger, error, "get cluster storage Class list - %s" % error.status)
         return SC_LIST
     except Exception as error:
         ERROR = "k8sStorageClassListGet: %s" % error
@@ -39,7 +40,7 @@ def k8sStorageClassListGet(username_role, user_token):
         return SC_LIST
     
 ##############################################################
-## SnapshotClass
+## VolumeSnapshotClass
 ##############################################################
 
 def k8sSnapshotClassListGet(username_role, user_token):
@@ -55,7 +56,7 @@ def k8sSnapshotClassListGet(username_role, user_token):
         for sc in snapshot_classes["items"]:
             SC = {
                 "name": sc["metadata"]["name"],
-                "created": sc["metadata"]["creationTimestamp"].strftime('%Y-%m-%d %H:%M:%S'),
+                "created": datetime.strptime(sc["metadata"]["creationTimestamp"], "%Y-%m-%dT%H:%M:%SZ").strftime('%Y-%m-%d %H:%M:%S'),
                 "annotations": trimAnnotations(sc["metadata"]["annotations"]),
                 "driver": sc["driver"],
                 "deletion_policy": sc["deletionPolicy"],
@@ -172,7 +173,7 @@ def k8sPersistentVolumeSnapshotListGet(username_role, user_token):
             PVS = {
             "name": pvs["metadata"]["name"],
             "annotations": trimAnnotations(pvs["metadata"]["annotations"]),
-            "created": pvs["metadata"]["creationTimestamp"].strftime('%Y-%m-%d %H:%M:%S'),
+            "created": datetime.strptime(pvs["metadata"]["creationTimestamp"], "%Y-%m-%dT%H:%M:%SZ").strftime('%Y-%m-%d %H:%M:%S'),
             "pvc": pvs["spec"]["source"]["persistentVolumeClaimName"],
             "volume_snapshot_class": pvs["spec"]["volumeSnapshotClassName"],
             "volume_snapshot_content": pvs["status"]["boundVolumeSnapshotContentName"],

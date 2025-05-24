@@ -54,7 +54,7 @@
                         </td>
                     {% endif %}
                         <td>
-                          <form action="/stotage/pv/data" method="POST">
+                          <form action="/storage/pv/data" method="POST">
                             <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
                             <input type="hidden" name="ns_select" value="{{ session['ns_select'] }}" />
                             <input type="hidden" name="selected" value="{{ pv.name }}" />
@@ -62,7 +62,7 @@
                           </form>
                         </td>
                         <td>
-                          <form action="/stotage/storage-class" method="POST">
+                          <form action="/storage/storage-class" method="POST">
                             <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
                             <input type="hidden" name="ns_select" value="{{ session['ns_select'] }}" />
                             <input type="hidden" name="selected" value="{{ pv.storage_class_name }}" />
@@ -70,7 +70,7 @@
                           </form>
                         </td>
                         <td>
-                          <form action="/stotage/pvc" method="POST">
+                          <form action="/storage/pvc" method="POST">
                             <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
                             <input type="hidden" name="ns_select" value="{{ session['ns_select'] }}" />
                             <input type="hidden" name="selected" value="{{ pv.volume_claim_name }}" />

@@ -3,6 +3,8 @@
 import logging
 import os
 import sys
+import socket
+import redis
 
 from flask import Flask, render_template, request
 
@@ -16,11 +18,30 @@ from lib.init_functions import get_database_url
 from lib.helper_functions import bool_var_test, get_logger
 from lib.k8s.server import k8sGetClusterStatus
 
+from lib.helper_functions import ThreadedTicker
+from lib.k8s.workload_cahers import (
+    fetch_and_cache_pods_all_namespaces,
+    fetch_and_cache_deployments_all_namespaces,
+    fetch_and_cache_statefulsets_all_namespaces,
+    fetch_and_cache_daemonsets_all_namespaces,
+    fetch_and_cache_replicasets_all_namespaces,
+)
+
+##############################################################
+## Variables
+##############################################################
+
 separator_long = "###################################################################################"
 separator_short = "#######################################"
 
 ##############################################################
 ## Helper Functions
+##############################################################
+
+
+
+##############################################################
+## Initialization Functions
 ##############################################################
 
 def initialize_app_logging(app: Flask):
@@ -85,9 +106,6 @@ def initialize_app_confifuration(app: Flask, external_config_name: str) -> bool:
         error (bool): A flag used to represent if the config initialization failed
     """
 
-    global jaeger_enable
-    global redis_enable
-
     if os.path.isfile("kubedash.ini"):
         app.logger.info("Reading Config file")
         import configparser
@@ -110,10 +128,10 @@ def initialize_app_confifuration(app: Flask, external_config_name: str) -> bool:
         app.config.from_object(app_config[config_name])
         app.config['ENV'] = config_name
 
-        #print(app.config['kubedash.ini'].sections())
-        #print(app.config['kubedash.ini'].items('monitoring'))
-        jaeger_enable = bool_var_test(app.config['kubedash.ini'].get('monitoring', 'jaeger_enabled'))
-        redis_enable = bool_var_test(app.config['kubedash.ini'].get('remote_cache', 'redis_enabled'))
+        # jaeger_enabled = bool_var_test(app.config['kubedash.ini'].get('monitoring', 'jaeger_enabled'))
+        # redis_enabled = bool_var_test(app.config['kubedash.ini'].get('remote_cache', 'redis_enabled'))
+        # short_cache_time = int(app.config['kubedash.ini'].get('remote_cache', 'short_cache_time', fallback=60))
+        # long_cache_time = int(app.config['kubedash.ini'].get('remote_cache', 'long_cache_time', fallback=900))
         
         return False
     else:
@@ -247,8 +265,7 @@ def initialize_blueprints(app: Flask):
     from blueprint.settings import settings, sso
     from blueprint.storage import storage
     from blueprint.user import users
-    from blueprint.workload import workload
-    
+    from blueprint.workload import workload    
 
     app.logger.info("Initialize blueprints")
     #app.register_blueprint(api)
@@ -267,8 +284,7 @@ def initialize_blueprints(app: Flask):
     app.register_blueprint(storage)
     app.register_blueprint(security)
     app.register_blueprint(other_resources)
-    app.register_blueprint(settings)
-    
+    app.register_blueprint(settings)    
 
 def initialize_commands(app: Flask):
     """Initialize commands"""
@@ -282,13 +298,58 @@ def initialize_app_tracing(app: Flask):
         app (Flask): Flask instance
 
     Returns:
-        jaeger_enable (global): True if tracing is enabled
+        jaeger_enabled (global): True if tracing is enabled
     """
+    jaeger_enabled = bool_var_test(app.config['kubedash.ini'].get('monitoring', 'jaeger_enabled'))
 
-    if jaeger_enable:
+    if jaeger_enabled:
         from lib.opentelemetry import init_opentelemetry_exporter 
         jaeger_base_url = app.config['kubedash.ini'].get('monitoring', 'jaeger_http_endpoint')
         init_opentelemetry_exporter(jaeger_base_url)
+     
+def initialize_app_caching(app: Flask):
+    """Initialize caching
+    
+    Args:
+        app (Flask): Flask app object
+    """
+    from lib.cache import cache
+    
+    redis_enabled = bool_var_test(app.config['kubedash.ini'].get('remote_cache', 'redis_enabled'))
+    
+    print(redis_enabled)
+    
+    if redis_enabled:
+        app.config['CACHE_TYPE'] = 'RedisCache'
+        app.config['CACHE_REDIS_HOST'] = app.config['kubedash.ini'].get('remote_cache', 'redis_host')
+        app.config['CACHE_REDIS_PORT'] = app.config['kubedash.ini'].get('remote_cache', 'redis_port')
+        app.config['CACHE_REDIS_DB'] = app.config['kubedash.ini'].get('remote_cache', 'redis_db')
+        #app.config['CACHE_REDIS_PASSWORD'] =
+        
+        endpoint = f"{app.config['CACHE_REDIS_HOST']}:{app.config['CACHE_REDIS_PORT']}"
+        sock = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
+        result = sock.connect_ex((
+            app.config['CACHE_REDIS_HOST'], 
+            int(app.config['CACHE_REDIS_PORT']))
+        )
+
+        if result == 0:
+            app.logger.info(f"Redis connection established at {endpoint}")
+        else:
+            app.logger.error(f"Cannot connect to Redis at {endpoint}")
+
+        sock.close()
+    else:
+        app.logger.info("Redis caching is disabled")
+        app.config['CACHE_TYPE'] = 'SimpleCache'
+        
+    cache.init_app(app)
+    app.cache = cache
+    
+    from lib.cache import cached_base, cached_base2
+    cached_base(app)
+    cached_base2(app)
+        
         
 def inicialize_instrumentors(app: Flask):
     """Initialize OpenTelemetry instrumentors
@@ -303,10 +364,27 @@ def inicialize_instrumentors(app: Flask):
     LoggingInstrumentor().instrument(set_logging_format=True)
 
 def initialize_app_plugins(app: Flask):
-    """Initialize Plugins
+    """
+    Initialize and register plugins for the Flask application.
 
+    This function configures various plugins based on the application's configuration,
+    logs the status of each plugin, and registers the corresponding blueprints for
+    enabled plugins.
     Args:
-        app (Flask): Flask app object
+        app (Flask): The Flask application instance to which the plugins will be added.
+
+    Returns:
+        None
+
+    The function performs the following steps:
+    1. Sets up the plugin configuration based on the 'kubedash.ini' file.
+    2. Logs the status of each plugin (enabled or disabled).
+    3. Registers blueprints for enabled plugins (helm, registry, gateway_api, 
+       cert_manager, and external_loadbalancer).
+
+    Note:
+        The actual enabling/disabling of plugins is determined by the 'kubedash.ini'
+        configuration file and the bool_var_test() function (not shown in this snippet).
     """
     app.logger.info("Initialize Plugins")
 
@@ -317,37 +395,45 @@ def initialize_app_plugins(app: Flask):
             "cert_manager":          app.config['kubedash.ini'].getboolean('plugin_settings', 'cert_manager', fallback=True),
             "external_loadbalancer": app.config['kubedash.ini'].getboolean('plugin_settings', 'external_loadbalancer', fallback=True),
         }
-    
+
     """Plugin Logging"""
     app.logger.info(separator_short)
     app.logger.info(" Starting Plugins:")
-    app.logger.info("	registry:	%s" % app.config["plugins"]["registry"])
-    app.logger.info("	helm:		%s" % app.config["plugins"]["helm"])
-    app.logger.info("	gateway_api:	%s" % app.config["plugins"]["gateway_api"])
-    app.logger.info("	cert_manager:	%s" % app.config["plugins"]["cert_manager"])
-    app.logger.info("	ext_lb: 	%s" % app.config["plugins"]["external_loadbalancer"])
-    app.logger.info(separator_short)
+    #app.logger.info("	registry:	%s" % app.config["plugins"]["registry"])
+    #app.logger.info("	helm:		%s" % app.config["plugins"]["helm"])
+    #app.logger.info("	gateway_api:	%s" % app.config["plugins"]["gateway_api"])
+    #app.logger.info("	cert_manager:	%s" % app.config["plugins"]["cert_manager"])
+    #app.logger.info("	ext_lb: 	%s" % app.config["plugins"]["external_loadbalancer"])
+    #app.logger.info(separator_short)
 
     """Register Plugin Blueprints"""
     if bool_var_test(app.config["plugins"]["helm"]):
+        app.logger.info("	helm")
         from plugins.helm import helm 
         app.register_blueprint(helm)
-        
+
     if bool_var_test(app.config["plugins"]["registry"]):
+        app.logger.info("	registry")
         from plugins.registry import registry 
         app.register_blueprint(registry)
-    
+
     if bool_var_test(app.config["plugins"]["gateway_api"]):
+        app.logger.info("	gateway_api")
         from plugins.gateway_api import gateway_api 
         app.register_blueprint(gateway_api)
 
     if bool_var_test(app.config["plugins"]["cert_manager"]):
+        app.logger.info("	cert_manager")
         from plugins.cert_manager import cm_routes 
         app.register_blueprint(cm_routes)
 
     if bool_var_test(app.config["plugins"]["external_loadbalancer"]):
+        app.logger.info("	external_loadbalancer")
         from plugins.external_loadbalancer import exlb_routes 
         app.register_blueprint(exlb_routes)
+        
+    app.logger.info(separator_short)
+    app.logger.info("Plugins initialized")
 
 
 def add_custom_jinja2_filters(app: Flask):
@@ -452,3 +538,53 @@ def initialize_app_security(app: Flask):
         response.headers["Expires"] = "0"
 
         return response
+    
+def initialize_workloadcachers(app: Flask):
+    """
+    Initialize and start background tasks for caching various Kubernetes workload resources.
+
+    This function sets up periodic tasks to fetch and cache information about pods,
+    deployments, statefulsets, daemonsets, and replicasets from all namespaces in the
+    Kubernetes cluster. Each task runs every 900 seconds (15 minutes).
+
+    Args:
+        app (Flask): The Flask application instance, used to provide context for
+                     the caching operations.
+
+    Returns:
+        None
+
+    Note:
+        This function starts multiple ThreadedTicker instances, each responsible
+        for caching a specific type of Kubernetes resource. These tickers run
+        in the background and update the cache at regular intervals.
+    """
+    pod_ticker = ThreadedTicker(
+        interval_sec=900, 
+        func=fetch_and_cache_pods_all_namespaces(app)
+    )
+    pod_ticker.start()
+
+    deployment_ticker = ThreadedTicker(
+        interval_sec=900, 
+        func=fetch_and_cache_deployments_all_namespaces(app)
+    )
+    deployment_ticker.start()
+
+    statefulset_ticker = ThreadedTicker(
+        interval_sec=900, 
+        func=fetch_and_cache_statefulsets_all_namespaces(app)
+    )
+    statefulset_ticker.start()
+
+    daemonset_ticker = ThreadedTicker(
+        interval_sec=900, 
+        func=fetch_and_cache_daemonsets_all_namespaces(app)
+    )
+    daemonset_ticker.start()
+
+    replicasets_ticker = ThreadedTicker(
+        interval_sec=900, 
+        func=fetch_and_cache_replicasets_all_namespaces(app)
+    )
+    replicasets_ticker.start()

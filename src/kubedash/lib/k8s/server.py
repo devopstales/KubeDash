@@ -149,11 +149,13 @@ def k8sClientConfigGet(username_role, user_token):
             span.set_attribute("user.role", username_role)
         if username_role == "Admin":
             try:
+                logger.debug("Loading local kube config for Admin")
                 k8s_config.load_kube_config()
                 if tracer and span.is_recording():
                     span.set_attribute("client.config", "local")
             except Exception as error:
                 try:
+                    logger.debug("Loading incluster kube config for Admin")
                     k8s_config.load_incluster_config()
                     if tracer and span.is_recording():
                         span.set_attribute("client.config", "incluster")
@@ -168,6 +170,7 @@ def k8sClientConfigGet(username_role, user_token):
             if k8sConfig is None:
                 logger.error("Kubectl Integration is not configured.")
             else:
+                logger.debug("Loading indb kube config for User")
                 k8s_server_url = k8sConfig.k8s_server_url
                 k8s_server_ca = str(base64_decode(k8sConfig.k8s_server_ca), 'UTF-8')
                 configuration = k8s_client.Configuration()

@@ -57,7 +57,7 @@
                         {% endif %}
                         </td>
                         <td>
-                          <form action="/workload/pod/data" method="POST">
+                          <form action="/workload/pods/data" method="POST">
                             <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
                             <input type="hidden" name="ns_select" value="{{ session['ns_select'] }}" />
                             <input type="hidden" name="po_name" value="{{ po.name }}" />
@@ -95,7 +95,7 @@
                         {% endif %}
                         -->
                         <td>
-                          <form action="/workload/pod/delete" method="POST">
+                          <form action="/workload/pods/delete" method="POST">
                               <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
                               <input type="hidden"  name="pod_name" value="{{ po.name }}"/>
                               <button type="submit" rel="tooltip" class="btn btn-danger btn-just-icon btn-sm" value="upvote">

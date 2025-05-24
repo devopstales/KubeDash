@@ -3,6 +3,8 @@ USER=$(id -u)
 echo "Setting USER environment variable to ${USER}"
 export USER=$USER
 
+export DOCKER_COMPOSE_FILES="-f ../../deploy/docker-compose/dc-nginx.yaml"
+
 # App
 #export K8S_CLUSTER_NAME=
 export KUBEDASH_VERSION="3.1"
@@ -10,6 +12,7 @@ export FLASK_APP="kubedash"
 export FLASK_DEBUG=1
 export TEMPLATES_AUTO_RELOAD=1
 export FLASK_ENV=development
+export PYTHONFAULTHANDLER=1
 
 mkdir -p /tmp/kubedash
 
@@ -24,24 +27,54 @@ if [ ! -f $CA_CERTS_FOLDER/rootCA.pem ]; then
 	mv kubedash.k3s.intra.pem kubedash.k3s.intra-key.pem $CA_CERTS_FOLDER/
 fi
 
-#echo "Start Nginx Proxy in Docker Compose"
-#docker compose -f ../../deploy/docker-compose/dc-nginx.yaml down
-#docker compose -f ../../deploy/docker-compose/dc-nginx.yaml up -d
+echo "Start Nginx Proxy in Docker Compose"
+#docker compose $DOCKER_COMPOSE_FILES down
+#docker compose $DOCKER_COMPOSE_FILES up -d
+task docker-up
 
+# Start DB migration
 echo ""
 echo "Start Migration"
 flask db upgrade
 echo "###################################################################################"
 
+# Start Gunicorn (Flask app)
 echo ""
 echo "Start Applications: KubeDash ${KUBEDASH_VERSION}"
 echo "###################################################################################"
 #flask run --host=0.0.0.0 --port=8000
-gunicorn --worker-class eventlet --conf gunicorn_conf.py kubedash:app --reload
+gunicorn --worker-class eventlet --conf gunicorn_conf.py kubedash:app --reload &
 #opentelemetry-instrument gunicorn --worker-class eventlet --conf gunicorn_conf.py kubedash:app
+GUNICORN_PID=$!
 
-#trap ctrl_c INT
-#function ctrl_c() {
-#    docker-compose -f ../../deploy/docker-compose/dc-nginx.yaml stop
-#    exit 0
-#}
+# Start Celery Worker
+#echo ""
+#echo "Starting Celery Worker..."
+#celery -A lib.components.celery worker --loglevel=info &
+#CELERY_WORKER_PID=$!
+
+# Start Celery Beat
+#echo ""
+#echo "Starting Celery Beat..."
+#celery -A lib.components.celery beat --loglevel=info &
+#CELERY_BEAT_PID=$!
+
+
+# Function to handle shutdown gracefully
+function shutdown {
+    echo "Stopping processes..."
+    kill -TERM $GUNICORN_PID
+    #kill -TERM $CELERY_WORKER_PID
+    #kill -TERM $CELERY_BEAT_PID
+    wait $GUNICORN_PID
+    #wait $CELERY_WORKER_PID
+    #wait $CELERY_BEAT_PID
+		#docker compose $DOCKER_COMPOSE_FILES down
+}
+
+# Trap signals for graceful exit
+trap shutdown SIGTERM SIGINT
+
+# Wait for processes to finish (prevents container from exiting)
+wait
+

@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 
 import sys
-from flask import Flask
+from flask import Flask, request
 
 from lib.initializers import (
     initialize_app_confifuration, 
@@ -18,11 +18,12 @@ from lib.initializers import (
     initialize_app_version,
     initialize_commands,
     inicialize_instrumentors,
+    initialize_app_caching,
 )
 from lib.metrics import (
     initialize_metrics_scraper
 )
-
+from lib.before_request import initbefore_request
 #############################################################
 ## Variables
 #############################################################
@@ -81,10 +82,16 @@ def create_app(external_config_name=None):
             initialize_blueprints(app)
             add_custom_jinja2_filters(app)
             initialize_app_security(app)
+            initialize_app_tracing(app)
+            
+            initialize_app_caching(app)
+            initbefore_request(app)
 
             print(separator_long)
+            
    
     return app
+
 
 ##############################################################
 ## Main Application variable for WSGI Like Gunicorn

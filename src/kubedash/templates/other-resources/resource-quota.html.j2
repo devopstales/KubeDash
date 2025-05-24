@@ -40,7 +40,7 @@
                       <tr>
                     {% endif %}
                         <td>
-                          <form action="/other-resources/resource-quota/data" method="POST">
+                          <form action="/other-resource/resource-quota/data" method="POST">
                             <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
                             <input type="hidden" name="quota_name" value="{{ quota.name }}" />
                             <a href="javascript:;" onclick="parentNode.submit();">{{ quota.name }}</a>

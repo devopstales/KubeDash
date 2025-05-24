@@ -6,7 +6,7 @@
       <nav aria-label="breadcrumb">
         <ol class="breadcrumb my-0">
           <li class="breadcrumb-item"><span>Workloads</span></li>
-          <li class="breadcrumb-item"><a href="/workload/statefulset">StatefulSets</a></li>
+          <li class="breadcrumb-item"><a href="/workload/statefulsets">StatefulSets</a></li>
           <li class="breadcrumb-item active"><span>{{ statefulset_data.name }}</span></li>
         </ol>
       </nav>
@@ -294,7 +294,7 @@
                                     <tr>
                                         <td>ServiceAccount</td>
                                         <td>
-                                            <form action="/security/service-account" method="POST">
+                                            <form action="/cluster-permission/service-account" method="POST">
                                                 <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
                                                 <input type="hidden" name="ns_select" value="{{ statefulset_data.namespace }}" />
                                                 <input type="hidden" name="selected" value="{{ statefulset_data.service_account }}" />

@@ -2,6 +2,7 @@ from kubernetes import client as k8s_client
 from kubernetes.client.rest import ApiException
 
 from lib.helper_functions import ErrorHandler, trimAnnotations
+from lib.components import cache, short_cache_time, long_cache_time
 
 from . import logger
 from .server import k8sClientConfigGet
@@ -10,7 +11,18 @@ from .server import k8sClientConfigGet
 ## Ingresses Class
 ##############################################################
 
-def k8sIngressClassListGet(username_role, user_token,):
+@cache.memoize(timeout=long_cache_time)
+def k8sIngressClassListGet(username_role, user_token):
+    """Get the list of IngressClass
+
+    Args:
+        username_role (str): Role of the current user
+        user_token (str): Auth token of the current user
+        
+    Return:
+        ingress_class_list (list): List of IngressClass objects
+        error (str): Error message if any
+    """
     k8sClientConfigGet(username_role, user_token)
     ING_LIST = list()
     try:
@@ -40,7 +52,19 @@ def k8sIngressClassListGet(username_role, user_token,):
 ## Ingress
 ##############################################################
 
+@cache.memoize(timeout=short_cache_time)
 def k8sIngressListGet(username_role, user_token, ns):
+    """Get the list of Ingresses for a given namespace
+
+    Args:
+        username_role (str): Role of the current user
+        user_token (str): Auth token of the current user
+        ns (str): Namespace name
+        
+    Return:
+        ingress_list (list): List of Ingress objects
+        error (str): Error message if any
+    """
     k8sClientConfigGet(username_role, user_token)
     ING_LIST = list()
     try:
@@ -83,7 +107,19 @@ def k8sIngressListGet(username_role, user_token, ns):
 # Service
 ##############################################################
 
+@cache.memoize(timeout=short_cache_time)
 def k8sServiceListGet(username_role, user_token, ns):
+    """Get the list of Services for a given namespace
+
+    Args:
+        username_role (str): Role of the current user
+        user_token (str): Auth token of the current user
+        ns (str): Namespace of the
+        
+    Return:
+        service_list (list): List of Service objects
+        error (str): Error message if any
+    """  
     k8sClientConfigGet(username_role, user_token)
     SERVICE_LIST = list()
     try:
@@ -114,7 +150,20 @@ def k8sServiceListGet(username_role, user_token, ns):
         ErrorHandler(logger, "error", ERROR)
         return SERVICE_LIST
 
+@cache.memoize(timeout=long_cache_time)
 def k8sPodSelectorListGet(username_role, user_token, ns, selectors):
+    """Get the list of Pods based on a label selector
+
+    Args:
+        username_role (str): Role of the current user
+        user_token (str): Auth token of the current user
+        ns (str): Namespace of the pods
+        selectors (dict): Dictionary of label selectors
+        
+    Return:
+        pod_list (list): List of Pod objects
+        error (str): Error message if any
+    """
     k8sClientConfigGet(username_role, user_token)
     POD_LIST = list()
     label_selector = ""

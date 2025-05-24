@@ -1,19 +1,124 @@
 import json
 
 from kubernetes import client as k8s_client
+from kubernetes.client import CustomObjectsApi, ApiextensionsV1Api
 from kubernetes.client.rest import ApiException
 
 from lib.helper_functions import ErrorHandler, trimAnnotations
+from lib.components import cache, short_cache_time, long_cache_time
 
 from . import logger
 from .server import k8sClientConfigGet
+
+###############################################################
+## Helpers
+###############################################################
+
+def get_vpa_crd_version(username_role, user_token):
+    """Determine the served+storage version of the VPA CRD
+    
+    Args:
+        username_role (str): Role of the current user
+        user_token (str): Auth token of the current user
+    Returns:
+        str: The version of the VPA CRD
+    """
+    k8sClientConfigGet(username_role, user_token)  # use actual auth here if needed
+    try:
+        api_ext = ApiextensionsV1Api()
+        crd = api_ext.read_custom_resource_definition("verticalpodautoscalers.autoscaling.k8s.io")
+
+        for version in crd.spec.versions:
+            if version.served and version.storage:
+                return version.name
+
+        # Fallback if no storage+served version is found
+        for version in crd.spec.versions:
+            if version.served:
+                return version.name
+
+    except Exception as e:
+        ErrorHandler(logger, e, "Failed to determine VPA CRD version")
+        return None
+
+
+##############################################################
+## VPA
+##############################################################
+
+@cache.memoize(timeout=long_cache_time)
+def k8sVPAListGet(username_role, user_token, ns_name):
+    """Get a list of Vertical Pod Autoscalers for a given namespace
+
+    Args:
+        username_role (str): Role of the current user
+        user_token (str): Auth token of the current user
+        ns_name (str): Namespace name
+
+    Returns:
+        VPA_LIST (list): Vertical Pod Autoscaler resources
+    """
+    k8sClientConfigGet(username_role, user_token)  # use actual auth here if needed
+    VPA_LIST = []
+    
+    api_version = get_vpa_crd_version(username_role, user_token)
+    if not api_version:
+        return VPA_LIST
+
+
+    try:
+        custom_api = CustomObjectsApi()
+        vpas = custom_api.list_namespaced_custom_object(
+            group="autoscaling.k8s.io",
+            version=api_version,  # <- updated based on CRD
+            namespace=ns_name,
+            plural="verticalpodautoscalers",
+            _request_timeout=5
+        )
+
+        for vpa in vpas.get("items", []):
+            metadata = vpa.get("metadata", {})
+            spec = vpa.get("spec", {})
+            status = vpa.get("status", {})
+
+            VPA_DATA = {
+                "name": metadata.get("name"),
+                "namespace": metadata.get("namespace"),
+                "annotations": trimAnnotations(metadata.get("annotations", {})),
+                "labels": metadata.get("labels", {}),
+                "spec": spec,
+                "status": status,
+                "created": metadata.get("creationTimestamp")
+            }
+
+            VPA_LIST.append(VPA_DATA)
+
+        return VPA_LIST
+
+    except ApiException as error:
+        if error.status != 404:
+            ErrorHandler(logger, error, f"get Vertical Pod Autoscaler list - {error.status}")
+        return VPA_LIST
+    except Exception as error:
+        return VPA_LIST
 
 ##############################################################
 ## HPA
 ##############################################################
 
+@cache.memoize(timeout=long_cache_time)
 def k8sHPAListGet(username_role, user_token, ns_name):
-    k8sClientConfigGet("admin", None)
+    """Get a list of Horizontal Pod Autoscalers for a given namespace
+    
+    Args:
+        username_role (str): Role of the current user
+        user_token (str): Auth token of the current user
+        ns_name (str): Namespace name
+        
+    Return:
+        HPA_LIST (list): Horizontal Pod Autoscalers
+    """
+    k8sClientConfigGet(username_role, user_token)
     HPA_LIST = list()
     try:
         hpas = k8s_client.AutoscalingV1Api().list_namespaced_horizontal_pod_autoscaler(ns_name, _request_timeout=5)
@@ -44,7 +149,18 @@ def k8sHPAListGet(username_role, user_token, ns_name):
 ## Pod Disruption Budget
 ##############################################################
 
+@cache.memoize(timeout=long_cache_time)
 def k8sPodDisruptionBudgetListGet(username_role, user_token, ns_name):
+    """Get a list of k8s Pod Disruption Budgets for a given namespace.
+    
+    Args:
+        username_role (str): Role of the current user
+        user_token (str): Auth token of the current user
+        ns_name (str): Namespace name
+        
+    Return:
+        PDB_LIST (list): List of Pod Disruption Budgets
+    """
     PDB_LIST = list()
     k8sClientConfigGet(username_role, user_token)
     try:
@@ -83,7 +199,18 @@ def k8sPodDisruptionBudgetListGet(username_role, user_token, ns_name):
 # Resource Quota
 ##############################################################
 
+@cache.memoize(timeout=long_cache_time)
 def k8sQuotaListGet(username_role, user_token, ns_name):
+    """Get a list of quotas for a given namespace.
+    
+    Args:
+        username_role (str): Role of the current user
+        user_token (str): Auth token of the current user
+        ns_name (str): Namespace name
+        
+    Return:
+        RQ_LIST (list): List of quotas
+    """
     RQ_LIST = list()
     k8sClientConfigGet(username_role, user_token)
     try:
@@ -117,7 +244,18 @@ def k8sQuotaListGet(username_role, user_token, ns_name):
 # Limit Range
 ##############################################################
 
+@cache.memoize(timeout=long_cache_time)
 def k8sLimitRangeListGet(username_role, user_token, ns_name):
+    """Get a list of Limit Ranges for a given namespace.
+    
+    Args:
+        username_role (str): Role of the current user
+        user_token (str): Auth token of the current user
+        ns_name (str): Namespace name
+        
+    Return:
+        LR_LIST (list): List of Limit Ranges
+    """
     LR_LIST = list()
     k8sClientConfigGet(username_role, user_token)
     try:
@@ -147,7 +285,17 @@ def k8sLimitRangeListGet(username_role, user_token, ns_name):
 ## Priority ClassList
 ##############################################################
 
+@cache.memoize(timeout=long_cache_time)
 def k8sPriorityClassList(username_role, user_token):
+    """Get a list of Priority Classes.
+    
+    Args:
+        username_role (str): Role of the current user
+        user_token (str): Auth token of the current user
+        
+    Return:
+        PC_LIST (list): List of Priority Classes
+    """
     PC_LIST = list()
     k8sClientConfigGet(username_role, user_token)
 
