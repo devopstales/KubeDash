@@ -1,0 +1,102 @@
+{% extends "base2.html.j2" %}
+
+{% block topmenu %}
+<ul class="header-nav d-lg-flex m-3">
+    <div class="container-fluid px-4">
+        <nav aria-label="breadcrumb">
+            <ol class="breadcrumb my-0">
+                <li class="breadcrumb-item"><span>Plugins</span></li>
+                <li class="breadcrumb-item active"><span>FluxCD Objects</span></li>
+            </ol>
+        </nav>
+    </div>
+</ul>
+{% include "segments/topmenu.html.j2" %}
+{% endblock %}
+
+{% block content %}
+<div class="container-fluid px-4">
+    <ul class="nav nav-tabs mb-3" id="fluxTabs" role="tablist">
+        <li class="nav-item" role="presentation">
+            <button class="nav-link active" id="sources-tab" data-bs-toggle="tab" data-bs-target="#sources" type="button" role="tab">Sources</button>
+        </li>
+        <li class="nav-item" role="presentation">
+            <button class="nav-link" id="kustomizations-tab" data-bs-toggle="tab" data-bs-target="#kustomizations" type="button" role="tab">Kustomizations</button>
+        </li>
+        <li class="nav-item" role="presentation">
+            <button class="nav-link" id="helm-tab" data-bs-toggle="tab" data-bs-target="#helm" type="button" role="tab">Helm Releases</button>
+        </li>
+        <li class="nav-item" role="presentation">
+            <button class="nav-link" id="notifications-tab" data-bs-toggle="tab" data-bs-target="#notifications" type="button" role="tab">Notifications</button>
+        </li>
+        <li class="nav-item" role="presentation">
+            <button class="nav-link" id="connections-tab" data-bs-toggle="tab" data-bs-target="#connections" type="button" role="tab">Connections</button>
+        </li>
+    </ul>
+
+    <div class="tab-content" id="fluxTabsContent">
+
+        <!-- SOURCES TAB -->
+        <div class="tab-pane fade show active" id="sources" role="tabpanel">
+            {% for kind in ['Buckets', 'GitRepositories', 'HelmRepositories', 'OCIRepositories'] %}
+                {% include "segments/flux_table.html.j2" with context %}
+            {% endfor %}
+        </div>
+
+        <!-- KUSTOMIZATIONS TAB -->
+        <div class="tab-pane fade" id="kustomizations" role="tabpanel">
+            {% set kind = 'Kustomizations' %}
+            {% include "segments/flux_table.html.j2" with context %}
+        </div>
+
+        <!-- HELM RELEASES TAB -->
+        <div class="tab-pane fade" id="helm" role="tabpanel">
+            {% set kind = 'HelmReleases' %}
+            {% include "segments/flux_table.html.j2" with context %}
+        </div>
+
+        <!-- NOTIFICATIONS TAB -->
+        <div class="tab-pane fade" id="notifications" role="tabpanel">
+            {% for kind in ['Alerts', 'Providers', 'Receivers'] %}
+                {% include "segments/flux_table.html.j2" with context %}
+            {% endfor %}
+        </div>
+
+        <!-- CONNECTIONS TAB -->
+        <div class="tab-pane fade" id="connections" role="tabpanel">
+            <div class="card shadow-sm mt-4">
+                <div class="card-header bg-info text-white">
+                    <h5 class="mb-0">FluxCD Object Connections</h5>
+                </div>
+                <div class="card-body">
+                    <div class="mermaid">
+                        graph TD
+                        {% for kind, objects in flux_objects.items() %}
+                            {% for obj in objects %}
+                                {% set name = kind ~ "-" ~ obj.metadata.name %}
+                                {% if kind == "Kustomizations" and obj.spec.sourceRef %}
+                                    {{ name }} --> {{ obj.spec.sourceRef.kind ~ "-" ~ obj.spec.sourceRef.name }}
+                                {% elif kind == "HelmReleases" and obj.spec.chart and obj.spec.chart.spec %}
+                                    {{ name }} --> {{ obj.spec.chart.spec.sourceRef.kind ~ "-" ~ obj.spec.chart.spec.sourceRef.name }}
+                                {% elif kind in ["Alerts", "Receivers", "Providers"] and obj.spec.providerRef %}
+                                    {{ name }} --> {{ obj.spec.providerRef.name }}
+                                {% else %}
+                                    {{ name }}
+                                {% endif %}
+                            {% endfor %}
+                        {% endfor %}
+                    </div>
+                </div>
+            </div>
+        </div>
+
+    </div>
+</div>
+{% endblock %}
+
+{% block scripts %}
+<script type="module">
+import mermaid from 'https://cdn.jsdelivr.net/npm/mermaid@10/dist/mermaid.esm.min.mjs';
+mermaid.initialize({ startOnLoad: true });
+</script>
+{% endblock %}
