@@ -91,6 +91,13 @@ notifications:
 
 ![Registry](../img/KubeDash_2.0_registry_pic_08.png)
 
+## Image Lableing
+
+The Doker registry UI can show stander docker labels based on common standards:
+
+* https://specs.opencontainers.org/image-spec/annotations/
+* http://label-schema.org/rc1/
+
 ## OCI Helm Charts
 
 If you use an OCI compatible Docker Registry you can store your Helm chart in OCI format. With KubeDash, you can visualize the Helm Chart metadata:

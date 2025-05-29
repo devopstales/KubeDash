@@ -1,0 +1,29 @@
+apiVersion: apiextensions.k8s.io/v1
+kind: CustomResourceDefinition
+metadata:
+  name: groups.kubedash.devopstales.io
+spec:
+  group: kubedash.devopstales.io
+  scope: Cluster
+  names:
+    plural: groups
+    singular: group
+    kind: Group
+    shortNames:
+      - grp
+  versions:
+    - name: v1
+      served: true
+      storage: true
+      schema:
+        openAPIV3Schema:
+          type: object
+          properties:
+            spec:
+              type: object
+              properties:
+                users:
+                  type: array
+                  items:
+                    type: string
+
