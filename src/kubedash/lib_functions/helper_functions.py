@@ -1,5 +1,5 @@
 import logging, re, time, six, json, yaml, sys
-from flask import flash
+from flask import flash, has_request_context
 from decimal import Decimal, InvalidOperation
 from logging import Logger
 from opentelemetry import trace
@@ -297,16 +297,20 @@ def ErrorHandler(logger, error, action):
     if hasattr(error, '__iter__'):
         if 'status' in error:
             if error.status == 401:
-                flash("401 - Unauthorized: User cannot connect to Kubernetes", "danger")
+                if has_request_context():
+                    flash("401 - Unauthorized: User cannot connect to Kubernetes", "danger")
                 logger.error("401 - Unauthorized: User cannot connect to Kubernetes")
             elif error.status == 403:
-                flash("403 - Forbidden: User cannot %s" % action, "danger")
+                if has_request_context():
+                    flash("403 - Forbidden: User cannot %s" % action, "danger")
                 logger.error("403 - Forbidden: User cannot %s" % action)
         else:
-            flash("Exception: %s" % action, "danger")
+            if has_request_context():
+                flash("Exception: %s" % action, "danger")
             logger.error("Exception: %s %s \n" % (action, error))
     else:
-        flash("Exception: %s" % action, "danger")
+        if has_request_context():
+            flash("Exception: %s" % action, "danger")
         logger.error("Exception: %s %s \n" % (action, error))
 
 def NoFlashErrorHandler(logger, error, action):

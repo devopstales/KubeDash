@@ -44,13 +44,14 @@ RUN addgroup -S -g 10001 kubedash && \
 
 COPY entrypoint.sh /entrypoint.sh
 
-RUN apk add --no-cache bash py3-setuptools
+RUN apk add --no-cache bash py3-setuptools libpq
 RUN apk -U upgrade
 
 COPY --from=builder /app/requirements /usr/local/lib/python3.11/site-packages
 COPY --chown=kubedash:kubedash ./kubedash /code/kubedash
 
 RUN touch /code/kubedash/CA.crt && chown kubedash:kubedash /code/kubedash/CA.crt
+RUN touch /code/kubedash/app-release && chown kubedash:kubedash /code/kubedash/app-release
 
 USER 10001:10001
 
