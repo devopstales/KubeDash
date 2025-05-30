@@ -47,7 +47,7 @@ tasks:
     desc: "Generate Kubedash requirements"
     dir: 'src/kubedash'
     cmds:
-      - poetry export --without-hashes -f requirements.txt
+      - poetry export --without-hashes -f requirements.txt > requirements.txt
 
   kubedash-safety:
     desc: "Safety chack Kubedash requirements"
@@ -60,6 +60,12 @@ tasks:
     dir: 'src/kubedash'
     cmds:
       - poetry run pip-audit
+
+  kubedash-scan:
+    desc: "Scan Kubedash for vulnerabilities"
+    dir: 'src/kubedash'
+    cmds:
+      - trivy -q fs . --scanners vuln
 
   kubedash-lint:
     desc: "Lint Kubedash"
@@ -81,7 +87,7 @@ tasks:
       - cp docker/kubedash/kubedash/gunicorn_conf.py docker/kubedash/gunicorn_conf.py
       - docker build --build-arg BUILD_DATE={{.DATE}} --build-arg VERSION={{.VERSION}}-devel -t devopstales/kubedash:{{.VERSION}}-devel docker/kubedash
 
-  kubedash-scan:
+  kubedash-docker-scan:
     desc: "Scan Kubedash Dockerfile for vulnerabilities"
     cmds:
       - trivy -q i devopstales/kubedash:{{.VERSION}}-devel --scanners vuln
