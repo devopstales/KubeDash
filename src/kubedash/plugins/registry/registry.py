@@ -4,8 +4,9 @@ from datetime import datetime
 from logging import getLogger
 
 from lib.helper_functions import ErrorHandler, ResponseHandler
+from lib.components import cache, short_cache_time, long_cache_time
 
-from .helpers import get_base_url, get_image_sbom_vulns, registry_request
+from .helpers import get_base_url, get_image_sbom_vulns, registry_request, process_image_labels
 
 logger = getLogger(__name__)
 
@@ -13,6 +14,7 @@ logger = getLogger(__name__)
 # OCI Registry Functions
 ##############################################################
 
+@cache.memoize(timeout=long_cache_time)
 def RegistryGetRepositories(registry_server_url: str) -> list:
     """Get all repositories from the registry server
     
@@ -34,6 +36,7 @@ def RegistryGetRepositories(registry_server_url: str) -> list:
                 repositories.extend(j['repositories'])
     return repositories
 
+@cache.memoize(timeout=long_cache_time)
 def RegistryGetTags(registry_server_url: str, image: str) -> dict:
     """Get all tags for an image from the registry server
     
@@ -44,8 +47,6 @@ def RegistryGetTags(registry_server_url: str, image: str) -> dict:
     Returns:
         tags (dict): Dictionary containing the image name and a list of tags.
     """
-    # TODO: Implement caching for tags to improve performance and reduce API calls.
-    #       Store the tags in a database and update them periodically.
     tags = {}
     registry_base_url = get_base_url(registry_server_url)
     r, links = registry_request(registry_server_url, f"{image}/tags/list")
@@ -58,6 +59,7 @@ def RegistryGetTags(registry_server_url: str, image: str) -> dict:
         }
     return tags
 
+@cache.memoize(timeout=long_cache_time)
 def RegistryGetManifest(registry_server_url, image, tag) -> list[dict]:
     """Get the manifest for an image and tag
     
@@ -69,8 +71,6 @@ def RegistryGetManifest(registry_server_url, image, tag) -> list[dict]:
     Returns:
         manifest (dict): Dictionary containing the image name, tag, and manifest details.
     """
-    # TODO: Implement caching for manifests to improve performance and reduce API calls.
-    #       Store the manifests in a database and update them periodically.
     manifest = list()
     registry_base_url = get_base_url(registry_server_url)
     r, links = registry_request(registry_server_url, f"{image}/manifests/{tag}")
@@ -168,27 +168,65 @@ def RegistryGetManifest(registry_server_url, image, tag) -> list[dict]:
             manifest["layers"] = len(j['layers'])
             manifest["format"] = "OCI"
             manifest["media_type"] = media_type
-
+            
+            # Lables
+            digest = j["config"]["digest"]
+            r2, links = registry_request(registry_server_url, f"{image}/blobs/{digest}")
+            if r2 and r2.status_code == 200:
+                j2 = r2.json()
+                
+                manifest["layers"] = len(j2['rootfs']['diff_ids'])
+                manifest["architecture"] = j2['architecture']
+                manifest["os"] = j2['os']
+                
+                if "config" in j2:
+                    if "ExposedPorts" in j2["config"]:
+                        manifest["exposed_ports"] = j2["config"]["ExposedPorts"]
+                    if "Env" in j2["config"]:
+                        manifest["env"] = j2["config"]["Env"]
+                    if "Volumes" in j2["config"]:
+                        manifest["volumes"] = j2["config"]["Volumes"]
+                    if "WorkingDir" in j2["config"]:
+                        manifest["working_dir"] = j2["config"]["WorkingDir"]
+                    if "Cmd" in j2["config"]:
+                        manifest["cmd"] = j2["config"]["Cmd"]
+                    if "Entrypoint" in j2["config"]:
+                        manifest["entrypoint"] = j2["config"]["Entrypoint"]
+                        
+                sv2_manifest = process_image_labels(j2)
+                manifest.update(sv2_manifest)
+                
             for layer in j['layers']:
                 if media_type == "application/vnd.oci.image.config.v1+json":
                         # Cosign Signature
                         if layer["mediaType"] == "application/vnd.dev.cosign.simplesigning.v1+json":
-                            manifest["cosign_signature"] = layer["annotations"]["dev.cosignproject.cosign/signature"]
-                            json_object = json.loads(layer["annotations"]["dev.sigstore.cosign/bundle"])
-                            manifest["cosign_bundle"] = json.dumps(json_object, indent=2)
-                            manifest["cosign_certificate"] = layer["annotations"]["dev.sigstore.cosign/certificate"]
-                            manifest["cosign_chain"] = layer["annotations"]["dev.sigstore.cosign/chain"]
+                            if "dev.cosignproject.cosign/signature" in layer["annotations"]:
+                                manifest["cosign_signature"] = layer["annotations"]["dev.cosignproject.cosign/signature"]
+                            if "dev.sigstore.cosign/bundle" in layer["annotations"]:
+                                json_object = json.loads(layer["annotations"]["dev.sigstore.cosign/bundle"])
+                                manifest["cosign_bundle"] = json.dumps(json_object, indent=2)
+                            if "dev.sigstore.cosign/certificate" in layer["annotations"]:
+                                manifest["cosign_certificate"] = layer["annotations"]["dev.sigstore.cosign/certificate"]
+                            if "dev.sigstore.cosign/chain" in layer["annotations"]:
+                                manifest["cosign_chain"] = layer["annotations"]["dev.sigstore.cosign/chain"]
 
                 if media_type == "application/vnd.aquasec.trivy.config.v1+json":
                     # Trivy DB
                     manifest["trivy_db"] = layer["annotations"]["org.opencontainers.image.title"]
+                
+                if media_type == "application/vnd.aquasec.trivy.db.layer.v1.tar+gzip" or \
+                    media_type == "application/vnd.aquasec.trivy.javadb.layer.v1.tar+gzip":
+                        # Trivy DB
+                        manifest["trivy_db"] = layer["annotations"]["org.opencontainers.image.title"]
+                        
+                # Fluxcd
+                #if media_type == "application/vnd.cncf.flux.content.v1.tar+gzip":
+                # {'mediaType': 'application/vnd.cncf.flux.content.v1.tar+gzip', 'size': 1115, 'digest': 'sha256:0cf7d9411e483a1a50ffc213ff174c39c1b5fa7eeafb4b90bc5055991875d942'}
+                #    ???
 
                 # Helm Chart
                 if media_type == "application/vnd.cncf.helm.config.v1+json":
-                    digest = j["config"]["digest"]
-                    r2, links = registry_request(registry_server_url, f"{image}/blobs/{digest}")
-                    if r2:
-                        j2 = r2.json()
+                    if j2:
                         if "name" in j2:
                             manifest["helm_name"] = j2["name"]
                         if "home" in j2:
@@ -206,7 +244,7 @@ def RegistryGetManifest(registry_server_url, image, tag) -> list[dict]:
                         if "annotations" in j2 and "licenses" in j2["annotations"]:
                             manifest["licenses"] = j2["annotations"]["licenses"]
                         if "maintainers" in j2:
-                            manifest["maintainer"] = j2["maintainers"][0]["name"]
+                            manifest["maintainer"] = j2["maintainers"][0]["name"]            
 
         else:
             manifest["format"] = "Unknown"

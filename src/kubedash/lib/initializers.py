@@ -5,6 +5,8 @@ import os
 import sys
 import socket
 import redis
+from redis.exceptions import AuthenticationError, ConnectionError, RedisError
+from redis.cluster import RedisCluster
 
 from flask import Flask, render_template, request
 
@@ -31,8 +33,14 @@ from lib.k8s.workload_cahers import (
 ## Variables
 ##############################################################
 
-separator_long = "###################################################################################"
-separator_short = "#######################################"
+# ANSI escape codes for colors
+BLUE = "\033[34m"
+RED = "\033[31m"
+RESET = "\033[0m"
+
+
+separator_long = f"###################################################################################"
+separator_short = f"#######################################"
 
 ##############################################################
 ## Helper Functions
@@ -181,15 +189,15 @@ def initialize_app_version(app: Flask):
     METRIC_APP_VERSION.info({'version': kubedash_version})
 
     LOGO = f"""
-   /$$   /$$           /$$                 /$$$$$$$                      /$$      
+{BLUE}   /$$   /$$           /$$                 /$$$$$$$                      /$$      
   | $$  /$$/          | $$                | $$__  $$                    | $$      
   | $$ /$$/  /$$   /$$| $$$$$$$   /$$$$$$ | $$  \ $$  /$$$$$$   /$$$$$$$| $$$$$$$ 
   | $$$$$/  | $$  | $$| $$__  $$ /$$__  $$| $$  | $$ |____  $$ /$$_____/| $$__  $$
   | $$  $$  | $$  | $$| $$  \ $$| $$$$$$$$| $$  | $$  /$$$$$$$|  $$$$$$ | $$  \ $$
   | $$\  $$ | $$  | $$| $$  | $$| $$_____/| $$  | $$ /$$__  $$ \____  $$| $$  | $$
   | $$ \  $$|  $$$$$$/| $$$$$$$/|  $$$$$$$| $$$$$$$/|  $$$$$$$ /$$$$$$$/| $$  | $$
-  |__/  \__/ \______/ |_______/  \_______/|_______/  \_______/|_______/ |__/  |__/
-   version: {kubedash_version}
+  |__/  \__/ \______/ |_______/  \_______/|_______/  \_______/|_______/ |__/  |__/{RESET}
+  version: {RED}{kubedash_version}{RESET}
 """
 
     print(separator_long)
@@ -263,7 +271,7 @@ def initialize_app_swagger(app: Flask):
         "OPENAPI_VERSION": "3.0.2",
         "OPENAPI_URL_PREFIX": "/api",                       # OpenAPI served under /api/
         "OPENAPI_SWAGGER_UI_PATH": "/swagger-ui",           # relative to URL_PREFIX → /api/swagger-ui
-        "OPENAPI_SWAGGER_UI_URL": "/api/swagger-ui-dist/",  # your local static files
+        "OPENAPI_SWAGGER_UI_URL": "/api/swagger-ui/",  # your local static files
     })
     api_doc.init_app(app)
 
@@ -281,12 +289,15 @@ def initialize_blueprints(app: Flask):
     from blueprint.settings import settings, sso
     from blueprint.storage import storage
     from blueprint.user import users
-    from blueprint.workload import workload    
+    from blueprint.workload import workload
+    from blueprint.history import history_bp
+
 
     app.logger.info("Initialize blueprints")
     #app.register_blueprint(api)
     api_doc.register_blueprint(api)
     app.register_blueprint(metrics)
+    app.register_blueprint(history_bp)
     
     app.register_blueprint(auth)
     app.register_blueprint(sso)
@@ -324,46 +335,93 @@ def initialize_app_tracing(app: Flask):
         init_opentelemetry_exporter(jaeger_base_url)
      
 def initialize_app_caching(app: Flask):
-    """Initialize caching
-    
+    """Initialize caching with Redis or Redis Cluster. If Redis is not available, fallback to SimpleCache.
+
     Args:
         app (Flask): Flask app object
     """
     from lib.cache import cache
-    
-    redis_enabled = bool_var_test(app.config['kubedash.ini'].get('remote_cache', 'redis_enabled'))
-        
+    from lib.cache import cached_base, cached_base2
+
+    ini = app.config['kubedash.ini']
+    redis_enabled = ini.get('remote_cache', 'redis_enabled', fallback='none').lower() == 'true'
+    cluster_enabled = ini.get('remote_cache', 'cluster_enabled', fallback='false').lower() == 'true'
+
+    redis_port = int(ini.get('remote_cache', 'redis_port', fallback='6379'))
+    redis_password = ini.get('remote_cache', 'redis_password', fallback=None) or None
+    redis_db = int(ini.get('remote_cache', 'redis_db', fallback='0'))
+
+    cache_ready = False
+
     if redis_enabled:
-        app.config['CACHE_TYPE'] = 'RedisCache'
-        app.config['CACHE_REDIS_HOST'] = app.config['kubedash.ini'].get('remote_cache', 'redis_host')
-        app.config['CACHE_REDIS_PORT'] = app.config['kubedash.ini'].get('remote_cache', 'redis_port')
-        app.config['CACHE_REDIS_DB'] = app.config['kubedash.ini'].get('remote_cache', 'redis_db')
-        #app.config['CACHE_REDIS_PASSWORD'] =
-        
-        endpoint = f"{app.config['CACHE_REDIS_HOST']}:{app.config['CACHE_REDIS_PORT']}"
-        sock = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
-        result = sock.connect_ex((
-            app.config['CACHE_REDIS_HOST'], 
-            int(app.config['CACHE_REDIS_PORT']))
-        )
+        if cluster_enabled:
+            # Parse cluster startup nodes
+            startup_nodes_raw = ini.get('remote_cache', 'cluster_startup_nodes', fallback='')
+            startup_nodes = [{'host': host.strip(), 'port': redis_port} for host in startup_nodes_raw.split(',') if host.strip()]
 
-        if result == 0:
-            app.logger.info(f"Redis connection established at {endpoint}")
+            try:
+                test_cluster = RedisCluster(startup_nodes=startup_nodes, decode_responses=True, password=redis_password, socket_timeout=2)
+                test_cluster.ping()
+                app.logger.info("Redis Cluster connection established.")
+
+                app.config['CACHE_TYPE'] = 'RedisClusterCache'
+                app.config['CACHE_REDIS_CLUSTER_STARTUP_NODES'] = startup_nodes
+                app.config['CACHE_REDIS_PASSWORD'] = redis_password
+                cache_ready = True
+            except (AuthenticationError, ConnectionError, RedisError) as e:
+                app.logger.error(f"Redis Cluster connection failed: {e}")
+            except Exception as e:
+                app.logger.exception(f"Unexpected error with Redis Cluster: {e}")
+
         else:
-            app.logger.error(f"Cannot connect to Redis at {endpoint}")
+            # Standalone Redis
+            redis_host = ini.get('remote_cache', 'redis_host', fallback='127.0.0.1')
+            endpoint = f"{redis_host}:{redis_port}"
 
-        sock.close()
-    else:
-        app.logger.info("Redis caching is disabled")
+            try:
+                sock = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
+                result = sock.connect_ex((redis_host, redis_port))
+                sock.close()
+
+                if result == 0:
+                    test_redis = redis.StrictRedis(
+                        host=redis_host,
+                        port=redis_port,
+                        db=redis_db,
+                        password=redis_password,
+                        socket_connect_timeout=2
+                    )
+                    test_redis.ping()
+                    app.logger.info(f"Redis connection established at {endpoint}")
+
+                    app.config['CACHE_TYPE'] = 'RedisCache'
+                    app.config['CACHE_REDIS_HOST'] = redis_host
+                    app.config['CACHE_REDIS_PORT'] = redis_port
+                    app.config['CACHE_REDIS_DB'] = redis_db
+                    app.config['CACHE_REDIS_PASSWORD'] = redis_password
+                    cache_ready = True
+                else:
+                    app.logger.error(f"Cannot connect to Redis socket at {endpoint}")
+            except (AuthenticationError, ConnectionError, RedisError) as e:
+                app.logger.error(f"Redis error at {endpoint}: {e}")
+            except Exception as e:
+                app.logger.exception(f"Unexpected Redis error at {endpoint}: {e}")
+
+    if not cache_ready:
+        app.logger.warning("Using in-memory fallback cache (SimpleCache)")
         app.config['CACHE_TYPE'] = 'SimpleCache'
-        
+
+    # Optional cache durations
+    app.config['SHORT_CACHE_TIMEOUT'] = int(ini.get('remote_cache', 'short_cache_time', fallback='60'))
+    app.config['LONG_CACHE_TIMEOUT'] = int(ini.get('remote_cache', 'long_cache_time', fallback='900'))
+
+    # Finalize cache setup
     cache.init_app(app)
     app.cache = cache
-    
-    from lib.cache import cached_base, cached_base2
+
+    # Register decorators or cache-bound setup
     cached_base(app)
     cached_base2(app)
-        
         
 def inicialize_instrumentors(app: Flask):
     """Initialize OpenTelemetry instrumentors

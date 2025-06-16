@@ -7,7 +7,7 @@ from kubernetes.client.rest import ApiException
 from opentelemetry.trace.status import Status, StatusCode
 
 from lib.components import db
-from lib.helper_functions import NoFlashErrorHandler
+from lib.helper_functions import ErrorHandler
 
 from . import logger, tracer
 
@@ -110,10 +110,10 @@ def k8sGetClusterStatus(username_role="Admin", user_token=None):
         return True
 
     except ApiException as e:
-        NoFlashErrorHandler(logger, e, f"Error getting cluster status: {e}")
+        ErrorHandler(logger, e, f"Error getting cluster status: {e}")
         return False
     except Exception as e:
-        NoFlashErrorHandler(logger, e, f"Unexpected error getting cluster status: {e}")
+        ErrorHandler(logger, e, f"Unexpected error getting cluster status: {e}")
         return False
 
 
@@ -160,12 +160,12 @@ def k8sClientConfigGet(username_role, user_token):
                     if tracer and span.is_recording():
                         span.set_attribute("client.config", "incluster")
                 except k8s_config.ConfigException as error:
-                    NoFlashErrorHandler(logger, error, "Could not configure kubernetes python client")
+                    ErrorHandler(logger, error, "Could not configure kubernetes python client")
                     if tracer and span.is_recording():
                         span.set_status(Status(StatusCode.ERROR, "Could not configure kubernetes python client: %s" % error))
         elif username_role == "User":
             if not user_token:
-                NoFlashErrorHandler(logger, error, "Missing user token")
+                ErrorHandler(logger, error, "Missing user token")
             k8sConfig = k8sServerConfigGet()
             if k8sConfig is None:
                 logger.error("Kubectl Integration is not configured.")
@@ -186,7 +186,7 @@ def k8sClientConfigGet(username_role, user_token):
                 configuration.verify_ssl = True
                 configuration.debug = False
                 configuration.api_key_prefix['authorization'] = 'Bearer'
-                configuration.api_key["authorization"] = str(user_token["id_token"])
+                configuration.api_key["authorization"] = str(user_token.get('access_token')) or str(user_token.get('id_token'))
                 if tracer and span.is_recording():
                     span.set_attribute("client.config", "oidc")
                 k8s_client.Configuration.set_default(configuration)

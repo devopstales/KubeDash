@@ -39,6 +39,20 @@
   </head>
   <body>
 
+    <!-- Toast container with stacking -->
+    <div class="position-fixed top-0 end-0 p-3" style="z-index: 11">
+      <div id="toastStack" class="toast-container"></div>
+    </div>
+
+    <!-- Toast template (hidden by default) -->
+    <div id="toastTemplate" class="toast d-none" role="alert" aria-live="assertive" aria-atomic="true">
+      <div class="toast-header">
+        <strong class="me-auto toast-title">Notification</strong>
+        <button type="button" class="btn-close" data-bs-dismiss="toast" aria-label="Close"></button>
+      </div>
+      <div class="toast-body"></div>
+    </div>
+
     <!-- Page body -->
     {% block content %}
     {% endblock %}
@@ -60,6 +74,40 @@
         }
       });
     </script>
+
+    <!-- Toast notification script -->
+    <script>
+      function showToast(type, message, title = 'Notification') {
+        const container = document.getElementById('toastStack');
+        const template = document.getElementById('toastTemplate');
+        const toastEl = template.cloneNode(true);
+        
+        toastEl.classList.remove('d-none');
+        toastEl.querySelector('.toast-title').textContent = title;
+        toastEl.querySelector('.toast-body').textContent = message;
+        
+        // Add styling based on type
+        if (type === 'success') {
+          toastEl.classList.add('bg-success', 'text-white');
+        } else if (type === 'error') {
+          toastEl.classList.add('bg-danger', 'text-white');
+        }
+        
+        container.appendChild(toastEl);
+        const toast = new bootstrap.Toast(toastEl, { autohide: true, delay: 5000 });
+        toast.show();
+        
+        // Remove toast after it's hidden
+        toastEl.addEventListener('hidden.bs.toast', () => {
+          toastEl.remove();
+        });
+      }
+
+      // Example usage:
+      // showToast('success', 'Item created successfully!', 'Success');
+      // showToast('error', 'Failed to save item', 'Error');
+    </script>
+
 
     <!-- Page tail_js -->
     {% block add_tail_js %}

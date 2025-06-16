@@ -164,17 +164,22 @@ def callback():
         username = user_data["preferred_username"]
         user_token = json.dumps(token)
         user = User.query.filter_by(username=username).first()
-
+        USER_GROUPS = user_data.get("groups")
+                
         if user is None:
             SSOUserCreate(username, email, user_token, "OpenID")
-            USER_GROUPS = user_data["groups"]
             if USER_GROUPS:
                 SSOGroupCreateFromList(username, USER_GROUPS)
                 SSOGroupsUpdateFromList(username, USER_GROUPS)
+            else:
+                logger.warning("No groups found for user %s" % username)
             user = User.query.filter_by(username=username, user_type = "OpenID").first()
         else:
             SSOTokenUpdate(username, user_token)
-            SSOGroupsUpdateFromList(username, user_data["groups"])
+            if USER_GROUPS:
+                SSOGroupsUpdateFromList(username, USER_GROUPS)
+            else:
+                logger.warning("No groups found for user %s" % username)
 
         user_role = UsersRoles.query.filter_by(user_id=user.id).first()
         role = Role.query.filter_by(id=user_role.role_id).first()

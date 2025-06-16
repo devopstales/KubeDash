@@ -8,7 +8,8 @@ RUN apk add --no-cache postgresql-libs && \
     apk add --no-cache bash gcc musl-dev linux-headers && \
     apk add --no-cache --virtual .build-deps gcc build-base freetype-dev libpng-dev openblas-dev libffi-dev musl-dev postgresql-dev
 RUN apk -U upgrade
-RUN pip install --no-cache-dir --target=/app/requirements -r /code/requirements.txt
+RUN pip install --no-cache-dir --prefix=/install-dir -r /code/requirements.txt &&\
+    pip install --no-cache-dir --prefix=/install-dir -U pip setuptools wheel 
 
 # main Contaiber
 ARG BUILDPLATFORM=linux/amd64
@@ -44,16 +45,18 @@ RUN addgroup -S -g 10001 kubedash && \
 
 COPY entrypoint.sh /entrypoint.sh
 
-RUN apk add --no-cache bash py3-setuptools
+RUN apk add --no-cache bash
 RUN apk -U upgrade
 
-COPY --from=builder /app/requirements /usr/local/lib/python3.11/site-packages
+COPY --from=builder /install-dir /usr/local
+ENV PATH=/usr/local/bin:$PATH
+
 COPY --chown=kubedash:kubedash ./kubedash /code/kubedash
 
 RUN touch /code/kubedash/CA.crt && chown kubedash:kubedash /code/kubedash/CA.crt
+RUN touch /code/kubedash/app-release && chown kubedash:kubedash /code/kubedash/app-release
 
 USER 10001:10001
 
 EXPOSE 8000
-ENV PATH=/usr/local/lib/python3.11/site-packages/bin:$PATH
 ENTRYPOINT ["/entrypoint.sh"]

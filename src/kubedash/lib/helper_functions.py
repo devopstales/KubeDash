@@ -2,12 +2,14 @@ import json
 import logging
 import re
 import sys
+import colorlog
+from colorlog.escape_codes import escape_codes
 from decimal import Decimal, InvalidOperation
 from logging import Logger
 
 import six
 import yaml
-from flask import flash
+from flask import flash, has_request_context
 from opentelemetry import trace
 
 ##############################################################
@@ -89,29 +91,56 @@ def get_logger() -> Logger:
     """
     span = trace.get_current_span()
 
-    # base config
-    logging.basicConfig(
-            level="INFO",
-            format='[%(asctime)s] [%(name)s] [%(levelname)s] %(message)s'
-        )
-    logging.captureWarnings(True)
+    # Remove existing handlers (avoid duplicate logs if reconfigured)
+    for handler in logging.root.handlers[:]:
+        logging.root.removeHandler(handler)
 
-    # get logger instance
+    # Define color codes
+    BLACK = escape_codes['black']  # black color code
+    PURPLE = escape_codes['purple']  # purple color code
+    RESET = escape_codes['reset']  # reset code
+    GREEN = '\033[32m'  # ANSI green
+    RED = '\033[31m'    # ANSI red
+
+    class BooleanColorFormatter(colorlog.ColoredFormatter):
+        def format(self, record):
+            msg = super().format(record)
+            # Colorize True and False words
+            msg = msg.replace("True", f"{GREEN}True{RESET}")
+            msg = msg.replace("False", f"{RED}False{RESET}")
+            return msg
+
+    # Define colorlog formatter with custom colors + BooleanColorFormatter
+    formatter = BooleanColorFormatter(
+        fmt=f'[{BLACK}%(asctime)s{RESET}] [{PURPLE}%(name)s{RESET}] [%(log_color)s%(levelname)s%(reset)s] %(message)s',
+        log_colors={
+            'DEBUG': 'bold_black',
+            'INFO': 'green',
+            'WARNING': 'yellow',
+            'ERROR': 'red',
+            'CRITICAL': 'bold_red',
+        }
+    )
+
+    # Set up stream handler with color
+    handler = logging.StreamHandler()
+    handler.setFormatter(formatter)
+
     logger = logging.getLogger()
+    logger.setLevel(logging.INFO)
+    logger.addHandler(handler)
+    logger.propagate = False  # Prevent double logs
 
-    if sys.argv[1] == 'cli' or sys.argv[1] == 'db':
+    # Disable noisy loggers in CLI/DB mode
+    if sys.argv[1] in ('cli', 'db'):
         log = logging.getLogger('werkzeug')
         log.disabled = True
-
-        formatter = logging.Formatter('[%(asctime)s] [{}] [%(levelname)s] %(message)s'.format(sys.argv[1]))
-        logger.handlers[0].setFormatter(formatter)
+        logger.name = sys.argv[1]
 
         if tracer and span.is_recording():
             span.set_attribute("run.mode", sys.argv[1])
     else:
-        formatter =logging.Formatter('[%(asctime)s] [kubedash] [%(levelname)s] %(message)s')
-        logger.handlers[0].setFormatter(formatter)
-
+        logger.name = "kubedash"
         if tracer and span.is_recording():
             span.set_attribute("run.mode", "server")
 
@@ -319,36 +348,21 @@ def ErrorHandler(logger, error, action):
     if hasattr(error, '__iter__'):
         if 'status' in error:
             if error.status == 401:
-                flash("401 - Unauthorized: User cannot connect to Kubernetes", "danger")
+                if has_request_context():
+                    flash("401 - Unauthorized: User cannot connect to Kubernetes", "danger")
                 logger.error("401 - Unauthorized: User cannot connect to Kubernetes")
             elif error.status == 403:
-                flash("403 - Forbidden: User cannot %s" % action, "danger")
+                if has_request_context():
+                    flash("403 - Forbidden: User cannot %s" % action, "danger")
                 logger.error("403 - Forbidden: User cannot %s" % action)
         else:
-            flash("Exception: %s" % action, "danger")
+            if has_request_context():
+                flash("Exception: %s" % action, "danger")
             logger.error("Exception: %s %s \n" % (action, error))
     else:
-        flash("Exception: %s" % action, "danger")
+        if has_request_context():
+            flash("Exception: %s" % action, "danger")
         logger.error("Exception: %s %s \n" % (action, error))
-
-def NoFlashErrorHandler(logger, error, action):
-    """Handle errors without flash messages
-    
-    Args:
-        logger (Logger): The Logger for the module.
-        error (str): The error to handle.
-        action (str): The action being performed.
-    """
-    if hasattr(error, '__iter__'):
-        if 'status' in error:
-            if error.status == 401:
-                logger.error("401 - Unauthorized: User cannot connect to Kubernetes")
-            elif error.status == 403:
-                logger.error("403 - Forbidden: User cannot %s" % action)
-        else:
-            logger.error("Exception: %s \n" % action)
-    else:
-        logger.error("Exception: %s" % action)
 
 def ResponseHandler(message, status):
     """Flash a message

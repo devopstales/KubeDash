@@ -86,7 +86,6 @@ def k8sNodesListGet(username_role, user_token):
                     NODE_INFO['version'] = value
                     
             for key, value in no.status.addresses[0].__dict__.items():
-                print(key, value)
                 if key == "_address":
                     NODE_INFO['ip'] = value
 

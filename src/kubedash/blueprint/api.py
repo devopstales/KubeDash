@@ -1,9 +1,8 @@
 from flask import send_from_directory
+from flask.views import MethodView
 from flask_smorest import Blueprint
 from contextlib import nullcontext
-import swagger_ui_bundle
-
-from flask import Blueprint
+from swagger_ui_bundle import swagger_ui_path
 
 from lib.helper_functions import get_logger
 from lib.init_functions import connect_database
@@ -16,7 +15,7 @@ from lib.sso import SSOServerTest
 ##############################################################
 
 """api Api Blueprint"""
-api = Blueprint("api", "api", url_prefix="/api", description="API endpoints")
+api = Blueprint("api", "api", url_prefix="/api")
 logger = get_logger()
 
 ##############################################################
@@ -25,7 +24,7 @@ logger = get_logger()
 @api.route('/swagger-ui/<path:filename>')
 def swagger_ui_static(filename):
     """Serve Swagger UI static files (JS, CSS) locally under /api"""
-    return send_from_directory(swagger_ui_bundle.dist_path, filename)
+    return send_from_directory(swagger_ui_path, filename)
 
 
 ##############################################################
@@ -33,7 +32,7 @@ def swagger_ui_static(filename):
 ##############################################################
 
 @api.route('/ping')
-class PingResource:
+class PingResource(MethodView):
     @api.response(200)
     def get(self):
         """Just Say Pong
@@ -56,7 +55,7 @@ class PingResource:
 ##############################################################
 
 @api.route('/health/live')
-class livenessResource:
+class livenessResource(MethodView):
     @api.response(200)
     def get(self):
         """
@@ -65,7 +64,7 @@ class livenessResource:
         return {'message': 'OK'}, 200
     
 @api.route('/health/ready')
-class readinessResource:
+class readinessResource(MethodView):
     @api.response(200)
     def get(self):
         """

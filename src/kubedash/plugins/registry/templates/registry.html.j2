@@ -209,27 +209,3 @@
 {% block add_head_css %}
 {% include "segments/datatable_snipet.html.j2" %}
 {% endblock %}
-
-{% block add_tail_js %}
-<script>
-    $(document).ready(function () {
-        $('#dataTable').DataTable({
-           responsive: true
-        });
-    });
-    function checkbox(ID) {
-        var checkBox =  document.getElementById(ID);
-        console.log(checkBox.checked);
-        console.log(ID);
-        console.log(ID+"_value");
-        console.log(document.getElementById(ID+"_value").value);
-        if (checkBox.checked == true){
-            console.log("Checked: True");
-            document.getElementById(ID+"_value").value = "True";
-        } else {
-            console.log("Checked: False");
-            document.getElementById(ID+"_value").value = "False";
-        }
-    }
-</script>
-{% endblock %}

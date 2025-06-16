@@ -9,6 +9,7 @@ from kubernetes.client.rest import ApiException
 
 from lib.helper_functions import ErrorHandler, json2yaml
 from lib.k8s.server import k8sClientConfigGet
+from lib.components import cache, short_cache_time, long_cache_time
 
 logger = getLogger(__name__)
 
@@ -16,6 +17,7 @@ logger = getLogger(__name__)
 ## Helm Charts functions
 ##############################################################
 
+@cache.memoize(timeout=long_cache_time)
 def k8sHelmChartListGet(username_role, user_token, namespace):
     k8sClientConfigGet(username_role, user_token)
     HAS_CHART = False

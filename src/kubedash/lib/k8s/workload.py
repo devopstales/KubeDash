@@ -5,8 +5,9 @@ from kubernetes.client.rest import ApiException
 from kubernetes.stream import stream
 
 from lib.components import socketio
-from lib.helper_functions import (ErrorHandler, NoFlashErrorHandler,
-                                  trimAnnotations)
+from lib.helper_functions import (
+    ErrorHandler, trimAnnotations
+)
 
 from. import logger
 from .server import k8sClientConfigGet
@@ -531,10 +532,10 @@ def k8sPodLogsStream(username_role, user_token, namespace, pod_name, container):
             socketio.emit('response',
                                 {'data': str(line)}, namespace="/log")
     except ApiException as error:
-            NoFlashErrorHandler(logger, error, "get logStream - %s" % error.status)
+            ErrorHandler(logger, error, "get logStream - %s" % error.status)
     except Exception as error:
         ERROR = "k8sPodLogsStream: %s" % error
-        NoFlashErrorHandler(logger, "error", ERROR)
+        ErrorHandler(logger, "error", ERROR)
 
 ##############################################################
 ## Pod Exec
@@ -556,7 +557,7 @@ def k8sPodExecSocket(username_role, user_token, namespace, pod_name, container):
         return wsclient
     except Exception as error:
         ERROR = "k8sPodExecSocket: %s" % error
-        NoFlashErrorHandler(logger, "error", ERROR)
+        ErrorHandler(logger, "error", ERROR)
         return None
     
 """

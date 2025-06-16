@@ -9,6 +9,7 @@ metadata:
   annotations:
     {{- toYaml . | nindent 4 }}
   {{- end }}
+{{- if .Values.createClusterRole }}
 ---
 apiVersion: rbac.authorization.k8s.io/v1
 kind: ClusterRole
@@ -28,22 +29,6 @@ rules:
   - '*'
   verbs:
   - '*'
----
-apiVersion: rbac.authorization.k8s.io/v1
-kind: ClusterRoleBinding
-metadata:
-  name: {{ include "kubedash.serviceAccountName" . }}
-  labels:
-    app: kubedash
-    {{- include "kubedash.labels" . | nindent 4 }}
-roleRef:
-  apiGroup: rbac.authorization.k8s.io
-  kind: ClusterRole
-  name: {{ include "kubedash.serviceAccountName" . }}
-subjects:
-- kind: ServiceAccount
-  name: {{ include "kubedash.serviceAccountName" . }}
-  namespace: {{ .Release.Namespace }}
 {{- if not (lookup "rbac.authorization.k8s.io/v1" "ClusterRole" "" "csr-creator") }}
 ---
 apiVersion: rbac.authorization.k8s.io/v1
@@ -60,7 +45,7 @@ rules:
   - get
   - list
   - watch
-{{- end }}
+{{ end }}
 {{- if not (lookup "rbac.authorization.k8s.io/v1" "ClusterRole" "" "csr-approver") }}
 ---
 apiVersion: rbac.authorization.k8s.io/v1
@@ -90,7 +75,7 @@ rules:
   - kubernetes.io/kubedash-apiserver-client
   verbs:
   - approve
-{{- end }}
+{{ end }}
 {{- if not (lookup "rbac.authorization.k8s.io/v1" "ClusterRole" "" "csr-signer") }}
 ---
 apiVersion: rbac.authorization.k8s.io/v1
@@ -121,6 +106,23 @@ rules:
   verbs:
   - sign
 {{- end }}
+{{ end }}
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRoleBinding
+metadata:
+  name: {{ include "kubedash.serviceAccountName" . }}
+  labels:
+    app: kubedash
+    {{- include "kubedash.labels" . | nindent 4 }}
+roleRef:
+  apiGroup: rbac.authorization.k8s.io
+  kind: ClusterRole
+  name: {{ include "kubedash.serviceAccountName" . }}
+subjects:
+- kind: ServiceAccount
+  name: {{ include "kubedash.serviceAccountName" . }}
+  namespace: {{ .Release.Namespace }}
 ---
 apiVersion: rbac.authorization.k8s.io/v1
 kind: ClusterRoleBinding

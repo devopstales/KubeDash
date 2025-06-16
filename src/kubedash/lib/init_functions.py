@@ -2,6 +2,10 @@
 import configparser
 import os
 import string
+from typing import List
+import requests
+from requests.exceptions import RequestException
+from urllib.parse import urljoin
 from flask import Flask
 
 from itsdangerous import base64_encode
@@ -73,6 +77,51 @@ def get_database_url(app: Flask, filename: string) -> string:
     app.logger.info("   Database URI: %s" % SQLALCHEMY_DATABASE_URI)
     return SQLALCHEMY_DATABASE_URI
 
+def validate_scopes(requested_scopes: List[str], issuer_url: str) -> List[str]:
+    """
+    Validate requested scopes against the IDP's supported scopes.
+    
+    Args:
+        requested_scopes: List of scopes to validate
+        issuer_url: OIDC issuer URL
+        
+    Returns:
+        List of valid scopes
+        
+    Raises:
+        ValueError: If scope validation fails
+    """
+    try:
+        # Get OIDC discovery document
+        if not issuer_url.endswith('/'):
+            issuer_url += '/'
+        well_known_url = urljoin(issuer_url, '.well-known/openid-configuration')   
+        logger.debug(f"Fetching OIDC configuration from: {well_known_url}")
+        response = requests.get(well_known_url, timeout=5)
+        response.raise_for_status()
+        oidc_config = response.json()
+        
+        # Get supported scopes (default to standard scopes if not specified)
+        supported_scopes = set(oidc_config.get('scopes_supported', [
+            'openid', 'profile', 'email', 'roles'
+        ]))
+        
+        # Always include 'openid' scope
+        supported_scopes.add('openid')
+        
+        # Filter invalid scopes
+        valid_scopes = [s for s in requested_scopes if s in supported_scopes]
+        
+        if not valid_scopes:
+            raise ValueError("No valid scopes found")
+            
+        return valid_scopes
+        
+    except RequestException as e:
+        logger.warning(f"Failed to fetch OIDC configuration: {e}")
+        # Fallback to basic openid scope if validation fails
+        return ['openid']
+
 ##############################################################
 ## Init Functions
 ##############################################################
@@ -142,17 +191,62 @@ def oidc_init(config: configparser.ConfigParser):
     OIDC_SECRET       = config.get('sso_settings', 'secret', fallback=None)
     OIDC_SCOPE        = config.get('sso_settings', 'scope', fallback=None)
     OIDC_CALLBACK_URL = config.get('sso_settings', 'callback_url', fallback=None)
+   
+    # Convert and validate scopes
+    try:
+        requested_scopes = string2list(OIDC_SCOPE)
+        valid_scopes = validate_scopes(requested_scopes, OIDC_ISSUER_URL)
+        
+        logger.debug(f"Requested scopes: {requested_scopes}")
+        logger.debug(f"Validated scopes: {valid_scopes}")
+        
+        if set(requested_scopes) != set(valid_scopes):
+            logger.warning(
+                f"Scope mismatch. Requested: {requested_scopes}, "
+                f"Using validated: {valid_scopes}"
+            )
+            
+    except Exception as e:
+        logger.error(f"Scope validation error: {e}")
+        valid_scopes = ['openid']  # Fallback to minimal scope
 
-    if OIDC_ISSUER_URL and OIDC_CLIENT_ID and OIDC_SECRET and OIDC_SCOPE and OIDC_CALLBACK_URL:
+    # Proceed with OIDC setup
+    if all([OIDC_ISSUER_URL, OIDC_CLIENT_ID, OIDC_SECRET, OIDC_CALLBACK_URL]):
         oidc_test, OIDC_ISSUER_URL_OLD = SSOServerTest()
-        if oidc_test:
-            SSOServerUpdate(OIDC_ISSUER_URL_OLD, OIDC_ISSUER_URL, OIDC_CLIENT_ID, OIDC_SECRET, OIDC_CALLBACK_URL, string2list(OIDC_SCOPE))
-            logger.info("OIDC Provider updated")
-            METRIC_OIDC_CONFIG_UPDATE.labels(OIDC_ISSUER_URL, OIDC_CLIENT_ID).set(1)
-        else:
-            SSOServerCreate(OIDC_ISSUER_URL, OIDC_CLIENT_ID, OIDC_SECRET, OIDC_CALLBACK_URL, string2list(OIDC_SCOPE))
-            logger.info("OIDC Provider created")
-            METRIC_OIDC_CONFIG_UPDATE.labels(OIDC_ISSUER_URL, OIDC_CLIENT_ID).set(0)
+        
+        try:
+            if oidc_test:
+                SSOServerUpdate(
+                    OIDC_ISSUER_URL_OLD, 
+                    OIDC_ISSUER_URL, 
+                    OIDC_CLIENT_ID, 
+                    OIDC_SECRET, 
+                    OIDC_CALLBACK_URL, 
+                    valid_scopes
+                )
+                logger.info("OIDC Provider updated")
+                METRIC_OIDC_CONFIG_UPDATE.labels(
+                    OIDC_ISSUER_URL, OIDC_CLIENT_ID
+                ).set(1)
+            else:
+                SSOServerCreate(
+                    OIDC_ISSUER_URL, 
+                    OIDC_CLIENT_ID, 
+                    OIDC_SECRET, 
+                    OIDC_CALLBACK_URL, 
+                    valid_scopes
+                )
+                logger.info("OIDC Provider created")
+                METRIC_OIDC_CONFIG_UPDATE.labels(
+                    OIDC_ISSUER_URL, OIDC_CLIENT_ID
+                ).set(0)
+                
+        except Exception as e:
+            logger.error(f"OIDC initialization failed: {e}")
+            METRIC_OIDC_CONFIG_UPDATE.labels(
+                OIDC_ISSUER_URL, OIDC_CLIENT_ID
+            ).set(-1)
+
 
 def k8s_config_int(config: configparser.ConfigParser):
     """Store K8S Api connection configuration in database. Test the K8S API Connection and add resoults to prometheus endpoint.

@@ -1,7 +1,7 @@
 version: '3'
 
 env:
-  VERSION: "3.1.0"
+  VERSION: "4.0.0"
   DATE: 
     sh: date "+%Y.%m.%d"
 
@@ -22,19 +22,31 @@ tasks:
     dir: '/tmp'
     cmds:
       # - skopeo login --tls-verify=false 127.0.0.1:4000
-      # - skopeo login devopstales
-      - skopeo copy --dest-tls-verify=false --override-os=linux docker://python:3.12-rc-alpine docker://127.0.0.1:4000/python:3.12-rc-alpine
-      - skopeo copy --dest-tls-verify=false --override-os=linux docker://devopstales/registry-imega-test:1.0 docker://127.0.0.1:4000/registry-imega-test:1.0
-      - skopeo copy --dest-tls-verify=false --override-os=linux docker://devopstales/registry-imega-test:2.0 docker://127.0.0.1:4000/registry-imega-test:2.0
-      - skopeo copy --dest-tls-verify=false --override-os=linux docker://devopstales/registry-imega-test:3.0 docker://127.0.0.1:4000/registry-imega-test:3.0
-      - skopeo copy --dest-tls-verify=false --override-os=linux docker://devopstales/registry-imega-test:3.0 docker://127.0.0.1:4000/registry-imega-test:test
+      # - skopeo login docker.io
+      - skopeo copy --dest-tls-verify=false --override-os=linux docker://docker.io/library/python:3.12-rc-alpine docker://127.0.0.1:4000/python:3.12-rc-alpine
+      - skopeo copy --dest-tls-verify=false --override-os=linux docker://docker.io/devopstales/registry-imega-test:1.0 docker://127.0.0.1:4000/registry-imega-test:1.0
+      - skopeo copy --dest-tls-verify=false --override-os=linux docker://docker.io/devopstales/registry-imega-test:2.0 docker://127.0.0.1:4000/registry-imega-test:2.0
+      - skopeo copy --dest-tls-verify=false --override-os=linux docker://docker.io/devopstales/registry-imega-test:3.0 docker://127.0.0.1:4000/registry-imega-test:3.0
+      - docker pull devopstales/registry-imega-test:3.0
+      - docker tag devopstales/registry-imega-test:3.0 127.0.0.1:4000/registry-imega-test:test
+      - docker push 127.0.0.1:4000/registry-imega-test:test
+      - cosign sign --key $HOME/.gnupg/cosign.key 127.0.0.1:4000/registry-imega-test:test -y 2>/dev/null
       # - oras login --plain-http 127.0.0.1:4000
       - oras copy --to-plain-http ghcr.io/aquasecurity/trivy-db:2 127.0.0.1:4000/trivy-db:2
       - oras copy --to-plain-http ghcr.io/aquasecurity/trivy-java-db:1 127.0.0.1:4000/trivy-java-db:1
       - helm pull oci://registry-1.docker.io/bitnamicharts/redis --version 17.9.5
       - helm push redis-17.9.5.tgz OCI://127.0.0.1:4000/helm-charts
+      - rm -f redis-17.9.5.tgz
       - trivy i --format cosign-vuln 127.0.0.1:4000/registry-imega-test:1.0 > image.sbom
       - cosign attach sbom --sbom image.sbom 127.0.0.1:4000/registry-imega-test:1.0
+      - rm -f image.sbom
+      - git clone https://github.com/stefanprodan/podinfo.git /tmp/podinfo
+      - |
+        flux push artifact oci://127.0.0.1:4000/podinfo:$(git -C /tmp/podinfo rev-parse --short HEAD) \
+        	--path="/tmp/podinfo/kustomize" \
+        	--source="$(git -C /tmp/podinfo config --get remote.origin.url)" \
+        	--revision="$(git -C /tmp/podinfo branch --show-current)@sha1:$(git rev-parse HEAD)"
+
 
 
   docker-down:
@@ -76,7 +88,54 @@ tasks:
       #- poetry run autoflake --remove-all-unused-imports --recursive --remove-unused-variables --in-place .
       - poetry run black --check .
 
-  kubedash-build:
+  kubedash-dev-build:
+    desc: "Build Kubedash devel docker image"
+    cmds:
+      - rm -rf docker/kubedash/kubedash
+      - cp -r src/kubedash docker/kubedash/kubedash
+      - rm -f docker/kubedash/requirements.txt
+      - cp docker/kubedash/kubedash/requirements.txt docker/kubedash/requirements.txt
+      - rm -f docker/kubedash/gunicorn_conf.py
+      - cp docker/kubedash/kubedash/gunicorn_conf.py docker/kubedash/gunicorn_conf.py
+      - |
+        docker build \
+        -f docker/kubedash/Dockerfile \
+        --build-arg BUILD_DATE={{.DATE}} \
+        --build-arg VERSION={{.VERSION}}-devel \
+        -t devopstales/kubedash:{{.VERSION}}-devel \
+        docker/kubedash
+
+  kubedash-dev-scan:
+    desc: "Scan Kubedash devel docker image for vulnerabilities"
+    cmds:
+      - trivy -q i devopstales/kubedash:{{.VERSION}}-devel --scanners vuln
+
+  kubedash-dev-sign:
+    desc: "Sign Kubedash devel docker image"
+    cmds:
+      - cosign sign --key $HOME/.gnupg/cosign.key devopstales/kubedash:{{.VERSION}}-devel -y
+
+  kubedash-dev-push:
+    desc: "Push Kubedash devel docker image"
+    cmds:
+      - docker push devopstales/kubedash:{{.VERSION}}-devel
+
+  kubedash-dev-rm:
+    desc: "Remove Kubedash devel docker image"
+    cmds:
+      - docker rmi devopstales/kubedash:{{.VERSION}}-devel
+
+  kubedash-dev:
+    desc: "Build, scan, sign and push Kubedash devel docker image"
+    cmds:
+      - task: kubedash-dev-build
+        run: true
+      - task: kubedash-dev-scan
+        run: true
+      - task: kubedash-dev-push
+        run: true
+
+  kubedash-prod-build:
     desc: "Build Kubedash docker image"
     cmds:
       - rm -rf docker/kubedash/kubedash
@@ -85,22 +144,123 @@ tasks:
       - cp docker/kubedash/kubedash/requirements.txt docker/kubedash/requirements.txt
       - rm -f docker/kubedash/gunicorn_conf.py
       - cp docker/kubedash/kubedash/gunicorn_conf.py docker/kubedash/gunicorn_conf.py
-      - docker build --build-arg BUILD_DATE={{.DATE}} --build-arg VERSION={{.VERSION}}-devel -t devopstales/kubedash:{{.VERSION}}-devel docker/kubedash
+      - |
+        docker build \
+        --build-arg BUILD_DATE={{.DATE}} \
+        --build-arg VERSION={{.VERSION}} \
+        -t devopstales/kubedash:{{.VERSION}} \
+        -t devopstales/kubedash:latest \
+        -t ghcr.io/devopstales/kubedash:{{.VERSION}} \
+        -t ghcr.io/devopstales/kubedash:latest \
+        docker/kubedash
 
-  kubedash-docker-scan:
+  kubedash-prod-scan:
     desc: "Scan Kubedash Dockerfile for vulnerabilities"
     cmds:
-      - trivy -q i devopstales/kubedash:{{.VERSION}}-devel --scanners vuln
+      - trivy -q i --scanners vuln devopstales/kubedash:{{.VERSION}}
+      - trivy -q i --format cyclonedx --output sbom.cdx.json --scanners vuln devopstales/kubedash:{{.VERSION}} 
 
-  kubedash-push:
+  kubedash-prod-push:
     desc: "Push Kubedash docker image"
     cmds:
-      - docker push devopstales/kubedash:{{.VERSION}}-devel
+      - docker push devopstales/kubedash:{{.VERSION}}
+      - docker push devopstales/kubedash:latest
+      - docker push ghcr.io/devopstales/kubedash:{{.VERSION}}
+      - docker push ghcr.io/devopstales/kubedash:latest
+      - |
+        oras attach docker.io/devopstales/kubedash:{{.VERSION}} \
+        --artifact-type application/vnd.cyclonedx+json \
+        --annotation "org.opencontainers.image.description=SBOM for kubedash" \
+        --annotation "org.opencontainers.artifact.description=SBOM for kubedash" \
+        --annotation "org.opencontainers.artifact.type=sbom" \
+        --annotation "org.cyclonedx.bom.version=1.4" \
+        --annotation "org.opencontainers.ref.name=kubedash-{{.VERSION}}" \
+        --annotation "org.opencontainers.created=$(date -u +%Y-%m-%dT%H:%M:%SZ)" \
+        sbom.cdx.json
+      - |
+        oras attach docker.io/devopstales/kubedash:latest \
+        --artifact-type application/vnd.cyclonedx+json \
+        --annotation "org.opencontainers.image.description=SBOM for kubedash" \
+        --annotation "org.opencontainers.artifact.description=SBOM for kubedash" \
+        --annotation "org.opencontainers.artifact.type=sbom" \
+        --annotation "org.cyclonedx.bom.version=1.4" \
+        --annotation "org.opencontainers.ref.name=kubedash-{{.VERSION}}" \
+        --annotation "org.opencontainers.created=$(date -u +%Y-%m-%dT%H:%M:%SZ)" \
+        sbom.cdx.json
+      - |
+        oras attach ghcr.io/devopstales/kubedash:{{.VERSION}} \
+        --artifact-type application/vnd.cyclonedx+json \
+        --annotation "org.opencontainers.image.description=SBOM for kubedash" \
+        --annotation "org.opencontainers.artifact.description=SBOM for kubedash" \
+        --annotation "org.opencontainers.artifact.type=sbom" \
+        --annotation "org.cyclonedx.bom.version=1.4" \
+        --annotation "org.opencontainers.ref.name=kubedash-{{.VERSION}}" \
+        --annotation "org.opencontainers.created=$(date -u +%Y-%m-%dT%H:%M:%SZ)" \
+        sbom.cdx.json
+      - |
+        oras attach ghcr.io/devopstales/kubedash:latest \
+        --artifact-type application/vnd.cyclonedx+json \
+        --annotation "org.opencontainers.image.description=SBOM for kubedash" \
+        --annotation "org.opencontainers.artifact.description=SBOM for kubedash" \
+        --annotation "org.opencontainers.artifact.type=sbom" \
+        --annotation "org.cyclonedx.bom.version=1.4" \
+        --annotation "org.opencontainers.ref.name=kubedash-{{.VERSION}}" \
+        --annotation "org.opencontainers.created=$(date -u +%Y-%m-%dT%H:%M:%SZ)" \
+        sbom.cdx.json
 
-  kubedash-rm:
+  kubedash-prod-sign:
+    desc: "Sign Kubedash docker image"
+    cmds:
+      - cosign sign -y --upload=true --key $HOME/.gnupg/cosign.key devopstales/kubedash:{{.VERSION}}
+      - cosign sign -y --upload=true --key $HOME/.gnupg/cosign.key devopstales/kubedash:latest
+      - cosign sign -y --upload=true --key $HOME/.gnupg/cosign.key ghcr.io/devopstales/kubedash:{{.VERSION}}
+      - cosign sign -y --upload=true --key $HOME/.gnupg/cosign.key ghcr.io/devopstales/kubedash:latest
+
+  kubedash-prod-rm:
     desc: "Remove Kubedash docker image"
     cmds:
-      - docker rmi devopstales/kubedash:{{.VERSION}}-devel
+      - rm sbom.cdx.json
+      - docker rmi devopstales/kubedash:{{.VERSION}}
+      - docker rmi ghcr.io/devopstales/kubedash:{{.VERSION}}
+
+  kubedash-prod:
+    desc: "Build, scan, sign and push Kubedash docker image"
+    cmds:
+      - task: kubedash-prod-build
+        run: true
+      - task: kubedash-prod-scan
+        run: true
+      - task: kubedash-prod-push
+        run: true
+      - task: kubedash-prod-sign
+        run: true
+      - task: kubedash-prod-rm
+        run: true
+
+  helm-docs:
+   desc: "Generate Helm Chart documentation"
+   dir: 'deploy/helm'
+   cmds:
+    - helm-docs
+
+  helm-build:
+    desc: "Build Helm Chart"
+    dir: 'deploy/helm'
+    cmds:
+      - helm dependency update
+      - helm package --version {{.VERSION}} --app-version {{.VERSION}} .
+      - helm push kubedash-{{.VERSION}}.tgz oci://registry-1.docker.io/devopstales &> push-metadata.txt
+
+  helm-sign:
+    desc: "Sign Helm Chart"
+    dir: 'deploy/helm'
+    cmds:
+      - cosign sign-blob -y --key $HOME/.gnupg/cosign.key kubedash-{{.VERSION}}.tgz --bundle ubedash-{{.VERSION}}.tgz.cosign.bundle
+      #- CHART_DIGEST=$(grep -oP "(?<=digest: sha256:)[a-z0-9]+" push-metadata.txt)
+      #- cosign sign -y --key $HOME/.gnupg/cosign.key push-metadata.txt devopstales/helm-charts/kubedash:$CHART_DIGEST
+      - rm -f push-metadata.txt
+      - rm -f kubedash-{{.VERSION}}.tgz
+      - rm -f kubedash-{{.VERSION}}.tgz.cosign.bundle
 
   kdlogin-build:
     desc: "Build kubectl-kdlogin"
@@ -139,9 +299,3 @@ tasks:
       - source .venv/bin/activate
       - pip3 install -r build/requirements.txt
       - mkdocs build
-
-  helm-docs:
-   desc: "Generate Helm Chart documentation"
-   dir: 'deploy/helm'
-   cmds:
-    - helm-docs

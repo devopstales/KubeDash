@@ -122,7 +122,62 @@
                             <h3>Image Configuration</h3>
                             <div class="table-responsive">
                                 <table class="table table-bordered" id="infoInfoTable" width="100%" cellspacing="0">
-                                {% if tag_data.format == "Docker" %}
+                                {% if tag_data.format == "OCI" %}
+                                    <tr>
+                                        <th>Media Type:</th>
+                                        <td>{{ tag_data.media_type }}</td>
+                                    </tr>
+                                    {% if tag_data.media_type == "application/vnd.aquasec.trivy.config.v1+json" %}
+                                    <tr>
+                                        <th>Trivy DB:</th>
+                                        <td>{{ tag_data.trivy_db }}</td>
+                                    </tr>
+                                    {% elif tag_data.media_type == "application/vnd.oci.image.config.v1+json" %}
+                                    <tr>
+                                        <th>Cosign Signature:</th>
+                                        <td>
+                                            <pre><code>{{ tag_data.cosign_signature }}</code></pre>
+                                        </td>
+
+                                    </tr>
+                                    <tr>
+                                        <th>Cosign Bundle:</th>
+                                        <td>
+                                            <pre><code>{{tag_data.cosign_bundle }}</code></pre>
+                                        </td>
+                                    </tr>
+                                    <tr>
+                                        <th>Cosign Certificate:</th>
+                                        <td>
+                                            <pre><code>{{ tag_data.cosign_certificate }}</code></pre>
+                                        </td>
+                                    </tr>
+                                    <tr>
+                                        <th>Cosign Chain:</th>
+                                        <td>
+                                            <pre><code>{{ tag_data.cosign_chain }}</code></pre>
+                                        </td>
+                                    </tr>
+                                    {% endif %}
+                                {% endif %}
+                                {% if tag_data.build_date %}
+                                    <tr>
+                                        <th>Build Date:</th>
+                                        <td>{{ tag_data.build_date }}</td>
+                                    </tr>
+                                {% endif %}
+                                {% if tag_data.vcs_url %}
+                                    <tr>
+                                        <th>VCS URL:</th>
+                                        <td><a href="{{ tag_data.vcs_url }}">{{ tag_data.vcs_url }}</a></td>
+                                    </tr>
+                                {% endif %}
+                                {% if tag_data.documentation %}
+                                    <tr>
+                                        <th>Documentation:</th>
+                                        <td><a href="{{ tag_data.documentation }}">{{ tag_data.documentation }}</a></td>
+                                    </tr>
+                                {% endif %}
                                     <tr>
                                         <th>Entrypoint</th>
                                         <td>
@@ -181,44 +236,6 @@
                                             {% endfor %}
                                         </td>
                                     </tr>
-                                {% elif tag_data.format == "OCI" %}
-                                    <tr>
-                                        <th>Media Type:</th>
-                                        <td>{{ tag_data.media_type }}</td>
-                                    </tr>
-                                    {% if tag_data.media_type == "application/vnd.aquasec.trivy.config.v1+json" %}
-                                    <tr>
-                                        <th>Trivy DB:</th>
-                                        <td>{{ tag_data.trivy_db }}</td>
-                                    </tr>
-                                    {% elif tag_data.media_type == "application/vnd.oci.image.config.v1+json" %}
-                                    <tr>
-                                        <th>Cosign Signature:</th>
-                                        <td>
-                                            <pre><code>{{ tag_data.cosign_signature }}</code></pre>
-                                        </td>
-
-                                    </tr>
-                                    <tr>
-                                        <th>Cosign Bundle:</th>
-                                        <td>
-                                            <pre><code>{{tag_data.cosign_bundle }}</code></pre>
-                                        </td>
-                                    </tr>
-                                    <tr>
-                                        <th>Cosign Certificate:</th>
-                                        <td>
-                                            <pre><code>{{ tag_data.cosign_certificate }}</code></pre>
-                                        </td>
-                                    </tr>
-                                    <tr>
-                                        <th>Cosign Chain:</th>
-                                        <td>
-                                            <pre><code>{{ tag_data.cosign_chain }}</code></pre>
-                                        </td>
-                                    </tr>
-                                    {% endif %}
-                                {% endif %}
                                 </table>
                             </div>
                         </div>
@@ -335,6 +352,7 @@
                                             <th>Score</th>
                                             <th>Package</th>
                                             <th>Installed Version</th>
+                                            <th>Fixed Version</th>
                                         </tr>
                                     </thead>
                                     <tbody>
@@ -357,6 +375,7 @@
                                             <td>{{ v.score }}</td>
                                             <td>{{ v.resource }}</td>
                                             <td>{{ v.installedVersion }}</td>
+                                            <td>{{ v.fixedVersion }}</td>
                                         </tr>
                                     {% endfor %}
                                     </tbody>

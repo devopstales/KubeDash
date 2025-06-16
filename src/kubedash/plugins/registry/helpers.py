@@ -106,7 +106,7 @@ def registry_request(registry_server_url: str, url_path, header=None, method='GE
     except requests.RequestException as error:
         ErrorHandler(logger, "Registry Error", 'Problem during docker registry connection: %s' % error)
         return None, None
-    
+
 def get_image_sbom_vulns(registry_server_url, image, tag) -> list:
     """Get the SBOM vulnerabilities for an image and tag
     
@@ -128,15 +128,77 @@ def get_image_sbom_vulns(registry_server_url, image, tag) -> list:
         if sbom_vulnerabilities:
             vulnerabilities = list()
             for sbom in sbom_vulnerabilities:
+                # Initialize score as None in case CVSS information isn't available
+                score = None
+                if "CVSS" in sbom and "redhat" in sbom["CVSS"] and "V3Score" in sbom["CVSS"]["redhat"]:
+                    score = sbom["CVSS"]["redhat"]["V3Score"]
+                    
+                fixed_version = None
+                if "FixedVersion" in sbom and sbom["FixedVersion"] is not None:
+                    fixed_version = sbom["FixedVersion"]
+                
                 vulnerability = {
                     "vulnerabilityID": sbom["VulnerabilityID"],
                     "severity": sbom["Severity"],
-                    "score": sbom["CVSS"]["redhat"]["V3Score"],
+                    "score": score,
                     "resource": sbom["PkgName"],
                     "installedVersion": sbom["InstalledVersion"],
                     "publishedDate": sbom["PublishedDate"],
+                    "fixedVersion": fixed_version,  # Initialize fixedVersion as None
                 }
-                if "fixedVersion" in sbom:
-                    vulnerability["fixedVersion"] = sbom["FixedVersion"]
+
                 vulnerabilities.append(vulnerability)
         return vulnerabilities
+
+def process_image_labels(config_data):
+    """
+    Extracts standardized labels from Docker image config and maps them to a structured format.
+    Follows OpenContainers Image Spec (https://specs.opencontainers.org/image-spec/annotations/)
+    and Label Schema (http://label-schema.org/rc1/) standards.
+    """
+    manifest = {}
+    created_label = None
+    
+    if "config" in config_data and "Labels" in config_data["config"]:
+        labels = config_data["config"]["Labels"]
+        manifest["labels"] = labels
+        
+        # OpenContainers Standard Annotations
+        label_mappings = {
+            # Core OpenContainers labels
+            "org.opencontainers.image.created": ("created", None),
+            "org.opencontainers.image.url": ("url", None),
+            "org.opencontainers.image.source": ("source_code", None),
+            "org.opencontainers.image.version": ("version", None),
+            "org.opencontainers.image.revision": ("revision", None),
+            "org.opencontainers.image.licenses": ("licenses", None),
+            "org.opencontainers.image.documentation": ("documentation", None),
+            
+            # Label Schema (legacy) mappings
+            "org.label-schema.build-date": ("build_date", None),
+            "org.label-schema.vcs-url": ("vcs_url", None),
+            "org.label-schema.vcs-ref": ("vcs_ref", None),
+            "org.label-schema.version": ("version", None),
+            "org.label-schema.license": ("license", None),
+            
+            # Common vendor-specific mappings
+            "com.example.maintainer": ("maintainer", None),
+            "com.example.release-notes": ("release_notes", None)
+        }
+        
+        # Process all labels
+        for label_key, label_value in labels.items():
+            # Standardized label processing
+            if label_key in label_mappings:
+                manifest_key, transform_fn = label_mappings[label_key]
+                manifest[manifest_key] = transform_fn(label_value) if transform_fn else label_value
+            
+            # Special handling for created date
+            if label_key == "org.opencontainers.image.created":
+                created_label = label_value
+                
+        # Set default fields if not found
+        if "created" not in manifest and created_label:
+            manifest["created"] = created_label
+            
+    return manifest

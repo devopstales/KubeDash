@@ -24,24 +24,32 @@ name = kubedash
 #################################### Cache server #############################
 [remote_cache]
 # Either redis, none default is none
-type = none
+redis_enabled = true
+
+# redis host 
+redis_host = 127.0.0.1
+redis_port = 6379
+
+# redis cluster
+cluster_enabled = false
+cluster_startup_nodes = 10.0.0.1,10.0.0.2
+
 
 # cache connectionstring options
-# redis: config like redis server e.g. `addr=127.0.0.1:6379,pool_size=100,db=0,ssl=false`. Only addr is required. ssl may be 'true', 'false', or 'insecure'.
-connstr =
+redis_port = 6379
+redis_db = 0
+redis_password =
 
-# prefix prepended to all the keys in the remote cache
-prefix =
-
-# This enables encryption of values stored in the remote cache
-encryption =
+# cache time
+short_cache_time = 60
+long_cache_time = 900
 
 #################################### SSO Settings ###########################
 [sso_settings]
 
 issuer_url = https://keycloak.kdev.intra/auth/realms/k8s-apps
 callback_url = https://kubedash.kdev.intra
-scope = groups email openid profile good-service
+scope = roles email openid profile good-service
 client_id = kubedash
 secret = nkBeJzvrBxzRfGNDJENrEvwtnqczGLzk
 

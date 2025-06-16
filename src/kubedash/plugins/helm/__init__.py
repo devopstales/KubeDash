@@ -7,6 +7,7 @@ from flask_login import login_required
 from lib.helper_functions import get_logger
 from lib.k8s.namespace import k8sNamespaceListGet
 from lib.sso import get_user_token
+from lib.components import cache, short_cache_time, long_cache_time
 
 from .functions import k8sHelmChartListGet
 
@@ -23,14 +24,14 @@ logger = get_logger()
 ##############################################################
 
 @helm.route('/helm-chart', methods=['GET', 'POST'])
+@cache.cached(timeout=long_cache_time, key_prefix='helm_charts')
 @login_required
-def charts():
+def charts():   
     user_token = get_user_token(session)
 
     if request.method == 'POST':
         if request.form.get('ns_select', None):
             session['ns_select'] = request.form.get('ns_select')
-
 
     namespace_list, error = k8sNamespaceListGet(session['user_role'], user_token)
     if not error:
@@ -47,6 +48,7 @@ def charts():
     )
 
 @helm.route('/helm-charts/data', methods=['GET', 'POST'])
+@cache.cached(timeout=short_cache_time, key_prefix='helm_charts_data')
 @login_required
 def charts_data():
     if request.method == 'POST':

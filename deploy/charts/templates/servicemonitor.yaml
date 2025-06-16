@@ -10,9 +10,11 @@ metadata:
     {{- include "kubedash.labels" . | nindent 4 }}
 {{- with .Values.metrics.serviceMonitor.labels  }}
 {{ toYaml . | indent 4 }}
+{{- end }}
 {{- with .Values.metrics.serviceMonitor.annotations  }}
   annotations:
 {{ toYaml . | indent 4 }}
+{{- end }}
 spec:
   {{- if .Values.metrics.serviceMonitor.jobLabel }}
   jobLabel: {{ .Values.metrics.serviceMonitor.jobLabel }}
@@ -24,8 +26,9 @@ spec:
     {{- include "kubedash.labels" . | nindent 6 }}
 {{- with .Values.metrics.serviceMonitor.labels  }}
 {{ toYaml . | indent 6 }}
+{{- end }}
   endpoints:
-    - port: prometheus-exporter
+    - port: prometheus
       {{- if .Values.metrics.serviceMonitor.interval }}
       interval: {{ .Values.metrics.serviceMonitor.interval }}
       {{- end }}

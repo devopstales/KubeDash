@@ -47,6 +47,6 @@ spec:
               service:
                 name: {{ include "kubedash.fullname" . }}
                 port: 
-                  number: 5000
+                  number: 8000
 {{- end }}
 {{- end }}

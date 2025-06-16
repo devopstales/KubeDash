@@ -74,6 +74,8 @@ def create_app(external_config_name=None):
             initialize_app_version(app)
             # connections            
             initialize_app_tracing(app)
+            initialize_app_caching(app)
+            initbefore_request(app)
             initialize_app_database(app, __file__)
             with app.app_context():
                 initialize_metrics_scraper(app)
@@ -82,11 +84,7 @@ def create_app(external_config_name=None):
             initialize_blueprints(app)
             add_custom_jinja2_filters(app)
             initialize_app_security(app)
-            initialize_app_tracing(app)
             
-            initialize_app_caching(app)
-            initbefore_request(app)
-
             print(separator_long)
             
    

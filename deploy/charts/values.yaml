@@ -5,6 +5,9 @@ logLevel: "INFO"
 # -- flask environment: production or development
 flaskConfig: "production"
 
+# -- Enable ClusterRole creation. Disable if the role already exists.
+createClusterRole: true
+
 serviceAccount:
   # -- Enable automatic serviceAccount creation
   create: true
@@ -136,7 +139,7 @@ redis:
       # -- Enable prometheus service monitor
       enabled: false
       # -- Prometheus service monitor namespace
-      namespace: "monitoring"
+      namespace: "monitoring"  
 
 # -- enable metrics-server
 metricsServer:
@@ -213,7 +216,7 @@ persistence:
   ##   set, choosing the default provisioner.  (gp2 on AWS, standard on
   ##   GKE, AWS & OpenStack)
   ##
-  # storageClass: "-"
+  storageClass: "-"
 
 ingress:
   # -- Enable Ingress object creation

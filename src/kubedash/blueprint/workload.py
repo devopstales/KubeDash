@@ -11,7 +11,7 @@ from lib.components import socketio
 from lib.helper_functions import get_logger
 from lib.k8s.namespace import k8sNamespaceListGet
 from lib.k8s.security import k8sPodListVulnsGet, k8sPodVulnsGet
-from lib.k8s.workload import (NoFlashErrorHandler, k8sDaemonsetPatch,
+from lib.k8s.workload import (ErrorHandler, k8sDaemonsetPatch,
                               k8sDaemonSetsGet, k8sDeploymentsGet,
                               k8sDeploymentsPatchReplica, k8sPodExecSocket,
                               k8sPodExecStream, k8sPodGet, k8sPodGetContainers,
@@ -191,10 +191,10 @@ def exec_input(data):
     try:
         wsclient.write_stdin(data["input"].encode())
     except ApiException as error:
-            NoFlashErrorHandler(logger, error, "exec_input")
+            ErrorHandler(logger, error, "exec_input")
     except Exception as error:
         ERROR = "exec_input: %s" % error
-        NoFlashErrorHandler(logger, "error", ERROR)
+        ErrorHandler(logger, "error", ERROR)
 
 ##############################################################
 ## Statefullsets

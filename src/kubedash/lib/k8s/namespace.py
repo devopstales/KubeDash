@@ -95,36 +95,36 @@ def k8sNamespacesGet(username_role, user_token):
             span.set_attribute("user.role", username_role)
         k8sClientConfigGet(username_role, user_token)
         NAMESPACE_LIST = []
-        #try:
-        namespaces, error = k8sListNamespaces(username_role, user_token)
-        if error is None:
-            for ns in namespaces.items:
-                NAMESPACE_DADTA = {
-                    "name": None,
-                    "status": None,
-                    "labels": list(),
-                    "annotations": list(),
-                    "created": None,
-                }
-                NAMESPACE_DADTA['name'] = ns.metadata.name
-                NAMESPACE_DADTA['status'] = ns.status.__dict__['_phase']
-                NAMESPACE_DADTA['created'] = ns.metadata.creation_timestamp.strftime('%Y-%m-%d %H:%M:%S')
-                if ns.metadata.labels:
-                    NAMESPACE_DADTA['labels'] = ns.metadata.labels
-                if ns.metadata.annotations:
-                    NAMESPACE_DADTA['annotations'] = trimAnnotations(ns.metadata.annotations)
-                NAMESPACE_LIST.append(NAMESPACE_DADTA)
-                if tracer and span.is_recording():
-                    span.set_attribute("namespace.name", ns.metadata.name)
-                    span.set_attribute("namespace.role", ns.status.__dict__['_phase'])
+        try:
+            namespaces, error = k8sListNamespaces(username_role, user_token)
+            if error is None:
+                for ns in namespaces.items:
+                    NAMESPACE_DADTA = {
+                        "name": None,
+                        "status": None,
+                        "labels": list(),
+                        "annotations": list(),
+                        "created": None,
+                    }
+                    NAMESPACE_DADTA['name'] = ns.metadata.name
+                    NAMESPACE_DADTA['status'] = ns.status.__dict__['_phase']
+                    NAMESPACE_DADTA['created'] = ns.metadata.creation_timestamp.strftime('%Y-%m-%d %H:%M:%S')
+                    if ns.metadata.labels:
+                        NAMESPACE_DADTA['labels'] = ns.metadata.labels
+                    if ns.metadata.annotations:
+                        NAMESPACE_DADTA['annotations'] = trimAnnotations(ns.metadata.annotations)
+                    NAMESPACE_LIST.append(NAMESPACE_DADTA)
+                    if tracer and span.is_recording():
+                        span.set_attribute("namespace.name", ns.metadata.name)
+                        span.set_attribute("namespace.role", ns.status.__dict__['_phase'])
+                return NAMESPACE_LIST
+            else:
+                return NAMESPACE_LIST
+        except Exception as error:
+            ErrorHandler(logger, "CannotConnect", "k8sNamespacesGet: %s" % error)
+            if tracer and span.is_recording():
+                span.set_status(Status(StatusCode.ERROR, "k8sNamespacesGet: %s" % error))
             return NAMESPACE_LIST
-        else:
-            return NAMESPACE_LIST
-        #except Exception as error:
-        #    ErrorHandler(logger, "CannotConnect", "k8sNamespacesGet: %s" % error)
-        #    if tracer and span.is_recording():
-        #        span.set_status(Status(StatusCode.ERROR, "k8sNamespacesGet: %s" % error))
-        #    return NAMESPACE_LIST
     
 def k8sNamespaceCreate(username_role, user_token, ns_name):
     """Create a namespace

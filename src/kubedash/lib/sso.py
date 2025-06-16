@@ -90,7 +90,7 @@ def SSOServerUpdate(oauth_server_uri_old, oauth_server_uri, client_id, client_se
         sso.base_uri = base_uri
         sso.scope = scope
         db.session.commit()
-
+        
 @tracer.start_as_current_span("get_logger")
 def SSOSererGet():
     """Get a SSOServer instance from database

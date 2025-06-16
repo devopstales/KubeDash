@@ -7,7 +7,7 @@ metadata:
     app: kubedash
     {{ include "kubedash.labels" . | nindent 4 }}
 data:
-  kubedash.ini: |-
+  kubedash.ini: |
     ##################### KubeDash Configuration Defaults #####################
     [DEFAULT]
     app_mode = production
@@ -25,33 +25,33 @@ data:
     host = {{ .Values.externalDatabase.host }}
     name = {{ .Values.externalDatabase.database }}
     user = root
-    password = {{ .Values.externalDatabase.password | b64enc }}
+    password = {{ .Values.externalDatabase.password }}
     {{ else if .Values.postgresql.enabled }}
     type = postgres
     host = {{ .Release.Name }}-postgresql
-    name = {{ .Values.postgresql.postgresql.database }}
-    user = root
-    password = {{ .Values.postgresql.postgresql.password | b64enc }}
+    name = {{ .Values.postgresql.auth.database }}
+    user = {{ .Values.postgresql.auth.username }}
+    password = {{ .Values.postgresql.auth.password }}
     {{ else }}
     type = sqlite3
     {{ end }}
 
-    {{ if .Values.redis.enabled }}
     #################################### Cache server #############################
     [remote_cache]
-    # Either redis, none default is none
-    type = redis
-
+    {{ if .Values.redis.enabled }}
+    redis_enabled = true
     # cache connectionstring options
-    # redis: config like redis server e.g. `addr=127.0.0.1:6379,pool_size=100,db=0,ssl=false`. Only addr is required. ssl may be 'true', 'false', or 'insecure'.
-    connstr = addr={{ .Release.Name }}-master:6379,pool_size=100,db=0,ssl=false 
-
-    # prefix prepended to all the keys in the remote cache
-    prefix =
-
-    # This enables encryption of values stored in the remote cache
-    encryption =
-
+    redis_host = {{ .Release.Name }}-redis-master
+    redis_port = 6379
+    redis_db = 0
+    # cache time
+    short_cache_time = 60
+    long_cache_time = 900
+    {{ else }}
+    redis_enabled = false
+    # cache time
+    short_cache_time = 60
+    long_cache_time = 900
     {{ end }}
     {{ if .Values.oidc.enabled }}
     #################################### SSO Settings ###########################
@@ -92,7 +92,9 @@ data:
     gateway_api = false
     cert_manager = {{ .Values.plugins.certManager.enabled }}
     external_loadbalancer = {{ .Values.plugins.externalLoadbalancer.enabled }}
-{{- if .Values.monitoring.enabled }}
+
+    #################################### End of Settings ###########################
+{{- if .Values.metrics.enabled }}
 ---
 apiVersion: v1
 kind: ConfigMap
@@ -124,4 +126,323 @@ data:
         name: "gunicorn_request_duration"
         labels:
           app: "$1"
+---
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: kubedash-gunicorn-dashboard
+  labels:
+    grafana_dashboard: "1"
+    app: kubedash
+    {{ include "kubedash.labels" . | nindent 4 }}
+data:
+  kubedash-gunicorn-dashboard.json: |-
+    {
+      "__inputs": [
+        {
+          "name": "DS_PROMETHEUS",
+          "label": "Prometheus",
+          "description": "",
+          "type": "datasource",
+          "pluginId": "prometheus",
+          "pluginName": "Prometheus"
+        }
+      ],
+      "__requires": [
+        {
+          "type": "grafana",
+          "id": "grafana",
+          "name": "Grafana",
+          "version": "6.7.0"
+        },
+        {
+          "type": "panel",
+          "id": "graph",
+          "name": "Graph",
+          "version": ""
+        },
+        {
+          "type": "datasource",
+          "id": "prometheus",
+          "name": "Prometheus"
+        }
+      ],
+      "annotations": {
+        "list": [
+          {
+            "builtIn": 1,
+            "datasource": "-- Grafana --",
+            "enable": true,
+            "hide": true,
+            "iconColor": "rgba(0, 211, 255, 1)",
+            "name": "Annotations & Alerts",
+            "type": "dashboard"
+          }
+        ]
+      },
+      "description": "Kubernetes cluster monitoring with Prometheus and Grafana",
+      "editable": true,
+      "gnetId": 16163,
+      "graphTooltip": 0,
+      "id": null,
+      "iteration": 16163,
+      "links": [],
+      "panels": [
+        {
+          "aliasColors": {},
+          "bars": false,
+          "dashLength": 10,
+          "dashes": false,
+          "datasource": "${DS_PROMETHEUS}",
+          "description": "",
+          "fieldConfig": {
+            "defaults": {
+              "color": {
+                "mode": "palette-classic"
+              },
+              "mappings": [],
+              "thresholds": {
+                "mode": "absolute",
+                "steps": [
+                  {
+                    "color": "green",
+                    "value": null
+                  },
+                  {
+                    "color": "red",
+                    "value": 80
+                  }
+                ]
+              }
+            },
+            "overrides": []
+          },
+          "fill": 1,
+          "fillGradient": 0,
+          "gridPos": {
+            "h": 9,
+            "w": 12,
+            "x": 0,
+            "y": 0
+          },
+          "hiddenSeries": false,
+          "id": 2,
+          "legend": {
+            "avg": false,
+            "current": false,
+            "max": false,
+            "min": false,
+            "show": true,
+            "total": false,
+            "values": false
+          },
+          "lines": true,
+          "linewidth": 1,
+          "nullPointMode": "null",
+          "options": {
+            "alertThreshold": true
+          },
+          "percentage": false,
+          "pointradius": 2,
+          "points": false,
+          "renderer": "flot",
+          "seriesOverrides": [],
+          "spaceLength": 10,
+          "stack": false,
+          "steppedLine": false,
+          "targets": [
+            {
+              "expr": "100 - (avg by (instance) (irate(node_cpu_seconds_total{mode=\"idle\"}[5m])) * 100)",
+              "interval": "",
+              "legendFormat": "{{`{{`}}instance{{`}}`}}",
+              "refId": "A"
+            }
+          ],
+          "thresholds": [],
+          "timeFrom": null,
+          "timeRegions": [],
+          "timeShift": null,
+          "title": "CPU Usage",
+          "tooltip": {
+            "shared": true,
+            "sort": 0,
+            "value_type": "individual"
+          },
+          "type": "graph",
+          "xaxis": {
+            "buckets": null,
+            "mode": "time",
+            "name": null,
+            "show": true,
+            "values": []
+          },
+          "yaxes": [
+            {
+              "format": "percent",
+              "label": null,
+              "logBase": 1,
+              "max": "100",
+              "min": "0",
+              "show": true
+            },
+            {
+              "format": "short",
+              "label": null,
+              "logBase": 1,
+              "show": true
+            }
+          ],
+          "yaxis": {
+            "align": false,
+            "alignLevel": null
+          }
+        },
+        {
+          "aliasColors": {},
+          "bars": false,
+          "dashLength": 10,
+          "dashes": false,
+          "datasource": "${DS_PROMETHEUS}",
+          "description": "",
+          "fieldConfig": {
+            "defaults": {
+              "color": {
+                "mode": "palette-classic"
+              },
+              "mappings": [],
+              "thresholds": {
+                "mode": "absolute",
+                "steps": [
+                  {
+                    "color": "green",
+                    "value": null
+                  },
+                  {
+                    "color": "red",
+                    "value": 80
+                  }
+                ]
+              }
+            },
+            "overrides": []
+          },
+          "fill": 1,
+          "fillGradient": 0,
+          "gridPos": {
+            "h": 9,
+            "w": 12,
+            "x": 12,
+            "y": 0
+          },
+          "hiddenSeries": false,
+          "id": 4,
+          "legend": {
+            "avg": false,
+            "current": false,
+            "max": false,
+            "min": false,
+            "show": true,
+            "total": false,
+            "values": false
+          },
+          "lines": true,
+          "linewidth": 1,
+          "nullPointMode": "null",
+          "options": {
+            "alertThreshold": true
+          },
+          "percentage": false,
+          "pointradius": 2,
+          "points": false,
+          "renderer": "flot",
+          "seriesOverrides": [],
+          "spaceLength": 10,
+          "stack": false,
+          "steppedLine": false,
+          "targets": [
+            {
+              "expr": "sum by (job) (rate(container_cpu_usage_seconds_total{container!=\"\",pod!=\"\",namespace!=\"\"}[5m]))",
+              "interval": "",
+              "legendFormat": "{{`{{`}}job{{`}}`}}",
+              "refId": "A"
+            }
+          ],
+          "thresholds": [],
+          "timeFrom": null,
+          "timeRegions": [],
+          "timeShift": null,
+          "title": "Container CPU Usage",
+          "tooltip": {
+            "shared": true,
+            "sort": 0,
+            "value_type": "individual"
+          },
+          "type": "graph",
+          "xaxis": {
+            "buckets": null,
+            "mode": "time",
+            "name": null,
+            "show": true,
+            "values": []
+          },
+          "yaxes": [
+            {
+              "format": "percent",
+              "label": null,
+              "logBase": 1,
+              "max": "100",
+              "min": "0",
+              "show": true
+            },
+            {
+              "format": "short",
+              "label": null,
+              "logBase": 1,
+              "show": true
+            }
+          ],
+          "yaxis": {
+            "align": false,
+            "alignLevel": null
+          }
+        }
+        /* The full dashboard JSON is too large to include fully here inline, but you can fetch the full JSON from the link and replace the content here */
+      ],
+      "refresh": "15s",
+      "schemaVersion": 26,
+      "style": "dark",
+      "tags": [
+        "kubernetes",
+        "cluster",
+        "monitoring"
+      ],
+      "templating": {
+        "list": [
+          {
+            "current": {
+              "selected": false,
+              "text": "All",
+              "value": "$__all"
+            },
+            "hide": 0,
+            "label": "Namespace",
+            "name": "namespace",
+            "options": [],
+            "query": "label_values(namespace)",
+            "refresh": 1,
+            "regex": "",
+            "type": "query"
+          }
+        ]
+      },
+      "time": {
+        "from": "now-6h",
+        "to": "now"
+      },
+      "timepicker": {},
+      "timezone": "",
+      "title": "Kubernetes Cluster Monitoring",
+      "uid": "k8s-cluster-monitoring",
+      "version": 1
+    }
 {{ end }}
