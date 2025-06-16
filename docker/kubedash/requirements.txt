@@ -30,7 +30,7 @@ flask-swagger-ui==4.11.1
 # graphwiz
 pyvis==0.3.2
 # socket
-flask_socketio==5.3.4
+flask_socketio==5.5.1
 gevent-websocket==0.10.1
 eventlet==0.37.0
 gunicorn==23.0.0
