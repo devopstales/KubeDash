@@ -49,9 +49,8 @@ def get_database_url(app: Flask, filename: string) -> string:
         SQLALCHEMY_DATABASE_URI (str): Database URL
     """
     
-    """Get database Type"""
+    """Get database Type""" 
     database_type = app.config['kubedash.ini'].get('database', 'type', fallback=None)
-    app.logger.info("   Database Type: %s" % database_type)
     if database_type == 'postgres':
         EXTERNAL_DATABASE_ENABLED = True
     else:
@@ -74,7 +73,6 @@ def get_database_url(app: Flask, filename: string) -> string:
     else:
         SQLALCHEMY_DATABASE_URI = "sqlite:///"+basedir+"/database/"+ app.config['ENV'] +".db"
         
-    app.logger.info("   Database URI: %s" % SQLALCHEMY_DATABASE_URI)
     return SQLALCHEMY_DATABASE_URI
 
 def validate_scopes(requested_scopes: List[str], issuer_url: str) -> List[str]:
@@ -187,6 +185,7 @@ def oidc_init(config: configparser.ConfigParser):
     # https://github.com/requests/requests-oauthlib/issues/387
     os.environ['OAUTHLIB_RELAX_TOKEN_SCOPE'] = "1"
     OIDC_ISSUER_URL   = config.get('sso_settings', 'issuer_url', fallback=None)
+    OICD_ISSUER_CA    = config.get('sso_settings', 'issuer_ca', fallback=None)
     OIDC_CLIENT_ID    = config.get('sso_settings', 'client_id', fallback=None)
     OIDC_SECRET       = config.get('sso_settings', 'secret', fallback=None)
     OIDC_SCOPE        = config.get('sso_settings', 'scope', fallback=None)
@@ -217,8 +216,9 @@ def oidc_init(config: configparser.ConfigParser):
         try:
             if oidc_test:
                 SSOServerUpdate(
-                    OIDC_ISSUER_URL_OLD, 
+                    OIDC_ISSUER_URL_OLD,
                     OIDC_ISSUER_URL, 
+                    OICD_ISSUER_CA, 
                     OIDC_CLIENT_ID, 
                     OIDC_SECRET, 
                     OIDC_CALLBACK_URL, 
@@ -230,7 +230,8 @@ def oidc_init(config: configparser.ConfigParser):
                 ).set(1)
             else:
                 SSOServerCreate(
-                    OIDC_ISSUER_URL, 
+                    OIDC_ISSUER_URL,
+                    OICD_ISSUER_CA, 
                     OIDC_CLIENT_ID, 
                     OIDC_SECRET, 
                     OIDC_CALLBACK_URL, 

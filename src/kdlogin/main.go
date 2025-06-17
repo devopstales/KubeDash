@@ -1,19 +1,18 @@
 package main
 
 import (
+	"context"
 	"flag"
 	"fmt"
 	"io/ioutil"
 	"log"
+	"net/http"
 	"net/url"
 	"os"
 	"os/exec"
+	"os/signal"
 	"path/filepath"
 	"runtime"
-
-	"context"
-	"net/http"
-	"os/signal"
 	"time"
 
 	"github.com/gin-gonic/gin"
@@ -28,10 +27,11 @@ import (
 )
 
 const (
-	kubeConfigEnvName         = "KUBECONFIG"
-	kubeConfigDefaultFilename = "~/.kube/config"
-	AppVersion = "3.1.0"
+	kubeConfigEnvName = "KUBECONFIG"
+	AppVersion        = "3.1.1"
 )
+
+var debugMode bool
 
 type RequestOIDC struct {
 	UserName                 string `json:"username"  validate:"required"`
@@ -42,6 +42,7 @@ type RequestOIDC struct {
 	IDToken                  string `json:"id-token"  validate:"required"`
 	RefreshToken             string `json:"refresh-token"  validate:"required"`
 	IdpIssuerURL             string `json:"idp-issuer-url"  validate:"required"`
+	IdpIssuerCAData          string `json:"idp-certificate-authority-data"  validate:"optional"`
 	ClientSecret             string `json:"client_secret"  validate:"required"`
 }
 
@@ -55,19 +56,22 @@ type RequestCert struct {
 }
 
 func main() {
-	// Print version
 	version := flag.Bool("v", false, "prints current app version")
+	flag.BoolVar(&debugMode, "debug", false, "enable debug logging")
 	flag.Parse()
+
 	if *version {
 		fmt.Println(AppVersion)
 		os.Exit(0)
 	}
-	// Get and validate the argument
-	if len(os.Args) == 2 {
-		if isValidUrl(os.Args[1]) {
-			OpenInBrowser(os.Args[1])
+
+	args := flag.Args() // use parsed args, NOT os.Args manually
+	if len(args) == 1 {
+		if isValidUrl(args[0]) {
+			debug("Opening URL in browser:", args[0])
+			OpenInBrowser(args[0])
 		} else {
-			fmt.Println("Argument is not a valid url")
+			fmt.Println("Argument is not a valid URL")
 			os.Exit(2)
 		}
 	} else {
@@ -75,17 +79,16 @@ func main() {
 		os.Exit(2)
 	}
 
-	// Start webserver for callback
 	gin.SetMode(gin.ReleaseMode)
 	router := gin.New()
 
-	// /info root for validation
-	router.GET("/info", info)
+	// Enable debug mode if the flag is set
+	if debugMode {
+		router.Use(gin.Logger())
+	}
 
-	// get callback POST on /
+	router.GET("/info", info)
 	router.POST("/", callback)
-	//router.Run(":8080")
-	////////////////////////////////////////
 
 	srv := &http.Server{
 		Addr:    ":8080",
@@ -93,7 +96,6 @@ func main() {
 	}
 
 	go func() {
-		// service connections
 		if err := srv.ListenAndServe(); err != nil && err != http.ErrServerClosed {
 			log.Fatalf("listen: %s\n", err)
 		}
@@ -121,15 +123,10 @@ func isValidUrl(toTest string) bool {
 	}
 
 	u, err := url.Parse(toTest)
-	if err != nil || u.Scheme == "" || u.Host == "" {
-		return false
-	}
-
-	return true
+	return err == nil && u.Scheme != "" && u.Host != ""
 }
 
 func OpenInBrowser(url string) {
-	// Open in browser
 	var err error
 	switch runtime.GOOS {
 	case "linux":
@@ -143,228 +140,164 @@ func OpenInBrowser(url string) {
 	}
 	if err != nil {
 		log.Fatal(err)
-		os.Exit(1)
 	}
 }
 
 func callback(c *gin.Context) {
 	var requestOIDC RequestOIDC
 	var requestCert RequestCert
-
 	var requestConfig clientcmdapi.Config
 	var context string
 
 	validate := validator.New()
 
-	// Debug
-	/*
-		body, _ := ioutil.ReadAll(c.Request.Body)
-		println(string(body))
-	*/
-
-	c.ShouldBindBodyWith(&requestOIDC, binding.JSON)
-	errOIDC := validate.Struct(requestOIDC)
-	if errOIDC != nil {
-		c.ShouldBindBodyWith(&requestCert, binding.JSON)
-		errCert := validate.Struct(requestCert)
-		if errCert != nil {
-			println("Invalid Response")
-		} else {
-			// Debug
-			/*
-				println("Get Cert Type Response") // Debug
-				fmt.Println(string(requestCert.ClientKeyData)) // Debug
-			*/
-			requestConfig, context = createValidTestConfigCert(requestCert)
+	if err := c.ShouldBindBodyWith(&requestOIDC, binding.JSON); err == nil {
+		if err := validate.Struct(requestOIDC); err == nil {
+			debug("Received valid OIDC configuration")
+			requestConfig, context = createValidTestConfigOIDC(requestOIDC)
 		}
-	} else {
-		// Debug
-		/*
-			println("Get OIDC Type Response") // Debug
-			fmt.Println(string(requestOIDC.ClientID)) // Debug
-		*/
-		requestConfig, context = createValidTestConfigOIDC(requestOIDC)
 	}
 
-	// Read config
-	var fileExist bool
-	var kubeconfig string
-	fileExist, kubeconfig = GetKubeConfig()
+	if context == "" {
+		if err := c.ShouldBindBodyWith(&requestCert, binding.JSON); err == nil {
+			if err := validate.Struct(requestCert); err == nil {
+				debug("Received valid certificate-based configuration")
+				requestConfig, context = createValidTestConfigCert(requestCert)
+			}
+		}
+	}
 
+	if context == "" {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "Invalid input data"})
+		return
+	}
+
+	fileExist, kubeconfig := GetKubeConfig()
+	debug("Kubeconfig file found:", fileExist, kubeconfig)
+
+	configOverrides, err := ioutil.TempFile("", "kubeconfig-*")
+	if err != nil {
+		log.Fatal(err)
+	}
+	defer os.Remove(configOverrides.Name())
+
+	clientcmd.WriteToFile(requestConfig, configOverrides.Name())
+
+	precedence := []string{}
 	if fileExist {
-		configOverrides, err := ioutil.TempFile("", "kubeconfig-*")
-		if err != nil {
-			log.Fatal(err)
-		}
-		// fmt.Println(configOverrides.Name()) // Debug
-
-		// Write config to the file
-		clientcmd.WriteToFile(requestConfig, configOverrides.Name())
-
-		// merge files
-		loadingRules := clientcmd.ClientConfigLoadingRules{
-			Precedence: []string{kubeconfig, configOverrides.Name()},
-		}
-
-		mergedConfig, err := loadingRules.Load()
-		if err != nil {
-			fmt.Printf("Unexpected error: %v", err)
-		}
-		json, err := pkgruntime.Encode(clientcmdlatest.Codec, mergedConfig)
-		if err != nil {
-			fmt.Printf("Unexpected error: %v", err)
-		}
-		output, err := yaml.JSONToYAML(json)
-		if err != nil {
-			fmt.Printf("Unexpected error: %v", err)
-		}
-
-		//fmt.Println(string(output)) // Debug
-		// Write to file
-		WriteToFile(string(output), context)
-
-		// Delete temp file
-		defer os.Remove(configOverrides.Name())
-	} else {
-		configOverrides, err := ioutil.TempFile("", "kubeconfig-*")
-		if err != nil {
-			log.Fatal(err)
-		}
-		// fmt.Println(configOverrides.Name()) // Debug
-
-		// Write to file the config
-		clientcmd.WriteToFile(requestConfig, configOverrides.Name())
-
-		// merge file
-		loadingRules := clientcmd.ClientConfigLoadingRules{
-			Precedence: []string{configOverrides.Name()},
-		}
-
-		kubeConfig, err := loadingRules.Load()
-		if err != nil {
-			fmt.Printf("Unexpected error: %v", err)
-		}
-		json, err := pkgruntime.Encode(clientcmdlatest.Codec, kubeConfig)
-		if err != nil {
-			fmt.Printf("Unexpected error: %v", err)
-		}
-		output, err := yaml.JSONToYAML(json)
-		if err != nil {
-			fmt.Printf("Unexpected error: %v", err)
-		}
-
-		//fmt.Println(string(output)) // Debug
-		// Write to file
-		WriteToFile(string(output), context)
-
-		// Delete temp file
-		defer os.Remove(configOverrides.Name())
+		precedence = append(precedence, kubeconfig)
 	}
+	precedence = append(precedence, configOverrides.Name())
+
+	loadingRules := clientcmd.ClientConfigLoadingRules{
+		Precedence: precedence,
+	}
+
+	mergedConfig, err := loadingRules.Load()
+	if err != nil {
+		log.Fatalf("Unexpected error: %v", err)
+	}
+
+	json, err := pkgruntime.Encode(clientcmdlatest.Codec, mergedConfig)
+	if err != nil {
+		log.Fatalf("Unexpected error: %v", err)
+	}
+
+	output, err := yaml.JSONToYAML(json)
+	if err != nil {
+		log.Fatalf("Unexpected error: %v", err)
+	}
+
+	WriteToFile(string(output), context)
 	c.JSON(200, "Client Get Data")
 }
 
 func GetKubeConfig() (bool, string) {
-	var fileExist bool
-	var kubeConfigFileName string
-
 	ConfigFilename := os.Getenv(kubeConfigEnvName)
 	if ConfigFilename == "" {
 		homedir, err := os.UserHomeDir()
 		if err != nil {
 			log.Fatal(err)
-			os.Exit(1)
-		} else {
-			var dirname string = filepath.Join(homedir, ".kube")
-			var filename string = filepath.Join(dirname, "config")
+		}
+		dirname := filepath.Join(homedir, ".kube")
+		filename := filepath.Join(dirname, "config")
 
-			// test if filename exists
-			if _, err := os.Stat(dirname); os.IsNotExist(err) {
-				// dir does not exist so create it
-				// fmt.Println("dir does not exist so create it") // Debug
-				os.Mkdir(dirname, 0755)
-				fileExist = false
-			} else if _, err := os.Stat(filename); os.IsNotExist(err) {
-				// file does not exist
-				// fmt.Println("file does not exist") // Debug
-				fileExist = false
-			} else {
-				// file exists
-				// fmt.Println("file exist") // Debug
-				fileExist = true
-			}
-			kubeConfigFileName = filename
+		if _, err := os.Stat(dirname); os.IsNotExist(err) {
+			os.Mkdir(dirname, 0755)
+			return false, filename
 		}
-	} else {
-		// test if kubeConfigEnvName exists
-		if _, err := os.Stat(ConfigFilename); os.IsNotExist(err) {
-			// file does not exist
-			fileExist = false
-		} else {
-			// file exists
-			fileExist = true
+		if _, err := os.Stat(filename); os.IsNotExist(err) {
+			return false, filename
 		}
-		kubeConfigFileName = ConfigFilename
+		return true, filename
 	}
-	return fileExist, kubeConfigFileName
-}
-
-func createValidTestConfigCert(request RequestCert) (clientcmdapi.Config, string) {
-	var (
-		kubeConfig = clientcmdapi.Config{
-			AuthInfos: map[string]*clientcmdapi.AuthInfo{
-				request.UserName: {
-					ClientCertificateData: []byte(request.ClientCertificateData),
-					ClientKeyData:         []byte(request.ClientKeyData),
-				},
-			},
-			Clusters: map[string]*clientcmdapi.Cluster{
-				request.Context: {
-					Server:                   request.Server,
-					CertificateAuthorityData: []byte(request.CertificateAuthorityData),
-				},
-			},
-			Contexts: map[string]*clientcmdapi.Context{
-				request.Context: {
-					AuthInfo: request.UserName,
-					Cluster:  request.Context,
-				},
-			},
-		}
-	)
-	return kubeConfig, request.Context
+	if _, err := os.Stat(ConfigFilename); os.IsNotExist(err) {
+		return false, ConfigFilename
+	}
+	return true, ConfigFilename
 }
 
 func createValidTestConfigOIDC(request RequestOIDC) (clientcmdapi.Config, string) {
-	var (
-		kubeConfig = clientcmdapi.Config{
-			AuthInfos: map[string]*clientcmdapi.AuthInfo{
-				request.UserName: {
-					AuthProvider: &clientcmdapi.AuthProviderConfig{
-						Name: "oidc",
-						Config: map[string]string{
-							"client-id":      request.ClientID,
-							"client-secret":  request.ClientSecret,
-							"id-token":       request.IDToken,
-							"idp-issuer-url": request.IdpIssuerURL,
-							"refresh-token":  request.RefreshToken,
-						},
-					},
+	authProviderConfig := map[string]string{
+		"client-id":      request.ClientID,
+		"client-secret":  request.ClientSecret,
+		"id-token":       request.IDToken,
+		"idp-issuer-url": request.IdpIssuerURL,
+		"refresh-token":  request.RefreshToken,
+	}
+	if request.IdpIssuerCAData != "" && request.IdpIssuerCAData != "none" {
+		authProviderConfig["idp-certificate-authority-data"] = request.IdpIssuerCAData
+		debug("Included idp-certificate-authority-data")
+	} else {
+		debug("Skipping idp-certificate-authority-data")
+	}
+
+	kubeConfig := clientcmdapi.Config{
+		AuthInfos: map[string]*clientcmdapi.AuthInfo{
+			request.UserName: {
+				AuthProvider: &clientcmdapi.AuthProviderConfig{
+					Name:   "oidc",
+					Config: authProviderConfig,
 				},
 			},
-			Clusters: map[string]*clientcmdapi.Cluster{
-				request.Context: {
-					Server:                   request.Server,
-					CertificateAuthorityData: []byte(request.CertificateAuthorityData),
-				},
+		},
+		Clusters: map[string]*clientcmdapi.Cluster{
+			request.Context: {
+				Server:                   request.Server,
+				CertificateAuthorityData: []byte(request.CertificateAuthorityData),
 			},
-			Contexts: map[string]*clientcmdapi.Context{
-				request.Context: {
-					AuthInfo: request.UserName,
-					Cluster:  request.Context,
-				},
+		},
+		Contexts: map[string]*clientcmdapi.Context{
+			request.Context: {
+				AuthInfo: request.UserName,
+				Cluster:  request.Context,
 			},
-		}
-	)
+		},
+	}
+	return kubeConfig, request.Context
+}
+
+func createValidTestConfigCert(request RequestCert) (clientcmdapi.Config, string) {
+	kubeConfig := clientcmdapi.Config{
+		AuthInfos: map[string]*clientcmdapi.AuthInfo{
+			request.UserName: {
+				ClientCertificateData: []byte(request.ClientCertificateData),
+				ClientKeyData:         []byte(request.ClientKeyData),
+			},
+		},
+		Clusters: map[string]*clientcmdapi.Cluster{
+			request.Context: {
+				Server:                   request.Server,
+				CertificateAuthorityData: []byte(request.CertificateAuthorityData),
+			},
+		},
+		Contexts: map[string]*clientcmdapi.Context{
+			request.Context: {
+				AuthInfo: request.UserName,
+				Cluster:  request.Context,
+			},
+		},
+	}
 	return kubeConfig, request.Context
 }
 
@@ -372,25 +305,27 @@ func WriteToFile(content string, context string) {
 	homedir, err := os.UserHomeDir()
 	if err != nil {
 		log.Fatal(err)
-		os.Exit(1)
 	}
-	var dirname string = filepath.Join(homedir, ".kube")
-	var filename string = filepath.Join(dirname, "config")
+	dirname := filepath.Join(homedir, ".kube")
+	filename := filepath.Join(dirname, "config")
 
 	f, err := os.Create(filename)
 	if err != nil {
 		log.Fatal(err)
-
 	}
 	defer f.Close()
 
-	_, err2 := f.WriteString(content)
-
-	if err2 != nil {
-		log.Fatal(err2)
+	if _, err := f.WriteString(content); err != nil {
+		log.Fatal(err)
 	}
-	fmt.Printf("Configfile created with config for %s to %s\n", context, filename)
+
+	log.Printf("Config file created for context [%s] at %s", context, filename)
 	fmt.Println("Happy Kubernetes interaction!")
-	// fmt.Println("(Press CTRL+C to quit)")
 	os.Exit(0)
+}
+
+func debug(args ...any) {
+	if debugMode {
+		log.Println("[DEBUG]", fmt.Sprint(args...))
+	}
 }

@@ -37,6 +37,7 @@ tracer = trace.get_tracer(__name__)
 def sso_config():
     if request.method == 'POST':
         oauth_server_uri = request.form['oauth_server_uri']
+        oauth_server_ca = str(base64_encode(oauth_server_ca.strip()), 'UTF-8') if oauth_server_ca else None
         client_id = request.form['client_id']
         client_secret = request.form['client_secret']
         base_uri = request.form['base_uri']
@@ -49,14 +50,15 @@ def sso_config():
         request_type = request.form['request_type']
         if request_type == "edit":
             oauth_server_uri_old = request.form['oauth_server_uri_old']
-            SSOServerUpdate(oauth_server_uri_old, oauth_server_uri, client_id, client_secret, base_uri, scope)
+            SSOServerUpdate(oauth_server_uri_old, oauth_server_uri,oauth_server_ca,client_id, client_secret, base_uri, scope)
         elif request_type == "create":
-            SSOServerCreate(oauth_server_uri, client_id, client_secret, base_uri, scope)
+            SSOServerCreate(oauth_server_uri, oauth_server_ca, client_id, client_secret, base_uri, scope)
 
         flash("SSO Server Updated Successfully", "success")
         return render_template(
             'settings/sso-config.html.j2',
             oauth_server_uri = oauth_server_uri,
+            oauth_server_ca = oauth_server_ca,
             client_id = client_id,
             client_secret = client_secret,
             base_uri = base_uri,
@@ -80,6 +82,7 @@ def sso_config():
             return render_template(
                 'settings/sso-config.html.j2',
                 oauth_server_uri = ssoServer.oauth_server_uri,
+                oauth_server_ca = ssoServer.oauth_server_ca,
                 client_id = ssoServer.client_id,
                 client_secret = ssoServer.client_secret,
                 base_uri = ssoServer.base_uri,
@@ -138,18 +141,24 @@ def callback():
             try:
                 i = requests.get('http://%s:8080/info' % remote_addr)
                 info = i.json()
+                response_json = {
+                                    "username": user_data["preferred_username"],
+                                    "context": k8sConfig.k8s_context,
+                                    "server": k8sConfig.k8s_server_url,
+                                    "certificate-authority-data": k8s_server_ca,
+                                    "client-id": ssoServer.client_id,
+                                    "id-token": token.get("id_token"),
+                                    "refresh-token": token.get("refresh_token"),
+                                    "idp-issuer-url": ssoServer.oauth_server_uri,
+                                    "client_secret": ssoServer.client_secret,
+                                }
+                if ssoServer.oauth_server_ca:
+                    response_json["idp-certificate-authority-data"] = ssoServer.oauth_server_ca
+                else:
+                    response_json["idp-certificate-authority-data"] = None
+                
                 if info["message"] == "kdlogin":
-                    x = requests.post('http://%s:8080/' % remote_addr, json={
-                            "username": user_data["preferred_username"],
-                            "context": k8sConfig.k8s_context,
-                            "server": k8sConfig.k8s_server_url,
-                            "certificate-authority-data": k8s_server_ca,
-                            "client-id": ssoServer.client_id,
-                            "id-token": token.get("id_token"),
-                            "refresh-token": token.get("refresh_token"),
-                            "idp-issuer-url": ssoServer.oauth_server_uri,
-                            "client_secret": ssoServer.client_secret,
-                        }
+                    x = requests.post('http://%s:8080/' % remote_addr, json=response_json
                     )
                     logger.info("Config sent to client")
                     logger.info("Answer from clinet: %s" % x.text)
@@ -270,6 +279,7 @@ def export():
                 id_token = token["id_token"],
                 refresh_token = token.get("refresh_token"),
                 oauth_server_uri = ssoServer.oauth_server_uri,
+                oauth_server_ca = ssoServer.oauth_server_ca,
                 context = k8sConfig.k8s_context,
                 k8s_server_url = k8sConfig.k8s_server_url,
                 k8s_server_ca = k8s_server_ca
@@ -352,6 +362,8 @@ def get_file():
                     }
                 }
             }
+        if ssoServer.oauth_server_ca:
+            kube_user["auth-provider"]["config"]["idp-certificate-authority-data"] = ssoServer.oauth_server_ca
         if ssoServer.client_secret:
             kube_user["auth-provider"]["config"]["client-secret"] = ssoServer.client_secret
         if verify:

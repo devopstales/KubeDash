@@ -2,10 +2,19 @@ import time
 
 from flask import g, Flask, request
 from lib.cache import cached_base, cached_base2
-
+from lib.helper_functions import get_logger
 from lib.prometheus import REQUEST_COUNT, REQUEST_LATENCY
 
-def initbefore_request(app: Flask):
+##############################################################
+## Helpers
+##############################################################
+
+logger = get_logger()
+tracer = None
+
+##############################################################
+
+def init_before_request(app: Flask):
 
   @app.before_request
   def before_request():
@@ -33,7 +42,7 @@ def initbefore_request(app: Flask):
       cached_base(app)
       cached_base2(app)
       
-def initbefore_request(app: Flask):
+def init_before_request(app: Flask):
     @app.before_request
     def before_request():
         path = request.path

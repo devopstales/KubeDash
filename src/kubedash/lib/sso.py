@@ -27,19 +27,22 @@ class Openid(UserMixin, db.Model):
     __tablename__ = 'openid'
     id = db.Column(db.Integer, primary_key=True)
     oauth_server_uri = db.Column(db.Text, unique=True, nullable=False)
+    oauth_server_ca = db.Column(db.Text, nullable=True)
     client_id = db.Column(db.Text, nullable=False)
     client_secret = db.Column(db.Text, nullable=False)
     base_uri = db.Column(db.Text, nullable=False)
     scope = db.Column(MutableList.as_mutable(PickleType), default=[], nullable=False)
 
+
     def __repr__(self):
         return '<Server URL %r>' % self.oauth_server_uri
 
-def SSOServerCreate(oauth_server_uri, client_id, client_secret, base_uri, scopes):
+def SSOServerCreate(oauth_server_uri, oauth_server_ca, client_id, client_secret, base_uri, scopes):
     """Create a SSOServer instance in database
     
     Args:
         oauth_server_uri (string): URL of the oauth server
+        oauth_server_ca (string): CA certificate for the oauth server
         client_id (string): Client ID for the oauth client
         client_secret (string): Client secret for the oauth client
         base_uri (string): Base URI for the oauth server redirect
@@ -47,6 +50,7 @@ def SSOServerCreate(oauth_server_uri, client_id, client_secret, base_uri, scopes
     sso = Openid.query.filter_by(oauth_server_uri=oauth_server_uri).first()
     sso_data = Openid(
         oauth_server_uri = oauth_server_uri,
+        oauth_server_ca = oauth_server_ca,
         client_id = client_id,
         client_secret = client_secret,
         base_uri = base_uri,
@@ -70,12 +74,13 @@ def SSOServerTest():
     else:
         return False, None
 
-def SSOServerUpdate(oauth_server_uri_old, oauth_server_uri, client_id, client_secret, base_uri, scope):
+def SSOServerUpdate(oauth_server_uri_old, oauth_server_uri, oauth_server_ca, client_id, client_secret, base_uri, scope):
     """Update a SSOServer instance in database
     
     Args:
         oauth_server_uri_old (string): Old URL of the oauth server
         oauth_server_uri (string): New URL of the oauth server
+        oauth_server_ca (string): CA certificate for the oauth server
         client_id (string): Client ID for the oauth client
         client_secret (string): Client secret for the oauth client
         base_uri (string): Base URI for the oauth server redirect
@@ -85,6 +90,7 @@ def SSOServerUpdate(oauth_server_uri_old, oauth_server_uri, client_id, client_se
     sso = Openid.query.filter_by(oauth_server_uri=oauth_server_uri_old).first()
     if sso:
         sso.oauth_server_uri = oauth_server_uri
+        sso.oauth_server_ca = oauth_server_ca
         sso.client_id = client_id
         sso.client_secret = client_secret
         sso.base_uri = base_uri

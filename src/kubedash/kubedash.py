@@ -4,7 +4,7 @@ import sys
 from flask import Flask, request
 
 from lib.initializers import (
-    initialize_app_confifuration, 
+    initialize_app_configuration, 
     initialize_app_logging,
     initialize_error_page,
     initialize_app_swagger,
@@ -23,7 +23,7 @@ from lib.initializers import (
 from lib.metrics import (
     initialize_metrics_scraper
 )
-from lib.before_request import initbefore_request
+from lib.before_request import init_before_request
 #############################################################
 ## Variables
 #############################################################
@@ -51,9 +51,9 @@ def create_app(external_config_name=None):
     
     print(separator_long)
     if external_config_name is not None:
-        error = initialize_app_confifuration(app, external_config_name)
+        error = initialize_app_configuration(app, external_config_name)
     else:
-        error = initialize_app_confifuration(app, None)
+        error = initialize_app_configuration(app, None)
     
     initialize_app_logging(app)
     initialize_error_page(app)
@@ -72,15 +72,15 @@ def create_app(external_config_name=None):
             print(separator_long)
         else:
             initialize_app_version(app)
+            initialize_app_plugins(app)
             # connections            
             initialize_app_tracing(app)
             initialize_app_caching(app)
-            initbefore_request(app)
+            init_before_request(app)
             initialize_app_database(app, __file__)
             with app.app_context():
                 initialize_metrics_scraper(app)
             initialize_app_socket(app)
-            initialize_app_plugins(app)
             initialize_blueprints(app)
             add_custom_jinja2_filters(app)
             initialize_app_security(app)

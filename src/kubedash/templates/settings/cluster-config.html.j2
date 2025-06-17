@@ -169,12 +169,8 @@
 <!-- Modal Edit User -->
 {% endblock %}
 
-{% block add_head_css %}
-{% include "segments/datatable_css.html.j2" %}
-{% endblock %}
-
 {% block add_tail_js %}
-{% include "segments/datatable_js.html.j2" %}
+{% include "segments/datatable_snipet.html.j2" %}
 {% include "segments/functions_snipet.j2"%}
     <script>
         var popoverTriggerList = [].slice.call(document.querySelectorAll('[data-bs-toggle="CertTooltip"]'))

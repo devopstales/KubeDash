@@ -36,7 +36,7 @@ def login():
     if request.environ.get('HTTP_X_FORWARDED_FOR') is None:
         remote_addr = request.remote_addr
     else:
-        remote_addr = request.environ['HTTP_X_FORWARDED_FOR']
+        remote_addr = request.environ['HTTP_X_FORWARDED_FOR'].split(',')[0].strip()
 
     if tracer and span.is_recording():
         span.set_attribute("http.route", "/")
@@ -98,7 +98,7 @@ def login():
         else:
             if tracer and span.is_recording():
                 span.add_event("log", {
-                    "log.severity": "error",
+                    "log.severity": "info",
                     "log.message": "Kubectl Integration is configured.",
                 })
             logger.info("Kubectl Integration is configured.")
@@ -112,17 +112,24 @@ def login():
                     user2 = KubectlConfig.query.filter_by(name=session['user_name']).first()
                     if is_sso_enabled and user:
                         token = eval(SSOTokenGet(username))
-                        x = requests.post('http://%s:8080/' % remote_addr, json={
-                                "username": username,
-                                "context": k8sConfig.k8s_context,
-                                "server": k8sConfig.k8s_server_url,
-                                "certificate-authority-data": k8s_server_ca,
-                                "client-id": ssoServer.client_id,
-                                "id-token": token.get("id_token"),
-                                "refresh-token": token.get("refresh_token"),
-                                "idp-issuer-url": ssoServer.oauth_server_uri,
-                                "client_secret": ssoServer.client_secret,
-                            }
+                        response_json = {
+                                            "username": username,
+                                            "context": k8sConfig.k8s_context,
+                                            "server": k8sConfig.k8s_server_url,
+                                            "certificate-authority-data": k8s_server_ca,
+                                            "client-id": ssoServer.client_id,
+                                            "id-token": token.get("id_token"),
+                                            "refresh-token": token.get("refresh_token"),
+                                            "idp-issuer-url": ssoServer.oauth_server_uri,
+                                            "client_secret": ssoServer.client_secret,
+                                        }
+                        
+                        if ssoServer.oauth_server_ca:
+                            response_json["idp-certificate-authority-data"] = ssoServer.oauth_server_ca
+                        else:
+                            response_json["idp-certificate-authority-data"] = None
+                        
+                        x = requests.post('http://%s:8080/' % remote_addr, json=response_json
                         )
                     elif user2:
                         user_private_key = str(base64_decode(user2.private_key), 'UTF-8')
@@ -138,8 +145,13 @@ def login():
                         )
                     logger.info("Config sent to client")
                     logger.info("Answer from clinet: %s" % x.text)
-            except:
-                pass
+            except Exception as e:
+                if tracer and span.is_recording():
+                    span.add_event("log", {
+                        "log.severity": "error",
+                        "log.message": "Failed to connect to client.",
+                    })
+                logger.error("Failed to connect to the kubectl client. (GET) %s" % e)
         return redirect(url_for('dashboard.cluster_metrics'))
     else:
         if tracer and span.is_recording():
@@ -164,7 +176,7 @@ def login_post():
     if request.environ.get('HTTP_X_FORWARDED_FOR') is None:
         remote_addr = request.remote_addr
     else:
-        remote_addr = request.environ['HTTP_X_FORWARDED_FOR']
+        remote_addr = request.environ['HTTP_X_FORWARDED_FOR'].split(',')[0].strip()
 
     user = User.query.filter(User.username == username, User.user_type != "OpenID").first()
     user2 = KubectlConfig.query.filter_by(name=username).first()
@@ -185,8 +197,19 @@ def login_post():
 
         k8sConfig = k8sServerConfigGet()
         if k8sConfig is None:
+            if tracer and span.is_recording():
+                span.add_event("log", {
+                    "log.severity": "error",
+                    "log.message": "Kubectl Integration is not configured.",
+                })
             logger.error ("Kubectl Integration is not configured.")
         else:
+            if tracer and span.is_recording():
+                span.add_event("log", {
+                    "log.severity": "info",
+                    "log.message": "Kubectl Integration is configured.",
+                })
+            logger.info("Kubectl Integration is configured.")
             k8s_server_ca = str(base64_decode(k8sConfig.k8s_server_ca), 'UTF-8')
             try:
                 i = requests.get('http://%s:8080/info' % remote_addr)
@@ -206,7 +229,12 @@ def login_post():
                     logger.info("Config sent to client")
                     logger.info("Answer from clinet: %s" % x.text)
             except:
-                pass
+                if tracer and span.is_recording():
+                    span.add_event("log", {
+                        "log.severity": "error",
+                        "log.message": "Failed to connect to client.",
+                    })
+                logger.error("Failed to connect to the kubectl client. (POST)")
 
         return redirect(url_for('dashboard.cluster_metrics'))
 

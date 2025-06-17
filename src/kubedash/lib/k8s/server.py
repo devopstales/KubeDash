@@ -44,7 +44,7 @@ def k8sServerConfigList():
         k8s_config_list (list): List of Kubernetes Server Configs
         k8s_config_list_length (int): Length of Kubernetes Server Configs
     """
-    k8s_config_list = db.session.query(k8sConfig).first()
+    k8s_config_list = db.session.query(k8sConfig)
     k8s_config_list_length = db.session.query(k8sConfig).count()
     return k8s_config_list, k8s_config_list_length
 

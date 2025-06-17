@@ -40,7 +40,7 @@ class User(UserMixin, db.Model):
     username = db.Column(db.String(80), unique=True, nullable=False)
     password_hash = db.Column(db.String(300), nullable=True)
     email = db.Column(db.String(80), unique=True, nullable=True)
-    user_type = db.Column(db.String(5), nullable=False)
+    user_type = db.Column(db.String(10), nullable=False)
     tokens = db.Column(db.Text, nullable=True)
 
     roles = db.relationship('Role', secondary='users_roles',

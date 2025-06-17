@@ -99,7 +99,12 @@ kubectl config set-credentials "{{ context }}" \
 --auth-provider-arg=client-secret="{{ client_secret }}" \
 --auth-provider-arg=id-token="{{ id_token }}" \
 --auth-provider-arg=refresh-token="{{ refresh_token }}" \
+{%- if oauth_server_ca %}
+--auth-provider-arg=idp-issuer-url="{{ oauth_server_uri }}" \
+--idp-certificate-authority-data="{{ oauth_server_ca }}"
+{%- else %}
 --auth-provider-arg=idp-issuer-url="{{ oauth_server_uri }}"
+{% endif %}
 
 # Associate your user with an existing cluster
 kubectl config set-context {{ context }} --cluster {{ context }} --user="{{ context }}"

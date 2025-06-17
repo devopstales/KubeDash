@@ -267,7 +267,12 @@ tasks:
     dir: 'src/kdlogin'
     cmds:
       - go mod tidy
-      - sed -i "s|AppVersion = .*|AppVersion = \"{{.VERSION}}\"|" main.go
+      - >-
+        if command -v gsed >/dev/null 2>&1; then
+          gsed -i "s|AppVersion        = .*|AppVersion        = \"{{.VERSION}}\"|" main.go
+        else
+          sed -i '' "s|AppVersion        = .*|AppVersion        = \"{{.VERSION}}\"|" main.go
+        fi
       - rm -rf dist/{windows,linux,osx,release}
       - rm -f dist/choco/*.nupkg
       - env CGO_ENABLED=0 go build -o dist/linux/kubectl-kdlogin main.go

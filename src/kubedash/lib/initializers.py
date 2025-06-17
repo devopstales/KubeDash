@@ -7,6 +7,7 @@ import socket
 import redis
 from redis.exceptions import AuthenticationError, ConnectionError, RedisError
 from redis.cluster import RedisCluster
+from sqlalchemy import create_engine, text
 
 from flask import Flask, render_template, request
 
@@ -103,7 +104,7 @@ def initialize_error_page(app: Flask):
             description = e.description,
             ), 500
 
-def initialize_app_confifuration(app: Flask, external_config_name: str) -> bool:
+def initialize_app_configuration(app: Flask, external_config_name: str) -> bool:
     """Initialize the configuration and return error if missing
 
     Args:
@@ -220,6 +221,26 @@ def initialize_app_database(app: Flask, filename: str):
     app.logger.info("   Get Database Configuration")    
     app.config['SESSION_SQLALCHEMY'] = db
     app.config['SQLALCHEMY_DATABASE_URI'] = get_database_url(app, filename)
+    database_type = app.config['kubedash.ini'].get('database', 'type', fallback=None)
+    
+    """Test Database Connection"""
+    app.logger.info("   Test Database Connection")
+    if database_type == 'postgres':
+        try:
+            engine = create_engine(app.config['SQLALCHEMY_DATABASE_URI'])
+            with engine.connect() as connection:
+                connection.execute(text("SELECT 1"))
+        except Exception as e:
+            app.logger.error(f"   Failed to connect to PostgreSQL database: {e}")
+            basedir = os.path.abspath(os.path.dirname(filename))
+            sqlite_url =  "sqlite:///"+basedir+"/database/"+ app.config['ENV'] +".db"
+            app.config['SQLALCHEMY_DATABASE_URI'] = sqlite_url
+            database_type = 'sqlite3'
+            
+    """Logging Database URL"""
+    app.logger.info("   Database Configuration:")
+    app.logger.info("   Database Type: %s" % database_type)
+    app.logger.info("   Database URI: %s" % app.config['SQLALCHEMY_DATABASE_URI'])
     
     """Initialize SQLAlchemy"""
     app.logger.info("   Initialize SQLAlchemy")

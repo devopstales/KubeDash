@@ -29,6 +29,10 @@
       {% if oauth_server_uri %}
       <input type="hidden" name="request_type" value="edit" />
       <input type="hidden" name="oauth_server_uri_old" value="{{ oauth_server_uri }}" />
+      {% if oauth_server_ca %}
+      <input type="hidden" name="oauth_server_ca" value="{{ oauth_server_ca }}" />
+      {% else %}
+      {% endif %}
       {% else %}
       <input type="hidden" name="request_type" value="create" />
       {% endif %}
@@ -46,7 +50,16 @@
           {% else %}
           <input type="text" class="form-control" id="oauth_server_uri" name= "oauth_server_uri" placeholder="URL">
           {% endif %}
+          {% if oauth_server_ca %}
+          <input type="hidden" name="oauth_server_ca" value="{{ oauth_server_ca }}" />
+          {% else %}
+          <input type="hidden" name="oauth_server_ca" placeholder="" />
+          {% endif %}
         </div>
+      </div>
+      <div class="col-sm-8 mt-2">
+        <p>Identity Provider CA Certificate</p>
+        <textarea class="form-control" id="oauth_server_ca" name= "oauth_server_ca" rows="3">{{ oauth_server_ca | j2_b64decode }}</textarea>
       </div>
       <div class="col-sm-8">
         <div class="row">
