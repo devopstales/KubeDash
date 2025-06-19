@@ -180,6 +180,8 @@ def login_post():
 
     user = User.query.filter(User.username == username, User.user_type != "OpenID").first()
     user2 = KubectlConfig.query.filter_by(name=username).first()
+    
+    span = trace.get_current_span()
 
     # check if user actually exists
     # take the user supplied password, hash it, and compare it to the hashed password in database

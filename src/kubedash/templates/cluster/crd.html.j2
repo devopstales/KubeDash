@@ -11,8 +11,57 @@
       </nav>
     </div>
 </ul>
+<ul class="header-nav ms-auto"></ul>
+<ul class="header-nav d-lg-flex">
 {% include "segments/topmenu.html.j2" %}
 {% endblock %}
 
 {% block content %}
+<div class="card shadow mb-4">
+    <div class="card-header py-3">
+        <h6 class="m-0 font-weight-bold text-primary">CRD List</h6>
+    </div>
+    <div class="card-body">
+        <div class="table-responsive">
+            <table class="table table-bordered" id="dataTable" width="100%" cellspacing="0">
+              <thead>
+                    <tr>
+                      <th>Resource</th>
+                      <th>Group</th>
+                      <th>Version</th>
+                      <th>Scope</th>
+                      <th>Action</th>
+                    </tr>
+              </thead>
+              <tbody>
+                    {% for crd in crd_list %}
+                    <tr>
+                        <td>
+                          <form action="/cluster/crd/data" method="POST">
+                            <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+                            <input type="hidden" name="crd_name" value="{{ crd.name }}" />
+                            <input type="hidden" name="crd_kind" value="{{ crd.kind }}" />
+                            <input type="hidden" name="crd_group" value="{{ crd.group }}" />
+                            <input type="hidden" name="crd_version" value="{{ crd.version }}" />
+                            {% if crd.scope == "Namespaced" %}
+                            <input type="hidden" name="crd_scope" value="{{ crd.scope }}" />
+                            {% endif %}
+                            <a href="javascript:;" onclick="parentNode.submit();">{{ crd.kind }}</a>
+                          </form>
+                        </td>
+                        <td>{{ crd.group }}</td>
+                        <td>{{ crd.version }}</td>
+                        <td>{{ crd.scope }}</td>
+                        <td>
+                        </td>
+                    </tr>
+                    {% endfor %}
+            </table>
+        </div>
+    </div>
+</div>
+{% endblock %}
+
+{% block add_head_css %}
+{% include "segments/datatable_snipet.html.j2" %}
 {% endblock %}

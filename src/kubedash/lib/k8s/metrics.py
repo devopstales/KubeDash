@@ -324,6 +324,44 @@ def k8sPVCMetric(namespace):
     except Exception as error:
         return PVC_LIST
 
+#@cache.memoize(timeout=long_cache_time)
+def k8sGetClusterEvents(username_role, user_token):
+    """Get the cluster events for a given username and user_token
+    
+    Args:
+        username_role (str): The username and role of the user
+        user_token (str): The user's token
+        
+    Returns:
+        events (list): The list of cluster events
+    """
+    k8sClientConfigGet(username_role, user_token)
+    try:
+        event_list = k8s_client.CoreV1Api().list_event_for_all_namespaces(_request_timeout=5)
+        events = []
+        for event in event_list.items:
+            if event.type != "Normal":
+                events.append({
+                    "name": event.metadata.name,
+                    "involvedObjectName": event.involved_object.name,
+                    "involvedObjectKind": event.involved_object.kind,
+                    "namespace": event.metadata.namespace,
+                    "message": event.message,
+                    "reason": event.reason,
+                    "type": event.type,
+                    "count": event.count,
+                    "first_timestamp": event.first_timestamp,
+                    "last_timestamp": event.last_timestamp,
+                })
+        return events
+    except ApiException as error:
+        ErrorHandler(logger, error, "Cannot Connect to Kubernetes - %s" % error.status)
+        return []
+    except Exception as error:
+        ErrorHandler(logger, "CannotConnect", "Cannot Connect to Kubernetes")
+        return []
+    
+
 @cache.memoize(timeout=long_cache_time)
 def k8sGetPodMap(username_role, user_token, namespace):
     """Get the Pod Map for a given username, user_token, and namespace

@@ -12,6 +12,7 @@ from lib.k8s.workload import (k8sDaemonsetPatch, k8sDeploymentsPatchAnnotation,
                               k8sStatefulSetPatchAnnotation,
                               k8sStatefulSetPatchReplica, k8sWorkloadList)
 from lib.sso import get_user_token
+from lib.k8s.crds import get_custom_resources, get_custom_resource_data
 
 ##############################################################
 ## Helpers
@@ -176,3 +177,55 @@ def nodes_data():
         )
     else:
         return redirect(url_for('auth.login'))
+
+##############################################################
+## CRDs
+##############################################################
+
+@cluster.route("/crd", methods=['GET', 'POST'])
+@login_required
+def crd_list():
+    if request.method == 'POST':
+        selected = request.form.get('selected')
+    else:
+        selected = None
+
+    user_token = get_user_token(session)
+
+    crd_list = get_custom_resources(session['user_role'], user_token)
+
+    return render_template(
+        'cluster/crd.html.j2',
+        crd_list = crd_list,
+        selected = selected,
+    )
+    
+@cluster.route("/crd/data", methods=['GET', 'POST'])
+@login_required
+def crd_data():
+    if request.method == 'POST':
+        crd_name = request.form.get('crd_name')
+        crd_kind = request.form.get('crd_kind')
+        crd_group = request.form.get('crd_group')
+        crd_version = request.form.get('crd_version')
+        crd_scope = request.form.get('crd_scope')
+        
+        user_token = get_user_token(session)
+
+        if crd_scope == "Namespaced":
+            namespace  = namespace = session['ns_select']
+            crd_data = get_custom_resource_data(session['user_role'], user_token, namespace, crd_name, crd_group, crd_version)
+        else:
+            crd_data = get_custom_resource_data(session['user_role'], user_token, None, crd_name, crd_group, crd_version)
+            
+        if crd_data is None:
+            crd_data = []
+
+        return render_template(
+            'cluster/crd-data.html.j2',
+            crd_data = crd_data,
+            crd_name = crd_name,
+            crd_kind = crd_kind,
+        )
+    else:
+        return redirect(url_for('.crd_list'))

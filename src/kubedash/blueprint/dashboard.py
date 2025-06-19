@@ -4,7 +4,7 @@ from opentelemetry import trace
 from werkzeug.security import check_password_hash
 
 from lib.helper_functions import get_logger
-from lib.k8s.metrics import k8sGetClusterMetric, k8sGetPodMap
+from lib.k8s.metrics import k8sGetClusterMetric, k8sGetClusterEvents, k8sGetPodMap
 from lib.k8s.namespace import k8sNamespaceListGet
 from lib.sso import get_user_token
 from lib.user import User
@@ -29,8 +29,11 @@ tracer = trace.get_tracer(__name__)
 @login_required
 def cluster_metrics():
     span = trace.get_current_span()
-
+    user_token = get_user_token(session)
+    
     cluster_metrics = k8sGetClusterMetric()
+    cluster_events  = k8sGetClusterEvents(session['user_role'], user_token)
+    
     username = session['user_name']
     user = User.query.filter_by(username="admin", user_type = "Local").first()
 
@@ -52,8 +55,13 @@ def cluster_metrics():
 
     return render_template(
         'dashboards/cluster-metric.html.j2',
-        cluster_metrics = cluster_metrics
+        cluster_metrics = cluster_metrics,
+        cluster_events  = cluster_events
     )
+
+##############################################################
+## Workload Map
+##############################################################
 
 @dashboard.route('/workload-map', methods=['GET', 'POST'])
 @tracer.start_as_current_span("/workload-map")
