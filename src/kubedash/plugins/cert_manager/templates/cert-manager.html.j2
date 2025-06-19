@@ -11,8 +11,264 @@
       </nav>
     </div>
 </ul>
+<ul class="header-nav ms-auto"></ul>
+<ul class="header-nav d-lg-flex">
 {% include "segments/topmenu.html.j2" %}
 {% endblock %}
 
 {% block content %}
+<div class="card shadow mb-4">
+    <div class="card-header">
+        <h6 class="m-0 fw-bold text-primary">Cert-Manager Objects</h6>
+    </div>
+    <div class="card-body">
+        <ul class="nav nav-tabs" id="nav-tab" role="tablist">
+            <li class="nav-item">
+                <a class="nav-link active" id="nav-cluster_issuer-tab" href="#nav-cluster_issuer" role="tab" aria-controls="nav-cluster_issuer" aria-selected="true" data-bs-toggle="tab">Cluster Issuer</a>
+            </li>
+            <li class="nav-item">
+                <a class="nav-link" id="nav-issuer-tab" href="#nav-issuer" role="tab" aria-controls="nav-issuer" aria-selected="false" data-bs-toggle="tab">Issuer</a>
+            </li>
+            <li class="nav-item">
+                <a class="nav-link" id="nav-certificate_request-tab" href="#nav-certificate_request" role="tab" aria-controls="nav-certificate_request" aria-selected="false" data-bs-toggle="tab">Certificate Request</a>
+            </li>
+            <li class="nav-item">
+                <a class="nav-link" id="nav-certificate-tab" href="#nav-certificate" role="tab" aria-controls="nav-certificate" aria-selected="false" data-bs-toggle="tab">Certificates</a>
+            </li>
+        </ul>
+        <div class="tab-content" id="nav-tabContent">
+            <!-- cluster_issuer -->
+            <div class="tab-pane fade show active" id="nav-cluster_issuer" role="tabpanel" aria-labelledby="nav-cluster_issuer-tab">
+                <div class="accordion">
+                    <div class="card shadow mb-4">
+                        <div class="card-body">
+                            <div class="table-responsive">
+                                <table class="table table-bordered display" id="cluster_issuerTable" width="100%" cellspacing="0">
+                                    <thead>
+                                        <tr>
+                                            <th>Status</th>
+                                            <th>Name</th>
+                                            <th>Type</th>
+                                        </tr>
+                                    </thead>
+                                    <tbody>
+                                        {% for cluster_issuer in cluster_issuer_list %}
+                                        <tr>
+                                            <td>
+                                                {% if cluster_issuer.status == 'True' %}
+                                                <span class="badge text-bg-tag text-bg-success">{{ cluster_issuer.reason }}</span>
+                                                {% else %}
+                                                <span class="badge text-bg-tag text-bg-danger">{{ cluster_issuer.reason }}</span>
+                                                {% endif %}
+                                            </td>
+                                            <td id="{{ cluster_issuer.name }}">
+                                                <form action="/plugins/cert-manager/data" method="POST">
+                                                    <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+                                                    <input type="hidden" name="object_data" value="{{ cluster_issuer }}" />
+                                                    <input type="hidden" name="object_type" value="cluster_issuer" />
+                                                    <a href="#" onclick="this.closest('form').submit(); return false;">{{ cluster_issuer.name }}</a>
+                                                </form>
+                                            </td>
+                                            <td>{{ cluster_issuer.type }}</td>
+                                        </tr>
+                                        {% endfor %}
+                                    </tbody>
+                                </table>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+            <!-- issuer -->
+            <div class="tab-pane fade" id="nav-issuer" role="tabpanel" aria-labelledby="nav-issuer-tab">
+                <div class="card shadow mb-4">
+                    <div class="card-body">
+                        <div class="table-responsive">
+                            <table class="table table-bordered" id="issuerTable" width="100%" cellspacing="0">
+                                <thead>
+                                    <tr>
+                                        <th>Status</th>
+                                        <th>Name</th>
+                                        <th>Type</th>
+                                    </tr>
+                                </thead>
+                                <tbody>
+                                    {% for issuer in issuer_list %}
+                                    <tr>
+                                        <td>
+                                            {% if issuer.status == 'True' %}
+                                            <span class="badge text-bg-tag text-bg-success">{{ issuer.reason }}</span>
+                                            {% else %}
+                                            <span class="badge text-bg-tag text-bg-danger">{{ issuer.reason }}</span>
+                                            {% endif %}
+                                        </td>
+                                        <td id="{{ issuer.name }}">
+                                            <form action="/plugins/cert-manager/data" method="POST">
+                                                <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+                                                <input type="hidden" name="object_data" value="{{ issuer }}" />
+                                                <input type="hidden" name="object_type" value="issuer" />
+                                                <a href="#" onclick="this.closest('form').submit(); return false;">{{ issuer.name }}</a>
+                                            </form>
+                                        </td>
+                                        <td>{{ issuer.type }}</td>
+                                    </tr>
+                                    {% endfor %}
+                                </tbody>
+                            </table>
+                        </div>
+                    </div>
+                </div>
+            </div>
+            <!-- certificate_request -->
+            <div class="tab-pane fade" id="nav-certificate_request" role="tabpanel" aria-labelledby="nav-certificate_request-tab">
+                <div class="card shadow mb-4">
+                    <div class="card-body">
+                        <div class="table-responsive">
+                            <table class="table table-bordered" id="certificate_requestTable" width="100%" cellspacing="0">
+                                <thead>
+                                    <tr>
+                                        <th>Status</th>
+                                        <th>Name</th>
+                                        <th>Issuer</th>
+                                        <th>Owner</th>
+                                    </tr>
+                                </thead>
+                                <tbody>
+                                    {% for certificate_request in certificate_request_list %}
+                                    <tr>
+                                        <td>
+                                            {% if certificate_request.status == 'True' %}
+                                            <span class="badge text-bg-tag text-bg-success">{{ certificate_request.reason }}</span>
+                                            {% else %}
+                                            <span class="badge text-bg-tag text-bg-danger">{{ certificate_request.reason }}</span>
+                                            {% endif %}
+                                        </td>
+                                        <td>
+                                            <form action="/plugins/cert-manager/data" method="POST">
+                                                <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+                                                <input type="hidden" name="object_data" value="{{ certificate_request }}" />
+                                                <input type="hidden" name="object_type" value="certificate_request" />
+                                                <a href="#" onclick="this.closest('form').submit(); return false;">{{ certificate_request.name }}</a>
+                                            </form>
+                                        </td>
+                                        <td>
+                                            <a href="#" onclick="goToTab('{{ certificate_request.issuer_type}}', '{{ certificate_request.issuer }}')">{{ certificate_request.issuer }}</a>
+                                        </td>
+                                        <td>{{ certificate_request.owner_type }}/{{ certificate_request.owner }}</td>
+                                    </tr>
+                                    {% endfor %}
+                                </tbody>
+                            </table>
+                        </div>
+                    </div>
+                </div>
+            </div>
+            <!-- certificate -->
+            <div class="tab-pane fade" id="nav-certificate" role="tabpanel" aria-labelledby="nav-certificate-tab">
+                <div class="card shadow mb-4">
+                    <div class="card-body">
+                        <div class="table-responsive">
+                            <table class="table table-bordered" id="certificateTable" width="100%" cellspacing="0">
+                                <thead>
+                                    <tr>
+                                        <th>Status</th>
+                                        <th>Name</th>
+                                        <th>Secret</th>
+                                        <th>Owner</th>
+                                    </tr>
+                                </thead>
+                                <tbody>
+                                    {% for certificate in certificate_list %}
+                                    <tr>
+                                        <td>
+                                            {% if certificate.status == 'True' %}
+                                            <span class="badge text-bg-tag text-bg-success">{{ certificate.reason }}</span>
+                                            {% else %}
+                                            <span class="badge text-bg-tag text-bg-danger">{{ certificate.reason }}</span>
+                                            {% endif %}
+                                        </td>
+                                        <td>
+                                            <form action="/plugins/cert-manager/data" method="POST">
+                                                <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+                                                <input type="hidden" name="object_data" value="{{ certificate }}" />
+                                                <input type="hidden" name="object_type" value="certificate" />
+                                                <a href="#" onclick="this.closest('form').submit(); return false;">{{ certificate.name }}</a>
+                                            </form>
+                                        </td>
+                                        <td>
+                                            <form action="/secrets" method="POST">
+                                                <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+                                                <input type="hidden" name="ns_select" value="{{ session['ns_select'] }}" />
+                                                <input type="hidden" name="selected" value="{{ certificate.secret_name }}" />
+                                                <a href="#" onclick="this.closest('form').submit(); return false;">{{ certificate.secret_name }}</a>
+                                            </form>
+                                        </td>
+                                        {% if certificate.owner_type is defined %}
+                                        <td>
+                                            {% if certificate.owner_type == "Ingress" %}
+                                            <form action="/ingress" method="POST">
+                                                <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+                                                <input type="hidden" name="ns_select" value="{{ session['ns_select'] }}" />
+                                                <input type="hidden" name="selected" value="{{ certificate.owner }}" />
+                                                <a href="#" onclick="this.closest('form').submit(); return false;">{{ certificate.owner }}</a>
+                                            </form>
+                                            {% else %}
+                                            {{ certificate.owner_type }}/{{ certificate.owner }}
+                                            {% endif %}
+                                        </td>
+                                        {% else %}
+                                        <td></td>
+                                        {% endif %}
+                                    </tr>
+                                    {% endfor %}
+                                </tbody>
+                            </table>
+                        </div>
+                    </div>
+                </div>
+            </div>
+            <!-- END -->
+        </div>
+    </div>
+</div>
+{% endblock %}
+
+{% block add_head_css %}
+{% include "segments/datatable_snipet.html.j2" %}
+{% endblock %}
+
+{% block tail_js %}
+<script>
+$(document).ready( function () {
+  $('#cluster_issuerTable').DataTable();
+  $('#issuerTable').DataTable();
+  $('#certificate_requestTable').DataTable();
+  $('#certificateTable').DataTable();
+} );
+
+function goToTab(issuer_type, element_name) {
+    if (issuer_type == "ClusterIssuer") {
+        $('#nav-cluster_issuer-tab').tab('show');
+        var rows = document.getElementById("cluster_issuerTable").getElementsByTagName("tr");
+        for (let i = 0; i < rows.length; i++) {
+            var cells = rows[i].cells
+            var object_name = cells[1].id
+            if (object_name == element_name) {
+                rows[i].classList.toggle('selected');
+            }
+        }
+    } 
+    else if (issuer_type == "Issuer") {
+        $('#nav-issuer-tab').tab('show');
+        var rows = document.getElementById("issuerTable").getElementsByTagName("tr");
+        for (let i = 0; i < rows.length; i++) {
+            var cells = rows[i].cells
+            var object_name = cells[1].id
+            if (object_name == element_name) {
+                rows[i].classList.toggle('selected');
+            }
+        }
+    }
+}
+</script>
 {% endblock %}

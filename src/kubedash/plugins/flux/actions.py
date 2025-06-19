@@ -1,6 +1,11 @@
+from datetime import datetime
 from logging import getLogger
 
 import kubernetes.client as k8s_client
+
+##############################################################
+# Variables
+##############################################################
 
 logger = getLogger(__name__)
 crd_api = k8s_client.CustomObjectsApi()
@@ -8,14 +13,27 @@ crd_api = k8s_client.CustomObjectsApi()
 ##############################################################
 # ForceReconciliationAction ???
 ##############################################################
-# patch https://github.com/headlamp-k8s/plugins/blob/main/flux/src/actions/index.tsx#L34
+"""
+patch https://github.com/headlamp-k8s/plugins/blob/main/flux/src/actions/index.tsx#L34
 
+kubectl annotate helmrelease -n kyverno-system kyverno reconcile.fluxcd.io/requestedAt="$(date +%s)"
+"""
 ##############################################################
 # SuspendAction
 ##############################################################
+"""
+patch: https://github.com/headlamp-k8s/plugins/blob/main/flux/src/actions/index.tsx#L92
+
+kubectl annotate helmrelease -n kyverno-system kyverno reconcile.fluxcd.io/requestedAt="$(date +%s)"
+
+kubectl get helmrelease kyverno -n kyverno-system -o jsonpath='{.spec.suspend}'
+# Should return "true"
+
+kubectl patch helmrelease kyverno -n kyverno-system --type merge -p '{"spec":{"suspend":false}}'
+"""
+
 def SuspendAction(obj):
     """
-    patch: https://github.com/headlamp-k8s/plugins/blob/main/flux/src/actions/index.tsx#L92
     """
 
     kind = obj.get("kind")
