@@ -2,47 +2,42 @@
 apiVersion: monitoring.coreos.com/v1
 kind: ServiceMonitor
 metadata:
-  name: {{ include "kubedash.fullname" . }}
+  name: {{ include "kubedash.fullname" . }}-ui
   namespace: {{ coalesce .Values.metrics.serviceMonitor.namespace .Release.Namespace | quote }}
   labels:
     app.kubernetes.io/component: metrics
-    app: kubedash
     {{- include "kubedash.labels" . | nindent 4 }}
-{{- with .Values.metrics.serviceMonitor.labels  }}
-{{ toYaml . | indent 4 }}
-{{- end }}
-{{- with .Values.metrics.serviceMonitor.annotations  }}
+    {{- with .Values.metrics.serviceMonitor.labels }}
+    {{- toYaml . | nindent 4 }}
+    {{- end }}
+  {{- with .Values.metrics.serviceMonitor.annotations }}
   annotations:
-{{ toYaml . | indent 4 }}
-{{- end }}
+    {{- toYaml . | nindent 4 }}
+  {{- end }}
 spec:
   {{- if .Values.metrics.serviceMonitor.jobLabel }}
   jobLabel: {{ .Values.metrics.serviceMonitor.jobLabel }}
   {{- end }}
   selector:
     matchLabels:
-    app.kubernetes.io/component: metrics
-    app: kubedash
-    {{- include "kubedash.labels" . | nindent 6 }}
-{{- with .Values.metrics.serviceMonitor.labels  }}
-{{ toYaml . | indent 6 }}
-{{- end }}
+      app.kubernetes.io/component: metrics
+      {{- include "kubedash.labels" . | nindent 6 }}
   endpoints:
-    - port: prometheus
+    - port: http-monitoring
       {{- if .Values.metrics.serviceMonitor.interval }}
       interval: {{ .Values.metrics.serviceMonitor.interval }}
       {{- end }}
       {{- if .Values.metrics.serviceMonitor.scrapeTimeout }}
       scrapeTimeout: {{ .Values.metrics.serviceMonitor.scrapeTimeout }}
       {{- end }}
-      {{- if .Values.metrics.serviceMonitor.relabelings }}
-      relabelings: {{ .Values.metrics.serviceMonitor.relabelings }}
-      {{- end }}
-      {{- if .Values.metrics.serviceMonitor.metricRelabelings }}
-      metricRelabelings: {{ .Values.metrics.serviceMonitor.metricRelabelings }}
-      {{- end }}
       {{- if .Values.metrics.serviceMonitor.honorLabels }}
       honorLabels: {{ .Values.metrics.serviceMonitor.honorLabels }}
+      {{- end }}
+      {{- if .Values.metrics.serviceMonitor.relabelings }}
+      relabelings: {{ toYaml .Values.metrics.serviceMonitor.relabelings | nindent 6 }}
+      {{- end }}
+      {{- if .Values.metrics.serviceMonitor.metricRelabelings }}
+      metricRelabelings: {{ toYaml .Values.metrics.serviceMonitor.metricRelabelings | nindent 6 }}
       {{- end }}
   namespaceSelector:
     matchNames:

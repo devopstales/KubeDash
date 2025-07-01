@@ -60,9 +60,10 @@ metrics:
     # -- Enable prometheus service monitor
     enabled: false
     # -- Prometheus service monitor namespace
-    namespace: "monitoring"
+    #namespace: "monitoring"
     # -- Prometheus service monitor labels
-    labels: {}
+    labels:
+      release: kube-prometheus-stack
     # -- Prometheus service monitor job labels
     jobLabel: {}
     # -- Prometheus service monitor annotations
@@ -71,8 +72,8 @@ metrics:
     interval: "30s"
     # -- Prometheus service monitor scrape timeout
     scrapeTimeout: "10s"
-    relabelings: {}
-    metricRelabelings: {}
+    relabelings: []
+    metricRelabelings: []
     honorLabels: {}
 
 # -- deploy postgresql
@@ -122,8 +123,14 @@ postgresql:
     serviceMonitor:
       # -- Enable prometheus service monitor
       enabled: false
+      # -- Prometheus service monitor labels
+      labels:
+        release: kube-prometheus-stack
+      # -- Set serviceMonitor labels
+      jobLabel: {}
+      honorLabels: {}
       # -- Prometheus service monitor namespace
-      namespace: "monitoring"
+      #namespace: "monitoring"
 # https://artifacthub.io/packages/helm/bitnami/postgresql
 
 # -- enable redis for caching
@@ -139,7 +146,9 @@ redis:
       # -- Enable prometheus service monitor
       enabled: false
       # -- Prometheus service monitor namespace
-      namespace: "monitoring"  
+      #namespace: "monitoring"
+      additionalLabels:
+        release: kube-prometheus-stack
 
 # -- enable metrics-server
 metricsServer:

@@ -73,10 +73,13 @@ spec:
         ports:
           - containerPort: 9125
             protocol: TCP
-            name: statsd
+            name: statsd-tcp
+          - containerPort: 9125
+            protocol: UDP
+            name: statsd-udp
           - containerPort: 9102
             protocol: TCP
-            name: prometheus
+            name: http-monitoring
         args:
           - --statsd.mapping-config=/statsd/statsd.conf
         volumeMounts:
