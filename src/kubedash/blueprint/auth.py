@@ -6,7 +6,7 @@ from itsdangerous import base64_decode
 from opentelemetry import trace
 from werkzeug.security import check_password_hash
 
-from lib.helper_functions import get_logger
+from lib.helper_functions import get_logger, is_safe_url
 from lib.k8s.server import k8sServerConfigGet
 from lib.sso import SSOSererGet, get_auth_server_info
 from lib.user import KubectlConfig, Role, SSOTokenGet, User, UsersRoles
@@ -15,7 +15,7 @@ from lib.user import KubectlConfig, Role, SSOTokenGet, User, UsersRoles
 ## Helpers
 ##############################################################
 
-auth = Blueprint("auth", __name__)
+auth_bp = Blueprint("auth", __name__)
 logger = get_logger()
 
 tracer = trace.get_tracer(__name__)
@@ -25,7 +25,7 @@ tracer = trace.get_tracer(__name__)
 ##############################################################
 
 
-@auth.route('/')
+@auth_bp.route('/')
 @tracer.start_as_current_span("/")
 def login():
     span = trace.get_current_span()
@@ -60,7 +60,7 @@ def login():
                     "log.message": "SSO is enabled",
                 })
                 span.set_attribute("sso.state", session['oauth_state'])
-                span.set_attribute("sso.auth.url", auth_url)
+                span.set_attribute("sso.auth_bp.url", auth_url)
                 span.set_attribute("sso.authorization.url", authorization_url)
         else:
             if tracer and span.is_recording():
@@ -167,7 +167,7 @@ def login():
             auth_url = authorization_url
         )
         
-@auth.route('/', methods=['POST'])
+@auth_bp.route('/', methods=['POST'])
 def login_post():
     username = request.form.get('username')
     password = request.form.get('password')
@@ -230,18 +230,22 @@ def login_post():
                     )
                     logger.info("Config sent to client")
                     logger.info("Answer from clinet: %s" % x.text)
-            except:
-                if tracer and span.is_recording():
-                    span.add_event("log", {
-                        "log.severity": "error",
-                        "log.message": "Failed to connect to client.",
-                    })
-                logger.error("Failed to connect to the kubectl client. (POST)")
+            except Exception as e:
+                if not request.args.get('next'):  # Only log if no 'next' parameter exists
+                    if tracer and span.is_recording():
+                        span.add_event("log", {
+                            "log.severity": "error",
+                            "log.message": f"Failed to connect to client: {str(e)}",
+                        })
+                    logger.error(f"Failed to connect to client: {str(e)}")
 
-        return redirect(url_for('dashboard.cluster_metrics'))
 
+        next_url = request.args.get('next')
+        if not next_url or not is_safe_url(next_url, request):  # <-- Security check!
+            next_url = url_for('dashboard.cluster_metrics')  # Default fallback
+        return redirect(next_url)  # <-- Redirect to 'next' or dashboard
 
-@auth.route('/logout')
+@auth_bp.route('/logout')
 @login_required
 def logout():
     logout_user()

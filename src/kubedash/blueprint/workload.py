@@ -24,7 +24,7 @@ from lib.sso import get_user_token
 ## Helpers
 ##############################################################
 
-workload = Blueprint("workload", __name__, url_prefix="/workload")
+workload_bp = Blueprint("workload", __name__, url_prefix="/workload")
 logger = get_logger()
 
 def authenticated_only(f):
@@ -43,11 +43,15 @@ def authenticated_only(f):
 ## Pods
 ##############################################################
 
-@workload.route("/pods", methods=['GET', 'POST'])
+@workload_bp.route("/pods", methods=['GET', 'POST'])
 @login_required
 def pod_list():
+    selected = None
+    
     if request.method == 'POST':
-        session['ns_select'] = request.form.get('ns_select')
+        selected = request.form.get('selected')
+        if request.form.get('ns_select', None):
+            session['ns_select'] = request.form.get('ns_select')
 
     user_token = get_user_token(session)
 
@@ -59,9 +63,10 @@ def pod_list():
         'workload/pod.html.j2',
         pods = pod_list,
         namespaces = namespace_list,
+        selected = selected
     )
 
-@workload.route('/pods/data', methods=['GET', 'POST'])
+@workload_bp.route('/pods/data', methods=['GET', 'POST'])
 @login_required
 def pod_data():
     if request.method == 'POST':
@@ -89,7 +94,7 @@ def pod_data():
 logging.getLogger('socketio').setLevel(logging.ERROR)
 logging.getLogger('engineio').setLevel(logging.ERROR)
 
-@workload.route('/pods/logs', methods=['POST'])
+@workload_bp.route('/pods/logs', methods=['POST'])
 @login_required
 def pod_logs():
     if request.method == 'POST':
@@ -135,7 +140,7 @@ def log_message(po_name, container):
 ## Pod Exec
 ##############################################################
 
-@workload.route('/pods/exec', methods=['POST'])
+@workload_bp.route('/pods/exec', methods=['POST'])
 @login_required
 def pod_exec():
     if request.method == 'POST':
@@ -200,7 +205,7 @@ def exec_input(data):
 ## Statefullsets
 ##############################################################
 
-@workload.route("/statefulsets", methods=['GET', 'POST'])
+@workload_bp.route("/statefulsets", methods=['GET', 'POST'])
 @login_required
 def statefulsets():
     selected = None
@@ -209,7 +214,7 @@ def statefulsets():
     if request.method == 'POST':
         if request.form.get('ns_select', None):
             session['ns_select'] = request.form.get('ns_select')
-        selected = request.form.get('selected')
+        selected = request.form.get('selected', None)
         
     namespace_list, error = k8sNamespaceListGet(session['user_role'], user_token)
     if not error:
@@ -224,7 +229,7 @@ def statefulsets():
         namespaces = namespace_list,
     )
 
-@workload.route('/statefulsets/data', methods=['GET', 'POST'])
+@workload_bp.route('/statefulsets/data', methods=['GET', 'POST'])
 @login_required
 def statefulsets_data():
     if request.method == 'POST':
@@ -246,7 +251,7 @@ def statefulsets_data():
     else:
         return redirect(url_for('auth.login'))
         
-@workload.route('/statefulsets/scale', methods=['GET', 'POST'])
+@workload_bp.route('/statefulsets/scale', methods=['GET', 'POST'])
 @login_required
 def statefulsets_scale():
     if request.method == 'POST':
@@ -264,7 +269,7 @@ def statefulsets_scale():
 ## Daemonsets
 ##############################################################
 
-@workload.route("/daemonsets", methods=['GET', 'POST'])
+@workload_bp.route("/daemonsets", methods=['GET', 'POST'])
 @login_required
 def daemonsets():
     selected = None
@@ -288,7 +293,7 @@ def daemonsets():
         selected = selected,
     )
 
-@workload.route('/daemonsets/data', methods=['GET', 'POST'])
+@workload_bp.route('/daemonsets/data', methods=['GET', 'POST'])
 @login_required
 def daemonset_data():
     if request.method == 'POST':
@@ -311,7 +316,7 @@ def daemonset_data():
     else:
         return redirect(url_for('auth.login'))
     
-@workload.route('/statefulsets/scale', methods=['GET', 'POST'])
+@workload_bp.route('/statefulsets/scale', methods=['GET', 'POST'])
 @login_required
 def daemonsets_scale():
     if request.method == 'POST':
@@ -338,7 +343,7 @@ def daemonsets_scale():
 ## Deployments
 ##############################################################
 
-@workload.route("/deployments", methods=['GET', 'POST'])
+@workload_bp.route("/deployments", methods=['GET', 'POST'])
 @login_required
 def deployments():
     selected = None
@@ -362,7 +367,7 @@ def deployments():
         namespaces = namespace_list,
     )
 
-@workload.route('/deployments/data', methods=['GET', 'POST'])
+@workload_bp.route('/deployments/data', methods=['GET', 'POST'])
 @login_required
 def deployment_data():
     if request.method == 'POST':
@@ -385,7 +390,7 @@ def deployment_data():
     else:
         return redirect(url_for('auth.login'))
     
-@workload.route('/deployments/scale', methods=['GET', 'POST'])
+@workload_bp.route('/deployments/scale', methods=['GET', 'POST'])
 @login_required
 def deployment_scale():
     if request.method == 'POST':
@@ -403,7 +408,7 @@ def deployment_scale():
 ## ReplicaSets
 ##############################################################
 
-@workload.route("/replicasets", methods=['GET', 'POST'])
+@workload_bp.route("/replicasets", methods=['GET', 'POST'])
 @login_required
 def replicasets():
     selected = None

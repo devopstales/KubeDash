@@ -17,7 +17,7 @@ from .helper import (bgpadvertisementsTest, bgppeersTest, ipaddresspoolTest,
 ## variables
 ##############################################################
 
-exlb_routes = Blueprint("external_loadbalancer", __name__, url_prefix="/plugins", \
+external_loadbalancer_bp = Blueprint("external_loadbalancer", __name__, url_prefix="/plugins", \
     template_folder="templates")
 logger = get_logger()
 
@@ -25,16 +25,18 @@ logger = get_logger()
 # exLB Routes
 ##############################################################
 
-@exlb_routes.route('/external-loadbalancer', methods=['GET', 'POST'])
+@external_loadbalancer_bp.route('/external-loadbalancer', methods=['GET', 'POST'])
 @login_required
 def external_loadbalancer():
     selected = None
+    selected_type = None
     user_token = get_user_token(session)
 
     if request.method == 'POST':
         if request.form.get('ns_select', None):
             session['ns_select'] = request.form.get('ns_select')
         selected = request.form.get('selected')
+        selected_type = request.form.get('object_type')
 
     namespace_list, error = k8sNamespaceListGet(session['user_role'], user_token)
     if not error:
@@ -57,9 +59,10 @@ def external_loadbalancer():
         bgpadvertisement_list=bgpadvertisement_list,
         bgppeers_list=bgppeers_list,
         selected=selected,
+        selected_type=selected_type,
     )
 
-@exlb_routes.route('/external-loadbalancer/data', methods=['GET', 'POST'])
+@external_loadbalancer_bp.route('/external-loadbalancer/data', methods=['GET', 'POST'])
 @login_required
 def external_loadbalancer_data():
     selected = None

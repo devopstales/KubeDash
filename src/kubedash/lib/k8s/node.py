@@ -27,7 +27,7 @@ def k8sListNodes(username_role, user_token):
     k8sClientConfigGet(username_role, user_token)
     node_list = list()
     try:
-        node_list = k8s_client.CoreV1Api().list_node(_request_timeout=5)
+        node_list = k8s_client.CoreV1Api().list_node(_request_timeout=1, timeout_seconds=1)
         return node_list, None
     except ApiException as error:
         if error.status != 404:

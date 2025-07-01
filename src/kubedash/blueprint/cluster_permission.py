@@ -13,7 +13,7 @@ from lib.sso import get_user_token
 ## Helpers
 ##############################################################
 
-cluster_permission = Blueprint("cluster_permission", __name__, url_prefix="/cluster-permission")
+cluster_permission_bp = Blueprint("cluster_permission", __name__, url_prefix="/cluster-permission")
 logger = get_logger()
 
 ##############################################################
@@ -22,7 +22,7 @@ logger = get_logger()
 ## Service Account
 ##############################################################
 
-@cluster_permission.route("/service-account", methods=['GET', 'POST'])
+@cluster_permission_bp.route("/service-account", methods=['GET', 'POST'])
 @login_required
 def service_accounts():
     selected = None
@@ -50,7 +50,7 @@ def service_accounts():
 ##  Role
 ##############################################################
 
-@cluster_permission.route("/role", methods=['GET', 'POST'])
+@cluster_permission_bp.route("/role", methods=['GET', 'POST'])
 @login_required
 def roles():
     selected = None
@@ -73,7 +73,7 @@ def roles():
         namespaces = namespace_list,
     )
 
-@cluster_permission.route("/role/data", methods=['GET', 'POST'])
+@cluster_permission_bp.route("/role/data", methods=['GET', 'POST'])
 @login_required
 def role_data():
     if request.method == 'POST':
@@ -101,7 +101,7 @@ def role_data():
 ##  Role Binding
 ##############################################################
 
-@cluster_permission.route("/role-binding", methods=['GET', 'POST'])
+@cluster_permission_bp.route("/role-binding", methods=['GET', 'POST'])
 @login_required
 def role_bindings():
     selected = None
@@ -128,7 +128,7 @@ def role_bindings():
 ## Cluster Role
 ##############################################################
 
-@cluster_permission.route("/cluster-role", methods=['GET', 'POST'])
+@cluster_permission_bp.route("/cluster-role", methods=['GET', 'POST'])
 @login_required
 def cluster_roles():
     selected = None
@@ -145,7 +145,7 @@ def cluster_roles():
         selected = selected,
     )
 
-@cluster_permission.route("/cluster-role/data", methods=['GET', 'POST'])
+@cluster_permission_bp.route("/cluster-role/data", methods=['GET', 'POST'])
 @login_required
 def cluster_role_data():
     if request.method == 'POST':
@@ -166,7 +166,7 @@ def cluster_role_data():
 ## Cluster Role Bindings
 ##############################################################
 
-@cluster_permission.route("/cluster-role-binding", methods=["GET", "POST"])
+@cluster_permission_bp.route("/cluster-role-binding", methods=["GET", "POST"])
 @login_required
 def cluster_role_bindings():
     crb_name = None

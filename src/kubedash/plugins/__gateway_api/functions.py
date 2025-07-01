@@ -20,7 +20,7 @@ def GatewayApiGetBackendTLSPolicy(username_role, user_token, namespace):
     api_plural = "backendtlspolicies"
     k8s_object_list = list()
     try:
-        k8s_objects = k8s_client.CustomObjectsApi().list_namespaced_custom_object(api_group, api_version, namespace, api_plural, _request_timeout=5)
+        k8s_objects = k8s_client.CustomObjectsApi().list_namespaced_custom_object(api_group, api_version, namespace, api_plural, _request_timeout=1, timeout_seconds=1)
     except ApiException as error:
         if error.status != 404:
             ErrorHandler(logger, error, "get %s" % api_plural)
@@ -35,7 +35,7 @@ def GatewayApiGetGatewayClass(username_role, user_token):
     api_plural = "gatewayclasses"
     k8s_object_list = list()
     try:
-        k8s_objects = k8s_client.CustomObjectsApi().list_cluster_custom_object(api_group, api_version, api_plural, _request_timeout=5)
+        k8s_objects = k8s_client.CustomObjectsApi().list_cluster_custom_object(api_group, api_version, api_plural, _request_timeout=1, timeout_seconds=1)
         for k8s_object in k8s_objects['items']:
             k8s_object_data = {
                 "name": k8s_object['metadata']['name'],
@@ -60,7 +60,7 @@ def GatewayApiGetGateway(username_role, user_token, namespace):
     api_plural = "gateways"
     k8s_object_list = list()
     try:
-        k8s_objects = k8s_client.CustomObjectsApi().list_namespaced_custom_object(api_group, api_version, namespace, api_plural, _request_timeout=5)
+        k8s_objects = k8s_client.CustomObjectsApi().list_namespaced_custom_object(api_group, api_version, namespace, api_plural, _request_timeout=1, timeout_seconds=1)
         for k8s_object in k8s_objects['items']:
             k8s_object_data = {
                 "name": k8s_object['metadata']['name'],
@@ -87,7 +87,7 @@ def GatewayApiGetHTTPRoute(username_role, user_token, namespace):
     api_plural = "httproutes"
     k8s_object_list = list()
     try:
-        k8s_objects = k8s_client.CustomObjectsApi().list_namespaced_custom_object(api_group, api_version, namespace, api_plural, _request_timeout=5)
+        k8s_objects = k8s_client.CustomObjectsApi().list_namespaced_custom_object(api_group, api_version, namespace, api_plural, _request_timeout=1, timeout_seconds=1)
         for k8s_object in k8s_objects['items']:
             k8s_object_data = {
                 "name": k8s_object['metadata']['name'],
@@ -116,7 +116,7 @@ def GatewayApiGetReferenceGrant(username_role, user_token, namespace):
     api_plural = "referencegrants"
     k8s_object_list = list()
     try:
-        k8s_objects = k8s_client.CustomObjectsApi().list_namespaced_custom_object(api_group, api_version, namespace, api_plural, _request_timeout=5)
+        k8s_objects = k8s_client.CustomObjectsApi().list_namespaced_custom_object(api_group, api_version, namespace, api_plural, _request_timeout=1, timeout_seconds=1)
     except ApiException as error:
         if error.status != 404:
             ErrorHandler(logger, error, "get %s" % api_plural)
@@ -131,7 +131,7 @@ def GatewayApiGetGRPCRoute(username_role, user_token, namespace):
     api_plural = "grpcroute"
     k8s_object_list = list()
     try:
-        k8s_objects = k8s_client.CustomObjectsApi().list_namespaced_custom_object(api_group, api_version, namespace, api_plural, _request_timeout=5)
+        k8s_objects = k8s_client.CustomObjectsApi().list_namespaced_custom_object(api_group, api_version, namespace, api_plural, _request_timeout=1, timeout_seconds=1)
     except ApiException as error:
         if error.status != 404:
             ErrorHandler(logger, error, "get %s" % api_plural)
@@ -146,7 +146,7 @@ def GatewayApiGetTCPRoute(username_role, user_token, namespace):
     api_plural = "tcproutes"
     k8s_object_list = list()
     try:
-        k8s_objects = k8s_client.CustomObjectsApi().list_namespaced_custom_object(api_group, api_version, namespace, api_plural, _request_timeout=5)
+        k8s_objects = k8s_client.CustomObjectsApi().list_namespaced_custom_object(api_group, api_version, namespace, api_plural, _request_timeout=1, timeout_seconds=1)
     except ApiException as error:
         if error.status != 404:
             ErrorHandler(logger, error, "get %s" % api_plural)
@@ -161,7 +161,7 @@ def GatewayApiGetTLSRoute(username_role, user_token, namespace):
     api_plural = "tlsroutes"
     k8s_object_list = list()
     try:
-        k8s_objects = k8s_client.CustomObjectsApi().list_namespaced_custom_object(api_group, api_version, namespace, api_plural, _request_timeout=5)
+        k8s_objects = k8s_client.CustomObjectsApi().list_namespaced_custom_object(api_group, api_version, namespace, api_plural, _request_timeout=1, timeout_seconds=1)
     except ApiException as error:
         if error.status != 404:
             ErrorHandler(logger, error, "get %s" % api_plural)
@@ -176,7 +176,7 @@ def GatewayApiGetUDPRoute(username_role, user_token, namespace):
     api_plural = "udproutes"
     k8s_object_list = list()
     try:
-        k8s_objects = k8s_client.CustomObjectsApi().list_namespaced_custom_object(api_group, api_version, namespace, api_plural, _request_timeout=5)
+        k8s_objects = k8s_client.CustomObjectsApi().list_namespaced_custom_object(api_group, api_version, namespace, api_plural, _request_timeout=1, timeout_seconds=1)
     except ApiException as error:
         if error.status != 404:
             ErrorHandler(logger, error, "get %s" % api_plural)

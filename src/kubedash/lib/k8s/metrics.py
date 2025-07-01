@@ -77,10 +77,10 @@ def k8sGetClusterMetric():
             }
         }
         try:
-            node_list = k8s_client.CoreV1Api().list_node(_request_timeout=5)
-            pod_list = k8s_client.CoreV1Api().list_pod_for_all_namespaces(_request_timeout=5)
+            node_list = k8s_client.CoreV1Api().list_node(_request_timeout=1, timeout_seconds=1)
+            pod_list = k8s_client.CoreV1Api().list_pod_for_all_namespaces(_request_timeout=1, timeout_seconds=1)
             try:
-                k8s_nodes = k8s_client.CustomObjectsApi().list_cluster_custom_object("metrics.k8s.io", "v1beta1", "nodes", _request_timeout=5)
+                k8s_nodes = k8s_client.CustomObjectsApi().list_cluster_custom_object("metrics.k8s.io", "v1beta1", "nodes", _request_timeout=1, timeout_seconds=1)
             except Exception as error:
                 k8s_nodes = None
                 flash("Metrics Server is not installed. If you want to see usage date please install Metrics Server.", "warning")
@@ -208,10 +208,10 @@ def k8sGetNodeMetric(node_name):
     k8sClientConfigGet("Admin", None)
     totalPodAllocatable = float()
     try:
-        node_list = k8s_client.CoreV1Api().list_node(_request_timeout=5)
-        pod_list = k8s_client.CoreV1Api().list_pod_for_all_namespaces(_request_timeout=5)
+        node_list = k8s_client.CoreV1Api().list_node(_request_timeout=1, timeout_seconds=1)
+        pod_list = k8s_client.CoreV1Api().list_pod_for_all_namespaces(_request_timeout=1, timeout_seconds=1)
         try:
-            k8s_nodes = k8s_client.CustomObjectsApi().list_cluster_custom_object("metrics.k8s.io", "v1beta1", "nodes", _request_timeout=5)
+            k8s_nodes = k8s_client.CustomObjectsApi().list_cluster_custom_object("metrics.k8s.io", "v1beta1", "nodes", _request_timeout=1, timeout_seconds=1)
         except Exception as error:
             k8s_nodes = None
             flash("Metrics Server is not installed. If you want to see usage date please install Metrics Server.", "warning")
@@ -301,7 +301,7 @@ def k8sPVCMetric(namespace):
         node_list = k8sNodesListGet("Admin", None)
         for mode in node_list:
             name = mode["name"]
-            data = k8s_client.CoreV1Api().connect_get_node_proxy_with_path(name, path="stats/summary", _request_timeout=5)
+            data = k8s_client.CoreV1Api().connect_get_node_proxy_with_path(name, path="stats/summary", _request_timeout=1, timeout_seconds=1)
             data_json = eval(data)
             for pod in data_json["pods"]:
                 if 'volume' in pod:
@@ -337,7 +337,7 @@ def k8sGetClusterEvents(username_role, user_token):
     """
     k8sClientConfigGet(username_role, user_token)
     try:
-        event_list = k8s_client.CoreV1Api().list_event_for_all_namespaces(_request_timeout=5)
+        event_list = k8s_client.CoreV1Api().list_event_for_all_namespaces(_request_timeout=1, timeout_seconds=1)
         events = []
         for event in event_list.items:
             if event.type != "Normal":
@@ -455,7 +455,7 @@ def getNodeMetrics():
     }
     
     try:
-        k8s_nodes = k8s_client.CustomObjectsApi().list_cluster_custom_object("metrics.k8s.io", "v1beta1", "nodes", _request_timeout=5)
+        k8s_nodes = k8s_client.CustomObjectsApi().list_cluster_custom_object("metrics.k8s.io", "v1beta1", "nodes", _request_timeout=1, timeout_seconds=1)
         for node in k8s_nodes['items']:
             node_metric['name']    = node['metadata']['name']
             node_metric['cpu']     = float(parse_quantity(node['usage']['cpu']))
@@ -486,7 +486,7 @@ def getPodMetrics():
         "storage": "",
     }
     try:
-        k8s_pods = k8s_client.CustomObjectsApi().list_cluster_custom_object("metrics.k8s.io", "v1beta1", "pods", _request_timeout=5)
+        k8s_pods = k8s_client.CustomObjectsApi().list_cluster_custom_object("metrics.k8s.io", "v1beta1", "pods", _request_timeout=1, timeout_seconds=1)
         for pod in k8s_pods['items']:
             for container in pod['containers']:
                 pod_metric['name']      = pod['metadata']['name']

@@ -31,69 +31,144 @@
         <ul class="header-nav ms-auto"></ul>
 
         <ul class="header-nav">
-        <li class="nav-item py-1">
-            <div class="vr h-100 mx-2 text-body text-opacity-75"></div>
-        </li>
-        <li class="nav-item dropdown">
-            <button class="btn btn-link nav-link py-2 px-2 d-flex align-items-center" type="button" aria-expanded="false" data-coreui-toggle="dropdown">
-            <svg class="icon icon-lg theme-icon-active">
-                <use xlink:href="{{ url_for('static',filename='/vendor/@coreui/icons/svg/free.svg') }}#cil-contrast"></use>
-            </svg>
-            </button>
-            <ul class="dropdown-menu dropdown-menu-end" style="--cui-dropdown-min-width: 8rem;">
-            <li>
-                <button class="dropdown-item d-flex align-items-center" type="button" data-coreui-theme-value="light">
-                <svg class="icon icon-lg me-3">
-                    <use xlink:href="{{ url_for('static',filename='/vendor/@coreui/icons/svg/free.svg') }}#cil-sun"></use>
-                </svg>Light
-                </button>
-            </li>
-            <li>
-                <button class="dropdown-item d-flex align-items-center" type="button" data-coreui-theme-value="dark">
-                <svg class="icon icon-lg me-3">
-                    <use xlink:href="{{ url_for('static',filename='/vendor/@coreui/icons/svg/free.svg') }}#cil-moon"></use>
-                </svg>Dark
-                </button>
-            </li>
-            <li>
-                <button class="dropdown-item d-flex align-items-center active" type="button" data-coreui-theme-value="auto">
-                <svg class="icon icon-lg me-3">
-                    <use xlink:href="{{ url_for('static',filename='/vendor/@coreui/icons/svg/free.svg') }}#cil-contrast"></use>
-                </svg>Auto
-                </button>
-            </li>
-            </ul>
-        </li>
-        <li class="nav-item py-1">
-            <div class="vr h-100 mx-2 text-body text-opacity-75"></div>
-        </li>
-        <li class="nav-item dropdown">
-            <a class="nav-link py-0 pe-0" data-coreui-toggle="dropdown" href="#" role="button" aria-haspopup="true" aria-expanded="false">
-                <div class="avatar avatar-md"><img class="avatar-img" src="{{ url_for('static',filename='/assets/img/avatars/undraw_profile.svg') }}" alt="{{ session['username'] }}"></div>
-            </a>
-            <div class="dropdown-menu dropdown-menu-end pt-0">
-                <div class="dropdown-header bg-body-tertiary text-body-secondary fw-semibold my-2">
-                    <div class="fw-semibold">Account</div>
-                </div>
-                <a class="dropdown-item" href="/user/info">
-                    <svg class="icon me-2">
-                        <use xlink:href="{{ url_for('static',filename='/vendor/@coreui/icons/svg/free.svg') }}#cil-user"></use>
+            <!-- GitHub Link -->
+            <li class="nav-item">
+                <a class="nav-link" href="https://github.com/devopstales/KubeDash" target="_blank" rel="noopener">
+                    <svg xmlns="http://www.w3.org/2000/svg" width="32" height="32" viewBox="0 0 32 32" class="icon icon-xl">
+                        <path fill="var(--ci-primary-color, currentColor)" d="M16 0.396c-8.839 0-16 7.167-16 16 0 7.073 4.584 13.068 10.937 15.183 0.803 0.151 1.093-0.344 1.093-0.772 0-0.38-0.009-1.385-0.015-2.719-4.453 0.964-5.391-2.151-5.391-2.151-0.729-1.844-1.781-2.339-1.781-2.339-1.448-0.989 0.115-0.968 0.115-0.968 1.604 0.109 2.448 1.645 2.448 1.645 1.427 2.448 3.744 1.74 4.661 1.328 0.14-1.031 0.557-1.74 1.011-2.135-3.552-0.401-7.287-1.776-7.287-7.907 0-1.751 0.62-3.177 1.645-4.297-0.177-0.401-0.719-2.031 0.141-4.235 0 0 1.339-0.427 4.4 1.641 1.281-0.355 2.641-0.532 4-0.541 1.36 0.009 2.719 0.187 4 0.541 3.043-2.068 4.381-1.641 4.381-1.641 0.859 2.204 0.317 3.833 0.161 4.235 1.015 1.12 1.635 2.547 1.635 4.297 0 6.145-3.74 7.5-7.296 7.891 0.556 0.479 1.077 1.464 1.077 2.959 0 2.14-0.020 3.864-0.020 4.385 0 0.416 0.28 0.916 1.104 0.755 6.4-2.093 10.979-8.093 10.979-15.156 0-8.833-7.161-16-16-16z"></path>
                     </svg>
-                Profile</a>
-                <a class="dropdown-item" href="/settings/export">
-                    <svg class="icon me-2">
-                        <use xlink:href="{{ url_for('static',filename='/vendor/@coreui/icons/svg/free.svg') }}#cil-settings"></use>
-                    </svg>
-                 Get KubeCong
                 </a>
-                <a class="dropdown-item" href="#">
-                    <div class="dropdown-divider"></div>
-                    <a class="dropdown-item" href="#" data-bs-toggle="modal" data-bs-target="#logoutModal">
+            </li>
+
+            <!-- Notifications Dropdown -->
+            <li class="nav-item dropdown">
+                <button class="btn btn-link nav-link py-2 px-2 d-flex align-items-center position-relative" 
+                        type="button" 
+                        id="notificationDropdown" 
+                        aria-expanded="false" 
+                        data-coreui-toggle="dropdown">
+                    <svg width="32" height="32" viewBox="0 0 32 32" class="icon icon-xl">
+                        <use xlink:href="{{ url_for('static',filename='/vendor/@coreui/icons/svg/free.svg') }}#cil-bell"></use>
+                    </svg>
+                    {% with messages = get_flashed_messages(with_categories=true) %}
+                        {% if messages %}
+                            <span class="position-absolute top-0 start-100 translate-middle badge rounded-pill bg-danger">
+                                {{ messages|length }}{% if messages|length >= 9 %}+{% endif %}
+                                <span class="visually-hidden">unread messages</span>
+                            </span>
+                        {% endif %}
+                    {% endwith %}
+                </button>
+                <!-- Dropdown Menu -->
+                <ul class="dropdown-menu dropdown-menu-end dropdown-menu-notifications" 
+                    aria-labelledby="notificationDropdown">
+                    <li class="dropdown-header d-flex justify-content-between align-items-center px-3 pt-2 pb-1">
+                        <span class="fw-semibold">Notifications</span>
+                        <button class="btn btn-sm btn-outline-secondary" onclick="clearAllNotifications()">
+                            Clear All
+                        </button>
+                    </li>
+                    <li><hr class="dropdown-divider my-1"></li>
+                    <div id="notificationList">
+                        {% with messages = get_flashed_messages(with_categories=true) %}
+                            {% if messages %}
+                                {% for category, message in messages %}
+                                <!--
+                                <li class="px-3 py-2 notification-item notification-item-{{ category }}" 
+                                    id="notif-{{ loop.index }}">
+                                -->
+                                <li class="px-3 py-2 notification-item {{ 'notification-item-' + category }}" 
+                                    id="notif-{{ loop.index }}">
+
+                                    <div class="d-flex justify-content-between">
+                                        <div>
+                                            <strong class="text-{{ category }}">
+                                                {{ category|capitalize }}
+                                            </strong>
+                                            <span class="notification-time ms-2 small text-muted">
+                                                Just now
+                                            </span>
+                                        </div>
+                                        <i class="fas fa-times notification-close" 
+                                        onclick="removeNotification('notif-{{ loop.index }}')"></i>
+                                    </div>
+                                    <div class="mt-1 small">{{ message }}</div>
+                                </li>
+                                {% if not loop.last %}<hr class="dropdown-divider my-1">{% endif %}
+                                {% endfor %}
+                            {% else %}
+                                <li class="px-3 py-2 text-center text-muted small">No notifications</li>
+                            {% endif %}
+                        {% endwith %}
+                    </div>
+                </ul>
+            </li>
+            
+            <li class="nav-item py-1">
+                <div class="vr h-100 mx-2 text-body text-opacity-75"></div>
+            </li>
+            <!-- Dark Mode Theme Switcher Dropdown -->
+            <li class="nav-item dropdown">
+                <button class="btn btn-link nav-link py-2 px-2 d-flex align-items-center" type="button" aria-expanded="false" data-coreui-toggle="dropdown">
+                    <svg class="icon icon-lg theme-icon-active">
+                        <use xlink:href="{{ url_for('static',filename='/vendor/@coreui/icons/svg/free.svg') }}#cil-contrast"></use>
+                    </svg>
+                </button>
+                <ul class="dropdown-menu dropdown-menu-end" style="--cui-dropdown-min-width: 8rem;">
+                <li>
+                    <button class="dropdown-item d-flex align-items-center" type="button" data-coreui-theme-value="light">
+                    <svg class="icon icon-lg me-3">
+                        <use xlink:href="{{ url_for('static',filename='/vendor/@coreui/icons/svg/free.svg') }}#cil-sun"></use>
+                    </svg>Light
+                    </button>
+                </li>
+                <li>
+                    <button class="dropdown-item d-flex align-items-center" type="button" data-coreui-theme-value="dark">
+                    <svg class="icon icon-lg me-3">
+                        <use xlink:href="{{ url_for('static',filename='/vendor/@coreui/icons/svg/free.svg') }}#cil-moon"></use>
+                    </svg>Dark
+                    </button>
+                </li>
+                <li>
+                    <button class="dropdown-item d-flex align-items-center active" type="button" data-coreui-theme-value="auto">
+                    <svg class="icon icon-lg me-3">
+                        <use xlink:href="{{ url_for('static',filename='/vendor/@coreui/icons/svg/free.svg') }}#cil-contrast"></use>
+                    </svg>Auto
+                    </button>
+                </li>
+                </ul>
+            </li>
+            <li class="nav-item py-1">
+                <div class="vr h-100 mx-2 text-body text-opacity-75"></div>
+            </li>
+            <!-- User Profile Dropdown -->
+            <li class="nav-item dropdown">
+                <a class="nav-link py-0 pe-0" data-coreui-toggle="dropdown" href="#" role="button" aria-haspopup="true" aria-expanded="false">
+                    <div class="avatar avatar-md"><img class="avatar-img" src="{{ url_for('static',filename='/assets/img/avatars/undraw_profile.svg') }}" alt="{{ session['username'] }}"></div>
+                </a>
+                <div class="dropdown-menu dropdown-menu-end pt-0">
+                    <div class="dropdown-header bg-body-tertiary text-body-secondary fw-semibold my-2">
+                        <div class="fw-semibold">Account</div>
+                    </div>
+                    <a class="dropdown-item" href="/user/info">
                         <svg class="icon me-2">
-                            <use xlink:href="{{ url_for('static',filename='/vendor/@coreui/icons/svg/free.svg') }}#cil-account-logout"></use>
+                            <use xlink:href="{{ url_for('static',filename='/vendor/@coreui/icons/svg/free.svg') }}#cil-user"></use>
                         </svg>
-                     Logout</a>
-            </div>
-        </li>
+                    Profile</a>
+                    <a class="dropdown-item" href="/settings/export">
+                        <svg class="icon me-2">
+                            <use xlink:href="{{ url_for('static',filename='/vendor/@coreui/icons/svg/free.svg') }}#cil-settings"></use>
+                        </svg>
+                     Get KubeCong
+                    </a>
+                    <a class="dropdown-item" href="#">
+                        <div class="dropdown-divider"></div>
+                        <a class="dropdown-item" href="#" data-bs-toggle="modal" data-bs-target="#logoutModal">
+                            <svg class="icon me-2">
+                                <use xlink:href="{{ url_for('static',filename='/vendor/@coreui/icons/svg/free.svg') }}#cil-account-logout"></use>
+                            </svg>
+                         Logout</a>
+                </div>
+            </li>
         </ul>
     </div>

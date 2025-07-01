@@ -6,10 +6,12 @@ import colorlog
 from colorlog.escape_codes import escape_codes
 from decimal import Decimal, InvalidOperation
 from logging import Logger
+from urllib.parse import urlparse, urljoin
 
 import six
 import yaml
-from flask import flash, has_request_context
+from flask import flash, has_request_context, Request
+from typing import Optional, Union
 from opentelemetry import trace
 
 ##############################################################
@@ -145,6 +147,33 @@ def get_logger() -> Logger:
             span.set_attribute("run.mode", "server")
 
     return logger
+
+def is_safe_url(url_target: Optional[str], url_request: Union[Request, str]) -> bool:
+    """
+    Check if the target URL is safe to prevent open redirects.
+    
+    Args:
+        url_target: The target URL to validate (can be None)
+        url_request: Either a Flask Request object or host URL string
+    
+    Returns:
+        bool: True if URL is safe, False otherwise
+    """
+    if not url_target:
+        return False
+    
+    # Get reference URL
+    if isinstance(url_request, Request):
+        ref_url = urlparse(url_request.host_url)
+    else:
+        ref_url = urlparse(url_request)
+    
+    # Resolve target URL
+    test_url = urlparse(urljoin(ref_url.geturl(), url_target))
+    
+    # Validate scheme and netloc
+    return test_url.scheme in ('http', 'https') and ref_url.netloc == test_url.netloc
+
 
 ##############################################################
 ## Test Functions
@@ -363,6 +392,30 @@ def ErrorHandler(logger, error, action):
         if has_request_context():
             flash("Exception: %s" % action, "danger")
         logger.error("Exception: %s %s \n" % (action, error))
+        
+def WarningHandler(logger, warning, action):
+    """Handle warnings and flash messages
+    
+    Args:
+        logger (Logger): The Logger for the module.
+        warning (str): The warning to handle.
+        action (str): The action being performed.
+    """
+    if has_request_context():
+        flash(warning, "warning")
+    logger.warning("%s %s" % (action, warning))
+        
+def MessageHandler(logger, message, action):
+    """Handle messages and flash them
+    
+    Args:
+        logger (Logger): The Logger for the module.
+        message (str): The message to handle.
+        action (str): The action being performed.
+    """
+    if has_request_context():
+        flash(message, "success")
+    logger.info("%s %s" % (action, message))
 
 def ResponseHandler(message, status):
     """Flash a message

@@ -5,6 +5,8 @@ import os
 import sys
 import socket
 import redis
+import importlib
+from pathlib import Path
 from redis.exceptions import AuthenticationError, ConnectionError, RedisError
 from redis.cluster import RedisCluster
 from sqlalchemy import create_engine, text
@@ -140,14 +142,7 @@ def initialize_app_configuration(app: Flask, external_config_name: str) -> bool:
         
         app.config.from_object(app_config[config_name])
         app.config['ENV'] = config_name
-               
-        app.logger.info("Plugins:")
-        app.logger.info("	registry:	%s" % app.config['kubedash.ini'].getboolean('plugin_settings', 'registry', fallback=False))
-        app.logger.info("	helm:		%s" % app.config['kubedash.ini'].getboolean('plugin_settings', 'helm', fallback=True))
-        app.logger.info("	gateway_api:	%s" % app.config['kubedash.ini'].getboolean('plugin_settings', 'gateway_api', fallback=False))
-        app.logger.info("	cert_manager:	%s" % app.config['kubedash.ini'].getboolean('plugin_settings', 'cert_manager', fallback=True))
-        app.logger.info("	ext_lb: 	%s" % app.config['kubedash.ini'].getboolean('plugin_settings', 'external_loadbalancer', fallback=True))
-        
+                      
         app.logger.info("Integrations:")
         app.logger.info("	Redis:	%s" % bool_var_test(app.config['kubedash.ini'].get('remote_cache', 'redis_enabled')))
         app.logger.info("	Jaeger:	%s" % bool_var_test(app.config['kubedash.ini'].get('monitoring', 'jaeger_enabled')))
@@ -247,10 +242,6 @@ def initialize_app_database(app: Flask, filename: str):
     db.init_app(app)
     migrate.init_app(app, db)
     
-    """Import External Database Models"""
-    app.logger.info("   Import Database Models")
-    from plugins.registry import model
-    
     from lib.init_functions import (
         db_init_roles, init_db_test,
         k8s_config_int, k8s_roles_init, oidc_init
@@ -298,41 +289,41 @@ def initialize_app_swagger(app: Flask):
 
 def initialize_blueprints(app: Flask):
     """Initialize blueprints"""
-    from blueprint.api import api
-    from blueprint.auth import auth
-    from blueprint.cluster import cluster
-    from blueprint.cluster_permission import cluster_permission
-    from blueprint.dashboard import dashboard
-    from blueprint.metrics import metrics
-    from blueprint.network import network
-    from blueprint.other_resources import other_resources
-    from blueprint.security import security
-    from blueprint.settings import settings, sso
-    from blueprint.storage import storage
-    from blueprint.user import users
-    from blueprint.workload import workload
+    from blueprint.api import api_bp
+    from blueprint.auth import auth_bp
+    from blueprint.cluster import cluster_bp
+    from blueprint.cluster_permission import cluster_permission_bp
+    from blueprint.dashboard import dashboard_bp
+    from blueprint.metrics import metrics_bp
+    from blueprint.network import network_bp
+    from blueprint.other_resources import other_resources_bp
+    from blueprint.security import security_bp
+    from blueprint.settings import settings_bp, sso_bp
+    from blueprint.storage import storage_bp
+    from blueprint.user import users_bp
+    from blueprint.workload import workload_bp
     from blueprint.history import history_bp
 
 
     app.logger.info("Initialize blueprints")
-    #app.register_blueprint(api)
-    api_doc.register_blueprint(api)
-    app.register_blueprint(metrics)
+    #app.register_blueprint(api_bp)
+    api_doc.register_blueprint(api_bp)
+    app.register_blueprint(metrics_bp)
     app.register_blueprint(history_bp)
     
-    app.register_blueprint(auth)
-    app.register_blueprint(sso)
+    app.register_blueprint(auth_bp)
+    app.register_blueprint(sso_bp)
     
-    app.register_blueprint(dashboard)
-    app.register_blueprint(users)
-    app.register_blueprint(cluster_permission)
-    app.register_blueprint(cluster)
-    app.register_blueprint(workload)
-    app.register_blueprint(network)
-    app.register_blueprint(storage)
-    app.register_blueprint(security)
-    app.register_blueprint(other_resources)
-    app.register_blueprint(settings)    
+    app.register_blueprint(dashboard_bp)
+    app.register_blueprint(users_bp)
+    app.register_blueprint(cluster_permission_bp)
+    app.register_blueprint(cluster_bp)
+    app.register_blueprint(workload_bp)
+    app.register_blueprint(network_bp)
+    app.register_blueprint(storage_bp)
+    app.register_blueprint(security_bp)
+    app.register_blueprint(other_resources_bp)
+    app.register_blueprint(settings_bp)    
 
 def initialize_commands(app: Flask):
     """Initialize commands"""
@@ -456,81 +447,81 @@ def inicialize_instrumentors(app: Flask):
     RequestsInstrumentor().instrument()
     LoggingInstrumentor().instrument(set_logging_format=True)
 
+
 def initialize_app_plugins(app: Flask):
+    """Initialize and register plugins for the Flask application dynamically.
+    
+    Scans the plugins directory and checks against [plugin_settings] in kubedash.ini.
+    Each plugin must have:
+    - A directory under plugins/
+    - An __init__.py exposing a blueprint named {plugin_name}_bp
     """
-    Initialize and register plugins for the Flask application.
-
-    This function configures various plugins based on the application's configuration,
-    logs the status of each plugin, and registers the corresponding blueprints for
-    enabled plugins.
-    Args:
-        app (Flask): The Flask application instance to which the plugins will be added.
-
-    Returns:
-        None
-
-    The function performs the following steps:
-    1. Sets up the plugin configuration based on the 'kubedash.ini' file.
-    2. Logs the status of each plugin (enabled or disabled).
-    3. Registers blueprints for enabled plugins (helm, registry, gateway_api, 
-       cert_manager, and external_loadbalancer).
-
-    Note:
-        The actual enabling/disabling of plugins is determined by the 'kubedash.ini'
-        configuration file and the bool_var_test() function (not shown in this snippet).
-    """
-    app.logger.info("Initialize Plugins")
-
-    app.config["plugins"] = {
-            "registry":              app.config['kubedash.ini'].getboolean('plugin_settings', 'registry', fallback=False),
-            "helm":                  app.config['kubedash.ini'].getboolean('plugin_settings', 'helm', fallback=True),
-            "gateway_api":           app.config['kubedash.ini'].getboolean('plugin_settings', 'gateway_api', fallback=False),
-            "cert_manager":          app.config['kubedash.ini'].getboolean('plugin_settings', 'cert_manager', fallback=True),
-            "external_loadbalancer": app.config['kubedash.ini'].getboolean('plugin_settings', 'external_loadbalancer', fallback=True),
-        }
-
-    """Plugin Logging"""
+    app.logger.info("Initializing Plugins Dynamically")
     app.logger.info(separator_short)
-    app.logger.info("Starting Plugins:")
-
-    """Register Plugin Blueprints"""
-    if bool_var_test(app.config["plugins"]["helm"]):
-        app.logger.info("   Start helm")
-        from plugins.helm import helm 
-        app.register_blueprint(helm)
-
-    if bool_var_test(app.config["plugins"]["registry"]):
-        app.logger.info("   Start registry")
-        from plugins.registry import registry 
-        app.register_blueprint(registry)
-
-    if bool_var_test(app.config["plugins"]["gateway_api"]):
-        app.logger.info("   Start gateway_api")
-        from plugins.gateway_api import gateway_api 
-        app.register_blueprint(gateway_api)
-
-    if bool_var_test(app.config["plugins"]["cert_manager"]):
-        app.logger.info("   Start cert_manager")
-        from plugins.cert_manager import cm_routes 
-        app.register_blueprint(cm_routes)
-
-    if bool_var_test(app.config["plugins"]["external_loadbalancer"]):
-        app.logger.info("   Start external_loadbalancer")
-        from plugins.external_loadbalancer import exlb_routes 
-        app.register_blueprint(exlb_routes)
+    
+    # Initialize plugin system
+    app.config["plugins"] = {}
+    
+    # Get the plugins directory
+    plugins_dir = Path(__file__).parent.parent / "plugins"
+    
+    # Get all plugin folders
+    plugin_folders = [f.name for f in plugins_dir.iterdir() if f.is_dir() and not f.name.startswith('__')]
+    
+    # Get plugin configuration (empty dict if section doesn't exist)
+    try:
+        plugin_config = app.config['kubedash.ini']['plugin_settings']
+    except KeyError:
+        plugin_config = {}
+    
+    # Process each discovered plugin
+    app.logger.info("Plugins:")
+    for plugin_name in plugin_folders:
+        # Determine if plugin is enabled (default to False if not in config)
+        is_enabled = plugin_config.getboolean(plugin_name, fallback=False)
+        app.logger.info(f"  Plugin {plugin_name}: {is_enabled}")
         
-    app.logger.info(separator_short)
+        app.config["plugins"][plugin_name] = is_enabled
+        
+        try:
+            if is_enabled:
+                # Import the plugin module
+                module = importlib.import_module(f"plugins.{plugin_name}")
 
+                # Find and register the first matching blueprint
+                bp_name = f"{plugin_name}_bp"
+                if hasattr(module, bp_name):
+                    blueprint = getattr(module, bp_name)
+                    app.register_blueprint(blueprint)
+
+                    try:
+                        importlib.import_module(f"plugins.{plugin_name}.model")
+                        app.logger.info("    Import Database Models")
+                    except ImportError:
+                        continue
+                    except Exception as e:
+                        app.logger.error(f"    Error loading models for {plugin_name}: {str(e)}")
+
+                else:
+                    app.logger.info(f"    No valid blueprint found for {plugin_name}")
+                
+        except ImportError as e:
+            app.logger.error(f"  Failed to import plugin {plugin_name}: {str(e)}")
+        except Exception as e:
+            app.logger.error(f"  Error loading plugin {plugin_name}: {str(e)}")
+    
+    app.logger.info(separator_short)
 
 def add_custom_jinja2_filters(app: Flask):
     """Add custom Jinja2 filers."""
     app.logger.info("Adding custom Jinja2 filters")
 
-    from lib.jinja2_decoders import j2_b64decode, j2_b64encode, split_uppercase 
+    from lib.custom_jinja2 import j2_b64decode, j2_b64encode, split_uppercase, check_url_exists
 
     app.add_template_filter(j2_b64decode)
     app.add_template_filter(j2_b64encode)
     app.add_template_filter(split_uppercase)
+    app.add_template_filter(check_url_exists)
 
 def initialize_app_socket(app: Flask):
     """Initialize socketIO"""

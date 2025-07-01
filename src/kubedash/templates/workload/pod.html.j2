@@ -42,7 +42,11 @@
                   </thead>
                   <tbody>
                     {% for po in pods %}
+                    {% if selected == po.name %}
+                      <tr class="selected" >
+                    {% else %}
                       <tr>
+                    {% endif %}
                         <td>
                         {% if po.status == "Running" %} 
                           <span class="badge text-bg-success">{{ po.status }}</span>

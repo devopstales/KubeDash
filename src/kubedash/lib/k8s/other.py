@@ -73,7 +73,7 @@ def k8sVPAListGet(username_role, user_token, ns_name):
             version=api_version,  # <- updated based on CRD
             namespace=ns_name,
             plural="verticalpodautoscalers",
-            _request_timeout=5
+            _request_timeout=1, timeout_seconds=1
         )
 
         for vpa in vpas.get("items", []):
@@ -121,7 +121,7 @@ def k8sHPAListGet(username_role, user_token, ns_name):
     k8sClientConfigGet(username_role, user_token)
     HPA_LIST = list()
     try:
-        hpas = k8s_client.AutoscalingV1Api().list_namespaced_horizontal_pod_autoscaler(ns_name, _request_timeout=5)
+        hpas = k8s_client.AutoscalingV1Api().list_namespaced_horizontal_pod_autoscaler(ns_name, _request_timeout=1, timeout_seconds=1)
         for hpa in hpas.items:
             HPA_DATA = {
                 "name": hpa.metadata.name,
@@ -164,7 +164,7 @@ def k8sPodDisruptionBudgetListGet(username_role, user_token, ns_name):
     PDB_LIST = list()
     k8sClientConfigGet(username_role, user_token)
     try:
-        pdbs = k8s_client.PolicyV1Api().list_namespaced_pod_disruption_budget(namespace=ns_name, _request_timeout=5)
+        pdbs = k8s_client.PolicyV1Api().list_namespaced_pod_disruption_budget(namespace=ns_name, _request_timeout=1, timeout_seconds=1)
         for pdb in pdbs.items:
             PDB_DATA = {
                 "name": pdb.metadata.name,
@@ -214,7 +214,7 @@ def k8sQuotaListGet(username_role, user_token, ns_name):
     RQ_LIST = list()
     k8sClientConfigGet(username_role, user_token)
     try:
-        rqs = k8s_client.CoreV1Api().list_namespaced_resource_quota(namespace=ns_name, _request_timeout=5)
+        rqs = k8s_client.CoreV1Api().list_namespaced_resource_quota(namespace=ns_name, _request_timeout=1, timeout_seconds=1)
         for rq in rqs.items:
             PQ_DATA = {
                 "name": rq.metadata.name,
@@ -259,7 +259,7 @@ def k8sLimitRangeListGet(username_role, user_token, ns_name):
     LR_LIST = list()
     k8sClientConfigGet(username_role, user_token)
     try:
-        lrs = k8s_client.CoreV1Api().list_namespaced_limit_range(ns_name, _request_timeout=5)
+        lrs = k8s_client.CoreV1Api().list_namespaced_limit_range(ns_name, _request_timeout=1, timeout_seconds=1)
         for lr in lrs.items:
             LR_DATA = {
                 "name": lr.metadata.name,
@@ -299,7 +299,7 @@ def k8sPriorityClassList(username_role, user_token):
     PC_LIST = list()
     k8sClientConfigGet(username_role, user_token)
 
-    pcs = k8s_client.SchedulingV1Api().list_priority_class(_request_timeout=5)
+    pcs = k8s_client.SchedulingV1Api().list_priority_class(_request_timeout=1, timeout_seconds=1)
     for cs in pcs.items:
         PCS_DATA = {
             "name": cs.metadata.name,

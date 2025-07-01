@@ -11,8 +11,231 @@
       </nav>
     </div>
 </ul>
+<ul class="header-nav ms-auto"></ul>
+<ul class="header-nav d-lg-flex">
 {% include "segments/topmenu.html.j2" %}
 {% endblock %}
 
 {% block content %}
+<div class="card shadow mb-4">
+    <div class="card-header py-3">
+        <h6 class="m-0 font-weight-bold text-primary">LoadBalancer Objects</h6>
+    </div>
+    <div class="card-body">
+        <ul class="nav nav-tabs" id="loadBalancerTab" role="tablist">
+            <li class="nav-item" role="presentation">
+                <button class="nav-link active" id="ipaddresspool-tab" data-bs-toggle="tab" data-bs-target="#nav-ipaddresspool" type="button" role="tab" aria-controls="nav-ipaddresspool" aria-selected="true">IP Address Pools</button>
+            </li>
+            <li class="nav-item" role="presentation">
+                <button class="nav-link" id="l2advertisement-tab" data-bs-toggle="tab" data-bs-target="#nav-l2advertisement" type="button" role="tab" aria-controls="nav-l2advertisement" aria-selected="false">L2 Advertisements</button>
+            </li>
+            {% if bgppeers_list is not none %}
+            <li class="nav-item" role="presentation">
+                <button class="nav-link" id="bgppeers-tab" data-bs-toggle="tab" data-bs-target="#nav-bgppeers_list" type="button" role="tab" aria-controls="nav-bgppeers_list" aria-selected="false">BGP Peers</button>
+            </li>
+            {% endif %}
+            <li class="nav-item" role="presentation">
+                <button class="nav-link" id="bgpadvertisement-tab" data-bs-toggle="tab" data-bs-target="#nav-bgpadvertisement" type="button" role="tab" aria-controls="nav-bgpadvertisement" aria-selected="false">BGP Advertisements</button>
+            </li>
+        </ul>
+        <div class="tab-content pt-3" id="loadBalancerTabContent">
+            <!-- ipaddresspool -->
+            <div class="tab-pane fade show active" id="nav-ipaddresspool" role="tabpanel" aria-labelledby="ipaddresspool-tab">
+                <div class="card shadow mb-4">
+                    <div class="card-body">
+                        <div class="table-responsive">
+                            <table class="table table-bordered display" id="ipaddresspoolTable" width="100%" cellspacing="0">
+                                <thead>
+                                    <tr>
+                                        <th>Type</th>
+                                        <th>Name</th>
+                                        <th>Addresses</th>
+                                    </tr>
+                                </thead>
+                                <tbody>
+                                    {% for ipaddresspool in ipaddresspool_list %}
+                                    <tr id="{{ ipaddresspool.name }}" class="{% if selected == ipaddresspool.name %}selected{% endif %}">
+                                        <td>{{ ipaddresspool.type }}</td>
+                                        <td id="{{ ipaddresspool.name }}">
+                                            <form action="/plugins/external-loadbalancer/data" method="POST">
+                                                <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+                                                <input type="hidden" name="object_data" value="{{ ipaddresspool }}" />
+                                                <input type="hidden" name="object_type" value="ipaddresspool" />
+                                                <a href="javascript:;" onclick="parentNode.submit();">{{ ipaddresspool.name }}</a>
+                                            </form>
+                                        </td>
+                                        <td>
+                                            {% if ipaddresspool.type == "cilium" %}
+                                                {% for address in ipaddresspool.blocks %}
+                                                    {% for key, value in address.items() %}
+                                                        {% if key == "start"%}
+                                                            {{ value }} -
+                                                        {% elif key == "stop"%}
+                                                            {{ value }}<br>
+                                                        {% elif key == "cidr"%}
+                                                            {{ value }}<br>
+                                                        {% endif %}
+                                                    {% endfor %}
+                                                {% endfor %}
+                                            {% else %}
+                                                {% for address in ipaddresspool.addresses %}
+                                                {{ address }}<br>
+                                                {% endfor %}
+                                            {% endif %}
+                                        </td>
+                                    </tr>
+                                    {% endfor %}
+                                </tbody>
+                            </table>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- l2advertisement -->
+            <div class="tab-pane fade" id="nav-l2advertisement" role="tabpanel" aria-labelledby="l2advertisement-tab">
+                <div class="card shadow mb-4">
+                    <div class="card-body">
+                        <div class="table-responsive">
+                            <table class="table table-bordered" id="l2advertisementTable" width="100%" cellspacing="0">
+                                <thead>
+                                    <tr>
+                                        <th>Type</th>
+                                        <th>Name</th>
+                                        <th>Pools</th>
+                                    </tr>
+                                </thead>
+                                <tbody>
+                                    {% for l2advertisement in l2advertisement_list %}
+                                    <tr>
+                                        <td>{{ l2advertisement.type }}</td>
+                                        <td>
+                                            <form action="/plugins/external-loadbalancer/data" method="POST">
+                                                <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+                                                <input type="hidden" name="object_data" value="{{ l2advertisement }}" />
+                                                <input type="hidden" name="object_type" value="l2advertisement" />
+                                                <a href="javascript:;" onclick="parentNode.submit();">{{ l2advertisement.name }}</a>
+                                            </form>
+                                        </td>
+                                        <td>
+                                            {% for pool in l2advertisement.ipAddressPools %}
+                                                <a href="javascript:;" onclick="goToTab('l2advertisement', '{{ pool }}')">{{ pool }}</a><br>
+                                            {% endfor %}
+                                        </td>
+                                    </tr>
+                                    {% endfor %}
+                                </tbody>
+                            </table>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        
+            {% if bgppeers_list is not none %}
+            <!-- bgppeers -->
+            <div class="tab-pane fade" id="nav-bgppeers_list" role="tabpanel" aria-labelledby="bgppeers-tab">
+                <div class="card shadow mb-4">
+                    <div class="card-body">
+                        <div class="table-responsive">
+                            <table class="table table-bordered" id="bgppeersTable" width="100%" cellspacing="0">
+                                <thead>
+                                    <tr>
+                                        <th>Type</th>
+                                        <th>Name</th>
+                                        <th>Peer</th>
+                                    </tr>
+                                </thead>
+                                <tbody>
+                                    {% for bgppeers in bgppeers_list %}
+                                    <tr>
+                                        <td>{{ bgppeers.type }}</td>
+                                        <td>
+                                            <form action="/plugins/external-loadbalancer/data" method="POST">
+                                                <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+                                                <input type="hidden" name="object_data" value="{{ bgppeers }}" />
+                                                <input type="hidden" name="object_type" value="bgppeers" />
+                                                <a href="javascript:;" onclick="parentNode.submit();">{{ bgppeers.name }}</a>
+                                            </form>
+                                        </td>
+                                        <td>
+                                        {% if bgppeers.type == "cilium" %}
+                                            {% for virtual_router in bgppeers.virtual_routers %}
+                                                {% for neighbor in virtual_router.neighbors %}
+                                                {{ neighbor.peerAddress }}<br>
+                                                {% endfor %}
+                                            {% endfor %}
+                                        {% else %}
+                                            {{ bgppeers.peerAddress }}
+                                        {% endif %}
+                                        </td>
+                                    </tr>
+                                    {% endfor %}
+                                </tbody>
+                            </table>
+                        </div>
+                    </div>
+                </div>
+            </div>
+            {% endif %}
+
+            <!-- bgpadvertisement -->
+            <div class="tab-pane fade" id="nav-bgpadvertisement" role="tabpanel" aria-labelledby="bgpadvertisement-tab">
+                <div class="card shadow mb-4">
+                    <div class="card-body">
+                        <div class="table-responsive">
+                            <table class="table table-bordered" id="bgpadvertisementTable" width="100%" cellspacing="0">
+                                <thead>
+                                    <tr>
+                                        <th>Type</th>
+                                        <th>Name</th>
+                                        <th>Pools</th>
+                                    </tr>
+                                </thead>
+                                <tbody>
+                                    {% for bgpadvertisement in bgpadvertisement_list %}
+                                    <tr>
+                                        <td>{{ bgpadvertisement.type }}</td>
+                                        <td>{{ bgpadvertisement.name }}</td>
+                                        <td>
+                                            {% for pool in bgpadvertisement.ipAddressPools %}
+                                                <a href="javascript:;" onclick="goToTab('bgpadvertisement', '{{ pool }}')">{{ pool }}</a><br>
+                                            {% endfor %}
+                                        </td>
+                                    </tr>
+                                    {% endfor %}
+                                </tbody>
+                            </table>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}
+
+{% block add_head_css %}
+{% include "segments/datatable_snipet.html.j2" %}
+{% endblock %}
+
+{% block tail_js %}
+<script>
+$(document).ready( function () {
+  $('#ipaddresspoolTable').DataTable();
+  $('#l2advertisementTable').DataTable();
+  $('#bgppeersTable').DataTable();
+  $('#bgpadvertisementTable').DataTable();
+
+    // Switch to the correct tab if a specific type was selected
+    {% if selected_type %}
+        $('#{{ selected_type }}-tab').tab('show');
+    {% endif %}
+} );
+
+function goToTab(issuer_type, element_name) {
+    if ((issuer_type == "l2advertisement") || (issuer_type == "bgpadvertisement")) {
+        $('#ipaddresspool-tab').tab('show');
+    }
+}
+</script>
 {% endblock %}

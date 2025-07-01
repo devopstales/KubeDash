@@ -16,14 +16,14 @@ from lib.sso import get_user_token
 ## Helpers
 ##############################################################
 
-other_resources = Blueprint("other_resources", __name__, url_prefix="/other-resource" )
+other_resources_bp = Blueprint("other_resources", __name__, url_prefix="/other-resource" )
 logger = get_logger()
 
 ##############################################################
 ## VPA
 ##############################################################
 
-@other_resources.route("/vertical-pod-autoscaler", methods=['GET', 'POST'])
+@other_resources_bp.route("/vertical-pod-autoscaler", methods=['GET', 'POST'])
 @login_required
 def vpa():
     selected = None
@@ -47,7 +47,7 @@ def vpa():
         namespaces = namespace_list,
     )
     
-@other_resources.route('/vertical-pod-autoscaler/data', methods=['GET', 'POST'])
+@other_resources_bp.route('/vertical-pod-autoscaler/data', methods=['GET', 'POST'])
 @login_required
 def vpa_data():
     if request.method == 'POST':
@@ -76,7 +76,7 @@ def vpa_data():
 ## HPA
 ##############################################################
 
-@other_resources.route("/horizontal-pod-autoscaler", methods=['GET', 'POST'])
+@other_resources_bp.route("/horizontal-pod-autoscaler", methods=['GET', 'POST'])
 @login_required
 def hpa():
     selected = None
@@ -100,7 +100,7 @@ def hpa():
         namespaces = namespace_list,
     )
 
-@other_resources.route('/horizontal-pod-autoscaler/data', methods=['GET', 'POST'])
+@other_resources_bp.route('/horizontal-pod-autoscaler/data', methods=['GET', 'POST'])
 @login_required
 def hpa_data():
     if request.method == 'POST':
@@ -128,7 +128,7 @@ def hpa_data():
 ## Pod Disruption Budget
 ##############################################################
 
-@other_resources.route("/pod-disruption-budget", methods=['GET', 'POST'])
+@other_resources_bp.route("/pod-disruption-budget", methods=['GET', 'POST'])
 @login_required
 def pdp():
     selected = None
@@ -152,7 +152,7 @@ def pdp():
         namespaces = namespace_list,
     )
 
-@other_resources.route('/pod-disruption-budget/data', methods=['GET', 'POST'])
+@other_resources_bp.route('/pod-disruption-budget/data', methods=['GET', 'POST'])
 @login_required
 def pdp_data():
     if request.method == 'POST':
@@ -180,7 +180,7 @@ def pdp_data():
 # Resource Quota
 ##############################################################
 
-@other_resources.route("/resource-quota", methods=['GET', 'POST'])
+@other_resources_bp.route("/resource-quota", methods=['GET', 'POST'])
 @login_required
 def resource_quota():
     selected = None
@@ -204,7 +204,7 @@ def resource_quota():
         namespaces = namespace_list,
     )
 
-@other_resources.route('/resource-quota/data', methods=['GET', 'POST'])
+@other_resources_bp.route('/resource-quota/data', methods=['GET', 'POST'])
 @login_required
 def resource_quota_data():
     if request.method == 'POST':
@@ -232,7 +232,7 @@ def resource_quota_data():
 # Limit Range
 ##############################################################
 
-@other_resources.route("/limit-range", methods=['GET', 'POST'])
+@other_resources_bp.route("/limit-range", methods=['GET', 'POST'])
 @login_required
 def limit_range():
     selected = None
@@ -256,7 +256,7 @@ def limit_range():
         namespaces = namespace_list,
     )
 
-@other_resources.route('/limit-range/data', methods=['GET', 'POST'])
+@other_resources_bp.route('/limit-range/data', methods=['GET', 'POST'])
 @login_required
 def limit_range_data():
     if request.method == 'POST':

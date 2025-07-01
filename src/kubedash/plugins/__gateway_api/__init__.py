@@ -12,7 +12,7 @@ from .functions import GatewayApiGetGatewayClass
 ## variables
 ##############################################################
 
-gateway_api = Blueprint("gateway_api", __name__, url_prefix="/plugins", \
+gateway_api_bp = Blueprint("gateway_api", __name__, url_prefix="/plugins", \
     template_folder="templates")
 logger = get_logger()
 
@@ -20,7 +20,7 @@ logger = get_logger()
 # Get Gateway API 1.0 Routes
 ##############################################################
 
-@gateway_api.route("/gateway-class", methods=['GET', 'POST'])
+@gateway_api_bp.route("/gateway-class", methods=['GET', 'POST'])
 @login_required
 def gateway_class():
     selected = None

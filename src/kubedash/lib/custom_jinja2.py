@@ -1,5 +1,6 @@
 #!/usr/bin/env python3
 import re
+import requests
 
 from itsdangerous import base64_decode, base64_encode
 
@@ -48,3 +49,20 @@ def split_uppercase(value: str) -> str:
     """
     split_value = re.findall('.[^A-Z]*', value)
     return split_value
+
+
+##############################################################
+## Check if URL exists
+##############################################################
+def check_url_exists(url: str) -> bool:
+    """Check if a URL exists by sending a HEAD request
+    Args:
+        url (str): URL to check
+    Returns:
+        bool: True if the URL exists (status code 200), False otherwise
+    """
+    try:
+        response = requests.head(url, timeout=3, allow_redirects=True)
+        return response.status_code == 200
+    except (requests.RequestException, ValueError):
+        return False

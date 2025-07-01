@@ -15,13 +15,13 @@ from lib.sso import SSOServerTest
 ##############################################################
 
 """api Api Blueprint"""
-api = Blueprint("api", "api", url_prefix="/api")
+api_bp = Blueprint("api", "api", url_prefix="/api")
 logger = get_logger()
 
 ##############################################################
 # Static file route for Swagger UI
 ##############################################################
-@api.route('/swagger-ui/<path:filename>')
+@api_bp.route('/swagger-ui/<path:filename>')
 def swagger_ui_static(filename):
     """Serve Swagger UI static files (JS, CSS) locally under /api"""
     return send_from_directory(swagger_ui_path, filename)
@@ -31,9 +31,9 @@ def swagger_ui_static(filename):
 ## API ping
 ##############################################################
 
-@api.route('/ping')
+@api_bp.route('/ping')
 class PingResource(MethodView):
-    @api.response(200)
+    @api_bp.response(200)
     def get(self):
         """Just Say Pong
 
@@ -54,18 +54,18 @@ class PingResource(MethodView):
 ## API liveness rediness
 ##############################################################
 
-@api.route('/health/live')
+@api_bp.route('/health/live')
 class livenessResource(MethodView):
-    @api.response(200)
+    @api_bp.response(200)
     def get(self):
         """
         Liveness probe api endpoint: /api/health/live
         """
         return {'message': 'OK'}, 200
     
-@api.route('/health/ready')
+@api_bp.route('/health/ready')
 class readinessResource(MethodView):
-    @api.response(200)
+    @api_bp.response(200)
     def get(self):
         """
         Rediness probe api endpoint: /api/api/ready

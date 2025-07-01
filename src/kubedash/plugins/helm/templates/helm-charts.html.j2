@@ -45,7 +45,7 @@
           {% else %}
             <tr>
           {% endif %}
-            {% if rd.icon %}
+            {% if rd.icon and rd.icon|check_url_exists %}
             <td><img src="{{ rd.icon }}" width="50" height="50"> </td>
             {% else %}
             <td><img src="/img/helm-icon-color.svg" width="50" height="50"> </td>

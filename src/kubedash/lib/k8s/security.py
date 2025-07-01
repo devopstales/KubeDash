@@ -30,7 +30,7 @@ def k8sPodListVulnsGet(username_role, user_token, ns):
     POD_VULN_LIST = list()
     HAS_REPORT = False
     try:
-        pod_list = k8s_client.CoreV1Api().list_namespaced_pod(ns, _request_timeout=5)
+        pod_list = k8s_client.CoreV1Api().list_namespaced_pod(ns, _request_timeout=1, timeout_seconds=1)
     except ApiException as error:
         if error.status != 404:
             ErrorHandler(logger, error, "get cluster roles - %s" % error.status)
@@ -43,7 +43,7 @@ def k8sPodListVulnsGet(username_role, user_token, ns):
         api_group = "trivy-operator.devopstales.io"
         api_version = "v1"
         api_plural = "vulnerabilityreports"
-        vulnerabilityreport_list = k8s_client.CustomObjectsApi().list_namespaced_custom_object(api_group, api_version, ns, api_plural, _request_timeout=5)
+        vulnerabilityreport_list = k8s_client.CustomObjectsApi().list_namespaced_custom_object(api_group, api_version, ns, api_plural, _request_timeout=1, timeout_seconds=1)
         HAS_REPORT = True
     except Exception as error:
         vulnerabilityreport_list = None
@@ -56,7 +56,7 @@ def k8sPodListVulnsGet(username_role, user_token, ns):
                 api_group = "aquasecurity.github.io"
                 api_version = "v1alpha1"
                 api_plural = "vulnerabilityreports"
-                vulnerabilityreport_list = k8s_client.CustomObjectsApi().list_namespaced_custom_object(api_group, api_version, ns, api_plural, _request_timeout=5)
+                vulnerabilityreport_list = k8s_client.CustomObjectsApi().list_namespaced_custom_object(api_group, api_version, ns, api_plural, _request_timeout=1, timeout_seconds=1)
                 HAS_REPORT = True
             except Exception as error2:
                 vulnerabilityreport_list = None
@@ -126,7 +126,7 @@ def k8sPodVulnsGet(username_role, user_token, ns, pod):
     POD_VULNS = {}
     HAS_REPORT = False
     try:
-        pod_list = k8s_client.CoreV1Api().list_namespaced_pod(ns, _request_timeout=5)
+        pod_list = k8s_client.CoreV1Api().list_namespaced_pod(ns, _request_timeout=1, timeout_seconds=1)
     except ApiException as error:
         if error.status != 404:
             ErrorHandler(logger, error, "get cluster roles - %s" % error.status)
@@ -140,7 +140,7 @@ def k8sPodVulnsGet(username_role, user_token, ns, pod):
         api_group = "trivy-operator.devopstales.io"
         api_version = "v1"
         api_plural = "vulnerabilityreports"
-        vulnerabilityreport_list = k8s_client.CustomObjectsApi().list_namespaced_custom_object(api_group, api_version, ns, api_plural, _request_timeout=5)
+        vulnerabilityreport_list = k8s_client.CustomObjectsApi().list_namespaced_custom_object(api_group, api_version, ns, api_plural, _request_timeout=1, timeout_seconds=1)
     except ApiException as error:
         #####################################################
         # aquasecurity trivy operator functions
@@ -150,7 +150,7 @@ def k8sPodVulnsGet(username_role, user_token, ns, pod):
                 api_group = "aquasecurity.github.io"
                 api_version = "v1alpha1"
                 api_plural = "vulnerabilityreports"
-                vulnerabilityreport_list = k8s_client.CustomObjectsApi().list_namespaced_custom_object(api_group, api_version, ns, api_plural, _request_timeout=5)
+                vulnerabilityreport_list = k8s_client.CustomObjectsApi().list_namespaced_custom_object(api_group, api_version, ns, api_plural, _request_timeout=1, timeout_seconds=1)
             except ApiException as error2:
                 vulnerabilityreport_list = None
                 if error2.status != 404:
@@ -243,7 +243,7 @@ def k8sSaListGet(username_role, user_token, ns):
     k8sClientConfigGet(username_role, user_token)
     SA_LIST = list()
     try:
-        service_accounts = k8s_client.CoreV1Api().list_namespaced_service_account(ns, _request_timeout=5)
+        service_accounts = k8s_client.CoreV1Api().list_namespaced_service_account(ns, _request_timeout=1, timeout_seconds=1)
         for sa in service_accounts.items:
             SA_INFO = {
                 "name": sa.metadata.name,
@@ -289,7 +289,7 @@ def k8sRoleListGet(username_role, user_token, ns):
     k8sClientConfigGet(username_role, user_token)
     ROLE_LIST = list()
     try:
-        role_list = k8s_client.RbacAuthorizationV1Api().list_namespaced_role(ns, _request_timeout=5)
+        role_list = k8s_client.RbacAuthorizationV1Api().list_namespaced_role(ns, _request_timeout=1, timeout_seconds=1)
         for role in role_list.items:
             ROLE_INFO = {
                 "name": role.metadata.name,
@@ -329,7 +329,7 @@ def k8sRoleBindingListGet(username_role, user_token, ns):
     k8sClientConfigGet(username_role, user_token)
     ROLE_BINDING_LIST = list()
     try:
-        role_binding_list = k8s_client.RbacAuthorizationV1Api().list_namespaced_role_binding(ns, _request_timeout=5)
+        role_binding_list = k8s_client.RbacAuthorizationV1Api().list_namespaced_role_binding(ns, _request_timeout=1, timeout_seconds=1)
         for rb in role_binding_list.items:
             ROLE_BINDING_INFO = {
             "name": rb.metadata.name,
@@ -380,7 +380,7 @@ def k8sRoleBindingGet(obeject_name, namespace):
         pretty = 'true'
     try:
         api_response = api_instance.read_namespaced_role_binding(
-            obeject_name, namespace, pretty=pretty, _request_timeout=5
+            obeject_name, namespace, pretty=pretty, _request_timeout=1, timeout_seconds=1
         )
         return True, None
     except ApiException as e:
@@ -482,7 +482,7 @@ def k8sRoleBindingCreate(user_role, namespace, username, group_name):
         )
     try:
         api_response = api_instance.create_namespaced_role_binding(
-            namespace, body, pretty=pretty, field_manager=field_manager, _request_timeout=5
+            namespace, body, pretty=pretty, field_manager=field_manager, _request_timeout=1, timeout_seconds=1
         )
         return True, None
     except ApiException as e:
@@ -553,7 +553,7 @@ def k8sUserClusterRoleTemplateListGet(username_role, user_token):
     k8sClientConfigGet(username_role, user_token)
     CLUSTER_ROLE_LIST = list()
     try:
-        cluster_roles = k8s_client.RbacAuthorizationV1Api().list_cluster_role(_request_timeout=5)
+        cluster_roles = k8s_client.RbacAuthorizationV1Api().list_cluster_role(_request_timeout=1, timeout_seconds=1)
         try:
             for cr in cluster_roles.items:
                 if "template-cluster-resources---" in cr.metadata.name:
@@ -580,7 +580,7 @@ def k8sUserRoleTemplateListGet(username_role, user_token):
     k8sClientConfigGet(username_role, user_token)
     CLUSTER_ROLE_LIST = list()
     try:
-        cluster_roles = k8s_client.RbacAuthorizationV1Api().list_cluster_role(_request_timeout=5)
+        cluster_roles = k8s_client.RbacAuthorizationV1Api().list_cluster_role(_request_timeout=1, timeout_seconds=1)
         try:
             for cr in cluster_roles.items:
                 if "template-namespaced-resources---" in cr.metadata.name:
@@ -615,7 +615,7 @@ def k8sClusterRoleGet(name):
         api_instance = k8s_client.RbacAuthorizationV1Api(api_client)
         pretty = 'true'
     try:
-        api_response = api_instance.read_cluster_role(name, pretty=pretty, _request_timeout=5)
+        api_response = api_instance.read_cluster_role(name, pretty=pretty, _request_timeout=1, timeout_seconds=1)
         return True, None
     except ApiException as e:
         if e.status != 404:
@@ -644,7 +644,7 @@ def k8sClusterRoleCreate(name, body):
         field_manager = 'KubeDash'
     try:
         api_response = api_instance.create_cluster_role(
-            body, pretty=pretty, field_manager=field_manager, _request_timeout=5
+            body, pretty=pretty, field_manager=field_manager, _request_timeout=1, timeout_seconds=1
         )
         return True
     except ApiException as e:
@@ -876,7 +876,7 @@ def k8sClusterRoleListGet(username_role, user_token):
     k8sClientConfigGet(username_role, user_token)
     CLUSTER_ROLE_LIST = list()
     try:
-        cluster_roles = k8s_client.RbacAuthorizationV1Api().list_cluster_role(_request_timeout=5)
+        cluster_roles = k8s_client.RbacAuthorizationV1Api().list_cluster_role(_request_timeout=1, timeout_seconds=1)
         try:
             for cr in cluster_roles.items:
                 CLUSTER_ROLE_DATA = {
@@ -934,7 +934,7 @@ def k8sClusterRoleBindingListGet(username_role, user_token):
     k8sClientConfigGet(username_role, user_token)
     CLUSTER_ROLE_BINDING_LIST = []
     try:
-        cluster_role_bindings = k8s_client.RbacAuthorizationV1Api().list_cluster_role_binding(_request_timeout=5)
+        cluster_role_bindings = k8s_client.RbacAuthorizationV1Api().list_cluster_role_binding(_request_timeout=1, timeout_seconds=1)
         for crb in cluster_role_bindings.items:
             CLUSTER_ROLE_BINDING_INFO = {
             "name": crb.metadata.name,
@@ -977,7 +977,7 @@ def k8sClusterRoleBindingGet(obeject_name):
         pretty = 'true'
     try:
         api_response = api_instance.read_cluster_role_binding(
-            obeject_name, pretty=pretty, _request_timeout=5
+            obeject_name, pretty=pretty, _request_timeout=1, timeout_seconds=1
         )
         return True, None
     except ApiException as e:
@@ -1047,7 +1047,7 @@ def k8sClusterRoleBindingCreate(user_cluster_role, username, group_name):
         )
     try:
         pi_response = api_instance.create_cluster_role_binding(
-            body, pretty=pretty, field_manager=field_manager, _request_timeout=5
+            body, pretty=pretty, field_manager=field_manager, _request_timeout=1, timeout_seconds=1
         )
         flash("User Role Created Successfully", "success")
     except ApiException as e:
@@ -1093,7 +1093,7 @@ def k8sUserPriviligeList(username_role="Admin", user_token=None, user="admin"):
     namespaces, error = k8sNamespaceListGet(username_role, user_token)
     if not error:
         for ns in namespaces:
-            role_binding_list = k8s_client.RbacAuthorizationV1Api().list_namespaced_role_binding(ns, _request_timeout=5)
+            role_binding_list = k8s_client.RbacAuthorizationV1Api().list_namespaced_role_binding(ns, _request_timeout=1, timeout_seconds=1)
             for rb in role_binding_list.items:
                 for obj in rb.subjects:
                     if obj.kind == "User" and obj.name == user:
@@ -1102,7 +1102,7 @@ def k8sUserPriviligeList(username_role="Admin", user_token=None, user="admin"):
                         elif rb.role_ref.kind == "Role":
                             ROLE_LIST.append([ns, rb.role_ref.name])
 
-    cluster_role_bindings = k8s_client.RbacAuthorizationV1Api().list_cluster_role_binding(_request_timeout=5)
+    cluster_role_bindings = k8s_client.RbacAuthorizationV1Api().list_cluster_role_binding(_request_timeout=1, timeout_seconds=1)
     for crb in cluster_role_bindings.items:
         if crb.subjects:
             for obj in crb.subjects:
@@ -1114,7 +1114,7 @@ def k8sUserPriviligeList(username_role="Admin", user_token=None, user="admin"):
             api_instance = k8s_client.RbacAuthorizationV1Api(api_client)
             pretty = 'true'
         try:
-            ROLE = api_instance.read_namespaced_role(r[1], r[0], pretty=pretty, _request_timeout=5)
+            ROLE = api_instance.read_namespaced_role(r[1], r[0], pretty=pretty, _request_timeout=1, timeout_seconds=1)
             for rr in ROLE.rules:
                 USER_ROLES.append({r[1]: rr})
         except:
@@ -1125,7 +1125,7 @@ def k8sUserPriviligeList(username_role="Admin", user_token=None, user="admin"):
             api_instance = k8s_client.RbacAuthorizationV1Api(api_client)
             pretty = 'true'
         try:
-            CLUSTER_ROLE = api_instance.read_cluster_role(cr, pretty=pretty, _request_timeout=5)
+            CLUSTER_ROLE = api_instance.read_cluster_role(cr, pretty=pretty, _request_timeout=1, timeout_seconds=1)
             for crr in CLUSTER_ROLE.rules:
                 USER_CLUSTER_ROLES.append(crr)
         except Exception as error:
@@ -1141,7 +1141,7 @@ def k8sUserPriviligeList(username_role="Admin", user_token=None, user="admin"):
 def k8sSecretListGet(username_role, user_token, namespace):
     k8sClientConfigGet(username_role, user_token)
     SECRET_LIST = list()
-    secret_list = k8s_client.CoreV1Api().list_namespaced_secret(namespace, _request_timeout=5)
+    secret_list = k8s_client.CoreV1Api().list_namespaced_secret(namespace, _request_timeout=1, timeout_seconds=1)
     for secret in secret_list.items:
         SECRET_DATA = {
             "name": secret.metadata.name,
@@ -1164,7 +1164,7 @@ def k8sSecretListGet(username_role, user_token, namespace):
 def k8sPolicyListGet(username_role, user_token, ns_name):
     POLICY_LIST = list()
     k8sClientConfigGet(username_role, user_token)
-    policy_list = k8s_client.NetworkingV1Api().list_namespaced_network_policy(ns_name, _request_timeout=5)
+    policy_list = k8s_client.NetworkingV1Api().list_namespaced_network_policy(ns_name, _request_timeout=1, timeout_seconds=1)
     try:
       for policy in policy_list.items:
           POLICY_DATA = {

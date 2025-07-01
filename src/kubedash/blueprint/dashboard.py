@@ -13,7 +13,7 @@ from lib.user import User
 ## Helpers
 ##############################################################
 
-dashboard = Blueprint("dashboard", __name__, url_prefix="/dashboard" )
+dashboard_bp = Blueprint("dashboard", __name__, url_prefix="/dashboard" )
 logger = get_logger()
 
 tracer = trace.get_tracer(__name__)
@@ -24,7 +24,7 @@ tracer = trace.get_tracer(__name__)
 ## Cluster Metrics
 ##############################################################
 
-@dashboard.route('/cluster-metric')
+@dashboard_bp.route('/cluster-metric')
 @tracer.start_as_current_span("/cluster-metrics")
 @login_required
 def cluster_metrics():
@@ -63,7 +63,7 @@ def cluster_metrics():
 ## Workload Map
 ##############################################################
 
-@dashboard.route('/workload-map', methods=['GET', 'POST'])
+@dashboard_bp.route('/workload-map', methods=['GET', 'POST'])
 @tracer.start_as_current_span("/workload-map")
 @login_required
 def workloads():

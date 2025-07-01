@@ -12,7 +12,7 @@ from lib.sso import get_user_token
 ## Helpers
 ##############################################################
 
-network = Blueprint("network", __name__, url_prefix="/network")
+network_bp = Blueprint("network", __name__, url_prefix="/network")
 logger = get_logger()
 
 ##############################################################
@@ -21,7 +21,7 @@ logger = get_logger()
 ## Ingress Class
 ##############################################################
 
-@network.route("/ingress-class", methods=['GET', 'POST'])
+@network_bp.route("/ingress-class", methods=['GET', 'POST'])
 @login_required
 def ingresses_class():
     selected = None
@@ -38,7 +38,7 @@ def ingresses_class():
         selected = selected,
     )
 
-@network.route('/ingress-class/data', methods=['GET', 'POST'])
+@network_bp.route('/ingress-class/data', methods=['GET', 'POST'])
 @login_required
 def ingresses_class_data():
     if request.method == 'POST':
@@ -67,7 +67,7 @@ def ingresses_class_data():
 ## Ingresses
 ##############################################################
 
-@network.route("/ingress", methods=['GET', 'POST'])
+@network_bp.route("/ingress", methods=['GET', 'POST'])
 @login_required
 def ingresses():
     selected = None
@@ -88,7 +88,7 @@ def ingresses():
         selected = selected,
     )
 
-@network.route('/ingress/data', methods=['GET', 'POST'])
+@network_bp.route('/ingress/data', methods=['GET', 'POST'])
 @login_required
 def ingresses_data():
     if request.method == 'POST':
@@ -116,7 +116,7 @@ def ingresses_data():
 # Service
 ##############################################################
 
-@network.route("/service", methods=['GET', 'POST'])
+@network_bp.route("/service", methods=['GET', 'POST'])
 @login_required
 def services():
     selected = None
@@ -137,7 +137,7 @@ def services():
         selected = selected,
     )
 
-@network.route('/service/data', methods=['GET', 'POST'])
+@network_bp.route('/service/data', methods=['GET', 'POST'])
 @login_required
 def services_data():
     pod_list = None

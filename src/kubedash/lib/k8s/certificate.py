@@ -52,7 +52,7 @@ def k8sCreateUserCSR(username_role, user_token, username, user_csr_base64):
     pretty = "true"
     field_manager = 'KubeDash'
     try:
-        api_response = api_instance.create_certificate_signing_request(body, pretty=pretty, field_manager=field_manager, _request_timeout=5)
+        api_response = api_instance.create_certificate_signing_request(body, pretty=pretty, field_manager=field_manager, _request_timeout=1, timeout_seconds=1)
         return True, None
     except ApiException as e:
         logger.error("Exception when calling CertificatesV1Api->create_certificate_signing_request: %s\n" % e)
@@ -102,7 +102,7 @@ def k8sReadUserCSR(username_role, user_token, username):
         pretty = "true"
         name = "kubedash-user-"+username
     try:
-        api_response = api_instance.read_certificate_signing_request(name, pretty=pretty, _request_timeout=5)
+        api_response = api_instance.read_certificate_signing_request(name, pretty=pretty, _request_timeout=1, timeout_seconds=1)
         user_certificate_base64 = api_response.status.certificate
         return user_certificate_base64
     except ApiException as e:
@@ -126,7 +126,7 @@ def k8sDeleteUserCSR(username_role, user_token, username):
         pretty = "true"
         name = "kubedash-user-"+username
     try:
-        api_response = api_instance.delete_certificate_signing_request(name, pretty=pretty, _request_timeout=5)
+        api_response = api_instance.delete_certificate_signing_request(name, pretty=pretty, _request_timeout=1, timeout_seconds=1)
     except ApiException as e:
         logger.error("Exception when calling CertificatesV1Api->delete_certificate_signing_request: %s\n" % e)
 

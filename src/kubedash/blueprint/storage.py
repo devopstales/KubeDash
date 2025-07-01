@@ -16,7 +16,7 @@ from lib.sso import get_user_token
 ## Helpers
 ##############################################################
 
-storage = Blueprint("storage", __name__, url_prefix="/storage")
+storage_bp = Blueprint("storage", __name__, url_prefix="/storage")
 logger = get_logger()
 
 ##############################################################
@@ -25,7 +25,7 @@ logger = get_logger()
 ## storage Class
 ##############################################################
 
-@storage.route("/storage-class", methods=['GET', 'POST'])
+@storage_bp.route("/storage-class", methods=['GET', 'POST'])
 @login_required
 def storage_class():
     selected = "default"
@@ -42,7 +42,7 @@ def storage_class():
         selected = selected,
     )
 
-@storage.route('/storage-class/data', methods=['GET', 'POST'])
+@storage_bp.route('/storage-class/data', methods=['GET', 'POST'])
 @login_required
 def storage_class_data():
     if request.method == 'POST':
@@ -70,7 +70,7 @@ def storage_class_data():
 ## SnapshotClass
 ##############################################################
 
-@storage.route("/snapshot-class", methods=['GET', 'POST'])
+@storage_bp.route("/snapshot-class", methods=['GET', 'POST'])
 @login_required
 def snapshot_class():
     selected = "default"
@@ -88,7 +88,7 @@ def snapshot_class():
         selected = selected,
     )
 
-@storage.route('/snapshot-class/data', methods=['GET', 'POST'])
+@storage_bp.route('/snapshot-class/data', methods=['GET', 'POST'])
 @login_required
 def snapshot_class_data():
     if request.method == 'POST':
@@ -116,7 +116,7 @@ def snapshot_class_data():
 ## Persistent Volume Claim
 ##############################################################
 
-@storage.route("/pvc", methods=['GET', 'POST'])
+@storage_bp.route("/pvc", methods=['GET', 'POST'])
 @login_required
 def pvc():
     selected = None
@@ -143,7 +143,7 @@ def pvc():
         selected = selected,
     )
 
-@storage.route('/pvc/data', methods=['GET', 'POST'])
+@storage_bp.route('/pvc/data', methods=['GET', 'POST'])
 @login_required
 def pvc_data():
     if request.method == 'POST':
@@ -172,7 +172,7 @@ def pvc_data():
 ## Persistent Volume
 ##############################################################
 
-@storage.route("/pv", methods=['GET', 'POST'])
+@storage_bp.route("/pv", methods=['GET', 'POST'])
 @login_required
 def pv():
     selected = None
@@ -197,7 +197,7 @@ def pv():
         namespaces = namespace_list,
     )
 
-@storage.route('/pv/data', methods=['GET', 'POST'])
+@storage_bp.route('/pv/data', methods=['GET', 'POST'])
 @login_required
 def pv_data():
     pv_data = None
@@ -229,7 +229,7 @@ def pv_data():
 ## Volume Snapshot
 ##############################################################
 
-@storage.route("/volumesnapshot", methods=['GET', 'POST'])
+@storage_bp.route("/volumesnapshot", methods=['GET', 'POST'])
 @login_required
 def volumesnapshots():
     selected = None
@@ -250,7 +250,7 @@ def volumesnapshots():
 ## ConfigMap
 ##############################################################
 
-@storage.route("/configmap", methods=['GET', 'POST'])
+@storage_bp.route("/configmap", methods=['GET', 'POST'])
 @login_required
 def configmap():
     selected = None
@@ -274,7 +274,7 @@ def configmap():
         selected = selected,
     )
 
-@storage.route('/configmap/data', methods=['GET', 'POST'])
+@storage_bp.route('/configmap/data', methods=['GET', 'POST'])
 @login_required
 def configmap_data():
     if request.method == 'POST':

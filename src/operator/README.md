@@ -3,24 +3,18 @@
 ## CRDs
 
 * User - Cluster
-* Groupe - Cluster
+* Identity - Cluster
+* Group - Cluster
 * Project - Cluster
+* Kubeconfig - Cluster
+
+### User
 
 ```bash
-$ oc get user
+oc get user
 
 NAME      UID                                    FULL NAME   IDENTITIES
 demo     75e4b80c-dbf1-11e5-8dc6-0e81e52cc949               htpasswd_auth:demo
-
-$ oc get identity
-
-NAME                  IDP NAME        IDP USER NAME   USER NAME   USER UID
-htpasswd_auth:demo    htpasswd_auth   demo            demo        75e4b80c-dbf1-11e5-8dc6-0e81e52cc949
-
-# oc get groups
-
-NAME      USERS
-west      john, betty
 ```
 
 ```bash
@@ -39,6 +33,15 @@ FIELDS:
    groups       <[]string>
 ```
 
+### Group
+
+```bash
+oc get groups
+
+NAME      USERS
+west      john, betty
+```
+
 ```bash
 KIND:     Group
 VERSION:  user.openshift.io/v1
@@ -51,6 +54,15 @@ FIELDS:
    kind         <string>
    metadata     <Object>
    users        <[]string>
+```
+
+### Identity
+
+```bash
+oc get identity
+
+NAME                  IDP NAME        IDP USER NAME   USER NAME   USER UID
+htpasswd_auth:demo    htpasswd_auth   demo            demo        75e4b80c-dbf1-11e5-8dc6-0e81e52cc949
 ```
 
 ```bash
@@ -71,6 +83,8 @@ FIELDS:
    providerUserName     <string>
    user                 <Object>
 ```
+
+### Project
 
 ```bash
 KIND:     Project

@@ -31,7 +31,7 @@ def k8sListNamespaces(username_role, user_token):
             span.set_attribute("user.role", username_role)
         k8sClientConfigGet(username_role, user_token)
         try:
-            namespace_list = k8s_client.CoreV1Api().list_namespace(_request_timeout=5)
+            namespace_list = k8s_client.CoreV1Api().list_namespace(_request_timeout=1, timeout_seconds=1)
             return namespace_list, None
         except ApiException as error:
             if error.status != 404:
@@ -99,21 +99,30 @@ def k8sNamespacesGet(username_role, user_token):
             namespaces, error = k8sListNamespaces(username_role, user_token)
             if error is None:
                 for ns in namespaces.items:
-                    NAMESPACE_DADTA = {
+                    NAMESPACE_DATA = {
                         "name": None,
                         "status": None,
                         "labels": list(),
                         "annotations": list(),
                         "created": None,
+                        "app_service": {
+                            "repository": None,
+                            "pipeline": None
+                        },
                     }
-                    NAMESPACE_DADTA['name'] = ns.metadata.name
-                    NAMESPACE_DADTA['status'] = ns.status.__dict__['_phase']
-                    NAMESPACE_DADTA['created'] = ns.metadata.creation_timestamp.strftime('%Y-%m-%d %H:%M:%S')
+                    NAMESPACE_DATA['name'] = ns.metadata.name
+                    NAMESPACE_DATA['status'] = ns.status.__dict__['_phase']
+                    NAMESPACE_DATA['created'] = ns.metadata.creation_timestamp.strftime('%Y-%m-%d %H:%M:%S')
                     if ns.metadata.labels:
-                        NAMESPACE_DADTA['labels'] = ns.metadata.labels
+                        NAMESPACE_DATA['labels'] = ns.metadata.labels
                     if ns.metadata.annotations:
-                        NAMESPACE_DADTA['annotations'] = trimAnnotations(ns.metadata.annotations)
-                    NAMESPACE_LIST.append(NAMESPACE_DADTA)
+                        NAMESPACE_DATA['annotations'] = trimAnnotations(ns.metadata.annotations)
+                        # Extract repository and pipeline from annotations if they exist
+                        if 'metadata.k8s.io/repository' in ns.metadata.annotations:
+                            NAMESPACE_DATA['app_service']['repository'] = ns.metadata.annotations['metadata.k8s.io/repository']
+                        if 'metadata.k8s.io/pipeline' in ns.metadata.annotations:
+                            NAMESPACE_DATA['app_service']['pipeline'] = ns.metadata.annotations['metadata.k8s.io/pipeline']
+                    NAMESPACE_LIST.append(NAMESPACE_DATA)
                     if tracer and span.is_recording():
                         span.set_attribute("namespace.name", ns.metadata.name)
                         span.set_attribute("namespace.role", ns.status.__dict__['_phase'])
@@ -153,7 +162,7 @@ def k8sNamespaceCreate(username_role, user_token, ns_name):
             )
         )
     try:
-        api_response = api_instance.create_namespace(body, pretty=pretty, field_manager=field_manager, _request_timeout=5)
+        api_response = api_instance.create_namespace(body, pretty=pretty, field_manager=field_manager, _request_timeout=1, timeout_seconds=1)
         flash("Namespace Created Successfully", "success")
     except ApiException as error:
         if error.status != 404:
@@ -177,7 +186,7 @@ def k8sNamespaceDelete(username_role, user_token, ns_name):
     with k8s_client.ApiClient() as api_client:
         api_instance = k8s_client.CoreV1Api(api_client)
     try:
-        api_response = api_instance.delete_namespace(ns_name, pretty=pretty, _request_timeout=5)
+        api_response = api_instance.delete_namespace(ns_name, pretty=pretty, _request_timeout=1, timeout_seconds=1)
         flash("Namespace Deleted Successfully", "success")
     except ApiException as error:
         if error.status != 404:

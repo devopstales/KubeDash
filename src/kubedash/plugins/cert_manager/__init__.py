@@ -17,7 +17,7 @@ from .functions import (CertificateRequestsGet, CertificatesGet,
 ## variables
 ##############################################################
 
-cm_routes = Blueprint("cert_manager", __name__, url_prefix="/plugins", \
+cert_manager_bp = Blueprint("cert_manager", __name__, url_prefix="/plugins", \
     template_folder="templates")
 logger = get_logger()
 
@@ -25,7 +25,7 @@ logger = get_logger()
 # Cert-Manager Routes
 ##############################################################
 
-@cm_routes.route('/cert-manager', methods=['GET', 'POST'])
+@cert_manager_bp.route('/cert-manager', methods=['GET', 'POST'])
 @login_required
 def cert_manager():
     selected = None
@@ -58,7 +58,7 @@ def cert_manager():
         selected = selected,
     )
 
-@cm_routes.route('/cert-manager/data', methods=['GET', 'POST'])
+@cert_manager_bp.route('/cert-manager/data', methods=['GET', 'POST'])
 @login_required
 def cert_manager_data():
     selected = None

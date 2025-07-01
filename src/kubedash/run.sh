@@ -16,6 +16,8 @@ export PYTHONFAULTHANDLER=1
 
 mkdir -p /tmp/kubedash
 
+$(poetry env activate)
+
 # Nginx Reverse Proxy
 #kubectx $K8S_CLUSTER_NAME
 CA_CERTS_FOLDER="$PWD/../../deploy/docker-compose/config"

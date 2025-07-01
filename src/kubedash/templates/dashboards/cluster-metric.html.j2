@@ -69,41 +69,36 @@
             <table class="table table-bordered" id="dataTable" width="100%" cellspacing="0">
                 <thead>
                     <tr>
-                        <th>Type</th>
-                        <th>Name</th>
-                        <th>Kind</th>
+                        <th style="white-space: nowrap;">Type</th>
+                        <th style="white-space: nowrap;">Name</th>
+                        <th style="white-space: nowrap;">Namespace</th>
+                        <th style="white-space: nowrap;">Reason</th>
                         <th>Message</th>
-                        <th>Namespace</th>
-                        <th>Reason</th>
-                        <th>Count</th>
+                        <th style="white-space: nowrap;">Count</th>
                     </tr>
                 </thead>
                 <tbody>
                 {% for event in cluster_events %}
                     <tr>
-                        <td>{{ event.type }}</td>
-                        <td>
-                           <!--
-                            <form action="/cluster/crd/data" method="POST">
+                        <td style="white-space: nowrap;">{{ event.involvedObjectKind }}</td>
+                        <td style="white-space: nowrap;">
+                           {% if event.involvedObjectKind == "Pod" %}
+                            <form action="/workload/pods" method="POST">
                                 <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
-                                <input type="hidden" name="crd_name" value="{{ event.involvedObjectName }}" />
-                                <input type="hidden" name="crd_kind" value="{{ event.involvedObjectKind }}" />
-                                <input type="hidden" name="crd_group" value="{{ event.involvedObjectGroup }}" />
-                                <input type="hidden" name="crd_version" value="{{ event.involvedObjectVersion }}" />
-                                {% if event.namespace %}
-                                    <input type="hidden" name="crd_scope" value="Namespaced" />
-                                    <input type="hidden" name="namespace" value="{{ event.namespace }}" />
-                                {% endif %}
+                                <input type="hidden" name="ns_select" value="{{ event.namespace }}" />
+                                <input type="hidden" name="selected" value="{{ event.involvedObjectName }}" />                                
                                 <a href="javascript:;" onclick="parentNode.submit();">{{ event.involvedObjectName }}</a>
                             </form>
-                            -->
+                            {% else %}
                             {{ event.involvedObjectName }}
+                            {% endif %}
                         </td>
-                        <td>{{ event.involvedObjectKind }}</td>
+                        <td style="white-space: nowrap;">{{ event.namespace }}</td>
+                        <td style="white-space: nowrap;">
+                            <span class="badge text-bg-secondary">{{ event.reason }}</span>
+                        </td>
                         <td>{{ event.message }}</td>
-                        <td>{{ event.namespace }}</td>
-                        <td>{{ event.reason }}</td>
-                        <td>{{ event.count }}</td>
+                        <td style="white-space: nowrap;">{{ event.count }}</td>
                     </tr>
                 {% endfor %}
                 </tbody>

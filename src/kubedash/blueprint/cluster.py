@@ -18,7 +18,7 @@ from lib.k8s.crds import get_custom_resources, get_custom_resource_data
 ## Helpers
 ##############################################################
 
-cluster = Blueprint("cluster", __name__, url_prefix="/cluster")
+cluster_bp = Blueprint("cluster", __name__, url_prefix="/cluster")
 logger = get_logger()
 
 ##############################################################
@@ -27,7 +27,7 @@ logger = get_logger()
 ## Namespaces
 ##############################################################
 
-@cluster.route("/namespace", methods=['GET', 'POST'])
+@cluster_bp.route("/namespace", methods=['GET', 'POST'])
 @login_required
 def namespaces():
     selected = None
@@ -52,7 +52,7 @@ def namespaces():
         namespace_list = ns_list,
     )
 
-@cluster.route("/namespace/data", methods=['GET', 'POST'])
+@cluster_bp.route("/namespace/data", methods=['GET', 'POST'])
 @login_required
 def namespaces_data():
     if request.method == 'POST':
@@ -76,7 +76,7 @@ def namespaces_data():
     else:
         return redirect(url_for('.namespace'))
 
-@cluster.route("/namespace/create", methods=['GET', 'POST'])
+@cluster_bp.route("/namespace/create", methods=['GET', 'POST'])
 @login_required
 def namespaces_create():
     if request.method == 'POST':
@@ -89,7 +89,7 @@ def namespaces_create():
     else:
         return redirect(url_for('.namespace'))
     
-@cluster.route("/namespace/delete", methods=['GET', 'POST'])
+@cluster_bp.route("/namespace/delete", methods=['GET', 'POST'])
 @login_required
 def namespaces_delete():
     if request.method == 'POST':
@@ -102,7 +102,7 @@ def namespaces_delete():
     else:
         return redirect(url_for('.namespace'))
 
-@cluster.route("/namespace/scale", methods=['GET', 'POST'])
+@cluster_bp.route("/namespace/scale", methods=['GET', 'POST'])
 @login_required
 def namespaces_scale():
     if request.method == 'POST':
@@ -139,7 +139,7 @@ def namespaces_scale():
 ## Nodes
 ##############################################################
 
-@cluster.route("/node", methods=['GET', 'POST'])
+@cluster_bp.route("/node", methods=['GET', 'POST'])
 @login_required
 def node_list():
     selected = None
@@ -159,7 +159,7 @@ def node_list():
         cluster_metrics = cluster_metrics,
     )
 
-@cluster.route('/node/data', methods=['GET', 'POST'])
+@cluster_bp.route('/node/data', methods=['GET', 'POST'])
 @login_required
 def nodes_data():
     if request.method == 'POST':
@@ -182,7 +182,7 @@ def nodes_data():
 ## CRDs
 ##############################################################
 
-@cluster.route("/crd", methods=['GET', 'POST'])
+@cluster_bp.route("/crd", methods=['GET', 'POST'])
 @login_required
 def crd_list():
     if request.method == 'POST':
@@ -200,7 +200,7 @@ def crd_list():
         selected = selected,
     )
     
-@cluster.route("/crd/data", methods=['GET', 'POST'])
+@cluster_bp.route("/crd/data", methods=['GET', 'POST'])
 @login_required
 def crd_data():
     if request.method == 'POST':

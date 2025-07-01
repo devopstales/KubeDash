@@ -24,7 +24,7 @@ def k8sHelmChartListGet(username_role, user_token, namespace):
     CHART_LIST = {}
     CHART_DATA = list()
     try:
-        secret_list = k8s_client.CoreV1Api().list_namespaced_secret(namespace, _request_timeout=5)
+        secret_list = k8s_client.CoreV1Api().list_namespaced_secret(namespace, _request_timeout=1, timeout_seconds=1)
         for secret in secret_list.items:
             if secret.type == 'helm.sh/release.v1':
                 base64_secret_data = str(base64_decode(secret.data['release']), 'UTF-8')
@@ -42,15 +42,15 @@ def k8sHelmChartListGet(username_role, user_token, namespace):
                 chart_name = secret_data['chart']['metadata']['name']
                 release_name = secret_data['name']
                 label_selector = f"app.kubernetes.io/instance={release_name}"
-                deployment_list = k8s_client.AppsV1Api().list_namespaced_deployment(namespace, label_selector=label_selector, _request_timeout=5).items
-                daemonset_list = k8s_client.AppsV1Api().list_namespaced_daemon_set(namespace, label_selector=label_selector, _request_timeout=5).items
-                stateful_set_list = k8s_client.AppsV1Api().list_namespaced_stateful_set(namespace, label_selector=label_selector, _request_timeout=5).items
-                svc_list = k8s_client.CoreV1Api().list_namespaced_service(namespace, label_selector=label_selector, _request_timeout=5).items
-                ingress_list = k8s_client.NetworkingV1Api().list_namespaced_ingress(namespace, label_selector=label_selector, _request_timeout=5).items
-                sa_list =  k8s_client.CoreV1Api().list_namespaced_service_account(namespace, label_selector=label_selector, _request_timeout=5).items
-                secret_list = k8s_client.CoreV1Api().list_namespaced_secret(namespace, label_selector=label_selector, _request_timeout=5).items
-                configma_list = k8s_client.CoreV1Api().list_namespaced_config_map(namespace, label_selector=label_selector, _request_timeout=5).items
-                pvc_list =  k8s_client.CoreV1Api().list_namespaced_persistent_volume_claim(namespace, label_selector=label_selector, _request_timeout=5).items
+                deployment_list = k8s_client.AppsV1Api().list_namespaced_deployment(namespace, label_selector=label_selector, _request_timeout=1, timeout_seconds=1).items
+                daemonset_list = k8s_client.AppsV1Api().list_namespaced_daemon_set(namespace, label_selector=label_selector, _request_timeout=1, timeout_seconds=1).items
+                stateful_set_list = k8s_client.AppsV1Api().list_namespaced_stateful_set(namespace, label_selector=label_selector, _request_timeout=1, timeout_seconds=1).items
+                svc_list = k8s_client.CoreV1Api().list_namespaced_service(namespace, label_selector=label_selector, _request_timeout=1, timeout_seconds=1).items
+                ingress_list = k8s_client.NetworkingV1Api().list_namespaced_ingress(namespace, label_selector=label_selector, _request_timeout=1, timeout_seconds=1).items
+                sa_list =  k8s_client.CoreV1Api().list_namespaced_service_account(namespace, label_selector=label_selector, _request_timeout=1, timeout_seconds=1).items
+                secret_list = k8s_client.CoreV1Api().list_namespaced_secret(namespace, label_selector=label_selector, _request_timeout=1, timeout_seconds=1).items
+                configma_list = k8s_client.CoreV1Api().list_namespaced_config_map(namespace, label_selector=label_selector, _request_timeout=1, timeout_seconds=1).items
+                pvc_list =  k8s_client.CoreV1Api().list_namespaced_persistent_volume_claim(namespace, label_selector=label_selector, _request_timeout=1, timeout_seconds=1).items
                 dependencies = None
                 if "lock" in secret_data['chart']:
                     if secret_data['chart']["lock"] and "dependencies" in secret_data['chart']["lock"]:
@@ -94,3 +94,18 @@ def k8sHelmChartListGet(username_role, user_token, namespace):
         ErrorHandler(logger, "error", ERROR)
         return HAS_CHART, CHART_LIST
  
+ ##############################################################
+## Get Chart Release
+##############################################################
+
+@cache.memoize(timeout=long_cache_time)
+def k8sHelmChartReleaseGet(chart_list, selected=None):
+    chart_name = None
+    chart_data = None
+    
+    for name, release in chart_list.items():
+        if name == selected:
+            chart_name = name
+            chart_data = release
+
+    return chart_name, chart_data

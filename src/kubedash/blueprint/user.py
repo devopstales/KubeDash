@@ -21,7 +21,7 @@ from lib.user import (KubectlConfigStore, Role, SSOGroupsList,
 ## Helpers
 ##############################################################
 
-users = Blueprint("users", __name__, url_prefix="/user")
+users_bp = Blueprint("users", __name__, url_prefix="/user")
 logger = get_logger()
 
 ##############################################################
@@ -30,7 +30,7 @@ logger = get_logger()
 ## Users and Privileges
 ##############################################################
 
-@users.route('/info', methods=['GET', 'POST'])
+@users_bp.route('/info', methods=['GET', 'POST'])
 @login_required
 def userinfo():
     username = session['user_name']
@@ -56,7 +56,7 @@ def userinfo():
         user_role = role.name,
     )
 
-@users.route('/list', methods=['GET', 'POST'])
+@users_bp.route('/list', methods=['GET', 'POST'])
 @login_required
 def users_list():
     if request.method == 'POST':
@@ -84,7 +84,7 @@ def users_list():
         k8s_contect_list = k8s_contect_list,
     )
 
-@users.route('/add', methods=['GET', 'POST'])
+@users_bp.route('/add', methods=['GET', 'POST'])
 @login_required
 def users_add():
     if request.method == 'POST':
@@ -97,11 +97,11 @@ def users_add():
         email_test = bool(email_check(email))
         if not email_test:
             flash("Email is not valid", "danger")
-            return redirect(url_for('users.users_list'))
+            return redirect(url_for('users_bp.users_list'))
         
         elif not len(password) >= 8:
             flash("Password must be 8 character in length", "danger")
-            return redirect(url_for('users.users_list'))
+            return redirect(url_for('users_bp.users_list'))
         else:
             if type != "Local":
                 private_key_base64, user_certificate_base64 = k8sCreateUser(username)
@@ -109,22 +109,22 @@ def users_add():
 
             UserCreate(username, password, email, type, role, None)
             flash("User Created Successfully", "success")
-            return redirect(url_for('users.users_list'))
+            return redirect(url_for('users_bp.users_list'))
     else:
         return redirect(url_for('auth.login'))
     
-@users.route('/delete', methods=['GET', 'POST'])
+@users_bp.route('/delete', methods=['GET', 'POST'])
 @login_required
 def users_delete():
     if request.method == 'POST':
         username = request.form['username']
         UserDelete(username)
         flash("User Deleted Successfully", "success")
-        return redirect(url_for('users.users_list'))
+        return redirect(url_for('users_bp.users_list'))
     else:
         return redirect(url_for('auth.login'))
     
-@users.route('/privilege', methods=['POST'])
+@users_bp.route('/privilege', methods=['POST'])
 @login_required
 def users_privilege_list():
     if request.method == 'POST':
@@ -140,7 +140,7 @@ def users_privilege_list():
     else:
         return redirect(url_for('auth.login'))
 
-@users.route('/privilege/edit', methods=['GET', 'POST'])
+@users_bp.route('/privilege/edit', methods=['GET', 'POST'])
 @login_required
 def users_privileges_edit():
     if request.method == 'POST':
@@ -219,7 +219,7 @@ def users_privileges_edit():
 ## Groups
 ##############################################################
 
-@users.route("/group", methods=['GET', 'POST'])
+@users_bp.route("/group", methods=['GET', 'POST'])
 @login_required
 def groups():
     selected = None
@@ -236,7 +236,7 @@ def groups():
         groupe_list = groupe_list,
     )
 
-@users.route("/group/privilege", methods=['GET', 'POST'])
+@users_bp.route("/group/privilege", methods=['GET', 'POST'])
 @login_required
 def groups_privilege():
     user_token = get_user_token(session)
@@ -256,7 +256,7 @@ def groups_privilege():
         group_cluster_role_binding = group_cluster_role_binding,
     )
 
-@users.route("/group/privilege/edit", methods=['POST'])
+@users_bp.route("/group/privilege/edit", methods=['POST'])
 @login_required
 def groups_mapping():
     if request.method == 'POST':

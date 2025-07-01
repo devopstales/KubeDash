@@ -12,7 +12,7 @@ from lib.sso import get_user_token
 ## Helpers
 ##############################################################
 
-security = Blueprint("security", __name__, url_prefix="/security")
+security_bp = Blueprint("security", __name__, url_prefix="/security")
 logger = get_logger()
 
 ##############################################################
@@ -21,7 +21,7 @@ logger = get_logger()
 ## Secrets
 ##############################################################
 
-@security.route("/secret", methods=['GET', 'POST'])
+@security_bp.route("/secret", methods=['GET', 'POST'])
 @login_required
 def secrets():
     selected = None
@@ -45,7 +45,7 @@ def secrets():
         selected = selected,
     )
 
-@security.route('/secret/data', methods=['GET', 'POST'])
+@security_bp.route('/secret/data', methods=['GET', 'POST'])
 @login_required
 def secrets_data():
     if request.method == 'POST':
@@ -77,7 +77,7 @@ def secrets_data():
 ## Network Policies
 ##############################################################
 
-@security.route('/network-policy', methods=['GET', 'POST'])
+@security_bp.route('/network-policy', methods=['GET', 'POST'])
 @login_required
 def policies_list():
     selected = None
@@ -101,7 +101,7 @@ def policies_list():
         selected = selected,
     )
 
-@security.route('/network-policy/data', methods=['GET', 'POST'])
+@security_bp.route('/network-policy/data', methods=['GET', 'POST'])
 @login_required
 def policies_data():
     if request.method == 'POST':
@@ -132,7 +132,7 @@ def policies_data():
 ##############################################################
 ## PriorityClass
 ##############################################################
-@security.route('/priorityclass', methods=['GET', 'POST'])
+@security_bp.route('/priorityclass', methods=['GET', 'POST'])
 @login_required
 def priorityclass_list():
     selected = None
@@ -149,7 +149,7 @@ def priorityclass_list():
         selected = selected,
     )
 
-@security.route('/priorityclass/data', methods=['GET', 'POST'])
+@security_bp.route('/priorityclass/data', methods=['GET', 'POST'])
 @login_required
 def priorityclass_data():
     if request.method == 'POST':

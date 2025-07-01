@@ -17,7 +17,7 @@ from .registry_server import (RegistryEventCreate, RegistryGetEvent,
 ## variables
 ##############################################################
 
-registry = Blueprint("registry", __name__, url_prefix="/plugins", \
+registry_bp = Blueprint("registry", __name__, url_prefix="/plugins", \
     template_folder="templates")
 logger = get_logger()
 
@@ -26,7 +26,7 @@ logger = get_logger()
 ##############################################################
 
 
-@registry.route("/registry", methods=['GET', 'POST'])
+@registry_bp.route("/registry", methods=['GET', 'POST'])
 @login_required
 def registry_main():
     selected = None
@@ -88,7 +88,7 @@ def registry_main():
         selected = selected,
     )
 
-@registry.route("/registry/image/list", methods=['GET', 'POST'])
+@registry_bp.route("/registry/image/list", methods=['GET', 'POST'])
 @login_required
 def image_list():
     selected = None
@@ -104,7 +104,7 @@ def image_list():
         selected = selected,
     )
     
-@registry.route("/registry/image/tags", methods=['GET', 'POST'])
+@registry_bp.route("/registry/image/tags", methods=['GET', 'POST'])
 @login_required
 def image_tags():
     selected = None
@@ -122,7 +122,7 @@ def image_tags():
         image_name = session['image_name'],
     )
 
-@registry.route("/registry/image/tag/delete", methods=['GET', 'POST'])
+@registry_bp.route("/registry/image/tag/delete", methods=['GET', 'POST'])
 @login_required
 def image_tag_delete():
     if request.method == 'POST':
@@ -133,7 +133,7 @@ def image_tag_delete():
     else:
         return redirect(url_for('auth.login'))
 
-@registry.route("/registry/image/data", methods=['GET', 'POST'])
+@registry_bp.route("/registry/image/data", methods=['GET', 'POST'])
 @login_required
 def image_data():
     if request.method == 'POST':
@@ -151,7 +151,7 @@ def image_data():
         tag_name = session['tag_name'],
     )
 
-@registry.route("/registry/events", methods=['POST'])
+@registry_bp.route("/registry/events", methods=['POST'])
 @csrf.exempt
 def registry_events():
     events = request.json["events"]

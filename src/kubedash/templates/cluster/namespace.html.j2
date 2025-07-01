@@ -35,18 +35,12 @@
                     <tr>
                         <th>Status</th>
                         <th>Namespace</th>
+                        <th>Repository</th>
+                        <th>Pipeline</th>
                         <th>Created</th>
                         <th>Action</th>
                     </tr>
                 </thead>
-                <tfoot>
-                    <tr>
-                        <th>Status</th>
-                        <th>Namespace</th>
-                        <th>Created</th>
-                        <th>Action</th>
-                    </tr>
-                </tfoot>
                 <tbody>
                     {% for ns in namespace_list %}
                     {% if selected == ns.name %}
@@ -71,7 +65,24 @@
                         
                       </td>
                       <td>
-                        {{ ns.created }}
+                        {% if ns.app_service.repository and ns.app_service.repository.startswith(('http://', 'https://')) %}
+                          <a  width="24" height="24" href="{{ ns.app_service.repository }}" target="_blank" rel="noopener noreferrer">
+                            <i class="fa-solid fa-code-branch fa-lg" style="font-size: 24px;"></i>
+                          </a>
+                        {% else %}
+                          -
+                        {% endif %}
+                      </td>
+                      <td>
+                        {% if ns.app_service.pipeline and ns.app_service.pipeline.startswith(('http://', 'https://')) %}
+                          <a href="{{ ns.app_service.pipeline }}" target="_blank" rel="noopener noreferrer">
+                            <i class="fa-solid fa-diagram-project fa-lg" style="font-size: 24px;"></i>
+                          </a>
+                        {% else %}
+                          -
+                        {% endif %}
+                      </td>
+                      <td>{{ ns.created }}</td>
                       <td>
                         <div class="d-flex flex-row">
                           {% if session['user_role'] == "Admin" %}

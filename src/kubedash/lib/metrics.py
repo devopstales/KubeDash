@@ -1,4 +1,5 @@
-from  datetime import datetime, timezone, timedelta
+import time
+from datetime import datetime, timezone, timedelta
 from flask import Flask
 from flask_login import UserMixin
 from flask_sqlalchemy import SQLAlchemy
@@ -89,9 +90,7 @@ def UpdateDatabase(app: Flask, db: SQLAlchemy, nodeMetrics, podMetrics):
                 memory=node["memory"],
                 storage=node["storage"],  # Assuming storage is part of node metrics
             )
-            db.session.add(node_data)
-            db.session.commit()
-            
+            db.session.add(node_data)           
         for pod in podMetrics:
             pod_data = Pods(
                 name=node["name"],
@@ -102,7 +101,7 @@ def UpdateDatabase(app: Flask, db: SQLAlchemy, nodeMetrics, podMetrics):
                 storage=pod["storage"],  # Assuming storage is part of pod metrics
             )
             db.session.add(pod_data)
-            db.session.commit()
+        db.session.commit()
         
 def CullDatabase(app: Flask, db: SQLAlchemy, window: int):
     """CullDatabase deletes rows from nodes and pods based on a time window.
@@ -117,9 +116,7 @@ def CullDatabase(app: Flask, db: SQLAlchemy, window: int):
     
     with app.app_context():
         # Delete rows older than the specified window from nodes table
-        db.session.query(Nodes).filter(Nodes.time < windowStr).delete()
-        db.session.commit()
-        
+        db.session.query(Nodes).filter(Nodes.time < windowStr).delete()       
         # Delete rows older than the specified window from pods table
         db.session.query(Pods).filter(Pods.time < windowStr).delete()
         db.session.commit()
@@ -133,6 +130,7 @@ def update_metrics(app: Flask, db: SQLAlchemy, window: int):
         window (int): Duration in hours to keep metrics in the DB
     """
     
+    start_time = time.time()
     nodeMetrics = getNodeMetrics()
     podMetrics  = getPodMetrics()
 
@@ -140,6 +138,7 @@ def update_metrics(app: Flask, db: SQLAlchemy, window: int):
         UpdateDatabase(app, db, nodeMetrics, podMetrics)
         CullDatabase(app, db, window)
         app.logger.info("Scraping metrics...")
+        app.logger.info(f"Metrics update took {time.time() - start_time:.2f}s")
 
 ##############################################################
 ## Main function
@@ -147,13 +146,13 @@ def update_metrics(app: Flask, db: SQLAlchemy, window: int):
 from functools import partial
 
 def initialize_metrics_scraper(app: Flask):
-    """Initialize the metrics scraper with a 60-second interval
+    """Initialize the metrics scraper with a 300-second interval
     
     Args:
         app (Flask): Flask app object
     """
     ticker = ThreadedTicker(
-        interval_sec=60, 
+        interval_sec=300, 
         func=partial(update_metrics, app, db, 30)
         )
     ticker.start()

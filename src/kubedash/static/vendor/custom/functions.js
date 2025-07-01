@@ -115,26 +115,50 @@ function validateClusterForm(element) {
  * @returns {void}
  */
 
+//function showSecret(element) {
+//  var x = document.getElementById(element);
+//  if (x) {
+//    if (x.classList.contains('textshadow')) {
+//        x.classList.remove("textshadow");
+//    } else {
+//        x.classList.add("textshadow");
+//    }
+//  } else {
+//    console.log("unhideElementsById: Element X not found");
+//  }
+//
+//  var y = document.getElementById(element+"_icon");
+//  if (y) {
+//    if (y.innerHTML === "visibility_off" ) {
+//        y.innerHTML = "visibility"
+//    } else {
+//        y.innerHTML = "visibility_off"
+//    }
+//  } else {
+//    console.log("unhideElementsById: Element Y not found");
+//  }
+//};
+
 function showSecret(element) {
-  var x = document.getElementById(element);
-  if (x) {
-    if (x.classList.contains('textshadow')) {
-        x.classList.remove("textshadow");
-    } else {
-        x.classList.add("textshadow");
-    }
-  } else {
-    console.log("unhideElementsById: Element X not found");
+  const secretElement = document.getElementById(element);
+  const iconElement = document.getElementById(`${element}_icon`);
+
+  // Null checks (critical for production)
+  if (!secretElement || !iconElement) {
+      console.error(`Element with ID '${element}' or its icon not found!`);
+      return; // Exit early if elements don't exist
   }
 
-  var y = document.getElementById(element+"_icon");
-  if (y) {
-    if (y.innerHTML === "visibility_off" ) {
-        y.innerHTML = "visibility"
-    } else {
-        y.innerHTML = "visibility_off"
-    }
-  } else {
-    console.log("unhideElementsById: Element Y not found");
-  }
+  // Toggle visibility
+  secretElement.classList.toggle("textshadow");
+
+  // Update icon
+  const isHidden = secretElement.classList.contains("textshadow");
+  iconElement.textContent = isHidden ? "visibility_off" : "visibility";
+
+  // Re-highlight if visible (optional)
+  //if (!isHidden) {
+  //    const codeBlock = secretElement.querySelector('code');
+  //    if (codeBlock) hljs.highlightElement(codeBlock);
+  //}
 };

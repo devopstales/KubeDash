@@ -22,8 +22,8 @@ from lib.user import (KubectlConfig, Role, SSOGroupCreateFromList,
 ## Helpers
 ##############################################################
 
-settings = Blueprint("settings", __name__, url_prefix="/settings")
-sso = Blueprint("sso", __name__)
+settings_bp = Blueprint("settings", __name__, url_prefix="/settings")
+sso_bp = Blueprint("sso", __name__)
 logger = get_logger()
 
 tracer = trace.get_tracer(__name__)
@@ -32,7 +32,7 @@ tracer = trace.get_tracer(__name__)
 ## SSO Settings
 ##############################################################
 
-@settings.route('/sso-config', methods=['GET', 'POST'])
+@settings_bp.route('/sso-config', methods=['GET', 'POST'])
 @login_required
 def sso_config():
     if request.method == 'POST':
@@ -89,7 +89,7 @@ def sso_config():
                 scope  = ssoServer.scope,
             )
         
-@sso.route("/callback", methods=["GET"])
+@sso_bp.route("/callback", methods=["GET"])
 def callback():
     if 'error' in request.args:
         if request.args.get('error') == 'access_denied':
@@ -98,7 +98,7 @@ def callback():
             flash('Error encountered.', "danger")
     ssoServer = SSOSererGet()
     if ('code' not in request.args and 'state' not in request.args) or not ssoServer:
-        return redirect(url_for('sso.login'))
+        return redirect(url_for('sso_bp.login'))
     else:
         auth_server_info, oauth = get_auth_server_info()
         token_url = auth_server_info["token_endpoint"]
@@ -207,7 +207,7 @@ def callback():
 ## Kubectl config
 ##############################################################
 
-@settings.route('/cluster-config', methods=['GET', 'POST'])
+@settings_bp.route('/cluster-config', methods=['GET', 'POST'])
 @login_required
 def k8s_config():
     if request.method == 'POST':
@@ -239,7 +239,7 @@ def k8s_config():
         k8s_config_list_length = k8s_config_list_length,
     )
 
-@settings.route('/export')
+@settings_bp.route('/export')
 @login_required
 def export():
     user = User.query.filter_by(username=session['user_name'], user_type = "OpenID").first()
@@ -308,7 +308,7 @@ def export():
             username_role = session['user_role']
         )
 
-@sso.route('/kdlogin')
+@sso_bp.route('/kdlogin')
 def index():
     auth_server_info, oauth = get_auth_server_info()
     auth_url = auth_server_info["authorization_endpoint"]
@@ -321,7 +321,7 @@ def index():
     session['oauth_state'] = state
     return redirect(authorization_url)
 
-@sso.route("/get-file")
+@sso_bp.route("/get-file")
 @login_required
 def get_file():
     user = User.query.filter_by(username=session['user_name'], user_type = "OpenID").first()

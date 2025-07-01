@@ -12,10 +12,12 @@
                     <th>Age</th>
                     <th>Status</th>
                     <th>Message</th>
+                    <th>Actions</th>
                 </tr>
             </thead>
             <tbody>
                 {% for item in flux_objects[kind] %}
+                {% if item is mapping %}
                 <tr>
                     <td>{{ item.metadata.name }}</td>
                     <td>{{ item.metadata.namespace }}</td>
@@ -26,7 +28,39 @@
                     <td>
                         {{ item.status.conditions[0].message if item.status and item.status.conditions else '' }}
                     </td>
+                    <td>
+                        <div class="d-flex flex-row">
+                            {% if session['user_role'] == "Admin" %}
+                            <form action="/plugins/flux/sync" method="post">
+                                <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+                                <input type="hidden"  name="flux_object" value="{{ item | tojson | forceescape }}"/>
+                                <button type="submit" rel="tooltip" class="btn btn-danger btn-just-icon btn-sm" value="upvote">
+                                    <i class="material-icons">autorenew</i>
+                                </button>
+                            </form>
+                            {% if item.spec.suspend %}
+                            <form action="/plugins/flux/resume" method="post" style="margin-left: 5px;">
+                                <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+                                <input type="hidden" name="flux_object" value="{{ item | tojson | forceescape }}"/>
+                                <button type="submit" rel="tooltip" class="btn btn-info btn-just-icon btn-sm">
+                                    <i class="material-icons">play_arrow</i>
+                                </button>
+                            </form>
+                            {% else %}
+                            <form action="/plugins/flux/suspend" method="post" style="margin-left: 5px;">
+                                <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+                                <input type="hidden" name="flux_object" value="{{ item | tojson | forceescape }}"/>
+                                <button type="submit" rel="tooltip" class="btn btn-warning btn-just-icon btn-sm">
+                                    <i class="material-icons">pause</i>
+                                </button>
+                            </form>
+                            {% endif %}
+                            <!-- pause,  play_arrow, add_task -->
+                            {% endif %}
+                        </div>
+                    </td>
                 </tr>
+                {% endif %}
                 {% endfor %}
             </tbody>
         </table>

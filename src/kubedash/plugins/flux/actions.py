@@ -3,12 +3,14 @@ from logging import getLogger
 
 import kubernetes.client as k8s_client
 
+from lib.k8s.server import k8sClientConfigGet
+from lib.helper_functions import ErrorHandler, MessageHandler, WarningHandler
+
 ##############################################################
 # Variables
 ##############################################################
 
 logger = getLogger(__name__)
-crd_api = k8s_client.CustomObjectsApi()
 
 ##############################################################
 # ForceReconciliationAction ???
@@ -32,9 +34,11 @@ kubectl get helmrelease kyverno -n kyverno-system -o jsonpath='{.spec.suspend}'
 kubectl patch helmrelease kyverno -n kyverno-system --type merge -p '{"spec":{"suspend":false}}'
 """
 
-def SuspendAction(obj):
+def SuspendAction(obj, username_role, user_token):
     """
     """
+    k8sClientConfigGet(username_role, user_token)
+    crd_api = k8s_client.CustomObjectsApi()
 
     kind = obj.get("kind")
     api_version = obj.get("apiVersion")
@@ -103,10 +107,13 @@ def SuspendAction(obj):
 ##############################################################
 # ResumeAction
 ##############################################################
-def ResumeAction(obj):
+def ResumeAction(obj, username_role, user_token):
     """
     patch: https://github.com/headlamp-k8s/plugins/blob/main/flux/src/actions/index.tsx#L139
     """
+    k8sClientConfigGet(username_role, user_token)
+    crd_api = k8s_client.CustomObjectsApi()
+    
     kind = obj.get("kind")
     api_version = obj.get("apiVersion")
     metadata = obj.get("metadata", {})
@@ -173,10 +180,13 @@ def ResumeAction(obj):
 ##############################################################
 # SyncAction
 ##############################################################
-def SyncAction(obj):
+def SyncAction(obj, username_role, user_token):
     """
     patch: https://github.com/headlamp-k8s/plugins/blob/main/flux/src/actions/index.tsx#L176
     """
+    k8sClientConfigGet(username_role, user_token)
+    crd_api = k8s_client.CustomObjectsApi()
+    
     kind = obj.get("kind")
     api_version = obj.get("apiVersion")
     metadata = obj.get("metadata", {})
@@ -212,19 +222,16 @@ def SyncAction(obj):
 
     if not all([kind, api_version, namespace, name]):
         msg = "Missing required fields in object: kind, apiVersion, metadata.name, metadata.namespace"
-        logger.warning(msg)
-        return True, msg, False
+        WarningHandler(logger, msg, "SyncAction")
 
     if kind not in VALID_OBJECTS:
         msg = f"Unsupported kind: {kind}"
-        logger.warning(msg)
-        return True, msg, False
+        WarningHandler(logger, msg, "SyncAction")
 
     expected_api_version = VALID_OBJECTS[kind]["api_version"]
     if api_version != expected_api_version:
         msg = f"Invalid apiVersion for {kind}: expected {expected_api_version}, got {api_version}"
-        logger.warning(msg)
-        return True, msg, False
+        WarningHandler(logger, msg, "SyncAction")
 
     # Create ISO8601 datetime string
     now_iso = datetime.utcnow().replace(microsecond=0).isoformat() + 'Z'
@@ -249,9 +256,7 @@ def SyncAction(obj):
             body=patch_body
         )
         msg = f"{kind} '{name}' sync requested at {now_iso}"
-        logger.info(msg)
-        return False, msg, True
-    except Exception as e:
-        msg = f"Failed to patch {kind} '{name}' in namespace '{namespace}': {e}"
-        logger.error(msg)
-        return True, msg, False
+        MessageHandler(logger, msg, "SyncAction")
+    except Exception as error:
+        msg = f"Failed to patch {kind} '{name}' in namespace '{namespace}': {error}"
+        ErrorHandler(logger, error, "get %s" % msg)
