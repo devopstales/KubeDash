@@ -42,8 +42,8 @@ RED = "\033[31m"
 RESET = "\033[0m"
 
 
-separator_long = f"###################################################################################"
-separator_short = f"#######################################"
+separator_long = r"###################################################################################"
+separator_short = r"#######################################"
 
 ##############################################################
 ## Helper Functions
@@ -196,9 +196,7 @@ def initialize_app_version(app: Flask):
   version: {RED}{kubedash_version}{RESET}
 """
 
-    print(separator_long)
-    print(LOGO)
-    print(separator_long)
+    app.logger.info("Initializing app Logo\n" + separator_long + "\n" + LOGO + "\n" + separator_long)  # Use logger instead of print
     app.logger.info("Running in %s mode" % app.config['ENV'])
 
 
@@ -548,19 +546,28 @@ def initialize_app_security(app: Flask):
     login_manager.login_view = "auth.login"
     login_manager.session_protection = "strong"
 
-    from flask_talisman import Talisman 
+    from flask_talisman import Talisman
     csp = {
+        'default-src': "'self'",
         'font-src': [
-            '\'self\'',
-            '*.gstatic.com'
+            "'self'",
+            'fonts.gstatic.com'
         ],
         'style-src': [
-            '\'self\'',
-            '\'unsafe-inline\'',
-            '\'unsafe-eval\'',
+            "'self'",
+            "'unsafe-inline'",  # Needed for some frameworks
             'fonts.googleapis.com',
-            '*.cloudflare.com',
+            'cdnjs.cloudflare.com',
         ],
+        'script-src': [
+            "'self'",
+            "'unsafe-inline'",  # Only if absolutely necessary
+            'cdnjs.cloudflare.com',
+        ],
+        'img-src': [
+            "'self'",
+            'data:',
+        ]
     }
 
     hsts = {

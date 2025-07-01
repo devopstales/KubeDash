@@ -89,10 +89,10 @@ class readinessResource(MethodView):
 
         if not database_status:
             code = 503
-        elif not oidc_test:
-            code = 503
         elif not k8s_status:
             code = 503
+        #elif not oidc_test:
+        #    code = 503
 
         return {
             'database': database_status,

@@ -99,7 +99,7 @@ tasks:
       - cp docker/kubedash/kubedash/gunicorn_conf.py docker/kubedash/gunicorn_conf.py
       - |
         docker build \
-        -f docker/kubedash/Dockerfile.dev \
+        -f docker/kubedash/Dockerfile \
         --build-arg BUILD_DATE={{.DATE}} \
         --build-arg VERSION={{.VERSION}}-devel \
         -t devopstales/kubedash:{{.VERSION}}-devel \

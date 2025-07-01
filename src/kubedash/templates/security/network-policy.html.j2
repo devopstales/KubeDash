@@ -38,7 +38,7 @@
                       <tr>
                     {% endif %}
                         <td>
-                          <form action="/security/policy/data" method="POST">
+                          <form action="/security/network-policy/data" method="POST">
                             <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
                             <input type="hidden" name="ns_select" value="{{ session['ns_select'] }}" />
                             <input type="hidden" name="policy_name" value="{{ policy.name }}" />
