@@ -15,7 +15,7 @@ tasks:
     desc: "Start dev containers"
     dir: 'deploy/docker-compose'
     cmds:
-      - docker compose -f dc-nginx.yaml -f dc-postgresql.yaml -f dc-redis.yaml -f dc-registry.yaml up -d
+      - docker compose -f dc-nginx.yaml -f dc-postgresql.yaml -f dc-redis.yaml -f dc-registry.yaml -f dc-exporter.yaml up -d
 
   docker-images:
     desc: "Copy docker images"
@@ -53,7 +53,7 @@ tasks:
     desc: "Stop dev containers"
     dir: 'deploy/docker-compose'
     cmds:
-      - docker compose -f dc-nginx.yaml -f dc-postgresql.yaml -f dc-redis.yaml -f dc-registry.yaml down
+      - docker compose -f dc-nginx.yaml -f dc-postgresql.yaml -f dc-redis.yaml -f dc-registry.yaml -f dc-exporter.yaml down
 
   kubedash-requirements:
     desc: "Generate Kubedash requirements"

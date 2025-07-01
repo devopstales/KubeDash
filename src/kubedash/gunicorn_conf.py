@@ -17,10 +17,24 @@ graceful_timeout = 120
 timeout = 120
 keepalive = 5
 threads = 100
+
 # Monitoring
-statsd_host = os.getenv("STATSD_HOST", "localhost")
-statsd_port = os.getenv("STATSD_PORT", 8125)
-statsd_prefix = os.getenv("STATSD_PREFIX", "kubedash")
+#statsd_host = os.getenv("STATSD_HOST", "localhost")
+#statsd_port = os.getenv("STATSD_PORT", 9125)
+#statsd_prefix = os.getenv("STATSD_PREFIX", "kubedash")
+
+from statsd import StatsClient
+statsd = StatsClient(
+    host=os.getenv("STATSD_HOST", "localhost"),
+    port=int(os.getenv("STATSD_PORT", "9125")),
+    prefix=os.getenv("STATSD_PREFIX", "kubedash")
+)
+def post_request(worker, req, environ, resp):
+    """Gunicorn hook that fires after each request"""
+    statsd.incr("gunicorn.requests")
+    if resp.status:
+        statsd.incr(f"gunicorn.request.status.{resp.status}")
+
 
 """Exclude requests logging"""
 class NoPing(logging.Filter):

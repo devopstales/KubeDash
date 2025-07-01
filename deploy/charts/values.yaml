@@ -188,16 +188,19 @@ oidc:
 plugins:
   registryUi:
     # -- Enable registry UI plugin
-    enabled: false
+    enabled: true
   helmDashboard:
     # -- Enable helm dashboard plugin
     enabled: true
   certManager:
     # -- Enable helm dashboard plugin
-    enabled: false
+    enabled: true
   externalLoadbalancer:
     # -- Enable external loadbalancer plugin
-    enabled: false
+    enabled: true
+  flux:
+    # -- Enable flux plugin
+    enabled: true
 
 # -- enable persistence
 persistence:

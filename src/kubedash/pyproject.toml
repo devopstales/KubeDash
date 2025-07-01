@@ -13,7 +13,6 @@ requires-python = ">=3.11"
 python = ">=3.11,<3.12"
 Flask = "3.0.2"
 weasyprint = "^56.1"
-gunicorn = "23.0.0"
 Werkzeug = "3.0.6"
 flask-login = "0.6.3"
 flask-sqlalchemy = "3.0.5"
@@ -65,6 +64,10 @@ flask-caching = "^2.3.1"
 plotly = "^6.0.0"
 redis = "^5.2.1"
 colorlog = "^6.9.0"
+statsd = "^4.0.1"
+gunicorn-prometheus-exporter = "^0.1.0"
+prometheus-client = "^0.22.1"
+gunicorn = {extras = ["statsd"], version = "^23.0.0"}
 
 
 [tool.poetry.group.dev.dependencies]

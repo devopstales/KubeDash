@@ -1,7 +1,12 @@
 services:
   kubedash-exporter:
+    container_name: kubedash-exporter
     image: prom/statsd-exporter:v0.22.4
     volumes:
       - ./config/statsd.conf:/statsd/statsd.conf # mapping file
     command:
       - --statsd.mapping-config=/statsd/statsd.conf # options
+    ports:
+      - 9125:9125/tcp
+      - 9125:9125/udp
+      - 9102:9102

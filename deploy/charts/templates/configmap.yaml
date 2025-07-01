@@ -40,7 +40,7 @@ data:
     [remote_cache]
     {{ if .Values.redis.enabled }}
     redis_enabled = true
-    # cache connectionstring options
+    # cache connection string options
     redis_host = {{ .Release.Name }}-redis-master
     redis_port = 6379
     redis_db = 0
@@ -92,7 +92,7 @@ data:
     gateway_api = false
     cert_manager = {{ .Values.plugins.certManager.enabled }}
     external_loadbalancer = {{ .Values.plugins.externalLoadbalancer.enabled }}
-
+    flux = {{ .Values.plugins.flux.enabled }}
     #################################### End of Settings ###########################
 {{- if .Values.metrics.enabled }}
 ---
