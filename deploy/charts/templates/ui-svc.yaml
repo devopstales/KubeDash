@@ -33,6 +33,28 @@ spec:
     app: kubedash
     {{- include "kubedash.selectorLabels" . | nindent 4 }}
   ports:
+    - name: http
+      port: 8000
+      protocol: TCP
+      targetPort: 8000
+  sessionAffinity: None
+  type: ClusterIP
+status:
+  loadBalancer: {}
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: {{ include "kubedash.fullname" . }}-gunicorn-metrics
+  labels:
+    app: kubedash
+    app.kubernetes.io/component: metrics
+    {{- include "kubedash.labels" . | nindent 4 }}
+spec:
+  selector:
+    app: kubedash
+    {{- include "kubedash.selectorLabels" . | nindent 4 }}
+  ports:
     - name: statsd-tcp
       port: 9125
       protocol: TCP

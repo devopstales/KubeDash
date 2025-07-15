@@ -4,6 +4,7 @@ env:
   VERSION: "4.0.0"
   DATE: 
     sh: date "+%Y.%m.%d"
+  DCFILES: "-f dc-nginx.yaml -f dc-postgresql.yaml -f dc-redis.yaml -f dc-registry.yaml -f dc-exporter.yaml -f dc-jaeger.yaml"
 
 tasks:
   default:
@@ -15,7 +16,7 @@ tasks:
     desc: "Start dev containers"
     dir: 'deploy/docker-compose'
     cmds:
-      - docker compose -f dc-nginx.yaml -f dc-postgresql.yaml -f dc-redis.yaml -f dc-registry.yaml -f dc-exporter.yaml up -d
+      - docker compose {{.DCFILES}} up -d
 
   docker-images:
     desc: "Copy docker images"
@@ -53,7 +54,7 @@ tasks:
     desc: "Stop dev containers"
     dir: 'deploy/docker-compose'
     cmds:
-      - docker compose -f dc-nginx.yaml -f dc-postgresql.yaml -f dc-redis.yaml -f dc-registry.yaml -f dc-exporter.yaml down
+      - docker compose {{.DCFILES}} down
 
   kubedash-requirements:
     desc: "Generate Kubedash requirements"

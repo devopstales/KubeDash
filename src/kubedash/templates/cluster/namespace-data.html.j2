@@ -6,7 +6,7 @@
       <nav aria-label="breadcrumb">
         <ol class="breadcrumb my-0">
           <li class="breadcrumb-item"><span>Cluster</span></li>
-          <li class="breadcrumb-item"><a href="/cluster/namespaces">Namespaces</a></li>
+          <li class="breadcrumb-item"><a href="/cluster/namespace">Namespaces</a></li>
           <li class="breadcrumb-item active"><span>{{ ns_data.name }}</span></li>
         </ol>
       </nav>
@@ -47,14 +47,14 @@
                     <th>Scale:</th>
                     <td>
                           {% if ns_data.name != "kube-system" and ns_data.live_workers == 0 %}
-                          <form action="/cluster/namespaces/scale" method="post">
+                          <form action="/cluster/namespace/scale" method="post">
                             <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
                             <input type="hidden"  name="namespace" value="{{ ns_data.name }}"/>
                             <input type="hidden"  name="action" value="up"/>
                             <button class="btn btn-outline-success" type="submit">turn on</button>
                           </form>
                           {% else %}
-                          <form action="/cluster/namespaces/scale" method="post">
+                          <form action="/cluster/namespace/scale" method="post">
                             <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
                             <input type="hidden"  name="namespace" value="{{ ns_data.name }}"/>
                             <input type="hidden"  name="action" value="down"/>

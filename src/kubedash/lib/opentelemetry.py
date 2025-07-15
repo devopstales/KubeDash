@@ -1,55 +1,70 @@
 import os
+import uuid
 import socket
+import logging
 from urllib.parse import urlparse
-
 from opentelemetry import trace
-from opentelemetry.exporter.otlp.proto.http.trace_exporter import \
-    OTLPSpanExporter
+from opentelemetry.exporter.otlp.proto.http.trace_exporter import OTLPSpanExporter
 from opentelemetry.sdk.resources import Resource
 from opentelemetry.sdk.trace import TracerProvider
-from opentelemetry.sdk.trace.export import BatchSpanProcessor
+from opentelemetry.sdk.trace.export import BatchSpanProcessor, ConsoleSpanExporter
 
-from lib.helper_functions import get_logger
+# Initialize basic logger that doesn't depend on tracing
+_logger = logging.getLogger(__name__)
+_logger.propagate = False  # This prevents the log from being handled by parent loggers
+_handler = logging.StreamHandler()
+_handler.setFormatter(logging.Formatter(
+    fmt=f'[%(asctime)s] [no-id] [%(name)s] [%(levelname)s] %(message)s',
+))
+_logger.addHandler(_handler)
 
-##############################################################
-## Helpers
-##############################################################
 
-logger = get_logger()
-tracer = None
-
-##############################################################
-## OTEL Functions
-##############################################################
+# Initialize default no-op tracer
+tracer = trace.get_tracer(__name__)
 
 def init_opentelemetry_exporter(jaeger_base_url: str):
-    """Initialize the OpenTelemetry exporter
+    """Initialize Jaeger exporter with proper error handling"""
+    if not jaeger_base_url:
+        _logger.info("Jaeger URL not configured, skipping tracing setup")
+        return False
+
+    endpoint = f"{jaeger_base_url}/v1/traces"
     
-    Args:
-        jaeger_base_url (str): The base URL of jaeger HTTP client
-    """
-    endpoint=jaeger_base_url+"/v1/traces"
-    resource = Resource(attributes={
-        "service.name": "KubeDash",
-        "service.instance.id": "2193801",
-        "telemetry.sdk.name": "opentelemetry",
-        "telemetry.sdk.language": "python",
-    })
+    # 1. Connection check
+    try:
+        url = urlparse(jaeger_base_url)
+        with socket.create_connection((url.hostname, url.port), timeout=2):
+            pass
+    except (socket.timeout, ConnectionRefusedError, ValueError) as e:
+        _logger.error(f"Jaeger connection failed: {str(e)}")
+        return False
 
-    sock = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
-    url = urlparse(jaeger_base_url)
-    result = sock.connect_ex((url.hostname, url.port))
-
-    if result == 0:
+    # 2. Setup proper tracer provider
+    try:
+        resource = Resource.create({
+            "service.name": "KubeDash",
+            "service.instance.id": str(uuid.uuid4()),
+            "telemetry.sdk.name": "opentelemetry",
+            "telemetry.sdk.language": "python",
+        })
+        
         trace.set_tracer_provider(TracerProvider(resource=resource))
         trace.get_tracer_provider().add_span_processor(
-            BatchSpanProcessor(
-                OTLPSpanExporter(endpoint=endpoint)
-            )
+            BatchSpanProcessor(OTLPSpanExporter(endpoint=endpoint))
         )
-        tracer = trace.get_tracer(__name__)
-        logger.info("Jaeger connection established")
-    else:
-        logger.error("Cannot Connect to Jaeger %s" % endpoint)
+        #trace.get_tracer_provider().add_span_processor(
+        #    BatchSpanProcessor(ConsoleSpanExporter())
+        #)
         
-    sock.close()
+        global tracer
+        tracer = trace.get_tracer(__name__)
+        
+        _logger.info(f"Jaeger exporter ready at {endpoint}")
+        return True
+    except Exception as e:
+        _logger.error(f"Failed to initialize Jaeger exporter: {str(e)}")
+        return False
+
+def get_tracer():
+    """Safe access to the tracer instance"""
+    return tracer

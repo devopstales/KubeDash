@@ -10,15 +10,16 @@ from urllib.parse import urlparse, urljoin
 
 import six
 import yaml
-from flask import flash, has_request_context, Request
+from flask import g, flash, has_request_context, Request
 from typing import Optional, Union
-from opentelemetry import trace
 
 ##############################################################
 ## Helpers
 ##############################################################
 
-tracer = trace.get_tracer(__name__)
+from lib.opentelemetry import get_tracer
+from opentelemetry import trace
+tracer = get_tracer()
 
 ##############################################################
 ## Helper Functions
@@ -86,11 +87,7 @@ class ThreadedTicker:
 
 @tracer.start_as_current_span("get_logger")
 def get_logger() -> Logger:
-    """Generate a Logger for the given module name
-
-    Returns:
-        logger (Logger): A Logger for the given module name.
-    """
+    """Generate a Logger for the given module name with correlation ID support"""
     span = trace.get_current_span()
 
     # Remove existing handlers (avoid duplicate logs if reconfigured)
@@ -98,23 +95,29 @@ def get_logger() -> Logger:
         logging.root.removeHandler(handler)
 
     # Define color codes
-    BLACK = escape_codes['black']  # black color code
-    PURPLE = escape_codes['purple']  # purple color code
-    RESET = escape_codes['reset']  # reset code
-    GREEN = '\033[32m'  # ANSI green
-    RED = '\033[31m'    # ANSI red
+    BLACK = escape_codes['black']
+    PURPLE = escape_codes['purple']
+    RESET = escape_codes['reset']
+    GREEN = '\033[32m'
+    RED = '\033[31m'
 
     class BooleanColorFormatter(colorlog.ColoredFormatter):
         def format(self, record):
+            # Ensure correlation_id exists on the record
+            if not hasattr(record, 'correlation_id'):
+                record.correlation_id = 'no-id'
+            if not record.correlation_id:
+                record.correlation_id = 'no-id'
             msg = super().format(record)
             # Colorize True and False words
             msg = msg.replace("True", f"{GREEN}True{RESET}")
             msg = msg.replace("False", f"{RED}False{RESET}")
             return msg
 
-    # Define colorlog formatter with custom colors + BooleanColorFormatter
+    # Define colorlog formatter with safe correlation_id fallback
     formatter = BooleanColorFormatter(
-        fmt=f'[{BLACK}%(asctime)s{RESET}] [{PURPLE}%(name)s{RESET}] [%(log_color)s%(levelname)s%(reset)s] %(message)s',
+        fmt=f'[{BLACK}%(asctime)s{RESET}] [%(correlation_id)s] [{PURPLE}%(name)s{RESET}] '
+            f'[%(log_color)s%(levelname)s%(reset)s] %(message)s',
         log_colors={
             'DEBUG': 'bold_black',
             'INFO': 'green',
@@ -131,19 +134,40 @@ def get_logger() -> Logger:
     logger = logging.getLogger()
     logger.setLevel(logging.INFO)
     logger.addHandler(handler)
-    logger.propagate = False  # Prevent double logs
+    logger.propagate = False
+
+    # Add correlation_id filter to ensure it's always available
+    class CorrelationIDFilter(logging.Filter):
+        def filter(self, record):
+            if not hasattr(record, 'correlation_id'):
+                corr_id = 'no-id'
+                try:
+                    # Only try to get from Flask's g context if we're in an app context
+                    from flask import has_app_context, g
+                    if has_app_context():
+                        corr_id = getattr(g, 'correlation_id', 'no-id')
+                    else:
+                        # Try to get from active span if not in app context
+                        current_span = tracer.get_current_span()
+                        if current_span.is_recording():
+                            corr_id = current_span.get_span_context().trace_id
+                except Exception:
+                    pass
+                
+                record.correlation_id = corr_id
+            return True
+
+    logger.addFilter(CorrelationIDFilter())
 
     # Disable noisy loggers in CLI/DB mode
-    if sys.argv[1] in ('cli', 'db'):
-        log = logging.getLogger('werkzeug')
-        log.disabled = True
+    if len(sys.argv) > 1 and sys.argv[1] in ('cli', 'db'):
+        logging.getLogger('werkzeug').disabled = True
         logger.name = sys.argv[1]
-
-        if tracer and span.is_recording():
+        if tracer and hasattr(span, 'is_recording') and span.is_recording():
             span.set_attribute("run.mode", sys.argv[1])
     else:
         logger.name = "kubedash"
-        if tracer and span.is_recording():
+        if tracer and hasattr(span, 'is_recording') and span.is_recording():
             span.set_attribute("run.mode", "server")
 
     return logger

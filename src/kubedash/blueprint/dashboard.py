@@ -1,6 +1,5 @@
 from flask import Blueprint, flash, render_template, request, session
 from flask_login import login_required
-from opentelemetry import trace
 from werkzeug.security import check_password_hash
 
 from lib.helper_functions import get_logger
@@ -16,7 +15,9 @@ from lib.user import User
 dashboard_bp = Blueprint("dashboard", __name__, url_prefix="/dashboard" )
 logger = get_logger()
 
-tracer = trace.get_tracer(__name__)
+from lib.opentelemetry import get_tracer
+from opentelemetry import trace
+tracer = get_tracer()
 
 ##############################################################
 ## Dashboard

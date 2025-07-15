@@ -128,4 +128,34 @@ data:
           app: "$1"
         timer_type: histogram  # This enables _sum/_count/_bucket generation
         buckets: [0.05, 0.1, 0.25, 0.5, 1, 2.5, 5, 10]
+---
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: kubedash-gunicorn-dashboard
+  labels:
+    grafana_dashboard: "1"
+    app: kubedash
+    {{ include "kubedash.labels" . | nindent 4 }}
+{{- with .Values.metrics.serviceMonitor.labels  }}
+{{ toYaml . | indent 4 }}
+{{- end }}
+data:
+  gunicorn-monitoring.json: |
+    {{- .Files.Get "files/gunicorn-monitoring.json" | nindent 4 }}
+---
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: kubedash-flask-dashboard
+  labels:
+    grafana_dashboard: "1"
+    app: kubedash
+    {{ include "kubedash.labels" . | nindent 4 }}
+{{- with .Values.metrics.serviceMonitor.labels  }}
+{{ toYaml . | indent 4 }}
+{{- end }}
+data:
+  flask-web-app.json: |
+    {{- .Files.Get "files/flask-web-app.json" | nindent 4 }}
 {{ end }}

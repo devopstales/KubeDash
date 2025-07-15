@@ -32,9 +32,10 @@ def k8sServerConfigGet():
         k8s_config (k8sConfig): Aktual Kubernetes Server Config
     """
     with tracer.start_as_current_span("list-cluster-configs") as span:
-        k8s_config_list = db.session.query(k8sConfig).first()       
+        k8s_config_list = db.session.query(k8sConfig).first()
         if tracer and span.is_recording():
-            span.set_attribute("k8s.cluster", k8s_config_list.k8s_context)
+            if k8s_config_list:
+                span.set_attribute("k8s.cluster", k8s_config_list.k8s_context)
         return k8s_config_list
 
 def k8sServerConfigList():

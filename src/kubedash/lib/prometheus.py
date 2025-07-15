@@ -4,10 +4,6 @@ from prometheus_client import Gauge, Info, Counter, Histogram
 ## Promatehus Endpoint
 ##############################################################
 
-METRIC_APP_VERSION = Info(
-    'app_version',
-    'Application Version')
-
 METRIC_DB_CONNECTION = Gauge(
     'app_databse_connection',
     'Database Info',

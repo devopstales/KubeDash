@@ -1,5 +1,5 @@
-from flask import Blueprint
-from prometheus_client import generate_latest
+from flask import Blueprint, Response
+from prometheus_client import generate_latest, CONTENT_TYPE_LATEST
 
 from lib.helper_functions import get_logger
 
@@ -16,4 +16,4 @@ logger = get_logger()
 
 @metrics_bp.route('/metrics')
 def metric_list():
-    return generate_latest()
+    return Response(generate_latest(), mimetype=CONTENT_TYPE_LATEST)

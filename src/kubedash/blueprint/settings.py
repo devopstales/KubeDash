@@ -6,7 +6,6 @@ from flask import (Blueprint, Response, flash, redirect, render_template,
                    request, session, url_for)
 from flask_login import login_required, login_user
 from itsdangerous import base64_decode, base64_encode
-from opentelemetry import trace
 
 from lib.helper_functions import get_logger
 from lib.k8s.server import (k8sServerConfigCreate, k8sServerConfigDelete,
@@ -26,7 +25,9 @@ settings_bp = Blueprint("settings", __name__, url_prefix="/settings")
 sso_bp = Blueprint("sso", __name__)
 logger = get_logger()
 
-tracer = trace.get_tracer(__name__)
+from lib.opentelemetry import get_tracer
+from opentelemetry import trace
+tracer = get_tracer()
 
 ##############################################################
 ## SSO Settings

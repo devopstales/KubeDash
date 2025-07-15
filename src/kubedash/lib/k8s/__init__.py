@@ -10,4 +10,6 @@ from lib.helper_functions import get_logger
 
 logger = get_logger()
 
-tracer = trace.get_tracer(__name__)
+from lib.opentelemetry import get_tracer
+from opentelemetry import trace
+tracer = get_tracer()

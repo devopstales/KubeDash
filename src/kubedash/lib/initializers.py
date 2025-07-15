@@ -2,6 +2,7 @@
 
 import logging
 import os
+import uuid
 import sys
 import socket
 import redis
@@ -11,8 +12,10 @@ from redis.exceptions import AuthenticationError, ConnectionError, RedisError
 from redis.cluster import RedisCluster
 from sqlalchemy import create_engine, text
 
-from flask import Flask, render_template, request
+from flask import g, Flask, render_template, request, has_request_context
 
+from opentelemetry import trace
+from opentelemetry.instrumentation.wsgi import OpenTelemetryMiddleware
 from opentelemetry.instrumentation.flask import FlaskInstrumentor
 from opentelemetry.instrumentation.logging import LoggingInstrumentor
 from opentelemetry.instrumentation.requests import RequestsInstrumentor
@@ -42,8 +45,9 @@ RED = "\033[31m"
 RESET = "\033[0m"
 
 
-separator_long = r"###################################################################################"
+separator_long = r"###########################################################################################"
 separator_short = r"#######################################"
+
 
 ##############################################################
 ## Helper Functions
@@ -181,19 +185,22 @@ def initialize_app_version(app: Flask):
     app.jinja_env.globals['kubedash_version'] = kubedash_version
 
     """Prometheus endpoint"""
-    from lib.prometheus import METRIC_APP_VERSION 
-    METRIC_APP_VERSION.info({'version': kubedash_version})
+    #from lib.prometheus import METRIC_APP_VERSION 
+    #METRIC_APP_VERSION.info({'version': kubedash_version})
+    from flask_prometheus_metrics import register_metrics
+    register_metrics(app, app_version=kubedash_version, app_config=app.config['ENV'])
+
 
     LOGO = f"""
-{BLUE}   /$$   /$$           /$$                 /$$$$$$$                      /$$      
-  | $$  /$$/          | $$                | $$__  $$                    | $$      
-  | $$ /$$/  /$$   /$$| $$$$$$$   /$$$$$$ | $$  \ $$  /$$$$$$   /$$$$$$$| $$$$$$$ 
-  | $$$$$/  | $$  | $$| $$__  $$ /$$__  $$| $$  | $$ |____  $$ /$$_____/| $$__  $$
-  | $$  $$  | $$  | $$| $$  \ $$| $$$$$$$$| $$  | $$  /$$$$$$$|  $$$$$$ | $$  \ $$
-  | $$\  $$ | $$  | $$| $$  | $$| $$_____/| $$  | $$ /$$__  $$ \____  $$| $$  | $$
-  | $$ \  $$|  $$$$$$/| $$$$$$$/|  $$$$$$$| $$$$$$$/|  $$$$$$$ /$$$$$$$/| $$  | $$
-  |__/  \__/ \______/ |_______/  \_______/|_______/  \_______/|_______/ |__/  |__/{RESET}
-  version: {RED}{kubedash_version}{RESET}
+{BLUE}     /$$   /$$           /$$                 /$$$$$$$                      /$$      
+    | $$  /$$/          | $$                | $$__  $$                    | $$      
+    | $$ /$$/  /$$   /$$| $$$$$$$   /$$$$$$ | $$  \ $$  /$$$$$$   /$$$$$$$| $$$$$$$ 
+    | $$$$$/  | $$  | $$| $$__  $$ /$$__  $$| $$  | $$ |____  $$ /$$_____/| $$__  $$
+    | $$  $$  | $$  | $$| $$  \ $$| $$$$$$$$| $$  | $$  /$$$$$$$|  $$$$$$ | $$  \ $$
+    | $$\  $$ | $$  | $$| $$  | $$| $$_____/| $$  | $$ /$$__  $$ \____  $$| $$  | $$
+    | $$ \  $$|  $$$$$$/| $$$$$$$/|  $$$$$$$| $$$$$$$/|  $$$$$$$ /$$$$$$$/| $$  | $$
+    |__/  \__/ \______/ |_______/  \_______/|_______/  \_______/|_______/ |__/  |__/{RESET}
+    version: {RED}{kubedash_version}{RESET}
 """
 
     app.logger.info("Initializing app Logo\n" + separator_long + "\n" + LOGO + "\n" + separator_long)  # Use logger instead of print
@@ -255,7 +262,14 @@ def initialize_app_database(app: Flask, filename: str):
         #db.create_all()
         
         if init_db_test(app):
-            SQLAlchemyInstrumentor().instrument(engine=db.engine)
+            SQLAlchemyInstrumentor().instrument(
+                engine=db.engine,
+                enable_commenter=True,
+                commenter_options={
+                    "db_framework": "flask",
+                    "db_driver": database_type
+                }
+            )
             db_init_roles(app.config['kubedash.ini'])
             
             """Add Contant to Tables"""
@@ -337,12 +351,30 @@ def initialize_app_tracing(app: Flask):
     Returns:
         jaeger_enabled (global): True if tracing is enabled
     """
-    jaeger_enabled = bool_var_test(app.config['kubedash.ini'].get('monitoring', 'jaeger_enabled'))
-
-    if jaeger_enabled:
-        from lib.opentelemetry import init_opentelemetry_exporter 
-        jaeger_base_url = app.config['kubedash.ini'].get('monitoring', 'jaeger_http_endpoint')
-        init_opentelemetry_exporter(jaeger_base_url)
+    if not bool_var_test(app.config['kubedash.ini'].get('monitoring', 'jaeger_enabled')):
+        return False
+    
+    jaeger_url = app.config['kubedash.ini'].get('monitoring', 'jaeger_http_endpoint')
+    
+    # 1. First setup exporter
+    from lib.opentelemetry import init_opentelemetry_exporter
+    if not init_opentelemetry_exporter(jaeger_url):
+        return False
+    
+    # 2. Then initialize instrumentors
+    initialize_instrumentors(app)
+    
+    # 3. Add additional span enrichment
+    @app.before_request
+    def enrich_spans():
+        if has_request_context() and hasattr(g, 'correlation_id'):
+            span = trace.get_current_span()
+            if span.is_recording():
+                span.set_attribute("correlation_id", g.correlation_id)
+                span.set_attribute("http.url", request.url)
+                span.set_attribute("http.method", request.method)
+    
+    return True
      
 def initialize_app_caching(app: Flask):
     """Initialize caching with Redis or Redis Cluster. If Redis is not available, fallback to SimpleCache.
@@ -433,17 +465,88 @@ def initialize_app_caching(app: Flask):
     cached_base(app)
     cached_base2(app)
         
-def inicialize_instrumentors(app: Flask):
-    """Initialize OpenTelemetry instrumentors
+def initialize_instrumentors(app: Flask):
+    """Initialize OpenTelemetry instrumentors with full correlation ID support
+    
     Args:
         app (Flask): Flask app object
     """
+    
+    def get_correlation_id():
+        """Unified correlation ID source with fallbacks"""
+        # 1. First try Flask's g context (this will work after before_request)
+        if has_request_context() and hasattr(g, 'correlation_id'):
+            return g.correlation_id
+        # 2. Check request headers
+        if has_request_context() and 'X-Correlation-ID' in request.headers:
+            return request.headers['X-Correlation-ID']
+        ## 3. Generate new if none exists
+        #return str(uuid.uuid4())
+        return None
+
+    def request_hook(span, environ):
+        """Set correlation ID on spans, but don't generate new ones here"""
+        # Don't generate new ID here - let before_request handle it
+        if has_request_context() and 'X-Correlation-ID' in request.headers:
+            span.set_attribute("correlation_id", request.headers['X-Correlation-ID'])
+        
+        # Mirror important HTTP attributes
+        span.set_attribute("http.route", environ.get('PATH_INFO'))
+        span.set_attribute("http.method", environ.get('REQUEST_METHOD'))
+        span.set_attribute("http.user_agent", environ.get('HTTP_USER_AGENT'))
+
+    def response_hook(span, status, response_headers):
+        """Ensure correlation ID header exists"""
+        correlation_id = get_correlation_id()
+        
+        if correlation_id:
+            # Add header if not present
+            if not any(k.lower() == 'x-correlation-id' for k, _ in response_headers):
+                response_headers.append(('X-Correlation-ID', correlation_id))
+        
+        # Record final status
+        span.set_attribute("http.status_code", status.split()[0])
+        span.set_attribute("http.status_text", status)
+
+    def log_hook(span, record):
+        """Inject correlation ID into all log records"""
+        record.correlation_id = get_correlation_id()
+        
+        # Additional useful context
+        if has_request_context():
+            record.endpoint = request.endpoint or ''
+            record.path = request.path or ''
+            record.method = request.method or ''
+        else:
+            record.endpoint = ''
+            record.path = ''
+            record.method = ''
+
+    # Instrumentation with all hooks
     FlaskInstrumentor().instrument_app(
         app,
-        excluded_urls="/vendor/*,/css/*,/scss/*,/js/*,/img/*,/static/*,/favicon.ico"
+        excluded_urls="/vendor/*,/css/*,/scss/*,/js/*,/img/*,/static/*,/favicon.ico",
+        request_hook=request_hook,
+        response_hook=response_hook,
+        tracer_provider=trace.get_tracer_provider()
     )
-    RequestsInstrumentor().instrument()
-    LoggingInstrumentor().instrument(set_logging_format=True)
+    
+    RequestsInstrumentor().instrument(
+        tracer_provider=trace.get_tracer_provider()
+    )
+    
+    LoggingInstrumentor().instrument(
+        set_logging_format=True,
+        log_hook=log_hook,
+        tracer_provider=trace.get_tracer_provider()
+    )
+    
+    # Ensure WSGI middleware is properly instrumented
+    app.wsgi_app = OpenTelemetryMiddleware(
+        app.wsgi_app,
+        tracer_provider=trace.get_tracer_provider()
+    )
+
 
 
 def initialize_app_plugins(app: Flask):

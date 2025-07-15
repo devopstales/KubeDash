@@ -17,7 +17,10 @@ from lib.user import SSOTokenUpdate
 ##############################################################
 
 logger = get_logger()
-tracer = trace.get_tracer(__name__)
+
+from lib.opentelemetry import get_tracer
+from opentelemetry import trace
+tracer = get_tracer()
 
 ##############################################################
 ## functions

@@ -3,7 +3,6 @@ from flask import (Blueprint, flash, redirect, render_template, request,
                    session, url_for)
 from flask_login import login_required, login_user, logout_user
 from itsdangerous import base64_decode
-from opentelemetry import trace
 from werkzeug.security import check_password_hash
 
 from lib.helper_functions import get_logger, is_safe_url
@@ -18,7 +17,9 @@ from lib.user import KubectlConfig, Role, SSOTokenGet, User, UsersRoles
 auth_bp = Blueprint("auth", __name__)
 logger = get_logger()
 
-tracer = trace.get_tracer(__name__)
+from lib.opentelemetry import get_tracer
+from opentelemetry import trace
+tracer = get_tracer()
 
 ##############################################################
 ## Login
@@ -157,9 +158,7 @@ def login():
         if tracer and span.is_recording():
             span.set_attribute("http.route", "/")
             span.set_attribute("http.method", request.method)
-            span.set_attribute("user.name", session['user_name'])
-            span.set_attribute("user.type", session['user_type'])
-            span.set_attribute("user.role", session['user_role'])
+        
         return render_template(
             'auth/login.html.j2',
             sso_enabled = is_sso_enabled,

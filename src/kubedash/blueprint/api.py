@@ -1,4 +1,4 @@
-from flask import send_from_directory
+from flask import g, send_from_directory, jsonify
 from flask.views import MethodView
 from flask_smorest import Blueprint
 from contextlib import nullcontext
@@ -17,6 +17,10 @@ from lib.sso import SSOServerTest
 """api Api Blueprint"""
 api_bp = Blueprint("api", "api", url_prefix="/api")
 logger = get_logger()
+
+from lib.opentelemetry import get_tracer
+from opentelemetry import trace
+tracer = get_tracer()
 
 ##############################################################
 # Static file route for Swagger UI
@@ -99,3 +103,26 @@ class readinessResource(MethodView):
             'oidc': oidc_test,
             'kubernetes': k8s_status,
         }, code
+        
+##############################################################
+# Debug Trace endpoint
+##############################################################
+@api_bp.route('/debug-trace')
+def debug_trace():
+    current_span = trace.get_current_span()
+    
+    if not current_span or not current_span.get_span_context().is_valid:
+        return jsonify({"error": "No active span"}), 400
+    
+    ctx = current_span.get_span_context()
+    
+    logger.info("Trigger debug-trace")
+    
+    return jsonify({
+        "flask_correlation_id": g.correlation_id,
+        "jaeger_trace_id": f"{ctx.trace_id:032x}",
+        "span_id": f"{ctx.span_id:016x}",
+        "trace_flags": hex(ctx.trace_flags),
+        "is_remote": ctx.is_remote,
+        "span_attributes": dict(current_span.attributes) if current_span.attributes else {}
+    })
