@@ -19,7 +19,7 @@ services:
     ports:
       - 8002:7843
 
-  redis-inight:
+  redis-insight:
     container_name: kubedash-redis-insight
     image: redis/redisinsight
     ports:

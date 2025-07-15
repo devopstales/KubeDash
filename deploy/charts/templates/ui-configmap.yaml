@@ -24,7 +24,7 @@ data:
     type = postgres
     host = {{ .Values.externalDatabase.host }}
     name = {{ .Values.externalDatabase.database }}
-    user = root
+    user = {{ .Values.externalDatabase.username }}
     password = {{ .Values.externalDatabase.password }}
     {{ else if .Values.postgresql.enabled }}
     type = postgres

@@ -76,6 +76,18 @@ metrics:
     metricRelabelings: []
     honorLabels: {}
 
+# -- deploy ui for db
+dbui:
+  image:
+    # -- adminer image
+    repository: sosedoff/pgweb
+    # -- adminer image tag
+    tag: latest
+    # -- adminer image pull policy
+    pullPolicy: IfNotPresent
+    # -- adminer plugins
+    plugins: "tables-filter,adminer-auto-login"
+
 # -- deploy postgresql
 postgresql:
   # -- Enable postgresql

@@ -1,7 +1,7 @@
 apiVersion: v1
 kind: Service
 metadata:
-  name: {{ include "kubedash.fullname" . }}
+  name: {{ include "kubedash.fullname" . }}-ui
   labels:
     app: kubedash
     {{- include "kubedash.labels" . | nindent 4 }}
@@ -23,7 +23,7 @@ status:
 apiVersion: v1
 kind: Service
 metadata:
-  name: {{ include "kubedash.fullname" . }}-metrics
+  name: {{ include "kubedash.fullname" . }}-ui-metrics
   labels:
     app: kubedash
     app.kubernetes.io/component: metrics
@@ -54,7 +54,7 @@ status:
 apiVersion: v1
 kind: Service
 metadata:
-  name: {{ include "kubedash.fullname" . }}-headless
+  name: {{ include "kubedash.fullname" . }}-ui-headless
   labels:
     app: kubedash
     {{- include "kubedash.labels" . | nindent 4 }}

@@ -5,7 +5,7 @@ metadata:
   labels:
     app: kubedash
     {{- include "kubedash.labels" . | nindent 4 }}
-    checksum/config: {{ include (print $.Template.BasePath "/configmap.yaml") . | sha256sum | trunc 63 }}
+    checksum/config: {{ include (print $.Template.BasePath "/ui-configmap.yaml") . | sha256sum | trunc 63 }}
 spec:
   serviceName: {{ include "kubedash.fullname" . }}-headless
   replicas: {{ .Values.replicas }}
@@ -18,7 +18,7 @@ spec:
       labels:
         app: kubedash
         {{- include "kubedash.labels" . | nindent 8 }}
-        checksum/config: {{ include (print $.Template.BasePath "/configmap.yaml") . | sha256sum | trunc 63 }}
+        checksum/config: {{ include (print $.Template.BasePath "/ui-configmap.yaml") . | sha256sum | trunc 63 }}
     spec:
       {{- with .Values.imagePullSecrets }}
       imagePullSecrets:

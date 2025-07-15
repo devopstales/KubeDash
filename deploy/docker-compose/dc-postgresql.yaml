@@ -16,15 +16,14 @@ services:
       options:
         max-size: "10k"
         max-file: "3"
-  pgadmin:
-    image: dpage/pgadmin4
-    container_name: kubedash-pgadmin4
+  dbui:
+    image: sosedoff/pgweb
+    container_name: kubedash-dbui
     restart: always
     ports:
-      - "8001:80"
+      - "8001:8081"
     environment:
-      PGADMIN_DEFAULT_EMAIL: kubedash@devopstales.intra
-      PGADMIN_DEFAULT_PASSWORD: kubedash
+      DATABASE_URL: postgres://kubedash:kubedash@postgresql:5432/kubedash?sslmode=disable
     volumes:
       - pgadmin-data:/var/lib/pgadmin
 

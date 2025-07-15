@@ -45,7 +45,7 @@ spec:
             pathType: Prefix
             backend:
               service:
-                name: {{ include "kubedash.fullname" . }}
+                name: {{ include "kubedash.fullname" . }}-ui
                 port: 
                   number: 8000
 {{- end }}
