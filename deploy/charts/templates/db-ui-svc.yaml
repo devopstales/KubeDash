@@ -2,9 +2,9 @@
 apiVersion: v1
 kind: Service
 metadata:
-  name: {{ include "kubedash.fullname" . }}-dbui
+  name: {{ include "kubedash.fullname" . }}-db-ui
   labels:
-    app: dbui
+    app: "db-ui"
     {{ include "kubedash.labels" . | nindent 4 }}
 spec:
   type: ClusterIP

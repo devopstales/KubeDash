@@ -2,20 +2,20 @@
 apiVersion: apps/v1
 kind: Deployment
 metadata:
-  name: {{ include "kubedash.fullname" . }}-dbui
+  name: {{ include "kubedash.fullname" . }}-db-ui
   labels:
-    app: dbui
+    app: "db-ui"
     {{ include "kubedash.labels" . | nindent 4 }}
 spec:
   replicas: 1
   selector:
     matchLabels:
-      app: dbui
+      app: "db-ui"
       {{ include "kubedash.labels" . | nindent 6 }}
   template:
     metadata:
       labels:
-        app: dbui
+        app: "db-ui"
         {{ include "kubedash.labels" . | nindent 8 }}
     spec:
       containers:

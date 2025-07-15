@@ -1,0 +1,29 @@
+{{ if .Values.redis.enabled }}
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: {{ include "kubedash.fullname" . }}-redis-ui
+  labels:
+    app: "redis-ui"
+    {{ include "kubedash.labels" . | nindent 4 }}
+data:
+  .p3xrs-conns.json: |
+    {
+        "list": [
+            {
+                "name": "redis",
+                "host": "{{ .Release.Name }}-redis-master",
+                "port": 6379,
+                "id": "0",
+                "password": "",
+                "ssh": false,
+                "sshPort": 22,
+                "cluster": false,
+                "sentinel": false,
+                "nodes": []
+            }
+        ],
+        "license": "",
+        "update": "2025-05-17T12:25:15.313Z"
+    }
+{{ end }}

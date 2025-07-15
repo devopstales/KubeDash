@@ -145,6 +145,20 @@ postgresql:
       #namespace: "monitoring"
 # https://artifacthub.io/packages/helm/bitnami/postgresql
 
+# -- redis ui
+redisui:
+  image:
+      repository: patrikx3/p3x-redis-ui
+      tag: latest
+      pullPolicy: Always
+  resources: {}
+    # requests:
+    #   cpu: 100m
+    #   memory: 100M
+    # limits:
+    #   cpu: 200m
+  #   memory: 200M
+
 # -- enable redis for caching
 redis:
   # -- Enable redis
