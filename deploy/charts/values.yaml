@@ -75,6 +75,15 @@ metrics:
     relabelings: []
     metricRelabelings: []
     honorLabels: {}
+  grafana:
+    # -- Enable grafana dashboard deploy
+    enabled: true 
+    # -- Grafana dashboard namespace
+    namespace: "monitoring-system"
+    annotations:
+      grafana_folder: "KubeDash"
+    labels:
+      grafana_dashboard: "1"
 
 # -- deploy ui for db
 dbui:
