@@ -10,7 +10,7 @@ from lib.helper_functions import get_logger
 ## variables
 ##############################################################
 
-service_catalog_bp = Blueprint("service_catalog", __name__, url_prefix="/plugins", \
+application_catalog_bp = Blueprint("application_catalog", __name__, url_prefix="/plugins", \
     template_folder="templates")
 logger = get_logger()
 
