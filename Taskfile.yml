@@ -208,6 +208,7 @@ tasks:
         --annotation "org.opencontainers.ref.name=kubedash-{{.VERSION}}" \
         --annotation "org.opencontainers.created=$(date -u +%Y-%m-%dT%H:%M:%SZ)" \
         sbom.cdx.json
+      - rm -f sbom.cdx.json
 
   kubedash-prod-sign:
     desc: "Sign Kubedash docker image"
@@ -283,13 +284,12 @@ tasks:
     desc: "Sign Helm Chart"
     dir: 'deploy/charts'
     cmds:
-      - cosign sign-blob -y --key $HOME/.gnupg/cosign.key kubedash-{{.VERSION}}.tgz --bundle ubedash-{{.VERSION}}.tgz.cosign.bundle
+      - cosign sign-blob -y --key $HOME/.gnupg/cosign.key kubedash-{{.VERSION}}.tgz --bundle kubedash-{{.VERSION}}.tgz.cosign.bundle
       #- CHART_DIGEST=$(grep -oP "(?<=digest: sha256:)[a-z0-9]+" push-metadata.txt)
       #- cosign sign -y --key $HOME/.gnupg/cosign.key push-metadata.txt devopstales/helm-charts/kubedash:$CHART_DIGEST
       - rm -f push-metadata.txt
       - rm -f kubedash-{{.VERSION}}.tgz
       - rm -f kubedash-{{.VERSION}}.tgz.cosign.bundle
-
 
   kdlogin-rm:
     desc: "Remove kubectl-kdlogin"
@@ -307,3 +307,7 @@ tasks:
       - helm-docs --chart-search-root deploy/charts --output-file configuration.md --template-files configuration.md.gotmpl
       - mv deploy/charts/configuration.md docs/installation/configuration.md
       - .venv/bin/mkdocs build
+
+      #-  .venv/bin/mike deploy --push {{.VERSION}}
+      #-  .venv/bin/mike deploy --push --update-aliases {{.VERSION}} latest
+      #-  .venv/bin/mike set-default --push latest
