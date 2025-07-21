@@ -2,7 +2,7 @@
 flask==3.0.0
 Werkzeug==3.0.6
 Jinja2==3.1.6
-dnspython==2.6.1
+dnspython==2.7.0
 pytz==2023.3.post1
 # config
 configparser==7.0.0
@@ -12,7 +12,7 @@ psycopg2==2.9.10
 SQLAlchemy==2.0.17
 sqlalchemy_utils==0.41.1
 flask_migrate==4.0.5
-flask_sqlalchemy==3.0.5
+flask_sqlalchemy==3.1.1
 # login
 flask_login==0.6.3
 flask_session==0.8.0
@@ -30,7 +30,7 @@ flask-swagger-ui==4.11.1
 # graphwiz
 pyvis==0.3.2
 # socket
-flask_socketio==5.3.4
+flask_socketio==5.5.1
 gevent-websocket==0.10.1
 eventlet==0.37.0
 gunicorn==23.0.0
@@ -56,8 +56,9 @@ pyOpenSSL==25.0.0
 cryptography==44.0.1
 ipython==8.27.0 # not directly required, pinned by Snyk to avoid a vulnerability
 gevent==23.9.0 # not directly required, pinned by Snyk to avoid a vulnerability
-urllib3==2.2.2 # not directly required, pinned by Snyk to avoid a vulnerability
+urllib3==2.5.0 # not directly required, pinned by Snyk to avoid a vulnerability
 requests==2.32.2 # not directly required, pinned by Snyk to avoid a vulnerability
 zipp==3.19.1 # not directly required, pinned by Snyk to avoid a vulnerability
-pip==23.3
+pip==25.1.1
 setuptools==78.1.1
+h11>=0.16.0 # not directly required, pinned by Snyk to avoid a vulnerability
