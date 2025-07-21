@@ -1,0 +1,275 @@
+{% extends "base2.html.j2" %}
+
+{% block topmenu %}
+<ul class="header-nav d-lg-flex m-3">
+    <div class="container-fluid px-4">
+      <nav aria-label="breadcrumb">
+        <ol class="breadcrumb my-0">
+          <li class="breadcrumb-item"><span>Dashboard</span></li>
+          <li class="breadcrumb-item active"><span>Cluster Metrics</span></li>
+        </ol>
+      </nav>
+    </div>
+</ul>
+<ul class="header-nav ms-auto"></ul>
+<ul class="header-nav d-lg-flex">
+{% include "segments/topmenu.html.j2" %}
+{% endblock %}
+
+{% block content %}
+<div class="card shadow mb-4">
+    <div class="card-header py-3">
+        <h6 class="m-0 font-weight-bold text-primary">Cluster Metrics</h6>
+    </div>
+    <div class="card-body">
+        <div class="row">
+            <div class="col-4">
+                <div>
+                    <canvas id="cpu" 
+                    {% for CPUkey, CPUvalue in cluster_metrics.clusterTotals.cpu.items() %}
+                        {% if 'Percent' in CPUkey %}
+                            {{ CPUkey }}="{{ CPUvalue }}"
+                        {% endif %}
+                    {% endfor %}
+                    width="300" height="300">
+                        <p>Hello Fallback World</p>
+                    </canvas>
+                </div>
+                <div>
+                {% for CPUkey, CPUvalue in cluster_metrics.clusterTotals.cpu.items() %}
+                     {% if "Percent" not in CPUkey %}
+                        {{ CPUkey }}: {{ CPUvalue |round(1)}} <br>
+                     {% endif %}
+                {% endfor %}
+                </div>
+            </div>
+            <div class="col-4">
+                <div>
+                    <canvas id="ram" 
+                    {% for RAMkey, RAMvalue in cluster_metrics.clusterTotals.memory.items() %}
+                        {% if 'Percent' in RAMkey %}
+                            {{ RAMkey }}="{{ RAMvalue }}"
+                        {% endif %}
+                    {% endfor %}
+                    width="300" height="300"></canvas>
+                </div>
+                <div>
+                {% for RAMkey, RAMvalue in cluster_metrics.clusterTotals.memory.items() %}
+                    {% if "Percent" not in RAMkey %}
+                        {{ RAMkey }}: {{ (RAMvalue / 1024 / 1024 / 1024) |round(1) }} <br>
+                    {% endif %}
+                {% endfor %}
+                </div>
+            </div>
+            <div class="col-4">
+                <div>
+                    <canvas id="pod"
+                    {% for pod_key, pod_value in cluster_metrics.clusterTotals.pod_count.items() %}
+                        {{ pod_key }}="{{ pod_value }}"
+                    {% endfor %}
+                    width="300" height="300"></canvas>
+                </div>
+                <div class="mp-10">
+                    {% for pod_key, pod_value in cluster_metrics.clusterTotals.pod_count.items() %}
+                        {{ pod_key }}: {{ pod_value }} <br>
+                    {% endfor %}
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}
+
+{% block add_head_css %}
+{% include "segments/chartjs_snipet.html.j2" %}
+{% endblock %}
+
+{% block add_tail_js %}
+    <script>
+        var ctx = document.getElementById('cpu');
+        var usagePercent = ctx.getAttribute('usagePercent');
+        var usagePercentReturn = (100 - usagePercent)
+        if (usagePercentReturn <= 0) {
+            usagePercentReturn = 0
+        }
+        var requestsPercent = ctx.getAttribute('requestsPercent');
+        var requestsPercentReturn = (100 - requestsPercent)
+        if (requestsPercentReturn <= 0) {
+            requestsPercentReturn = 0
+        }
+        var limitsPercent = ctx.getAttribute('limitsPercent');
+        var limitsPercentReturn = (100 - limitsPercent)
+        if (limitsPercentReturn <= 0) {
+            limitsPercentReturn = 0
+        }
+        new Chart(ctx, {
+            type: 'doughnut',
+            data: {
+                datasets: [
+                    {
+                        backgroundColor: ['#00baa6', '#ededed'],
+                        data: [usagePercent, usagePercentReturn],
+                        borderWidth: [0, 0]
+                    },
+                    {
+                        backgroundColor: ['#36A2EB', '#ededed'],
+                        data: [requestsPercent, requestsPercentReturn],
+                        borderWidth: [0, 0]
+                    },
+                    {
+                        backgroundColor: ['#b91d47', '#ededed'],
+                        data: [limitsPercent, limitsPercentReturn],
+                        borderWidth: [0, 0]
+                    }
+                ]
+            },
+            options: {
+                maintainAspectRatio: false,
+                cutoutPercentage: 30,
+                tooltips: {
+                    caretPadding: 10,
+                },
+                legend: {
+                    display: true,
+                    position: 'bottom',
+                    labels: {
+                        generateLabels: function() {
+                        return [
+                            {
+                                text: 'usagePercent',
+                                fillStyle: '#00baa6',
+                                strokeStyle: '#ededed'
+                            },
+                            {
+                                text: 'requestsPercent',
+                                fillStyle: '#36A2EB',
+                                strokeStyle: '#ededed'
+                            },
+                            {
+                                text: 'limitsPercent',
+                                fillStyle: '#b91d47',
+                                strokeStyle: '#ededed'
+                            }
+                        ];
+                        }
+                    }
+                },
+                title: {
+                        display: true,
+                        text: 'CPU'
+                },
+            }
+        });
+    </script>
+    <script>
+        var ctx = document.getElementById('ram');
+        var usagePercent = ctx.getAttribute('usagePercent');
+        var usagePercentReturn = (100 - usagePercent)
+        if (usagePercentReturn <= 0) {
+            usagePercentReturn = 0
+        }
+        var requestsPercent = ctx.getAttribute('requestsPercent');
+        var requestsPercentReturn = (100 - requestsPercent)
+        if (requestsPercentReturn <= 0) {
+            requestsPercentReturn = 0
+        }
+        var limitsPercent = ctx.getAttribute('limitsPercent');
+        var limitsPercentReturn = (100 - limitsPercent)
+        if (limitsPercentReturn <= 0) {
+            limitsPercentReturn = 0
+        }
+        new Chart(ctx, {
+            type: 'doughnut',
+            data: {
+                datasets: [
+                    {
+                        backgroundColor: ['#00baa6', '#ededed'],
+                        data: [usagePercent, usagePercentReturn],
+                        borderWidth: [0, 0]
+                    },
+                    {
+                        backgroundColor: ['#36A2EB', '#ededed'],
+                        data: [requestsPercent, requestsPercentReturn],
+                        borderWidth: [0, 0]
+                    },
+                    {
+                        backgroundColor: ['#b91d47', '#ededed'],
+                        data: [limitsPercent, limitsPercentReturn],
+                        borderWidth: [0, 0]
+                    }
+                ]
+            },
+            options: {
+                maintainAspectRatio: false,
+                cutoutPercentage: 30,
+                tooltips: {
+                    caretPadding: 10,
+                },
+                legend: {
+                    display: true,
+                    position: 'bottom',
+                    labels: {
+                        generateLabels: function() {
+                        return [
+                            {
+                                text: 'usagePercent',
+                                fillStyle: '#00baa6',
+                                strokeStyle: '#ededed'
+                            },
+                            {
+                                text: 'requestsPercent',
+                                fillStyle: '#36A2EB',
+                                strokeStyle: '#ededed'
+                            },
+                            {
+                                text: 'limitsPercent',
+                                fillStyle: '#b91d47',
+                                strokeStyle: '#ededed'
+                            }
+                        ];
+                        }
+                    }
+                },
+                title: {
+                        display: true,
+                        text: 'RAM'
+                },
+            }
+        });
+    </script>
+    <script>
+        var ctx = document.getElementById('pod');
+        var current = ctx.getAttribute('current');
+        var allocatable = ctx.getAttribute('allocatable');
+        var currentReturn = (allocatable - current)
+        if (currentReturn <= 0) {
+            currentReturn = 0
+        };
+        new Chart(ctx, {
+            type: 'doughnut',
+            data: {
+                labels: ["Current", "All"],
+                datasets: [{
+                        backgroundColor: ['#00baa6', '#ededed'],
+                        data: [current, currentReturn],
+                        borderWidth: [0, 0]
+                    }]
+            },
+            options: {
+                maintainAspectRatio: false,
+                cutoutPercentage: 75,
+                tooltips: {
+                    caretPadding: 10,
+                },
+                legend: {
+                    display: true,
+                    position: 'bottom',
+                },
+                title: {
+                        display: true,
+                        text: 'PODS'
+                },
+            }
+        });
+    </script>
+{% endblock %}

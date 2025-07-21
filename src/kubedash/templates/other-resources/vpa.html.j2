@@ -1,0 +1,98 @@
+{% extends "base2.html.j2" %}
+
+{% block topmenu %}
+<ul class="header-nav d-lg-flex m-3">
+    <div class="container-fluid px-4">
+      <nav aria-label="breadcrumb">
+        <ol class="breadcrumb my-0">
+          <li class="breadcrumb-item"><span>Other Resources</span></li>
+          <li class="breadcrumb-item active"><span>VPAs</span></li>
+        </ol>
+      </nav>
+    </div>
+</ul>
+<ul class="header-nav ms-auto"></ul>
+<ul class="header-nav d-lg-flex">
+{% include "segments/topmenu.html.j2" %}
+{% endblock %}
+
+{% block content %}
+<div class="card shadow mb-4">
+    <div class="card-header py-3">
+        <h6 class="m-0 font-weight-bold text-primary">Vertical Pod Autoscaler List</h6>
+    </div>
+    <div class="card-body">
+        <div class="table-responsive">
+            <table class="table table-bordered" id="dataTable" width="100%" cellspacing="0">
+                <thead>
+                    <tr>
+                      <th>Name</th>
+                      <th>Namespace</th>
+                      <th>Target Kind</th>
+                      <th>Target Name</th>
+                      <th>Update Mode</th>
+                      <th>Min Memory</th>
+                      <th>Max Memory</th>
+                      <th>Creation Timestamp</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    {% for vpa in vpas %}
+                    {% if selected == vpa.name %}
+                      <tr class="selected">
+                    {% else %}
+                      <tr>
+                    {% endif %}
+                        <td>
+                          <form action="/other-resource/vertical-pod-autoscaler/data" method="POST">
+                            <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+                            <input type="hidden" name="vpa_name" value="{{ vpa.name }}" />
+                            <a href="javascript:;" onclick="parentNode.submit();">{{ vpa.name }}</a>
+                          </form>
+                        </td>
+                        <td>{{ vpa.namespace }}</td>
+                        <td>{{ vpa.spec.targetRef.kind }}</td>
+                        <td>
+                          <form action="/workload/{{ vpa.spec.targetRef.kind | lower }}s" method="POST">
+                              <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+                              <input type="hidden" name="ns_select" value="{{ vpa.namespace }}" />
+                              <input type="hidden" name="selected" value="{{ vpa.spec.targetRef.name }}" />
+                              <a href="javascript:;" onclick="parentNode.submit();">{{ vpa.spec.targetRef.name }}</a>
+                          </form>
+                        </td>
+                        <td>{{ vpa.spec.updatePolicy.updateMode if vpa.spec.updatePolicy is defined else "N/A" }}</td>
+                        <td>
+                          {% set mem_min = "N/A" %}
+                          {% if vpa.spec.resourcePolicy is defined and vpa.spec.resourcePolicy.containerPolicies is defined %}
+                            {% for cp in vpa.spec.resourcePolicy.containerPolicies %}
+                              {% if cp.minAllowed is defined and cp.minAllowed.memory is defined %}
+                                {% set mem_min = cp.minAllowed.memory %}
+                              {% endif %}
+                            {% endfor %}
+                          {% endif %}
+                          {{ mem_min }}
+                        </td>
+                        <td>
+                          {% set mem_max = "N/A" %}
+                          {% if vpa.spec.resourcePolicy is defined and vpa.spec.resourcePolicy.containerPolicies is defined %}
+                            {% for cp in vpa.spec.resourcePolicy.containerPolicies %}
+                              {% if cp.maxAllowed is defined and cp.maxAllowed.memory is defined %}
+                                {% set mem_max = cp.maxAllowed.memory %}
+                              {% endif %}
+                            {% endfor %}
+                          {% endif %}
+                          {{ mem_max }}
+                        </td>
+                        <td>{{ vpa.created }}</td>
+                      </tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+        </div>
+    </div>
+</div>
+{% endblock %}
+
+{% block add_head_css %}
+{% include "segments/datatable_snipet.html.j2" %}
+{% endblock %}

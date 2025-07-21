@@ -1,0 +1,52 @@
+---
+apiVersion: snapshot.storage.k8s.io/v1
+kind: VolumeSnapshotClass
+metadata:
+  name: k8s-etc-ssd
+driver: rbd.csi.ceph.com
+parameters:
+  clusterID: 54530b3e-9823-4c84-9c39-a65470e961e8
+  csi.storage.k8s.io/snapshotter-secret-name: csi-rbd-secret
+  csi.storage.k8s.io/snapshotter-secret-namespace: ceph-storage-system
+deletionPolicy: Delete
+---
+apiVersion: v1
+kind: PersistentVolumeClaim
+metadata:
+  name: rbd-pvc
+  namespace: network-testing
+  labels:
+    group: test
+spec:
+  accessModes:
+    - ReadWriteOnce
+  resources:
+    requests:
+      storage: 1Gi
+  storageClassName: k8s-etc-ssd
+---
+apiVersion: snapshot.storage.k8s.io/v1
+kind: VolumeSnapshot
+metadata:
+  name: rbd-pvc-snapshot
+  namespace: network-testing
+spec:
+  volumeSnapshotClassName: k8s-etc-ssd
+  source:
+    persistentVolumeClaimName: rbd-pvc
+---
+apiVersion: v1
+kind: PersistentVolumeClaim
+metadata:
+  name: rbd-pvc-clone
+  namespace: network-testing
+spec:
+  storageClassName: k8s-etc-ssd
+  dataSource:
+    name: rbd-pvc
+    kind: PersistentVolumeClaim
+  accessModes:
+    - ReadWriteOnce
+  resources:
+    requests:
+      storage: 1Gi

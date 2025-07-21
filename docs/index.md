@@ -6,24 +6,25 @@ KubeDash was created to be a Kubernetes web UI that has the traditional function
 
 ## Features
 
+* Dark mode
 * Manage any Kubernetes cluster.
 * CPU and Memory metrics visualization.
 * User management.
-  * Role management for users based on templates
-  * Role management for SSO groups based on templates
+    - Role management for users based on templates
+    - Role management for SSO groups based on templates
 * Pod Debugging
-  * Login to pod with UI based terminal
-  * View container logs in pods
-* [trivy-operator](https://devopstales.github.io/trivy-operator/) integration to visualize vulnerability
+    - Login to pod with UI based terminal
+    - View container logs in pods
 * Single sign-on integration with authentication and authorization
 * Kubectl configuration generation
-  * Generate OIDC based Kubernetes API authentication
-  * Generate Certificate based authentication
-  * kubectl plugin for easier config download
+    - Generate OIDC based Kubernetes API authentication
+    - Generate Certificate based authentication
+    - kubectl plugin for easier config download
 * Dashboard Plugins
-  * Docker Registry UI
-  * Hem Chart listing
+    - Docker Registry UI
+    - Hem Chart listing
+    - Cert-manager Plugin object visualization
 * Coming soon:
-  * Gateway API Plugin for object visualization
-  * Cert-manager Plugin object visualization
-  * FluxCD Plugin object visualization
+    - Gateway API Plugin for object visualization
+    - FluxCD Plugin object visualization
+    - [trivy-operator](https://devopstales.github.io/trivy-operator/) integration to visualize vulnerability

@@ -1,0 +1,211 @@
+{% extends "base2.html.j2" %}
+
+{% block topmenu %}
+<ul class="header-nav d-lg-flex m-3">
+    <div class="container-fluid px-4">
+      <nav aria-label="breadcrumb">
+        <ol class="breadcrumb my-0">
+          <li class="breadcrumb-item"><span>Plugins</span></li>
+          <li class="breadcrumb-item active"><span>OCI Registry</span></li>
+        </ol>
+      </nav>
+    </div>
+</ul>
+<ul class="header-nav ms-auto"></ul>
+<!-- Button trigger modal -->
+<button type="button" class="btn btn-success" data-bs-toggle="modal" data-bs-target="#modaladd">
+  Add Registry
+</button>
+
+<ul class="header-nav d-lg-flex">
+{% include "segments/topmenu.html.j2" %}
+{% endblock %}
+
+{% block content %}
+<!-- Modal -->
+<div class="modal fade" id="exampleModal" tabindex="-1" aria-labelledby="exampleModalLabel" aria-hidden="true">
+  <div class="modal-dialog">
+    <div class="modal-content">
+      <div class="modal-header">
+        <h5 class="modal-title" id="exampleModalLabel">Modal title</h5>
+        <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+      </div>
+      <div class="modal-body">
+        ...
+      </div>
+      <div class="modal-footer">
+        <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Close</button>
+        <button type="button" class="btn btn-primary">Save changes</button>
+      </div>
+    </div>
+  </div>
+</div>
+
+
+<!-- Modal Add Config -->
+<div class="modal fade" id="modaladd" tabindex="-1" role="dialog" aria-labelledby="modaladdLabel" aria-hidden="true">
+  <div class="modal-dialog" role="document">
+    <div class="modal-content">
+      <div class="modal-header">
+          <h5 class="modal-title" id="modaladdLabel">Create Registry</h5>
+          <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+      </div>
+      <div class="modal-body">
+          <form action="/plugins/registry" method="POST">
+              <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+              <input type="hidden" name="request_type" value="create" />
+              <div class="form-group">
+                  <label for="registry_server_url">Registry Hostname</label>
+                  <input type="text" class="form-control" id="registry_server_url" name="registry_server_url" placeholder="Server Hostname">
+              </div>
+              <div class="form-group">
+                  <label for="registry_server_port">Registry Port</label>
+                  <input type="text" class="form-control" id="registry_server_port" name="registry_server_port" placeholder="Port" value="443">
+              </div>
+              <div class="form-group">
+                  <label for="registry_server_auth_user">Username</label>
+                  <input type="text" class="form-control" id="registry_server_auth_user" name="registry_server_auth_user" placeholder="Username">
+              </div>
+              <div class="form-group">
+                  <label for="registry_server_auth_pass">Password</label>
+                  <input type="password" class="form-control" id="registry_server_auth_pass" name="registry_server_auth_pass" placeholder="Password">
+              </div>
+              <div class="custom-control custom-switch">
+                  <input type="checkbox" class="custom-control-input" id="registry_server_tls_register" onclick="checkbox('registry_server_tls_register')" checked>
+                  <label class="custom-control-label" for="registry_server_tls_register">TLS</label>
+                  <input type="hidden" name="registry_server_tls_register_value" id="registry_server_tls_register_value" value="True">
+              </div>
+              <div class="custom-control custom-switch">
+                  <input type="checkbox" class="custom-control-input" id="insecure_tls_register" onclick="checkbox('insecure_tls_register')">
+                  <label class="custom-control-label" for="insecure_tls_register">Insecure TLS</label>
+                  <input type="hidden" name="insecure_tls_register_value" id="insecure_tls_register_value" value="False">
+              </div>
+              <div class="modal-footer">
+                  <div class="form-group mt-2">
+                      <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Close</button>
+                      <button type="submit" class="btn btn-primary" onClick="save();" value="Add" id="add">Add</button>
+                  </div>
+              </div>
+          </form>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- Modal Edit Config -->
+{% for server in registries %}
+<div class="modal fade" id="modaledit-{{ server.registry_server_url|replace('.','_') }}" tabindex="-1" role="dialog" aria-labelledby="modaleditLabel" aria-hidden="true">
+    <div class="modal-dialog">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h5 class="modal-title" id="modaleditLabel">Update Information</h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close">
+                    
+                </button>
+            </div>
+            <div class="modal-body">
+                <form action="/plugins/registry" method="POST">
+                    <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+                    <input type="hidden" name="request_type" value="edit" />
+                    <input type="hidden" name="registry_server_url_old" value="{{ server.registry_server_url }}" />
+                    <div class="form-group">
+                        <label for="registry_server_url">Registry Hostname</label>
+                        <input type="text" class="form-control" id="registry_server_url" name="registry_server_url" value="{{ server.registry_server_url }}">
+                    </div>
+                    <div class="form-group">
+                        <label for="registry_server_port">Registry Port</label>
+                        <input type="text" class="form-control" id="registry_server_port" name="registry_server_port" value="{{ server.registry_server_port }}">
+                    </div>
+                    <div class="form-group">
+                        <label for="registry_server_auth_user">Username</label>
+                        <input type="text" class="form-control" id="registry_server_auth_user" name="registry_server_auth_user" value="{{ server.registry_server_auth_user|replace('None','') }}">
+                    </div>
+                    <div class="form-group">
+                        <label for="registry_server_auth_pass">Password</label>
+                        <input type="password" class="form-control" id="registry_server_auth_pass" name="registry_server_auth_pass" value="{{ server.registry_server_auth_pass|replace('None','') }}">
+                    </div>
+                    <div class="custom-control custom-switch">
+                        <input type="checkbox" class="custom-control-input" id="registry_server_tls_edit" onclick="checkbox('registry_server_tls_edit')" checked>
+                        <label class="custom-control-label" for="registry_server_tls_edit">TLS</label>
+                        <input type="hidden" name="registry_server_tls_edit_value" id="registry_server_tls_edit_value" value="True">
+                    </div>
+                    <div class="custom-control custom-switch">
+                        <input type="checkbox" class="custom-control-input" id="insecure_tls_edit" onclick="checkbox('insecure_tls_edit')">
+                        <label class="custom-control-label" for="insecure_tls_edit">Insecure TLS</label>
+                        <input type="hidden" name="insecure_tls_edit_value" id="insecure_tls_edit_value" value="False">
+                    </div>
+                    <div class="modal-footer">
+                        <div class="form-group mt-2">
+                            <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Close</button>
+                            <button type="submit" class="btn btn-primary" onClick="save();" value="Add" id="add">Add</button>
+                        </div>
+                    </div>
+                </form>
+            </div>
+        </div>
+    </div>
+</div>
+{% endfor %}
+
+<!-- Modal Config -->
+<div class="card shadow mb-4">
+    <div class="card-header py-3">
+        <h6 class="m-0 font-weight-bold text-primary">Registry List</h6>
+    </div>
+    <div class="card-body">
+        <div class="table-responsive">
+            <table class="table table-bordered" id="dataTable" width="100%" cellspacing="0">
+                <thead>
+                    <tr>
+                      <th>URL</th>
+                      <th>Port</th>
+                      <th>Authentication</th>
+                      <th>TLS</th>
+                      <th>Insecure</th>
+                      <th>Action</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    {% for server in registries %}
+                    <tr>
+                        <td>
+                          <form action="/plugins/registry/image/list" method="POST">
+                            <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+                            <input type="hidden" name="registry_server_url" value="{{ server.registry_server_url }}" />
+                            <a href="javascript:;" onclick="parentNode.submit();">{{ server.registry_server_url }}</a>
+                          </form>
+                        </td>
+                        <td>{{ server.registry_server_port }}</td>
+                        <td>{{ server.registry_server_auth }}</td>
+                        <td>{{ server.registry_server_tls }}</td>
+                        <td>{{ server.insecure_tls }}</td>
+                        <td>
+                            {% if session['user_role'] == "Admin" %}
+                            <!-- Button trigger modal edit -->
+                            <form action="/plugins/registry" method="POST">
+                                <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+                                <button type="button" class="btn btn-success btn-just-icon btn-xs" data-bs-toggle="modal" data-bs-target="#modaledit-{{ server.registry_server_url|replace('.','_') }}">
+                                    <i class="material-icons">edit</i>
+                                </button>
+                                <input type="hidden" name="request_type" value="delete" />
+                                <input type="hidden" name="registry_server_url" value="{{ server.registry_server_url }}" />
+                                <button type="submit" rel="tooltip" class="btn btn-danger btn-just-icon btn-sm" value="upvote">
+                                    <i class="material-icons">delete</i>
+                                </button>
+                            </form>
+                            {% endif %}
+                        </td>
+                    </tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+
+        </div>
+    </div>
+</div>
+
+{% endblock %}
+
+{% block add_head_css %}
+{% include "segments/datatable_snipet.html.j2" %}
+{% endblock %}

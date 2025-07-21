@@ -1,0 +1,52 @@
+{{- if .Values.ingress.enabled -}}
+{{- if not .Values.route.enabled -}}
+apiVersion: {{ include "common.capabilities.ingress.apiVersion" . }}
+kind: Ingress
+metadata:
+  name: {{ include "kubedash.fullname" . }}-ingress
+  labels:
+    app: kubedash
+    {{- include "kubedash.labels" . | nindent 4 }}
+  annotations:
+    {{- if .Values.ingress.tls.enabled }}
+    nginx.ingress.kubernetes.io/ssl-redirect: "true"
+    {{- end }}
+    {{- if .Values.ingress.whitelist.enabled }}
+    {{- $last := sub (len .Values.ingress.whitelist.ips) 1 }}
+    {{- range $index, $ip := .Values.ingress.whitelist.ips }}
+        nginx.ingress.kubernetes.io/whitelist-source-range: "{{ $ip }}{{ if ne $index $last }}, {{ end }}"
+    {{- end }}
+    {{- end }}
+    {{- if .Values.ingress.tls.certManager.enabled }}
+    cert-manager.io/cluster-issuer: "{{ .Values.ingress.tls.certManager.clusterIssuer }}"
+    {{- end }}
+{{- with .Values.ingress.annotations }}
+{{ toYaml . | indent 4 }}
+{{- end }}
+spec:
+  {{- if and .Values.ingress.className (semverCompare ">=1.18-0" .Capabilities.KubeVersion.GitVersion) }}
+  ingressClassName: {{ .Values.ingress.className }}
+  {{- end }}
+{{- if .Values.ingress.tls.enabled }}
+  tls:
+  - hosts:
+    - {{ .Values.ingress.url }}
+    {{- if .Values.ingress.tls.certManager.enabled }}
+    secretName: {{ include "kubedash.fullname" . }}-ingress-tls
+    {{- else if .Values.ingress.tls.tlsSecret }}
+    secretName: {{ .Values.ingress.tls.tlsSecret }}
+    {{- end }}
+{{- end }}
+  rules:
+    - host: "{{ .Values.ingress.url }}"
+      http:
+        paths:
+          - path: /
+            pathType: Prefix
+            backend:
+              service:
+                name: {{ include "kubedash.fullname" . }}-ui
+                port: 
+                  number: 8000
+{{- end }}
+{{- end }}

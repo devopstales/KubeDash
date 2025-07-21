@@ -8,13 +8,13 @@ export USER=$USER
 
 echo ""
 echo "Start Migration"
-echo "###################################################################################"
+echo "###########################################################################################"
 flask db upgrade
 echo ${KUBEDASH_VERSION} > /code/kubedash/app-release
 
 echo ""
 echo "Start Applications"
-echo "###################################################################################"
+echo "###########################################################################################"
 #flask run --host=0.0.0.0 --port=8000
 #python3 kubedash.py
 gunicorn --worker-class eventlet --conf gunicorn_conf.py kubedash:app

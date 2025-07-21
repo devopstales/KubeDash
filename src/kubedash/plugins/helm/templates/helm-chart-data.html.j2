@@ -1,0 +1,301 @@
+{% extends "base2.html.j2" %}
+
+{% block topmenu %}
+<ul class="header-nav d-lg-flex m-3">
+    <div class="container-fluid px-4">
+      <nav aria-label="breadcrumb">
+        <ol class="breadcrumb my-0">
+          <li class="breadcrumb-item"><span>Plugins</span></li>
+          <li class="breadcrumb-item"><a href="/plugins/helm-chart">Helm Charts</a></li>
+          <li class="breadcrumb-item active"><span>{{ chart_name }}</span></li>
+        </ol>
+      </nav>
+    </div>
+</ul>
+<ul class="header-nav ms-auto"></ul>
+<ul class="header-nav d-lg-flex">
+{% include "segments/topmenu.html.j2" %}
+{% endblock %}
+
+{% block content %}
+<div class="card shadow mb-4">
+    <div class="card-header">
+        <h6 class="m-0 font-weight-bold text-primary">Chart Data</h6>
+    </div>
+    <div class="card-body">
+        <!-- Chart releases loop -->
+        {% for rd in chart_data %}
+        {% if loop.last %}
+
+        <ul class="nav nav-tabs" id="nav-tab" role="tablist">
+            <li class="nav-item">
+                <a class="nav-link active" id="nav-release-tab" data-bs-toggle="tab" href="#nav-release" role="tab" aria-controls="nav-release" aria-selected="true" data-bs-toggle="tab">Release</a>
+            </li>
+            <li class="nav-item">
+                <a class="nav-link" id="nav-values-tab" data-bs-toggle="tab" href="#nav-values" role="tab" aria-controls="nav-values" aria-selected="false" data-bs-toggle="tab">Values</a>
+            </li>
+            <li class="nav-item">
+                <a class="nav-link" id="nav-manifests-tab" data-bs-toggle="tab" href="#nav-manifests" role="tab" aria-controls="nav-manifests" aria-selected="false" data-bs-toggle="tab">Manifests</a>
+            </li>
+            <li class="nav-item">
+                <a class="nav-link" id="nav-resources-tab" data-bs-toggle="tab" href="#nav-resources" role="tab" aria-controls="nav-resources" aria-selected="false" data-bs-toggle="tab">Resources</a>
+            </li>
+            {#
+            {% if rd.dependencies %}
+            <li class="nav-item">
+                <a class="nav-link" id="nav-dependencies-tab" data-bs-toggle="tab" href="#nav-dependencies" role="tab" aria-controls="nav-dependencies" aria-selected="false" data-bs-toggle="tab">Dependencies</a>
+            </li>
+            {% endif %}
+            #}
+        </ul>
+
+        <div class="tab-content" id="nav-tabContent">
+            <!-- release -->
+            <div class="tab-pane fade show active" id="nav-release" role="tabpanel" aria-labelledby="nav-release-tab">
+                <div class="card shadow mb-4">
+                    <div class="card-body">
+                        <div class="table-responsive">
+                            <table class="table table-bordered" id="releaseInfoTable" width="100%" cellspacing="0">
+                            <tr>
+                                <th>Name:</th>
+                                <td>{{ chart_name }}</td>
+                            </tr>
+                            <tr>
+                                <th>Namespace:</th>
+                                <td>
+                                    <form action="/cluster/namespace" method="POST">
+                                        <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+                                        <input type="hidden" name="ns_select" value="{{ session['ns_select'] }}" />
+                                        <input type="hidden" name="selected" value="{{ session['ns_select'] }}" />
+                                        <a href="javascript:;" onclick="parentNode.submit();">{{ session['ns_select'] }}</a>
+                                    </form>
+                                </td>
+                            </tr>
+                            <tr>
+                                <th>Status:</th>
+                                <td>
+                                    {% if rd.status == "deployed" %}
+                                        <span class="badge text-bg-tag text-bg-success">{{ rd.status }}</span>
+                                    {% else %}
+                                        <span class="badge text-bg-tag text-bg-danger">{{ rd.status }}</span>
+                                    {% endif %}
+                                </td>
+                            </tr>
+                            <tr>
+                                <th>Revision:</th>
+                                <td>{{ rd.revision }}</td>
+                            </tr>
+                            <tr>
+                                <th>Chart Version:</th>
+                                <td>{{ rd.chart_name }}-{{ rd.chart_version }}</td>
+                            </tr>
+                            <tr>
+                                <th>App Version:</th>
+                                <td>{{ rd.app_version }}</td>
+                            </tr>
+                            <tr>
+                                <th>Created:</th>
+                                <td>{{ rd.updated }}</td>
+                            </tr>
+                            </table>
+                        </div>
+                    </div>
+                </div>
+            </div>
+            <!-- Values -->
+            <div class="tab-pane fade" id="nav-values" role="tabpanel" aria-labelledby="nav-profile-tab">
+                <div id="accordion">
+                    <div class="card shadow mb-4">
+                        <div class="card-body">
+                            <h3>Values</h3>
+                            
+                            <div class="table-responsive">
+                                <pre><code>{{ rd["values"] }}</code></pre>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+            <!-- Manifests -->
+            <div class="tab-pane fade" id="nav-manifests" role="tabpanel" aria-labelledby="nav-profile-tab">
+                <div id="accordion">
+                    <div class="card shadow mb-4">
+                        <div class="card-body">
+                            <h3>Manifests</h3>
+                            
+                            <div class="table-responsive">
+                                <pre><code>{{ rd.manifests }}</code></pre>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+            <!-- resources -->
+            <div class="tab-pane fade" id="nav-resources" role="tabpanel" aria-labelledby="nav-profile-tab">
+                <div id="accordion">
+                    <div class="card shadow mb-4">
+                        <div class="card-body">
+                            <h3>Resources</h3>
+                            
+                            <div class="table-responsive">
+                                <table class="table table-bordered" id="initContainersTable" width="100%" cellspacing="0">
+                                    <thead>
+                                        <tr>
+                                            <th>Resource Type</th>
+                                            <th>Name</th>
+                                        </tr>
+                                    </thead>
+                                    <tbody>
+                                        {% for deployment in rd.deployments %}
+                                        <tr>
+                                            <td>Deployment</td>
+                                            <td>
+                                                <form action="/workload/deployments" method="POST">
+                                                    <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+                                                    <input type="hidden" name="ns_select" value="{{ session['ns_select'] }}" />
+                                                    <input type="hidden" name="selected" value="{{ deployment }}" />
+                                                    <a href="javascript:;" onclick="parentNode.submit();">{{ deployment }}</a>
+                                                </form>
+                                            </td>
+                                        </tr>
+                                        {% endfor %}
+                                        {% for daemonset in rd.daemonset %}
+                                        <tr>
+                                            <td>Daemonset</td>
+                                            <td>
+                                                <form action="/workload/daemonsets" method="POST">
+                                                    <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+                                                    <input type="hidden" name="ns_select" value="{{ session['ns_select'] }}" />
+                                                    <input type="hidden" name="selected" value="{{ daemonset }}" />
+                                                    <a href="javascript:;" onclick="parentNode.submit();">{{ daemonset }}</a>
+                                                </form>
+                                            </td>
+                                        </tr>
+                                        {% endfor %}
+                                        {% for ss in rd.statefulsets %}
+                                        <tr>
+                                            <td>Stateful Set</td>
+                                            <td>
+                                                <form action="/workload/statefulsets" method="POST">
+                                                    <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+                                                    <input type="hidden" name="ns_select" value="{{ session['ns_select'] }}" />
+                                                    <input type="hidden" name="selected" value="{{ ss }}" />
+                                                    <a href="javascript:;" onclick="parentNode.submit();">{{ ss }}</a>
+                                                </form>
+                                            </td>
+                                        </tr>
+                                        {% endfor %}
+                                        {% for service in rd.services %}
+                                        <tr>
+                                            <td>Service</td>
+                                            <td>
+                                                <form action="/network/service" method="POST">
+                                                    <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+                                                    <input type="hidden" name="ns_select" value="{{ session['ns_select'] }}" />
+                                                    <input type="hidden" name="selected" value="{{ service }}" />
+                                                    <a href="javascript:;" onclick="parentNode.submit();">{{ service }}</a>
+                                                </form>
+                                            </td>
+                                        </tr>
+                                        {% endfor %}
+                                        {% for ingress in rd.ingresses %}
+                                        <tr>
+                                            <td>Ingress</td>
+                                            <td>
+                                                <form action="/network/ingress" method="POST">
+                                                    <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+                                                    <input type="hidden" name="ns_select" value="{{ session['ns_select'] }}" />
+                                                    <input type="hidden" name="selected" value="{{ ingress }}" />
+                                                    <a href="javascript:;" onclick="parentNode.submit();">{{ ingress }}</a>
+                                                </form>
+                                            </td>
+                                        </tr>
+                                        {% endfor %}
+                                        {% for sa in rd.service_accounts %}
+                                        <tr>
+                                            <td>Aervice Account</td>
+                                            <td>
+                                                <form action="/cluster-permission/service-account" method="POST">
+                                                    <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+                                                    <input type="hidden" name="ns_select" value="{{ session['ns_select'] }}" />
+                                                    <input type="hidden" name="selected" value="{{ sa }}" />
+                                                    <a href="javascript:;" onclick="parentNode.submit();">{{ sa }}</a>
+                                                </form>
+                                            </td>
+                                        </tr>
+                                        {% endfor %}
+                                        {% for secret in rd.secrets %}
+                                        <tr>
+                                            <td>Secret</td>
+                                            <td>
+                                                <form action="/security/secret" method="POST">
+                                                    <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+                                                    <input type="hidden" name="ns_select" value="{{ session['ns_select'] }}" />
+                                                    <input type="hidden" name="selected" value="{{ secret }}" />
+                                                    <a href="javascript:;" onclick="parentNode.submit();">{{ secret }}</a>
+                                                </form>
+                                            </tr>
+                                        </tr>
+                                        {% endfor %}
+                                        {% for configmap in rd.configmaps %}
+                                        <tr>
+                                            <td>Configmap</td>
+                                            <td>
+                                                <form action="/storage/configmap" method="POST">
+                                                    <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+                                                    <input type="hidden" name="ns_select" value="{{ session['ns_select'] }}" />
+                                                    <input type="hidden" name="selected" value="{{ configmap }}" />
+                                                    <a href="javascript:;" onclick="parentNode.submit();">{{ configmap }}</a>
+                                                </form>
+                                            </td>
+                                        </tr>
+                                        {% endfor %}
+                                        {% for pvc in rd.persistent_volume_claims %}
+                                        <tr>
+                                            <td>Persistent Volume Claim</td>
+                                            <td>
+                                                <form action="/storage/pvc" method="POST">
+                                                    <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+                                                    <input type="hidden" name="ns_select" value="{{ session['ns_select'] }}" />
+                                                    <input type="hidden" name="selected" value="{{ pvc }}" />
+                                                    <a href="javascript:;" onclick="parentNode.submit();">{{ pvc }}</a>
+                                                </form>
+                                            </td>
+                                        </tr>
+                                        {% endfor %}
+                                    </tbody>
+                                </table>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+            <!-- dependencies -->
+            {#
+            {% if rd.dependencies %}
+            <div class="tab-pane fade" id="nav-dependencies" role="tabpanel" aria-labelledby="nav-profile-tab">
+                <div id="accordion">
+                    <div class="card shadow mb-4">
+                        <div class="card-body">
+                            <h3>Dependencies</h3>
+                            
+                            <div class="table-responsive">
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+            {% endif %}
+            #}
+        </div>
+        <!-- End Of Chart releases loop -->
+        {% endif %}
+        {% endfor %}
+    </div>
+</div>
+{% endblock %}
+
+{% block add_head_css %}
+{% include "segments/datatable_snipet.html.j2" %}
+{% include "segments/highlight_snipet.html.j2"%}
+{% endblock %}

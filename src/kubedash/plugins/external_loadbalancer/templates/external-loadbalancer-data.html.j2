@@ -1,0 +1,317 @@
+{% extends "base2.html.j2" %}
+
+{% block topmenu %}
+<ul class="header-nav d-lg-flex m-3">
+    <div class="container-fluid px-4">
+      <nav aria-label="breadcrumb">
+        <ol class="breadcrumb my-0">
+          <li class="breadcrumb-item"><span>Plugins</span></li>
+          <li class="breadcrumb-item"><a href="/plugins/external-loadbalancer">LoadBalancers</a></li>
+          <li class="breadcrumb-item">{{ object_type|replace("_", " ")|capitalize }}</li>
+          <li class="breadcrumb-item active" aria-current="page">{{ object_data.name }}</li>
+        </ol>
+      </nav>
+    </div>
+</ul>
+<ul class="header-nav ms-auto"></ul>
+<ul class="header-nav d-lg-flex">
+{% include "segments/topmenu.html.j2" %}
+{% endblock %}
+
+{% block content %}
+<div class="card shadow mb-4">
+    <div class="card-header py-3">
+        <h6 class="m-0 fw-bold text-primary">{{ object_type }} Objects</h6>
+    </div>
+    <div class="card-body">
+        <div class="table-responsive">
+            <table class="table table-bordered" id="lbInfoTable" width="100%">
+                <tbody>
+                    <tr>
+                        <th class="w-25">Name:</th>
+                        <td>{{ object_data.name }}</td>
+                    </tr>
+                    <tr>
+                        <th>Type:</th>
+                        <td>{{ object_data.type }}</td>
+                    </tr>
+                    
+                    {% if object_type == "ipaddresspool" %}
+                    <tr>
+                        <th>Addresses:</th>
+                        <td>
+                            {% if object_data.type == "cilium" %}
+                                <div class="table-responsive">
+                                    <table class="table table-bordered table-sm">
+                                        {% for address in object_data.blocks %}
+                                        <tr>
+                                            {% for key, value in address.items() %}
+                                                {% if key == "start"%}
+                                                    <td>{{ value }} -</td>
+                                                {% elif key == "stop"%}
+                                                    <td>{{ value }}</td>
+                                                {% elif key == "cidr"%}
+                                                    <td>{{ value }}</td>
+                                                {% endif %}
+                                            {% endfor %}
+                                        </tr>
+                                        {% endfor %}
+                                    </table>
+                                </div>
+                            {% else %}
+                                {% for address in object_data.addresses %}
+                                {{ address }}<br>
+                                {% endfor %}
+                            {% endif %}
+                        </td>
+                    </tr>
+                    
+                    {% if object_data.type != "cilium" %}
+                    <tr>
+                        <th>Auto assign:</th>
+                        <td>{{ object_data.autoAssign }}</td>
+                    </tr>
+                    {% endif %}
+                    
+                    <tr>
+                        <th>Avoid buggy IPs:</th>
+                        <td>
+                            {% if object_data.type == "cilium" %}
+                                {{ object_data.allowFirstLastIPs }}
+                            {% else %}
+                                {{ object_data.avoidBuggyIPs }}
+                            {% endif %}
+                        </td>
+                    </tr>
+                    
+                    {% if object_data.ServiceAllocation_namespaces is defined %}
+                    <tr>
+                        <th>Allocation Namespaces:</th>
+                        <td>
+                            {% for namespace in object_data.ServiceAllocation_namespaces %}
+                            {{ namespace }}<br>
+                            {% endfor %}
+                        </td>
+                    </tr>
+                    {% endif %}
+                    
+                    {% if object_data.ServiceAllocation_namespaceSelectors is defined %}
+                    <tr>
+                        <th>Allocation Namespace Selectors:</th>
+                        <td>
+                            <h6 class="fw-bold">Labels:</h6>
+                            <div class="table-responsive">
+                                <table class="table table-bordered table-sm">
+                                    {% for selector in object_data.ServiceAllocation_namespaceSelectors %}
+                                        {% for key, value in selector.matchLabels.items() %}
+                                        <tr>
+                                            <td>{{ key }}</td>
+                                            <td>{{ value }}</td>
+                                        </tr>
+                                        {% endfor %}
+                                    {% endfor %}
+                                </table>
+                            </div>
+                        </td>
+                    </tr>
+                    {% endif %}
+                    
+                    {% if object_data.ServiceAllocation_serviceSelectors is defined %}
+                    <tr>
+                        <th>Service Selectors:</th>
+                        <td>
+                            <h6 class="fw-bold">Match Expressions</h6>
+                            <div class="table-responsive">
+                                <table class="table table-bordered table-sm">
+                                    {% for selector in object_data.ServiceAllocation_serviceSelectors %}
+                                        {% for expressions in selector.matchExpressions %}
+                                        <tr>
+                                            {% for expression in expressions %}
+                                            <td>{{ expressions[expression] }}</td>
+                                            {% endfor %}
+                                        </tr>
+                                        {% endfor %}
+                                    {% endfor %}
+                                </table>
+                            </div>
+                        </td>
+                    </tr>
+                    {% endif %}
+                    
+                    {% if object_data.serviceSelector is defined %}
+                    <tr>
+                        <th>Allocation Service Selectors:</th>
+                        <td>
+                            <div class="table-responsive">
+                                <table class="table table-bordered table-sm">
+                                    <tr>
+                                    {% for key, value in object_data.serviceSelector.matchLabels.items() %}
+                                        <td>{{ key }}</td>
+                                        <td>{{ value }}</td>
+                                    {% endfor %}
+                                    </tr>
+                                </table>
+                            </div>
+                        </td>
+                    </tr>
+                    {% endif %}
+                    
+                    {% elif object_type == "l2advertisement" %}
+                    {% if object_data.type != 'cilium' %}
+                    <tr>
+                        <th>IP Address Pools:</th>
+                        <td>
+                            {% for pool in object_data.ipAddressPools %}
+                            <form action="/plugins/external-loadbalancer" method="POST">
+                                <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+                                <input type="hidden" name="ns_select" value="{{ session['ns_select'] }}" />
+                                <input type="hidden" name="selected" value="{{ pool }}" />
+                                <input type="hidden" name="object_type" value="ipaddresspool" />
+                                <a href="javascript:;" onclick="parentNode.submit();" class="text-decoration-none">{{ pool }}</a>
+                            </form>
+                            <br>
+                            {% endfor %}
+                        </td>
+                    </tr>
+                    {% else %}
+                    <tr>
+                        <th>Interfaces:</th>
+                        <td>
+                            {% for interface in object_data.interfaces %}
+                            {{ interface }}<br>
+                            {% endfor %}
+                        </td>
+                    </tr>
+                    
+                    {% if object_data.nodeSelector is defined %}
+                    <tr>
+                        <th>Node Selectors:</th>
+                        <td>
+                            <h6 class="fw-bold">Node Labels</h6>
+                            <div class="table-responsive">
+                                <table class="table table-bordered table-sm">
+                                    <tr>
+                                    {% for key, value in object_data.nodeSelector.matchLabels.items() %}
+                                        <td>{{ key }}</td>
+                                        <td>{{ value }}</td>
+                                    {% endfor %}
+                                    </tr>
+                                </table>
+                            </div>
+                        </td>
+                    </tr>
+                    {% endif %}
+                    {% endif %}
+                    
+                    {% if object_data.ipAddressPoolSelectors is defined %}
+                    <tr>
+                        <th>IP Address Pool Selectors:</th>
+                        <td>{{ object_data.ipAddressPoolSelectors }}</td>
+                    </tr>
+                    {% endif %}
+                    
+                    {% if object_data.nodeSelectors is defined %}
+                    <tr>
+                        <th>Node Selectors:</th>
+                        <td>{{ object_data.nodeSelectors }}</td>
+                    </tr>
+                    {% endif %}
+                    
+                    {% elif object_type == "bgppeers" %}
+                    <tr>
+                        <th>My ASN:</th>
+                        {% if object_data.type == "cilium" %}
+                            <td>
+                            {% for router in object_data.virtual_routers %}
+                            {{ router.localASN }}<br>
+                            {% endfor %}
+                            </td>
+                        {% else %}
+                            <td>{{ object_data.myASN }}</td>
+                        {% endif %}
+                    </tr>
+                    
+                    <tr>
+                        <th>Peer Address:</th>
+                        {% if object_data.type == "cilium" %}
+                        <td>
+                            {% for router in object_data.virtual_routers %}
+                                {% for neighbor in router.neighbors %}
+                                    {{ neighbor.peerAddress }}<br>
+                                {% endfor %}
+                            {% endfor %}
+                        </td>
+                        {% else %}
+                            <td>{{ object_data.peerAddress }}</td>
+                        {% endif %}
+                    </tr>
+                    
+                    <tr>
+                        <th>Peer ASN:</th>
+                        {% if object_data.type == "cilium" %}
+                        <td>
+                            {% for router in object_data.virtual_routers %}
+                                {% for neighbor in router.neighbors %}
+                                    {{ neighbor.peerASN }}<br>
+                                {% endfor %}
+                            {% endfor %}
+                        </td>
+                        {% else %}
+                            <td>{{ object_data.peerASN }}</td>
+                        {% endif %}
+                    </tr>
+                    
+                    {% if object_data.nodeSelectors is defined %}
+                    <tr>
+                        <th>Node Selectors:</th>
+                        <td>
+                            <h6 class="fw-bold">Node Selectors</h6>
+                            <div class="table-responsive">
+                                <table class="table table-bordered table-sm">
+                                {% for selector in object_data.nodeSelectors %}
+                                    {% for expressions in selector.matchExpressions %}
+                                    <tr>
+                                        {% for expression in expressions %}
+                                        <td>{{ expressions[expression] }}</td>
+                                        {% endfor %}
+                                    </tr>
+                                    {% endfor %}
+                                {% endfor %}
+                                </table>
+                            </div>
+                        </td>
+                    </tr>
+                    {% endif %}
+                    
+                    {% if object_data.nodeSelector is defined %}
+                    <tr>
+                        <th>Node Selectors:</th>
+                        <td>
+                            <h6 class="fw-bold">Node Labels</h6>
+                            <div class="table-responsive">
+                                <table class="table table-bordered table-sm">
+                                    <tr>
+                                    {% for key, value in object_data.nodeSelector.matchLabels.items() %}
+                                        <td>{{ key }}</td>
+                                        <td>{{ value }}</td>
+                                    {% endfor %}
+                                    </tr>
+                                </table>
+                            </div>
+                        </td>
+                    </tr>
+                    {% endif %}
+                    {% endif %}
+                </tbody>
+            </table>
+        </div>
+    </div>
+</div>
+{% endblock %}
+
+{% block add_head_css %}
+{% include "segments/datatable_snipet.html.j2" %}
+{% endblock %}
+
+{% block tail_js %}
+{% endblock %}

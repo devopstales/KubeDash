@@ -1,0 +1,119 @@
+/* Smooth transition AFTER load */
+html {
+  transition: background-color 200ms ease, color 200ms ease;
+}
+
+/* Prevent transition during initial load */
+html.light, html.dark {
+  transition: none !important;
+}
+
+/*
+Image For login Page
+*/
+.bg-login-image {
+  background: url(/img/PIXNIO-210964-725x484.jpeg);
+  background-position-x: 0%;
+  background-position-y: 0%;
+  background-size: auto;
+  background-position: center;
+  background-size: cover;
+}
+
+/* 
+Password hide
+*/
+.textshadow code {
+  filter: blur(5px);
+  user-select: none;
+  transition: filter 0.2s ease;
+}
+
+ /* 
+Xtermjs styles
+
+    width: 100%;
+    height: calc(100% - 50px)
+*/
+
+.form-post {
+  display: inline;
+}
+
+.terminalBody {
+  display: inline;
+  width: calc(100% - 15px);
+  height: calc(100% - 50px);
+}
+
+span.status {
+  font-size: small;
+}
+
+span.connected {
+  background-color: lightgreen;
+}
+
+span.disconnected {
+  background-color: #ff8383;
+}
+
+/* Notification styles */
+.dropdown-menu-notifications {
+  width: 320px;
+  max-height: 500px;
+  overflow-y: auto;
+}
+
+/* Base notification item style */
+.notification-item {
+  border-left: 3px solid transparent;
+  margin: 0.25rem 0;
+  transition: all 0.3s ease;
+  padding-left: 0.75rem;
+  margin-left: 0.75rem;
+}
+
+/* Category-specific styles */
+.notification-item.notification-item-success { 
+  border-left-color: var(--cui-success) !important;
+  background-color: rgba(var(--bs-success-rgb), 0.05);
+}
+
+.notification-item.notification-item-danger { 
+  border-left-color: var(--cui-danger) !important;
+  background-color: rgba(var(--bs-danger-rgb), 0.05);
+}
+
+.notification-item.notification-item-warning { 
+  border-left-color: var(--cui-warning) !important;
+  background-color: rgba(var(--bs-warning-rgb), 0.05);
+}
+
+.notification-item.notification-item-info { 
+  border-left-color: var(--cui-info) !important;
+  background-color: rgba(var(--bs-info-rgb), 0.05);
+}
+
+.notification-time {
+  font-size: 0.8em;
+  color: var(--bs-secondary-color);
+}
+
+.notification-close {
+  cursor: pointer;
+  opacity: 0.5;
+  transition: opacity 0.2s;
+  color: var(--bs-secondary-color);
+  font-size: 0.9em;
+  margin-top: 2px;
+}
+
+.notification-close:hover {
+  opacity: 1;
+  color: var(--bs-danger);
+}
+
+.notification-item:hover {
+  background-color: rgba(0, 0, 0, 0.03);
+}

@@ -1,0 +1,161 @@
+---
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: {{ include "kubedash.fullname" . }}-kubedash-ini
+  labels:
+    app: kubedash
+    {{ include "kubedash.labels" . | nindent 4 }}
+data:
+  kubedash.ini: |
+    ##################### KubeDash Configuration Defaults #####################
+    [DEFAULT]
+    app_mode = production
+
+    #################################### Security ############################
+    [security]
+
+    # default admin password, can be changed before first start of grafana, or in profile settings
+    admin_password = admin
+
+    #################################### Database ############################
+    [database]
+    {{ if .Values.externalDatabase.enabled }}
+    type = postgres
+    host = {{ .Values.externalDatabase.host }}
+    name = {{ .Values.externalDatabase.database }}
+    user = {{ .Values.externalDatabase.username }}
+    password = {{ .Values.externalDatabase.password }}
+    {{ else if .Values.postgresql.enabled }}
+    type = postgres
+    host = {{ .Release.Name }}-postgresql
+    name = {{ .Values.postgresql.auth.database }}
+    user = {{ .Values.postgresql.auth.username }}
+    password = {{ .Values.postgresql.auth.password }}
+    {{ else }}
+    type = sqlite3
+    {{ end }}
+
+    #################################### Cache server #############################
+    [remote_cache]
+    {{ if .Values.redis.enabled }}
+    redis_enabled = true
+    # cache connection string options
+    redis_host = {{ .Release.Name }}-redis-master
+    redis_port = 6379
+    redis_db = 0
+    # cache time
+    short_cache_time = 60
+    long_cache_time = 900
+    {{ else }}
+    redis_enabled = false
+    # cache time
+    short_cache_time = 60
+    long_cache_time = 900
+    {{ end }}
+    {{ if .Values.oidc.enabled }}
+    #################################### SSO Settings ###########################
+    [sso_settings]
+
+    issuer_url = {{ .Values.oidc.provider.oidcUrl}}
+
+    client_id = {{ .Values.oidc.provider.oidcClientId }}
+
+    secret = {{ .Values.oidc.provider.oidcSecret }}
+
+    scope = {{ .Values.oidc.provider.oidcScopes}}
+
+    {{ if .Values.ingress.tls.enabled }}
+    callback_url = https://{{ .Values.ingress.url }}
+    {{ else }}
+    callback_url = http://{{ .Values.ingress.url }}
+    {{ end }}
+    {{ end }}
+    #################################### K8S ###########################
+    [k8s]
+    cluster_name = {{ .Values.cluster.name }}
+    api_server = {{ .Values.cluster.apiUrl }}
+    {{ if .Values.cluster.caCert }}
+    api_ca = {{ .Values.cluster.caCert | b64enc }}
+    {{ end }}
+
+    #################################### Monitoring Settings ###########################
+    [monitoring]
+
+    jaeger_enabled = false
+    jaeger_http_endpoint = http://127.0.0.1:4318
+
+    #################################### Plugin Settings ###########################
+    [plugin_settings]
+    registry = {{ .Values.plugins.registryUi.enabled }}
+    helm = {{ .Values.plugins.helmDashboard.enabled }}
+    gateway_api = false
+    cert_manager = {{ .Values.plugins.certManager.enabled }}
+    external_loadbalancer = {{ .Values.plugins.externalLoadbalancer.enabled }}
+    flux = {{ .Values.plugins.flux.enabled }}
+    #################################### End of Settings ###########################
+{{- if .Values.metrics.enabled }}
+---
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: {{ include "kubedash.fullname" . }}-statsd-config
+  labels:
+    app: kubedash
+    {{ include "kubedash.labels" . | nindent 4 }}
+data:
+  statsd.conf: |-
+    # StatsD configuration
+    # This file is used to configure the StatsD exporter.
+    mappings:
+      - match: "*.gunicorn.request.status.*"
+        help: "gunicorn response code"
+        name: "gunicorn_response_code"
+        labels:
+          app: "$1"
+          status: "$2"
+      - match: "*.gunicorn.workers"
+        name: "gunicorn_workers"
+        labels:
+          app: "$1"
+      - match: "*.gunicorn.requests"
+        name: "gunicorn_requests"
+        labels:
+          app: "$1"
+      - match: "*.gunicorn.request.duration"
+        name: "gunicorn_request_duration"
+        labels:
+          app: "$1"
+        timer_type: histogram  # This enables _sum/_count/_bucket generation
+        buckets: [0.05, 0.1, 0.25, 0.5, 1, 2.5, 5, 10]
+---
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: kubedash-gunicorn-dashboard
+  labels:
+    grafana_dashboard: "1"
+    app: kubedash
+    {{ include "kubedash.labels" . | nindent 4 }}
+{{- with .Values.metrics.serviceMonitor.labels  }}
+{{ toYaml . | indent 4 }}
+{{- end }}
+data:
+  gunicorn-monitoring.json: |
+    {{- .Files.Get "files/gunicorn-monitoring.json" | nindent 4 }}
+---
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: kubedash-flask-dashboard
+  labels:
+    grafana_dashboard: "1"
+    app: kubedash
+    {{ include "kubedash.labels" . | nindent 4 }}
+{{- with .Values.metrics.serviceMonitor.labels  }}
+{{ toYaml . | indent 4 }}
+{{- end }}
+data:
+  flask-web-app.json: |
+    {{- .Files.Get "files/flask-web-app.json" | nindent 4 }}
+{{ end }}

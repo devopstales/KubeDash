@@ -1,0 +1,187 @@
+    <div class="sidebar sidebar-dark sidebar-fixed border-end" id="sidebar">
+    <div class="sidebar-header border-bottom">
+        <div class="sidebar-brand">
+            <svg class="sidebar-brand-full" width="88" height="32" alt="CoreUI Logo">
+            <use xlink:href="{{ url_for('static',filename='/assets/brand/coreui.svg') }}#full"></use>
+            </svg>
+            <svg class="sidebar-brand-narrow" width="32" height="32" alt="CoreUI Logo">
+            <use xlink:href="{{ url_for('static',filename='/assets/brand/coreui.svg') }}#signet"></use>
+            </svg>
+        </div>
+        <button class="btn-close d-lg-none" type="button" data-coreui-dismiss="offcanvas" data-coreui-theme="dark" aria-label="Close" onclick="coreui.Sidebar.getInstance(document.querySelector(&quot;#sidebar&quot;)).toggle()"></button>
+        </div>
+        <ul class="sidebar-nav" data-coreui="navigation" data-simplebar="">
+
+            <!-- Dashboard -->
+            <li class="nav-group"><a class="nav-link nav-group-toggle" href="#">
+                <svg class="nav-icon">
+                    <use xlink:href="{{ url_for('static',filename='/vendor/@coreui/icons/svg/free.svg') }}#cil-speedometer"></use>
+                </svg> Dashboard </a>
+                <ul class="nav-group-items compact">
+                    <li class="nav-item"><a class="nav-link" href="/dashboard/cluster-metric"> Cluster Metrics</a></li>
+                    <li class="nav-item"><a class="nav-link" href="/dashboard/workload-map"> Workload <span class="badge text-bg-sm bg-warning ms-auto">Beta</span></a></li>
+                </ul>
+            </li>
+
+            <!-- Divider -->
+            <div class="border-top d-none d-md-flex"></div>
+
+            <!-- Heading -->
+            <li class="nav-title">Permissions</li>
+            <!-- User Management Collapse Menu -->
+            <li class="nav-group"><a class="nav-link nav-group-toggle" href="#">
+                <svg class="nav-icon">
+                    <use xlink:href="{{ url_for('static',filename='/vendor/@coreui/icons/svg/free.svg') }}#cil-user"></use>
+                </svg> User Management </a>
+                <ul class="nav-group-items compact">
+                    <li class="nav-item"><a class="nav-link" href="/user/list"> Users </a></li>
+                    <li class="nav-item"><a class="nav-link" href="/user/group"> Groups </a></li>
+                </ul>
+            </li>
+            <li class="nav-group"><a class="nav-link nav-group-toggle" href="#">
+                <svg class="nav-icon">
+                    <use xlink:href="{{ url_for('static',filename='/vendor/@coreui/icons/svg/free.svg') }}#cil-group"></use>
+                </svg> Cluster Permissions </a>
+                <ul class="nav-group-items compact">
+                    <li class="nav-item"><a class="nav-link" href="/cluster-permission/service-account"> ServiceAccounts </a></li>
+                    <li class="nav-item"><a class="nav-link" href="/cluster-permission/role"> Roles </a></li>
+                    <li class="nav-item"><a class="nav-link" href="/cluster-permission/role-binding">RoleBindings</a></li>
+                    <li class="nav-item"><a class="nav-link" href="/cluster-permission/cluster-role">ClusterRoles</a></li>
+                    <li class="nav-item"><a class="nav-link" href="/cluster-permission/cluster-role-binding">ClusterRoleBindings</a></li>
+                </ul>
+            </li>
+
+            <!-- Divider -->
+            <div class="border-top d-none d-md-flex"></div>
+
+            <!-- Heading -->
+            <li class="nav-title">Interface</li>
+            <!-- Cluster Collapse Menu -->
+            <li class="nav-group"><a class="nav-link nav-group-toggle" href="#">
+                <svg class="nav-icon">
+                    <use xlink:href="{{ url_for('static',filename='/vendor/@coreui/icons/svg/brand.svg') }}#cib-kubernetes"></use>
+                </svg> Cluster </a>
+                <ul class="nav-group-items compact">
+                    <li class="nav-item"><a class="nav-link" href="/cluster/namespace"> Namespaces </a></li>
+                    <li class="nav-item"><a class="nav-link" href="/cluster/node"> Nodes </a></li>
+                    <li class="nav-item"><a class="nav-link" href="/cluster/crd"> CRDs </a></li>
+                    <!-- <li class="nav-item"><a class="nav-link" href="/cluster/runetime-class"> Runetime Class </a></li> -->
+                </ul>
+            </li>
+        <!-- Workloads Collapse Menu -->
+            <li class="nav-group"><a class="nav-link nav-group-toggle" href="#">
+                <svg class="nav-icon" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 576 512">
+                    <path d="M290.8 48.6l78.4 29.7L288 109.5 206.8 78.3l78.4-29.7c1.8-.7 3.8-.7 5.7 0zM136 92.5l0 112.2c-1.3 .4-2.6 .8-3.9 1.3l-96 36.4C14.4 250.6 0 271.5 0 294.7L0 413.9c0 22.2 13.1 42.3 33.5 51.3l96 42.2c14.4 6.3 30.7 6.3 45.1 0L288 457.5l113.5 49.9c14.4 6.3 30.7 6.3 45.1 0l96-42.2c20.3-8.9 33.5-29.1 33.5-51.3l0-119.1c0-23.3-14.4-44.1-36.1-52.4l-96-36.4c-1.3-.5-2.6-.9-3.9-1.3l0-112.2c0-23.3-14.4-44.1-36.1-52.4l-96-36.4c-12.8-4.8-26.9-4.8-39.7 0l-96 36.4C150.4 48.4 136 69.3 136 92.5zM392 210.6l-82.4 31.2 0-89.2L392 121l0 89.6zM154.8 250.9l78.4 29.7L152 311.7 70.8 280.6l78.4-29.7c1.8-.7 3.8-.7 5.7 0zm18.8 204.4l0-100.5L256 323.2l0 95.9-82.4 36.2zM421.2 250.9c1.8-.7 3.8-.7 5.7 0l78.4 29.7L424 311.7l-81.2-31.1 78.4-29.7zM523.2 421.2l-77.6 34.1 0-100.5L528 323.2l0 90.7c0 3.2-1.9 6-4.8 7.3z"/>
+                </svg> Workloads </a>
+                <ul class="nav-group-items compact">
+                    <li class="nav-item"><a class="nav-link" href="/workload/pods"> Pods </a></li>
+                    <li class="nav-item"><a class="nav-link" href="/workload/deployments"> Deployments </a></li>
+                    <li class="nav-item"><a class="nav-link" href="/workload/statefulsets"> StatefulSets </a></li>
+                    <li class="nav-item"><a class="nav-link" href="/workload/daemonsets"> DaemonSets </a></li>
+                    <li class="nav-item"><a class="nav-link" href="/workload/replicasets"> ReplicaSets </a></li>
+                </ul>
+            </li>
+        <!-- Workloads Collapse Menu -->
+            <li class="nav-group"><a class="nav-link nav-group-toggle" href="#">
+                <svg class="nav-icon" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 576 512">
+                    <path d="M208 80c0-26.5 21.5-48 48-48l64 0c26.5 0 48 21.5 48 48l0 64c0 26.5-21.5 48-48 48l-8 0 0 40 152 0c30.9 0 56 25.1 56 56l0 32 8 0c26.5 0 48 21.5 48 48l0 64c0 26.5-21.5 48-48 48l-64 0c-26.5 0-48-21.5-48-48l0-64c0-26.5 21.5-48 48-48l8 0 0-32c0-4.4-3.6-8-8-8l-152 0 0 40 8 0c26.5 0 48 21.5 48 48l0 64c0 26.5-21.5 48-48 48l-64 0c-26.5 0-48-21.5-48-48l0-64c0-26.5 21.5-48 48-48l8 0 0-40-152 0c-4.4 0-8 3.6-8 8l0 32 8 0c26.5 0 48 21.5 48 48l0 64c0 26.5-21.5 48-48 48l-64 0c-26.5 0-48-21.5-48-48l0-64c0-26.5 21.5-48 48-48l8 0 0-32c0-30.9 25.1-56 56-56l152 0 0-40-8 0c-26.5 0-48-21.5-48-48l0-64z"/>
+                </svg> Network </a>
+                <ul class="nav-group-items compact">
+                    <li class="nav-item"><a class="nav-link" href="/network/service"> Services </a></li>
+                    <!-- endpoints -->
+                    <li class="nav-item"><a class="nav-link" href="/network/ingress"> Ingress </a></li>
+                    <li class="nav-item"><a class="nav-link" href="/network/ingress-class"> Ingress Class </a></li>
+                    <!-- Gateways -->
+                    <!-- Gateway classes -->
+                </ul>
+            </li>
+        <!-- Storage Collapse Menu -->
+            <li class="nav-group"><a class="nav-link nav-group-toggle" href="#">
+                <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 448 512" class="nav-icon">
+                    <path d="M448 80l0 48c0 44.2-100.3 80-224 80S0 172.2 0 128L0 80C0 35.8 100.3 0 224 0S448 35.8 448 80zM393.2 214.7c20.8-7.4 39.9-16.9 54.8-28.6L448 288c0 44.2-100.3 80-224 80S0 332.2 0 288L0 186.1c14.9 11.8 34 21.2 54.8 28.6C99.7 230.7 159.5 240 224 240s124.3-9.3 169.2-25.3zM0 346.1c14.9 11.8 34 21.2 54.8 28.6C99.7 390.7 159.5 400 224 400s124.3-9.3 169.2-25.3c20.8-7.4 39.9-16.9 54.8-28.6l0 85.9c0 44.2-100.3 80-224 80S0 476.2 0 432l0-85.9z"/>
+                </svg> Storage </a>
+                <ul class="nav-group-items compact">
+                    <li class="nav-item"><a class="nav-link" href="/storage/configmap"> ConfigMaps </a></li>
+                    <li class="nav-item"><a class="nav-link" href="/storage/pv"> Volumes </a></li>
+                    <li class="nav-item"><a class="nav-link" href="/storage/pvc"> VolumeClames </a></li>
+                    <li class="nav-item"><a class="nav-link" href="/storage/volumesnapshot"> VolumeSnapshot </a></li>
+                    <li class="nav-item"><a class="nav-link" href="/storage/storage-class"> StorageClass </a></li>
+                    <li class="nav-item"><a class="nav-link" href="/storage/snapshot-class"> SnapshotClass </a></li>
+                </ul>
+            </li>
+            <!-- Security Collapse Menu -->
+            <li class="nav-group"><a class="nav-link nav-group-toggle" href="#">
+                <svg class="nav-icon">
+                    <use xlink:href="{{ url_for('static',filename='/vendor/@coreui/icons/svg/free.svg') }}#cil-shield-alt"></use>
+                </svg> Security </a>
+                <ul class="nav-group-items compact">
+                    <li class="nav-item"><a class="nav-link" href="/security/secret"> Secrets </a></li>
+                    <li class="nav-item"><a class="nav-link" href="/security/network-policy"> Network Policies </a></li>
+                    <li class="nav-item"><a class="nav-link" href="/security/priorityclass"> Priority Classes </a></li>
+                </ul>
+            </li>
+        <!-- Other Resources Collapse Menu -->
+            <li class="nav-group"><a class="nav-link nav-group-toggle" href="#">
+                <svg class="nav-icon" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512">
+                    <path d="M495.9 166.6c3.2 8.7 .5 18.4-6.4 24.6l-43.3 39.4c1.1 8.3 1.7 16.8 1.7 25.4s-.6 17.1-1.7 25.4l43.3 39.4c6.9 6.2 9.6 15.9 6.4 24.6c-4.4 11.9-9.7 23.3-15.8 34.3l-4.7 8.1c-6.6 11-14 21.4-22.1 31.2c-5.9 7.2-15.7 9.6-24.5 6.8l-55.7-17.7c-13.4 10.3-28.2 18.9-44 25.4l-12.5 57.1c-2 9.1-9 16.3-18.2 17.8c-13.8 2.3-28 3.5-42.5 3.5s-28.7-1.2-42.5-3.5c-9.2-1.5-16.2-8.7-18.2-17.8l-12.5-57.1c-15.8-6.5-30.6-15.1-44-25.4L83.1 425.9c-8.8 2.8-18.6 .3-24.5-6.8c-8.1-9.8-15.5-20.2-22.1-31.2l-4.7-8.1c-6.1-11-11.4-22.4-15.8-34.3c-3.2-8.7-.5-18.4 6.4-24.6l43.3-39.4C64.6 273.1 64 264.6 64 256s.6-17.1 1.7-25.4L22.4 191.2c-6.9-6.2-9.6-15.9-6.4-24.6c4.4-11.9 9.7-23.3 15.8-34.3l4.7-8.1c6.6-11 14-21.4 22.1-31.2c5.9-7.2 15.7-9.6 24.5-6.8l55.7 17.7c13.4-10.3 28.2-18.9 44-25.4l12.5-57.1c2-9.1 9-16.3 18.2-17.8C227.3 1.2 241.5 0 256 0s28.7 1.2 42.5 3.5c9.2 1.5 16.2 8.7 18.2 17.8l12.5 57.1c15.8 6.5 30.6 15.1 44 25.4l55.7-17.7c8.8-2.8 18.6-.3 24.5 6.8c8.1 9.8 15.5 20.2 22.1 31.2l4.7 8.1c6.1 11 11.4 22.4 15.8 34.3zM256 336a80 80 0 1 0 0-160 80 80 0 1 0 0 160z"/>
+                </svg> Other Resources </a>
+                <ul class="nav-group-items compact">
+                    <li class="nav-item"><a class="nav-link" href="/other-resource/horizontal-pod-autoscaler"> HPAs </a></li>
+                    <li class="nav-item"><a class="nav-link" href="/other-resource/vertical-pod-autoscaler"> VPAs </a></li>
+                    <li class="nav-item"><a class="nav-link" href="/other-resource/pod-disruption-budget"> Pod Disruption Budget </a></li>
+                    <li class="nav-item"><a class="nav-link" href="/other-resource/resource-quota"> Resource Quota </a></li>
+                    <li class="nav-item"><a class="nav-link" href="/other-resource/limit-range"> Limit Range </a></li>
+                </ul>
+            </li>
+            
+            {% if session['user_role'] == "Admin" %}
+            <!-- Settings Collapse Menu -->
+            <li class="nav-group"><a class="nav-link nav-group-toggle" href="#">
+                <svg class="nav-icon" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512">
+                    <path d="M0 416c0 17.7 14.3 32 32 32l54.7 0c12.3 28.3 40.5 48 73.3 48s61-19.7 73.3-48L480 448c17.7 0 32-14.3 32-32s-14.3-32-32-32l-246.7 0c-12.3-28.3-40.5-48-73.3-48s-61 19.7-73.3 48L32 384c-17.7 0-32 14.3-32 32zm128 0a32 32 0 1 1 64 0 32 32 0 1 1 -64 0zM320 256a32 32 0 1 1 64 0 32 32 0 1 1 -64 0zm32-80c-32.8 0-61 19.7-73.3 48L32 224c-17.7 0-32 14.3-32 32s14.3 32 32 32l246.7 0c12.3 28.3 40.5 48 73.3 48s61-19.7 73.3-48l54.7 0c17.7 0 32-14.3 32-32s-14.3-32-32-32l-54.7 0c-12.3-28.3-40.5-48-73.3-48zM192 128a32 32 0 1 1 0-64 32 32 0 1 1 0 64zm73.3-64C253 35.7 224.8 16 192 16s-61 19.7-73.3 48L32 64C14.3 64 0 78.3 0 96s14.3 32 32 32l86.7 0c12.3 28.3 40.5 48 73.3 48s61-19.7 73.3-48L480 128c17.7 0 32-14.3 32-32s-14.3-32-32-32L265.3 64z"/>
+                </svg> Settings </a>
+                <ul class="nav-group-items compact">
+                    <li class="nav-item"><a class="nav-link" href="/settings/sso-config"> Auth Provider </a></li>
+                    <li class="nav-item"><a class="nav-link" href="/settings/cluster-config"> Cluster Configuration </a></li>
+                </ul>
+            </li>
+            {% endif %}
+
+            <!-- Divider -->
+            <div class="border-top d-none d-md-flex"></div>
+
+        <!-- Plugins -->
+            <li class="nav-group"><a class="nav-link nav-group-toggle" href="#">
+                <svg class="nav-icon" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512">
+                    <path d="M176 88l0 40 160 0 0-40c0-4.4-3.6-8-8-8L184 80c-4.4 0-8 3.6-8 8zm-48 40l0-40c0-30.9 25.1-56 56-56l144 0c30.9 0 56 25.1 56 56l0 40 28.1 0c12.7 0 24.9 5.1 33.9 14.1l51.9 51.9c9 9 14.1 21.2 14.1 33.9l0 92.1-128 0 0-32c0-17.7-14.3-32-32-32s-32 14.3-32 32l0 32-128 0 0-32c0-17.7-14.3-32-32-32s-32 14.3-32 32l0 32L0 320l0-92.1c0-12.7 5.1-24.9 14.1-33.9l51.9-51.9c9-9 21.2-14.1 33.9-14.1l28.1 0zM0 416l0-64 128 0c0 17.7 14.3 32 32 32s32-14.3 32-32l128 0c0 17.7 14.3 32 32 32s32-14.3 32-32l128 0 0 64c0 35.3-28.7 64-64 64L64 480c-35.3 0-64-28.7-64-64z"/>
+                </svg> Plugins </a>
+                <ul class="nav-group-items compact">
+                {% if config.plugins["registry"] %}
+                    <li class="nav-item"><a class="nav-link" href="/plugins/registry"> OCI Registry </a></li>
+                {% endif %}
+                {% if config.plugins["helm"] %}
+                    <li class="nav-item"><a class="nav-link" href="/plugins/helm-chart"> Helm Charts </a></li>
+                {% endif %}
+                {% if config.plugins["flux"] %}
+                    <li class="nav-item"><a class="nav-link" href="/plugins/flux"> Flux CD <span class="badge text-bg-sm bg-warning ms-auto">Beta</span></a></li>
+                {% endif %}
+                {% if config.plugins["cert_manager"] %}
+                    <li class="nav-item"><a class="nav-link" href="/plugins/cert-manager"> Cert-Manager <span class="badge text-bg-sm bg-warning ms-auto">Beta</span></a></li>
+                {% endif %}
+                {% if config.plugins["external_loadbalancer"] %}
+                    <li class="nav-item"><a class="nav-link" href="/plugins/external-loadbalancer"> LoadBalancers <span class="badge text-bg-sm bg-warning ms-auto">Beta</span></a></li>
+                {% endif %}
+                </ul>
+            </li>
+
+            <!-- Divider -->
+            <div class="border-top d-none d-md-flex"></div>
+
+
+        </ul>
+        <!-- Divider -->
+        <div class="sidebar-footer border-top d-none d-md-flex">
+            <!-- Sidebar Toggler (Sidebar) -->
+            <button class="sidebar-toggler" type="button" data-coreui-toggle="unfoldable"></button>
+    </div>
+    </div>

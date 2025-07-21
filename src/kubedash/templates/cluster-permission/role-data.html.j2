@@ -1,0 +1,90 @@
+{% extends "base2.html.j2" %}
+
+{% block topmenu %}
+<ul class="header-nav d-lg-flex m-3">
+    <div class="container-fluid px-4">
+      <nav aria-label="breadcrumb">
+        <ol class="breadcrumb my-0">
+          <li class="breadcrumb-item"><span>Cluster Permissions</span></li>
+          <li class="breadcrumb-item "><a href="/cluster-permission/role">Roles</a></li>
+          <li class="breadcrumb-item active"><span>{{ r_name }}</span></li>
+        </ol>
+      </nav>
+    </div>
+</ul>
+<ul class="header-nav ms-auto"></ul>
+<ul class="header-nav d-lg-flex">
+{% include "segments/topmenu.html.j2" %}
+{% endblock %}
+
+{% block content %}
+<div class="card shadow mb-4">
+    <div class="card-header py-3">
+        <h6 class="m-0 font-weight-bold text-primary">Rule List</h6>
+    </div>
+    <div class="card-body">
+        <div class="table-responsive">
+            <table class="table table-bordered" id="dataTable" width="100%" cellspacing="0">
+                <thead>
+                    <tr>
+                        <th>API Groups</th>
+                        <th>Non Resources</th>
+                        <th>Resources</th>
+                        <th>Verbs</th>
+                    </tr>
+                </thead>
+                <tbody>
+                {% for r in roles %}
+                {% if r_name == r.name %}
+                {% for rules in r.rules %}
+                    <tr>
+                        <td>
+                            {% if rules.api_groups %}
+                            {% for ag in rules.api_groups %}
+                                {{ ag }}{% if not loop.last %}<br>{% endif %}
+                            {% endfor %}
+                            {% else %}
+                                {{ rules.api_groups }}
+                            {% endif %}
+                        </td>
+                        <td>
+                            {% if rules.resource_names %}
+                            {% for rn in rules.resource_names %}
+                                {{ rn }}{% if not loop.last %}<br>{% endif %}
+                            {% endfor %}
+                            {% else %}
+                                {{ rules.resource_names }}
+                            {% endif %}
+                        </td>
+                        <td>
+                            {% if rules.resources %}
+                            {% for r in rules.resources %}
+                                {{ r }}{% if not loop.last %}<br>{% endif %}
+                            {% endfor %}
+                            {% else %}
+                                {{ rules.resources }}
+                            {% endif %}
+                        </td>
+                        <td>
+                            {% if rules.verbs %}
+                            {% for v in rules.verbs %}
+                                {{ v }}{% if not loop.last %}<br>{% endif %}
+                            {% endfor %}
+                            {% else %}
+                                {{ rules.verbs }}
+                            {% endif %}
+                        </td>
+                    </tr>
+                {% endfor %}
+                {% endif %}
+                {% endfor %}  
+                </tbody>
+            </table>
+        </div>
+    </div>
+</div>
+{% endblock %}
+
+{% block add_head_css %}
+{% include "segments/datatable_snipet.html.j2" %}
+{% endblock %}

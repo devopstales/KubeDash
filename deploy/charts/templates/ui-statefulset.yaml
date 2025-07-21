@@ -1,0 +1,128 @@
+apiVersion: apps/v1
+kind: StatefulSet
+metadata:
+  name: {{ include "kubedash.fullname" . }}-ui
+  labels:
+    app: kubedash
+    {{- include "kubedash.labels" . | nindent 4 }}
+    checksum/config: {{ include (print $.Template.BasePath "/ui-configmap.yaml") . | sha256sum | trunc 63 }}
+spec:
+  serviceName: {{ include "kubedash.fullname" . }}-headless
+  replicas: {{ .Values.replicas }}
+  selector:
+    matchLabels:
+      app: kubedash
+      {{- include "kubedash.selectorLabels" . | nindent 6 }}
+  template:
+    metadata:
+      labels:
+        app: kubedash
+        {{- include "kubedash.labels" . | nindent 8 }}
+        checksum/config: {{ include (print $.Template.BasePath "/ui-configmap.yaml") . | sha256sum | trunc 63 }}
+    spec:
+      {{- with .Values.imagePullSecrets }}
+      imagePullSecrets:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
+      serviceAccountName: {{ include "kubedash.serviceAccountName" . }}
+      securityContext:
+        {{- toYaml .Values.podSecurityContext | nindent 8 }}
+      containers:
+      - name: {{ .Chart.Name }}
+        image: "{{ .Values.image.repository }}:{{ .Values.image.tag | default .Chart.AppVersion }}"
+        imagePullPolicy: {{ .Values.image.pullPolicy }}
+        securityContext:
+          {{- toYaml .Values.containerSecurityContext | nindent 10 }}
+        env:
+          - name: TZ
+            value: {{ .Values.TimeZone }}
+          - name: FLASK_CONFIG
+            value: "{{ .Values.flaskConfig }}"
+          {{- if or (eq .Values.logLevel "DEBUG") (eq .Values.logLevel "HIGH") }}
+          - name: VERBOSE_LOG
+            value: "True"
+          {{- end }}
+        livenessProbe:
+          httpGet:
+            path: /api/health/live
+            port: 8000
+          initialDelaySeconds: 5
+          timeoutSeconds: 1
+        readinessProbe:
+          httpGet:
+            path: /api/health/ready
+            port: 8000
+          initialDelaySeconds: 5
+          timeoutSeconds: 1
+        ports:
+        - containerPort: 8000
+          protocol: TCP
+          name: http
+        volumeMounts:
+{{- if and .Values.persistence.enabled (not .Values.externalDatabase.enabled) (not .Values.postgresql.enabled) }}
+        - name: cache
+          mountPath: "/code/kubedash/database"
+{{- end }}
+        - mountPath: /code/kubedash/kubedash.ini
+          name: kubedash-ini
+          subPath: kubedash.ini
+{{- if .Values.metrics.enabled }}
+      - name: statsd-exporter
+        image: "{{ .Values.image.statsdExporter.repository }}:{{ .Values.image.statsdExporter.tag }}"
+        imagePullPolicy: {{ .Values.image.pullPolicy }}
+        ports:
+          - containerPort: 9125
+            protocol: TCP
+            name: statsd-tcp
+          - containerPort: 9125
+            protocol: UDP
+            name: statsd-udp
+          - containerPort: 9102
+            protocol: TCP
+            name: http-monitoring
+        args:
+          - --statsd.mapping-config=/statsd/statsd.conf
+        volumeMounts:
+          - mountPath: /statsd/statsd.conf
+            name: statsd-config
+            subPath: statsd.conf
+{{- end }}
+      volumes:
+{{- if and .Values.persistence.enabled (not .Values.externalDatabase.enabled) (not .Values.postgresql.enabled) }}
+      - name: cache
+        persistentVolumeClaim:
+          claimName: {{ include "kubedash.fullname" . }}-db
+{{- end }}
+      - configMap:
+          defaultMode: 420
+          name: {{ include "kubedash.fullname" . }}-kubedash-ini
+        name: kubedash-ini
+{{- if .Values.metrics.enabled }}
+      - configMap:
+          defaultMode: 420
+          name: {{ include "kubedash.fullname" . }}-statsd-config
+        name: statsd-config
+{{- end }}
+{{- with .Values.nodeSelector }}
+      nodeSelector:
+        {{- . | toYaml | nindent 8 }}
+{{- end }}
+{{- with .Values.affinity }}
+      affinity:
+        {{- . | toYaml | nindent 8 }}
+{{- end }}
+{{- with .Values.tolerations }}
+      tolerations:
+        {{- . | toYaml | nindent 8 }}
+{{- end }}
+  volumeClaimTemplates:
+{{- if and .Values.persistence.enabled (not .Values.externalDatabase.enabled) (not .Values.postgresql.enabled) }}
+  - metadata:
+      name: cache
+    spec:
+      accessModes: [ "ReadWriteOnce" ]
+      resources:
+        requests:
+          storage: {{ .Values.persistence.size }}
+      storageClassName: {{ .Values.persistence.storageClass | default "standard" }}
+{{- end }}

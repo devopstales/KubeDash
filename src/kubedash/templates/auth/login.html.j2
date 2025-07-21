@@ -1,0 +1,65 @@
+{# extend base layout #}
+{% extends "base.html.j2" %}
+
+{% block content %}
+<div class="bg-primary min-vh-100 d-flex flex-row align-items-center">
+  <div class="container">
+    <div class="row justify-content-center">
+      <div class="col-lg-8">
+        <div class="card-group d-block d-md-flex row">
+
+        <!-- Flask Messages -->
+        {% if get_flashed_messages() %}
+        {% for category, message in get_flashed_messages(with_categories=true) %}
+        <div id="flashMessage" class="alert alert-{{category}} alert-dismissible fade show" role="alert">
+          {{ message }}
+          <button type="button" class="btn-close" data-coreui-dismiss="alert" aria-label="Close"></button>
+        </div>
+        {% endfor %}
+        {% endif %}
+
+          
+          <div class="card col-md-4 p-4 mb-0">
+            <div class="card-body">
+              <h1>Login</h1>
+              <p class="text-body-secondary">Sign In to your account</p>
+
+              <form class="user" method="POST" name="login">
+                <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+                <div class="input-group mb-3"><span class="input-group-text">
+                    <svg class="icon">
+                      <use xlink:href="{{ url_for('static',filename='/vendor/@coreui/icons/svg/free.svg') }}#cil-user"></use>
+                    </svg></span>
+                    <input type="text" placeholder="Username" class="form-control form-control-user" id="floatingInput" name="username" value="{{request.form.username }}">
+
+                </div>
+                <div class="input-group mb-4"><span class="input-group-text">
+                    <svg class="icon">
+                      <use xlink:href="{{ url_for('static',filename='/vendor/@coreui/icons/svg/free.svg') }}#cil-lock-locked"></use>
+                    </svg></span>
+                    <input type="password" placeholder="Password" class="form-control form-control-user" id="floatingPassword" name="password" value="{{request.form.password }}">
+                </div>
+                <div class="row">
+                  <div class="col-6">
+                    <button class="btn btn-primary px-4" type="submit">Login</button>
+                  </div>
+                </div>
+                {% if sso_enabled %}
+                <hr>
+                <a class="w-100 btn btn-primary btn-user btn-block" href="{{auth_url}}" role="button">Login With SSO</a>
+                {% endif %}
+              </form>
+            </div>
+          </div>
+
+          <div class="col-lg-6 d-none d-lg-block bg-login-image"></div>
+          
+        <!--
+          <div class="card col-md-5 text-white bg-primary py-5"></div>
+        -->
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+{% endblock %}

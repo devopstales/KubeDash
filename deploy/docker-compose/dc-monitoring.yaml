@@ -2,6 +2,7 @@ version: "3"
 services:
 
   grafana:
+    container_name: kubedash-grafana
     image: grafana/grafana:9.4.3
     volumes:
       - ./config/grafana-datasources.yaml:/etc/grafana/provisioning/datasources/datasources.yaml
@@ -14,6 +15,7 @@ services:
       - "3000:3000"
 
   jaeger:
+    container_name: kubedash-jaeger
     image: jaegertracing/all-in-one:latest
     ports:
       - "16686:16686"  # jaeger-query
@@ -27,6 +29,7 @@ services:
       - PROMETHEUS_SERVER_URL=http://prometheus:9090
 
   prometheus:
+    container_name: kubedash-prometheus
     image: prom/prometheus:latest
     command:
       - --config.file=/etc/prometheus.yaml

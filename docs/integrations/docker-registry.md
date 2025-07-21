@@ -73,7 +73,7 @@ If your Registry supports sending webhook notifications in response to events ha
 notifications:
   endpoints:
     - name: kubedash
-      url: https://kubedash.mydomain.intra/registry/events
+      url: https://kubedash.mydomain.intra/plugins/registry/events
       timeout: 1s
       threshold: 5
       backoff: 10s
@@ -90,6 +90,13 @@ notifications:
 ![Registry](../img/KubeDash_2.0_registry_pic_07.png)
 
 ![Registry](../img/KubeDash_2.0_registry_pic_08.png)
+
+## Image Lableing
+
+The Doker registry UI can show stander docker labels based on common standards:
+
+* https://specs.opencontainers.org/image-spec/annotations/
+* http://label-schema.org/rc1/
 
 ## OCI Helm Charts
 

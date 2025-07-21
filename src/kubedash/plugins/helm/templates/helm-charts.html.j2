@@ -1,0 +1,89 @@
+{% extends "base2.html.j2" %}
+
+{% block topmenu %}
+<ul class="header-nav d-lg-flex m-3">
+    <div class="container-fluid px-4">
+      <nav aria-label="breadcrumb">
+        <ol class="breadcrumb my-0">
+          <li class="breadcrumb-item"><span>Plugins</span></li>
+          <li class="breadcrumb-item active"><span>Helm Charts</span></li>
+        </ol>
+      </nav>
+    </div>
+</ul>
+<ul class="header-nav ms-auto"></ul>
+<ul class="header-nav d-lg-flex">
+{% include "segments/topmenu.html.j2" %}
+{% endblock %}
+
+{% block content %}
+<div class="card shadow mb-4">
+  <div class="card-header">
+    <h6 class="m-0 font-weight-bold text-primary">Helm Charts</h6>
+  </div>
+  <div class="card-body">
+    <div class="table-responsive">
+      <table class="table table-bordered" id="dataTable" width="100%" cellspacing="0">
+        <thead>
+          <tr>
+            <th>Icon</th>
+            <th>Release</th>
+            <th>Status</th>
+            <th>Chart</th>
+            <th>App Version</th>
+            <th>Revision</th>
+            <th>Updated</th>
+          </tr>
+        </thead>
+        {% if has_chart %}
+        <tbody>
+          {% for name, release in chart_list.items() %}
+          {% for rd in release %}
+          {% if loop.last %}
+          {% if selected == name %}
+            <tr class="selected" >
+          {% else %}
+            <tr>
+          {% endif %}
+            {% if rd.icon and rd.icon|check_url_exists %}
+            <td><img src="{{ rd.icon }}" width="50" height="50"> </td>
+            {% else %}
+            <td><img src="/img/helm-icon-color.svg" width="50" height="50"> </td>
+            {% endif %}
+            <td>
+              <form action="/plugins/helm-charts/data" method="POST">
+                <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+                <input type="hidden" name="ns_select" value="{{ session['ns_select'] }}" />
+                <input type="hidden" name="selected" value="{{ name }}" />
+                <a href="javascript:;" onclick="parentNode.submit();">{{ name }}</a>
+              </form>
+            </td>
+            <td>
+              {% if rd.status == "deployed" %}
+                <span class="badge text-bg-tag text-bg-success">{{ rd.status }}</span>
+              {% else %}
+                <span class="badge text-bg-tag text-bg-danger">{{ rd.status }}</span>
+              {% endif %}
+            </td>
+            <td>{{ rd.chart_name }}-{{ rd.chart_version }}</td>
+            <td>{{ rd.app_version }}</td>
+            <td>{{ rd.revision }}</td>
+            <td>{{ rd.updated }}</td>
+          </tr>
+          {% endif %}
+          {% endfor %}
+          {% endfor %}
+        </tbody>
+        {% else %}
+        <tbody>
+        </tbody>
+        {% endif %}
+      </table>
+    </div>
+  </div>
+</div>
+{% endblock %}
+
+{% block add_head_css %}
+{% include "segments/datatable_snipet.html.j2" %}
+{% endblock %}

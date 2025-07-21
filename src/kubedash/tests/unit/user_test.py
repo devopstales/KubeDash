@@ -1,7 +1,9 @@
 
 import pytest
-from lib_functions.user import UserCreate, User, UsersRoles, Role
 from werkzeug.security import check_password_hash
+
+from lib.user import Role, User, UserCreate, UsersRoles
+
 
 @pytest.mark.order("first")
 def test_user_creation(client):

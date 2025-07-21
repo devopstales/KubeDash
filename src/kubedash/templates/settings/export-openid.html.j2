@@ -1,0 +1,140 @@
+<h2 class="text-center my-4" >Welcome {{ preferred_username }}</h2>
+<h3 class="text-center my-4" >In order to get command-line acces to the {{ context }} Kubernetes cluster, you will need to configure OpenID Connect (OIDC) authentication for your kubectl client.</h3>
+
+<ul class="nav nav-tabs mb-4 mx-5">
+  <li class="nav-item">
+    <a class="nav-link active" href="#DownloadKubeconfig">Download Kubeconfig</a>
+  </li>
+  <li class="nav-item">
+    <a class="nav-link" href="#DownloadKubectl">Download Kubectl</a>
+  </li>
+  <li class="nav-item">
+    <a class="nav-link" href="#KubectlPlugin">Kubectl Plugin</a>
+  </li>
+  <li class="nav-item"></li>
+    <a class="nav-link" href="#lAdvanced">Manual Config</a>
+  </li>
+  <li class="nav-item"></li>
+    <a class="nav-link" href="#RunningKubectl">User kubectl</a>
+  </li>
+</ul>
+
+<div data-spy="scroll" data-bs-target="#list" data-offset="0" class="scrollspy"></div>
+
+<div class="card mb-4 mx-5">
+  <div class="card-header py-3">
+    <h5 class="m-0 font-weight-bold text-primary" id="DownloadKubeconfig">Download Kubeconfig File</h5>
+  </div>
+  <div class="card-body">
+    <p class="card-text">If you didn't want to use the kubectl plugin, save this file as <code>~/.kube/config</code> to enable OIDC based <code>kubectl</code> authentication.</p>
+    <a href="/get-file" class="btn btn-primary">Download Config File</a>
+  </div>
+</div>
+
+<div class="card mb-4 mx-5">
+  <div class="card-header py-3">
+    <h5 class="m-0 font-weight-bold text-primary" id="DownloadKubectl">Download Kubectl</h5>
+  </div>
+
+  <div class="card-body">
+    <h5 class="card-title">Install as Kubectl</h5><pre><code># Install kubectl binary with curl on Linux
+curl -LO "https://dl.k8s.io/release/$(curl -L -s https://dl.k8s.io/release/stable.txt)/bin/linux/amd64/kubectl"
+chmod +x ./kubectl
+sudo mv ./kubectl /usr/local/bin/kubectl
+ 
+# Install kubectl binary with curl on macOS
+curl -LO "https://dl.k8s.io/release/$(curl -L -s https://dl.k8s.io/release/stable.txt)/bin/darwin/amd64/kubectl"
+chmod +x ./kubectl
+sudo mv ./kubectl /usr/local/bin/kubectl
+ 
+# Install kubectl on Windows 
+curl.exe -LO "https://dl.k8s.io/release/$(curl.exe -L -s https://dl.k8s.io/release/stable.txt)/bin/windows/amd64/kubectl.exe"</code></pre>
+  </div>
+</div>
+
+<div class="card mb-4 mx-5">
+  <div class="card-header py-3">
+    <h5 class="m-0 font-weight-bold text-primary" id="KubectlPlugin">Kubectl Plugin</h5>
+  </div>
+
+  <div class="card-body">
+    <h5 class="card-title">Install as Kubectl plugin.</h5><pre><code># Homebrew (macOS and Linux)
+brew tap devopstales/devopstales
+brew install devopstales/devopstales/kubectl-login
+
+# My krew repo (macOS, Linux, Windows and ARM)
+kubectl krew index add devopstales https://github.com/devopstales/krew
+kubectl krew install devopstales/kdlogin
+
+# Binary release (Windows, macOS and Linux)
+https://github.com/devopstales/kubedash/releases</code></pre>
+    <h5 class="card-title">Use the plugin.</h5>
+    <pre><code class="bash">$ kubectl kdlogin {{ base_uri }}/
+Configfile created with config for productioncluster to ~/.kube/config
+Happy Kubernetes interaction!</code></pre>
+  </div>
+</div>
+
+<div class="card mx-5 mb-5">
+  <div class="card-header py-3">
+    <h5 class="m-0 font-weight-bold text-primary" id="lAdvanced">Authenticate Manually</h5>
+  </div>
+  <div class="card-body">
+    <p class="card-text">If you want to maintain your existing <code>~/.kube/config</code> file you can run the following commands to add your user to the file: </p>
+    <pre><code class="bash"># Create the k8s server ca pem
+echo "{{ k8s_server_ca }}
+" \ > ~/.kube/{{ context }}-server-ca.pem
+
+# Add your server to kubectl config
+kubectl config set-cluster {{ context }} \
+--server={{ k8s_server_url }} \
+--user={{ context }} \
+--certificate-authority={{ context }}-server-ca.pem \
+--embed-certs
+
+# Add your user to kubectl config
+kubectl config set-credentials "{{ context }}" \
+--auth-provider=oidc \
+--auth-provider-arg=client-id="{{ client_id }}" \
+--auth-provider-arg=client-secret="{{ client_secret }}" \
+--auth-provider-arg=id-token="{{ id_token }}" \
+--auth-provider-arg=refresh-token="{{ refresh_token }}" \
+{%- if oauth_server_ca %}
+--auth-provider-arg=idp-issuer-url="{{ oauth_server_uri }}" \
+--idp-certificate-authority-data="{{ oauth_server_ca }}"
+{%- else %}
+--auth-provider-arg=idp-issuer-url="{{ oauth_server_uri }}"
+{% endif %}
+
+# Associate your user with an existing cluster
+kubectl config set-context {{ context }} --cluster {{ context }} --user="{{ context }}"
+kubectl config use-context {{ context }}
+
+# Delete the certificate files
+rm -f {{ context }}-server-ca.pem</code></pre>
+  </div>
+</div>
+
+<div class="card mb-4 mx-5">
+  <div class="card-header py-3">
+    <h5 class="m-0 font-weight-bold text-primary" id="RunningKubectl">Running kubectl</h5>
+  </div>
+  <div class="card-body">
+    <p class="card-text">Once you get the <code>~/.kube/config</code> file you should be able to run <code>kubectl</code>: </p>
+    <pre><code class="bash"># These are examples. Your context and cluster names will likely differ.
+
+$ kubectl config get-contexts
+CURRENT   NAME       CLUSTER            AUTHINFO   NAMESPACE
+      k8s        k8s                k8s        
+      microk8s   microk8s-cluster   admin      
+
+$ kubectl --context k8s get namespaces
+NAME          STATUS    AGE
+default       Active    83d
+experimental  Active    15d
+
+$ kubectl --context k8s -n experimental get pods
+NAME                                       READY     STATUS             RESTARTS   AGE
+testapp-4074452424-06m0b                   1/1       Running            1          6d</code></pre>
+  </div>
+</div>

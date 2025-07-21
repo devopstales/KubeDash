@@ -1,0 +1,40 @@
+{{- if .Values.redis.enabled }}
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: {{ include "kubedash.fullname" . }}-redis-ui
+  labels:
+    app: "redis-ui"
+    {{- include "kubedash.labels" . | nindent 4 }}
+spec:
+  replicas: {{ .Values.replicas }}
+  selector:
+    matchLabels:
+      app: "redis-ui"
+      {{- include "kubedash.labels" . | nindent 6 }}
+  template:
+    metadata:
+      labels:
+        app: "redis-ui"
+        {{- include "kubedash.labels" . | nindent 8 }}
+    spec:
+      containers:
+        - name: p3x-redis-ui
+          image: "{{ .Values.redisui.image.repository }}:{{ .Values.redisui.image.tag }}"
+          imagePullPolicy: {{ .Values.redisui.image.pullPolicy }}
+          ports:
+            - name: http
+              containerPort: 7843
+          {{- with .Values.redisui.resources }}
+          resources:
+            {{- toYaml . | nindent 12 }}
+          {{- end }}
+          volumeMounts:
+            - name: p3x-redis-ui-settings
+              mountPath: /settings/.p3xrs-conns.json
+              subPath: .p3xrs-conns.json
+      volumes:
+        - name: p3x-redis-ui-settings
+          configMap:
+            name: {{ include "kubedash.fullname" . }}-redis-ui
+{{- end }}

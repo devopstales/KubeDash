@@ -1,0 +1,427 @@
+{% extends "base2.html.j2" %}
+
+{% block topmenu %}
+<ul class="header-nav d-lg-flex m-3">
+    <div class="container-fluid px-4">
+      <nav aria-label="breadcrumb">
+        <ol class="breadcrumb my-0">
+          <li class="breadcrumb-item"><span>Plugins</span></li>
+          <li class="breadcrumb-item"><a href="/plugins/registry">Registry</a></li>
+          <li class="breadcrumb-item"><a href="/plugins/registry/image/list">Images</a></li>
+          <li class="breadcrumb-item"><a href="/plugins/registry/image/tags">{{ image_name }}</a></li>
+          <li class="breadcrumb-item active"><span>{{ tag_name }}</span></li>
+        </ol>
+      </nav>
+    </div>
+</ul>
+<ul class="header-nav ms-auto"></ul>
+<ul class="header-nav d-lg-flex">
+{% include "segments/topmenu.html.j2" %}
+{% endblock %}
+
+{% block content %}
+<div class="card shadow mb-4">
+    <div class="card-header py-3">
+        <h6 class="m-0 font-weight-bold text-primary">Tag Data</h6>
+    </div>
+    <div class="card-body">
+        <ul class="nav nav-tabs" id="nav-tab" role="tablist">
+            <li class="nav-item">
+                <a class="nav-link active" id="nav-info-tab" data-bs-toggle="tab" href="#nav-info" role="tab" aria-controls="nav-info" aria-selected="true" data-bs-toggle="tab">Info</a>
+            </li>
+            <li class="nav-item">
+                <a class="nav-link" id="nav-configuration-tab" data-bs-toggle="tab" href="#nav-configuration" role="tab" aria-controls="nav-configuration" aria-selected="false" data-bs-toggle="tab">Configuration</a>
+            </li>
+            {% if tag_data.format == "Docker" or tag_data.media_type == "application/vnd.cncf.helm.config.v1+json" %}
+            <li class="nav-item">
+                <a class="nav-link" id="nav-metadata-tab" data-bs-toggle="tab" href="#nav-metadata" role="tab" aria-controls="nav-metadata" aria-selected="false" data-bs-toggle="tab">Metadata</a>
+            </li>
+            {% endif %}
+            {% if tag_data.vulnerabilities %}
+            <li class="nav-item">
+                <a class="nav-link" id="nav-vuln-tab" data-bs-toggle="tab" href="#nav-vuln" role="tab" aria-controls="nav-vuln" aria-selected="false" data-bs-toggle="tab">Vulnerabilities</a>
+            </li>
+            {% endif %}
+            {% if tag_events %}
+            <li class="nav-item">
+                <a class="nav-link" id="nav-events-tab" data-bs-toggle="tab" href="#nav-events" role="tab" aria-controls="nav-events" aria-selected="false" data-bs-toggle="tab">Events</a>
+            </li>
+            {% endif %}
+        </ul>
+        <div class="tab-content" id="nav-tabContent">
+            <div class="tab-pane fade show active" id="nav-info" role="tabpanel" aria-labelledby="nav-info-tab">
+                <div class="card shadow mb-4">
+                    <div class="card-body">
+                        <div class="table-responsive">
+                            <table class="table table-bordered" id="infoInfoTable" width="100%" cellspacing="0">
+                                <tr>
+                                    <th>Image:</th>
+                                    {% if tag_data.format == "Docker" %}
+                                    <td>{{ tag_data.registry | replace("https://","") | replace("http://","") | replace("www.","") }}/{{ image_name }}:{{ tag_name }}</td>
+                                    {% elif tag_data.format == "OCI" %}
+                                    <td>{{ tag_data.registry | replace("https://","oci://") | replace("http://","oci://") | replace("www.","oci://") }}/{{ image_name }}:{{ tag_name }}</td>
+                                    {% endif %}
+                                </tr>
+                                <tr>
+                                    <th>Digest:</th>
+                                    <td>{{ tag_data.digest }}</td>
+                                </tr>
+                                <tr>
+                                    <th>Signed</th>
+                                    <td>
+                                        {% if tag_data.signed %}
+                                            <span class="material-icons text-success">check_circle</span>
+
+                                        {% else %}
+                                            <span class="material-icons text-danger">cancel</span>
+                                        {% endif %}
+                                    </td>
+                                </tr>
+                                <tr>
+                                    <th>Format:</th>
+                                    <td>{{ tag_data.format }}</td>
+                                </tr>
+                                {% if tag_data.created %}
+                                <tr>
+                                    <th>Created:</th>
+                                    <td>{{ tag_data.created }}</td>
+                                </tr>
+                                {% endif %}
+                                {% if tag_data.architecture %}
+                                <tr>
+                                    <th>Architecture:</th>
+                                    <td>{{ tag_data.architecture }}</td>
+                                </tr>
+                                {% endif %}
+                                {% if tag_data.os %}
+                                <tr>
+                                    <th>Operation System:</th>
+                                    <td>{{ tag_data.os }}</td>
+                                </tr>
+                                {% endif %}
+                                {% if tag_data.docker_version %}
+                                <tr>
+                                    <th>Docker Version:</th>
+                                    <td>{{ tag_data.docker_version }}</td>
+                                </tr>
+                                {% endif %}
+                                <tr>
+                                    <th>Number of Layers:</th>
+                                    <td>{{ tag_data.layers }}</td>
+                                </tr>
+                            </table>
+                        </div>
+                    </div>
+                </div>
+            </div>
+            <!-- -->
+            <div class="tab-pane fade" id="nav-configuration" role="tabpanel" aria-labelledby="nav-configuration-tab">
+                <div id="accordion">
+                    <div class="card shadow mb-4">
+                        <div class="card-body">
+                            <h3>Image Configuration</h3>
+                            <div class="table-responsive">
+                                <table class="table table-bordered" id="infoInfoTable" width="100%" cellspacing="0">
+                                {% if tag_data.format == "OCI" %}
+                                    <tr>
+                                        <th>Media Type:</th>
+                                        <td>{{ tag_data.media_type }}</td>
+                                    </tr>
+                                    {% if tag_data.media_type == "application/vnd.aquasec.trivy.config.v1+json" %}
+                                    <tr>
+                                        <th>Trivy DB:</th>
+                                        <td>{{ tag_data.trivy_db }}</td>
+                                    </tr>
+                                    {% elif tag_data.media_type == "application/vnd.oci.image.config.v1+json" %}
+                                    <tr>
+                                        <th>Cosign Signature:</th>
+                                        <td>
+                                            <pre><code>{{ tag_data.cosign_signature }}</code></pre>
+                                        </td>
+
+                                    </tr>
+                                    <tr>
+                                        <th>Cosign Bundle:</th>
+                                        <td>
+                                            <pre><code>{{tag_data.cosign_bundle }}</code></pre>
+                                        </td>
+                                    </tr>
+                                    <tr>
+                                        <th>Cosign Certificate:</th>
+                                        <td>
+                                            <pre><code>{{ tag_data.cosign_certificate }}</code></pre>
+                                        </td>
+                                    </tr>
+                                    <tr>
+                                        <th>Cosign Chain:</th>
+                                        <td>
+                                            <pre><code>{{ tag_data.cosign_chain }}</code></pre>
+                                        </td>
+                                    </tr>
+                                    {% endif %}
+                                {% endif %}
+                                {% if tag_data.build_date %}
+                                    <tr>
+                                        <th>Build Date:</th>
+                                        <td>{{ tag_data.build_date }}</td>
+                                    </tr>
+                                {% endif %}
+                                {% if tag_data.vcs_url %}
+                                    <tr>
+                                        <th>VCS URL:</th>
+                                        <td><a href="{{ tag_data.vcs_url }}">{{ tag_data.vcs_url }}</a></td>
+                                    </tr>
+                                {% endif %}
+                                {% if tag_data.documentation %}
+                                    <tr>
+                                        <th>Documentation:</th>
+                                        <td><a href="{{ tag_data.documentation }}">{{ tag_data.documentation }}</a></td>
+                                    </tr>
+                                {% endif %}
+                                    <tr>
+                                        <th>Entrypoint</th>
+                                        <td>
+                                        {% if tag_data.entrypoint %}
+                                            {% for item in tag_data.entrypoint %}
+                                                {{ item }}{% if not loop.last %} {% endif %}
+                                            {% endfor %}
+                                        {% endif %}
+                                        </td>
+                                    </tr>
+                                    <tr>
+                                        <th>CMD</th>
+                                        <td>
+                                            {% for item in tag_data.cmd %}
+                                               {{ item }}{% if not loop.last %} {% endif %}
+                                            {% endfor %}
+                                        </td>
+                                    </tr>
+                                    <tr>
+                                        <th>ENV</th>
+                                        <td>
+                                            {% for item in tag_data.env %}
+                                                {{ item }}{% if not loop.last %}<br>{% endif %}
+                                            {% endfor %}
+                                        </td>
+                                    </tr>
+                                    {% if tag_data.labels %}
+                                    <tr>
+                                        <th>Labels</th>
+                                        <td>
+                                            {% for key, value in tag_data.labels.items() %}
+                                                {{ key }}={{ value }}{% if not loop.last %}<br>{% endif %}
+                                            {% endfor %}
+                                        </td>
+                                    </tr>
+                                    {% endif %}
+                                    <tr>
+                                        <th>WorkDir</th>
+                                        <td>{{ tag_data.working_dir }}</td>
+                                    </tr>
+                                    <tr>
+                                        <th>Volumes</th>
+                                        <td>
+                                        {% if tag_data.volumes %}
+                                            {% for item in tag_data.volumes %}
+                                                {{ item }}{% if not loop.last %}<br>{% endif %}
+                                            {% endfor %}
+                                        {% endif %}
+                                        </td>
+                                    </tr>
+                                    <tr>
+                                        <th>ExposedPorts</th>
+                                        <td>
+                                            {% for item in tag_data.exposed_ports %}
+                                                {{ item }}{% if not loop.last %}<br>{% endif %}
+                                            {% endfor %}
+                                        </td>
+                                    </tr>
+                                </table>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+            <!-- -->
+            <div class="tab-pane fade" id="nav-metadata" role="tabpanel" aria-labelledby="nav-metadata-tab">
+                <div id="accordion">
+                    <div class="card shadow mb-4">
+                        <div class="card-body">
+                            <h3>Image Metadata</h3>
+                            <div class="table-responsive">
+                                <table class="table table-bordered" id="infoInfoTable" width="100%" cellspacing="0">
+                                {% if tag_data.format == "Docker" %}
+                                    <tr>
+                                        <th>Maintainer</th>
+                                        <td>{{ tag_data.maintainer }}</td>
+                                    </tr>
+                                    {% if tag_data.authors %}
+                                    <tr>
+                                        <th>Authors</th>
+                                        <td>{{ tag_data.authors }}</td>
+                                    </tr>
+                                    {% endif %}
+                                    <tr>
+                                        <th>Licence</th>
+                                        <td>{{ tag_data.licenses }}</td>
+                                    </tr>
+                                    <tr>
+                                        <th>URL</th>
+                                        <td><a href="{{ tag_data.url }}">{{ tag_data.url }}</a></td>
+                                    </tr>
+                                    <tr>
+                                        <th>Documentation</th>
+                                        <td><a href="{{ tag_data.documentation }}">{{ tag_data.documentation }}</a></td>
+                                    </tr>
+                                    <tr>
+                                        <th>Source Code</th>
+                                        <td><a href="{{ tag_data.source_code }}">{{ tag_data.source_code }}</a></td>
+                                    </tr>
+                                    <tr>
+                                        <th>Commit Hash</th>
+                                        <td>{{ tag_data.source_code_version }}</td>
+                                    </tr>
+                                {% elif tag_data.media_type == "application/vnd.cncf.helm.config.v1+json" %}
+                                    {% if tag_data.maintainer %}
+                                    <tr>
+                                        <th>Maintainer</th>
+                                        <td>{{ tag_data.maintainer }}</td>
+                                    </tr>
+                                    {% endif %}
+                                    {% if tag_data.licenses %}
+                                    <tr>
+                                        <th>Licence</th>
+                                        <td>{{ tag_data.licenses }}</td>
+                                    </tr>
+                                    {% endif %}
+                                    {% if tag_data.url %}
+                                    <tr>
+                                        <th>URL</th>
+                                        <td><a href="{{ tag_data.url }}">{{ tag_data.url }}</a></td>
+                                    </tr>
+                                    {% endif %}
+                                    {% if tag_data.helm_name %}
+                                    <tr>
+                                        <th>Chart Name</th>
+                                        <td>{{ tag_data.helm_name }}</td>
+                                    </tr>
+                                    {% endif %}
+                                    {% if tag_data.helm_description %}
+                                    <tr>
+                                        <th>Chart Description</th>
+                                        <td>{{ tag_data.helm_description }}</td>
+                                    </tr>
+                                    {% endif %}
+                                    {% if tag_data.helm_version %}
+                                    <tr>
+                                        <th>Chart Version</th>
+                                        <td>{{ tag_data.helm_version }}</td>
+                                    </tr>
+                                    {% endif %}
+                                    {% if tag_data.helm_app_version %}
+                                    <tr>
+                                        <th>Chart App Version</th>
+                                        <td>{{ tag_data.helm_app_version }}</td>
+                                    </tr>
+                                    {% endif %}
+                                    {% if tag_data.helm_api_version %}
+                                    <tr>
+                                        <th>Chart API Version</th>
+                                        <td>{{ tag_data.helm_api_version }}</td>
+                                    </tr>
+                                    {% endif %}
+                                {% endif %}
+                                </table>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+            <!-- -->
+            <div class="tab-pane fade" id="nav-vuln" role="tabpanel" aria-labelledby="nav-vuln-tab">
+                <div id="accordion">
+                    <div class="card shadow mb-4">
+                        <div class="card-body">
+                            <h3>Image Vulnerabilities</h3>
+                            <div class="table-responsive">
+                                <table class="table table-bordered" id="infoInfoTable" width="100%" cellspacing="0">
+                                    <thead>
+                                        <tr>
+                                            <th>ID</th>
+                                            <th>Severity</th>
+                                            <th>Score</th>
+                                            <th>Package</th>
+                                            <th>Installed Version</th>
+                                            <th>Fixed Version</th>
+                                        </tr>
+                                    </thead>
+                                    <tbody>
+                                    {% for v in tag_data.vulnerabilities %}
+                                        <tr>
+                                            <td>
+                                                <a href="https://avd.aquasec.com/nvd/{{ v.vulnerabilityID | lower }}" rel="noopener noreferrer" target="_blank">{{ v.vulnerabilityID }}</a>
+                                            </td>
+                                            {% if v.severity == "CRITICAL" %}
+                                            <td><span class="badge text-bg-danger">{{ v.severity }}</span></td>
+                                            {% elif v.severity == "HIGH" %}
+                                            <td><span class="badge text-bg-warning">{{ v.severity }}</span></td>
+                                            {% elif v.severity == "MEDIUM" %}
+                                            <td><span class="badge text-bg-primary">{{ v.severity }}</span></td>
+                                            {% elif v.severity == "LOW" %}
+                                            <td><span class="badge text-bg-info">{{ v.severity }}</span></td>
+                                            {% else %}
+                                            <td><span class="badge text-bg-secondary">{{ v.severity }}</span></td>
+                                            {% endif %}
+                                            <td>{{ v.score }}</td>
+                                            <td>{{ v.resource }}</td>
+                                            <td>{{ v.installedVersion }}</td>
+                                            <td>{{ v.fixedVersion }}</td>
+                                        </tr>
+                                    {% endfor %}
+                                    </tbody>
+                                </table>
+                            </div>
+                        </div>
+                    </div>     
+                </div>
+            </div>
+            <!-- -->
+            <div class="tab-pane fade" id="nav-events" role="tabpanel" aria-labelledby="nav-events-tab">
+                <div id="accordion">
+                    <div class="card shadow mb-4">
+                        <div class="card-body">
+                            <h3>Event Log</h3>
+                            <div class="table-responsive">
+                                <table class="table table-bordered" id="infoInfoTable" width="100%" cellspacing="0">
+                                    <thead>
+                                        <tr>
+                                            <th>Action</th>
+                                            <th>IP Adress</th>
+                                            <th>User</th>
+                                            <th>Time</th>
+                                        </tr>
+                                    </thead>
+                                    <tbody>
+                                        {% for e in tag_events %}
+                                        <tr>
+                                            <td>{{ e.action }}</td>
+                                            <td>{{ e.ip }}</td>
+                                            <td>{{ e.user }}</td>
+                                            <td>{{ e.created }}</td>
+                                        </tr>
+                                        {% endfor %}
+                                    </tbody>
+                                </table>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}
+
+{% block add_head_css %}
+{% include "segments/datatable_snipet.html.j2" %}
+{% endblock %}

@@ -1,0 +1,168 @@
+{% extends "base2.html.j2" %}
+
+{% block add_head_css %}
+<link rel="stylesheet" href="{{ url_for('static',filename='/vendor/check-strength-password/password-strength.css') }}">
+{% endblock %}
+
+
+{% block topmenu %}
+<ul class="header-nav d-lg-flex m-3">
+    <div class="container-fluid px-4">
+      <nav aria-label="breadcrumb">
+        <ol class="breadcrumb my-0">
+          <li class="breadcrumb-item"><span>User</span></li>
+          <li class="breadcrumb-item active"><span>Info</span></li>
+        </ol>
+      </nav>
+    </div>
+</ul>
+<ul class="header-nav ms-auto"></ul>
+<ul class="header-nav d-lg-flex">
+    <div class="col">
+      <a class="card-link float-right" data-bs-toggle="collapse" href="#" onclick="unhideElementsById(['hiddenDIV','hiddenHR','hiddenFOOTER'])" id="addBTN">
+        <i class="material-icons">edit</i></a>
+    </div>
+{% include "segments/topmenu.html.j2" %}
+{% endblock %}
+
+{% block content %}
+<div class="card shadow mb-4">
+  <form action="" method="POST">
+        <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+        <div class="card-body">
+            <div class="container">
+                <div class="row justify-content-center">
+                    <div class="text-center">
+                        <img width="80" height="80" src="{{ url_for('static',filename='/assets/img/avatars/undraw_profile.svg') }}" class="rounded">
+                    </div>
+                </div>
+                <div class="row">
+                    <div class="col-sm">
+                        <div class="form-group">
+                            <label>Name:</label>
+                            <input class="form-control user" name="username" type="text" placeholder="{{ user.username }}" readonly>
+                        </div>
+                    </div>
+                    <div class="col-sm">
+                        <div class="form-group">
+                            <label>Email:</label>
+                            <input class="form-control user" name="email" type="text" placeholder="{{ user.email }}" readonly>
+                        </div>
+                    </div>
+                </div>
+                <div class="row">
+                    <div class="col-sm">
+                        <div class="form-group">
+                            <label>Role:</label>
+                            <input class="form-control user" name="role" type="text" placeholder="{{ user_role }}" readonly>
+                        </div>
+                    </div>
+                    <div class="col-sm">
+                        <div class="form-group">
+                            <label>Type:</label>
+                            <input class="form-control user" name="type" type="text" placeholder="{{ user.user_type }}" readonly>
+                        </div>
+                    </div>
+                </div>
+            </div>
+            <!-- hidden -->
+            <hr id="hiddenHR" hidden=true>
+            <div id="hiddenDIV" hidden=true class="container">
+                <div class="row">
+                    <div class="col-sm">
+                        <div class="form-group">
+                            <label>Current Password:</label>
+                            <div class="d-flex flex-row">
+                                <div>
+                                    <input class="form-control user" id="old_password" name="old_password" type="password" placeholder="Current Password" required>
+                                </div>
+                                <div class="p-2">
+                                        <button type="button" class="btn btn-just-icon btn-xs" onclick="showPasswords('old_password')">
+                                            <i id="old_password_icon" class="material-icons">visibility_off</i> 
+                                        </button>
+                                </div>
+                            </div>
+                            
+                        </div>
+                    </div>
+                    <div class="col-sm">
+                        <div class="form-group">
+                            <label>New Password:</label>
+                            <div class="d-flex flex-row">
+                                <div>
+                                    <input class="form-control user" id="new_password" name="new_password" type="password" placeholder="New Password" required>
+                                </div>
+                                <div class="p-2">
+                                        <button type="button" class="btn btn-just-icon btn-xs" onclick="showPasswords('new_password')">
+                                            <i id="new_password_icon" class="material-icons">visibility_off</i> 
+                                        </button>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+                <div class="row">
+                    <div class="col-sm">
+                        <p>To change your password, please enter your current password, your new password and confirmation of new password.</p>
+                        <ul class="pswd_info" id="passwordCriterion">
+                            <li data-criterion="length" class="invalid">8-15 <strong>Characters</strong></li>
+                            <li data-criterion="capital" class="invalid">At least <strong>one capital letter</strong></li>
+                            <li data-criterion="small" class="invalid">At least <strong>one small letter</strong></li>
+                            <li data-criterion="number" class="invalid">At least <strong>one number</strong></li>
+                            <li data-criterion="special" class="invalid">At least <strong>one Specail Characters </strong></li>
+                            <li data-criterion="difference" class="invalid">Old and New password <strong>shoud not be the same </strong></li>
+                            <li data-criterion="same" class="invalid">Password and Conformation <strong>shoud be the same </strong></li>
+                        </ul>
+                    </div>
+                    <div class="col-sm">
+                        <div class="form-group">
+                            <label>Confirm New Password:</label>
+                                <div class="d-flex flex-row">
+                                    <div>
+                                        <input class="form-control user" id="confirm_new_password" name="confirm_new_password" type="password" placeholder="Confirm New Password" required>
+                                    </div>
+                                    <div class="m-2">
+                                        <button type="button" class="btn btn-just-icon btn-xs" onclick="showPasswords('confirm_new_password')">
+                                            <i id="confirm_new_password_icon" class="material-icons">visibility_off</i> 
+                                        </button>
+                                    </div>
+                                </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+        <div id="hiddenFOOTER" class="modal-footer m-3" hidden=true>
+            <div class="form-group">
+                <button type="button" class="btn btn-secondary m-1" onclick="unhideElementsById(['hiddenDIV','hiddenHR','hiddenFOOTER'])">Close</button>
+                <button type="submit" class="btn btn-primary m-1" >Update Profile</button>
+            </div>
+        </div>
+    </form>
+</div>
+<!-- add content -->
+{% endblock %}
+
+{% block add_tail_js %}
+{% include "segments/functions_snipet.j2"%}
+
+    <!-- Core plugin JavaScript-->
+    <script src="{{ url_for('static',filename='/vendor/jquery-easing/jquery.easing.min.js') }}"></script>
+    
+    <!-- https://www.jqueryscript.net/form/check-strength-password.html -->
+    <script src="{{ url_for('static',filename='/vendor/check-strength-password/password-strength.js') }}"></script>
+
+    <script>
+        $('#new_password').keyup(function(event) {
+            var old_password = $('#old_password').val();
+            var new_password = $('#new_password').val();
+            checkPasswordStrength(old_password, new_password);
+        });
+
+        $('#confirm_new_password').keyup(function(event) {
+            var confirm_new_password = $('#confirm_new_password').val();
+            var new_password = $('#new_password').val();
+            checkPasswordConformation(new_password, confirm_new_password);
+        });
+    </script>
+{% endblock %}

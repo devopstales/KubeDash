@@ -1,0 +1,171 @@
+{% extends "base2.html.j2" %}
+
+{% block topmenu %}
+<ul class="header-nav d-lg-flex m-3">
+    <div class="container-fluid px-4">
+      <nav aria-label="breadcrumb">
+        <ol class="breadcrumb my-0">
+          <li class="breadcrumb-item"><span>Other Resources</span></li>
+          <li class="breadcrumb-item"><a href="/other-resource/horizontal-pod-autoscaler">HPAs</a></li>
+          <li class="breadcrumb-item active"><span>{{ hpa_data.name }}</span></li>
+        </ol>
+      </nav>
+    </div>
+</ul>
+<ul class="header-nav ms-auto"></ul>
+<ul class="header-nav d-lg-flex">
+{% include "segments/topmenu.html.j2" %}
+{% endblock %}
+
+{% block content %}
+<div class="card shadow mb-4">
+    <div class="card-header">
+        <h6 class="m-0 font-weight-bold text-primary">Horizontal Pod Autoscaler Data</h6>
+    </div>
+    <div class="card-body">
+        <div class="tab-content" id="nav-tabContent">
+            <!-- policy -->
+                <div class="card shadow mb-4">
+                    <div class="card-body">
+                        <div class="table-responsive">
+                            <table class="table table-bordered" id="policyInfoTable" width="100%" cellspacing="0">
+                                <tr>
+                                    <th>Name:</th>
+                                    <td>{{ hpa_data.name }}</td>
+                                </tr>
+                                <tr>
+                                    <th>Created:</th>
+                                    <td>{{ hpa_data.created }}</td>
+                                </tr>
+                                <tr>
+                                    <th>Namespace:</th>
+                                    <td>{{ hpa_data.namespace }}</td>
+                                </tr>
+                                <tr>
+                                    <th>Annotations:</th>
+                                    <td>
+                                        {% if hpa_data.annotations %}
+                                        <table class="table table-bordered" id="annotationTable" width="100%" cellspacing="0">
+                                            <thead>
+                                                <tr>
+                                                    <th width="50%">Key</th>
+                                                    <th width="50%">Value</th>
+                                                </tr>
+                                            </thead>
+                                            <tbody>
+                                            {% for key, value in hpa_data.annotations.items() %}
+                                                <tr>
+                                                    <td width="50%">{{ key }}</td>
+                                                    <td width="50%">{{ value }}</td>
+                                                </tr>
+                                            {% endfor %}
+                                            </tbody>
+                                        </table>
+                                        {% endif %}
+                                    </td>
+                                </tr>
+                               <tr>
+                                    <th>Lables:</th>
+                                    <td>
+                                        {% if hpa_data.labels %}
+                                        <table class="table table-bordered" id="labelsTable" width="100%" cellspacing="0">
+                                            <thead>
+                                                <tr>
+                                                    <th width="50%">Key</th>
+                                                    <th width="50%">Value</th>
+                                                </tr>
+                                            </thead>
+                                            <tbody>
+                                            {% for key, value in hpa_data.labels.items() %}
+                                                <tr>
+                                                    <td width="50%">{{ key }}</td>
+                                                    <td width="50%">{{ value }}</td>
+                                                </tr>
+                                            {% endfor %}
+                                            </tbody>
+                                        </table>
+                                        {% endif %}
+                                    </td>
+                                </tr>
+                                <tr>
+                                    <th>Owner:</th>
+                                    <td>
+                                        <form action="/workload/{{ hpa_data.spec.scale_target_ref.kind | lower}}s" method="POST">
+                                            <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+                                            <input type="hidden" name="ns_select" value="{{ hpa_data.namespace }}" />
+                                            <input type="hidden" name="selected" value="{{ hpa_data.spec.scale_target_ref.name }}" />
+                                            <a href="javascript:;" onclick="parentNode.submit();">{{ hpa_data.spec.scale_target_ref.name }}</a>
+                                        </form>
+                                    </td>
+                                </tr>
+                                <tr>
+                                    <th>Metrics:</th>
+                                    <td>
+                                        {% if hpa_data.status.current_cpu_utilization_percentage %}
+                                            <span class="badge text-bg-tag text-bg-secondary">{{ hpa_data.status.current_cpu_utilization_percentage }} / {{ hpa_data.spec.target_cpu_utilization_percentage }} %</span>
+                                        {% else %}
+                                            <span class="badge text-bg-tag text-bg-secondary">UNKNOWN / {{ hpa_data.spec.target_cpu_utilization_percentage }} %</span>
+                                        {% endif %}
+                                    </td>
+                                </tr>
+                                <tr>
+                                    <th>MinReplicas:</th>
+                                    <td>{{ hpa_data.spec.min_replicas }}</td>
+                                </tr>
+                                <tr>
+                                    <th>MaxReplicas:</th>
+                                    <td>{{ hpa_data.spec.max_replicas }}</td>
+                                </tr>
+                                <tr>
+                                    <th>Deployment pods:</th>
+                                    <td>{{ hpa_data.status.current_replicas }} Current / {{ hpa_data.status.desired_replicas }} Desired</td>
+                                </tr>
+                            </table>
+                        </div>
+                    </div>
+                </div>
+        </div>
+    </div>
+</div>
+
+<div class="card shadow mb-4">
+    <div class="card-header">
+        <h6 class="m-0 font-weight-bold text-primary">Conditions</h6>
+    </div>
+    <div class="card-body">
+        <div class="tab-content" id="nav-tabContent">
+            <!-- policy -->
+                <div class="card shadow mb-4">
+                    <div class="card-body">
+                        <div class="table-responsive">
+                            <table class="table table-bordered" id="policyInfoTable" width="100%" cellspacing="0">
+                            <thead>
+                                <tr>
+                                    <th>Type</th>
+                                    <th>Status</th>
+                                    <th>lastTransitionTime</th>
+                                    <th>Reason</th>
+                                    <th>Message</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                {% for condition in hpa_data.conditions %}
+                                <tr>
+                                    {% for key, value in condition.items() %}
+                                    <td>{{ value }}</td>
+                                    {% endfor %}
+                                </tr>
+                                {% endfor %}
+                            </tbody>
+                            </table>
+                        </div>
+                    </div>
+                </div>
+        </div>
+    </div>
+</div>
+{% endblock %}
+
+{% block add_head_css %}
+{% include "segments/datatable_snipet.html.j2" %}
+{% endblock %}

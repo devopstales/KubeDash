@@ -1,0 +1,109 @@
+{% extends "base2.html.j2" %}
+
+{% block topmenu %}
+<ul class="header-nav d-lg-flex m-3">
+    <div class="container-fluid px-4">
+      <nav aria-label="breadcrumb">
+        <ol class="breadcrumb my-0">
+          <li class="breadcrumb-item"><span>Workloads</span></li>
+          <li class="breadcrumb-item"><span>Pods</span></li>
+          <li class="breadcrumb-item">
+            <div class="d-flex">
+              <form action="/workload/pods/data" method="POST" class="form-post">
+                <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+                <input type="hidden" name="ns_select" value="{{ session['ns_select'] }}" />
+                <input type="hidden" name="po_name" value="{{ po_name }}" />
+                <a href="javascript:;" onclick="parentNode.submit();">{{ po_name }}</a>
+              </form>
+            </div>
+          </li>
+          <li class="breadcrumb-item active"><span>Log</span></li>
+        </ol>
+      </nav>
+    </div>
+</ul>
+<ul class="header-nav ms-auto"></ul>
+<ul class="header-nav d-lg-flex">
+{% include "segments/topmenu.html.j2" %}
+{% endblock %}
+
+{% block content %}
+<div class="card">
+    <div id="filter-menu" class="card-header">
+      <div class="row justify-content-between">
+        <div class="col-3">
+          <span>Status: <span id="status">connecting...</span></span>
+        </div>
+        <form name="add" method="POST" class="col-3">
+          <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+          <input type="hidden" name="po_name" value="{{ po_name }}">
+          <div class="input-group">
+              <select name="container_select" class="form-select" id="containers" aria-label="Select Container">
+                {% for container in pod_init_containers %}
+                {% if container == container_select %}
+                <option value="{{ container }}" selected>{{ container }}</option>
+                {% else %}
+                <option value="{{ container }}">{{ container }}</option>
+                {% endif %}
+                {% endfor %}
+                <option disabled>-----------</option>
+                {% for container in pod_containers %}
+                {% if container == container_select %}
+                <option value="{{ container }}" selected>{{ container }}</option>
+                {% else %}
+                <option value="{{ container }}">{{ container }}</option>
+                {% endif %}
+                {% endfor %}
+              </select>
+              <button type="submit" class="btn btn-primary" type="button">Submit</button>
+          </div>
+        </form>
+      </div>
+    </div>
+    <div id="terminal" class="card-body terminalBody"></div>
+</div>
+{% endblock %}
+
+{% block add_head_css %}
+{% include "segments/datatable_snipet.html.j2" %}
+{% include "segments/socket_snipet.html.j2" %}
+{% endblock %}
+
+{% block add_tail_js %}
+    <script>
+      const term = new Terminal({
+        cursorBlink: true,
+        macOptionIsMeta: true,
+        scrollback: true,
+      });
+
+      // https://github.com/xtermjs/xterm.js/issues/2941
+      const fit = new FitAddon.FitAddon();
+      term.loadAddon(fit);
+      term.loadAddon(new WebLinksAddon.WebLinksAddon());
+      term.loadAddon(new SearchAddon.SearchAddon());
+
+      term.open(document.getElementById("terminal"));
+      fit.fit();
+      //console.log(`size: ${term.cols} columns, ${term.rows} rows`);
+      term.writeln("Welcome to kubedash!");
+
+      const socket = io.connect('/log');
+      const status = document.getElementById("status");
+
+      socket.on("connect", () => {
+        socket.send("{{ po_name }}", "{{ container_select}}");
+        term.reset();
+        status.innerHTML = '<span class="connected">connected</span>';
+      });
+
+      socket.on('response', function(msg) {
+          term.write(msg.data + "\r\n");
+      });
+
+      socket.on("disconnect", () => {
+        status.innerHTML =
+          '<span class="disconnected">disconnected</span>';
+      });
+    </script>
+{% endblock %}

@@ -1,0 +1,224 @@
+{% extends "base2.html.j2" %}
+
+{% block topmenu %}
+<ul class="header-nav d-lg-flex m-3">
+    <div class="container-fluid px-4">
+      <nav aria-label="breadcrumb">
+        <ol class="breadcrumb my-0">
+          <li class="breadcrumb-item"><span>User Management</span></li>
+          <li class="breadcrumb-item active"><span>Users</span></li>
+        </ol>
+      </nav>
+    </div>
+</ul>
+<ul class="header-nav ms-auto"></ul>
+<ul class="header-nav d-lg-flex">
+  <!-- Button trigger modal add -->
+  {% if session['user_role'] == "Admin" %}
+  <div class="col">
+    <button class="header-toggler" type="button" data-bs-toggle="modal" data-bs-target="#modaladd">
+      <i class="material-icons">person_add</i>
+    </button>
+  </div>
+  {% endif %}
+{% include "segments/topmenu.html.j2" %}
+{% endblock %}
+
+{% block content %}
+<!-- DataTales Example -->
+<div class="card shadow mb-4">
+    <div class="card-header py-3">
+        <h6 class="m-0 font-weight-bold text-primary">User List</h6>
+    </div>
+    <div class="card-body">
+        <div class="table-responsive">
+            <table class="table table-bordered" id="dataTable" width="100%" cellspacing="0">
+                <thead>
+                    <tr>
+                      <th>Username</th>
+                      <th>Email</th>
+                      <th>Permission</th>
+                      <th>Type</th>
+                      <th>Action</th>
+                    </tr>
+                </thead>
+                <tfoot>
+                    <tr>
+                      <th>Username</th>
+                      <th>Email</th>
+                      <th>Permission</th>
+                      <th>Type</th>
+                      <th>Action</th>
+                    </tr>
+                </tfoot>
+                <tbody>
+                  {% for user in users %}
+                  <tr>
+                    {% if session['user_role'] == "Admin" and user.username != "admin" %}
+                    <td>
+                      <form action="/user/privilege" method="POST">
+                        <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+                        <input type="hidden"  name="username" value="{{ user.username }}"/>
+                        <a href="javascript:;" onclick="parentNode.submit();">{{ user.username }}</a>
+                      </form>
+                    </td>
+                    {% elif user.username == session['username'] and user.username != "admin" %}
+                    <td>
+                      <form action="/user/privilege" method="POST">
+                        <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+                        <input type="hidden"  name="username" value="{{ user.username }}"/>
+                        <a href="javascript:;" onclick="parentNode.submit();">{{ user.username }}</a>
+                      </form>
+                    </td>
+                    {% else %}
+                      <td>{{ user.username }}</td>
+                    {% endif %}
+                    <td>{{ user.email }}</td>
+                    {% for ur in user_role %}
+                      {% if ur.user_id == user.id %}
+                        {% for r in roles %}
+                          {% if r.id == ur.role_id %}
+                            <td>{{ r.name }}</td>
+                          {% endif %}
+                        {% endfor %}
+                      {% endif %}
+                    {% endfor %}
+                    <td>{{ user.user_type }}</td>
+                    <td>
+                      {% if session['user_role'] == "Admin" and user.username != "admin" %}
+                      <!-- Button trigger modal edit -->
+                      <div class="d-flex flex-row">
+                        <form action="/user/delete" method="POST">
+                            <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+                            <button type="button" class="btn btn-success btn-just-icon btn-xs" data-bs-toggle="modal" data-bs-target="#modaledit{{ user.id }}" data-user="{{ user.username }}" data-role="{{ user.role }}">
+                                <i class="material-icons">edit</i>
+                            </button>
+                            {% if user.username != username %}
+                            <input type="hidden"  name="username" value="{{ user.username }}"/>
+                            <button type="submit" rel="tooltip" class="btn btn-danger btn-just-icon btn-sm" value="upvote">
+                                <i class="material-icons">delete</i>
+                            </button>
+                            {% endif %}
+                        </form>
+                        <form action="/user/privilege/edit">
+                          <button type="submit" rel="tooltip" class="btn btn-secondary btn-just-icon btn-sm" value="upvote">
+                            <i class="material-icons">workspace_premium</i>
+                          </button>
+                        </form> 
+                      </div>   
+                      {% endif %}
+                    </td>
+                  </tr>
+                  {% endfor %}
+
+                </tbody>
+            </table>
+
+        </div>
+    </div>
+</div>
+
+<!-- Modal Add User -->
+<div class="modal fade" id="modaladd" tabindex="-1" role="dialog" aria-labelledby="modaladdLabel" aria-hidden="true">
+    <div class="modal-dialog">
+        <div class="modal-content">
+            <div class="modal-header">
+              <h5 class="modal-title" id="modaladdLabel">Create User</h5>
+              <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+            </div>
+            <div class="modal-body">
+              <form action="/user/add" method="POST">
+                <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+                <div class="form-group">
+                  <label>Name:</label>
+                  <input class="form-control user" name="username" type="text" placeholder="Type your username">
+                </div>
+                <div class="form-group">
+                  <label>Email:</label>
+                  <input class="form-control user" name="email" type="text" placeholder="Type your email">
+                </div>
+                <div class="form-group">
+                  <label>Password:</label>
+                  <input type="password" name="password" id="PassEntry" class="form-control user" placeholder="Type your password">
+                </div>
+                <div class="form-group">
+                  <label>Permission:</label>
+                  <select class="form-select" aria-label="Select role" name="role">
+                    <option value="User">User</option>
+                    <option value="Admin">Admin</option>
+                  </select>
+                </div>
+                <div class="form-group">
+                  <label>Type:</label>
+                  <select class="form-select" aria-label="Select role" name="type">
+                    <option value="Local">Local</option>
+                    {% for contect in k8s_contect_list%}
+                    <option value="{{ contect }}">{{ contect }}</option>
+                    {% endfor %}
+                  </select>
+                </div>
+                <div class="modal-footer">
+                  <div class="form-group mt-2">
+                    <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Close</button>
+                    <button type="submit" class="btn btn-primary" >Add User</button>
+                  </div>
+                </div>
+              </form>
+            </div>
+        </div>
+  </div>
+</div>
+<!-- Modal Add User -->
+
+<!-- Modal Edit User -->
+{% for user in users %}
+<div class="modal fade" id="modaledit{{ user.id }}" tabindex="-1" role="dialog" aria-labelledby="modaleditLabel" aria-hidden="true">
+  <div class="modal-dialog">
+    <div class="modal-content">
+      <div class="modal-header">
+        <h5 class="modal-title" id="modaleditLabel">Update Information</h5>
+        <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+      </div>
+      <div class="modal-body">
+        <form action="/user/list" method="POST">
+          <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+          <div class="form-group">
+            <label>Name:</label>
+            <input class="form-control" name="username" type="text" value="{{ user.username }}">
+          </div>
+          <div class="form-group">
+            <label>Dashboard Role:</label>
+            <select class="form-select" aria-label="Select role" name="role">
+              <option value="User">User</option>
+              <option value="Admin">Admin</option>
+            </select>
+          </div>
+          <div class="form-group">
+            <label>Type:</label>
+            <select class="form-select" aria-label="Select role" name="type">
+              <option value="{{ user.user_type }}">{{ user.user_type }}</option>
+              {% for contect in k8s_contect_list%}
+              <option value="{{ contect }}">{{ contect }}</option>
+              {% endfor %}
+            </select>
+          </div>
+          <div class="form-group">
+            <div class="modal-footer mt-2">
+              <div class="form-group">
+                <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Close</button>
+                <button type="submit" class="btn btn-primary" >Save changes</button>
+              </div>
+            </div>
+          </div>
+        </form>
+      </div>
+    </div>
+  </div>
+</div>
+{% endfor %}
+<!-- Modal Edit User -->
+{% endblock %}
+
+{% block add_head_css %}
+{% include "segments/datatable_snipet.html.j2" %}
+{% endblock %}

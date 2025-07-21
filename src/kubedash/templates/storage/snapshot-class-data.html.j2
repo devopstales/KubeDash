@@ -1,0 +1,120 @@
+{% extends "base2.html.j2" %}
+
+{% block topmenu %}
+<ul class="header-nav d-lg-flex m-3">
+    <div class="container-fluid px-4">
+      <nav aria-label="breadcrumb">
+        <ol class="breadcrumb my-0">
+          <li class="breadcrumb-item"><span>Storage</span></li>
+          <li class="breadcrumb-item"><a href="/storage/snapshot-class">SnapshotClass</a></li>
+          <li class="breadcrumb-item active"><span>{{ sc_data.name }}</span></li>
+        </ol>
+      </nav>
+    </div>
+</ul>
+<ul class="header-nav ms-auto"></ul>
+<ul class="header-nav d-lg-flex">
+{% include "segments/topmenu.html.j2" %}
+{% endblock %}
+
+{% block content %}
+<div class="card shadow mb-4">
+    <div class="card-header">
+        <h6 class="m-0 font-weight-bold text-primary">Snapshot Class Data</h6>
+    </div>
+    <div class="card-body">
+        <div class="card shadow mb-4">
+            <div class="card-body">
+                <div class="table-responsive">
+                    <table class="table table-bordered" id="podInfoTable" width="100%" cellspacing="0">
+                        <tr>
+                            <th>Name:</th>
+                            <td>{{ sc_data.name }}</td>
+                        </tr>
+                        <tr>
+                            <th>Created:</th>
+                            <td>{{ sc_data.created }}</td>
+                        </tr>
+                        <tr>
+                            <th>Annotations:</th>
+                            <td>
+                                {% if sc_data.annotations %}
+                                <table class="table table-bordered" id="annotationTable" width="100%" cellspacing="0">
+                                    <thead>
+                                        <tr>
+                                            <th width="50%">Key</th>
+                                            <th width="50%">Value</th>
+                                        </tr>
+                                    </thead>
+                                    <tbody>
+                                    {% for key, value in sc_data.annotations.items() %}
+                                        <tr>
+                                            <td width="50%">{{ key }}</td>
+                                            <td width="50%">{{ value }}</td>
+                                        </tr>
+                                    {% endfor %}
+                                    </tbody>
+                                </table>
+                                {% endif %}
+                            </td>
+                        </tr>
+                        <tr>
+                            <th>Lables:</th>
+                            <td>
+                                {% if sc_data.labels %}
+                                <table class="table table-bordered" id="labelsTable" width="100%" cellspacing="0">
+                                    <thead>
+                                        <tr>
+                                            <th width="50%">Key</th>
+                                            <th width="50%">Value</th>
+                                        </tr>
+                                    </thead>
+                                    <tbody>
+                                    {% for key, value in sc_data.labels.items() %}
+                                        <tr>
+                                            <td width="50%">{{ key }}</td>
+                                            <td width="50%">{{ value }}</td>
+                                        </tr>
+                                    {% endfor %}
+                                    </tbody>
+                                </table>
+                                {% endif %}
+                            </td>
+                        </tr>
+                        <tr>
+                            <th>Deletion Policy:</th>
+                            <td>{{ sc_data.deletion_policy }}</td>
+                        </tr>
+                        <tr>
+                            <th>Driver:</th>
+                            <td>{{ sc_data.driver }}</td>
+                        </tr>
+                    </table>
+                </div>
+            </div>
+        </div>
+        {% if sc_data.parameters %}
+        <div class="card-body">
+            <div class="card shadow mb-4">
+                <div class="card-body">
+                    <div class="table-responsive">
+                        <table class="table table-bordered" id="podInfoTable" width="100%" cellspacing="0">
+                            {% for da_key, da_value in sc_data.parameters.items() %}
+                            <tr>
+                                <th>{{ da_key }}:</th>
+                                <td>{{ da_value }}</td>
+                            </tr>
+                            {% endfor %}
+                        </table>
+                    </div>
+                </div>
+            </div>
+        </div>
+        {% endif %}
+    </div>
+</div>
+{% endblock %}
+
+{% block add_head_css %}
+{% include "segments/datatable_snipet.html.j2" %}
+{% endblock %}

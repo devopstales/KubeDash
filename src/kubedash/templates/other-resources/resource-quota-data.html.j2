@@ -1,0 +1,177 @@
+{% extends "base2.html.j2" %}
+
+{% block topmenu %}
+<ul class="header-nav d-lg-flex m-3">
+    <div class="container-fluid px-4">
+      <nav aria-label="breadcrumb">
+        <ol class="breadcrumb my-0">
+          <li class="breadcrumb-item"><span>Other Resources</span></li>
+          <li class="breadcrumb-item active"><a href="/other-resource/resource-quota">Resource Quotas</a></li>
+          <li class="breadcrumb-item active"><span>{{ quota_data.name }}</span></li>
+
+        </ol>
+      </nav>
+    </div>
+</ul>
+<ul class="header-nav ms-auto"></ul>
+<ul class="header-nav d-lg-flex">
+{% include "segments/topmenu.html.j2" %}
+{% endblock %}
+
+{% block content %}
+<div class="card shadow mb-4">
+    <div class="card-header">
+        <h6 class="m-0 font-weight-bold text-primary">Resource Quota Data</h6>
+    </div>
+    <div class="card-body">
+        <div class="tab-content" id="nav-tabContent">
+            <!-- policy -->
+                <div class="card shadow mb-4">
+                    <div class="card-body">
+                        <div class="table-responsive">
+                            <table class="table table-bordered" id="policyInfoTable" width="100%" cellspacing="0">
+                                <tr>
+                                    <th>Name:</th>
+                                    <td>{{ quota_data.name }}</td>
+                                </tr>
+                                <tr>
+                                    <th>Created:</th>
+                                    <td>{{ quota_data.created }}</td>
+                                </tr>
+                                <tr>
+                                    <th>Namespace:</th>
+                                    <td>{{ quota_data.namespace }}</td>
+                                </tr>
+                                <tr>
+                                    <th>Creation:</th>
+                                    <td>{{ quota_data.creation_timestamp }}</td>
+                                </tr>
+                                    <th>Selectors:</th>
+                                    <td>
+                                        {% if quota_data.selectors %}
+                                        <table class="table table-bordered" id="selectorsTable" width="100%" cellspacing="0">
+                                            <thead>
+                                                <tr>
+                                                    <th width="50%">Key</th>
+                                                    <th width="50%">Value</th>
+                                                </tr>
+                                            </thead>
+                                            <tbody>
+                                            {% for key, value in quota_data.selectors.items() %}
+                                                <tr>
+                                                    <td width="50%">{{ key }}</td>
+                                                    <td width="50%">{{ value }}</td>
+                                                </tr>
+                                            {% endfor %}
+                                            </tbody>
+                                        </table>
+                                        {% endif %}
+                                    </td>
+                                </tr>
+                                <tr>
+                                    <th>Scopes:</th>
+                                    <td>
+                                        {% if quota_data.scope %}
+                                            {% for scope in quota_data.scope %}
+                                                <span class="badge text-bg-tag text-bg-secondary">{{ scope }}</span>
+                                                {% if not loop.last %}<br>{% endif %}
+                                            {% endfor %}
+                                        {% endif %}
+                                    </td>
+                                </tr>
+                                <tr>
+                                    <th>Annotations:</th>
+                                    <td>
+                                        {% if quota_data.annotations %}
+                                        <table class="table table-bordered" id="annotationTable" width="100%" cellspacing="0">
+                                            <thead>
+                                                <tr>
+                                                    <th width="50%">Key</th>
+                                                    <th width="50%">Value</th>
+                                                </tr>
+                                            </thead>
+                                            <tbody>
+                                            {% for key, value in quota_data.annotations.items() %}
+                                                <tr>
+                                                {% if key != "kubectl.kubernetes.io/last-applied-configuration" %}
+                                                    <td width="50%">{{ key }}</td>
+                                                    <td width="50%">{{ value }}</td>
+                                                {% endif %}
+                                                </tr>
+                                            {% endfor %}
+                                            </tbody>
+                                        </table>
+                                        {% endif %}
+                                    </td>
+                                </tr>
+                               <tr>
+                                    <th>Lables:</th>
+                                    <td>
+                                        {% if quota_data.labels %}
+                                        <table class="table table-bordered" id="labelsTable" width="100%" cellspacing="0">
+                                            <thead>
+                                                <tr>
+                                                    <th width="50%">Key</th>
+                                                    <th width="50%">Value</th>
+                                                </tr>
+                                            </thead>
+                                            <tbody>
+                                            {% for key, value in quota_data.labels.items() %}
+                                                <tr>
+                                                    <td width="50%">{{ key }}</td>
+                                                    <td width="50%">{{ value }}</td>
+                                                </tr>
+                                            {% endfor %}
+                                            </tbody>
+                                        </table>
+                                        {% endif %}
+                                    </td>
+                                </tr>
+                                <tr>
+                                    <th>Status:</th>
+                                    <td>
+                                        <table class="table table-bordered" id="policyInfoTable" width="100%" cellspacing="0">
+                                            <thead>
+                                                <tr>
+                                                    <th>Resource</th>
+                                                    <th>Used</th>
+                                                    <th>Hard Limit</th>
+                                                </tr>
+                                            </thead>
+                                            <tbody>
+                                                <tr>
+                                                    <td>limits.cpu</td>
+                                                    <td>{{ quota_data.status.used["limits.cpu"] }}</td>
+                                                    <td>{{ quota_data.status.hard["limits.cpu"] }}</td>
+                                                </tr>
+                                                <tr>
+                                                    <td>limits.memory</td>
+                                                    <td>{{ quota_data.status.used["limits.memory"] }}</td>
+                                                    <td>{{ quota_data.status.hard["limits.memory"] }}</td>
+                                                </tr>
+                                                <tr>
+                                                    <td>requests.cpu</td>
+                                                    <td>{{ quota_data.status.used["requests.cpu"] }}</td>
+                                                    <td>{{ quota_data.status.hard["requests.cpu"] }}</td>
+                                                </tr>
+                                                <tr>
+                                                    <td>requests.memory</td>
+                                                    <td>{{ quota_data.status.used["requests.memory"] }}</td>
+                                                    <td>{{ quota_data.status.hard["requests.memory"] }}</td>
+                                                </tr>
+                                            </tbody>
+                                        </table>
+                                    </td>
+                                </tr>
+                            </table>
+                        </div>
+                    </div>
+                </div>
+        </div>
+    </div>
+</div>
+{% endblock %}
+
+{% block add_head_css %}
+{% include "segments/datatable_snipet.html.j2" %}
+{% endblock %}

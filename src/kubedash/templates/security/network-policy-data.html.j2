@@ -1,0 +1,379 @@
+{% extends "base2.html.j2" %}
+
+{% block topmenu %}
+<ul class="header-nav d-lg-flex m-3">
+    <div class="container-fluid px-4">
+      <nav aria-label="breadcrumb">
+        <ol class="breadcrumb my-0">
+          <li class="breadcrumb-item"><span>Security</span></li>
+          <li class="breadcrumb-item active"><a href="/security/network-policy">Network Policies</a></li>
+          <li class="breadcrumb-item"><span>{{ policy_data.name }}</span></li>
+        </ol>
+      </nav>
+    </div>
+</ul>
+<ul class="header-nav ms-auto"></ul>
+<ul class="header-nav d-lg-flex">
+{% include "segments/topmenu.html.j2" %}
+{% endblock %}
+
+{% block content %}
+<div class="card shadow mb-4">
+    <div class="card-header">
+        <h6 class="m-0 font-weight-bold text-primary">Policy Data</h6>
+    </div>
+    <div class="card-body">
+        <ul class="nav nav-tabs" id="nav-tab" role="tablist">
+            <li class="nav-item">
+                <a class="nav-link active" id="nav-policy-tab" data-bs-toggle="tab" href="#nav-policy" role="tab" aria-controls="nav-policy" aria-selected="true" data-bs-toggle="tab">Policy</a>
+            </li>
+            <li class="nav-item">
+                <a class="nav-link" id="nav-ingress-tab" data-bs-toggle="tab" href="#nav-ingress" role="tab" aria-controls="nav-ingress" aria-selected="false" data-bs-toggle="tab">Ingress</a>
+            </li>
+            <li class="nav-item">
+                <a class="nav-link" id="nav-egress-tab" data-bs-toggle="tab" href="#nav-egress" role="tab" aria-controls="nav-egress" aria-selected="false" data-bs-toggle="tab">Egress</a>
+            </li>
+        </ul>
+        <div class="tab-content" id="nav-tabContent">
+            <!-- policy -->
+            <div class="tab-pane fade show active" id="nav-policy" role="tabpanel" aria-labelledby="nav-policy-tab">
+                <div class="card shadow mb-4">
+                    <div class="card-body">
+                        <div class="table-responsive">
+                            <table class="table table-bordered" id="policyInfoTable" width="100%" cellspacing="0">
+                                <tr>
+                                    <th>Namespace:</th>
+                                    <td>{{ policy_data.namespace }}</td>
+                                </tr>
+                                <tr>
+                                    <th>Name:</th>
+                                    <td>{{ policy_data.name }}</td>
+                                </tr>
+                                <tr>
+                                    <th>Annotations:</th>
+                                    <td>
+                                        {% if policy_data.annotations %}
+                                        <table class="table table-bordered" id="annotationTable" width="100%" cellspacing="0">
+                                            <thead>
+                                                <tr>
+                                                    <th width="50%">Key</th>
+                                                    <th width="50%">Value</th>
+                                                </tr>
+                                            </thead>
+                                            <tbody>
+                                            {% for key, value in policy_data.annotations.items() %}
+                                                <tr>
+                                                    <td width="50%">{{ key }}</td>
+                                                    <td width="50%">{{ value }}</td>
+                                                </tr>
+                                            {% endfor %}
+                                            </tbody>
+                                        </table>
+                                        {% endif %}
+                                    </td>
+                                </tr>
+                               <tr>
+                                    <th>Lables:</th>
+                                    <td>
+                                        {% if policy_data.labels %}
+                                        <table class="table table-bordered" id="labelsTable" width="100%" cellspacing="0">
+                                            <thead>
+                                                <tr>
+                                                    <th width="50%">Key</th>
+                                                    <th width="50%">Value</th>
+                                                </tr>
+                                            </thead>
+                                            <tbody>
+                                            {% for key, value in policy_data.labels.items() %}
+                                                <tr>
+                                                    <td width="50%">{{ key }}</td>
+                                                    <td width="50%">{{ value }}</td>
+                                                </tr>
+                                            {% endfor %}
+                                            </tbody>
+                                        </table>
+                                        {% endif %}
+                                    </td>
+                                </tr>
+                                <tr>
+                                    <th>Selectors:</th>
+                                    <td>
+                                        {% if policy_data.selectors %}
+                                        <table class="table table-bordered" id="selectorsTable" width="100%" cellspacing="0">
+                                            <thead>
+                                                <tr>
+                                                    <th width="50%">Key</th>
+                                                    <th width="50%">Value</th>
+                                                </tr>
+                                            </thead>
+                                            <tbody>
+                                            {% for key, value in policy_data.selectors.items() %}
+                                                <tr>
+                                                    <td width="50%">{{ key }}</td>
+                                                    <td width="50%">{{ value }}</td>
+                                                </tr>
+                                            {% endfor %}
+                                            </tbody>
+                                        </table>
+                                        {% endif %}
+                                    </td>
+                                </tr>
+                            </table>
+                        </div>
+                    </div>
+                </div>
+            </div>
+            <!-- Ingress -->
+            <div class="tab-pane fade show" id="nav-ingress" role="tabpanel" aria-labelledby="nav-ingress-tab">
+                <div class="card shadow mb-4">
+                    <div class="card-body">
+                         <div class="table-responsive">
+                            <table class="table table-bordered" id="ingressInfoTable" width="100%" cellspacing="0">
+                                <thead>
+                                    <tr>
+                                        <th>Src Namespace</th>
+                                        <th>Src Pods</th>
+                                        <th>Src Subnet</th>
+                                        <th>Src Exception</th>
+                                        <th>Dst Namespace</th>
+                                        <th>Dst Pods</th>
+                                        <th>Dst Port</th>
+                                    </tr>
+                                </thead>
+                                <tbody>
+                                {% if policy_data.ingress_rules %}
+                                    {% for ir in policy_data.ingress_rules %}
+                                        {% if ir._from %}
+                                            {% for src in ir._from %}
+                                            <tr>
+                                                <!-- Source Namespace -->
+                                                <td>
+                                                    {% if src.namespace_selector and src.namespace_selector.match_labels %}
+                                                        {% for l_key, l_value in src.namespace_selector.match_labels.items() %}
+                                                            <span class="badge text-bg-tag text-bg-secondary">{{ l_key }}: {{ l_value }}</span>
+                                                            {% if not loop.last %}<br>{% endif %}
+                                                        {% endfor %}
+                                                    {% elif src.pod_selector and src.pod_selector.match_labels %}
+                                                        {{ policy_data.namespace }}
+                                                    {% else %}
+                                                        Any
+                                                    {% endif %}
+                                                </td>
+                                                
+                                                <!-- Source Pods -->
+                                                <td>
+                                                    {% if src.pod_selector and src.pod_selector.match_labels %}
+                                                        {% for l_key, l_value in src.pod_selector.match_labels.items() %}
+                                                            <span class="badge text-bg-tag text-bg-secondary">{{ l_key }}: {{ l_value }}</span>
+                                                            {% if not loop.last %}<br>{% endif %}
+                                                        {% endfor %}
+                                                    {% elif src.namespace_selector and src.namespace_selector.match_labels %}
+                                                        Any
+                                                    {% else %}
+                                                        Any
+                                                    {% endif %}
+                                                </td>
+                                                
+                                                <!-- Source Subnet and Exception -->
+                                                {% if src.ip_block %}
+                                                    <td>{{ src.ip_block.cidr if src.ip_block.cidr else 'Any' }}</td>
+                                                    <td>
+                                                        {% if src.ip_block._except %}
+                                                            {% for exception in src.ip_block._except %}
+                                                                {{ exception }}{% if not loop.last %}<br>{% endif %}
+                                                            {% endfor %}
+                                                        {% else %}
+                                                            None
+                                                        {% endif %}
+                                                    </td>
+                                                {% else %}
+                                                    <td>Any</td>
+                                                    <td>None</td>
+                                                {% endif %}
+                                                
+                                                <!-- Destination Namespace -->
+                                                <td>{{ policy_data.namespace }}</td>
+                                                
+                                                <!-- Destination Pods -->
+                                                <td>
+                                                    {% if policy_data.pod_selector and policy_data.pod_selector.match_labels %}
+                                                        {% for l_key, l_value in policy_data.pod_selector.match_labels.items() %}
+                                                            <span class="badge text-bg-tag text-bg-secondary">{{ l_key }}: {{ l_value }}</span>
+                                                            {% if not loop.last %}<br>{% endif %}
+                                                        {% endfor %}
+                                                    {% else %}
+                                                        Any
+                                                    {% endif %}
+                                                </td>
+                                                
+                                                <!-- Destination Ports -->
+                                                <td>
+                                                    {% if ir.ports %}
+                                                        {% for port in ir.ports %}
+                                                            {{ port.protocol|upper }}: {{ port.port }}{% if not loop.last %}<br>{% endif %}
+                                                        {% endfor %}
+                                                    {% else %}
+                                                        Any
+                                                    {% endif %}
+                                                </td>
+                                            </tr>
+                                            {% endfor %}
+                                        {% else %}
+                                            <!-- Fallback for empty '_from' rules -->
+                                            <tr>
+                                                <td>Any</td>
+                                                <td>Any</td>
+                                                <td>Any</td>
+                                                <td>None</td>
+                                                <td>{{ policy_data.namespace }}</td>
+                                                <td>Any</td>
+                                                <td>Any</td>
+                                            </tr>
+                                        {% endif %}
+                                    {% endfor %}
+                                {% else %}
+                                    <!-- Fallback for no ingress rules -->
+                                    <tr>
+                                        <td colspan="7" class="text-center">No ingress communication is allowed</td>
+                                    </tr>
+                                {% endif %}
+                                </tbody>
+                            </table>
+                         </div>
+                    </div>
+                </div>
+            </div>
+            <!-- Egress -->
+            <div class="tab-pane fade show" id="nav-egress" role="tabpanel" aria-labelledby="nav-egress-tab">
+                <div class="card shadow mb-4">
+                    <div class="card-body">
+                         <div class="table-responsive">
+                            <table class="table table-bordered" id="egressInfoTable" width="100%" cellspacing="0">
+                                <thead>
+                                    <tr>
+                                        <th>Src Namespace</th>
+                                        <th>Src Pods</th>
+                                        <th>Dst Namespace</th>
+                                        <th>Dst Pods</th>
+                                        <th>Dst Subnet</th>
+                                        <th>Dst Exception</th>
+                                        <th>Dst Port</th>
+                                    </tr>
+                                </thead>
+                                <tbody>
+                                {% if policy_data.egress_rules %}
+                                    {% for er in policy_data.egress_rules %}
+                                        {% if er['to'] %}
+                                            {% for dst in er['to'] %}
+                                            <tr>
+                                                <!-- Source Namespace -->
+                                                <td>{{ policy_data.namespace }}</td>
+                                                
+                                                <!-- Source Pods -->
+                                                <td>
+                                                    {% if policy_data.pod_selector and policy_data.pod_selector.match_labels %}
+                                                        {% for l_key, l_value in policy_data.pod_selector.match_labels.items() %}
+                                                            <span class="badge text-bg-tag text-bg-secondary">{{ l_key }}: {{ l_value }}</span>
+                                                            {% if not loop.last %}<br>{% endif %}
+                                                        {% endfor %}
+                                                    {% else %}
+                                                        Any
+                                                    {% endif %}
+                                                </td>
+                                                
+                                                <!-- Destination Namespace -->
+                                                <td>
+                                                    {% if dst.namespace_selector and dst.namespace_selector.match_labels %}
+                                                        {% for l_key, l_value in dst.namespace_selector.match_labels.items() %}
+                                                            <span class="badge text-bg-tag text-bg-secondary">{{ l_key }}: {{ l_value }}</span>
+                                                            {% if not loop.last %}<br>{% endif %}
+                                                        {% endfor %}
+                                                    {% elif dst.pod_selector and dst.pod_selector.match_labels %}
+                                                        {{ policy_data.namespace }}
+                                                    {% else %}
+                                                        Any
+                                                    {% endif %}
+                                                </td>
+                                                
+                                                <!-- Destination Pods -->
+                                                <td>
+                                                    {% if dst.pod_selector and dst.pod_selector.match_labels %}
+                                                        {% for l_key, l_value in dst.pod_selector.match_labels.items() %}
+                                                            <span class="badge text-bg-tag text-bg-secondary">{{ l_key }}: {{ l_value }}</span>
+                                                            {% if not loop.last %}<br>{% endif %}
+                                                        {% endfor %}
+                                                    {% elif dst.namespace_selector and dst.namespace_selector.match_labels %}
+                                                        Any
+                                                    {% else %}
+                                                        Any
+                                                    {% endif %}
+                                                </td>
+                                                
+                                                <!-- Destination Subnet and Exception -->
+                                                {% if dst.ip_block %}
+                                                    <td>{{ dst.ip_block.cidr if dst.ip_block.cidr else 'Any' }}</td>
+                                                    <td>
+                                                        {% if dst.ip_block._except %}
+                                                            {% for exception in dst.ip_block._except %}
+                                                                {{ exception }}{% if not loop.last %}<br>{% endif %}
+                                                            {% endfor %}
+                                                        {% else %}
+                                                            None
+                                                        {% endif %}
+                                                    </td>
+                                                {% else %}
+                                                    <td>Any</td>
+                                                    <td>None</td>
+                                                {% endif %}
+                                                
+                                                <!-- Destination Ports -->
+                                                <td>
+                                                    {% if er.ports %}
+                                                        {% for port in er.ports %}
+                                                            {{ port.protocol|upper }}: {{ port.port }}{% if not loop.last %}<br>{% endif %}
+                                                        {% endfor %}
+                                                    {% else %}
+                                                        Any
+                                                    {% endif %}
+                                                </td>
+                                            </tr>
+                                            {% endfor %}
+                                        {% else %}
+                                            <!-- Fallback for empty 'to' rules -->
+                                            <tr>
+                                                <td>{{ policy_data.namespace }}</td>
+                                                <td>Any</td>
+                                                <td>Any</td>
+                                                <td>Any</td>
+                                                <td>Any</td>
+                                                <td>None</td>
+                                                <td>Any</td>
+                                            </tr>
+                                        {% endif %}
+                                    {% endfor %}
+                                {% else %}
+                                    <!-- Fallback for no egress rules -->
+                                    <tr>
+                                        <td>{{ policy_data.namespace }}</td>
+                                        <td>Any</td>
+                                        <td>Any</td>
+                                        <td>Any</td>
+                                        <td>Any</td>
+                                        <td>None</td>
+                                        <td>Any</td>
+                                    </tr>
+                                {% endif %}
+                                </tbody>
+                            </table>                         </div>
+                    </div>
+                </div>
+            </div>
+            <!-- END -->
+        </div>
+    </div>
+</div>
+{% endblock %}
+
+{% block add_head_css %}
+{% include "segments/datatable_snipet.html.j2" %}
+{% endblock %}

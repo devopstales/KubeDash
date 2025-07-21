@@ -5,6 +5,9 @@ logLevel: "INFO"
 # -- flask environment: production or development
 flaskConfig: "production"
 
+# -- Enable ClusterRole creation. Disable if the role already exists.
+createClusterRole: true
+
 serviceAccount:
   # -- Enable automatic serviceAccount creation
   create: true
@@ -18,6 +21,11 @@ image:
   pullPolicy: Always
   # -- The docker image tag to use
   tag: 3.1.0
+  statsdExporter:
+    # -- The docker image repository to use
+    repository: prom/statsd-exporter
+    # -- The docker image tag to use
+    tag: v0.22.4
 
 # -- pullsecrets
 imagePullSecrets: []
@@ -27,40 +35,155 @@ replicas: 1
 
 # -- enable external postgresql support
 externalDatabase:
+  # -- Enable external postgresql
   enabled: false
+  # -- External postgresql host
   host: ""
+  # -- External postgresql port
   port: 5432
+  # -- External postgresql database
   database: "kubedash"
-  username: "kubedash-user"
-  password: "kubedash-pass"
+  # -- External postgresql username
+  username: "kubedash"
+  # -- External postgresql password
+  password: "kubedash"
   secret:
     # -- Name of the secret storing EXTERNAL_DATABASE_PASSWORD.
     name: "kubedash-postgresql"
     # -- Secret must provide the following variables: EXTERNAL_DATABASE_PASSWORD.
     useExistingSecret: false
 
-# -- deploy HA postgresql
-postgresqlHa:
-  enabled: false
+metrics:
+  # -- Enable metrics
+  enabled: true
+  serviceMonitor:
+    # -- Enable prometheus service monitor
+    enabled: false
+    # -- Prometheus service monitor namespace
+    #namespace: "monitoring"
+    # -- Prometheus service monitor labels
+    labels:
+      release: kube-prometheus-stack
+    # -- Prometheus service monitor job labels
+    jobLabel: {}
+    # -- Prometheus service monitor annotations
+    annotations: {}
+    # -- Prometheus service monitor interval
+    interval: "30s"
+    # -- Prometheus service monitor scrape timeout
+    scrapeTimeout: "10s"
+    relabelings: []
+    metricRelabelings: []
+    honorLabels: {}
+  grafana:
+    # -- Enable grafana dashboard deploy
+    enabled: true 
+    # -- Grafana dashboard namespace
+    namespace: "monitoring-system"
+    annotations:
+      grafana_folder: "KubeDash"
+    labels:
+      grafana_dashboard: "1"
+
+# -- deploy ui for db
+dbui:
+  image:
+    # -- adminer image
+    repository: sosedoff/pgweb
+    # -- adminer image tag
+    tag: latest
+    # -- adminer image pull policy
+    pullPolicy: IfNotPresent
+    # -- adminer plugins
+    plugins: "tables-filter,adminer-auto-login"
+
+# -- deploy postgresql
+postgresql:
+  # -- Enable postgresql
+  enabled: true
+  
   rbac:
     create: true
-  persistence:
-    enabled: true
-#    storageClass: default
-  postgresql:
+  auth:
+    # -- Postgresql database
     database: "kubedash"
-    username: "kubedash-user"
-    password: "kubedash-pass"
-    repmgrPassword: "change-me"
+    # -- Postgresql username
+    username: "kubedash"
+    # -- Postgresql password
+    password: "kubedash"
+    # -- Postgresql replication password
+    replicationPassword: "change-me"
+    # -- Postgresql postgres user password
     postgresPassword: "change-me"
-  pgpool:
-    replicaCount: 2
-    adminPassword: "change-me"
+
+  volumePermissions:
+    # -- Enable init container to set permissions on data volume
+    enabled: false
+    securityContext:
+      runAsUser: "auto"
+
+  securityContext:
+    # -- Enable postgresql security context
+    enabled: false
+
+  shmVolume:
+    # -- Enable postgresql shared memory volume
+    chmod:
+      enabled: false
+
+  primary:
+    persistence:
+      size: 10Gi
+  readReplicas:
+    # -- Number of read replicas to create
+    replicaCount: 0
+
   metrics:
+    # -- Enable postgresql metrics
     enabled: true
     serviceMonitor:
+      # -- Enable prometheus service monitor
       enabled: false
-# https://artifacthub.io/packages/helm/bitnami/postgresql-ha
+      # -- Prometheus service monitor labels
+      labels:
+        release: kube-prometheus-stack
+      # -- Set serviceMonitor labels
+      jobLabel: {}
+      honorLabels: {}
+      # -- Prometheus service monitor namespace
+      #namespace: "monitoring"
+# https://artifacthub.io/packages/helm/bitnami/postgresql
+
+# -- redis ui
+redisui:
+  image:
+      repository: patrikx3/p3x-redis-ui
+      tag: latest
+      pullPolicy: Always
+  resources: {}
+    # requests:
+    #   cpu: 100m
+    #   memory: 100M
+    # limits:
+    #   cpu: 200m
+  #   memory: 200M
+
+# -- enable redis for caching
+redis:
+  # -- Enable redis
+  enabled: true
+  # -- Redis cluster architecture
+  architecture: standalone
+  metrics:
+    # -- Enable redis metrics
+    enabled: true
+    serviceMonitor:
+      # -- Enable prometheus service monitor
+      enabled: false
+      # -- Prometheus service monitor namespace
+      #namespace: "monitoring"
+      additionalLabels:
+        release: kube-prometheus-stack
 
 # -- enable metrics-server
 metricsServer:
@@ -109,16 +232,19 @@ oidc:
 plugins:
   registryUi:
     # -- Enable registry UI plugin
-    enabled: false
+    enabled: true
   helmDashboard:
     # -- Enable helm dashboard plugin
     enabled: true
   certManager:
     # -- Enable helm dashboard plugin
-    enabled: false
+    enabled: true
   externalLoadbalancer:
     # -- Enable external loadbalancer plugin
-    enabled: false
+    enabled: true
+  flux:
+    # -- Enable flux plugin
+    enabled: true
 
 # -- enable persistence
 persistence:
@@ -137,7 +263,7 @@ persistence:
   ##   set, choosing the default provisioner.  (gp2 on AWS, standard on
   ##   GKE, AWS & OpenStack)
   ##
-  # storageClass: "-"
+  storageClass: "-"
 
 ingress:
   # -- Enable Ingress object creation

@@ -1,0 +1,37 @@
+{{ if or .Values.externalDatabase.enabled .Values.postgresql.enabled }}
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: {{ include "kubedash.fullname" . }}-db-ui
+  labels:
+    app: "db-ui"
+    {{ include "kubedash.labels" . | nindent 4 }}
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: "db-ui"
+      {{ include "kubedash.labels" . | nindent 6 }}
+  template:
+    metadata:
+      labels:
+        app: "db-ui"
+        {{ include "kubedash.labels" . | nindent 8 }}
+    spec:
+      containers:
+        - name: dbui
+          image: "{{ .Values.dbui.image.repository }}:{{ .Values.dbui.image.tag }}"
+          imagePullPolicy: {{ .Values.dbui.image.pullPolicy }}
+          ports:
+            - name: http
+              containerPort: 8081
+              protocol: TCP
+          env:
+            {{- if .Values.externalDatabase.enabled }}
+            - name: DATABASE_URL
+              value: postgres://{{ .Values.externalDatabase.username }}:{{ .Values.externalDatabase.password }}@{{ .Values.externalDatabase.host }}:5432/{{ .Values.externalDatabase.database }}?sslmode=disable
+            {{- else if .Values.postgresql.enabled }}
+            - name: DATABASE_URL
+              value: postgres://{{ .Values.postgresql.auth.username }}:{{ .Values.postgresql.auth.password }}@{{ .Release.Name }}-postgresql:5432/{{ .Values.postgresql.auth.database }}?sslmode=disable
+            {{- end }}
+{{ end }}

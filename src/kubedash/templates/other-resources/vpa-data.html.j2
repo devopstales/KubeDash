@@ -1,0 +1,193 @@
+{% extends "base2.html.j2" %}
+
+{% block topmenu %}
+<ul class="header-nav d-lg-flex m-3">
+    <div class="container-fluid px-4">
+      <nav aria-label="breadcrumb">
+        <ol class="breadcrumb my-0">
+          <li class="breadcrumb-item"><span>Other Resources</span></li>
+          <li class="breadcrumb-item"><a href="/other-resource/vertical-pod-autoscaler">VPAs</a></li>
+          <li class="breadcrumb-item active"><span>{{ vpa_data.name }}</span></li>
+        </ol>
+      </nav>
+    </div>
+</ul>
+<ul class="header-nav ms-auto"></ul>
+<ul class="header-nav d-lg-flex">
+{% include "segments/topmenu.html.j2" %}
+{% endblock %}
+
+{% block content %}
+<div class="card shadow mb-4">
+    <div class="card-header">
+        <h6 class="m-0 font-weight-bold text-primary">Vertical Pod Autoscaler Data</h6>
+    </div>
+    <div class="card-body">
+        <div class="table-responsive">
+            <table class="table table-bordered" width="100%" cellspacing="0">
+                <tr>
+                    <th>Name:</th>
+                    <td>{{ vpa_data.name }}</td>
+                </tr>
+                <tr>
+                    <th>Created:</th>
+                    <td>{{ vpa_data.created }}</td>
+                </tr>
+                <tr>
+                    <th>Namespace:</th>
+                    <td>{{ vpa_data.namespace }}</td>
+                </tr>
+                <tr>
+                    <th>Annotations:</th>
+                    <td>
+                        {% if vpa_data.annotations %}
+                        <table class="table table-bordered" width="100%" cellspacing="0">
+                            <thead>
+                                <tr><th width="50%">Key</th><th width="50%">Value</th></tr>
+                            </thead>
+                            <tbody>
+                            {% for key, value in vpa_data.annotations.items() %}
+                                <tr>
+                                    <td>{{ key }}</td>
+                                    <td>{{ value }}</td>
+                                </tr>
+                            {% endfor %}
+                            </tbody>
+                        </table>
+                        {% else %}
+                        None
+                        {% endif %}
+                    </td>
+                </tr>
+                <tr>
+                    <th>Labels:</th>
+                    <td>
+                        {% if vpa_data.labels %}
+                        <table class="table table-bordered" width="100%" cellspacing="0">
+                            <thead>
+                                <tr><th width="50%">Key</th><th width="50%">Value</th></tr>
+                            </thead>
+                            <tbody>
+                            {% for key, value in vpa_data.labels.items() %}
+                                <tr>
+                                    <td>{{ key }}</td>
+                                    <td>{{ value }}</td>
+                                </tr>
+                            {% endfor %}
+                            </tbody>
+                        </table>
+                        {% else %}
+                        None
+                        {% endif %}
+                    </td>
+                </tr>
+                <tr>
+                    <th>Target (Owner):</th>
+                    <td>
+                        <form action="/workload/{{ vpa_data.spec.targetRef.kind | lower }}s" method="POST">
+                            <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+                            <input type="hidden" name="ns_select" value="{{ vpa_data.namespace }}" />
+                            <input type="hidden" name="selected" value="{{ vpa_data.spec.targetRef.name }}" />
+                            <a href="javascript:;" onclick="parentNode.submit();">{{ vpa_data.spec.targetRef.name }}</a>
+                        </form>
+                    </td>
+                </tr>
+                <tr>
+                    <th>Update Mode:</th>
+                    <td>{{ vpa_data.spec.updatePolicy.updateMode if vpa_data.spec.updatePolicy is defined else "N/A" }}</td>
+                </tr>
+                <tr>
+                    <th>Container Policies:</th>
+                    <td>
+                        {% if vpa_data.spec.resourcePolicy is defined and vpa_data.spec.resourcePolicy.containerPolicies is defined %}
+                        <table class="table table-bordered" width="100%" cellspacing="0">
+                            <thead>
+                                <tr>
+                                    <th>Container Name</th>
+                                    <th>Controlled Values</th>
+                                    <th>Mode</th>
+                                    <th>Min Allowed</th>
+                                    <th>Max Allowed</th>
+                                    <th>Controlled Resources</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                            {% for cp in vpa_data.spec.resourcePolicy.containerPolicies %}
+                                <tr>
+                                    <td>{{ cp.containerName }}</td>
+                                    <td>{{ cp.controlledValues }}</td>
+                                    <td>{{ cp.mode }}</td>
+                                    <td>
+                                        {% if cp.minAllowed %}
+                                            {% for res, val in cp.minAllowed.items() %}
+                                                {{ res }}: {{ val }}<br>
+                                            {% endfor %}
+                                        {% else %}
+                                            N/A
+                                        {% endif %}
+                                    </td>
+                                    <td>
+                                        {% if cp.maxAllowed %}
+                                            {% for res, val in cp.maxAllowed.items() %}
+                                                {{ res }}: {{ val }}<br>
+                                            {% endfor %}
+                                        {% else %}
+                                            N/A
+                                        {% endif %}
+                                    </td>
+                                    <td>
+                                        {% if cp.controlledResources %}
+                                            {{ cp.controlledResources | join(", ") }}
+                                        {% else %}
+                                            N/A
+                                        {% endif %}
+                                    </td>
+                                </tr>
+                            {% endfor %}
+                            </tbody>
+                        </table>
+                        {% else %}
+                        None
+                        {% endif %}
+                    </td>
+                </tr>
+                <tr>
+                    <th>Conditions:</th>
+                    <td>
+                        {% if vpa_data.conditions %}
+                        <table class="table table-bordered" width="100%" cellspacing="0">
+                            <thead>
+                                <tr>
+                                    <th>Type</th>
+                                    <th>Status</th>
+                                    <th>Last Transition Time</th>
+                                    <th>Reason</th>
+                                    <th>Message</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                {% for cond in vpa_data.conditions %}
+                                <tr>
+                                    <td>{{ cond.type }}</td>
+                                    <td>{{ cond.status }}</td>
+                                    <td>{{ cond.lastTransitionTime }}</td>
+                                    <td>{{ cond.reason }}</td>
+                                    <td>{{ cond.message }}</td>
+                                </tr>
+                                {% endfor %}
+                            </tbody>
+                        </table>
+                        {% else %}
+                        None
+                        {% endif %}
+                    </td>
+                </tr>
+            </table>
+        </div>
+    </div>
+</div>
+{% endblock %}
+
+{% block add_head_css %}
+{% include "segments/datatable_snipet.html.j2" %}
+{% endblock %}

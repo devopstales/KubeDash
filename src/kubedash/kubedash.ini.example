@@ -16,32 +16,37 @@ admin_password = admin
 
 # Either postgres or sqlite3, it's your choice
 type = sqlite3
-host = 127.0.0.1:3306
+host = 127.0.0.1:5432
 name = kubedash
 # user = root
 # password =
 
 #################################### Cache server #############################
 [remote_cache]
-# Either redis, none default is none
-type = none
+# redis host
+redis_enabled = true
+redis_host = 127.0.0.1
+
+# redis cluster
+cluster_enabled = false
+cluster_startup_nodes = 10.0.0.1,10.0.0.2
+
 
 # cache connectionstring options
-# redis: config like redis server e.g. `addr=127.0.0.1:6379,pool_size=100,db=0,ssl=false`. Only addr is required. ssl may be 'true', 'false', or 'insecure'.
-connstr =
+redis_port = 6379
+redis_db = 0
+redis_password =
 
-# prefix prepended to all the keys in the remote cache
-prefix =
-
-# This enables encryption of values stored in the remote cache
-encryption =
+# cache time
+short_cache_time = 60
+long_cache_time = 900
 
 #################################### SSO Settings ###########################
 [sso_settings]
 
 issuer_url = https://keycloak.kdev.intra/auth/realms/k8s-apps
 callback_url = https://kubedash.kdev.intra
-scope = groups email openid profile good-service
+scope = roles email openid profile good-service
 client_id = kubedash
 secret = nkBeJzvrBxzRfGNDJENrEvwtnqczGLzk
 
@@ -62,16 +67,13 @@ jaeger_http_endpoint = http://127.0.0.1:4318
 [plugin_settings]
 
 # enable registry plugin
-registry = false
+registry = true
 
 # enable helm plugin
 helm = true
 
+# enable gateway api plugin
+gateway_api = true
+
 # enable cert-manager plugin
 cert_manager = true
-
-# enable external loadbalancer plugin (cilium, metallb)
-external_loadbalancer = false
-
-# enable gateway api plugin
-gateway_api = false

@@ -1,0 +1,60 @@
+{% extends "base2.html.j2" %}
+
+{% block topmenu %}
+<ul class="header-nav d-lg-flex m-3">
+    <div class="container-fluid px-4">
+      <nav aria-label="breadcrumb">
+        <ol class="breadcrumb my-0">
+          <li class="breadcrumb-item"><span>Cluster</span></li>
+          <li class="breadcrumb-item"><a href="/cluster/crd">CRDs</a></li>
+          <li class="breadcrumb-item active"><span>{{ crd_kind }}</span></li>
+        </ol>
+      </nav>
+    </div>
+</ul>
+<ul class="header-nav ms-auto"></ul>
+<ul class="header-nav d-lg-flex">
+{% include "segments/topmenu.html.j2" %}
+{% endblock %}
+
+{% block content %}
+<div class="card shadow mb-4">
+    <div class="card-header py-3">
+        <h6 class="m-0 font-weight-bold text-primary">CRD Data</h6>
+    </div>
+    <div class="card-body">
+        <div class="table-responsive">
+            <table class="table table-bordered" id="dataTable" width="100%" cellspacing="0">
+              <thead>
+                    <tr>
+                      <th>Name</th>
+                      <th>Namespace</th>
+                      <th>Status</th>
+                      <th>Type</th>
+                      <th>Reason</th>
+                      <th>Message</th>
+                      <th>Action</th>
+                    </tr>
+              </thead>
+              <tbody>
+                {% for crd in crd_data %}
+                <tr>
+                    <td>{{ crd.name }}</td>
+                    <td>{{ crd.namespace }}</td>
+                    <td>{{ crd.status }}</td>
+                    <td>{{ crd.type }}</td>
+                    <td>{{ crd.reason }}</td>
+                    <td>{{ crd.message }}</td>
+                    <td></td>
+                </tr>
+                {% endfor %}
+              </tbody>
+            </table>
+        </div>
+    </div>
+</div>
+{% endblock %}
+
+{% block add_head_css %}
+{% include "segments/datatable_snipet.html.j2" %}
+{% endblock %}
