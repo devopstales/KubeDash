@@ -3,7 +3,7 @@ apiVersion: v1
 kind: ConfigMap
 data:
   {{ include "kubedash.fullname" . }}-gunicorn-dashboard.json: |-
-    {{- $file := .Files.Get "files/dashboards/kubedash-gunicorn-dashboard.json" }}
+    {{- $file := .Files.Get "files/gunicorn-dashboard.json" }}
     {{- $file | nindent 4 }}
 metadata:
   annotations:
@@ -16,5 +16,24 @@ metadata:
     {{- toYaml . | nindent 4 }}
     {{- end }}
   name: {{ include "kubedash.fullname" . }}-gunicorn-dashboard
+  namespace: {{ .Values.metrics.grafana.namespace }}
+---
+apiVersion: v1
+kind: ConfigMap
+data:
+  {{ include "kubedash.fullname" . }}-flask-web-app.json: |-
+    {{- $file := .Files.Get "files/flask-web-app.json" }}
+    {{- $file | nindent 4 }}
+metadata:
+  annotations:
+    {{- with .Values.metrics.grafana.annotations }}
+    {{- toYaml . | nindent 4 }}
+    {{- end }}
+  labels:
+    dashboard-provider: {{ include "kubedash.fullname" . }}-gunicorn-dashboard
+    {{- with .Values.metrics.grafana.labels }}
+    {{- toYaml . | nindent 4 }}
+    {{- end }}
+  name: {{ include "kubedash.fullname" . }}-flask-dashboard
   namespace: {{ .Values.metrics.grafana.namespace }}
 {{ end }}
