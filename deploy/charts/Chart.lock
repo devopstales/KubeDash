@@ -1,12 +1,12 @@
 dependencies:
 - name: redis
   repository: https://charts.bitnami.com/bitnami
-  version: 21.2.5
+  version: 21.2.12
 - name: postgresql
   repository: https://charts.bitnami.com/bitnami
-  version: 16.7.13
+  version: 16.7.20
 - name: metrics-server
   repository: https://kubernetes-sigs.github.io/metrics-server/
   version: 3.8.4
-digest: sha256:ee7accb95b4d6c78b095ae4fcbacec039b5abf71781209e121c08950715fb80d
-generated: "2025-06-24T14:26:33.74134576+02:00"
+digest: sha256:187c8c866bec9ee7b8b4721854c2d3347eedb4af790f91439151662340b217c1
+generated: "2025-07-21T14:51:50.093064543+02:00"

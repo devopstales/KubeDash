@@ -267,13 +267,13 @@ tasks:
 
   helm-docs:
    desc: "Generate Helm Chart documentation"
-   dir: 'deploy/helm'
+   dir: 'deploy/charts'
    cmds:
     - helm-docs
 
   helm-build:
     desc: "Build Helm Chart"
-    dir: 'deploy/helm'
+    dir: 'deploy/charts'
     cmds:
       - helm dependency update
       - helm package --version {{.VERSION}} --app-version {{.VERSION}} .
@@ -281,7 +281,7 @@ tasks:
 
   helm-sign:
     desc: "Sign Helm Chart"
-    dir: 'deploy/helm'
+    dir: 'deploy/charts'
     cmds:
       - cosign sign-blob -y --key $HOME/.gnupg/cosign.key kubedash-{{.VERSION}}.tgz --bundle ubedash-{{.VERSION}}.tgz.cosign.bundle
       #- CHART_DIGEST=$(grep -oP "(?<=digest: sha256:)[a-z0-9]+" push-metadata.txt)
