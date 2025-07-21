@@ -9,6 +9,10 @@ CA.crt
 src/kubedash/run.sh
 src/kubedash/kubedash.ini
 
+# helm
+.cr-index/
+.cr-release-packages/
+
 # deploy
 docker/kubedash/kubedash
 src/kubedash/kubedash.ini

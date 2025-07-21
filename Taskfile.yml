@@ -12,6 +12,19 @@ tasks:
     cmds:
       - "task --list-all"
 
+  install-deps:
+    desc: "Install development dependencies"
+    cmds:
+      - curl -sSL https://install.python-poetry.org | python3 -
+      - brew install helm
+      - brew install helm-docs
+      - brew install chart-releaser
+      - brew install trivy
+      - brew install cosign
+      - brew install skopeo
+      - brew install oras
+      - brew install fluxcd/tap/flux
+
   docker-up:
     desc: "Start dev containers"
     dir: 'deploy/docker-compose'
@@ -47,8 +60,6 @@ tasks:
         	--path="/tmp/podinfo/kustomize" \
         	--source="$(git -C /tmp/podinfo config --get remote.origin.url)" \
         	--revision="$(git -C /tmp/podinfo branch --show-current)@sha1:$(git rev-parse HEAD)"
-
-
 
   docker-down:
     desc: "Stop dev containers"
@@ -290,6 +301,17 @@ tasks:
       - rm -f push-metadata.txt
       - rm -f kubedash-{{.VERSION}}.tgz
       - rm -f kubedash-{{.VERSION}}.tgz.cosign.bundle
+
+  helm-push:
+    desc: "Push Helm Chart"
+    dir: 'deploy/charts'
+    cmds:
+      - mkdir .cr-index
+      - cr package .
+      - cr upload --owner devopstales --git-repo helm-charts
+      - cr index --owner devopstales --git-repo helm-charts
+      - rm -rf .cr-index
+      - rm -rf .cr-release-packages
 
   kdlogin-rm:
     desc: "Remove kubectl-kdlogin"
