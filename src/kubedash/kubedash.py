@@ -68,15 +68,16 @@ def create_app(external_config_name=None):
             print(separator_long)
             initialize_commands(app)
         elif sys.argv[1] == 'db':
+            initialize_app_plugins(app)
             initialize_app_database(app, __file__)
             print(separator_long)
         else:
             initialize_app_version(app)
             initialize_app_plugins(app)
-            # connections            
+            # connections
+            initialize_app_database(app, __file__)
             initialize_app_caching(app)
             init_before_request(app)
-            initialize_app_database(app, __file__)
             with app.app_context():
                 initialize_metrics_scraper(app)
             initialize_app_socket(app)

@@ -4,7 +4,7 @@ env:
   VERSION: "4.0.0"
   DATE: 
     sh: date "+%Y.%m.%d"
-  DCFILES: "-f dc-nginx.yaml -f dc-postgresql.yaml -f dc-redis.yaml -f dc-registry.yaml -f dc-exporter.yaml -f dc-jaeger.yaml"
+  DCFILES: "-f dc-nginx.yaml -f dc-postgresql.yaml -f dc-redis.yaml -f dc-registry.yaml -f dc-exporter.yaml -f dc-jaeger.yaml -f dc-kubeview.yaml"
 
 tasks:
   default:
@@ -306,12 +306,15 @@ tasks:
     desc: "Push Helm Chart"
     dir: 'deploy/charts'
     cmds:
-      - mkdir .cr-index
       - cr package .
-      - cr upload --owner devopstales --git-repo helm-charts
-      - cr index --owner devopstales --git-repo helm-charts
-      - rm -rf .cr-index
-      - rm -rf .cr-release-packages
+      - git clone -b gh-pages git@github.com:devopstales/helm-charts.git gh-pages-temp
+      - cd gh-pages-temp
+      - cp ../.cr-release-packages/kubedash-4.0.0.tgz ./
+      - git add .
+      - git commit -m "Manual update for kubedash-4.0.0"
+      - git push origin gh-pages
+      - cd ..
+      - rm -rf gh-pages-temp .cr-release-packages
 
   kdlogin-rm:
     desc: "Remove kubectl-kdlogin"

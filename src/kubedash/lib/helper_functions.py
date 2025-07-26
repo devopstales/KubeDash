@@ -3,6 +3,7 @@ import logging
 import re
 import sys
 import colorlog
+import validators
 from colorlog.escape_codes import escape_codes
 from decimal import Decimal, InvalidOperation
 from logging import Logger
@@ -198,6 +199,22 @@ def is_safe_url(url_target: Optional[str], url_request: Union[Request, str]) -> 
     # Validate scheme and netloc
     return test_url.scheme in ('http', 'https') and ref_url.netloc == test_url.netloc
 
+
+
+def is_valid_url(url):
+    """Check if a URL is valid.
+    
+    Args:
+        url (str): The URL to check.
+        
+    Returns:
+        bool: True if the URL is valid, False otherwise.
+    """
+    if url.startswith(('http://', 'https://')):
+        return validators.url(url)
+    else:
+        # If the URL does not start with http:// or https://, we assume it's not valid
+        return False
 
 ##############################################################
 ## Test Functions

@@ -10,7 +10,7 @@ class ApplicationCatalog(UserMixin, db.Model):
     id = db.Column(db.Integer, primary_key=True)
     application_name = db.Column(db.String(100), unique=True, nullable=False)
     application_enabled = db.Column(db.Boolean, nullable=False, default=False)
-    application_url = db.Column(db.String(200), nullable=False)
+    application_url = db.Column(db.String(200), unique=True, nullable=False)
     application_icon = db.Column(db.String(200), nullable=True)
 
     def __repr__(self):
