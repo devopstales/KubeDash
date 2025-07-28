@@ -107,22 +107,30 @@ def SSOSererGet():
     Returns:
         Openid: SSOServer instance or None if not found
     """
-    span = trace.get_current_span()
-    inspector = inspect(db.engine)
-    if inspector.has_table("openid"):
-        if tracer and span.is_recording():
-            span.add_event("log", {
-                "log.severity": "info",
-                "log.message": "openid exists",
-            })
-        return Openid.query.get(1)
-    else:
-        if tracer and span.is_recording():
-            span.add_event("log", {
-                "log.severity": "error",
-                "log.message": "openid is missing",
-            })
-        return None
+    with tracer.start_as_current_span("sso-server-get") as span:
+        inspector = inspect(db.engine)
+        if inspector.has_table("openid"):
+            if tracer and span.is_recording():
+                span.set_attribute("db.table", "openid")
+            openid = Openid.query.get(1)
+            if openid:
+                span.set_attribute("openid.id", openid.id)
+                span.set_attribute("openid.oauth_server_uri", openid.oauth_server_uri)
+                span.add_event("log", {
+                    "log.severity": "info",
+                    "log.message": "openid exists",
+                })
+            return openid
+        else:
+            if tracer and span.is_recording():
+                span.set_attribute("db.table", "openid")
+                span.set_attribute("openid.id", None)
+                span.set_attribute("openid.oauth_server_uri", None)
+                span.add_event("log", {
+                    "log.severity": "error",
+                    "log.message": "openid is missing",
+                })
+            return None
 
 def get_auth_server_info():
     """Get OAuth2Session and Auth Server Info
@@ -130,6 +138,8 @@ def get_auth_server_info():
     Returns:
         tuple: auth_server_info (dict), oauth (OAuth2Session)
     """
+    span = trace.get_current_span()
+    
     ssoServer = SSOSererGet()
     redirect_uri = ssoServer.base_uri+"/callback"
     oauth = OAuth2Session(
@@ -144,9 +154,23 @@ def get_auth_server_info():
             verify=False,
             timeout=1
         ).json()
+        if tracer and span.is_recording():
+            span.set_attribute("auth_server_info.token_endpoint", auth_server_info.get("token_endpoint"))
+            span.set_attribute("auth_server_info.authorization_endpoint", auth_server_info.get("authorization_endpoint"))
+            span.add_event("log", {
+                "log.severity": "info",
+                "log.message": "Auth server info retrieved successfully.",
+            })
     except Exception as error:
         auth_server_info = None
         logger.error('Cannot connect to identity provider: %s ' % error)
+        if tracer and span.is_recording():
+            span.set_attribute("error", True)
+            span.set_attribute("error.message", str(error))
+            span.add_event("log", {
+                "log.severity": "error",
+                "log.message": f"Error retrieving auth server info: {str(error)}",
+            })
 
     return auth_server_info, oauth
 
@@ -159,37 +183,60 @@ def get_user_token(session):
     Returns:
         string: user token or None if not found in session
     """
-    if session['user_type'] == "OpenID":
-        """Refreshing an OAuth 2 token using a refresh token.
-        """
-        ssoServer = SSOSererGet()
-        auth_server_info, oauth = get_auth_server_info()
+    with tracer.start_as_current_span("sso-user-get-token") as span:
+        if session['user_type'] == "OpenID":
+            """Refreshing an OAuth 2 token using a refresh token.
+            """
+            span = trace.get_current_span()
+            
+            ssoServer = SSOSererGet()
+            auth_server_info, oauth = get_auth_server_info()
 
-        # Get OAuth2Session
-        oauth = OAuth2Session(
-            ssoServer.client_id,
-            redirect_uri = ssoServer.base_uri+"/callback",
-            scope = ssoServer.scope
-        )
+            # Get OAuth2Session
+            oauth = OAuth2Session(
+                ssoServer.client_id,
+                redirect_uri = ssoServer.base_uri+"/callback",
+                scope = ssoServer.scope
+            )
 
-        # Use OAuth2Session to refresh tokens
-        token_new = oauth.refresh_token(
-            token_url = auth_server_info["token_endpoint"],
-            refresh_token = session['refresh_token'],
-            client_id = ssoServer.client_id,
-            client_secret = ssoServer.client_secret,
-            verify=False,
-            timeout=60,
-        )
+            # Use OAuth2Session to refresh tokens
+            token_new = oauth.refresh_token(
+                token_url = auth_server_info["token_endpoint"],
+                refresh_token = session['refresh_token'],
+                client_id = ssoServer.client_id,
+                client_secret = ssoServer.client_secret,
+                verify=False,
+                timeout=60,
+            )
 
-        # Store Updated Token Data in User session
-        session['oauth_token']   = token_new
-        session['refresh_token'] = token_new.get("refresh_token")
+            # Store Updated Token Data in User session
+            session['oauth_token']   = token_new
+            session['refresh_token'] = token_new.get("refresh_token")
 
-        # Store Updated Token Data in DB
-        SSOTokenUpdate(session['user_name'], json.dumps(token_new))
+            # Store Updated Token Data in DB
+            SSOTokenUpdate(session['user_name'], json.dumps(token_new))
 
-        user_token = session['oauth_token']
-    else:
-        user_token = None
+            user_token = session['oauth_token']
+            
+            if tracer and span.is_recording():
+                span.set_attribute("user.name", session['user_name'])
+                span.set_attribute("user.type", session['user_type'])
+                span.set_attribute("user.role", session['user_role'])
+                span.set_attribute("user.token", user_token)
+                span.add_event("log", {
+                    "log.severity": "info",
+                    "log.message": "User token refreshed successfully.",
+                })
+                
+        else:
+            user_token = None
+            if tracer and span.is_recording():
+                span.set_attribute("user.name", session['user_name'])
+                span.set_attribute("user.type", session['user_type'])
+                span.set_attribute("user.role", session['user_role'])
+                span.set_attribute("user.token", "None")
+                span.add_event("log", {
+                    "log.severity": "info",
+                    "log.message": "User token is not OpenID, returning None.",
+                })
     return user_token

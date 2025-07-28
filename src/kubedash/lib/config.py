@@ -24,6 +24,7 @@ class Config(object):
     # security
     CORS_HEADERS = 'Content-Type'
     SECRET_KEY = "develop"
+    WTF_CSRF_ENABLED = True
 
 class DevelopmentConfig(Config):
     """

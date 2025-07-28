@@ -1,5 +1,5 @@
 services:
-  postgresql:
+  kubeview:
     container_name: kubedash-kubeview
     image: ghcr.io/benc-uk/kubeview:latest
     environment:

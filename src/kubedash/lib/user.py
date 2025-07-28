@@ -17,6 +17,10 @@ from lib.opentelemetry import tracer  # type: ignore
 
 logger = get_logger()
 
+from lib.opentelemetry import get_tracer
+from opentelemetry import trace
+tracer = get_tracer()
+
 ##############################################################
 ## functions
 ##############################################################
@@ -224,10 +228,18 @@ def SSOTokenUpdate(username, tokens):
         username (string): User name
         tokens (string): User tokens
     """
-    user = User.query.filter_by(username=username).first()
-    if user:
-        user.tokens = tokens
-        db.session.commit()
+    with tracer.start_as_current_span("sso-token-update") as span:
+        user = User.query.filter_by(username=username).first()
+        if user:
+            if tracer and span.is_recording():
+                span.set_attribute("enduser.name", username)
+                span.set_attribute("enduser.tokens", tokens)
+                span.add_event("log", {
+                    "log.severity": "info",
+                    "log.message": f"Updating tokens for user: {username}",
+                })
+            user.tokens = tokens
+            db.session.commit()
 
 def SSOTokenGet(username):
     """Get user tokens from database

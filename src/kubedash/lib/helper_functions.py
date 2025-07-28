@@ -352,56 +352,65 @@ def parse_quantity(quantity: str):
     Raises:
         ValueError on invalid or unknown input
     """
-    if isinstance(quantity, (int, float, Decimal)):
-        return Decimal(quantity)
+    with tracer.start_as_current_span("parse_quantity") as span:
+        span.set_attribute("quantity", quantity)
+        if isinstance(quantity, (int, float, Decimal)):
+            return Decimal(quantity)
 
-    exponents = {"n": -3, "u": -2, "m": -1, "K": 1, "k": 1, "M": 2,
-                 "G": 3, "T": 4, "P": 5, "E": 6}
+        exponents = {"n": -3, "u": -2, "m": -1, "K": 1, "k": 1, "M": 2,
+                    "G": 3, "T": 4, "P": 5, "E": 6}
 
-    quantity = str(quantity)
-    number = quantity
-    suffix = None
-    if len(quantity) >= 2 and quantity[-1] == "i":
-        if quantity[-2] in exponents:
-            number = quantity[:-2]
-            suffix = quantity[-2:]
-    elif len(quantity) >= 1 and quantity[-1] in exponents:
-        number = quantity[:-1]
-        suffix = quantity[-1:]
+        quantity = str(quantity)
+        number = quantity
+        suffix = None
+        if len(quantity) >= 2 and quantity[-1] == "i":
+            if quantity[-2] in exponents:
+                number = quantity[:-2]
+                suffix = quantity[-2:]
+        elif len(quantity) >= 1 and quantity[-1] in exponents:
+            number = quantity[:-1]
+            suffix = quantity[-1:]
 
-    try:
-        number = Decimal(number)
-    except InvalidOperation:
-        raise ValueError("Invalid number format: {}".format(number))
+        try:
+            number = Decimal(number)
+        except InvalidOperation:
+            raise ValueError("Invalid number format: {}".format(number))
 
-    if suffix is None:
-        return number
+        if suffix is None:
+            return number
 
-    if suffix.endswith("i"):
-        base = 1024
-    elif len(suffix) == 1:
-        base = 1000
-    else:
-        raise ValueError("{} has unknown suffix".format(quantity))
+        if suffix.endswith("i"):
+            base = 1024
+        elif len(suffix) == 1:
+            base = 1000
+        else:
+            raise ValueError("{} has unknown suffix".format(quantity))
 
-    # handle SI inconsistency
-    if suffix == "ki":
-        raise ValueError("{} has unknown suffix".format(quantity))
+        # handle SI inconsistency
+        if suffix == "ki":
+            raise ValueError("{} has unknown suffix".format(quantity))
 
-    if suffix[0] not in exponents:
-        raise ValueError("{} has unknown suffix".format(quantity))
+        if suffix[0] not in exponents:
+            raise ValueError("{} has unknown suffix".format(quantity))
 
-    exponent = Decimal(exponents[suffix[0]])
-    return number * (base ** exponent)
+        exponent = Decimal(exponents[suffix[0]])
+        return number * (base ** exponent)
 
 def calcPercent(x, y, integer = False):
     """Calculate the percentage.
     """
-    percent = x / y * 100
-   
-    if integer:
-        return int(percent)
-    return percent
+    with tracer.start_as_current_span("calcPercent") as span:
+        span.set_attribute("x", x)
+        span.set_attribute("y", y)
+        
+        if y == 0:
+            return 0 if integer else 0.0
+        
+        percent = x / y * 100
+    
+        if integer:
+            return int(percent)
+        return percent
 
 ##############################################################
 ## Error Handler Functions

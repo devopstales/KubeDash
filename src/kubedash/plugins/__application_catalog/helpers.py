@@ -4,15 +4,27 @@ import os
 from flask import current_app
 from .application import ApplicationCreate
 
+#############################################################
+## Variables
+#############################################################
+
+from lib.initializers import (
+    separator_long,
+    separator_short
+)
+
 logger = getLogger(__name__)
 
 #############################################################
 ## Helper Functions
 ##############################################################
 
-local_app = current_app
+flask_app = current_app
 
 def init_applications(application_list=None):
+    flask_app.logger.info(separator_short)
+    flask_app.logger.info("Initializing application catalog with provided applications.")
+    
     for application in application_list or []:
         APP_NAME = application.get('name', None)
         APP_URL = application.get('url', None)
@@ -20,7 +32,7 @@ def init_applications(application_list=None):
         APP_ENABLED = application.get('enable', True)
         if APP_NAME and APP_URL:
             ApplicationCreate(
-                local_app,
+                flask_app,
                 application_name=APP_NAME,
                 application_url=APP_URL,
                 application_icon=APP_ICON,
@@ -28,6 +40,7 @@ def init_applications(application_list=None):
             )
         else:
             logger.warning(f"Skipping application registration for {APP_NAME} due to missing URL or name.")
+    flask_app.logger.info(separator_short)
             
 def update_security_policies(app, applications):
     """

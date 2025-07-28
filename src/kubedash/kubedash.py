@@ -28,7 +28,8 @@ from lib.before_request import init_before_request
 #############################################################
 
 from lib.initializers import (
-    separator_long
+    separator_long,
+    separator_short
 )
 
 #############################################################
@@ -58,11 +59,11 @@ def create_app(external_config_name=None):
     if not error and len(sys.argv) > 1 and sys.argv[1] not in ('cli', 'db'):
         initialize_app_tracing(app)
     
-    initialize_error_page(app)
-    initialize_app_swagger(app)
 
     # manage cli commands
     if not error:
+        initialize_error_page(app)
+        initialize_app_swagger(app)
         if sys.argv[1] == 'cli':
             initialize_app_database(app, __file__)
             print(separator_long)
@@ -75,15 +76,19 @@ def create_app(external_config_name=None):
             initialize_app_version(app)
             initialize_app_plugins(app)
             # connections
+            app.logger.info(separator_short)
             initialize_app_database(app, __file__)
             initialize_app_caching(app)
             init_before_request(app)
+            app.logger.info(separator_short)
             with app.app_context():
                 initialize_metrics_scraper(app)
+            app.logger.info(separator_short)
             initialize_app_socket(app)
             initialize_blueprints(app)
             add_custom_jinja2_filters(app)
             initialize_app_security(app)
+            
             
             print(separator_long)
             

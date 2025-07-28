@@ -1,5 +1,6 @@
 #!/usr/bin/env python3
 
+from email.policy import HTTP
 import logging
 import os
 import uuid
@@ -20,6 +21,7 @@ from opentelemetry.instrumentation.flask import FlaskInstrumentor
 from opentelemetry.instrumentation.logging import LoggingInstrumentor
 from opentelemetry.instrumentation.requests import RequestsInstrumentor
 from opentelemetry.instrumentation.sqlalchemy import SQLAlchemyInstrumentor
+from opentelemetry.instrumentation.redis import RedisInstrumentor
 
 from lib.components import csrf, db, migrate, login_manager, socketio, sess, api_doc
 from lib.init_functions import get_database_url
@@ -82,33 +84,63 @@ def initialize_app_logging(app: Flask):
         logging.getLogger("werkzeug").addFilter(NoPing())
         logging.getLogger("werkzeug").addFilter(NoSocketIoGet()) 
         logging.getLogger("werkzeug").addFilter(NoSocketIoPost())
-        
+         
 def initialize_error_page(app: Flask):
     """Initialize error pages
 
     Args:
         app (Flask): Flask app object
     """
-    @app.errorhandler(404)
-    def page_not_found404(e):
-        app.logger.error(e.description)
-        return render_template('errors/404.html.j2'), 404
-
     @app.errorhandler(400)
     def page_not_found400(e):
-        app.logger.error(e.description)
+        app.logger.error(f"400 Error: {e.description}")
         return render_template(
             'errors/400.html.j2',
-            description = e.description,
+            description=e.description,
             ), 400
+        
+    @app.errorhandler(403)
+    def page_not_found400(e):
+        app.logger.error(f"403 Error: {e.description}")
+        return render_template(
+            'errors/403.html.j2',
+            description=e.description,
+            ), 403
+        
+    @app.errorhandler(404)
+    def page_not_found404(e):
+        app.logger.error(f"404 Error: {e.description}")
+        return render_template('errors/404.html.j2'), 404
+
 
     @app.errorhandler(500)
-    def page_not_found500(e):
-        app.logger.error(e.description)
+    def internal_server_error(e):
+        # Handle cases where description might not exist
+        description = getattr(e, 'description', 'Internal Server Error')
+        app.logger.error(f"500 Error: {description}")
         return render_template(
             'errors/500.html.j2',
-            description = e.description,
+            description=description,
             ), 500
+
+    # Also handle generic exceptions
+    @app.errorhandler(Exception)
+    def handle_unexpected_error(e):
+        app.logger.error(f"Unexpected error: {str(e)}")
+        description = "An unexpected error occurred"
+        return render_template(
+            'errors/500.html.j2',
+            description=description,
+            ), 500
+        
+    @app.errorhandler(502)
+    def bad_gateway(e):
+        return render_template('errors/502.html.j2', description=e.description), 502
+
+    @app.errorhandler(504)
+    def gateway_timeout(e):
+        return render_template('errors/504.html.j2', description=e.description), 504
+
 
 def initialize_app_configuration(app: Flask, external_config_name: str) -> bool:
     """Initialize the configuration and return error if missing
@@ -214,7 +246,6 @@ def initialize_app_database(app: Flask, filename: str):
         app (Flask): Flask app object
         filename (str): Name of the main file to find the database file
     """
-    app.logger.info(separator_short)
     app.logger.info("Initialize Database:")
     
     """Get Database Configuration"""
@@ -358,7 +389,7 @@ def initialize_app_tracing(app: Flask):
     
     # 1. First setup exporter
     from lib.opentelemetry import init_opentelemetry_exporter
-    if not init_opentelemetry_exporter(jaeger_url):
+    if not init_opentelemetry_exporter(app, jaeger_url):
         return False
     
     # 2. Then initialize instrumentors
@@ -395,7 +426,7 @@ def initialize_app_caching(app: Flask):
 
     cache_ready = False
 
-    if redis_enabled:
+    if redis_enabled:       
         if cluster_enabled:
             # Parse cluster startup nodes
             startup_nodes_raw = ini.get('remote_cache', 'cluster_startup_nodes', fallback='')
@@ -493,7 +524,11 @@ def initialize_instrumentors(app: Flask):
         # Mirror important HTTP attributes
         span.set_attribute("http.route", environ.get('PATH_INFO'))
         span.set_attribute("http.method", environ.get('REQUEST_METHOD'))
-        span.set_attribute("http.user_agent", environ.get('HTTP_USER_AGENT'))
+        HTTP_USER_AGENT = environ.get('HTTP_USER_AGENT')
+        if HTTP_USER_AGENT:
+            span.set_attribute("http.user_agent", HTTP_USER_AGENT)
+        else:
+            span.set_attribute("http.user_agent", "Unknown")
 
     def response_hook(span, status, response_headers):
         """Ensure correlation ID header exists"""
@@ -522,7 +557,61 @@ def initialize_instrumentors(app: Flask):
             record.path = ''
             record.method = ''
 
+    def redis_request_hook(span, instance, args, kwargs=None):
+        """Updated Redis request hook with all arguments"""
+        correlation_id = get_correlation_id()
+        if correlation_id:
+            span.set_attribute("correlation_id", correlation_id)
+        
+        # Handle both args and kwargs
+        command_args = list(args)
+        if kwargs:
+            command_args.extend(f"{k}={v}" for k, v in kwargs.items())
+        
+        # Sanitize and truncate arguments
+        sanitized_args = [
+            arg.decode('utf-8') if isinstance(arg, bytes) else str(arg)
+            for arg in command_args[:3]  # Only show first 3 args
+        ]
+        span.set_attribute("redis.command", " ".join(sanitized_args))
+        
+        # Add connection context
+        if hasattr(instance, 'connection_pool'):
+            span.set_attributes({
+                "redis.connection.host": instance.connection_pool.connection_kwargs.get('host'),
+                "redis.connection.port": instance.connection_pool.connection_kwargs.get('port'),
+                "redis.connection.db": instance.connection_pool.connection_kwargs.get('db')
+            })
+
+    def redis_response_hook(span, instance, response):
+        """Record response metrics"""
+        if response is not None:
+            response_size = len(response) if isinstance(response, (bytes, str, list, dict)) else 1
+            span.set_attribute("redis.response_size", response_size)
+        
+        # Record cache hit/miss for GET operations
+        if span.is_recording() and hasattr(span, 'name') and 'get' in span.name.lower():
+            span.set_attribute("redis.cache_hit", response is not None)
+
+    app_config = app.config['kubedash.ini']
+    redis_enabled = app_config.get('remote_cache', 'redis_enabled', fallback='none').lower() == 'true'
+    
+    # Initialize Redis instrumentation
+    if redis_enabled:
+        app.logger.info("\tInitializing tracing for Redis")
+        RedisInstrumentor().instrument(
+            tracer_provider=trace.get_tracer_provider(),
+            request_hook=redis_request_hook,
+            response_hook=redis_response_hook,
+            # Enable these for more detailed tracing
+            enable_commenter=True,  # Adds trace context to Redis commands
+            suppress_instrumentation=False,
+            # Custom span names
+            span_name_formatter=lambda cmd: f"redis.{cmd.decode('utf-8').split()[0].lower()}"
+        )
+
     # Instrumentation with all hooks
+    app.logger.info("\tInitializing tracing for Flask")
     FlaskInstrumentor().instrument_app(
         app,
         excluded_urls="/vendor/*,/css/*,/scss/*,/js/*,/img/*,/static/*,/favicon.ico",
@@ -531,10 +620,12 @@ def initialize_instrumentors(app: Flask):
         tracer_provider=trace.get_tracer_provider()
     )
     
+    app.logger.info("\tInitializing tracing for SQLAlchemy")
     RequestsInstrumentor().instrument(
         tracer_provider=trace.get_tracer_provider()
     )
     
+    app.logger.info("\tInitializing tracing for Logging")
     LoggingInstrumentor().instrument(
         set_logging_format=True,
         log_hook=log_hook,
@@ -542,6 +633,7 @@ def initialize_instrumentors(app: Flask):
     )
     
     # Ensure WSGI middleware is properly instrumented
+    app.logger.info("\tInitializing OpenTelemetry WSGI Middleware")
     app.wsgi_app = OpenTelemetryMiddleware(
         app.wsgi_app,
         tracer_provider=trace.get_tracer_provider()
@@ -611,8 +703,6 @@ def initialize_app_plugins(app: Flask):
         except Exception as e:
             app.logger.error(f"  Error loading plugin {plugin_name}: {str(e)}")
     
-    app.logger.info(separator_short)
-
 def add_custom_jinja2_filters(app: Flask):
     """Add custom Jinja2 filers."""
     app.logger.info("Adding custom Jinja2 filters")
@@ -654,7 +744,8 @@ def initialize_app_security(app: Flask):
         'default-src': "'self'",
         'font-src': [
             "'self'",
-            'fonts.gstatic.com'
+            'fonts.gstatic.com',
+            'cdnjs.cloudflare.com',
         ],
         'style-src': [
             "'self'",
@@ -665,7 +756,9 @@ def initialize_app_security(app: Flask):
         'script-src': [
             "'self'",
             "'unsafe-inline'",  # Only if absolutely necessary
+            "'unsafe-eval'",
             'cdnjs.cloudflare.com',
+            'www.googletagmanager.com',
         ],
         'img-src': [
             "'self'",
@@ -680,6 +773,9 @@ def initialize_app_security(app: Flask):
 
     app.config['SECRET_KEY'] = os.urandom(12).hex()
     # add rootCA folder # MissingImplementation
+    
+    """Init Talisman"""
+    app.talisman = Talisman(app)
 
     if app.config['ENV'] == 'production':
         from werkzeug.middleware.proxy_fix import ProxyFix 
@@ -687,24 +783,22 @@ def initialize_app_security(app: Flask):
         app.wsgi_app = ProxyFix(
           app.wsgi_app, x_for=1, x_proto=1, x_host=1, x_prefix=1
         )
-        """Init Talisman"""
-        talisman = Talisman(app)
-        talisman.force_https = False
-        talisman.strict_transport_security = hsts
+        """Config Talisman"""
+        app.talisman.force_https = True
+        app.talisman.strict_transport_security = hsts
 
     else:
-        """Init Talisman"""
-        talisman = Talisman(app)
-        talisman.force_https = False
+        """Config Talisman"""
+        app.talisman.force_https = False
         
         
     """Init CSRF"""
     csrf.init_app(app)
 
-    talisman.content_security_policy = csp
-    talisman.x_xss_protection = True
-    talisman.session_cookie_secure = True
-    talisman.session_cookie_samesite = 'Lax'
+    app.talisman.content_security_policy = csp
+    app.talisman.x_xss_protection = True
+    app.talisman.session_cookie_secure = True
+    app.talisman.session_cookie_samesite = 'Lax'
 
     @app.after_request
     def set_security_headers(response):
@@ -717,7 +811,6 @@ def initialize_app_security(app: Flask):
         response.headers['Cross-Origin-Opener-Policy']   = "same-origin"
         response.headers['Cross-Origin-Resource-Policy'] = "same-origin"
         response.headers["Access-Control-Max-Age"] = "600"
-        response.headers['Clear-Site-Data'] = "*"
 
         # Cache
         response.headers["Cache-Control"] = "no-store, max-age=0"

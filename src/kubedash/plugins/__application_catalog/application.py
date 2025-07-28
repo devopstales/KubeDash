@@ -10,11 +10,11 @@ from .model import ApplicationCatalog
 ## Registry Server
 ##############################################################
 
-def ApplicationCreate(local_app, application_name, application_url, application_icon, application_enabled=True):
+def ApplicationCreate(current_app, application_name, application_url, application_icon, application_enabled=True):
     """Create application object in database if it doesn't already exist
     
     Args:
-        local_app: Flask application context
+        current_app: Flask application context
         application_name (str): Name of application
         application_url (str): URL of the application
         application_icon (str): base64 encoded icon of the application
@@ -32,7 +32,7 @@ def ApplicationCreate(local_app, application_name, application_url, application_
         
         if existing_app:
             db.session.rollback()  # Release the lock
-            local_app.logger.info(f"Application already exists: {application_name} at {application_url}")
+            current_app.logger.info(f"\tApplication already exists: {application_name} at {application_url}")
             return True, "Application already exists", existing_app
         
         # Create new application
@@ -44,12 +44,12 @@ def ApplicationCreate(local_app, application_name, application_url, application_
         )
         db.session.add(new_app)
         db.session.commit()
-        local_app.logger.info(f"Registered application: {application_name} at {application_url}")
+        current_app.logger.info(f"\tRegistered application: {application_name} at {application_url}")
         return True, "Application created successfully", new_app
         
     except IntegrityError as e:
         db.session.rollback()
-        local_app.logger.error(f"Integrity error creating application {application_name}: {str(e)}")
+        current_app.logger.error(f"\tIntegrity error creating application {application_name}: {str(e)}")
         # Try to return the existing application if the error was due to a race condition
         existing = ApplicationCatalog.query.filter_by(application_url=application_url).first()
         if existing:
@@ -58,15 +58,15 @@ def ApplicationCreate(local_app, application_name, application_url, application_
         
     except Exception as e:
         db.session.rollback()
-        local_app.logger.error(f"Error creating application {application_name}: {str(e)}")
+        current_app.logger.error(f"\tError creating application {application_name}: {str(e)}")
         return False, f"Error creating application: {str(e)}", None
     
         
-def ApplicationUpdate(local_app, application_name, application_url_old, application_url, application_icon, application_enabled=False):
+def ApplicationUpdate(current_app, application_name, application_url_old, application_url, application_icon, application_enabled=False):
     """Update application object in database
     
     Args:
-        local_app: Flask application context
+        current_app: Flask application context
         application_name (str): Name of application
         application_url (str): New URL of the application
         application_url_old (str): Old URL of the application (to find the record)
@@ -91,6 +91,7 @@ def ApplicationUpdate(local_app, application_name, application_url_old, applicat
         ).first()
         
         if existing_app:
+            current_app.logger.warning(f"\tAnother application already uses URL: {application_url}")
             return False, f"Another application already uses URL: {application_url}"
     
     # Proceed with the update
@@ -100,7 +101,7 @@ def ApplicationUpdate(local_app, application_name, application_url_old, applicat
         application.application_icon = application_icon
         application.application_enabled = application_enabled
         db.session.commit()
-        local_app.logger.info(f"Update application: {application_name} at {application_url}")
+        current_app.logger.info(f"\tUpdate application: {application_name} at {application_url}")
         return True, "Application updated successfully"
     except Exception as e:
         db.session.rollback()
