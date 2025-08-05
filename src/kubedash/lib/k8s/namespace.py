@@ -31,7 +31,7 @@ def k8sListNamespaces(username_role, user_token):
             span.set_attribute("user.role", username_role)
         k8sClientConfigGet(username_role, user_token)
         try:
-            namespace_list = k8s_client.CoreV1Api().list_namespace(_request_timeout=1, timeout_seconds=1)
+            namespace_list = k8s_client.CoreV1Api().list_namespace(_request_timeout=1)
             return namespace_list, None
         except ApiException as error:
             if error.status != 404:
@@ -47,7 +47,7 @@ def k8sListNamespaces(username_role, user_token):
             namespace_list = ""
             return namespace_list, "CannotConnect"
 
-@cache.memoize(timeout=long_cache_time)
+#@cache.memoize(timeout=long_cache_time)
 def k8sNamespaceListGet(username_role, user_token):
     """Get the list of namespaces
 
@@ -162,7 +162,7 @@ def k8sNamespaceCreate(username_role, user_token, ns_name):
             )
         )
     try:
-        api_response = api_instance.create_namespace(body, pretty=pretty, field_manager=field_manager, _request_timeout=1, timeout_seconds=1)
+        api_response = api_instance.create_namespace(body, pretty=pretty, field_manager=field_manager, _request_timeout=1)
         flash("Namespace Created Successfully", "success")
     except ApiException as error:
         if error.status != 404:
@@ -186,7 +186,7 @@ def k8sNamespaceDelete(username_role, user_token, ns_name):
     with k8s_client.ApiClient() as api_client:
         api_instance = k8s_client.CoreV1Api(api_client)
     try:
-        api_response = api_instance.delete_namespace(ns_name, pretty=pretty, _request_timeout=1, timeout_seconds=1)
+        api_response = api_instance.delete_namespace(ns_name, pretty=pretty, _request_timeout=1)
         flash("Namespace Deleted Successfully", "success")
     except ApiException as error:
         if error.status != 404:

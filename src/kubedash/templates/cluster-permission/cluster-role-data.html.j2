@@ -7,7 +7,7 @@
         <ol class="breadcrumb my-0">
           <li class="breadcrumb-item"><span>Cluster Permissions</span></li>
           <li class="breadcrumb-item"><a href="/cluster-permission/cluster-role">Cluster Role</a></li>
-          <li class="breadcrumb-item active"><span>{{ selected }}</span></li>
+          <li class="breadcrumb-item active"><span>{{ cr_name }}</span></li>
         </ol>
       </nav>
     </div>
@@ -34,50 +34,64 @@
                     </tr>
                 </thead>
                 <tbody>
-                {% for cr in cluster_roles %}
-                {% if cr_name == cr.name %}
-                {% for rules in cr.rules %}
+                {% if cluster_role %}
+                    {% if cluster_role.rules %}
+                        {% for rules in cluster_role.rules %}
+                            <tr>
+                                <td>
+                                    {% if rules.api_groups %}
+                                    {% for ag in rules.api_groups %}
+                                        {{ ag }}{% if not loop.last %}<br>{% endif %}
+                                    {% endfor %}
+                                    {% else %}
+                                        {{ rules.api_groups }}
+                                    {% endif %}
+                                </td>
+                                <td>
+                                    {% if rules.resource_names %}
+                                    {% for rn in rules.resource_names %}
+                                        {{ rn }}{% if not loop.last %}<br>{% endif %}
+                                    {% endfor %}
+                                    {% else %}
+                                        {{ rules.resource_names }}
+                                    {% endif %}
+                                </td>
+                                <td>
+                                    {% if rules.resources %}
+                                    {% for r in rules.resources %}
+                                        {{ r }}{% if not loop.last %}<br>{% endif %}
+                                    {% endfor %}
+                                    {% else %}
+                                        {{ rules.resources }}
+                                    {% endif %}
+                                </td>
+                                <td>
+                                    {% if rules.verbs %}
+                                    {% for v in rules.verbs %}
+                                        {{ v }}{% if not loop.last %}<br>{% endif %}
+                                    {% endfor %}
+                                    {% else %}
+                                        {{ rules.verbs }}
+                                    {% endif %}
+                                </td>
+                            </tr>
+                        {% endfor %}
+                    {% else %}
                     <tr>
-                        <td>
-                            {% if rules.api_groups %}
-                            {% for ag in rules.api_groups %}
-                                {{ ag }}{% if not loop.last %}<br>{% endif %}
-                            {% endfor %}
-                            {% else %}
-                                {{ rules.api_groups }}
-                            {% endif %}
-                        </td>
-                        <td>
-                            {% if rules.resource_names %}
-                            {% for rn in rules.resource_names %}
-                                {{ rn }}{% if not loop.last %}<br>{% endif %}
-                            {% endfor %}
-                            {% else %}
-                                {{ rules.resource_names }}
-                            {% endif %}
-                        </td>
-                        <td>
-                            {% if rules.resources %}
-                            {% for r in rules.resources %}
-                                {{ r }}{% if not loop.last %}<br>{% endif %}
-                            {% endfor %}
-                            {% else %}
-                                {{ rules.resources }}
-                            {% endif %}
-                        </td>
-                        <td>
-                            {% if rules.verbs %}
-                            {% for v in rules.verbs %}
-                                {{ v }}{% if not loop.last %}<br>{% endif %}
-                            {% endfor %}
-                            {% else %}
-                                {{ rules.verbs }}
-                            {% endif %}
-                        </td>
+                        <td></td>
+                        <td class="text-center">No rules found.</td>
+                        <td></td>
+                        <td></td>
                     </tr>
-                {% endfor %}
+                    {% endif %}
+                {% else %}
+                <tr>
+                    <td></td>
+                    <td class="text-center">No role.</td>
+                    <td></td>
+                    <td></td>
+                </tr>
                 {% endif %}
-                {% endfor %}  
                 </tbody>
             </table>
         </div>
@@ -86,5 +100,5 @@
 {% endblock %}
 
 {% block add_head_css %}
-{% include "segments/datatable_snipet.html.j2" %}
+{% include "segments/datatable_snippet.html.j2" %}
 {% endblock %}

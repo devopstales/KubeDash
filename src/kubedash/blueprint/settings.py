@@ -38,15 +38,26 @@ tracer = get_tracer()
 def sso_config():
     if request.method == 'POST':
         oauth_server_uri = request.form['oauth_server_uri']
-        oauth_server_ca = str(base64_encode(oauth_server_ca.strip()), 'UTF-8') if oauth_server_ca else None
+        oauth_server_ca = None
+        if "oauth_server_ca" in request.form:
+            oauth_server_ca_bas64 = request.form['oauth_server_ca']
+            oauth_server_ca = str(base64_encode(oauth_server_ca_bas64.strip()), 'UTF-8')
         client_id = request.form['client_id']
         client_secret = request.form['client_secret']
         base_uri = request.form['base_uri']
         if not base_uri:
             base_uri = request.root_url.rstrip(request.root_url[-1])
-        scope = request.form.getlist('scope')
-        while("" in scope):
-            scope.remove("")
+        if "scope" in request.form:
+            scope = request.form.getlist('scope')
+            while("" in scope):
+                scope.remove("")
+        else:
+            scope = [
+                "openid",          # mandatory for OpenIDConnect auth
+                "email",           # smallest and most consistent scope and claim
+                "offline_access",  # needed to actually ask for refresh_token
+                "profile",
+            ]
 
         request_type = request.form['request_type']
         if request_type == "edit":
@@ -71,13 +82,7 @@ def sso_config():
             return render_template(
                 'settings/sso-config.html.j2',
                 base_uri = request.root_url.rstrip(request.root_url[-1]),
-                scope = [
-                    "openid",          # mandatory for OpenIDConnect auth
-                    "email",           # smallest and most consistent scope and claim
-                    "offline_access",  # needed to actually ask for refresh_token
-                    "good-service",
-                    "profile",
-                ]
+                scope = scope
             )
         else:
             return render_template(
@@ -99,7 +104,7 @@ def callback():
             flash('Error encountered.', "danger")
     ssoServer = SSOSererGet()
     if ('code' not in request.args and 'state' not in request.args) or not ssoServer:
-        return redirect(url_for('sso_bp.login'))
+        return redirect(url_for('sso.login'))
     else:
         auth_server_info, oauth = get_auth_server_info()
         token_url = auth_server_info["token_endpoint"]

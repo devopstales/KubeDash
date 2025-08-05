@@ -20,7 +20,7 @@ def FluxBucketRepositoryGet(username_role, user_token, namespace):
     api_version = sourceVersion
     api_plural = "buckets"
     try:
-        k8s_objects = k8s_client.CustomObjectsApi().list_namespaced_custom_object(api_group, api_version, namespace, api_plural, _request_timeout=1, timeout_seconds=1)
+        k8s_objects = k8s_client.CustomObjectsApi().list_namespaced_custom_object(api_group, api_version, namespace, api_plural, _request_timeout=1)
         return k8s_objects.get('items', [])
     except ApiException as error:
         if error.status != 404:
@@ -40,7 +40,7 @@ def FluxGitRepositoryGet(username_role, user_token, namespace):
     api_version = sourceVersion
     api_plural = "gitrepositories"
     try:
-        k8s_objects = k8s_client.CustomObjectsApi().list_namespaced_custom_object(api_group, api_version, namespace, api_plural, _request_timeout=1, timeout_seconds=1)
+        k8s_objects = k8s_client.CustomObjectsApi().list_namespaced_custom_object(api_group, api_version, namespace, api_plural, _request_timeout=1)
         return k8s_objects.get('items', [])
     except ApiException as error:
         if error.status != 404:
@@ -60,7 +60,7 @@ def FluxHelmChartGet(username_role, user_token, namespace):
     api_version = sourceVersion
     api_plural = "helmcharts"
     try:
-        k8s_objects = k8s_client.CustomObjectsApi().list_namespaced_custom_object(api_group, api_version, namespace, api_plural, _request_timeout=1, timeout_seconds=1)
+        k8s_objects = k8s_client.CustomObjectsApi().list_namespaced_custom_object(api_group, api_version, namespace, api_plural, _request_timeout=1)
         return k8s_objects.get('items', [])
     except ApiException as error:
         if error.status != 404:
@@ -80,7 +80,7 @@ def FluxHelmRepositoryGet(username_role, user_token, namespace):
     api_version = sourceVersion
     api_plural = "helmrepositories"
     try:
-        k8s_objects = k8s_client.CustomObjectsApi().list_namespaced_custom_object(api_group, api_version, namespace, api_plural, _request_timeout=1, timeout_seconds=1)
+        k8s_objects = k8s_client.CustomObjectsApi().list_namespaced_custom_object(api_group, api_version, namespace, api_plural, _request_timeout=1)
         return k8s_objects.get('items', [])
     except ApiException as error:
         if error.status != 404:
@@ -101,7 +101,7 @@ def FluxOCIRepositoryGet(username_role, user_token, namespace):
     api_plural = "ocirepositories"
     k8s_objects = []
     try:
-        k8s_objects = k8s_client.CustomObjectsApi().list_namespaced_custom_object(api_group, api_version, namespace, api_plural, _request_timeout=1, timeout_seconds=1)
+        k8s_objects = k8s_client.CustomObjectsApi().list_namespaced_custom_object(api_group, api_version, namespace, api_plural, _request_timeout=1)
         return k8s_objects.get('items', [])
     except ApiException as error:
         if error.status != 404:

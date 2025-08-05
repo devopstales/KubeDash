@@ -46,7 +46,6 @@ def get_custom_resources(username_role, user_token):
                 )[0]
                 
                 for resource in resources.get('resources', []):
-                    print(resource) # Debug
                     if '/' not in resource['name']:
                         crd_list.append({
                             "name": resource['name'],

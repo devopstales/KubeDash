@@ -39,7 +39,6 @@
         <tbody>
           {% for name, release in chart_list.items() %}
           {% for rd in release %}
-          {% if loop.last %}
           {% if selected == name %}
             <tr class="selected" >
           {% else %}
@@ -54,7 +53,8 @@
               <form action="/plugins/helm-charts/data" method="POST">
                 <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
                 <input type="hidden" name="ns_select" value="{{ session['ns_select'] }}" />
-                <input type="hidden" name="selected" value="{{ name }}" />
+                <input type="hidden" name="helm_release_name" value="{{ name }}" />
+                <input type="hidden" name="helm_release_version" value="{{ rd.release_version }}" />
                 <a href="javascript:;" onclick="parentNode.submit();">{{ name }}</a>
               </form>
             </td>
@@ -67,10 +67,9 @@
             </td>
             <td>{{ rd.chart_name }}-{{ rd.chart_version }}</td>
             <td>{{ rd.app_version }}</td>
-            <td>{{ rd.revision }}</td>
+            <td>{{ rd.release_version }}</td>
             <td>{{ rd.updated }}</td>
           </tr>
-          {% endif %}
           {% endfor %}
           {% endfor %}
         </tbody>
@@ -85,5 +84,5 @@
 {% endblock %}
 
 {% block add_head_css %}
-{% include "segments/datatable_snipet.html.j2" %}
+{% include "segments/datatable_snippet.html.j2" %}
 {% endblock %}

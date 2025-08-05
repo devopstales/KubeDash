@@ -23,10 +23,7 @@
         <h6 class="m-0 font-weight-bold text-primary">Chart Data</h6>
     </div>
     <div class="card-body">
-        <!-- Chart releases loop -->
-        {% for rd in chart_data %}
-        {% if loop.last %}
-
+        <!-- Chart releases -->
         <ul class="nav nav-tabs" id="nav-tab" role="tablist">
             <li class="nav-item">
                 <a class="nav-link active" id="nav-release-tab" data-bs-toggle="tab" href="#nav-release" role="tab" aria-controls="nav-release" aria-selected="true" data-bs-toggle="tab">Release</a>
@@ -41,7 +38,7 @@
                 <a class="nav-link" id="nav-resources-tab" data-bs-toggle="tab" href="#nav-resources" role="tab" aria-controls="nav-resources" aria-selected="false" data-bs-toggle="tab">Resources</a>
             </li>
             {#
-            {% if rd.dependencies %}
+            {% if chart_data.dependencies %}
             <li class="nav-item">
                 <a class="nav-link" id="nav-dependencies-tab" data-bs-toggle="tab" href="#nav-dependencies" role="tab" aria-controls="nav-dependencies" aria-selected="false" data-bs-toggle="tab">Dependencies</a>
             </li>
@@ -74,28 +71,28 @@
                             <tr>
                                 <th>Status:</th>
                                 <td>
-                                    {% if rd.status == "deployed" %}
-                                        <span class="badge text-bg-tag text-bg-success">{{ rd.status }}</span>
+                                    {% if chart_data.status == "deployed" %}
+                                        <span class="badge text-bg-tag text-bg-success">{{ chart_data.status }}</span>
                                     {% else %}
-                                        <span class="badge text-bg-tag text-bg-danger">{{ rd.status }}</span>
+                                        <span class="badge text-bg-tag text-bg-danger">{{ chart_data.status }}</span>
                                     {% endif %}
                                 </td>
                             </tr>
                             <tr>
                                 <th>Revision:</th>
-                                <td>{{ rd.revision }}</td>
+                                <td>{{ chart_data.release_version }}</td>
                             </tr>
                             <tr>
                                 <th>Chart Version:</th>
-                                <td>{{ rd.chart_name }}-{{ rd.chart_version }}</td>
+                                <td>{{ chart_data.chart_name }}-{{ chart_data.chart_version }}</td>
                             </tr>
                             <tr>
                                 <th>App Version:</th>
-                                <td>{{ rd.app_version }}</td>
+                                <td>{{ chart_data.app_version }}</td>
                             </tr>
                             <tr>
                                 <th>Created:</th>
-                                <td>{{ rd.updated }}</td>
+                                <td>{{ chart_data.updated }}</td>
                             </tr>
                             </table>
                         </div>
@@ -110,7 +107,7 @@
                             <h3>Values</h3>
                             
                             <div class="table-responsive">
-                                <pre><code>{{ rd["values"] }}</code></pre>
+                                <pre><code>{{ chart_data["values"] }}</code></pre>
                             </div>
                         </div>
                     </div>
@@ -124,7 +121,7 @@
                             <h3>Manifests</h3>
                             
                             <div class="table-responsive">
-                                <pre><code>{{ rd.manifests }}</code></pre>
+                                <pre><code>{{ chart_data.manifests }}</code></pre>
                             </div>
                         </div>
                     </div>
@@ -146,7 +143,7 @@
                                         </tr>
                                     </thead>
                                     <tbody>
-                                        {% for deployment in rd.deployments %}
+                                        {% for deployment in chart_data.deployments %}
                                         <tr>
                                             <td>Deployment</td>
                                             <td>
@@ -159,7 +156,7 @@
                                             </td>
                                         </tr>
                                         {% endfor %}
-                                        {% for daemonset in rd.daemonset %}
+                                        {% for daemonset in chart_data.daemonset %}
                                         <tr>
                                             <td>Daemonset</td>
                                             <td>
@@ -172,7 +169,7 @@
                                             </td>
                                         </tr>
                                         {% endfor %}
-                                        {% for ss in rd.statefulsets %}
+                                        {% for ss in chart_data.statefulsets %}
                                         <tr>
                                             <td>Stateful Set</td>
                                             <td>
@@ -185,7 +182,7 @@
                                             </td>
                                         </tr>
                                         {% endfor %}
-                                        {% for service in rd.services %}
+                                        {% for service in chart_data.services %}
                                         <tr>
                                             <td>Service</td>
                                             <td>
@@ -198,7 +195,7 @@
                                             </td>
                                         </tr>
                                         {% endfor %}
-                                        {% for ingress in rd.ingresses %}
+                                        {% for ingress in chart_data.ingresses %}
                                         <tr>
                                             <td>Ingress</td>
                                             <td>
@@ -211,7 +208,7 @@
                                             </td>
                                         </tr>
                                         {% endfor %}
-                                        {% for sa in rd.service_accounts %}
+                                        {% for sa in chart_data.service_accounts %}
                                         <tr>
                                             <td>Aervice Account</td>
                                             <td>
@@ -224,7 +221,7 @@
                                             </td>
                                         </tr>
                                         {% endfor %}
-                                        {% for secret in rd.secrets %}
+                                        {% for secret in chart_data.secrets %}
                                         <tr>
                                             <td>Secret</td>
                                             <td>
@@ -237,7 +234,7 @@
                                             </tr>
                                         </tr>
                                         {% endfor %}
-                                        {% for configmap in rd.configmaps %}
+                                        {% for configmap in chart_data.configmaps %}
                                         <tr>
                                             <td>Configmap</td>
                                             <td>
@@ -250,7 +247,7 @@
                                             </td>
                                         </tr>
                                         {% endfor %}
-                                        {% for pvc in rd.persistent_volume_claims %}
+                                        {% for pvc in chart_data.persistent_volume_claims %}
                                         <tr>
                                             <td>Persistent Volume Claim</td>
                                             <td>
@@ -272,7 +269,7 @@
             </div>
             <!-- dependencies -->
             {#
-            {% if rd.dependencies %}
+            {% if chart_data.dependencies %}
             <div class="tab-pane fade" id="nav-dependencies" role="tabpanel" aria-labelledby="nav-profile-tab">
                 <div id="accordion">
                     <div class="card shadow mb-4">
@@ -288,14 +285,12 @@
             {% endif %}
             #}
         </div>
-        <!-- End Of Chart releases loop -->
-        {% endif %}
-        {% endfor %}
+        <!-- End Of Chart releases -->
     </div>
 </div>
 {% endblock %}
 
 {% block add_head_css %}
-{% include "segments/datatable_snipet.html.j2" %}
-{% include "segments/highlight_snipet.html.j2"%}
+{% include "segments/datatable_snippet.html.j2" %}
+{% include "segments/highlight_snippet.html.j2"%}
 {% endblock %}

@@ -43,6 +43,7 @@
                     <th>Created:</th>
                     <td>{{ ns_data.created }}</td>
                 </tr>
+                <!-- Disable Scale Function  
                 <tr>
                     <th>Scale:</th>
                     <td>
@@ -62,6 +63,7 @@
                           </form>
                           {% endif %}
                     </td>
+                    --- IGNORE --> 
                 </tr>
                 <tr>
                     <th>Annotations:</th>
@@ -116,5 +118,5 @@
 {% endblock %}
 
 {% block add_head_css %}
-{% include "segments/datatable_snipet.html.j2" %}
+{% include "segments/datatable_snippet.html.j2" %}
 {% endblock %}

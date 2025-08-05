@@ -97,11 +97,11 @@ def users_add():
         email_test = bool(email_check(email))
         if not email_test:
             flash("Email is not valid", "danger")
-            return redirect(url_for('users_bp.users_list'))
+            return redirect(url_for('users.users_list'))
         
         elif not len(password) >= 8:
             flash("Password must be 8 character in length", "danger")
-            return redirect(url_for('users_bp.users_list'))
+            return redirect(url_for('users.users_list'))
         else:
             if type != "Local":
                 private_key_base64, user_certificate_base64 = k8sCreateUser(username)
@@ -109,7 +109,7 @@ def users_add():
 
             UserCreate(username, password, email, type, role, None)
             flash("User Created Successfully", "success")
-            return redirect(url_for('users_bp.users_list'))
+            return redirect(url_for('users.users_list'))
     else:
         return redirect(url_for('auth.login'))
     
@@ -120,7 +120,7 @@ def users_delete():
         username = request.form['username']
         UserDelete(username)
         flash("User Deleted Successfully", "success")
-        return redirect(url_for('users_bp.users_list'))
+        return redirect(url_for('users.users_list'))
     else:
         return redirect(url_for('auth.login'))
     
