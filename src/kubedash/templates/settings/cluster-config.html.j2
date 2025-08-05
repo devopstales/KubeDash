@@ -170,8 +170,8 @@
 {% endblock %}
 
 {% block add_tail_js %}
-{% include "segments/datatable_snipet.html.j2" %}
-{% include "segments/functions_snipet.j2"%}
+{% include "segments/datatable_snippet.html.j2" %}
+{% include "segments/functions_snippet.j2"%}
     <script>
         var popoverTriggerList = [].slice.call(document.querySelectorAll('[data-bs-toggle="CertTooltip"]'))
         var popoverList = popoverTriggerList.map(function (popoverTriggerEl) {

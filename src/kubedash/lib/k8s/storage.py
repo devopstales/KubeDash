@@ -16,7 +16,7 @@ def k8sStorageClassListGet(username_role, user_token):
     k8sClientConfigGet(username_role, user_token)
     SC_LIST = list()
     try:
-        storage_classes = k8s_client.StorageV1Api().list_storage_class(_request_timeout=1, timeout_seconds=1)
+        storage_classes = k8s_client.StorageV1Api().list_storage_class(_request_timeout=1)
         for sc in storage_classes.to_dict()["items"]:
             SC = {
                 "name": sc["metadata"]["name"],
@@ -51,7 +51,7 @@ def k8sSnapshotClassListGet(username_role, user_token):
             "snapshot.storage.k8s.io", 
             "v1", 
             "volumesnapshotclasses",
-            _request_timeout=1, timeout_seconds=1
+            _request_timeout=1
         )
         for sc in snapshot_classes["items"]:
             SC = {
@@ -84,7 +84,7 @@ def k8sPersistentVolumeClaimListGet(username_role, user_token, namespace):
     k8sClientConfigGet(username_role, user_token)
     PVC_LIST = list()
     try:
-        persistent_volume_clames= k8s_client.CoreV1Api().list_namespaced_persistent_volume_claim(namespace, _request_timeout=1, timeout_seconds=1)
+        persistent_volume_clames= k8s_client.CoreV1Api().list_namespaced_persistent_volume_claim(namespace, _request_timeout=1)
         for pvc in persistent_volume_clames.items:
             PVC = {
                 "status": pvc.status.phase,
@@ -117,7 +117,7 @@ def k8sPersistentVolumeListGet(username_role, user_token, namespace):
     k8sClientConfigGet(username_role, user_token)
     PV_LIST = list()
     try:
-        pv_list = k8s_client.CoreV1Api().list_persistent_volume(_request_timeout=1, timeout_seconds=1)
+        pv_list = k8s_client.CoreV1Api().list_persistent_volume(_request_timeout=1)
         for pv in pv_list.items:
             if namespace == pv.spec.claim_ref.namespace:
                 PV = {
@@ -167,7 +167,7 @@ def k8sPersistentVolumeSnapshotListGet(username_role, user_token):
             "snapshot.storage.k8s.io", 
             "v1", 
             "volumesnapshots", 
-            _request_timeout=1, timeout_seconds=1
+            _request_timeout=1
         )
         for pvs in snapshot_list["items"]:
             PVS = {
@@ -200,7 +200,7 @@ def k8sPersistentVolumeSnapshotListGet(username_role, user_token):
 def k8sConfigmapListGet(username_role, user_token, namespace):
     k8sClientConfigGet(username_role, user_token)
     CONFIGMAP_LIST = list()
-    configmap_list = k8s_client.CoreV1Api().list_namespaced_config_map(namespace, _request_timeout=1, timeout_seconds=1)
+    configmap_list = k8s_client.CoreV1Api().list_namespaced_config_map(namespace, _request_timeout=1)
     for configmap in configmap_list.items:
         CONFIGMAP_DATA = {
             "name": configmap.metadata.name,

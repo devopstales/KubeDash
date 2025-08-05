@@ -1,4 +1,7 @@
-# KubeDash Operator
+# KubeDash Extension API Server
+
+* https://kubernetes.io/docs/tasks/extend-kubernetes/setup-extension-api-server/
+* https://kubernetes.io/docs/tasks/extend-kubernetes/configure-aggregation-layer/
 
 ## CRDs
 
@@ -116,3 +119,4 @@ The admission Controller functionality:
 | `Namespace` is created | Create corresponding `Project`   |
 | `Namespace` is deleted | Delete corresponding `Project`   |
 | `Project` is deleted   | Delete corresponding `Namespace` |
+

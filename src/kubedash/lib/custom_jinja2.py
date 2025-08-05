@@ -17,8 +17,11 @@ def j2_b64decode(value: str) -> str:
     Returns:
         decoded_value (str): Decoded value
     """
-    decoded_value = str(base64_decode(value), 'UTF-8')
-    return decoded_value
+    if value:
+        decoded_value = str(base64_decode(value), 'UTF-8')
+        return decoded_value
+    else:
+        raise ValueError("Value cannot be None or empty")
 
 ##############################################################
 ## base64 encode
@@ -32,8 +35,11 @@ def j2_b64encode(value: str) -> str:
     Returns:
         encoded_value (str): Base64 encoded value
     """
-    encoded_value = str(base64_encode(value), 'UTF-8')
-    return encoded_value
+    if value:
+        encoded_value = str(base64_encode(value), 'UTF-8')
+        return encoded_value
+    else:
+        raise ValueError("Value cannot be None or empty")
 
 ##############################################################
 ## split uppercase

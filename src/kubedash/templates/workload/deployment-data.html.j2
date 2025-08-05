@@ -67,16 +67,20 @@
                                 {% if session['user_role'] == "Admin" %}
                                     <td>
                                         <div class="input-group">
+                                            <!-- Disbale Dcale
                                             <div class="input-group-prepend">
                                               <button id="ctrl__button--decrement" class="btn btn-outline-danger" type="button">-</button>
                                             </div>
+                                            --->
                                             <input type="text" class="spinner" id="spinner" readonly="readonly" 
                                                 value="{{ deployment_data.replicas }}"  k8s_type="deployments" 
                                                 csrf_token="{{ csrf_token() }}" selected="{{ deployment_data.name }}"
                                                 namespace="{{ deployment_data.namespace }}">
+                                            <!-- Disbale Dcale
                                             <div class="input-group-append">
                                                 <button id="ctrl__button--increment" class="btn btn-outline-success" type="button">+</button>
-                                              </div>
+                                            </div>
+                                            -->
                                           </div>
                                     </td>
                                 {% else %}
@@ -399,7 +403,7 @@
 {% endblock %}
 
 {% block add_head_css %}
-{% include "segments/datatable_snipet.html.j2" %}
+{% include "segments/datatable_snippet.html.j2" %}
 {% endblock %}
 
 {% block add_tail_js %}

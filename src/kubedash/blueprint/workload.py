@@ -15,7 +15,7 @@ from lib.k8s.workload import (ErrorHandler, k8sDaemonsetPatch,
                               k8sDaemonSetsGet, k8sDeploymentsGet,
                               k8sDeploymentsPatchReplica, k8sPodExecSocket,
                               k8sPodExecStream, k8sPodGet, k8sPodGetContainers,
-                              k8sPodListGet, k8sPodLogsStream,
+                              k8sPodListGet, k8sPodLogsStream, k8sPodDelete,
                               k8sReplicaSetsGet, k8sStatefulSetPatchReplica,
                               k8sStatefulSetsGet)
 from lib.sso import get_user_token
@@ -50,7 +50,7 @@ def pod_list():
     
     if request.method == 'POST':
         selected = request.form.get('selected')
-        if request.form.get('ns_select', None):
+        if 'ns_select' in request.form:
             session['ns_select'] = request.form.get('ns_select')
 
     user_token = get_user_token(session)
@@ -65,13 +65,31 @@ def pod_list():
         namespaces = namespace_list,
         selected = selected
     )
+    
+@workload_bp.route('/pods/delete', methods=['POST'])
+@login_required
+def pod_delete():
+    if request.method == 'POST':
+        pod_name = request.form.get('pod_name')
+        if 'ns_select' in request.form:
+            session['ns_select'] = request.form.get('ns_select')
+
+        user_token = get_user_token(session)
+        
+        try:
+            k8sPodDelete(session['user_role'], user_token, session['ns_select'], pod_name)
+            return redirect(url_for('.pod_list'))
+        except ApiException:
+            return redirect(url_for('.pod_list'))
+        
+            
 
 @workload_bp.route('/pods/data', methods=['GET', 'POST'])
 @login_required
 def pod_data():
     if request.method == 'POST':
         po_name = request.form.get('po_name')
-        if request.form.get('ns_select'):
+        if 'ns_select' in request.form:
             session['ns_select'] = request.form.get('ns_select')
 
         user_token = get_user_token(session)
@@ -99,7 +117,7 @@ logging.getLogger('engineio').setLevel(logging.ERROR)
 def pod_logs():
     if request.method == 'POST':
         po_name = request.form.get('po_name')
-        if request.form.get('ns_select', None):
+        if 'ns_select' in request.form:
             session['ns_select'] = request.form.get('ns_select')
 
         user_token = get_user_token(session)
@@ -145,7 +163,7 @@ def log_message(po_name, container):
 def pod_exec():
     if request.method == 'POST':
         po_name = request.form.get('po_name')
-        if request.form.get('ns_select', None):
+        if 'ns_select' in request.form:
             session['ns_select'] = request.form.get('ns_select')
 
         user_token = get_user_token(session)
@@ -212,7 +230,7 @@ def statefulsets():
     user_token = get_user_token(session)
 
     if request.method == 'POST':
-        if request.form.get('ns_select', None):
+        if 'ns_select' in request.form:
             session['ns_select'] = request.form.get('ns_select')
         selected = request.form.get('selected', None)
         
@@ -234,7 +252,7 @@ def statefulsets():
 def statefulsets_data():
     if request.method == 'POST':
         selected = request.form.get('selected')
-        if request.form.get('ns_select', None):
+        if 'ns_select' in request.form:
             session['ns_select'] = request.form.get('ns_select')
 
         user_token = get_user_token(session)
@@ -276,7 +294,7 @@ def daemonsets():
     user_token = get_user_token(session)
 
     if request.method == 'POST':
-        if request.form.get('ns_select', None):
+        if 'ns_select' in request.form:
             session['ns_select'] = request.form.get('ns_select')
         selected = request.form.get('selected')
 
@@ -297,7 +315,7 @@ def daemonsets():
 @login_required
 def daemonset_data():
     if request.method == 'POST':
-        if request.form.get('ns_select', None):
+        if 'ns_select' in request.form:
             session['ns_select'] = request.form.get('ns_select')
         selected = request.form.get('selected')
 
@@ -350,7 +368,7 @@ def deployments():
     user_token = get_user_token(session)
 
     if request.method == 'POST':
-        if request.form.get('ns_select', None):
+        if 'ns_select' in request.form:
             session['ns_select'] = request.form.get('ns_select')
         selected = request.form.get('selected')
 
@@ -372,7 +390,7 @@ def deployments():
 def deployment_data():
     if request.method == 'POST':
         selected = request.form.get('selected')
-        if request.form.get('ns_select', None):
+        if 'ns_select' in request.form:
             session['ns_select'] = request.form.get('ns_select')
 
         user_token = get_user_token(session)
@@ -415,7 +433,7 @@ def replicasets():
     user_token = get_user_token(session)
 
     if request.method == 'POST':
-        if request.form.get('ns_select', None):
+        if 'ns_select' in request.form:
             session['ns_select'] = request.form.get('ns_select')
         selected = request.form.get('selected')
 

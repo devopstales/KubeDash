@@ -13,12 +13,14 @@
 </ul>
 <ul class="header-nav ms-auto"></ul>
 <ul class="header-nav d-lg-flex">
-      <!-- Button trigger modal add -->
-      {% if session['user_role'] == "Admin" %}
-      <a data-bs-toggle="#modaladd" data-bs-toggle="modal" class="float-right" id="modaladdNav" href="#" onclick='$("#modaladd").modal()'>
-        <i class="material-icons">add</i>
-      </a>
-      {% endif %}
+  <!-- Button trigger modal add -->
+  {% if session['user_role'] == "Admin" %}
+  <div class="col">
+    <button class="header-toggler" type="button" data-bs-toggle="modal" data-bs-target="#modaladd">
+      <i class="material-icons">add</i>
+    </button>
+  </div>
+  {% endif %}
 {% include "segments/topmenu.html.j2" %}
 {% endblock %}
 
@@ -106,37 +108,35 @@
     </div>
 </div>
 
-<!-- Modal Add User -->
-  <div class="modal fade" id="modaladd" tabindex="-1" role="dialog" aria-labelledby="modaladdLabel" aria-hidden="true">
-    <div class="modal-dialog" role="document">
-      <div class="modal-content">
-        <div class="modal-header">
-          <h5 class="modal-title" id="modaladdLabel">New</h5>
-          <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
-        </div>
-        <div class="modal-body">
-          <form action="/cluster/namespace/create" method="POST">
-            <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
-            <div class="form-group">
-              <label>Namespace:</label>
-              <input class="form-control user" name="namespace" type="text" placeholder="Type your username">
+<!-- Modal Add Namespace -->
+<div class="modal fade" id="modaladd" tabindex="-1" role="dialog" aria-labelledby="modaladdLabel" aria-hidden="true">
+  <div class="modal-dialog" role="document">
+    <div class="modal-content">
+      <div class="modal-header">
+        <h5 class="modal-title" id="modaladdLabel">New</h5>
+        <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+      </div>
+      <div class="modal-body">
+        <form action="/cluster/namespace/create" method="POST">
+          <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+          <div class="form-group">
+            <label>Namespace:</label>
+            <input class="form-control user" name="namespace" type="text" placeholder="Type your username">
+          </div>
+          <div class="modal-footer">
+            <div class="form-group mt-2">
+              <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Close</button>
+              <button type="submit" class="btn btn-primary" >Add Namespace</button>
             </div>
-            <div class="modal-footer">
-              <div class="form-group mt-2">
-                <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Close</button>
-                <button type="submit" class="btn btn-primary" >Add Namespace</button>
-              </div>
-            </div>
-          </form>
-        </div>
+          </div>
+        </form>
       </div>
     </div>
   </div>
-<!-- Modal Add User -->
+</div>
+<!-- Modal Add Namespace -->
 {% endblock %}
 
 {% block add_head_css %}
-{% include "segments/chartjs_snipet.html.j2" %}
-
-{% include "segments/datatable_snipet.html.j2" %}
+{% include "segments/datatable_snippet.html.j2" %}
 {% endblock %}

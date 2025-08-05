@@ -30,7 +30,7 @@ def vpa():
     user_token = get_user_token(session)
 
     if request.method == 'POST':
-        if request.form.get('ns_select'):
+        if 'ns_select' in request.form:
             session['ns_select'] = request.form.get('ns_select')
         selected = request.form.get('selected')
 
@@ -82,7 +82,7 @@ def hpa():
     selected = None
 
     if request.method == 'POST':
-        if request.form.get('ns_select'):
+        if 'ns_select' in request.form:
             session['ns_select'] = request.form.get('ns_select')
         selected = request.form.get('selected')
 
@@ -135,7 +135,7 @@ def pdp():
     user_token = get_user_token(session)
 
     if request.method == 'POST':
-        if request.form.get('ns_select'):
+        if 'ns_select' in request.form:
             session['ns_select'] = request.form.get('ns_select')
         selected = request.form.get('selected')
 
@@ -187,7 +187,7 @@ def resource_quota():
     user_token = get_user_token(session)
 
     if request.method == 'POST':
-        if request.form.get('ns_select'):
+        if 'ns_select' in request.form:
             session['ns_select'] = request.form.get('ns_select')
         selected = request.form.get('selected')
 
@@ -239,7 +239,7 @@ def limit_range():
     user_token = get_user_token(session)
 
     if request.method == 'POST':
-        if request.form.get('ns_select'):
+        if 'ns_select' in request.form:
             session['ns_select'] = request.form.get('ns_select')
         selected = request.form.get('selected')
 

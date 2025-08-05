@@ -74,7 +74,7 @@ def ingresses():
     user_token = get_user_token(session)
 
     if request.method == 'POST':
-        if request.form.get('ns_select', None):
+        if 'ns_select' in request.form:
             session['ns_select'] = request.form.get('ns_select')
         selected = request.form.get('selected')
 
@@ -123,7 +123,7 @@ def services():
     user_token = get_user_token(session)
 
     if request.method == 'POST':
-        if request.form.get('ns_select', None):
+        if 'ns_select' in request.form:
             session['ns_select'] = request.form.get('ns_select')
         selected = request.form.get('selected')
 
@@ -143,7 +143,7 @@ def services_data():
     pod_list = None
     if request.method == 'POST':
         service_name = request.form.get('service_name')
-        if request.form.get('ns_select', None):
+        if 'ns_select' in request.form:
             session['ns_select'] = request.form.get('ns_select')
 
         user_token = get_user_token(session)
