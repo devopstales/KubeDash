@@ -1,0 +1,16 @@
+services:
+  kubeview:
+    container_name: kubedash-kubeview
+    image: ghcr.io/benc-uk/kubeview:latest
+    environment:
+      TZ: Europe/Budapest
+      PORT: 8003
+      NAMESPACE_FILTER: "^kube-"
+    volumes:
+      - "$HOME/.kube/cl06:/root/.kube/config"
+    ports:
+      - 8003:8003
+    logging:
+      options:
+        max-size: "10k"
+        max-file: "3"

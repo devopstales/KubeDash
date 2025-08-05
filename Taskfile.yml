@@ -4,13 +4,26 @@ env:
   VERSION: "4.0.0"
   DATE: 
     sh: date "+%Y.%m.%d"
-  DCFILES: "-f dc-nginx.yaml -f dc-postgresql.yaml -f dc-redis.yaml -f dc-registry.yaml -f dc-exporter.yaml -f dc-jaeger.yaml"
+  DCFILES: "-f dc-nginx.yaml -f dc-postgresql.yaml -f dc-redis.yaml -f dc-registry.yaml -f dc-exporter.yaml -f dc-jaeger.yaml -f dc-kubeview.yaml"
 
 tasks:
   default:
     desc: "Print Help"
     cmds:
       - "task --list-all"
+
+  install-deps:
+    desc: "Install development dependencies"
+    cmds:
+      - curl -sSL https://install.python-poetry.org | python3 -
+      - brew install helm
+      - brew install helm-docs
+      - brew install chart-releaser
+      - brew install trivy
+      - brew install cosign
+      - brew install skopeo
+      - brew install oras
+      - brew install fluxcd/tap/flux
 
   docker-up:
     desc: "Start dev containers"
@@ -47,8 +60,6 @@ tasks:
         	--path="/tmp/podinfo/kustomize" \
         	--source="$(git -C /tmp/podinfo config --get remote.origin.url)" \
         	--revision="$(git -C /tmp/podinfo branch --show-current)@sha1:$(git rev-parse HEAD)"
-
-
 
   docker-down:
     desc: "Stop dev containers"
@@ -290,6 +301,20 @@ tasks:
       - rm -f push-metadata.txt
       - rm -f kubedash-{{.VERSION}}.tgz
       - rm -f kubedash-{{.VERSION}}.tgz.cosign.bundle
+
+  helm-push:
+    desc: "Push Helm Chart"
+    dir: 'deploy/charts'
+    cmds:
+      - cr package .
+      - git clone -b gh-pages git@github.com:devopstales/helm-charts.git gh-pages-temp
+      - cd gh-pages-temp
+      - cp ../.cr-release-packages/kubedash-4.0.0.tgz ./
+      - git add .
+      - git commit -m "Manual update for kubedash-4.0.0"
+      - git push origin gh-pages
+      - cd ..
+      - rm -rf gh-pages-temp .cr-release-packages
 
   kdlogin-rm:
     desc: "Remove kubectl-kdlogin"

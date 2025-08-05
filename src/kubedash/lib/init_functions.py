@@ -192,21 +192,22 @@ def oidc_init(config: configparser.ConfigParser):
     OIDC_CALLBACK_URL = config.get('sso_settings', 'callback_url', fallback=None)
    
     # Convert and validate scopes
+    logger.info("Initializing OIDC Provider")
     try:
         requested_scopes = string2list(OIDC_SCOPE)
         valid_scopes = validate_scopes(requested_scopes, OIDC_ISSUER_URL)
         
-        logger.debug(f"Requested scopes: {requested_scopes}")
-        logger.debug(f"Validated scopes: {valid_scopes}")
+        logger.debug(f"\tRequested scopes: {requested_scopes}")
+        logger.debug(f"\tValidated scopes: {valid_scopes}")
         
         if set(requested_scopes) != set(valid_scopes):
             logger.warning(
-                f"Scope mismatch. Requested: {requested_scopes}, "
-                f"Using validated: {valid_scopes}"
+                f"\tScope mismatch. Requested: {requested_scopes}, "
+                f"\tUsing validated: {valid_scopes}"
             )
             
     except Exception as e:
-        logger.error(f"Scope validation error: {e}")
+        logger.error(f"\tScope validation error: {e}")
         valid_scopes = ['openid']  # Fallback to minimal scope
 
     # Proceed with OIDC setup
@@ -224,7 +225,7 @@ def oidc_init(config: configparser.ConfigParser):
                     OIDC_CALLBACK_URL, 
                     valid_scopes
                 )
-                logger.info("OIDC Provider updated")
+                logger.info("\tOIDC Provider updated")
                 METRIC_OIDC_CONFIG_UPDATE.labels(
                     OIDC_ISSUER_URL, OIDC_CLIENT_ID
                 ).set(1)
@@ -237,16 +238,21 @@ def oidc_init(config: configparser.ConfigParser):
                     OIDC_CALLBACK_URL, 
                     valid_scopes
                 )
-                logger.info("OIDC Provider created")
+                logger.info("\tOIDC Provider created")
                 METRIC_OIDC_CONFIG_UPDATE.labels(
                     OIDC_ISSUER_URL, OIDC_CLIENT_ID
                 ).set(0)
                 
         except Exception as e:
-            logger.error(f"OIDC initialization failed: {e}")
+            logger.error(f"\tOIDC initialization failed: {e}")
             METRIC_OIDC_CONFIG_UPDATE.labels(
                 OIDC_ISSUER_URL, OIDC_CLIENT_ID
             ).set(-1)
+    else:
+        logger.error("\tMissing OIDC configuration parameters")
+        METRIC_OIDC_CONFIG_UPDATE.labels(
+            OIDC_ISSUER_URL, OIDC_CLIENT_ID
+        ).set(-1)    
 
 
 def k8s_config_int(config: configparser.ConfigParser):

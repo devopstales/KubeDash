@@ -19,15 +19,17 @@ services:
     ports:
       - 8002:7843
 
-  redis-insight:
-    container_name: kubedash-redis-insight
-    image: redis/redisinsight
-    ports:
-      - 8003:5540
+  redis-commander:
+    container_name: kubedash-redis-commander
+    hostname: redis-commander
+    image: ghcr.io/joeferner/redis-commander:latest
+    restart: always
     environment:
-      - REDIS_HOST=redis
-      - REDIS_PORT=6379
-      - REDIS_PASSWORD=redispassword
-      - REDIS_DB=0
-    depends_on:
-      - redis
+      - REDIS_HOSTS=local:kubedash-redis:6379
+      - REDIS_COMMANDER_HTTP_AUTH_USER=
+      - REDIS_COMMANDER_HTTP_AUTH_PASSWORD=
+      - REDIS_COMMANDER_HTTP_AUTH=no
+      - REDIS_COMMANDER_NOAUTH=true
+    ports:
+      - "8004:8081"
+    user: redis
