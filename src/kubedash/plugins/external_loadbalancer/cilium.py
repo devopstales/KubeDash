@@ -21,7 +21,7 @@ def ciliumloadbalancerippoolsGet(namespace):
     k8s_object_list = list()
     k8s_object_error = None
     #try:
-    k8s_objects = k8s_client.CustomObjectsApi().list_cluster_custom_object(api_group, api_version, api_plural, _request_timeout=1, timeout_seconds=1)
+    k8s_objects = k8s_client.CustomObjectsApi().list_cluster_custom_object(api_group, api_version, api_plural, _request_timeout=1)
     for k8s_object in k8s_objects['items']:
         k8s_object_data = {
             "type": "cilium",
@@ -66,7 +66,7 @@ def ciliuml2announcementpoliciesGet(namespace):
     k8s_object_list = list()
     k8s_object_error = None
     try:
-        k8s_objects = k8s_client.CustomObjectsApi().list_cluster_custom_object(api_group, api_version, api_plural, _request_timeout=1, timeout_seconds=1)
+        k8s_objects = k8s_client.CustomObjectsApi().list_cluster_custom_object(api_group, api_version, api_plural, _request_timeout=1)
         for k8s_object in k8s_objects['items']:
             k8s_object_data = {
                 "type": "cilium",
@@ -104,7 +104,7 @@ def ciliumbgppeeringpoliciesGet(namespace):
     k8s_object_list = list()
     k8s_object_error = None
     try:
-        k8s_objects = k8s_client.CustomObjectsApi().list_cluster_custom_object(api_group, api_version, api_plural, _request_timeout=1, timeout_seconds=1)
+        k8s_objects = k8s_client.CustomObjectsApi().list_cluster_custom_object(api_group, api_version, api_plural, _request_timeout=1)
         for k8s_object in k8s_objects['items']:
             k8s_object_data = {
                 "type": "cilium",

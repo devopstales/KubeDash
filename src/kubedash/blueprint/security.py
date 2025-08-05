@@ -28,7 +28,7 @@ def secrets():
     user_token = get_user_token(session)
 
     if request.method == 'POST':
-        if request.form.get('ns_select', None):
+        if 'ns_select' in request.form:
             session['ns_select'] = request.form.get('ns_select')
         selected = request.form.get('selected')
 
@@ -50,7 +50,7 @@ def secrets():
 def secrets_data():
     if request.method == 'POST':
         secret_name = request.form.get('secret_name')
-        if request.form.get('ns_select', None):
+        if 'ns_select' in request.form:
             session['ns_select'] = request.form.get('ns_select')
 
         user_token = get_user_token(session)
@@ -84,7 +84,7 @@ def policies_list():
     user_token = get_user_token(session)
 
     if request.method == 'POST':
-        if request.form.get('ns_select', None):
+        if 'ns_select' in request.form:
             session['ns_select'] = request.form.get('ns_select')
         selected = request.form.get('selected')
 
@@ -106,7 +106,7 @@ def policies_list():
 def policies_data():
     if request.method == 'POST':
         policy_name = request.form.get('policy_name')
-        if request.form.get('ns_select', None):
+        if 'ns_select' in request.form:
             session['ns_select'] = request.form.get('ns_select')
 
         user_token = get_user_token(session)
@@ -154,7 +154,7 @@ def priorityclass_list():
 def priorityclass_data():
     if request.method == 'POST':
         pc_name = request.form.get('pc_name')
-        if request.form.get('ns_select', None):
+        if 'ns_select' in request.form:
             session['ns_select'] = request.form.get('ns_select')
 
         user_token = get_user_token(session)

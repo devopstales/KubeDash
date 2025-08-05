@@ -26,7 +26,7 @@ def k8sIngressClassListGet(username_role, user_token):
     k8sClientConfigGet(username_role, user_token)
     ING_LIST = list()
     try:
-        ingress_class_list = k8s_client.NetworkingV1Api().list_ingress_class(_request_timeout=1, timeout_seconds=1)
+        ingress_class_list = k8s_client.NetworkingV1Api().list_ingress_class(_request_timeout=1)
         for ic in ingress_class_list.items:
             ING_INFO = {
                 "name": ic.metadata.name,
@@ -68,7 +68,7 @@ def k8sIngressListGet(username_role, user_token, ns):
     k8sClientConfigGet(username_role, user_token)
     ING_LIST = list()
     try:
-        ingress_list = k8s_client.NetworkingV1Api().list_namespaced_ingress(ns, _request_timeout=1, timeout_seconds=1)
+        ingress_list = k8s_client.NetworkingV1Api().list_namespaced_ingress(ns, _request_timeout=1)
         for ingress in ingress_list.items:
             ig = ingress.status.load_balancer.ingress
             rules = list()
@@ -123,7 +123,7 @@ def k8sServiceListGet(username_role, user_token, ns):
     k8sClientConfigGet(username_role, user_token)
     SERVICE_LIST = list()
     try:
-        service_list = k8s_client.CoreV1Api().list_namespaced_service(ns, _request_timeout=1, timeout_seconds=1)
+        service_list = k8s_client.CoreV1Api().list_namespaced_service(ns, _request_timeout=1)
         for service in service_list.items:
             SERVICE_INFO = {
                 "name": service.metadata.name,
@@ -173,7 +173,7 @@ def k8sPodSelectorListGet(username_role, user_token, ns, selectors):
         else:
             label_selector  = label_selector + f"{key}={value},"
     try:
-        pod_list = k8s_client.CoreV1Api().list_namespaced_pod(ns, label_selector=label_selector, _request_timeout=1, timeout_seconds=1)
+        pod_list = k8s_client.CoreV1Api().list_namespaced_pod(ns, label_selector=label_selector, _request_timeout=1)
         for pod in pod_list.items:
             POD_INFO = {
                 "status": pod.status.phase,

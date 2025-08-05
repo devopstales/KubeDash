@@ -1,11 +1,13 @@
+from math import e
 from flask import (Blueprint, redirect, render_template, request, session,
                    url_for)
 from flask_login import login_required
 
 from lib.helper_functions import get_logger
 from lib.k8s.namespace import k8sNamespaceListGet
-from lib.k8s.security import (k8sClusterRoleBindingListGet,
-                              k8sClusterRoleListGet, k8sRoleBindingListGet,
+from lib.k8s.security import (k8sClusterRoleBindingListGet, k8sRoleGet,
+                              k8sClusterRoleListGet, k8sClusterRoleGet, 
+                              k8sRoleBindingListGet,
                               k8sRoleListGet, k8sSaListGet)
 from lib.sso import get_user_token
 
@@ -29,7 +31,8 @@ def service_accounts():
     user_token = get_user_token(session)
 
     if request.method == 'POST':
-        session['ns_select'] = request.form.get('ns_select')
+        if 'ns_select' in request.form:
+            session['ns_select'] = request.form.get('ns_select')
         selected = request.form.get('selected')
 
     namespace_list, error = k8sNamespaceListGet(session['user_role'], user_token)
@@ -57,7 +60,8 @@ def roles():
     user_token = get_user_token(session)
 
     if request.method == 'POST':
-        session['ns_select'] = request.form.get('ns_select')
+        if 'ns_select' in request.form:
+            session['ns_select'] = request.form.get('ns_select')
         selected = request.form.get('selected')
 
     namespace_list, error = k8sNamespaceListGet(session['user_role'], user_token)
@@ -77,21 +81,19 @@ def roles():
 @login_required
 def role_data():
     if request.method == 'POST':
-        session['ns_select'] = request.form.get('ns_select')
+        if 'ns_select' in request.form:
+            session['ns_select'] = request.form.get('ns_select')
         r_name = request.form.get('r_name')
         
         user_token = get_user_token(session)
         
         namespace_list, error = k8sNamespaceListGet(session['user_role'], user_token)
-        if not error:
-            roles = k8sRoleListGet(session['user_role'], user_token, session['ns_select'])
-        else:
-            roles = list()
+        role = k8sRoleGet(session['user_role'], user_token, r_name, session['ns_select'])
 
         return render_template(
             'cluster-permission/role-data.html.j2',
             namespace_list = namespace_list,
-            roles = roles,
+            role = role,
             r_name = r_name,
         )
     else:
@@ -108,7 +110,8 @@ def role_bindings():
     user_token = get_user_token(session)
 
     if request.method == 'POST':
-        session['ns_select'] = request.form.get('ns_select')
+        if 'ns_select' in request.form:
+            session['ns_select'] = request.form.get('ns_select')
         selected = request.form.get('rb_name')
 
     namespace_list, error = k8sNamespaceListGet(session['user_role'], user_token)
@@ -151,12 +154,11 @@ def cluster_role_data():
     if request.method == 'POST':
         cr_name = request.form.get('cr_name')
         user_token = get_user_token(session)
-        cluster_roles = k8sClusterRoleListGet(session['user_role'], user_token)
-
+        cluster_role = k8sClusterRoleGet(session['user_role'], user_token, cr_name)
 
         return render_template(
             'cluster-permission/cluster-role-data.html.j2',
-            cluster_roles = cluster_roles,
+            cluster_role = cluster_role,
             cr_name = cr_name,
         )
     else:

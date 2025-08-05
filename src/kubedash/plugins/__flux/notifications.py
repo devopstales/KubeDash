@@ -19,7 +19,7 @@ def FluxAlertNotificationGet(username_role, user_token, namespace):
     api_version = notificationVersion
     api_plural = "alerts"
     try:
-        k8s_objects = k8s_client.CustomObjectsApi().list_namespaced_custom_object(api_group, api_version, namespace, api_plural, _request_timeout=1, timeout_seconds=1)
+        k8s_objects = k8s_client.CustomObjectsApi().list_namespaced_custom_object(api_group, api_version, namespace, api_plural, _request_timeout=1)
         return k8s_objects.get('items', [])
     except ApiException as error:
         if error.status != 404:
@@ -40,7 +40,7 @@ def FluxProviderNotificationGet(username_role, user_token, namespace):
     api_plural = "providers"
     k8s_object_list = list()
     try:
-        k8s_object_list = k8s_client.CustomObjectsApi().list_namespaced_custom_object(api_group, api_version, namespace, api_plural, _request_timeout=1, timeout_seconds=1)
+        k8s_object_list = k8s_client.CustomObjectsApi().list_namespaced_custom_object(api_group, api_version, namespace, api_plural, _request_timeout=1)
         return k8s_object_list.get('items', [])
     except ApiException as error:
         if error.status != 404:
@@ -61,7 +61,7 @@ def FluxReceiverNotificationGet(username_role, user_token, namespace):
     api_plural = "receivers"
     k8s_object_list = list()
     try:
-        k8s_object_list = k8s_client.CustomObjectsApi().list_namespaced_custom_object(api_group, api_version, namespace, api_plural, _request_timeout=1, timeout_seconds=1)
+        k8s_object_list = k8s_client.CustomObjectsApi().list_namespaced_custom_object(api_group, api_version, namespace, api_plural, _request_timeout=1)
         return k8s_object_list.get('items', [])
     except ApiException as error:
         if error.status != 404:

@@ -20,7 +20,7 @@ def FluxKustomizationGet(username_role, user_token, namespace):
     api_plural = "kustomizations"
     k8s_objects = []
     try:
-        k8s_objects = k8s_client.CustomObjectsApi().list_namespaced_custom_object(api_group, api_version, namespace, api_plural, _request_timeout=1, timeout_seconds=1)
+        k8s_objects = k8s_client.CustomObjectsApi().list_namespaced_custom_object(api_group, api_version, namespace, api_plural, _request_timeout=1)
         return k8s_objects.get('items', [])
     except ApiException as error:
         if error.status != 404:

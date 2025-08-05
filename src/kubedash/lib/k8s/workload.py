@@ -20,7 +20,7 @@ def k8sDaemonSetsGet(username_role, user_token, ns):
     k8sClientConfigGet(username_role, user_token)
     DAEMONSET_LIST = list()
     try:
-        daemonset_list = k8s_client.AppsV1Api().list_namespaced_daemon_set(ns, _request_timeout=1, timeout_seconds=1)
+        daemonset_list = k8s_client.AppsV1Api().list_namespaced_daemon_set(ns, _request_timeout=1)
         for ds in daemonset_list.items:
             DAEMONSET_DATA = {
                 "name": ds.metadata.name,
@@ -130,7 +130,7 @@ def k8sDaemonsetPatch(username_role, user_token, ns, name, body):
     k8sClientConfigGet(username_role, user_token)
     try:
         api_response = k8s_client.AppsV1Api().patch_namespaced_daemon_set(
-                name, ns, body, _request_timeout=1, timeout_seconds=1
+                name, ns, body, _request_timeout=1
             )
         flash("Daemonset: %s patched to replicas" % name, "success")
         logger.info("Deployment: %s patched to replicas" % name)
@@ -152,7 +152,7 @@ def k8sDeploymentsGet(username_role, user_token, ns):
     k8sClientConfigGet(username_role, user_token)
     DEPLOYMENT_LIST = list()
     try:
-        deployment_list = k8s_client.AppsV1Api().list_namespaced_deployment(ns, _request_timeout=1, timeout_seconds=1)
+        deployment_list = k8s_client.AppsV1Api().list_namespaced_deployment(ns, _request_timeout=1)
         for d in deployment_list.items:
             DEPLOYMENT_DATA = {
                 "name": d.metadata.name,
@@ -272,7 +272,7 @@ def k8sDeploymentsPatchReplica(username_role, user_token, ns, name, replicas):
             }
         ]
         api_response = k8s_client.AppsV1Api().patch_namespaced_deployment_scale(
-                name, ns, body, _request_timeout=1, timeout_seconds=1
+                name, ns, body, _request_timeout=1
             )
         flash("Deployment: %s patched to replicas %s" % (name, replicas), "success")
         logger.info("Deployment: %s patched to replicas %s" % (name, replicas))
@@ -296,7 +296,7 @@ def k8sDeploymentsPatchAnnotation(username_role, user_token, ns, name, replicas)
             }
         ]
         api_response = k8s_client.AppsV1Api().patch_namespaced_deployment(
-                name, ns, body, _request_timeout=1, timeout_seconds=1
+                name, ns, body, _request_timeout=1
             )
         flash("Deployment: %s Annotation patched" % name, "success")
         logger.info("Deployment: %s Annotation patched" % name)
@@ -318,7 +318,7 @@ def k8sPodListGet(username_role, user_token, ns):
     k8sClientConfigGet(username_role, user_token)
     POD_LIST = list()
     try:
-        pod_list = k8s_client.CoreV1Api().list_namespaced_pod(ns, _request_timeout=1, timeout_seconds=1)
+        pod_list = k8s_client.CoreV1Api().list_namespaced_pod(ns, _request_timeout=1)
         for pod in pod_list.items:
             POD_SUM = {
                 "name": pod.metadata.name,
@@ -350,7 +350,7 @@ def k8sPodGet(username_role, user_token, ns, po):
     k8sClientConfigGet(username_role, user_token)
     POD_DATA = {}
     try: 
-        pod_data = k8s_client.CoreV1Api().read_namespaced_pod(po, ns, _request_timeout=1, timeout_seconds=1)
+        pod_data = k8s_client.CoreV1Api().read_namespaced_pod(po, ns, _request_timeout=1)
         POD_DATA = {
             # main
             "name": po,
@@ -490,7 +490,7 @@ def k8sPodGetContainers(username_role, user_token, namespace, pod_name):
     POD_CONTAINER_LIST = list()
     POD_INIT_CONTAINER_LIST = list()
     try:
-        pod_data = k8s_client.CoreV1Api().read_namespaced_pod(pod_name, namespace, _request_timeout=1, timeout_seconds=1)
+        pod_data = k8s_client.CoreV1Api().read_namespaced_pod(pod_name, namespace, _request_timeout=1)
         for c in  pod_data.spec.containers:
             for cs in pod_data.status.container_statuses:
                 if cs.name == c.name:
@@ -512,6 +512,33 @@ def k8sPodGetContainers(username_role, user_token, namespace, pod_name):
         ErrorHandler(logger, "error", ERROR)
         return POD_CONTAINER_LIST, POD_INIT_CONTAINER_LIST
 
+def k8sPodDelete(username_role, user_token, ns, po):
+    """ Deletes a pod in the specified namespace.
+
+    Args:
+        username_role (str): The username and role of the user.
+        user_token (str): The authentication token for the user.
+        ns (str): The namespace where the pod is located.
+        po (str): The name of the pod to delete.
+
+    Returns:
+        bool: True if the pod was successfully deleted, False otherwise.
+    """
+    k8sClientConfigGet(username_role, user_token)
+    try:
+        api_response = k8s_client.CoreV1Api().delete_namespaced_pod(
+                po, ns, _request_timeout=1
+            )
+        flash("Pod: %s deleted" % po, "success")
+        logger.info("Pod: %s deleted" % po)
+        return True
+    except ApiException as error:
+        ErrorHandler(logger, error, "ERROR: %s delete Pod: %s" % (po, error))
+        return False
+    except Exception as error:
+        ERROR = "k8sPodDelete: %s" % error
+        ErrorHandler(logger, "error", ERROR)
+        return False
 
 ##############################################################
 ## Pod Logs
@@ -527,7 +554,7 @@ def k8sPodLogsStream(username_role, user_token, namespace, pod_name, container):
                 namespace=namespace,
                 container=container,
                 tail_lines=100,
-                _request_timeout=1, timeout_seconds=1
+                _request_timeout=1
             ):
             socketio.emit('response',
                                 {'data': str(line)}, namespace="/log")
@@ -552,7 +579,7 @@ def k8sPodExecSocket(username_role, user_token, namespace, pod_name, container):
                 stderr=True, stdin=True,
                 stdout=True, tty=True,
                 _preload_content=False,
-                _request_timeout=1, timeout_seconds=1
+                _request_timeout=1
                 )
         return wsclient
     except Exception as error:
@@ -624,7 +651,7 @@ def k8sReplicaSetsGet(username_role, user_token, ns):
     k8sClientConfigGet(username_role, user_token)
     REPLICASET_LIST = list()
     try:
-        replicaset_list = k8s_client.AppsV1Api().list_namespaced_replica_set(ns, _request_timeout=1, timeout_seconds=1)
+        replicaset_list = k8s_client.AppsV1Api().list_namespaced_replica_set(ns, _request_timeout=1)
         for rs in replicaset_list.items:
             REPLICASET_DATA = {
                 "name": rs.metadata.name,
@@ -668,7 +695,7 @@ def k8sStatefulSetsGet(username_role, user_token, ns):
     k8sClientConfigGet(username_role, user_token)
     STATEFULSET_LIST = list()
     try:
-        statefulset_list = k8s_client.AppsV1Api().list_namespaced_stateful_set(ns, _request_timeout=1, timeout_seconds=1)
+        statefulset_list = k8s_client.AppsV1Api().list_namespaced_stateful_set(ns, _request_timeout=1)
         for sfs in statefulset_list.items:
             STATEFULSET_DATA = {
                 "name": sfs.metadata.name,
@@ -786,7 +813,7 @@ def k8sStatefulSetPatchReplica(username_role, user_token, ns, name, replicas):
             }
         ]
         api_response = k8s_client.AppsV1Api().patch_namespaced_stateful_set_scale(
-                name, ns, body, _request_timeout=1, timeout_seconds=1
+                name, ns, body, _request_timeout=1
             )
         flash("StatefulSet: %s patched to replicas %s" % (name, replicas), "success")
         logger.info("StatefulSet: %s patched to replicas %s" % (name, replicas))
@@ -810,7 +837,7 @@ def k8sStatefulSetPatchAnnotation(username_role, user_token, ns, name, replicas)
             }
         ]
         api_response = k8s_client.AppsV1Api().patch_namespaced_stateful_set(
-                name, ns, body, _request_timeout=1, timeout_seconds=1
+                name, ns, body, _request_timeout=1
             )
         flash("StatefulSet: %s Annotation patched" % name, "success")
         logger.info("StatefulSet: %s Annotation patched" % name)

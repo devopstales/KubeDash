@@ -21,7 +21,7 @@ def ipaddresspoolsGet(namespace):
     k8s_object_list = list()
     k8s_object_error = None
     try:
-        k8s_objects = k8s_client.CustomObjectsApi().list_namespaced_custom_object(api_group, api_version, namespace, api_plural, _request_timeout=1, timeout_seconds=1)
+        k8s_objects = k8s_client.CustomObjectsApi().list_namespaced_custom_object(api_group, api_version, namespace, api_plural, _request_timeout=1)
         for k8s_object in k8s_objects['items']:
             k8s_object_data = {
                 "type": "metallb",
@@ -60,7 +60,7 @@ def l2advertisementsGet(namespace):
     k8s_object_list = list()
     k8s_object_error = False
     try:
-        k8s_objects = k8s_client.CustomObjectsApi().list_namespaced_custom_object(api_group, api_version, namespace, api_plural, _request_timeout=1, timeout_seconds=1)
+        k8s_objects = k8s_client.CustomObjectsApi().list_namespaced_custom_object(api_group, api_version, namespace, api_plural, _request_timeout=1)
         for k8s_object in k8s_objects['items']:
             k8s_object_data = {
                 "type": "metallb",
@@ -94,7 +94,7 @@ def communitiesGet(namespace):
     api_plural = "communities"
     k8s_object_list = list()
     try:
-        k8s_objects = k8s_client.CustomObjectsApi().list_namespaced_custom_object(api_group, api_version, namespace, api_plural, _request_timeout=1, timeout_seconds=1)
+        k8s_objects = k8s_client.CustomObjectsApi().list_namespaced_custom_object(api_group, api_version, namespace, api_plural, _request_timeout=1)
         for k8s_object in k8s_objects['items']:
             k8s_object_data = {
                 "type": "metallb",
@@ -121,7 +121,7 @@ def bgppeersGet(namespace):
     api_plural = "bgppeers"
     k8s_object_list = list()
     try:
-        k8s_objects = k8s_client.CustomObjectsApi().list_namespaced_custom_object(api_group, api_version, namespace, api_plural, _request_timeout=1, timeout_seconds=1)
+        k8s_objects = k8s_client.CustomObjectsApi().list_namespaced_custom_object(api_group, api_version, namespace, api_plural, _request_timeout=1)
         for k8s_object in k8s_objects['items']:
             k8s_object_data = {
                 "type": "metallb",
@@ -178,7 +178,7 @@ def bgpadvertisementsGet(namespace):
     k8s_object_list = list()
     k8s_object_error = None
     try:
-        k8s_objects = k8s_client.CustomObjectsApi().list_namespaced_custom_object(api_group, api_version, namespace, api_plural, _request_timeout=1, timeout_seconds=1)
+        k8s_objects = k8s_client.CustomObjectsApi().list_namespaced_custom_object(api_group, api_version, namespace, api_plural, _request_timeout=1)
         for k8s_object in k8s_objects['items']:
             k8s_object_data = {
                 "type": "metallb",
@@ -221,7 +221,7 @@ def bfdprofilesGet(username_role, user_token, namespace):
     api_plural = "bfdprofiles"
     k8s_object_list = list()
     try:
-        k8s_objects = k8s_client.CustomObjectsApi().list_namespaced_custom_object(api_group, api_version, namespace, api_plural, _request_timeout=1, timeout_seconds=1)
+        k8s_objects = k8s_client.CustomObjectsApi().list_namespaced_custom_object(api_group, api_version, namespace, api_plural, _request_timeout=1)
         for k8s_object in k8s_objects['items']:
             k8s_object_data = {
                 "type": "metallb",

@@ -64,16 +64,10 @@
                                 {% if session['user_role'] == "Admin" %}
                                     <td>
                                         <div class="input-group">
-                                            <div class="input-group-prepend">
-                                              <button id="ctrl__button--decrement" class="btn btn-outline-danger" type="button">-</button>
-                                            </div>
                                             <input type="text" class="spinner" id="spinner" readonly="readonly" 
                                                 value="{{ daemonset_data.desired }}"  k8s_type="daemonset" 
                                                 csrf_token="{{ csrf_token() }}" selected="{{ daemonset_data.name }}"
                                                 namespace="{{ daemonset_data.namespace }}">
-                                            <div class="input-group-append">
-                                                <button id="ctrl__button--increment" class="btn btn-outline-success" type="button">+</button>
-                                              </div>
                                           </div>
                                     </td>
                                 {% else %}
@@ -366,7 +360,7 @@
 {% endblock %}
 
 {% block add_head_css %}
-{% include "segments/datatable_snipet.html.j2" %}
+{% include "segments/datatable_snippet.html.j2" %}
 {% endblock %}
 
 {% block add_tail_js %}

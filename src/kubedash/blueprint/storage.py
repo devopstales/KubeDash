@@ -123,7 +123,7 @@ def pvc():
     user_token = get_user_token(session)
 
     if request.method == 'POST':
-        if request.form.get('ns_select', None):
+        if 'ns_select' in request.form:
             session['ns_select'] = request.form.get('ns_select')
         selected = request.form.get('selected')
 
@@ -179,7 +179,7 @@ def pv():
     user_token = get_user_token(session)
 
     if request.method == 'POST':
-        if request.form.get('ns_select', None):
+        if 'ns_select' in request.form:
             session['ns_select'] = request.form.get('ns_select')
         selected = request.form.get('selected')
 
@@ -202,7 +202,7 @@ def pv():
 def pv_data():
     pv_data = None
     if request.method == 'POST':
-        if request.form.get('ns_select', None):
+        if 'ns_select' in request.form:
             session['ns_select'] = request.form.get('ns_select')
         selected = request.form.get('selected')
         user_token = get_user_token(session)
@@ -257,7 +257,7 @@ def configmap():
     user_token = get_user_token(session)
 
     if request.method == 'POST':
-        if request.form.get('ns_select', None):
+        if 'ns_select' in request.form:
             session['ns_select'] = request.form.get('ns_select')
         selected = request.form.get('selected')
 
@@ -279,7 +279,7 @@ def configmap():
 def configmap_data():
     if request.method == 'POST':
         configmap_name = request.form.get('configmap_name')
-        if request.form.get('ns_select', None):
+        if 'ns_select' in request.form:
             session['ns_select'] = request.form.get('ns_select')
 
         user_token = get_user_token(session)

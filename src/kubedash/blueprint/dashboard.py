@@ -74,7 +74,7 @@ def workloads():
         span.set_attribute("http.method", request.method)
 
     if request.method == 'POST':
-        if request.form.get('ns_select', None):
+        if 'ns_select' in request.form:
             session['ns_select'] = request.form.get('ns_select')
         if tracer and span.is_recording():
             span.set_attribute("namespace.selected", request.form.get('ns_select'))

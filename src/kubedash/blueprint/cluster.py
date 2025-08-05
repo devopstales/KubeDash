@@ -29,7 +29,7 @@ logger = get_logger()
 
 @cluster_bp.route("/namespace", methods=['GET', 'POST'])
 @login_required
-def namespaces():
+def namespace():
     selected = None
     user_token = get_user_token(session)
 
@@ -80,11 +80,11 @@ def namespaces_data():
 @login_required
 def namespaces_create():
     if request.method == 'POST':
-        if request.form.get('ns_select', None):
-            session['ns_select'] = request.form['namespace']
+        if request.form.get('namespace', None):
+            namespace = request.form['namespace']
         user_token = get_user_token(session)
 
-        k8sNamespaceCreate(session['user_role'], user_token, session['ns_select'])
+        k8sNamespaceCreate(session['user_role'], user_token, namespace)
         return redirect(url_for('.namespace'))
     else:
         return redirect(url_for('.namespace'))
@@ -93,11 +93,11 @@ def namespaces_create():
 @login_required
 def namespaces_delete():
     if request.method == 'POST':
-        if request.form.get('ns_select', None):
-            session['ns_select'] = request.form['namespace']
+        if request.form.get('namespace', None):
+            namespace = request.form['namespace']
         user_token = get_user_token(session)
 
-        k8sNamespaceDelete(session['user_role'], user_token, session['ns_select'])
+        k8sNamespaceDelete(session['user_role'], namespace)
         return redirect(url_for('.namespace'))
     else:
         return redirect(url_for('.namespace'))

@@ -106,7 +106,7 @@ def k8sGetClusterStatus(username_role="Admin", user_token=None):
     k8sClientConfigGet(username_role, user_token)
     try:
         api = k8s_client.CoreV1Api()
-        component_statuses = api.list_component_status(_request_timeout=1, timeout_seconds=1)
+        component_statuses = api.list_component_status(_request_timeout=1)
 
         return True
 
