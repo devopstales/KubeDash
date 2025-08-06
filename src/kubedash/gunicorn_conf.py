@@ -5,11 +5,19 @@ import time
 from statsd import StatsClient
 
 from gunicorn.glogging import Logger as GunicornBaseLogger
+from lib.cert_utils import generate_self_signed_cert
 
+cert_path, key_path, ca_cert_path = generate_self_signed_cert()
 # ========================
 # 1. Server Configuration
 # ========================
-bind = "0.0.0.0:8000"
+keyfile = key_path
+certfile = cert_path
+ca_certs = ca_cert_path
+bind = [
+    "0.0.0.0:8000",  # HTTP
+    "0.0.0.0:8443"   # HTTPS
+]
 workers = 1
 threads = 4
 worker_tmp_dir = "/tmp/kubedash"
@@ -24,7 +32,7 @@ logger_class = "gunicorn_color.Logger"
 loglevel = "info"
 errorlog = "-"  # stderr
 accesslog = "-"  # stdout
-access_log_format = '%(t)s [%(correlation_id)s] %(h)s "%(r)s" %(s)s %(b)s "%(f)s" "%(a)s"'
+access_log_format = '[%(asctime)s] [%(correlation_id)s] %(h)s "%(r)s" %(s)s %(b)s "%(f)s" "%(a)s"'
 
 # ========================
 # 3. Correlation ID Setup

@@ -72,6 +72,7 @@ opentelemetry-instrumentation-redis = "^0.56b0"
 flask-prometheus-metrics = "^1.0.0"
 wrapt = "^1.17.2"
 bs4 = "^0.0.2"
+validators = "^0.35.0"
 
 
 [tool.poetry.group.dev.dependencies]

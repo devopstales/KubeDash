@@ -7,13 +7,14 @@ export DOCKER_COMPOSE_FILES="-f ../../deploy/docker-compose/dc-nginx.yaml"
 
 # App
 #export K8S_CLUSTER_NAME=
-export KUBEDASH_VERSION="4.0"
+export KUBEDASH_VERSION="4.1"
 export FLASK_APP="kubedash"
 export FLASK_DEBUG=1
 export TEMPLATES_AUTO_RELOAD=1
 export FLASK_ENV=development
 export PYTHONFAULTHANDLER=1
 export JAEGER_HTTP_ENDPOINT="http://127.0.0.1:4318/v1/traces"
+export POD_NAMESPACE="balazs-paldi"
 
 mkdir -p /tmp/kubedash
 

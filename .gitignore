@@ -5,6 +5,8 @@ CA.crt
 *database/
 *neo4j/
 *.crt
+*.pem
+*certs/
 *manage.py
 src/kubedash/run.sh
 src/kubedash/kubedash.ini

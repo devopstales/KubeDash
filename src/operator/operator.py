@@ -253,7 +253,7 @@ import logging
 @kopf.on.startup()
 def configure(settings: kopf.OperatorSettings, **_):
     service_name = "kubedash-api"
-    namespace = "default"
+    namespace = os.environ.get("POD_NAMESPACE", "default")
     
     print("Starting operator")
     settings.posting.level = logging.INFO
