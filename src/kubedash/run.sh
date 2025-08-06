@@ -32,8 +32,6 @@ if [ ! -f $CA_CERTS_FOLDER/rootCA.pem ]; then
 fi
 
 echo "Start Nginx Proxy in Docker Compose"
-#docker compose $DOCKER_COMPOSE_FILES down
-#docker compose $DOCKER_COMPOSE_FILES up -d
 task docker-up
 
 # Start DB migration

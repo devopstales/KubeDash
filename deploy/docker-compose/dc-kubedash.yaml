@@ -1,0 +1,9 @@
+services:
+  nginx:
+    container_name: kubedash-us
+    image: devopstales/kubedash:latest
+    restart: always
+    entrypoint: sleep infinity
+    ports:
+      - 8000:8000
+#    volumes:

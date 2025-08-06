@@ -1,0 +1,97 @@
+services:
+  app:
+    container_name: vsc-kubedash-ui
+    build:
+      context: ..
+      dockerfile: .devcontainer/Dockerfile
+
+    volumes:
+      - ../..:/workspaces:cached
+
+    # Overrides default command so things don't shut down after the process ends.
+    command: sleep infinity
+
+    # Runs app on the same network as the database container, allows "forwardPorts" in devcontainer.json function.
+    network_mode: service:postgresql
+
+    # Use "forwardPorts" in **devcontainer.json** to forward an app port locally.
+    # (Adding the "ports" property to this file will not forward from a Codespace.)
+
+  nginx:
+    container_name: vsc-kubedash-proxy
+    image: nginx:latest
+    restart: always
+    ports:
+      - 80:80
+      - 443:443
+    volumes:
+      - ./config/nginx-kubedash.conf:/etc/nginx/conf.d/nginx-kubedash.conf
+      - ./config/kubedash.k3s.intra.pem:/etc/nginx/kubedash.k3s.intra.pem
+      - ./config/kubedash.k3s.intra-key.pem:/etc/nginx/kubedash.k3s.intra-key.pem
+    extra_hosts:
+      - "host.docker.internal:host-gateway"
+
+  postgresql:
+    container_name: vsc-kubedash-postgresql
+    image: postgres:13.12
+    environment:
+      POSTGRES_DB: kubedash
+      POSTGRES_USER: kubedash
+      POSTGRES_PASSWORD: kubedash
+      PGDATA: /var/lib/postgresql/data/pgdata
+      TZ: Europe/Budapest
+    volumes:
+      - postgres-data:/var/lib/postgresql/data
+    ports:
+      - 5432:5432
+    logging:
+      options:
+        max-size: "10k"
+        max-file: "3"
+
+  redis:
+    container_name: vsc-kubedash-redis
+    image: redis:latest
+    healthcheck:
+      test: ["CMD-SHELL", "redis-cli ping | grep PONG"]
+      interval: 1s
+      timeout: 3s
+      retries: 5
+    ports:
+      - 6379:6379
+    command: ["redis-server"]
+
+  dbui:
+    image: sosedoff/pgweb
+    container_name: vsc-kubedash-dbui
+    restart: always
+    ports:
+      - "8001:8081"
+    environment:
+      DATABASE_URL: postgres://kubedash:kubedash@postgresql:5432/kubedash?sslmode=disable
+
+  redis-ui:
+    container_name: vsc-kubedash-redis-ui
+    image: patrikx3/p3x-redis-ui
+    volumes:
+      - ./config/redis-ui.json:/settings/.p3xrs-conns.json
+    ports:
+      - 8002:7843
+
+  redis-commander:
+    container_name: vsc-kubedash-redis-commander
+    hostname: redis-commander
+    image: ghcr.io/joeferner/redis-commander:latest
+    restart: always
+    environment:
+      - REDIS_HOSTS=local:kubedash-redis:6379
+      - REDIS_COMMANDER_HTTP_AUTH_USER=
+      - REDIS_COMMANDER_HTTP_AUTH_PASSWORD=
+      - REDIS_COMMANDER_HTTP_AUTH=no
+      - REDIS_COMMANDER_NOAUTH=true
+    ports:
+      - "8004:8081"
+    user: redis
+
+volumes:
+  postgres-data:
