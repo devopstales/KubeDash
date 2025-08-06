@@ -1,4 +1,5 @@
 
+import os
 from flask_login import UserMixin
 from itsdangerous import base64_decode
 from kubernetes import client as k8s_client
@@ -171,15 +172,17 @@ def k8sClientConfigGet(username_role, user_token):
             if k8sConfig is None:
                 logger.error("Kubectl Integration is not configured.")
             else:
-                logger.debug("Loading indb kube config for User")
+                logger.debug("Loading in db kube config for User")
                 k8s_server_url = k8sConfig.k8s_server_url
                 k8s_server_ca = str(base64_decode(k8sConfig.k8s_server_ca), 'UTF-8')
                 configuration = k8s_client.Configuration()
                 if k8s_server_ca:
-                    file = open("CA.crt", "w+")
+                    logger.info("Kubectl CA Write")
+                    os.makedirs("certs", exist_ok=True)
+                    file = open("certs/sa-ca.crt", "w+")
                     file.write( k8s_server_ca )
                     file.close
-                    configuration.ssl_ca_cert = 'CA.crt'
+                    configuration.ssl_ca_cert = 'certs/sa-ca.crt'
                 else:
                     configuration.ssl_ca_cert = "/var/run/secrets/kubernetes.io/serviceaccount/ca.crt"
                 

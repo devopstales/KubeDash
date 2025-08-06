@@ -71,7 +71,7 @@ def initialize_app_logging(app: Flask):
     
     logger = get_logger()
     
-    if sys.argv[1] != 'cli' and sys.argv[1] != 'db':
+    if len(sys.argv) > 1 and sys.argv[1] not in ('cli', 'db'):
         app.logger.info("Initialize logging")
 
     if app.config['DEBUG']:
@@ -307,7 +307,7 @@ def initialize_app_database(app: Flask, filename: str):
             app.logger.info("   Add Contant to Tables")
             app.logger.info(separator_short)
             
-            if sys.argv[1] != 'cli' and sys.argv[1] != 'db':
+            if len(sys.argv) > 1 and sys.argv[1] not in ('cli', 'db'):
                 oidc_init(app.config['kubedash.ini'])
                 k8s_config_int(app.config['kubedash.ini'])
                 if k8sGetClusterStatus():

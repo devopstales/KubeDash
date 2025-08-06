@@ -40,12 +40,12 @@ task docker-up
 echo ""
 echo "Start Migration"
 flask db upgrade
-echo "###################################################################################"
+echo "###########################################################################################"
 
 # Start Gunicorn (Flask app)
 echo ""
 echo "Start Applications: KubeDash ${KUBEDASH_VERSION}"
-echo "###################################################################################"
+echo "###########################################################################################"
 #flask run --host=0.0.0.0 --port=8000
 gunicorn --worker-class eventlet --conf gunicorn_conf.py kubedash:app --reload &
 #opentelemetry-instrument gunicorn --worker-class eventlet --conf gunicorn_conf.py kubedash:app

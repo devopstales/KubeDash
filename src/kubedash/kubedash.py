@@ -53,26 +53,22 @@ def create_app(external_config_name=None):
     else:
         error = initialize_app_configuration(app, None)
     
-    initialize_app_logging(app)
-    
-    # Then initialize tracing (before request handlers)
-    if not error and len(sys.argv) > 1 and sys.argv[1] not in ('cli', 'db'):
-        initialize_app_tracing(app)
-    
+    initialize_app_logging(app) 
 
     # manage cli commands
     if not error:
         initialize_error_page(app)
         initialize_app_swagger(app)
-        if sys.argv[1] == 'cli':
+        if len(sys.argv) > 1 and sys.argv[1] == 'cli':
             initialize_app_database(app, __file__)
             print(separator_long)
             initialize_commands(app)
-        elif sys.argv[1] == 'db':
+        elif len(sys.argv) > 1 and sys.argv[1] == 'db':
             initialize_app_plugins(app)
             initialize_app_database(app, __file__)
             print(separator_long)
         else:
+            initialize_app_tracing(app)
             initialize_app_version(app)
             initialize_app_plugins(app)
             # connections
