@@ -1,7 +1,11 @@
 #!/usr/bin/env bash
 
-FLASK_APP=kubedash
 
-playwright install
+poetry install --with test
+poetry run pytest --cov=kubedash --cov=blueprint --cov=lib --cov=plugins tests/
 
-pytest
+#FLASK_APP=kubedash
+#
+#playwright install
+#
+#pytest

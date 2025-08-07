@@ -36,11 +36,12 @@ from lib.initializers import (
 ## Main App creation Function
 #############################################################
 
-def create_app(external_config_name=None):
+def create_app(external_config_name=None, app_mode=None):
     """Initialize Flask app object
 
     Args:
         external_config_name (str, optional): Name of the configuration file. Defaults to None.
+        app_mode (str): Application mode. Defaults to None.
 
     Returns:
         app (Flask): Flask app object
@@ -48,12 +49,8 @@ def create_app(external_config_name=None):
     app = Flask(__name__, static_url_path='', static_folder='static')
        
     print(separator_long)
-    if external_config_name is not None:
-        error = initialize_app_configuration(app, external_config_name)
-    else:
-        error = initialize_app_configuration(app, None)
-    
-    initialize_app_logging(app) 
+    error = initialize_app_configuration(app, external_config_name, app_mode)   
+    initialize_app_logging(app)
 
     # manage cli commands
     if not error:
@@ -83,17 +80,7 @@ def create_app(external_config_name=None):
             initialize_app_socket(app)
             initialize_blueprints(app)
             add_custom_jinja2_filters(app)
-            initialize_app_security(app)
-            
-            
+            initialize_app_security(app)           
             print(separator_long)
-            
    
     return app
-
-
-##############################################################
-## Main Application variable for WSGI Like Gunicorn
-##############################################################
-
-app = create_app()

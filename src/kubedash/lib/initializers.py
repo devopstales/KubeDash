@@ -24,7 +24,6 @@ from opentelemetry.instrumentation.sqlalchemy import SQLAlchemyInstrumentor
 from opentelemetry.instrumentation.redis import RedisInstrumentor
 
 from lib.components import csrf, db, migrate, login_manager, socketio, sess, api_doc
-from lib.init_functions import get_database_url
 from lib.helper_functions import bool_var_test, get_logger
 from lib.k8s.server import k8sGetClusterStatus
 
@@ -142,12 +141,17 @@ def initialize_error_page(app: Flask):
         return render_template('errors/504.html.j2', description=e.description), 504
 
 
-def initialize_app_configuration(app: Flask, external_config_name: str) -> bool:
+def initialize_app_configuration(
+    app: Flask, 
+    external_config_name: str,
+    app_mode: str
+    ) -> bool:
     """Initialize the configuration and return error if missing
 
     Args:
         app (Flask): Flask app object
         external_config_name (str): The name of the external configuration file
+        app_mode (str): Application mode.
 
     Returns:
         error (bool): A flag used to represent if the config initialization failed
@@ -173,11 +177,18 @@ def initialize_app_configuration(app: Flask, external_config_name: str) -> bool:
         else:
             if 'FLASK_ENV' in os.environ:
                 config_name = os.environ['FLASK_ENV']
+            elif app_mode is not None:
+                config_name = app_mode
             else:
                 config_name = config_ini.get('DEFAULT', 'app_mode', fallback='development')
         
-        app.config.from_object(app_config[config_name])
-        app.config['ENV'] = config_name
+        try:
+            app.config.from_object(app_config[config_name])
+            app.config['ENV'] = config_name
+        except:
+            config_name = config_ini.get('DEFAULT', 'app_mode', fallback='development')
+            app.config.from_object(app_config[config_name])
+            app.config['ENV'] = config_name
                       
         app.logger.info("Integrations:")
         app.logger.info("	Redis:	%s" % bool_var_test(app.config['kubedash.ini'].get('remote_cache', 'redis_enabled')))
@@ -251,8 +262,26 @@ def initialize_app_database(app: Flask, filename: str):
     """Get Database Configuration"""
     app.logger.info("   Get Database Configuration")    
     app.config['SESSION_SQLALCHEMY'] = db
-    app.config['SQLALCHEMY_DATABASE_URI'] = get_database_url(app, filename)
+    
     database_type = app.config['kubedash.ini'].get('database', 'type', fallback=None)
+    basedir = os.path.abspath(os.path.dirname(filename))
+    
+    if app.config['ENV'] != 'testing':       
+        """Get database Type""" 
+        if database_type == 'postgres':
+            SQLALCHEMY_DATABASE_HOST     = app.config['kubedash.ini'].get('database', 'host', fallback=None)
+            SQLALCHEMY_DATABASE_DB       = app.config['kubedash.ini'].get('database', 'name', fallback=None)
+            SQLALCHEMY_DATABASE_USER     = app.config['kubedash.ini'].get('database', 'user', fallback=None)
+            SQLALCHEMY_DATABASE_PASSWORD = app.config['kubedash.ini'].get('database', 'password', fallback=None)
+        
+            """Create Database URL"""
+            if SQLALCHEMY_DATABASE_USER and SQLALCHEMY_DATABASE_PASSWORD and SQLALCHEMY_DATABASE_HOST and SQLALCHEMY_DATABASE_DB:
+                app.config['SQLALCHEMY_DATABASE_URI'] = "postgresql://%s:%s@%s/%s" % (
+                    SQLALCHEMY_DATABASE_USER, 
+                    SQLALCHEMY_DATABASE_PASSWORD, 
+                    SQLALCHEMY_DATABASE_HOST, 
+                    SQLALCHEMY_DATABASE_DB
+                )
     
     """Test Database Connection"""
     app.logger.info("   Test Database Connection")
@@ -370,7 +399,7 @@ def initialize_blueprints(app: Flask):
 
 def initialize_commands(app: Flask):
     """Initialize commands"""
-    from lib.commands import cli 
+    from blueprint.commands import cli 
     app.register_blueprint(cli)
     
 def initialize_app_tracing(app: Flask):

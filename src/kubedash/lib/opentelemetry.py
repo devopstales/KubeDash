@@ -84,9 +84,6 @@ def init_opentelemetry_exporter(
         otlp_exporter = OTLPSpanExporter(
             endpoint=endpoint,
             timeout=timeout,
-            # These are the default retry parameters in OTLP HTTP exporter
-            max_retries=max_retries,
-            retry_delay=retry_delay * 1000,  # in milliseconds
         )
         
         trace.get_tracer_provider().add_span_processor(
@@ -94,7 +91,7 @@ def init_opentelemetry_exporter(
         )
         
         # Add console exporter if enabled
-        if enable_console_exporter or (app.config.get('ENV') == 'development'):
+        if enable_console_exporter and (app.config.get('ENV') == 'development'):
             trace.get_tracer_provider().add_span_processor(
                 SimpleSpanProcessor(ConsoleSpanExporter())
             )
