@@ -23,13 +23,12 @@ from opentelemetry.instrumentation.requests import RequestsInstrumentor
 from opentelemetry.instrumentation.sqlalchemy import SQLAlchemyInstrumentor
 from opentelemetry.instrumentation.redis import RedisInstrumentor
 
-from lib.components import csrf, db, migrate, login_manager, socketio, sess, api_doc
-from lib.init_functions import get_database_url
-from lib.helper_functions import bool_var_test, get_logger
-from lib.k8s.server import k8sGetClusterStatus
+from kubedash.lib.components import csrf, db, migrate, login_manager, socketio, sess, api_doc
+from kubedash.lib.helper_functions import bool_var_test, get_logger
+from kubedash.lib.k8s.server import k8sGetClusterStatus
 
-from lib.helper_functions import ThreadedTicker
-from lib.k8s.workload_cahers import (
+from kubedash.lib.helper_functions import ThreadedTicker
+from kubedash.lib.k8s.workload_cahers import (
     fetch_and_cache_pods_all_namespaces,
     fetch_and_cache_deployments_all_namespaces,
     fetch_and_cache_statefulsets_all_namespaces,
@@ -40,6 +39,13 @@ from lib.k8s.workload_cahers import (
 ##############################################################
 ## Variables
 ##############################################################
+
+from kubedash.lib.components import (
+  KUBEDASH_ROOT,
+  PROJECT_ROOT
+)
+
+from kubedash.version import __version__
 
 # ANSI escape codes for colors
 BLUE = "\033[34m"
@@ -66,12 +72,12 @@ def initialize_app_logging(app: Flask):
     Args:
         app (Flask): Flask app object
     """
-    from lib.logfilters import (NoHealth, NoMetrics, NoPing, NoSocketIoGet,
+    from kubedash.lib.logfilters import (NoHealth, NoMetrics, NoPing, NoSocketIoGet,
                                 NoSocketIoPost) 
     
     logger = get_logger()
     
-    if sys.argv[1] != 'cli' and sys.argv[1] != 'db':
+    if len(sys.argv) > 1 and sys.argv[1] not in ('cli', 'db'):
         app.logger.info("Initialize logging")
 
     if app.config['DEBUG']:
@@ -142,12 +148,12 @@ def initialize_error_page(app: Flask):
         return render_template('errors/504.html.j2', description=e.description), 504
 
 
-def initialize_app_configuration(app: Flask, external_config_name: str) -> bool:
+def initialize_app_configuration(app: Flask, app_mode: str) -> bool:
     """Initialize the configuration and return error if missing
 
     Args:
         app (Flask): Flask app object
-        external_config_name (str): The name of the external configuration file
+        app_mode (str): App mode to run like testing
 
     Returns:
         error (bool): A flag used to represent if the config initialization failed
@@ -161,15 +167,15 @@ def initialize_app_configuration(app: Flask, external_config_name: str) -> bool:
         app.logger.info("Reading Config file")
         import configparser
 
-        from lib.config import app_config
+        from kubedash.lib.config import app_config
 
         config_ini = configparser.ConfigParser()
         config_ini.sections()
         config_ini.read('kubedash.ini')
         app.config['kubedash.ini'] = config_ini
 
-        if external_config_name is not None:
-            config_name = external_config_name
+        if app_mode is not None:
+            config_name = app_mode
         else:
             if 'FLASK_ENV' in os.environ:
                 config_name = os.environ['FLASK_ENV']
@@ -178,6 +184,7 @@ def initialize_app_configuration(app: Flask, external_config_name: str) -> bool:
         
         app.config.from_object(app_config[config_name])
         app.config['ENV'] = config_name
+        app.logger.info("Running in %s mode" % app.config['ENV'])
                       
         app.logger.info("Integrations:")
         app.logger.info("	Redis:	%s" % bool_var_test(app.config['kubedash.ini'].get('remote_cache', 'redis_enabled')))
@@ -199,25 +206,18 @@ def initialize_app_version(app: Flask):
         app (Flask): Flask app object
     """
     app.logger.info("Initializing app version")
-    app_version = os.getenv('KUBEDASH_VERSION', default=None)
-
-    if app_version:
-        if app.config['ENV'] == 'production':
-            kubedash_version = os.getenv('KUBEDASH_VERSION')
-        elif app.config['ENV'] == 'development':
-            kubedash_version = os.getenv('KUBEDASH_VERSION') + '-devel'
-        elif app.config['ENV'] == 'testing':
-            kubedash_version = "testing"
-    elif app.config['ENV'] == 'testing':
-            kubedash_version = "testing"
+    if app.config['ENV'] == 'testing':
+        kubedash_version = "testing"
+    elif app.config['ENV'] == 'development':
+        kubedash_version = __version__ + '-devel'
     else:
-        kubedash_version = "Unknown"
+        kubedash_version = __version__
 
     app.config['VERSION'] = kubedash_version
     app.jinja_env.globals['kubedash_version'] = kubedash_version
 
     """Prometheus endpoint"""
-    #from lib.prometheus import METRIC_APP_VERSION 
+    #from kubedash.lib.prometheus import METRIC_APP_VERSION 
     #METRIC_APP_VERSION.info({'version': kubedash_version})
     from flask_prometheus_metrics import register_metrics
     register_metrics(app, app_version=kubedash_version, app_config=app.config['ENV'])
@@ -236,37 +236,39 @@ def initialize_app_version(app: Flask):
 """
 
     app.logger.info("Initializing app Logo\n" + separator_long + "\n" + LOGO + "\n" + separator_long)  # Use logger instead of print
-    app.logger.info("Running in %s mode" % app.config['ENV'])
 
-
-def initialize_app_database(app: Flask, filename: str):
+def initialize_app_database(app: Flask):
     """Initialize the database
 
     Args:
         app (Flask): Flask app object
-        filename (str): Name of the main file to find the database file
     """
+    app.logger.info(separator_short)
     app.logger.info("Initialize Database:")
+    app.logger.info(separator_short)
     
     """Get Database Configuration"""
     app.logger.info("   Get Database Configuration")    
     app.config['SESSION_SQLALCHEMY'] = db
-    app.config['SQLALCHEMY_DATABASE_URI'] = get_database_url(app, filename)
     database_type = app.config['kubedash.ini'].get('database', 'type', fallback=None)
+    basedir = str(PROJECT_ROOT)
     
-    """Test Database Connection"""
-    app.logger.info("   Test Database Connection")
-    if database_type == 'postgres':
-        try:
-            engine = create_engine(app.config['SQLALCHEMY_DATABASE_URI'])
-            with engine.connect() as connection:
-                connection.execute(text("SELECT 1"))
-        except Exception as e:
-            app.logger.error(f"   Failed to connect to PostgreSQL database: {e}")
-            basedir = os.path.abspath(os.path.dirname(filename))
-            sqlite_url =  "sqlite:///"+basedir+"/database/"+ app.config['ENV'] +".db"
-            app.config['SQLALCHEMY_DATABASE_URI'] = sqlite_url
-            database_type = 'sqlite3'
+    if app.config['ENV'] != 'testing' and database_type == 'postgres':
+      SQLALCHEMY_DATABASE_HOST     = app.config['kubedash.ini'].get('database', 'host', fallback=None)
+      SQLALCHEMY_DATABASE_DB       = app.config['kubedash.ini'].get('database', 'name', fallback=None)
+      SQLALCHEMY_DATABASE_USER     = app.config['kubedash.ini'].get('database', 'user', fallback=None)
+      SQLALCHEMY_DATABASE_PASSWORD = app.config['kubedash.ini'].get('database', 'password', fallback=None)
+      
+      try:
+        app.config['SQLALCHEMY_DATABASE_URI'] = "postgresql://%s:%s@%s/%s" % \
+          (SQLALCHEMY_DATABASE_USER, SQLALCHEMY_DATABASE_PASSWORD, SQLALCHEMY_DATABASE_HOST, SQLALCHEMY_DATABASE_DB)
+        engine = create_engine(app.config['SQLALCHEMY_DATABASE_URI'])
+        with engine.connect() as connection:
+            connection.execute(text("SELECT 1"))
+      except Exception as e:
+        app.logger.error(f"   Failed to connect to PostgreSQL database: {e}")
+        app.config['SQLALCHEMY_DATABASE_URI'] = "sqlite:///"+basedir+"/database/"+ app.config['ENV'] +".db"
+        database_type = 'sqlite3'
             
     """Logging Database URL"""
     app.logger.info("   Database Configuration:")
@@ -278,7 +280,7 @@ def initialize_app_database(app: Flask, filename: str):
     db.init_app(app)
     migrate.init_app(app, db)
     
-    from lib.init_functions import (
+    from kubedash.lib.init_functions import (
         db_init_roles, init_db_test,
         k8s_config_int, k8s_roles_init, oidc_init
     ) 
@@ -307,7 +309,7 @@ def initialize_app_database(app: Flask, filename: str):
             app.logger.info("   Add Contant to Tables")
             app.logger.info(separator_short)
             
-            if sys.argv[1] != 'cli' and sys.argv[1] != 'db':
+            if len(sys.argv) > 1 and sys.argv[1] not in ('cli', 'db'):
                 oidc_init(app.config['kubedash.ini'])
                 k8s_config_int(app.config['kubedash.ini'])
                 if k8sGetClusterStatus():
@@ -332,20 +334,20 @@ def initialize_app_swagger(app: Flask):
 
 def initialize_blueprints(app: Flask):
     """Initialize blueprints"""
-    from blueprint.api import api_bp
-    from blueprint.auth import auth_bp
-    from blueprint.cluster import cluster_bp
-    from blueprint.cluster_permission import cluster_permission_bp
-    from blueprint.dashboard import dashboard_bp
-    from blueprint.metrics import metrics_bp
-    from blueprint.network import network_bp
-    from blueprint.other_resources import other_resources_bp
-    from blueprint.security import security_bp
-    from blueprint.settings import settings_bp, sso_bp
-    from blueprint.storage import storage_bp
-    from blueprint.user import users_bp
-    from blueprint.workload import workload_bp
-    from blueprint.history import history_bp
+    from kubedash.blueprint.api import api_bp
+    from kubedash.blueprint.auth import auth_bp
+    from kubedash.blueprint.cluster import cluster_bp
+    from kubedash.blueprint.cluster_permission import cluster_permission_bp
+    from kubedash.blueprint.dashboard import dashboard_bp
+    from kubedash.blueprint.metrics import metrics_bp
+    from kubedash.blueprint.network import network_bp
+    from kubedash.blueprint.other_resources import other_resources_bp
+    from kubedash.blueprint.security import security_bp
+    from kubedash.blueprint.settings import settings_bp, sso_bp
+    from kubedash.blueprint.storage import storage_bp
+    from kubedash.blueprint.user import users_bp
+    from kubedash.blueprint.workload import workload_bp
+    from kubedash.blueprint.history import history_bp
 
 
     app.logger.info("Initialize blueprints")
@@ -370,7 +372,7 @@ def initialize_blueprints(app: Flask):
 
 def initialize_commands(app: Flask):
     """Initialize commands"""
-    from lib.commands import cli 
+    from kubedash.lib.commands import cli 
     app.register_blueprint(cli)
     
 def initialize_app_tracing(app: Flask):
@@ -388,7 +390,7 @@ def initialize_app_tracing(app: Flask):
     jaeger_url = app.config['kubedash.ini'].get('monitoring', 'jaeger_http_endpoint')
     
     # 1. First setup exporter
-    from lib.opentelemetry import init_opentelemetry_exporter
+    from kubedash.lib.opentelemetry import init_opentelemetry_exporter
     if not init_opentelemetry_exporter(app, jaeger_url):
         return False
     
@@ -413,8 +415,8 @@ def initialize_app_caching(app: Flask):
     Args:
         app (Flask): Flask app object
     """
-    from lib.cache import cache
-    from lib.cache import cached_base, cached_base2
+    from kubedash.lib.cache import cache
+    from kubedash.lib.cache import cached_base, cached_base2
 
     ini = app.config['kubedash.ini']
     redis_enabled = ini.get('remote_cache', 'redis_enabled', fallback='none').lower() == 'true'
@@ -656,7 +658,7 @@ def initialize_app_plugins(app: Flask):
     app.config["plugins"] = {}
     
     # Get the plugins directory
-    plugins_dir = Path(__file__).parent.parent / "plugins"
+    plugins_dir = KUBEDASH_ROOT / "plugins"
     
     # Get all plugin folders
     plugin_folders = [f.name for f in plugins_dir.iterdir() if f.is_dir() and not f.name.startswith('__')]
@@ -679,7 +681,7 @@ def initialize_app_plugins(app: Flask):
         try:
             if is_enabled:
                 # Import the plugin module
-                module = importlib.import_module(f"plugins.{plugin_name}")
+                module = importlib.import_module(f"kubedash.plugins.{plugin_name}")
 
                 # Find and register the first matching blueprint
                 bp_name = f"{plugin_name}_bp"
@@ -688,7 +690,7 @@ def initialize_app_plugins(app: Flask):
                     app.register_blueprint(blueprint)
 
                     try:
-                        importlib.import_module(f"plugins.{plugin_name}.model")
+                        importlib.import_module(f"kubedash.plugins.{plugin_name}.model")
                         app.logger.info("    Import Database Models")
                     except ImportError:
                         continue
@@ -707,7 +709,7 @@ def add_custom_jinja2_filters(app: Flask):
     """Add custom Jinja2 filers."""
     app.logger.info("Adding custom Jinja2 filters")
 
-    from lib.custom_jinja2 import j2_b64decode, j2_b64encode, split_uppercase, check_url_exists
+    from kubedash.lib.custom_jinja2 import j2_b64decode, j2_b64encode, split_uppercase, check_url_exists
 
     app.add_template_filter(j2_b64decode)
     app.add_template_filter(j2_b64encode)

@@ -38,43 +38,6 @@ logger = get_logger()
 ## Helper Functions
 ##############################################################
 
-def get_database_url(app: Flask, filename: string) -> string:
-    """Get the database URL from the configuration
-    
-    Args:
-        app (Flask): Flask app object
-        filename (str): Name of the main file to find the configuration file
-    
-    Returns:
-        SQLALCHEMY_DATABASE_URI (str): Database URL
-    """
-    
-    """Get database Type""" 
-    database_type = app.config['kubedash.ini'].get('database', 'type', fallback=None)
-    if database_type == 'postgres':
-        EXTERNAL_DATABASE_ENABLED = True
-    else:
-        EXTERNAL_DATABASE_ENABLED = False
-        
-    """Set Postgresql Variables"""
-    if EXTERNAL_DATABASE_ENABLED:
-        SQLALCHEMY_DATABASE_HOST     = app.config['kubedash.ini'].get('database', 'host', fallback=None)
-        SQLALCHEMY_DATABASE_DB       = app.config['kubedash.ini'].get('database', 'name', fallback=None)
-        SQLALCHEMY_DATABASE_USER     = app.config['kubedash.ini'].get('database', 'user', fallback=None)
-        SQLALCHEMY_DATABASE_PASSWORD = app.config['kubedash.ini'].get('database', 'password', fallback=None)
-        
-    """Create Database URL"""
-    basedir = os.path.abspath(os.path.dirname(filename))
-    if app.config['ENV'] == 'testing':
-        SQLALCHEMY_DATABASE_URI = "sqlite:///"+basedir+"/database/"+ app.config['ENV'] +".db"
-    elif EXTERNAL_DATABASE_ENABLED and SQLALCHEMY_DATABASE_USER and SQLALCHEMY_DATABASE_PASSWORD and SQLALCHEMY_DATABASE_HOST and SQLALCHEMY_DATABASE_DB:
-        SQLALCHEMY_DATABASE_URI = "postgresql://%s:%s@%s/%s" % \
-            (SQLALCHEMY_DATABASE_USER, SQLALCHEMY_DATABASE_PASSWORD, SQLALCHEMY_DATABASE_HOST, SQLALCHEMY_DATABASE_DB)
-    else:
-        SQLALCHEMY_DATABASE_URI = "sqlite:///"+basedir+"/database/"+ app.config['ENV'] +".db"
-        
-    return SQLALCHEMY_DATABASE_URI
-
 def validate_scopes(requested_scopes: List[str], issuer_url: str) -> List[str]:
     """
     Validate requested scopes against the IDP's supported scopes.

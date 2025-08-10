@@ -2,7 +2,7 @@
 
 
 poetry install --with test
-poetry run pytest --cov=kubedash --cov=blueprint --cov=lib --cov=plugins tests/
+poetry run pytest --cov=kubedash tests/
 
 #FLASK_APP=kubedash
 #
