@@ -5,6 +5,7 @@
 USER=$(id -u)
 echo "Setting USER environment variable to ${USER}"
 export USER=$USER
+export FLASK_APP=kubedash:create_app
 
 echo ""
 echo "Start Migration"
@@ -15,6 +16,4 @@ echo ${KUBEDASH_VERSION} > /code/kubedash/app-release
 echo ""
 echo "Start Applications"
 echo "###########################################################################################"
-#flask run --host=0.0.0.0 --port=8000
-#python3 kubedash.py
 gunicorn --worker-class eventlet --conf gunicorn_conf.py wsgi:app

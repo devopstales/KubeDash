@@ -1,13 +1,14 @@
-[project]
-name = "KubeDash"
+[tool.poetry]
+name = "kubedash"
 version = "4.1.0"
-description = "KubeDash is a kubernetes Dashboard"
+description = "KubeDash is a Kubernetes Dashboard"
 license = "Apache-2.0"
-authors = [
-    {name = "Páldi Balázs",email = "devopstales2@gmail.com"}
-]
+authors = ["Páldi Balázs <devopstales2@gmail.com>"]
 readme = "README.md"
-requires-python = ">=3.11"
+#packages = [
+#    { include = "kubedash", from = "src" }
+#]
+
 
 [tool.poetry.dependencies]
 python = ">=3.11,<3.13"
@@ -54,7 +55,7 @@ h11 = "0.16.0"
 swagger-ui-bundle = "^1.1.0"
 flask-caching = "^2.3.1"
 plotly = "^6.0.0"
-redis = "^5.2.1"
+redis = "6.4.0"
 colorlog = "^6.9.0"
 protobuf = "5.29.5"
 statsd = "^4.0.1"

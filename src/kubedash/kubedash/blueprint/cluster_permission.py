@@ -1,0 +1,187 @@
+from math import e
+from flask import (Blueprint, redirect, render_template, request, session,
+                   url_for)
+from flask_login import login_required
+
+from kubedash.lib.helper_functions import get_logger
+from kubedash.lib.k8s.namespace import k8sNamespaceListGet
+from kubedash.lib.k8s.security import (k8sClusterRoleBindingListGet, k8sRoleGet,
+                              k8sClusterRoleListGet, k8sClusterRoleGet, 
+                              k8sRoleBindingListGet,
+                              k8sRoleListGet, k8sSaListGet)
+from kubedash.lib.sso import get_user_token
+
+##############################################################
+## Helpers
+##############################################################
+
+cluster_permission_bp = Blueprint("cluster_permission", __name__, url_prefix="/cluster-permission")
+logger = get_logger()
+
+##############################################################
+## cluster-permission Pages
+##############################################################
+## Service Account
+##############################################################
+
+@cluster_permission_bp.route("/service-account", methods=['GET', 'POST'])
+@login_required
+def service_accounts():
+    selected = None
+    user_token = get_user_token(session)
+
+    if request.method == 'POST':
+        if 'ns_select' in request.form:
+            session['ns_select'] = request.form.get('ns_select')
+        selected = request.form.get('selected')
+
+    namespace_list, error = k8sNamespaceListGet(session['user_role'], user_token)
+    if not error:
+        service_accounts = k8sSaListGet(session['user_role'], user_token, session['ns_select'])
+    else:
+        service_accounts = list()
+
+    return render_template(
+        'cluster-permission/service-account.html.j2',
+        selected = selected,
+        service_accounts = service_accounts,
+        namespaces = namespace_list,
+    )
+
+
+##############################################################
+##  Role
+##############################################################
+
+@cluster_permission_bp.route("/role", methods=['GET', 'POST'])
+@login_required
+def roles():
+    selected = None
+    user_token = get_user_token(session)
+
+    if request.method == 'POST':
+        if 'ns_select' in request.form:
+            session['ns_select'] = request.form.get('ns_select')
+        selected = request.form.get('selected')
+
+    namespace_list, error = k8sNamespaceListGet(session['user_role'], user_token)
+    if not error:
+        roles = k8sRoleListGet(session['user_role'], user_token, session['ns_select'])
+    else:
+        roles = list()
+
+    return render_template(
+        'cluster-permission/role.html.j2',
+        selected = selected,
+        roles = roles,
+        namespaces = namespace_list,
+    )
+
+@cluster_permission_bp.route("/role/data", methods=['GET', 'POST'])
+@login_required
+def role_data():
+    if request.method == 'POST':
+        if 'ns_select' in request.form:
+            session['ns_select'] = request.form.get('ns_select')
+        r_name = request.form.get('r_name')
+        
+        user_token = get_user_token(session)
+        
+        namespace_list, error = k8sNamespaceListGet(session['user_role'], user_token)
+        role = k8sRoleGet(session['user_role'], user_token, r_name, session['ns_select'])
+
+        return render_template(
+            'cluster-permission/role-data.html.j2',
+            namespace_list = namespace_list,
+            role = role,
+            r_name = r_name,
+        )
+    else:
+        return redirect(url_for('auth.login'))
+    
+##############################################################
+##  Role Binding
+##############################################################
+
+@cluster_permission_bp.route("/role-binding", methods=['GET', 'POST'])
+@login_required
+def role_bindings():
+    selected = None
+    user_token = get_user_token(session)
+
+    if request.method == 'POST':
+        if 'ns_select' in request.form:
+            session['ns_select'] = request.form.get('ns_select')
+        selected = request.form.get('rb_name')
+
+    namespace_list, error = k8sNamespaceListGet(session['user_role'], user_token)
+    if not error:
+        role_bindings, error = k8sRoleBindingListGet(session['user_role'], user_token, session['ns_select'])
+    else:
+        role_bindings = list()
+
+    return render_template(
+        'cluster-permission/role-binding.html.j2',
+        role_bindings = role_bindings,
+        namespaces = namespace_list,
+        selected = selected,
+    )
+
+##############################################################
+## Cluster Role
+##############################################################
+
+@cluster_permission_bp.route("/cluster-role", methods=['GET', 'POST'])
+@login_required
+def cluster_roles():
+    selected = None
+    user_token = get_user_token(session)
+
+    if request.method == 'POST':
+        selected = request.form.get('selected')
+
+    cluster_roles = k8sClusterRoleListGet(session['user_role'], user_token)
+
+    return render_template(
+        'cluster-permission/cluster-role.html.j2',
+        cluster_roles = cluster_roles,
+        selected = selected,
+    )
+
+@cluster_permission_bp.route("/cluster-role/data", methods=['GET', 'POST'])
+@login_required
+def cluster_role_data():
+    if request.method == 'POST':
+        cr_name = request.form.get('cr_name')
+        user_token = get_user_token(session)
+        cluster_role = k8sClusterRoleGet(session['user_role'], user_token, cr_name)
+
+        return render_template(
+            'cluster-permission/cluster-role-data.html.j2',
+            cluster_role = cluster_role,
+            cr_name = cr_name,
+        )
+    else:
+        return redirect(url_for('auth.login'))
+    
+##############################################################
+## Cluster Role Bindings
+##############################################################
+
+@cluster_permission_bp.route("/cluster-role-binding", methods=["GET", "POST"])
+@login_required
+def cluster_role_bindings():
+    crb_name = None
+    user_token = get_user_token(session)
+
+    if request.method == 'POST':
+        crb_name = request.form.get('crb_name')
+
+    cluster_role_bindings, error = k8sClusterRoleBindingListGet(session['user_role'], user_token)
+    return render_template(
+        'cluster-permission/cluster-role-binding.html.j2',
+        cluster_role_bindings = cluster_role_bindings,
+        crb_name = crb_name,
+    )
+
+
