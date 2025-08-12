@@ -1,3 +1,5 @@
+from flask import current_app
+
 from kubernetes import client, config
 from kubernetes.client.rest import ApiException
 
@@ -11,6 +13,29 @@ except:
 
 core_api = client.CoreV1Api()
 auth_api = client.AuthorizationV1Api()
+
+def validate_user(request):
+    # Get user identity
+    user = request.headers.get("X-Remote-User") or request.headers.get("Impersonate-User")
+    
+    # Handle group headers properly
+    groups = []
+    group_header = request.headers.get("X-Remote-Group") or request.headers.get("Impersonate-Group")
+    if group_header:
+        groups = [g.strip() for g in group_header.split(',') if g.strip()]
+    
+    # Handle system components
+    if not user and not groups:
+        auth_header = request.headers.get("Authorization")
+        if auth_header and ("system:serviceaccount" in auth_header or "system:kube-controller-manager" in auth_header):
+            user = auth_header.split(":")[-1] if ":" in auth_header else auth_header
+            groups = ["system:authenticated"]
+    
+    if not user and not groups:
+        return {"message": "Authorization credentials required"}, 401
+        
+    return user, groups
+
 
 def is_namespace_visible(namespace_obj, user, groups):
     k8sClientConfigGet('Admin', None)  # your setup
@@ -49,7 +74,8 @@ def to_project(namespace_obj, user, spec=None):
         "metadata": {
             "name": namespace_obj.metadata.name,
             "labels": namespace_obj.metadata.labels or {},
-            "annotations": namespace_obj.metadata.annotations or {}
+            "annotations": namespace_obj.metadata.annotations or {},
+            "creationTimestamp": namespace_obj.metadata.creation_timestamp or {}
         }
     }
     if spec:
@@ -66,7 +92,15 @@ def list_visible_projects(user, groups):
     """
     allowed_ns_list = []
     k8sClientConfigGet('Admin', None)
-    namespace_list, error = k8sListNamespaces('Admin', None)
+
+    try:
+        namespace_list, error = k8sListNamespaces('Admin', None)
+        if error:
+            raise Exception(f"Failed to list namespaces: {error}")
+    except Exception as e:
+        current_app.logger.error(f"Namespace listing failed: {str(e)}")
+        return {"message": "Internal server error"}, 500
+
     for ns_obj in namespace_list.items:
         if is_namespace_visible(ns_obj, user, groups):
             allowed_ns_list.append(ns_obj)
