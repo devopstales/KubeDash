@@ -27,14 +27,6 @@ from kubedash.lib.components import csrf, db, migrate, login_manager, socketio, 
 from kubedash.lib.helper_functions import bool_var_test, get_logger
 from kubedash.lib.k8s.server import k8sGetClusterStatus
 
-from kubedash.lib.helper_functions import ThreadedTicker
-from kubedash.lib.k8s.workload_cahers import (
-    fetch_and_cache_pods_all_namespaces,
-    fetch_and_cache_deployments_all_namespaces,
-    fetch_and_cache_statefulsets_all_namespaces,
-    fetch_and_cache_daemonsets_all_namespaces,
-    fetch_and_cache_replicasets_all_namespaces,
-)
 
 ##############################################################
 ## Variables
@@ -262,7 +254,13 @@ def initialize_app_database(app: Flask):
       try:
         app.config['SQLALCHEMY_DATABASE_URI'] = "postgresql://%s:%s@%s/%s" % \
           (SQLALCHEMY_DATABASE_USER, SQLALCHEMY_DATABASE_PASSWORD, SQLALCHEMY_DATABASE_HOST, SQLALCHEMY_DATABASE_DB)
-        engine = create_engine(app.config['SQLALCHEMY_DATABASE_URI'])
+        engine = create_engine(
+            app.config['SQLALCHEMY_DATABASE_URI'],
+            pool_pre_ping=True,
+            pool_size=5,
+            max_overflow=10,
+            pool_recycle=1800,
+        )
         with engine.connect() as connection:
             connection.execute(text("SELECT 1"))
       except Exception as e:
@@ -349,7 +347,6 @@ def initialize_blueprints(app: Flask):
     from kubedash.blueprint.workload import workload_bp
     from kubedash.blueprint.history import history_bp
 
-
     app.logger.info("Initialize blueprints")
     #app.register_blueprint(api_bp)
     api_doc.register_blueprint(api_bp)
@@ -368,7 +365,12 @@ def initialize_blueprints(app: Flask):
     app.register_blueprint(storage_bp)
     app.register_blueprint(security_bp)
     app.register_blueprint(other_resources_bp)
-    app.register_blueprint(settings_bp)    
+    app.register_blueprint(settings_bp)
+    
+    app.logger.info("Initialize Api Extension blueprints")
+    from kubedash.blueprint.k8s_api_extension import project_bp
+    
+    api_doc.register_blueprint(project_bp)
 
 def initialize_commands(app: Flask):
     """Initialize commands"""
@@ -796,6 +798,12 @@ def initialize_app_security(app: Flask):
         
     """Init CSRF"""
     csrf.init_app(app)
+    
+    try:
+        from kubedash.blueprint.k8s_api_extension import project_bp
+        csrf.exempt(project_bp)
+    except Exception as e:
+        app.logger.error("Error add CSRF exception for project_bp: %s" % e)
 
     app.talisman.content_security_policy = csp
     app.talisman.x_xss_protection = True
@@ -820,53 +828,3 @@ def initialize_app_security(app: Flask):
         response.headers["Expires"] = "0"
 
         return response
-    
-def initialize_workloadcachers(app: Flask):
-    """
-    Initialize and start background tasks for caching various Kubernetes workload resources.
-
-    This function sets up periodic tasks to fetch and cache information about pods,
-    deployments, statefulsets, daemonsets, and replicasets from all namespaces in the
-    Kubernetes cluster. Each task runs every 900 seconds (15 minutes).
-
-    Args:
-        app (Flask): The Flask application instance, used to provide context for
-                     the caching operations.
-
-    Returns:
-        None
-
-    Note:
-        This function starts multiple ThreadedTicker instances, each responsible
-        for caching a specific type of Kubernetes resource. These tickers run
-        in the background and update the cache at regular intervals.
-    """
-    pod_ticker = ThreadedTicker(
-        interval_sec=900, 
-        func=fetch_and_cache_pods_all_namespaces(app)
-    )
-    pod_ticker.start()
-
-    deployment_ticker = ThreadedTicker(
-        interval_sec=900, 
-        func=fetch_and_cache_deployments_all_namespaces(app)
-    )
-    deployment_ticker.start()
-
-    statefulset_ticker = ThreadedTicker(
-        interval_sec=900, 
-        func=fetch_and_cache_statefulsets_all_namespaces(app)
-    )
-    statefulset_ticker.start()
-
-    daemonset_ticker = ThreadedTicker(
-        interval_sec=900, 
-        func=fetch_and_cache_daemonsets_all_namespaces(app)
-    )
-    daemonset_ticker.start()
-
-    replicasets_ticker = ThreadedTicker(
-        interval_sec=900, 
-        func=fetch_and_cache_replicasets_all_namespaces(app)
-    )
-    replicasets_ticker.start()

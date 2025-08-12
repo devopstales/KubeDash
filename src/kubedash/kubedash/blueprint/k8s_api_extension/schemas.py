@@ -11,7 +11,7 @@ class SpecSchema(Schema):
     display_name = fields.Str(required=False, allow_none=True, data_key="display-name")
 
 class ProjectSchema(Schema):
-    apiVersion = fields.Str(required=True, validate=validate.Equal("mygroup.example.com/v1"))
+    apiVersion = fields.Str(required=True, validate=validate.Equal("devopstales.github.io/v1"))
     kind = fields.Str(required=True, validate=validate.Equal("Project"))
     metadata = fields.Nested(MetadataSchema, required=True)
     spec = fields.Nested(SpecSchema, required=False)

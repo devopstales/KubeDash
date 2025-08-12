@@ -131,7 +131,13 @@ def init_db_test(app) -> bool:
     else:
         EXTERNAL_DATABASE_ENABLED = False
     
-    engine = create_engine(SQLALCHEMY_DATABASE_URI)
+    engine = create_engine(
+        SQLALCHEMY_DATABASE_URI,
+        pool_pre_ping=True,
+        pool_size=5,
+        max_overflow=10,
+        pool_recycle=1800,
+    )
     if inspect(engine).has_table("alembic_version"):
         METRIC_DB_CONNECTION.labels(EXTERNAL_DATABASE_ENABLED, database_type).set(1.0)
         return True

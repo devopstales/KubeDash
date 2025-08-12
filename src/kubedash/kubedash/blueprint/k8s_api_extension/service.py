@@ -42,10 +42,10 @@ def is_namespace_visible(namespace_obj, user, groups):
     # No permission found
     return False
 
-def to_project(namespace_obj, user, spec):
+def to_project(namespace_obj, user, spec=None):
     project_onj = {
         "kind": "Project",
-        "apiVersion": "mygroup.example.com/v1",
+        "apiVersion": "devopstales.github.io/v1",
         "metadata": {
             "name": namespace_obj.metadata.name,
             "labels": namespace_obj.metadata.labels or {},

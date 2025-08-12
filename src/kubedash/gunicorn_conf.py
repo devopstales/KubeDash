@@ -23,8 +23,8 @@ bind = "0.0.0.0:8000"
 workers = 1
 threads = 4
 worker_tmp_dir = "/tmp/kubedash"
-timeout = 120
-graceful_timeout = 120
+timeout = 5
+graceful_timeout = 10
 keepalive = 5
 
 # ========================

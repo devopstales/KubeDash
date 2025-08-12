@@ -15,7 +15,7 @@ metadata:
   namespace: default
 subsets:
   - addresses:
-      - ip: <k8s-master01.mydomain.intra-IP>
+      - ip: 192.168.206.11
     ports:
       - port: 8000
 ---

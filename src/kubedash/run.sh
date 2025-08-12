@@ -1,4 +1,5 @@
 #!/bin/bash
+
 USER=$(id -u)
 echo "Setting USER environment variable to ${USER}"
 export USER=$USER
@@ -41,23 +42,4 @@ echo "##########################################################################
 echo ""
 echo "Start Application"
 echo "###########################################################################################"
-#flask run --host=0.0.0.0 --port=8000
-gunicorn --worker-class gevent --conf gunicorn_conf.py wsgi:app --reload
-#  &
-# #opentelemetry-instrument gunicorn --worker-class eventlet --conf gunicorn_conf.py kubedash:app
-# GUNICORN_PID=$!
-# 
-# 
-# # Function to handle shutdown gracefully
-# function shutdown {
-#     echo "Stopping processes..."
-#     kill -TERM $GUNICORN_PID
-#     wait $GUNICORN_PID
-# }
-# 
-# # Trap signals for graceful exit
-# trap shutdown SIGTERM SIGINT
-# 
-# # Wait for processes to finish (prevents container from exiting)
-# wait
-
+gunicorn --worker-class gevent --conf gunicorn_conf.py wsgi:app --reload --preload
