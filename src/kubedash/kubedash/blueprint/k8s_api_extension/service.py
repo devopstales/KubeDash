@@ -1,4 +1,5 @@
 from flask import current_app
+from datetime import datetime, timezone
 
 from kubernetes import client, config
 from kubernetes.client.rest import ApiException
@@ -13,6 +14,18 @@ except:
 
 core_api = client.CoreV1Api()
 auth_api = client.AuthorizationV1Api()
+
+
+
+
+def format_age(ts: str) -> str:
+    """Return human-readable age like '3y 2d' from RFC3339 timestamp."""
+    dt = datetime.strptime(ts, "%Y-%m-%dT%H:%M:%SZ").replace(tzinfo=timezone.utc)
+    delta = datetime.now(timezone.utc) - dt
+    years, days = divmod(delta.days, 365)
+    if years > 0:
+        return f"{years}y{days}d"
+    return f"{days}d"
 
 def validate_user(request):
     # Get user identity
@@ -68,6 +81,11 @@ def is_namespace_visible(namespace_obj, user, groups):
     return False
 
 def to_project(namespace_obj, user, spec=None):
+    from datetime import timezone
+
+    ts = namespace_obj.metadata.creation_timestamp
+    creation_ts = ts.astimezone(timezone.utc).strftime("%Y-%m-%dT%H:%M:%SZ")    
+
     project_onj = {
         "kind": "Project",
         "apiVersion": "devopstales.github.io/v1",
@@ -75,9 +93,13 @@ def to_project(namespace_obj, user, spec=None):
             "name": namespace_obj.metadata.name,
             "labels": namespace_obj.metadata.labels or {},
             "annotations": namespace_obj.metadata.annotations or {},
-            "creationTimestamp": namespace_obj.metadata.creation_timestamp or {}
+            "creationTimestamp": creation_ts
+        }, 
+        "status": {
+            "phase": namespace_obj.status.phase
         }
     }
+    
     if spec:
         project_onj["spec"] = spec
     else:

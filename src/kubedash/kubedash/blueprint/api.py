@@ -15,7 +15,7 @@ from kubedash.lib.sso import SSOServerTest
 ##############################################################
 
 """api Api Blueprint"""
-api_bp = Blueprint("api", "api", url_prefix="/api")
+api_bp = Blueprint("api", "api", description="KubeDash APIs", url_prefix="/api")
 logger = get_logger()
 
 from kubedash.lib.opentelemetry import get_tracer

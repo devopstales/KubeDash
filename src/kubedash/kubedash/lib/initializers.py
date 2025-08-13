@@ -8,7 +8,6 @@ import sys
 import socket
 import redis
 import importlib
-from pathlib import Path
 from redis.exceptions import AuthenticationError, ConnectionError, RedisError
 from redis.cluster import RedisCluster
 from sqlalchemy import create_engine, text
@@ -368,9 +367,11 @@ def initialize_blueprints(app: Flask):
     app.register_blueprint(settings_bp)
     
     app.logger.info("Initialize Api Extension blueprints")
-    from kubedash.blueprint.k8s_api_extension import project_bp
+    from kubedash.blueprint.k8s_api_extension import extension_api_root_bp
+    from kubedash.blueprint.k8s_api_extension import extension_api_project_bp
     
-    api_doc.register_blueprint(project_bp)
+    api_doc.register_blueprint(extension_api_root_bp)
+    api_doc.register_blueprint(extension_api_project_bp)
 
 def initialize_commands(app: Flask):
     """Initialize commands"""
@@ -800,8 +801,9 @@ def initialize_app_security(app: Flask):
     csrf.init_app(app)
     
     try:
-        from kubedash.blueprint.k8s_api_extension import project_bp
-        csrf.exempt(project_bp)
+        from kubedash.blueprint.k8s_api_extension import extension_api_project_bp
+        
+        csrf.exempt(extension_api_project_bp)
     except Exception as e:
         app.logger.error("Error add CSRF exception for project_bp: %s" % e)
 

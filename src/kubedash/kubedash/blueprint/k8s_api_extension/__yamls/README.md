@@ -6,6 +6,55 @@
 * https://github.com/kubernetes-sigs/metrics-server/blob/master/manifests/base/apiservice.yaml
 * https://cert-manager.io/docs/concepts/ca-injector/
 
+## K8S API Extension
+
+* `/openapi/v2`
+* `/openapi/v3`
+* `/apis`
+  * `APIGroupList`
+
+```json
+    {
+      "name": "namespaces",
+      "singularName": "namespace",
+      "namespaced": false,
+      "kind": "Namespace",
+      "verbs": [
+        "create",
+        "delete",
+        "get",
+        "list",
+        "patch",
+        "update",
+        "watch"
+      ],
+      "shortNames": [
+        "ns"
+      ],
+      "storageVersionHash": "Q3oi5N2YM8M="
+    },
+    {
+      "name": "namespaces/finalize",
+      "singularName": "",
+      "namespaced": false,
+      "kind": "Namespace",
+      "verbs": [
+        "update"
+      ]
+    },
+    {
+      "name": "namespaces/status",
+      "singularName": "",
+      "namespaced": false,
+      "kind": "Namespace",
+      "verbs": [
+        "get",
+        "patch",
+        "update"
+      ]
+    },
+```
+
 ## APIService
 
 ```bash
@@ -30,7 +79,69 @@ spec:
   versionPriority: 100
 ```
 
+## My objects
+
 ### Project
+
+```yaml
+apiVersion: devopstales.github.io/v1
+kind: Project
+metadata:
+  creationTimestamp: date
+  name: name
+  labels:
+    label: value
+  annotations:
+    label: value
+spec:
+  description: "Description"
+  owner: "User name"
+status:
+  phase: Active
+```
+
+* Status can be used to archive?
+* owner vs requester
+* Membership view
+
+## Openshift
+
+### Projects
+
+```json
+{
+    "kind": "APIResourceList",
+    "apiVersion": "v1",
+    "groupVersion": "project.openshift.io/v1",
+    "resources": [
+        {
+            "name": "projectrequests",
+            "singularName": "",
+            "namespaced": false,
+            "kind": "ProjectRequest",
+            "verbs": [
+                "create",
+                "list"
+            ]
+        },
+        {
+            "name": "projects",
+            "singularName": "",
+            "namespaced": false,
+            "kind": "Project",
+            "verbs": [
+                "create",
+                "delete",
+                "get",
+                "list",
+                "patch",
+                "update",
+                "watch"
+            ]
+        }
+    ]
+}
+```
 
 ```bash
 KIND:     Project
@@ -140,6 +251,77 @@ The admission Controller functionality:
 * Group - Cluster
 * Kubeconfig - Cluster
 
+```json
+{
+    "kind": "APIResourceList",
+    "apiVersion": "v1",
+    "groupVersion": "user.openshift.io/v1",
+    "resources": [
+        {
+            "name": "groups",
+            "singularName": "",
+            "namespaced": false,
+            "kind": "Group",
+            "verbs": [
+                "create",
+                "delete",
+                "deletecollection",
+                "get",
+                "list",
+                "patch",
+                "update",
+                "watch"
+            ]
+        },
+        {
+            "name": "identities",
+            "singularName": "",
+            "namespaced": false,
+            "kind": "Identity",
+            "verbs": [
+                "create",
+                "delete",
+                "deletecollection",
+                "get",
+                "list",
+                "patch",
+                "update",
+                "watch"
+            ]
+        },
+        {
+            "name": "useridentitymappings",
+            "singularName": "",
+            "namespaced": false,
+            "kind": "UserIdentityMapping",
+            "verbs": [
+                "create",
+                "delete",
+                "get",
+                "patch",
+                "update"
+            ]
+        },
+        {
+            "name": "users",
+            "singularName": "",
+            "namespaced": false,
+            "kind": "User",
+            "verbs": [
+                "create",
+                "delete",
+                "deletecollection",
+                "get",
+                "list",
+                "patch",
+                "update",
+                "watch"
+            ]
+        }
+    ]
+}
+```
+
 ### User
 
 ```bash
@@ -192,6 +374,24 @@ spec:
               minimum: 2
 ```
 
+```yaml
+apiVersion: user.openshift.io/v1
+fullName: Test User
+groups: null
+identities:
+- shiwaforcesso:test.user@mydomain.intra
+- email_jira_ldap:test.user@mydomain.intra
+- sso_shiwaforce:test.user@mydomain.intra
+- email_jira:test.user@mydomain.intra
+kind: User
+metadata:
+  creationTimestamp: "2019-05-27T13:18:54Z"
+  name: test.user@mydomain.intra
+  resourceVersion: "7086165"
+  selfLink: /apis/user.openshift.io/v1/users/test.user%40mydomain.intra
+  uid: fa36d145-8081-11e9-af1a-66934f1af826
+```
+
 ### Group
 
 ```bash
@@ -231,6 +431,37 @@ spec:
   name: "test-3"
   path: "ldap/test"
   policies: "admin, audit, users"
+```
+
+```json
+    {
+      "name": "groups",
+      "singularName": "group",
+      "namespaced": true,
+      "kind": "Group",
+      "verbs": [
+        "delete",
+        "deletecollection",
+        "get",
+        "list",
+        "patch",
+        "create",
+        "update",
+        "watch"
+      ],
+      "storageVersionHash": "GstsBbv2Ed8="
+    },
+    {
+      "name": "groups/status",
+      "singularName": "",
+      "namespaced": true,
+      "kind": "Group",
+      "verbs": [
+        "get",
+        "patch",
+        "update"
+      ]
+    },
 ```
 
 ### Identity

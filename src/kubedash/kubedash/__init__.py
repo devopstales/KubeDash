@@ -70,8 +70,8 @@ def create_app(app_mode=None):
             initialize_app_plugins(app)
             # connections
             app.logger.info(separator_short)
-            initialize_app_database(app)
             initialize_app_caching(app)
+            initialize_app_database(app)
             init_before_request(app)
             app.logger.info(separator_short)
             with app.app_context():
