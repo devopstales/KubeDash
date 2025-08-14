@@ -1,10 +1,7 @@
 # KubeDash Extension API Server
 
-* https://kubernetes.io/docs/tasks/extend-kubernetes/setup-extension-api-server/
-* https://kubernetes.io/docs/tasks/extend-kubernetes/configure-aggregation-layer/
-* https://kubernetes.io/docs/concepts/extend-kubernetes/api-extension/apiserver-aggregation/
-* https://github.com/kubernetes-sigs/metrics-server/blob/master/manifests/base/apiservice.yaml
-* https://cert-manager.io/docs/concepts/ca-injector/
+* https://www.kubeflow.org/docs/components/central-dash/profiles/
+* https://github.com/sighupio/permission-manager
 
 ## K8S API Extension
 
@@ -81,6 +78,17 @@ spec:
 
 ## My objects
 
+* Project - Cluster
+  * Namespace 1v1
+  * Or group of Namespaces
+* Space
+* User - Cluster
+* Identity - Cluster
+* Account
+* Group - Cluster
+* Kubeconfig - Cluster
+* Profile
+
 ### Project
 
 ```yaml
@@ -96,6 +104,11 @@ metadata:
 spec:
   description: "Description"
   owner: "User name"
+  resources: # Create Namespace limit automaticle
+    limits:
+      cpu: "10"
+      memory: 20Gi
+  networkPolicy: "default-deny"  # Triggers controller to apply a NetworkPolicy ????
 status:
   phase: Active
 ```
@@ -132,6 +145,74 @@ status:
             "verbs": [
                 "create",
                 "delete",
+                "get",
+                "list",
+                "patch",
+                "update",
+                "watch"
+            ]
+        }
+    ]
+},
+{
+    "kind": "APIResourceList",
+    "apiVersion": "v1",
+    "groupVersion": "user.openshift.io/v1",
+    "resources": [
+        {
+            "name": "groups",
+            "singularName": "",
+            "namespaced": false,
+            "kind": "Group",
+            "verbs": [
+                "create",
+                "delete",
+                "deletecollection",
+                "get",
+                "list",
+                "patch",
+                "update",
+                "watch"
+            ]
+        },
+        {
+            "name": "identities",
+            "singularName": "",
+            "namespaced": false,
+            "kind": "Identity",
+            "verbs": [
+                "create",
+                "delete",
+                "deletecollection",
+                "get",
+                "list",
+                "patch",
+                "update",
+                "watch"
+            ]
+        },
+        {
+            "name": "useridentitymappings",
+            "singularName": "",
+            "namespaced": false,
+            "kind": "UserIdentityMapping",
+            "verbs": [
+                "create",
+                "delete",
+                "get",
+                "patch",
+                "update"
+            ]
+        },
+        {
+            "name": "users",
+            "singularName": "",
+            "namespaced": false,
+            "kind": "User",
+            "verbs": [
+                "create",
+                "delete",
+                "deletecollection",
                 "get",
                 "list",
                 "patch",
@@ -229,6 +310,61 @@ status:
   phase: Active
 ```
 
+```yaml
+apiVersion: management.cattle.io/v3
+kind: Project
+metadata:
+  name: "my-project"
+  labels:
+    # Quotas are set in the UI/API, not YAML.
+spec:
+  resourceQuota:
+    limit:  # Applies to all namespaces in the Project
+      limitsCpu: "100"
+      limitsMemory: 200Gi
+    usedLimit: {}  # Tracks usage
+```
+
+```yaml
+apiVersion: tenancy.kiosk.sh/v1alpha1
+kind: Space
+metadata:
+  name: "dev-team-space"
+spec:
+  account: "dev-team"  # Owner (references an Account CRD)
+  namespace: "kiosk-dev-team"  # Optional: Override auto-generated namespace
+  resources:
+    limits:
+      cpu: "10"
+      memory: 20Gi
+```
+
+```yaml
+apiVersion: storage.loft.sh/v1
+kind: Space
+metadata:
+  name: "alice-project"
+  namespace: "loft"  # Loft-managed namespace
+spec:
+  user: "alice"      # Owner (references a User CRD)
+  team: "backend"    # Optional: Group ownership
+  cluster: "prod-cluster"  # Target cluster
+  sleepAfter: "24h"  # Auto-sleep after inactivity
+```
+
+```yaml
+apiVersion: acme.corp/v1
+kind: Space
+metadata:
+  name: "project-alpha"
+spec:
+  owner: "alice@acme.corp"
+  quota:
+    cpu: "16"
+    memory: "64Gi"
+  networkPolicy: "default-deny"
+```
+
 The pod will listen on port 8443 and 443. The 8443 is the external api and the 443 is the kopf based operator.
 
 It will create a `APIService` object for the api server to connect to port `8443`.
@@ -242,85 +378,6 @@ The admission Controller functionality:
 | `Namespace` is created | Create corresponding `Project`   |
 | `Namespace` is deleted | Delete corresponding `Project`   |
 | `Project` is deleted   | Delete corresponding `Namespace` |
-
-## CRDs
-
-* Project - Cluster
-* User - Cluster
-* Identity - Cluster
-* Group - Cluster
-* Kubeconfig - Cluster
-
-```json
-{
-    "kind": "APIResourceList",
-    "apiVersion": "v1",
-    "groupVersion": "user.openshift.io/v1",
-    "resources": [
-        {
-            "name": "groups",
-            "singularName": "",
-            "namespaced": false,
-            "kind": "Group",
-            "verbs": [
-                "create",
-                "delete",
-                "deletecollection",
-                "get",
-                "list",
-                "patch",
-                "update",
-                "watch"
-            ]
-        },
-        {
-            "name": "identities",
-            "singularName": "",
-            "namespaced": false,
-            "kind": "Identity",
-            "verbs": [
-                "create",
-                "delete",
-                "deletecollection",
-                "get",
-                "list",
-                "patch",
-                "update",
-                "watch"
-            ]
-        },
-        {
-            "name": "useridentitymappings",
-            "singularName": "",
-            "namespaced": false,
-            "kind": "UserIdentityMapping",
-            "verbs": [
-                "create",
-                "delete",
-                "get",
-                "patch",
-                "update"
-            ]
-        },
-        {
-            "name": "users",
-            "singularName": "",
-            "namespaced": false,
-            "kind": "User",
-            "verbs": [
-                "create",
-                "delete",
-                "deletecollection",
-                "get",
-                "list",
-                "patch",
-                "update",
-                "watch"
-            ]
-        }
-    ]
-}
-```
 
 ### User
 
@@ -352,8 +409,13 @@ OR:
 ```yaml
 apiVersion: apiextensions.k8s.io/v1
 kind: CustomResourceDefinition
+apiVersion: management.cattle.io/v3
+kind: User
 metadata:
   name: permissionmanagerusers.permissionmanager.user
+  name: "user-abc123"  # Auto-generated ID
+  labels:
+    cattle.io/creator: "norman"  # Default admin user
 spec:
   group: permissionmanager.user
   versions:
@@ -385,6 +447,13 @@ metadata:
   name: permissionmanagerusers.permissionmanager.user.test
 spec:
   name: test
+  mustChangePassword: false
+  principalIDs:
+    - "local://user-abc123"  # Local auth provider
+    - "github://1234567"     # If GitHub OAuth is used
+  username: "john.doe"
+  displayName: "John Doe"
+  enabled: true
 ```
 
 ```yaml
@@ -403,6 +472,17 @@ metadata:
   resourceVersion: "7086165"
   selfLink: /apis/user.openshift.io/v1/users/test.user%40mydomain.intra
   uid: fa36d145-8081-11e9-af1a-66934f1af826
+```
+
+```bash
+apiVersion: tenancy.kiosk.sh/v1alpha1
+kind: Account
+metadata:
+  name: "dev-team"
+spec:
+  subjects:
+  - kind: User
+    name: "bob"
 ```
 
 ### Group
@@ -429,6 +509,19 @@ FIELDS:
 ```
 
 OR:
+
+```yaml
+apiVersion: management.cattle.io/v3
+kind: Group
+metadata:
+  name: "github:my-org:my-team"  # Example for GitHub team sync
+spec:
+  displayName: "My Team"
+  members:
+    - "user-abc123"  # References User resource
+---
+
+```
 
 ```yml
 apiVersion: redhatcop.redhat.io/v1alpha1
