@@ -350,28 +350,41 @@ FIELDS:
 OR:
 
 ```yaml
-apiVersion: "apiextensions.k8s.io/v1beta1"
-kind: "CustomResourceDefinition"
+apiVersion: apiextensions.k8s.io/v1
+kind: CustomResourceDefinition
 metadata:
-  name: "permissionmanagerusers.permissionmanager.user"
+  name: permissionmanagerusers.permissionmanager.user
 spec:
-  group: "permissionmanager.user"
-  version: "v1alpha1"
-  scope: "Cluster"
+  group: permissionmanager.user
+  versions:
+  - name: v1alpha1
+    served: true
+    storage: true
+    schema:
+      openAPIV3Schema:
+        type: object
+        properties:
+          spec:
+            type: object
+            properties:
+              name:
+                type: string
+                minLength: 2
+  scope: Cluster
   names:
-    plural: "permissionmanagerusers"
-    singular: "permissionmanageruser"
-    kind: "Permissionmanageruser"
-  validation:
-    openAPIV3Schema:
-      required: ["spec"]
-      properties:
-        spec:
-          required: ["name"]
-          properties:
-            name:
-              type: "string"
-              minimum: 2
+    plural: permissionmanagerusers
+    singular: permissionmanageruser
+    kind: Permissionmanageruser
+```
+
+```yaml
+apiVersion: permissionmanager.user/v1alpha1
+kind: Permissionmanageruser
+metadata:
+  generation: 1
+  name: permissionmanagerusers.permissionmanager.user.test
+spec:
+  name: test
 ```
 
 ```yaml

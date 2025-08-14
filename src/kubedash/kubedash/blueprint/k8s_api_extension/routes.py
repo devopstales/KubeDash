@@ -158,7 +158,7 @@ class ProjectResource(MethodView):
     def get(self, name):
         """Get a single project [X]"""
         user, groups = validate_user(request)
-        
+
         project, status = get_project(name, user, groups)
         if status == 200:
             return project

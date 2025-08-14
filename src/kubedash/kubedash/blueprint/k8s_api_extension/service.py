@@ -134,15 +134,20 @@ def list_visible_projects(user, groups):
 
 def get_project(name, user, groups):
     k8sClientConfigGet('Admin', None)
-    if not is_namespace_visible(name, user, groups):
-        return None, 401
     try:
         ns_obj = core_api.read_namespace(name)
+        
+        if not is_namespace_visible(ns_obj, user, groups):
+            return None, 401
+        
         return to_project(ns_obj, user, None), 200
+    
     except ApiException as e:
         if e.status == 404:
             return None, 404
         raise
+    
+
 
 def create_project(name, user, spec=None):
     k8sClientConfigGet('Admin', None)
