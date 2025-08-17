@@ -1,7 +1,5 @@
-import eventlet
-eventlet.monkey_patch()
-#from gevent import monkey
-#monkey.patch_all()
+#import eventlet
+#eventlet.monkey_patch()
 
 import logging
 import os
@@ -9,22 +7,15 @@ import uuid
 import time
 from statsd import StatsClient
 
-from gunicorn.glogging import Logger as GunicornBaseLogger
-from kubedash.lib.cert_utils import generate_self_signed_cert
-
-cert_path, key_path, ca_cert_path = generate_self_signed_cert()
 # ========================
 # 1. Server Configuration
 # ========================
-keyfile = key_path
-certfile = cert_path
-ca_certs = ca_cert_path
 bind = "0.0.0.0:8000"
 workers = 1
 threads = 4
 worker_tmp_dir = "/tmp/kubedash"
 timeout = 5
-graceful_timeout = 10
+graceful_timeout = 5
 keepalive = 5
 
 # ========================

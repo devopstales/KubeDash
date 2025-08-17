@@ -7,12 +7,11 @@ export USER=$USER
 export DOCKER_COMPOSE_FILES="-f ../../deploy/docker-compose/dc-nginx.yaml"
 
 # App
-#export FLASK_APP="kubedash"
+#export FLASK_APP=wsgi:app
 #export FLASK_DEBUG=1
 #export TEMPLATES_AUTO_RELOAD=1
 #export FLASK_ENV=development
 #export PYTHONFAULTHANDLER=1
-export POD_NAMESPACE="balazs-paldi"
 
 mkdir -p /tmp/kubedash
 
@@ -42,5 +41,6 @@ echo "##########################################################################
 echo ""
 echo "Start Application"
 echo "###########################################################################################"
-gunicorn --worker-class eventlet --conf gunicorn_conf.py wsgi:app --reload
-#--preload
+#flask run --host=0.0.0.0 --port=8000
+gunicorn --worker-class eventlet --conf gunicorn_conf.py wsgi:app
+##--reload --preload
