@@ -1,3 +1,0 @@
-kopf
-kubernetes
-cryptography

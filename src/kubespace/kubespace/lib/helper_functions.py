@@ -1,0 +1,364 @@
+import json
+import logging
+import re
+import sys
+import colorlog
+import validators
+from colorlog.escape_codes import escape_codes
+from decimal import Decimal, InvalidOperation
+from logging import Logger
+from urllib.parse import urlparse, urljoin
+
+import six
+import yaml
+from flask import g, has_request_context, Request
+from typing import Optional, Union
+
+
+##############################################################
+## Helper Functions
+##############################################################
+
+def get_logger() -> Logger:
+    # Remove existing handlers (avoid duplicate logs if reconfigured)
+    for handler in logging.root.handlers[:]:
+        logging.root.removeHandler(handler)
+
+    # Define color codes
+    BLACK = escape_codes['black']
+    PURPLE = escape_codes['purple']
+    RESET = escape_codes['reset']
+    GREEN = '\033[32m'
+    RED = '\033[31m'
+
+    class BooleanColorFormatter(colorlog.ColoredFormatter):
+        def format(self, record):
+            # Ensure correlation_id exists on the record
+            if not hasattr(record, 'correlation_id'):
+                record.correlation_id = 'no-id'
+            if not record.correlation_id:
+                record.correlation_id = 'no-id'
+            msg = super().format(record)
+            # Colorize True and False words
+            msg = msg.replace("True", f"{GREEN}True{RESET}")
+            msg = msg.replace("False", f"{RED}False{RESET}")
+            return msg
+
+    # Define colorlog formatter with safe correlation_id fallback
+    formatter = BooleanColorFormatter(
+        fmt=f'[{BLACK}%(asctime)s{RESET}] [%(correlation_id)s] [{PURPLE}%(name)s{RESET}] '
+            f'[%(log_color)s%(levelname)s%(reset)s] %(message)s',
+        log_colors={
+            'DEBUG': 'bold_black',
+            'INFO': 'green',
+            'WARNING': 'yellow',
+            'ERROR': 'red',
+            'CRITICAL': 'bold_red',
+        }
+    )
+
+    # Set up stream handler with color
+    handler = logging.StreamHandler()
+    handler.setFormatter(formatter)
+
+    logger = logging.getLogger()
+    logger.setLevel(logging.INFO)
+    logger.addHandler(handler)
+    logger.propagate = False
+
+    # Add correlation_id filter to ensure it's always available
+    class CorrelationIDFilter(logging.Filter):
+        def filter(self, record):
+            if not hasattr(record, 'correlation_id'):
+                corr_id = 'no-id'
+                try:
+                    # Only try to get from Flask's g context if we're in an app context
+                    from flask import has_app_context, g
+                    if has_app_context():
+                        corr_id = getattr(g, 'correlation_id', 'no-id')
+                except Exception:
+                    pass
+                
+                record.correlation_id = corr_id
+            return True
+
+    logger.addFilter(CorrelationIDFilter())
+    logger.name = "kubespace"
+
+    return logger
+
+def is_safe_url(url_target: Optional[str], url_request: Union[Request, str]) -> bool:
+    """
+    Check if the target URL is safe to prevent open redirects.
+    
+    Args:
+        url_target: The target URL to validate (can be None)
+        url_request: Either a Flask Request object or host URL string
+    
+    Returns:
+        bool: True if URL is safe, False otherwise
+    """
+    if not url_target:
+        return False
+    
+    # Get reference URL
+    if isinstance(url_request, Request):
+        ref_url = urlparse(url_request.host_url)
+    else:
+        ref_url = urlparse(url_request)
+    
+    # Resolve target URL
+    test_url = urlparse(urljoin(ref_url.geturl(), url_target))
+    
+    # Validate scheme and netloc
+    return test_url.scheme in ('http', 'https') and ref_url.netloc == test_url.netloc
+
+
+
+def is_valid_url(url):
+    """Check if a URL is valid.
+    
+    Args:
+        url (str): The URL to check.
+        
+    Returns:
+        bool: True if the URL is valid, False otherwise.
+    """
+    if url.startswith(('http://', 'https://')):
+        return validators.url(url)
+    else:
+        # If the URL does not start with http:// or https://, we assume it's not valid
+        return False
+
+##############################################################
+## Test Functions
+##############################################################
+
+def bool_var_test(var) -> bool:
+    """Check if a variable is a valid boolean value
+    
+    Args:
+        var (any): The variable to check.
+    
+    Returns:
+        bool: True if the variable is a valid boolean value, False otherwise.
+    """
+    if isinstance(var, bool):
+        resp = var
+    elif isinstance(var, six.string_types):
+        if var.lower() in ['true']:
+            resp = True
+        else:
+            resp = False
+    else:
+        resp = False
+    return resp
+
+def email_check(email):
+    regex = r'\b[A-Za-z0-9._%+-]+@[A-Za-z0-9.-]+\.[A-Z|a-z]{2,}\b'
+    if(re.fullmatch(regex, email)):
+        return True
+    else:
+        return False
+
+##############################################################
+## Formatting Functions
+##############################################################
+
+def string2list(string: str) -> list:
+    """Function to converst string to list
+    
+    Args:
+        string (str): The string to be converted
+
+    Returns:
+        list (list): The list of elements in the string.
+    """
+    list = string.split()
+    return list
+
+def json2yaml(json_input: json) -> yaml:
+    """Function to convert JSON to YAML
+    
+    Args:
+        json_input (dict): The JSON data to be converted
+
+    Returns:
+        yaml_formatted_data (str): The YAML formatted data.
+    """
+    json_values = json.dumps(json_input)
+    yaml_data = yaml.safe_load(json_values)
+    yaml_formatted_data = yaml.dump(yaml_data)
+    return yaml_formatted_data
+
+def format_json(json_input: json) -> str:
+    """Function to format JSON to a human-readable string
+    
+    Args:
+        json_input (dict): The JSON data to be formatted
+
+    Returns:
+        josn_formatted_data (str): The formatted JSON data.
+    """
+    josn_formatted_data = json.dumps(json_input, indent=2)
+    return josn_formatted_data
+
+def find_values_in_json(id: int, json_repr) -> list:
+    """Find values in JSON
+    
+    Args:
+        id (int): The ID to search for in the JSON.
+        json_repr (str): The JSON data as a string.
+
+    Returns:
+        list: A list of values found in the JSON with the given ID.
+    """
+    results = list()
+
+    def _decode_dict(a_dict):
+        try:
+            results.append(a_dict[id])
+        except KeyError:
+            pass
+        return a_dict
+
+    json.loads(json_repr, object_hook=_decode_dict) # Return value ignored.
+    return results
+
+def trimAnnotations(annotations: dict) -> dict:
+    """Trim annotations
+    
+    Args:
+        annotations (dict): The annotations to be trimmed.
+
+    Returns:
+        dict: The trimmed annotations.
+    """
+    trimmed_annotations = {}
+    if annotations is not None:
+        for key, value in annotations.items():
+            if key == 'kubectl.kubernetes.io/last-applied-configuration':
+                continue
+            elif key == "autoscaling.alpha.kubernetes.io/conditions":
+                continue
+            else:
+                trimmed_annotations[key] = value
+    return trimmed_annotations
+
+##############################################################
+## Percentage Functions
+##############################################################
+
+def parse_quantity(quantity: str):
+    """
+    Parse kubernetes canonical form quantity like 200Mi to a decimal number.
+    Supported SI suffixes:
+    base1024: Ki | Mi | Gi | Ti | Pi | Ei
+    base1000: n | u | m | "" | k | M | G | T | P | E
+    See https://github.com/kubernetes/apimachinery/blob/master/pkg/api/resource/quantity.go
+
+    Args:
+        quantity: string. kubernetes canonical form quantity
+    
+    Returns:
+        Decimal
+    
+    Raises:
+        ValueError on invalid or unknown input
+    """
+    if isinstance(quantity, (int, float, Decimal)):
+        return Decimal(quantity)
+
+    exponents = {"n": -3, "u": -2, "m": -1, "K": 1, "k": 1, "M": 2,
+                "G": 3, "T": 4, "P": 5, "E": 6}
+
+    quantity = str(quantity)
+    number = quantity
+    suffix = None
+    if len(quantity) >= 2 and quantity[-1] == "i":
+        if quantity[-2] in exponents:
+            number = quantity[:-2]
+            suffix = quantity[-2:]
+    elif len(quantity) >= 1 and quantity[-1] in exponents:
+        number = quantity[:-1]
+        suffix = quantity[-1:]
+
+    try:
+        number = Decimal(number)
+    except InvalidOperation:
+        raise ValueError("Invalid number format: {}".format(number))
+
+    if suffix is None:
+        return number
+
+    if suffix.endswith("i"):
+        base = 1024
+    elif len(suffix) == 1:
+        base = 1000
+    else:
+        raise ValueError("{} has unknown suffix".format(quantity))
+
+    # handle SI inconsistency
+    if suffix == "ki":
+        raise ValueError("{} has unknown suffix".format(quantity))
+
+    if suffix[0] not in exponents:
+        raise ValueError("{} has unknown suffix".format(quantity))
+
+    exponent = Decimal(exponents[suffix[0]])
+    return number * (base ** exponent)
+
+def calcPercent(x, y, integer = False):
+    """Calculate the percentage.
+    """
+    if y == 0:
+        return 0 if integer else 0.0
+    
+    percent = x / y * 100
+
+    if integer:
+        return int(percent)
+    return percent
+
+##############################################################
+## Error Handler Functions
+##############################################################
+
+def ErrorHandler(logger, error, action):
+    """Handle errors and flash messages
+    
+    Args:
+        logger (Logger): The Logger for the module.
+        error (str): The error to handle.
+        action (str): The action being performed.
+    """
+    if hasattr(error, '__iter__'):
+        if 'status' in error:
+            if error.status == 401:
+                logger.error("401 - Unauthorized: User cannot connect to Kubernetes")
+            elif error.status == 403:
+                logger.error("403 - Forbidden: User cannot %s" % action)
+        else:
+            logger.error("Exception: %s %s \n" % (action, error))
+    else:
+        logger.error("Exception: %s %s \n" % (action, error))
+        
+def WarningHandler(logger, warning, action):
+    """Handle warnings and flash messages
+    
+    Args:
+        logger (Logger): The Logger for the module.
+        warning (str): The warning to handle.
+        action (str): The action being performed.
+    """
+    logger.warning("%s %s" % (action, warning))
+        
+def MessageHandler(logger, message, action):
+    """Handle messages and flash them
+    
+    Args:
+        logger (Logger): The Logger for the module.
+        message (str): The message to handle.
+        action (str): The action being performed.
+    """
+    logger.info("%s %s" % (action, message))

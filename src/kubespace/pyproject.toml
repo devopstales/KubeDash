@@ -1,0 +1,29 @@
+[project]
+name = "kubespace"
+version = "0.1.0"
+description = ""
+authors = [
+    {name = "devopstales",email = "42894256+devopstales@users.noreply.github.com"}
+]
+readme = "README.md"
+requires-python = ">=3.11"
+dependencies = [
+    "flask-smorest (>=0.46.1,<0.47.0)",
+    "flask (>=3.1.1,<4.0.0)",
+    "marshmallow (>=4.0.0,<5.0.0)",
+    "kubernetes (>=33.1.0,<34.0.0)",
+    "colorlog (>=6.9.0,<7.0.0)",
+    "validators (>=0.35.0,<0.36.0)",
+    "swagger-ui-bundle (>=1.1.0,<2.0.0)",
+]
+
+[tool.poetry]
+packages = [{include = "kubespace", from = "src"}]
+
+[tool.poetry.dependencies]
+python = ">=3.11,<=3.13"
+
+
+[build-system]
+requires = ["poetry-core>=2.0.0,<3.0.0"]
+build-backend = "poetry.core.masonry.api"

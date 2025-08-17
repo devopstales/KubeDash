@@ -1,0 +1,18 @@
+apiVersion: devopstales.github.io/v1
+kind: Space
+metadata:
+  name: torolheto
+  labels:
+    label: value
+  annotations:
+    label: value
+spec:
+  description: "Description"
+  pipeline: https://github.com/devopstales/KubeDash/actions
+  repository: https://github.com/devopstales/KubeDash
+  resources:
+    limits:
+      cpu: "10"
+      memory: 20Gi
+status:
+  phase: Active
