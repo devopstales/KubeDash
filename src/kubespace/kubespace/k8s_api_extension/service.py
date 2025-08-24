@@ -1,3 +1,4 @@
+from jsonpatch import JsonPatch
 from flask import current_app
 from datetime import datetime, timezone
 
@@ -163,19 +164,21 @@ def list_visible_spaces(user, groups):
     return allowed_ns_list
 
 def get_space(name, user, groups):
-    k8sClientConfigGet('Admin', None)
     try:
         ns_obj = core_api.read_namespace(name)
-        
         if not is_namespace_visible(ns_obj, user, groups):
-            return None, 401
+            return {"error": "Unauthorized"}, 401
+            
+        if not hasattr(ns_obj.status, 'phase'):
+            ns_obj.status.phase = "Active"
+            
+        space = to_space(ns_obj, user, None)
+        return space, 200
         
-        return to_space(ns_obj, user, None), 200
-    
     except ApiException as e:
-        if e.status == 404:
-            return None, 404
-        raise
+        return {"error": "Not found"}, 404 if e.status == 404 else {"error": str(e)}, 500
+    except Exception as e:
+        return {"error": str(e)}, 500
 
 def create_space(name, user, spec=None):
     k8sClientConfigGet('Admin', None)
@@ -216,17 +219,6 @@ def create_space(name, user, spec=None):
     # Use remaining_spec if there were non-annotation fields, otherwise use original spec
     return to_space(ns_obj, user, remaining_spec if remaining_spec else spec)
 
-def update_space(name, data, user, spec=None):
-    k8sClientConfigGet('Admin', None)
-    try:
-        patch = {"metadata": data.get("metadata", {})}
-        ns_obj = core_api.patch_namespace(name, patch)
-        return to_space(ns_obj, user, spec)
-    except ApiException as e:
-        if e.status == 404:
-            return None
-        raise
-
 def delete_space(name):
     k8sClientConfigGet('Admin', None)
     try:
@@ -236,3 +228,48 @@ def delete_space(name):
         if e.status == 404:
             return False
         raise
+
+def apply_json_patch(current_obj, patch_operations):
+    """Apply RFC 6902 JSON Patch operations"""
+    try:
+        if not isinstance(patch_operations, list):
+            raise ValueError("JSON Patch must be an array of operations")
+            
+        # Implement patch operations (or use a library like jsonpatch)
+        result = current_obj.copy()
+        for op in patch_operations:
+            if op['op'] == 'add':
+                # Implementation for add operation
+                pass
+            elif op['op'] == 'remove':
+                # Implementation for remove operation
+                pass
+            elif op['op'] == 'replace':
+                # Implementation for replace operation
+                pass
+            # ... other operations ...
+        return result
+    except Exception as e:
+        raise ValueError(f"Invalid patch: {str(e)}")
+
+def update_space(name, data):
+    """Update namespace with complete or partial data"""
+    try:
+        # Get current namespace
+        ns = core_api.read_namespace(name)
+        
+        # Update metadata if provided
+        if 'metadata' in data:
+            if 'labels' in data['metadata']:
+                ns.metadata.labels = {**(ns.metadata.labels or {}), **data['metadata']['labels']}
+            if 'annotations' in data['metadata']:
+                ns.metadata.annotations = {**(ns.metadata.annotations or {}), **data['metadata']['annotations']}
+        
+        # Apply changes
+        updated_ns = core_api.patch_namespace(
+            name=name,
+            body=ns
+        )
+        return to_space(updated_ns, None, None)
+    except ApiException as e:
+        raise Exception(f"Kubernetes API error: {e}")

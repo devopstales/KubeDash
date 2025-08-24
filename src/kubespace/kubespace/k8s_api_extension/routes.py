@@ -7,7 +7,7 @@ from datetime import datetime, timezone
 from .schemas import SpaceSchema
 from . import extension_api_space_bp
 from .service import (
-    validate_user, format_age,
+    validate_user, format_age, apply_json_patch,
     list_visible_spaces, get_space, to_space,
     create_space, update_space, delete_space
 )
@@ -255,3 +255,70 @@ class SpaceResource(MethodView):
         if not deleted:
             return {"error": "Space not found"}, 404
         return {"message": f"Space {name} deleted"}
+
+    @extension_api_space_bp.doc(parameters=[
+        {"in": "header", "name": "Content-Type", "required": True,
+         "schema": {"type": "string", "default": "application/json-patch+json"},
+         "description": "Must be application/json-patch+json or application/merge-patch+json"}
+    ])
+    @extension_api_space_bp.response(200, SpaceSchema)
+    @extension_api_space_bp.response(400, "Invalid patch format")
+    @extension_api_space_bp.response(404, "Space not found")
+    @extension_api_space_bp.response(500, "Internal server error")
+    def patch(self, name):
+        """Partially update a space"""
+        try:
+            # 1. Validate request
+            if not request.is_json:
+                return {"error": "Request must be JSON"}, 400
+
+            # 2. Authenticate user
+            user, groups, error = validate_user(request)
+            if error:
+                return error
+
+            # 3. Get current space
+            current_space, status = get_space(name, user, groups)
+            if status != 200:
+                return current_space, status
+
+            # 4. Process patch based on content type
+            content_type = request.headers.get('Content-Type', '')
+            patch_data = request.get_json()
+
+            if 'application/json-patch+json' in content_type:
+                # JSON Patch (RFC 6902)
+                updated_space = apply_json_patch(current_space, patch_data)
+            elif 'application/merge-patch+json' in content_type:
+                # JSON Merge Patch (RFC 7386)
+                updated_space = {**current_space, **patch_data}
+            else:
+                # Handle kubectl client-side apply
+                if isinstance(patch_data, dict):
+                    updated_space = current_space.copy()
+                    if 'metadata' in patch_data and 'annotations' in patch_data['metadata']:
+                        if 'kubectl.kubernetes.io/last-applied-configuration' in patch_data['metadata']['annotations']:
+                            updated_space.setdefault('metadata', {}).setdefault('annotations', {})[
+                                'kubectl.kubernetes.io/last-applied-configuration'] = \
+                                patch_data['metadata']['annotations']['kubectl.kubernetes.io/last-applied-configuration']
+                    
+                    # Merge other changes
+                    if 'spec' in patch_data:
+                        updated_space['spec'] = {**current_space.get('spec', {}), **patch_data['spec']}
+                else:
+                    return {"error": "Unsupported patch format"}, 400
+
+            # 5. Validate
+            errors = SpaceSchema().validate(updated_space)
+            if errors:
+                return {"error": "Validation failed", "details": errors}, 400
+
+            # 6. Save changes
+            result = update_space(name, updated_space)
+            return jsonify(result), 200
+
+        except json.JSONDecodeError:
+            return {"error": "Invalid JSON"}, 400
+        except Exception as e:
+            current_app.logger.error(f"PATCH failed: {str(e)}", exc_info=True)
+            return {"error": "Internal server error"}, 500

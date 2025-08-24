@@ -1,7 +1,7 @@
 # /etc/ssh/sshd_config
 # GatewayPorts yes
 #
-# ssh -R 0.0.0.0:8000:localhost:8000 k8s-master01.mydomain.intra
+# ssh -R 0.0.0.0:8443:localhost:8443 k8s-master01.mydomain.intra
 # 
 # kubectl get apiservice
 # kubectl get apiservice v1.devopstales.github.io -o jsonpath='{.status.conditions}'
@@ -17,7 +17,7 @@ subsets:
   - addresses:
       - ip: 192.168.206.11
     ports:
-      - port: 8000
+      - port: 8443
 ---
 apiVersion: v1
 kind: Service
@@ -27,7 +27,7 @@ metadata:
 spec:
   ports:
     - port: 443
-      targetPort: 8000
+      targetPort: 8443
 ---
 apiVersion: apiregistration.k8s.io/v1
 kind: APIService

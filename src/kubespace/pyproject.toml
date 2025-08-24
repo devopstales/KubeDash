@@ -15,6 +15,7 @@ dependencies = [
     "colorlog (>=6.9.0,<7.0.0)",
     "validators (>=0.35.0,<0.36.0)",
     "swagger-ui-bundle (>=1.1.0,<2.0.0)",
+    "jsonpatch (>=1.33,<2.0)",
 ]
 
 [tool.poetry]

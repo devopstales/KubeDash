@@ -37,40 +37,89 @@ class APIGroupListResource(MethodView):
             ]
         }
 
-@extension_api_root_bp.route("/openapi/v2")
-def openapi_v2():
-    """
-    Minimal OpenAPI v2 spec for Kubernetes discovery
-    """
-    # Example: only include your Space CRD
-    spec = {
+@extension_api_root_bp.route('/openapi/v2')
+def openapi_schema():
+    """Serve OpenAPI v2 spec for Kubernetes discovery"""
+    schema = {
         "swagger": "2.0",
-        "info": {"title": "DevOpsTales Extension API", "version": "v1"},
+        "info": {"title": "Spaces API", "version": "v1"},
         "paths": {
             "/apis/devopstales.github.io/v1/spaces": {
                 "get": {
-                    "summary": "List spaces",
-                    "responses": {"200": {"description": "List of spaces"}}
-                },
-                "post": {
-                    "summary": "Create a space",
-                    "responses": {"201": {"description": "Space created"}}
+                    "responses": {
+                        "200": {
+                            "description": "OK",
+                            "schema": {
+                                "$ref": "#/definitions/SpaceList"
+                            }
+                        }
+                    }
+                }
+            }
+        },
+        "definitions": {
+            "Space": {
+                # Match your CRD schema here
+                "type": "object",
+                "required": ["apiVersion", "kind", "metadata"],
+                "properties": {
+                    "apiVersion": {"type": "string"},
+                    "kind": {"type": "string"},
+                    "metadata": {
+                        "type": "object",
+                        "properties": {
+                            "name": {"type": "string"},
+                            "labels": {"type": "object"},
+                            "annotations": {"type": "object"}
+                        }
+                    },
+                    "spec": {
+                        "type": "object",
+                        "properties": {
+                            "description": {"type": "string"},
+                            "owner": {"type": "string"},
+                            "resources": {
+                                "type": "object",
+                                "properties": {
+                                    "limits": {
+                                        "type": "object",
+                                        "properties": {
+                                            "cpu": {"type": "string"},
+                                            "memory": {"type": "string"}
+                                        }
+                                    }
+                                }
+                            }
+                        }
+                    },
+                    "status": {
+                        "type": "object",
+                        "properties": {
+                            "phase": {"type": "string"}
+                        }
+                    }
                 }
             },
-            "/apis/devopstales.github.io/v1/spaces/{name}": {
-                "get": {"summary": "Get space"},
-                "put": {"summary": "Update space"},
-                "delete": {"summary": "Delete space"}
+            "SpaceList": {
+                "type": "object",
+                "properties": {
+                    "items": {
+                        "type": "array",
+                        "items": {
+                            "$ref": "#/definitions/Space"
+                        }
+                    }
+                }
             }
         }
     }
-    return jsonify(spec)
+    return jsonify(schema)
 
 @extension_api_root_bp.route("/openapi/v3")
 def openapi_v3():
-    """Serve OpenAPI v3 spec for Kubernetes discovery (minimal, reusing v2)"""
+    """Serve OpenAPI v3 spec for Kubernetes discovery"""
     # For now, just reuse the v2 spec to satisfy dashboard requests
-    return openapi_v2()
+    return openapi_schema()
 
 ##################################################################
 # Space Object Blueprint
