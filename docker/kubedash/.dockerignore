@@ -4,7 +4,6 @@ kubedash/database/*
 kubedash/tests
 kubedash/run.sh
 kubedash/kubedash.ini
-kubedash/requirements.txt
 kubedash/.devcontainer
 kubedash/.skaffold.yaml
 kubedash/.venv

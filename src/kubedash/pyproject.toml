@@ -72,6 +72,7 @@ opentelemetry-instrumentation-redis = "^0.56b0"
 flask-prometheus-metrics = "^1.0.0"
 wrapt = "^1.17.2"
 bs4 = "^0.0.2"
+validators = "^0.35.0"
 
 
 [tool.poetry.group.dev.dependencies]
@@ -84,8 +85,8 @@ autoflake = "^1.6.1"
 safety = "^3.3.1"
 flake8 = "^7.1.2"
 
-#[tool.poetry.requires-plugins]
-#poetry-plugin-export = ">=1.8"
+[tool.poetry.requires-plugins]
+poetry-plugin-export = ">=1.8"
 
 
 [build-system]
