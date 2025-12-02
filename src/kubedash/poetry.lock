@@ -6022,11 +6022,11 @@ test = ["pytest", "websockets"]
 
 [[package]]
 name = "werkzeug"
-version = "3.1.5"
+version = "3.1.4"
 description = "The comprehensive WSGI web application library."
 optional = false
 python-versions = ">=3.9"
-groups = ["main", "test"]
+groups = ["main"]
 files = [
     {file = "werkzeug-3.1.5-py3-none-any.whl", hash = "sha256:5111e36e91086ece91f93268bb39b4a35c1e6f1feac762c9c822ded0a4e322dc"},
     {file = "werkzeug-3.1.5.tar.gz", hash = "sha256:6a548b0e88955dd07ccb25539d7d0cc97417ee9e179677d22c7041c8f078ce67"},
@@ -6429,4 +6429,10 @@ test = ["pytest"]
 [metadata]
 lock-version = "2.1"
 python-versions = ">=3.11,<3.13"
+<<<<<<< HEAD
 content-hash = "713f5b8848ef5cdd3bcf49d530f8c226161aafbad54dea3d8198c21b81a58f7e"
+||||||| parent of 68ea2af5 (build(deps): bump werkzeug from 3.0.6 to 3.1.4 in /src/kubedash)
+content-hash = "41fa90f14a8783efd4f94641a7b26a2d2451b7f028ae9b6cd7630871d0a008d2"
+=======
+content-hash = "ae5ef76f8dd734734eb015867ad1cd51834349672fa5cde753cb281f32b43d03"
+>>>>>>> 68ea2af5 (build(deps): bump werkzeug from 3.0.6 to 3.1.4 in /src/kubedash)
