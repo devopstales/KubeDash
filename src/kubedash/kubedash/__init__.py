@@ -74,8 +74,8 @@ def create_app(app_mode=None):
             initialize_app_database(app)
             init_before_request(app)
             app.logger.info(separator_short)
-            with app.app_context():
-                initialize_metrics_scraper(app)
+            #with app.app_context():
+            #    initialize_metrics_scraper(app)
             app.logger.info(separator_short)
             initialize_app_socket(app)
             initialize_blueprints(app)

@@ -42,4 +42,5 @@ echo "##########################################################################
 echo ""
 echo "Start Application"
 echo "###########################################################################################"
-gunicorn --worker-class gevent --conf gunicorn_conf.py wsgi:app --reload --preload
+#gunicorn --worker-class gevent --conf gunicorn_conf.py wsgi:app --reload --preload
+gunicorn --worker-class eventlet --conf gunicorn_conf.py wsgi:app --reload
