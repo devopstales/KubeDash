@@ -45,7 +45,7 @@ def init_opentelemetry_exporter(app: Flask, jaeger_base_url: str):
             "telemetry.sdk.language": "python",
         })
         
-        trace.set_tracer_provider(TracerProvider(resource=resource))
+        trace.set_tracer_provider(TracerProvider(resource=resource, shutdown_on_exit=False))
         trace.get_tracer_provider().add_span_processor(
             BatchSpanProcessor(OTLPSpanExporter(endpoint=endpoint))
         )
