@@ -145,7 +145,7 @@ def callback():
         else:
             k8s_server_ca = str(base64_decode(k8sConfig.k8s_server_ca), 'UTF-8')
             try:
-                i = requests.get('http://%s:8080/info' % remote_addr)
+                i = requests.get('http://%s:8080/info' % remote_addr, timeout=1)
                 info = i.json()
                 response_json = {
                                     "username": user_data["preferred_username"],
@@ -163,9 +163,8 @@ def callback():
                 else:
                     response_json["idp-certificate-authority-data"] = None
                 
-                if info["message"] == "kdlogin":
-                    x = requests.post('http://%s:8080/' % remote_addr, json=response_json
-                    )
+                if info.get("message") == "kdlogin":
+                    x = requests.post('http://%s:8080/' % remote_addr, json=response_json, timeout=5)
                     logger.info("Config sent to client")
                     logger.info("Answer from clinet: %s" % x.text)
                 else:

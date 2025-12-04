@@ -7,7 +7,7 @@ export DOCKER_COMPOSE_FILES="-f ../../deploy/docker-compose/dc-nginx.yaml"
 
 # App
 #export K8S_CLUSTER_NAME=
-export KUBEDASH_VERSION="4.0"
+export KUBEDASH_VERSION=$(grep -m1 '^version' pyproject.toml | cut -d'"' -f2)
 export FLASK_APP="kubedash"
 export FLASK_DEBUG=1
 export TEMPLATES_AUTO_RELOAD=1
@@ -39,12 +39,12 @@ task docker-up
 echo ""
 echo "Start Migration"
 flask db upgrade
-echo "###################################################################################"
+echo "###########################################################################################"
 
 # Start Gunicorn (Flask app)
 echo ""
 echo "Start Applications: KubeDash ${KUBEDASH_VERSION}"
-echo "###################################################################################"
+echo "###########################################################################################"
 #flask run --host=0.0.0.0 --port=8000
 gunicorn --worker-class eventlet --conf gunicorn_conf.py kubedash:app --reload &
 #opentelemetry-instrument gunicorn --worker-class eventlet --conf gunicorn_conf.py kubedash:app

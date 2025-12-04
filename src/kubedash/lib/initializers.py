@@ -109,7 +109,8 @@ def initialize_error_page(app: Flask):
         
     @app.errorhandler(404)
     def page_not_found404(e):
-        app.logger.error(f"404 Error: {e.description}")
+        from flask import request
+        app.logger.error(f"404 Error: {e.description} {request.url}")
         return render_template('errors/404.html.j2'), 404
 
 

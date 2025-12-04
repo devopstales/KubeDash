@@ -1,6 +1,6 @@
 [project]
 name = "KubeDash"
-version = "4.0.0"
+version = "4.1.0"
 description = "KubeDash is a kubernetes Dashboard"
 license = "Apache-2.0"
 authors = [
@@ -85,8 +85,8 @@ autoflake = "^1.6.1"
 safety = "^3.3.1"
 flake8 = "^7.1.2"
 
-[tool.poetry.requires-plugins]
-poetry-plugin-export = ">=1.8"
+#[tool.poetry.requires-plugins]
+#poetry-plugin-export = ">=1.8"
 
 
 [build-system]

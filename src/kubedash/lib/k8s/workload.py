@@ -554,7 +554,7 @@ def k8sPodLogsStream(username_role, user_token, namespace, pod_name, container):
                 namespace=namespace,
                 container=container,
                 tail_lines=100,
-                _request_timeout=1
+                _request_timeout=300
             ):
             socketio.emit('response',
                                 {'data': str(line)}, namespace="/log")

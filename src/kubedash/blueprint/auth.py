@@ -105,9 +105,9 @@ def login():
             logger.info("Kubectl Integration is configured.")
             k8s_server_ca = str(base64_decode(k8sConfig.k8s_server_ca), 'UTF-8')
             try:
-                i = requests.get('http://%s:8080/info' % remote_addr)
+                i = requests.get('http://%s:8080/info' % remote_addr, timeout=1)
                 info = i.json()
-                if info["message"] == "kdlogin":
+                if info.get("message") == "kdlogin":
                     # start a separate tracer
                     user = User.query.filter_by(username=username, user_type = "OpenID").first()
                     user2 = KubectlConfig.query.filter_by(name=session['user_name']).first()
@@ -130,8 +130,7 @@ def login():
                         else:
                             response_json["idp-certificate-authority-data"] = None
                         
-                        x = requests.post('http://%s:8080/' % remote_addr, json=response_json
-                        )
+                        x = requests.post('http://%s:8080/' % remote_addr, json=response_json, timeout=5)
                     elif user2:
                         user_private_key = str(base64_decode(user2.private_key), 'UTF-8')
                         user_certificate = str(base64_decode(user2.user_certificate), 'UTF-8')
@@ -142,10 +141,14 @@ def login():
                                 "certificate-authority-data": k8s_server_ca,
                                 "user-private-key": user_private_key,
                                 "user-certificate": user_certificate,
-                            }
+                            },
+                            timeout=5
                         )
                     logger.info("Config sent to client")
                     logger.info("Answer from clinet: %s" % x.text)
+            except requests.exceptions.ConnectTimeout:
+                # kubelogin client not running - expected for browser logins
+                logger.debug("No kubelogin client detected (timeout)")
             except Exception as e:
                 if tracer and span.is_recording():
                     span.add_event("log", {
@@ -213,9 +216,9 @@ def login_post():
             logger.info("Kubectl Integration is configured.")
             k8s_server_ca = str(base64_decode(k8sConfig.k8s_server_ca), 'UTF-8')
             try:
-                i = requests.get('http://%s:8080/info' % remote_addr)
+                i = requests.get('http://%s:8080/info' % remote_addr, timeout=1)
                 info = i.json()
-                if info["message"] == "kdlogin" and user2:
+                if info.get("message") == "kdlogin" and user2:
                     user_private_key = str(base64_decode(user2.private_key), 'UTF-8')
                     user_certificate = str(base64_decode(user2.user_certificate), 'UTF-8')
                     x = requests.post('http://%s:8080/' % remote_addr, json={
@@ -225,10 +228,14 @@ def login_post():
                             "certificate-authority-data": k8s_server_ca,
                             "user-private-key": user_private_key,
                             "user-certificate": user_certificate,
-                        }
+                        },
+                        timeout=5
                     )
                     logger.info("Config sent to client")
                     logger.info("Answer from clinet: %s" % x.text)
+            except requests.exceptions.ConnectTimeout:
+                # kubelogin client not running - expected for browser logins
+                logger.debug("No kubelogin client detected (timeout)")
             except Exception as e:
                 if not request.args.get('next'):  # Only log if no 'next' parameter exists
                     if tracer and span.is_recording():
