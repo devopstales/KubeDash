@@ -20,33 +20,52 @@
 {% block content %}
 <div class="card">
     <div id="filter-menu" class="card-header">
-        <div class="row no-gutters">
-            <div class="col-3">
-                <select class="form-select" aria-label="Default select example" onchange="updateFilter(value, 'item')" id="select-item" >
+        <div class="row g-2 align-items-center">
+            <div class="col-md-3">
+                <select class="form-select" aria-label="Select network item" onchange="updateFilter(value, 'item')" id="select-item" >
                     <option value="">Select a network item</option>
                     <option value="edge">edge</option>
                     <option value="node">node</option>
                 </select>
             </div>
-            <div class="col-3 pl-2">
-                <select class="form-select" aria-label="Default select example" onchange="updateFilter(value, 'property')" id="select-property" >
+            <div class="col-md-3">
+                <select class="form-select" aria-label="Select property" onchange="updateFilter(value, 'property')" id="select-property" >
                     <option value="">Select a property...</option>
                 </select>
             </div>
-            <div class="col-3 pl-2">
-                <select class="form-select" aria-label="Default select example" id="select-value" >
+            <div class="col-md-3">
+                <select class="form-select" aria-label="Select value" id="select-value" >
                     <option value="">Select value(s)...</option>
                 </select>
             </div>
-            <div class="col-1 pl-2">
-              <button type="button" class="btn btn-primary btn-block" onclick="highlightFilter(filter);">Filter</button>
+            <div class="col-md-1">
+              <button type="button" class="btn btn-primary w-100" onclick="highlightFilter(filter);">Filter</button>
             </div>
-            <div class="col-2 pl-2">
-              <button type="button" class="btn btn-primary btn-block" onclick="clearFilter(true)">Reset Selection</button>
+            <div class="col-md-2">
+              <button type="button" class="btn btn-outline-secondary w-100" onclick="clearFilter(true)">Reset</button>
             </div>
         </div>
     </div>
-    <div id="mynetwork" class="card-body"></div>
+    <div id="network-wrapper" style="position: relative;">
+        <div id="mynetwork" class="card-body" style="min-height: 600px; height: calc(100vh - 320px);"></div>
+        <!-- Node Tooltip -->
+        <div id="node-tooltip" style="display: none; position: absolute; z-index: 1000; max-width: 350px; pointer-events: none;"></div>
+    </div>
+    <!-- Legend -->
+    <div class="card-footer">
+        <div class="d-flex flex-wrap align-items-center gap-3">
+            <small class="text-muted">
+                <strong>Legend:</strong>
+                <span class="ms-2"><img src="{{ url_for('static',filename='/img/ds.svg') }}" style="width:18px;height:18px;vertical-align:middle;"> Deployment</span>
+                <span class="ms-2"><img src="{{ url_for('static',filename='/img/ds.svg') }}" style="width:18px;height:18px;vertical-align:middle;"> DaemonSet</span>
+                <span class="ms-2"><img src="{{ url_for('static',filename='/img/sts.svg') }}" style="width:18px;height:18px;vertical-align:middle;"> StatefulSet</span>
+                <span class="ms-2"><img src="{{ url_for('static',filename='/img/rs.svg') }}" style="width:18px;height:18px;vertical-align:middle;"> ReplicaSet</span>
+            </small>
+            <small class="text-muted border-start ps-3">
+                <i class="fa fa-mouse-pointer"></i> <strong>Hover</strong> for info | <i class="fa fa-hand-pointer"></i> <strong>Click</strong> to view details
+            </small>
+        </div>
+    </div>
 </div>
 {% endblock %}
 
@@ -64,34 +83,121 @@
         function updateNetworkTheme() {
             let isDark = document.documentElement.getAttribute('data-coreui-theme') === 'dark';
             let bgColor = isDark ? '#181a1b' : '#ffffff';
-            let textColor = isDark ? '#ffffff' : '#000000';
+            let textColor = isDark ? '#ffffff' : '#343a40';
+            let edgeColor = isDark ? '#6c757d' : '#adb5bd';
 
             // Change Pyvis background
-            document.getElementById('mynetwork').style.backgroundColor = bgColor;
+            let networkEl = document.getElementById('mynetwork');
+            if (networkEl) {
+                networkEl.style.backgroundColor = bgColor;
+            }
 
-            // Change tooltip color for node titles
+            // Update network node font colors if network exists
+            if (typeof network !== 'undefined' && network !== null) {
+                network.setOptions({
+                    nodes: {
+                        font: {
+                            color: textColor,
+                            strokeColor: bgColor
+                        }
+                    },
+                    edges: {
+                        color: {
+                            color: edgeColor,
+                            highlight: "#326ce5",
+                            hover: "#326ce5"
+                        }
+                    }
+                });
+            }
+
+            // Change tooltip and control styling
+            let styleId = 'workload-map-theme-style';
+            let existingStyle = document.getElementById(styleId);
+            if (existingStyle) {
+                existingStyle.remove();
+            }
+
             let style = document.createElement('style');
+            style.id = styleId;
             style.innerHTML = `
                 .vis-tooltip {
-                    color: ${textColor} !important;
-                    background-color: rgba(0, 0, 0, 0.8) !important;
-                    border: 1px solid #ccc !important;
+                    color: #ffffff !important;
+                    background-color: rgba(0, 0, 0, 0.85) !important;
+                    border: 1px solid #326ce5 !important;
+                    border-radius: 4px !important;
+                    padding: 8px 12px !important;
+                    font-size: 12px !important;
                 }
                 /* Fix the select object (.ts-control) in dark mode */
                 .ts-control {
                     background-color: ${bgColor} !important;
                     color: ${textColor} !important;
-                    border: 1px solid ${isDark ? '#ffffff' : '#000000'} !important;
+                    border: 1px solid ${isDark ? '#495057' : '#ced4da'} !important;
                 }
                 .ts-control input {
                     background-color: ${bgColor} !important;
                     color: ${textColor} !important;
                 }
                 /* Fix .data-selectable elements in dark mode */
+                .ts-dropdown {
+                    background-color: ${bgColor} !important;
+                    border: 1px solid ${isDark ? '#495057' : '#ced4da'} !important;
+                }
                 .ts-dropdown [data-selectable].option {
                     background-color: ${bgColor} !important;
                     color: ${textColor} !important;
-                    border: 1px solid ${isDark ? '#ffffff' : '#000000'} !important;
+                }
+                .ts-dropdown [data-selectable].option:hover,
+                .ts-dropdown [data-selectable].option.active {
+                    background-color: ${isDark ? '#495057' : '#e9ecef'} !important;
+                    color: ${textColor} !important;
+                }
+                /* Navigation buttons styling - complete override */
+                div.vis-network div.vis-navigation div.vis-button {
+                    width: 34px !important;
+                    height: 34px !important;
+                    background-color: ${isDark ? '#212529' : '#ffffff'} !important;
+                    border: 1px solid ${isDark ? '#495057' : '#dee2e6'} !important;
+                    border-radius: 6px !important;
+                    background-image: none !important;
+                    box-shadow: 0 1px 3px rgba(0,0,0,0.1) !important;
+                    cursor: pointer !important;
+                }
+                div.vis-network div.vis-navigation div.vis-button:hover {
+                    background-color: ${isDark ? '#343a40' : '#f8f9fa'} !important;
+                    border-color: #326ce5 !important;
+                }
+                div.vis-network div.vis-navigation div.vis-button:active {
+                    background-color: ${isDark ? '#495057' : '#e9ecef'} !important;
+                }
+                /* Custom arrow icons using CSS */
+                div.vis-button.vis-up:before,
+                div.vis-button.vis-down:before,
+                div.vis-button.vis-left:before,
+                div.vis-button.vis-right:before,
+                div.vis-button.vis-zoomIn:before,
+                div.vis-button.vis-zoomOut:before,
+                div.vis-button.vis-zoomExtends:before {
+                    display: flex !important;
+                    align-items: center !important;
+                    justify-content: center !important;
+                    width: 100% !important;
+                    height: 100% !important;
+                    font-size: 16px !important;
+                    font-weight: bold !important;
+                    color: ${isDark ? '#adb5bd' : '#495057'} !important;
+                    font-family: Arial, sans-serif !important;
+                }
+                div.vis-button.vis-up:before { content: '▲' !important; }
+                div.vis-button.vis-down:before { content: '▼' !important; }
+                div.vis-button.vis-left:before { content: '◀' !important; }
+                div.vis-button.vis-right:before { content: '▶' !important; }
+                div.vis-button.vis-zoomIn:before { content: '+' !important; font-size: 20px !important; }
+                div.vis-button.vis-zoomOut:before { content: '−' !important; font-size: 20px !important; }
+                div.vis-button.vis-zoomExtends:before { content: '⤢' !important; font-size: 18px !important; }
+                div.vis-button:hover:before {
+                    color: #326ce5 !important;
                 }
             `;
             document.head.appendChild(style);
@@ -264,17 +370,40 @@
             // adding nodes and edges to the graph
             data = {nodes: nodes, edges: edges};
 
+            // Detect dark mode for font colors
+            let isDark = document.documentElement.getAttribute('data-coreui-theme') === 'dark';
+            let fontColor = isDark ? '#ffffff' : '#343a40';
+            let edgeColor = isDark ? '#6c757d' : '#adb5bd';
+
             var options = {
                 "configure": {
                     "enabled": false
                 },
                 "edges": {
                     "color": {
-                        "inherit": true
+                        "color": edgeColor,
+                        "highlight": "#326ce5",
+                        "hover": "#326ce5"
                     },
                     "smooth": {
                         "enabled": true,
                         "type": "dynamic"
+                    },
+                    "arrows": {
+                        "to": {
+                            "enabled": true,
+                            "scaleFactor": 0.5
+                        }
+                    },
+                    "width": 1.5
+                },
+                "nodes": {
+                    "font": {
+                        "color": fontColor,
+                        "size": 12,
+                        "face": "Arial, sans-serif",
+                        "strokeWidth": 0,
+                        "strokeColor": isDark ? "#181a1b" : "#ffffff"
                     }
                 },
                 "groups": {
@@ -315,27 +444,38 @@
                     }
                 },
                 "interaction": {
-                    "zoomView": false,
+                    "zoomView": true,
+                    "zoomSpeed": 0.5,
                     "dragNodes": true,
                     "hideEdgesOnDrag": false,
                     "hideNodesOnDrag": false,
                     "navigationButtons": true,
+                    "hover": true,
+                    "tooltipDelay": 200
                 },
                 "layout": {
                     "hierarchical": {
                         "blockShifting": true,
                         "edgeMinimization": true,
                         "enabled": true,
-                        "levelSeparation": 150,
+                        "direction": "UD",
+                        "levelSeparation": 120,
+                        "nodeSpacing": 150,
                         "parentCentralization": true,
-                        "sortMethod": "hubsize",
+                        "sortMethod": "directed",
                         "treeSpacing": 200
                     },
                     "improvedLayout": true,
                     "randomSeed": 0
                 },
                 "physics": {
-                    "enabled": true,
+                    "enabled": false,
+                    "hierarchicalRepulsion": {
+                        "centralGravity": 0.0,
+                        "springLength": 100,
+                        "springConstant": 0.01,
+                        "nodeDistance": 150
+                    },
                     "stabilization": {
                         "enabled": true,
                         "fit": true,
@@ -350,8 +490,166 @@
             // put it in its div
             // options.configure["container"] = document.getElementById("config");
             network = new vis.Network(container, data, options);
+
+            // Apply theme after network is created
+            setTimeout(updateNetworkTheme, 100);
+
+            // Add click handler for navigation
+            network.on('click', function(params) {
+                if (params.nodes.length > 0) {
+                    let nodeId = params.nodes[0];
+                    let nodeData = nodes.get(nodeId);
+                    if (nodeData && nodeData.kind) {
+                        // Map kind to route path
+                        let kindRoutes = {
+                            'Deployment': '/workload/deployments',
+                            'DaemonSet': '/workload/daemonsets',
+                            'StatefulSet': '/workload/statefulsets',
+                            'ReplicaSet': '/workload/replicasets'
+                        };
+                        let route = kindRoutes[nodeData.kind];
+                        if (route) {
+                            window.location.href = route;
+                        }
+                    }
+                }
+            });
+
+            // Add hover handlers for tooltip
+            network.on('hoverNode', function(params) {
+                document.body.style.cursor = 'pointer';
+                showNodeTooltip(params.node);
+            });
+
+            network.on('blurNode', function(params) {
+                document.body.style.cursor = 'default';
+                hideNodeTooltip();
+            });
+
+            // Update tooltip position on mouse move
+            container.addEventListener('mousemove', function(evt) {
+                moveNodeTooltip(evt);
+            });
+
             return network;
         }
+
+        // Tooltip functions
+        var tooltip = null;
+        
+        function showNodeTooltip(nodeId) {
+            tooltip = document.getElementById('node-tooltip');
+            if (!tooltip) return;
+            
+            let nodeData = nodes.get(nodeId);
+            if (!nodeData) return;
+            
+            let isDark = document.documentElement.getAttribute('data-coreui-theme') === 'dark';
+            let bgColor = isDark ? '#2d2d2d' : '#ffffff';
+            let textColor = isDark ? '#e4e4e4' : '#212529';
+            let borderColor = isDark ? '#444' : '#dee2e6';
+            let codeBg = isDark ? '#333' : '#f1f3f5';
+            
+            // Determine status based on ready/desired
+            let statusBadge = '';
+            let ready = nodeData.ready || 0;
+            let desired = nodeData.desired || 0;
+            if (ready >= desired && desired > 0) {
+                statusBadge = '<span style="background:#198754;color:#fff;padding:2px 8px;border-radius:4px;font-size:11px;">✓ Ready ' + ready + '/' + desired + '</span>';
+            } else if (ready > 0) {
+                statusBadge = '<span style="background:#ffc107;color:#000;padding:2px 8px;border-radius:4px;font-size:11px;">⚠ Partial ' + ready + '/' + desired + '</span>';
+            } else {
+                statusBadge = '<span style="background:#dc3545;color:#fff;padding:2px 8px;border-radius:4px;font-size:11px;">✗ Not Ready ' + ready + '/' + desired + '</span>';
+            }
+            
+            // Kind color mapping
+            let kindColors = {
+                'Deployment': '#326ce5',
+                'DaemonSet': '#326ce5',
+                'StatefulSet': '#326ce5',
+                'ReplicaSet': '#6c757d'
+            };
+            let kindColor = kindColors[nodeData.kind] || '#6c757d';
+            
+            let html = '<div style="background:' + bgColor + ';border:1px solid ' + borderColor + ';border-radius:8px;padding:12px 14px;box-shadow:0 4px 16px rgba(0,0,0,0.2);color:' + textColor + ';min-width:260px;">';
+            
+            // Header with kind badge
+            html += '<div style="display:flex;align-items:center;gap:8px;margin-bottom:10px;padding-bottom:8px;border-bottom:1px solid ' + borderColor + ';">';
+            html += '<span style="background:' + kindColor + ';color:#fff;padding:2px 8px;border-radius:4px;font-size:10px;text-transform:uppercase;">' + (nodeData.kind || nodeData.group || '-') + '</span>';
+            html += '<span style="font-weight:bold;font-size:14px;">' + (nodeData.label || nodeId) + '</span>';
+            html += '</div>';
+            
+            html += '<table style="font-size:12px;width:100%;border-collapse:collapse;">';
+            html += '<tr><td style="padding:3px 10px 3px 0;color:#6c757d;width:80px;">Namespace:</td><td style="padding:3px 0;"><code style="background:' + codeBg + ';padding:1px 4px;border-radius:3px;font-size:11px;">' + (nodeData.namespace || '-') + '</code></td></tr>';
+            html += '<tr><td style="padding:3px 10px 3px 0;color:#6c757d;">Status:</td><td style="padding:3px 0;">' + statusBadge + '</td></tr>';
+            
+            // Show available if present
+            if (nodeData.available !== undefined) {
+                html += '<tr><td style="padding:3px 10px 3px 0;color:#6c757d;">Available:</td><td style="padding:3px 0;">' + nodeData.available + '</td></tr>';
+            }
+            
+            // Show age if present
+            if (nodeData.age) {
+                html += '<tr><td style="padding:3px 10px 3px 0;color:#6c757d;">Age:</td><td style="padding:3px 0;">' + nodeData.age + '</td></tr>';
+            }
+            
+            // Show container image for deployments
+            if (nodeData.containerImage) {
+                let img = nodeData.containerImage.length > 40 ? nodeData.containerImage.substring(0, 40) + '...' : nodeData.containerImage;
+                html += '<tr><td style="padding:3px 10px 3px 0;color:#6c757d;vertical-align:top;">Image:</td><td style="padding:3px 0;font-size:11px;word-break:break-all;">' + img + '</td></tr>';
+            }
+            
+            // Show owner for replicasets
+            if (nodeData.owner) {
+                html += '<tr><td style="padding:3px 10px 3px 0;color:#6c757d;">Owner:</td><td style="padding:3px 0;font-size:11px;">' + nodeData.owner + '</td></tr>';
+            }
+            
+            html += '</table>';
+            
+            // Click hint
+            html += '<div style="font-size:10px;color:#6c757d;margin-top:10px;padding-top:8px;border-top:1px solid ' + borderColor + ';text-align:center;">';
+            html += '<span style="background:#326ce5;color:#fff;padding:2px 8px;border-radius:4px;">🔗 Click to view ' + (nodeData.kind || 'workload') + 's</span>';
+            html += '</div>';
+            html += '</div>';
+            
+            tooltip.innerHTML = html;
+            tooltip.style.display = 'block';
+        }
+        
+        function moveNodeTooltip(evt) {
+            if (!tooltip || tooltip.style.display === 'none') return;
+            
+            let wrapper = document.getElementById('network-wrapper');
+            if (!wrapper) return;
+            
+            let wrapperRect = wrapper.getBoundingClientRect();
+            let x = evt.clientX - wrapperRect.left + 15;
+            let y = evt.clientY - wrapperRect.top + 15;
+            
+            // Keep tooltip within bounds
+            let tooltipRect = tooltip.getBoundingClientRect();
+            let tooltipWidth = tooltipRect.width || 300;
+            let tooltipHeight = tooltipRect.height || 200;
+            
+            if (x + tooltipWidth > wrapperRect.width - 10) {
+                x = evt.clientX - wrapperRect.left - tooltipWidth - 15;
+            }
+            if (y + tooltipHeight > wrapperRect.height - 10) {
+                y = wrapperRect.height - tooltipHeight - 10;
+            }
+            if (x < 10) x = 10;
+            if (y < 10) y = 10;
+            
+            tooltip.style.left = x + 'px';
+            tooltip.style.top = y + 'px';
+        }
+        
+        function hideNodeTooltip() {
+            if (tooltip) {
+                tooltip.style.display = 'none';
+            }
+        }
+
         drawGraph();
     </script>
 {% endblock %}

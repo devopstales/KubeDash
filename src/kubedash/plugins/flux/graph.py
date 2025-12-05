@@ -122,6 +122,9 @@ def build_flux_graph(flux_objects: Dict[str, List[Dict[str, Any]]]) -> Dict[str,
             # Get revision info
             revision = _get_revision(obj, kind)
             
+            # Extract additional info based on kind
+            extra_info = _get_extra_info(obj, kind)
+            
             node = {
                 "data": {
                     "id": node_id,
@@ -136,6 +139,12 @@ def build_flux_graph(flux_objects: Dict[str, List[Dict[str, Any]]]) -> Dict[str,
                     "suspended": obj.get("spec", {}).get("suspend", False),
                     "color": NODE_COLORS.get(kind, "#6c757d"),
                     "shape": NODE_SHAPES.get(kind, "ellipse"),
+                    "url": extra_info.get("url", ""),
+                    "interval": extra_info.get("interval", ""),
+                    "chart": extra_info.get("chart", ""),
+                    "path": extra_info.get("path", ""),
+                    "branch": extra_info.get("branch", ""),
+                    "lastTransitionTime": extra_info.get("lastTransitionTime", ""),
                 }
             }
             nodes.append(node)
@@ -337,6 +346,69 @@ def _get_status_info(obj: Dict[str, Any]) -> Dict[str, str]:
         "color": "#ffc107",  # Yellow
         "message": "No status conditions found",
     }
+
+
+def _get_extra_info(obj: Dict[str, Any], kind: str) -> Dict[str, str]:
+    """Extract additional useful information from a Flux object based on its kind."""
+    spec = obj.get("spec", {})
+    status = obj.get("status", {})
+    info = {}
+    
+    # Common: interval
+    interval = spec.get("interval", "")
+    if interval:
+        info["interval"] = interval
+    
+    # Last transition time from Ready condition
+    conditions = status.get("conditions", [])
+    for cond in conditions:
+        if cond.get("type") == "Ready":
+            info["lastTransitionTime"] = cond.get("lastTransitionTime", "")
+            break
+    
+    # Kind-specific info
+    if kind == "GitRepository":
+        info["url"] = spec.get("url", "")
+        ref = spec.get("ref", {})
+        info["branch"] = ref.get("branch", ref.get("tag", ref.get("commit", "")))
+        
+    elif kind == "HelmRepository":
+        info["url"] = spec.get("url", "")
+        
+    elif kind == "OCIRepository":
+        info["url"] = spec.get("url", "")
+        ref = spec.get("ref", {})
+        info["branch"] = ref.get("tag", ref.get("digest", ""))
+        
+    elif kind == "Bucket":
+        info["url"] = f"{spec.get('provider', '')}/{spec.get('bucketName', '')}"
+        info["path"] = spec.get("prefix", "")
+        
+    elif kind == "Kustomization":
+        info["path"] = spec.get("path", "./")
+        source_ref = spec.get("sourceRef", {})
+        if source_ref:
+            info["url"] = f"{source_ref.get('kind', '')}/{source_ref.get('name', '')}"
+            
+    elif kind == "HelmRelease":
+        chart = spec.get("chart", {}).get("spec", {})
+        info["chart"] = chart.get("chart", "")
+        info["path"] = chart.get("version", "")  # Use path field for version
+        source_ref = chart.get("sourceRef", {})
+        if source_ref:
+            info["url"] = f"{source_ref.get('kind', '')}/{source_ref.get('name', '')}"
+            
+    elif kind == "Alert":
+        info["url"] = f"Events: {len(spec.get('eventSources', []))} sources"
+        
+    elif kind == "Provider":
+        info["url"] = spec.get("type", "")
+        
+    elif kind == "Receiver":
+        info["url"] = spec.get("type", "")
+        info["path"] = f"{len(spec.get('resources', []))} resources"
+    
+    return info
 
 
 def _get_revision(obj: Dict[str, Any], kind: str) -> str:

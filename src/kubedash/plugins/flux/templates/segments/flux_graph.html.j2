@@ -20,15 +20,25 @@
         
         <!-- Legend -->
         <div class="p-3 border-top">
-            <small class="text-muted">
-                <strong>Legend:</strong>
-                <span class="ms-3"><span style="display:inline-block;width:12px;height:12px;background:#6f42c1;border-radius:2px;"></span> GitRepository</span>
-                <span class="ms-2"><span style="display:inline-block;width:12px;height:12px;background:#0d6efd;border-radius:2px;"></span> HelmRepository</span>
-                <span class="ms-2"><span style="display:inline-block;width:12px;height:12px;background:#20c997;border-radius:2px;"></span> OCIRepository</span>
-                <span class="ms-2"><span style="display:inline-block;width:12px;height:12px;background:#198754;border-radius:2px;"></span> Kustomization</span>
-                <span class="ms-2"><span style="display:inline-block;width:12px;height:12px;background:#dc3545;border-radius:2px;"></span> HelmRelease</span>
-                <span class="ms-3">| Hover for info, click for details</span>
-            </small>
+            <div class="d-flex flex-wrap align-items-center gap-3">
+                <small class="text-muted">
+                    <strong>Legend:</strong>
+                    <span class="ms-2"><span style="display:inline-block;width:12px;height:12px;background:#6f42c1;border-radius:2px;vertical-align:middle;"></span> GitRepository</span>
+                    <span class="ms-2"><span style="display:inline-block;width:12px;height:12px;background:#0d6efd;border-radius:2px;vertical-align:middle;"></span> HelmRepository</span>
+                    <span class="ms-2"><span style="display:inline-block;width:12px;height:12px;background:#20c997;border-radius:2px;vertical-align:middle;"></span> OCIRepository</span>
+                    <span class="ms-2"><span style="display:inline-block;width:12px;height:12px;background:#198754;border-radius:2px;vertical-align:middle;"></span> Kustomization</span>
+                    <span class="ms-2"><span style="display:inline-block;width:12px;height:12px;background:#dc3545;border-radius:2px;vertical-align:middle;"></span> HelmRelease</span>
+                </small>
+                <small class="text-muted border-start ps-3">
+                    <strong>Status:</strong>
+                    <span class="ms-2" style="color:#198754;">● Ready</span>
+                    <span class="ms-2" style="color:#dc3545;">● Error</span>
+                    <span class="ms-2" style="color:#6c757d;">● Suspended</span>
+                </small>
+                <small class="text-muted border-start ps-3">
+                    <i class="fa fa-mouse-pointer"></i> <strong>Hover</strong> for info bubble | <i class="fa fa-hand-pointer"></i> <strong>Click</strong> to open details
+                </small>
+            </div>
         </div>
     </div>
 </div>
@@ -153,6 +163,13 @@ function initializeGraph() {
                 }
             },
             {
+                selector: 'node:active',
+                style: {
+                    'overlay-opacity': 0.2,
+                    'overlay-color': '#326ce5'
+                }
+            },
+            {
                 selector: 'edge',
                 style: {
                     'width': 2,
@@ -219,29 +236,78 @@ function showTooltip(evt) {
     // Build tooltip content
     var statusBadge = '';
     if (data.status === 'Ready') {
-        statusBadge = '<span style="background:#198754;color:#fff;padding:2px 8px;border-radius:4px;font-size:11px;">Ready</span>';
+        statusBadge = '<span style="background:#198754;color:#fff;padding:2px 8px;border-radius:4px;font-size:11px;">✓ Ready</span>';
     } else if (data.status === 'Suspended') {
-        statusBadge = '<span style="background:#6c757d;color:#fff;padding:2px 8px;border-radius:4px;font-size:11px;">Suspended</span>';
+        statusBadge = '<span style="background:#6c757d;color:#fff;padding:2px 8px;border-radius:4px;font-size:11px;">⏸ Suspended</span>';
+    } else if (data.status === 'Progressing') {
+        statusBadge = '<span style="background:#0dcaf0;color:#000;padding:2px 8px;border-radius:4px;font-size:11px;">⟳ Progressing</span>';
     } else {
-        statusBadge = '<span style="background:#dc3545;color:#fff;padding:2px 8px;border-radius:4px;font-size:11px;">Not Ready</span>';
+        statusBadge = '<span style="background:#dc3545;color:#fff;padding:2px 8px;border-radius:4px;font-size:11px;">✗ Not Ready</span>';
     }
     
-    var html = '<div style="background:' + colors.tooltipBg + ';border:1px solid ' + colors.tooltipBorder + ';border-radius:6px;padding:12px;box-shadow:0 4px 12px rgba(0,0,0,0.15);color:' + colors.tooltipText + ';">';
-    html += '<div style="font-weight:bold;font-size:14px;margin-bottom:8px;border-bottom:1px solid ' + colors.tooltipBorder + ';padding-bottom:8px;">' + data.label + '</div>';
-    html += '<table style="font-size:12px;width:100%;">';
-    html += '<tr><td style="padding:2px 8px 2px 0;color:#6c757d;">Kind:</td><td style="padding:2px 0;">' + (data.kind || '-') + '</td></tr>';
-    html += '<tr><td style="padding:2px 8px 2px 0;color:#6c757d;">Namespace:</td><td style="padding:2px 0;">' + (data.namespace || '-') + '</td></tr>';
-    html += '<tr><td style="padding:2px 8px 2px 0;color:#6c757d;">Status:</td><td style="padding:2px 0;">' + statusBadge + '</td></tr>';
-    if (data.message) {
-        var msg = data.message.length > 100 ? data.message.substring(0, 100) + '...' : data.message;
-        html += '<tr><td style="padding:2px 8px 2px 0;color:#6c757d;vertical-align:top;">Message:</td><td style="padding:2px 0;word-break:break-word;">' + msg + '</td></tr>';
+    var html = '<div style="background:' + colors.tooltipBg + ';border:1px solid ' + colors.tooltipBorder + ';border-radius:8px;padding:12px 14px;box-shadow:0 4px 16px rgba(0,0,0,0.2);color:' + colors.tooltipText + ';min-width:280px;">';
+    
+    // Header with kind badge
+    var kindColor = data.color || '#6c757d';
+    html += '<div style="display:flex;align-items:center;gap:8px;margin-bottom:10px;padding-bottom:8px;border-bottom:1px solid ' + colors.tooltipBorder + ';">';
+    html += '<span style="background:' + kindColor + ';color:#fff;padding:2px 8px;border-radius:4px;font-size:10px;text-transform:uppercase;">' + (data.kind || '-') + '</span>';
+    html += '<span style="font-weight:bold;font-size:14px;">' + data.label + '</span>';
+    html += '</div>';
+    
+    html += '<table style="font-size:12px;width:100%;border-collapse:collapse;">';
+    html += '<tr><td style="padding:3px 10px 3px 0;color:#6c757d;width:90px;">Namespace:</td><td style="padding:3px 0;"><code style="background:' + (colors.background === '#1e1e1e' ? '#333' : '#f1f3f5') + ';padding:1px 4px;border-radius:3px;font-size:11px;">' + (data.namespace || '-') + '</code></td></tr>';
+    html += '<tr><td style="padding:3px 10px 3px 0;color:#6c757d;">Status:</td><td style="padding:3px 0;">' + statusBadge + '</td></tr>';
+    
+    // Show URL/Source info based on kind
+    if (data.url) {
+        var urlLabel = 'Source:';
+        if (data.kind === 'GitRepository' || data.kind === 'HelmRepository' || data.kind === 'OCIRepository') {
+            urlLabel = 'URL:';
+        } else if (data.kind === 'Provider') {
+            urlLabel = 'Type:';
+        }
+        var urlDisplay = data.url.length > 45 ? data.url.substring(0, 45) + '...' : data.url;
+        html += '<tr><td style="padding:3px 10px 3px 0;color:#6c757d;vertical-align:top;">' + urlLabel + '</td><td style="padding:3px 0;word-break:break-all;font-size:11px;">' + urlDisplay + '</td></tr>';
     }
+    
+    // Branch/Tag for repos
+    if (data.branch) {
+        html += '<tr><td style="padding:3px 10px 3px 0;color:#6c757d;">Branch/Tag:</td><td style="padding:3px 0;"><code style="background:' + (colors.background === '#1e1e1e' ? '#333' : '#f1f3f5') + ';padding:1px 4px;border-radius:3px;font-size:11px;">' + data.branch + '</code></td></tr>';
+    }
+    
+    // Chart name for HelmRelease
+    if (data.chart) {
+        html += '<tr><td style="padding:3px 10px 3px 0;color:#6c757d;">Chart:</td><td style="padding:3px 0;font-weight:500;">' + data.chart + (data.path ? ' <span style="color:#6c757d;">v' + data.path + '</span>' : '') + '</td></tr>';
+    }
+    
+    // Path for Kustomization
+    if (data.path && data.kind === 'Kustomization') {
+        html += '<tr><td style="padding:3px 10px 3px 0;color:#6c757d;">Path:</td><td style="padding:3px 0;font-family:monospace;font-size:11px;">' + data.path + '</td></tr>';
+    }
+    
+    // Interval
+    if (data.interval) {
+        html += '<tr><td style="padding:3px 10px 3px 0;color:#6c757d;">Interval:</td><td style="padding:3px 0;">' + data.interval + '</td></tr>';
+    }
+    
+    // Revision
     if (data.revision) {
-        var rev = data.revision.length > 40 ? data.revision.substring(0, 40) + '...' : data.revision;
-        html += '<tr><td style="padding:2px 8px 2px 0;color:#6c757d;">Revision:</td><td style="padding:2px 0;font-family:monospace;font-size:11px;">' + rev + '</td></tr>';
+        var rev = data.revision.length > 35 ? data.revision.substring(0, 35) + '...' : data.revision;
+        html += '<tr><td style="padding:3px 10px 3px 0;color:#6c757d;">Revision:</td><td style="padding:3px 0;font-family:monospace;font-size:10px;">' + rev + '</td></tr>';
     }
+    
+    // Message (if not ready)
+    if (data.message && data.status !== 'Ready') {
+        var msg = data.message.length > 80 ? data.message.substring(0, 80) + '...' : data.message;
+        html += '<tr><td style="padding:3px 10px 3px 0;color:#6c757d;vertical-align:top;">Message:</td><td style="padding:3px 0;word-break:break-word;font-size:11px;color:' + (data.status === 'Not Ready' ? '#dc3545' : colors.tooltipText) + ';">' + msg + '</td></tr>';
+    }
+    
     html += '</table>';
-    html += '<div style="font-size:10px;color:#6c757d;margin-top:8px;text-align:center;">Click to view details</div>';
+    
+    // Click hint with icon
+    html += '<div style="font-size:10px;color:#6c757d;margin-top:10px;padding-top:8px;border-top:1px solid ' + colors.tooltipBorder + ';text-align:center;">';
+    html += '<span style="background:#326ce5;color:#fff;padding:2px 8px;border-radius:4px;cursor:pointer;">🔗 Click for details</span>';
+    html += '</div>';
     html += '</div>';
     
     tooltip.innerHTML = html;

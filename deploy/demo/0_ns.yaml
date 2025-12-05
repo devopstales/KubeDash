@@ -4,6 +4,9 @@ metadata:
   name: network-testing
   annotations:
     metadata.k8s.io/repository: "https://github.com/devopstales/KubeDash"
+    metadata.k8s.io/owner: devopstales
+    kubedash.devopstales.github.io/created-by: devopstales
+    kubedash.devopstales.github.io/protected: "true"    
 ---
 apiVersion: v1
 kind: Pod

@@ -462,23 +462,67 @@ def k8sGetPodMap(username_role, user_token, namespace):
     statefulset_list = k8sStatefulSetsGet(username_role, user_token, namespace)
     for sts in statefulset_list:
         if int(sts["desired"]) != 0:
-            net.add_node(sts["name"], label=sts["name"], shape="image", group="statefulset")
+            net.add_node(
+                sts["name"], 
+                label=sts["name"], 
+                shape="image", 
+                group="statefulset",
+                kind="StatefulSet",
+                namespace=sts.get("namespace", namespace),
+                desired=sts.get("desired", 0),
+                ready=sts.get("ready", 0),
+                age=sts.get("age", ""),
+            )
 
     daemonset_list = k8sDaemonSetsGet(username_role, user_token, namespace)
     for ds in daemonset_list:
         if int(ds["desired"]) != 0:
-            net.add_node(ds["name"], label=ds["name"], shape="image", group="daemonset")
+            net.add_node(
+                ds["name"], 
+                label=ds["name"], 
+                shape="image", 
+                group="daemonset",
+                kind="DaemonSet",
+                namespace=ds.get("namespace", namespace),
+                desired=ds.get("desired", 0),
+                ready=ds.get("ready", 0),
+                available=ds.get("available", 0),
+                age=ds.get("age", ""),
+            )
 
     deployments_list = k8sDeploymentsGet(username_role, user_token, namespace)
     for deploy in deployments_list:
         if int(deploy["desired"]) != 0:
-            net.add_node(deploy["name"], label=deploy["name"], shape="image", group="deployment")
+            net.add_node(
+                deploy["name"], 
+                label=deploy["name"], 
+                shape="image", 
+                group="deployment",
+                kind="Deployment",
+                namespace=deploy.get("namespace", namespace),
+                desired=deploy.get("desired", 0),
+                ready=deploy.get("ready", 0),
+                available=deploy.get("available", 0),
+                age=deploy.get("age", ""),
+                containerImage=deploy.get("image", ""),
+            )
 
     replicaset_list = k8sReplicaSetsGet(username_role, user_token, namespace)
     for rs in replicaset_list:
         if rs["desired"] != 0:
             on_name = rs["owner"].split("/", 1)[1]
-            net.add_node(rs["name"], label=rs["name"], shape="image", group="replicaset")
+            net.add_node(
+                rs["name"], 
+                label=rs["name"], 
+                shape="image", 
+                group="replicaset",
+                kind="ReplicaSet",
+                namespace=rs.get("namespace", namespace),
+                desired=rs.get("desired", 0),
+                ready=rs.get("ready", 0),
+                owner=rs.get("owner", ""),
+                age=rs.get("age", ""),
+            )
             net.add_edge(on_name, rs["name"], arrowStrikethrough=False, physics=True, valu=1000)
 
     #has_report, pod_list = k8sPodListVulnsGet(username_role, user_token, namespace)
