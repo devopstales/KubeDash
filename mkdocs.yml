@@ -18,18 +18,28 @@ nav:
       - Manage Privileges: functions/rbac.md
       - Connect a Kubernetes Cluster: functions/k8s-api.md
       - Generate Kubectl Config: functions/kubectl-config.md
+      - Cluster Metrics & Dashboard: functions/cluster-metrics.md
       - Resource Map: functions/resource-map.md
+      - Workload Management: functions/workloads.md
+      - Pod Debugging: functions/pod-debugging.md
+      - Namespace Management: functions/namespaces.md
+      - Network Resources: functions/network.md
+      - Storage Resources: functions/storage.md
+      - Security Resources: functions/security.md
+      - Node Management: functions/nodes.md
+      - Cluster Permissions: functions/cluster-permissions.md
+      - Autoscaling & Resource Management: functions/autoscaling.md
+      - Custom Resource Definitions: functions/crds.md
     - Integrations:
       - Kubectl Plugin: integrations/kubectl-plugin.md
       - Docker Registry: integrations/docker-registry.md
       - Helm Chart: integrations/helm.md
       - Cert Manager: integrations/cert-manager.md
       - External LoadBalancer: integrations/external-load-balancer.md
-      #- Trivy Operator: integrations/trivy-operator.md
-      #- FluxCD: integrations/flux.md
+      - Extension API: integrations/extension-api.md
     - Contributing: contributing.md
     - FAQ:
-      - technical: faq/technical.md
+      - Technical: faq/technical.md
 
 # Documentation and theme
 theme:
