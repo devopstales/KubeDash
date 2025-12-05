@@ -795,6 +795,13 @@ def initialize_app_security(app: Flask):
             "'unsafe-eval'",
             'cdnjs.cloudflare.com',
             'www.googletagmanager.com',
+            'unpkg.com',  # For Cytoscape.js (Flux plugin graph)
+            'cdn.socket.io',  # For Socket.IO (real-time updates)
+        ],
+        'connect-src': [
+            "'self'",
+            'wss:',  # WebSocket connections
+            'ws:',   # WebSocket connections (dev)
         ],
         'img-src': [
             "'self'",

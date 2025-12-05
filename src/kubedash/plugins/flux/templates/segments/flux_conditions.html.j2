@@ -1,0 +1,96 @@
+<div class="card shadow-sm mt-3">
+    <div class="card-header bg-light">
+        <strong>Conditions</strong>
+    </div>
+    <div class="card-body">
+        {% if conditions %}
+        <div class="table-responsive">
+            <table class="table table-sm table-bordered table-hover" id="conditionsTable">
+                <thead class="table-light">
+                    <tr>
+                        <th>Type</th>
+                        <th>Status</th>
+                        <th>Reason</th>
+                        <th>Message</th>
+                        <th>Last Transition</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    {% for cond in conditions %}
+                    <tr>
+                        <td>
+                            {% if cond.type == 'Ready' %}
+                                {% if cond.status == 'True' %}
+                                <span class="badge bg-success">{{ cond.type }}</span>
+                                {% else %}
+                                <span class="badge bg-danger">{{ cond.type }}</span>
+                                {% endif %}
+                            {% elif cond.type == 'Reconciling' %}
+                            <span class="badge bg-info">{{ cond.type }}</span>
+                            {% elif cond.type == 'Stalled' %}
+                            <span class="badge bg-warning">{{ cond.type }}</span>
+                            {% elif cond.type == 'Healthy' %}
+                                {% if cond.status == 'True' %}
+                                <span class="badge bg-success">{{ cond.type }}</span>
+                                {% else %}
+                                <span class="badge bg-danger">{{ cond.type }}</span>
+                                {% endif %}
+                            {% else %}
+                            <span class="badge bg-secondary">{{ cond.type }}</span>
+                            {% endif %}
+                        </td>
+                        <td>
+                            {% if cond.status == 'True' %}
+                            <i class="material-icons text-success align-middle" style="font-size: 18px;">check_circle</i>
+                            {% elif cond.status == 'False' %}
+                            <i class="material-icons text-danger align-middle" style="font-size: 18px;">cancel</i>
+                            {% else %}
+                            <i class="material-icons text-warning align-middle" style="font-size: 18px;">help</i>
+                            {% endif %}
+                            {{ cond.status }}
+                        </td>
+                        <td>
+                            <code class="small">{{ cond.reason }}</code>
+                        </td>
+                        <td class="small" style="max-width: 400px; word-wrap: break-word;">
+                            {{ cond.message }}
+                        </td>
+                        <td class="small text-nowrap">
+                            {{ cond.last_transition_time }}
+                        </td>
+                    </tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+        </div>
+        {% else %}
+        <div class="alert alert-info mb-0">
+            <i class="material-icons align-middle me-1">info</i>
+            No conditions available for this object.
+        </div>
+        {% endif %}
+    </div>
+</div>
+
+<!-- Condition Legend -->
+<div class="card shadow-sm mt-3">
+    <div class="card-header bg-light">
+        <strong>Condition Types Reference</strong>
+    </div>
+    <div class="card-body">
+        <div class="row">
+            <div class="col-md-4">
+                <h6><span class="badge bg-success">Ready</span></h6>
+                <p class="small text-muted">Indicates the object has been successfully reconciled and is ready.</p>
+            </div>
+            <div class="col-md-4">
+                <h6><span class="badge bg-info">Reconciling</span></h6>
+                <p class="small text-muted">Indicates the object is currently being reconciled.</p>
+            </div>
+            <div class="col-md-4">
+                <h6><span class="badge bg-warning">Stalled</span></h6>
+                <p class="small text-muted">Indicates reconciliation has stalled due to an error or dependency.</p>
+            </div>
+        </div>
+    </div>
+</div>

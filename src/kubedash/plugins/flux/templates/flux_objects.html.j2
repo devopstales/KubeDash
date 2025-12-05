@@ -1,0 +1,96 @@
+{% extends "base2.html.j2" %}
+
+{% block topmenu %}
+<ul class="header-nav d-lg-flex m-3">
+    <div class="container-fluid px-4">
+        <nav aria-label="breadcrumb">
+            <ol class="breadcrumb my-0">
+                <li class="breadcrumb-item"><span>Plugins</span></li>
+                <li class="breadcrumb-item active"><span>Flux CD</span></li>
+            </ol>
+        </nav>
+    </div>
+</ul>
+<ul class="header-nav ms-auto"></ul>
+<ul class="header-nav d-lg-flex">
+{% include "segments/topmenu.html.j2" %}
+{% endblock %}
+
+{% block content %}
+<div class="card shadow mb-4">
+    <div class="card-header py-3">
+        <h6 class="m-0 font-weight-bold text-primary">Flux CD Objects</h6>
+    </div>
+    <div class="card-body">
+        <ul class="nav nav-tabs" id="nav-tab" role="tablist">
+            <li class="nav-item">
+                <a class="nav-link active" id="nav-sources-tab" href="#nav-sources" role="tab" aria-controls="nav-sources" aria-selected="true" data-bs-toggle="tab">Sources</a>
+            </li>
+            <li class="nav-item">
+                <a class="nav-link" id="nav-kustomizations-tab" href="#nav-kustomizations" role="tab" aria-controls="nav-kustomizations" aria-selected="false" data-bs-toggle="tab">Kustomizations</a>
+            </li>
+            <li class="nav-item">
+                <a class="nav-link" id="nav-helm-tab" href="#nav-helm" role="tab" aria-controls="nav-helm" aria-selected="false" data-bs-toggle="tab">Helm Releases</a>
+            </li>
+            <li class="nav-item">
+                <a class="nav-link" id="nav-notifications-tab" href="#nav-notifications" role="tab" aria-controls="nav-notifications" aria-selected="false" data-bs-toggle="tab">Notifications</a>
+            </li>
+            <li class="nav-item">
+                <a class="nav-link" id="nav-graph-tab" href="#nav-graph" role="tab" aria-controls="nav-graph" aria-selected="false" data-bs-toggle="tab">Graph</a>
+            </li>
+        </ul>
+        <div class="tab-content" id="nav-tabContent">
+            <!-- SOURCES TAB -->
+            <div class="tab-pane fade show active pt-3" id="nav-sources" role="tabpanel" aria-labelledby="nav-sources-tab">
+                {% for kind in ['GitRepositories', 'HelmRepositories', 'OCIRepositories', 'Buckets'] %}
+                    {% include "segments/flux_table.html.j2" %}
+                {% endfor %}
+            </div>
+
+            <!-- KUSTOMIZATIONS TAB -->
+            <div class="tab-pane fade pt-3" id="nav-kustomizations" role="tabpanel" aria-labelledby="nav-kustomizations-tab">
+                {% set kind = 'Kustomizations' %}
+                {% include "segments/flux_table.html.j2" %}
+            </div>
+
+            <!-- HELM RELEASES TAB -->
+            <div class="tab-pane fade pt-3" id="nav-helm" role="tabpanel" aria-labelledby="nav-helm-tab">
+                {% set kind = 'HelmReleases' %}
+                {% include "segments/flux_table.html.j2" %}
+            </div>
+
+            <!-- NOTIFICATIONS TAB -->
+            <div class="tab-pane fade pt-3" id="nav-notifications" role="tabpanel" aria-labelledby="nav-notifications-tab">
+                {% for kind in ['Alerts', 'Providers', 'Receivers'] %}
+                    {% include "segments/flux_table.html.j2" %}
+                {% endfor %}
+            </div>
+
+            <!-- GRAPH TAB -->
+            <div class="tab-pane fade pt-3" id="nav-graph" role="tabpanel" aria-labelledby="nav-graph-tab">
+                {% include "segments/flux_graph.html.j2" %}
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}
+
+{% block add_head_css %}
+{% include "segments/datatable_snippet.html.j2" %}
+{% endblock %}
+
+{% block add_tail_js %}
+<script>
+$(document).ready(function() {
+    $('#gitRepositoriesTable').DataTable();
+    $('#helmRepositoriesTable').DataTable();
+    $('#ociRepositoriesTable').DataTable();
+    $('#bucketsTable').DataTable();
+    $('#kustomizationsTable').DataTable();
+    $('#helmReleasesTable').DataTable();
+    $('#alertsTable').DataTable();
+    $('#providersTable').DataTable();
+    $('#receiversTable').DataTable();
+});
+</script>
+{% endblock %}

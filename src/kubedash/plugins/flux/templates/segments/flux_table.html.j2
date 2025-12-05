@@ -1,0 +1,126 @@
+{# Map plural kind names to singular for detail view URLs #}
+{% set kind_map = {
+    'GitRepositories': 'GitRepository',
+    'HelmRepositories': 'HelmRepository',
+    'OCIRepositories': 'OCIRepository',
+    'Buckets': 'Bucket',
+    'HelmCharts': 'HelmChart',
+    'Kustomizations': 'Kustomization',
+    'HelmReleases': 'HelmRelease',
+    'Alerts': 'Alert',
+    'Providers': 'Provider',
+    'Receivers': 'Receiver'
+} %}
+
+{% set singular_kind = kind_map.get(kind, kind.rstrip('s')) %}
+
+{# Map kind to table ID for DataTables #}
+{% set table_id_map = {
+    'GitRepositories': 'gitRepositoriesTable',
+    'HelmRepositories': 'helmRepositoriesTable',
+    'OCIRepositories': 'ociRepositoriesTable',
+    'Buckets': 'bucketsTable',
+    'HelmCharts': 'helmChartsTable',
+    'Kustomizations': 'kustomizationsTable',
+    'HelmReleases': 'helmReleasesTable',
+    'Alerts': 'alertsTable',
+    'Providers': 'providersTable',
+    'Receivers': 'receiversTable'
+} %}
+
+{% set table_id = table_id_map.get(kind, kind | lower ~ 'Table') %}
+
+<div class="card shadow mb-4">
+    <div class="card-header py-3">
+        <h6 class="m-0 font-weight-bold text-primary">{{ kind }}</h6>
+    </div>
+    <div class="card-body">
+        <div class="table-responsive">
+            <table class="table table-bordered" id="{{ table_id }}" width="100%" cellspacing="0">
+                <thead>
+                    <tr>
+                        <th>Status</th>
+                        <th>Name</th>
+                        <th>Namespace</th>
+                        <th>Message</th>
+                        <th>Age</th>
+                        {% if session['user_role'] == "Admin" %}
+                        <th>Actions</th>
+                        {% endif %}
+                    </tr>
+                </thead>
+                <tbody>
+                    {% if flux_objects[kind] %}
+                    {% for item in flux_objects[kind] %}
+                    {% if item is mapping %}
+                    {% set is_ready = item.status and item.status.conditions and item.status.conditions[0].status == 'True' %}
+                    {% set is_suspended = item.spec and item.spec.suspend %}
+                    {% set condition_type = item.status.conditions[0].type if item.status and item.status.conditions else 'Unknown' %}
+                    {% set condition_message = item.status.conditions[0].message if item.status and item.status.conditions else '' %}
+                    {% if selected == item.metadata.name %}
+                    <tr class="selected">
+                    {% else %}
+                    <tr>
+                    {% endif %}
+                        <td>
+                            {% if is_suspended %}
+                            <span class="badge text-bg-tag text-bg-secondary">Suspended</span>
+                            {% elif is_ready %}
+                            <span class="badge text-bg-tag text-bg-success">{{ condition_type }}</span>
+                            {% else %}
+                            <span class="badge text-bg-tag text-bg-danger">{{ condition_type }}</span>
+                            {% endif %}
+                        </td>
+                        <td>
+                            <a href="/plugins/flux/detail/{{ singular_kind }}/{{ item.metadata.namespace }}/{{ item.metadata.name }}">
+                                {{ item.metadata.name }}
+                            </a>
+                        </td>
+                        <td>{{ item.metadata.namespace }}</td>
+                        <td title="{{ condition_message }}">
+                            {{ condition_message[:80] }}{% if condition_message|length > 80 %}...{% endif %}
+                        </td>
+                        <td>{{ item.metadata.creationTimestamp or 'N/A' }}</td>
+                        {% if session['user_role'] == "Admin" %}
+                        <td>
+                            {# Sync action for all reconcilable objects #}
+                            {% if kind in ['GitRepositories', 'HelmRepositories', 'OCIRepositories', 'Buckets', 'HelmCharts', 'Kustomizations', 'HelmReleases'] %}
+                            <form action="/plugins/flux/sync" method="post" class="d-inline">
+                                <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+                                <input type="hidden" name="flux_object" value="{{ item | tojson | forceescape }}"/>
+                                <button type="submit" class="btn btn-primary btn-sm" title="Sync">
+                                    <i class="fa fa-sync"></i>
+                                </button>
+                            </form>
+                            {% endif %}
+                            {# Suspend/Resume action for all objects that support it #}
+                            {% if kind in ['GitRepositories', 'HelmRepositories', 'OCIRepositories', 'Buckets', 'HelmCharts', 'Kustomizations', 'HelmReleases', 'Alerts', 'Receivers'] %}
+                            {% if is_suspended %}
+                            <form action="/plugins/flux/resume" method="post" class="d-inline">
+                                <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+                                <input type="hidden" name="flux_object" value="{{ item | tojson | forceescape }}"/>
+                                <button type="submit" class="btn btn-success btn-sm" title="Resume">
+                                    <i class="fa fa-play"></i>
+                                </button>
+                            </form>
+                            {% else %}
+                            <form action="/plugins/flux/suspend" method="post" class="d-inline">
+                                <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+                                <input type="hidden" name="flux_object" value="{{ item | tojson | forceescape }}"/>
+                                <button type="submit" class="btn btn-warning btn-sm" title="Suspend">
+                                    <i class="fa fa-pause"></i>
+                                </button>
+                            </form>
+                            {% endif %}
+                            {% endif %}
+                        </td>
+                        {% endif %}
+                    </tr>
+                    {% endif %}
+                    {% endfor %}
+                    {% endif %}
+                </tbody>
+            </table>
+        </div>
+    </div>
+</div>

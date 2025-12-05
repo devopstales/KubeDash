@@ -1,0 +1,90 @@
+<div class="card shadow-sm mt-3">
+    <div class="card-header bg-light d-flex justify-content-between align-items-center">
+        <strong>Kubernetes Events</strong>
+        <span class="badge bg-secondary">{{ events | length }} events</span>
+    </div>
+    <div class="card-body">
+        {% if events %}
+        <div class="table-responsive">
+            <table class="table table-sm table-bordered table-hover" id="eventsTable">
+                <thead class="table-light">
+                    <tr>
+                        <th>Last Seen</th>
+                        <th>Type</th>
+                        <th>Reason</th>
+                        <th>Message</th>
+                        <th>Count</th>
+                        <th>Source</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    {% for event in events %}
+                    <tr>
+                        <td class="small text-nowrap">
+                            {{ event.last_timestamp or event.first_timestamp or 'Unknown' }}
+                        </td>
+                        <td>
+                            {% if event.type == 'Normal' %}
+                            <span class="badge bg-success">{{ event.type }}</span>
+                            {% elif event.type == 'Warning' %}
+                            <span class="badge bg-warning text-dark">{{ event.type }}</span>
+                            {% else %}
+                            <span class="badge bg-secondary">{{ event.type }}</span>
+                            {% endif %}
+                        </td>
+                        <td>
+                            <code class="small">{{ event.reason }}</code>
+                        </td>
+                        <td class="small" style="max-width: 400px; word-wrap: break-word;">
+                            {{ event.message }}
+                        </td>
+                        <td class="text-center">
+                            {% if event.count > 1 %}
+                            <span class="badge bg-info">{{ event.count }}</span>
+                            {% else %}
+                            {{ event.count }}
+                            {% endif %}
+                        </td>
+                        <td class="small">
+                            {{ event.source or event.reporting_controller or 'Unknown' }}
+                        </td>
+                    </tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+        </div>
+        {% else %}
+        <div class="alert alert-info mb-0">
+            <i class="material-icons align-middle me-1">info</i>
+            No events found for this object. Events may have been cleaned up or the object was recently created.
+        </div>
+        {% endif %}
+    </div>
+</div>
+
+<!-- Event Types Legend -->
+<div class="card shadow-sm mt-3">
+    <div class="card-header bg-light">
+        <strong>Common Event Reasons</strong>
+    </div>
+    <div class="card-body">
+        <div class="row">
+            <div class="col-md-3">
+                <h6><code>ReconciliationSucceeded</code></h6>
+                <p class="small text-muted">Object was successfully reconciled.</p>
+            </div>
+            <div class="col-md-3">
+                <h6><code>ReconciliationFailed</code></h6>
+                <p class="small text-muted">Object reconciliation failed.</p>
+            </div>
+            <div class="col-md-3">
+                <h6><code>NewArtifact</code></h6>
+                <p class="small text-muted">A new artifact was detected and fetched.</p>
+            </div>
+            <div class="col-md-3">
+                <h6><code>ArtifactFailed</code></h6>
+                <p class="small text-muted">Failed to fetch or process artifact.</p>
+            </div>
+        </div>
+    </div>
+</div>

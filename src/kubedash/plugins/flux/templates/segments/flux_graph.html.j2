@@ -1,0 +1,303 @@
+<div class="card shadow mb-4">
+    <div class="card-header py-3 d-flex justify-content-between align-items-center">
+        <h6 class="m-0 font-weight-bold text-primary">Flux Object Dependencies</h6>
+        <div>
+            <button type="button" class="btn btn-sm btn-secondary" onclick="fitGraph()" title="Fit to view">
+                <i class="fa fa-expand"></i>
+            </button>
+            <button type="button" class="btn btn-sm btn-secondary" onclick="resetLayout()" title="Reset layout">
+                <i class="fa fa-redo"></i>
+            </button>
+        </div>
+    </div>
+    <div class="card-body p-0">
+        <!-- Graph Container with Tooltip -->
+        <div id="flux-graph-wrapper" style="position: relative; height: 500px; width: 100%;">
+            <div id="flux-graph-container" style="height: 100%; width: 100%;"></div>
+            <!-- Node Tooltip (inside graph wrapper) -->
+            <div id="node-tooltip" style="display: none; position: absolute; z-index: 1000; max-width: 350px; pointer-events: none;"></div>
+        </div>
+        
+        <!-- Legend -->
+        <div class="p-3 border-top">
+            <small class="text-muted">
+                <strong>Legend:</strong>
+                <span class="ms-3"><span style="display:inline-block;width:12px;height:12px;background:#6f42c1;border-radius:2px;"></span> GitRepository</span>
+                <span class="ms-2"><span style="display:inline-block;width:12px;height:12px;background:#0d6efd;border-radius:2px;"></span> HelmRepository</span>
+                <span class="ms-2"><span style="display:inline-block;width:12px;height:12px;background:#20c997;border-radius:2px;"></span> OCIRepository</span>
+                <span class="ms-2"><span style="display:inline-block;width:12px;height:12px;background:#198754;border-radius:2px;"></span> Kustomization</span>
+                <span class="ms-2"><span style="display:inline-block;width:12px;height:12px;background:#dc3545;border-radius:2px;"></span> HelmRelease</span>
+                <span class="ms-3">| Hover for info, click for details</span>
+            </small>
+        </div>
+    </div>
+</div>
+
+<!-- Cytoscape.js -->
+<script src="https://unpkg.com/cytoscape@3.28.1/dist/cytoscape.min.js"></script>
+<script src="https://unpkg.com/dagre@0.8.5/dist/dagre.min.js"></script>
+<script src="https://unpkg.com/cytoscape-dagre@2.5.0/cytoscape-dagre.js"></script>
+
+<script>
+var cy = null;
+var graphData = {{ graph_data | safe }};
+var tooltip = null;
+
+// Theme detection
+function isDarkMode() {
+    return document.documentElement.getAttribute('data-coreui-theme') === 'dark';
+}
+
+function getThemeColors() {
+    var dark = isDarkMode();
+    return {
+        background: dark ? '#1e1e1e' : '#f8f9fa',
+        textColor: dark ? '#e4e4e4' : '#212529',
+        textOutline: dark ? '#1e1e1e' : '#fff',
+        edgeColor: dark ? '#6c757d' : '#adb5bd',
+        tooltipBg: dark ? '#2d2d2d' : '#ffffff',
+        tooltipBorder: dark ? '#444' : '#dee2e6',
+        tooltipText: dark ? '#e4e4e4' : '#212529'
+    };
+}
+
+function updateGraphTheme() {
+    var colors = getThemeColors();
+    var wrapper = document.getElementById('flux-graph-wrapper');
+    if (wrapper) {
+        wrapper.style.background = colors.background;
+    }
+    if (cy) {
+        cy.style()
+            .selector('node')
+            .style({
+                'color': colors.textColor,
+                'text-outline-color': colors.textOutline
+            })
+            .selector('edge')
+            .style({
+                'line-color': colors.edgeColor,
+                'target-arrow-color': colors.edgeColor,
+                'color': colors.edgeColor
+            })
+            .update();
+    }
+}
+
+document.addEventListener('DOMContentLoaded', function() {
+    tooltip = document.getElementById('node-tooltip');
+    initializeGraph();
+    
+    // Listen for theme changes
+    var observer = new MutationObserver(function() {
+        updateGraphTheme();
+    });
+    observer.observe(document.documentElement, { attributes: true, attributeFilter: ['data-coreui-theme'] });
+});
+
+function initializeGraph() {
+    var elements = [];
+    var colors = getThemeColors();
+    
+    // Set initial background on wrapper
+    var wrapper = document.getElementById('flux-graph-wrapper');
+    var container = document.getElementById('flux-graph-container');
+    if (wrapper) {
+        wrapper.style.background = colors.background;
+    }
+    
+    if (graphData.nodes) {
+        graphData.nodes.forEach(function(node) {
+            elements.push({ group: 'nodes', data: node.data });
+        });
+    }
+    
+    if (graphData.edges) {
+        graphData.edges.forEach(function(edge) {
+            elements.push({ group: 'edges', data: edge.data });
+        });
+    }
+    
+    cy = cytoscape({
+        container: container,
+        elements: elements,
+        style: [
+            {
+                selector: 'node',
+                style: {
+                    'background-color': 'data(color)',
+                    'label': 'data(label)',
+                    'color': colors.textColor,
+                    'text-outline-color': colors.textOutline,
+                    'text-outline-width': 2,
+                    'font-size': '11px',
+                    'text-valign': 'bottom',
+                    'text-margin-y': 6,
+                    'width': 35,
+                    'height': 35,
+                    'border-width': 2,
+                    'border-color': function(ele) {
+                        var status = ele.data('status');
+                        if (status === 'Ready') return '#198754';
+                        if (status === 'Not Ready') return '#dc3545';
+                        if (status === 'Suspended') return '#6c757d';
+                        return '#ffc107';
+                    }
+                }
+            },
+            {
+                selector: 'node:selected',
+                style: {
+                    'border-width': 4,
+                    'border-color': '#0d6efd'
+                }
+            },
+            {
+                selector: 'edge',
+                style: {
+                    'width': 2,
+                    'line-color': colors.edgeColor,
+                    'target-arrow-color': colors.edgeColor,
+                    'target-arrow-shape': 'triangle',
+                    'curve-style': 'bezier',
+                    'label': 'data(label)',
+                    'font-size': '9px',
+                    'color': colors.edgeColor,
+                    'text-rotation': 'autorotate',
+                    'text-margin-y': -8
+                }
+            },
+            {
+                selector: 'edge[lineStyle = "dashed"]',
+                style: {
+                    'line-style': 'dashed'
+                }
+            }
+        ],
+        layout: {
+            name: 'dagre',
+            rankDir: 'LR',
+            nodeSep: 60,
+            rankSep: 100,
+            padding: 20
+        },
+        minZoom: 0.3,
+        maxZoom: 2,
+        wheelSensitivity: 0.3
+    });
+    
+    cy.on('tap', 'node', function(evt) {
+        var node = evt.target;
+        var kind = node.data('kind');
+        var namespace = node.data('namespace');
+        var label = node.data('label');
+        window.location.href = '/plugins/flux/detail/' + kind + '/' + namespace + '/' + label;
+    });
+    
+    cy.on('mouseover', 'node', function(evt) {
+        document.body.style.cursor = 'pointer';
+        showTooltip(evt);
+    });
+    
+    cy.on('mouseout', 'node', function() {
+        document.body.style.cursor = 'default';
+        hideTooltip();
+    });
+    
+    cy.on('mousemove', 'node', function(evt) {
+        moveTooltip(evt);
+    });
+    
+    cy.fit(30);
+}
+
+function showTooltip(evt) {
+    var node = evt.target;
+    var data = node.data();
+    var colors = getThemeColors();
+    
+    // Build tooltip content
+    var statusBadge = '';
+    if (data.status === 'Ready') {
+        statusBadge = '<span style="background:#198754;color:#fff;padding:2px 8px;border-radius:4px;font-size:11px;">Ready</span>';
+    } else if (data.status === 'Suspended') {
+        statusBadge = '<span style="background:#6c757d;color:#fff;padding:2px 8px;border-radius:4px;font-size:11px;">Suspended</span>';
+    } else {
+        statusBadge = '<span style="background:#dc3545;color:#fff;padding:2px 8px;border-radius:4px;font-size:11px;">Not Ready</span>';
+    }
+    
+    var html = '<div style="background:' + colors.tooltipBg + ';border:1px solid ' + colors.tooltipBorder + ';border-radius:6px;padding:12px;box-shadow:0 4px 12px rgba(0,0,0,0.15);color:' + colors.tooltipText + ';">';
+    html += '<div style="font-weight:bold;font-size:14px;margin-bottom:8px;border-bottom:1px solid ' + colors.tooltipBorder + ';padding-bottom:8px;">' + data.label + '</div>';
+    html += '<table style="font-size:12px;width:100%;">';
+    html += '<tr><td style="padding:2px 8px 2px 0;color:#6c757d;">Kind:</td><td style="padding:2px 0;">' + (data.kind || '-') + '</td></tr>';
+    html += '<tr><td style="padding:2px 8px 2px 0;color:#6c757d;">Namespace:</td><td style="padding:2px 0;">' + (data.namespace || '-') + '</td></tr>';
+    html += '<tr><td style="padding:2px 8px 2px 0;color:#6c757d;">Status:</td><td style="padding:2px 0;">' + statusBadge + '</td></tr>';
+    if (data.message) {
+        var msg = data.message.length > 100 ? data.message.substring(0, 100) + '...' : data.message;
+        html += '<tr><td style="padding:2px 8px 2px 0;color:#6c757d;vertical-align:top;">Message:</td><td style="padding:2px 0;word-break:break-word;">' + msg + '</td></tr>';
+    }
+    if (data.revision) {
+        var rev = data.revision.length > 40 ? data.revision.substring(0, 40) + '...' : data.revision;
+        html += '<tr><td style="padding:2px 8px 2px 0;color:#6c757d;">Revision:</td><td style="padding:2px 0;font-family:monospace;font-size:11px;">' + rev + '</td></tr>';
+    }
+    html += '</table>';
+    html += '<div style="font-size:10px;color:#6c757d;margin-top:8px;text-align:center;">Click to view details</div>';
+    html += '</div>';
+    
+    tooltip.innerHTML = html;
+    tooltip.style.display = 'block';
+    moveTooltip(evt);
+}
+
+function moveTooltip(evt) {
+    var wrapper = document.getElementById('flux-graph-wrapper');
+    var wrapperRect = wrapper.getBoundingClientRect();
+    var renderedPos = evt.target.renderedPosition();
+    
+    // Position relative to the wrapper container
+    var x = renderedPos.x + 20;
+    var y = renderedPos.y - 10;
+    
+    // Get tooltip dimensions after content is set
+    var tooltipRect = tooltip.getBoundingClientRect();
+    var tooltipWidth = tooltipRect.width || 300;
+    var tooltipHeight = tooltipRect.height || 150;
+    
+    // Keep tooltip within the graph wrapper bounds
+    if (x + tooltipWidth > wrapperRect.width - 10) {
+        x = renderedPos.x - tooltipWidth - 20;
+    }
+    if (x < 10) x = 10;
+    
+    if (y + tooltipHeight > wrapperRect.height - 10) {
+        y = wrapperRect.height - tooltipHeight - 10;
+    }
+    if (y < 10) y = 10;
+    
+    tooltip.style.left = x + 'px';
+    tooltip.style.top = y + 'px';
+}
+
+function hideTooltip() {
+    if (tooltip) {
+        tooltip.style.display = 'none';
+    }
+}
+
+function fitGraph() {
+    if (cy) cy.fit(30);
+}
+
+function resetLayout() {
+    if (cy) {
+        cy.layout({
+            name: 'dagre',
+            rankDir: 'LR',
+            nodeSep: 60,
+            rankSep: 100,
+            padding: 20
+        }).run();
+        cy.fit(30);
+    }
+}
+</script>

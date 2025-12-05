@@ -47,7 +47,7 @@ def SuspendAction(obj, username_role, user_token):
     name = metadata.get("name")
     spec = obj.get("spec")
  
-    # Accepted kinds and their apiVersions
+    # Accepted kinds and their apiVersions (all objects that support spec.suspend)
     VALID_OBJECTS = {
         "Kustomization": {
             "api_version": "kustomize.toolkit.fluxcd.io/v1",
@@ -60,6 +60,48 @@ def SuspendAction(obj, username_role, user_token):
             "group": "helm.toolkit.fluxcd.io",
             "version": "v2",
             "plural": "helmreleases"
+        },
+        "GitRepository": {
+            "api_version": "source.toolkit.fluxcd.io/v1",
+            "group": "source.toolkit.fluxcd.io",
+            "version": "v1",
+            "plural": "gitrepositories"
+        },
+        "HelmRepository": {
+            "api_version": "source.toolkit.fluxcd.io/v1",
+            "group": "source.toolkit.fluxcd.io",
+            "version": "v1",
+            "plural": "helmrepositories"
+        },
+        "OCIRepository": {
+            "api_version": "source.toolkit.fluxcd.io/v1beta2",
+            "group": "source.toolkit.fluxcd.io",
+            "version": "v1beta2",
+            "plural": "ocirepositories"
+        },
+        "Bucket": {
+            "api_version": "source.toolkit.fluxcd.io/v1",
+            "group": "source.toolkit.fluxcd.io",
+            "version": "v1",
+            "plural": "buckets"
+        },
+        "HelmChart": {
+            "api_version": "source.toolkit.fluxcd.io/v1",
+            "group": "source.toolkit.fluxcd.io",
+            "version": "v1",
+            "plural": "helmcharts"
+        },
+        "Alert": {
+            "api_version": "notification.toolkit.fluxcd.io/v1beta3",
+            "group": "notification.toolkit.fluxcd.io",
+            "version": "v1beta3",
+            "plural": "alerts"
+        },
+        "Receiver": {
+            "api_version": "notification.toolkit.fluxcd.io/v1",
+            "group": "notification.toolkit.fluxcd.io",
+            "version": "v1",
+            "plural": "receivers"
         }
     }
 
@@ -121,6 +163,7 @@ def ResumeAction(obj, username_role, user_token):
     name = metadata.get("name")
     spec = obj.get("spec")
 
+    # All objects that support spec.suspend
     VALID_OBJECTS = {
         "Kustomization": {
             "api_version": "kustomize.toolkit.fluxcd.io/v1",
@@ -133,6 +176,48 @@ def ResumeAction(obj, username_role, user_token):
             "group": "helm.toolkit.fluxcd.io",
             "version": "v2",
             "plural": "helmreleases"
+        },
+        "GitRepository": {
+            "api_version": "source.toolkit.fluxcd.io/v1",
+            "group": "source.toolkit.fluxcd.io",
+            "version": "v1",
+            "plural": "gitrepositories"
+        },
+        "HelmRepository": {
+            "api_version": "source.toolkit.fluxcd.io/v1",
+            "group": "source.toolkit.fluxcd.io",
+            "version": "v1",
+            "plural": "helmrepositories"
+        },
+        "OCIRepository": {
+            "api_version": "source.toolkit.fluxcd.io/v1beta2",
+            "group": "source.toolkit.fluxcd.io",
+            "version": "v1beta2",
+            "plural": "ocirepositories"
+        },
+        "Bucket": {
+            "api_version": "source.toolkit.fluxcd.io/v1",
+            "group": "source.toolkit.fluxcd.io",
+            "version": "v1",
+            "plural": "buckets"
+        },
+        "HelmChart": {
+            "api_version": "source.toolkit.fluxcd.io/v1",
+            "group": "source.toolkit.fluxcd.io",
+            "version": "v1",
+            "plural": "helmcharts"
+        },
+        "Alert": {
+            "api_version": "notification.toolkit.fluxcd.io/v1beta3",
+            "group": "notification.toolkit.fluxcd.io",
+            "version": "v1beta3",
+            "plural": "alerts"
+        },
+        "Receiver": {
+            "api_version": "notification.toolkit.fluxcd.io/v1",
+            "group": "notification.toolkit.fluxcd.io",
+            "version": "v1",
+            "plural": "receivers"
         }
     }
     
@@ -193,6 +278,7 @@ def SyncAction(obj, username_role, user_token):
     namespace = metadata.get("namespace")
     name = metadata.get("name")
     
+    # All reconcilable Flux objects
     VALID_OBJECTS = {
         "Bucket": {
             "api_version": "source.toolkit.fluxcd.io/v1",
@@ -217,6 +303,24 @@ def SyncAction(obj, username_role, user_token):
             "group": "source.toolkit.fluxcd.io",
             "version": "v1",
             "plural": "helmrepositories"
+        },
+        "HelmChart": {
+            "api_version": "source.toolkit.fluxcd.io/v1",
+            "group": "source.toolkit.fluxcd.io",
+            "version": "v1",
+            "plural": "helmcharts"
+        },
+        "Kustomization": {
+            "api_version": "kustomize.toolkit.fluxcd.io/v1",
+            "group": "kustomize.toolkit.fluxcd.io",
+            "version": "v1",
+            "plural": "kustomizations"
+        },
+        "HelmRelease": {
+            "api_version": "helm.toolkit.fluxcd.io/v2",
+            "group": "helm.toolkit.fluxcd.io",
+            "version": "v2",
+            "plural": "helmreleases"
         }
     }
 

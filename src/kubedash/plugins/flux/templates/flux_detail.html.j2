@@ -1,0 +1,380 @@
+{% extends "base2.html.j2" %}
+
+{% block topmenu %}
+<ul class="header-nav d-lg-flex m-3">
+    <div class="container-fluid px-4">
+        <nav aria-label="breadcrumb">
+            <ol class="breadcrumb my-0">
+                <li class="breadcrumb-item"><span>Plugins</span></li>
+                <li class="breadcrumb-item"><a href="/plugins/flux">Flux CD</a></li>
+                <li class="breadcrumb-item"><span>{{ kind }}</span></li>
+                <li class="breadcrumb-item active"><span>{{ name }}</span></li>
+            </ol>
+        </nav>
+    </div>
+</ul>
+<ul class="header-nav ms-auto"></ul>
+<ul class="header-nav d-lg-flex">
+{% include "segments/topmenu.html.j2" %}
+{% endblock %}
+
+{% block content %}
+<div class="card shadow mb-4">
+    <div class="card-header py-3 d-flex justify-content-between align-items-center">
+        <h6 class="m-0 font-weight-bold text-primary">{{ kind }}: {{ name }}</h6>
+        <div>
+            {% if ready_status.ready %}
+            <span class="badge text-bg-tag text-bg-success">Ready</span>
+            {% elif flux_object.spec.suspend %}
+            <span class="badge text-bg-tag text-bg-secondary">Suspended</span>
+            {% else %}
+            <span class="badge text-bg-tag text-bg-danger">Not Ready</span>
+            {% endif %}
+            
+            {% if session['user_role'] == "Admin" %}
+            {% if kind in ['GitRepository', 'HelmRepository', 'OCIRepository', 'Bucket', 'HelmChart'] %}
+            <form action="/plugins/flux/sync" method="post" class="d-inline ms-2">
+                <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+                <input type="hidden" name="flux_object" value="{{ flux_object | tojson | forceescape }}"/>
+                <input type="hidden" name="return_to_detail" value="true"/>
+                <button type="submit" class="btn btn-primary btn-sm" title="Sync">
+                    <i class="fa fa-sync"></i> Sync
+                </button>
+            </form>
+            {% endif %}
+            {% if flux_object.spec.suspend %}
+            <form action="/plugins/flux/resume" method="post" class="d-inline ms-1">
+                <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+                <input type="hidden" name="flux_object" value="{{ flux_object | tojson | forceescape }}"/>
+                <input type="hidden" name="return_to_detail" value="true"/>
+                <button type="submit" class="btn btn-info btn-sm" title="Resume">
+                    <i class="fa fa-play"></i> Resume
+                </button>
+            </form>
+            {% else %}
+            <form action="/plugins/flux/suspend" method="post" class="d-inline ms-1">
+                <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+                <input type="hidden" name="flux_object" value="{{ flux_object | tojson | forceescape }}"/>
+                <input type="hidden" name="return_to_detail" value="true"/>
+                <button type="submit" class="btn btn-warning btn-sm" title="Suspend">
+                    <i class="fa fa-pause"></i> Suspend
+                </button>
+            </form>
+            {% endif %}
+            {% endif %}
+        </div>
+    </div>
+    <div class="card-body">
+        <ul class="nav nav-tabs" id="nav-tab" role="tablist">
+            <li class="nav-item">
+                <a class="nav-link active" id="nav-overview-tab" href="#nav-overview" role="tab" aria-controls="nav-overview" aria-selected="true" data-bs-toggle="tab">Overview</a>
+            </li>
+            <li class="nav-item">
+                <a class="nav-link" id="nav-conditions-tab" href="#nav-conditions" role="tab" aria-controls="nav-conditions" aria-selected="false" data-bs-toggle="tab">Conditions</a>
+            </li>
+            <li class="nav-item">
+                <a class="nav-link" id="nav-events-tab" href="#nav-events" role="tab" aria-controls="nav-events" aria-selected="false" data-bs-toggle="tab">Events ({{ events | length }})</a>
+            </li>
+            <li class="nav-item">
+                <a class="nav-link" id="nav-spec-tab" href="#nav-spec" role="tab" aria-controls="nav-spec" aria-selected="false" data-bs-toggle="tab">Spec</a>
+            </li>
+            <li class="nav-item">
+                <a class="nav-link" id="nav-status-tab" href="#nav-status" role="tab" aria-controls="nav-status" aria-selected="false" data-bs-toggle="tab">Status</a>
+            </li>
+        </ul>
+        
+        <div class="tab-content" id="nav-tabContent">
+            <!-- OVERVIEW TAB -->
+            <div class="tab-pane fade show active" id="nav-overview" role="tabpanel" aria-labelledby="nav-overview-tab">
+                <div class="row mt-3">
+                    <div class="col-md-6">
+                        <div class="card shadow mb-4">
+                            <div class="card-header py-3">
+                                <h6 class="m-0 font-weight-bold text-primary">Metadata</h6>
+                            </div>
+                            <div class="card-body">
+                                <table class="table table-bordered" width="100%" cellspacing="0">
+                                    <tr>
+                                        <th style="width: 30%;">Name</th>
+                                        <td>{{ flux_object.metadata.name }}</td>
+                                    </tr>
+                                    <tr>
+                                        <th>Namespace</th>
+                                        <td>{{ flux_object.metadata.namespace }}</td>
+                                    </tr>
+                                    <tr>
+                                        <th>Kind</th>
+                                        <td>{{ kind }}</td>
+                                    </tr>
+                                    <tr>
+                                        <th>API Version</th>
+                                        <td>{{ flux_object.apiVersion }}</td>
+                                    </tr>
+                                    <tr>
+                                        <th>Created</th>
+                                        <td>{{ flux_object.metadata.creationTimestamp }}</td>
+                                    </tr>
+                                    <tr>
+                                        <th>UID</th>
+                                        <td><code>{{ flux_object.metadata.uid }}</code></td>
+                                    </tr>
+                                    {% if last_revision %}
+                                    <tr>
+                                        <th>Last Revision</th>
+                                        <td><code title="{{ last_revision }}">{{ last_revision[:60] }}{% if last_revision|length > 60 %}...{% endif %}</code></td>
+                                    </tr>
+                                    {% endif %}
+                                </table>
+                            </div>
+                        </div>
+                    </div>
+                    
+                    <div class="col-md-6">
+                        <div class="card shadow mb-4">
+                            <div class="card-header py-3">
+                                <h6 class="m-0 font-weight-bold text-primary">Status</h6>
+                            </div>
+                            <div class="card-body">
+                                <table class="table table-bordered" width="100%" cellspacing="0">
+                                    <tr>
+                                        <th style="width: 30%;">Ready</th>
+                                        <td>
+                                            {% if ready_status.ready %}
+                                            <span class="badge text-bg-tag text-bg-success">Yes</span>
+                                            {% elif flux_object.spec.suspend %}
+                                            <span class="badge text-bg-tag text-bg-secondary">Suspended</span>
+                                            {% else %}
+                                            <span class="badge text-bg-tag text-bg-danger">No</span>
+                                            {% endif %}
+                                        </td>
+                                    </tr>
+                                    <tr>
+                                        <th>Reason</th>
+                                        <td>{{ ready_status.reason }}</td>
+                                    </tr>
+                                    <tr>
+                                        <th>Message</th>
+                                        <td>{{ ready_status.message }}</td>
+                                    </tr>
+                                </table>
+                            </div>
+                        </div>
+                        
+                        {% if source_ref %}
+                        <div class="card shadow mb-4">
+                            <div class="card-header py-3">
+                                <h6 class="m-0 font-weight-bold text-primary">Source Reference</h6>
+                            </div>
+                            <div class="card-body">
+                                <table class="table table-bordered" width="100%" cellspacing="0">
+                                    <tr>
+                                        <th style="width: 30%;">Kind</th>
+                                        <td>{{ source_ref.kind }}</td>
+                                    </tr>
+                                    <tr>
+                                        <th>Name</th>
+                                        <td>
+                                            <a href="/plugins/flux/detail/{{ source_ref.kind }}/{{ source_ref.namespace }}/{{ source_ref.name }}">
+                                                {{ source_ref.name }}
+                                            </a>
+                                        </td>
+                                    </tr>
+                                    <tr>
+                                        <th>Namespace</th>
+                                        <td>{{ source_ref.namespace }}</td>
+                                    </tr>
+                                </table>
+                            </div>
+                        </div>
+                        {% endif %}
+                    </div>
+                </div>
+                
+                <!-- Labels -->
+                {% if flux_object.metadata.labels %}
+                <div class="card shadow mb-4">
+                    <div class="card-header py-3">
+                        <h6 class="m-0 font-weight-bold text-primary">Labels</h6>
+                    </div>
+                    <div class="card-body">
+                        <table class="table table-bordered" width="100%" cellspacing="0">
+                            <thead>
+                                <tr>
+                                    <th width="50%">Key</th>
+                                    <th width="50%">Value</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                            {% for key, value in flux_object.metadata.labels.items() %}
+                                <tr>
+                                    <td>{{ key }}</td>
+                                    <td>{{ value }}</td>
+                                </tr>
+                            {% endfor %}
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+                {% endif %}
+                
+                <!-- Annotations -->
+                {% if flux_object.metadata.annotations %}
+                <div class="card shadow mb-4">
+                    <div class="card-header py-3">
+                        <h6 class="m-0 font-weight-bold text-primary">Annotations</h6>
+                    </div>
+                    <div class="card-body">
+                        <table class="table table-bordered" width="100%" cellspacing="0">
+                            <thead>
+                                <tr>
+                                    <th width="50%">Key</th>
+                                    <th width="50%">Value</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                            {% for key, value in flux_object.metadata.annotations.items() %}
+                                <tr>
+                                    <td style="word-break: break-all;">{{ key }}</td>
+                                    <td style="word-break: break-all;">{{ value }}</td>
+                                </tr>
+                            {% endfor %}
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+                {% endif %}
+            </div>
+            
+            <!-- CONDITIONS TAB -->
+            <div class="tab-pane fade" id="nav-conditions" role="tabpanel" aria-labelledby="nav-conditions-tab">
+                <div class="card shadow mb-4 mt-3">
+                    <div class="card-header py-3">
+                        <h6 class="m-0 font-weight-bold text-primary">Conditions</h6>
+                    </div>
+                    <div class="card-body">
+                        <div class="table-responsive">
+                            <table class="table table-bordered" id="conditionsTable" width="100%" cellspacing="0">
+                                <thead>
+                                    <tr>
+                                        <th>Type</th>
+                                        <th>Status</th>
+                                        <th>Reason</th>
+                                        <th>Message</th>
+                                        <th>Last Transition</th>
+                                    </tr>
+                                </thead>
+                                <tbody>
+                                    {% for cond in conditions %}
+                                    <tr>
+                                        <td>
+                                            {% if cond.type == 'Ready' and cond.status == 'True' %}
+                                            <span class="badge text-bg-tag text-bg-success">{{ cond.type }}</span>
+                                            {% elif cond.type == 'Ready' %}
+                                            <span class="badge text-bg-tag text-bg-danger">{{ cond.type }}</span>
+                                            {% else %}
+                                            <span class="badge text-bg-tag text-bg-secondary">{{ cond.type }}</span>
+                                            {% endif %}
+                                        </td>
+                                        <td>{{ cond.status }}</td>
+                                        <td><code>{{ cond.reason }}</code></td>
+                                        <td>{{ cond.message }}</td>
+                                        <td>{{ cond.last_transition_time }}</td>
+                                    </tr>
+                                    {% endfor %}
+                                </tbody>
+                            </table>
+                        </div>
+                    </div>
+                </div>
+            </div>
+            
+            <!-- EVENTS TAB -->
+            <div class="tab-pane fade" id="nav-events" role="tabpanel" aria-labelledby="nav-events-tab">
+                <div class="card shadow mb-4 mt-3">
+                    <div class="card-header py-3">
+                        <h6 class="m-0 font-weight-bold text-primary">Kubernetes Events</h6>
+                    </div>
+                    <div class="card-body">
+                        <div class="table-responsive">
+                            <table class="table table-bordered" id="eventsTable" width="100%" cellspacing="0">
+                                <thead>
+                                    <tr>
+                                        <th>Last Seen</th>
+                                        <th>Type</th>
+                                        <th>Reason</th>
+                                        <th>Message</th>
+                                        <th>Count</th>
+                                    </tr>
+                                </thead>
+                                <tbody>
+                                    {% for event in events %}
+                                    <tr>
+                                        <td>{{ event.last_timestamp or event.first_timestamp or 'Unknown' }}</td>
+                                        <td>
+                                            {% if event.type == 'Normal' %}
+                                            <span class="badge text-bg-tag text-bg-success">{{ event.type }}</span>
+                                            {% elif event.type == 'Warning' %}
+                                            <span class="badge text-bg-tag text-bg-warning">{{ event.type }}</span>
+                                            {% else %}
+                                            <span class="badge text-bg-tag text-bg-secondary">{{ event.type }}</span>
+                                            {% endif %}
+                                        </td>
+                                        <td><code>{{ event.reason }}</code></td>
+                                        <td>{{ event.message }}</td>
+                                        <td>{{ event.count }}</td>
+                                    </tr>
+                                    {% endfor %}
+                                </tbody>
+                            </table>
+                        </div>
+                    </div>
+                </div>
+            </div>
+            
+            <!-- SPEC TAB -->
+            <div class="tab-pane fade" id="nav-spec" role="tabpanel" aria-labelledby="nav-spec-tab">
+                <div class="card shadow mb-4 mt-3">
+                    <div class="card-header py-3">
+                        <h6 class="m-0 font-weight-bold text-primary">Spec</h6>
+                    </div>
+                    <div class="card-body">
+                        <pre><code class="language-json">{% autoescape false %}{{ flux_object.spec | tojson(indent=2) | replace("<", "&lt;") | replace(">", "&gt;") }}{% endautoescape %}</code></pre>
+                    </div>
+                </div>
+            </div>
+            
+            <!-- STATUS TAB -->
+            <div class="tab-pane fade" id="nav-status" role="tabpanel" aria-labelledby="nav-status-tab">
+                <div class="card shadow mb-4 mt-3">
+                    <div class="card-header py-3">
+                        <h6 class="m-0 font-weight-bold text-primary">Status</h6>
+                    </div>
+                    <div class="card-body">
+                        <pre><code class="language-json">{% autoescape false %}{{ (flux_object.status | tojson(indent=2) if flux_object.status else '{}') | replace("<", "&lt;") | replace(">", "&gt;") }}{% endautoescape %}</code></pre>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}
+
+{% block add_head_css %}
+{% include "segments/datatable_snippet.html.j2" %}
+{% include "segments/highlight_snippet.html.j2" %}
+{% endblock %}
+
+{% block add_tail_js %}
+<script>
+$(document).ready(function() {
+    $('#eventsTable').DataTable({
+        order: [[0, 'desc']]
+    });
+    $('#conditionsTable').DataTable({
+        paging: false,
+        searching: false,
+        info: false
+    });
+});
+</script>
+{% endblock %}
