@@ -89,8 +89,8 @@ def workloads():
         edges = []
 
     if tracer and span.is_recording():
-        span.set_attribute("workloads.nodes", nodes)
-        span.set_attribute("workloads.edges", edges)
+        span.set_attribute("workloads.nodes_count", len(nodes))
+        span.set_attribute("workloads.edges_count", len(edges))
 
     return render_template(
         'dashboards/workload-map.html.j2',

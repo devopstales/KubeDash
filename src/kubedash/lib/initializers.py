@@ -157,40 +157,66 @@ def initialize_app_configuration(app: Flask, external_config_name: str) -> bool:
     app.logger.info(separator_short)
     app.logger.info("Initializing app configuration")
     
+    import configparser
+    from lib.config import app_config
+
+    config_ini = configparser.ConfigParser()
 
     if os.path.isfile("kubedash.ini"):
         app.logger.info("Reading Config file")
-        import configparser
-
-        from lib.config import app_config
-
-        config_ini = configparser.ConfigParser()
-        config_ini.sections()
         config_ini.read('kubedash.ini')
-        app.config['kubedash.ini'] = config_ini
-
-        if external_config_name is not None:
-            config_name = external_config_name
-        else:
-            if 'FLASK_ENV' in os.environ:
-                config_name = os.environ['FLASK_ENV']
-            else:
-                config_name = config_ini.get('DEFAULT', 'app_mode', fallback='development')
-        
-        app.config.from_object(app_config[config_name])
-        app.config['ENV'] = config_name
-                      
-        app.logger.info("Integrations:")
-        app.logger.info("	Redis:	%s" % bool_var_test(app.config['kubedash.ini'].get('remote_cache', 'redis_enabled')))
-        app.logger.info("	Jaeger:	%s" % bool_var_test(app.config['kubedash.ini'].get('monitoring', 'jaeger_enabled')))
-
-        app.logger.info(separator_short)
-
-        
-        return False
     else:
-        app.logger.error("Missing Local Configfile")
-        return True
+        app.logger.warning("Config file kubedash.ini not found, using defaults")
+        # Set default configuration
+        config_ini['DEFAULT'] = {'app_mode': 'development'}
+        config_ini['security'] = {'admin_password': 'admin'}
+        config_ini['database'] = {
+            'type': 'sqlite3',
+            'host': '127.0.0.1:5432',
+            'name': 'kubedash'
+        }
+        config_ini['remote_cache'] = {
+            'redis_enabled': 'false',
+            'redis_host': '127.0.0.1',
+            'redis_port': '6379',
+            'redis_db': '0',
+            'redis_password': '',
+            'cluster_enabled': 'false',
+            'cluster_startup_nodes': '',
+            'short_cache_time': '60',
+            'long_cache_time': '900'
+        }
+        config_ini['monitoring'] = {
+            'jaeger_enabled': 'false',
+            'jaeger_http_endpoint': 'http://127.0.0.1:4318'
+        }
+        config_ini['plugin_settings'] = {
+            'registry': 'false',
+            'helm': 'true',
+            'gateway_api': 'false',
+            'cert_manager': 'false'
+        }
+
+    app.config['kubedash.ini'] = config_ini
+
+    if external_config_name is not None:
+        config_name = external_config_name
+    else:
+        if 'FLASK_ENV' in os.environ:
+            config_name = os.environ['FLASK_ENV']
+        else:
+            config_name = config_ini.get('DEFAULT', 'app_mode', fallback='development')
+    
+    app.config.from_object(app_config[config_name])
+    app.config['ENV'] = config_name
+                  
+    app.logger.info("Integrations:")
+    app.logger.info("	Redis:	%s" % bool_var_test(app.config['kubedash.ini'].get('remote_cache', 'redis_enabled')))
+    app.logger.info("	Jaeger:	%s" % bool_var_test(app.config['kubedash.ini'].get('monitoring', 'jaeger_enabled')))
+
+    app.logger.info(separator_short)
+
+    return False
     
 
 def initialize_app_version(app: Flask):
@@ -224,7 +250,7 @@ def initialize_app_version(app: Flask):
     register_metrics(app, app_version=kubedash_version, app_config=app.config['ENV'])
 
 
-    LOGO = f"""
+    LOGO = rf"""
 {BLUE}     /$$   /$$           /$$                 /$$$$$$$                      /$$      
     | $$  /$$/          | $$                | $$__  $$                    | $$      
     | $$ /$$/  /$$   /$$| $$$$$$$   /$$$$$$ | $$  \ $$  /$$$$$$   /$$$$$$$| $$$$$$$ 
@@ -338,6 +364,7 @@ def initialize_blueprints(app: Flask):
     from blueprint.cluster import cluster_bp
     from blueprint.cluster_permission import cluster_permission_bp
     from blueprint.dashboard import dashboard_bp
+    from blueprint.extension_api import extension_api_bp
     from blueprint.metrics import metrics_bp
     from blueprint.network import network_bp
     from blueprint.other_resources import other_resources_bp
@@ -367,7 +394,11 @@ def initialize_blueprints(app: Flask):
     app.register_blueprint(storage_bp)
     app.register_blueprint(security_bp)
     app.register_blueprint(other_resources_bp)
-    app.register_blueprint(settings_bp)    
+    app.register_blueprint(settings_bp)
+    
+    # Kubernetes Extension API Server blueprint
+    app.logger.info("Initialize Extension API blueprint")
+    api_doc.register_blueprint(extension_api_bp)    
 
 def initialize_commands(app: Flask):
     """Initialize commands"""
