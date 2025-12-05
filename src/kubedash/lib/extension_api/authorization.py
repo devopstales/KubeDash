@@ -185,13 +185,18 @@ def can_user_list_all_namespaces(user: AuthenticatedUser) -> bool:
             api = k8s_client.AuthorizationV1Api()
             result = api.create_subject_access_review(sar, _request_timeout=5)
             
+            logger.debug(
+                f"SubjectAccessReview for {user.username} (groups={user.groups}): "
+                f"list namespaces = {result.status.allowed}"
+            )
+            
             if tracer and span and span.is_recording():
                 span.set_attribute("authz.cluster_admin", result.status.allowed)
             
             return result.status.allowed
             
         except Exception as e:
-            logger.error(f"Cluster namespace access check error: {e}")
+            logger.error(f"Cluster namespace access check error for {user.username}: {e}")
             if tracer and span and span.is_recording():
                 span.set_status(Status(StatusCode.ERROR, str(e)))
             return False

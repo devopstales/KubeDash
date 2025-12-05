@@ -8,6 +8,7 @@ from flask_wtf.csrf import CSRFProtect
 from flask_caching import Cache
 
 from lib.helper_functions import get_logger
+from lib.paths import KUBEDASH_ROOT, PROJECT_ROOT  # Re-export for backwards compatibility
 
 ##############################################################
 ## Helpers

@@ -62,3 +62,60 @@ print()
 print('... showing 25 of ' + str(len(data.get('items', []))) + ' projects')
 "
 ```
+
+```yaml
+---
+# Service without selector - requires manual Endpoints
+apiVersion: v1
+kind: Service
+metadata:
+  name: kubedash-extension-api
+  namespace: kubedash
+  labels:
+    app: kubedash
+spec:
+  ports:
+    - name: https
+      port: 443
+      targetPort: 8000
+      protocol: TCP
+  # No selector - traffic routed via Endpoints below
+---
+# Endpoints pointing to external IP
+apiVersion: v1
+kind: Endpoints
+metadata:
+  name: kubedash-api  # Must match Service name
+  namespace: kubedash
+subsets:
+  - addresses:
+      - ip: 192.168.0.51 # node IP
+    ports:
+      - name: https
+        port: 8000
+        protocol: TCP
+
+---
+apiVersion: apiregistration.k8s.io/v1
+kind: APIService
+metadata:
+  name: v1.kubedash.devopstales.github.io
+spec:
+  group: kubedash.devopstales.github.io
+  version: v1
+  service:
+    name: kubedash-extension-api
+    namespace: kubedash
+    port: 443
+  # Option 1: Provide CA bundle (recommended)
+  # caBundle: <base64-encoded-ca-cert>
+  # Option 2: Skip TLS verification (dev only, still requires HTTPS!)
+  insecureSkipTLSVerify: true
+  groupPriorityMinimum: 1000
+  versionPriority: 100
+```
+
+```
+kubectl get APIService
+kubectl api-resources
+```

@@ -5,10 +5,15 @@ import time
 from statsd import StatsClient
 
 from gunicorn.glogging import Logger as GunicornBaseLogger
+from lib.cert_utils import generate_self_signed_cert
 
+cert_path, key_path, ca_cert_path = generate_self_signed_cert()
 # ========================
 # 1. Server Configuration
 # ========================
+keyfile = key_path
+certfile = cert_path
+ca_certs = ca_cert_path
 bind = "0.0.0.0:8000"
 workers = 1
 threads = 4
@@ -109,12 +114,24 @@ class NoSocketIo(logging.Filter):
         """Filter requests for /socket.io endpoint"""
         return record.getMessage().find('/socket.io') == -1
 
+class ExtensionAPIFilter(logging.Filter):
+    """Filter /openapi and /apis paths - only log if not 200"""
+    def filter(self, record):
+        msg = record.getMessage()
+        # Check if this is an /openapi or /apis request
+        if '/openapi' in msg or '"/apis' in msg or ' /apis' in msg:
+            # Only log if status is not 200 (look for " 200 " in the log message)
+            return ' 200 ' not in msg
+        # Allow all other requests
+        return True
+
 def on_starting(server):
     """Executed when Gunicorn starts."""
     server.log.access_log.addFilter(NoPing())
     server.log.access_log.addFilter(NoHealth())
     server.log.access_log.addFilter(NoMetrics())
     server.log.access_log.addFilter(NoSocketIo())
+    server.log.access_log.addFilter(ExtensionAPIFilter())
     
     # Initialize StatsD client
     server.statsd = StatsClient(

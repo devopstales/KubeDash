@@ -155,21 +155,28 @@ def list_projects(
         }
     ) if tracer else nullcontext() as span:
         
+        # Log user info for debugging
+        logger.debug(f"Listing projects for user: {user.username}, groups: {user.groups}")
+        
         # Get all namespaces first
         namespaces, error = list_all_namespaces()
         if error:
+            logger.error(f"Failed to list namespaces: {error}")
             return build_project_list([]), error
+        
+        logger.debug(f"Found {len(namespaces)} total namespaces")
         
         # Check if user is cluster admin (can list all namespaces)
         is_cluster_admin = can_user_list_all_namespaces(user)
+        logger.debug(f"User {user.username} is_cluster_admin: {is_cluster_admin}")
         
         if is_cluster_admin:
             # User can see all namespaces
-            logger.debug(f"User {user.username} is cluster admin, showing all namespaces")
+            logger.debug(f"User {user.username} is cluster admin, showing all {len(namespaces)} namespaces")
             allowed_namespaces = namespaces
         else:
             # Filter namespaces by permission
-            logger.debug(f"Filtering namespaces for user {user.username}")
+            logger.debug(f"Filtering namespaces for user {user.username} (non-admin)")
             namespace_names = [ns["name"] for ns in namespaces]
             allowed_ns_names = filter_namespaces_by_permission(
                 user,
@@ -178,6 +185,7 @@ def list_projects(
                 resource=ACCESS_CHECK_RESOURCE
             )
             allowed_namespaces = [ns for ns in namespaces if ns["name"] in allowed_ns_names]
+            logger.debug(f"User {user.username} allowed namespaces: {len(allowed_ns_names)}/{len(namespace_names)}")
         
         # Apply label selector filter if provided
         if label_selector:

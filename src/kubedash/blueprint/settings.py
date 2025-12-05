@@ -107,6 +107,12 @@ def callback():
         return redirect(url_for('sso.login'))
     else:
         auth_server_info, oauth = get_auth_server_info()
+        
+        if auth_server_info is None:
+            flash("Cannot connect to identity provider. Please try again later.", "danger")
+            logger.error("Cannot connect to identity provider during callback - auth_server_info is None")
+            return redirect(url_for('login.login'))
+        
         token_url = auth_server_info["token_endpoint"]
         userinfo_url = auth_server_info["userinfo_endpoint"]
 
@@ -257,15 +263,35 @@ def export():
             redirect_uri = ssoServer.base_uri+"/callback"
             auth_server_info, oauth = get_auth_server_info()
 
+            if auth_server_info is None:
+                flash("Cannot connect to identity provider. Please try again later.", "danger")
+                logger.error("Cannot connect to identity provider - auth_server_info is None")
+                return render_template(
+                    'settings/export.html.j2',
+                    preferred_username = session['user_name'],
+                    username_role = session['user_role'],
+                    error = "Cannot connect to identity provider"
+                )
+
             token_url = auth_server_info["token_endpoint"]
-            token = oauth.refresh_token(
-                token_url = token_url,
-                refresh_token = session['refresh_token'],
-                client_id = ssoServer.client_id,
-                client_secret = ssoServer.client_secret,
-                verify=False,
-                timeout=60,
-            )
+            try:
+                token = oauth.refresh_token(
+                    token_url = token_url,
+                    refresh_token = session['refresh_token'],
+                    client_id = ssoServer.client_id,
+                    client_secret = ssoServer.client_secret,
+                    verify=False,
+                    timeout=60,
+                )
+            except Exception as e:
+                flash(f"Failed to refresh token: {str(e)}", "danger")
+                logger.error(f"Failed to refresh token: {e}")
+                return render_template(
+                    'settings/export.html.j2',
+                    preferred_username = session['user_name'],
+                    username_role = session['user_role'],
+                    error = f"Failed to refresh token: {str(e)}"
+                )
 
             userinfo_url = auth_server_info["userinfo_endpoint"]
             user_data = oauth.get(
@@ -316,6 +342,12 @@ def export():
 @sso_bp.route('/kdlogin')
 def index():
     auth_server_info, oauth = get_auth_server_info()
+    
+    if auth_server_info is None:
+        flash("Cannot connect to identity provider. Please try again later.", "danger")
+        logger.error("Cannot connect to identity provider - auth_server_info is None")
+        return redirect(url_for('login.login'))
+    
     auth_url = auth_server_info["authorization_endpoint"]
 
     authorization_url, state = oauth.authorization_url(
@@ -344,17 +376,28 @@ def get_file():
     if user:
         ssoServer = SSOSererGet()
         auth_server_info, oauth = get_auth_server_info()
+        
+        if auth_server_info is None:
+            flash("Cannot connect to identity provider. Please try again later.", "danger")
+            logger.error("Cannot connect to identity provider - auth_server_info is None")
+            return Response("Cannot connect to identity provider", status=503, mimetype='text/plain')
+        
         token_url = auth_server_info["token_endpoint"]
         verify = False
 
-        token = oauth.refresh_token(
-            token_url = token_url,
-            refresh_token = session['refresh_token'],
-            client_id = ssoServer.client_id,
-            client_secret = ssoServer.client_secret,
-            verify = verify,
-            timeout = 60,
-        )
+        try:
+            token = oauth.refresh_token(
+                token_url = token_url,
+                refresh_token = session['refresh_token'],
+                client_id = ssoServer.client_id,
+                client_secret = ssoServer.client_secret,
+                verify = verify,
+                timeout = 60,
+            )
+        except Exception as e:
+            flash(f"Failed to refresh token: {str(e)}", "danger")
+            logger.error(f"Failed to refresh token: {e}")
+            return Response(f"Failed to refresh token: {str(e)}", status=503, mimetype='text/plain')
 
         kube_user = {
                 "auth-provider": {

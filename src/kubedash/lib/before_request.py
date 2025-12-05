@@ -21,6 +21,11 @@ def init_before_request(app: Flask):
         '/assets/', '/api/health', 
         '/socket.io', '/metrics'
     )
+    
+    # Paths to skip page caching (API endpoints don't need base templates)
+    SKIP_PAGE_CACHE_PATH = (
+        '/openapi', '/apis'
+    )
 
     @app.before_request
     def before_request():
@@ -36,17 +41,27 @@ def init_before_request(app: Flask):
         if correlation_id:
             g.correlation_id = correlation_id
         
-        cached_base(app)
-        cached_base2(app)
+        # Skip page cache for API paths (they don't use HTML templates)
+        if not any(path.startswith(p) for p in SKIP_PAGE_CACHE_PATH):
+            cached_base(app)
+            cached_base2(app)
 
     @app.after_request
     def after_request(response):
         path = request.path
         
         if not any(path.startswith(p) for p in SKIP_PATH) and request.endpoint is not None:
-            latency = time.time() - getattr(g, '_start_time', time.time())
-            REQUEST_LATENCY.labels(endpoint=request.endpoint).observe(latency)
-            REQUEST_COUNT.labels(method=request.method, endpoint=request.endpoint).inc()
+            # For /openapi and /apis paths, only log if response is not 200
+            if any(path.startswith(p) for p in SKIP_PAGE_CACHE_PATH):
+                if response.status_code != 200:
+                    latency = time.time() - getattr(g, '_start_time', time.time())
+                    REQUEST_LATENCY.labels(endpoint=request.endpoint).observe(latency)
+                    REQUEST_COUNT.labels(method=request.method, endpoint=request.endpoint).inc()
+                    logger.warning(f"Extension API request failed: {request.method} {path} - {response.status_code}")
+            else:
+                latency = time.time() - getattr(g, '_start_time', time.time())
+                REQUEST_LATENCY.labels(endpoint=request.endpoint).observe(latency)
+                REQUEST_COUNT.labels(method=request.method, endpoint=request.endpoint).inc()
             
         # Ensure correlation ID is in response headers
         if hasattr(g, 'correlation_id'):

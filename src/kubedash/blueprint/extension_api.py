@@ -186,13 +186,135 @@ class APIResourceListResource(MethodView):
                         "singularName": "project",
                         "namespaced": False,
                         "kind": "Project",
-                        "verbs": ["get", "list", "watch", "create", "update", "patch", "delete"],
+                        "verbs": ["get", "list", "create", "update", "patch", "delete"],
                         "shortNames": ["proj"],
                         "categories": ["all"],
                         "storageVersionHash": ""
                     }
                 ]
             })
+
+
+##############################################################
+## Table Format Helper (for kubectl display)
+##############################################################
+
+def _format_age(creation_timestamp: str) -> str:
+    """Format creation timestamp as human-readable age."""
+    if not creation_timestamp:
+        return "<unknown>"
+    
+    from datetime import datetime, timezone
+    try:
+        # Parse ISO format timestamp
+        if creation_timestamp.endswith('Z'):
+            created = datetime.fromisoformat(creation_timestamp.replace('Z', '+00:00'))
+        else:
+            created = datetime.fromisoformat(creation_timestamp)
+        
+        now = datetime.now(timezone.utc)
+        delta = now - created
+        
+        days = delta.days
+        if days > 365:
+            return f"{days // 365}y"
+        elif days > 0:
+            return f"{days}d"
+        
+        hours = delta.seconds // 3600
+        if hours > 0:
+            return f"{hours}h"
+        
+        minutes = delta.seconds // 60
+        if minutes > 0:
+            return f"{minutes}m"
+        
+        return f"{delta.seconds}s"
+    except Exception:
+        return "<unknown>"
+
+
+def _build_table_response(project_list: dict) -> dict:
+    """
+    Convert ProjectList to Table format for kubectl display.
+    
+    This provides nice columnar output with custom columns like PROTECTED, OWNER.
+    """
+    items = project_list.get("items", [])
+    
+    # Define columns
+    column_definitions = [
+        {
+            "name": "Name",
+            "type": "string",
+            "format": "name",
+            "description": "Name of the project",
+            "priority": 0
+        },
+        {
+            "name": "Protected",
+            "type": "string",
+            "description": "Whether the project is protected from deletion",
+            "priority": 0
+        },
+        {
+            "name": "Owner",
+            "type": "string",
+            "description": "Owner of the project",
+            "priority": 0
+        },
+        {
+            "name": "Status",
+            "type": "string",
+            "description": "Current status of the project",
+            "priority": 0
+        },
+        {
+            "name": "Age",
+            "type": "string",
+            "description": "Age of the project",
+            "priority": 0
+        }
+    ]
+    
+    # Build rows
+    rows = []
+    for project in items:
+        metadata = project.get("metadata", {})
+        spec = project.get("spec", {})
+        status = project.get("status", {})
+        
+        # Get values
+        name = metadata.get("name", "")
+        protected = "Yes" if spec.get("protected") else "No"
+        owner = spec.get("owner", "") or "-"
+        phase = status.get("phase", "Unknown")
+        age = _format_age(metadata.get("creationTimestamp", ""))
+        
+        rows.append({
+            "cells": [name, protected, owner, phase, age],
+            "object": {
+                "kind": "PartialObjectMetadata",
+                "apiVersion": "meta.k8s.io/v1",
+                "metadata": metadata
+            }
+        })
+    
+    return {
+        "kind": "Table",
+        "apiVersion": "meta.k8s.io/v1",
+        "metadata": {
+            "resourceVersion": project_list.get("metadata", {}).get("resourceVersion", "")
+        },
+        "columnDefinitions": column_definitions,
+        "rows": rows
+    }
+
+
+def _wants_table_format(req) -> bool:
+    """Check if client wants Table format (kubectl default)."""
+    accept = req.headers.get('Accept', '')
+    return 'as=Table' in accept
 
 
 ##############################################################
@@ -275,6 +397,10 @@ class ProjectListResource(MethodView):
             
             if tracer and span and span.is_recording():
                 span.set_attribute("project.count", len(project_list.get("items", [])))
+            
+            # Return Table format if requested by kubectl
+            if _wants_table_format(request):
+                return jsonify(_build_table_response(project_list))
             
             return jsonify(project_list)
 
@@ -484,6 +610,14 @@ class ProjectResource(MethodView):
                 if tracer and span and span.is_recording():
                     span.set_attribute("error", error)
                 return jsonify(build_not_found_response("projects", name)), status_code
+            
+            # Return Table format if requested by kubectl
+            if _wants_table_format(request):
+                project_list = {
+                    "items": [project],
+                    "metadata": {"resourceVersion": project.get("metadata", {}).get("resourceVersion", "")}
+                }
+                return jsonify(_build_table_response(project_list))
             
             return jsonify(project)
 
@@ -1006,4 +1140,30 @@ class OpenAPISpecResource(MethodView):
                 }
             }
         })
+
+
+##############################################################
+## Catch-all for Invalid Paths (must be last)
+##############################################################
+
+@extension_api_bp.route('/<path:invalid_path>')
+def catch_all_not_found(invalid_path):
+    """
+    Catch-all route for invalid paths under /apis.
+    Returns JSON 404 response instead of HTML.
+    """
+    return jsonify({
+        "kind": "Status",
+        "apiVersion": "v1",
+        "metadata": {},
+        "status": "Failure",
+        "message": f'the server could not find the requested resource',
+        "reason": "NotFound",
+        "details": {
+            "name": invalid_path,
+            "group": "",
+            "kind": ""
+        },
+        "code": 404
+    }), 404
 

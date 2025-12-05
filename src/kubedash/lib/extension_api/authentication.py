@@ -1,8 +1,10 @@
 """
 Authentication module for Kubernetes Extension API Server.
 
-This module handles authentication delegation to Kubernetes API server
-using the TokenReview API.
+This module handles authentication for the extension API server:
+1. Front-proxy authentication (X-Remote-User headers from API server)
+2. Bearer token authentication (TokenReview API)
+3. Session authentication (Web UI)
 """
 
 from contextlib import nullcontext
@@ -21,7 +23,7 @@ from lib.k8s.server import k8sClientConfigGet
 ##############################################################
 
 class AuthenticatedUser:
-    """Represents an authenticated user from TokenReview."""
+    """Represents an authenticated user from TokenReview or front-proxy."""
     
     def __init__(self, username: str, uid: str = None, groups: list = None, extra: dict = None):
         self.username = username
@@ -34,7 +36,65 @@ class AuthenticatedUser:
 
 
 ##############################################################
-## Authentication Functions
+## Front-Proxy Authentication (API Aggregation)
+##############################################################
+
+def authenticate_front_proxy(req: request) -> Optional[AuthenticatedUser]:
+    """
+    Authenticate using Kubernetes front-proxy headers.
+    
+    When Kubernetes API server proxies requests to extension API servers,
+    it sends the authenticated user info via headers:
+    - X-Remote-User: The username
+    - X-Remote-Group: The user's groups (can appear multiple times)
+    - X-Remote-Extra-*: Additional user info
+    
+    Args:
+        req: Flask request object
+        
+    Returns:
+        AuthenticatedUser: The authenticated user info, or None if headers not present
+    """
+    # Log all headers for debugging (only in debug mode)
+    logger.debug(f"Request headers: {dict(req.headers)}")
+    
+    username = req.headers.get('X-Remote-User')
+    
+    if not username:
+        logger.debug("No X-Remote-User header found")
+        return None
+    
+    # Get all X-Remote-Group headers (can be multiple headers or comma-separated)
+    raw_groups = req.headers.getlist('X-Remote-Group')
+    groups = []
+    for group_value in raw_groups:
+        # Split comma-separated groups and strip whitespace
+        for g in group_value.split(','):
+            g = g.strip()
+            if g and g not in groups:
+                groups.append(g)
+    
+    # Get extra info from X-Remote-Extra-* headers
+    extra = {}
+    for key, value in req.headers:
+        if key.lower().startswith('x-remote-extra-'):
+            extra_key = key[15:]  # Remove 'X-Remote-Extra-' prefix
+            if extra_key not in extra:
+                extra[extra_key] = []
+            extra[extra_key].append(value)
+    
+    logger.debug(f"Front-proxy auth: user={username}, groups={groups}")
+    
+    return AuthenticatedUser(
+        username=username,
+        uid="",  # Not provided by front-proxy
+        groups=groups,
+        extra=extra
+    )
+
+
+##############################################################
+## Bearer Token Authentication (TokenReview)
 ##############################################################
 
 def extract_bearer_token(req: request) -> Optional[str]:
@@ -130,11 +190,12 @@ def authenticate_request(req: request) -> Optional[AuthenticatedUser]:
 
 def get_user_from_session_or_token(req: request, session: dict = None) -> Optional[AuthenticatedUser]:
     """
-    Get authenticated user from either Flask session or Bearer token.
+    Get authenticated user from front-proxy headers, Bearer token, or session.
     
-    This allows the Extension API to work both with:
-    - Direct API calls with Bearer tokens (kubectl, API clients)
-    - Web UI requests with session authentication
+    This allows the Extension API to work with:
+    1. Front-proxy headers (from Kubernetes API server via aggregation)
+    2. Direct API calls with Bearer tokens (kubectl, API clients)
+    3. Web UI requests with session authentication
     
     Args:
         req: Flask request object
@@ -143,17 +204,26 @@ def get_user_from_session_or_token(req: request, session: dict = None) -> Option
     Returns:
         AuthenticatedUser: The authenticated user, or None
     """
-    # First try Bearer token (API clients)
+    # First try front-proxy authentication (Kubernetes API aggregation)
+    user = authenticate_front_proxy(req)
+    if user:
+        logger.debug(f"Authenticated via front-proxy: {user.username}")
+        return user
+    
+    # Try Bearer token (direct API clients like kubectl)
     user = authenticate_request(req)
     if user:
+        logger.debug(f"Authenticated via Bearer token: {user.username}")
         return user
     
     # Fall back to session authentication (Web UI)
     if session and 'username' in session:
+        logger.debug(f"Authenticated via session: {session.get('username')}")
         return AuthenticatedUser(
             username=session.get('username'),
             uid=str(session.get('user_id', '')),
             groups=[session.get('user_role', 'User')]
         )
     
+    logger.warning("No authentication method succeeded (no front-proxy, no token, no session)")
     return None

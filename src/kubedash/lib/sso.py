@@ -152,7 +152,7 @@ def get_auth_server_info():
             f"{ssoServer.oauth_server_uri}/.well-known/openid-configuration",
             withhold_token=True,
             verify=False,
-            timeout=1
+            timeout=10
         ).json()
         if tracer and span.is_recording():
             span.set_attribute("auth_server_info.token_endpoint", auth_server_info.get("token_endpoint"))
@@ -181,7 +181,7 @@ def get_user_token(session):
         session: session
     
     Returns:
-        string: user token or None if not found in session
+        string: user token or None if not found in session or on error
     """
     with tracer.start_as_current_span("sso-user-get-token") as span:
         if session['user_type'] == "OpenID":
@@ -192,6 +192,17 @@ def get_user_token(session):
             ssoServer = SSOSererGet()
             auth_server_info, oauth = get_auth_server_info()
 
+            if auth_server_info is None:
+                logger.error("Cannot connect to identity provider - auth_server_info is None")
+                if tracer and span.is_recording():
+                    span.set_attribute("error", True)
+                    span.set_attribute("error.message", "Cannot connect to identity provider")
+                    span.add_event("log", {
+                        "log.severity": "error",
+                        "log.message": "Cannot connect to identity provider - auth_server_info is None",
+                    })
+                return None
+
             # Get OAuth2Session
             oauth = OAuth2Session(
                 ssoServer.client_id,
@@ -199,15 +210,26 @@ def get_user_token(session):
                 scope = ssoServer.scope
             )
 
-            # Use OAuth2Session to refresh tokens
-            token_new = oauth.refresh_token(
-                token_url = auth_server_info["token_endpoint"],
-                refresh_token = session['refresh_token'],
-                client_id = ssoServer.client_id,
-                client_secret = ssoServer.client_secret,
-                verify=False,
-                timeout=60,
-            )
+            try:
+                # Use OAuth2Session to refresh tokens
+                token_new = oauth.refresh_token(
+                    token_url = auth_server_info["token_endpoint"],
+                    refresh_token = session['refresh_token'],
+                    client_id = ssoServer.client_id,
+                    client_secret = ssoServer.client_secret,
+                    verify=False,
+                    timeout=60,
+                )
+            except Exception as e:
+                logger.error(f"Failed to refresh token: {e}")
+                if tracer and span.is_recording():
+                    span.set_attribute("error", True)
+                    span.set_attribute("error.message", str(e))
+                    span.add_event("log", {
+                        "log.severity": "error",
+                        "log.message": f"Failed to refresh token: {str(e)}",
+                    })
+                return None
 
             # Store Updated Token Data in User session
             session['oauth_token']   = token_new

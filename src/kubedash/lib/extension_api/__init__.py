@@ -35,6 +35,7 @@ from .helpers import (
 
 from .authentication import (
     AuthenticatedUser,
+    authenticate_front_proxy,
     authenticate_request,
     extract_bearer_token,
     get_user_from_session_or_token,
@@ -84,6 +85,7 @@ __all__ = [
     "API_GROUP_VERSION",
     # Authentication
     "AuthenticatedUser",
+    "authenticate_front_proxy",
     "authenticate_request",
     "extract_bearer_token",
     "get_user_from_session_or_token",

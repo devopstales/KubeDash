@@ -398,7 +398,11 @@ def initialize_blueprints(app: Flask):
     
     # Kubernetes Extension API Server blueprint
     app.logger.info("Initialize Extension API blueprint")
-    api_doc.register_blueprint(extension_api_bp)    
+    api_doc.register_blueprint(extension_api_bp)
+    
+    # Root-level endpoints for Kubernetes API aggregation (openapi, healthz)
+    from blueprint.extension_root import extension_root_bp
+    app.register_blueprint(extension_root_bp)    
 
 def initialize_commands(app: Flask):
     """Initialize commands"""
