@@ -47,7 +47,7 @@ def cluster_metrics():
 
 
     if username == "admin" and check_password_hash(user.password_hash, "admin"):
-        flash('<a href="/profile">You should change the default password!</a>', "warning")
+        flash('<a href="/user/info">You should change the default password!</a>', "warning")
         if tracer and span.is_recording():
             span.add_event("log", {
                 "log.severity": "warning",

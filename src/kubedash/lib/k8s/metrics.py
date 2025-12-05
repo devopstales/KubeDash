@@ -82,6 +82,7 @@ def k8sGetClusterMetric():
                 "pod_count": {
                     "current": 0,
                     "allocatable": 0,
+                    "currentPercent": 0,
                 },
             }
         }
@@ -244,9 +245,26 @@ def k8sGetNodeMetric(node_name):
         
     Returns:
         node_metric (dict): The node metric
+        bad_node_metric (dict): If any error occurred, return this data instead
     """
     k8sClientConfigGet("Admin", None)
     totalPodAllocatable = float()
+    bad_node_metric = {
+        "cpu": {
+            "usagePercent": 0,
+            "requestsPercent": 0,
+            "limitsPercent": 0,
+        },
+        "memory": {
+            "usagePercent": 0,
+            "requestsPercent": 0,
+            "limitsPercent": 0,
+        },
+        "pod_count": {
+            "currentPercent": 0,
+        }
+    }
+
     try:
         node_list = k8s_client.CoreV1Api().list_node(_request_timeout=1)
         pod_list = k8s_client.CoreV1Api().list_pod_for_all_namespaces(_request_timeout=1)
@@ -316,14 +334,14 @@ def k8sGetNodeMetric(node_name):
                 }
                 return node_metric
             else:
-                return None
+                return bad_node_metric
     except ApiException as error:
         if error.status != 404:
             ErrorHandler(logger, error, "Cannot Connect to Kubernetes - %s " % error.status)
-        return None
+        return bad_node_metric
     except Exception as error:
         ErrorHandler(logger, "CannotConnect", "Cannot Connect to Kubernetes")
-        return None
+        return bad_node_metric
 
 @cache.memoize(timeout=long_cache_time)
 def k8sPVCMetric(namespace):
