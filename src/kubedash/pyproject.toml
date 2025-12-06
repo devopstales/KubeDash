@@ -42,7 +42,7 @@ pyopenssl = "25.1.0"
 cryptography = "44.0.1"
 ipython = "8.27.0"
 gevent = "23.9.0"
-urllib3 = "2.5.0"
+urllib3 = "2.6.0"
 requests = "2.32.4"
 zipp = "3.19.1"
 apiflask = {extras = ["yaml"], version = "^2.3.2"}
