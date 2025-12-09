@@ -336,3 +336,9 @@ tasks:
       #-  .venv/bin/mike deploy --push {{.VERSION}}
       #-  .venv/bin/mike deploy --push --update-aliases {{.VERSION}} latest
       #-  .venv/bin/mike set-default --push latest
+
+  docs-run:
+    desc: "Run local documentation server"
+    cmds:
+      - .venv/bin/mkdocs build
+      - .venv/bin/python -m mkdocs serve

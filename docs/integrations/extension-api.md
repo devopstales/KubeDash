@@ -174,7 +174,7 @@ curl -X GET "http://kubedash.example.com/apis/kubedash.devopstales.github.io/v1/
         "name": "default",
         "uid": "abc123",
         "resourceVersion": "100",
-        "creationTimestamp": "2024-01-01T00:00:00Z"
+        "creationTimestamp": "2025-01-01T00:00:00Z"
       },
       "spec": {
         "owner": "admin",

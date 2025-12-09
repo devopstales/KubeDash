@@ -13,6 +13,7 @@ nav:
       - Configuration: installation/configuration.md
       - Platforms: installation/platforms.md
     - Functions:
+      - Features Overview: functions/features.md
       - Authentication: functions/authentication.md
       - User Management: functions/users.md
       - Manage Privileges: functions/rbac.md
@@ -37,6 +38,29 @@ nav:
       - Cert Manager: integrations/cert-manager.md
       - External LoadBalancer: integrations/external-load-balancer.md
       - Extension API: integrations/extension-api.md
+      - Project Data: integrations/project-data.md
+      - Trivy Operator: integrations/trivy-operator.md
+    - Development:
+      - Architecture: development/architecture.md
+      - Developer Guide: development/developer-guide.md
+      - Testing Guide: development/testing.md
+      - Security Guide: development/security.md
+      - API Reference: development/api-reference.md
+      - Product Overview: development/product-overview.md
+      - Environment Setup: development/env.md
+      - Database Migrations: development/dbmigrate.md
+    - Product Requirements:
+      - Authentication & Users: prd/authentication-user-management.md
+      - Workload Management: prd/workload-management.md
+      - Dashboard & Monitoring: prd/dashboard-monitoring.md
+      - Extension API: prd/extension-api.md
+      - Helm Plugin: prd/plugin-helm.md
+      - Registry Plugin: prd/plugin-registry.md
+      - Cert-Manager Plugin: prd/plugin-cert-manager.md
+      - External LoadBalancer Plugin: prd/plugin-external-loadbalancer.md
+      - Flux Plugin: prd/plugin-flux.md
+      - Trivy Operator Plugin: prd/plugin-trivy-operator.md
+      - Gateway API Plugin: prd/plugin-gateway-api.md
     - Contributing: contributing.md
     - FAQ:
       - Technical: faq/technical.md
@@ -62,13 +86,20 @@ theme:
 # Extensions
 markdown_extensions:
   - pymdownx.highlight
-  - pymdownx.superfences
+  - pymdownx.superfences:
+      custom_fences:
+        - name: mermaid
+          class: mermaid
+          format: !!python/name:pymdownx.superfences.fence_code_format
   - admonition
   - footnotes
   - attr_list
   - pymdownx.tabbed
   - def_list
   - pymdownx.details
+  - tables
+  - toc:
+      permalink: true
 
 extra:
   generator: false
