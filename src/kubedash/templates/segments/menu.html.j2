@@ -168,6 +168,9 @@
                 {% if config.plugins["cert_manager"] %}
                     <li class="nav-item"><a class="nav-link" href="/plugins/cert-manager"> Cert-Manager <span class="badge text-bg-sm bg-warning ms-auto">Beta</span></a></li>
                 {% endif %}
+                {% if config.plugins["gateway_api"] %}
+                    <li class="nav-item"><a class="nav-link" href="/plugins/gateway-api"> Gateway API <span class="badge text-bg-sm bg-warning ms-auto">Beta</span></a></li>
+                {% endif %}
                 {% if config.plugins["external_loadbalancer"] %}
                     <li class="nav-item"><a class="nav-link" href="/plugins/external-loadbalancer"> LoadBalancers <span class="badge text-bg-sm bg-warning ms-auto">Beta</span></a></li>
                 {% endif %}

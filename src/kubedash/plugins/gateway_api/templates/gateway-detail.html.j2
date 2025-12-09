@@ -1,0 +1,525 @@
+{% extends "base2.html.j2" %}
+
+{% block topmenu %}
+<ul class="header-nav d-lg-flex m-3">
+    <div class="container-fluid px-4">
+        <nav aria-label="breadcrumb">
+            <ol class="breadcrumb my-0">
+                <li class="breadcrumb-item"><span>Plugins</span></li>
+                <li class="breadcrumb-item"><a href="/plugins/gateway-api">Gateway API</a></li>
+                <li class="breadcrumb-item"><span>Gateway</span></li>
+                <li class="breadcrumb-item active"><span>{{ gateway.namespace }}/{{ gateway.name }}</span></li>
+            </ol>
+        </nav>
+    </div>
+</ul>
+<ul class="header-nav ms-auto"></ul>
+<ul class="header-nav d-lg-flex">
+{% include "segments/topmenu.html.j2" %}
+{% endblock %}
+
+{% block content %}
+<div class="card shadow mb-4">
+    <div class="card-header py-3 d-flex justify-content-between align-items-center">
+        <h6 class="m-0 font-weight-bold text-primary">Gateway: {{ gateway.name }}</h6>
+        <div>
+            {% set programmed = gateway.conditions | selectattr('type', 'equalto', 'Programmed') | first %}
+            {% set accepted = gateway.conditions | selectattr('type', 'equalto', 'Accepted') | first %}
+            {% if programmed and programmed.status == 'True' %}
+            <span class="badge bg-success">Programmed</span>
+            {% elif accepted and accepted.status == 'True' %}
+            <span class="badge bg-info">Accepted</span>
+            {% else %}
+            <span class="badge bg-warning text-dark">Pending</span>
+            {% endif %}
+        </div>
+    </div>
+    <div class="card-body">
+        <ul class="nav nav-tabs" id="nav-tab" role="tablist">
+            <li class="nav-item">
+                <a class="nav-link active" id="nav-overview-tab" href="#nav-overview" role="tab" aria-controls="nav-overview" aria-selected="true" data-bs-toggle="tab">Overview</a>
+            </li>
+            <li class="nav-item">
+                <a class="nav-link" id="nav-listeners-tab" href="#nav-listeners" role="tab" aria-controls="nav-listeners" aria-selected="false" data-bs-toggle="tab">Listeners ({{ gateway.listeners|length }})</a>
+            </li>
+            <li class="nav-item">
+                <a class="nav-link" id="nav-routes-tab" href="#nav-routes" role="tab" aria-controls="nav-routes" aria-selected="false" data-bs-toggle="tab">Attached Routes ({{ attached_httproutes|length }})</a>
+            </li>
+            <li class="nav-item">
+                <a class="nav-link" id="nav-conditions-tab" href="#nav-conditions" role="tab" aria-controls="nav-conditions" aria-selected="false" data-bs-toggle="tab">Conditions</a>
+            </li>
+            <li class="nav-item">
+                <a class="nav-link" id="nav-events-tab" href="#nav-events" role="tab" aria-controls="nav-events" aria-selected="false" data-bs-toggle="tab">Events ({{ events|length }})</a>
+            </li>
+            <li class="nav-item">
+                <a class="nav-link" id="nav-yaml-tab" href="#nav-yaml" role="tab" aria-controls="nav-yaml" aria-selected="false" data-bs-toggle="tab">YAML</a>
+            </li>
+        </ul>
+        
+        <div class="tab-content" id="nav-tabContent">
+            <!-- OVERVIEW TAB -->
+            <div class="tab-pane fade show active" id="nav-overview" role="tabpanel" aria-labelledby="nav-overview-tab">
+                <div class="row mt-3">
+                    <div class="col-md-6">
+                        <div class="card shadow mb-4">
+                            <div class="card-header py-3">
+                                <h6 class="m-0 font-weight-bold text-primary">Metadata</h6>
+                            </div>
+                            <div class="card-body">
+                                <table class="table table-bordered" width="100%" cellspacing="0">
+                                    <tr>
+                                        <th style="width: 30%;">Name</th>
+                                        <td>{{ gateway.name }}</td>
+                                    </tr>
+                                    <tr>
+                                        <th>Namespace</th>
+                                        <td>{{ gateway.namespace }}</td>
+                                    </tr>
+                                    <tr>
+                                        <th>GatewayClass</th>
+                                        <td>
+                                            <a href="/plugins/gateway-api/gatewayclass/{{ gateway.gateway_class }}">{{ gateway.gateway_class }}</a>
+                                        </td>
+                                    </tr>
+                                    <tr>
+                                        <th>Age</th>
+                                        <td>{{ gateway.age }}</td>
+                                    </tr>
+                                    <tr>
+                                        <th>Created</th>
+                                        <td>{{ gateway.creation_timestamp }}</td>
+                                    </tr>
+                                </table>
+                            </div>
+                        </div>
+                    </div>
+                    
+                    <div class="col-md-6">
+                        <div class="card shadow mb-4">
+                            <div class="card-header py-3">
+                                <h6 class="m-0 font-weight-bold text-primary">Addresses</h6>
+                            </div>
+                            <div class="card-body">
+                                {% if gateway.addresses %}
+                                <table class="table table-bordered" width="100%" cellspacing="0">
+                                    <thead>
+                                        <tr>
+                                            <th>Type</th>
+                                            <th>Value</th>
+                                        </tr>
+                                    </thead>
+                                    <tbody>
+                                        {% for addr in gateway.addresses %}
+                                        <tr>
+                                            <td>{{ addr.type or 'IPAddress' }}</td>
+                                            <td><code>{{ addr.value }}</code></td>
+                                        </tr>
+                                        {% endfor %}
+                                    </tbody>
+                                </table>
+                                {% else %}
+                                <p class="text-muted mb-0">No addresses assigned yet</p>
+                                {% endif %}
+                            </div>
+                        </div>
+                        
+                        <div class="card shadow mb-4">
+                            <div class="card-header py-3">
+                                <h6 class="m-0 font-weight-bold text-primary">Summary</h6>
+                            </div>
+                            <div class="card-body">
+                                <table class="table table-bordered" width="100%" cellspacing="0">
+                                    <tr>
+                                        <th style="width: 50%;">Total Listeners</th>
+                                        <td><span class="badge bg-primary">{{ gateway.listeners|length }}</span></td>
+                                    </tr>
+                                    <tr>
+                                        <th>Attached Routes</th>
+                                        <td><span class="badge bg-info">{{ attached_httproutes|length }}</span></td>
+                                    </tr>
+                                </table>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+                
+                <!-- Labels -->
+                {% if gateway.labels %}
+                <div class="card shadow mb-4">
+                    <div class="card-header py-3">
+                        <h6 class="m-0 font-weight-bold text-primary">Labels</h6>
+                    </div>
+                    <div class="card-body">
+                        <table class="table table-bordered" width="100%" cellspacing="0">
+                            <thead>
+                                <tr>
+                                    <th width="50%">Key</th>
+                                    <th width="50%">Value</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                            {% for key, value in gateway.labels.items() %}
+                                <tr>
+                                    <td>{{ key }}</td>
+                                    <td>{{ value }}</td>
+                                </tr>
+                            {% endfor %}
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+                {% endif %}
+                
+                <!-- Annotations -->
+                {% if gateway.annotations %}
+                <div class="card shadow mb-4">
+                    <div class="card-header py-3">
+                        <h6 class="m-0 font-weight-bold text-primary">Annotations</h6>
+                    </div>
+                    <div class="card-body">
+                        <table class="table table-bordered" width="100%" cellspacing="0">
+                            <thead>
+                                <tr>
+                                    <th width="50%">Key</th>
+                                    <th width="50%">Value</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                            {% for key, value in gateway.annotations.items() %}
+                                <tr>
+                                    <td style="word-break: break-all;">{{ key }}</td>
+                                    <td style="word-break: break-all;">{{ value }}</td>
+                                </tr>
+                            {% endfor %}
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+                {% endif %}
+            </div>
+            
+            <!-- LISTENERS TAB -->
+            <div class="tab-pane fade" id="nav-listeners" role="tabpanel" aria-labelledby="nav-listeners-tab">
+                <div class="card shadow mb-4 mt-3">
+                    <div class="card-header py-3">
+                        <h6 class="m-0 font-weight-bold text-primary">Listeners</h6>
+                    </div>
+                    <div class="card-body">
+                        {% for listener in gateway.listeners %}
+                        <div class="card mb-3 {% if listener.conditions %}{% set ready = listener.conditions | selectattr('type', 'equalto', 'Ready') | first %}{% if ready and ready.status == 'True' %}border-success{% else %}border-warning{% endif %}{% endif %}">
+                            <div class="card-header d-flex justify-content-between align-items-center">
+                                <strong>{{ listener.name }}</strong>
+                                <div>
+                                    <span class="badge bg-primary">{{ listener.protocol }}</span>
+                                    <span class="badge bg-secondary">Port: {{ listener.port }}</span>
+                                    <span class="badge bg-info">{{ listener.attachedRoutes }} routes</span>
+                                </div>
+                            </div>
+                            <div class="card-body">
+                                <div class="row">
+                                    <div class="col-md-6">
+                                        <table class="table table-sm table-bordered">
+                                            <tr>
+                                                <th style="width: 35%;">Hostname</th>
+                                                <td><code>{{ listener.hostname or '*' }}</code></td>
+                                            </tr>
+                                            <tr>
+                                                <th>Protocol</th>
+                                                <td>{{ listener.protocol }}</td>
+                                            </tr>
+                                            <tr>
+                                                <th>Port</th>
+                                                <td>{{ listener.port }}</td>
+                                            </tr>
+                                        </table>
+                                    </div>
+                                    <div class="col-md-6">
+                                        {% if listener.tls %}
+                                        <table class="table table-sm table-bordered">
+                                            <tr>
+                                                <th style="width: 35%;">TLS Mode</th>
+                                                <td>{{ listener.tls.mode or 'Terminate' }}</td>
+                                            </tr>
+                                            {% if listener.tls.certificateRefs %}
+                                            <tr>
+                                                <th>Certificate</th>
+                                                <td>
+                                                    {% for cert in listener.tls.certificateRefs %}
+                                                    <code>{{ cert.namespace or gateway.namespace }}/{{ cert.name }}</code>
+                                                    {% endfor %}
+                                                </td>
+                                            </tr>
+                                            {% endif %}
+                                        </table>
+                                        {% endif %}
+                                        
+                                        {% if listener.allowedRoutes %}
+                                        <table class="table table-sm table-bordered">
+                                            <tr>
+                                                <th style="width: 35%;">Allowed Namespaces</th>
+                                                <td>
+                                                    {% if listener.allowedRoutes.namespaces %}
+                                                    {{ listener.allowedRoutes.namespaces.from or 'Same' }}
+                                                    {% else %}
+                                                    Same
+                                                    {% endif %}
+                                                </td>
+                                            </tr>
+                                            <tr>
+                                                <th>Allowed Kinds</th>
+                                                <td>
+                                                    {% if listener.allowedRoutes.kinds %}
+                                                    {% for kind in listener.allowedRoutes.kinds %}
+                                                    <span class="badge bg-light text-dark">{{ kind.kind }}</span>
+                                                    {% endfor %}
+                                                    {% else %}
+                                                    <span class="text-muted">All</span>
+                                                    {% endif %}
+                                                </td>
+                                            </tr>
+                                        </table>
+                                        {% endif %}
+                                    </div>
+                                </div>
+                                
+                                {% if listener.conditions %}
+                                <h6 class="mt-3">Listener Conditions</h6>
+                                <table class="table table-sm table-bordered">
+                                    <thead>
+                                        <tr>
+                                            <th>Type</th>
+                                            <th>Status</th>
+                                            <th>Reason</th>
+                                            <th>Message</th>
+                                        </tr>
+                                    </thead>
+                                    <tbody>
+                                        {% for cond in listener.conditions %}
+                                        <tr>
+                                            <td>
+                                                {% if cond.status == 'True' %}
+                                                <span class="badge bg-success">{{ cond.type }}</span>
+                                                {% else %}
+                                                <span class="badge bg-warning text-dark">{{ cond.type }}</span>
+                                                {% endif %}
+                                            </td>
+                                            <td>{{ cond.status }}</td>
+                                            <td><code>{{ cond.reason }}</code></td>
+                                            <td>{{ cond.message or '-' }}</td>
+                                        </tr>
+                                        {% endfor %}
+                                    </tbody>
+                                </table>
+                                {% endif %}
+                            </div>
+                        </div>
+                        {% else %}
+                        <p class="text-muted">No listeners configured</p>
+                        {% endfor %}
+                    </div>
+                </div>
+            </div>
+            
+            <!-- ROUTES TAB -->
+            <div class="tab-pane fade" id="nav-routes" role="tabpanel" aria-labelledby="nav-routes-tab">
+                <div class="card shadow mb-4 mt-3">
+                    <div class="card-header py-3">
+                        <h6 class="m-0 font-weight-bold text-primary">Attached HTTPRoutes</h6>
+                    </div>
+                    <div class="card-body">
+                        <div class="table-responsive">
+                            <table class="table table-bordered table-hover" id="routesTable" width="100%" cellspacing="0">
+                                <thead>
+                                    <tr>
+                                        <th>Status</th>
+                                        <th>Name</th>
+                                        <th>Namespace</th>
+                                        <th>Hostnames</th>
+                                        <th>Rules</th>
+                                        <th>Backends</th>
+                                        <th>Age</th>
+                                    </tr>
+                                </thead>
+                                <tbody>
+                                    {% for route in attached_httproutes %}
+                                    <tr>
+                                        <td>
+                                            {% if route.accepted_parents == route.total_parents %}
+                                            <span class="badge bg-success">{{ route.accepted_parents }}/{{ route.total_parents }}</span>
+                                            {% elif route.accepted_parents > 0 %}
+                                            <span class="badge bg-warning text-dark">{{ route.accepted_parents }}/{{ route.total_parents }}</span>
+                                            {% else %}
+                                            <span class="badge bg-danger">{{ route.accepted_parents }}/{{ route.total_parents }}</span>
+                                            {% endif %}
+                                        </td>
+                                        <td>
+                                            <a href="/plugins/gateway-api/httproute/{{ route.namespace }}/{{ route.name }}">{{ route.name }}</a>
+                                        </td>
+                                        <td>{{ route.namespace }}</td>
+                                        <td>
+                                            {% for hostname in route.hostnames[:2] %}
+                                            <span class="badge bg-light text-dark">{{ hostname }}</span>
+                                            {% endfor %}
+                                            {% if route.hostnames|length > 2 %}
+                                            <span class="badge bg-secondary">+{{ route.hostnames|length - 2 }}</span>
+                                            {% endif %}
+                                        </td>
+                                        <td><span class="badge bg-secondary">{{ route.rules_count }}</span></td>
+                                        <td>
+                                            {% for backend in route.backends[:2] %}
+                                            <code class="small">{{ backend }}</code>
+                                            {% endfor %}
+                                            {% if route.backends|length > 2 %}
+                                            <span class="badge bg-secondary">+{{ route.backends|length - 2 }}</span>
+                                            {% endif %}
+                                        </td>
+                                        <td>{{ route.age }}</td>
+                                    </tr>
+                                    {% else %}
+                                    <tr>
+                                        <td colspan="7" class="text-center text-muted">No HTTPRoutes attached to this Gateway</td>
+                                    </tr>
+                                    {% endfor %}
+                                </tbody>
+                            </table>
+                        </div>
+                    </div>
+                </div>
+            </div>
+            
+            <!-- CONDITIONS TAB -->
+            <div class="tab-pane fade" id="nav-conditions" role="tabpanel" aria-labelledby="nav-conditions-tab">
+                <div class="card shadow mb-4 mt-3">
+                    <div class="card-header py-3">
+                        <h6 class="m-0 font-weight-bold text-primary">Gateway Conditions</h6>
+                    </div>
+                    <div class="card-body">
+                        <div class="table-responsive">
+                            <table class="table table-bordered" id="conditionsTable" width="100%" cellspacing="0">
+                                <thead>
+                                    <tr>
+                                        <th>Type</th>
+                                        <th>Status</th>
+                                        <th>Reason</th>
+                                        <th>Message</th>
+                                        <th>Last Transition</th>
+                                    </tr>
+                                </thead>
+                                <tbody>
+                                    {% for cond in gateway.conditions %}
+                                    <tr>
+                                        <td>
+                                            {% if (cond.type == 'Programmed' or cond.type == 'Accepted' or cond.type == 'Ready') and cond.status == 'True' %}
+                                            <span class="badge bg-success">{{ cond.type }}</span>
+                                            {% elif cond.type in ['Programmed', 'Accepted', 'Ready'] %}
+                                            <span class="badge bg-danger">{{ cond.type }}</span>
+                                            {% else %}
+                                            <span class="badge bg-secondary">{{ cond.type }}</span>
+                                            {% endif %}
+                                        </td>
+                                        <td>{{ cond.status }}</td>
+                                        <td><code>{{ cond.reason }}</code></td>
+                                        <td>{{ cond.message }}</td>
+                                        <td>{{ cond.lastTransitionTime }}</td>
+                                    </tr>
+                                    {% else %}
+                                    <tr>
+                                        <td colspan="5" class="text-center text-muted">No conditions</td>
+                                    </tr>
+                                    {% endfor %}
+                                </tbody>
+                            </table>
+                        </div>
+                    </div>
+                </div>
+            </div>
+            
+            <!-- EVENTS TAB -->
+            <div class="tab-pane fade" id="nav-events" role="tabpanel" aria-labelledby="nav-events-tab">
+                <div class="card shadow mb-4 mt-3">
+                    <div class="card-header py-3">
+                        <h6 class="m-0 font-weight-bold text-primary">Kubernetes Events</h6>
+                    </div>
+                    <div class="card-body">
+                        <div class="table-responsive">
+                            <table class="table table-bordered" id="eventsTable" width="100%" cellspacing="0">
+                                <thead>
+                                    <tr>
+                                        <th>Last Seen</th>
+                                        <th>Type</th>
+                                        <th>Reason</th>
+                                        <th>Message</th>
+                                        <th>Count</th>
+                                    </tr>
+                                </thead>
+                                <tbody>
+                                    {% for event in events %}
+                                    <tr>
+                                        <td>{{ event.last_timestamp or event.first_timestamp or 'Unknown' }}</td>
+                                        <td>
+                                            {% if event.type == 'Normal' %}
+                                            <span class="badge bg-success">{{ event.type }}</span>
+                                            {% elif event.type == 'Warning' %}
+                                            <span class="badge bg-warning text-dark">{{ event.type }}</span>
+                                            {% else %}
+                                            <span class="badge bg-secondary">{{ event.type }}</span>
+                                            {% endif %}
+                                        </td>
+                                        <td><code>{{ event.reason }}</code></td>
+                                        <td>{{ event.message }}</td>
+                                        <td>{{ event.count }}</td>
+                                    </tr>
+                                    {% else %}
+                                    <tr>
+                                        <td colspan="5" class="text-center text-muted">No events found</td>
+                                    </tr>
+                                    {% endfor %}
+                                </tbody>
+                            </table>
+                        </div>
+                    </div>
+                </div>
+            </div>
+            
+            <!-- YAML TAB -->
+            <div class="tab-pane fade" id="nav-yaml" role="tabpanel" aria-labelledby="nav-yaml-tab">
+                <div class="card shadow mb-4 mt-3">
+                    <div class="card-header py-3">
+                        <h6 class="m-0 font-weight-bold text-primary">Resource YAML</h6>
+                    </div>
+                    <div class="card-body">
+                        <pre><code class="language-json">{% autoescape false %}{{ gateway.raw | tojson(indent=2) | replace("<", "&lt;") | replace(">", "&gt;") }}{% endautoescape %}</code></pre>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}
+
+{% block add_head_css %}
+{% include "segments/datatable_snippet.html.j2" %}
+{% include "segments/highlight_snippet.html.j2" %}
+{% endblock %}
+
+{% block add_tail_js %}
+<script>
+$(document).ready(function() {
+    $('#routesTable').DataTable({
+        order: [[1, 'asc']],
+        pageLength: 25
+    });
+    $('#conditionsTable').DataTable({
+        paging: false,
+        searching: false,
+        info: false
+    });
+    // Only initialize events table if there are events
+    if ($('#eventsTable tbody tr').filter(function() { return !$(this).find('td[colspan]').length; }).length > 0) {
+        $('#eventsTable').DataTable({
+            order: [[0, 'desc']]
+        });
+    }
+});
+</script>
+{% endblock %}

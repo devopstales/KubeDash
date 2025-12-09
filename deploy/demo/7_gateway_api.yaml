@@ -6,6 +6,8 @@ kind: GatewayClass
 metadata:
   name: cluster-gateway
   namespace: network-testing
+  labels:
+    app: test
 spec:
   controllerName: "example.net/gateway-controller"
 ---

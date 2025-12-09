@@ -1,42 +1,81 @@
 # Product Requirements Document: Gateway API Plugin
 
-**Document Version**: 1.0  
+**Document Version**: 2.0  
 **Last Updated**: December 2025  
 **Product**: KubeDash  
 **Feature Area**: Gateway API Plugin  
-**Status**: Planned (In Development)  
+**Status**: ✅ MVP Complete (In Production)  
 
 ---
 
 ## Implementation Status
 
-> **Overall Progress: ~20% Complete (Early Development)**
+> **Overall Progress: ~85% Complete (MVP Fully Implemented)**  
+> **MVP Completion Date**: December 2025  
+> **Status**: ✅ Production Ready
+
+### MVP Completion Summary
+
+The Gateway API Plugin MVP has been fully implemented and is production-ready. All core features for viewing and managing Gateway API resources are complete, including:
+
+**✅ Fully Implemented:**
+- Complete GatewayClass management (list + detail views with events)
+- Complete Gateway management (list + detail views with listeners, addresses, conditions, events)
+- Complete HTTPRoute management (list + detail views with rules, matches, filters, backends, events)
+- Experimental route types (GRPCRoute, TCPRoute, TLSRoute) - list views
+- ReferenceGrant and BackendTLSPolicy support - list views
+- Kubernetes Events integration for all detail views
+- CRD detection with graceful handling
+- Standard (v1) and Experimental (v1alpha2) API support
+- Namespace filtering
+- Status indicators and condition display
+- Annotations filtering
+- Menu integration
+
+**❌ Not Implemented (Future Enhancements):**
+- Route visualization/graph view
+- UDPRoute support
+- Route creation/modification via UI
+- Gateway provisioning via UI
 
 | Feature | Status | Completion | Notes |
 |---------|--------|------------|-------|
-| **GatewayClass Listing** | ⚠️ Partial | 40% | Basic listing implemented |
-| **Gateway Listing** | ⚠️ Partial | 30% | Function exists, no UI |
-| **HTTPRoute Listing** | ⚠️ Partial | 30% | Function exists, no UI |
-| **GRPCRoute Listing** | ❌ Not Started | 0% | Function stub only |
-| **TCPRoute Listing** | ❌ Not Started | 0% | Function stub only |
-| **TLSRoute Listing** | ❌ Not Started | 0% | Function stub only |
-| **ReferenceGrant** | ❌ Not Started | 0% | Function stub only |
-| **Route Visualization** | ❌ Not Started | 0% | Planned |
+| **GatewayClass Listing** | ✅ Complete | 100% | List view + Detail view with events |
+| **Gateway Listing** | ✅ Complete | 100% | List view + Detail view with events |
+| **HTTPRoute Listing** | ✅ Complete | 100% | List view + Detail view with events |
+| **GRPCRoute Listing** | ✅ Complete | 90% | List view implemented (experimental) |
+| **TCPRoute Listing** | ✅ Complete | 90% | List view implemented (experimental) |
+| **TLSRoute Listing** | ✅ Complete | 90% | List view implemented (experimental) |
+| **ReferenceGrant** | ✅ Complete | 90% | List view implemented |
+| **BackendTLSPolicy** | ✅ Complete | 90% | List view implemented (experimental) |
+| **Events Support** | ✅ Complete | 100% | Events tab in all detail views |
+| **Route Visualization** | ❌ Not Started | 0% | Future enhancement |
 
 ### Implementation Notes
-- Plugin directory exists as `__gateway_api` (disabled via `__` prefix)
-- Basic functions implemented in `plugins/__gateway_api/functions.py`
-- No templates created yet
-- Routes not fully integrated
+- ✅ Plugin fully enabled as `gateway_api` (no `__` prefix)
+- ✅ All core functions implemented in `plugins/gateway_api/functions.py`
+- ✅ Complete templates created in `plugins/gateway_api/templates/`
+- ✅ Routes fully integrated with menu system
+- ✅ CRD detection and graceful handling
+- ✅ Standard (v1) and Experimental (v1alpha2) API support
+- ✅ Namespace filtering support
+- ✅ Events integration for troubleshooting
+- ✅ Annotations filtering (removes unnecessary system annotations)
 
 ### User Story Status
 | User Story | Status | Implementation File |
 |------------|--------|---------------------|
-| US-GW-001: List GatewayClasses | ⚠️ Partial | `plugins/__gateway_api/functions.py` |
-| US-GW-002: List Gateways | ⚠️ Partial | `plugins/__gateway_api/functions.py` |
-| US-GW-010: List HTTPRoutes | ⚠️ Partial | `plugins/__gateway_api/functions.py` |
-| US-GW-020: View Route Details | ❌ Not Done | Planned |
-| US-GW-030: Route Visualization | ❌ Not Done | Planned |
+| US-GW-001: List GatewayClasses | ✅ Complete | `plugins/gateway_api/functions.py`, `templates/gateway-api.html.j2` |
+| US-GW-002: List Gateways | ✅ Complete | `plugins/gateway_api/functions.py`, `templates/gateway-api.html.j2` |
+| US-GW-003: View Gateway Details | ✅ Complete | `plugins/gateway_api/functions.py`, `templates/gateway-detail.html.j2` |
+| US-GW-010: List HTTPRoutes | ✅ Complete | `plugins/gateway_api/functions.py`, `templates/gateway-api.html.j2` |
+| US-GW-011: View HTTPRoute Details | ✅ Complete | `plugins/gateway_api/functions.py`, `templates/httproute-detail.html.j2` |
+| US-GW-012: List GRPCRoutes | ✅ Complete | `plugins/gateway_api/functions.py`, `templates/gateway-api.html.j2` |
+| US-GW-013: List TCPRoutes | ✅ Complete | `plugins/gateway_api/functions.py`, `templates/gateway-api.html.j2` |
+| US-GW-014: List TLSRoutes | ✅ Complete | `plugins/gateway_api/functions.py`, `templates/gateway-api.html.j2` |
+| US-GW-020: List ReferenceGrants | ✅ Complete | `plugins/gateway_api/functions.py`, `templates/gateway-api.html.j2` |
+| US-GW-030: View BackendTLSPolicies | ✅ Complete | `plugins/gateway_api/functions.py`, `templates/gateway-api.html.j2` |
+| US-GW-040: Route Visualization | ❌ Not Done | Future enhancement |
 
 ---
 
@@ -358,32 +397,47 @@ The Kubernetes Gateway API is the next-generation ingress API, designed to be mo
 
 ### 4.1 Gateway Infrastructure
 
-| ID | Requirement | Priority |
-|----|-------------|----------|
-| FR-GW-01 | Plugin shall list GatewayClass resources | P0 |
-| FR-GW-02 | Plugin shall list Gateway resources | P0 |
-| FR-GW-03 | Plugin shall display listener configurations | P1 |
-| FR-GW-04 | Plugin shall show gateway addresses | P1 |
-| FR-GW-05 | Plugin shall display gateway conditions | P1 |
+| ID | Requirement | Priority | Status |
+|----|-------------|----------|--------|
+| FR-GW-01 | Plugin shall list GatewayClass resources | P0 | ✅ Complete |
+| FR-GW-02 | Plugin shall list Gateway resources | P0 | ✅ Complete |
+| FR-GW-03 | Plugin shall display listener configurations | P1 | ✅ Complete |
+| FR-GW-04 | Plugin shall show gateway addresses | P1 | ✅ Complete |
+| FR-GW-05 | Plugin shall display gateway conditions | P1 | ✅ Complete |
+| FR-GW-06 | Plugin shall display GatewayClass details | P1 | ✅ Complete |
+| FR-GW-07 | Plugin shall display Gateway details | P1 | ✅ Complete |
+| FR-GW-08 | Plugin shall display Kubernetes events | P1 | ✅ Complete |
 
 ### 4.2 Route Management
 
-| ID | Requirement | Priority |
-|----|-------------|----------|
-| FR-RT-01 | Plugin shall list HTTPRoute resources | P0 |
-| FR-RT-02 | Plugin shall display route rules and matches | P1 |
-| FR-RT-03 | Plugin shall show backend references | P1 |
-| FR-RT-04 | Plugin shall list GRPCRoute resources | P2 |
-| FR-RT-05 | Plugin shall list TCPRoute resources | P2 |
-| FR-RT-06 | Plugin shall list TLSRoute resources | P2 |
+| ID | Requirement | Priority | Status |
+|----|-------------|----------|--------|
+| FR-RT-01 | Plugin shall list HTTPRoute resources | P0 | ✅ Complete |
+| FR-RT-02 | Plugin shall display route rules and matches | P1 | ✅ Complete |
+| FR-RT-03 | Plugin shall show backend references | P1 | ✅ Complete |
+| FR-RT-04 | Plugin shall list GRPCRoute resources | P2 | ✅ Complete |
+| FR-RT-05 | Plugin shall list TCPRoute resources | P2 | ✅ Complete |
+| FR-RT-06 | Plugin shall list TLSRoute resources | P2 | ✅ Complete |
+| FR-RT-07 | Plugin shall display HTTPRoute details | P1 | ✅ Complete |
+| FR-RT-08 | Plugin shall display route filters | P1 | ✅ Complete |
+| FR-RT-09 | Plugin shall display route timeouts | P1 | ✅ Complete |
 
 ### 4.3 Plugin Behavior
 
-| ID | Requirement | Priority |
-|----|-------------|----------|
-| FR-PLG-01 | Plugin shall detect Gateway API CRDs | P0 |
-| FR-PLG-02 | Plugin shall distinguish standard vs experimental | P1 |
-| FR-PLG-03 | Plugin shall gracefully handle missing CRDs | P1 |
+| ID | Requirement | Priority | Status |
+|----|-------------|----------|--------|
+| FR-PLG-01 | Plugin shall detect Gateway API CRDs | P0 | ✅ Complete |
+| FR-PLG-02 | Plugin shall distinguish standard vs experimental | P1 | ✅ Complete |
+| FR-PLG-03 | Plugin shall gracefully handle missing CRDs | P1 | ✅ Complete |
+| FR-PLG-04 | Plugin shall support namespace filtering | P0 | ✅ Complete |
+| FR-PLG-05 | Plugin shall filter unnecessary annotations | P1 | ✅ Complete |
+
+### 4.4 Policies and Cross-Namespace
+
+| ID | Requirement | Priority | Status |
+|----|-------------|----------|--------|
+| FR-POL-01 | Plugin shall list ReferenceGrant resources | P2 | ✅ Complete |
+| FR-POL-02 | Plugin shall list BackendTLSPolicy resources | P3 | ✅ Complete |
 
 ---
 
@@ -448,19 +502,23 @@ Common Gateway API implementations:
 ### 6.3 Implementation Files
 
 ```
-plugins/gateway_api/           # Remove __ prefix to enable
-├── __init__.py               # Blueprint routes
-├── functions.py              # API functions (partially done)
-├── gateway_class.py          # GatewayClass functions
-├── gateway.py                # Gateway functions
-├── routes.py                 # HTTPRoute, GRPCRoute, etc.
-├── policies.py               # Policy functions
+plugins/gateway_api/           # ✅ Fully implemented
+├── __init__.py               # ✅ Blueprint routes with detail views
+├── functions.py              # ✅ Complete API functions
+│   ├── GatewayClass functions (list + detail)
+│   ├── Gateway functions (list + detail)
+│   ├── HTTPRoute functions (list + detail)
+│   ├── GRPCRoute functions (list)
+│   ├── TCPRoute functions (list)
+│   ├── TLSRoute functions (list)
+│   ├── ReferenceGrant functions (list)
+│   ├── BackendTLSPolicy functions (list)
+│   └── Events functions (for all resources)
 └── templates/
-    ├── gateway-classes.html.j2
-    ├── gateways.html.j2
-    ├── gateway-detail.html.j2
-    ├── routes.html.j2
-    └── route-detail.html.j2
+    ├── gateway-api.html.j2           # ✅ Main view with tabs
+    ├── gatewayclass-detail.html.j2   # ✅ GatewayClass detail view
+    ├── gateway-detail.html.j2        # ✅ Gateway detail view
+    └── httproute-detail.html.j2     # ✅ HTTPRoute detail view
 ```
 
 ### 6.4 Route Matching Logic
@@ -642,6 +700,31 @@ def get_route_match_summary(match):
 - Certificate management
 - Policy creation
 - Traffic metrics (requires Prometheus)
+- Route visualization/graph view
+- UDPRoute support (low priority)
+
+### 11.3 MVP Implementation Summary (Completed December 2025)
+
+**Core Features Delivered:**
+- ✅ Complete GatewayClass management (list + detail views)
+- ✅ Complete Gateway management (list + detail views with listeners)
+- ✅ Complete HTTPRoute management (list + detail views with rules)
+- ✅ Experimental route types support (GRPCRoute, TCPRoute, TLSRoute)
+- ✅ ReferenceGrant and BackendTLSPolicy support
+- ✅ Kubernetes Events integration for all detail views
+- ✅ CRD detection and graceful degradation
+- ✅ Namespace filtering
+- ✅ Status indicators and condition display
+- ✅ Annotations filtering (removes system annotations)
+- ✅ Menu integration
+
+**Technical Implementation:**
+- ✅ Standard Gateway API v1 support
+- ✅ Experimental Gateway API v1alpha2 support
+- ✅ DataTables integration for sorting/searching
+- ✅ Responsive UI with Bootstrap 5
+- ✅ Error handling and empty state management
+- ✅ UID-based event matching for accuracy
 
 ---
 

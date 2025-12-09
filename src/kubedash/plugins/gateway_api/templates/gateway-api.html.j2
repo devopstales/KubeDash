@@ -1,0 +1,637 @@
+{% extends "base2.html.j2" %}
+
+{% block topmenu %}
+<ul class="header-nav d-lg-flex m-3">
+    <div class="container-fluid px-4">
+        <nav aria-label="breadcrumb">
+            <ol class="breadcrumb my-0">
+                <li class="breadcrumb-item"><span>Plugins</span></li>
+                <li class="breadcrumb-item active"><span>Gateway API</span></li>
+            </ol>
+        </nav>
+    </div>
+</ul>
+<ul class="header-nav ms-auto"></ul>
+<ul class="header-nav d-lg-flex">
+{% include "segments/topmenu.html.j2" %}
+{% endblock %}
+
+{% block content %}
+<!-- Gateway API Status Alert -->
+{% if not gateway_api_status.installed %}
+<div class="alert alert-warning" role="alert">
+    <strong>Gateway API Not Detected</strong> - No Gateway API CRDs found in this cluster. 
+    Please install the Gateway API CRDs to use this plugin.
+    <a href="https://gateway-api.sigs.k8s.io/guides/#installing-gateway-api" target="_blank" class="alert-link">Learn more</a>
+</div>
+{% endif %}
+
+<div class="card shadow mb-4">
+    <div class="card-header d-flex justify-content-between align-items-center">
+        <h6 class="m-0 fw-bold text-primary">Gateway API Resources</h6>
+        <div class="d-flex align-items-center">
+            {% if gateway_api_status.installed %}
+            <span class="badge bg-success me-2">
+                <i class="cil-check-circle"></i> Gateway API Installed
+            </span>
+            {% endif %}
+            {% if gateway_api_status.experimental|length > 0 %}
+            <span class="badge bg-info">
+                Experimental APIs: {{ gateway_api_status.experimental|length }}
+            </span>
+            {% endif %}
+        </div>
+    </div>
+    <div class="card-body">
+        <!-- Navigation Tabs -->
+        <ul class="nav nav-tabs" id="gateway-api-tabs" role="tablist">
+            <li class="nav-item">
+                <a class="nav-link {% if active_tab == 'gatewayclasses' %}active{% endif %}" 
+                   id="nav-gatewayclasses-tab" data-bs-toggle="tab" href="#nav-gatewayclasses" 
+                   role="tab" aria-controls="nav-gatewayclasses" aria-selected="{% if active_tab == 'gatewayclasses' %}true{% else %}false{% endif %}">
+                    GatewayClasses <span class="badge bg-secondary">{{ gateway_classes|length }}</span>
+                </a>
+            </li>
+            <li class="nav-item">
+                <a class="nav-link {% if active_tab == 'gateways' %}active{% endif %}" 
+                   id="nav-gateways-tab" data-bs-toggle="tab" href="#nav-gateways" 
+                   role="tab" aria-controls="nav-gateways" aria-selected="{% if active_tab == 'gateways' %}true{% else %}false{% endif %}">
+                    Gateways <span class="badge bg-secondary">{{ gateways|length }}</span>
+                </a>
+            </li>
+            <li class="nav-item">
+                <a class="nav-link {% if active_tab == 'httproutes' %}active{% endif %}" 
+                   id="nav-httproutes-tab" data-bs-toggle="tab" href="#nav-httproutes" 
+                   role="tab" aria-controls="nav-httproutes" aria-selected="{% if active_tab == 'httproutes' %}true{% else %}false{% endif %}">
+                    HTTPRoutes <span class="badge bg-secondary">{{ httproutes|length }}</span>
+                </a>
+            </li>
+            {% if grpcroutes|length > 0 or 'grpcroutes' in gateway_api_status.experimental %}
+            <li class="nav-item">
+                <a class="nav-link {% if active_tab == 'grpcroutes' %}active{% endif %}" 
+                   id="nav-grpcroutes-tab" data-bs-toggle="tab" href="#nav-grpcroutes" 
+                   role="tab" aria-controls="nav-grpcroutes" aria-selected="{% if active_tab == 'grpcroutes' %}true{% else %}false{% endif %}">
+                    GRPCRoutes <span class="badge bg-secondary">{{ grpcroutes|length }}</span>
+                    <span class="badge bg-warning text-dark ms-1">Exp</span>
+                </a>
+            </li>
+            {% endif %}
+            {% if tcproutes|length > 0 or 'tcproutes' in gateway_api_status.experimental %}
+            <li class="nav-item">
+                <a class="nav-link {% if active_tab == 'tcproutes' %}active{% endif %}" 
+                   id="nav-tcproutes-tab" data-bs-toggle="tab" href="#nav-tcproutes" 
+                   role="tab" aria-controls="nav-tcproutes" aria-selected="{% if active_tab == 'tcproutes' %}true{% else %}false{% endif %}">
+                    TCPRoutes <span class="badge bg-secondary">{{ tcproutes|length }}</span>
+                    <span class="badge bg-warning text-dark ms-1">Exp</span>
+                </a>
+            </li>
+            {% endif %}
+            {% if tlsroutes|length > 0 or 'tlsroutes' in gateway_api_status.experimental %}
+            <li class="nav-item">
+                <a class="nav-link {% if active_tab == 'tlsroutes' %}active{% endif %}" 
+                   id="nav-tlsroutes-tab" data-bs-toggle="tab" href="#nav-tlsroutes" 
+                   role="tab" aria-controls="nav-tlsroutes" aria-selected="{% if active_tab == 'tlsroutes' %}true{% else %}false{% endif %}">
+                    TLSRoutes <span class="badge bg-secondary">{{ tlsroutes|length }}</span>
+                    <span class="badge bg-warning text-dark ms-1">Exp</span>
+                </a>
+            </li>
+            {% endif %}
+            {% if referencegrants|length > 0 or 'referencegrants' in gateway_api_status.standard %}
+            <li class="nav-item">
+                <a class="nav-link {% if active_tab == 'referencegrants' %}active{% endif %}" 
+                   id="nav-referencegrants-tab" data-bs-toggle="tab" href="#nav-referencegrants" 
+                   role="tab" aria-controls="nav-referencegrants" aria-selected="{% if active_tab == 'referencegrants' %}true{% else %}false{% endif %}">
+                    ReferenceGrants <span class="badge bg-secondary">{{ referencegrants|length }}</span>
+                </a>
+            </li>
+            {% endif %}
+            {% if backendtlspolicies|length > 0 or 'backendtlspolicies' in gateway_api_status.experimental %}
+            <li class="nav-item">
+                <a class="nav-link {% if active_tab == 'backendtlspolicies' %}active{% endif %}" 
+                   id="nav-backendtlspolicies-tab" data-bs-toggle="tab" href="#nav-backendtlspolicies" 
+                   role="tab" aria-controls="nav-backendtlspolicies" aria-selected="{% if active_tab == 'backendtlspolicies' %}true{% else %}false{% endif %}">
+                    BackendTLSPolicies <span class="badge bg-secondary">{{ backendtlspolicies|length }}</span>
+                    <span class="badge bg-warning text-dark ms-1">Exp</span>
+                </a>
+            </li>
+            {% endif %}
+        </ul>
+
+        <!-- Tab Content -->
+        <div class="tab-content" id="gateway-api-tab-content">
+            
+            <!-- GatewayClasses Tab -->
+            <div class="tab-pane fade {% if active_tab == 'gatewayclasses' %}show active{% endif %}" 
+                 id="nav-gatewayclasses" role="tabpanel" aria-labelledby="nav-gatewayclasses-tab">
+                <div class="card shadow mb-4 mt-3">
+                    <div class="card-body">
+                        <div class="table-responsive">
+                            <table class="table table-bordered table-hover" id="gatewayClassTable" width="100%" cellspacing="0">
+                                <thead>
+                                    <tr>
+                                        <th>Status</th>
+                                        <th>Name</th>
+                                        <th>Controller</th>
+                                        <th>Description</th>
+                                        <th>Age</th>
+                                    </tr>
+                                </thead>
+                                <tbody>
+                                    {% for gc in gateway_classes %}
+                                    <tr>
+                                        <td>
+                                            {% if gc.status == 'True' %}
+                                            <span class="badge bg-success">{{ gc.status_reason or 'Accepted' }}</span>
+                                            {% else %}
+                                            <span class="badge bg-danger">{{ gc.status_reason or 'Pending' }}</span>
+                                            {% endif %}
+                                        </td>
+                                        <td>
+                                            <a href="/plugins/gateway-api/gatewayclass/{{ gc.name }}">{{ gc.name }}</a>
+                                        </td>
+                                        <td><code>{{ gc.controller }}</code></td>
+                                        <td>{{ gc.description or '-' }}</td>
+                                        <td>{{ gc.age }}</td>
+                                    </tr>
+                                    {% else %}
+                                    <tr>
+                                        <td class="text-center text-muted" colspan="5">No GatewayClasses found</td>
+                                    </tr>
+                                    {% endfor %}
+                                </tbody>
+                            </table>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Gateways Tab -->
+            <div class="tab-pane fade {% if active_tab == 'gateways' %}show active{% endif %}" 
+                 id="nav-gateways" role="tabpanel" aria-labelledby="nav-gateways-tab">
+                <div class="card shadow mb-4 mt-3">
+                    <div class="card-body">
+                        <div class="table-responsive">
+                            <table class="table table-bordered table-hover" id="gatewayTable" width="100%" cellspacing="0">
+                                <thead>
+                                    <tr>
+                                        <th>Status</th>
+                                        <th>Name</th>
+                                        <th>Namespace</th>
+                                        <th>Class</th>
+                                        <th>Listeners</th>
+                                        <th>Addresses</th>
+                                        <th>Routes</th>
+                                        <th>Age</th>
+                                    </tr>
+                                </thead>
+                                <tbody>
+                                    {% for gw in gateways %}
+                                    <tr>
+                                        <td>
+                                            {% if gw.programmed_status == 'True' %}
+                                            <span class="badge bg-success">Programmed</span>
+                                            {% elif gw.accepted_status == 'True' %}
+                                            <span class="badge bg-info">Accepted</span>
+                                            {% else %}
+                                            <span class="badge bg-warning text-dark">{{ gw.programmed_reason or 'Pending' }}</span>
+                                            {% endif %}
+                                        </td>
+                                        <td>
+                                            <a href="/plugins/gateway-api/gateway/{{ gw.namespace }}/{{ gw.name }}">{{ gw.name }}</a>
+                                        </td>
+                                        <td>{{ gw.namespace }}</td>
+                                        <td>
+                                            <a href="/plugins/gateway-api/gatewayclass/{{ gw.gateway_class }}">{{ gw.gateway_class }}</a>
+                                        </td>
+                                        <td>
+                                            {% for listener in gw.listeners %}
+                                            <span class="badge bg-light text-dark me-1">
+                                                {{ listener.protocol }}:{{ listener.port }}
+                                            </span>
+                                            {% endfor %}
+                                        </td>
+                                        <td>
+                                            {% for addr in gw.addresses %}
+                                            <code>{{ addr.split(':')[-1] }}</code>
+                                            {% else %}
+                                            <span class="text-muted">-</span>
+                                            {% endfor %}
+                                        </td>
+                                        <td>
+                                            <span class="badge bg-primary">{{ gw.attached_routes }}</span>
+                                        </td>
+                                        <td>{{ gw.age }}</td>
+                                    </tr>
+                                    {% else %}
+                                    <tr>
+                                        <td class="text-center text-muted" colspan="8">No Gateways found in namespace {{ session['ns_select'] }}</td>
+                                    </tr>
+                                    {% endfor %}
+                                </tbody>
+                            </table>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- HTTPRoutes Tab -->
+            <div class="tab-pane fade {% if active_tab == 'httproutes' %}show active{% endif %}" 
+                 id="nav-httproutes" role="tabpanel" aria-labelledby="nav-httproutes-tab">
+                <div class="card shadow mb-4 mt-3">
+                    <div class="card-body">
+                        <div class="table-responsive">
+                            <table class="table table-bordered table-hover" id="httpRouteTable" width="100%" cellspacing="0">
+                                <thead>
+                                    <tr>
+                                        <th>Status</th>
+                                        <th>Name</th>
+                                        <th>Namespace</th>
+                                        <th>Hostnames</th>
+                                        <th>Parent Gateways</th>
+                                        <th>Rules</th>
+                                        <th>Backends</th>
+                                        <th>Age</th>
+                                    </tr>
+                                </thead>
+                                <tbody>
+                                    {% for route in httproutes %}
+                                    <tr>
+                                        <td>
+                                            {% if route.accepted_parents == route.total_parents %}
+                                            <span class="badge bg-success">{{ route.accepted_parents }}/{{ route.total_parents }}</span>
+                                            {% elif route.accepted_parents > 0 %}
+                                            <span class="badge bg-warning text-dark">{{ route.accepted_parents }}/{{ route.total_parents }}</span>
+                                            {% else %}
+                                            <span class="badge bg-danger">{{ route.accepted_parents }}/{{ route.total_parents }}</span>
+                                            {% endif %}
+                                        </td>
+                                        <td>
+                                            <a href="/plugins/gateway-api/httproute/{{ route.namespace }}/{{ route.name }}">{{ route.name }}</a>
+                                        </td>
+                                        <td>{{ route.namespace }}</td>
+                                        <td>
+                                            {% for hostname in route.hostnames[:3] %}
+                                            <span class="badge bg-light text-dark">{{ hostname }}</span>
+                                            {% endfor %}
+                                            {% if route.hostnames|length > 3 %}
+                                            <span class="badge bg-secondary">+{{ route.hostnames|length - 3 }}</span>
+                                            {% endif %}
+                                        </td>
+                                        <td>
+                                            {% for gw in route.gateways %}
+                                            <a href="/plugins/gateway-api/gateway/{{ gw.replace('/', '/') }}" class="badge bg-info text-decoration-none">{{ gw.split('/')[-1] }}</a>
+                                            {% endfor %}
+                                        </td>
+                                        <td>
+                                            <span class="badge bg-secondary">{{ route.rules_count }}</span>
+                                        </td>
+                                        <td>
+                                            {% for backend in route.backends[:2] %}
+                                            <code class="small">{{ backend }}</code>
+                                            {% endfor %}
+                                            {% if route.backends|length > 2 %}
+                                            <span class="badge bg-secondary">+{{ route.backends|length - 2 }}</span>
+                                            {% endif %}
+                                        </td>
+                                        <td>{{ route.age }}</td>
+                                    </tr>
+                                    {% else %}
+                                    <tr>
+                                        <td class="text-center text-muted" colspan="8">No HTTPRoutes found in namespace {{ session['ns_select'] }}</td>
+                                    </tr>
+                                    {% endfor %}
+                                </tbody>
+                            </table>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- GRPCRoutes Tab -->
+            <div class="tab-pane fade {% if active_tab == 'grpcroutes' %}show active{% endif %}" 
+                 id="nav-grpcroutes" role="tabpanel" aria-labelledby="nav-grpcroutes-tab">
+                <div class="card shadow mb-4 mt-3">
+                    <div class="card-header bg-warning bg-opacity-25">
+                        <small><i class="cil-warning"></i> Experimental API (v1alpha2)</small>
+                    </div>
+                    <div class="card-body">
+                        <div class="table-responsive">
+                            <table class="table table-bordered table-hover" id="grpcRouteTable" width="100%" cellspacing="0">
+                                <thead>
+                                    <tr>
+                                        <th>Name</th>
+                                        <th>Namespace</th>
+                                        <th>Hostnames</th>
+                                        <th>Parent Gateways</th>
+                                        <th>Services</th>
+                                        <th>Backends</th>
+                                        <th>Age</th>
+                                    </tr>
+                                </thead>
+                                <tbody>
+                                    {% for route in grpcroutes %}
+                                    <tr>
+                                        <td>{{ route.name }}</td>
+                                        <td>{{ route.namespace }}</td>
+                                        <td>
+                                            {% for hostname in route.hostnames %}
+                                            <span class="badge bg-light text-dark">{{ hostname }}</span>
+                                            {% endfor %}
+                                        </td>
+                                        <td>
+                                            {% for gw in route.gateways %}
+                                            <span class="badge bg-info">{{ gw.split('/')[-1] }}</span>
+                                            {% endfor %}
+                                        </td>
+                                        <td>
+                                            {% for svc in route.services[:2] %}
+                                            <code class="small">{{ svc }}</code>
+                                            {% endfor %}
+                                        </td>
+                                        <td>
+                                            {% for backend in route.backends %}
+                                            <code class="small">{{ backend }}</code>
+                                            {% endfor %}
+                                        </td>
+                                        <td>{{ route.age }}</td>
+                                    </tr>
+                                    {% else %}
+                                    <tr>
+                                        <td class="text-center text-muted" colspan="7">No GRPCRoutes found</td>
+                                    </tr>
+                                    {% endfor %}
+                                </tbody>
+                            </table>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- TCPRoutes Tab -->
+            <div class="tab-pane fade {% if active_tab == 'tcproutes' %}show active{% endif %}" 
+                 id="nav-tcproutes" role="tabpanel" aria-labelledby="nav-tcproutes-tab">
+                <div class="card shadow mb-4 mt-3">
+                    <div class="card-header bg-warning bg-opacity-25">
+                        <small><i class="cil-warning"></i> Experimental API (v1alpha2)</small>
+                    </div>
+                    <div class="card-body">
+                        <div class="table-responsive">
+                            <table class="table table-bordered table-hover" id="tcpRouteTable" width="100%" cellspacing="0">
+                                <thead>
+                                    <tr>
+                                        <th>Status</th>
+                                        <th>Name</th>
+                                        <th>Namespace</th>
+                                        <th>Parent Gateways</th>
+                                        <th>Backends</th>
+                                        <th>Age</th>
+                                    </tr>
+                                </thead>
+                                <tbody>
+                                    {% for route in tcproutes %}
+                                    <tr>
+                                        <td>
+                                            {% if route.accepted_parents == route.total_parents %}
+                                            <span class="badge bg-success">{{ route.accepted_parents }}/{{ route.total_parents }}</span>
+                                            {% else %}
+                                            <span class="badge bg-warning text-dark">{{ route.accepted_parents }}/{{ route.total_parents }}</span>
+                                            {% endif %}
+                                        </td>
+                                        <td>{{ route.name }}</td>
+                                        <td>{{ route.namespace }}</td>
+                                        <td>
+                                            {% for gw in route.gateways %}
+                                            <span class="badge bg-info">{{ gw.split('/')[-1] }}</span>
+                                            {% endfor %}
+                                        </td>
+                                        <td>
+                                            {% for backend in route.backends %}
+                                            <code class="small">{{ backend }}</code>
+                                            {% endfor %}
+                                        </td>
+                                        <td>{{ route.age }}</td>
+                                    </tr>
+                                    {% else %}
+                                    <tr>
+                                        <td class="text-center text-muted" colspan="6">No TCPRoutes found</td>
+                                    </tr>
+                                    {% endfor %}
+                                </tbody>
+                            </table>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- TLSRoutes Tab -->
+            <div class="tab-pane fade {% if active_tab == 'tlsroutes' %}show active{% endif %}" 
+                 id="nav-tlsroutes" role="tabpanel" aria-labelledby="nav-tlsroutes-tab">
+                <div class="card shadow mb-4 mt-3">
+                    <div class="card-header bg-warning bg-opacity-25">
+                        <small><i class="cil-warning"></i> Experimental API (v1alpha2)</small>
+                    </div>
+                    <div class="card-body">
+                        <div class="table-responsive">
+                            <table class="table table-bordered table-hover" id="tlsRouteTable" width="100%" cellspacing="0">
+                                <thead>
+                                    <tr>
+                                        <th>Status</th>
+                                        <th>Name</th>
+                                        <th>Namespace</th>
+                                        <th>Hostnames (SNI)</th>
+                                        <th>Parent Gateways</th>
+                                        <th>Backends</th>
+                                        <th>Age</th>
+                                    </tr>
+                                </thead>
+                                <tbody>
+                                    {% for route in tlsroutes %}
+                                    <tr>
+                                        <td>
+                                            {% if route.accepted_parents == route.total_parents %}
+                                            <span class="badge bg-success">{{ route.accepted_parents }}/{{ route.total_parents }}</span>
+                                            {% else %}
+                                            <span class="badge bg-warning text-dark">{{ route.accepted_parents }}/{{ route.total_parents }}</span>
+                                            {% endif %}
+                                        </td>
+                                        <td>{{ route.name }}</td>
+                                        <td>{{ route.namespace }}</td>
+                                        <td>
+                                            {% for hostname in route.hostnames %}
+                                            <span class="badge bg-light text-dark">{{ hostname }}</span>
+                                            {% endfor %}
+                                        </td>
+                                        <td>
+                                            {% for gw in route.gateways %}
+                                            <span class="badge bg-info">{{ gw.split('/')[-1] }}</span>
+                                            {% endfor %}
+                                        </td>
+                                        <td>
+                                            {% for backend in route.backends %}
+                                            <code class="small">{{ backend }}</code>
+                                            {% endfor %}
+                                        </td>
+                                        <td>{{ route.age }}</td>
+                                    </tr>
+                                    {% else %}
+                                    <tr>
+                                        <td class="text-center text-muted" colspan="7">No TLSRoutes found</td>
+                                    </tr>
+                                    {% endfor %}
+                                </tbody>
+                            </table>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- ReferenceGrants Tab -->
+            <div class="tab-pane fade {% if active_tab == 'referencegrants' %}show active{% endif %}" 
+                 id="nav-referencegrants" role="tabpanel" aria-labelledby="nav-referencegrants-tab">
+                <div class="card shadow mb-4 mt-3">
+                    <div class="card-body">
+                        <div class="table-responsive">
+                            <table class="table table-bordered table-hover" id="referenceGrantTable" width="100%" cellspacing="0">
+                                <thead>
+                                    <tr>
+                                        <th>Name</th>
+                                        <th>Namespace</th>
+                                        <th>From (Allowed Referencing)</th>
+                                        <th>To (Allowed Referenced)</th>
+                                        <th>Age</th>
+                                    </tr>
+                                </thead>
+                                <tbody>
+                                    {% for grant in referencegrants %}
+                                    <tr>
+                                        <td>{{ grant.name }}</td>
+                                        <td>{{ grant.namespace }}</td>
+                                        <td>
+                                            {% for ref in grant.from %}
+                                            <span class="badge bg-secondary me-1">{{ ref.kind }}@{{ ref.namespace }}</span>
+                                            {% endfor %}
+                                        </td>
+                                        <td>
+                                            {% for ref in grant.to %}
+                                            <span class="badge bg-info me-1">{{ ref.kind }}/{{ ref.name or '*' }}</span>
+                                            {% endfor %}
+                                        </td>
+                                        <td>{{ grant.age }}</td>
+                                    </tr>
+                                    {% else %}
+                                    <tr>
+                                        <td class="text-center text-muted" colspan="5">No ReferenceGrants found</td>
+                                    </tr>
+                                    {% endfor %}
+                                </tbody>
+                            </table>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- BackendTLSPolicies Tab -->
+            <div class="tab-pane fade {% if active_tab == 'backendtlspolicies' %}show active{% endif %}" 
+                 id="nav-backendtlspolicies" role="tabpanel" aria-labelledby="nav-backendtlspolicies-tab">
+                <div class="card shadow mb-4 mt-3">
+                    <div class="card-header bg-warning bg-opacity-25">
+                        <small><i class="cil-warning"></i> Experimental API (v1alpha2)</small>
+                    </div>
+                    <div class="card-body">
+                        <div class="table-responsive">
+                            <table class="table table-bordered table-hover" id="backendTLSPolicyTable" width="100%" cellspacing="0">
+                                <thead>
+                                    <tr>
+                                        <th>Status</th>
+                                        <th>Name</th>
+                                        <th>Namespace</th>
+                                        <th>Target</th>
+                                        <th>Hostname</th>
+                                        <th>Age</th>
+                                    </tr>
+                                </thead>
+                                <tbody>
+                                    {% for policy in backendtlspolicies %}
+                                    <tr>
+                                        <td>
+                                            {% if policy.status == 'True' %}
+                                            <span class="badge bg-success">{{ policy.status_reason or 'Accepted' }}</span>
+                                            {% else %}
+                                            <span class="badge bg-warning text-dark">{{ policy.status_reason or 'Pending' }}</span>
+                                            {% endif %}
+                                        </td>
+                                        <td>{{ policy.name }}</td>
+                                        <td>{{ policy.namespace }}</td>
+                                        <td><code>{{ policy.target }}</code></td>
+                                        <td>{{ policy.hostname or '-' }}</td>
+                                        <td>{{ policy.age }}</td>
+                                    </tr>
+                                    {% else %}
+                                    <tr>
+                                        <td class="text-center text-muted" colspan="6">No BackendTLSPolicies found</td>
+                                    </tr>
+                                    {% endfor %}
+                                </tbody>
+                            </table>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+        </div>
+    </div>
+</div>
+{% endblock %}
+
+{% block add_head_css %}
+{% include "segments/datatable_snippet.html.j2" %}
+<style>
+    .badge.bg-light {
+        border: 1px solid #dee2e6;
+    }
+    code.small {
+        font-size: 0.85em;
+    }
+</style>
+{% endblock %}
+
+{% block add_tail_js %}
+<script>
+$(document).ready(function() {
+    // Initialize DataTables - only initialize if table has data rows
+    function safeInitDataTable(selector, orderCol) {
+        var $table = $(selector);
+        if ($table.length) {
+            // Check if table has actual data rows (not just empty message)
+            var hasData = $table.find('tbody tr').filter(function() {
+                return !$(this).find('td[colspan]').length;
+            }).length > 0;
+            
+            if (hasData) {
+                $table.DataTable({
+                    "order": [orderCol],
+                    "pageLength": 25
+                });
+            }
+        }
+    }
+    
+    safeInitDataTable('#gatewayClassTable', [1, "asc"]);
+    safeInitDataTable('#gatewayTable', [1, "asc"]);
+    safeInitDataTable('#httpRouteTable', [1, "asc"]);
+    safeInitDataTable('#grpcRouteTable', [0, "asc"]);
+    safeInitDataTable('#tcpRouteTable', [1, "asc"]);
+    safeInitDataTable('#tlsRouteTable', [1, "asc"]);
+    safeInitDataTable('#referenceGrantTable', [0, "asc"]);
+    safeInitDataTable('#backendTLSPolicyTable', [1, "asc"]);
+    
+    // Store active tab in URL
+    $('a[data-bs-toggle="tab"]').on('shown.bs.tab', function (e) {
+        var tabId = $(e.target).attr('href').replace('#nav-', '');
+        var url = new URL(window.location);
+        url.searchParams.set('tab', tabId);
+        window.history.replaceState({}, '', url);
+    });
+});
+</script>
+{% endblock %}

@@ -1,0 +1,542 @@
+{% extends "base2.html.j2" %}
+
+{% block topmenu %}
+<ul class="header-nav d-lg-flex m-3">
+    <div class="container-fluid px-4">
+        <nav aria-label="breadcrumb">
+            <ol class="breadcrumb my-0">
+                <li class="breadcrumb-item"><span>Plugins</span></li>
+                <li class="breadcrumb-item"><a href="/plugins/gateway-api">Gateway API</a></li>
+                <li class="breadcrumb-item"><span>HTTPRoute</span></li>
+                <li class="breadcrumb-item active"><span>{{ httproute.namespace }}/{{ httproute.name }}</span></li>
+            </ol>
+        </nav>
+    </div>
+</ul>
+<ul class="header-nav ms-auto"></ul>
+<ul class="header-nav d-lg-flex">
+{% include "segments/topmenu.html.j2" %}
+{% endblock %}
+
+{% block content %}
+<div class="card shadow mb-4">
+    <div class="card-header py-3 d-flex justify-content-between align-items-center">
+        <h6 class="m-0 font-weight-bold text-primary">HTTPRoute: {{ httproute.name }}</h6>
+        <div>
+            {% set total_parents = httproute.parents | length %}
+            {% set accepted_count = 0 %}
+            {% for parent in httproute.parents %}
+                {% for cond in parent.conditions if cond.type == 'Accepted' and cond.status == 'True' %}
+                    {% set accepted_count = accepted_count + 1 %}
+                {% endfor %}
+            {% endfor %}
+            {% if accepted_count == total_parents and total_parents > 0 %}
+            <span class="badge bg-success">{{ accepted_count }}/{{ total_parents }} Accepted</span>
+            {% elif accepted_count > 0 %}
+            <span class="badge bg-warning text-dark">{{ accepted_count }}/{{ total_parents }} Accepted</span>
+            {% else %}
+            <span class="badge bg-danger">Not Accepted</span>
+            {% endif %}
+        </div>
+    </div>
+    <div class="card-body">
+        <ul class="nav nav-tabs" id="nav-tab" role="tablist">
+            <li class="nav-item">
+                <a class="nav-link active" id="nav-overview-tab" href="#nav-overview" role="tab" aria-controls="nav-overview" aria-selected="true" data-bs-toggle="tab">Overview</a>
+            </li>
+            <li class="nav-item">
+                <a class="nav-link" id="nav-rules-tab" href="#nav-rules" role="tab" aria-controls="nav-rules" aria-selected="false" data-bs-toggle="tab">Rules ({{ httproute.rules|length }})</a>
+            </li>
+            <li class="nav-item">
+                <a class="nav-link" id="nav-parents-tab" href="#nav-parents" role="tab" aria-controls="nav-parents" aria-selected="false" data-bs-toggle="tab">Parent Gateways ({{ httproute.parents|length }})</a>
+            </li>
+            <li class="nav-item">
+                <a class="nav-link" id="nav-events-tab" href="#nav-events" role="tab" aria-controls="nav-events" aria-selected="false" data-bs-toggle="tab">Events ({{ events|length }})</a>
+            </li>
+            <li class="nav-item">
+                <a class="nav-link" id="nav-yaml-tab" href="#nav-yaml" role="tab" aria-controls="nav-yaml" aria-selected="false" data-bs-toggle="tab">YAML</a>
+            </li>
+        </ul>
+        
+        <div class="tab-content" id="nav-tabContent">
+            <!-- OVERVIEW TAB -->
+            <div class="tab-pane fade show active" id="nav-overview" role="tabpanel" aria-labelledby="nav-overview-tab">
+                <div class="row mt-3">
+                    <div class="col-md-6">
+                        <div class="card shadow mb-4">
+                            <div class="card-header py-3">
+                                <h6 class="m-0 font-weight-bold text-primary">Metadata</h6>
+                            </div>
+                            <div class="card-body">
+                                <table class="table table-bordered" width="100%" cellspacing="0">
+                                    <tr>
+                                        <th style="width: 30%;">Name</th>
+                                        <td>{{ httproute.name }}</td>
+                                    </tr>
+                                    <tr>
+                                        <th>Namespace</th>
+                                        <td>{{ httproute.namespace }}</td>
+                                    </tr>
+                                    <tr>
+                                        <th>Age</th>
+                                        <td>{{ httproute.age }}</td>
+                                    </tr>
+                                    <tr>
+                                        <th>Created</th>
+                                        <td>{{ httproute.creation_timestamp }}</td>
+                                    </tr>
+                                </table>
+                            </div>
+                        </div>
+                        
+                        <div class="card shadow mb-4">
+                            <div class="card-header py-3">
+                                <h6 class="m-0 font-weight-bold text-primary">Hostnames</h6>
+                            </div>
+                            <div class="card-body">
+                                {% if httproute.hostnames %}
+                                <div class="d-flex flex-wrap gap-2">
+                                    {% for hostname in httproute.hostnames %}
+                                    <span class="badge bg-primary fs-6">{{ hostname }}</span>
+                                    {% endfor %}
+                                </div>
+                                {% else %}
+                                <p class="text-muted mb-0">Matches all hostnames (*)</p>
+                                {% endif %}
+                            </div>
+                        </div>
+                    </div>
+                    
+                    <div class="col-md-6">
+                        <div class="card shadow mb-4">
+                            <div class="card-header py-3">
+                                <h6 class="m-0 font-weight-bold text-primary">Parent Gateways</h6>
+                            </div>
+                            <div class="card-body">
+                                {% if httproute.parents %}
+                                <table class="table table-bordered" width="100%" cellspacing="0">
+                                    <thead>
+                                        <tr>
+                                            <th>Gateway</th>
+                                            <th>Section</th>
+                                            <th>Status</th>
+                                        </tr>
+                                    </thead>
+                                    <tbody>
+                                        {% for parent in httproute.parents %}
+                                        <tr>
+                                            <td>
+                                                <a href="/plugins/gateway-api/gateway/{{ parent.namespace }}/{{ parent.name }}">
+                                                    {{ parent.namespace }}/{{ parent.name }}
+                                                </a>
+                                            </td>
+                                            <td>{{ parent.sectionName or '*' }}</td>
+                                            <td>
+                                                {% set accepted = parent.conditions | selectattr('type', 'equalto', 'Accepted') | first %}
+                                                {% if accepted and accepted.status == 'True' %}
+                                                <span class="badge bg-success">Accepted</span>
+                                                {% else %}
+                                                <span class="badge bg-danger">{{ accepted.reason if accepted else 'Unknown' }}</span>
+                                                {% endif %}
+                                            </td>
+                                        </tr>
+                                        {% endfor %}
+                                    </tbody>
+                                </table>
+                                {% else %}
+                                <p class="text-muted mb-0">No parent gateways</p>
+                                {% endif %}
+                            </div>
+                        </div>
+                        
+                        <div class="card shadow mb-4">
+                            <div class="card-header py-3">
+                                <h6 class="m-0 font-weight-bold text-primary">Summary</h6>
+                            </div>
+                            <div class="card-body">
+                                <table class="table table-bordered" width="100%" cellspacing="0">
+                                    <tr>
+                                        <th style="width: 50%;">Total Rules</th>
+                                        <td><span class="badge bg-primary">{{ httproute.rules|length }}</span></td>
+                                    </tr>
+                                    <tr>
+                                        <th>Parent Gateways</th>
+                                        <td><span class="badge bg-info">{{ httproute.parents|length }}</span></td>
+                                    </tr>
+                                    <tr>
+                                        <th>Hostnames</th>
+                                        <td><span class="badge bg-secondary">{{ httproute.hostnames|length }}</span></td>
+                                    </tr>
+                                </table>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+                
+                <!-- Labels -->
+                {% if httproute.labels %}
+                <div class="card shadow mb-4">
+                    <div class="card-header py-3">
+                        <h6 class="m-0 font-weight-bold text-primary">Labels</h6>
+                    </div>
+                    <div class="card-body">
+                        <table class="table table-bordered" width="100%" cellspacing="0">
+                            <thead>
+                                <tr>
+                                    <th width="50%">Key</th>
+                                    <th width="50%">Value</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                            {% for key, value in httproute.labels.items() %}
+                                <tr>
+                                    <td>{{ key }}</td>
+                                    <td>{{ value }}</td>
+                                </tr>
+                            {% endfor %}
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+                {% endif %}
+                
+                <!-- Annotations -->
+                {% if httproute.annotations %}
+                <div class="card shadow mb-4">
+                    <div class="card-header py-3">
+                        <h6 class="m-0 font-weight-bold text-primary">Annotations</h6>
+                    </div>
+                    <div class="card-body">
+                        <table class="table table-bordered" width="100%" cellspacing="0">
+                            <thead>
+                                <tr>
+                                    <th width="50%">Key</th>
+                                    <th width="50%">Value</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                            {% for key, value in httproute.annotations.items() %}
+                                <tr>
+                                    <td style="word-break: break-all;">{{ key }}</td>
+                                    <td style="word-break: break-all;">{{ value }}</td>
+                                </tr>
+                            {% endfor %}
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+                {% endif %}
+            </div>
+            
+            <!-- RULES TAB -->
+            <div class="tab-pane fade" id="nav-rules" role="tabpanel" aria-labelledby="nav-rules-tab">
+                <div class="card shadow mb-4 mt-3">
+                    <div class="card-header py-3">
+                        <h6 class="m-0 font-weight-bold text-primary">Routing Rules</h6>
+                    </div>
+                    <div class="card-body">
+                        {% for rule in httproute.rules %}
+                        <div class="card mb-3 border-primary">
+                            <div class="card-header bg-primary bg-opacity-10 d-flex justify-content-between align-items-center">
+                                <strong>Rule {{ rule.index }}</strong>
+                                <div>
+                                    <span class="badge bg-secondary">{{ rule.matches|length }} match{% if rule.matches|length != 1 %}es{% endif %}</span>
+                                    <span class="badge bg-info">{{ rule.backendRefs|length }} backend{% if rule.backendRefs|length != 1 %}s{% endif %}</span>
+                                    {% if rule.filters %}
+                                    <span class="badge bg-warning text-dark">{{ rule.filters|length }} filter{% if rule.filters|length != 1 %}s{% endif %}</span>
+                                    {% endif %}
+                                </div>
+                            </div>
+                            <div class="card-body">
+                                <!-- Matches -->
+                                <h6 class="text-muted">Matches</h6>
+                                {% if rule.match_summaries %}
+                                <div class="mb-3">
+                                    {% for summary in rule.match_summaries %}
+                                    <div class="alert alert-light mb-1 py-2">
+                                        <code>{{ summary }}</code>
+                                    </div>
+                                    {% endfor %}
+                                </div>
+                                {% else %}
+                                <p class="text-muted">Match all requests</p>
+                                {% endif %}
+                                
+                                <!-- Filters -->
+                                {% if rule.filters %}
+                                <h6 class="text-muted mt-3">Filters</h6>
+                                <table class="table table-sm table-bordered mb-3">
+                                    <thead>
+                                        <tr>
+                                            <th>Type</th>
+                                            <th>Configuration</th>
+                                        </tr>
+                                    </thead>
+                                    <tbody>
+                                        {% for filter in rule.filters %}
+                                        <tr>
+                                            <td><span class="badge bg-warning text-dark">{{ filter.type }}</span></td>
+                                            <td>
+                                                {% if filter.type == 'RequestHeaderModifier' %}
+                                                    {% if filter.requestHeaderModifier.set %}
+                                                    <strong>Set:</strong>
+                                                    {% for header in filter.requestHeaderModifier.set %}
+                                                    <code>{{ header.name }}: {{ header.value }}</code>
+                                                    {% endfor %}
+                                                    {% endif %}
+                                                    {% if filter.requestHeaderModifier.add %}
+                                                    <strong>Add:</strong>
+                                                    {% for header in filter.requestHeaderModifier.add %}
+                                                    <code>{{ header.name }}: {{ header.value }}</code>
+                                                    {% endfor %}
+                                                    {% endif %}
+                                                    {% if filter.requestHeaderModifier.remove %}
+                                                    <strong>Remove:</strong> {{ filter.requestHeaderModifier.remove | join(', ') }}
+                                                    {% endif %}
+                                                {% elif filter.type == 'ResponseHeaderModifier' %}
+                                                    {% if filter.responseHeaderModifier.set %}
+                                                    <strong>Set:</strong>
+                                                    {% for header in filter.responseHeaderModifier.set %}
+                                                    <code>{{ header.name }}: {{ header.value }}</code>
+                                                    {% endfor %}
+                                                    {% endif %}
+                                                {% elif filter.type == 'RequestRedirect' %}
+                                                    {% if filter.requestRedirect.scheme %}<strong>Scheme:</strong> {{ filter.requestRedirect.scheme }}<br>{% endif %}
+                                                    {% if filter.requestRedirect.hostname %}<strong>Host:</strong> {{ filter.requestRedirect.hostname }}<br>{% endif %}
+                                                    {% if filter.requestRedirect.port %}<strong>Port:</strong> {{ filter.requestRedirect.port }}<br>{% endif %}
+                                                    {% if filter.requestRedirect.path %}<strong>Path:</strong> {{ filter.requestRedirect.path.type }}: {{ filter.requestRedirect.path.value or filter.requestRedirect.path.replacePrefixMatch }}<br>{% endif %}
+                                                    {% if filter.requestRedirect.statusCode %}<strong>Status:</strong> {{ filter.requestRedirect.statusCode }}{% endif %}
+                                                {% elif filter.type == 'URLRewrite' %}
+                                                    {% if filter.urlRewrite.hostname %}<strong>Host:</strong> {{ filter.urlRewrite.hostname }}<br>{% endif %}
+                                                    {% if filter.urlRewrite.path %}<strong>Path:</strong> {{ filter.urlRewrite.path.type }}: {{ filter.urlRewrite.path.value or filter.urlRewrite.path.replacePrefixMatch }}{% endif %}
+                                                {% elif filter.type == 'RequestMirror' %}
+                                                    <strong>Mirror to:</strong> {{ filter.requestMirror.backendRef.name }}:{{ filter.requestMirror.backendRef.port }}
+                                                {% elif filter.type == 'ExtensionRef' %}
+                                                    <strong>Extension:</strong> {{ filter.extensionRef.group }}/{{ filter.extensionRef.kind }}/{{ filter.extensionRef.name }}
+                                                {% else %}
+                                                    <pre class="mb-0"><code>{{ filter | tojson(indent=2) }}</code></pre>
+                                                {% endif %}
+                                            </td>
+                                        </tr>
+                                        {% endfor %}
+                                    </tbody>
+                                </table>
+                                {% endif %}
+                                
+                                <!-- Backend Refs -->
+                                <h6 class="text-muted mt-3">Backends</h6>
+                                <table class="table table-sm table-bordered">
+                                    <thead>
+                                        <tr>
+                                            <th>Kind</th>
+                                            <th>Namespace</th>
+                                            <th>Name</th>
+                                            <th>Port</th>
+                                            <th>Weight</th>
+                                        </tr>
+                                    </thead>
+                                    <tbody>
+                                        {% for backend in rule.backendRefs %}
+                                        <tr>
+                                            <td>{{ backend.kind }}</td>
+                                            <td>{{ backend.namespace }}</td>
+                                            <td><code>{{ backend.name }}</code></td>
+                                            <td>{{ backend.port }}</td>
+                                            <td>
+                                                <div class="progress" style="height: 20px; min-width: 60px;">
+                                                    {% set total_weight = rule.backendRefs | map(attribute='weight') | sum %}
+                                                    {% set pct = (backend.weight / total_weight * 100) | int if total_weight > 0 else 100 %}
+                                                    <div class="progress-bar" role="progressbar" style="width: {{ pct }}%;" aria-valuenow="{{ backend.weight }}" aria-valuemin="0" aria-valuemax="{{ total_weight }}">{{ backend.weight }}</div>
+                                                </div>
+                                            </td>
+                                        </tr>
+                                        {% else %}
+                                        <tr>
+                                            <td colspan="5" class="text-center text-muted">No backends configured</td>
+                                        </tr>
+                                        {% endfor %}
+                                    </tbody>
+                                </table>
+                                
+                                <!-- Timeouts -->
+                                {% if rule.timeouts %}
+                                <h6 class="text-muted mt-3">Timeouts</h6>
+                                <table class="table table-sm table-bordered">
+                                    <tbody>
+                                        {% if rule.timeouts.request %}
+                                        <tr>
+                                            <th style="width: 30%;">Request Timeout</th>
+                                            <td>{{ rule.timeouts.request }}</td>
+                                        </tr>
+                                        {% endif %}
+                                        {% if rule.timeouts.backendRequest %}
+                                        <tr>
+                                            <th>Backend Request Timeout</th>
+                                            <td>{{ rule.timeouts.backendRequest }}</td>
+                                        </tr>
+                                        {% endif %}
+                                    </tbody>
+                                </table>
+                                {% endif %}
+                            </div>
+                        </div>
+                        {% else %}
+                        <p class="text-muted">No rules configured</p>
+                        {% endfor %}
+                    </div>
+                </div>
+            </div>
+            
+            <!-- PARENTS TAB -->
+            <div class="tab-pane fade" id="nav-parents" role="tabpanel" aria-labelledby="nav-parents-tab">
+                <div class="card shadow mb-4 mt-3">
+                    <div class="card-header py-3">
+                        <h6 class="m-0 font-weight-bold text-primary">Parent Gateway Status</h6>
+                    </div>
+                    <div class="card-body">
+                        {% for parent in httproute.parents %}
+                        <div class="card mb-3">
+                            <div class="card-header d-flex justify-content-between align-items-center">
+                                <strong>
+                                    <a href="/plugins/gateway-api/gateway/{{ parent.namespace }}/{{ parent.name }}">
+                                        {{ parent.namespace }}/{{ parent.name }}
+                                    </a>
+                                    {% if parent.sectionName %}
+                                    <span class="text-muted">({{ parent.sectionName }})</span>
+                                    {% endif %}
+                                </strong>
+                                <div>
+                                    {% set accepted = parent.conditions | selectattr('type', 'equalto', 'Accepted') | first %}
+                                    {% if accepted and accepted.status == 'True' %}
+                                    <span class="badge bg-success">Accepted</span>
+                                    {% else %}
+                                    <span class="badge bg-danger">{{ accepted.reason if accepted else 'Unknown' }}</span>
+                                    {% endif %}
+                                </div>
+                            </div>
+                            <div class="card-body">
+                                {% if parent.conditions %}
+                                <table class="table table-sm table-bordered mb-0">
+                                    <thead>
+                                        <tr>
+                                            <th>Type</th>
+                                            <th>Status</th>
+                                            <th>Reason</th>
+                                            <th>Message</th>
+                                        </tr>
+                                    </thead>
+                                    <tbody>
+                                        {% for cond in parent.conditions %}
+                                        <tr>
+                                            <td>
+                                                {% if cond.status == 'True' %}
+                                                <span class="badge bg-success">{{ cond.type }}</span>
+                                                {% else %}
+                                                <span class="badge bg-danger">{{ cond.type }}</span>
+                                                {% endif %}
+                                            </td>
+                                            <td>{{ cond.status }}</td>
+                                            <td><code>{{ cond.reason }}</code></td>
+                                            <td>{{ cond.message or '-' }}</td>
+                                        </tr>
+                                        {% endfor %}
+                                    </tbody>
+                                </table>
+                                {% else %}
+                                <p class="text-muted mb-0">No condition status available</p>
+                                {% endif %}
+                            </div>
+                        </div>
+                        {% else %}
+                        <p class="text-muted">No parent gateways</p>
+                        {% endfor %}
+                    </div>
+                </div>
+            </div>
+            
+            <!-- EVENTS TAB -->
+            <div class="tab-pane fade" id="nav-events" role="tabpanel" aria-labelledby="nav-events-tab">
+                <div class="card shadow mb-4 mt-3">
+                    <div class="card-header py-3">
+                        <h6 class="m-0 font-weight-bold text-primary">Kubernetes Events</h6>
+                    </div>
+                    <div class="card-body">
+                        <div class="table-responsive">
+                            <table class="table table-bordered" id="eventsTable" width="100%" cellspacing="0">
+                                <thead>
+                                    <tr>
+                                        <th>Last Seen</th>
+                                        <th>Type</th>
+                                        <th>Reason</th>
+                                        <th>Message</th>
+                                        <th>Count</th>
+                                    </tr>
+                                </thead>
+                                <tbody>
+                                    {% for event in events %}
+                                    <tr>
+                                        <td>{{ event.last_timestamp or event.first_timestamp or 'Unknown' }}</td>
+                                        <td>
+                                            {% if event.type == 'Normal' %}
+                                            <span class="badge bg-success">{{ event.type }}</span>
+                                            {% elif event.type == 'Warning' %}
+                                            <span class="badge bg-warning text-dark">{{ event.type }}</span>
+                                            {% else %}
+                                            <span class="badge bg-secondary">{{ event.type }}</span>
+                                            {% endif %}
+                                        </td>
+                                        <td><code>{{ event.reason }}</code></td>
+                                        <td>{{ event.message }}</td>
+                                        <td>{{ event.count }}</td>
+                                    </tr>
+                                    {% else %}
+                                    <tr>
+                                        <td colspan="5" class="text-center text-muted">No events found</td>
+                                    </tr>
+                                    {% endfor %}
+                                </tbody>
+                            </table>
+                        </div>
+                    </div>
+                </div>
+            </div>
+            
+            <!-- YAML TAB -->
+            <div class="tab-pane fade" id="nav-yaml" role="tabpanel" aria-labelledby="nav-yaml-tab">
+                <div class="card shadow mb-4 mt-3">
+                    <div class="card-header py-3">
+                        <h6 class="m-0 font-weight-bold text-primary">Resource YAML</h6>
+                    </div>
+                    <div class="card-body">
+                        <pre><code class="language-json">{% autoescape false %}{{ httproute.raw | tojson(indent=2) | replace("<", "&lt;") | replace(">", "&gt;") }}{% endautoescape %}</code></pre>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}
+
+{% block add_head_css %}
+{% include "segments/datatable_snippet.html.j2" %}
+{% include "segments/highlight_snippet.html.j2" %}
+<style>
+    .alert-light {
+        background-color: #f8f9fa;
+        border-color: #e9ecef;
+    }
+</style>
+{% endblock %}
+
+{% block add_tail_js %}
+<script>
+$(document).ready(function() {
+    // Only initialize events table if there are events
+    if ($('#eventsTable tbody tr').filter(function() { return !$(this).find('td[colspan]').length; }).length > 0) {
+        $('#eventsTable').DataTable({
+            order: [[0, 'desc']]
+        });
+    }
+});
+</script>
+{% endblock %}

@@ -72,8 +72,17 @@ registry = true
 # enable helm plugin
 helm = true
 
-# enable gateway api plugin
-gateway_api = true
+# enable external loadbalancer plugin
+external_loadbalancer = true
 
 # enable cert-manager plugin
 cert_manager = true
+
+# enable flux cd plugin
+flux = true
+
+# enable gateway api plugin
+gateway_api = true
+
+# enable trivy operator plugin
+trivy_operator = true
