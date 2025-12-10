@@ -10,7 +10,7 @@ from kubernetes.client.rest import ApiException
 from lib.components import socketio
 from lib.helper_functions import get_logger
 from lib.k8s.namespace import k8sNamespaceListGet
-from lib.k8s.security import k8sPodListVulnsGet, k8sPodVulnsGet
+from lib.k8s.security import k8sPodListVulnsGet
 from lib.k8s.workload import (ErrorHandler, k8sDaemonsetPatch,
                               k8sDaemonSetsGet, k8sDeploymentsGet,
                               k8sDeploymentsPatchReplica, k8sPodExecSocket,
@@ -95,7 +95,6 @@ def pod_data():
         user_token = get_user_token(session)
 
         pod_data = k8sPodGet(session['user_role'], user_token, session['ns_select'], po_name)
-        # has_report, pod_vulns = k8sPodVulnsGet(session['user_role'], user_token, session['ns_select'], po_name)
 
         return render_template(
             'workload/pod-data.html.j2',

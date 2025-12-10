@@ -115,7 +115,6 @@ def k8sNodeGet(username_role, user_token, no_name):
         error (str): Error message if any
     """
     k8sClientConfigGet(username_role, user_token)
-    nodes, error = k8sListNodes(username_role, user_token)
     NODE_INFO = {
         "status": "",
         "name": "",
@@ -129,42 +128,49 @@ def k8sNodeGet(username_role, user_token, no_name):
         "labels": "",
         "conditions": {},
     }
-    if error is None:
-        for no in nodes.items:
-            if no.metadata.name == no_name:
-                NODE_INFO['name'] = no.metadata.name
-                taints = no.spec.taints
-                if taints:
-                    for t in taints:
-                        if t.value:
-                            NODE_INFO["taint"].append(t.key + "=" + t.value)
-                        else:
-                            NODE_INFO["taint"].append(t.key + "=")
-                NODE_INFO['role'] = None
-                NODE_INFO['annotations'] = trimAnnotations(no.metadata.annotations)
-                NODE_INFO['labels'] = no.metadata.labels
-                NODE_INFO['pod_cidr'] = no.spec.pod_cidr
-                NODE_INFO['os'] = no.status.node_info.os_image
-                NODE_INFO['conditions'] = list()
-                for co in no.status.conditions:
-                    NODE_INFO['conditions'].append([co.type, co.status, co.reason, co.message])
-                    
-                for label, value in no.metadata.labels.items():
-                    if "node-role.kubernetes.io" in label:
-                        NODE_INFO['role'] = label.split('/')[1].capitalize()
+    try:
+        # Optimize: Use read_node() instead of list_node() and looping
+        # This avoids fetching all nodes when we only need one specific node
+        no = k8s_client.CoreV1Api().read_node(no_name, _request_timeout=1)
+        
+        NODE_INFO['name'] = no.metadata.name
+        taints = no.spec.taints
+        if taints:
+            for t in taints:
+                if t.value:
+                    NODE_INFO["taint"].append(t.key + "=" + t.value)
+                else:
+                    NODE_INFO["taint"].append(t.key + "=")
+        NODE_INFO['role'] = None
+        NODE_INFO['annotations'] = trimAnnotations(no.metadata.annotations)
+        NODE_INFO['labels'] = no.metadata.labels
+        NODE_INFO['pod_cidr'] = no.spec.pod_cidr
+        NODE_INFO['os'] = no.status.node_info.os_image
+        NODE_INFO['conditions'] = list()
+        for co in no.status.conditions:
+            NODE_INFO['conditions'].append([co.type, co.status, co.reason, co.message])
+            
+        for label, value in no.metadata.labels.items():
+            if "node-role.kubernetes.io" in label:
+                NODE_INFO['role'] = label.split('/')[1].capitalize()
 
-                for key, value in no.status.node_info.__dict__.items():
-                    if key == "_container_runtime_version":
-                        NODE_INFO['runtime'] = value
-                    elif key == "_kubelet_version":
-                        NODE_INFO['version'] = value
+        for key, value in no.status.node_info.__dict__.items():
+            if key == "_container_runtime_version":
+                NODE_INFO['runtime'] = value
+            elif key == "_kubelet_version":
+                NODE_INFO['version'] = value
+        
+        for key, value in no.status.conditions[-1].__dict__.items():
+            if key == "_type":
+                NODE_INFO['status'] = value
                 
-                for key, value in no.status.conditions[-1].__dict__.items():
-                    if key == "_type":
-                        NODE_INFO['status'] = value
-                        
-                if NODE_INFO['role'] is None:
-                    NODE_INFO['role'] = "Worker"
+        if NODE_INFO['role'] is None:
+            NODE_INFO['role'] = "Worker"
         return NODE_INFO
-    else:
+    except ApiException as error:
+        if error.status != 404:
+            ErrorHandler(logger, error, "get node %s - %s" % (no_name, error.status))
+        return NODE_INFO
+    except Exception as error:
+        ErrorHandler(logger, "CannotConnect", "k8sNodeGet: %s" % error)
         return NODE_INFO

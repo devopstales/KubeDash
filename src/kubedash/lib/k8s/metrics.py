@@ -95,41 +95,32 @@ def k8sGetClusterMetric():
             }
         }
         try:
-            # Parallelize API calls to reduce total time from ~3s to ~1s (longest call)
-            def fetch_nodes():
-                with tracer.start_as_current_span("k8s_client__list_node") as span:
-                    return k8s_client.CoreV1Api().list_node(_request_timeout=5)
-            
-            def fetch_pods():
-                with tracer.start_as_current_span("k8s_client__list_pod_for_all_namespaces") as span:
-                    return k8s_client.CoreV1Api().list_pod_for_all_namespaces(_request_timeout=5)
-            
-            def fetch_node_metrics():
-                try:
-                    with tracer.start_as_current_span("k8s_client__list_cluster_custom_object") as span:
-                        return k8s_client.CustomObjectsApi().list_cluster_custom_object("metrics.k8s.io", "v1beta1", "nodes", _request_timeout=5)
-                except Exception as error:
-                    if tracer and span.is_recording():
-                        span.set_status(Status(StatusCode.ERROR, "Metrics Server is not installed. If you want to see usage date please install Metrics Server."))
-                    flash("Metrics Server is not installed. If you want to see usage date please install Metrics Server.", "warning")
-                    return None
-            
-            # Execute all three API calls in parallel
-            with ThreadPoolExecutor(max_workers=3) as executor:
-                node_future = executor.submit(fetch_nodes)
-                pod_future = executor.submit(fetch_pods)
-                metrics_future = executor.submit(fetch_node_metrics)
-                
-                # Wait for all calls to complete
-                node_list = node_future.result()
-                pod_list = pod_future.result()
-                k8s_nodes = metrics_future.result()
+            with tracer.start_as_current_span("k8s_client__list_node") as span:
+                # Increased timeout from 1s to 10s for better reliability in large clusters
+                node_list = k8s_client.CoreV1Api().list_node(_request_timeout=10)
+            with tracer.start_as_current_span("k8s_client__list_pod_for_all_namespaces") as span:
+                # Increased timeout from 1s to 10s - listing all pods can be slow
+                # Use field selector to filter Running pods at API level instead of in Python
+                pod_list = k8s_client.CoreV1Api().list_pod_for_all_namespaces(
+                    field_selector="status.phase=Running",
+                    _request_timeout=10
+                )
+            try:
+                with tracer.start_as_current_span("k8s_client__list_cluster_custom_object") as span:
+                    # Increased timeout from 1s to 10s for metrics API
+                    k8s_nodes = k8s_client.CustomObjectsApi().list_cluster_custom_object("metrics.k8s.io", "v1beta1", "nodes", _request_timeout=10)
+            except Exception as error:
+                k8s_nodes = None
+                if tracer and span.is_recording():
+                    span.set_status(Status(StatusCode.ERROR, "Metrics Server is not installed. If you want to see usage date please install Metrics Server."))
+                flash("Metrics Server is not installed. If you want to see usage date please install Metrics Server.", "warning")
             
             # Performance optimization: Group pods by node to avoid O(nodes × pods) nested loop
             # This reduces complexity from O(nodes × pods) to O(nodes + pods)
+            # Note: Pods are already filtered by status.phase=Running via field selector
             pods_by_node = {}
             for pod in pod_list.items:
-                if pod.spec.node_name and pod.status.phase == "Running":
+                if pod.spec.node_name:  # status.phase check removed since already filtered by API
                     node_name = pod.spec.node_name
                     if node_name not in pods_by_node:
                         pods_by_node[node_name] = []
@@ -352,79 +343,95 @@ def k8sGetNodeMetric(node_name):
     }
 
     try:
-        # Increased timeout from 1s to 10s for better reliability
-        node_list = k8s_client.CoreV1Api().list_node(_request_timeout=10)
-        pod_list = k8s_client.CoreV1Api().list_pod_for_all_namespaces(_request_timeout=10)
+        # Optimize: Use read_node() instead of list_node() since we only need one specific node
+        # This avoids fetching all nodes and looping through them
+        try:
+            node = k8s_client.CoreV1Api().read_node(node_name, _request_timeout=10)
+        except ApiException as error:
+            if error.status == 404:
+                return bad_node_metric
+            raise
+        
+        # Optimize: Use field selector to fetch only pods for this specific node with Running status
+        # This avoids fetching all pods and looping through them
+        pod_list = k8s_client.CoreV1Api().list_pod_for_all_namespaces(
+            field_selector=f"spec.nodeName={node_name},status.phase=Running",
+            _request_timeout=10
+        )
+        
         try:
             k8s_nodes = k8s_client.CustomObjectsApi().list_cluster_custom_object("metrics.k8s.io", "v1beta1", "nodes", _request_timeout=10)
         except Exception as error:
             k8s_nodes = None
             flash("Metrics Server is not installed. If you want to see usage date please install Metrics Server.", "warning")
-        for node in node_list.items:
-            tmpPodCount = int()
-            tmpCpuLimit = float()
-            tmpMemoryLimit = float()
-            tmpCpuRequest = float()
-            tmpMemoryRequest = float()
-            node_mem_usage = 0
-            node_cpu_usage = 0
-            if node.metadata.name == node_name:
-                for pod in pod_list.items:
-                    if pod.spec.node_name == node.metadata.name and pod.status.phase == "Running":
-                        tmpPodCount += 1
-                        for container in pod.spec.containers:
-                            if container.resources.limits:
-                                if "cpu" in container.resources.limits:
-                                    tmpCpuLimit += float(parse_quantity(container.resources.limits["cpu"]))
-                                if "memory" in container.resources.limits:
-                                    tmpMemoryLimit += float(parse_quantity(container.resources.limits["memory"]))
-                            if container.resources.requests:
-                                if "cpu" in container.resources.requests:
-                                    tmpCpuRequest += float(parse_quantity(container.resources.requests["cpu"]))
-                                if "memory" in container.resources.requests:
-                                    tmpMemoryRequest += float(parse_quantity(container.resources.requests["memory"]))
-                totalPodAllocatable += float(node.status.allocatable["pods"])
-                node_mem_capacity = float(parse_quantity(node.status.capacity["memory"]))
-                node_mem_allocatable = float(parse_quantity(node.status.allocatable["memory"]))
-                # Parse CPU quantities (can be in formats like "2500m", "2.5", etc.)
-                node_cpu_capacity = float(parse_quantity(node.status.capacity["cpu"]))
-                node_cpu_allocatable = float(parse_quantity(node.status.allocatable["cpu"]))
-                if k8s_nodes:
-                    for stats in k8s_nodes['items']:
-                        if stats['metadata']['name'] == node.metadata.name:
-                            node_mem_usage = float(parse_quantity(stats['usage']['memory']))
-                            node_cpu_usage = float(parse_quantity(stats['usage']['cpu']))
-                node_metric = {
-                    "name": node.metadata.name,
-                    "cpu": {
-                        "capacity":  int(node_cpu_capacity),
-                        "allocatable":  int(node_cpu_allocatable),
-                        "requests": tmpCpuRequest,
-                        "requestsPercent": calcPercent(tmpCpuRequest, node_cpu_capacity, True),
-                        "limits": tmpCpuLimit,
-                        "limitsPercent": calcPercent(tmpCpuLimit, node_cpu_capacity, True),
-                        "usage": node_cpu_usage,
-                        "usagePercent": calcPercent(node_cpu_usage, node_cpu_capacity, True),
-                    },
-                    "memory": {
-                        "capacity": node_mem_capacity,
-                        "allocatable": node_mem_allocatable,
-                        "requests": tmpMemoryRequest,
-                        "requestsPercent": calcPercent(tmpMemoryRequest, node_mem_capacity, True),
-                        "limits": tmpMemoryLimit,
-                        "limitsPercent": calcPercent(tmpMemoryLimit, node_mem_capacity, True),
-                        "usage": node_mem_usage,
-                        "usagePercent": calcPercent(node_mem_usage, node_mem_capacity, True),
-                    },
-                    "pod_count": {
-                        "current": tmpPodCount,
-                        "currentPercent": calcPercent(tmpPodCount, totalPodAllocatable, True),
-                        "allocatable": totalPodAllocatable,
-                    },
-                }
-                return node_metric
-            else:
-                return bad_node_metric
+        
+        tmpPodCount = int()
+        tmpCpuLimit = float()
+        tmpMemoryLimit = float()
+        tmpCpuRequest = float()
+        tmpMemoryRequest = float()
+        node_mem_usage = 0
+        node_cpu_usage = 0
+        
+        # Process pods for this node (already filtered by API)
+        for pod in pod_list.items:
+            tmpPodCount += 1
+            for container in pod.spec.containers:
+                if container.resources.limits:
+                    if "cpu" in container.resources.limits:
+                        tmpCpuLimit += float(parse_quantity(container.resources.limits["cpu"]))
+                    if "memory" in container.resources.limits:
+                        tmpMemoryLimit += float(parse_quantity(container.resources.limits["memory"]))
+                if container.resources.requests:
+                    if "cpu" in container.resources.requests:
+                        tmpCpuRequest += float(parse_quantity(container.resources.requests["cpu"]))
+                    if "memory" in container.resources.requests:
+                        tmpMemoryRequest += float(parse_quantity(container.resources.requests["memory"]))
+        
+        totalPodAllocatable += float(node.status.allocatable["pods"])
+        node_mem_capacity = float(parse_quantity(node.status.capacity["memory"]))
+        node_mem_allocatable = float(parse_quantity(node.status.allocatable["memory"]))
+        # Parse CPU quantities (can be in formats like "2500m", "2.5", etc.)
+        node_cpu_capacity = float(parse_quantity(node.status.capacity["cpu"]))
+        node_cpu_allocatable = float(parse_quantity(node.status.allocatable["cpu"]))
+        
+        # Find node metrics (CustomObjectsApi doesn't support field selectors, so we still need to loop)
+        if k8s_nodes:
+            for stats in k8s_nodes['items']:
+                if stats['metadata']['name'] == node_name:
+                    node_mem_usage = float(parse_quantity(stats['usage']['memory']))
+                    node_cpu_usage = float(parse_quantity(stats['usage']['cpu']))
+                    break  # Found the node, no need to continue looping
+        
+        node_metric = {
+            "name": node.metadata.name,
+            "cpu": {
+                "capacity":  int(node_cpu_capacity),
+                "allocatable":  int(node_cpu_allocatable),
+                "requests": tmpCpuRequest,
+                "requestsPercent": calcPercent(tmpCpuRequest, node_cpu_capacity, True),
+                "limits": tmpCpuLimit,
+                "limitsPercent": calcPercent(tmpCpuLimit, node_cpu_capacity, True),
+                "usage": node_cpu_usage,
+                "usagePercent": calcPercent(node_cpu_usage, node_cpu_capacity, True),
+            },
+            "memory": {
+                "capacity": node_mem_capacity,
+                "allocatable": node_mem_allocatable,
+                "requests": tmpMemoryRequest,
+                "requestsPercent": calcPercent(tmpMemoryRequest, node_mem_capacity, True),
+                "limits": tmpMemoryLimit,
+                "limitsPercent": calcPercent(tmpMemoryLimit, node_mem_capacity, True),
+                "usage": node_mem_usage,
+                "usagePercent": calcPercent(node_mem_usage, node_mem_capacity, True),
+            },
+            "pod_count": {
+                "current": tmpPodCount,
+                "currentPercent": calcPercent(tmpPodCount, totalPodAllocatable, True),
+                "allocatable": totalPodAllocatable,
+            },
+        }
+        return node_metric
     except ApiException as error:
         if error.status != 404:
             ErrorHandler(logger, error, "Cannot Connect to Kubernetes - %s " % error.status)

@@ -108,121 +108,6 @@ def k8sPodListVulnsGet(username_role, user_token, ns):
 
     return HAS_REPORT, POD_VULN_LIST
 
-@cache.memoize(timeout=long_cache_time)
-def k8sPodVulnsGet(username_role, user_token, ns, pod):
-    """Get vulnerability details for a specific pod in a given namespace.
-    
-    Args:
-        username_role (str): Role of the current user
-        user_token (str): Auth token of the current user
-        ns (str): Namespace name
-        pod (str): Pod name
-        
-    Returns:
-        HAS_REPORT (bool): True if a vulnerability report exists, False otherwise
-        POD_VULNS (dict): Vulnerability details for the pod
-    """
-    k8sClientConfigGet(username_role, user_token)
-    POD_VULNS = {}
-    HAS_REPORT = False
-    try:
-        pod_list = k8s_client.CoreV1Api().list_namespaced_pod(ns, _request_timeout=1)
-    except ApiException as error:
-        if error.status != 404:
-            ErrorHandler(logger, error, "get cluster roles - %s" % error.status)
-        return HAS_REPORT, POD_VULNS
-    except Exception as error:
-        ERROR = "k8sPodVulnsGet: %s" % error
-        ErrorHandler(logger, "error", ERROR)
-        return HAS_REPORT, POD_VULNS
-    
-    try:
-        api_group = "trivy-operator.devopstales.io"
-        api_version = "v1"
-        api_plural = "vulnerabilityreports"
-        vulnerabilityreport_list = k8s_client.CustomObjectsApi().list_namespaced_custom_object(api_group, api_version, ns, api_plural, _request_timeout=1)
-    except ApiException as error:
-        #####################################################
-        # aquasecurity trivy operator functions
-        #####################################################
-        if error.status == 404:
-            try:
-                api_group = "aquasecurity.github.io"
-                api_version = "v1alpha1"
-                api_plural = "vulnerabilityreports"
-                vulnerabilityreport_list = k8s_client.CustomObjectsApi().list_namespaced_custom_object(api_group, api_version, ns, api_plural, _request_timeout=1)
-            except ApiException as error2:
-                vulnerabilityreport_list = None
-                if error2.status != 404:
-                    ERROR = "k8sPodVulnsGet: %s" % error2
-                    ErrorHandler(logger, "error", ERROR)
-            except Exception as error2:
-                ErrorHandler(logger, "error", error2)
-                vulnerabilityreport_list = None
-        #####################################################
-        else:
-            vulnerabilityreport_list = None
-            ERROR = "k8sPodVulnsGet: %s" % error
-            ErrorHandler(logger, "error", ERROR)
-    except Exception as error:
-        ErrorHandler(logger, "error", error)
-        vulnerabilityreport_list = None
-
-    for po in pod_list.items:
-        POD_VULNS = {}
-        if po.metadata.name == pod:
-            if vulnerabilityreport_list is not None:
-                for vr in vulnerabilityreport_list['items']:
-                    fixedVersion = None
-                    publishedDate = None
-                    vuln_scoe = None
-                    if 'trivy-operator.pod.name' in vr['metadata']['labels']:
-                        if vr['metadata']['labels']['trivy-operator.pod.name'] == po.metadata.name:
-                            HAS_REPORT = True
-                            VULN_LIST = list()
-                            for vuln in vr['report']['vulnerabilities']:
-                                if 'fixedVersion' in vuln:
-                                    fixedVersion = vuln['fixedVersion']
-                                if 'publishedDate' in vuln:
-                                    publishedDate = vuln['publishedDate']
-                                if 'score' in vuln:
-                                    vuln_scoe = vuln['score']
-                                VULN_LIST.append({
-                                    "vulnerabilityID": vuln['vulnerabilityID'],
-                                    "severity": vuln['severity'],
-                                    "score": vuln_scoe,
-                                    "resource": vuln['resource'],
-                                    "installedVersion": vuln['installedVersion'],
-                                    "fixedVersion": fixedVersion,
-                                    "publishedDate": publishedDate,
-                                })
-                            POD_VULNS.update({vr['metadata']['labels']['trivy-operator.container.name']: VULN_LIST})
-                    elif 'trivy-operator.resource.kind' in vr['metadata']['labels']:
-                        if  vr['metadata']['labels']['trivy-operator.resource.kind'] == po.metadata.owner_references[0].kind and \
-                            vr['metadata']['labels']['trivy-operator.resource.name'] == po.metadata.owner_references[0].name:
-                                HAS_REPORT = True
-                                VULN_LIST = list()
-                                for vuln in vr['report']['vulnerabilities']:
-                                    if 'fixedVersion' in vuln:
-                                        fixedVersion = vuln['fixedVersion']
-                                    if 'publishedDate' in vuln:
-                                        publishedDate = vuln['publishedDate']
-                                    if 'score' in vuln:
-                                        vuln_scoe = vuln['score']
-                                    VULN_LIST.append({
-                                        "vulnerabilityID": vuln['vulnerabilityID'],
-                                        "severity": vuln['severity'],
-                                        "score": vuln_scoe,
-                                        "resource": vuln['resource'],
-                                        "installedVersion": vuln['installedVersion'],
-                                        "fixedVersion": fixedVersion,
-                                        "publishedDate": publishedDate,
-                                    })
-                                POD_VULNS.update({vr['metadata']['labels']['trivy-operator.container.name']: VULN_LIST})
-                return HAS_REPORT, POD_VULNS
-            else:
-                return False, None
-
 ##############################################################
 ## Service Account
 ##############################################################
@@ -290,16 +175,16 @@ def k8sRoleGet(username_role, user_token, role_name, ns):
     ROLE_INFO = None
     k8sClientConfigGet(username_role, user_token)
     try:
-        role_list = k8s_client.RbacAuthorizationV1Api().list_namespaced_role(ns, _request_timeout=1)
-        for role in role_list.items:
-            if role.metadata.name == role_name:
-                ROLE_INFO = {
-                    "name": role.metadata.name,
-                    "annotations": trimAnnotations(role.metadata.annotations),
-                    "labels": role.metadata.labels,
-                    "rules": role.rules,
-                    "created": role.metadata.creation_timestamp.strftime('%Y-%m-%d %H:%M:%S'),
-                }
+        # Optimize: Use read_namespaced_role() instead of list_namespaced_role() and looping
+        # This avoids fetching all roles when we only need one specific role
+        role = k8s_client.RbacAuthorizationV1Api().read_namespaced_role(role_name, ns, _request_timeout=1)
+        ROLE_INFO = {
+            "name": role.metadata.name,
+            "annotations": trimAnnotations(role.metadata.annotations),
+            "labels": role.metadata.labels,
+            "rules": role.rules,
+            "created": role.metadata.creation_timestamp.strftime('%Y-%m-%d %H:%M:%S'),
+        }
         return ROLE_INFO
     except ApiException as error:
         if error.status != 404:
@@ -900,21 +785,18 @@ def k8sClusterRoleGet(username_role, user_token, cluster_role_name=None):
     k8sClientConfigGet(username_role, user_token)
     CLUSTER_ROLE_DATA = None
     try:
-        cluster_roles = k8s_client.RbacAuthorizationV1Api().list_cluster_role(_request_timeout=1)
-        try:
-            for cr in cluster_roles.items:
-                if cluster_role_name is not None:
-                    if cr.metadata.name == cluster_role_name:
-                        CLUSTER_ROLE_DATA = {
-                            "name": cr.metadata.name,
-                            "annotations": trimAnnotations(cr.metadata.annotations),
-                            "labels": cr.metadata.labels,
-                            "rules": cr.rules,
-                            "created": cr.metadata.creation_timestamp.strftime('%Y-%m-%d %H:%M:%S'),
-                        }
-            return CLUSTER_ROLE_DATA
-        except:
-            return CLUSTER_ROLE_DATA
+        if cluster_role_name is not None:
+            # Optimize: Use read_cluster_role() instead of list_cluster_role() and looping
+            # This avoids fetching all cluster roles when we only need one specific role
+            cr = k8s_client.RbacAuthorizationV1Api().read_cluster_role(cluster_role_name, _request_timeout=1)
+            CLUSTER_ROLE_DATA = {
+                "name": cr.metadata.name,
+                "annotations": trimAnnotations(cr.metadata.annotations),
+                "labels": cr.metadata.labels,
+                "rules": cr.rules,
+                "created": cr.metadata.creation_timestamp.strftime('%Y-%m-%d %H:%M:%S'),
+            }
+        return CLUSTER_ROLE_DATA
     except ApiException as error:
         if error.status != 404:
             ErrorHandler(logger, error, "get cluster role %s - %s" % (cluster_role_name, error.status))
