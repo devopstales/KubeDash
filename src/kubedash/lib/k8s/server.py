@@ -1,4 +1,5 @@
 
+import os
 from flask_login import UserMixin
 from itsdangerous import base64_decode
 from kubernetes import client as k8s_client
@@ -193,7 +194,13 @@ def k8sClientConfigGet(username_role, user_token):
                     file.close
                     configuration.ssl_ca_cert = 'CA.crt'
                 else:
-                    configuration.ssl_ca_cert = "/var/run/secrets/kubernetes.io/serviceaccount/ca.crt"
+                    # Try to use Kubernetes service account CA if available
+                    service_account_ca = "/var/run/secrets/kubernetes.io/serviceaccount/ca.crt"
+                    if os.path.exists(service_account_ca):
+                        configuration.ssl_ca_cert = service_account_ca
+                    else:
+                        logger.warning("No CA certificate configured and service account CA not found. SSL verification may fail.")
+                        configuration.verify_ssl = False
                 
                 configuration.host = k8s_server_url
                 configuration.verify_ssl = True

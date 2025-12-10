@@ -78,3 +78,6 @@ coverage.xml
 .hypothesis/
 .pytest_cache/
 cover/
+src/certs
+!kubedash.ini.example
+kubedash.ini*

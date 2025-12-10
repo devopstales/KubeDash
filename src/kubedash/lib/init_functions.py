@@ -7,6 +7,7 @@ import requests
 from requests.exceptions import RequestException
 from urllib.parse import urljoin
 from flask import Flask
+import logging
 
 from itsdangerous import base64_encode
 from sqlalchemy import create_engine, inspect
@@ -194,7 +195,11 @@ def oidc_init(config: configparser.ConfigParser):
     # Convert and validate scopes
     logger.info("Initializing OIDC Provider")
     try:
-        requested_scopes = string2list(OIDC_SCOPE)
+        # Handle None scope gracefully
+        if OIDC_SCOPE is None:
+            requested_scopes = ['openid']  # Default to minimal scope
+        else:
+            requested_scopes = string2list(OIDC_SCOPE)
         valid_scopes = validate_scopes(requested_scopes, OIDC_ISSUER_URL)
         
         logger.debug(f"\tRequested scopes: {requested_scopes}")
@@ -266,12 +271,22 @@ def k8s_config_int(config: configparser.ConfigParser):
 
     K8S_API_CA       = config.get('k8s', 'api_ca', fallback=None)
     if K8S_API_CA is None:
-        with open("/var/run/secrets/kubernetes.io/serviceaccount/ca.crt", 'r') as cert_file:
-            cert_file_data = cert_file.read()
-            base64_encoded_data = str(base64_encode(cert_file_data), "UTF-8")
-            K8S_API_CA = base64_encoded_data
+        # Try to read from Kubernetes service account if running inside K8s
+        try:
+            if os.path.exists("/var/run/secrets/kubernetes.io/serviceaccount/ca.crt"):
+                with open("/var/run/secrets/kubernetes.io/serviceaccount/ca.crt", 'r') as cert_file:
+                    cert_file_data = cert_file.read()
+                    base64_encoded_data = str(base64_encode(cert_file_data), "UTF-8")
+                    K8S_API_CA = base64_encoded_data
+                    logger.info("Using Kubernetes service account CA certificate")
+            else:
+                logger.warning("K8S_API_CA not configured and service account CA not found. Skipping Kubernetes config initialization.")
+                K8S_API_CA = None
+        except (FileNotFoundError, PermissionError, IOError) as e:
+            logger.warning(f"Could not read Kubernetes service account CA certificate: {e}. Skipping Kubernetes config initialization.")
+            K8S_API_CA = None
 
-    if K8S_API_SERVER:
+    if K8S_API_SERVER and K8S_API_CA:
         k8sConfig = k8sServerConfigGet()
         if k8sConfig is None:
             k8sServerConfigCreate(K8S_API_SERVER, K8S_CLUSTER_NAME, K8S_API_CA)
