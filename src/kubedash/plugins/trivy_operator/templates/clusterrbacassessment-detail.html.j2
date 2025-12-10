@@ -1,0 +1,261 @@
+{% extends "base2.html.j2" %}
+
+{% block topmenu %}
+<ul class="header-nav d-lg-flex m-3">
+    <div class="container-fluid px-4">
+        <nav aria-label="breadcrumb">
+            <ol class="breadcrumb my-0">
+                <li class="breadcrumb-item"><span>Plugins</span></li>
+                <li class="breadcrumb-item"><a href="/plugins/trivy-operator/cluster">Trivy Operator</a></li>
+                <li class="breadcrumb-item"><span>Cluster RBAC Assessment Report</span></li>
+                <li class="breadcrumb-item active"><span>{{ report.name }}</span></li>
+            </ol>
+        </nav>
+    </div>
+</ul>
+<ul class="header-nav ms-auto"></ul>
+<ul class="header-nav d-lg-flex">
+{% include "segments/topmenu.html.j2" %}
+{% endblock %}
+
+{% block content %}
+<div class="card shadow mb-4">
+    <div class="card-header py-3 d-flex justify-content-between align-items-center">
+        <h6 class="m-0 font-weight-bold text-primary">Cluster RBAC Assessment Report: {{ report.name }}</h6>
+        <div>
+            {% if report.summary.get('dangerCount', 0) > 0 %}
+            <span class="badge bg-danger">Danger: {{ report.summary.get('dangerCount', 0) }}</span>
+            {% endif %}
+            {% if report.summary.get('warningCount', 0) > 0 %}
+            <span class="badge bg-warning text-dark">Warning: {{ report.summary.get('warningCount', 0) }}</span>
+            {% endif %}
+        </div>
+    </div>
+    <div class="card-body">
+        <ul class="nav nav-tabs" id="nav-tab" role="tablist">
+            <li class="nav-item">
+                <a class="nav-link active" id="nav-overview-tab" href="#nav-overview" role="tab" aria-controls="nav-overview" aria-selected="true" data-bs-toggle="tab">Overview</a>
+            </li>
+            <li class="nav-item">
+                <a class="nav-link" id="nav-checks-tab" href="#nav-checks" role="tab" aria-controls="nav-checks" aria-selected="false" data-bs-toggle="tab">Checks ({{ report.checks|length }})</a>
+            </li>
+            <li class="nav-item">
+                <a class="nav-link" id="nav-events-tab" href="#nav-events" role="tab" aria-controls="nav-events" aria-selected="false" data-bs-toggle="tab">Events ({{ events|length }})</a>
+            </li>
+            <li class="nav-item">
+                <a class="nav-link" id="nav-yaml-tab" href="#nav-yaml" role="tab" aria-controls="nav-yaml" aria-selected="false" data-bs-toggle="tab">YAML</a>
+            </li>
+        </ul>
+        
+        <div class="tab-content" id="nav-tabContent">
+            <!-- OVERVIEW TAB -->
+            <div class="tab-pane fade show active" id="nav-overview" role="tabpanel" aria-labelledby="nav-overview-tab">
+                <div class="row mt-3">
+                    <div class="col-md-6">
+                        <div class="card shadow mb-4">
+                            <div class="card-header py-3">
+                                <h6 class="m-0 font-weight-bold text-primary">Metadata</h6>
+                            </div>
+                            <div class="card-body">
+                                <table class="table table-bordered" width="100%" cellspacing="0">
+                                    <tr>
+                                        <th style="width: 30%;">Name</th>
+                                        <td>{{ report.name }}</td>
+                                    </tr>
+                                    <tr>
+                                        <th>Scope</th>
+                                        <td><span class="badge bg-info">Cluster</span></td>
+                                    </tr>
+                                    <tr>
+                                        <th>Resource</th>
+                                        <td>{{ report.resource_kind }}/{{ report.resource_name }}</td>
+                                    </tr>
+                                    <tr>
+                                        <th>Age</th>
+                                        <td>{{ report.age }}</td>
+                                    </tr>
+                                    <tr>
+                                        <th>Created</th>
+                                        <td>{{ report.creation_timestamp }}</td>
+                                    </tr>
+                                </table>
+                            </div>
+                        </div>
+                    </div>
+                    
+                    <div class="col-md-6">
+                        <div class="card shadow mb-4">
+                            <div class="card-header py-3">
+                                <h6 class="m-0 font-weight-bold text-primary">Summary</h6>
+                            </div>
+                            <div class="card-body">
+                                <table class="table table-bordered" width="100%" cellspacing="0">
+                                    <tr>
+                                        <th style="width: 50%;">Danger</th>
+                                        <td><span class="badge bg-danger">{{ report.summary.get('dangerCount', 0) or 0 }}</span></td>
+                                    </tr>
+                                    <tr>
+                                        <th>Warning</th>
+                                        <td><span class="badge bg-warning text-dark">{{ report.summary.get('warningCount', 0) or 0 }}</span></td>
+                                    </tr>
+                                    <tr>
+                                        <th>Pass</th>
+                                        <td><span class="badge bg-success">{{ report.summary.get('passCount', 0) or 0 }}</span></td>
+                                    </tr>
+                                    <tr>
+                                        <th>Total</th>
+                                        <td><strong>{{ (report.summary.get('dangerCount', 0) or 0) + (report.summary.get('warningCount', 0) or 0) + (report.summary.get('passCount', 0) or 0) }}</strong></td>
+                                    </tr>
+                                </table>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+            
+            <!-- CHECKS TAB -->
+            <div class="tab-pane fade" id="nav-checks" role="tabpanel" aria-labelledby="nav-checks-tab">
+                <div class="card shadow mb-4 mt-3">
+                    <div class="card-body">
+                        <div class="table-responsive">
+                            <table class="table table-bordered table-hover" id="checksTable" width="100%" cellspacing="0">
+                                <thead>
+                                    <tr>
+                                        <th>Status</th>
+                                        <th>Check ID</th>
+                                        <th>Title</th>
+                                        <th>Severity</th>
+                                        <th>Category</th>
+                                        <th>Description</th>
+                                    </tr>
+                                </thead>
+                                <tbody>
+                                    {% if report.checks %}
+                                    {% for check in report.checks %}
+                                    <tr>
+                                        <td>
+                                            {% if check.success %}
+                                            <span class="badge bg-success">Pass</span>
+                                            {% elif check.severity == 'DANGER' %}
+                                            <span class="badge bg-danger">Danger</span>
+                                            {% else %}
+                                            <span class="badge bg-warning text-dark">Warning</span>
+                                            {% endif %}
+                                        </td>
+                                        <td><code>{{ check.checkID }}</code></td>
+                                        <td>{{ check.title or '-' }}</td>
+                                        <td>
+                                            {% if check.severity == 'DANGER' %}
+                                            <span class="badge bg-danger">{{ check.severity }}</span>
+                                            {% elif check.severity == 'WARNING' %}
+                                            <span class="badge bg-warning text-dark">{{ check.severity }}</span>
+                                            {% else %}
+                                            <span class="badge bg-secondary">{{ check.severity }}</span>
+                                            {% endif %}
+                                        </td>
+                                        <td>{{ check.category or '-' }}</td>
+                                        <td>
+                                            <small>{{ check.description or '-' }}</small>
+                                            {% if check.remediation %}
+                                            <br><br>
+                                            <strong>Remediation:</strong> <small>{{ check.remediation }}</small>
+                                            {% endif %}
+                                            {% if check.messages %}
+                                            <br><br>
+                                            <strong>Messages:</strong>
+                                            <ul class="mb-0">
+                                                {% for msg in check.messages %}
+                                                <li><small>{{ msg }}</small></li>
+                                                {% endfor %}
+                                            </ul>
+                                            {% endif %}
+                                        </td>
+                                    </tr>
+                                    {% endfor %}
+                                    {% else %}
+                                    <tr>
+                                        <td class="text-center text-muted" colspan="6">No checks found</td>
+                                    </tr>
+                                    {% endif %}
+                                </tbody>
+                            </table>
+                        </div>
+                    </div>
+                </div>
+            </div>
+            
+            <!-- EVENTS TAB -->
+            <div class="tab-pane fade" id="nav-events" role="tabpanel" aria-labelledby="nav-events-tab">
+                <div class="card shadow mb-4 mt-3">
+                    <div class="card-body">
+                        {% if events %}
+                        <div class="table-responsive">
+                            <table class="table table-bordered table-hover" width="100%" cellspacing="0">
+                                <thead>
+                                    <tr>
+                                        <th>Type</th>
+                                        <th>Reason</th>
+                                        <th>Message</th>
+                                        <th>Count</th>
+                                        <th>Last Seen</th>
+                                    </tr>
+                                </thead>
+                                <tbody>
+                                    {% for event in events %}
+                                    <tr>
+                                        <td>
+                                            {% if event.type == 'Warning' %}
+                                            <span class="badge bg-warning text-dark">{{ event.type }}</span>
+                                            {% else %}
+                                            <span class="badge bg-info">{{ event.type }}</span>
+                                            {% endif %}
+                                        </td>
+                                        <td><code>{{ event.reason }}</code></td>
+                                        <td>{{ event.message }}</td>
+                                        <td>{{ event.count }}</td>
+                                        <td>{{ event.last_timestamp or event.first_timestamp or '-' }}</td>
+                                    </tr>
+                                    {% endfor %}
+                                </tbody>
+                            </table>
+                        </div>
+                        {% else %}
+                        <p class="text-muted">No events found</p>
+                        {% endif %}
+                    </div>
+                </div>
+            </div>
+            
+            <!-- YAML TAB -->
+            <div class="tab-pane fade" id="nav-yaml" role="tabpanel" aria-labelledby="nav-yaml-tab">
+                <div class="card shadow mb-4 mt-3">
+                    <div class="card-header py-3">
+                        <h6 class="m-0 font-weight-bold text-primary">Resource YAML</h6>
+                    </div>
+                    <div class="card-body">
+                        <pre><code class="language-yaml">{% autoescape false %}{{ report.raw | tojson(indent=2) | replace("<", "&lt;") | replace(">", "&gt;") }}{% endautoescape %}</code></pre>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}
+
+{% block add_head_css %}
+{% include "segments/datatable_snippet.html.j2" %}
+{% include "segments/highlight_snippet.html.j2" %}
+{% endblock %}
+
+{% block add_tail_js %}
+<script>
+$(document).ready(function() {
+    {% if report.checks and report.checks|length > 0 %}
+    $('#checksTable').DataTable({
+        "order": [[0, "asc"]], // Sort by status
+        "pageLength": 25
+    });
+    {% endif %}
+});
+</script>
+{% endblock %}

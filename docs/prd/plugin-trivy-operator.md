@@ -1,35 +1,81 @@
 # Product Requirements Document: Trivy Operator Plugin
 
-**Document Version**: 1.0  
-**Last Updated**: December 2025  
+**Document Version**: 1.1  
+**Last Updated**: January 2025  
 **Product**: KubeDash  
 **Feature Area**: Trivy Operator Security Plugin  
-**Status**: Active  
+**Status**: Active - MVP Implemented  
 
 ---
 
 ## Implementation Status
 
-> **Overall Progress: ~60% Complete**
+> **Overall Progress: ~75% Complete (MVP Fully Implemented)**
+
+### MVP Implementation Summary
+✅ **MVP Status: COMPLETE** - The core Trivy Operator plugin has been fully implemented as an MVP with dedicated plugin routes, comprehensive list and detail views for all primary report types, and full support for both API variants.
 
 | Feature | Status | Completion | Notes |
 |---------|--------|------------|-------|
-| **Pod Vulnerability Summary** | ✅ Implemented | 90% | Summary counts in pod list |
-| **Pod Vulnerability Details** | ✅ Implemented | 85% | Per-container CVE list |
-| **VulnerabilityReport Listing** | ⚠️ Partial | 50% | Via pod view only |
-| **ConfigAuditReport** | ❌ Not Started | 0% | Planned |
-| **InfraAssessmentReport** | ❌ Not Started | 0% | Planned |
+| **Pod Vulnerability Summary** | ✅ Implemented | 90% | Summary counts in pod list (existing in `lib/k8s/security.py`) |
+| **Pod Vulnerability Details** | ✅ Implemented | 85% | Per-container CVE list (existing in `lib/k8s/security.py`) |
+| **VulnerabilityReport Listing** | ✅ **Implemented** | **100%** | **Full dedicated plugin view with tabs** |
+| **VulnerabilityReport Details** | ✅ **Implemented** | **100%** | **Complete detail view with vulnerabilities table** |
+| **ConfigAuditReport** | ✅ **Implemented** | **100%** | **Full list and detail views with check results** |
+| **ExposedSecretReport** | ✅ **Implemented** | **100%** | **Full list and detail views** |
+| **RbacAssessmentReport** | ✅ **Implemented** | **100%** | **Full list and detail views** |
+| **InfraAssessmentReport** | ❌ Not Started | 0% | Planned (similar to ConfigAudit) |
 | **ClusterComplianceReport** | ❌ Not Started | 0% | Planned |
 | **SBOM Reports** | ❌ Not Started | 0% | Planned |
+| **Vulnerability Dashboard** | ❌ Not Started | 0% | Aggregated statistics (P2) |
 
 ### User Story Status
 | User Story | Status | Implementation File |
 |------------|--------|---------------------|
 | US-TRIVY-001: View Pod Vulnerabilities | ✅ Done | `lib/k8s/security.py` |
 | US-TRIVY-002: View Vulnerability Details | ✅ Done | `lib/k8s/security.py` |
-| US-TRIVY-003: List VulnerabilityReports | ⚠️ Partial | Via pod view |
-| US-TRIVY-010: View ConfigAuditReports | ❌ Not Done | Planned |
+| US-TRIVY-003: List VulnerabilityReports | ✅ **Done** | **`plugins/trivy_operator/`** |
+| US-TRIVY-010: View ConfigAuditReports | ✅ **Done** | **`plugins/trivy_operator/`** |
+| US-TRIVY-040: View Exposed Secrets | ✅ **Done** | **`plugins/trivy_operator/`** |
 | US-TRIVY-020: View ClusterComplianceReports | ❌ Not Done | Planned |
+| US-TRIVY-004: Vulnerability Dashboard | ❌ Not Done | Planned (P2) |
+| US-TRIVY-011: View InfraAssessmentReports | ❌ Not Done | Planned (P3) |
+| US-TRIVY-030: View SBOM Reports | ❌ Not Done | Planned (P3) |
+
+### MVP Implementation Details
+
+**Implemented Features:**
+- ✅ Dedicated plugin route: `/plugins/trivy-operator`
+- ✅ Main dashboard with tabbed interface for all report types
+- ✅ Namespace filtering support
+- ✅ Auto-detection of Trivy Operator API variants (both `aquasecurity.github.io/v1alpha1` and `trivy-operator.devopstales.io/v1`)
+- ✅ Complete VulnerabilityReport support (list + detail views)
+- ✅ Complete ConfigAuditReport support (list + detail views)
+- ✅ Complete ExposedSecretReport support (list + detail views)
+- ✅ Complete RbacAssessmentReport support (list + detail views)
+- ✅ Detail views include: Overview, Findings, Events, and YAML tabs
+- ✅ Color-coded severity indicators
+- ✅ DataTables for sorting and filtering
+- ✅ Integration with KubeDash plugin system
+- ✅ Configuration support in `kubedash.ini`
+
+**Implementation Files:**
+- `plugins/trivy_operator/__init__.py` - Blueprint and routes
+- `plugins/trivy_operator/functions.py` - All API interaction functions
+- `plugins/trivy_operator/templates/trivy-operator.html.j2` - Main dashboard
+- `plugins/trivy_operator/templates/vulnerability-detail.html.j2` - VulnerabilityReport detail
+- `plugins/trivy_operator/templates/configaudit-detail.html.j2` - ConfigAuditReport detail
+- `plugins/trivy_operator/templates/exposedsecret-detail.html.j2` - ExposedSecretReport detail
+- `plugins/trivy_operator/templates/rbacassessment-detail.html.j2` - RbacAssessmentReport detail
+
+**Not Yet Implemented (Future Enhancements):**
+- ⚠️ Vulnerability Dashboard with aggregated statistics (US-TRIVY-004)
+- ⚠️ ClusterComplianceReport support (US-TRIVY-020)
+- ⚠️ InfraAssessmentReport support (US-TRIVY-011)
+- ⚠️ SBOM Report support (US-TRIVY-030)
+- ⚠️ Export functionality (CSV/JSON)
+- ⚠️ Advanced filtering within findings
+- ⚠️ Trend analysis and historical data
 
 ---
 
@@ -421,18 +467,37 @@ def detect_trivy_operator():
 
 ### 6.4 Implementation Files
 
+**Current Implementation (MVP Complete):**
 ```
-lib/k8s/security.py          # Existing - vulnerability functions
-plugins/trivy_operator/      # New dedicated plugin (planned)
-├── __init__.py              # Blueprint routes
-├── vulnerability.py         # VulnerabilityReport functions
-├── config_audit.py          # ConfigAuditReport functions
-├── compliance.py            # Compliance functions
-├── sbom.py                  # SBOM functions
+lib/k8s/security.py          # Existing - pod vulnerability functions (legacy)
+plugins/trivy_operator/      # ✅ IMPLEMENTED - Dedicated plugin
+├── __init__.py              # ✅ Blueprint routes (5 routes)
+├── functions.py              # ✅ All report type functions
+│   ├── check_trivy_operator_installed()
+│   ├── TrivyGetVulnerabilityReports()
+│   ├── TrivyGetVulnerabilityReport()
+│   ├── TrivyGetConfigAuditReports()
+│   ├── TrivyGetConfigAuditReport()
+│   ├── TrivyGetExposedSecretReports()
+│   ├── TrivyGetExposedSecretReport()
+│   ├── TrivyGetRbacAssessmentReports()
+│   ├── TrivyGetRbacAssessmentReport()
+│   └── TrivyGetEvents()
 └── templates/
-    ├── trivy-dashboard.html.j2
-    ├── vulnerability-report.html.j2
-    └── config-audit.html.j2
+    ├── trivy-operator.html.j2           # ✅ Main dashboard
+    ├── vulnerability-detail.html.j2      # ✅ VulnerabilityReport detail
+    ├── configaudit-detail.html.j2       # ✅ ConfigAuditReport detail
+    ├── exposedsecret-detail.html.j2     # ✅ ExposedSecretReport detail
+    └── rbacassessment-detail.html.j2    # ✅ RbacAssessmentReport detail
+```
+
+**Planned (Future):**
+```
+plugins/trivy_operator/
+├── compliance.py            # ClusterComplianceReport functions (planned)
+├── sbom.py                  # SBOM functions (planned)
+└── templates/
+    └── dashboard.html.j2    # Aggregated security dashboard (planned)
 ```
 
 ---

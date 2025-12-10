@@ -1,0 +1,443 @@
+{% extends "base2.html.j2" %}
+
+{% block topmenu %}
+<ul class="header-nav d-lg-flex m-3">
+    <div class="container-fluid px-4">
+        <nav aria-label="breadcrumb">
+            <ol class="breadcrumb my-0">
+                <li class="breadcrumb-item"><span>Plugins</span></li>
+                <li class="breadcrumb-item active"><span>Trivy Operator</span></li>
+            </ol>
+        </nav>
+    </div>
+</ul>
+<ul class="header-nav ms-auto"></ul>
+<ul class="header-nav d-lg-flex">
+{% include "segments/topmenu.html.j2" %}
+{% endblock %}
+
+{% block content %}
+<!-- Trivy Operator Status Alert -->
+{% if not trivy_status.installed %}
+<div class="alert alert-warning" role="alert">
+    <strong>Trivy Operator Not Detected</strong> - No Trivy Operator CRDs found in this cluster. 
+    Please install Trivy Operator to use this plugin.
+    <a href="https://aquasecurity.github.io/trivy-operator/latest/" target="_blank" class="alert-link">Learn more</a>
+</div>
+{% endif %}
+
+<div class="card shadow mb-4">
+    <div class="card-header d-flex justify-content-between align-items-center">
+        <h6 class="m-0 fw-bold text-primary">Trivy Operator Security Reports</h6>
+        <div class="d-flex align-items-center">
+            {% if trivy_status.installed %}
+            <span class="badge bg-success me-2">
+                <i class="cil-check-circle"></i> Trivy Operator Installed
+            </span>
+            <span class="badge bg-info">
+                API: {{ trivy_status.api_group }}/{{ trivy_status.api_version }}
+            </span>
+            {% endif %}
+        </div>
+    </div>
+    <div class="card-body">
+        <!-- Navigation Tabs -->
+        <ul class="nav nav-tabs" id="trivy-tabs" role="tablist">
+            <li class="nav-item">
+                <a class="nav-link {% if active_tab == 'vulnerabilityreports' %}active{% endif %}" 
+                   id="nav-vulnerabilityreports-tab" data-bs-toggle="tab" href="#nav-vulnerabilityreports" 
+                   role="tab" aria-controls="nav-vulnerabilityreports" aria-selected="{% if active_tab == 'vulnerabilityreports' %}true{% else %}false{% endif %}">
+                    Vulnerability Reports <span class="badge bg-secondary">{{ vulnerability_reports|length }}</span>
+                </a>
+            </li>
+            <li class="nav-item">
+                <a class="nav-link {% if active_tab == 'configauditreports' %}active{% endif %}" 
+                   id="nav-configauditreports-tab" data-bs-toggle="tab" href="#nav-configauditreports" 
+                   role="tab" aria-controls="nav-configauditreports" aria-selected="{% if active_tab == 'configauditreports' %}true{% else %}false{% endif %}">
+                    Config Audit Reports <span class="badge bg-secondary">{{ configaudit_reports|length }}</span>
+                </a>
+            </li>
+            <li class="nav-item">
+                <a class="nav-link {% if active_tab == 'exposedsecretreports' %}active{% endif %}" 
+                   id="nav-exposedsecretreports-tab" data-bs-toggle="tab" href="#nav-exposedsecretreports" 
+                   role="tab" aria-controls="nav-exposedsecretreports" aria-selected="{% if active_tab == 'exposedsecretreports' %}true{% else %}false{% endif %}">
+                    Exposed Secret Reports <span class="badge bg-secondary">{{ exposedsecret_reports|length }}</span>
+                </a>
+            </li>
+            <li class="nav-item">
+                <a class="nav-link {% if active_tab == 'rbacassessmentreports' %}active{% endif %}" 
+                   id="nav-rbacassessmentreports-tab" data-bs-toggle="tab" href="#nav-rbacassessmentreports" 
+                   role="tab" aria-controls="nav-rbacassessmentreports" aria-selected="{% if active_tab == 'rbacassessmentreports' %}true{% else %}false{% endif %}">
+                    RBAC Assessment Reports <span class="badge bg-secondary">{{ rbacassessment_reports|length }}</span>
+                </a>
+            </li>
+            <li class="nav-item">
+                <a class="nav-link {% if active_tab == 'sbomreports' %}active{% endif %}" 
+                   id="nav-sbomreports-tab" data-bs-toggle="tab" href="#nav-sbomreports" 
+                   role="tab" aria-controls="nav-sbomreports" aria-selected="{% if active_tab == 'sbomreports' %}true{% else %}false{% endif %}">
+                    SBOM Reports <span class="badge bg-secondary">{{ sbom_reports|length }}</span>
+                </a>
+            </li>
+        </ul>
+
+        <!-- Tab Content -->
+        <div class="tab-content" id="trivy-tab-content">
+            
+            <!-- Vulnerability Reports Tab -->
+            <div class="tab-pane fade {% if active_tab == 'vulnerabilityreports' %}show active{% endif %}" 
+                 id="nav-vulnerabilityreports" role="tabpanel" aria-labelledby="nav-vulnerabilityreports-tab">
+                <div class="card shadow mb-4 mt-3">
+                    <div class="card-body">
+                        <div class="table-responsive">
+                            <table class="table table-bordered table-hover" id="vulnerabilityTable" width="100%" cellspacing="0">
+                                <thead>
+                                    <tr>
+                                        <th>Resource</th>
+                                        <th>Container</th>
+                                        <th>Critical</th>
+                                        <th>High</th>
+                                        <th>Medium</th>
+                                        <th>Low</th>
+                                        <th>Total</th>
+                                        <th>Age</th>
+                                    </tr>
+                                </thead>
+                                <tbody>
+                                    {% for report in vulnerability_reports %}
+                                    <tr>
+                                        <td>
+                                            <a href="/plugins/trivy-operator/vulnerability/{{ report.namespace }}/{{ report.name }}">
+                                                {{ report.resource_kind }}/{{ report.resource_name }}
+                                            </a>
+                                            <br>
+                                            <small class="text-muted">{{ report.namespace }}</small>
+                                        </td>
+                                        <td><code>{{ report.container_name }}</code></td>
+                                        <td>
+                                            {% if report.critical > 0 %}
+                                            <span class="badge bg-danger">{{ report.critical }}</span>
+                                            {% else %}
+                                            <span class="badge bg-secondary">0</span>
+                                            {% endif %}
+                                        </td>
+                                        <td>
+                                            {% if report.high > 0 %}
+                                            <span class="badge bg-warning text-dark">{{ report.high }}</span>
+                                            {% else %}
+                                            <span class="badge bg-secondary">0</span>
+                                            {% endif %}
+                                        </td>
+                                        <td>
+                                            {% if report.medium > 0 %}
+                                            <span class="badge bg-info">{{ report.medium }}</span>
+                                            {% else %}
+                                            <span class="badge bg-secondary">0</span>
+                                            {% endif %}
+                                        </td>
+                                        <td>
+                                            {% if report.low > 0 %}
+                                            <span class="badge bg-primary">{{ report.low }}</span>
+                                            {% else %}
+                                            <span class="badge bg-secondary">0</span>
+                                            {% endif %}
+                                        </td>
+                                        <td><strong>{{ report.total }}</strong></td>
+                                        <td>{{ report.age }}</td>
+                                    </tr>
+                                    {% else %}
+                                    <tr>
+                                        <td class="text-center text-muted" colspan="8">No Vulnerability Reports found</td>
+                                    </tr>
+                                    {% endfor %}
+                                </tbody>
+                            </table>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Config Audit Reports Tab -->
+            <div class="tab-pane fade {% if active_tab == 'configauditreports' %}show active{% endif %}" 
+                 id="nav-configauditreports" role="tabpanel" aria-labelledby="nav-configauditreports-tab">
+                <div class="card shadow mb-4 mt-3">
+                    <div class="card-body">
+                        <div class="table-responsive">
+                            <table class="table table-bordered table-hover" id="configauditTable" width="100%" cellspacing="0">
+                                <thead>
+                                    <tr>
+                                        <th>Resource</th>
+                                        <th>Critical</th>
+                                        <th>High</th>
+                                        <th>Medium</th>
+                                        <th>Low</th>
+                                        <th>Total</th>
+                                        <th>Age</th>
+                                    </tr>
+                                </thead>
+                                <tbody>
+                                    {% for report in configaudit_reports %}
+                                    <tr>
+                                        <td>
+                                            <a href="/plugins/trivy-operator/configaudit/{{ report.namespace }}/{{ report.name }}">
+                                                {{ report.resource_kind }}/{{ report.resource_name }}
+                                            </a>
+                                            <br>
+                                            <small class="text-muted">{{ report.namespace }}</small>
+                                        </td>
+                                        <td>
+                                            {% if report.critical > 0 %}
+                                            <span class="badge bg-danger">{{ report.critical }}</span>
+                                            {% else %}
+                                            <span class="badge bg-secondary">0</span>
+                                            {% endif %}
+                                        </td>
+                                        <td>
+                                            {% if report.high > 0 %}
+                                            <span class="badge bg-warning text-dark">{{ report.high }}</span>
+                                            {% else %}
+                                            <span class="badge bg-secondary">0</span>
+                                            {% endif %}
+                                        </td>
+                                        <td>
+                                            {% if report.medium > 0 %}
+                                            <span class="badge bg-info">{{ report.medium }}</span>
+                                            {% else %}
+                                            <span class="badge bg-secondary">0</span>
+                                            {% endif %}
+                                        </td>
+                                        <td>
+                                            {% if report.low > 0 %}
+                                            <span class="badge bg-secondary">{{ report.low }}</span>
+                                            {% else %}
+                                            <span class="badge bg-secondary">0</span>
+                                            {% endif %}
+                                        </td>
+                                        <td><strong>{{ report.total }}</strong></td>
+                                        <td>{{ report.age }}</td>
+                                    </tr>
+                                    {% else %}
+                                    <tr>
+                                        <td class="text-center text-muted" colspan="6">No Config Audit Reports found</td>
+                                    </tr>
+                                    {% endfor %}
+                                </tbody>
+                            </table>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Exposed Secret Reports Tab -->
+            <div class="tab-pane fade {% if active_tab == 'exposedsecretreports' %}show active{% endif %}" 
+                 id="nav-exposedsecretreports" role="tabpanel" aria-labelledby="nav-exposedsecretreports-tab">
+                <div class="card shadow mb-4 mt-3">
+                    <div class="card-body">
+                        <div class="table-responsive">
+                            <table class="table table-bordered table-hover" id="exposedsecretTable" width="100%" cellspacing="0">
+                                <thead>
+                                    <tr>
+                                        <th>Resource</th>
+                                        <th>Critical</th>
+                                        <th>High</th>
+                                        <th>Medium</th>
+                                        <th>Low</th>
+                                        <th>Total</th>
+                                        <th>Age</th>
+                                    </tr>
+                                </thead>
+                                <tbody>
+                                    {% for report in exposedsecret_reports %}
+                                    <tr>
+                                        <td>
+                                            <a href="/plugins/trivy-operator/exposedsecret/{{ report.namespace }}/{{ report.name }}">
+                                                {{ report.resource_kind }}/{{ report.resource_name }}
+                                            </a>
+                                            <br>
+                                            <small class="text-muted">{{ report.namespace }}</small>
+                                        </td>
+                                        <td>
+                                            {% if report.critical > 0 %}
+                                            <span class="badge bg-danger">{{ report.critical }}</span>
+                                            {% else %}
+                                            <span class="badge bg-secondary">0</span>
+                                            {% endif %}
+                                        </td>
+                                        <td>
+                                            {% if report.high > 0 %}
+                                            <span class="badge bg-warning text-dark">{{ report.high }}</span>
+                                            {% else %}
+                                            <span class="badge bg-secondary">0</span>
+                                            {% endif %}
+                                        </td>
+                                        <td>
+                                            {% if report.medium > 0 %}
+                                            <span class="badge bg-info">{{ report.medium }}</span>
+                                            {% else %}
+                                            <span class="badge bg-secondary">0</span>
+                                            {% endif %}
+                                        </td>
+                                        <td>
+                                            {% if report.low > 0 %}
+                                            <span class="badge bg-primary">{{ report.low }}</span>
+                                            {% else %}
+                                            <span class="badge bg-secondary">0</span>
+                                            {% endif %}
+                                        </td>
+                                        <td><strong>{{ report.total }}</strong></td>
+                                        <td>{{ report.age }}</td>
+                                    </tr>
+                                    {% else %}
+                                    <tr>
+                                        <td class="text-center text-muted" colspan="7">No Exposed Secret Reports found</td>
+                                    </tr>
+                                    {% endfor %}
+                                </tbody>
+                            </table>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- RBAC Assessment Reports Tab -->
+            <div class="tab-pane fade {% if active_tab == 'rbacassessmentreports' %}show active{% endif %}" 
+                 id="nav-rbacassessmentreports" role="tabpanel" aria-labelledby="nav-rbacassessmentreports-tab">
+                <div class="card shadow mb-4 mt-3">
+                    <div class="card-body">
+                        <div class="table-responsive">
+                            <table class="table table-bordered table-hover" id="rbacassessmentTable" width="100%" cellspacing="0">
+                                <thead>
+                                    <tr>
+                                        <th>Resource</th>
+                                        <th>Danger</th>
+                                        <th>Warning</th>
+                                        <th>Pass</th>
+                                        <th>Total</th>
+                                        <th>Age</th>
+                                    </tr>
+                                </thead>
+                                <tbody>
+                                    {% for report in rbacassessment_reports %}
+                                    <tr>
+                                        <td>
+                                            <a href="/plugins/trivy-operator/rbacassessment/{{ report.namespace }}/{{ report.name }}">
+                                                {{ report.resource_kind }}/{{ report.resource_name }}
+                                            </a>
+                                            <br>
+                                            <small class="text-muted">{{ report.namespace }}</small>
+                                        </td>
+                                        <td>
+                                            {% if report.danger > 0 %}
+                                            <span class="badge bg-danger">{{ report.danger }}</span>
+                                            {% else %}
+                                            <span class="badge bg-secondary">0</span>
+                                            {% endif %}
+                                        </td>
+                                        <td>
+                                            {% if report.warning > 0 %}
+                                            <span class="badge bg-warning text-dark">{{ report.warning }}</span>
+                                            {% else %}
+                                            <span class="badge bg-secondary">0</span>
+                                            {% endif %}
+                                        </td>
+                                        <td>
+                                            {% if report.pass > 0 %}
+                                            <span class="badge bg-success">{{ report.pass }}</span>
+                                            {% else %}
+                                            <span class="badge bg-secondary">0</span>
+                                            {% endif %}
+                                        </td>
+                                        <td><strong>{{ report.total }}</strong></td>
+                                        <td>{{ report.age }}</td>
+                                    </tr>
+                                    {% else %}
+                                    <tr>
+                                        <td class="text-center text-muted" colspan="6">No RBAC Assessment Reports found</td>
+                                    </tr>
+                                    {% endfor %}
+                                </tbody>
+                            </table>
+                        </div>
+                    </div>
+                </div>
+            </div>
+            
+            <!-- SBOM Reports Tab -->
+            <div class="tab-pane fade {% if active_tab == 'sbomreports' %}show active{% endif %}" 
+                 id="nav-sbomreports" role="tabpanel" aria-labelledby="nav-sbomreports-tab">
+                <div class="card shadow mb-4 mt-3">
+                    <div class="card-body">
+                        <div class="table-responsive">
+                            <table class="table table-bordered table-hover" id="sbomTable" width="100%" cellspacing="0">
+                                <thead>
+                                    <tr>
+                                        <th>Resource</th>
+                                        <th>Container</th>
+                                        <th>Image</th>
+                                        <th>Components</th>
+                                        <th>Dependencies</th>
+                                        <th>Age</th>
+                                    </tr>
+                                </thead>
+                                <tbody>
+                                    {% for report in sbom_reports %}
+                                    <tr>
+                                        <td>
+                                            <a href="/plugins/trivy-operator/sbom/{{ report.namespace }}/{{ report.name }}">
+                                                {{ report.resource_kind }}/{{ report.resource_name }}
+                                            </a>
+                                            <br>
+                                            <small class="text-muted">{{ report.namespace }}</small>
+                                        </td>
+                                        <td><code>{{ report.container_name }}</code></td>
+                                        <td>
+                                            {% if report.image_ref %}
+                                            <code>{{ report.image_ref }}</code>
+                                            {% else %}
+                                            <span class="text-muted">-</span>
+                                            {% endif %}
+                                        </td>
+                                        <td><span class="badge bg-info">{{ report.components_count }}</span></td>
+                                        <td><span class="badge bg-secondary">{{ report.dependencies_count }}</span></td>
+                                        <td>{{ report.age }}</td>
+                                    </tr>
+                                    {% else %}
+                                    <tr>
+                                        <td class="text-center text-muted" colspan="6">No SBOM Reports found</td>
+                                    </tr>
+                                    {% endfor %}
+                                </tbody>
+                            </table>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<script>
+// Initialize DataTables for all tables
+$(document).ready(function() {
+    $('#vulnerabilityTable').DataTable({
+        "order": [[6, "desc"]], // Sort by total descending
+        "pageLength": 25
+    });
+    $('#configauditTable').DataTable({
+        "order": [[4, "desc"]], // Sort by total descending
+        "pageLength": 25
+    });
+    $('#exposedsecretTable').DataTable({
+        "order": [[5, "desc"]], // Sort by total descending
+        "pageLength": 25
+    });
+    $('#rbacassessmentTable').DataTable({
+        "order": [[4, "desc"]], // Sort by total descending
+        "pageLength": 25
+    });
+    $('#sbomTable').DataTable({
+        "order": [[3, "desc"]], // Sort by components count descending
+        "pageLength": 25
+    });
+});
+</script>
+{% endblock %}

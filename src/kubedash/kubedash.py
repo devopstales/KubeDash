@@ -77,8 +77,8 @@ def create_app(external_config_name=None):
             initialize_app_plugins(app)
             # connections
             app.logger.info(separator_short)
-            initialize_app_database(app, __file__)
             initialize_app_caching(app)
+            initialize_app_database(app, __file__)
             init_before_request(app)
             app.logger.info(separator_short)
             with app.app_context():

@@ -1,0 +1,1430 @@
+apiVersion: v1
+items:
+- apiVersion: aquasecurity.github.io/v1alpha1
+  kind: ConfigAuditReport
+  metadata:
+    annotations:
+      trivy-operator.aquasecurity.github.io/report-ttl: 24h0m0s
+    creationTimestamp: "2025-01-30T14:38:40Z"
+    generation: 1
+    labels:
+      plugin-config-hash: 6d67b68bf9
+      resource-spec-hash: 58bc65dc86
+      trivy-operator.resource.kind: DaemonSet
+      trivy-operator.resource.name: nginx
+      trivy-operator.resource.namespace: network-testing
+    name: daemonset-nginx
+    namespace: network-testing
+    ownerReferences:
+    - apiVersion: apps/v1
+      blockOwnerDeletion: false
+      controller: true
+      kind: DaemonSet
+      name: nginx
+      uid: 8cbdecfa-b248-4486-ac5a-fee137efc458
+    resourceVersion: "244086986"
+    uid: 522e1227-0784-447a-bbdd-bb7c5f6a6632
+  report:
+    checks:
+    - category: Kubernetes Security Check
+      checkID: KSV001
+      description: A program inside the container can elevate its own privileges and
+        run as root, which might give the program control over the container and node.
+      messages:
+      - Container 'nginx' of DaemonSet 'nginx' should set 'securityContext.allowPrivilegeEscalation'
+        to false
+      remediation: Set 'set containers[].securityContext.allowPrivilegeEscalation'
+        to 'false'.
+      severity: MEDIUM
+      success: false
+      title: Can elevate its own privileges
+    - category: Kubernetes Security Check
+      checkID: KSV003
+      description: The container should drop all default capabilities and add only
+        those that are needed for its execution.
+      messages:
+      - Container 'nginx' of DaemonSet 'nginx' should add 'ALL' to 'securityContext.capabilities.drop'
+      remediation: Add 'ALL' to containers[].securityContext.capabilities.drop.
+      severity: LOW
+      success: false
+      title: 'Default capabilities: some containers do not drop all'
+    - category: Kubernetes Security Check
+      checkID: KSV004
+      description: Security best practices require containers to run with minimal
+        required capabilities.
+      messages:
+      - Container 'nginx' of 'daemonset' 'nginx' in 'network-testing' namespace should
+        set securityContext.capabilities.drop
+      remediation: Specify at least one unneeded capability in 'containers[].securityContext.capabilities.drop'
+      severity: LOW
+      success: false
+      title: 'Default capabilities: some containers do not drop any'
+    - category: Kubernetes Security Check
+      checkID: KSV011
+      description: Enforcing CPU limits prevents DoS via resource exhaustion.
+      messages:
+      - Container 'nginx' of DaemonSet 'nginx' should set 'resources.limits.cpu'
+      remediation: Set a limit value under 'containers[].resources.limits.cpu'.
+      severity: LOW
+      success: false
+      title: CPU not limited
+    - category: Kubernetes Security Check
+      checkID: KSV012
+      description: Force the running image to run as a non-root user to ensure least
+        privileges.
+      messages:
+      - Container 'nginx' of DaemonSet 'nginx' should set 'securityContext.runAsNonRoot'
+        to true
+      remediation: Set 'containers[].securityContext.runAsNonRoot' to true.
+      severity: MEDIUM
+      success: false
+      title: Runs as root user
+    - category: Kubernetes Security Check
+      checkID: KSV013
+      description: It is best to avoid using the ':latest' image tag when deploying
+        containers in production. Doing so makes it hard to track which version of
+        the image is running, and hard to roll back the version.
+      messages:
+      - Container 'nginx' of DaemonSet 'nginx' should specify an image tag
+      remediation: Use a specific container image tag that is not 'latest'.
+      severity: MEDIUM
+      success: false
+      title: Image tag ":latest" used
+    - category: Kubernetes Security Check
+      checkID: KSV014
+      description: An immutable root file system prevents applications from writing
+        to their local disk. This can limit intrusions, as attackers will not be able
+        to tamper with the file system or write foreign executables to disk.
+      messages:
+      - Container 'nginx' of DaemonSet 'nginx' should set 'securityContext.readOnlyRootFilesystem'
+        to true
+      remediation: Change 'containers[].securityContext.readOnlyRootFilesystem' to
+        'true'.
+      severity: HIGH
+      success: false
+      title: Root file system is not read-only
+    - category: Kubernetes Security Check
+      checkID: KSV015
+      description: When containers have resource requests specified, the scheduler
+        can make better decisions about which nodes to place pods on, and how to deal
+        with resource contention.
+      messages:
+      - Container 'nginx' of DaemonSet 'nginx' should set 'resources.requests.cpu'
+      remediation: Set 'containers[].resources.requests.cpu'.
+      severity: LOW
+      success: false
+      title: CPU requests not specified
+    - category: Kubernetes Security Check
+      checkID: KSV016
+      description: When containers have memory requests specified, the scheduler can
+        make better decisions about which nodes to place pods on, and how to deal
+        with resource contention.
+      messages:
+      - Container 'nginx' of DaemonSet 'nginx' should set 'resources.requests.memory'
+      remediation: Set 'containers[].resources.requests.memory'.
+      severity: LOW
+      success: false
+      title: Memory requests not specified
+    - category: Kubernetes Security Check
+      checkID: KSV018
+      description: Enforcing memory limits prevents DoS via resource exhaustion.
+      messages:
+      - Container 'nginx' of DaemonSet 'nginx' should set 'resources.limits.memory'
+      remediation: Set a limit value under 'containers[].resources.limits.memory'.
+      severity: LOW
+      success: false
+      title: Memory not limited
+    - category: Kubernetes Security Check
+      checkID: KSV020
+      description: Force the container to run with user ID > 10000 to avoid conflicts
+        with the host’s user table.
+      messages:
+      - Container 'nginx' of DaemonSet 'nginx' should set 'securityContext.runAsUser'
+        > 10000
+      remediation: Set 'containers[].securityContext.runAsUser' to an integer > 10000.
+      severity: LOW
+      success: false
+      title: Runs with UID <= 10000
+    - category: Kubernetes Security Check
+      checkID: KSV021
+      description: Force the container to run with group ID > 10000 to avoid conflicts
+        with the host’s user table.
+      messages:
+      - Container 'nginx' of DaemonSet 'nginx' should set 'securityContext.runAsGroup'
+        > 10000
+      remediation: Set 'containers[].securityContext.runAsGroup' to an integer > 10000.
+      severity: LOW
+      success: false
+      title: Runs with GID <= 10000
+    - category: Kubernetes Security Check
+      checkID: KSV024
+      description: According to pod security standard 'Host Ports', hostPorts should
+        be disallowed, or at minimum restricted to a known list.
+      messages:
+      - Container 'nginx' of DaemonSet 'nginx' should not set host ports, 'ports[*].hostPort'
+      remediation: Do not set spec.containers[*].ports[*].hostPort and spec.initContainers[*].ports[*].hostPort.
+      severity: HIGH
+      success: false
+      title: Access to host ports
+    - category: Kubernetes Security Check
+      checkID: KSV030
+      description: According to pod security standard 'Seccomp', the RuntimeDefault
+        seccomp profile must be required, or allow specific additional profiles.
+      messages:
+      - Either Pod or Container should set 'securityContext.seccompProfile.type' to
+        'RuntimeDefault'
+      remediation: Set 'spec.securityContext.seccompProfile.type', 'spec.containers[*].securityContext.seccompProfile'
+        and 'spec.initContainers[*].securityContext.seccompProfile' to 'RuntimeDefault'
+        or undefined.
+      severity: LOW
+      success: false
+      title: Runtime/Default Seccomp profile not set
+    - category: Kubernetes Security Check
+      checkID: KSV032
+      description: Containers should only use images from trusted registries.
+      messages:
+      - container nginx of daemonset nginx in network-testing namespace should restrict
+        container image to your specific registry domain. For Azure any domain ending
+        in 'azurecr.io'
+      remediation: Use images from trusted Azure registries.
+      severity: MEDIUM
+      success: false
+      title: All container images must start with the *.azurecr.io domain
+    - category: Kubernetes Security Check
+      checkID: KSV033
+      description: Containers should only use images from trusted GCR registries.
+      messages:
+      - 'container nginx of daemonset nginx in network-testing namespace should restrict
+        container image to your specific registry domain. See the full GCR list here:
+        https://cloud.google.com/container-registry/docs/overview#registries'
+      remediation: Use images from trusted GCR registries.
+      severity: MEDIUM
+      success: false
+      title: All container images must start with a GCR domain
+    - category: Kubernetes Security Check
+      checkID: KSV034
+      description: Container images must not start with an empty prefix or a defined
+        public registry domain.
+      messages:
+      - Container 'nginx' of DaemonSet 'nginx' should restrict container image to
+        use private registries
+      remediation: Use images from private registries.
+      severity: MEDIUM
+      success: false
+      title: Container images from public registries used
+    - category: Kubernetes Security Check
+      checkID: KSV035
+      description: Container images from non-ECR registries should be forbidden.
+      messages:
+      - 'Container ''nginx'' of DaemonSet ''nginx'' should restrict images to own
+        ECR repository. See the full ECR list here: https://docs.aws.amazon.com/general/latest/gr/ecr.html'
+      remediation: Container image should be used from Amazon container Registry
+      severity: MEDIUM
+      success: false
+      title: All container images must start with an ECR domain
+    - category: Kubernetes Security Check
+      checkID: KSV039
+      description: ensure limit range policy has configure in order to limit resource
+        usage for namespaces or nodes
+      messages:
+      - limit range policy with a default request and limit, min and max request,
+        for each container should be configure
+      remediation: create limit range policy with a default request and limit, min
+        and max request, for each container.
+      severity: LOW
+      success: false
+      title: limit range usage
+    - category: Kubernetes Security Check
+      checkID: KSV040
+      description: ensure resource quota policy has configure in order to limit aggregate
+        resource usage within namespace
+      messages:
+      - resource quota policy with hard memory and cpu quota per namespace should
+        be configure
+      remediation: create resource quota policy with mem and cpu quota per each namespace
+      severity: LOW
+      success: false
+      title: resource quota usage
+    - category: Kubernetes Security Check
+      checkID: KSV104
+      description: A program inside the container can bypass Seccomp protection policies.
+      messages:
+      - container "nginx" of daemonset "nginx" in "network-testing" namespace should
+        specify a seccomp profile
+      remediation: Specify seccomp either by annotation or by seccomp profile type
+        having allowed values as per pod security standards
+      severity: MEDIUM
+      success: false
+      title: Seccomp policies disabled
+    - category: Kubernetes Security Check
+      checkID: KSV106
+      description: Containers must drop ALL capabilities, and are only permitted to
+        add back the NET_BIND_SERVICE capability.
+      messages:
+      - container should drop all
+      remediation: Set 'spec.containers[*].securityContext.capabilities.drop' to 'ALL'
+        and only add 'NET_BIND_SERVICE' to 'spec.containers[*].securityContext.capabilities.add'.
+      severity: LOW
+      success: false
+      title: Container capabilities must only include NET_BIND_SERVICE
+    - category: Kubernetes Security Check
+      checkID: KSV117
+      description: The ports which are lower than 1024 receive and transmit various
+        sensitive and privileged data. Allowing containers to use them can bring serious
+        implications.
+      messages:
+      - daemonset nginx in network-testing namespace should not set spec.template.spec.containers.ports.containerPort
+        to less than 1024
+      remediation: Do not map the container ports to privileged host ports when starting
+        a container.
+      severity: HIGH
+      success: false
+      title: Prevent binding to privileged ports
+    scanner:
+      name: Trivy
+      vendor: Aqua Security
+      version: 0.22.0
+    summary:
+      criticalCount: 0
+      highCount: 3
+      lowCount: 12
+      mediumCount: 8
+    updateTimestamp: "2025-01-30T14:38:40Z"
+- apiVersion: aquasecurity.github.io/v1alpha1
+  kind: ConfigAuditReport
+  metadata:
+    annotations:
+      trivy-operator.aquasecurity.github.io/report-ttl: 24h0m0s
+    creationTimestamp: "2025-02-14T11:26:58Z"
+    generation: 5
+    labels:
+      plugin-config-hash: 6d67b68bf9
+      resource-spec-hash: 6bbfc56899
+      trivy-operator.resource.kind: Ingress
+      trivy-operator.resource.name: ca-issuer-test
+      trivy-operator.resource.namespace: network-testing
+    name: ingress-ca-issuer-test
+    namespace: network-testing
+    ownerReferences:
+    - apiVersion: networking.k8s.io/v1
+      blockOwnerDeletion: false
+      controller: true
+      kind: Ingress
+      name: ca-issuer-test
+      uid: b70c76f1-64bd-4a3b-b2f5-7e98a1d42d07
+    resourceVersion: "538332747"
+    uid: 0796bc30-9992-457d-819d-793ff0739f94
+  report:
+    checks:
+    - category: Kubernetes Security Check
+      checkID: KSV039
+      description: ensure limit range policy has configure in order to limit resource
+        usage for namespaces or nodes
+      messages:
+      - limit range policy with a default request and limit, min and max request,
+        for each container should be configure
+      remediation: create limit range policy with a default request and limit, min
+        and max request, for each container.
+      severity: LOW
+      success: false
+      title: limit range usage
+    - category: Kubernetes Security Check
+      checkID: KSV040
+      description: ensure resource quota policy has configure in order to limit aggregate
+        resource usage within namespace
+      messages:
+      - resource quota policy with hard memory and cpu quota per namespace should
+        be configure
+      remediation: create resource quota policy with mem and cpu quota per each namespace
+      severity: LOW
+      success: false
+      title: resource quota usage
+    scanner:
+      name: Trivy
+      vendor: Aqua Security
+      version: 0.22.0
+    summary:
+      criticalCount: 0
+      highCount: 0
+      lowCount: 2
+      mediumCount: 0
+    updateTimestamp: "2025-12-09T14:36:52Z"
+- apiVersion: aquasecurity.github.io/v1alpha1
+  kind: ConfigAuditReport
+  metadata:
+    annotations:
+      trivy-operator.aquasecurity.github.io/report-ttl: 24h0m0s
+    creationTimestamp: "2025-02-23T13:34:26Z"
+    generation: 5
+    labels:
+      plugin-config-hash: 6d67b68bf9
+      resource-spec-hash: 5d99dc8948
+      trivy-operator.resource.kind: LimitRange
+      trivy-operator.resource.name: limits
+      trivy-operator.resource.namespace: network-testing
+    name: limitrange-limits
+    namespace: network-testing
+    ownerReferences:
+    - apiVersion: v1
+      blockOwnerDeletion: false
+      controller: true
+      kind: LimitRange
+      name: limits
+      uid: 87038069-b8fe-433c-bc12-8b4899dc5d05
+    resourceVersion: "445468369"
+    uid: 959794d0-87d6-452e-abc8-fc1360306000
+  report:
+    checks:
+    - category: Kubernetes Security Check
+      checkID: KSV039
+      description: ensure limit range policy has configure in order to limit resource
+        usage for namespaces or nodes
+      messages:
+      - limit range policy with a default request and limit, min and max request,
+        for each container should be configure
+      remediation: create limit range policy with a default request and limit, min
+        and max request, for each container.
+      severity: LOW
+      success: false
+      title: limit range usage
+    - category: Kubernetes Security Check
+      checkID: KSV040
+      description: ensure resource quota policy has configure in order to limit aggregate
+        resource usage within namespace
+      messages:
+      - resource quota policy with hard memory and cpu quota per namespace should
+        be configure
+      remediation: create resource quota policy with mem and cpu quota per each namespace
+      severity: LOW
+      success: false
+      title: resource quota usage
+    scanner:
+      name: Trivy
+      vendor: Aqua Security
+      version: 0.22.0
+    summary:
+      criticalCount: 0
+      highCount: 0
+      lowCount: 2
+      mediumCount: 0
+    updateTimestamp: "2025-09-08T06:41:38Z"
+- apiVersion: aquasecurity.github.io/v1alpha1
+  kind: ConfigAuditReport
+  metadata:
+    annotations:
+      trivy-operator.aquasecurity.github.io/report-ttl: 24h0m0s
+    creationTimestamp: "2025-02-23T13:34:28Z"
+    generation: 1
+    labels:
+      plugin-config-hash: 6d67b68bf9
+      resource-spec-hash: 7898b56f55
+      trivy-operator.resource.kind: LimitRange
+      trivy-operator.resource.name: storagelimits
+      trivy-operator.resource.namespace: network-testing
+    name: limitrange-storagelimits
+    namespace: network-testing
+    ownerReferences:
+    - apiVersion: v1
+      blockOwnerDeletion: false
+      controller: true
+      kind: LimitRange
+      name: storagelimits
+      uid: 58c59638-6fc8-446a-8206-9eb2a4bb946c
+    resourceVersion: "265746042"
+    uid: 1b652a3a-75d1-43c8-8aae-debe1882660a
+  report:
+    checks:
+    - category: Kubernetes Security Check
+      checkID: KSV039
+      description: ensure limit range policy has configure in order to limit resource
+        usage for namespaces or nodes
+      messages:
+      - limit range policy with a default request and limit, min and max request,
+        for each container should be configure
+      remediation: create limit range policy with a default request and limit, min
+        and max request, for each container.
+      severity: LOW
+      success: false
+      title: limit range usage
+    - category: Kubernetes Security Check
+      checkID: KSV040
+      description: ensure resource quota policy has configure in order to limit aggregate
+        resource usage within namespace
+      messages:
+      - resource quota policy with hard memory and cpu quota per namespace should
+        be configure
+      remediation: create resource quota policy with mem and cpu quota per each namespace
+      severity: LOW
+      success: false
+      title: resource quota usage
+    scanner:
+      name: Trivy
+      vendor: Aqua Security
+      version: 0.22.0
+    summary:
+      criticalCount: 0
+      highCount: 0
+      lowCount: 2
+      mediumCount: 0
+    updateTimestamp: "2025-02-23T13:34:28Z"
+- apiVersion: aquasecurity.github.io/v1alpha1
+  kind: ConfigAuditReport
+  metadata:
+    annotations:
+      trivy-operator.aquasecurity.github.io/report-ttl: 24h0m0s
+    creationTimestamp: "2025-02-23T10:26:52Z"
+    generation: 1
+    labels:
+      plugin-config-hash: 6d67b68bf9
+      resource-spec-hash: 7fc9c97c8f
+      trivy-operator.resource.kind: ReplicaSet
+      trivy-operator.resource.name: hpa-demo-deployment-7c869666df
+      trivy-operator.resource.namespace: network-testing
+    name: replicaset-hpa-demo-deployment-7c869666df
+    namespace: network-testing
+    ownerReferences:
+    - apiVersion: apps/v1
+      blockOwnerDeletion: false
+      controller: true
+      kind: ReplicaSet
+      name: hpa-demo-deployment-7c869666df
+      uid: 17189c59-aa3a-44b4-a809-e0cfd539e55c
+    resourceVersion: "265627304"
+    uid: e96961b4-9bea-488d-8e60-8f9391940bb3
+  report:
+    checks:
+    - category: Kubernetes Security Check
+      checkID: KSV001
+      description: A program inside the container can elevate its own privileges and
+        run as root, which might give the program control over the container and node.
+      messages:
+      - Container 'hpa-demo-deployment' of ReplicaSet 'hpa-demo-deployment-7c869666df'
+        should set 'securityContext.allowPrivilegeEscalation' to false
+      remediation: Set 'set containers[].securityContext.allowPrivilegeEscalation'
+        to 'false'.
+      severity: MEDIUM
+      success: false
+      title: Can elevate its own privileges
+    - category: Kubernetes Security Check
+      checkID: KSV003
+      description: The container should drop all default capabilities and add only
+        those that are needed for its execution.
+      messages:
+      - Container 'hpa-demo-deployment' of ReplicaSet 'hpa-demo-deployment-7c869666df'
+        should add 'ALL' to 'securityContext.capabilities.drop'
+      remediation: Add 'ALL' to containers[].securityContext.capabilities.drop.
+      severity: LOW
+      success: false
+      title: 'Default capabilities: some containers do not drop all'
+    - category: Kubernetes Security Check
+      checkID: KSV004
+      description: Security best practices require containers to run with minimal
+        required capabilities.
+      messages:
+      - Container 'hpa-demo-deployment' of 'replicaset' 'hpa-demo-deployment-7c869666df'
+        in 'network-testing' namespace should set securityContext.capabilities.drop
+      remediation: Specify at least one unneeded capability in 'containers[].securityContext.capabilities.drop'
+      severity: LOW
+      success: false
+      title: 'Default capabilities: some containers do not drop any'
+    - category: Kubernetes Security Check
+      checkID: KSV012
+      description: Force the running image to run as a non-root user to ensure least
+        privileges.
+      messages:
+      - Container 'hpa-demo-deployment' of ReplicaSet 'hpa-demo-deployment-7c869666df'
+        should set 'securityContext.runAsNonRoot' to true
+      remediation: Set 'containers[].securityContext.runAsNonRoot' to true.
+      severity: MEDIUM
+      success: false
+      title: Runs as root user
+    - category: Kubernetes Security Check
+      checkID: KSV013
+      description: It is best to avoid using the ':latest' image tag when deploying
+        containers in production. Doing so makes it hard to track which version of
+        the image is running, and hard to roll back the version.
+      messages:
+      - Container 'hpa-demo-deployment' of ReplicaSet 'hpa-demo-deployment-7c869666df'
+        should specify an image tag
+      remediation: Use a specific container image tag that is not 'latest'.
+      severity: MEDIUM
+      success: false
+      title: Image tag ":latest" used
+    - category: Kubernetes Security Check
+      checkID: KSV014
+      description: An immutable root file system prevents applications from writing
+        to their local disk. This can limit intrusions, as attackers will not be able
+        to tamper with the file system or write foreign executables to disk.
+      messages:
+      - Container 'hpa-demo-deployment' of ReplicaSet 'hpa-demo-deployment-7c869666df'
+        should set 'securityContext.readOnlyRootFilesystem' to true
+      remediation: Change 'containers[].securityContext.readOnlyRootFilesystem' to
+        'true'.
+      severity: HIGH
+      success: false
+      title: Root file system is not read-only
+    - category: Kubernetes Security Check
+      checkID: KSV016
+      description: When containers have memory requests specified, the scheduler can
+        make better decisions about which nodes to place pods on, and how to deal
+        with resource contention.
+      messages:
+      - Container 'hpa-demo-deployment' of ReplicaSet 'hpa-demo-deployment-7c869666df'
+        should set 'resources.requests.memory'
+      remediation: Set 'containers[].resources.requests.memory'.
+      severity: LOW
+      success: false
+      title: Memory requests not specified
+    - category: Kubernetes Security Check
+      checkID: KSV018
+      description: Enforcing memory limits prevents DoS via resource exhaustion.
+      messages:
+      - Container 'hpa-demo-deployment' of ReplicaSet 'hpa-demo-deployment-7c869666df'
+        should set 'resources.limits.memory'
+      remediation: Set a limit value under 'containers[].resources.limits.memory'.
+      severity: LOW
+      success: false
+      title: Memory not limited
+    - category: Kubernetes Security Check
+      checkID: KSV020
+      description: Force the container to run with user ID > 10000 to avoid conflicts
+        with the host’s user table.
+      messages:
+      - Container 'hpa-demo-deployment' of ReplicaSet 'hpa-demo-deployment-7c869666df'
+        should set 'securityContext.runAsUser' > 10000
+      remediation: Set 'containers[].securityContext.runAsUser' to an integer > 10000.
+      severity: LOW
+      success: false
+      title: Runs with UID <= 10000
+    - category: Kubernetes Security Check
+      checkID: KSV021
+      description: Force the container to run with group ID > 10000 to avoid conflicts
+        with the host’s user table.
+      messages:
+      - Container 'hpa-demo-deployment' of ReplicaSet 'hpa-demo-deployment-7c869666df'
+        should set 'securityContext.runAsGroup' > 10000
+      remediation: Set 'containers[].securityContext.runAsGroup' to an integer > 10000.
+      severity: LOW
+      success: false
+      title: Runs with GID <= 10000
+    - category: Kubernetes Security Check
+      checkID: KSV030
+      description: According to pod security standard 'Seccomp', the RuntimeDefault
+        seccomp profile must be required, or allow specific additional profiles.
+      messages:
+      - Either Pod or Container should set 'securityContext.seccompProfile.type' to
+        'RuntimeDefault'
+      remediation: Set 'spec.securityContext.seccompProfile.type', 'spec.containers[*].securityContext.seccompProfile'
+        and 'spec.initContainers[*].securityContext.seccompProfile' to 'RuntimeDefault'
+        or undefined.
+      severity: LOW
+      success: false
+      title: Runtime/Default Seccomp profile not set
+    - category: Kubernetes Security Check
+      checkID: KSV032
+      description: Containers should only use images from trusted registries.
+      messages:
+      - container hpa-demo-deployment of replicaset hpa-demo-deployment-7c869666df
+        in network-testing namespace should restrict container image to your specific
+        registry domain. For Azure any domain ending in 'azurecr.io'
+      remediation: Use images from trusted Azure registries.
+      severity: MEDIUM
+      success: false
+      title: All container images must start with the *.azurecr.io domain
+    - category: Kubernetes Security Check
+      checkID: KSV035
+      description: Container images from non-ECR registries should be forbidden.
+      messages:
+      - 'Container ''hpa-demo-deployment'' of ReplicaSet ''hpa-demo-deployment-7c869666df''
+        should restrict images to own ECR repository. See the full ECR list here:
+        https://docs.aws.amazon.com/general/latest/gr/ecr.html'
+      remediation: Container image should be used from Amazon container Registry
+      severity: MEDIUM
+      success: false
+      title: All container images must start with an ECR domain
+    - category: Kubernetes Security Check
+      checkID: KSV039
+      description: ensure limit range policy has configure in order to limit resource
+        usage for namespaces or nodes
+      messages:
+      - limit range policy with a default request and limit, min and max request,
+        for each container should be configure
+      remediation: create limit range policy with a default request and limit, min
+        and max request, for each container.
+      severity: LOW
+      success: false
+      title: limit range usage
+    - category: Kubernetes Security Check
+      checkID: KSV040
+      description: ensure resource quota policy has configure in order to limit aggregate
+        resource usage within namespace
+      messages:
+      - resource quota policy with hard memory and cpu quota per namespace should
+        be configure
+      remediation: create resource quota policy with mem and cpu quota per each namespace
+      severity: LOW
+      success: false
+      title: resource quota usage
+    - category: Kubernetes Security Check
+      checkID: KSV104
+      description: A program inside the container can bypass Seccomp protection policies.
+      messages:
+      - container "hpa-demo-deployment" of replicaset "hpa-demo-deployment-7c869666df"
+        in "network-testing" namespace should specify a seccomp profile
+      remediation: Specify seccomp either by annotation or by seccomp profile type
+        having allowed values as per pod security standards
+      severity: MEDIUM
+      success: false
+      title: Seccomp policies disabled
+    - category: Kubernetes Security Check
+      checkID: KSV106
+      description: Containers must drop ALL capabilities, and are only permitted to
+        add back the NET_BIND_SERVICE capability.
+      messages:
+      - container should drop all
+      remediation: Set 'spec.containers[*].securityContext.capabilities.drop' to 'ALL'
+        and only add 'NET_BIND_SERVICE' to 'spec.containers[*].securityContext.capabilities.add'.
+      severity: LOW
+      success: false
+      title: Container capabilities must only include NET_BIND_SERVICE
+    - category: Kubernetes Security Check
+      checkID: KSV117
+      description: The ports which are lower than 1024 receive and transmit various
+        sensitive and privileged data. Allowing containers to use them can bring serious
+        implications.
+      messages:
+      - replicaset hpa-demo-deployment-7c869666df in network-testing namespace should
+        not set spec.template.spec.containers.ports.containerPort to less than 1024
+      remediation: Do not map the container ports to privileged host ports when starting
+        a container.
+      severity: HIGH
+      success: false
+      title: Prevent binding to privileged ports
+    scanner:
+      name: Trivy
+      vendor: Aqua Security
+      version: 0.22.0
+    summary:
+      criticalCount: 0
+      highCount: 2
+      lowCount: 10
+      mediumCount: 6
+    updateTimestamp: "2025-02-23T10:26:52Z"
+- apiVersion: aquasecurity.github.io/v1alpha1
+  kind: ConfigAuditReport
+  metadata:
+    annotations:
+      trivy-operator.aquasecurity.github.io/report-ttl: 24h0m0s
+    creationTimestamp: "2025-01-30T14:38:39Z"
+    generation: 1
+    labels:
+      plugin-config-hash: 6d67b68bf9
+      resource-spec-hash: 574c854fdd
+      trivy-operator.resource.kind: ReplicaSet
+      trivy-operator.resource.name: nginx-d-5964ff4c56
+      trivy-operator.resource.namespace: network-testing
+    name: replicaset-nginx-d-5964ff4c56
+    namespace: network-testing
+    ownerReferences:
+    - apiVersion: apps/v1
+      blockOwnerDeletion: false
+      controller: true
+      kind: ReplicaSet
+      name: nginx-d-5964ff4c56
+      uid: 138af930-5606-435f-b98c-118a6e63f337
+    resourceVersion: "244086985"
+    uid: 134e26b1-2cda-4acb-9ec7-12fbf846722d
+  report:
+    checks:
+    - category: Kubernetes Security Check
+      checkID: KSV001
+      description: A program inside the container can elevate its own privileges and
+        run as root, which might give the program control over the container and node.
+      messages:
+      - Container 'frontend' of ReplicaSet 'nginx-d-5964ff4c56' should set 'securityContext.allowPrivilegeEscalation'
+        to false
+      remediation: Set 'set containers[].securityContext.allowPrivilegeEscalation'
+        to 'false'.
+      severity: MEDIUM
+      success: false
+      title: Can elevate its own privileges
+    - category: Kubernetes Security Check
+      checkID: KSV003
+      description: The container should drop all default capabilities and add only
+        those that are needed for its execution.
+      messages:
+      - Container 'frontend' of ReplicaSet 'nginx-d-5964ff4c56' should add 'ALL' to
+        'securityContext.capabilities.drop'
+      remediation: Add 'ALL' to containers[].securityContext.capabilities.drop.
+      severity: LOW
+      success: false
+      title: 'Default capabilities: some containers do not drop all'
+    - category: Kubernetes Security Check
+      checkID: KSV004
+      description: Security best practices require containers to run with minimal
+        required capabilities.
+      messages:
+      - Container 'frontend' of 'replicaset' 'nginx-d-5964ff4c56' in 'network-testing'
+        namespace should set securityContext.capabilities.drop
+      remediation: Specify at least one unneeded capability in 'containers[].securityContext.capabilities.drop'
+      severity: LOW
+      success: false
+      title: 'Default capabilities: some containers do not drop any'
+    - category: Kubernetes Security Check
+      checkID: KSV011
+      description: Enforcing CPU limits prevents DoS via resource exhaustion.
+      messages:
+      - Container 'frontend' of ReplicaSet 'nginx-d-5964ff4c56' should set 'resources.limits.cpu'
+      remediation: Set a limit value under 'containers[].resources.limits.cpu'.
+      severity: LOW
+      success: false
+      title: CPU not limited
+    - category: Kubernetes Security Check
+      checkID: KSV012
+      description: Force the running image to run as a non-root user to ensure least
+        privileges.
+      messages:
+      - Container 'frontend' of ReplicaSet 'nginx-d-5964ff4c56' should set 'securityContext.runAsNonRoot'
+        to true
+      remediation: Set 'containers[].securityContext.runAsNonRoot' to true.
+      severity: MEDIUM
+      success: false
+      title: Runs as root user
+    - category: Kubernetes Security Check
+      checkID: KSV013
+      description: It is best to avoid using the ':latest' image tag when deploying
+        containers in production. Doing so makes it hard to track which version of
+        the image is running, and hard to roll back the version.
+      messages:
+      - Container 'frontend' of ReplicaSet 'nginx-d-5964ff4c56' should specify an
+        image tag
+      remediation: Use a specific container image tag that is not 'latest'.
+      severity: MEDIUM
+      success: false
+      title: Image tag ":latest" used
+    - category: Kubernetes Security Check
+      checkID: KSV014
+      description: An immutable root file system prevents applications from writing
+        to their local disk. This can limit intrusions, as attackers will not be able
+        to tamper with the file system or write foreign executables to disk.
+      messages:
+      - Container 'frontend' of ReplicaSet 'nginx-d-5964ff4c56' should set 'securityContext.readOnlyRootFilesystem'
+        to true
+      remediation: Change 'containers[].securityContext.readOnlyRootFilesystem' to
+        'true'.
+      severity: HIGH
+      success: false
+      title: Root file system is not read-only
+    - category: Kubernetes Security Check
+      checkID: KSV015
+      description: When containers have resource requests specified, the scheduler
+        can make better decisions about which nodes to place pods on, and how to deal
+        with resource contention.
+      messages:
+      - Container 'frontend' of ReplicaSet 'nginx-d-5964ff4c56' should set 'resources.requests.cpu'
+      remediation: Set 'containers[].resources.requests.cpu'.
+      severity: LOW
+      success: false
+      title: CPU requests not specified
+    - category: Kubernetes Security Check
+      checkID: KSV016
+      description: When containers have memory requests specified, the scheduler can
+        make better decisions about which nodes to place pods on, and how to deal
+        with resource contention.
+      messages:
+      - Container 'frontend' of ReplicaSet 'nginx-d-5964ff4c56' should set 'resources.requests.memory'
+      remediation: Set 'containers[].resources.requests.memory'.
+      severity: LOW
+      success: false
+      title: Memory requests not specified
+    - category: Kubernetes Security Check
+      checkID: KSV018
+      description: Enforcing memory limits prevents DoS via resource exhaustion.
+      messages:
+      - Container 'frontend' of ReplicaSet 'nginx-d-5964ff4c56' should set 'resources.limits.memory'
+      remediation: Set a limit value under 'containers[].resources.limits.memory'.
+      severity: LOW
+      success: false
+      title: Memory not limited
+    - category: Kubernetes Security Check
+      checkID: KSV020
+      description: Force the container to run with user ID > 10000 to avoid conflicts
+        with the host’s user table.
+      messages:
+      - Container 'frontend' of ReplicaSet 'nginx-d-5964ff4c56' should set 'securityContext.runAsUser'
+        > 10000
+      remediation: Set 'containers[].securityContext.runAsUser' to an integer > 10000.
+      severity: LOW
+      success: false
+      title: Runs with UID <= 10000
+    - category: Kubernetes Security Check
+      checkID: KSV021
+      description: Force the container to run with group ID > 10000 to avoid conflicts
+        with the host’s user table.
+      messages:
+      - Container 'frontend' of ReplicaSet 'nginx-d-5964ff4c56' should set 'securityContext.runAsGroup'
+        > 10000
+      remediation: Set 'containers[].securityContext.runAsGroup' to an integer > 10000.
+      severity: LOW
+      success: false
+      title: Runs with GID <= 10000
+    - category: Kubernetes Security Check
+      checkID: KSV030
+      description: According to pod security standard 'Seccomp', the RuntimeDefault
+        seccomp profile must be required, or allow specific additional profiles.
+      messages:
+      - Either Pod or Container should set 'securityContext.seccompProfile.type' to
+        'RuntimeDefault'
+      remediation: Set 'spec.securityContext.seccompProfile.type', 'spec.containers[*].securityContext.seccompProfile'
+        and 'spec.initContainers[*].securityContext.seccompProfile' to 'RuntimeDefault'
+        or undefined.
+      severity: LOW
+      success: false
+      title: Runtime/Default Seccomp profile not set
+    - category: Kubernetes Security Check
+      checkID: KSV032
+      description: Containers should only use images from trusted registries.
+      messages:
+      - container frontend of replicaset nginx-d-5964ff4c56 in network-testing namespace
+        should restrict container image to your specific registry domain. For Azure
+        any domain ending in 'azurecr.io'
+      remediation: Use images from trusted Azure registries.
+      severity: MEDIUM
+      success: false
+      title: All container images must start with the *.azurecr.io domain
+    - category: Kubernetes Security Check
+      checkID: KSV033
+      description: Containers should only use images from trusted GCR registries.
+      messages:
+      - 'container frontend of replicaset nginx-d-5964ff4c56 in network-testing namespace
+        should restrict container image to your specific registry domain. See the
+        full GCR list here: https://cloud.google.com/container-registry/docs/overview#registries'
+      remediation: Use images from trusted GCR registries.
+      severity: MEDIUM
+      success: false
+      title: All container images must start with a GCR domain
+    - category: Kubernetes Security Check
+      checkID: KSV034
+      description: Container images must not start with an empty prefix or a defined
+        public registry domain.
+      messages:
+      - Container 'frontend' of ReplicaSet 'nginx-d-5964ff4c56' should restrict container
+        image to use private registries
+      remediation: Use images from private registries.
+      severity: MEDIUM
+      success: false
+      title: Container images from public registries used
+    - category: Kubernetes Security Check
+      checkID: KSV035
+      description: Container images from non-ECR registries should be forbidden.
+      messages:
+      - 'Container ''frontend'' of ReplicaSet ''nginx-d-5964ff4c56'' should restrict
+        images to own ECR repository. See the full ECR list here: https://docs.aws.amazon.com/general/latest/gr/ecr.html'
+      remediation: Container image should be used from Amazon container Registry
+      severity: MEDIUM
+      success: false
+      title: All container images must start with an ECR domain
+    - category: Kubernetes Security Check
+      checkID: KSV039
+      description: ensure limit range policy has configure in order to limit resource
+        usage for namespaces or nodes
+      messages:
+      - limit range policy with a default request and limit, min and max request,
+        for each container should be configure
+      remediation: create limit range policy with a default request and limit, min
+        and max request, for each container.
+      severity: LOW
+      success: false
+      title: limit range usage
+    - category: Kubernetes Security Check
+      checkID: KSV040
+      description: ensure resource quota policy has configure in order to limit aggregate
+        resource usage within namespace
+      messages:
+      - resource quota policy with hard memory and cpu quota per namespace should
+        be configure
+      remediation: create resource quota policy with mem and cpu quota per each namespace
+      severity: LOW
+      success: false
+      title: resource quota usage
+    - category: Kubernetes Security Check
+      checkID: KSV104
+      description: A program inside the container can bypass Seccomp protection policies.
+      messages:
+      - container "frontend" of replicaset "nginx-d-5964ff4c56" in "network-testing"
+        namespace should specify a seccomp profile
+      remediation: Specify seccomp either by annotation or by seccomp profile type
+        having allowed values as per pod security standards
+      severity: MEDIUM
+      success: false
+      title: Seccomp policies disabled
+    - category: Kubernetes Security Check
+      checkID: KSV106
+      description: Containers must drop ALL capabilities, and are only permitted to
+        add back the NET_BIND_SERVICE capability.
+      messages:
+      - container should drop all
+      remediation: Set 'spec.containers[*].securityContext.capabilities.drop' to 'ALL'
+        and only add 'NET_BIND_SERVICE' to 'spec.containers[*].securityContext.capabilities.add'.
+      severity: LOW
+      success: false
+      title: Container capabilities must only include NET_BIND_SERVICE
+    - category: Kubernetes Security Check
+      checkID: KSV117
+      description: The ports which are lower than 1024 receive and transmit various
+        sensitive and privileged data. Allowing containers to use them can bring serious
+        implications.
+      messages:
+      - replicaset nginx-d-5964ff4c56 in network-testing namespace should not set
+        spec.template.spec.containers.ports.containerPort to less than 1024
+      remediation: Do not map the container ports to privileged host ports when starting
+        a container.
+      severity: HIGH
+      success: false
+      title: Prevent binding to privileged ports
+    scanner:
+      name: Trivy
+      vendor: Aqua Security
+      version: 0.22.0
+    summary:
+      criticalCount: 0
+      highCount: 2
+      lowCount: 12
+      mediumCount: 8
+    updateTimestamp: "2025-01-30T14:38:39Z"
+- apiVersion: aquasecurity.github.io/v1alpha1
+  kind: ConfigAuditReport
+  metadata:
+    annotations:
+      trivy-operator.aquasecurity.github.io/report-ttl: 24h0m0s
+    creationTimestamp: "2025-02-23T13:34:27Z"
+    generation: 12
+    labels:
+      plugin-config-hash: 6d67b68bf9
+      resource-spec-hash: 7fb7f78dbc
+      trivy-operator.resource.kind: ResourceQuota
+      trivy-operator.resource.name: compute-quota
+      trivy-operator.resource.namespace: network-testing
+    name: resourcequota-compute-quota
+    namespace: network-testing
+    ownerReferences:
+    - apiVersion: v1
+      blockOwnerDeletion: false
+      controller: true
+      kind: ResourceQuota
+      name: compute-quota
+      uid: ed139791-8ce3-4b2c-afad-e82ee6885588
+    resourceVersion: "499020752"
+    uid: adda88c9-7511-4933-ae52-d3d3a957073a
+  report:
+    checks:
+    - category: Kubernetes Security Check
+      checkID: KSV039
+      description: ensure limit range policy has configure in order to limit resource
+        usage for namespaces or nodes
+      messages:
+      - limit range policy with a default request and limit, min and max request,
+        for each container should be configure
+      remediation: create limit range policy with a default request and limit, min
+        and max request, for each container.
+      severity: LOW
+      success: false
+      title: limit range usage
+    scanner:
+      name: Trivy
+      vendor: Aqua Security
+      version: 0.22.0
+    summary:
+      criticalCount: 0
+      highCount: 0
+      lowCount: 1
+      mediumCount: 0
+    updateTimestamp: "2025-10-31T20:27:39Z"
+- apiVersion: aquasecurity.github.io/v1alpha1
+  kind: ConfigAuditReport
+  metadata:
+    annotations:
+      trivy-operator.aquasecurity.github.io/report-ttl: 24h0m0s
+    creationTimestamp: "2025-02-23T13:34:29Z"
+    generation: 1
+    labels:
+      plugin-config-hash: 6d67b68bf9
+      resource-spec-hash: 7f96d4c8f
+      trivy-operator.resource.kind: ResourceQuota
+      trivy-operator.resource.name: pods-low
+      trivy-operator.resource.namespace: network-testing
+    name: resourcequota-pods-low
+    namespace: network-testing
+    ownerReferences:
+    - apiVersion: v1
+      blockOwnerDeletion: false
+      controller: true
+      kind: ResourceQuota
+      name: pods-low
+      uid: 9b443952-d66f-4503-a0f2-31e5509a98b9
+    resourceVersion: "265746047"
+    uid: d12b1df4-7a6d-4e72-a808-9d8b304a4742
+  report:
+    checks:
+    - category: Kubernetes Security Check
+      checkID: KSV039
+      description: ensure limit range policy has configure in order to limit resource
+        usage for namespaces or nodes
+      messages:
+      - limit range policy with a default request and limit, min and max request,
+        for each container should be configure
+      remediation: create limit range policy with a default request and limit, min
+        and max request, for each container.
+      severity: LOW
+      success: false
+      title: limit range usage
+    - category: Kubernetes Security Check
+      checkID: KSV040
+      description: ensure resource quota policy has configure in order to limit aggregate
+        resource usage within namespace
+      messages:
+      - resource quota policy with hard memory and cpu quota per namespace should
+        be configure
+      remediation: create resource quota policy with mem and cpu quota per each namespace
+      severity: LOW
+      success: false
+      title: resource quota usage
+    scanner:
+      name: Trivy
+      vendor: Aqua Security
+      version: 0.22.0
+    summary:
+      criticalCount: 0
+      highCount: 0
+      lowCount: 2
+      mediumCount: 0
+    updateTimestamp: "2025-02-23T13:34:29Z"
+- apiVersion: aquasecurity.github.io/v1alpha1
+  kind: ConfigAuditReport
+  metadata:
+    annotations:
+      trivy-operator.aquasecurity.github.io/report-ttl: 24h0m0s
+    creationTimestamp: "2025-02-23T13:34:31Z"
+    generation: 3
+    labels:
+      plugin-config-hash: 6d67b68bf9
+      resource-spec-hash: 56d9d8b77b
+      trivy-operator.resource.kind: ResourceQuota
+      trivy-operator.resource.name: storagequota
+      trivy-operator.resource.namespace: network-testing
+    name: resourcequota-storagequota
+    namespace: network-testing
+    ownerReferences:
+    - apiVersion: v1
+      blockOwnerDeletion: false
+      controller: true
+      kind: ResourceQuota
+      name: storagequota
+      uid: 83fce531-7415-4bf6-af69-358ef891be99
+    resourceVersion: "311778733"
+    uid: a787fb2e-6e21-4694-ad43-9d9e2237c85c
+  report:
+    checks:
+    - category: Kubernetes Security Check
+      checkID: KSV039
+      description: ensure limit range policy has configure in order to limit resource
+        usage for namespaces or nodes
+      messages:
+      - limit range policy with a default request and limit, min and max request,
+        for each container should be configure
+      remediation: create limit range policy with a default request and limit, min
+        and max request, for each container.
+      severity: LOW
+      success: false
+      title: limit range usage
+    - category: Kubernetes Security Check
+      checkID: KSV040
+      description: ensure resource quota policy has configure in order to limit aggregate
+        resource usage within namespace
+      messages:
+      - resource quota policy with hard memory and cpu quota per namespace should
+        be configure
+      remediation: create resource quota policy with mem and cpu quota per each namespace
+      severity: LOW
+      success: false
+      title: resource quota usage
+    scanner:
+      name: Trivy
+      vendor: Aqua Security
+      version: 0.22.0
+    summary:
+      criticalCount: 0
+      highCount: 0
+      lowCount: 2
+      mediumCount: 0
+    updateTimestamp: "2025-04-15T13:23:45Z"
+- apiVersion: aquasecurity.github.io/v1alpha1
+  kind: ConfigAuditReport
+  metadata:
+    annotations:
+      trivy-operator.aquasecurity.github.io/report-ttl: 24h0m0s
+    creationTimestamp: "2025-01-30T14:38:40Z"
+    generation: 1
+    labels:
+      plugin-config-hash: 6d67b68bf9
+      resource-spec-hash: 6876c84547
+      trivy-operator.resource.kind: StatefulSet
+      trivy-operator.resource.name: nginx-ss
+      trivy-operator.resource.namespace: network-testing
+    name: statefulset-nginx-ss
+    namespace: network-testing
+    ownerReferences:
+    - apiVersion: apps/v1
+      blockOwnerDeletion: false
+      controller: true
+      kind: StatefulSet
+      name: nginx-ss
+      uid: 625462ee-838e-4820-a342-00821d5ec0b8
+    resourceVersion: "244086989"
+    uid: 13490110-6902-498c-9600-0402fe4441cb
+  report:
+    checks:
+    - category: Kubernetes Security Check
+      checkID: KSV001
+      description: A program inside the container can elevate its own privileges and
+        run as root, which might give the program control over the container and node.
+      messages:
+      - Container 'nginx' of StatefulSet 'nginx-ss' should set 'securityContext.allowPrivilegeEscalation'
+        to false
+      remediation: Set 'set containers[].securityContext.allowPrivilegeEscalation'
+        to 'false'.
+      severity: MEDIUM
+      success: false
+      title: Can elevate its own privileges
+    - category: Kubernetes Security Check
+      checkID: KSV003
+      description: The container should drop all default capabilities and add only
+        those that are needed for its execution.
+      messages:
+      - Container 'nginx' of StatefulSet 'nginx-ss' should add 'ALL' to 'securityContext.capabilities.drop'
+      remediation: Add 'ALL' to containers[].securityContext.capabilities.drop.
+      severity: LOW
+      success: false
+      title: 'Default capabilities: some containers do not drop all'
+    - category: Kubernetes Security Check
+      checkID: KSV004
+      description: Security best practices require containers to run with minimal
+        required capabilities.
+      messages:
+      - Container 'nginx' of 'statefulset' 'nginx-ss' in 'network-testing' namespace
+        should set securityContext.capabilities.drop
+      remediation: Specify at least one unneeded capability in 'containers[].securityContext.capabilities.drop'
+      severity: LOW
+      success: false
+      title: 'Default capabilities: some containers do not drop any'
+    - category: Kubernetes Security Check
+      checkID: KSV011
+      description: Enforcing CPU limits prevents DoS via resource exhaustion.
+      messages:
+      - Container 'nginx' of StatefulSet 'nginx-ss' should set 'resources.limits.cpu'
+      remediation: Set a limit value under 'containers[].resources.limits.cpu'.
+      severity: LOW
+      success: false
+      title: CPU not limited
+    - category: Kubernetes Security Check
+      checkID: KSV012
+      description: Force the running image to run as a non-root user to ensure least
+        privileges.
+      messages:
+      - Container 'nginx' of StatefulSet 'nginx-ss' should set 'securityContext.runAsNonRoot'
+        to true
+      remediation: Set 'containers[].securityContext.runAsNonRoot' to true.
+      severity: MEDIUM
+      success: false
+      title: Runs as root user
+    - category: Kubernetes Security Check
+      checkID: KSV013
+      description: It is best to avoid using the ':latest' image tag when deploying
+        containers in production. Doing so makes it hard to track which version of
+        the image is running, and hard to roll back the version.
+      messages:
+      - Container 'nginx' of StatefulSet 'nginx-ss' should specify an image tag
+      remediation: Use a specific container image tag that is not 'latest'.
+      severity: MEDIUM
+      success: false
+      title: Image tag ":latest" used
+    - category: Kubernetes Security Check
+      checkID: KSV014
+      description: An immutable root file system prevents applications from writing
+        to their local disk. This can limit intrusions, as attackers will not be able
+        to tamper with the file system or write foreign executables to disk.
+      messages:
+      - Container 'nginx' of StatefulSet 'nginx-ss' should set 'securityContext.readOnlyRootFilesystem'
+        to true
+      remediation: Change 'containers[].securityContext.readOnlyRootFilesystem' to
+        'true'.
+      severity: HIGH
+      success: false
+      title: Root file system is not read-only
+    - category: Kubernetes Security Check
+      checkID: KSV015
+      description: When containers have resource requests specified, the scheduler
+        can make better decisions about which nodes to place pods on, and how to deal
+        with resource contention.
+      messages:
+      - Container 'nginx' of StatefulSet 'nginx-ss' should set 'resources.requests.cpu'
+      remediation: Set 'containers[].resources.requests.cpu'.
+      severity: LOW
+      success: false
+      title: CPU requests not specified
+    - category: Kubernetes Security Check
+      checkID: KSV016
+      description: When containers have memory requests specified, the scheduler can
+        make better decisions about which nodes to place pods on, and how to deal
+        with resource contention.
+      messages:
+      - Container 'nginx' of StatefulSet 'nginx-ss' should set 'resources.requests.memory'
+      remediation: Set 'containers[].resources.requests.memory'.
+      severity: LOW
+      success: false
+      title: Memory requests not specified
+    - category: Kubernetes Security Check
+      checkID: KSV018
+      description: Enforcing memory limits prevents DoS via resource exhaustion.
+      messages:
+      - Container 'nginx' of StatefulSet 'nginx-ss' should set 'resources.limits.memory'
+      remediation: Set a limit value under 'containers[].resources.limits.memory'.
+      severity: LOW
+      success: false
+      title: Memory not limited
+    - category: Kubernetes Security Check
+      checkID: KSV020
+      description: Force the container to run with user ID > 10000 to avoid conflicts
+        with the host’s user table.
+      messages:
+      - Container 'nginx' of StatefulSet 'nginx-ss' should set 'securityContext.runAsUser'
+        > 10000
+      remediation: Set 'containers[].securityContext.runAsUser' to an integer > 10000.
+      severity: LOW
+      success: false
+      title: Runs with UID <= 10000
+    - category: Kubernetes Security Check
+      checkID: KSV021
+      description: Force the container to run with group ID > 10000 to avoid conflicts
+        with the host’s user table.
+      messages:
+      - Container 'nginx' of StatefulSet 'nginx-ss' should set 'securityContext.runAsGroup'
+        > 10000
+      remediation: Set 'containers[].securityContext.runAsGroup' to an integer > 10000.
+      severity: LOW
+      success: false
+      title: Runs with GID <= 10000
+    - category: Kubernetes Security Check
+      checkID: KSV030
+      description: According to pod security standard 'Seccomp', the RuntimeDefault
+        seccomp profile must be required, or allow specific additional profiles.
+      messages:
+      - Either Pod or Container should set 'securityContext.seccompProfile.type' to
+        'RuntimeDefault'
+      remediation: Set 'spec.securityContext.seccompProfile.type', 'spec.containers[*].securityContext.seccompProfile'
+        and 'spec.initContainers[*].securityContext.seccompProfile' to 'RuntimeDefault'
+        or undefined.
+      severity: LOW
+      success: false
+      title: Runtime/Default Seccomp profile not set
+    - category: Kubernetes Security Check
+      checkID: KSV032
+      description: Containers should only use images from trusted registries.
+      messages:
+      - container nginx of statefulset nginx-ss in network-testing namespace should
+        restrict container image to your specific registry domain. For Azure any domain
+        ending in 'azurecr.io'
+      remediation: Use images from trusted Azure registries.
+      severity: MEDIUM
+      success: false
+      title: All container images must start with the *.azurecr.io domain
+    - category: Kubernetes Security Check
+      checkID: KSV033
+      description: Containers should only use images from trusted GCR registries.
+      messages:
+      - 'container nginx of statefulset nginx-ss in network-testing namespace should
+        restrict container image to your specific registry domain. See the full GCR
+        list here: https://cloud.google.com/container-registry/docs/overview#registries'
+      remediation: Use images from trusted GCR registries.
+      severity: MEDIUM
+      success: false
+      title: All container images must start with a GCR domain
+    - category: Kubernetes Security Check
+      checkID: KSV034
+      description: Container images must not start with an empty prefix or a defined
+        public registry domain.
+      messages:
+      - Container 'nginx' of StatefulSet 'nginx-ss' should restrict container image
+        to use private registries
+      remediation: Use images from private registries.
+      severity: MEDIUM
+      success: false
+      title: Container images from public registries used
+    - category: Kubernetes Security Check
+      checkID: KSV035
+      description: Container images from non-ECR registries should be forbidden.
+      messages:
+      - 'Container ''nginx'' of StatefulSet ''nginx-ss'' should restrict images to
+        own ECR repository. See the full ECR list here: https://docs.aws.amazon.com/general/latest/gr/ecr.html'
+      remediation: Container image should be used from Amazon container Registry
+      severity: MEDIUM
+      success: false
+      title: All container images must start with an ECR domain
+    - category: Kubernetes Security Check
+      checkID: KSV039
+      description: ensure limit range policy has configure in order to limit resource
+        usage for namespaces or nodes
+      messages:
+      - limit range policy with a default request and limit, min and max request,
+        for each container should be configure
+      remediation: create limit range policy with a default request and limit, min
+        and max request, for each container.
+      severity: LOW
+      success: false
+      title: limit range usage
+    - category: Kubernetes Security Check
+      checkID: KSV040
+      description: ensure resource quota policy has configure in order to limit aggregate
+        resource usage within namespace
+      messages:
+      - resource quota policy with hard memory and cpu quota per namespace should
+        be configure
+      remediation: create resource quota policy with mem and cpu quota per each namespace
+      severity: LOW
+      success: false
+      title: resource quota usage
+    - category: Kubernetes Security Check
+      checkID: KSV104
+      description: A program inside the container can bypass Seccomp protection policies.
+      messages:
+      - container "nginx" of statefulset "nginx-ss" in "network-testing" namespace
+        should specify a seccomp profile
+      remediation: Specify seccomp either by annotation or by seccomp profile type
+        having allowed values as per pod security standards
+      severity: MEDIUM
+      success: false
+      title: Seccomp policies disabled
+    - category: Kubernetes Security Check
+      checkID: KSV106
+      description: Containers must drop ALL capabilities, and are only permitted to
+        add back the NET_BIND_SERVICE capability.
+      messages:
+      - container should drop all
+      remediation: Set 'spec.containers[*].securityContext.capabilities.drop' to 'ALL'
+        and only add 'NET_BIND_SERVICE' to 'spec.containers[*].securityContext.capabilities.add'.
+      severity: LOW
+      success: false
+      title: Container capabilities must only include NET_BIND_SERVICE
+    scanner:
+      name: Trivy
+      vendor: Aqua Security
+      version: 0.22.0
+    summary:
+      criticalCount: 0
+      highCount: 1
+      lowCount: 12
+      mediumCount: 8
+    updateTimestamp: "2025-01-30T14:38:40Z"
+kind: List
+metadata:
+  resourceVersion: ""
