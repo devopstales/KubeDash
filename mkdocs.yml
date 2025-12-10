@@ -50,6 +50,7 @@ nav:
       - Environment Setup: development/env.md
       - Database Migrations: development/dbmigrate.md
     - Product Requirements:
+      - Overview: prd/kubedash-product-requirements.md
       - Authentication & Users: prd/authentication-user-management.md
       - Workload Management: prd/workload-management.md
       - Dashboard & Monitoring: prd/dashboard-monitoring.md

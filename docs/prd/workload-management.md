@@ -27,6 +27,7 @@ This section tracks the current implementation status against the requirements d
 | **Real-time Logs** | ✅ Implemented | 100% | WebSocket streaming |
 | **Pod Exec** | ✅ Implemented | 100% | Interactive terminal |
 | **RBAC Integration** | ✅ Implemented | 100% | Namespace filtering |
+| **Namespace Scale Up/Down** | ⚠️ Partial | 40% | Backend exists, UI disabled, bugs present |
 
 ### User Story Implementation Status
 
@@ -81,6 +82,12 @@ This section tracks the current implementation status against the requirements d
 2. **ReplicaSet details view** - Missing, only list view exists
 3. **Pod events** - Shown in dashboard, not per-pod detail view
 4. **Batch operations** - Cannot select and delete multiple pods
+5. **Namespace Scale Up/Down** - Partially implemented but disabled due to bugs:
+   - Annotation parsing bug in `k8sWorkloadList` (treats annotations as strings instead of dict)
+   - Missing fallback to read original replicas from spec if annotation missing
+   - No error handling or user feedback
+   - No confirmation dialog for dangerous operation
+   - UI buttons commented out in template
 
 ### Next Steps
 
@@ -532,6 +539,57 @@ Kubernetes workloads are the fundamental building blocks of containerized applic
 - Context menu (right-click) support
 
 **Priority**: P2 (Medium)
+
+---
+
+#### US-WL-004: Namespace Scale Up/Down
+**As an** administrator  
+**I want to** scale all workloads in a namespace up or down  
+**So that** I can quickly stop/start all applications in a namespace for maintenance  
+
+**Acceptance Criteria**:
+- Scale Down:
+  - Save current replica counts for all Deployments and StatefulSets in annotation
+  - Scale all Deployments to 0 replicas
+  - Scale all StatefulSets to 0 replicas
+  - Suspend all DaemonSets (via node selector workaround)
+  - Show confirmation dialog before scaling down
+  - Display progress of scaling operation
+  - Handle errors gracefully (continue with other workloads if one fails)
+- Scale Up:
+  - Read saved replica counts from annotations
+  - Restore Deployments to original replica count
+  - Restore StatefulSets to original replica count
+  - Resume DaemonSets (remove node selector)
+  - If annotation missing, read current spec.replicas (fallback)
+  - Show confirmation dialog before scaling up
+  - Display progress of scaling operation
+- UI:
+  - "Turn Off" button when namespace has running workloads
+  - "Turn On" button when namespace has no running workloads
+  - Visual indicator of namespace scale state
+  - Prevent scaling of system namespaces (kube-system, etc.)
+- Error Handling:
+  - Log failures for each workload
+  - Show summary of successful/failed operations
+  - Allow partial success (some workloads scaled, others failed)
+
+**Status**: ⚠️ **Partially Implemented, Disabled in UI**
+- Backend route exists (`/cluster/namespace/scale`)
+- UI buttons are commented out in template
+- **Known Issues**:
+  1. Annotation parsing bug: `k8sWorkloadList` incorrectly parses annotations as `key=value` strings instead of dictionary
+  2. Missing original replica fallback: If annotation doesn't exist, scales to 0 instead of reading from spec
+  3. No error handling: Failures are silent
+  4. No confirmation dialog: Dangerous operation without user confirmation
+  5. No progress feedback: User cannot see operation status
+
+**Priority**: P1 (High)
+
+**Implementation Files**:
+- `blueprint/cluster.py` (lines 105-136): Route handler
+- `lib/k8s/workload.py`: Annotation and scaling functions
+- `templates/cluster/namespace-data.html.j2` (lines 46-66): **Commented out**
 
 ---
 
