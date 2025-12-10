@@ -106,15 +106,27 @@ def k8sGetClusterStatus(username_role="Admin", user_token=None):
     k8sClientConfigGet(username_role, user_token)
     try:
         api = k8s_client.CoreV1Api()
-        component_statuses = api.list_component_status(_request_timeout=1)
+        # Use a more reasonable timeout (10 seconds) instead of 1 second
+        # componentstatuses can be slow, especially in large clusters
+        # Note: componentstatuses is deprecated in K8s 1.19+, but still works
+        component_statuses = api.list_component_status(_request_timeout=10)
 
         return True
 
     except ApiException as e:
-        ErrorHandler(logger, e, f"Error getting cluster status: {e}")
+        # Don't log as error for timeout - it's expected in some environments
+        if e.status == 408 or "timeout" in str(e).lower():
+            logger.debug(f"Cluster status check timed out (this is acceptable): {e}")
+        else:
+            ErrorHandler(logger, e, f"Error getting cluster status: {e}")
         return False
     except Exception as e:
-        ErrorHandler(logger, e, f"Unexpected error getting cluster status: {e}")
+        # Check if it's a timeout error
+        error_str = str(e).lower()
+        if "timeout" in error_str or "read timed out" in error_str:
+            logger.debug(f"Cluster status check timed out (this is acceptable): {e}")
+        else:
+            ErrorHandler(logger, e, f"Unexpected error getting cluster status: {e}")
         return False
 
 

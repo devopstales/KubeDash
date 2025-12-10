@@ -146,9 +146,9 @@ def login():
                         )
                     logger.info("Config sent to client")
                     logger.info("Answer from clinet: %s" % x.text)
-            except requests.exceptions.ConnectTimeout:
+            except (requests.exceptions.ConnectTimeout, requests.exceptions.ConnectionError):
                 # kubelogin client not running - expected for browser logins
-                logger.debug("No kubelogin client detected (timeout)")
+                logger.debug("No kubelogin client detected (connection refused/timeout)")
             except Exception as e:
                 if tracer and span.is_recording():
                     span.add_event("log", {
@@ -233,9 +233,9 @@ def login_post():
                     )
                     logger.info("Config sent to client")
                     logger.info("Answer from clinet: %s" % x.text)
-            except requests.exceptions.ConnectTimeout:
+            except (requests.exceptions.ConnectTimeout, requests.exceptions.ConnectionError):
                 # kubelogin client not running - expected for browser logins
-                logger.debug("No kubelogin client detected (timeout)")
+                logger.debug("No kubelogin client detected (connection refused/timeout)")
             except Exception as e:
                 if not request.args.get('next'):  # Only log if no 'next' parameter exists
                     if tracer and span.is_recording():

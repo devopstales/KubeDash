@@ -18,54 +18,109 @@
 {% endblock %}
 
 {% block content %}
+{% if node_metrics and node_metrics.cpu and node_metrics.memory and node_metrics.pod_count %}
 <div class="card shadow mb-4">
+    <div class="card-header py-3">
+        <h6 class="m-0 font-weight-bold text-primary">Node Resource Metrics - {{ node_data.name }}</h6>
+    </div>
     <div class="card-body">
-        <div class="row">
-            <div class="col">
-                <div>
-		  {% if node_metrics and node_metrics.cpu %}
-                    <canvas id="cpu" width="300" height="300"></canvas>
-                </div>
-                <div>
-                {% for CPUkey, CPUvalue in node_metrics.cpu.items() %}
-                     {% if "Percent" not in CPUkey %}
-                        {{ CPUkey }}: {{ CPUvalue |round(1)}} <br>
-                     {% endif %}
-                {% endfor %}
-                  {% endif %}
+        <div class="row g-4">
+            <!-- CPU Chart -->
+            <div class="col-12 col-md-6 col-lg-4">
+                <div class="card border-0" style="background-color: var(--cui-card-bg, #fff);">
+                    <div class="card-body text-center">
+                        <div class="mb-3" style="position: relative; height: 300px;">
+                            <canvas id="cpu"></canvas>
+                        </div>
+                        <div class="mt-3">
+                            <div class="row text-start small">
+                                <div class="col-6 mb-2">
+                                    <strong>Capacity:</strong><br>
+                                    <span class="text-muted">{{ node_metrics.cpu.capacity |round(1) }} cores</span>
+                                </div>
+                                <div class="col-6 mb-2">
+                                    <strong>Allocatable:</strong><br>
+                                    <span class="text-muted">{{ node_metrics.cpu.allocatable |round(1) }} cores</span>
+                                </div>
+                                <div class="col-6 mb-2">
+                                    <strong>Requests:</strong><br>
+                                    <span class="text-muted">{{ node_metrics.cpu.requests |round(1) }} cores</span>
+                                </div>
+                                <div class="col-6 mb-2">
+                                    <strong>Limits:</strong><br>
+                                    <span class="text-muted">{{ node_metrics.cpu.limits |round(1) }} cores</span>
+                                </div>
+                                <div class="col-6 mb-2">
+                                    <strong>Usage:</strong><br>
+                                    <span class="text-muted">{{ node_metrics.cpu.usage |round(1) }} cores</span>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
                 </div>
             </div>
-            <div class="col">
-                <div>
-                  {% if node_metrics and node_metrics.memory %}
-                    <canvas id="memory" width="300" height="300"></canvas>
-                </div>
-                <div>
-                    {% for RAMkey, RAMvalue in node_metrics.memory.items() %}
-                     {% if "Percent" not in RAMkey %}
-                        {{ RAMkey }}: {{ (RAMvalue / 1024 / 1024 / 1024) |round(1) }} <br>
-                     {% endif %}
-                    {% endfor %}
-                  {% endif %}
+            
+            <!-- Memory Chart -->
+            <div class="col-12 col-md-6 col-lg-4">
+                <div class="card border-0" style="background-color: var(--cui-card-bg, #fff);">
+                    <div class="card-body text-center">
+                        <div class="mb-3" style="position: relative; height: 300px;">
+                            <canvas id="memory"></canvas>
+                        </div>
+                        <div class="mt-3">
+                            <div class="row text-start small">
+                                <div class="col-6 mb-2">
+                                    <strong>Capacity:</strong><br>
+                                    <span class="text-muted">{{ (node_metrics.memory.capacity / 1024 / 1024 / 1024) |round(2) }} GB</span>
+                                </div>
+                                <div class="col-6 mb-2">
+                                    <strong>Allocatable:</strong><br>
+                                    <span class="text-muted">{{ (node_metrics.memory.allocatable / 1024 / 1024 / 1024) |round(2) }} GB</span>
+                                </div>
+                                <div class="col-6 mb-2">
+                                    <strong>Requests:</strong><br>
+                                    <span class="text-muted">{{ (node_metrics.memory.requests / 1024 / 1024 / 1024) |round(2) }} GB</span>
+                                </div>
+                                <div class="col-6 mb-2">
+                                    <strong>Limits:</strong><br>
+                                    <span class="text-muted">{{ (node_metrics.memory.limits / 1024 / 1024 / 1024) |round(2) }} GB</span>
+                                </div>
+                                <div class="col-6 mb-2">
+                                    <strong>Usage:</strong><br>
+                                    <span class="text-muted">{{ (node_metrics.memory.usage / 1024 / 1024 / 1024) |round(2) }} GB</span>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
                 </div>
             </div>
-            <div class="col">
-                <div>
-                  {% if node_metrics and node_metrics.pod_count %}
-                    <canvas id="pod" width="300" height="300"></canvas>
-                </div>
-                <div class="mp-10">
-                    {% for pod_key, pod_value in node_metrics.pod_count.items() %}
-                        {% if "Percent" not in pod_key %}
-                            {{ pod_key }}: {{ pod_value }} <br>
-                        {% endif %}
-                    {% endfor %}
-                  {% endif %}
+            
+            <!-- Pod Chart -->
+            <div class="col-12 col-md-6 col-lg-4">
+                <div class="card border-0" style="background-color: var(--cui-card-bg, #fff);">
+                    <div class="card-body text-center">
+                        <div class="mb-3" style="position: relative; height: 300px;">
+                            <canvas id="pod"></canvas>
+                        </div>
+                        <div class="mt-3">
+                            <div class="row text-start small">
+                                <div class="col-6 mb-2">
+                                    <strong>Current:</strong><br>
+                                    <span class="text-muted">{{ node_metrics.pod_count.current }} pods</span>
+                                </div>
+                                <div class="col-6 mb-2">
+                                    <strong>Allocatable:</strong><br>
+                                    <span class="text-muted">{{ node_metrics.pod_count.allocatable |round(0) |int }} pods</span>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
                 </div>
             </div>
         </div>
     </div>
 </div>
+{% endif %}
 
 <div class="card shadow mb-4">
     <div class="card-header">
@@ -269,28 +324,43 @@
 {% endblock %}
 
 {% block add_tail_js %}
-{% include "segments/chartjs_snippet.html.j2" %}
+{% if node_metrics and node_metrics.cpu and node_metrics.memory and node_metrics.pod_count %}
 {% include "segments/chartjs_snippet.html.j2" %}
     <script>
-        // Function to detect Bootstrap dark mode
+        // Function to detect Bootstrap dark mode and return appropriate text color
         function getThemeColor() {
-            return document.documentElement.getAttribute('data-coreui-theme') === 'dark' ? '#ffffffde' : '#252b36f2';
+            const isDark = document.documentElement.getAttribute('data-coreui-theme') === 'dark';
+            // Return white/light color for dark mode, dark color for light mode
+            return isDark ? '#ffffff' : '#212529';
         }
-        // Listen for theme change and update chart title color
+        
+        // Function to get background color based on theme
+        function getThemeBgColor() {
+            const isDark = document.documentElement.getAttribute('data-coreui-theme') === 'dark';
+            return isDark ? '#1e1e1e' : '#f8f9fa';
+        }
+        
+        // Listen for theme change and update chart colors
         const observer = new MutationObserver(() => {
             const themeColor = getThemeColor();
 
-            CPUChart.options.plugins.title.color = themeColor;
-            CPUChart.options.plugins.legend.labels.color = themeColor;
-            CPUChart.update();
+            if (typeof CPUChart !== 'undefined') {
+                CPUChart.options.plugins.title.color = themeColor;
+                CPUChart.options.plugins.legend.labels.color = themeColor;
+                CPUChart.update();
+            }
 
-            MemoryChart.options.plugins.title.color = themeColor;
-            MemoryChart.options.plugins.legend.labels.color = themeColor;
-            MemoryChart.update();
+            if (typeof MemoryChart !== 'undefined') {
+                MemoryChart.options.plugins.title.color = themeColor;
+                MemoryChart.options.plugins.legend.labels.color = themeColor;
+                MemoryChart.update();
+            }
 
-            PodChart.options.plugins.title.color = themeColor;
-            PodChart.options.plugins.legend.labels.color = themeColor;
-            PodChart.update();
+            if (typeof PodChart !== 'undefined') {
+                PodChart.options.plugins.title.color = themeColor;
+                PodChart.options.plugins.legend.labels.color = themeColor;
+                PodChart.update();
+            }
         });
 
         observer.observe(document.documentElement, { attributes: true, attributeFilter: ['data-coreui-theme'] });
@@ -343,45 +413,61 @@
                 plugins: {
                     title: {
                         display: true,
-                        text: 'CPU Allocation (cores)',
+                        text: 'CPU Allocation',
                         font: {
-                            size: 20,
+                            size: 18,
                             weight: 'bold'
                         },
                         color: getThemeColor(),
                         padding: {
                             top: 10,
-                            bottom: 20
+                            bottom: 15
                         }
                     },
                     legend: {
                         display: true,
-                        position: 'right',
+                        position: 'bottom',
                         labels: {
-                            color: getThemeColor(), // Set initial legend text color
-                            usePointStyle: true, // Use circle markers in legend
+                            color: getThemeColor(),
+                            usePointStyle: true,
+                            padding: 12,
                             font: {
-                                size: 14
+                                size: 12
                             },
                             generateLabels: function(chart) {
                                 let labels = [];
                                 let datasetIndex = 0;
+                                const themeColor = getThemeColor();
 
                                 chart.data.datasets.forEach((dataset) => {
                                     dataset.data.forEach((value, index) => {
-                                        labels.push({
-                                            text: chart.data.labels[datasetIndex * 2 + index],
-                                            fillStyle: dataset.backgroundColor[index],
-                                            strokeStyle: dataset.backgroundColor[index],
-                                            lineWidth: 1,
-                                            fontColor: getThemeColor(), // Dynamically set text color
-                                            hidden: isNaN(value)
-                                        });
+                                        if (!isNaN(value) && value > 0) {
+                                            labels.push({
+                                                text: chart.data.labels[datasetIndex * 2 + index] + ' (' + value.toFixed(1) + '%)',
+                                                fillStyle: dataset.backgroundColor[index],
+                                                strokeStyle: dataset.backgroundColor[index],
+                                                lineWidth: 1,
+                                                fontColor: themeColor,
+                                                hidden: false
+                                            });
+                                        }
                                     });
                                     datasetIndex++;
                                 });
 
                                 return labels;
+                            }
+                        }
+                    },
+                    tooltip: {
+                        callbacks: {
+                            label: function(context) {
+                                let label = context.label || '';
+                                if (label) {
+                                    label += ': ';
+                                }
+                                label += context.parsed + '%';
+                                return label;
                             }
                         }
                     }
@@ -437,45 +523,61 @@
                 plugins: {
                     title: {
                         display: true,
-                        text: 'Memory Allocation (bytes)',
+                        text: 'Memory Allocation',
                         font: {
-                            size: 20,
+                            size: 18,
                             weight: 'bold'
                         },
                         color: getThemeColor(),
                         padding: {
                             top: 10,
-                            bottom: 20
+                            bottom: 15
                         }
                     },
                     legend: {
                         display: true,
-                        position: 'right',
+                        position: 'bottom',
                         labels: {
-                            color: getThemeColor(), // Set initial legend text color
-                            usePointStyle: true, // Use circle markers in legend
+                            color: getThemeColor(),
+                            usePointStyle: true,
+                            padding: 12,
                             font: {
-                                size: 14
+                                size: 12
                             },
                             generateLabels: function(chart) {
                                 let labels = [];
                                 let datasetIndex = 0;
+                                const themeColor = getThemeColor();
 
                                 chart.data.datasets.forEach((dataset) => {
                                     dataset.data.forEach((value, index) => {
-                                        labels.push({
-                                            text: chart.data.labels[datasetIndex * 2 + index],
-                                            fillStyle: dataset.backgroundColor[index],
-                                            strokeStyle: dataset.backgroundColor[index],
-                                            lineWidth: 1,
-                                            fontColor: getThemeColor(), // Dynamically set text color
-                                            hidden: isNaN(value)
-                                        });
+                                        if (!isNaN(value) && value > 0) {
+                                            labels.push({
+                                                text: chart.data.labels[datasetIndex * 2 + index] + ' (' + value.toFixed(1) + '%)',
+                                                fillStyle: dataset.backgroundColor[index],
+                                                strokeStyle: dataset.backgroundColor[index],
+                                                lineWidth: 1,
+                                                fontColor: themeColor,
+                                                hidden: false
+                                            });
+                                        }
                                     });
                                     datasetIndex++;
                                 });
 
                                 return labels;
+                            }
+                        }
+                    },
+                    tooltip: {
+                        callbacks: {
+                            label: function(context) {
+                                let label = context.label || '';
+                                if (label) {
+                                    label += ': ';
+                                }
+                                label += context.parsed + '%';
+                                return label;
                             }
                         }
                     }
@@ -511,43 +613,55 @@
                         display: true,
                         text: 'Pod Allocation',
                         font: {
-                            size: 20,
+                            size: 18,
                             weight: 'bold'
                         },
                         color: getThemeColor(),
                         padding: {
                             top: 10,
-                            bottom: 20
+                            bottom: 15
                         }
                     },
                     legend: {
                         display: true,
-                        position: 'right',
+                        position: 'bottom',
                         labels: {
-                            color: getThemeColor(), // Set initial legend text color
-                            usePointStyle: true, // Use circle markers in legend
+                            color: getThemeColor(),
+                            usePointStyle: true,
+                            padding: 12,
                             font: {
-                                size: 14
+                                size: 12
                             },
                             generateLabels: function(chart) {
                                 let labels = [];
-                                let datasetIndex = 0;
-
+                                const themeColor = getThemeColor();
                                 chart.data.datasets.forEach((dataset) => {
                                     dataset.data.forEach((value, index) => {
-                                        labels.push({
-                                            text: chart.data.labels[datasetIndex * 2 + index],
-                                            fillStyle: dataset.backgroundColor[index],
-                                            strokeStyle: dataset.backgroundColor[index],
-                                            lineWidth: 1,
-                                            fontColor: getThemeColor(), // Dynamically set text color
-                                            hidden: isNaN(value)
-                                        });
+                                        if (!isNaN(value) && value > 0) {
+                                            labels.push({
+                                                text: chart.data.labels[index] + ' (' + value.toFixed(1) + '%)',
+                                                fillStyle: dataset.backgroundColor[index],
+                                                strokeStyle: dataset.backgroundColor[index],
+                                                lineWidth: 1,
+                                                fontColor: themeColor,
+                                                hidden: false
+                                            });
+                                        }
                                     });
-                                    datasetIndex++;
                                 });
-
                                 return labels;
+                            }
+                        }
+                    },
+                    tooltip: {
+                        callbacks: {
+                            label: function(context) {
+                                let label = context.label || '';
+                                if (label) {
+                                    label += ': ';
+                                }
+                                label += context.parsed + '%';
+                                return label;
                             }
                         }
                     }
@@ -555,4 +669,5 @@
             }
         });
     </script>
+{% endif %}
 {% endblock %}

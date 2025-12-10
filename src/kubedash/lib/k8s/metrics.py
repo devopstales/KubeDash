@@ -27,15 +27,22 @@ tracer = get_tracer()
 ## Metrics
 ##############################################################
 
-@cache.memoize(timeout=long_cache_time)
 def k8sGetClusterMetric():
-    """Get cluster metrics from a kubernetes cluster
+    """Get cluster metrics from a kubernetes cluster (cached only on success)
     
     Returns:
         clusterMetric (dict): Cluster metrics data
         bad_clusterMetric (dict): If any error occurred, return this data instead
     """
+    # Check cache first
+    cache_key = f"k8sGetClusterMetric"
+    cached_result = cache.get(cache_key)
+    if cached_result is not None:
+        return cached_result
+    
+    # Not in cache, fetch fresh data
     with tracer.start_as_current_span("k8s-get-cluster-metrics") as span:
+        result = None
         k8sClientConfigGet("Admin", None)
         tmpTotalPodCount = float()
         totalTotalPodAllocatable = float()
@@ -88,72 +95,91 @@ def k8sGetClusterMetric():
         }
         try:
             with tracer.start_as_current_span("k8s_client__list_node") as span:
-                node_list = k8s_client.CoreV1Api().list_node(_request_timeout=1)
+                # Increased timeout from 1s to 10s for better reliability in large clusters
+                node_list = k8s_client.CoreV1Api().list_node(_request_timeout=10)
             with tracer.start_as_current_span("k8s_client__list_pod_for_all_namespaces") as span:
-                pod_list = k8s_client.CoreV1Api().list_pod_for_all_namespaces(_request_timeout=1)
+                # Increased timeout from 1s to 10s - listing all pods can be slow
+                pod_list = k8s_client.CoreV1Api().list_pod_for_all_namespaces(_request_timeout=10)
             try:
                 with tracer.start_as_current_span("k8s_client__list_cluster_custom_object") as span:
-                    k8s_nodes = k8s_client.CustomObjectsApi().list_cluster_custom_object("metrics.k8s.io", "v1beta1", "nodes", _request_timeout=1)
+                    # Increased timeout from 1s to 10s for metrics API
+                    k8s_nodes = k8s_client.CustomObjectsApi().list_cluster_custom_object("metrics.k8s.io", "v1beta1", "nodes", _request_timeout=10)
             except Exception as error:
                 k8s_nodes = None
                 if tracer and span.is_recording():
                     span.set_status(Status(StatusCode.ERROR, "Metrics Server is not installed. If you want to see usage date please install Metrics Server."))
                 flash("Metrics Server is not installed. If you want to see usage date please install Metrics Server.", "warning")
+            
+            # Performance optimization: Group pods by node to avoid O(nodes × pods) nested loop
+            # This reduces complexity from O(nodes × pods) to O(nodes + pods)
+            pods_by_node = {}
+            for pod in pod_list.items:
+                if pod.spec.node_name and pod.status.phase == "Running":
+                    node_name = pod.spec.node_name
+                    if node_name not in pods_by_node:
+                        pods_by_node[node_name] = []
+                    pods_by_node[node_name].append(pod)
+            
+            # Create a lookup dictionary for node metrics
+            node_metrics_lookup = {}
+            if k8s_nodes:
+                for stats in k8s_nodes['items']:
+                    node_name = stats['metadata']['name']
+                    node_metrics_lookup[node_name] = {
+                        'memory': float(parse_quantity(stats['usage']['memory'])),
+                        'cpu': float(parse_quantity(stats['usage']['cpu']))
+                    }
+            
             for node in node_list.items:
-                with tracer.start_as_current_span("iterate-nodelist") as span:
-                    span.set_attribute("node.name", node.metadata.name)
-                    tmpPodCount = int()
-                    tmpCpuLimit = float()
-                    tmpMemoryLimit = float()
-                    tmpCpuRequest = float()
-                    tmpMemoryRequest = float()
-                    node_mem_usage = 0
-                    node_cpu_usage = 0
-                    
-                    for pod in pod_list.items:
-                        with tracer.start_as_current_span("iterate-podlist") as span:
-                            span.set_attribute("node.name", node.metadata.name)
-                            span.set_attribute("pod.count", len(pod_list.items))
-                        if pod.spec.node_name == node.metadata.name and pod.status.phase == "Running":
-                            tmpPodCount += 1
-                            for container in pod.spec.containers:
-                                if container.resources.limits:
-                                    if "cpu" in container.resources.limits:
-                                        tmpCpuLimit += float(parse_quantity(container.resources.limits["cpu"]))
-                                    if "memory" in container.resources.limits:
-                                        tmpMemoryLimit += float(parse_quantity(container.resources.limits["memory"]))
-                                if container.resources.requests:
-                                    if "cpu" in container.resources.requests:
-                                        tmpCpuRequest += float(parse_quantity(container.resources.requests["cpu"]))
-                                    if "memory" in container.resources.requests:
-                                        tmpMemoryRequest += float(parse_quantity(container.resources.requests["memory"]))
-                    totalPodAllocatable += float(node.status.allocatable["pods"])
-                    node_mem_capacity = float(parse_quantity(node.status.capacity["memory"]))
-                    node_mem_allocatable = float(parse_quantity(node.status.allocatable["memory"]))
-                    if k8s_nodes:
-                        for stats in k8s_nodes['items']:
-                            if stats['metadata']['name'] == node.metadata.name:
-                                node_mem_usage = float(parse_quantity(stats['usage']['memory']))
-                                node_cpu_usage = float(parse_quantity(stats['usage']['cpu']))
-                                
-                    with tracer.start_as_current_span("append-node-metric") as span:
-                        span.set_attribute("node.name", node.metadata.name)
-                        span.set_attribute("node.cpu.capacity", int(node.status.capacity["cpu"]))
-                        span.set_attribute("node.cpu.allocatable", int(node.status.allocatable["cpu"]))
-                        span.set_attribute("node.memory.capacity", node_mem_capacity)
-                        span.set_attribute("node.memory.allocatable", node_mem_allocatable)
-                        
-                        clusterMetric["nodes"].append({
-                            "name": node.metadata.name,
+                node_name = node.metadata.name
+                tmpPodCount = int()
+                tmpCpuLimit = float()
+                tmpMemoryLimit = float()
+                tmpCpuRequest = float()
+                tmpMemoryRequest = float()
+                node_mem_usage = 0
+                node_cpu_usage = 0
+                
+                # Process pods for this node (much faster than nested loop)
+                node_pods = pods_by_node.get(node_name, [])
+                for pod in node_pods:
+                    tmpPodCount += 1
+                    for container in pod.spec.containers:
+                        if container.resources.limits:
+                            if "cpu" in container.resources.limits:
+                                tmpCpuLimit += float(parse_quantity(container.resources.limits["cpu"]))
+                            if "memory" in container.resources.limits:
+                                tmpMemoryLimit += float(parse_quantity(container.resources.limits["memory"]))
+                        if container.resources.requests:
+                            if "cpu" in container.resources.requests:
+                                tmpCpuRequest += float(parse_quantity(container.resources.requests["cpu"]))
+                            if "memory" in container.resources.requests:
+                                tmpMemoryRequest += float(parse_quantity(container.resources.requests["memory"]))
+                
+                totalPodAllocatable += float(node.status.allocatable["pods"])
+                node_mem_capacity = float(parse_quantity(node.status.capacity["memory"]))
+                node_mem_allocatable = float(parse_quantity(node.status.allocatable["memory"]))
+                # Parse CPU quantities (can be in formats like "2500m", "2.5", etc.)
+                node_cpu_capacity = float(parse_quantity(node.status.capacity["cpu"]))
+                node_cpu_allocatable = float(parse_quantity(node.status.allocatable["cpu"]))
+                
+                # Lookup node metrics (much faster than nested loop)
+                if node_name in node_metrics_lookup:
+                    node_mem_usage = node_metrics_lookup[node_name]['memory']
+                    node_cpu_usage = node_metrics_lookup[node_name]['cpu']
+                
+                # Reduced tracing overhead - only trace once per node instead of per pod
+                clusterMetric["nodes"].append({
+                    "name": node.metadata.name,
                             "cpu": {
                                 "capacity": node.status.capacity["cpu"],
                                 "allocatable": node.status.allocatable["cpu"],
                                 "requests": tmpCpuRequest,
-                                "requestsPercent": calcPercent(tmpCpuRequest, int(node.status.capacity["cpu"]), True),
+                                "requestsPercent": calcPercent(tmpCpuRequest, node_cpu_capacity, True),
                                 "limits": tmpCpuLimit,
-                                "limitsPercent": calcPercent(tmpCpuLimit, int(node.status.capacity["cpu"]), True),
+                                "limitsPercent": calcPercent(tmpCpuLimit, node_cpu_capacity, True),
                                 "usage": node_cpu_usage,
-                                "usagePercent": calcPercent(node_cpu_usage, int(node.status.capacity["cpu"]), True),
+                                "usagePercent": calcPercent(node_cpu_usage, node_cpu_capacity, True),
                             },
                             "memory": {
                                 "capacity": node_mem_capacity,
@@ -165,76 +191,121 @@ def k8sGetClusterMetric():
                                 "usage": node_mem_usage,
                                 "usagePercent": calcPercent(node_mem_usage, node_mem_capacity, True),
                             },
-                            "pod_count": {
-                                "current": tmpPodCount,
-                                "currentPercent": calcPercent(tmpPodCount, totalPodAllocatable, True),
-                                "allocatable": totalPodAllocatable,
-                            },
-                        })
-                        tmpTotalPodCount += tmpPodCount
-                        totalTotalPodAllocatable += totalPodAllocatable
-                        tmpTotalCpuAllocatable += int(node.status.allocatable["cpu"])
-                        tmpTotalMenoryAllocatable += node_mem_allocatable
-                        tmpTotalCpuCapacity += int(node.status.capacity["cpu"])
-                        tmpTotalMemoryCapacity += node_mem_capacity
-                        tmpTotalCpuLimit += tmpCpuLimit
-                        tmpTotalMemoryLimit += tmpMemoryLimit
-                        tmpTotalCpuRequest += tmpCpuRequest
-                        tmpTotalMemoryRequest += tmpMemoryRequest
-                        total_node_mem_usage += node_mem_usage
-                        total_node_cpu_usage += node_cpu_usage
-                # clusterTotals
-                with tracer.start_as_current_span("set-cluster-totals") as span:
-                    span.set_attribute("total.cpu.capacity", tmpTotalCpuCapacity)
-                    span.set_attribute("total.memory.capacity", tmpTotalMemoryCapacity)
-                    span.set_attribute("total.cpu.allocatable", tmpTotalCpuAllocatable)
-                    span.set_attribute("total.memory.allocatable", tmpTotalMenoryAllocatable)
-                    span.set_attribute("total.cpu.requests", tmpTotalCpuRequest)
-                    span.set_attribute("total.memory.requests", tmpTotalMemoryRequest)
-                    span.set_attribute("total.cpu.limits", tmpTotalCpuLimit)
-                    span.set_attribute("total.memory.limits", tmpTotalMemoryLimit)
-                    span.set_attribute("total.pod.count.current", tmpTotalPodCount)
-                    span.set_attribute("total.pod.count.allocatable", totalTotalPodAllocatable)
-                    
-                    clusterMetric["clusterTotals"] = {
-                            "cpu": {
-                                "capacity": tmpTotalCpuCapacity,
-                                "allocatable": tmpTotalCpuAllocatable,
-                                "requests": tmpTotalCpuRequest,
-                                "requestsPercent": calcPercent(tmpTotalCpuRequest, tmpTotalCpuAllocatable, True),
-                                "limits": tmpTotalCpuLimit,
-                                "limitsPercent": calcPercent(tmpTotalCpuLimit, tmpTotalCpuAllocatable, True),
-                                "usage": total_node_cpu_usage,
-                                "usagePercent": calcPercent(total_node_cpu_usage, tmpTotalCpuAllocatable, True),
-                            },
-                            "memory": {
-                                "capacity": tmpTotalMemoryCapacity,
-                                "allocatable": tmpTotalMenoryAllocatable,
-                                "requests": tmpTotalMemoryRequest,
-                                "requestsPercent": calcPercent(tmpTotalMemoryRequest, tmpTotalMenoryAllocatable, True),
-                                "limits": tmpTotalMemoryLimit,
-                                "limitsPercent":  calcPercent(tmpTotalMemoryLimit, tmpTotalMenoryAllocatable, True),
-                                "usage": total_node_mem_usage,
-                                "usagePercent": calcPercent(total_node_mem_usage, tmpTotalMenoryAllocatable, True),
-                            },
-                            "pod_count": {
-                                "current": tmpTotalPodCount,
-                                "currentPercent": calcPercent(tmpTotalPodCount, totalTotalPodAllocatable, True),
-                                "allocatable": totalTotalPodAllocatable,
-                            },
-                    }
-                    return clusterMetric
+                    "pod_count": {
+                        "current": tmpPodCount,
+                        "currentPercent": calcPercent(tmpPodCount, totalPodAllocatable, True),
+                        "allocatable": totalPodAllocatable,
+                    },
+                })
+                tmpTotalPodCount += tmpPodCount
+                totalTotalPodAllocatable += totalPodAllocatable
+                tmpTotalCpuAllocatable += node_cpu_allocatable
+                tmpTotalMenoryAllocatable += node_mem_allocatable
+                tmpTotalCpuCapacity += node_cpu_capacity
+                tmpTotalMemoryCapacity += node_mem_capacity
+                tmpTotalCpuLimit += tmpCpuLimit
+                tmpTotalMemoryLimit += tmpMemoryLimit
+                tmpTotalCpuRequest += tmpCpuRequest
+                tmpTotalMemoryRequest += tmpMemoryRequest
+                total_node_mem_usage += node_mem_usage
+                total_node_cpu_usage += node_cpu_usage
+            
+            # clusterTotals
+            with tracer.start_as_current_span("set-cluster-totals") as span:
+                span.set_attribute("total.cpu.capacity", tmpTotalCpuCapacity)
+                span.set_attribute("total.memory.capacity", tmpTotalMemoryCapacity)
+                span.set_attribute("total.cpu.allocatable", tmpTotalCpuAllocatable)
+                span.set_attribute("total.memory.allocatable", tmpTotalMenoryAllocatable)
+                span.set_attribute("total.cpu.requests", tmpTotalCpuRequest)
+                span.set_attribute("total.memory.requests", tmpTotalMemoryRequest)
+                span.set_attribute("total.cpu.limits", tmpTotalCpuLimit)
+                span.set_attribute("total.memory.limits", tmpTotalMemoryLimit)
+                span.set_attribute("total.pod.count.current", tmpTotalPodCount)
+                span.set_attribute("total.pod.count.allocatable", totalTotalPodAllocatable)
+                
+                clusterMetric["clusterTotals"] = {
+                    "cpu": {
+                        "capacity": tmpTotalCpuCapacity,
+                        "allocatable": tmpTotalCpuAllocatable,
+                        "requests": tmpTotalCpuRequest,
+                        "requestsPercent": calcPercent(tmpTotalCpuRequest, tmpTotalCpuAllocatable, True),
+                        "limits": tmpTotalCpuLimit,
+                        "limitsPercent": calcPercent(tmpTotalCpuLimit, tmpTotalCpuAllocatable, True),
+                        "usage": total_node_cpu_usage,
+                        "usagePercent": calcPercent(total_node_cpu_usage, tmpTotalCpuAllocatable, True),
+                    },
+                    "memory": {
+                        "capacity": tmpTotalMemoryCapacity,
+                        "allocatable": tmpTotalMenoryAllocatable,
+                        "requests": tmpTotalMemoryRequest,
+                        "requestsPercent": calcPercent(tmpTotalMemoryRequest, tmpTotalMenoryAllocatable, True),
+                        "limits": tmpTotalMemoryLimit,
+                        "limitsPercent":  calcPercent(tmpTotalMemoryLimit, tmpTotalMenoryAllocatable, True),
+                        "usage": total_node_mem_usage,
+                        "usagePercent": calcPercent(total_node_mem_usage, tmpTotalMenoryAllocatable, True),
+                    },
+                    "pod_count": {
+                        "current": tmpTotalPodCount,
+                        "currentPercent": calcPercent(tmpTotalPodCount, totalTotalPodAllocatable, True),
+                        "allocatable": totalTotalPodAllocatable,
+                    },
+                }
+            result = clusterMetric
         except ApiException as error:
             if error.status != 404:
-                ErrorHandler(logger, error, "Cannot Connect to Kubernetes - %s " % error.status)
+                error_msg = f"Cannot Connect to Kubernetes API - Status: {error.status}, Reason: {getattr(error, 'reason', 'Unknown')}"
+                if hasattr(error, 'body') and error.body:
+                    try:
+                        import json
+                        error_body = json.loads(error.body) if isinstance(error.body, str) else error.body
+                        error_msg += f", Message: {error_body.get('message', 'N/A')}"
+                    except:
+                        pass
+                ErrorHandler(logger, error, error_msg)
             if tracer and span.is_recording():
-                span.set_status(Status(StatusCode.ERROR, "Cannot Connect to Kubernetes: %s" % error))
-            return bad_clusterMetric
+                span.set_status(Status(StatusCode.ERROR, f"Cannot Connect to Kubernetes: {error}"))
+            result = bad_clusterMetric
         except Exception as error:
-            ErrorHandler(logger, "CannotConnect", "Cannot Connect to Kubernetes")
+            # Extract more details about the connection error
+            error_type = type(error).__name__
+            error_message = str(error)
+            
+            # Check for common connection error patterns
+            if "timeout" in error_message.lower() or "timed out" in error_message.lower():
+                error_msg = f"Cannot Connect to Kubernetes - Connection Timeout: {error_message}"
+            elif "connection refused" in error_message.lower() or "econnrefused" in error_message.lower():
+                error_msg = f"Cannot Connect to Kubernetes - Connection Refused: {error_message}"
+            elif "name resolution" in error_message.lower() or "dns" in error_message.lower():
+                error_msg = f"Cannot Connect to Kubernetes - DNS Resolution Failed: {error_message}"
+            elif "certificate" in error_message.lower() or "ssl" in error_message.lower():
+                error_msg = f"Cannot Connect to Kubernetes - SSL/Certificate Error: {error_message}"
+            else:
+                error_msg = f"Cannot Connect to Kubernetes - {error_type}: {error_message}"
+            
+            logger.error(error_msg)
             if tracer and span.is_recording():
-                span.set_status(Status(StatusCode.ERROR, "Cannot Connect to Kubernetes: %s" % error))
-            return bad_clusterMetric
+                span.set_status(Status(StatusCode.ERROR, f"Cannot Connect to Kubernetes: {error_type} - {error_message}"))
+            result = bad_clusterMetric
+        
+        # Only cache successful results (with valid data)
+        # Check if result has nodes or non-zero capacity to determine if it's valid
+        if result is not None:
+            is_valid = (
+                len(result.get("nodes", [])) > 0 or 
+                result.get("clusterTotals", {}).get("cpu", {}).get("capacity", 0) > 0 or
+                result.get("clusterTotals", {}).get("memory", {}).get("capacity", 0) > 0
+            )
+            
+            if is_valid:
+                # Cache valid results for long_cache_time seconds
+                cache.set(cache_key, result, timeout=long_cache_time)
+            # If invalid, don't cache - return the error result immediately
+        
+        # Ensure result is never None
+        if result is None:
+            result = bad_clusterMetric
+        
+        return result
 
 @cache.memoize(timeout=long_cache_time)
 def k8sGetNodeMetric(node_name):
@@ -266,10 +337,11 @@ def k8sGetNodeMetric(node_name):
     }
 
     try:
-        node_list = k8s_client.CoreV1Api().list_node(_request_timeout=1)
-        pod_list = k8s_client.CoreV1Api().list_pod_for_all_namespaces(_request_timeout=1)
+        # Increased timeout from 1s to 10s for better reliability
+        node_list = k8s_client.CoreV1Api().list_node(_request_timeout=10)
+        pod_list = k8s_client.CoreV1Api().list_pod_for_all_namespaces(_request_timeout=10)
         try:
-            k8s_nodes = k8s_client.CustomObjectsApi().list_cluster_custom_object("metrics.k8s.io", "v1beta1", "nodes", _request_timeout=1)
+            k8s_nodes = k8s_client.CustomObjectsApi().list_cluster_custom_object("metrics.k8s.io", "v1beta1", "nodes", _request_timeout=10)
         except Exception as error:
             k8s_nodes = None
             flash("Metrics Server is not installed. If you want to see usage date please install Metrics Server.", "warning")
@@ -299,6 +371,9 @@ def k8sGetNodeMetric(node_name):
                 totalPodAllocatable += float(node.status.allocatable["pods"])
                 node_mem_capacity = float(parse_quantity(node.status.capacity["memory"]))
                 node_mem_allocatable = float(parse_quantity(node.status.allocatable["memory"]))
+                # Parse CPU quantities (can be in formats like "2500m", "2.5", etc.)
+                node_cpu_capacity = float(parse_quantity(node.status.capacity["cpu"]))
+                node_cpu_allocatable = float(parse_quantity(node.status.allocatable["cpu"]))
                 if k8s_nodes:
                     for stats in k8s_nodes['items']:
                         if stats['metadata']['name'] == node.metadata.name:
@@ -307,14 +382,14 @@ def k8sGetNodeMetric(node_name):
                 node_metric = {
                     "name": node.metadata.name,
                     "cpu": {
-                        "capacity":  int(node.status.capacity["cpu"]),
-                        "allocatable":  int(node.status.allocatable["cpu"]),
+                        "capacity":  int(node_cpu_capacity),
+                        "allocatable":  int(node_cpu_allocatable),
                         "requests": tmpCpuRequest,
-                        "requestsPercent": calcPercent(tmpCpuRequest, int(node.status.capacity["cpu"]), True),
+                        "requestsPercent": calcPercent(tmpCpuRequest, node_cpu_capacity, True),
                         "limits": tmpCpuLimit,
-                        "limitsPercent": calcPercent(tmpCpuLimit, int(node.status.capacity["cpu"]), True),
+                        "limitsPercent": calcPercent(tmpCpuLimit, node_cpu_capacity, True),
                         "usage": node_cpu_usage,
-                        "usagePercent": calcPercent(node_cpu_usage, int(node.status.capacity["cpu"]), True),
+                        "usagePercent": calcPercent(node_cpu_usage, node_cpu_capacity, True),
                     },
                     "memory": {
                         "capacity": node_mem_capacity,
@@ -359,7 +434,8 @@ def k8sPVCMetric(namespace):
         node_list = k8sNodesListGet("Admin", None)
         for mode in node_list:
             name = mode["name"]
-            data = k8s_client.CoreV1Api().connect_get_node_proxy_with_path(name, path="stats/summary", _request_timeout=1)
+            # Increased timeout from 1s to 10s for node proxy calls
+            data = k8s_client.CoreV1Api().connect_get_node_proxy_with_path(name, path="stats/summary", _request_timeout=10)
             data_json = eval(data)
             for pod in data_json["pods"]:
                 if 'volume' in pod:
@@ -382,7 +458,7 @@ def k8sPVCMetric(namespace):
     except Exception as error:
         return PVC_LIST
 
-#@cache.memoize(timeout=long_cache_time)
+@cache.memoize(timeout=long_cache_time)
 def k8sGetClusterEvents(username_role, user_token):
     """Get the cluster events for a given username and user_token
     
@@ -400,35 +476,29 @@ def k8sGetClusterEvents(username_role, user_token):
             if user_token:
                 span.set_attribute("user_token", user_token)
         
-            event_list = k8s_client.CoreV1Api().list_event_for_all_namespaces(_request_timeout=1)
+            # Increased timeout from 1s to 10s - listing all events can be slow in large clusters
+            event_list = k8s_client.CoreV1Api().list_event_for_all_namespaces(_request_timeout=10)
             events = []
+            # Reduced tracing overhead - process events without per-event spans
             for event in event_list.items:
-                with tracer.start_as_current_span("iterate-event-list") as span:
-                    span.set_attribute("event.name", event.metadata.name)
-                    span.set_attribute("event.involved_object_name", event.involved_object.name)
-                    span.set_attribute("event.involved_object_kind", event.involved_object.kind)
-                    span.set_attribute("event.namespace", event.metadata.namespace)
-                    span.set_attribute("event.message", event.message)
-                    span.set_attribute("event.reason", event.reason)
-                    span.set_attribute("event.type", event.type)
-                    if event.count:
-                        span.set_attribute("event.count", event.count)
-                    span.set_attribute("event.first_timestamp", str(event.first_timestamp))
-                    span.set_attribute("event.last_timestamp", str(event.last_timestamp))
-                    
-                    if event.type != "Normal":
-                        events.append({
-                            "name": event.metadata.name,
-                            "involvedObjectName": event.involved_object.name,
-                            "involvedObjectKind": event.involved_object.kind,
-                            "namespace": event.metadata.namespace,
-                            "message": event.message,
-                            "reason": event.reason,
-                            "type": event.type,
-                            "count": event.count,
-                            "first_timestamp": event.first_timestamp,
-                            "last_timestamp": event.last_timestamp,
-                        })
+                if event.type != "Normal":
+                    events.append({
+                        "name": event.metadata.name,
+                        "involvedObjectName": event.involved_object.name,
+                        "involvedObjectKind": event.involved_object.kind,
+                        "namespace": event.metadata.namespace,
+                        "message": event.message,
+                        "reason": event.reason,
+                        "type": event.type,
+                        "count": event.count,
+                        "first_timestamp": event.first_timestamp,
+                        "last_timestamp": event.last_timestamp,
+                    })
+            
+            # Set span attributes once for all events instead of per-event
+            if tracer and span.is_recording():
+                span.set_attribute("events.count", len(events))
+                span.set_attribute("events.total", len(event_list.items))
             return events
     except ApiException as error:
         if tracer and span.is_recording():
@@ -579,7 +649,8 @@ def getNodeMetrics():
     }
     
     try:
-        k8s_nodes = k8s_client.CustomObjectsApi().list_cluster_custom_object("metrics.k8s.io", "v1beta1", "nodes", _request_timeout=1)
+        # Increased timeout from 1s to 10s for metrics API
+        k8s_nodes = k8s_client.CustomObjectsApi().list_cluster_custom_object("metrics.k8s.io", "v1beta1", "nodes", _request_timeout=10)
         for node in k8s_nodes['items']:
             node_metric['name']    = node['metadata']['name']
             node_metric['cpu']     = float(parse_quantity(node['usage']['cpu']))
@@ -610,7 +681,8 @@ def getPodMetrics():
         "storage": "",
     }
     try:
-        k8s_pods = k8s_client.CustomObjectsApi().list_cluster_custom_object("metrics.k8s.io", "v1beta1", "pods", _request_timeout=1)
+        # Increased timeout from 1s to 10s for metrics API
+        k8s_pods = k8s_client.CustomObjectsApi().list_cluster_custom_object("metrics.k8s.io", "v1beta1", "pods", _request_timeout=10)
         for pod in k8s_pods['items']:
             for container in pod['containers']:
                 pod_metric['name']      = pod['metadata']['name']
