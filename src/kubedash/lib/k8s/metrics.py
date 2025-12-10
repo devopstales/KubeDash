@@ -1,4 +1,5 @@
 from os import wait4
+from concurrent.futures import ThreadPoolExecutor, as_completed
 from flask import flash
 from kubernetes import client as k8s_client
 from kubernetes.client.rest import ApiException
@@ -94,21 +95,35 @@ def k8sGetClusterMetric():
             }
         }
         try:
-            with tracer.start_as_current_span("k8s_client__list_node") as span:
-                # Increased timeout from 1s to 10s for better reliability in large clusters
-                node_list = k8s_client.CoreV1Api().list_node(_request_timeout=10)
-            with tracer.start_as_current_span("k8s_client__list_pod_for_all_namespaces") as span:
-                # Increased timeout from 1s to 10s - listing all pods can be slow
-                pod_list = k8s_client.CoreV1Api().list_pod_for_all_namespaces(_request_timeout=10)
-            try:
-                with tracer.start_as_current_span("k8s_client__list_cluster_custom_object") as span:
-                    # Increased timeout from 1s to 10s for metrics API
-                    k8s_nodes = k8s_client.CustomObjectsApi().list_cluster_custom_object("metrics.k8s.io", "v1beta1", "nodes", _request_timeout=10)
-            except Exception as error:
-                k8s_nodes = None
-                if tracer and span.is_recording():
-                    span.set_status(Status(StatusCode.ERROR, "Metrics Server is not installed. If you want to see usage date please install Metrics Server."))
-                flash("Metrics Server is not installed. If you want to see usage date please install Metrics Server.", "warning")
+            # Parallelize API calls to reduce total time from ~3s to ~1s (longest call)
+            def fetch_nodes():
+                with tracer.start_as_current_span("k8s_client__list_node") as span:
+                    return k8s_client.CoreV1Api().list_node(_request_timeout=5)
+            
+            def fetch_pods():
+                with tracer.start_as_current_span("k8s_client__list_pod_for_all_namespaces") as span:
+                    return k8s_client.CoreV1Api().list_pod_for_all_namespaces(_request_timeout=5)
+            
+            def fetch_node_metrics():
+                try:
+                    with tracer.start_as_current_span("k8s_client__list_cluster_custom_object") as span:
+                        return k8s_client.CustomObjectsApi().list_cluster_custom_object("metrics.k8s.io", "v1beta1", "nodes", _request_timeout=5)
+                except Exception as error:
+                    if tracer and span.is_recording():
+                        span.set_status(Status(StatusCode.ERROR, "Metrics Server is not installed. If you want to see usage date please install Metrics Server."))
+                    flash("Metrics Server is not installed. If you want to see usage date please install Metrics Server.", "warning")
+                    return None
+            
+            # Execute all three API calls in parallel
+            with ThreadPoolExecutor(max_workers=3) as executor:
+                node_future = executor.submit(fetch_nodes)
+                pod_future = executor.submit(fetch_pods)
+                metrics_future = executor.submit(fetch_node_metrics)
+                
+                # Wait for all calls to complete
+                node_list = node_future.result()
+                pod_list = pod_future.result()
+                k8s_nodes = metrics_future.result()
             
             # Performance optimization: Group pods by node to avoid O(nodes × pods) nested loop
             # This reduces complexity from O(nodes × pods) to O(nodes + pods)
@@ -459,13 +474,14 @@ def k8sPVCMetric(namespace):
         return PVC_LIST
 
 @cache.memoize(timeout=long_cache_time)
-def k8sGetClusterEvents(username_role, user_token):
+def k8sGetClusterEvents(username_role, user_token, limit=100):
     """Get the cluster events for a given username and user_token
-    
+
     Args:
         username_role (str): The username and role of the user
         user_token (str): The user's token
-        
+        limit (int): Maximum number of events to return (default: 100)
+
     Returns:
         events (list): The list of cluster events
     """
@@ -476,12 +492,20 @@ def k8sGetClusterEvents(username_role, user_token):
             if user_token:
                 span.set_attribute("user_token", user_token)
         
+            # Use field selector to filter for non-Normal events at the API level
+            # Kubernetes field selectors support '!=' operator to exclude values
+            # This filters out Normal events before they're transferred, improving performance
+            field_selector = "type!=Normal"
+            
             # Increased timeout from 1s to 10s - listing all events can be slow in large clusters
-            event_list = k8s_client.CoreV1Api().list_event_for_all_namespaces(_request_timeout=10)
+            event_list = k8s_client.CoreV1Api().list_event_for_all_namespaces(
+                field_selector=field_selector,
+                limit=limit,
+                _request_timeout=10
+            )
             events = []
             # Reduced tracing overhead - process events without per-event spans
             for event in event_list.items:
-                if event.type != "Normal":
                     events.append({
                         "name": event.metadata.name,
                         "involvedObjectName": event.involved_object.name,

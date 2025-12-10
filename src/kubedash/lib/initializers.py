@@ -449,8 +449,18 @@ def initialize_app_caching(app: Flask):
     Args:
         app (Flask): Flask app object
     """
+    import os
     from lib.cache import cache
     from lib.cache import cached_base, cached_base2
+
+    # Check if caching is disabled via environment variable
+    disable_cache = os.getenv('KUBEDASH_DISABLE_CACHE', 'false').lower() in ('true', '1', 'yes', 'on')
+    if disable_cache:
+        app.logger.info("Caching disabled via KUBEDASH_DISABLE_CACHE environment variable")
+        app.config['CACHE_TYPE'] = 'NullCache'
+        cache.init_app(app)
+        app.cache = cache
+        return
 
     ini = app.config['kubedash.ini']
     redis_enabled = ini.get('remote_cache', 'redis_enabled', fallback='none').lower() == 'true'

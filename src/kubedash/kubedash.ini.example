@@ -27,6 +27,8 @@ name = kubedash
 redis_enabled = true
 redis_host = 127.0.0.1
 
+# Note: Caching can be completely disabled by setting the environment variable KUBEDASH_DISABLE_CACHE=true
+
 # redis cluster
 cluster_enabled = false
 cluster_startup_nodes = 10.0.0.1,10.0.0.2

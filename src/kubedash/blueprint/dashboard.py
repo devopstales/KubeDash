@@ -33,7 +33,7 @@ def cluster_metrics():
     user_token = get_user_token(session)
     
     cluster_metrics = k8sGetClusterMetric()
-    cluster_events  = k8sGetClusterEvents(session['user_role'], user_token)
+    cluster_events  = k8sGetClusterEvents(session['user_role'], user_token, limit=100)
     
     username = session['user_name']
     user = User.query.filter_by(username="admin", user_type = "Local").first()
