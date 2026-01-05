@@ -1,5 +1,6 @@
 from flask import g, send_from_directory, jsonify
 from flask.views import MethodView
+from flask_login import login_required
 from flask_smorest import Blueprint
 from contextlib import nullcontext
 from swagger_ui_bundle import swagger_ui_path
@@ -26,6 +27,7 @@ tracer = get_tracer()
 # Static file route for Swagger UI
 ##############################################################
 @api_bp.route('/swagger-ui/<path:filename>')
+@login_required
 def swagger_ui_static(filename):
     """Serve Swagger UI static files (JS, CSS) locally under /api"""
     return send_from_directory(swagger_ui_path, filename)

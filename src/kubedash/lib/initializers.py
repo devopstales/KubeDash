@@ -356,6 +356,38 @@ def initialize_app_swagger(app: Flask):
         "OPENAPI_SWAGGER_UI_URL": "/api/swagger-ui/",  # your local static files
     })
     api_doc.init_app(app)
+    
+    # Protect Swagger UI with flask-login
+    # Use a before_request handler that checks authentication
+    # We need to set prometheus metrics attributes to avoid middleware errors
+    from flask_login import current_user
+    from flask import request, redirect, url_for, Response
+    import time
+    
+    @app.before_request
+    def protect_swagger_ui():
+        """Protect Swagger UI endpoints - require login"""
+        # Check if the request is for the swagger-ui page (main page, not static files)
+        # Static files are already protected by @login_required decorator in blueprint/api.py
+        path = request.path.rstrip('/')
+        if path == "/api/swagger-ui":
+            if not current_user.is_authenticated:
+                # Set prometheus metrics start time to avoid AttributeError in after_request
+                # This ensures the flask_prometheus_metrics middleware doesn't fail
+                if not hasattr(request, '_prometheus_metrics_request_start_time'):
+                    request._prometheus_metrics_request_start_time = time.time()
+                
+                # Create a redirect response
+                login_url = url_for('auth.login')
+                # Add next parameter to redirect back to swagger-ui after login
+                if request.url:
+                    from urllib.parse import urlencode
+                    login_url += '?' + urlencode({'next': request.url})
+                # Return a proper Response object
+                return Response(
+                    status=302,
+                    headers={'Location': login_url}
+                )
 
 def initialize_blueprints(app: Flask):
     """Initialize blueprints"""
