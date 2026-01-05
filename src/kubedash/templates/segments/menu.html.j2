@@ -81,7 +81,7 @@
                     <li class="nav-item"><a class="nav-link" href="/workload/replicasets"> ReplicaSets </a></li>
                 </ul>
             </li>
-        <!-- Workloads Collapse Menu -->
+        <!-- Networking Collapse Menu -->
             <li class="nav-group"><a class="nav-link nav-group-toggle" href="#">
                 <svg class="nav-icon" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 576 512">
                     <path d="M208 80c0-26.5 21.5-48 48-48l64 0c26.5 0 48 21.5 48 48l0 64c0 26.5-21.5 48-48 48l-8 0 0 40 152 0c30.9 0 56 25.1 56 56l0 32 8 0c26.5 0 48 21.5 48 48l0 64c0 26.5-21.5 48-48 48l-64 0c-26.5 0-48-21.5-48-48l0-64c0-26.5 21.5-48 48-48l8 0 0-32c0-4.4-3.6-8-8-8l-152 0 0 40 8 0c26.5 0 48 21.5 48 48l0 64c0 26.5-21.5 48-48 48l-64 0c-26.5 0-48-21.5-48-48l0-64c0-26.5 21.5-48 48-48l8 0 0-40-152 0c-4.4 0-8 3.6-8 8l0 32 8 0c26.5 0 48 21.5 48 48l0 64c0 26.5-21.5 48-48 48l-64 0c-26.5 0-48-21.5-48-48l0-64c0-26.5 21.5-48 48-48l8 0 0-32c0-30.9 25.1-56 56-56l152 0 0-40-8 0c-26.5 0-48-21.5-48-48l0-64z"/>
@@ -89,10 +89,18 @@
                 <ul class="nav-group-items compact">
                     <li class="nav-item"><a class="nav-link" href="/network/service"> Services </a></li>
                     <!-- endpoints -->
+                {% if config.plugins["cert_manager"] %}
+                    <li class="nav-item"><a class="nav-link" href="/plugins/cert-manager"> Cert-Manager <span class="badge text-bg-sm bg-warning ms-auto">Beta</span></a></li>
+                {% endif %}
+                {% if config.plugins["external_loadbalancer"] %}
+                    <li class="nav-item"><a class="nav-link" href="/plugins/external-loadbalancer"> LoadBalancers <span class="badge text-bg-sm bg-warning ms-auto">Beta</span></a></li>
+                {% endif %}
                     <li class="nav-item"><a class="nav-link" href="/network/ingress"> Ingress </a></li>
-                    <li class="nav-item"><a class="nav-link" href="/network/ingress-class"> Ingress Class </a></li>
                     <!-- Gateways -->
-                    <!-- Gateway classes -->
+                {% if config.plugins["gateway_api"] %}
+                    <li class="nav-item"><a class="nav-link" href="/plugins/gateway-api"> Gateway API <span class="badge text-bg-sm bg-warning ms-auto">Beta</span></a></li>
+                {% endif %}
+
                 </ul>
             </li>
         <!-- Storage Collapse Menu -->
@@ -118,6 +126,15 @@
                     <li class="nav-item"><a class="nav-link" href="/security/secret"> Secrets </a></li>
                     <li class="nav-item"><a class="nav-link" href="/security/network-policy"> Network Policies </a></li>
                     <li class="nav-item"><a class="nav-link" href="/security/priorityclass"> Priority Classes </a></li>
+                {% if config.plugins["trivy_operator"] %}
+                    <li class="nav-group"><a class="nav-link nav-group-toggle" href="#">
+                        Trivy Operator <span class="badge text-bg-sm bg-warning ms-auto">Beta</span></a>
+                        <ul class="nav-group-items compact">
+                            <li class="nav-item"><a class="nav-link" href="/plugins/trivy-operator/namespace"> Namespace Reports </a></li>
+                            <li class="nav-item"><a class="nav-link" href="/plugins/trivy-operator/cluster"> Cluster Reports </a></li>
+                        </ul>
+                    </li>
+                {% endif %}
                 </ul>
             </li>
         <!-- Other Resources Collapse Menu -->
@@ -164,24 +181,6 @@
                 {% endif %}
                 {% if config.plugins["flux"] %}
                     <li class="nav-item"><a class="nav-link" href="/plugins/flux"> Flux CD </a></li>
-                {% endif %}
-                {% if config.plugins["cert_manager"] %}
-                    <li class="nav-item"><a class="nav-link" href="/plugins/cert-manager"> Cert-Manager <span class="badge text-bg-sm bg-warning ms-auto">Beta</span></a></li>
-                {% endif %}
-                {% if config.plugins["gateway_api"] %}
-                    <li class="nav-item"><a class="nav-link" href="/plugins/gateway-api"> Gateway API <span class="badge text-bg-sm bg-warning ms-auto">Beta</span></a></li>
-                {% endif %}
-                {% if config.plugins["external_loadbalancer"] %}
-                    <li class="nav-item"><a class="nav-link" href="/plugins/external-loadbalancer"> LoadBalancers <span class="badge text-bg-sm bg-warning ms-auto">Beta</span></a></li>
-                {% endif %}
-                {% if config.plugins["trivy_operator"] %}
-                    <li class="nav-group"><a class="nav-link nav-group-toggle" href="#">
-                        Trivy Operator <span class="badge text-bg-sm bg-warning ms-auto">Beta</span></a>
-                        <ul class="nav-group-items compact">
-                            <li class="nav-item"><a class="nav-link" href="/plugins/trivy-operator/namespace"> Namespace Reports </a></li>
-                            <li class="nav-item"><a class="nav-link" href="/plugins/trivy-operator/cluster"> Cluster Reports </a></li>
-                        </ul>
-                    </li>
                 {% endif %}
                 </ul>
             </li>

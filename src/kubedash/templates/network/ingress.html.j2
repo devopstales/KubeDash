@@ -18,54 +18,140 @@
 
 {% block content %}
 <div class="card shadow mb-4">
-    <div class="card-header py-3">
-        <h6 class="m-0 font-weight-bold text-primary">Ingress List</h6>
+    <div class="card-header d-flex justify-content-between align-items-center">
+        <h6 class="m-0 fw-bold text-primary">Ingress Resources</h6>
+        <div class="d-flex align-items-center">
+            <form action="/network/ingress" method="POST" class="d-flex align-items-center">
+                <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+                <input type="hidden" name="active_tab" value="{{ active_tab }}">
+                <select name="ns_select" class="form-select form-select-sm me-2" style="width: auto;" onchange="this.form.submit()">
+                    {% for ns in namespaces %}
+                    <option value="{{ ns }}" {% if session['ns_select'] == ns %}selected{% endif %}>{{ ns }}</option>
+                    {% endfor %}
+                </select>
+            </form>
+        </div>
     </div>
     <div class="card-body">
-        <div class="table-responsive">
-            <table class="table table-bordered" id="dataTable" width="100%" cellspacing="0">
-                <thead>
-                    <tr>
-                      <th>Name</th>
-                      <th>IngressClass</th>
-                      <th>Hostname</th>
-                    </tr>
-                  </thead>
-                  <tbody>
-                    {% for i in ingresses %}
-                    {% if selected == i.name %}
-                      <tr class="selected" >
-                    {% else %}
-                      <tr>
-                    {% endif %}
-                        <td>
-                          <form action="/network/ingress/data" method="POST">
-                            <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
-                            <input type="hidden" name="ns_select" value="{{ session['ns_select'] }}" />
-                            <input type="hidden" name="i_name" value="{{ i.name }}" />
-                            <a href="javascript:;" onclick="parentNode.submit();">{{ i.name }}</a>
-                          </form>
-                        </td>
-                        <td>
-                            {% if i.ingressClass %}
-                              <form action="/network/ingress-class" method="POST">
-                                <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
-                                <input type="hidden" name="selected" value="{{ i.ingressClass }}" />
-                                <a href="javascript:;" onclick="parentNode.submit();">{{ i.ingressClass }}</a>
-                              </form>
-                            {% else %}
-                              {{ i.ingressClass }}
-                            {% endif %}
-                        </td>
-                        <td>
-                          {% for host in i.hosts %}
-                            {{ host }}{% if not loop.last %}<br>{% endif %}
-                          {% endfor %}
-                        </td>
-                      </tr>
-                    {% endfor %}
-                  </tbody>
-            </table>
+        <!-- Navigation Tabs -->
+        <ul class="nav nav-tabs" id="ingress-tabs" role="tablist">
+            <li class="nav-item">
+                <a class="nav-link {% if active_tab == 'ingresses' %}active{% endif %}" 
+                   id="nav-ingresses-tab" data-bs-toggle="tab" href="#nav-ingresses" 
+                   role="tab" aria-controls="nav-ingresses" aria-selected="{% if active_tab == 'ingresses' %}true{% else %}false{% endif %}"
+                   onclick="updateTabUrl('ingresses')">
+                    Ingresses <span class="badge bg-secondary">{{ ingresses|length }}</span>
+                </a>
+            </li>
+            <li class="nav-item">
+                <a class="nav-link {% if active_tab == 'ingressclasses' %}active{% endif %}" 
+                   id="nav-ingressclasses-tab" data-bs-toggle="tab" href="#nav-ingressclasses" 
+                   role="tab" aria-controls="nav-ingressclasses" aria-selected="{% if active_tab == 'ingressclasses' %}true{% else %}false{% endif %}"
+                   onclick="updateTabUrl('ingressclasses')">
+                    IngressClasses <span class="badge bg-secondary">{{ ingresses_classes|length }}</span>
+                </a>
+            </li>
+        </ul>
+
+        <!-- Tab Content -->
+        <div class="tab-content" id="ingress-tab-content">
+            
+            <!-- Ingresses Tab -->
+            <div class="tab-pane fade {% if active_tab == 'ingresses' %}show active{% endif %}" 
+                 id="nav-ingresses" role="tabpanel" aria-labelledby="nav-ingresses-tab">
+                <div class="card shadow mb-4 mt-3">
+                    <div class="card-body">
+                        <div class="table-responsive">
+                            <table class="table table-bordered table-hover" id="ingressTable" width="100%" cellspacing="0">
+                                <thead>
+                                    <tr>
+                                        <th>Name</th>
+                                        <th>IngressClass</th>
+                                        <th>Hostname</th>
+                                    </tr>
+                                </thead>
+                                <tbody>
+                                    {% for i in ingresses %}
+                                    <tr>
+                                        <td>
+                                            <form action="/network/ingress/data" method="POST" style="display: inline;">
+                                                <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+                                                <input type="hidden" name="ns_select" value="{{ session['ns_select'] }}" />
+                                                <input type="hidden" name="i_name" value="{{ i.name }}" />
+                                                <a href="javascript:;" onclick="parentNode.submit();">{{ i.name }}</a>
+                                            </form>
+                                        </td>
+                                        <td>
+                                            {% if i.ingressClass %}
+                                            <form action="/network/ingress-class/data" method="POST" style="display: inline;">
+                                                <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+                                                <input type="hidden" name="ic_name" value="{{ i.ingressClass }}" />
+                                                <a href="javascript:;" onclick="parentNode.submit();">{{ i.ingressClass }}</a>
+                                            </form>
+                                            {% else %}
+                                            {{ i.ingressClass or '-' }}
+                                            {% endif %}
+                                        </td>
+                                        <td>
+                                            {% for host in i.hosts %}
+                                                {{ host }}{% if not loop.last %}<br>{% endif %}
+                                            {% else %}
+                                                <span class="text-muted">-</span>
+                                            {% endfor %}
+                                        </td>
+                                    </tr>
+                                    {% endfor %}
+                                    {% if ingresses|length == 0 %}
+                                    <tr>
+                                        <td class="text-center text-muted" colspan="3">No Ingresses found in namespace {{ session['ns_select'] }}</td>
+                                    </tr>
+                                    {% endif %}
+                                </tbody>
+                            </table>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- IngressClasses Tab -->
+            <div class="tab-pane fade {% if active_tab == 'ingressclasses' %}show active{% endif %}" 
+                 id="nav-ingressclasses" role="tabpanel" aria-labelledby="nav-ingressclasses-tab">
+                <div class="card shadow mb-4 mt-3">
+                    <div class="card-body">
+                        <div class="table-responsive">
+                            <table class="table table-bordered table-hover" id="ingressClassTable" width="100%" cellspacing="0">
+                                <thead>
+                                    <tr>
+                                        <th>Name</th>
+                                        <th>Controller</th>
+                                        <th>Created</th>
+                                    </tr>
+                                </thead>
+                                <tbody>
+                                    {% for ic in ingresses_classes %}
+                                    <tr>
+                                        <td>
+                                            <form action="/network/ingress-class/data" method="POST" style="display: inline;">
+                                                <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+                                                <input type="hidden" name="ic_name" value="{{ ic.name }}" />
+                                                <a href="javascript:;" onclick="parentNode.submit();">{{ ic.name }}</a>
+                                            </form>
+                                        </td>
+                                        <td>{{ ic.controller }}</td>
+                                        <td>{{ ic.created }}</td>
+                                    </tr>
+                                    {% endfor %}
+                                    {% if ingresses_classes|length == 0 %}
+                                    <tr>
+                                        <td class="text-center text-muted" colspan="3">No IngressClasses found</td>
+                                    </tr>
+                                    {% endif %}
+                                </tbody>
+                            </table>
+                        </div>
+                    </div>
+                </div>
+            </div>
         </div>
     </div>
 </div>
@@ -73,4 +159,63 @@
 
 {% block add_head_css %}
 {% include "segments/datatable_snippet.html.j2" %}
+{% endblock %}
+
+{% block add_tail_js %}
+<script>
+    // Function to update URL with tab parameter
+    function updateTabUrl(tab) {
+        const url = new URL(window.location);
+        url.searchParams.set('tab', tab);
+        window.history.pushState({}, '', url);
+    }
+    
+    // Initialize DataTables - only initialize if table has data rows
+    function safeInitDataTable(selector, orderCol) {
+        var $table = $(selector);
+        if ($table.length) {
+            // Check if table has actual data rows (not just empty message)
+            var hasData = $table.find('tbody tr').filter(function() {
+                return !$(this).find('td[colspan]').length;
+            }).length > 0;
+            
+            if (hasData) {
+                $table.DataTable({
+                    "order": [orderCol],
+                    "pageLength": 25,
+                    "columnDefs": [
+                        {
+                            "targets": [0, 1, 2], // All columns
+                            "orderable": true,
+                            "searchable": true
+                        }
+                    ]
+                });
+            }
+        }
+    }
+    
+    // Initialize DataTables when document is ready
+    $(document).ready(function() {
+        // Initialize tables only for the active tab
+        {% if active_tab == 'ingresses' %}
+        safeInitDataTable('#ingressTable', [0, "asc"]);
+        {% elif active_tab == 'ingressclasses' %}
+        safeInitDataTable('#ingressClassTable', [0, "asc"]);
+        {% endif %}
+        
+        // Handle tab switching to initialize DataTables when tab becomes visible
+        $('a[data-bs-toggle="tab"]').on('shown.bs.tab', function (e) {
+            if (e.target.id === 'nav-ingresses-tab') {
+                if (!$.fn.DataTable.isDataTable('#ingressTable')) {
+                    safeInitDataTable('#ingressTable', [0, "asc"]);
+                }
+            } else if (e.target.id === 'nav-ingressclasses-tab') {
+                if (!$.fn.DataTable.isDataTable('#ingressClassTable')) {
+                    safeInitDataTable('#ingressClassTable', [0, "asc"]);
+                }
+            }
+        });
+    });
+</script>
 {% endblock %}

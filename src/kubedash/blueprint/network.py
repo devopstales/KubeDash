@@ -18,75 +18,47 @@ logger = get_logger()
 ##############################################################
 # Network
 ##############################################################
-## Ingress Class
-##############################################################
-
-@network_bp.route("/ingress-class", methods=['GET', 'POST'])
-@login_required
-def ingresses_class():
-    selected = None
-    user_token = get_user_token(session)
-
-    if request.method == 'POST':
-        selected = request.form.get('selected')
-
-    ingresses_classes = k8sIngressClassListGet(session['user_role'], user_token)
-
-    return render_template(
-        'network/ingress-class.html.j2',
-        ingresses_classes = ingresses_classes,
-        selected = selected,
-    )
-
-@network_bp.route('/ingress-class/data', methods=['GET', 'POST'])
-@login_required
-def ingresses_class_data():
-    if request.method == 'POST':
-        ic_name = request.form.get('ic_name')
-
-        user_token = get_user_token(session)
-
-        ingresses_classes = k8sIngressClassListGet(session['user_role'], user_token)
-        ic_data = None
-        for ic in ingresses_classes:
-            if ic["name"] == ic_name:
-                ic_data = ic
-
-        if ic_data:
-            return render_template(
-                'network/ingress-class-data.html.j2',
-                ic_data = ic_data
-            )
-        else:
-                flash("Cannot iterate IngressClassList", "danger")
-                return redirect(url_for('.ingresses_class'))
-    else:
-        return redirect(url_for('auth.login'))
-
-##############################################################
-## Ingresses
+## Ingress (Combined Ingress and IngressClass)
 ##############################################################
 
 @network_bp.route("/ingress", methods=['GET', 'POST'])
 @login_required
 def ingresses():
-    selected = None
+    """Main Ingress view with tabs for Ingress and IngressClass resources."""
     user_token = get_user_token(session)
-
+    active_tab = request.args.get('tab', 'ingresses')
+    
     if request.method == 'POST':
         if 'ns_select' in request.form:
             session['ns_select'] = request.form.get('ns_select')
-        selected = request.form.get('selected')
-
+        if request.form.get('active_tab'):
+            active_tab = request.form.get('active_tab')
+    else:
+        # Handle GET requests with tab parameter
+        active_tab = request.args.get('tab', 'ingresses')
+    
+    # Get namespace list
     namespace_list, error = k8sNamespaceListGet(session['user_role'], user_token)
-    ingresses = k8sIngressListGet(session['user_role'], user_token, session['ns_select'])
-
+    if error:
+        namespace_list = []
+    
+    # Fetch both resource types
+    ingresses_classes = k8sIngressClassListGet(session['user_role'], user_token)
+    ingresses = k8sIngressListGet(session['user_role'], user_token, session.get('ns_select', 'default'))
+    
     return render_template(
         'network/ingress.html.j2',
         namespaces = namespace_list,
         ingresses = ingresses,
-        selected = selected,
+        ingresses_classes = ingresses_classes,
+        active_tab = active_tab,
     )
+
+@network_bp.route("/ingress-class", methods=['GET', 'POST'])
+@login_required
+def ingresses_class():
+    """Redirect old ingress-class route to main ingress route."""
+    return redirect(url_for('.ingresses', tab='ingressclasses'))
 
 @network_bp.route('/ingress/data', methods=['GET', 'POST'])
 @login_required
@@ -109,6 +81,31 @@ def ingresses_data():
         else:
                 flash("Cannot iterate IngressList", "danger")
                 return redirect(url_for('.ingresses'))
+    else:
+        return redirect(url_for('auth.login'))
+
+@network_bp.route('/ingress-class/data', methods=['GET', 'POST'])
+@login_required
+def ingresses_class_data():
+    if request.method == 'POST':
+        ic_name = request.form.get('ic_name')
+
+        user_token = get_user_token(session)
+
+        ingresses_classes = k8sIngressClassListGet(session['user_role'], user_token)
+        ic_data = None
+        for ic in ingresses_classes:
+            if ic["name"] == ic_name:
+                ic_data = ic
+
+        if ic_data:
+            return render_template(
+                'network/ingress-class-data.html.j2',
+                ic_data = ic_data
+            )
+        else:
+                flash("Cannot iterate IngressClassList", "danger")
+                return redirect(url_for('.ingresses', tab='ingressclasses'))
     else:
         return redirect(url_for('auth.login'))
 
