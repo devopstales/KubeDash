@@ -34,23 +34,23 @@
                             <div class="row text-start small">
                                 <div class="col-6 mb-2">
                                     <strong>Capacity:</strong><br>
-                                    <span class="text-muted">{{ cluster_metrics.clusterTotals.cpu.capacity |round(1) }} cores</span>
+                                    <span class="text-muted" id="cpu-capacity">Loading...</span>
                                 </div>
                                 <div class="col-6 mb-2">
                                     <strong>Allocatable:</strong><br>
-                                    <span class="text-muted">{{ cluster_metrics.clusterTotals.cpu.allocatable |round(1) }} cores</span>
+                                    <span class="text-muted" id="cpu-allocatable">Loading...</span>
                                 </div>
                                 <div class="col-6 mb-2">
                                     <strong>Requests:</strong><br>
-                                    <span class="text-muted">{{ cluster_metrics.clusterTotals.cpu.requests |round(1) }} cores</span>
+                                    <span class="text-muted" id="cpu-requests">Loading...</span>
                                 </div>
                                 <div class="col-6 mb-2">
                                     <strong>Limits:</strong><br>
-                                    <span class="text-muted">{{ cluster_metrics.clusterTotals.cpu.limits |round(1) }} cores</span>
+                                    <span class="text-muted" id="cpu-limits">Loading...</span>
                                 </div>
                                 <div class="col-6 mb-2">
                                     <strong>Usage:</strong><br>
-                                    <span class="text-muted">{{ cluster_metrics.clusterTotals.cpu.usage |round(1) }} cores</span>
+                                    <span class="text-muted" id="cpu-usage">Loading...</span>
                                 </div>
                             </div>
                         </div>
@@ -69,23 +69,23 @@
                             <div class="row text-start small">
                                 <div class="col-6 mb-2">
                                     <strong>Capacity:</strong><br>
-                                    <span class="text-muted">{{ (cluster_metrics.clusterTotals.memory.capacity / 1024 / 1024 / 1024) |round(2) }} GB</span>
+                                    <span class="text-muted" id="memory-capacity">Loading...</span>
                                 </div>
                                 <div class="col-6 mb-2">
                                     <strong>Allocatable:</strong><br>
-                                    <span class="text-muted">{{ (cluster_metrics.clusterTotals.memory.allocatable / 1024 / 1024 / 1024) |round(2) }} GB</span>
+                                    <span class="text-muted" id="memory-allocatable">Loading...</span>
                                 </div>
                                 <div class="col-6 mb-2">
                                     <strong>Requests:</strong><br>
-                                    <span class="text-muted">{{ (cluster_metrics.clusterTotals.memory.requests / 1024 / 1024 / 1024) |round(2) }} GB</span>
+                                    <span class="text-muted" id="memory-requests">Loading...</span>
                                 </div>
                                 <div class="col-6 mb-2">
                                     <strong>Limits:</strong><br>
-                                    <span class="text-muted">{{ (cluster_metrics.clusterTotals.memory.limits / 1024 / 1024 / 1024) |round(2) }} GB</span>
+                                    <span class="text-muted" id="memory-limits">Loading...</span>
                                 </div>
                                 <div class="col-6 mb-2">
                                     <strong>Usage:</strong><br>
-                                    <span class="text-muted">{{ (cluster_metrics.clusterTotals.memory.usage / 1024 / 1024 / 1024) |round(2) }} GB</span>
+                                    <span class="text-muted" id="memory-usage">Loading...</span>
                                 </div>
                             </div>
                         </div>
@@ -104,11 +104,11 @@
                             <div class="row text-start small">
                                 <div class="col-6 mb-2">
                                     <strong>Current:</strong><br>
-                                    <span class="text-muted">{{ cluster_metrics.clusterTotals.pod_count.current }} pods</span>
+                                    <span class="text-muted" id="pod-current">Loading...</span>
                                 </div>
                                 <div class="col-6 mb-2">
                                     <strong>Allocatable:</strong><br>
-                                    <span class="text-muted">{{ cluster_metrics.clusterTotals.pod_count.allocatable |round(0) |int }} pods</span>
+                                    <span class="text-muted" id="pod-allocatable">Loading...</span>
                                 </div>
                             </div>
                         </div>
@@ -136,30 +136,8 @@
                         <th style="white-space: nowrap;">Count</th>
                     </tr>
                 </thead>
-                <tbody>
-                {% for event in cluster_events %}
-                    <tr>
-                        <td style="white-space: nowrap;">{{ event.involvedObjectKind }}</td>
-                        <td style="white-space: nowrap;">
-                           {% if event.involvedObjectKind == "Pod" %}
-                            <form action="/workload/pods" method="POST">
-                                <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
-                                <input type="hidden" name="ns_select" value="{{ event.namespace }}" />
-                                <input type="hidden" name="selected" value="{{ event.involvedObjectName }}" />                                
-                                <a href="javascript:;" onclick="parentNode.submit();">{{ event.involvedObjectName }}</a>
-                            </form>
-                            {% else %}
-                            {{ event.involvedObjectName }}
-                            {% endif %}
-                        </td>
-                        <td style="white-space: nowrap;">{{ event.namespace }}</td>
-                        <td style="white-space: nowrap;">
-                            <span class="badge text-bg-secondary">{{ event.reason }}</span>
-                        </td>
-                        <td>{{ event.message }}</td>
-                        <td style="white-space: nowrap;">{{ event.count }}</td>
-                    </tr>
-                {% endfor %}
+                <tbody id="events-tbody">
+                    <!-- Data will be loaded via JavaScript -->
                 </tbody>
             </table>
         </div>
@@ -212,23 +190,56 @@
         observer.observe(document.documentElement, { attributes: true, attributeFilter: ['data-coreui-theme'] });
     </script>
     <script>
-        var usagePercent = {{ cluster_metrics.clusterTotals.cpu.usagePercent }};
-        var usagePercentFree = (100 - usagePercent)
-        if (usagePercentFree <= 0) {
-            usagePercentFree = 0
+        // API URLs - using Flask pattern with direct paths
+        const metrics_url = '/api/v1/cluster/metrics';
+        const events_url = '/api/v1/cluster/events';
+        
+        // CSRF token for forms - rendered server-side using Flask tojson filter
+        const csrf_token = {{ csrf_token()|tojson }};
+        
+        // Global chart variables
+        let CPUChart = null;
+        let MemoryChart = null;
+        let PodChart = null;
+        
+        // Helper function to format bytes to GB
+        function formatGB(bytes) {
+            return (bytes / 1024 / 1024 / 1024).toFixed(2) + ' GB';
         }
-        var requestsPercent = {{ cluster_metrics.clusterTotals.cpu.requestsPercent }};
-        var requestsPercentFree = (100 - requestsPercent)
-        if (requestsPercentFree <= 0) {
-            requestsPercentFree = 0
+        
+        // Helper function to format CPU cores
+        function formatCPU(cores) {
+            return cores.toFixed(1) + ' cores';
         }
-        var limitsPercent = {{ cluster_metrics.clusterTotals.cpu.limitsPercent }};
-        var limitsPercentFree = (100 - limitsPercent)
-        if (limitsPercentFree <= 0) {
-            limitsPercentFree = 0
-        }
-        const ctx1 = document.getElementById('cpu').getContext('2d');
-        const CPUChart = new Chart(ctx1, {
+        
+        // Initialize CPU Chart
+        function initCPUChart(metrics) {
+            const cpu = metrics.clusterTotals.cpu;
+            var usagePercent = cpu.usagePercent;
+            var usagePercentFree = (100 - usagePercent);
+            if (usagePercentFree <= 0) {
+                usagePercentFree = 0;
+            }
+            var requestsPercent = cpu.requestsPercent;
+            var requestsPercentFree = (100 - requestsPercent);
+            if (requestsPercentFree <= 0) {
+                requestsPercentFree = 0;
+            }
+            var limitsPercent = cpu.limitsPercent;
+            var limitsPercentFree = (100 - limitsPercent);
+            if (limitsPercentFree <= 0) {
+                limitsPercentFree = 0;
+            }
+            
+            // Update text values
+            document.getElementById('cpu-capacity').textContent = formatCPU(cpu.capacity);
+            document.getElementById('cpu-allocatable').textContent = formatCPU(cpu.allocatable);
+            document.getElementById('cpu-requests').textContent = formatCPU(cpu.requests);
+            document.getElementById('cpu-limits').textContent = formatCPU(cpu.limits);
+            document.getElementById('cpu-usage').textContent = formatCPU(cpu.usage);
+            
+            const ctx1 = document.getElementById('cpu').getContext('2d');
+            CPUChart = new Chart(ctx1, {
             type: 'doughnut',
             data: {
                 datasets: [
@@ -320,25 +331,36 @@
                 }
             }
         });
-    </script>
-    <script>
-        var usagePercent = {{ cluster_metrics.clusterTotals.memory.usagePercent }};
-        var usagePercentFree = (100 - usagePercent)
-        if (usagePercentFree <= 0) {
-            usagePercentFree = 0
         }
-        var requestsPercent = {{ cluster_metrics.clusterTotals.memory.requestsPercent }};
-        var requestsPercentFree = (100 - requestsPercent)
-        if (requestsPercentFree <= 0) {
-            requestsPercentFree = 0
-        }
-        var limitsPercent = {{ cluster_metrics.clusterTotals.memory.limitsPercent }};
-        var limitsPercentFree = (100 - limitsPercent)
-        if (limitsPercentFree <= 0) {
-            limitsPercentFree = 0
-        }
-        const ctx2 = document.getElementById('memory').getContext('2d');
-        const MemoryChart = new Chart(ctx2, {
+        
+        // Initialize Memory Chart
+        function initMemoryChart(metrics) {
+            const memory = metrics.clusterTotals.memory;
+            var usagePercent = memory.usagePercent;
+            var usagePercentFree = (100 - usagePercent);
+            if (usagePercentFree <= 0) {
+                usagePercentFree = 0;
+            }
+            var requestsPercent = memory.requestsPercent;
+            var requestsPercentFree = (100 - requestsPercent);
+            if (requestsPercentFree <= 0) {
+                requestsPercentFree = 0;
+            }
+            var limitsPercent = memory.limitsPercent;
+            var limitsPercentFree = (100 - limitsPercent);
+            if (limitsPercentFree <= 0) {
+                limitsPercentFree = 0;
+            }
+            
+            // Update text values
+            document.getElementById('memory-capacity').textContent = formatGB(memory.capacity);
+            document.getElementById('memory-allocatable').textContent = formatGB(memory.allocatable);
+            document.getElementById('memory-requests').textContent = formatGB(memory.requests);
+            document.getElementById('memory-limits').textContent = formatGB(memory.limits);
+            document.getElementById('memory-usage').textContent = formatGB(memory.usage);
+            
+            const ctx2 = document.getElementById('memory').getContext('2d');
+            MemoryChart = new Chart(ctx2, {
             type: 'doughnut',
             data: {
                 datasets: [
@@ -430,15 +452,23 @@
                 }
             }
         });
-    </script>
-    <script>
-        var usagePercent = {{ cluster_metrics.clusterTotals.pod_count.currentPercent }};
-        var usagePercentFree = (100 - usagePercent)
-        if (usagePercentFree <= 0) {
-            usagePercentFree = 0
         }
-        const ctx3 = document.getElementById('pod').getContext('2d');
-        const PodChart = new Chart(ctx3, {
+        
+        // Initialize Pod Chart
+        function initPodChart(metrics) {
+            const podCount = metrics.clusterTotals.pod_count;
+            var usagePercent = podCount.currentPercent;
+            var usagePercentFree = (100 - usagePercent);
+            if (usagePercentFree <= 0) {
+                usagePercentFree = 0;
+            }
+            
+            // Update text values
+            document.getElementById('pod-current').textContent = podCount.current + ' pods';
+            document.getElementById('pod-allocatable').textContent = Math.round(podCount.allocatable) + ' pods';
+            
+            const ctx3 = document.getElementById('pod').getContext('2d');
+            PodChart = new Chart(ctx3, {
             type: 'doughnut',
             data: {
                 datasets: [
@@ -512,6 +542,215 @@
                         }
                     }
                 }
+            }
+        });
+        }
+        
+        // Populate events table
+        function populateEventsTable(events) {
+            console.log('populateEventsTable called with:', events); // Debug log
+            const tbody = document.getElementById('events-tbody');
+            const table = document.getElementById('dataTable');
+            
+            if (!events || events.length === 0) {
+                console.log('No events to display');
+                // Clear tbody and add a single row with proper structure for DataTables
+                tbody.innerHTML = '';
+                // Initialize DataTable with language option to customize empty message
+                if ($.fn.DataTable && $(table).length) {
+                    if ($.fn.DataTable.isDataTable(table)) {
+                        $(table).DataTable().destroy();
+                    }
+                    $(table).DataTable({
+                        responsive: true,
+                        pageLength: 25,
+                        language: {
+                            emptyTable: "No cluster events found. This is normal if there are no recent warning or error events."
+                        }
+                    });
+                }
+                return;
+            }
+            
+            console.log('Processing', events.length, 'events');
+            
+            // Helper function to escape HTML (simple version)
+            const escapeHtml = (text) => {
+                if (text === null || text === undefined) return '';
+                const map = {
+                    '&': '&amp;',
+                    '<': '&lt;',
+                    '>': '&gt;',
+                    '"': '&quot;',
+                    "'": '&#039;'
+                };
+                return String(text).replace(/[&<>"']/g, m => map[m]);
+            };
+            
+            // Build HTML rows
+            const rowsHtml = events.map(event => {
+                const kind = escapeHtml(event.involvedObjectKind || '');
+                const name = escapeHtml(event.involvedObjectName || '');
+                const namespace = escapeHtml(event.namespace || '');
+                const reason = escapeHtml(event.reason || '');
+                const message = escapeHtml(event.message || '');
+                const count = event.count || 0;
+                
+                const nameCell = event.involvedObjectKind === 'Pod' 
+                    ? `<form action="/workload/pods" method="POST">
+                         <input type="hidden" name="csrf_token" value="${csrf_token}">
+                         <input type="hidden" name="ns_select" value="${namespace}" />
+                         <input type="hidden" name="selected" value="${name}" />                                
+                         <a href="javascript:;" onclick="parentNode.submit();">${name}</a>
+                       </form>`
+                    : name;
+                
+                return `
+                    <tr>
+                        <td style="white-space: nowrap;">${kind}</td>
+                        <td style="white-space: nowrap;">${nameCell}</td>
+                        <td style="white-space: nowrap;">${namespace}</td>
+                        <td style="white-space: nowrap;">
+                            <span class="badge text-bg-secondary">${reason}</span>
+                        </td>
+                        <td>${message}</td>
+                        <td style="white-space: nowrap;">${count}</td>
+                    </tr>
+                `;
+            }).join('');
+            
+            // Set innerHTML
+            tbody.innerHTML = rowsHtml;
+            
+            // Verify rows were added
+            const rowCount = tbody.querySelectorAll('tr').length;
+            console.log('Rows added to tbody:', rowCount);
+            
+            // Small delay to ensure DOM is updated, then initialize DataTable
+            setTimeout(() => {
+                if ($.fn.DataTable && $(table).length) {
+                    // Check if DataTable is already initialized
+                    if ($.fn.DataTable.isDataTable(table)) {
+                        console.log('Destroying existing DataTable');
+                        // Save the tbody HTML before destroying (destroy removes rows from DOM)
+                        const savedRows = tbody.innerHTML;
+                        $(table).DataTable().destroy();
+                        // Restore the rows after destroying
+                        tbody.innerHTML = savedRows;
+                    }
+                    
+                    // Verify rows still exist before initializing
+                    const currentRowCount = tbody.querySelectorAll('tr').length;
+                    console.log('Initializing DataTable with', currentRowCount, 'rows');
+                    
+                    if (currentRowCount === 0) {
+                        console.error('No rows found in tbody after DataTable destroy/restore');
+                        return;
+                    }
+                    
+                    // Initialize DataTable
+                    $(table).DataTable({
+                        responsive: true,
+                        pageLength: 25,
+                        order: [[5, 'desc']], // Sort by Count column descending
+                        language: {
+                            emptyTable: "No cluster events found"
+                        }
+                    });
+                    
+                    console.log('DataTable initialized successfully');
+                } else {
+                    console.error('jQuery or DataTable not available for initialization');
+                }
+            }, 50); // Small delay to ensure DOM is fully updated
+        }
+        
+        // Load data using fetch() - following Flask fetch pattern
+        document.addEventListener('DOMContentLoaded', async function() {
+            // Wait for jQuery and DataTables to be ready (with retry)
+            let retries = 0;
+            while ((typeof $ === 'undefined' || typeof $.fn.DataTable === 'undefined') && retries < 10) {
+                await new Promise(resolve => setTimeout(resolve, 100));
+                retries++;
+            }
+            
+            if (typeof $ === 'undefined' || typeof $.fn.DataTable === 'undefined') {
+                console.error('jQuery or DataTables not loaded after waiting');
+                return;
+            }
+            
+            try {
+                // Fetch cluster metrics
+                const metricsResponse = await fetch(metrics_url);
+                if (!metricsResponse.ok) {
+                    throw new Error(`HTTP error! status: ${metricsResponse.status}`);
+                }
+                const metricsData = await metricsResponse.json();
+                
+                if (metricsData.error) {
+                    throw new Error(metricsData.message || 'Failed to load metrics');
+                }
+                
+                const metrics = metricsData.data;
+                
+                // Initialize charts with fetched data
+                initCPUChart(metrics);
+                initMemoryChart(metrics);
+                initPodChart(metrics);
+                
+                // Fetch cluster events
+                console.log('Fetching events from:', events_url);
+                const eventsResponse = await fetch(events_url + '?limit=100');
+                if (!eventsResponse.ok) {
+                    throw new Error(`HTTP error! status: ${eventsResponse.status}`);
+                }
+                const eventsData = await eventsResponse.json();
+                
+                console.log('Events API response:', eventsData); // Debug log
+                
+                if (eventsData.error) {
+                    throw new Error(eventsData.message || 'Failed to load events');
+                }
+                
+                // Check if data exists and is an array
+                if (!eventsData.data) {
+                    console.warn('Events data is missing or undefined');
+                    populateEventsTable([]);
+                } else if (!Array.isArray(eventsData.data)) {
+                    console.warn('Events data is not an array:', typeof eventsData.data, eventsData.data);
+                    populateEventsTable([]);
+                } else {
+                    console.log('Populating events table with', eventsData.data.length, 'events');
+                    // Populate events table
+                    populateEventsTable(eventsData.data);
+                }
+                
+            } catch (error) {
+                console.error('Error loading cluster metrics:', error);
+                
+                // Show error messages
+                const tbody = document.getElementById('events-tbody');
+                if (tbody) {
+                    tbody.innerHTML = '<tr><td colspan="6" class="text-center text-danger">Error loading events: ' + error.message + '</td></tr>';
+                    
+                    // Initialize DataTable even with error message
+                    const table = document.getElementById('dataTable');
+                    if ($.fn.DataTable && $(table).length && !$.fn.DataTable.isDataTable(table)) {
+                        $(table).DataTable({
+                            responsive: true,
+                            pageLength: 25
+                        });
+                    }
+                }
+                
+                // Update metric placeholders with error
+                const errorMsg = 'Error loading data';
+                const cpuCapacity = document.getElementById('cpu-capacity');
+                const memoryCapacity = document.getElementById('memory-capacity');
+                const podCurrent = document.getElementById('pod-current');
+                if (cpuCapacity) cpuCapacity.textContent = errorMsg;
+                if (memoryCapacity) memoryCapacity.textContent = errorMsg;
+                if (podCurrent) podCurrent.textContent = errorMsg;
             }
         });
     </script>
