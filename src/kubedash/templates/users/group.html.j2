@@ -208,10 +208,10 @@
             return `
                 <tr ${rowClass}>
                     <td>
-                        <form action="/user/group/privilege" method="POST">
+                        <form action="/user/group/privilege" method="POST" onsubmit="sessionStorage.setItem('group_privilege_name', '${escapeHtml(groupName)}'); return true;">
                             <input type="hidden" name="csrf_token" value="${csrf_token}">
-                            <input type="hidden" name="group_name" value="${groupName}" />
-                            <a href="javascript:;" onclick="parentNode.submit();">${groupName}</a>
+                            <input type="hidden" name="group_name" value="${escapeHtml(groupName)}" />
+                            <a href="javascript:;" onclick="sessionStorage.setItem('group_privilege_name', '${escapeHtml(groupName)}'); parentNode.submit();">${groupName}</a>
                         </form>
                     </td>
                     <td>${created}</td>

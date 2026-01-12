@@ -165,6 +165,12 @@ def groups_privilege():
     Data is now loaded client-side via JavaScript API calls.
     This route only renders the template structure.
     """
+    # If POST request, extract group_name and redirect with it as query parameter
+    if request.method == 'POST':
+        group_name = request.form.get('group_name')
+        if group_name:
+            return redirect(url_for('users.groups_privilege', group_name=group_name))
+    
     # Template now loads data via JavaScript from /api/v1/users/groups/<group_name>/privileges
     return render_template('users/group-privilege.html.j2')
 

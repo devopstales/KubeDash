@@ -201,13 +201,21 @@
         return String(text).replace(/[&<>"']/g, m => map[m]);
     };
     
-    // Get group name from URL query parameter or form data
+    // Get group name from URL query parameter, form data, or sessionStorage
     function getGroupName() {
         // Try URL query parameter first
         const urlParams = new URLSearchParams(window.location.search);
         let groupName = urlParams.get('group_name');
         
-        // If not in query, check form data
+        // If not in query, check sessionStorage (set when navigating from group list)
+        if (!groupName) {
+            groupName = sessionStorage.getItem('group_privilege_name');
+            if (groupName) {
+                sessionStorage.removeItem('group_privilege_name');
+            }
+        }
+        
+        // If still not found, check form data
         if (!groupName) {
             const form = document.querySelector('form[action="/user/group/privilege"]');
             if (form) {
