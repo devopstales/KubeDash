@@ -21,6 +21,10 @@ def track_history():
     # Skip static or internal routes like /back
     if request.endpoint in ('static', 'history.back'):
         return
+    
+    # Skip API endpoints - they shouldn't be tracked in navigation history
+    if request.path.startswith('/api/'):
+        return
 
     entry = {
         'method': request.method,

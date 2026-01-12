@@ -130,6 +130,12 @@ def users_privileges_edit():
     Data is now loaded client-side via JavaScript API calls.
     This route only renders the template structure.
     """
+    # If POST request, extract username and redirect with it as query parameter
+    if request.method == 'POST':
+        username = request.form.get('username')
+        if username:
+            return redirect(url_for('users.users_privileges_edit', username=username))
+    
     # Template now loads data via JavaScript from /api/v1/users/privileges/templates
     # Form submissions are handled via /api/v1/users/<username>/privileges
     return render_template('users/privilege-edit.html.j2')
@@ -171,6 +177,12 @@ def groups_mapping():
     Data is now loaded client-side via JavaScript API calls.
     This route only renders the template structure.
     """
+    # If POST request, extract group_name and redirect with it as query parameter
+    if request.method == 'POST':
+        group_name = request.form.get('group_name')
+        if group_name:
+            return redirect(url_for('users.groups_mapping', group_name=group_name))
+    
     # Template now loads data via JavaScript from /api/v1/users/privileges/templates
     # Form submissions are handled via /api/v1/users/groups/<group_name>/privileges
     return render_template('users/group-privilege-edit.html.j2')

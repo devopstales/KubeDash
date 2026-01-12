@@ -137,7 +137,14 @@
                     </tr>
                 </thead>
                 <tbody id="events-tbody">
-                    <!-- Data will be loaded via JavaScript -->
+                    <tr>
+                        <td colspan="6" class="text-center">
+                            <div class="spinner-border spinner-border-sm text-primary" role="status">
+                                <span class="visually-hidden">Loading...</span>
+                            </div>
+                            <span class="ms-2">Loading events...</span>
+                        </td>
+                    </tr>
                 </tbody>
             </table>
         </div>
@@ -190,6 +197,86 @@
         observer.observe(document.documentElement, { attributes: true, attributeFilter: ['data-coreui-theme'] });
     </script>
     <script>
+        // IMMEDIATE: Prevent datatables-demo.js from initializing on loading row
+        // Override jQuery ready to intercept datatables-demo.js initialization
+        (function() {
+            // Override when jQuery loads
+            function setupOverride() {
+                if (typeof $ !== 'undefined' && $.fn && !window._datatableOverrideSetup) {
+                    window._datatableOverrideSetup = true;
+                    
+                    // Intercept DataTable calls on #dataTable
+                    const originalDataTable = $.fn.DataTable;
+                    $.fn.DataTable = function(options) {
+                        const table = this[0];
+                        if (table && table.id === 'dataTable') {
+                            const tbody = table.querySelector('tbody');
+                            if (tbody) {
+                                const rows = tbody.querySelectorAll('tr');
+                                const hasColspanRow = Array.from(rows).some(row => {
+                                    const cells = row.querySelectorAll('td');
+                                    return Array.from(cells).some(cell => cell.hasAttribute('colspan'));
+                                });
+                                if (hasColspanRow) {
+                                    console.log('Blocked DataTable initialization on loading row');
+                                    return this; // Return jQuery object, don't initialize
+                                }
+                            }
+                        }
+                        return originalDataTable.apply(this, arguments);
+                    };
+                    
+                    // Copy static methods
+                    Object.setPrototypeOf($.fn.DataTable, originalDataTable);
+                    Object.keys(originalDataTable).forEach(key => {
+                        $.fn.DataTable[key] = originalDataTable[key];
+                    });
+                }
+            }
+            
+            // Try immediately and on intervals
+            setupOverride();
+            setTimeout(setupOverride, 0);
+            setTimeout(setupOverride, 50);
+            setTimeout(setupOverride, 100);
+        })();
+        
+        // Also destroy any auto-initialized DataTable instances as backup
+        (function() {
+            function checkAndDestroyAutoInit() {
+                if (typeof $ !== 'undefined' && $.fn.DataTable) {
+                    const table = document.getElementById('dataTable');
+                    if (table && $.fn.DataTable.isDataTable(table)) {
+                        const tbody = table.querySelector('tbody');
+                        if (tbody) {
+                            const rows = tbody.querySelectorAll('tr');
+                            const hasColspanRow = Array.from(rows).some(row => {
+                                const cells = row.querySelectorAll('td');
+                                return Array.from(cells).some(cell => cell.hasAttribute('colspan'));
+                            });
+                            if (hasColspanRow) {
+                                console.log('Destroying auto-initialized DataTable on loading row');
+                                try {
+                                    $(table).DataTable().destroy();
+                                } catch(e) {
+                                    console.error('Error destroying DataTable:', e);
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+            
+            if (typeof $ !== 'undefined') {
+                checkAndDestroyAutoInit();
+            }
+            setTimeout(checkAndDestroyAutoInit, 50);
+            setTimeout(checkAndDestroyAutoInit, 100);
+            setTimeout(checkAndDestroyAutoInit, 200);
+            setTimeout(checkAndDestroyAutoInit, 500);
+            setTimeout(checkAndDestroyAutoInit, 1000);
+        })();
+        
         // API URLs - using Flask pattern with direct paths
         const metrics_url = '/api/v1/cluster/metrics';
         const events_url = '/api/v1/cluster/events';
@@ -552,6 +639,24 @@
             const tbody = document.getElementById('events-tbody');
             const table = document.getElementById('dataTable');
             
+            // Destroy any existing DataTable instance first (in case it was auto-initialized)
+            if (table && typeof $ !== 'undefined' && $.fn.DataTable && $.fn.DataTable.isDataTable(table)) {
+                console.log('Destroying existing DataTable before populating');
+                $(table).DataTable().destroy();
+            }
+            
+            // Show loading state while processing
+            tbody.innerHTML = `
+                <tr>
+                    <td colspan="6" class="text-center">
+                        <div class="spinner-border spinner-border-sm text-primary" role="status">
+                            <span class="visually-hidden">Loading...</span>
+                        </div>
+                        <span class="ms-2">Processing events...</span>
+                    </td>
+                </tr>
+            `;
+            
             if (!events || events.length === 0) {
                 console.log('No events to display');
                 // Clear tbody and add a single row with proper structure for DataTables
@@ -677,6 +782,31 @@
             if (typeof $ === 'undefined' || typeof $.fn.DataTable === 'undefined') {
                 console.error('jQuery or DataTables not loaded after waiting');
                 return;
+            }
+            
+            // CRITICAL: Destroy any auto-initialized DataTable instance from datatables-demo.js
+            // This prevents initialization on the loading row with colspan
+            const table = document.getElementById('dataTable');
+            if (table) {
+                // Check if DataTable was auto-initialized on a loading row
+                if ($.fn.DataTable && $.fn.DataTable.isDataTable(table)) {
+                    const tbody = table.querySelector('tbody');
+                    if (tbody) {
+                        const rows = tbody.querySelectorAll('tr');
+                        const hasColspanRow = Array.from(rows).some(row => {
+                            const cells = row.querySelectorAll('td');
+                            return Array.from(cells).some(cell => cell.hasAttribute('colspan'));
+                        });
+                        if (hasColspanRow) {
+                            console.log('Destroying auto-initialized DataTable instance on loading row');
+                            $(table).DataTable().destroy();
+                        }
+                    } else {
+                        // No tbody or empty, destroy anyway
+                        console.log('Destroying auto-initialized DataTable instance (no valid tbody)');
+                        $(table).DataTable().destroy();
+                    }
+                }
             }
             
             try {

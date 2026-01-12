@@ -112,6 +112,31 @@ class RoleResource(MethodView):
                     "message": f"Role '{name}' not found in namespace '{namespace}'"
                 }), 404
             
+            # Convert V1PolicyRule objects to dictionaries for JSON serialization
+            if role.get('rules'):
+                serialized_rules = []
+                for rule in role['rules']:
+                    if hasattr(rule, 'to_dict'):
+                        # Use to_dict() if available (Kubernetes client library method)
+                        rule_dict = rule.to_dict()
+                        serialized_rules.append(rule_dict)
+                    elif isinstance(rule, dict):
+                        # Already a dict
+                        serialized_rules.append(rule)
+                    else:
+                        # Manual conversion for V1PolicyRule objects
+                        rule_dict = {
+                            'apiGroups': list(rule.api_groups) if hasattr(rule, 'api_groups') and rule.api_groups else [],
+                            'resources': list(rule.resources) if hasattr(rule, 'resources') and rule.resources else [],
+                            'verbs': list(rule.verbs) if hasattr(rule, 'verbs') and rule.verbs else [],
+                            'resourceNames': list(rule.resource_names) if hasattr(rule, 'resource_names') and rule.resource_names else None,
+                            'nonResourceURLs': list(rule.non_resource_urls) if hasattr(rule, 'non_resource_urls') and rule.non_resource_urls else None
+                        }
+                        # Remove None values
+                        rule_dict = {k: v for k, v in rule_dict.items() if v is not None}
+                        serialized_rules.append(rule_dict)
+                role['rules'] = serialized_rules
+            
             return jsonify({
                 "data": role,
                 "metadata": {
@@ -190,6 +215,31 @@ class ClusterRoleResource(MethodView):
                     "error": "NotFound",
                     "message": f"ClusterRole '{name}' not found"
                 }), 404
+            
+            # Convert V1PolicyRule objects to dictionaries for JSON serialization
+            if cluster_role.get('rules'):
+                serialized_rules = []
+                for rule in cluster_role['rules']:
+                    if hasattr(rule, 'to_dict'):
+                        # Use to_dict() if available (Kubernetes client library method)
+                        rule_dict = rule.to_dict()
+                        serialized_rules.append(rule_dict)
+                    elif isinstance(rule, dict):
+                        # Already a dict
+                        serialized_rules.append(rule)
+                    else:
+                        # Manual conversion for V1PolicyRule objects
+                        rule_dict = {
+                            'apiGroups': list(rule.api_groups) if hasattr(rule, 'api_groups') and rule.api_groups else [],
+                            'resources': list(rule.resources) if hasattr(rule, 'resources') and rule.resources else [],
+                            'verbs': list(rule.verbs) if hasattr(rule, 'verbs') and rule.verbs else [],
+                            'resourceNames': list(rule.resource_names) if hasattr(rule, 'resource_names') and rule.resource_names else None,
+                            'nonResourceURLs': list(rule.non_resource_urls) if hasattr(rule, 'non_resource_urls') and rule.non_resource_urls else None
+                        }
+                        # Remove None values
+                        rule_dict = {k: v for k, v in rule_dict.items() if v is not None}
+                        serialized_rules.append(rule_dict)
+                cluster_role['rules'] = serialized_rules
             
             return jsonify({
                 "data": cluster_role,

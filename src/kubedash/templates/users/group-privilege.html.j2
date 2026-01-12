@@ -6,8 +6,8 @@
       <nav aria-label="breadcrumb">
         <ol class="breadcrumb my-0">
           <li class="breadcrumb-item"><span>User Management</span></li>
-          <li class="breadcrumb-item"><a hrep="/user/group">Groups</a></li>
-          <li class="breadcrumb-item active">{{ group_name }}</li>
+          <li class="breadcrumb-item"><a href="/user/group">Groups</a></li>
+          <li class="breadcrumb-item active" id="group-name-breadcrumb">Loading...</li>
         </ol>
       </nav>
     </div>
@@ -45,14 +45,15 @@
                                         <th>Type</th>
                                     </tr>
                                 </thead>
-                                <tbody>
-                                    {% for member in groupe_member_list %}
+                                <tbody id="members-tbody">
                                     <tr>
-                                        <th>{{ member.name }}</th>
-                                        <th>{{ member.email }}</th>
-                                        <th>{{ member.type }}</th>
+                                        <td colspan="3" class="text-center">
+                                            <div class="spinner-border spinner-border-sm text-primary" role="status">
+                                                <span class="visually-hidden">Loading...</span>
+                                            </div>
+                                            <span class="ms-2">Loading members...</span>
+                                        </td>
                                     </tr>
-                                    {% endfor %}
                                 </tbody>
                             </table>
                         </div>
@@ -74,48 +75,15 @@
                                             <th>ClusterRole</th>
                                         </tr>
                                     </thead>
-                                    <tbody>
-                                        {% for role_binding in group_role_binding%}
+                                    <tbody id="roles-tbody">
                                         <tr>
-                                            <td>{{ role_binding["namespace"] }}</td>
-                                            <td>RoleBinding</td>
-                                            <td>
-                                                <form action="/cluster-permission/role-binding" method="POST">
-                                                    <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
-                                                    <input type="hidden" name="ns_select" value="{{ role_binding['namespace'] }}" />
-                                                    <input type="hidden" name="rb_name" value="{{ role_binding['name'] }}" />
-                                                    <a href="javascript:;" onclick="parentNode.submit();">{{ role_binding["name"] }}</a>
-                                                </form>
-                                            </td>
-                                            <td>
-                                                <form action="/cluster-permission/cluster-role/data" method="POST">
-                                                    <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
-                                                    <input type="hidden" name="cr_name" value="{{ role_binding['role'][0]['ClusterRole'] }}" />
-                                                    <a href="javascript:;" onclick="parentNode.submit();">{{ role_binding["role"][0]["ClusterRole"] }}</a>
-                                                </form>
+                                            <td colspan="4" class="text-center">
+                                                <div class="spinner-border spinner-border-sm text-primary" role="status">
+                                                    <span class="visually-hidden">Loading...</span>
+                                                </div>
+                                                <span class="ms-2">Loading role bindings...</span>
                                             </td>
                                         </tr>
-                                        {% endfor %}
-                                        {% for cluster_role_binding in group_cluster_role_binding%}
-                                        <tr>
-                                            <td></td>
-                                            <td>ClusterRoleBinding</td>
-                                            <td>
-                                                <form action="/cluster-permission/cluster-role-binding" method="POST">
-                                                    <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
-                                                    <input type="hidden" name="crb_name" value="{{ cluster_role_binding['name'] }}" />
-                                                    <a href="javascript:;" onclick="parentNode.submit();">{{ cluster_role_binding["name"] }}</a>
-                                                </form>
-                                            </td>
-                                            <td>
-                                                <form action="/cluster-permission/cluster-role/data" method="POST">
-                                                    <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
-                                                    <input type="hidden" name="cr_name" value="{{ cluster_role_binding['role'][0]['ClusterRole'] }}" />
-                                                    <a href="javascript:;" onclick="parentNode.submit();">{{ cluster_role_binding["role"][0]["ClusterRole"] }}</a>
-                                                </form>
-                                            </td>
-                                        </tr>
-                                        {% endfor %}
                                     </tbody>
                                 </table>
                             </div>
@@ -131,4 +99,366 @@
 
 {% block add_head_css %}
 {% include "segments/datatable_snippet.html.j2" %}
+{% endblock %}
+
+{% block add_tail_js %}
+<script>
+    // IMMEDIATE: Prevent datatables-demo.js from initializing on loading row
+    // Override jQuery ready to intercept datatables-demo.js initialization
+    (function() {
+        // Override when jQuery loads
+        function setupOverride() {
+            if (typeof $ !== 'undefined' && $.fn && !window._datatableOverrideSetup) {
+                window._datatableOverrideSetup = true;
+                
+                // Intercept DataTable calls on #dataTable
+                const originalDataTable = $.fn.DataTable;
+                $.fn.DataTable = function(options) {
+                    const table = this[0];
+                    if (table && (table.id === 'membersInfoTable' || table.id === 'rolesTable')) {
+                        const tbody = table.querySelector('tbody');
+                        if (tbody) {
+                            const rows = tbody.querySelectorAll('tr');
+                            const hasColspanRow = Array.from(rows).some(row => {
+                                const cells = row.querySelectorAll('td');
+                                return Array.from(cells).some(cell => cell.hasAttribute('colspan'));
+                            });
+                            if (hasColspanRow) {
+                                console.log('Blocked DataTable initialization on loading row');
+                                return this; // Return jQuery object, don't initialize
+                            }
+                        }
+                    }
+                    return originalDataTable.apply(this, arguments);
+                };
+                
+                // Copy static methods
+                Object.setPrototypeOf($.fn.DataTable, originalDataTable);
+                Object.keys(originalDataTable).forEach(key => {
+                    $.fn.DataTable[key] = originalDataTable[key];
+                });
+            }
+        }
+        
+        // Try immediately and on intervals
+        setupOverride();
+        setTimeout(setupOverride, 0);
+        setTimeout(setupOverride, 50);
+        setTimeout(setupOverride, 100);
+    })();
+    
+    // Also destroy any auto-initialized DataTable instances as backup
+    (function() {
+        function checkAndDestroyAutoInit() {
+            if (typeof $ !== 'undefined' && $.fn.DataTable) {
+                ['membersInfoTable', 'rolesTable'].forEach(tableId => {
+                    const table = document.getElementById(tableId);
+                    if (table && $.fn.DataTable.isDataTable(table)) {
+                        const tbody = table.querySelector('tbody');
+                        if (tbody) {
+                            const rows = tbody.querySelectorAll('tr');
+                            const hasColspanRow = Array.from(rows).some(row => {
+                                const cells = row.querySelectorAll('td');
+                                return Array.from(cells).some(cell => cell.hasAttribute('colspan'));
+                            });
+                            if (hasColspanRow) {
+                                console.log('Destroying auto-initialized DataTable on loading row:', tableId);
+                                try {
+                                    $(table).DataTable().destroy();
+                                } catch(e) {
+                                    console.error('Error destroying DataTable:', e);
+                                }
+                            }
+                        }
+                    }
+                });
+            }
+        }
+        
+        if (typeof $ !== 'undefined') {
+            checkAndDestroyAutoInit();
+        }
+        setTimeout(checkAndDestroyAutoInit, 50);
+        setTimeout(checkAndDestroyAutoInit, 100);
+        setTimeout(checkAndDestroyAutoInit, 200);
+        setTimeout(checkAndDestroyAutoInit, 500);
+        setTimeout(checkAndDestroyAutoInit, 1000);
+    })();
+    
+    // Session data - rendered server-side using Flask tojson filter
+    const csrf_token = {{ csrf_token()|tojson }};
+    
+    // Helper function to escape HTML
+    const escapeHtml = (text) => {
+        if (text === null || text === undefined) return '';
+        const map = {
+            '&': '&amp;',
+            '<': '&lt;',
+            '>': '&gt;',
+            '"': '&quot;',
+            "'": '&#039;'
+        };
+        return String(text).replace(/[&<>"']/g, m => map[m]);
+    };
+    
+    // Get group name from URL query parameter or form data
+    function getGroupName() {
+        // Try URL query parameter first
+        const urlParams = new URLSearchParams(window.location.search);
+        let groupName = urlParams.get('group_name');
+        
+        // If not in query, check form data
+        if (!groupName) {
+            const form = document.querySelector('form[action="/user/group/privilege"]');
+            if (form) {
+                const groupNameInput = form.querySelector('input[name="group_name"]');
+                if (groupNameInput) {
+                    groupName = groupNameInput.value;
+                }
+            }
+        }
+        
+        return groupName;
+    }
+    
+    // Populate members table
+    function populateMembersTable(members) {
+        const tbody = document.getElementById('members-tbody');
+        const table = document.getElementById('membersInfoTable');
+        
+        // Destroy any existing DataTable instance first
+        if (table && typeof $ !== 'undefined' && $.fn.DataTable && $.fn.DataTable.isDataTable(table)) {
+            $(table).DataTable().destroy();
+        }
+        
+        if (!members || members.length === 0) {
+            tbody.innerHTML = '<tr><td colspan="3" class="text-center text-muted">No members found</td></tr>';
+            return;
+        }
+        
+        // Build table rows
+        const rowsHtml = members.map(member => {
+            return `
+                <tr>
+                    <td>${escapeHtml(member.name || '')}</td>
+                    <td>${escapeHtml(member.email || '')}</td>
+                    <td>${escapeHtml(member.type || '')}</td>
+                </tr>
+            `;
+        }).join('');
+        
+        tbody.innerHTML = rowsHtml;
+        
+        // Initialize DataTable
+        setTimeout(() => {
+            if ($.fn.DataTable && $(table).length) {
+                const rows = tbody.querySelectorAll('tr');
+                const hasDataRows = Array.from(rows).some(row => {
+                    const cells = row.querySelectorAll('td');
+                    return !Array.from(cells).some(cell => cell.hasAttribute('colspan')) && cells.length === 3;
+                });
+                
+                if (hasDataRows) {
+                    $(table).DataTable({
+                        responsive: true,
+                        pageLength: 25
+                    });
+                }
+            }
+        }, 50);
+    }
+    
+    // Populate roles table
+    function populateRolesTable(roleBindings, clusterRoleBindings) {
+        const tbody = document.getElementById('roles-tbody');
+        const table = document.getElementById('rolesTable');
+        
+        // Destroy any existing DataTable instance first
+        if (table && typeof $ !== 'undefined' && $.fn.DataTable && $.fn.DataTable.isDataTable(table)) {
+            $(table).DataTable().destroy();
+        }
+        
+        // Show loading state
+        tbody.innerHTML = `
+            <tr>
+                <td colspan="4" class="text-center">
+                    <div class="spinner-border spinner-border-sm text-primary" role="status">
+                        <span class="visually-hidden">Loading...</span>
+                    </div>
+                    <span class="ms-2">Processing role bindings...</span>
+                </td>
+            </tr>
+        `;
+        
+        let rowsHtml = '';
+        
+        // Add role bindings
+        if (roleBindings && Array.isArray(roleBindings)) {
+            roleBindings.forEach(rb => {
+                const namespace = escapeHtml(rb.namespace || '');
+                const name = escapeHtml(rb.name || '');
+                const clusterRole = rb.role && rb.role[0] ? escapeHtml(rb.role[0].ClusterRole || '') : '';
+                
+                rowsHtml += `
+                    <tr>
+                        <td>${namespace}</td>
+                        <td>RoleBinding</td>
+                        <td>
+                            <form action="/cluster-permission/role-binding" method="POST">
+                                <input type="hidden" name="csrf_token" value="${csrf_token}">
+                                <input type="hidden" name="ns_select" value="${namespace}" />
+                                <input type="hidden" name="rb_name" value="${name}" />
+                                <a href="javascript:;" onclick="parentNode.submit();">${name}</a>
+                            </form>
+                        </td>
+                        <td>
+                            ${clusterRole ? `
+                            <form action="/cluster-permission/cluster-role/data" method="POST">
+                                <input type="hidden" name="csrf_token" value="${csrf_token}">
+                                <input type="hidden" name="cr_name" value="${clusterRole}" />
+                                <a href="javascript:;" onclick="parentNode.submit();">${clusterRole}</a>
+                            </form>
+                            ` : ''}
+                        </td>
+                    </tr>
+                `;
+            });
+        }
+        
+        // Add cluster role bindings
+        if (clusterRoleBindings && Array.isArray(clusterRoleBindings)) {
+            clusterRoleBindings.forEach(crb => {
+                const name = escapeHtml(crb.name || '');
+                const clusterRole = crb.role && crb.role[0] ? escapeHtml(crb.role[0].ClusterRole || '') : '';
+                
+                rowsHtml += `
+                    <tr>
+                        <td></td>
+                        <td>ClusterRoleBinding</td>
+                        <td>
+                            <form action="/cluster-permission/cluster-role-binding" method="POST">
+                                <input type="hidden" name="csrf_token" value="${csrf_token}">
+                                <input type="hidden" name="crb_name" value="${name}" />
+                                <a href="javascript:;" onclick="parentNode.submit();">${name}</a>
+                            </form>
+                        </td>
+                        <td>
+                            ${clusterRole ? `
+                            <form action="/cluster-permission/cluster-role/data" method="POST">
+                                <input type="hidden" name="csrf_token" value="${csrf_token}">
+                                <input type="hidden" name="cr_name" value="${clusterRole}" />
+                                <a href="javascript:;" onclick="parentNode.submit();">${clusterRole}</a>
+                            </form>
+                            ` : ''}
+                        </td>
+                    </tr>
+                `;
+            });
+        }
+        
+        if (rowsHtml === '') {
+            tbody.innerHTML = '<tr><td colspan="4" class="text-center text-muted">No role bindings found</td></tr>';
+        } else {
+            tbody.innerHTML = rowsHtml;
+        }
+        
+        // Initialize DataTable
+        setTimeout(() => {
+            if ($.fn.DataTable && $(table).length) {
+                const rows = tbody.querySelectorAll('tr');
+                const hasDataRows = Array.from(rows).some(row => {
+                    const cells = row.querySelectorAll('td');
+                    return !Array.from(cells).some(cell => cell.hasAttribute('colspan')) && cells.length === 4;
+                });
+                
+                if (hasDataRows) {
+                    $(table).DataTable({
+                        responsive: true,
+                        pageLength: 25
+                    });
+                }
+            }
+        }, 50);
+    }
+    
+    // Load group privileges using fetch() - following Flask fetch pattern
+    document.addEventListener('DOMContentLoaded', async function() {
+        // Wait for jQuery and DataTables
+        let retries = 0;
+        while ((typeof $ === 'undefined' || typeof $.fn.DataTable === 'undefined') && retries < 10) {
+            await new Promise(resolve => setTimeout(resolve, 100));
+            retries++;
+        }
+        
+        if (typeof $ === 'undefined' || typeof $.fn.DataTable === 'undefined') {
+            console.error('jQuery or DataTables not loaded');
+            return;
+        }
+        
+        // Get group name
+        const groupName = getGroupName();
+        
+        if (!groupName) {
+            console.error('No group name provided');
+            const membersTbody = document.getElementById('members-tbody');
+            const rolesTbody = document.getElementById('roles-tbody');
+            const breadcrumb = document.getElementById('group-name-breadcrumb');
+            if (membersTbody) {
+                membersTbody.innerHTML = '<tr><td colspan="3" class="text-center text-danger">Error: Group name not provided</td></tr>';
+            }
+            if (rolesTbody) {
+                rolesTbody.innerHTML = '<tr><td colspan="4" class="text-center text-danger">Error: Group name not provided</td></tr>';
+            }
+            if (breadcrumb) {
+                breadcrumb.textContent = 'Error';
+            }
+            return;
+        }
+        
+        // Update breadcrumb
+        const breadcrumb = document.getElementById('group-name-breadcrumb');
+        if (breadcrumb) {
+            breadcrumb.textContent = groupName;
+        }
+        
+        try {
+            const privilegesUrl = `/api/v1/users/groups/${encodeURIComponent(groupName)}/privileges`;
+            console.log('Fetching group privileges from:', privilegesUrl);
+            
+            const response = await fetch(privilegesUrl);
+            
+            if (!response.ok) {
+                throw new Error(`HTTP error! status: ${response.status}`);
+            }
+            
+            const data = await response.json();
+            console.log('Group privileges API response:', data);
+            
+            if (data.error) {
+                throw new Error(data.message || 'Failed to load group privileges');
+            }
+            
+            // Extract data
+            const groupData = data.data || {};
+            const members = groupData.members || [];
+            const roleBindings = groupData.role_bindings || [];
+            const clusterRoleBindings = groupData.cluster_role_bindings || [];
+            
+            // Populate tables
+            populateMembersTable(members);
+            populateRolesTable(roleBindings, clusterRoleBindings);
+            
+        } catch (error) {
+            console.error('Error loading group privileges:', error);
+            const membersTbody = document.getElementById('members-tbody');
+            const rolesTbody = document.getElementById('roles-tbody');
+            if (membersTbody) {
+                membersTbody.innerHTML = '<tr><td colspan="3" class="text-center text-danger">Error loading members: ' + escapeHtml(error.message) + '</td></tr>';
+            }
+            if (rolesTbody) {
+                rolesTbody.innerHTML = '<tr><td colspan="4" class="text-center text-danger">Error loading role bindings: ' + escapeHtml(error.message) + '</td></tr>';
+            }
+        }
+    });
+</script>
 {% endblock %}

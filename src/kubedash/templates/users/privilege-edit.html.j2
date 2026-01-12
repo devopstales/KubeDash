@@ -8,7 +8,7 @@
           <li class="breadcrumb-item">User Management</li>
           <li class="breadcrumb-item"><a href="/user/list">Users</a></li>
           <li class="breadcrumb-item">Privileges</li>
-          <li class="breadcrumb-item active" aria-current="page">{{ username }}</li>
+          <li class="breadcrumb-item active" aria-current="page" id="username-breadcrumb">Loading...</li>
         </ol>
       </nav>
     </div>
@@ -22,7 +22,7 @@
 <!-- DataTales Example -->
 <div class="card shadow mb-4">
     <div class="card-header py-3">
-        <h5 class="m-0 font-weight-bold text-primary">User: {{ username }}</h5>
+        <h5 class="m-0 font-weight-bold text-primary">User: <span id="username-header">Loading...</span></h5>
     </div>
     <div class="card-body">
         <div class="form-group">
@@ -36,9 +36,7 @@
                             <label for="user_namespaced_role_1">TEMPLATE</label>
                             <select class="form-control" aria-label="Select template" id="user_namespaced_role_1" name="user_namespaced_role_1">
                                 <option value="">None</option>
-                                {% for user_role in user_role_template_list %}
-                                <option value="{{ user_role }}">{{ user_role }}</option>
-                                {% endfor %}
+                                <!-- Options will be populated from API -->
                             </select>
                         </div>
                         <div class="form-group col-md-4 m-2">
@@ -46,9 +44,7 @@
                                 NAMESPACES
                             </label>
                             <select class="form-select select2" id="user_namespaces_1" name="user_namespaces_1" data-placeholder="Select namespaces" multiple>
-                            {% for ns in namespace_list %}
-                                <option>{{ ns }}</option>
-                            {% endfor %}
+                                <!-- Options will be populated from API -->
                             </select>
                             <div class="form-check">
                                 <input class="form-check-input" type="checkbox" value="" id="flexCheckDefault" name="user_all_namespaces_1">
@@ -64,9 +60,7 @@
                                 <label for="user_namespaced_role_2">TEMPLATE</label>
                                 <select class="form-control" aria-label="Select template" id="user_namespaced_role_2" name="user_namespaced_role_2">
                                     <option value="">None</option>
-                                    {% for user_role in user_role_template_list %}
-                                    <option value="{{ user_role }}">{{ user_role }}</option>
-                                    {% endfor %}
+                                    <!-- Options will be populated from API -->
                                 </select>
                             </div>
                             <div class="form-group col-md-4 m-2">
@@ -74,9 +68,7 @@
                                     NAMESPACES
                                 </label>
                                 <select class="form-control select2" id="user_namespaces_2" name="user_namespaces_2" data-placeholder="Select namespaces" multiple>
-                                {% for ns in namespace_list %}
-                                    <option>{{ ns }}</option>
-                                {% endfor %}
+                                    <!-- Options will be populated from API -->
                                 </select>
                                 <div class="form-check">
                                     <input class="form-check-input" type="checkbox" value="" id="flexCheckDefault" name="user_all_namespaces_2">
@@ -91,16 +83,14 @@
                 </div>
                 <div class="block uppercase font-bold mb-2">access to cluster resources (non-namespaced):</div>
                 <div class="form-group col-md-4 m-2">
-                    <select class="form-control" aria-label="Select template" name="user_cluster_role">
+                    <select class="form-control" aria-label="Select template" name="user_cluster_role" id="user_cluster_role">
                         <option value="">None</option>
-                        {% for user_clusterRole in user_clusterRole_template_list %}
-                        <option value="{{ user_clusterRole }}">{{ user_clusterRole }}</option>
-                        {% endfor %}
+                        <!-- Options will be populated from API -->
                     </select>
                 </div>
                 <hr>
-                <input class="form-control" name="username" type="hidden" value="{{ username }}">
-                <button type="submit" class="btn btn-primary" >Save</button>
+                <input class="form-control" name="username" type="hidden" id="username_input" value="">
+                <button type="submit" class="btn btn-primary" id="save-btn">Save</button>
             </form>
         </div>
     </div>
@@ -116,41 +106,324 @@
 
     <script src="{{ url_for('static',filename='/vendor/select2@4.0.13/select2.full.min.js') }}"></script>
     <script>
-        $( '.select2' ).select2( {
-            theme: "bootstrap-5",
-            width: $( this ).data( 'width' ) ? $( this ).data( 'width' ) : $( this ).hasClass( 'w-100' ) ? '100%' : 'style',
-            placeholder: $( this ).data( 'placeholder' ),
-            closeOnSelect: false,
-        } );
-
+        // Session data - rendered server-side using Flask tojson filter
+        const csrf_token = {{ csrf_token()|tojson }};
+        
+        // API URLs
+        const templates_api_url = '/api/v1/users/privileges/templates';
+        const namespaces_api_url = '/api/v1/namespaces';
+        
+        // Global variables
+        let privilegeTemplates = null;
+        let clusterRoleTemplates = null;
+        let namespaces = [];
+        let username = null;
+        
+        // Helper function to escape HTML
+        const escapeHtml = (text) => {
+            if (text === null || text === undefined) return '';
+            const map = {
+                '&': '&amp;',
+                '<': '&lt;',
+                '>': '&gt;',
+                '"': '&quot;',
+                "'": '&#039;'
+            };
+            return String(text).replace(/[&<>"']/g, m => map[m]);
+        };
+        
+        // Get username from URL query parameter, form data, or sessionStorage
+        function getUsername() {
+            // Try URL query parameter first
+            const urlParams = new URLSearchParams(window.location.search);
+            let name = urlParams.get('username');
+            
+            // If not in query, check the hidden input field (might be set by server or previous form)
+            if (!name) {
+                const usernameInput = document.getElementById('username_input');
+                if (usernameInput && usernameInput.value) {
+                    name = usernameInput.value;
+                }
+            }
+            
+            // If still not found, check sessionStorage (set when navigating from user list)
+            if (!name) {
+                name = sessionStorage.getItem('privilege_edit_username');
+                if (name) {
+                    sessionStorage.removeItem('privilege_edit_username');
+                }
+            }
+            
+            // If still not found, check any form on the page
+            if (!name) {
+                const form = document.querySelector('form');
+                if (form) {
+                    const usernameInput = form.querySelector('input[name="username"]');
+                    if (usernameInput && usernameInput.value) {
+                        name = usernameInput.value;
+                    }
+                }
+            }
+            
+            return name;
+        }
+        
+        // Initialize Select2
+        function initSelect2() {
+            $('.select2').select2({
+                theme: "bootstrap-5",
+                width: function() {
+                    return $(this).data('width') ? $(this).data('width') : $(this).hasClass('w-100') ? '100%' : 'style';
+                },
+                placeholder: function() {
+                    return $(this).data('placeholder');
+                },
+                closeOnSelect: false,
+            });
+        }
+        
+        // Populate template dropdowns
+        function populateTemplates() {
+            if (!privilegeTemplates || !clusterRoleTemplates) {
+                console.error('Templates not loaded');
+                return;
+            }
+            
+            // Populate namespaced role templates
+            const roleSelect1 = document.getElementById('user_namespaced_role_1');
+            const roleSelect2 = document.getElementById('user_namespaced_role_2');
+            
+            [roleSelect1, roleSelect2].forEach(select => {
+                if (select) {
+                    // Keep the "None" option
+                    const noneOption = select.querySelector('option[value=""]');
+                    select.innerHTML = '';
+                    if (noneOption) {
+                        select.appendChild(noneOption);
+                    }
+                    
+                    privilegeTemplates.forEach(template => {
+                        const option = document.createElement('option');
+                        option.value = template;
+                        option.textContent = template;
+                        select.appendChild(option);
+                    });
+                }
+            });
+            
+            // Populate cluster role template
+            const clusterRoleSelect = document.getElementById('user_cluster_role');
+            if (clusterRoleSelect) {
+                const noneOption = clusterRoleSelect.querySelector('option[value=""]');
+                clusterRoleSelect.innerHTML = '';
+                if (noneOption) {
+                    clusterRoleSelect.appendChild(noneOption);
+                }
+                
+                clusterRoleTemplates.forEach(template => {
+                    const option = document.createElement('option');
+                    option.value = template;
+                    option.textContent = template;
+                    clusterRoleSelect.appendChild(option);
+                });
+            }
+        }
+        
+        // Populate namespace dropdowns
+        function populateNamespaces() {
+            if (!namespaces || namespaces.length === 0) {
+                console.error('Namespaces not loaded');
+                return;
+            }
+            
+            const namespaceSelect1 = document.getElementById('user_namespaces_1');
+            const namespaceSelect2 = document.getElementById('user_namespaces_2');
+            
+            [namespaceSelect1, namespaceSelect2].forEach(select => {
+                if (select) {
+                    select.innerHTML = '';
+                    
+                    namespaces.forEach(ns => {
+                        const option = document.createElement('option');
+                        option.value = ns;
+                        option.textContent = ns;
+                        select.appendChild(option);
+                    });
+                    
+                    // Reinitialize Select2 after populating
+                    $(select).select2({
+                        theme: "bootstrap-5",
+                        width: '100%',
+                        placeholder: select.getAttribute('data-placeholder') || 'Select namespaces',
+                        closeOnSelect: false,
+                    });
+                }
+            });
+        }
+        
+        // Toggle hidden form section
         function unHide() {
             var x = document.getElementById("hiddenDIV");
             if (x.hidden === true) {
-              x.hidden=false;
-                $( '.select2' ).select2( {
+                x.hidden = false;
+                // Reinitialize Select2 for the newly visible select
+                $('#user_namespaces_2').select2({
                     theme: "bootstrap-5",
-                    width: $( this ).data( 'width' ) ? $( this ).data( 'width' ) : $( this ).hasClass( 'w-100' ) ? '100%' : 'style',
-                    placeholder: $( this ).data( 'placeholder' ),
+                    width: '100%',
+                    placeholder: 'Select namespaces',
                     closeOnSelect: false,
-                } );
+                });
             } else {
-              x.hidden=true;
+                x.hidden = true;
             }
             var y = document.getElementById("hiddenHR");
             if (y.hidden === true) {
-              y.hidden=false;
+                y.hidden = false;
             } else {
-              y.hidden=true;
+                y.hidden = true;
             }
-            if ( document.getElementById("addBTN").classList.contains('btn-outline-secondary') ) {
-              document.getElementById("addBTN").classList.remove('btn-outline-secondary');
-              document.getElementById("addBTN").classList.add('btn-outline-danger');
-              document.getElementById("addBTN").innerHTML = 'delete';
+            if (document.getElementById("addBTN").classList.contains('btn-outline-secondary')) {
+                document.getElementById("addBTN").classList.remove('btn-outline-secondary');
+                document.getElementById("addBTN").classList.add('btn-outline-danger');
+                document.getElementById("addBTN").innerHTML = 'delete';
             } else {
-              document.getElementById("addBTN").classList.remove('btn-outline-danger');
-              document.getElementById("addBTN").classList.add('btn-outline-secondary');
-              document.getElementById("addBTN").innerHTML = 'add';
+                document.getElementById("addBTN").classList.remove('btn-outline-danger');
+                document.getElementById("addBTN").classList.add('btn-outline-secondary');
+                document.getElementById("addBTN").innerHTML = 'add';
             }
-          };
+        }
+        
+        // Handle form submission
+        document.addEventListener('DOMContentLoaded', async function() {
+            // Get username - try multiple sources
+            username = getUsername();
+            
+            // If still not found, wait a bit for any async form data to load
+            if (!username) {
+                await new Promise(resolve => setTimeout(resolve, 100));
+                username = getUsername();
+            }
+            
+            if (!username) {
+                console.error('No username provided');
+                console.log('URL:', window.location.href);
+                console.log('Query params:', new URLSearchParams(window.location.search).toString());
+                console.log('Form inputs:', Array.from(document.querySelectorAll('input[name="username"]')).map(i => i.value));
+                console.log('SessionStorage:', sessionStorage.getItem('privilege_edit_username'));
+                
+                const breadcrumb = document.getElementById('username-breadcrumb');
+                const header = document.getElementById('username-header');
+                if (breadcrumb) breadcrumb.textContent = 'Error';
+                if (header) header.textContent = 'Error: Username not provided';
+                
+                // Show error message to user
+                alert('Error: Username not provided. Please navigate to this page from the Users list.');
+                return;
+            }
+            
+            // Update UI with username
+            const breadcrumb = document.getElementById('username-breadcrumb');
+            const header = document.getElementById('username-header');
+            const usernameInput = document.getElementById('username_input');
+            if (breadcrumb) breadcrumb.textContent = username;
+            if (header) header.textContent = username;
+            if (usernameInput) usernameInput.value = username;
+            
+            // Load data from APIs
+            try {
+                // Load privilege templates
+                console.log('Fetching privilege templates from:', templates_api_url);
+                const templatesResponse = await fetch(templates_api_url);
+                if (!templatesResponse.ok) {
+                    throw new Error(`Failed to load templates: ${templatesResponse.status}`);
+                }
+                const templatesData = await templatesResponse.json();
+                privilegeTemplates = templatesData.data?.user_role_template_list || [];
+                clusterRoleTemplates = templatesData.data?.user_clusterRole_template_list || [];
+                console.log('Loaded templates:', { privilegeTemplates, clusterRoleTemplates });
+                
+                // Load namespaces
+                console.log('Fetching namespaces from:', namespaces_api_url);
+                const namespacesResponse = await fetch(namespaces_api_url);
+                if (!namespacesResponse.ok) {
+                    throw new Error(`Failed to load namespaces: ${namespacesResponse.status}`);
+                }
+                const namespacesData = await namespacesResponse.json();
+                namespaces = namespacesData.data || [];
+                console.log('Loaded namespaces:', namespaces);
+                
+                // Populate dropdowns
+                populateTemplates();
+                populateNamespaces();
+                
+            } catch (error) {
+                console.error('Error loading data:', error);
+                alert('Error loading data: ' + error.message);
+            }
+            
+            // Handle form submission
+            const form = document.querySelector('form[action=""]');
+            if (form) {
+                form.addEventListener('submit', async function(e) {
+                    e.preventDefault();
+                    
+                    const saveBtn = document.getElementById('save-btn');
+                    if (saveBtn) {
+                        saveBtn.disabled = true;
+                        saveBtn.textContent = 'Saving...';
+                    }
+                    
+                    try {
+                        // Collect form data
+                        const formData = new FormData(form);
+                        const data = {
+                            username: formData.get('username'),
+                            user_cluster_role: formData.get('user_cluster_role') || '',
+                            user_namespaced_role_1: formData.get('user_namespaced_role_1') || '',
+                            user_all_namespaces_1: formData.get('user_all_namespaces_1') === 'on',
+                            user_namespaces_1: formData.getAll('user_namespaces_1'),
+                            user_namespaced_role_2: formData.get('user_namespaced_role_2') || '',
+                            user_all_namespaces_2: formData.get('user_all_namespaces_2') === 'on',
+                            user_namespaces_2: formData.getAll('user_namespaces_2')
+                        };
+                        
+                        const updateUrl = `/api/v1/users/${encodeURIComponent(username)}/privileges`;
+                        console.log('Updating user privileges:', updateUrl, data);
+                        
+                        const response = await fetch(updateUrl, {
+                            method: 'POST',
+                            headers: {
+                                'Content-Type': 'application/json',
+                            },
+                            body: JSON.stringify(data)
+                        });
+                        
+                        if (!response.ok) {
+                            const errorData = await response.json().catch(() => ({}));
+                            throw new Error(errorData.message || `HTTP error! status: ${response.status}`);
+                        }
+                        
+                        const result = await response.json();
+                        console.log('Update successful:', result);
+                        
+                        // Redirect to user privilege page
+                        window.location.href = `/user/privilege?username=${encodeURIComponent(username)}`;
+                        
+                    } catch (error) {
+                        console.error('Error updating user privileges:', error);
+                        alert('Error updating user privileges: ' + error.message);
+                        if (saveBtn) {
+                            saveBtn.disabled = false;
+                            saveBtn.textContent = 'Save';
+                        }
+                    }
+                });
+            }
+        });
+        
+        // Initialize Select2 on page load
+        $(document).ready(function() {
+            initSelect2();
+        });
     </script>
 {% endblock %}
