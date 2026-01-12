@@ -24,90 +24,73 @@ logger = get_logger()
 @network_bp.route("/ingress", methods=['GET', 'POST'])
 @login_required
 def ingresses():
-    """Main Ingress view with tabs for Ingress and IngressClass resources."""
-    user_token = get_user_token(session)
-    active_tab = request.args.get('tab', 'ingresses')
+    """
+    Main Ingress view with tabs for Ingress and IngressClass resources.
     
+    Data is now loaded client-side via JavaScript API calls.
+    This route only renders the template structure.
+    """
+    # Handle POST requests for backward compatibility
     if request.method == 'POST':
         if 'ns_select' in request.form:
             session['ns_select'] = request.form.get('ns_select')
         if request.form.get('active_tab'):
             active_tab = request.form.get('active_tab')
-    else:
-        # Handle GET requests with tab parameter
-        active_tab = request.args.get('tab', 'ingresses')
-    
-    # Get namespace list
-    namespace_list, error = k8sNamespaceListGet(session['user_role'], user_token)
-    if error:
-        namespace_list = []
-    
-    # Fetch both resource types
-    ingresses_classes = k8sIngressClassListGet(session['user_role'], user_token)
-    ingresses = k8sIngressListGet(session['user_role'], user_token, session.get('ns_select', 'default'))
-    
-    return render_template(
-        'network/ingress.html.j2',
-        namespaces = namespace_list,
-        ingresses = ingresses,
-        ingresses_classes = ingresses_classes,
-        active_tab = active_tab,
-    )
+
+    # Template now loads data via JavaScript from /api/v1/network/ingress and /api/v1/network/ingress-classes
+    return render_template('network/ingress.html.j2')
 
 @network_bp.route("/ingress-class", methods=['GET', 'POST'])
 @login_required
 def ingresses_class():
-    """Redirect old ingress-class route to main ingress route."""
-    return redirect(url_for('.ingresses', tab='ingressclasses'))
+    """
+    IngressClasses list page.
+    
+    Data is now loaded client-side via JavaScript API calls.
+    This route only renders the template structure.
+    """
+    # Handle POST requests for backward compatibility
+    if request.method == 'POST':
+        if 'ns_select' in request.form:
+            session['ns_select'] = request.form.get('ns_select')
+        selected = request.form.get('selected')
+
+    # Template now loads data via JavaScript from /api/v1/network/ingress-classes
+    return render_template('network/ingress-class.html.j2')
 
 @network_bp.route('/ingress/data', methods=['GET', 'POST'])
 @login_required
 def ingresses_data():
+    """
+    Ingress detail page.
+    
+    Data is now loaded client-side via JavaScript API calls.
+    This route only renders the template structure.
+    """
+    # Handle POST requests for backward compatibility
     if request.method == 'POST':
         i_name = request.form.get('i_name')
-        user_token = get_user_token(session)
+        if 'ns_select' in request.form:
+            session['ns_select'] = request.form.get('ns_select')
 
-        ingresses = k8sIngressListGet(session['user_role'], user_token, session['ns_select'])
-        i_data = None
-        for i in ingresses:
-            if i["name"] == i_name:
-                i_data = i
-
-        if i_data:
-            return render_template(
-                'network/ingress-data.html.j2',
-                i_data = i_data
-            )
-        else:
-                flash("Cannot iterate IngressList", "danger")
-                return redirect(url_for('.ingresses'))
-    else:
-        return redirect(url_for('auth.login'))
+    # Template now loads data via JavaScript from /api/v1/network/ingress/<name>
+    return render_template('network/ingress-data.html.j2')
 
 @network_bp.route('/ingress-class/data', methods=['GET', 'POST'])
 @login_required
 def ingresses_class_data():
+    """
+    IngressClass detail page.
+    
+    Data is now loaded client-side via JavaScript API calls.
+    This route only renders the template structure.
+    """
+    # Handle POST requests for backward compatibility
     if request.method == 'POST':
         ic_name = request.form.get('ic_name')
 
-        user_token = get_user_token(session)
-
-        ingresses_classes = k8sIngressClassListGet(session['user_role'], user_token)
-        ic_data = None
-        for ic in ingresses_classes:
-            if ic["name"] == ic_name:
-                ic_data = ic
-
-        if ic_data:
-            return render_template(
-                'network/ingress-class-data.html.j2',
-                ic_data = ic_data
-            )
-        else:
-                flash("Cannot iterate IngressClassList", "danger")
-                return redirect(url_for('.ingresses', tab='ingressclasses'))
-    else:
-        return redirect(url_for('auth.login'))
+    # Template now loads data via JavaScript from /api/v1/network/ingress-classes/<name>
+    return render_template('network/ingress-class-data.html.j2')
 
 ##############################################################
 # Service
@@ -116,47 +99,35 @@ def ingresses_class_data():
 @network_bp.route("/service", methods=['GET', 'POST'])
 @login_required
 def services():
-    selected = None
-    user_token = get_user_token(session)
-
+    """
+    Services list page.
+    
+    Data is now loaded client-side via JavaScript API calls.
+    This route only renders the template structure.
+    """
+    # Handle POST requests for backward compatibility
     if request.method == 'POST':
         if 'ns_select' in request.form:
             session['ns_select'] = request.form.get('ns_select')
         selected = request.form.get('selected')
 
-    namespace_list, error = k8sNamespaceListGet(session['user_role'], user_token)
-    services = k8sServiceListGet(session['user_role'], user_token, session['ns_select'])
-
-    return render_template(
-      'network/service.html.j2',
-        services = services,
-        namespaces = namespace_list,
-        selected = selected,
-    )
+    # Template now loads data via JavaScript from /api/v1/network/services
+    return render_template('network/service.html.j2')
 
 @network_bp.route('/service/data', methods=['GET', 'POST'])
 @login_required
 def services_data():
-    pod_list = None
+    """
+    Service detail page.
+    
+    Data is now loaded client-side via JavaScript API calls.
+    This route only renders the template structure.
+    """
+    # Handle POST requests for backward compatibility
     if request.method == 'POST':
         service_name = request.form.get('service_name')
         if 'ns_select' in request.form:
             session['ns_select'] = request.form.get('ns_select')
 
-        user_token = get_user_token(session)
-
-        services = k8sServiceListGet(session['user_role'], user_token, session['ns_select'])
-        for service in services:
-            if service["name"] == service_name:
-                service_data = service
-        if service_data["selector"]:
-            pod_list = k8sPodSelectorListGet(session['user_role'], user_token, session['ns_select'], service_data["selector"])
-
-        return render_template(
-          'network/service-data.html.j2',
-            service_data = service_data,
-            namespace = session['ns_select'],
-            pod_list = pod_list,
-        )
-    else:
-        return redirect(url_for('auth.login'))
+    # Template now loads data via JavaScript from /api/v1/network/services/<name>
+    return render_template('network/service-data.html.j2')

@@ -30,51 +30,39 @@ logger = get_logger()
 @cluster_bp.route("/namespace", methods=['GET', 'POST'])
 @login_required
 def namespace():
-    selected = None
-    user_token = get_user_token(session)
-
+    """
+    Namespaces list page.
+    
+    Data is now loaded client-side via JavaScript API calls.
+    This route only renders the template structure.
+    """
+    # Handle POST requests for backward compatibility
     if request.method == 'POST':
         selected = request.form.get('selected')
 
-    ns_list = k8sNamespacesGet(session['user_role'], user_token)
-    #namespace_list = []
-    #for namespace in ns_list:
-    #    WORKLOAD_LIST = k8sWorkloadList(session['user_role'], user_token, namespace["name"])
-    #    namespace["live"] = 0
-    #    for WORKLOAD in WORKLOAD_LIST:
-    #        if WORKLOAD["replicas"] > 0:
-    #            namespace["live"] += WORKLOAD["replicas"]
-    #    namespace_list.append(namespace)
-    
-    return render_template(
-        'cluster/namespace.html.j2',
-        selected = selected,
-        namespace_list = ns_list,
-    )
+    # Template now loads data via JavaScript from /api/v1/namespaces/list
+    return render_template('cluster/namespace.html.j2')
 
 @cluster_bp.route("/namespace/data", methods=['GET', 'POST'])
 @login_required
 def namespaces_data():
+    """
+    Namespace detail page.
+    
+    Data is now loaded client-side via JavaScript API calls.
+    This route only renders the template structure.
+    """
+    # Handle POST requests (from form submission) - redirect to GET with namespace name
     if request.method == 'POST':
-        namespace = request.form['ns_select']
-        namespace_data = eval(request.form['ns_data'])
-            
-        user_token = get_user_token(session)
-        WORKLOAD_NUM = 0
-        WORKLOAD_LIST = k8sWorkloadList(session['user_role'], user_token, namespace)
-        for WORKLOAD in WORKLOAD_LIST:
-            if WORKLOAD["replicas"] > 0:
-                WORKLOAD_NUM += WORKLOAD["replicas"]
-        namespace_data['live_workers'] = WORKLOAD_NUM
-                
-        print(namespace_data)
-
-        return render_template(
-            'cluster/namespace-data.html.j2',
-            ns_data = namespace_data,
-        )
-    else:
+        namespace = request.form.get('ns_select')
+        if namespace:
+            # Redirect to GET request with namespace as query parameter
+            return redirect(url_for('.namespaces_data', namespace=namespace))
         return redirect(url_for('.namespace'))
+    
+    # Handle GET requests - just render the template
+    # The template will fetch data client-side using the namespace query parameter
+    return render_template('cluster/namespace-data.html.j2')
 
 @cluster_bp.route("/namespace/create", methods=['GET', 'POST'])
 @login_required
@@ -142,41 +130,34 @@ def namespaces_scale():
 @cluster_bp.route("/node", methods=['GET', 'POST'])
 @login_required
 def node_list():
-    selected = None
-
+    """
+    Nodes list page.
+    
+    Data is now loaded client-side via JavaScript API calls.
+    This route only renders the template structure.
+    """
+    # Handle POST requests for backward compatibility
     if request.method == 'POST':
         selected = request.form.get('selected')
 
-    user_token = get_user_token(session)
-
-    node_data = k8sNodesListGet(session['user_role'], user_token)
-    cluster_metrics = k8sGetClusterMetric()
-
-    return render_template(
-        'cluster/node.html.j2',
-        nodes = node_data,
-        selected = selected,
-        cluster_metrics = cluster_metrics,
-    )
+    # Template now loads data via JavaScript from /api/v1/nodes and /api/v1/cluster/metrics
+    return render_template('cluster/node.html.j2')
 
 @cluster_bp.route('/node/data', methods=['GET', 'POST'])
 @login_required
 def nodes_data():
+    """
+    Node detail page.
+    
+    Data is now loaded client-side via JavaScript API calls.
+    This route only renders the template structure.
+    """
+    # Handle POST requests for backward compatibility
     if request.method == 'POST':
         no_name = request.form.get('no_name')
 
-        user_token = get_user_token(session)
-        node_data = k8sNodeGet(session['user_role'], user_token, no_name)
-        node_metrics = k8sGetNodeMetric(no_name)
-
-        return render_template(
-            'cluster/node-data.html.j2',
-            no_name = no_name,
-            node_data = node_data,
-            node_metrics = node_metrics,
-        )
-    else:
-        return redirect(url_for('auth.login'))
+    # Template now loads data via JavaScript from /api/v1/nodes/<name> and /api/v1/nodes/<name>/metrics
+    return render_template('cluster/node-data.html.j2')
 
 ##############################################################
 ## CRDs
@@ -185,20 +166,18 @@ def nodes_data():
 @cluster_bp.route("/crd", methods=['GET', 'POST'])
 @login_required
 def crd_list():
+    """
+    CRDs list page.
+    
+    Data is now loaded client-side via JavaScript API calls.
+    This route only renders the template structure.
+    """
+    # Handle POST requests for backward compatibility
     if request.method == 'POST':
         selected = request.form.get('selected')
-    else:
-        selected = None
 
-    user_token = get_user_token(session)
-
-    crd_list = get_custom_resources(session['user_role'], user_token)
-
-    return render_template(
-        'cluster/crd.html.j2',
-        crd_list = crd_list,
-        selected = selected,
-    )
+    # Template now loads data via JavaScript from /api/v1/other-resources/crds
+    return render_template('cluster/crd.html.j2')
     
 @cluster_bp.route("/crd/data", methods=['GET', 'POST'])
 @login_required
@@ -229,3 +208,23 @@ def crd_data():
         )
     else:
         return redirect(url_for('.crd_list'))
+
+##############################################################
+## Runtime Classes
+##############################################################
+
+@cluster_bp.route("/runtime-class", methods=['GET', 'POST'])
+@login_required
+def runtime_class():
+    """
+    Runtime Classes list page.
+    
+    Data is now loaded client-side via JavaScript API calls.
+    This route only renders the template structure.
+    """
+    # Handle POST requests for backward compatibility
+    if request.method == 'POST':
+        selected = request.form.get('selected')
+
+    # Template now loads data via JavaScript from /api/v1/cluster/runtime-classes
+    return render_template('cluster/runetime-class.html.j2')

@@ -3,7 +3,6 @@ from flask_login import login_required
 from werkzeug.security import check_password_hash
 
 from lib.helper_functions import get_logger
-from lib.k8s.metrics import k8sGetClusterMetric, k8sGetClusterEvents, k8sGetPodMap
 from lib.k8s.namespace import k8sNamespaceListGet
 from lib.sso import get_user_token
 from lib.user import User
@@ -29,11 +28,13 @@ tracer = get_tracer()
 @tracer.start_as_current_span("/cluster-metrics")
 @login_required
 def cluster_metrics():
-    span = trace.get_current_span()
-    user_token = get_user_token(session)
+    """
+    Cluster metrics dashboard page.
     
-    cluster_metrics = k8sGetClusterMetric()
-    cluster_events  = k8sGetClusterEvents(session['user_role'], user_token, limit=100)
+    Data is now loaded client-side via JavaScript API calls.
+    This route only renders the template structure.
+    """
+    span = trace.get_current_span()
     
     username = session['user_name']
     user = User.query.filter_by(username="admin", user_type = "Local").first()
@@ -45,8 +46,8 @@ def cluster_metrics():
         span.set_attribute("user.type", session['user_type'])
         span.set_attribute("user.role", session['user_role'])
 
-
-    if username == "admin" and check_password_hash(user.password_hash, "admin"):
+    # Check for default password warning (still needed for flash message)
+    if username == "admin" and user and check_password_hash(user.password_hash, "admin"):
         flash('<a href="/user/info">You should change the default password!</a>', "warning")
         if tracer and span.is_recording():
             span.add_event("log", {
@@ -54,11 +55,8 @@ def cluster_metrics():
                 "log.message": "You should change the default password!",
             })
 
-    return render_template(
-        'dashboards/cluster-metric.html.j2',
-        cluster_metrics = cluster_metrics,
-        cluster_events  = cluster_events
-    )
+    # Template now loads data via JavaScript from /api/v1/cluster/metrics and /api/v1/cluster/events
+    return render_template('dashboards/cluster-metric.html.j2')
 
 ##############################################################
 ## Workload Map
@@ -68,33 +66,29 @@ def cluster_metrics():
 @tracer.start_as_current_span("/workload-map")
 @login_required
 def workloads():
+    """
+    Workload map dashboard page.
+    
+    Data is now loaded client-side via JavaScript API calls.
+    This route only renders the template structure.
+    """
     span = trace.get_current_span()
     if tracer and span.is_recording():
-        span.set_attribute("http.route", "/cluster-metrics")
+        span.set_attribute("http.route", "/workload-map")
         span.set_attribute("http.method", request.method)
 
+    # Handle POST requests for namespace selection (for backward compatibility)
     if request.method == 'POST':
         if 'ns_select' in request.form:
             session['ns_select'] = request.form.get('ns_select')
         if tracer and span.is_recording():
             span.set_attribute("namespace.selected", request.form.get('ns_select'))
 
-
+    # Get namespaces for topbar selector
     user_token = get_user_token(session)
     namespace_list, error = k8sNamespaceListGet(session['user_role'], user_token)
-    if not error:
-        nodes, edges = k8sGetPodMap(session['user_role'], user_token, session['ns_select'])
-    else:
-        nodes = []
-        edges = []
+    namespaces = namespace_list if not error else []
 
-    if tracer and span.is_recording():
-        span.set_attribute("workloads.nodes_count", len(nodes))
-        span.set_attribute("workloads.edges_count", len(edges))
-
-    return render_template(
-        'dashboards/workload-map.html.j2',
-        namespaces = namespace_list,
-        nodes = nodes,
-        edges = edges,
-    )
+    # Template now loads data via JavaScript from /api/v1/cluster/workload-map
+    # and /api/v1/namespaces
+    return render_template('dashboards/workload-map.html.j2', namespaces=namespaces)

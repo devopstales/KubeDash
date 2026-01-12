@@ -46,25 +46,20 @@ def authenticated_only(f):
 @workload_bp.route("/pods", methods=['GET', 'POST'])
 @login_required
 def pod_list():
-    selected = None
+    """
+    Pod list page.
     
+    Data is now loaded client-side via JavaScript API calls.
+    This route only renders the template structure.
+    """
+    # Handle POST requests for backward compatibility
     if request.method == 'POST':
         selected = request.form.get('selected')
         if 'ns_select' in request.form:
             session['ns_select'] = request.form.get('ns_select')
 
-    user_token = get_user_token(session)
-
-    namespace_list, error = k8sNamespaceListGet(session['user_role'], user_token)
-    #    has_report, pod_list = k8sPodListVulnsGet(session['user_role'], user_token, session['ns_select'])
-    pod_list = k8sPodListGet(session['user_role'], user_token, session['ns_select'])
-
-    return render_template(
-        'workload/pod.html.j2',
-        pods = pod_list,
-        namespaces = namespace_list,
-        selected = selected
-    )
+    # Template now loads data via JavaScript from /api/v1/workloads/pods
+    return render_template('workload/pod.html.j2')
     
 @workload_bp.route('/pods/delete', methods=['POST'])
 @login_required
@@ -87,22 +82,14 @@ def pod_delete():
 @workload_bp.route('/pods/data', methods=['GET', 'POST'])
 @login_required
 def pod_data():
-    if request.method == 'POST':
-        po_name = request.form.get('po_name')
-        if 'ns_select' in request.form:
-            session['ns_select'] = request.form.get('ns_select')
-
-        user_token = get_user_token(session)
-
-        pod_data = k8sPodGet(session['user_role'], user_token, session['ns_select'], po_name)
-
-        return render_template(
-            'workload/pod-data.html.j2',
-            po_name = po_name,
-            pod_data = pod_data,
-        )
-    else:
-        return redirect(url_for('auth.login'))
+    """
+    Pod detail page.
+    
+    Data is now loaded client-side via JavaScript API calls.
+    This route only renders the template structure.
+    """
+    # Template now loads data via JavaScript from /api/v1/workloads/pods/<name>
+    return render_template('workload/pod-data.html.j2')
 
 ##############################################################
 ## Pod Logs
@@ -111,36 +98,27 @@ def pod_data():
 logging.getLogger('socketio').setLevel(logging.ERROR)
 logging.getLogger('engineio').setLevel(logging.ERROR)
 
-@workload_bp.route('/pods/logs', methods=['POST'])
+@workload_bp.route('/pods/logs', methods=['GET', 'POST'])
 @login_required
 def pod_logs():
-    if request.method == 'POST':
-        po_name = request.form.get('po_name')
-        if 'ns_select' in request.form:
-            session['ns_select'] = request.form.get('ns_select')
-
-        user_token = get_user_token(session)
-
-        logger.info("async_mode: %s" % socketio.async_mode)
-        pod_containers, pod_init_containers = k8sPodGetContainers(session['user_role'], user_token, session['ns_select'], po_name)
-        if request.form.get('container_select'):
-            container_select = request.form.get('container_select')
-        else:
-            if pod_containers:
-                container_select = pod_containers[0]
-            else:
-                container_select = None
-
-        return render_template(
-            'workload/pod-log.html.j2', 
-            po_name = po_name,
-            container_select = container_select,
-            pod_containers = pod_containers,
-            pod_init_containers = pod_init_containers,
-            async_mode = socketio.async_mode
-        )
-    else:
-        return redirect(url_for('auth.login'))
+    """
+    Pod logs page.
+    
+    Containers are loaded client-side via JavaScript API calls.
+    Websocket connection is handled server-side for log streaming.
+    """
+    # Get pod name and namespace from query params or form
+    po_name = request.args.get('po_name') or request.form.get('po_name')
+    if 'ns_select' in request.form:
+        session['ns_select'] = request.form.get('ns_select')
+    
+    # Template loads containers via JavaScript from /api/v1/workloads/pods/<name>/containers
+    # Websocket connection is handled by the template's JavaScript
+    return render_template(
+        'workload/pod-log.html.j2', 
+        po_name=po_name or '',
+        async_mode=socketio.async_mode
+    )
 
 @socketio.on("connect", namespace="/log")
 @authenticated_only
@@ -157,36 +135,27 @@ def log_message(po_name, container):
 ## Pod Exec
 ##############################################################
 
-@workload_bp.route('/pods/exec', methods=['POST'])
+@workload_bp.route('/pods/exec', methods=['GET', 'POST'])
 @login_required
 def pod_exec():
-    if request.method == 'POST':
-        po_name = request.form.get('po_name')
-        if 'ns_select' in request.form:
-            session['ns_select'] = request.form.get('ns_select')
-
-        user_token = get_user_token(session)
-
-        logger.info("async_mode: %s" % socketio.async_mode)
-        pod_containers, pod_init_containers = k8sPodGetContainers(session['user_role'], user_token, session['ns_select'], po_name)
-        if request.form.get('container_select'):
-            container_select = request.form.get('container_select')
-        else:
-            if pod_containers:
-                container_select = pod_containers[0]
-            else:
-                container_select = None
-
-        return render_template(
-            'workload/pod-exec.html.j2', 
-            po_name = po_name,
-            container_select = container_select,
-            pod_containers = pod_containers,
-            pod_init_containers = pod_init_containers,  # Not used in this context, but kept for completeness.
-            async_mode = socketio.async_mode
-        )
-    else:
-        return redirect(url_for('auth.login'))
+    """
+    Pod exec page.
+    
+    Containers are loaded client-side via JavaScript API calls.
+    Websocket connection is handled server-side for exec streaming.
+    """
+    # Get pod name and namespace from query params or form
+    po_name = request.args.get('po_name') or request.form.get('po_name')
+    if 'ns_select' in request.form:
+        session['ns_select'] = request.form.get('ns_select')
+    
+    # Template loads containers via JavaScript from /api/v1/workloads/pods/<name>/containers
+    # Websocket connection is handled by the template's JavaScript
+    return render_template(
+        'workload/pod-exec.html.j2', 
+        po_name=po_name or '',
+        async_mode=socketio.async_mode
+    )
 
 @socketio.on("connect", namespace="/exec")
 @authenticated_only
@@ -225,48 +194,32 @@ def exec_input(data):
 @workload_bp.route("/statefulsets", methods=['GET', 'POST'])
 @login_required
 def statefulsets():
-    selected = None
-    user_token = get_user_token(session)
-
+    """
+    StatefulSets list page.
+    
+    Data is now loaded client-side via JavaScript API calls.
+    This route only renders the template structure.
+    """
+    # Handle POST requests for backward compatibility
     if request.method == 'POST':
         if 'ns_select' in request.form:
             session['ns_select'] = request.form.get('ns_select')
         selected = request.form.get('selected', None)
-        
-    namespace_list, error = k8sNamespaceListGet(session['user_role'], user_token)
-    if not error:
-        statefulset_list = k8sStatefulSetsGet(session['user_role'], user_token, session['ns_select'])
-    else:
-        statefulset_list = []
 
-    return render_template(
-        'workload/statefulset.html.j2',
-        selected = selected,
-        statefulsets = statefulset_list,
-        namespaces = namespace_list,
-    )
+    # Template now loads data via JavaScript from /api/v1/workloads/statefulsets
+    return render_template('workload/statefulset.html.j2')
 
 @workload_bp.route('/statefulsets/data', methods=['GET', 'POST'])
 @login_required
 def statefulsets_data():
-    if request.method == 'POST':
-        selected = request.form.get('selected')
-        if 'ns_select' in request.form:
-            session['ns_select'] = request.form.get('ns_select')
-
-        user_token = get_user_token(session)
-        statefulset_list = k8sStatefulSetsGet(session['user_role'], user_token, session['ns_select'])
-        statefulset_data = None
-        for statefulset in statefulset_list:
-            if statefulset["name"] == selected:
-                statefulset_data = statefulset
-
-        return render_template(
-            'workload/statefulset-data.html.j2',
-            statefulset_data = statefulset_data,
-        )
-    else:
-        return redirect(url_for('auth.login'))
+    """
+    StatefulSet detail page.
+    
+    Data is now loaded client-side via JavaScript API calls.
+    This route only renders the template structure.
+    """
+    # Template now loads data via JavaScript from /api/v1/workloads/statefulsets/<name>
+    return render_template('workload/statefulset-data.html.j2')
         
 @workload_bp.route('/statefulsets/scale', methods=['GET', 'POST'])
 @login_required
@@ -289,49 +242,32 @@ def statefulsets_scale():
 @workload_bp.route("/daemonsets", methods=['GET', 'POST'])
 @login_required
 def daemonsets():
-    selected = None
-    user_token = get_user_token(session)
-
+    """
+    DaemonSets list page.
+    
+    Data is now loaded client-side via JavaScript API calls.
+    This route only renders the template structure.
+    """
+    # Handle POST requests for backward compatibility
     if request.method == 'POST':
         if 'ns_select' in request.form:
             session['ns_select'] = request.form.get('ns_select')
         selected = request.form.get('selected')
 
-    namespace_list, error = k8sNamespaceListGet(session['user_role'], user_token)
-    if not error:
-        daemonset_list = k8sDaemonSetsGet(session['user_role'], user_token, session['ns_select'])
-    else:
-        daemonset_list = []
-
-    return render_template(
-        'workload/daemonset.html.j2',
-        daemonsets = daemonset_list,
-        namespaces = namespace_list,
-        selected = selected,
-    )
+    # Template now loads data via JavaScript from /api/v1/workloads/daemonsets
+    return render_template('workload/daemonset.html.j2')
 
 @workload_bp.route('/daemonsets/data', methods=['GET', 'POST'])
 @login_required
 def daemonset_data():
-    if request.method == 'POST':
-        if 'ns_select' in request.form:
-            session['ns_select'] = request.form.get('ns_select')
-        selected = request.form.get('selected')
-
-        user_token = get_user_token(session)
-
-        daemonset_list = k8sDaemonSetsGet(session['user_role'], user_token, session['ns_select'])
-        daemonset_data = None
-        for daemonset in daemonset_list:
-            if daemonset["name"] == selected:
-                daemonset_data = daemonset
-
-        return render_template(
-            'workload/daemonset-data.html.j2',
-            daemonset_data = daemonset_data,
-        )
-    else:
-        return redirect(url_for('auth.login'))
+    """
+    DaemonSet detail page.
+    
+    Data is now loaded client-side via JavaScript API calls.
+    This route only renders the template structure.
+    """
+    # Template now loads data via JavaScript from /api/v1/workloads/daemonsets/<name>
+    return render_template('workload/daemonset-data.html.j2')
     
 @workload_bp.route('/statefulsets/scale', methods=['GET', 'POST'])
 @login_required
@@ -363,49 +299,32 @@ def daemonsets_scale():
 @workload_bp.route("/deployments", methods=['GET', 'POST'])
 @login_required
 def deployments():
-    selected = None
-    user_token = get_user_token(session)
-
+    """
+    Deployments list page.
+    
+    Data is now loaded client-side via JavaScript API calls.
+    This route only renders the template structure.
+    """
+    # Handle POST requests for backward compatibility
     if request.method == 'POST':
         if 'ns_select' in request.form:
             session['ns_select'] = request.form.get('ns_select')
         selected = request.form.get('selected')
 
-    namespace_list, error = k8sNamespaceListGet(session['user_role'], user_token)
-    if not error:
-        deployments_list = k8sDeploymentsGet(session['user_role'], user_token, session['ns_select'])
-    else:
-        deployments_list = []
-
-    return render_template(
-        'workload/deployment.html.j2',
-        selected = selected,
-        deployments = deployments_list,
-        namespaces = namespace_list,
-    )
+    # Template now loads data via JavaScript from /api/v1/workloads/deployments
+    return render_template('workload/deployment.html.j2')
 
 @workload_bp.route('/deployments/data', methods=['GET', 'POST'])
 @login_required
 def deployment_data():
-    if request.method == 'POST':
-        selected = request.form.get('selected')
-        if 'ns_select' in request.form:
-            session['ns_select'] = request.form.get('ns_select')
-
-        user_token = get_user_token(session)
-
-        deployments_list = k8sDeploymentsGet(session['user_role'], user_token, session['ns_select'])
-        deployment_data = None
-        for deployment in deployments_list:
-            if deployment["name"] == selected:
-                deployment_data = deployment
-
-        return render_template(
-            'workload/deployment-data.html.j2',
-            deployment_data = deployment_data,
-        )
-    else:
-        return redirect(url_for('auth.login'))
+    """
+    Deployment detail page.
+    
+    Data is now loaded client-side via JavaScript API calls.
+    This route only renders the template structure.
+    """
+    # Template now loads data via JavaScript from /api/v1/workloads/deployments/<name>
+    return render_template('workload/deployment-data.html.j2')
     
 @workload_bp.route('/deployments/scale', methods=['GET', 'POST'])
 @login_required
@@ -428,23 +347,17 @@ def deployment_scale():
 @workload_bp.route("/replicasets", methods=['GET', 'POST'])
 @login_required
 def replicasets():
-    selected = None
-    user_token = get_user_token(session)
-
+    """
+    ReplicaSets list page.
+    
+    Data is now loaded client-side via JavaScript API calls.
+    This route only renders the template structure.
+    """
+    # Handle POST requests for backward compatibility
     if request.method == 'POST':
         if 'ns_select' in request.form:
             session['ns_select'] = request.form.get('ns_select')
         selected = request.form.get('selected')
 
-    namespace_list, error = k8sNamespaceListGet(session['user_role'], user_token)
-    if not error:
-        replicaset_list = k8sReplicaSetsGet(session['user_role'], user_token, session['ns_select'])
-    else:
-        replicaset_list = []
-
-    return render_template(
-        'workload/replicaset.html.j2',
-        replicasets = replicaset_list,
-        namespaces = namespace_list,
-        selected = selected,
-    )
+    # Template now loads data via JavaScript from /api/v1/workloads/replicasets
+    return render_template('workload/replicaset.html.j2')

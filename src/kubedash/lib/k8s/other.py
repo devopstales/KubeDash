@@ -313,3 +313,46 @@ def k8sPriorityClassList(username_role, user_token):
         }
         PC_LIST.append(PCS_DATA)
     return PC_LIST
+
+##############################################################
+## Runtime Class List
+##############################################################
+
+@cache.memoize(timeout=long_cache_time)
+def k8sRuntimeClassListGet(username_role, user_token):
+    """Get a list of Runtime Classes.
+    
+    Args:
+        username_role (str): Role of the current user
+        user_token (str): Auth token of the current user
+        
+    Return:
+        RC_LIST (list): List of Runtime Classes
+    """
+    RC_LIST = list()
+    k8sClientConfigGet(username_role, user_token)
+
+    try:
+        runtime_classes = k8s_client.NodeV1Api().list_runtime_class(_request_timeout=1)
+        for rc in runtime_classes.items:
+            RC_DATA = {
+                "name": rc.metadata.name,
+                "annotations": trimAnnotations(rc.metadata.annotations),
+                "labels": rc.metadata.labels,
+                "created": rc.metadata.creation_timestamp.strftime('%Y-%m-%d %H:%M:%S'),
+                "handler": rc.handler,
+            }
+            if hasattr(rc, 'overhead') and rc.overhead:
+                RC_DATA["overhead"] = rc.overhead.to_dict() if hasattr(rc.overhead, 'to_dict') else rc.overhead
+            if hasattr(rc, 'scheduling') and rc.scheduling:
+                RC_DATA["scheduling"] = rc.scheduling.to_dict() if hasattr(rc.scheduling, 'to_dict') else rc.scheduling
+            RC_LIST.append(RC_DATA)
+        return RC_LIST
+    except ApiException as error:
+        if error.status != 404:
+            ErrorHandler(logger, error, "get runtime class list - %s" % error.status)
+        return RC_LIST
+    except Exception as error:
+        ERROR = "k8sRuntimeClassListGet: %s" % error
+        ErrorHandler(logger, "error", ERROR)
+        return RC_LIST

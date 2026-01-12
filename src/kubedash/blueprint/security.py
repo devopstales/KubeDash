@@ -24,54 +24,32 @@ logger = get_logger()
 @security_bp.route("/secret", methods=['GET', 'POST'])
 @login_required
 def secrets():
-    selected = None
-    user_token = get_user_token(session)
-
+    """
+    Secrets list page.
+    
+    Data is now loaded client-side via JavaScript API calls.
+    This route only renders the template structure.
+    """
+    # Handle POST requests for backward compatibility
     if request.method == 'POST':
         if 'ns_select' in request.form:
             session['ns_select'] = request.form.get('ns_select')
         selected = request.form.get('selected')
 
-    namespace_list, error = k8sNamespaceListGet(session['user_role'], user_token)
-    if not error:
-        secrets = k8sSecretListGet(session['user_role'], user_token, session['ns_select'])
-    else:
-        secrets = list()
-
-    return render_template(
-        'security/secret.html.j2',
-        secrets = secrets,
-        namespaces = namespace_list,
-        selected = selected,
-    )
+    # Template now loads data via JavaScript from /api/v1/security/secrets
+    return render_template('security/secret.html.j2')
 
 @security_bp.route('/secret/data', methods=['GET', 'POST'])
 @login_required
 def secrets_data():
-    if request.method == 'POST':
-        secret_name = request.form.get('secret_name')
-        if 'ns_select' in request.form:
-            session['ns_select'] = request.form.get('ns_select')
-
-        user_token = get_user_token(session)
-
-        secrets = k8sSecretListGet(session['user_role'], user_token, session['ns_select'])
-        secret_data = None
-        for secret in secrets:
-            if secret["name"] == secret_name:
-                secret_data = secret
-        
-        if secret_data:
-            return render_template(
-                'security/secret-data.html.j2',
-                secret_data = secret_data,
-                namespace = session['ns_select'],
-            )
-        else:
-                flash("Cannot iterate SecretList", "danger")
-                return redirect(url_for('.secrets'))
-    else:
-        return redirect(url_for('auth.login'))
+    """
+    Secret detail page.
+    
+    Data is now loaded client-side via JavaScript API calls.
+    This route only renders the template structure.
+    """
+    # Template now loads data via JavaScript from /api/v1/security/secrets/<name>
+    return render_template('security/secret-data.html.j2')
     
 ##############################################################
 ## Network Policies
@@ -80,54 +58,32 @@ def secrets_data():
 @security_bp.route('/network-policy', methods=['GET', 'POST'])
 @login_required
 def policies_list():
-    selected = None
-    user_token = get_user_token(session)
-
+    """
+    Network Policies list page.
+    
+    Data is now loaded client-side via JavaScript API calls.
+    This route only renders the template structure.
+    """
+    # Handle POST requests for backward compatibility
     if request.method == 'POST':
         if 'ns_select' in request.form:
             session['ns_select'] = request.form.get('ns_select')
         selected = request.form.get('selected')
 
-    namespace_list, error = k8sNamespaceListGet(session['user_role'], user_token)
-    if not error:
-        policies = k8sPolicyListGet(session['user_role'], user_token, session['ns_select'])
-    else:
-        policies = list()
-
-    return render_template(
-        'security/network-policy.html.j2',
-        policies = policies,
-        namespaces = namespace_list,
-        selected = selected,
-    )
+    # Template now loads data via JavaScript from /api/v1/security/network-policies
+    return render_template('security/network-policy.html.j2')
 
 @security_bp.route('/network-policy/data', methods=['GET', 'POST'])
 @login_required
 def policies_data():
-    if request.method == 'POST':
-        policy_name = request.form.get('policy_name')
-        if 'ns_select' in request.form:
-            session['ns_select'] = request.form.get('ns_select')
-
-        user_token = get_user_token(session)
-
-        policies =  k8sPolicyListGet(session['user_role'], user_token, session['ns_select'])
-        policy_data = None
-        for policy in policies:
-            if policy["name"] == policy_name:
-                policy_data = policy
-
-        if policy_data:
-            return render_template(
-                'security/network-policy-data.html.j2',
-                policy_data = policy_data,
-                namespace = session['ns_select'],
-            )
-        else:
-                flash("Cannot iterate PolicyList", "danger")
-                return redirect(url_for('.policies_list'))
-    else:
-        return redirect(url_for('auth.login'))
+    """
+    Network Policy detail page.
+    
+    Data is now loaded client-side via JavaScript API calls.
+    This route only renders the template structure.
+    """
+    # Template now loads data via JavaScript from /api/v1/security/network-policies/<name>
+    return render_template('security/network-policy-data.html.j2')
 
 ##############################################################
 ## PriorityClass
@@ -135,44 +91,27 @@ def policies_data():
 @security_bp.route('/priorityclass', methods=['GET', 'POST'])
 @login_required
 def priorityclass_list():
-    selected = None
-    user_token = get_user_token(session)
-
+    """
+    Priority Classes list page.
+    
+    Data is now loaded client-side via JavaScript API calls.
+    This route only renders the template structure.
+    """
+    # Handle POST requests for backward compatibility
     if request.method == 'POST':
         selected = request.form.get('selected')
 
-    priorityclass = k8sPriorityClassList(session['user_role'], user_token)
-
-    return render_template(
-        'security/priority-class.html.j2',
-        priorityclass = priorityclass,
-        selected = selected,
-    )
+    # Template now loads data via JavaScript from /api/v1/other-resources/priority-classes
+    return render_template('security/priority-class.html.j2')
 
 @security_bp.route('/priorityclass/data', methods=['GET', 'POST'])
 @login_required
 def priorityclass_data():
-    if request.method == 'POST':
-        pc_name = request.form.get('pc_name')
-        if 'ns_select' in request.form:
-            session['ns_select'] = request.form.get('ns_select')
-
-        user_token = get_user_token(session)
-
-        priorityclass = k8sPriorityClassList(session['user_role'], user_token)
-        pc_data = None
-        for pc in priorityclass:
-            if pc["name"] == pc_name:
-                pc_data = pc
-
-        if pc_data:
-            return render_template(
-                'security/priority-class-data.html.j2',
-                pc_data = pc_data,
-                namespace = session['ns_select'],
-            )
-        else:
-                flash("Cannot iterate PriorityClassList", "danger")
-                return redirect(url_for('.priorityclass_list'))
-    else:
-        return redirect(url_for('auth.login'))
+    """
+    Priority Class detail page.
+    
+    Data is now loaded client-side via JavaScript API calls.
+    This route only renders the template structure.
+    """
+    # Template now loads data via JavaScript from /api/v1/other-resources/priority-classes/<name>
+    return render_template('security/priority-class-data.html.j2')

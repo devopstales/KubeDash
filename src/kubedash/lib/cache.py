@@ -59,6 +59,8 @@ def cached_base2(app: Flask):
     with tracer.start_as_current_span("render.base2"):
         with app.app_context():
             with app.test_request_context():
+                # CSRF token meta tag will be empty during initialization
+                # JavaScript will populate it from forms/cookies on page load
                 return render_template('base2.html.j2')
 
 @tracer.start_as_current_span("cache.base_template")

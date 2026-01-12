@@ -36,64 +36,14 @@ tracer = get_tracer()
 @settings_bp.route('/sso-config', methods=['GET', 'POST'])
 @login_required
 def sso_config():
-    if request.method == 'POST':
-        oauth_server_uri = request.form['oauth_server_uri']
-        oauth_server_ca = None
-        if "oauth_server_ca" in request.form:
-            oauth_server_ca_bas64 = request.form['oauth_server_ca']
-            oauth_server_ca = str(base64_encode(oauth_server_ca_bas64.strip()), 'UTF-8')
-        client_id = request.form['client_id']
-        client_secret = request.form['client_secret']
-        base_uri = request.form['base_uri']
-        if not base_uri:
-            base_uri = request.root_url.rstrip(request.root_url[-1])
-        if "scope" in request.form:
-            scope = request.form.getlist('scope')
-            while("" in scope):
-                scope.remove("")
-        else:
-            scope = [
-                "openid",          # mandatory for OpenIDConnect auth
-                "email",           # smallest and most consistent scope and claim
-                "offline_access",  # needed to actually ask for refresh_token
-                "profile",
-            ]
-
-        request_type = request.form['request_type']
-        if request_type == "edit":
-            oauth_server_uri_old = request.form['oauth_server_uri_old']
-            SSOServerUpdate(oauth_server_uri_old, oauth_server_uri,oauth_server_ca,client_id, client_secret, base_uri, scope)
-        elif request_type == "create":
-            SSOServerCreate(oauth_server_uri, oauth_server_ca, client_id, client_secret, base_uri, scope)
-
-        flash("SSO Server Updated Successfully", "success")
-        return render_template(
-            'settings/sso-config.html.j2',
-            oauth_server_uri = oauth_server_uri,
-            oauth_server_ca = oauth_server_ca,
-            client_id = client_id,
-            client_secret = client_secret,
-            base_uri = base_uri,
-            scope = scope,
-        )
-    else:
-        ssoServer = SSOSererGet()
-        if ssoServer is None:
-            return render_template(
-                'settings/sso-config.html.j2',
-                base_uri = request.root_url.rstrip(request.root_url[-1]),
-                scope = scope
-            )
-        else:
-            return render_template(
-                'settings/sso-config.html.j2',
-                oauth_server_uri = ssoServer.oauth_server_uri,
-                oauth_server_ca = ssoServer.oauth_server_ca,
-                client_id = ssoServer.client_id,
-                client_secret = ssoServer.client_secret,
-                base_uri = ssoServer.base_uri,
-                scope  = ssoServer.scope,
-            )
+    """
+    SSO configuration page.
+    
+    Data is now loaded client-side via JavaScript API calls.
+    This route only renders the template structure.
+    """
+    # Template now loads data via JavaScript from /api/v1/settings/sso
+    return render_template('settings/sso-config.html.j2')
         
 @sso_bp.route("/callback", methods=["GET"])
 def callback():
@@ -221,123 +171,26 @@ def callback():
 @settings_bp.route('/cluster-config', methods=['GET', 'POST'])
 @login_required
 def k8s_config():
-    if request.method == 'POST':
-        request_type = request.form['request_type']
-        if request_type == "create":
-            k8s_server_url = request.form['k8s_server_url']
-            k8s_context = request.form['k8s_context']
-            k8s_server_ca = str(base64_encode(request.form['k8s_server_ca'].strip()), 'UTF-8')
-
-            k8sServerConfigCreate(k8s_server_url, k8s_context, k8s_server_ca)
-            flash("Kubernetes Config Updated Successfully", "success")
-        elif request_type == "edit":
-            k8s_server_url = request.form['k8s_server_url']
-            k8s_context = request.form['k8s_context']
-            k8s_context_old = request.form['k8s_context_old']
-            k8s_server_ca = base64_encode(request.form['k8s_server_ca'].strip())
-
-            k8sServerConfigUpdate(k8s_context_old, k8s_server_url, k8s_context, k8s_server_ca)
-            flash("Kubernetes Config Updated Successfully", "success")
-        elif request_type == "delete":
-            k8s_context = request.form['k8s_context']
-            k8sServerConfigDelete(k8s_context)
-
-    k8s_servers, k8s_config_list_length = k8sServerConfigList()
-
-    return render_template(
-        'settings/cluster-config.html.j2',
-        k8s_servers = k8s_servers,
-        k8s_config_list_length = k8s_config_list_length,
-    )
+    """
+    Kubernetes cluster configuration page.
+    
+    Data is now loaded client-side via JavaScript API calls.
+    This route only renders the template structure.
+    """
+    # Template now loads data via JavaScript from /api/v1/settings/k8s/configs
+    return render_template('settings/cluster-config.html.j2')
 
 @settings_bp.route('/export')
 @login_required
 def export():
-    user = User.query.filter_by(username=session['user_name'], user_type = "OpenID").first()
-    user2 = KubectlConfig.query.filter_by(name=session['user_name']).first()
-    k8sConfig = k8sServerConfigGet()
-    if k8sConfig:
-        k8s_server_ca = str(base64_decode(k8sConfig.k8s_server_ca), 'UTF-8')
-        if user:
-            ssoServer = SSOSererGet()
-            redirect_uri = ssoServer.base_uri+"/callback"
-            auth_server_info, oauth = get_auth_server_info()
-
-            if auth_server_info is None:
-                flash("Cannot connect to identity provider. Please try again later.", "danger")
-                logger.error("Cannot connect to identity provider - auth_server_info is None")
-                return render_template(
-                    'settings/export.html.j2',
-                    preferred_username = session['user_name'],
-                    username_role = session['user_role'],
-                    error = "Cannot connect to identity provider"
-                )
-
-            token_url = auth_server_info["token_endpoint"]
-            try:
-                token = oauth.refresh_token(
-                    token_url = token_url,
-                    refresh_token = session['refresh_token'],
-                    client_id = ssoServer.client_id,
-                    client_secret = ssoServer.client_secret,
-                    verify=False,
-                    timeout=60,
-                )
-            except Exception as e:
-                flash(f"Failed to refresh token: {str(e)}", "danger")
-                logger.error(f"Failed to refresh token: {e}")
-                return render_template(
-                    'settings/export.html.j2',
-                    preferred_username = session['user_name'],
-                    username_role = session['user_role'],
-                    error = f"Failed to refresh token: {str(e)}"
-                )
-
-            userinfo_url = auth_server_info["userinfo_endpoint"]
-            user_data = oauth.get(
-                userinfo_url,
-                timeout=60,
-                verify=False,
-            ).json()
-
-            return render_template(
-                'settings/export.html.j2',
-                base_uri = ssoServer.base_uri,
-                preferred_username = user_data["preferred_username"],
-                redirect_uri = redirect_uri,
-                client_id = ssoServer.client_id,
-                client_secret = ssoServer.client_secret,
-                id_token = token["id_token"],
-                refresh_token = token.get("refresh_token"),
-                oauth_server_uri = ssoServer.oauth_server_uri,
-                oauth_server_ca = ssoServer.oauth_server_ca,
-                context = k8sConfig.k8s_context,
-                k8s_server_url = k8sConfig.k8s_server_url,
-                k8s_server_ca = k8s_server_ca
-            )
-        elif user2:
-            return render_template(
-                'settings/export.html.j2',
-                preferred_username = user2.name,
-                context = k8sConfig.k8s_context,
-                k8s_server_url = k8sConfig.k8s_server_url,
-                k8s_server_ca = k8s_server_ca,
-                k8s_user_private_key = user2.private_key,
-                k8s_user_certificate = user2.user_certificate,
-            )
-        else:
-            return render_template(
-                'settings/export.html.j2',
-                preferred_username = session['user_name'],
-                username_role = session['user_role']
-            )
-    else:
-        flash("Kubernetes Cluster is not Configured.", "danger")
-        return render_template(
-            'settings/export.html.j2',
-            preferred_username = session['user_name'],
-            username_role = session['user_role']
-        )
+    """
+    Export kubectl configuration page.
+    
+    Data is now loaded client-side via JavaScript API calls.
+    This route only renders the template structure.
+    """
+    # Template now loads data via JavaScript from /api/v1/settings/export
+    return render_template('settings/export.html.j2')
 
 @sso_bp.route('/kdlogin')
 def index():

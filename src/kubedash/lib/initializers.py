@@ -347,15 +347,91 @@ def initialize_app_swagger(app: Flask):
         app (Flask): Flask app object
     """
     app.logger.info("Initialize Swagger UI")
+    api_description = """
+KubeDash REST API Documentation
+
+This API provides programmatic access to KubeDash functionality including:
+- Kubernetes resource management (pods, deployments, services, etc.)
+- Cluster metrics and monitoring
+- User and role management
+- Application settings and configuration
+- Plugin resources (Flux, Gateway API, Cert Manager, etc.)
+
+## Authentication
+
+Most endpoints require authentication via Flask-Login session cookies.
+Some endpoints may support Bearer token authentication.
+
+## Base URL
+
+All API endpoints are prefixed with `/api/v1/`
+
+## Response Format
+
+All responses follow a consistent format:
+```json
+{
+    "data": {...},
+    "metadata": {
+        "count": 10,
+        "namespace": "default"
+    }
+}
+```
+
+## Error Format
+
+Errors follow this format:
+```json
+{
+    "error": "Error type",
+    "message": "Human-readable error message"
+}
+```
+"""
+    
     app.config.update({
         "API_TITLE": "KubeDash API",
         "API_VERSION": "v1",
+        "API_DESCRIPTION": api_description,
         "OPENAPI_VERSION": "3.0.2",
         "OPENAPI_URL_PREFIX": "/api",                       # OpenAPI served under /api/
         "OPENAPI_SWAGGER_UI_PATH": "/swagger-ui",           # relative to URL_PREFIX → /api/swagger-ui
-        "OPENAPI_SWAGGER_UI_URL": "/api/swagger-ui/",  # your local static files
+        "OPENAPI_SWAGGER_UI_URL": "/api/swagger-ui/",       # your local static files
+        "OPENAPI_REDOC_PATH": "/redoc",                    # ReDoc UI path → /api/redoc
+        "OPENAPI_REDOC_URL": "/api/redoc/",                # ReDoc UI URL
+        "OPENAPI_JSON_PATH": "/openapi.json",               # OpenAPI JSON spec → /api/openapi.json
+        "OPENAPI_RAPIDOC_PATH": "/rapidoc",                 # RapiDoc UI path → /api/rapidoc
+        "OPENAPI_RAPIDOC_URL": "/api/rapidoc/",             # RapiDoc UI URL
     })
     api_doc.init_app(app)
+    
+    # Add additional metadata to spec after initialization
+    # Access the spec's _spec dictionary to add contact and license
+    if hasattr(api_doc.spec, '_spec'):
+        spec_dict = api_doc.spec._spec
+        if 'info' not in spec_dict:
+            spec_dict['info'] = {}
+        spec_dict['info']['contact'] = {
+            "name": "KubeDash Support",
+            "url": "https://github.com/kubedash/kubedash"
+        }
+        spec_dict['info']['license'] = {
+            "name": "MIT",
+            "url": "https://opensource.org/licenses/MIT"
+        }
+    
+    # Add security scheme for session-based auth
+    try:
+        api_doc.spec.components.security_scheme("sessionAuth", {
+            "type": "apiKey",
+            "in": "cookie",
+            "name": "session",
+            "description": "Session-based authentication via Flask-Login"
+        })
+    except Exception as e:
+        # If security scheme addition fails, log but don't crash
+        app.logger.warning(f"Could not add security scheme: {e}")
     
     # Protect Swagger UI with flask-login
     # Use a before_request handler that checks authentication
@@ -391,7 +467,8 @@ def initialize_app_swagger(app: Flask):
 
 def initialize_blueprints(app: Flask):
     """Initialize blueprints"""
-    from blueprint.api import api_bp
+    from blueprint.api_base import api_bp  # Main API blueprint (ping, health, debug)
+    from blueprint.api import api_v1_bp  # API v1 blueprint (all resource endpoints)
     from blueprint.auth import auth_bp
     from blueprint.cluster import cluster_bp
     from blueprint.cluster_permission import cluster_permission_bp
@@ -410,7 +487,8 @@ def initialize_blueprints(app: Flask):
 
     app.logger.info("Initialize blueprints")
     #app.register_blueprint(api_bp)
-    api_doc.register_blueprint(api_bp)
+    api_doc.register_blueprint(api_bp)  # Main API blueprint (ping, health, debug)
+    api_doc.register_blueprint(api_v1_bp)  # API v1 blueprint (all resource endpoints)
     app.register_blueprint(metrics_bp)
     app.register_blueprint(history_bp)
     
