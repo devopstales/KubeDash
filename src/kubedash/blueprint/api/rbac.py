@@ -33,6 +33,46 @@ logger = get_logger()
 tracer = get_tracer()
 
 ##############################################################
+## Helper Functions
+##############################################################
+
+def serialize_policy_rules(rules):
+    """
+    Convert V1PolicyRule objects to dictionaries for JSON serialization.
+    
+    Args:
+        rules: List of V1PolicyRule objects or dicts
+        
+    Returns:
+        list: List of serialized rule dictionaries
+    """
+    if not rules:
+        return []
+    
+    serialized_rules = []
+    for rule in rules:
+        if hasattr(rule, 'to_dict'):
+            # Use to_dict() if available (Kubernetes client library method)
+            rule_dict = rule.to_dict()
+            serialized_rules.append(rule_dict)
+        elif isinstance(rule, dict):
+            # Already a dict
+            serialized_rules.append(rule)
+        else:
+            # Manual conversion for V1PolicyRule objects
+            rule_dict = {
+                'apiGroups': list(rule.api_groups) if hasattr(rule, 'api_groups') and rule.api_groups else [],
+                'resources': list(rule.resources) if hasattr(rule, 'resources') and rule.resources else [],
+                'verbs': list(rule.verbs) if hasattr(rule, 'verbs') and rule.verbs else [],
+                'resourceNames': list(rule.resource_names) if hasattr(rule, 'resource_names') and rule.resource_names else None,
+                'nonResourceURLs': list(rule.non_resource_urls) if hasattr(rule, 'non_resource_urls') and rule.non_resource_urls else None
+            }
+            # Remove None values
+            rule_dict = {k: v for k, v in rule_dict.items() if v is not None}
+            serialized_rules.append(rule_dict)
+    return serialized_rules
+
+##############################################################
 ## Roles
 ##############################################################
 
@@ -59,6 +99,11 @@ class RolesListResource(MethodView):
         namespace = request.args.get('namespace', session.get('ns_select', 'default'))
         
         roles = k8sRoleListGet(session['user_role'], user_token, namespace)
+        
+        # Serialize V1PolicyRule objects in rules for each role
+        for role in roles:
+            if role.get('rules'):
+                role['rules'] = serialize_policy_rules(role['rules'])
         
         return jsonify({
             "data": roles,
@@ -114,28 +159,7 @@ class RoleResource(MethodView):
             
             # Convert V1PolicyRule objects to dictionaries for JSON serialization
             if role.get('rules'):
-                serialized_rules = []
-                for rule in role['rules']:
-                    if hasattr(rule, 'to_dict'):
-                        # Use to_dict() if available (Kubernetes client library method)
-                        rule_dict = rule.to_dict()
-                        serialized_rules.append(rule_dict)
-                    elif isinstance(rule, dict):
-                        # Already a dict
-                        serialized_rules.append(rule)
-                    else:
-                        # Manual conversion for V1PolicyRule objects
-                        rule_dict = {
-                            'apiGroups': list(rule.api_groups) if hasattr(rule, 'api_groups') and rule.api_groups else [],
-                            'resources': list(rule.resources) if hasattr(rule, 'resources') and rule.resources else [],
-                            'verbs': list(rule.verbs) if hasattr(rule, 'verbs') and rule.verbs else [],
-                            'resourceNames': list(rule.resource_names) if hasattr(rule, 'resource_names') and rule.resource_names else None,
-                            'nonResourceURLs': list(rule.non_resource_urls) if hasattr(rule, 'non_resource_urls') and rule.non_resource_urls else None
-                        }
-                        # Remove None values
-                        rule_dict = {k: v for k, v in rule_dict.items() if v is not None}
-                        serialized_rules.append(rule_dict)
-                role['rules'] = serialized_rules
+                role['rules'] = serialize_policy_rules(role['rules'])
             
             return jsonify({
                 "data": role,
@@ -169,6 +193,11 @@ class ClusterRolesListResource(MethodView):
         user_token = get_user_token(session)
         
         cluster_roles = k8sClusterRoleListGet(session['user_role'], user_token)
+        
+        # Serialize V1PolicyRule objects in rules for each cluster role
+        for cluster_role in cluster_roles:
+            if cluster_role.get('rules'):
+                cluster_role['rules'] = serialize_policy_rules(cluster_role['rules'])
         
         return jsonify({
             "data": cluster_roles,
@@ -218,28 +247,7 @@ class ClusterRoleResource(MethodView):
             
             # Convert V1PolicyRule objects to dictionaries for JSON serialization
             if cluster_role.get('rules'):
-                serialized_rules = []
-                for rule in cluster_role['rules']:
-                    if hasattr(rule, 'to_dict'):
-                        # Use to_dict() if available (Kubernetes client library method)
-                        rule_dict = rule.to_dict()
-                        serialized_rules.append(rule_dict)
-                    elif isinstance(rule, dict):
-                        # Already a dict
-                        serialized_rules.append(rule)
-                    else:
-                        # Manual conversion for V1PolicyRule objects
-                        rule_dict = {
-                            'apiGroups': list(rule.api_groups) if hasattr(rule, 'api_groups') and rule.api_groups else [],
-                            'resources': list(rule.resources) if hasattr(rule, 'resources') and rule.resources else [],
-                            'verbs': list(rule.verbs) if hasattr(rule, 'verbs') and rule.verbs else [],
-                            'resourceNames': list(rule.resource_names) if hasattr(rule, 'resource_names') and rule.resource_names else None,
-                            'nonResourceURLs': list(rule.non_resource_urls) if hasattr(rule, 'non_resource_urls') and rule.non_resource_urls else None
-                        }
-                        # Remove None values
-                        rule_dict = {k: v for k, v in rule_dict.items() if v is not None}
-                        serialized_rules.append(rule_dict)
-                cluster_role['rules'] = serialized_rules
+                cluster_role['rules'] = serialize_policy_rules(cluster_role['rules'])
             
             return jsonify({
                 "data": cluster_role,
@@ -275,13 +283,24 @@ class RoleBindingsListResource(MethodView):
         user_token = get_user_token(session)
         namespace = request.args.get('namespace', session.get('ns_select', 'default'))
         
-        role_bindings = k8sRoleBindingListGet(session['user_role'], user_token, namespace)
+        role_bindings, error = k8sRoleBindingListGet(session['user_role'], user_token, namespace)
+        
+        if error:
+            return jsonify({
+                "error": "Error",
+                "message": str(error),
+                "data": [],
+                "metadata": {
+                    "namespace": namespace,
+                    "count": 0
+                }
+            }), 500
         
         return jsonify({
             "data": role_bindings,
             "metadata": {
                 "namespace": namespace,
-                "count": len(role_bindings)
+                "count": len(role_bindings) if role_bindings else 0
             }
         })
 
@@ -308,12 +327,22 @@ class ClusterRoleBindingsListResource(MethodView):
         """
         user_token = get_user_token(session)
         
-        cluster_role_bindings = k8sClusterRoleBindingListGet(session['user_role'], user_token)
+        cluster_role_bindings, error = k8sClusterRoleBindingListGet(session['user_role'], user_token)
+        
+        if error:
+            return jsonify({
+                "error": "Error",
+                "message": str(error),
+                "data": [],
+                "metadata": {
+                    "count": 0
+                }
+            }), 500
         
         return jsonify({
             "data": cluster_role_bindings,
             "metadata": {
-                "count": len(cluster_role_bindings)
+                "count": len(cluster_role_bindings) if cluster_role_bindings else 0
             }
         })
 

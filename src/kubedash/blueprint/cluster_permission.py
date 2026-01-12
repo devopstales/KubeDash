@@ -39,8 +39,13 @@ def service_accounts():
             session['ns_select'] = request.form.get('ns_select')
         selected = request.form.get('selected')
 
+    # Get namespaces for topbar selector
+    user_token = get_user_token(session)
+    namespace_list, error = k8sNamespaceListGet(session['user_role'], user_token)
+    namespaces = namespace_list if not error else []
+
     # Template now loads data via JavaScript from /api/v1/rbac/service-accounts
-    return render_template('cluster-permission/service-account.html.j2')
+    return render_template('cluster-permission/service-account.html.j2', namespaces=namespaces)
 
 
 ##############################################################
@@ -62,8 +67,13 @@ def roles():
             session['ns_select'] = request.form.get('ns_select')
         selected = request.form.get('selected')
 
+    # Get namespaces for topbar selector
+    user_token = get_user_token(session)
+    namespace_list, error = k8sNamespaceListGet(session['user_role'], user_token)
+    namespaces = namespace_list if not error else []
+
     # Template now loads data via JavaScript from /api/v1/rbac/roles
-    return render_template('cluster-permission/role.html.j2')
+    return render_template('cluster-permission/role.html.j2', namespaces=namespaces)
 
 @cluster_permission_bp.route("/role/data", methods=['GET', 'POST'])
 @login_required
@@ -74,14 +84,22 @@ def role_data():
     Data is now loaded client-side via JavaScript API calls.
     This route only renders the template structure.
     """
-    # Handle POST requests for backward compatibility
+    # Handle POST requests - redirect to GET with query parameters
     if request.method == 'POST':
         if 'ns_select' in request.form:
             session['ns_select'] = request.form.get('ns_select')
         r_name = request.form.get('r_name')
+        namespace = request.form.get('ns_select', session.get('ns_select', 'default'))
+        if r_name:
+            return redirect(url_for('cluster_permission.role_data', r_name=r_name, namespace=namespace))
+
+    # Get namespaces for topbar selector
+    user_token = get_user_token(session)
+    namespace_list, error = k8sNamespaceListGet(session['user_role'], user_token)
+    namespaces = namespace_list if not error else []
 
     # Template now loads data via JavaScript from /api/v1/rbac/roles/<name>
-    return render_template('cluster-permission/role-data.html.j2')
+    return render_template('cluster-permission/role-data.html.j2', namespaces=namespaces)
     
 ##############################################################
 ##  Role Binding
@@ -102,8 +120,13 @@ def role_bindings():
             session['ns_select'] = request.form.get('ns_select')
         selected = request.form.get('rb_name')
 
+    # Get namespaces for topbar selector
+    user_token = get_user_token(session)
+    namespace_list, error = k8sNamespaceListGet(session['user_role'], user_token)
+    namespaces = namespace_list if not error else []
+
     # Template now loads data via JavaScript from /api/v1/rbac/role-bindings
-    return render_template('cluster-permission/role-binding.html.j2')
+    return render_template('cluster-permission/role-binding.html.j2', namespaces=namespaces)
 
 ##############################################################
 ## Cluster Role
@@ -122,6 +145,7 @@ def cluster_roles():
     if request.method == 'POST':
         selected = request.form.get('selected')
 
+    # Cluster roles are cluster-scoped, no namespace selector needed
     # Template now loads data via JavaScript from /api/v1/rbac/cluster-roles
     return render_template('cluster-permission/cluster-role.html.j2')
 
@@ -134,10 +158,13 @@ def cluster_role_data():
     Data is now loaded client-side via JavaScript API calls.
     This route only renders the template structure.
     """
-    # Handle POST requests for backward compatibility
+    # Handle POST requests - redirect to GET with query parameters
     if request.method == 'POST':
         cr_name = request.form.get('cr_name')
+        if cr_name:
+            return redirect(url_for('cluster_permission.cluster_role_data', cr_name=cr_name))
 
+    # Cluster roles are cluster-scoped, no namespace selector needed
     # Template now loads data via JavaScript from /api/v1/rbac/cluster-roles/<name>
     return render_template('cluster-permission/cluster-role-data.html.j2')
     
@@ -158,6 +185,7 @@ def cluster_role_bindings():
     if request.method == 'POST':
         crb_name = request.form.get('crb_name')
 
+    # Cluster role bindings are cluster-scoped, no namespace selector needed
     # Template now loads data via JavaScript from /api/v1/rbac/cluster-role-bindings
     return render_template('cluster-permission/cluster-role-binding.html.j2')
 
