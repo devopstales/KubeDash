@@ -58,8 +58,13 @@ def pod_list():
         if 'ns_select' in request.form:
             session['ns_select'] = request.form.get('ns_select')
 
+    # Get namespaces for topbar selector
+    user_token = get_user_token(session)
+    namespace_list, error = k8sNamespaceListGet(session['user_role'], user_token)
+    namespaces = namespace_list if not error else []
+
     # Template now loads data via JavaScript from /api/v1/workloads/pods
-    return render_template('workload/pod.html.j2')
+    return render_template('workload/pod.html.j2', namespaces=namespaces)
     
 @workload_bp.route('/pods/delete', methods=['POST'])
 @login_required
@@ -88,8 +93,29 @@ def pod_data():
     Data is now loaded client-side via JavaScript API calls.
     This route only renders the template structure.
     """
-    # Template now loads data via JavaScript from /api/v1/workloads/pods/<name>
-    return render_template('workload/pod-data.html.j2')
+    # Handle POST requests (from form submission) - redirect to GET with parameters
+    if request.method == 'POST':
+        po_name = request.form.get('po_name')
+        ns_select = request.form.get('ns_select')
+        
+        # Build query parameters
+        params = {}
+        if po_name:
+            params['po_name'] = po_name
+        if ns_select:
+            params['namespace'] = ns_select
+        
+        # Redirect to GET request with parameters
+        return redirect(url_for('.pod_data', **params))
+    
+    # Get namespaces for topbar selector
+    user_token = get_user_token(session)
+    namespace_list, error = k8sNamespaceListGet(session['user_role'], user_token)
+    namespaces = namespace_list if not error else []
+    
+    # Handle GET requests - just render the template
+    # The template will fetch data client-side using the query parameters
+    return render_template('workload/pod-data.html.j2', namespaces=namespaces)
 
 ##############################################################
 ## Pod Logs
@@ -206,8 +232,13 @@ def statefulsets():
             session['ns_select'] = request.form.get('ns_select')
         selected = request.form.get('selected', None)
 
+    # Get namespaces for topbar selector
+    user_token = get_user_token(session)
+    namespace_list, error = k8sNamespaceListGet(session['user_role'], user_token)
+    namespaces = namespace_list if not error else []
+
     # Template now loads data via JavaScript from /api/v1/workloads/statefulsets
-    return render_template('workload/statefulset.html.j2')
+    return render_template('workload/statefulset.html.j2', namespaces=namespaces)
 
 @workload_bp.route('/statefulsets/data', methods=['GET', 'POST'])
 @login_required
@@ -218,8 +249,29 @@ def statefulsets_data():
     Data is now loaded client-side via JavaScript API calls.
     This route only renders the template structure.
     """
-    # Template now loads data via JavaScript from /api/v1/workloads/statefulsets/<name>
-    return render_template('workload/statefulset-data.html.j2')
+    # Handle POST requests (from form submission) - redirect to GET with parameters
+    if request.method == 'POST':
+        selected = request.form.get('selected')
+        ns_select = request.form.get('ns_select')
+        
+        # Build query parameters
+        params = {}
+        if selected:
+            params['statefulset_name'] = selected
+        if ns_select:
+            params['namespace'] = ns_select
+        
+        # Redirect to GET request with parameters
+        return redirect(url_for('.statefulsets_data', **params))
+    
+    # Get namespaces for topbar selector
+    user_token = get_user_token(session)
+    namespace_list, error = k8sNamespaceListGet(session['user_role'], user_token)
+    namespaces = namespace_list if not error else []
+    
+    # Handle GET requests - just render the template
+    # The template will fetch data client-side using the query parameters
+    return render_template('workload/statefulset-data.html.j2', namespaces=namespaces)
         
 @workload_bp.route('/statefulsets/scale', methods=['GET', 'POST'])
 @login_required
@@ -254,8 +306,13 @@ def daemonsets():
             session['ns_select'] = request.form.get('ns_select')
         selected = request.form.get('selected')
 
+    # Get namespaces for topbar selector
+    user_token = get_user_token(session)
+    namespace_list, error = k8sNamespaceListGet(session['user_role'], user_token)
+    namespaces = namespace_list if not error else []
+
     # Template now loads data via JavaScript from /api/v1/workloads/daemonsets
-    return render_template('workload/daemonset.html.j2')
+    return render_template('workload/daemonset.html.j2', namespaces=namespaces)
 
 @workload_bp.route('/daemonsets/data', methods=['GET', 'POST'])
 @login_required
@@ -266,8 +323,29 @@ def daemonset_data():
     Data is now loaded client-side via JavaScript API calls.
     This route only renders the template structure.
     """
-    # Template now loads data via JavaScript from /api/v1/workloads/daemonsets/<name>
-    return render_template('workload/daemonset-data.html.j2')
+    # Handle POST requests (from form submission) - redirect to GET with parameters
+    if request.method == 'POST':
+        selected = request.form.get('selected')
+        ns_select = request.form.get('ns_select')
+        
+        # Build query parameters
+        params = {}
+        if selected:
+            params['daemonset_name'] = selected
+        if ns_select:
+            params['namespace'] = ns_select
+        
+        # Redirect to GET request with parameters
+        return redirect(url_for('.daemonset_data', **params))
+    
+    # Get namespaces for topbar selector
+    user_token = get_user_token(session)
+    namespace_list, error = k8sNamespaceListGet(session['user_role'], user_token)
+    namespaces = namespace_list if not error else []
+    
+    # Handle GET requests - just render the template
+    # The template will fetch data client-side using the query parameters
+    return render_template('workload/daemonset-data.html.j2', namespaces=namespaces)
     
 @workload_bp.route('/statefulsets/scale', methods=['GET', 'POST'])
 @login_required
@@ -311,8 +389,13 @@ def deployments():
             session['ns_select'] = request.form.get('ns_select')
         selected = request.form.get('selected')
 
+    # Get namespaces for topbar selector
+    user_token = get_user_token(session)
+    namespace_list, error = k8sNamespaceListGet(session['user_role'], user_token)
+    namespaces = namespace_list if not error else []
+
     # Template now loads data via JavaScript from /api/v1/workloads/deployments
-    return render_template('workload/deployment.html.j2')
+    return render_template('workload/deployment.html.j2', namespaces=namespaces)
 
 @workload_bp.route('/deployments/data', methods=['GET', 'POST'])
 @login_required
@@ -323,8 +406,29 @@ def deployment_data():
     Data is now loaded client-side via JavaScript API calls.
     This route only renders the template structure.
     """
-    # Template now loads data via JavaScript from /api/v1/workloads/deployments/<name>
-    return render_template('workload/deployment-data.html.j2')
+    # Handle POST requests (from form submission) - redirect to GET with parameters
+    if request.method == 'POST':
+        selected = request.form.get('selected')
+        ns_select = request.form.get('ns_select')
+        
+        # Build query parameters
+        params = {}
+        if selected:
+            params['deployment_name'] = selected
+        if ns_select:
+            params['namespace'] = ns_select
+        
+        # Redirect to GET request with parameters
+        return redirect(url_for('.deployment_data', **params))
+    
+    # Get namespaces for topbar selector
+    user_token = get_user_token(session)
+    namespace_list, error = k8sNamespaceListGet(session['user_role'], user_token)
+    namespaces = namespace_list if not error else []
+    
+    # Handle GET requests - just render the template
+    # The template will fetch data client-side using the query parameters
+    return render_template('workload/deployment-data.html.j2', namespaces=namespaces)
     
 @workload_bp.route('/deployments/scale', methods=['GET', 'POST'])
 @login_required
@@ -359,5 +463,10 @@ def replicasets():
             session['ns_select'] = request.form.get('ns_select')
         selected = request.form.get('selected')
 
+    # Get namespaces for topbar selector
+    user_token = get_user_token(session)
+    namespace_list, error = k8sNamespaceListGet(session['user_role'], user_token)
+    namespaces = namespace_list if not error else []
+
     # Template now loads data via JavaScript from /api/v1/workloads/replicasets
-    return render_template('workload/replicaset.html.j2')
+    return render_template('workload/replicaset.html.j2', namespaces=namespaces)

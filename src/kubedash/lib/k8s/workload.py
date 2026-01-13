@@ -169,8 +169,8 @@ def k8sDeploymentsGet(username_role, user_token, ns):
                 "environment_variables": [],
                 # Security
                 "security_context": d.spec.template.spec.security_context.to_dict(),
-                # Conditions
-                "conditions": d.status.conditions,
+                # Conditions (will be serialized later)
+                "conditions": [],
                 # Containers
                 "containers": list(),
                 "init_containers": list(),
@@ -201,6 +201,29 @@ def k8sDeploymentsGet(username_role, user_token, ns):
                 DEPLOYMENT_DATA["annotations"] = trimAnnotations(d.metadata.annotations)
             selectors = d.spec.selector.to_dict()
             DEPLOYMENT_DATA['selectors'] = selectors['match_labels']
+            # Serialize V1DeploymentCondition objects to dictionaries
+            if d.status.conditions:
+                DEPLOYMENT_DATA['conditions'] = []
+                for condition in d.status.conditions:
+                    if hasattr(condition, 'to_dict'):
+                        # Use to_dict() if available (Kubernetes client library method)
+                        condition_dict = condition.to_dict()
+                        # Convert snake_case to camelCase for consistency
+                        if 'last_transition_time' in condition_dict:
+                            condition_dict['lastTransitionTime'] = condition_dict.pop('last_transition_time')
+                        DEPLOYMENT_DATA['conditions'].append(condition_dict)
+                    else:
+                        # Manual conversion
+                        condition_dict = {
+                            'type': condition.type if hasattr(condition, 'type') else '',
+                            'status': condition.status if hasattr(condition, 'status') else '',
+                            'reason': condition.reason if hasattr(condition, 'reason') else '',
+                            'message': condition.message if hasattr(condition, 'message') else '',
+                            'lastTransitionTime': condition.last_transition_time.strftime('%Y-%m-%d %H:%M:%S') if hasattr(condition, 'last_transition_time') and condition.last_transition_time else ''
+                        }
+                        # Remove empty values
+                        condition_dict = {k: v for k, v in condition_dict.items() if v}
+                        DEPLOYMENT_DATA['conditions'].append(condition_dict)
             if d.spec.template.spec.image_pull_secrets:
                 for ips in d.spec.template.spec.image_pull_secrets:
                     DEPLOYMENT_DATA['image_pull_secrets'].append(ips.to_dict())
