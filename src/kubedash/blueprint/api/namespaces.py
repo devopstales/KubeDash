@@ -165,11 +165,57 @@ class NamespaceCreateResource(MethodView):
             }), 500
 
 
-@namespaces_api_bp.route('/<name>', methods=['DELETE'])
-class NamespaceDeleteResource(MethodView):
+@namespaces_api_bp.route('/<name>')
+class NamespaceResource(MethodView):
     """
-    Namespace deletion endpoint.
+    Individual namespace endpoint.
     """
+    
+    @namespaces_api_bp.response(200, description="Successfully retrieved namespace details")
+    @namespaces_api_bp.response(404, description="Namespace not found")
+    @namespaces_api_bp.doc(tags=['Cluster'])
+    @login_required
+    def get(self, name):
+        """
+        Get namespace details
+        
+        Path Parameters:
+            name (str): Name of the namespace
+        
+        Returns:
+            dict: Namespace details
+        """
+        user_token = get_user_token(session)
+        
+        with tracer.start_as_current_span(
+            "namespace-get",
+            attributes={
+                "http.route": "/api/v1/namespaces/{name}",
+                "http.method": "GET",
+                "namespace.name": name,
+            }
+        ) if tracer else nullcontext():
+            namespaces = k8sNamespacesGet(session['user_role'], user_token)
+            
+            # Find the namespace by name
+            namespace_data = None
+            for ns in namespaces:
+                if ns.get('name') == name:
+                    namespace_data = ns
+                    break
+            
+            if not namespace_data:
+                return jsonify({
+                    "error": "NotFound",
+                    "message": f"Namespace '{name}' not found"
+                }), 404
+            
+            return jsonify({
+                "data": namespace_data,
+                "metadata": {
+                    "name": name
+                }
+            })
     
     @namespaces_api_bp.response(200, description="Successfully deleted namespace")
     @namespaces_api_bp.response(404, description="Namespace not found")

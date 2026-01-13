@@ -152,11 +152,16 @@ def nodes_data():
     Data is now loaded client-side via JavaScript API calls.
     This route only renders the template structure.
     """
-    # Handle POST requests for backward compatibility
+    # Handle POST requests (from form submission) - redirect to GET with node name
     if request.method == 'POST':
         no_name = request.form.get('no_name')
-
-    # Template now loads data via JavaScript from /api/v1/nodes/<name> and /api/v1/nodes/<name>/metrics
+        if no_name:
+            # Redirect to GET request with node name as query parameter
+            return redirect(url_for('.nodes_data', no_name=no_name))
+        return redirect(url_for('.node_list'))
+    
+    # Handle GET requests - just render the template
+    # The template will fetch data client-side using the no_name query parameter
     return render_template('cluster/node-data.html.j2')
 
 ##############################################################
@@ -182,6 +187,13 @@ def crd_list():
 @cluster_bp.route("/crd/data", methods=['GET', 'POST'])
 @login_required
 def crd_data():
+    """
+    CRD data page.
+    
+    Data is now loaded client-side via JavaScript API calls.
+    This route only renders the template structure.
+    """
+    # Handle POST requests (from form submission) - redirect to GET with parameters
     if request.method == 'POST':
         crd_name = request.form.get('crd_name')
         crd_kind = request.form.get('crd_kind')
@@ -189,25 +201,25 @@ def crd_data():
         crd_version = request.form.get('crd_version')
         crd_scope = request.form.get('crd_scope')
         
-        user_token = get_user_token(session)
-
-        if crd_scope == "Namespaced":
-            namespace  = namespace = session['ns_select']
-            crd_data = get_custom_resource_data(session['user_role'], user_token, namespace, crd_name, crd_group, crd_version)
-        else:
-            crd_data = get_custom_resource_data(session['user_role'], user_token, None, crd_name, crd_group, crd_version)
-            
-        if crd_data is None:
-            crd_data = []
-
-        return render_template(
-            'cluster/crd-data.html.j2',
-            crd_data = crd_data,
-            crd_name = crd_name,
-            crd_kind = crd_kind,
-        )
-    else:
-        return redirect(url_for('.crd_list'))
+        # Build query parameters
+        params = {}
+        if crd_name:
+            params['crd_name'] = crd_name
+        if crd_kind:
+            params['crd_kind'] = crd_kind
+        if crd_group:
+            params['crd_group'] = crd_group
+        if crd_version:
+            params['crd_version'] = crd_version
+        if crd_scope:
+            params['crd_scope'] = crd_scope
+        
+        # Redirect to GET request with parameters
+        return redirect(url_for('.crd_data', **params))
+    
+    # Handle GET requests - just render the template
+    # The template will fetch data client-side using the query parameters
+    return render_template('cluster/crd-data.html.j2')
 
 ##############################################################
 ## Runtime Classes

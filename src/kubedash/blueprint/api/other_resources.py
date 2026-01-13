@@ -638,25 +638,63 @@ class CRDDataResource(MethodView):
         
         Query Parameters:
             namespace (str): Kubernetes namespace (optional)
+            name (str): CRD plural resource name (optional, defaults to kind.lower() + 's')
         
         Returns:
             dict: CRD data
         """
         user_token = get_user_token(session)
         namespace = request.args.get('namespace', None)
+        crd_name = request.args.get('name', None)
         
-        crd_data = get_custom_resource_data(
-            session['user_role'], user_token, namespace,
-            kind.lower() + 's', group, version
-        )
+        # Use provided name or construct from kind (fallback)
+        if not crd_name:
+            crd_name = kind.lower() + 's'
         
-        return jsonify({
-            "data": crd_data,
-            "metadata": {
-                "group": group,
-                "version": version,
-                "kind": kind,
-                "namespace": namespace
-            }
-        })
+        try:
+            crd_data = get_custom_resource_data(
+                session['user_role'], user_token, namespace,
+                crd_name, group, version
+            )
+            
+            # Check if crd_data is None (error case)
+            if crd_data is None:
+                return jsonify({
+                    "data": [],
+                    "error": "UnknownError",
+                    "message": f"Failed to retrieve CRD data for {kind}",
+                    "metadata": {
+                        "group": group,
+                        "version": version,
+                        "kind": kind,
+                        "namespace": namespace,
+                        "plural": crd_name
+                    }
+                }), 500
+            
+            return jsonify({
+                "data": crd_data,
+                "metadata": {
+                    "group": group,
+                    "version": version,
+                    "kind": kind,
+                    "namespace": namespace,
+                    "plural": crd_name,
+                    "count": len(crd_data) if crd_data else 0
+                }
+            })
+        except Exception as e:
+            logger.error(f"Error retrieving CRD data for {kind}: {str(e)}")
+            return jsonify({
+                "data": [],
+                "error": "InternalError",
+                "message": str(e),
+                "metadata": {
+                    "group": group,
+                    "version": version,
+                    "kind": kind,
+                    "namespace": namespace,
+                    "plural": crd_name
+                }
+            }), 500
 
