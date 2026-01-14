@@ -12,6 +12,7 @@ from lib.initializers import (
     initialize_app_database,
     initialize_app_plugins,
     initialize_blueprints,
+    initialize_plugin_apis,
     initialize_app_socket,
     add_custom_jinja2_filters,
     initialize_app_security,
@@ -86,6 +87,7 @@ def create_app(external_config_name=None):
             app.logger.info(separator_short)
             initialize_app_socket(app)
             initialize_blueprints(app)
+            initialize_plugin_apis(app)
             add_custom_jinja2_filters(app)
             initialize_app_security(app)
             

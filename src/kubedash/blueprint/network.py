@@ -37,8 +37,13 @@ def ingresses():
         if request.form.get('active_tab'):
             active_tab = request.form.get('active_tab')
 
+    # Get namespaces for topbar selector
+    user_token = get_user_token(session)
+    namespace_list, error = k8sNamespaceListGet(session['user_role'], user_token)
+    namespaces = namespace_list if not error else []
+
     # Template now loads data via JavaScript from /api/v1/network/ingress and /api/v1/network/ingress-classes
-    return render_template('network/ingress.html.j2')
+    return render_template('network/ingress.html.j2', namespaces=namespaces)
 
 @network_bp.route("/ingress-class", methods=['GET', 'POST'])
 @login_required
@@ -67,14 +72,28 @@ def ingresses_data():
     Data is now loaded client-side via JavaScript API calls.
     This route only renders the template structure.
     """
-    # Handle POST requests for backward compatibility
+    # Handle POST requests (from form submission) - redirect to GET with parameters
     if request.method == 'POST':
         i_name = request.form.get('i_name')
-        if 'ns_select' in request.form:
-            session['ns_select'] = request.form.get('ns_select')
+        ns_select = request.form.get('ns_select')
+        
+        # Build query parameters
+        params = {}
+        if i_name:
+            params['i_name'] = i_name
+        if ns_select:
+            params['namespace'] = ns_select
+        
+        # Redirect to GET request with query parameters
+        return redirect(url_for('.ingresses_data', **params))
+    
+    # Get namespaces for topbar selector
+    user_token = get_user_token(session)
+    namespace_list, error = k8sNamespaceListGet(session['user_role'], user_token)
+    namespaces = namespace_list if not error else []
 
     # Template now loads data via JavaScript from /api/v1/network/ingress/<name>
-    return render_template('network/ingress-data.html.j2')
+    return render_template('network/ingress-data.html.j2', namespaces=namespaces)
 
 @network_bp.route('/ingress-class/data', methods=['GET', 'POST'])
 @login_required
@@ -85,11 +104,20 @@ def ingresses_class_data():
     Data is now loaded client-side via JavaScript API calls.
     This route only renders the template structure.
     """
-    # Handle POST requests for backward compatibility
+    # Handle POST requests (from form submission) - redirect to GET with parameters
     if request.method == 'POST':
         ic_name = request.form.get('ic_name')
+        
+        # Build query parameters
+        params = {}
+        if ic_name:
+            params['ic_name'] = ic_name
+        
+        # Redirect to GET request with query parameters
+        return redirect(url_for('.ingresses_class_data', **params))
 
     # Template now loads data via JavaScript from /api/v1/network/ingress-classes/<name>
+    # Note: IngressClasses are cluster-scoped, so no namespace selector needed
     return render_template('network/ingress-class-data.html.j2')
 
 ##############################################################
@@ -111,8 +139,13 @@ def services():
             session['ns_select'] = request.form.get('ns_select')
         selected = request.form.get('selected')
 
+    # Get namespaces for topbar selector
+    user_token = get_user_token(session)
+    namespace_list, error = k8sNamespaceListGet(session['user_role'], user_token)
+    namespaces = namespace_list if not error else []
+
     # Template now loads data via JavaScript from /api/v1/network/services
-    return render_template('network/service.html.j2')
+    return render_template('network/service.html.j2', namespaces=namespaces)
 
 @network_bp.route('/service/data', methods=['GET', 'POST'])
 @login_required
@@ -123,11 +156,25 @@ def services_data():
     Data is now loaded client-side via JavaScript API calls.
     This route only renders the template structure.
     """
-    # Handle POST requests for backward compatibility
+    # Handle POST requests (from form submission) - redirect to GET with parameters
     if request.method == 'POST':
         service_name = request.form.get('service_name')
-        if 'ns_select' in request.form:
-            session['ns_select'] = request.form.get('ns_select')
+        ns_select = request.form.get('ns_select')
+        
+        # Build query parameters
+        params = {}
+        if service_name:
+            params['service_name'] = service_name
+        if ns_select:
+            params['namespace'] = ns_select
+        
+        # Redirect to GET request with query parameters
+        return redirect(url_for('.services_data', **params))
+    
+    # Get namespaces for topbar selector
+    user_token = get_user_token(session)
+    namespace_list, error = k8sNamespaceListGet(session['user_role'], user_token)
+    namespaces = namespace_list if not error else []
 
     # Template now loads data via JavaScript from /api/v1/network/services/<name>
-    return render_template('network/service-data.html.j2')
+    return render_template('network/service-data.html.j2', namespaces=namespaces)

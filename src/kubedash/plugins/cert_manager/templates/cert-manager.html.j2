@@ -51,27 +51,15 @@
                                             <th>Type</th>
                                         </tr>
                                     </thead>
-                                    <tbody>
-                                        {% for cluster_issuer in cluster_issuer_list %}
+                                    <tbody id="cluster-issuers-tbody">
                                         <tr>
-                                            <td>
-                                                {% if cluster_issuer.status == 'True' %}
-                                                <span class="badge text-bg-tag text-bg-success">{{ cluster_issuer.reason }}</span>
-                                                {% else %}
-                                                <span class="badge text-bg-tag text-bg-danger">{{ cluster_issuer.reason }}</span>
-                                                {% endif %}
+                                            <td colspan="3" class="text-center">
+                                                <div class="spinner-border spinner-border-sm text-primary" role="status">
+                                                    <span class="visually-hidden">Loading...</span>
+                                                </div>
+                                                <span class="ms-2">Loading cluster issuers...</span>
                                             </td>
-                                            <td id="{{ cluster_issuer.name }}">
-                                                <form action="/plugins/cert-manager/data" method="POST">
-                                                    <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
-                                                    <input type="hidden" name="object_data" value="{{ cluster_issuer }}" />
-                                                    <input type="hidden" name="object_type" value="cluster_issuer" />
-                                                    <a href="#" onclick="this.closest('form').submit(); return false;">{{ cluster_issuer.name }}</a>
-                                                </form>
-                                            </td>
-                                            <td>{{ cluster_issuer.type }}</td>
                                         </tr>
-                                        {% endfor %}
                                     </tbody>
                                 </table>
                             </div>
@@ -92,27 +80,15 @@
                                         <th>Type</th>
                                     </tr>
                                 </thead>
-                                <tbody>
-                                    {% for issuer in issuer_list %}
+                                <tbody id="issuers-tbody">
                                     <tr>
-                                        <td>
-                                            {% if issuer.status == 'True' %}
-                                            <span class="badge text-bg-tag text-bg-success">{{ issuer.reason }}</span>
-                                            {% else %}
-                                            <span class="badge text-bg-tag text-bg-danger">{{ issuer.reason }}</span>
-                                            {% endif %}
+                                        <td colspan="3" class="text-center">
+                                            <div class="spinner-border spinner-border-sm text-primary" role="status">
+                                                <span class="visually-hidden">Loading...</span>
+                                            </div>
+                                            <span class="ms-2">Loading issuers...</span>
                                         </td>
-                                        <td id="{{ issuer.name }}">
-                                            <form action="/plugins/cert-manager/data" method="POST">
-                                                <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
-                                                <input type="hidden" name="object_data" value="{{ issuer }}" />
-                                                <input type="hidden" name="object_type" value="issuer" />
-                                                <a href="#" onclick="this.closest('form').submit(); return false;">{{ issuer.name }}</a>
-                                            </form>
-                                        </td>
-                                        <td>{{ issuer.type }}</td>
                                     </tr>
-                                    {% endfor %}
                                 </tbody>
                             </table>
                         </div>
@@ -133,30 +109,15 @@
                                         <th>Owner</th>
                                     </tr>
                                 </thead>
-                                <tbody>
-                                    {% for certificate_request in certificate_request_list %}
+                                <tbody id="certificate-requests-tbody">
                                     <tr>
-                                        <td>
-                                            {% if certificate_request.status == 'True' %}
-                                            <span class="badge text-bg-tag text-bg-success">{{ certificate_request.reason }}</span>
-                                            {% else %}
-                                            <span class="badge text-bg-tag text-bg-danger">{{ certificate_request.reason }}</span>
-                                            {% endif %}
+                                        <td colspan="4" class="text-center">
+                                            <div class="spinner-border spinner-border-sm text-primary" role="status">
+                                                <span class="visually-hidden">Loading...</span>
+                                            </div>
+                                            <span class="ms-2">Loading certificate requests...</span>
                                         </td>
-                                        <td>
-                                            <form action="/plugins/cert-manager/data" method="POST">
-                                                <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
-                                                <input type="hidden" name="object_data" value="{{ certificate_request }}" />
-                                                <input type="hidden" name="object_type" value="certificate_request" />
-                                                <a href="#" onclick="this.closest('form').submit(); return false;">{{ certificate_request.name }}</a>
-                                            </form>
-                                        </td>
-                                        <td>
-                                            <a href="#" onclick="goToTab('{{ certificate_request.issuer_type}}', '{{ certificate_request.issuer }}')">{{ certificate_request.issuer }}</a>
-                                        </td>
-                                        <td>{{ certificate_request.owner_type }}/{{ certificate_request.owner }}</td>
                                     </tr>
-                                    {% endfor %}
                                 </tbody>
                             </table>
                         </div>
@@ -177,50 +138,15 @@
                                         <th>Owner</th>
                                     </tr>
                                 </thead>
-                                <tbody>
-                                    {% for certificate in certificate_list %}
+                                <tbody id="certificates-tbody">
                                     <tr>
-                                        <td>
-                                            {% if certificate.status == 'True' %}
-                                            <span class="badge text-bg-tag text-bg-success">{{ certificate.reason }}</span>
-                                            {% else %}
-                                            <span class="badge text-bg-tag text-bg-danger">{{ certificate.reason }}</span>
-                                            {% endif %}
+                                        <td colspan="4" class="text-center">
+                                            <div class="spinner-border spinner-border-sm text-primary" role="status">
+                                                <span class="visually-hidden">Loading...</span>
+                                            </div>
+                                            <span class="ms-2">Loading certificates...</span>
                                         </td>
-                                        <td>
-                                            <form action="/plugins/cert-manager/data" method="POST">
-                                                <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
-                                                <input type="hidden" name="object_data" value="{{ certificate }}" />
-                                                <input type="hidden" name="object_type" value="certificate" />
-                                                <a href="#" onclick="this.closest('form').submit(); return false;">{{ certificate.name }}</a>
-                                            </form>
-                                        </td>
-                                        <td>
-                                            <form action="/secrets" method="POST">
-                                                <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
-                                                <input type="hidden" name="ns_select" value="{{ session['ns_select'] }}" />
-                                                <input type="hidden" name="selected" value="{{ certificate.secret_name }}" />
-                                                <a href="#" onclick="this.closest('form').submit(); return false;">{{ certificate.secret_name }}</a>
-                                            </form>
-                                        </td>
-                                        {% if certificate.owner_type is defined %}
-                                        <td>
-                                            {% if certificate.owner_type == "Ingress" %}
-                                            <form action="/ingress" method="POST">
-                                                <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
-                                                <input type="hidden" name="ns_select" value="{{ session['ns_select'] }}" />
-                                                <input type="hidden" name="selected" value="{{ certificate.owner }}" />
-                                                <a href="#" onclick="this.closest('form').submit(); return false;">{{ certificate.owner }}</a>
-                                            </form>
-                                            {% else %}
-                                            {{ certificate.owner_type }}/{{ certificate.owner }}
-                                            {% endif %}
-                                        </td>
-                                        {% else %}
-                                        <td></td>
-                                        {% endif %}
                                     </tr>
-                                    {% endfor %}
                                 </tbody>
                             </table>
                         </div>
@@ -237,38 +163,482 @@
 {% include "segments/datatable_snippet.html.j2" %}
 {% endblock %}
 
-{% block tail_js %}
+{% block add_tail_js %}
 <script>
-$(document).ready( function () {
-  $('#cluster_issuerTable').DataTable();
-  $('#issuerTable').DataTable();
-  $('#certificate_requestTable').DataTable();
-  $('#certificateTable').DataTable();
-} );
-
-function goToTab(issuer_type, element_name) {
-    if (issuer_type == "ClusterIssuer") {
-        $('#nav-cluster_issuer-tab').tab('show');
-        var rows = document.getElementById("cluster_issuerTable").getElementsByTagName("tr");
-        for (let i = 0; i < rows.length; i++) {
-            var cells = rows[i].cells
-            var object_name = cells[1].id
-            if (object_name == element_name) {
-                rows[i].classList.toggle('selected');
+    const escapeHtml = (text) => {
+        if (text === null || text === undefined) return '';
+        const map = {
+            '&': '&amp;',
+            '<': '&lt;',
+            '>': '&gt;',
+            '"': '&quot;',
+            "'": '&#039;'
+        };
+        return String(text).replace(/[&<>"']/g, m => map[m]);
+    };
+    
+    const csrf_token = {{ csrf_token()|tojson }};
+    const selected = {{ selected|tojson if selected else 'null' }};
+    
+    // DataTables protection - prevent auto-initialization on loading rows and reinitialization
+    (function() {
+        // Wait for jQuery and DataTables to be available
+        function setupDataTablesProtection() {
+            if (typeof $ === 'undefined' || typeof $.fn.DataTable === 'undefined') {
+                setTimeout(setupDataTablesProtection, 100);
+                return;
+            }
+            
+            // Override DataTable initialization to prevent on colspan rows and prevent reinitialization
+            const originalDataTable = $.fn.DataTable;
+            $.fn.DataTable = function(opts) {
+                const $this = $(this);
+                const tableId = $this.attr('id');
+                
+                // Check if this is a loading row with colspan
+                if ($this.find('tbody tr td[colspan]').length > 0) {
+                    console.log('Blocked DataTable initialization on loading row for table:', tableId);
+                    return $this;
+                }
+                
+                // Check if DataTable is already initialized - prevent reinitialization
+                if (typeof originalDataTable.isDataTable === 'function' && originalDataTable.isDataTable($this)) {
+                    // Return the jQuery object to prevent reinitialization
+                    // The caller can use $this.DataTable() to get the API instance if needed
+                    return $this;
+                }
+                
+                return originalDataTable.apply(this, arguments);
+            };
+            
+            // Copy static methods and properties from original DataTable
+            Object.setPrototypeOf($.fn.DataTable, originalDataTable);
+            Object.keys(originalDataTable).forEach(key => {
+                if (typeof originalDataTable[key] !== 'undefined') {
+                    $.fn.DataTable[key] = originalDataTable[key];
+                }
+            });
+        }
+        setupDataTablesProtection();
+    })();
+    
+    const initializedTables = new Set();
+    
+    function safeInitDataTable(selector, orderCol) {
+        const $table = $(selector);
+        if (!$table.length) return;
+        
+        // Wait for jQuery and DataTables to be available
+        if (typeof $ === 'undefined' || typeof $.fn.DataTable === 'undefined') {
+            console.warn('DataTables not available yet');
+            return;
+        }
+        
+        // Check if DataTable is already initialized - if so, don't reinitialize
+        if ($.fn.DataTable.isDataTable && $.fn.DataTable.isDataTable(selector)) {
+            return;
+        }
+        
+        // Check if it's in our tracking set
+        if (initializedTables.has(selector)) {
+            // Double-check if it's actually initialized
+            if ($.fn.DataTable.isDataTable && $.fn.DataTable.isDataTable(selector)) {
+                return;
+            } else {
+                // Was tracked but not actually initialized, remove from set
+                initializedTables.delete(selector);
             }
         }
-    } 
-    else if (issuer_type == "Issuer") {
-        $('#nav-issuer-tab').tab('show');
-        var rows = document.getElementById("issuerTable").getElementsByTagName("tr");
-        for (let i = 0; i < rows.length; i++) {
-            var cells = rows[i].cells
-            var object_name = cells[1].id
-            if (object_name == element_name) {
-                rows[i].classList.toggle('selected');
+        
+        try {
+            // Check if table has data rows (not just loading row)
+            const hasDataRows = $table.find('tbody tr').filter(function() {
+                return !$(this).find('td[colspan]').length;
+            }).length > 0;
+            
+            if (!hasDataRows) {
+                return;
+            }
+            
+            // Final check right before initialization to prevent race conditions
+            if ($.fn.DataTable.isDataTable && $.fn.DataTable.isDataTable(selector)) {
+                initializedTables.add(selector);
+                return;
+            }
+            
+            // Initialize DataTable - the override will prevent reinitialization
+            $table.DataTable({
+                "order": [orderCol],
+                "pageLength": 25,
+                "responsive": true
+            });
+            
+            initializedTables.add(selector);
+        } catch (e) {
+            // If error is about reinitialization, that's expected in some edge cases
+            if (e.message && e.message.includes('Cannot reinitialise')) {
+                // Table was already initialized, just track it
+                initializedTables.add(selector);
+                return;
+            }
+            console.warn('Error in safeInitDataTable:', e);
+            initializedTables.delete(selector);
+        }
+    }
+    
+    // Get namespace from topbar selector or use default
+    function getSelectedNamespace() {
+        const topbarSelect = document.getElementById('inputGroupSelect04');
+        if (topbarSelect) {
+            return topbarSelect.value;
+        }
+        return sessionStorage.getItem('ns_select') || 'default';
+    }
+    
+    async function loadClusterIssuers() {
+        try {
+            const response = await fetch('/api/v1/plugins/cert-manager/cluster-issuers');
+            if (!response.ok) {
+                throw new Error(`HTTP error! status: ${response.status}`);
+            }
+            const data = await response.json();
+            
+            if (data.error) {
+                throw new Error(data.message || 'Failed to load cluster issuers');
+            }
+            
+            populateClusterIssuersTable(data.data || []);
+        } catch (error) {
+            console.error('Error loading cluster issuers:', error);
+            const tbody = document.getElementById('cluster-issuers-tbody');
+            if (tbody) {
+                tbody.innerHTML = '<tr><td colspan="3" class="text-center text-danger">Error loading cluster issuers: ' + escapeHtml(error.message) + '</td></tr>';
             }
         }
     }
-}
+    
+    async function loadIssuers(namespace) {
+        try {
+            const apiUrl = `/api/v1/plugins/cert-manager/issuers?namespace=${encodeURIComponent(namespace)}`;
+            const response = await fetch(apiUrl);
+            if (!response.ok) {
+                throw new Error(`HTTP error! status: ${response.status}`);
+            }
+            const data = await response.json();
+            
+            if (data.error) {
+                throw new Error(data.message || 'Failed to load issuers');
+            }
+            
+            populateIssuersTable(data.data || []);
+        } catch (error) {
+            console.error('Error loading issuers:', error);
+            const tbody = document.getElementById('issuers-tbody');
+            if (tbody) {
+                tbody.innerHTML = '<tr><td colspan="3" class="text-center text-danger">Error loading issuers: ' + escapeHtml(error.message) + '</td></tr>';
+            }
+        }
+    }
+    
+    async function loadCertificateRequests(namespace) {
+        try {
+            const apiUrl = `/api/v1/plugins/cert-manager/certificate-requests?namespace=${encodeURIComponent(namespace)}`;
+            const response = await fetch(apiUrl);
+            if (!response.ok) {
+                throw new Error(`HTTP error! status: ${response.status}`);
+            }
+            const data = await response.json();
+            
+            if (data.error) {
+                throw new Error(data.message || 'Failed to load certificate requests');
+            }
+            
+            populateCertificateRequestsTable(data.data || []);
+        } catch (error) {
+            console.error('Error loading certificate requests:', error);
+            const tbody = document.getElementById('certificate-requests-tbody');
+            if (tbody) {
+                tbody.innerHTML = '<tr><td colspan="4" class="text-center text-danger">Error loading certificate requests: ' + escapeHtml(error.message) + '</td></tr>';
+            }
+        }
+    }
+    
+    async function loadCertificates(namespace) {
+        try {
+            const apiUrl = `/api/v1/plugins/cert-manager/certificates?namespace=${encodeURIComponent(namespace)}`;
+            const response = await fetch(apiUrl);
+            if (!response.ok) {
+                throw new Error(`HTTP error! status: ${response.status}`);
+            }
+            const data = await response.json();
+            
+            if (data.error) {
+                throw new Error(data.message || 'Failed to load certificates');
+            }
+            
+            populateCertificatesTable(data.data || []);
+        } catch (error) {
+            console.error('Error loading certificates:', error);
+            const tbody = document.getElementById('certificates-tbody');
+            if (tbody) {
+                tbody.innerHTML = '<tr><td colspan="4" class="text-center text-danger">Error loading certificates: ' + escapeHtml(error.message) + '</td></tr>';
+            }
+        }
+    }
+    
+    function populateClusterIssuersTable(clusterIssuers) {
+        const tbody = document.getElementById('cluster-issuers-tbody');
+        
+        if (!clusterIssuers || clusterIssuers.length === 0) {
+            tbody.innerHTML = '<tr><td colspan="3" class="text-center text-muted">No cluster issuers found</td></tr>';
+            return;
+        }
+        
+        const rows = clusterIssuers.map(ci => {
+            const status = ci.status === 'True' 
+                ? `<span class="badge text-bg-tag text-bg-success">${escapeHtml(ci.reason || '')}</span>`
+                : `<span class="badge text-bg-tag text-bg-danger">${escapeHtml(ci.reason || '')}</span>`;
+            const name = escapeHtml(ci.name || '');
+            const type = escapeHtml(ci.type || '');
+            const isSelected = selected === ci.name;
+            const rowClass = isSelected ? 'selected' : '';
+            
+            return `
+                <tr class="${rowClass}">
+                    <td>${status}</td>
+                    <td id="${name}">
+                        <form action="/plugins/cert-manager/data" method="POST" onsubmit="sessionStorage.setItem('cert_manager_object_type', 'cluster_issuer'); sessionStorage.setItem('cert_manager_selected', '${name}'); return true;">
+                            <input type="hidden" name="csrf_token" value="${escapeHtml(csrf_token)}">
+                            <input type="hidden" name="object_type" value="cluster_issuer" />
+                            <input type="hidden" name="selected" value="${name}" />
+                            <a href="javascript:;" onclick="parentNode.submit();">${name}</a>
+                        </form>
+                    </td>
+                    <td>${type}</td>
+                </tr>
+            `;
+        }).join('');
+        
+        tbody.innerHTML = rows;
+        setTimeout(() => safeInitDataTable('#cluster_issuerTable', [1, "asc"]), 100);
+    }
+    
+    function populateIssuersTable(issuers) {
+        const tbody = document.getElementById('issuers-tbody');
+        
+        if (!issuers || issuers.length === 0) {
+            tbody.innerHTML = '<tr><td colspan="3" class="text-center text-muted">No issuers found</td></tr>';
+            return;
+        }
+        
+        const namespace = getSelectedNamespace();
+        const rows = issuers.map(issuer => {
+            const status = issuer.status === 'True' 
+                ? `<span class="badge text-bg-tag text-bg-success">${escapeHtml(issuer.reason || '')}</span>`
+                : `<span class="badge text-bg-tag text-bg-danger">${escapeHtml(issuer.reason || '')}</span>`;
+            const name = escapeHtml(issuer.name || '');
+            const type = escapeHtml(issuer.type || '');
+            const isSelected = selected === issuer.name;
+            const rowClass = isSelected ? 'selected' : '';
+            
+            return `
+                <tr class="${rowClass}">
+                    <td>${status}</td>
+                    <td id="${name}">
+                        <form action="/plugins/cert-manager/data" method="POST" onsubmit="sessionStorage.setItem('cert_manager_object_type', 'issuer'); sessionStorage.setItem('cert_manager_selected', '${name}'); return true;">
+                            <input type="hidden" name="csrf_token" value="${escapeHtml(csrf_token)}">
+                            <input type="hidden" name="object_type" value="issuer" />
+                            <input type="hidden" name="selected" value="${name}" />
+                            <input type="hidden" name="ns_select" value="${escapeHtml(namespace)}" />
+                            <a href="javascript:;" onclick="parentNode.submit();">${name}</a>
+                        </form>
+                    </td>
+                    <td>${type}</td>
+                </tr>
+            `;
+        }).join('');
+        
+        tbody.innerHTML = rows;
+        setTimeout(() => safeInitDataTable('#issuerTable', [1, "asc"]), 100);
+    }
+    
+    function populateCertificateRequestsTable(certificateRequests) {
+        const tbody = document.getElementById('certificate-requests-tbody');
+        
+        if (!certificateRequests || certificateRequests.length === 0) {
+            tbody.innerHTML = '<tr><td colspan="4" class="text-center text-muted">No certificate requests found</td></tr>';
+            return;
+        }
+        
+        const namespace = getSelectedNamespace();
+        const rows = certificateRequests.map(cr => {
+            const status = cr.status === 'True' 
+                ? `<span class="badge text-bg-tag text-bg-success">${escapeHtml(cr.reason || '')}</span>`
+                : `<span class="badge text-bg-tag text-bg-danger">${escapeHtml(cr.reason || '')}</span>`;
+            const name = escapeHtml(cr.name || '');
+            const issuer = escapeHtml(cr.issuer || '');
+            const issuerType = escapeHtml(cr.issuer_type || '');
+            const owner = cr.owner ? `${escapeHtml(cr.owner_type || '')}/${escapeHtml(cr.owner)}` : '-';
+            
+            return `
+                <tr>
+                    <td>${status}</td>
+                    <td>
+                        <form action="/plugins/cert-manager/data" method="POST" onsubmit="sessionStorage.setItem('cert_manager_object_type', 'certificate_request'); sessionStorage.setItem('cert_manager_selected', '${name}'); return true;">
+                            <input type="hidden" name="csrf_token" value="${escapeHtml(csrf_token)}">
+                            <input type="hidden" name="object_type" value="certificate_request" />
+                            <input type="hidden" name="selected" value="${name}" />
+                            <input type="hidden" name="ns_select" value="${escapeHtml(namespace)}" />
+                            <a href="javascript:;" onclick="parentNode.submit();">${name}</a>
+                        </form>
+                    </td>
+                    <td>
+                        <a href="#" onclick="goToTab('${issuerType}', '${issuer}'); return false;">${issuer}</a>
+                    </td>
+                    <td>${owner}</td>
+                </tr>
+            `;
+        }).join('');
+        
+        tbody.innerHTML = rows;
+        safeInitDataTable('#certificate_requestTable', [1, "asc"]);
+    }
+    
+    function populateCertificatesTable(certificates) {
+        const tbody = document.getElementById('certificates-tbody');
+        
+        if (!certificates || certificates.length === 0) {
+            tbody.innerHTML = '<tr><td colspan="4" class="text-center text-muted">No certificates found</td></tr>';
+            return;
+        }
+        
+        const namespace = getSelectedNamespace();
+        const rows = certificates.map(cert => {
+            const status = cert.status === 'True' 
+                ? `<span class="badge text-bg-tag text-bg-success">${escapeHtml(cert.reason || '')}</span>`
+                : `<span class="badge text-bg-tag text-bg-danger">${escapeHtml(cert.reason || '')}</span>`;
+            const name = escapeHtml(cert.name || '');
+            const secretName = escapeHtml(cert.secret_name || '');
+            let ownerHtml = '<td></td>';
+            if (cert.owner && cert.owner_type) {
+                if (cert.owner_type === 'Ingress') {
+                    ownerHtml = `
+                        <td>
+                            <form action="/network/ingress" method="POST">
+                                <input type="hidden" name="csrf_token" value="${escapeHtml(csrf_token)}">
+                                <input type="hidden" name="ns_select" value="${escapeHtml(namespace)}" />
+                                <input type="hidden" name="selected" value="${escapeHtml(cert.owner)}" />
+                                <a href="#" onclick="this.closest('form').submit(); return false;">${escapeHtml(cert.owner)}</a>
+                            </form>
+                        </td>
+                    `;
+                } else {
+                    ownerHtml = `<td>${escapeHtml(cert.owner_type)}/${escapeHtml(cert.owner)}</td>`;
+                }
+            }
+            
+            return `
+                <tr>
+                    <td>${status}</td>
+                    <td>
+                        <form action="/plugins/cert-manager/data" method="POST" onsubmit="sessionStorage.setItem('cert_manager_object_type', 'certificate'); sessionStorage.setItem('cert_manager_selected', '${name}'); return true;">
+                            <input type="hidden" name="csrf_token" value="${escapeHtml(csrf_token)}">
+                            <input type="hidden" name="object_type" value="certificate" />
+                            <input type="hidden" name="selected" value="${name}" />
+                            <input type="hidden" name="ns_select" value="${escapeHtml(namespace)}" />
+                            <a href="javascript:;" onclick="parentNode.submit();">${name}</a>
+                        </form>
+                    </td>
+                    <td>
+                        <form action="/security/secrets" method="POST">
+                            <input type="hidden" name="csrf_token" value="${escapeHtml(csrf_token)}">
+                            <input type="hidden" name="ns_select" value="${escapeHtml(namespace)}" />
+                            <input type="hidden" name="selected" value="${secretName}" />
+                            <a href="#" onclick="this.closest('form').submit(); return false;">${secretName}</a>
+                        </form>
+                    </td>
+                    ${ownerHtml}
+                </tr>
+            `;
+        }).join('');
+        
+        tbody.innerHTML = rows;
+        safeInitDataTable('#certificateTable', [1, "asc"]);
+    }
+    
+    function goToTab(issuer_type, element_name) {
+        if (issuer_type === "ClusterIssuer") {
+            $('#nav-cluster_issuer-tab').tab('show');
+            setTimeout(function() {
+                const rows = document.getElementById("cluster_issuerTable").getElementsByTagName("tr");
+                for (let i = 0; i < rows.length; i++) {
+                    const cells = rows[i].cells;
+                    if (cells.length > 1) {
+                        const nameCell = cells[1];
+                        const object_name = nameCell.id;
+                        if (object_name === element_name) {
+                            rows[i].classList.add('selected');
+                            rows[i].scrollIntoView({ behavior: 'smooth', block: 'center' });
+                        }
+                    }
+                }
+            }, 200);
+        } else if (issuer_type === "Issuer") {
+            $('#nav-issuer-tab').tab('show');
+            setTimeout(function() {
+                const rows = document.getElementById("issuerTable").getElementsByTagName("tr");
+                for (let i = 0; i < rows.length; i++) {
+                    const cells = rows[i].cells;
+                    if (cells.length > 1) {
+                        const nameCell = cells[1];
+                        const object_name = nameCell.id;
+                        if (object_name === element_name) {
+                            rows[i].classList.add('selected');
+                            rows[i].scrollIntoView({ behavior: 'smooth', block: 'center' });
+                        }
+                    }
+                }
+            }, 200);
+        }
+    }
+    
+    // Load data when page loads
+    document.addEventListener('DOMContentLoaded', function() {
+        const namespace = getSelectedNamespace();
+        
+        // Load all data in parallel
+        loadClusterIssuers();
+        loadIssuers(namespace);
+        loadCertificateRequests(namespace);
+        loadCertificates(namespace);
+        
+        // Reload namespaced data when namespace changes
+        const namespaceSelect = document.getElementById('inputGroupSelect04');
+        if (namespaceSelect) {
+            namespaceSelect.addEventListener('change', function() {
+                const newNamespace = this.value;
+                sessionStorage.setItem('ns_select', newNamespace);
+                loadIssuers(newNamespace);
+                loadCertificateRequests(newNamespace);
+                loadCertificates(newNamespace);
+            });
+        }
+        
+        // Handle tab switching to initialize DataTables when tab becomes visible
+        $('a[data-bs-toggle="tab"]').on('shown.bs.tab', function (e) {
+            // Use a small delay to ensure tab content is fully visible
+            setTimeout(function() {
+                if (e.target.id === 'nav-cluster_issuer-tab') {
+                    safeInitDataTable('#cluster_issuerTable', [1, "asc"]);
+                } else if (e.target.id === 'nav-issuer-tab') {
+                    safeInitDataTable('#issuerTable', [1, "asc"]);
+                } else if (e.target.id === 'nav-certificate_request-tab') {
+                    safeInitDataTable('#certificate_requestTable', [1, "asc"]);
+                } else if (e.target.id === 'nav-certificate-tab') {
+                    safeInitDataTable('#certificateTable', [1, "asc"]);
+                }
+            }, 50);
+        });
+    });
 </script>
 {% endblock %}

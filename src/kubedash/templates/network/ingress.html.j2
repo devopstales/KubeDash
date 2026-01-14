@@ -18,37 +18,26 @@
 
 {% block content %}
 <div class="card shadow mb-4">
-    <div class="card-header d-flex justify-content-between align-items-center">
-        <h6 class="m-0 fw-bold text-primary">Ingress Resources</h6>
-        <div class="d-flex align-items-center">
-            <form action="/network/ingress" method="POST" class="d-flex align-items-center">
-                <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
-                <input type="hidden" name="active_tab" value="{{ active_tab }}">
-                <select name="ns_select" class="form-select form-select-sm me-2" style="width: auto;" onchange="this.form.submit()">
-                    {% for ns in namespaces %}
-                    <option value="{{ ns }}" {% if session['ns_select'] == ns %}selected{% endif %}>{{ ns }}</option>
-                    {% endfor %}
-                </select>
-            </form>
-        </div>
+    <div class="card-header py-3">
+        <h6 class="m-0 font-weight-bold text-primary">Ingress Resources</h6>
     </div>
     <div class="card-body">
         <!-- Navigation Tabs -->
         <ul class="nav nav-tabs" id="ingress-tabs" role="tablist">
             <li class="nav-item">
-                <a class="nav-link {% if active_tab == 'ingresses' %}active{% endif %}" 
+                <a class="nav-link active" 
                    id="nav-ingresses-tab" data-bs-toggle="tab" href="#nav-ingresses" 
-                   role="tab" aria-controls="nav-ingresses" aria-selected="{% if active_tab == 'ingresses' %}true{% else %}false{% endif %}"
+                   role="tab" aria-controls="nav-ingresses" aria-selected="true"
                    onclick="updateTabUrl('ingresses')">
-                    Ingresses <span class="badge bg-secondary">{{ ingresses|length }}</span>
+                    Ingresses <span class="badge bg-secondary" id="ingresses-badge">0</span>
                 </a>
             </li>
             <li class="nav-item">
-                <a class="nav-link {% if active_tab == 'ingressclasses' %}active{% endif %}" 
+                <a class="nav-link" 
                    id="nav-ingressclasses-tab" data-bs-toggle="tab" href="#nav-ingressclasses" 
-                   role="tab" aria-controls="nav-ingressclasses" aria-selected="{% if active_tab == 'ingressclasses' %}true{% else %}false{% endif %}"
+                   role="tab" aria-controls="nav-ingressclasses" aria-selected="false"
                    onclick="updateTabUrl('ingressclasses')">
-                    IngressClasses <span class="badge bg-secondary">{{ ingresses_classes|length }}</span>
+                    IngressClasses <span class="badge bg-secondary" id="ingressclasses-badge">0</span>
                 </a>
             </li>
         </ul>
@@ -57,7 +46,7 @@
         <div class="tab-content" id="ingress-tab-content">
             
             <!-- Ingresses Tab -->
-            <div class="tab-pane fade {% if active_tab == 'ingresses' %}show active{% endif %}" 
+            <div class="tab-pane fade show active" 
                  id="nav-ingresses" role="tabpanel" aria-labelledby="nav-ingresses-tab">
                 <div class="card shadow mb-4 mt-3">
                     <div class="card-body">
@@ -70,42 +59,15 @@
                                         <th>Hostname</th>
                                     </tr>
                                 </thead>
-                                <tbody>
-                                    {% for i in ingresses %}
+                                <tbody id="ingresses-tbody">
                                     <tr>
-                                        <td>
-                                            <form action="/network/ingress/data" method="POST" style="display: inline;">
-                                                <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
-                                                <input type="hidden" name="ns_select" value="{{ session['ns_select'] }}" />
-                                                <input type="hidden" name="i_name" value="{{ i.name }}" />
-                                                <a href="javascript:;" onclick="parentNode.submit();">{{ i.name }}</a>
-                                            </form>
-                                        </td>
-                                        <td>
-                                            {% if i.ingressClass %}
-                                            <form action="/network/ingress-class/data" method="POST" style="display: inline;">
-                                                <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
-                                                <input type="hidden" name="ic_name" value="{{ i.ingressClass }}" />
-                                                <a href="javascript:;" onclick="parentNode.submit();">{{ i.ingressClass }}</a>
-                                            </form>
-                                            {% else %}
-                                            {{ i.ingressClass or '-' }}
-                                            {% endif %}
-                                        </td>
-                                        <td>
-                                            {% for host in i.hosts %}
-                                                {{ host }}{% if not loop.last %}<br>{% endif %}
-                                            {% else %}
-                                                <span class="text-muted">-</span>
-                                            {% endfor %}
+                                        <td colspan="3" class="text-center">
+                                            <div class="spinner-border spinner-border-sm text-primary" role="status">
+                                                <span class="visually-hidden">Loading...</span>
+                                            </div>
+                                            <span class="ms-2">Loading ingresses...</span>
                                         </td>
                                     </tr>
-                                    {% endfor %}
-                                    {% if ingresses|length == 0 %}
-                                    <tr>
-                                        <td class="text-center text-muted" colspan="3">No Ingresses found in namespace {{ session['ns_select'] }}</td>
-                                    </tr>
-                                    {% endif %}
                                 </tbody>
                             </table>
                         </div>
@@ -114,7 +76,7 @@
             </div>
 
             <!-- IngressClasses Tab -->
-            <div class="tab-pane fade {% if active_tab == 'ingressclasses' %}show active{% endif %}" 
+            <div class="tab-pane fade" 
                  id="nav-ingressclasses" role="tabpanel" aria-labelledby="nav-ingressclasses-tab">
                 <div class="card shadow mb-4 mt-3">
                     <div class="card-body">
@@ -127,25 +89,15 @@
                                         <th>Created</th>
                                     </tr>
                                 </thead>
-                                <tbody>
-                                    {% for ic in ingresses_classes %}
+                                <tbody id="ingressclasses-tbody">
                                     <tr>
-                                        <td>
-                                            <form action="/network/ingress-class/data" method="POST" style="display: inline;">
-                                                <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
-                                                <input type="hidden" name="ic_name" value="{{ ic.name }}" />
-                                                <a href="javascript:;" onclick="parentNode.submit();">{{ ic.name }}</a>
-                                            </form>
+                                        <td colspan="3" class="text-center">
+                                            <div class="spinner-border spinner-border-sm text-primary" role="status">
+                                                <span class="visually-hidden">Loading...</span>
+                                            </div>
+                                            <span class="ms-2">Loading ingress classes...</span>
                                         </td>
-                                        <td>{{ ic.controller }}</td>
-                                        <td>{{ ic.created }}</td>
                                     </tr>
-                                    {% endfor %}
-                                    {% if ingresses_classes|length == 0 %}
-                                    <tr>
-                                        <td class="text-center text-muted" colspan="3">No IngressClasses found</td>
-                                    </tr>
-                                    {% endif %}
                                 </tbody>
                             </table>
                         </div>
@@ -163,6 +115,49 @@
 
 {% block add_tail_js %}
 <script>
+    const escapeHtml = (text) => {
+        if (text === null || text === undefined) return '';
+        const map = {
+            '&': '&amp;',
+            '<': '&lt;',
+            '>': '&gt;',
+            '"': '&quot;',
+            "'": '&#039;'
+        };
+        return String(text).replace(/[&<>"']/g, m => map[m]);
+    };
+    
+    const csrf_token = {{ csrf_token()|tojson }};
+    
+    // DataTables protection - prevent auto-initialization on loading rows
+    (function() {
+        const originalTableIds = ['ingressTable', 'ingressClassTable'];
+        
+        // Override DataTable initialization to prevent on colspan rows
+        if (typeof $ !== 'undefined' && $.fn.DataTable) {
+            const originalDataTable = $.fn.DataTable;
+            $.fn.DataTable = function(opts) {
+                const $this = $(this);
+                // Check if this is a loading row with colspan
+                if ($this.find('tbody tr td[colspan]').length > 0) {
+                    console.log('Blocked DataTable initialization on loading row');
+                    return $this;
+                }
+                return originalDataTable.apply(this, arguments);
+            };
+        }
+    })();
+    
+    // Get namespace from topbar selector or use default
+    function getSelectedNamespace() {
+        const topbarSelect = document.getElementById('inputGroupSelect04');
+        if (topbarSelect) {
+            return topbarSelect.value;
+        }
+        // Fallback to sessionStorage or default
+        return sessionStorage.getItem('ns_select') || 'default';
+    }
+    
     // Function to update URL with tab parameter
     function updateTabUrl(tab) {
         const url = new URL(window.location);
@@ -170,51 +165,334 @@
         window.history.pushState({}, '', url);
     }
     
-    // Initialize DataTables - only initialize if table has data rows
+    // Track which tables have been initialized to prevent reinitialization
+    const initializedTables = new Set();
+    
     function safeInitDataTable(selector, orderCol) {
-        var $table = $(selector);
-        if ($table.length) {
-            // Check if table has actual data rows (not just empty message)
-            var hasData = $table.find('tbody tr').filter(function() {
-                return !$(this).find('td[colspan]').length;
-            }).length > 0;
+        const $table = $(selector);
+        if (!$table.length) {
+            console.warn('Table not found:', selector);
+            return;
+        }
+        
+        // First check: Is DataTable already initialized?
+        if (typeof $.fn.DataTable !== 'undefined' && typeof $.fn.DataTable.isDataTable === 'function') {
+            if ($.fn.DataTable.isDataTable(selector)) {
+                console.log('DataTable already initialized, skipping:', selector);
+                if (!initializedTables.has(selector)) {
+                    initializedTables.add(selector);
+                }
+                return;
+            }
+        }
+        
+        // Second check: Is it in our tracking set?
+        if (initializedTables.has(selector)) {
+            // Double-check if it's still actually initialized
+            if (typeof $.fn.DataTable !== 'undefined' && typeof $.fn.DataTable.isDataTable === 'function') {
+                if ($.fn.DataTable.isDataTable(selector)) {
+                    console.log('DataTable already initialized (from set), skipping:', selector);
+                    return;
+                } else {
+                    // Table was destroyed, remove from set
+                    initializedTables.delete(selector);
+                }
+            } else {
+                // DataTables not loaded yet, but we think it's initialized - wait
+                console.log('DataTables not loaded yet, waiting for:', selector);
+                setTimeout(function() {
+                    safeInitDataTable(selector, orderCol);
+                }, 100);
+                return;
+            }
+        }
+        
+        try {
+            // Check if DataTable is already initialized using multiple methods
+            let isInitialized = false;
+            if (typeof $.fn.DataTable !== 'undefined' && typeof $.fn.DataTable.isDataTable === 'function') {
+                isInitialized = $.fn.DataTable.isDataTable(selector);
+            }
+            if (!isInitialized && $table.data('DataTable')) {
+                isInitialized = true;
+            }
             
-            if (hasData) {
-                $table.DataTable({
-                    "order": [orderCol],
-                    "pageLength": 25,
-                    "columnDefs": [
-                        {
-                            "targets": [0, 1, 2], // All columns
-                            "orderable": true,
-                            "searchable": true
+            // Destroy existing DataTable if it exists
+            if (isInitialized) {
+                try {
+                    const dtInstance = $table.DataTable();
+                    if (dtInstance) {
+                        dtInstance.destroy();
+                    }
+                    // Clear any cached DataTable data
+                    $table.removeData('DataTable');
+                    initializedTables.delete(selector);
+                    console.log('Destroyed existing DataTable:', selector);
+                } catch (destroyError) {
+                    console.warn('Error destroying DataTable:', destroyError);
+                    // Remove from set even if destroy failed
+                    initializedTables.delete(selector);
+                }
+            }
+            
+            // Initialize DataTables (only if not already initialized)
+            // Use a small delay to ensure DOM is ready
+            setTimeout(function() {
+                try {
+                    // Final check - make sure it's not initialized (double-check)
+                    if (typeof $.fn.DataTable !== 'undefined' && typeof $.fn.DataTable.isDataTable === 'function') {
+                        if ($.fn.DataTable.isDataTable(selector)) {
+                            console.log('DataTable already initialized in timeout, skipping:', selector);
+                            initializedTables.add(selector);
+                            return;
                         }
-                    ]
-                });
+                    }
+                    
+                    // Check if table has data rows (not just loading/empty message)
+                    const hasDataRows = $table.find('tbody tr').filter(function() {
+                        return !$(this).find('td[colspan]').length;
+                    }).length > 0;
+                    
+                    if (!hasDataRows) {
+                        console.log('Table has no data rows, skipping initialization:', selector);
+                        return;
+                    }
+                    
+                    // Mark as initializing to prevent concurrent calls
+                    initializedTables.add(selector);
+                    
+                    $table.DataTable({
+                        "order": [orderCol],
+                        "pageLength": 25,
+                        "columnDefs": [
+                            {
+                                "targets": [0, 1, 2],
+                                "orderable": true,
+                                "searchable": true
+                            }
+                        ]
+                    });
+                    
+                    console.log('DataTable initialized successfully:', selector);
+                } catch (initError) {
+                    console.warn('Error initializing DataTable:', initError);
+                    initializedTables.delete(selector);
+                }
+            }, 10);
+        } catch (e) {
+            console.warn('Error in safeInitDataTable:', e);
+            initializedTables.delete(selector);
+        }
+    }
+    
+    function populateIngressesTable(ingresses) {
+        const tbody = document.getElementById('ingresses-tbody');
+        const badge = document.getElementById('ingresses-badge');
+        
+        if (badge) {
+            badge.textContent = ingresses ? ingresses.length : 0;
+        }
+        
+        if (!ingresses || ingresses.length === 0) {
+            const namespace = getSelectedNamespace();
+            tbody.innerHTML = `<tr><td colspan="3" class="text-center text-muted">No Ingresses found in namespace ${escapeHtml(namespace)}</td></tr>`;
+            return;
+        }
+        
+        const namespace = getSelectedNamespace();
+        
+        const rows = ingresses.map(ingress => {
+            const name = escapeHtml(ingress.name || '');
+            const ingressClass = ingress.ingressClass || '';
+            const hosts = ingress.hosts || [];
+            
+            let ingressClassCell = '<td>-</td>';
+            if (ingressClass) {
+                ingressClassCell = `
+                    <td>
+                        <form action="/network/ingress-class/data" method="POST" onsubmit="sessionStorage.setItem('ns_select', '${escapeHtml(namespace)}'); return true;">
+                            <input type="hidden" name="csrf_token" value="${escapeHtml(csrf_token)}">
+                            <input type="hidden" name="ic_name" value="${escapeHtml(ingressClass)}" />
+                            <a href="javascript:;" onclick="parentNode.submit();">${escapeHtml(ingressClass)}</a>
+                        </form>
+                    </td>
+                `;
+            }
+            
+            let hostsCell = '<td><span class="text-muted">-</span></td>';
+            if (hosts.length > 0) {
+                hostsCell = `<td>${hosts.map(h => escapeHtml(h)).join('<br>')}</td>`;
+            }
+            
+            return `
+                <tr>
+                    <td>
+                        <form action="/network/ingress/data" method="POST" onsubmit="sessionStorage.setItem('ns_select', '${escapeHtml(namespace)}'); return true;">
+                            <input type="hidden" name="csrf_token" value="${escapeHtml(csrf_token)}">
+                            <input type="hidden" name="ns_select" value="${escapeHtml(namespace)}" />
+                            <input type="hidden" name="i_name" value="${name}" />
+                            <a href="javascript:;" onclick="parentNode.submit();">${name}</a>
+                        </form>
+                    </td>
+                    ${ingressClassCell}
+                    ${hostsCell}
+                </tr>
+            `;
+        }).join('');
+        
+        tbody.innerHTML = rows;
+        
+        // Initialize DataTables after a short delay to ensure DOM is updated
+        setTimeout(function() {
+        safeInitDataTable('#ingressTable', [0, "asc"]);
+        }, 100);
+    }
+    
+    function populateIngressClassesTable(ingressClasses) {
+        const tbody = document.getElementById('ingressclasses-tbody');
+        const badge = document.getElementById('ingressclasses-badge');
+        
+        if (badge) {
+            badge.textContent = ingressClasses ? ingressClasses.length : 0;
+        }
+        
+        if (!ingressClasses || ingressClasses.length === 0) {
+            tbody.innerHTML = '<tr><td colspan="3" class="text-center text-muted">No IngressClasses found</td></tr>';
+            return;
+        }
+        
+        const rows = ingressClasses.map(ic => {
+            const name = escapeHtml(ic.name || '');
+            const controller = escapeHtml(ic.controller || '-');
+            const created = escapeHtml(ic.created || '-');
+            
+            return `
+                <tr>
+                    <td>
+                        <form action="/network/ingress-class/data" method="POST" onsubmit="return true;">
+                            <input type="hidden" name="csrf_token" value="${escapeHtml(csrf_token)}">
+                            <input type="hidden" name="ic_name" value="${name}" />
+                            <a href="javascript:;" onclick="parentNode.submit();">${name}</a>
+                        </form>
+                    </td>
+                    <td>${controller}</td>
+                    <td>${created}</td>
+                </tr>
+            `;
+        }).join('');
+        
+        tbody.innerHTML = rows;
+        
+        // Initialize DataTables after a short delay to ensure DOM is updated
+        // Only initialize if not already initialized
+        setTimeout(function() {
+            if (!initializedTables.has('#ingressClassTable')) {
+                safeInitDataTable('#ingressClassTable', [0, "asc"]);
+            }
+        }, 100);
+    }
+    
+    async function loadIngresses(namespace) {
+        try {
+            const apiUrl = `/api/v1/network/ingress${namespace ? '?namespace=' + encodeURIComponent(namespace) : ''}`;
+            console.log('Fetching ingresses from:', apiUrl);
+            
+            const response = await fetch(apiUrl);
+            if (!response.ok) {
+                throw new Error(`HTTP error! status: ${response.status}`);
+            }
+            
+            const data = await response.json();
+            console.log('Ingresses API response:', data);
+            
+            if (data.error) {
+                throw new Error(data.message || 'Failed to load ingresses');
+            }
+            
+            const ingresses = data.data || [];
+            populateIngressesTable(ingresses);
+            
+        } catch (error) {
+            console.error('Error loading ingresses:', error);
+            const tbody = document.getElementById('ingresses-tbody');
+            if (tbody) {
+                tbody.innerHTML = '<tr><td colspan="3" class="text-center text-danger">Error loading ingresses: ' + escapeHtml(error.message) + '</td></tr>';
             }
         }
     }
     
-    // Initialize DataTables when document is ready
-    $(document).ready(function() {
-        // Initialize tables only for the active tab
-        {% if active_tab == 'ingresses' %}
-        safeInitDataTable('#ingressTable', [0, "asc"]);
-        {% elif active_tab == 'ingressclasses' %}
-        safeInitDataTable('#ingressClassTable', [0, "asc"]);
-        {% endif %}
-        
-        // Handle tab switching to initialize DataTables when tab becomes visible
-        $('a[data-bs-toggle="tab"]').on('shown.bs.tab', function (e) {
-            if (e.target.id === 'nav-ingresses-tab') {
-                if (!$.fn.DataTable.isDataTable('#ingressTable')) {
-                    safeInitDataTable('#ingressTable', [0, "asc"]);
-                }
-            } else if (e.target.id === 'nav-ingressclasses-tab') {
-                if (!$.fn.DataTable.isDataTable('#ingressClassTable')) {
-                    safeInitDataTable('#ingressClassTable', [0, "asc"]);
-                }
+    async function loadIngressClasses() {
+        try {
+            const apiUrl = '/api/v1/network/ingress-classes';
+            console.log('Fetching ingress classes from:', apiUrl);
+            
+            const response = await fetch(apiUrl);
+            if (!response.ok) {
+                throw new Error(`HTTP error! status: ${response.status}`);
             }
+            
+            const data = await response.json();
+            console.log('Ingress classes API response:', data);
+            
+            if (data.error) {
+                throw new Error(data.message || 'Failed to load ingress classes');
+            }
+            
+            const ingressClasses = data.data || [];
+            populateIngressClassesTable(ingressClasses);
+            
+        } catch (error) {
+            console.error('Error loading ingress classes:', error);
+            const tbody = document.getElementById('ingressclasses-tbody');
+            if (tbody) {
+                tbody.innerHTML = '<tr><td colspan="3" class="text-center text-danger">Error loading ingress classes: ' + escapeHtml(error.message) + '</td></tr>';
+            }
+        }
+    }
+    
+    // Load data when page loads
+    document.addEventListener('DOMContentLoaded', function() {
+        const namespace = getSelectedNamespace();
+        loadIngresses(namespace);
+        loadIngressClasses();
+    });
+    
+    // Reload data when namespace changes (if namespace selector exists)
+    document.addEventListener('DOMContentLoaded', function() {
+        const namespaceSelect = document.getElementById('inputGroupSelect04');
+        if (namespaceSelect) {
+            namespaceSelect.addEventListener('change', function() {
+                const namespace = this.value;
+                console.log('Namespace changed to:', namespace);
+                sessionStorage.setItem('ns_select', namespace);
+                loadIngresses(namespace);
+            });
+        }
+    });
+        
+    // Handle tab switching to initialize DataTables when tab becomes visible
+    document.addEventListener('DOMContentLoaded', function() {
+        // Wait for jQuery to be available
+        if (typeof $ === 'undefined') {
+            setTimeout(arguments.callee, 100);
+            return;
+        }
+        
+        $('a[data-bs-toggle="tab"]').on('shown.bs.tab', function (e) {
+            // Add a small delay to ensure tab content is fully visible
+            setTimeout(function() {
+                if (e.target.id === 'nav-ingresses-tab') {
+                    // Only initialize if not already initialized
+                    if (!initializedTables.has('#ingressTable')) {
+                        safeInitDataTable('#ingressTable', [0, "asc"]);
+                    }
+                } else if (e.target.id === 'nav-ingressclasses-tab') {
+                    // Only initialize if not already initialized
+                    if (!initializedTables.has('#ingressClassTable')) {
+                        safeInitDataTable('#ingressClassTable', [0, "asc"]);
+                    }
+                }
+            }, 100);
         });
     });
 </script>

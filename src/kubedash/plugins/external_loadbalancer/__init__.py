@@ -28,6 +28,12 @@ logger = get_logger()
 @external_loadbalancer_bp.route('/external-loadbalancer', methods=['GET', 'POST'])
 @login_required
 def external_loadbalancer():
+    """
+    External LoadBalancer list page.
+    
+    Data is now loaded client-side via JavaScript API calls.
+    This route only renders the template structure and provides namespaces.
+    """
     selected = None
     selected_type = None
     user_token = get_user_token(session)
@@ -39,25 +45,11 @@ def external_loadbalancer():
         selected_type = request.form.get('object_type')
 
     namespace_list, error = k8sNamespaceListGet(session['user_role'], user_token)
-    if not error:
-        ipaddresspool_list = ipaddresspoolTest(session['ns_select'])
-        l2advertisement_list = l2advertisementsTest(session['ns_select'])
-        bgpadvertisement_list = bgpadvertisementsTest(session['ns_select'])
-        bgppeers_list = bgppeersTest(session['ns_select'])
-
-    else:
-        bgppeers_list = list()
-        ipaddresspool_list = list()
-        l2advertisement_list = list()
-        bgpadvertisement_list = list()
+    namespaces = namespace_list if not error else []
 
     return render_template(
         'external-loadbalancer.html.j2',
-        namespaces = namespace_list,
-        ipaddresspool_list=ipaddresspool_list,
-        l2advertisement_list=l2advertisement_list,
-        bgpadvertisement_list=bgpadvertisement_list,
-        bgppeers_list=bgppeers_list,
+        namespaces = namespaces,
         selected=selected,
         selected_type=selected_type,
     )
@@ -65,23 +57,37 @@ def external_loadbalancer():
 @external_loadbalancer_bp.route('/external-loadbalancer/data', methods=['GET', 'POST'])
 @login_required
 def external_loadbalancer_data():
-    selected = None
-    user_token = get_user_token(session)
-
+    """
+    External LoadBalancer detail page.
+    
+    Data is now loaded client-side via JavaScript API calls.
+    This route only renders the template structure.
+    """
+    # Handle POST requests (from form submission) - redirect to GET with parameters
     if request.method == 'POST':
         if request.form.get('ns_select', None):
             session['ns_select'] = request.form.get('ns_select')
         selected = request.form.get('selected')
         object_type = request.form.get('object_type')
-        object_data_str = request.form.get('object_data')
+        ns_select = request.form.get('ns_select')
+        
+        # Build query parameters
+        params = {}
+        if selected:
+            params['selected'] = selected
+        if object_type:
+            params['object_type'] = object_type
+        if ns_select:
+            params['namespace'] = ns_select
+        # Note: object_data is complex, so we'll use sessionStorage on client side
+        
+        # Redirect to GET request with query parameters
+        return redirect(url_for('.external_loadbalancer_data', **params))
+    
+    # Get namespaces for topbar selector
+    user_token = get_user_token(session)
+    namespace_list, error = k8sNamespaceListGet(session['user_role'], user_token)
+    namespaces = namespace_list if not error else []
 
-
-        return render_template(
-            'external-loadbalancer-data.html.j2',
-            object_type=object_type,
-            object_data=ast.literal_eval(object_data_str),
-            selected=selected,
-        )
-
-    else:
-        return redirect(url_for('auth.login'))
+    # Template now loads data via JavaScript from sessionStorage
+    return render_template('external-loadbalancer-data.html.j2', namespaces=namespaces)

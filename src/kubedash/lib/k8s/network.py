@@ -52,6 +52,74 @@ def k8sIngressClassListGet(username_role, user_token):
 ## Ingress
 ##############################################################
 
+def serialize_ingress_status(status):
+    """
+    Convert V1IngressStatus object to dictionary for JSON serialization.
+    
+    Args:
+        status: V1IngressStatus object or None
+        
+    Returns:
+        dict: Serialized status dictionary or None
+    """
+    if not status:
+        return None
+    
+    if hasattr(status, 'to_dict'):
+        # Use to_dict() if available (Kubernetes client library method)
+        return status.to_dict()
+    elif isinstance(status, dict):
+        # Already a dict
+        return status
+    else:
+        # Manual conversion for V1IngressStatus objects
+        status_dict = {}
+        if hasattr(status, 'load_balancer') and status.load_balancer:
+            if hasattr(status.load_balancer, 'ingress') and status.load_balancer.ingress:
+                status_dict['load_balancer'] = {
+                    'ingress': [
+                        {
+                            'ip': getattr(ing, 'ip', None),
+                            'hostname': getattr(ing, 'hostname', None)
+                        }
+                        for ing in status.load_balancer.ingress
+                    ]
+                }
+        return status_dict if status_dict else None
+
+def serialize_ingress_tls(tls):
+    """
+    Convert V1IngressTLS objects to dictionaries for JSON serialization.
+    
+    Args:
+        tls: List of V1IngressTLS objects or None
+        
+    Returns:
+        list: List of serialized TLS dictionaries
+    """
+    if not tls:
+        return []
+    
+    serialized_tls = []
+    for tls_item in tls:
+        if hasattr(tls_item, 'to_dict'):
+            # Use to_dict() if available
+            tls_dict = tls_item.to_dict()
+            serialized_tls.append(tls_dict)
+        elif isinstance(tls_item, dict):
+            # Already a dict
+            serialized_tls.append(tls_item)
+        else:
+            # Manual conversion
+            tls_dict = {
+                'hosts': list(getattr(tls_item, 'hosts', [])) if hasattr(tls_item, 'hosts') else [],
+                'secret_name': getattr(tls_item, 'secret_name', None) or getattr(tls_item, 'secretName', None)
+            }
+            # Remove None values
+            tls_dict = {k: v for k, v in tls_dict.items() if v is not None}
+            serialized_tls.append(tls_dict)
+    return serialized_tls
+
 @cache.memoize(timeout=short_cache_time)
 def k8sIngressListGet(username_role, user_token, ns):
     """Get the list of Ingresses for a given namespace
@@ -70,11 +138,16 @@ def k8sIngressListGet(username_role, user_token, ns):
     try:
         ingress_list = k8s_client.NetworkingV1Api().list_namespaced_ingress(ns, _request_timeout=1)
         for ingress in ingress_list.items:
-            ig = ingress.status.load_balancer.ingress
+            ig = ingress.status.load_balancer.ingress if ingress.status.load_balancer else None
             rules = list()
             for rule in ingress.spec.rules:
                 for r in rule.http.paths:
                     rules.append(r.to_dict())
+            
+            # Serialize status and TLS
+            serialized_status = serialize_ingress_status(ingress.status)
+            serialized_tls = serialize_ingress_tls(ingress.spec.tls) if ingress.spec.tls else []
+            
             ING_INFO = {
                 "name": ingress.metadata.name,
                 "ingressClass": ingress.spec.ingress_class_name,
@@ -82,15 +155,16 @@ def k8sIngressListGet(username_role, user_token, ns):
                 "created": ingress.metadata.creation_timestamp.strftime('%Y-%m-%d %H:%M:%S'),
                 "annotations": trimAnnotations(ingress.metadata.annotations),
                 "labels": ingress.metadata.labels,
-                "tls": ingress.spec.tls,
-                "status": ingress.status,
+                "tls": serialized_tls,
+                "status": serialized_status,
             }
-            if ig:
-                ING_INFO["endpoint"] = ig[0].ip
+            if ig and len(ig) > 0:
+                ING_INFO["endpoint"] = ig[0].ip if hasattr(ig[0], 'ip') else None
             if rules:
                 HOSTS = list()
                 for rule in ingress.spec.rules:
-                    HOSTS.append(rule.host)
+                    if rule.host:
+                        HOSTS.append(rule.host)
                 ING_INFO["hosts"] = HOSTS
             ING_LIST.append(ING_INFO)
         return ING_LIST
@@ -106,6 +180,50 @@ def k8sIngressListGet(username_role, user_token, ns):
 ##############################################################
 # Service
 ##############################################################
+
+def serialize_service_ports(ports):
+    """
+    Convert V1ServicePort objects to dictionaries for JSON serialization.
+    
+    Args:
+        ports: List of V1ServicePort objects or None
+        
+    Returns:
+        list: List of serialized port dictionaries
+    """
+    if not ports:
+        return []
+    
+    serialized_ports = []
+    for port in ports:
+        if hasattr(port, 'to_dict'):
+            # Use to_dict() if available (Kubernetes client library method)
+            port_dict = port.to_dict()
+            # Ensure consistent naming (camelCase for JSON)
+            serialized_port = {
+                'name': port_dict.get('name'),
+                'port': port_dict.get('port'),
+                'protocol': port_dict.get('protocol'),
+                'target_port': port_dict.get('target_port') or port_dict.get('targetPort'),
+                'node_port': port_dict.get('node_port') or port_dict.get('nodePort')
+            }
+            serialized_ports.append(serialized_port)
+        elif isinstance(port, dict):
+            # Already a dict
+            serialized_ports.append(port)
+        else:
+            # Manual conversion for V1ServicePort objects
+            serialized_port = {
+                'name': getattr(port, 'name', None),
+                'port': getattr(port, 'port', None),
+                'protocol': getattr(port, 'protocol', None),
+                'target_port': getattr(port, 'target_port', None),
+                'node_port': getattr(port, 'node_port', None)
+            }
+            # Remove None values for cleaner JSON
+            serialized_port = {k: v for k, v in serialized_port.items() if v is not None}
+            serialized_ports.append(serialized_port)
+    return serialized_ports
 
 @cache.memoize(timeout=short_cache_time)
 def k8sServiceListGet(username_role, user_token, ns):
@@ -132,9 +250,13 @@ def k8sServiceListGet(username_role, user_token, ns):
                 "annotations": trimAnnotations(service.metadata.annotations),
                 "labels": service.metadata.labels,
                 "selector": service.spec.selector,
-                "ports": service.spec.ports,
+                "ports": [],  # Initialize as empty list
                 "cluster_ip": service.spec.cluster_ip,
             }
+            # Serialize V1ServicePort objects to dictionaries
+            if service.spec.ports:
+                SERVICE_INFO['ports'] = serialize_service_ports(service.spec.ports)
+            
             if service.spec.type == "LoadBalancer":
                 SERVICE_INFO["external_ip"] = service.status.load_balancer.ingress[0].ip
             else:

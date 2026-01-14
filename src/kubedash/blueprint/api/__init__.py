@@ -55,3 +55,5 @@ api_v1_bp.register_blueprint(other_resources_api_bp)
 api_v1_bp.register_blueprint(users_api_bp)
 api_v1_bp.register_blueprint(settings_api_bp)
 
+# Note: Plugin API blueprints are dynamically loaded in lib/initializers.initialize_plugin_apis()
+

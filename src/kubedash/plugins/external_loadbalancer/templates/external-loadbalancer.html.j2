@@ -17,6 +17,14 @@
 {% endblock %}
 
 {% block content %}
+<script>
+    // Immediate test - should execute as soon as script tag is parsed
+    console.log('=== INLINE SCRIPT TEST - External LoadBalancer ===');
+    if (typeof window !== 'undefined') {
+        window.externalLoadBalancerTest = 'Script is executing!';
+        console.log('Window object available, script is working');
+    }
+</script>
 <div class="card shadow mb-4">
     <div class="card-header py-3">
         <h6 class="m-0 font-weight-bold text-primary">LoadBalancer Objects</h6>
@@ -29,11 +37,9 @@
             <li class="nav-item" role="presentation">
                 <button class="nav-link" id="l2advertisement-tab" data-bs-toggle="tab" data-bs-target="#nav-l2advertisement" type="button" role="tab" aria-controls="nav-l2advertisement" aria-selected="false">L2 Advertisements</button>
             </li>
-            {% if bgppeers_list is not none %}
-            <li class="nav-item" role="presentation">
+            <li class="nav-item" role="presentation" id="bgppeers-tab-container" style="display: none;">
                 <button class="nav-link" id="bgppeers-tab" data-bs-toggle="tab" data-bs-target="#nav-bgppeers_list" type="button" role="tab" aria-controls="nav-bgppeers_list" aria-selected="false">BGP Peers</button>
             </li>
-            {% endif %}
             <li class="nav-item" role="presentation">
                 <button class="nav-link" id="bgpadvertisement-tab" data-bs-toggle="tab" data-bs-target="#nav-bgpadvertisement" type="button" role="tab" aria-controls="nav-bgpadvertisement" aria-selected="false">BGP Advertisements</button>
             </li>
@@ -52,39 +58,15 @@
                                         <th>Addresses</th>
                                     </tr>
                                 </thead>
-                                <tbody>
-                                    {% for ipaddresspool in ipaddresspool_list %}
-                                    <tr id="{{ ipaddresspool.name }}" class="{% if selected == ipaddresspool.name %}selected{% endif %}">
-                                        <td>{{ ipaddresspool.type }}</td>
-                                        <td id="{{ ipaddresspool.name }}">
-                                            <form action="/plugins/external-loadbalancer/data" method="POST">
-                                                <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
-                                                <input type="hidden" name="object_data" value="{{ ipaddresspool }}" />
-                                                <input type="hidden" name="object_type" value="ipaddresspool" />
-                                                <a href="javascript:;" onclick="parentNode.submit();">{{ ipaddresspool.name }}</a>
-                                            </form>
-                                        </td>
-                                        <td>
-                                            {% if ipaddresspool.type == "cilium" %}
-                                                {% for address in ipaddresspool.blocks %}
-                                                    {% for key, value in address.items() %}
-                                                        {% if key == "start"%}
-                                                            {{ value }} -
-                                                        {% elif key == "stop"%}
-                                                            {{ value }}<br>
-                                                        {% elif key == "cidr"%}
-                                                            {{ value }}<br>
-                                                        {% endif %}
-                                                    {% endfor %}
-                                                {% endfor %}
-                                            {% else %}
-                                                {% for address in ipaddresspool.addresses %}
-                                                {{ address }}<br>
-                                                {% endfor %}
-                                            {% endif %}
+                                <tbody id="ipaddresspool-tbody">
+                                    <tr>
+                                        <td colspan="3" class="text-center">
+                                            <div class="spinner-border spinner-border-sm text-primary" role="status">
+                                                <span class="visually-hidden">Loading...</span>
+                                            </div>
+                                            <span class="ms-2">Loading IP address pools...</span>
                                         </td>
                                     </tr>
-                                    {% endfor %}
                                 </tbody>
                             </table>
                         </div>
@@ -105,25 +87,15 @@
                                         <th>Pools</th>
                                     </tr>
                                 </thead>
-                                <tbody>
-                                    {% for l2advertisement in l2advertisement_list %}
+                                <tbody id="l2advertisement-tbody">
                                     <tr>
-                                        <td>{{ l2advertisement.type }}</td>
-                                        <td>
-                                            <form action="/plugins/external-loadbalancer/data" method="POST">
-                                                <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
-                                                <input type="hidden" name="object_data" value="{{ l2advertisement }}" />
-                                                <input type="hidden" name="object_type" value="l2advertisement" />
-                                                <a href="javascript:;" onclick="parentNode.submit();">{{ l2advertisement.name }}</a>
-                                            </form>
-                                        </td>
-                                        <td>
-                                            {% for pool in l2advertisement.ipAddressPools %}
-                                                <a href="javascript:;" onclick="goToTab('l2advertisement', '{{ pool }}')">{{ pool }}</a><br>
-                                            {% endfor %}
+                                        <td colspan="3" class="text-center">
+                                            <div class="spinner-border spinner-border-sm text-primary" role="status">
+                                                <span class="visually-hidden">Loading...</span>
+                                            </div>
+                                            <span class="ms-2">Loading L2 advertisements...</span>
                                         </td>
                                     </tr>
-                                    {% endfor %}
                                 </tbody>
                             </table>
                         </div>
@@ -131,7 +103,6 @@
                 </div>
             </div>
         
-            {% if bgppeers_list is not none %}
             <!-- bgppeers -->
             <div class="tab-pane fade" id="nav-bgppeers_list" role="tabpanel" aria-labelledby="bgppeers-tab">
                 <div class="card shadow mb-4">
@@ -145,38 +116,21 @@
                                         <th>Peer</th>
                                     </tr>
                                 </thead>
-                                <tbody>
-                                    {% for bgppeers in bgppeers_list %}
+                                <tbody id="bgppeers-tbody">
                                     <tr>
-                                        <td>{{ bgppeers.type }}</td>
-                                        <td>
-                                            <form action="/plugins/external-loadbalancer/data" method="POST">
-                                                <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
-                                                <input type="hidden" name="object_data" value="{{ bgppeers }}" />
-                                                <input type="hidden" name="object_type" value="bgppeers" />
-                                                <a href="javascript:;" onclick="parentNode.submit();">{{ bgppeers.name }}</a>
-                                            </form>
-                                        </td>
-                                        <td>
-                                        {% if bgppeers.type == "cilium" %}
-                                            {% for virtual_router in bgppeers.virtual_routers %}
-                                                {% for neighbor in virtual_router.neighbors %}
-                                                {{ neighbor.peerAddress }}<br>
-                                                {% endfor %}
-                                            {% endfor %}
-                                        {% else %}
-                                            {{ bgppeers.peerAddress }}
-                                        {% endif %}
+                                        <td colspan="3" class="text-center">
+                                            <div class="spinner-border spinner-border-sm text-primary" role="status">
+                                                <span class="visually-hidden">Loading...</span>
+                                            </div>
+                                            <span class="ms-2">Loading BGP peers...</span>
                                         </td>
                                     </tr>
-                                    {% endfor %}
                                 </tbody>
                             </table>
                         </div>
                     </div>
                 </div>
             </div>
-            {% endif %}
 
             <!-- bgpadvertisement -->
             <div class="tab-pane fade" id="nav-bgpadvertisement" role="tabpanel" aria-labelledby="bgpadvertisement-tab">
@@ -191,18 +145,15 @@
                                         <th>Pools</th>
                                     </tr>
                                 </thead>
-                                <tbody>
-                                    {% for bgpadvertisement in bgpadvertisement_list %}
+                                <tbody id="bgpadvertisement-tbody">
                                     <tr>
-                                        <td>{{ bgpadvertisement.type }}</td>
-                                        <td>{{ bgpadvertisement.name }}</td>
-                                        <td>
-                                            {% for pool in bgpadvertisement.ipAddressPools %}
-                                                <a href="javascript:;" onclick="goToTab('bgpadvertisement', '{{ pool }}')">{{ pool }}</a><br>
-                                            {% endfor %}
+                                        <td colspan="3" class="text-center">
+                                            <div class="spinner-border spinner-border-sm text-primary" role="status">
+                                                <span class="visually-hidden">Loading...</span>
+                                            </div>
+                                            <span class="ms-2">Loading BGP advertisements...</span>
                                         </td>
                                     </tr>
-                                    {% endfor %}
                                 </tbody>
                             </table>
                         </div>
@@ -218,24 +169,594 @@
 {% include "segments/datatable_snippet.html.j2" %}
 {% endblock %}
 
-{% block tail_js %}
+{% block add_tail_js %}
 <script>
-$(document).ready( function () {
-  $('#ipaddresspoolTable').DataTable();
-  $('#l2advertisementTable').DataTable();
-  $('#bgppeersTable').DataTable();
-  $('#bgpadvertisementTable').DataTable();
-
-    // Switch to the correct tab if a specific type was selected
-    {% if selected_type %}
-        $('#{{ selected_type }}-tab').tab('show');
-    {% endif %}
-} );
-
-function goToTab(issuer_type, element_name) {
-    if ((issuer_type == "l2advertisement") || (issuer_type == "bgpadvertisement")) {
-        $('#ipaddresspool-tab').tab('show');
+(function() {
+    'use strict';
+    try {
+        console.log('External LoadBalancer script starting...');
+        
+        const escapeHtml = (text) => {
+            if (text === null || text === undefined) return '';
+            const map = {
+                '&': '&amp;',
+                '<': '&lt;',
+                '>': '&gt;',
+                '"': '&quot;',
+                "'": '&#039;'
+            };
+            return String(text).replace(/[&<>"']/g, m => map[m]);
+        };
+        
+        const csrf_token = {{ csrf_token()|tojson }};
+        
+        const selected = {{ selected|tojson if selected else 'null' }};
+        const selected_type = {{ selected_type|tojson if selected_type else 'null' }};
+    
+    // Get namespace from topbar selector or use default
+    function getSelectedNamespace() {
+        const topbarSelect = document.getElementById('inputGroupSelect04');
+        if (topbarSelect) {
+            return topbarSelect.value;
+        }
+        return sessionStorage.getItem('ns_select') || 'default';
     }
-}
+    
+    // DataTables protection - prevent auto-initialization on loading rows
+    (function() {
+        const tableIds = ['ipaddresspoolTable', 'l2advertisementTable', 'bgppeersTable', 'bgpadvertisementTable'];
+        
+        // Override DataTable initialization to prevent on colspan rows
+        if (typeof $ !== 'undefined' && $.fn.DataTable) {
+            const originalDataTable = $.fn.DataTable;
+            $.fn.DataTable = function(opts) {
+                const $this = $(this);
+                // Check if this is a loading row with colspan
+                if ($this.find('tbody tr td[colspan]').length > 0) {
+                    console.log('Blocked DataTable initialization on loading row');
+                    return $this;
+                }
+                return originalDataTable.apply(this, arguments);
+            };
+        }
+    })();
+    
+    // Track which tables have been initialized
+    const initializedTables = new Set();
+    const initializingTables = new Set(); // Track tables currently being initialized
+    
+    function safeInitDataTable(selector, orderCol) {
+        const $table = $(selector);
+        if (!$table.length) return;
+        
+        // Check if already initialized or currently initializing
+        if (initializedTables.has(selector) || initializingTables.has(selector)) {
+            // Double-check if it's actually initialized
+            if (typeof $.fn.DataTable !== 'undefined' && typeof $.fn.DataTable.isDataTable === 'function') {
+                if ($.fn.DataTable.isDataTable(selector)) {
+                    return; // Already initialized, skip
+                } else {
+                    // Was marked as initialized but isn't - remove from set
+                    initializedTables.delete(selector);
+                }
+            }
+        }
+        
+        // Check if DataTable is already initialized (synchronous check)
+        if (typeof $.fn.DataTable !== 'undefined' && typeof $.fn.DataTable.isDataTable === 'function') {
+            if ($.fn.DataTable.isDataTable(selector)) {
+                initializedTables.add(selector);
+                return; // Already initialized
+            }
+        }
+        
+        // Check if table has data rows (not just loading/empty rows)
+        const hasDataRows = $table.find('tbody tr').filter(function() {
+            return !$(this).find('td[colspan]').length;
+        }).length > 0;
+        
+        if (!hasDataRows) {
+            return; // No data to display, don't initialize
+        }
+        
+        // Mark as initializing to prevent concurrent initialization
+        initializingTables.add(selector);
+        
+        // Destroy existing DataTable if it exists (shouldn't happen, but be safe)
+        try {
+            if (typeof $.fn.DataTable !== 'undefined' && typeof $.fn.DataTable.isDataTable === 'function') {
+                if ($.fn.DataTable.isDataTable(selector)) {
+                    $table.DataTable().destroy();
+                    $table.removeData('DataTable');
+                }
+            }
+        } catch (destroyError) {
+            // Ignore destroy errors
+        }
+        
+        // Initialize DataTable
+        try {
+            $table.DataTable({
+                "order": [orderCol],
+                "pageLength": 25,
+                "destroy": true // Allow re-initialization if needed
+            });
+            initializedTables.add(selector);
+            initializingTables.delete(selector);
+        } catch (initError) {
+            console.warn('Error initializing DataTable:', initError);
+            initializedTables.delete(selector);
+            initializingTables.delete(selector);
+        }
+    }
+    
+    function formatAddresses(pool) {
+        if (pool.type === 'cilium' && pool.blocks && Array.isArray(pool.blocks)) {
+            let html = '';
+            pool.blocks.forEach(address => {
+                if (typeof address === 'object') {
+                    if (address.start) html += escapeHtml(String(address.start)) + ' - ';
+                    if (address.stop) html += escapeHtml(String(address.stop)) + '<br>';
+                    if (address.cidr) html += escapeHtml(String(address.cidr)) + '<br>';
+                }
+            });
+            return html;
+        } else if (pool.addresses && Array.isArray(pool.addresses)) {
+            return pool.addresses.map(addr => escapeHtml(String(addr))).join('<br>');
+        }
+        return '-';
+    }
+    
+    function formatPeerAddress(bgppeers) {
+        if (bgppeers.type === 'cilium' && bgppeers.virtual_routers && Array.isArray(bgppeers.virtual_routers)) {
+            let html = '';
+            bgppeers.virtual_routers.forEach(router => {
+                if (router.neighbors && Array.isArray(router.neighbors)) {
+                    router.neighbors.forEach(neighbor => {
+                        if (neighbor.peerAddress) {
+                            html += escapeHtml(String(neighbor.peerAddress)) + '<br>';
+                        }
+                    });
+                }
+            });
+            return html || '-';
+        } else if (bgppeers.peerAddress) {
+            return escapeHtml(String(bgppeers.peerAddress));
+        }
+        return '-';
+    }
+    
+    function populateIPAddressPoolsTable(pools, selected, namespace) {
+        const tbody = document.getElementById('ipaddresspool-tbody');
+        if (!tbody) {
+            console.error('ipaddresspool-tbody element not found');
+            return;
+        }
+        
+        if (!pools || !Array.isArray(pools) || pools.length === 0) {
+            tbody.innerHTML = '<tr><td colspan="3" class="text-center text-muted">No IP address pools found</td></tr>';
+            return;
+        }
+        
+        try {
+            // Store pools data in a global object for access in onclick handlers
+            if (!window.loadbalancerPoolsData) {
+                window.loadbalancerPoolsData = {};
+            }
+            
+            const rows = pools.map((pool, index) => {
+                if (!pool || typeof pool !== 'object') {
+                    return '';
+                }
+                const name = escapeHtml(pool.name || '');
+                const type = escapeHtml(pool.type || '');
+                const addresses = formatAddresses(pool);
+                const isSelected = selected === pool.name;
+                const rowClass = isSelected ? 'selected' : '';
+                
+                // Store pool data in global object
+                const poolKey = `ipaddresspool_${index}_${name}`;
+                try {
+                    window.loadbalancerPoolsData[poolKey] = pool;
+                } catch (e) {
+                    console.warn('Error storing pool data:', e);
+                }
+                
+                return `
+                    <tr id="${name}" class="${rowClass}">
+                        <td>${type}</td>
+                        <td>
+                            <form action="/plugins/external-loadbalancer/data" method="POST" data-pool-key="${poolKey}" onsubmit="const form = this; const poolKey = form.getAttribute('data-pool-key'); if (poolKey && window.loadbalancerPoolsData && window.loadbalancerPoolsData[poolKey]) { sessionStorage.setItem('loadbalancer_object_data', JSON.stringify(window.loadbalancerPoolsData[poolKey])); } sessionStorage.setItem('loadbalancer_object_type', 'ipaddresspool'); return true;">
+                                <input type="hidden" name="csrf_token" value="${escapeHtml(csrf_token)}">
+                                <input type="hidden" name="object_type" value="ipaddresspool" />
+                                <input type="hidden" name="ns_select" value="${escapeHtml(namespace || 'default')}" />
+                                <a href="javascript:;" onclick="parentNode.submit();">${name}</a>
+                            </form>
+                        </td>
+                        <td>${addresses}</td>
+                    </tr>
+                `;
+            }).filter(row => row !== '').join('');
+            
+            tbody.innerHTML = rows;
+            
+            // Initialize DataTable after a short delay to ensure DOM is updated
+            setTimeout(function() {
+                safeInitDataTable('#ipaddresspoolTable', [1, "asc"]);
+            }, 50);
+        } catch (error) {
+            console.error('Error populating IP address pools table:', error);
+            tbody.innerHTML = '<tr><td colspan="3" class="text-center text-danger">Error loading data: ' + escapeHtml(error.message) + '</td></tr>';
+        }
+    }
+    
+    function populateL2AdvertisementsTable(advertisements, namespace) {
+        const tbody = document.getElementById('l2advertisement-tbody');
+        
+        if (!advertisements || advertisements.length === 0) {
+            tbody.innerHTML = '<tr><td colspan="3" class="text-center text-muted">No L2 advertisements found</td></tr>';
+            return;
+        }
+        
+        const rows = advertisements.map(adv => {
+            const name = escapeHtml(adv.name || '');
+            const type = escapeHtml(adv.type || '');
+            let poolsHtml = '-';
+            if (adv.ipAddressPools && Array.isArray(adv.ipAddressPools)) {
+                poolsHtml = adv.ipAddressPools.map(pool => 
+                    `<a href="javascript:;" onclick="goToTab('l2advertisement', '${escapeHtml(pool)}')">${escapeHtml(pool)}</a>`
+                ).join('<br>');
+            }
+            
+            return `
+                <tr>
+                    <td>${type}</td>
+                    <td>
+                        <form action="/plugins/external-loadbalancer/data" method="POST" onsubmit="sessionStorage.setItem('loadbalancer_object_data', JSON.stringify(${JSON.stringify(adv)})); sessionStorage.setItem('loadbalancer_object_type', 'l2advertisement'); return true;">
+                            <input type="hidden" name="csrf_token" value="${escapeHtml(csrf_token)}">
+                            <input type="hidden" name="object_type" value="l2advertisement" />
+                            <input type="hidden" name="ns_select" value="${escapeHtml(namespace)}" />
+                            <a href="javascript:;" onclick="parentNode.submit();">${name}</a>
+                        </form>
+                    </td>
+                    <td>${poolsHtml}</td>
+                </tr>
+            `;
+        }).join('');
+        
+        tbody.innerHTML = rows;
+        
+        // Initialize DataTable after a short delay to ensure DOM is updated
+        setTimeout(function() {
+            safeInitDataTable('#l2advertisementTable', [1, "asc"]);
+        }, 50);
+    }
+    
+    function populateBGPPeersTable(peers, namespace) {
+        const tbody = document.getElementById('bgppeers-tbody');
+        const tabContainer = document.getElementById('bgppeers-tab-container');
+        
+        if (!peers || peers.length === 0) {
+            tbody.innerHTML = '<tr><td colspan="3" class="text-center text-muted">No BGP peers found</td></tr>';
+            if (tabContainer) tabContainer.style.display = 'none';
+            return;
+        }
+        
+        if (tabContainer) tabContainer.style.display = '';
+        
+        const rows = peers.map(peer => {
+            const name = escapeHtml(peer.name || '');
+            const type = escapeHtml(peer.type || '');
+            const peerAddress = formatPeerAddress(peer);
+            
+            return `
+                <tr>
+                    <td>${type}</td>
+                    <td>
+                        <form action="/plugins/external-loadbalancer/data" method="POST" onsubmit="sessionStorage.setItem('loadbalancer_object_data', JSON.stringify(${JSON.stringify(peer)})); sessionStorage.setItem('loadbalancer_object_type', 'bgppeers'); return true;">
+                            <input type="hidden" name="csrf_token" value="${escapeHtml(csrf_token)}">
+                            <input type="hidden" name="object_type" value="bgppeers" />
+                            <input type="hidden" name="ns_select" value="${escapeHtml(namespace)}" />
+                            <a href="javascript:;" onclick="parentNode.submit();">${name}</a>
+                        </form>
+                    </td>
+                    <td>${peerAddress}</td>
+                </tr>
+            `;
+        }).join('');
+        
+        tbody.innerHTML = rows;
+        
+        // Initialize DataTable after a short delay to ensure DOM is updated
+        setTimeout(function() {
+            safeInitDataTable('#bgppeersTable', [1, "asc"]);
+        }, 50);
+    }
+    
+    function populateBGPAdvertisementsTable(advertisements) {
+        const tbody = document.getElementById('bgpadvertisement-tbody');
+        
+        if (!advertisements || advertisements.length === 0) {
+            tbody.innerHTML = '<tr><td colspan="3" class="text-center text-muted">No BGP advertisements found</td></tr>';
+            return;
+        }
+        
+        const rows = advertisements.map(adv => {
+            const name = escapeHtml(adv.name || '');
+            const type = escapeHtml(adv.type || '');
+            let poolsHtml = '-';
+            if (adv.ipAddressPools && Array.isArray(adv.ipAddressPools)) {
+                poolsHtml = adv.ipAddressPools.map(pool => 
+                    `<a href="javascript:;" onclick="goToTab('bgpadvertisement', '${escapeHtml(pool)}')">${escapeHtml(pool)}</a>`
+                ).join('<br>');
+            }
+            
+            return `
+                <tr>
+                    <td>${type}</td>
+                    <td>${name}</td>
+                    <td>${poolsHtml}</td>
+                </tr>
+            `;
+        }).join('');
+        
+        tbody.innerHTML = rows;
+        
+        // Initialize DataTable after a short delay to ensure DOM is updated
+        setTimeout(function() {
+            safeInitDataTable('#bgpadvertisementTable', [1, "asc"]);
+        }, 50);
+    }
+    
+    function goToTab(tabType, elementName) {
+        if (tabType === 'l2advertisement' || tabType === 'bgpadvertisement') {
+        $('#ipaddresspool-tab').tab('show');
+            // Scroll to element if it exists
+            setTimeout(function() {
+                const element = document.getElementById(elementName);
+                if (element) {
+                    element.scrollIntoView({ behavior: 'smooth', block: 'center' });
+                    element.classList.add('selected');
+                }
+            }, 300);
+        }
+    }
+    
+    async function loadIPAddressPools(namespace) {
+        try {
+            const apiUrl = `/api/v1/plugins/external-loadbalancer/ip-address-pools?namespace=${encodeURIComponent(namespace)}`;
+            console.log('Loading IP address pools from:', apiUrl);
+            const response = await fetch(apiUrl, {
+                method: 'GET',
+                headers: {
+                    'Accept': 'application/json',
+                },
+                credentials: 'same-origin'
+            });
+            console.log('IP address pools response status:', response.status);
+            if (!response.ok) {
+                const errorText = await response.text();
+                console.error('IP address pools HTTP error:', response.status, errorText);
+                throw new Error(`HTTP error! status: ${response.status}`);
+            }
+            const data = await response.json();
+            console.log('IP address pools data received:', data);
+            
+            if (data.error) {
+                throw new Error(data.message || 'Failed to load IP address pools');
+            }
+            
+            populateIPAddressPoolsTable(data.data || [], selected, namespace);
+        } catch (error) {
+            console.error('Error loading IP address pools:', error);
+            const tbody = document.getElementById('ipaddresspool-tbody');
+            if (tbody) {
+                tbody.innerHTML = '<tr><td colspan="3" class="text-center text-danger">Error loading IP address pools: ' + escapeHtml(error.message) + '</td></tr>';
+            }
+        }
+    }
+    
+    async function loadL2Advertisements(namespace) {
+        try {
+            const apiUrl = `/api/v1/plugins/external-loadbalancer/l2-advertisements?namespace=${encodeURIComponent(namespace)}`;
+            console.log('Loading L2 advertisements from:', apiUrl);
+            const response = await fetch(apiUrl, {
+                method: 'GET',
+                headers: {
+                    'Accept': 'application/json',
+                },
+                credentials: 'same-origin'
+            });
+            console.log('L2 advertisements response status:', response.status);
+            if (!response.ok) {
+                const errorText = await response.text();
+                console.error('L2 advertisements HTTP error:', response.status, errorText);
+                throw new Error(`HTTP error! status: ${response.status}`);
+            }
+            const data = await response.json();
+            console.log('L2 advertisements data received:', data);
+            
+            if (data.error) {
+                throw new Error(data.message || 'Failed to load L2 advertisements');
+            }
+            
+            populateL2AdvertisementsTable(data.data || [], namespace);
+        } catch (error) {
+            console.error('Error loading L2 advertisements:', error);
+            const tbody = document.getElementById('l2advertisement-tbody');
+            if (tbody) {
+                tbody.innerHTML = '<tr><td colspan="3" class="text-center text-danger">Error loading L2 advertisements: ' + escapeHtml(error.message) + '</td></tr>';
+            }
+        }
+    }
+    
+    async function loadBGPAdvertisements(namespace) {
+        try {
+            const apiUrl = `/api/v1/plugins/external-loadbalancer/bgp-advertisements?namespace=${encodeURIComponent(namespace)}`;
+            console.log('Loading BGP advertisements from:', apiUrl);
+            const response = await fetch(apiUrl, {
+                method: 'GET',
+                headers: {
+                    'Accept': 'application/json',
+                },
+                credentials: 'same-origin'
+            });
+            console.log('BGP advertisements response status:', response.status);
+            if (!response.ok) {
+                const errorText = await response.text();
+                console.error('BGP advertisements HTTP error:', response.status, errorText);
+                throw new Error(`HTTP error! status: ${response.status}`);
+            }
+            const data = await response.json();
+            console.log('BGP advertisements data received:', data);
+            
+            if (data.error) {
+                throw new Error(data.message || 'Failed to load BGP advertisements');
+            }
+            
+            populateBGPAdvertisementsTable(data.data || []);
+        } catch (error) {
+            console.error('Error loading BGP advertisements:', error);
+            const tbody = document.getElementById('bgpadvertisement-tbody');
+            if (tbody) {
+                tbody.innerHTML = '<tr><td colspan="3" class="text-center text-danger">Error loading BGP advertisements: ' + escapeHtml(error.message) + '</td></tr>';
+            }
+        }
+    }
+    
+    async function loadBGPPeers(namespace) {
+        try {
+            const apiUrl = `/api/v1/plugins/external-loadbalancer/bgp-peers?namespace=${encodeURIComponent(namespace)}`;
+            console.log('Loading BGP peers from:', apiUrl);
+            const response = await fetch(apiUrl, {
+                method: 'GET',
+                headers: {
+                    'Accept': 'application/json',
+                },
+                credentials: 'same-origin'
+            });
+            console.log('BGP peers response status:', response.status);
+            if (!response.ok) {
+                const errorText = await response.text();
+                console.error('BGP peers HTTP error:', response.status, errorText);
+                throw new Error(`HTTP error! status: ${response.status}`);
+            }
+            const data = await response.json();
+            console.log('BGP peers data received:', data);
+            
+            if (data.error) {
+                throw new Error(data.message || 'Failed to load BGP peers');
+            }
+            
+            populateBGPPeersTable(data.data || [], namespace);
+        } catch (error) {
+            console.error('Error loading BGP peers:', error);
+            const tbody = document.getElementById('bgppeers-tbody');
+            if (tbody) {
+                tbody.innerHTML = '<tr><td colspan="3" class="text-center text-danger">Error loading BGP peers: ' + escapeHtml(error.message) + '</td></tr>';
+            }
+        }
+    }
+    
+    // Load data when page loads
+    // Test if script is executing
+    console.log('=== External LoadBalancer Script Loaded ===');
+    
+    // Try immediate execution first
+    if (document.readyState === 'loading') {
+        console.log('Document still loading, waiting for DOMContentLoaded...');
+        document.addEventListener('DOMContentLoaded', function() {
+            console.log('DOMContentLoaded fired!');
+            initializePage();
+        });
+    } else {
+        console.log('Document already loaded, initializing immediately...');
+        // Document already loaded
+        setTimeout(initializePage, 100);
+    }
+    
+    function initializePage() {
+        console.log('External LoadBalancer page initializing...');
+        try {
+            const namespace = getSelectedNamespace();
+            console.log('Selected namespace:', namespace);
+            
+            // Load all data in parallel
+            console.log('Starting to load all data...');
+            loadIPAddressPools(namespace);
+            loadL2Advertisements(namespace);
+            loadBGPAdvertisements(namespace);
+            loadBGPPeers(namespace);
+        
+            // Switch to the correct tab if a specific type was selected
+            if (selected_type) {
+                setTimeout(function() {
+                    if (typeof $ !== 'undefined') {
+                        const tabId = '#' + selected_type + '-tab';
+                        $(tabId).tab('show');
+                    }
+                }, 200);
+            }
+            
+            // Reload data when namespace changes
+            const namespaceSelect = document.getElementById('inputGroupSelect04');
+            if (namespaceSelect) {
+                namespaceSelect.addEventListener('change', function() {
+                    const newNamespace = this.value;
+                    sessionStorage.setItem('ns_select', newNamespace);
+                    loadIPAddressPools(newNamespace);
+                    loadL2Advertisements(newNamespace);
+                    loadBGPAdvertisements(newNamespace);
+                    loadBGPPeers(newNamespace);
+                });
+            }
+            
+            // Note: DataTables are initialized automatically when data is loaded
+            // in the populate*Table functions. No need to initialize empty tables.
+            
+            // Handle tab switching - DataTables will be initialized when data loads
+            // This is just for edge cases where a table might need re-initialization
+            if (typeof $ !== 'undefined') {
+                $('button[data-bs-toggle="tab"]').on('shown.bs.tab', function (e) {
+                    // Only try to initialize if the table has data and isn't already initialized
+                    setTimeout(function() {
+                        let selector = null;
+                        if (e.target.id === 'ipaddresspool-tab') {
+                            selector = '#ipaddresspoolTable';
+                        } else if (e.target.id === 'l2advertisement-tab') {
+                            selector = '#l2advertisementTable';
+                        } else if (e.target.id === 'bgppeers-tab') {
+                            selector = '#bgppeersTable';
+                        } else if (e.target.id === 'bgpadvertisement-tab') {
+                            selector = '#bgpadvertisementTable';
+                        }
+                        
+                        if (selector) {
+                            const $table = $(selector);
+                            // Only initialize if table has data rows and isn't already a DataTable
+                            if ($table.length && $table.find('tbody tr').filter(function() {
+                                return !$(this).find('td[colspan]').length;
+                            }).length > 0) {
+                                if (typeof $.fn.DataTable.isDataTable === 'function' && !$.fn.DataTable.isDataTable(selector)) {
+                                    safeInitDataTable(selector, [1, "asc"]);
+                                }
+                            }
+                        }
+                    }, 100);
+                });
+            }
+        } catch (error) {
+            console.error('Error in initializePage:', error);
+        }
+    }
+    } catch (error) {
+        console.error('Error in External LoadBalancer script:', error);
+        // Show error in UI
+        const errorDiv = document.createElement('div');
+        errorDiv.className = 'alert alert-danger';
+        errorDiv.textContent = 'Error loading External LoadBalancer page: ' + error.message;
+        document.body.insertBefore(errorDiv, document.body.firstChild);
+    }
+})();
 </script>
 {% endblock %}

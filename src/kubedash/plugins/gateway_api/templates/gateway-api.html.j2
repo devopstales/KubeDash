@@ -18,111 +18,83 @@
 
 {% block content %}
 <!-- Gateway API Status Alert -->
-{% if not gateway_api_status.installed %}
-<div class="alert alert-warning" role="alert">
-    <strong>Gateway API Not Detected</strong> - No Gateway API CRDs found in this cluster. 
-    Please install the Gateway API CRDs to use this plugin.
-    <a href="https://gateway-api.sigs.k8s.io/guides/#installing-gateway-api" target="_blank" class="alert-link">Learn more</a>
+<div id="gateway-api-status-alert" style="display: none;">
+    <div class="alert alert-warning" role="alert">
+        <strong>Gateway API Not Detected</strong> - No Gateway API CRDs found in this cluster. 
+        Please install the Gateway API CRDs to use this plugin.
+        <a href="https://gateway-api.sigs.k8s.io/guides/#installing-gateway-api" target="_blank" class="alert-link">Learn more</a>
+    </div>
 </div>
-{% endif %}
 
 <div class="card shadow mb-4">
     <div class="card-header d-flex justify-content-between align-items-center">
         <h6 class="m-0 fw-bold text-primary">Gateway API Resources</h6>
-        <div class="d-flex align-items-center">
-            {% if gateway_api_status.installed %}
-            <span class="badge bg-success me-2">
-                <i class="cil-check-circle"></i> Gateway API Installed
-            </span>
-            {% endif %}
-            {% if gateway_api_status.experimental|length > 0 %}
-            <span class="badge bg-info">
-                Experimental APIs: {{ gateway_api_status.experimental|length }}
-            </span>
-            {% endif %}
+        <div class="d-flex align-items-center" id="gateway-api-status-badges">
+            <!-- Status badges will be populated by JavaScript -->
         </div>
     </div>
     <div class="card-body">
         <!-- Navigation Tabs -->
         <ul class="nav nav-tabs" id="gateway-api-tabs" role="tablist">
             <li class="nav-item">
-                <a class="nav-link {% if active_tab == 'gatewayclasses' %}active{% endif %}" 
-                   id="nav-gatewayclasses-tab" data-bs-toggle="tab" href="#nav-gatewayclasses" 
-                   role="tab" aria-controls="nav-gatewayclasses" aria-selected="{% if active_tab == 'gatewayclasses' %}true{% else %}false{% endif %}">
-                    GatewayClasses <span class="badge bg-secondary">{{ gateway_classes|length }}</span>
+                <a class="nav-link active" id="nav-gatewayclasses-tab" data-bs-toggle="tab" href="#nav-gatewayclasses" 
+                   role="tab" aria-controls="nav-gatewayclasses" aria-selected="true">
+                    GatewayClasses <span class="badge bg-secondary" id="gatewayclasses-badge">0</span>
                 </a>
             </li>
             <li class="nav-item">
-                <a class="nav-link {% if active_tab == 'gateways' %}active{% endif %}" 
-                   id="nav-gateways-tab" data-bs-toggle="tab" href="#nav-gateways" 
-                   role="tab" aria-controls="nav-gateways" aria-selected="{% if active_tab == 'gateways' %}true{% else %}false{% endif %}">
-                    Gateways <span class="badge bg-secondary">{{ gateways|length }}</span>
+                <a class="nav-link" id="nav-gateways-tab" data-bs-toggle="tab" href="#nav-gateways" 
+                   role="tab" aria-controls="nav-gateways" aria-selected="false">
+                    Gateways <span class="badge bg-secondary" id="gateways-badge">0</span>
                 </a>
             </li>
             <li class="nav-item">
-                <a class="nav-link {% if active_tab == 'httproutes' %}active{% endif %}" 
-                   id="nav-httproutes-tab" data-bs-toggle="tab" href="#nav-httproutes" 
-                   role="tab" aria-controls="nav-httproutes" aria-selected="{% if active_tab == 'httproutes' %}true{% else %}false{% endif %}">
-                    HTTPRoutes <span class="badge bg-secondary">{{ httproutes|length }}</span>
+                <a class="nav-link" id="nav-httproutes-tab" data-bs-toggle="tab" href="#nav-httproutes" 
+                   role="tab" aria-controls="nav-httproutes" aria-selected="false">
+                    HTTPRoutes <span class="badge bg-secondary" id="httproutes-badge">0</span>
                 </a>
             </li>
-            {% if grpcroutes|length > 0 or 'grpcroutes' in gateway_api_status.experimental %}
-            <li class="nav-item">
-                <a class="nav-link {% if active_tab == 'grpcroutes' %}active{% endif %}" 
-                   id="nav-grpcroutes-tab" data-bs-toggle="tab" href="#nav-grpcroutes" 
-                   role="tab" aria-controls="nav-grpcroutes" aria-selected="{% if active_tab == 'grpcroutes' %}true{% else %}false{% endif %}">
-                    GRPCRoutes <span class="badge bg-secondary">{{ grpcroutes|length }}</span>
+            <li class="nav-item" id="grpcroutes-tab-container" style="display: none;">
+                <a class="nav-link" id="nav-grpcroutes-tab" data-bs-toggle="tab" href="#nav-grpcroutes" 
+                   role="tab" aria-controls="nav-grpcroutes" aria-selected="false">
+                    GRPCRoutes <span class="badge bg-secondary" id="grpcroutes-badge">0</span>
                     <span class="badge bg-warning text-dark ms-1">Exp</span>
                 </a>
             </li>
-            {% endif %}
-            {% if tcproutes|length > 0 or 'tcproutes' in gateway_api_status.experimental %}
-            <li class="nav-item">
-                <a class="nav-link {% if active_tab == 'tcproutes' %}active{% endif %}" 
-                   id="nav-tcproutes-tab" data-bs-toggle="tab" href="#nav-tcproutes" 
-                   role="tab" aria-controls="nav-tcproutes" aria-selected="{% if active_tab == 'tcproutes' %}true{% else %}false{% endif %}">
-                    TCPRoutes <span class="badge bg-secondary">{{ tcproutes|length }}</span>
+            <li class="nav-item" id="tcproutes-tab-container" style="display: none;">
+                <a class="nav-link" id="nav-tcproutes-tab" data-bs-toggle="tab" href="#nav-tcproutes" 
+                   role="tab" aria-controls="nav-tcproutes" aria-selected="false">
+                    TCPRoutes <span class="badge bg-secondary" id="tcproutes-badge">0</span>
                     <span class="badge bg-warning text-dark ms-1">Exp</span>
                 </a>
             </li>
-            {% endif %}
-            {% if tlsroutes|length > 0 or 'tlsroutes' in gateway_api_status.experimental %}
-            <li class="nav-item">
-                <a class="nav-link {% if active_tab == 'tlsroutes' %}active{% endif %}" 
-                   id="nav-tlsroutes-tab" data-bs-toggle="tab" href="#nav-tlsroutes" 
-                   role="tab" aria-controls="nav-tlsroutes" aria-selected="{% if active_tab == 'tlsroutes' %}true{% else %}false{% endif %}">
-                    TLSRoutes <span class="badge bg-secondary">{{ tlsroutes|length }}</span>
+            <li class="nav-item" id="tlsroutes-tab-container" style="display: none;">
+                <a class="nav-link" id="nav-tlsroutes-tab" data-bs-toggle="tab" href="#nav-tlsroutes" 
+                   role="tab" aria-controls="nav-tlsroutes" aria-selected="false">
+                    TLSRoutes <span class="badge bg-secondary" id="tlsroutes-badge">0</span>
                     <span class="badge bg-warning text-dark ms-1">Exp</span>
                 </a>
             </li>
-            {% endif %}
-            {% if referencegrants|length > 0 or 'referencegrants' in gateway_api_status.standard %}
-            <li class="nav-item">
-                <a class="nav-link {% if active_tab == 'referencegrants' %}active{% endif %}" 
-                   id="nav-referencegrants-tab" data-bs-toggle="tab" href="#nav-referencegrants" 
-                   role="tab" aria-controls="nav-referencegrants" aria-selected="{% if active_tab == 'referencegrants' %}true{% else %}false{% endif %}">
-                    ReferenceGrants <span class="badge bg-secondary">{{ referencegrants|length }}</span>
+            <li class="nav-item" id="referencegrants-tab-container" style="display: none;">
+                <a class="nav-link" id="nav-referencegrants-tab" data-bs-toggle="tab" href="#nav-referencegrants" 
+                   role="tab" aria-controls="nav-referencegrants" aria-selected="false">
+                    ReferenceGrants <span class="badge bg-secondary" id="referencegrants-badge">0</span>
                 </a>
             </li>
-            {% endif %}
-            {% if backendtlspolicies|length > 0 or 'backendtlspolicies' in gateway_api_status.experimental %}
-            <li class="nav-item">
-                <a class="nav-link {% if active_tab == 'backendtlspolicies' %}active{% endif %}" 
-                   id="nav-backendtlspolicies-tab" data-bs-toggle="tab" href="#nav-backendtlspolicies" 
-                   role="tab" aria-controls="nav-backendtlspolicies" aria-selected="{% if active_tab == 'backendtlspolicies' %}true{% else %}false{% endif %}">
-                    BackendTLSPolicies <span class="badge bg-secondary">{{ backendtlspolicies|length }}</span>
+            <li class="nav-item" id="backendtlspolicies-tab-container" style="display: none;">
+                <a class="nav-link" id="nav-backendtlspolicies-tab" data-bs-toggle="tab" href="#nav-backendtlspolicies" 
+                   role="tab" aria-controls="nav-backendtlspolicies" aria-selected="false">
+                    BackendTLSPolicies <span class="badge bg-secondary" id="backendtlspolicies-badge">0</span>
                     <span class="badge bg-warning text-dark ms-1">Exp</span>
                 </a>
             </li>
-            {% endif %}
         </ul>
 
         <!-- Tab Content -->
         <div class="tab-content" id="gateway-api-tab-content">
             
             <!-- GatewayClasses Tab -->
-            <div class="tab-pane fade {% if active_tab == 'gatewayclasses' %}show active{% endif %}" 
-                 id="nav-gatewayclasses" role="tabpanel" aria-labelledby="nav-gatewayclasses-tab">
+            <div class="tab-pane fade show active" id="nav-gatewayclasses" role="tabpanel" aria-labelledby="nav-gatewayclasses-tab">
                 <div class="card shadow mb-4 mt-3">
                     <div class="card-body">
                         <div class="table-responsive">
@@ -136,28 +108,15 @@
                                         <th>Age</th>
                                     </tr>
                                 </thead>
-                                <tbody>
-                                    {% for gc in gateway_classes %}
+                                <tbody id="gatewayclasses-tbody">
                                     <tr>
-                                        <td>
-                                            {% if gc.status == 'True' %}
-                                            <span class="badge bg-success">{{ gc.status_reason or 'Accepted' }}</span>
-                                            {% else %}
-                                            <span class="badge bg-danger">{{ gc.status_reason or 'Pending' }}</span>
-                                            {% endif %}
+                                        <td colspan="5" class="text-center">
+                                            <div class="spinner-border spinner-border-sm text-primary" role="status">
+                                                <span class="visually-hidden">Loading...</span>
+                                            </div>
+                                            <span class="ms-2">Loading GatewayClasses...</span>
                                         </td>
-                                        <td>
-                                            <a href="/plugins/gateway-api/gatewayclass/{{ gc.name }}">{{ gc.name }}</a>
-                                        </td>
-                                        <td><code>{{ gc.controller }}</code></td>
-                                        <td>{{ gc.description or '-' }}</td>
-                                        <td>{{ gc.age }}</td>
                                     </tr>
-                                    {% else %}
-                                    <tr>
-                                        <td class="text-center text-muted" colspan="5">No GatewayClasses found</td>
-                                    </tr>
-                                    {% endfor %}
                                 </tbody>
                             </table>
                         </div>
@@ -166,8 +125,7 @@
             </div>
 
             <!-- Gateways Tab -->
-            <div class="tab-pane fade {% if active_tab == 'gateways' %}show active{% endif %}" 
-                 id="nav-gateways" role="tabpanel" aria-labelledby="nav-gateways-tab">
+            <div class="tab-pane fade" id="nav-gateways" role="tabpanel" aria-labelledby="nav-gateways-tab">
                 <div class="card shadow mb-4 mt-3">
                     <div class="card-body">
                         <div class="table-responsive">
@@ -184,49 +142,15 @@
                                         <th>Age</th>
                                     </tr>
                                 </thead>
-                                <tbody>
-                                    {% for gw in gateways %}
+                                <tbody id="gateways-tbody">
                                     <tr>
-                                        <td>
-                                            {% if gw.programmed_status == 'True' %}
-                                            <span class="badge bg-success">Programmed</span>
-                                            {% elif gw.accepted_status == 'True' %}
-                                            <span class="badge bg-info">Accepted</span>
-                                            {% else %}
-                                            <span class="badge bg-warning text-dark">{{ gw.programmed_reason or 'Pending' }}</span>
-                                            {% endif %}
+                                        <td colspan="8" class="text-center">
+                                            <div class="spinner-border spinner-border-sm text-primary" role="status">
+                                                <span class="visually-hidden">Loading...</span>
+                                            </div>
+                                            <span class="ms-2">Loading Gateways...</span>
                                         </td>
-                                        <td>
-                                            <a href="/plugins/gateway-api/gateway/{{ gw.namespace }}/{{ gw.name }}">{{ gw.name }}</a>
-                                        </td>
-                                        <td>{{ gw.namespace }}</td>
-                                        <td>
-                                            <a href="/plugins/gateway-api/gatewayclass/{{ gw.gateway_class }}">{{ gw.gateway_class }}</a>
-                                        </td>
-                                        <td>
-                                            {% for listener in gw.listeners %}
-                                            <span class="badge bg-light text-dark me-1">
-                                                {{ listener.protocol }}:{{ listener.port }}
-                                            </span>
-                                            {% endfor %}
-                                        </td>
-                                        <td>
-                                            {% for addr in gw.addresses %}
-                                            <code>{{ addr.split(':')[-1] }}</code>
-                                            {% else %}
-                                            <span class="text-muted">-</span>
-                                            {% endfor %}
-                                        </td>
-                                        <td>
-                                            <span class="badge bg-primary">{{ gw.attached_routes }}</span>
-                                        </td>
-                                        <td>{{ gw.age }}</td>
                                     </tr>
-                                    {% else %}
-                                    <tr>
-                                        <td class="text-center text-muted" colspan="8">No Gateways found in namespace {{ session['ns_select'] }}</td>
-                                    </tr>
-                                    {% endfor %}
                                 </tbody>
                             </table>
                         </div>
@@ -235,8 +159,7 @@
             </div>
 
             <!-- HTTPRoutes Tab -->
-            <div class="tab-pane fade {% if active_tab == 'httproutes' %}show active{% endif %}" 
-                 id="nav-httproutes" role="tabpanel" aria-labelledby="nav-httproutes-tab">
+            <div class="tab-pane fade" id="nav-httproutes" role="tabpanel" aria-labelledby="nav-httproutes-tab">
                 <div class="card shadow mb-4 mt-3">
                     <div class="card-body">
                         <div class="table-responsive">
@@ -253,53 +176,15 @@
                                         <th>Age</th>
                                     </tr>
                                 </thead>
-                                <tbody>
-                                    {% for route in httproutes %}
+                                <tbody id="httproutes-tbody">
                                     <tr>
-                                        <td>
-                                            {% if route.accepted_parents == route.total_parents %}
-                                            <span class="badge bg-success">{{ route.accepted_parents }}/{{ route.total_parents }}</span>
-                                            {% elif route.accepted_parents > 0 %}
-                                            <span class="badge bg-warning text-dark">{{ route.accepted_parents }}/{{ route.total_parents }}</span>
-                                            {% else %}
-                                            <span class="badge bg-danger">{{ route.accepted_parents }}/{{ route.total_parents }}</span>
-                                            {% endif %}
+                                        <td colspan="8" class="text-center">
+                                            <div class="spinner-border spinner-border-sm text-primary" role="status">
+                                                <span class="visually-hidden">Loading...</span>
+                                            </div>
+                                            <span class="ms-2">Loading HTTPRoutes...</span>
                                         </td>
-                                        <td>
-                                            <a href="/plugins/gateway-api/httproute/{{ route.namespace }}/{{ route.name }}">{{ route.name }}</a>
-                                        </td>
-                                        <td>{{ route.namespace }}</td>
-                                        <td>
-                                            {% for hostname in route.hostnames[:3] %}
-                                            <span class="badge bg-light text-dark">{{ hostname }}</span>
-                                            {% endfor %}
-                                            {% if route.hostnames|length > 3 %}
-                                            <span class="badge bg-secondary">+{{ route.hostnames|length - 3 }}</span>
-                                            {% endif %}
-                                        </td>
-                                        <td>
-                                            {% for gw in route.gateways %}
-                                            <a href="/plugins/gateway-api/gateway/{{ gw.replace('/', '/') }}" class="badge bg-info text-decoration-none">{{ gw.split('/')[-1] }}</a>
-                                            {% endfor %}
-                                        </td>
-                                        <td>
-                                            <span class="badge bg-secondary">{{ route.rules_count }}</span>
-                                        </td>
-                                        <td>
-                                            {% for backend in route.backends[:2] %}
-                                            <code class="small">{{ backend }}</code>
-                                            {% endfor %}
-                                            {% if route.backends|length > 2 %}
-                                            <span class="badge bg-secondary">+{{ route.backends|length - 2 }}</span>
-                                            {% endif %}
-                                        </td>
-                                        <td>{{ route.age }}</td>
                                     </tr>
-                                    {% else %}
-                                    <tr>
-                                        <td class="text-center text-muted" colspan="8">No HTTPRoutes found in namespace {{ session['ns_select'] }}</td>
-                                    </tr>
-                                    {% endfor %}
                                 </tbody>
                             </table>
                         </div>
@@ -308,8 +193,7 @@
             </div>
 
             <!-- GRPCRoutes Tab -->
-            <div class="tab-pane fade {% if active_tab == 'grpcroutes' %}show active{% endif %}" 
-                 id="nav-grpcroutes" role="tabpanel" aria-labelledby="nav-grpcroutes-tab">
+            <div class="tab-pane fade" id="nav-grpcroutes" role="tabpanel" aria-labelledby="nav-grpcroutes-tab">
                 <div class="card shadow mb-4 mt-3">
                     <div class="card-header bg-warning bg-opacity-25">
                         <small><i class="cil-warning"></i> Experimental API (v1alpha2)</small>
@@ -328,38 +212,15 @@
                                         <th>Age</th>
                                     </tr>
                                 </thead>
-                                <tbody>
-                                    {% for route in grpcroutes %}
+                                <tbody id="grpcroutes-tbody">
                                     <tr>
-                                        <td>{{ route.name }}</td>
-                                        <td>{{ route.namespace }}</td>
-                                        <td>
-                                            {% for hostname in route.hostnames %}
-                                            <span class="badge bg-light text-dark">{{ hostname }}</span>
-                                            {% endfor %}
+                                        <td colspan="7" class="text-center">
+                                            <div class="spinner-border spinner-border-sm text-primary" role="status">
+                                                <span class="visually-hidden">Loading...</span>
+                                            </div>
+                                            <span class="ms-2">Loading GRPCRoutes...</span>
                                         </td>
-                                        <td>
-                                            {% for gw in route.gateways %}
-                                            <span class="badge bg-info">{{ gw.split('/')[-1] }}</span>
-                                            {% endfor %}
-                                        </td>
-                                        <td>
-                                            {% for svc in route.services[:2] %}
-                                            <code class="small">{{ svc }}</code>
-                                            {% endfor %}
-                                        </td>
-                                        <td>
-                                            {% for backend in route.backends %}
-                                            <code class="small">{{ backend }}</code>
-                                            {% endfor %}
-                                        </td>
-                                        <td>{{ route.age }}</td>
                                     </tr>
-                                    {% else %}
-                                    <tr>
-                                        <td class="text-center text-muted" colspan="7">No GRPCRoutes found</td>
-                                    </tr>
-                                    {% endfor %}
                                 </tbody>
                             </table>
                         </div>
@@ -368,8 +229,7 @@
             </div>
 
             <!-- TCPRoutes Tab -->
-            <div class="tab-pane fade {% if active_tab == 'tcproutes' %}show active{% endif %}" 
-                 id="nav-tcproutes" role="tabpanel" aria-labelledby="nav-tcproutes-tab">
+            <div class="tab-pane fade" id="nav-tcproutes" role="tabpanel" aria-labelledby="nav-tcproutes-tab">
                 <div class="card shadow mb-4 mt-3">
                     <div class="card-header bg-warning bg-opacity-25">
                         <small><i class="cil-warning"></i> Experimental API (v1alpha2)</small>
@@ -387,35 +247,15 @@
                                         <th>Age</th>
                                     </tr>
                                 </thead>
-                                <tbody>
-                                    {% for route in tcproutes %}
+                                <tbody id="tcproutes-tbody">
                                     <tr>
-                                        <td>
-                                            {% if route.accepted_parents == route.total_parents %}
-                                            <span class="badge bg-success">{{ route.accepted_parents }}/{{ route.total_parents }}</span>
-                                            {% else %}
-                                            <span class="badge bg-warning text-dark">{{ route.accepted_parents }}/{{ route.total_parents }}</span>
-                                            {% endif %}
+                                        <td colspan="6" class="text-center">
+                                            <div class="spinner-border spinner-border-sm text-primary" role="status">
+                                                <span class="visually-hidden">Loading...</span>
+                                            </div>
+                                            <span class="ms-2">Loading TCPRoutes...</span>
                                         </td>
-                                        <td>{{ route.name }}</td>
-                                        <td>{{ route.namespace }}</td>
-                                        <td>
-                                            {% for gw in route.gateways %}
-                                            <span class="badge bg-info">{{ gw.split('/')[-1] }}</span>
-                                            {% endfor %}
-                                        </td>
-                                        <td>
-                                            {% for backend in route.backends %}
-                                            <code class="small">{{ backend }}</code>
-                                            {% endfor %}
-                                        </td>
-                                        <td>{{ route.age }}</td>
                                     </tr>
-                                    {% else %}
-                                    <tr>
-                                        <td class="text-center text-muted" colspan="6">No TCPRoutes found</td>
-                                    </tr>
-                                    {% endfor %}
                                 </tbody>
                             </table>
                         </div>
@@ -424,8 +264,7 @@
             </div>
 
             <!-- TLSRoutes Tab -->
-            <div class="tab-pane fade {% if active_tab == 'tlsroutes' %}show active{% endif %}" 
-                 id="nav-tlsroutes" role="tabpanel" aria-labelledby="nav-tlsroutes-tab">
+            <div class="tab-pane fade" id="nav-tlsroutes" role="tabpanel" aria-labelledby="nav-tlsroutes-tab">
                 <div class="card shadow mb-4 mt-3">
                     <div class="card-header bg-warning bg-opacity-25">
                         <small><i class="cil-warning"></i> Experimental API (v1alpha2)</small>
@@ -444,40 +283,15 @@
                                         <th>Age</th>
                                     </tr>
                                 </thead>
-                                <tbody>
-                                    {% for route in tlsroutes %}
+                                <tbody id="tlsroutes-tbody">
                                     <tr>
-                                        <td>
-                                            {% if route.accepted_parents == route.total_parents %}
-                                            <span class="badge bg-success">{{ route.accepted_parents }}/{{ route.total_parents }}</span>
-                                            {% else %}
-                                            <span class="badge bg-warning text-dark">{{ route.accepted_parents }}/{{ route.total_parents }}</span>
-                                            {% endif %}
+                                        <td colspan="7" class="text-center">
+                                            <div class="spinner-border spinner-border-sm text-primary" role="status">
+                                                <span class="visually-hidden">Loading...</span>
+                                            </div>
+                                            <span class="ms-2">Loading TLSRoutes...</span>
                                         </td>
-                                        <td>{{ route.name }}</td>
-                                        <td>{{ route.namespace }}</td>
-                                        <td>
-                                            {% for hostname in route.hostnames %}
-                                            <span class="badge bg-light text-dark">{{ hostname }}</span>
-                                            {% endfor %}
-                                        </td>
-                                        <td>
-                                            {% for gw in route.gateways %}
-                                            <span class="badge bg-info">{{ gw.split('/')[-1] }}</span>
-                                            {% endfor %}
-                                        </td>
-                                        <td>
-                                            {% for backend in route.backends %}
-                                            <code class="small">{{ backend }}</code>
-                                            {% endfor %}
-                                        </td>
-                                        <td>{{ route.age }}</td>
                                     </tr>
-                                    {% else %}
-                                    <tr>
-                                        <td class="text-center text-muted" colspan="7">No TLSRoutes found</td>
-                                    </tr>
-                                    {% endfor %}
                                 </tbody>
                             </table>
                         </div>
@@ -486,8 +300,7 @@
             </div>
 
             <!-- ReferenceGrants Tab -->
-            <div class="tab-pane fade {% if active_tab == 'referencegrants' %}show active{% endif %}" 
-                 id="nav-referencegrants" role="tabpanel" aria-labelledby="nav-referencegrants-tab">
+            <div class="tab-pane fade" id="nav-referencegrants" role="tabpanel" aria-labelledby="nav-referencegrants-tab">
                 <div class="card shadow mb-4 mt-3">
                     <div class="card-body">
                         <div class="table-responsive">
@@ -501,28 +314,15 @@
                                         <th>Age</th>
                                     </tr>
                                 </thead>
-                                <tbody>
-                                    {% for grant in referencegrants %}
+                                <tbody id="referencegrants-tbody">
                                     <tr>
-                                        <td>{{ grant.name }}</td>
-                                        <td>{{ grant.namespace }}</td>
-                                        <td>
-                                            {% for ref in grant.from %}
-                                            <span class="badge bg-secondary me-1">{{ ref.kind }}@{{ ref.namespace }}</span>
-                                            {% endfor %}
+                                        <td colspan="5" class="text-center">
+                                            <div class="spinner-border spinner-border-sm text-primary" role="status">
+                                                <span class="visually-hidden">Loading...</span>
+                                            </div>
+                                            <span class="ms-2">Loading ReferenceGrants...</span>
                                         </td>
-                                        <td>
-                                            {% for ref in grant.to %}
-                                            <span class="badge bg-info me-1">{{ ref.kind }}/{{ ref.name or '*' }}</span>
-                                            {% endfor %}
-                                        </td>
-                                        <td>{{ grant.age }}</td>
                                     </tr>
-                                    {% else %}
-                                    <tr>
-                                        <td class="text-center text-muted" colspan="5">No ReferenceGrants found</td>
-                                    </tr>
-                                    {% endfor %}
                                 </tbody>
                             </table>
                         </div>
@@ -531,8 +331,7 @@
             </div>
 
             <!-- BackendTLSPolicies Tab -->
-            <div class="tab-pane fade {% if active_tab == 'backendtlspolicies' %}show active{% endif %}" 
-                 id="nav-backendtlspolicies" role="tabpanel" aria-labelledby="nav-backendtlspolicies-tab">
+            <div class="tab-pane fade" id="nav-backendtlspolicies" role="tabpanel" aria-labelledby="nav-backendtlspolicies-tab">
                 <div class="card shadow mb-4 mt-3">
                     <div class="card-header bg-warning bg-opacity-25">
                         <small><i class="cil-warning"></i> Experimental API (v1alpha2)</small>
@@ -550,27 +349,15 @@
                                         <th>Age</th>
                                     </tr>
                                 </thead>
-                                <tbody>
-                                    {% for policy in backendtlspolicies %}
+                                <tbody id="backendtlspolicies-tbody">
                                     <tr>
-                                        <td>
-                                            {% if policy.status == 'True' %}
-                                            <span class="badge bg-success">{{ policy.status_reason or 'Accepted' }}</span>
-                                            {% else %}
-                                            <span class="badge bg-warning text-dark">{{ policy.status_reason or 'Pending' }}</span>
-                                            {% endif %}
+                                        <td colspan="6" class="text-center">
+                                            <div class="spinner-border spinner-border-sm text-primary" role="status">
+                                                <span class="visually-hidden">Loading...</span>
+                                            </div>
+                                            <span class="ms-2">Loading BackendTLSPolicies...</span>
                                         </td>
-                                        <td>{{ policy.name }}</td>
-                                        <td>{{ policy.namespace }}</td>
-                                        <td><code>{{ policy.target }}</code></td>
-                                        <td>{{ policy.hostname or '-' }}</td>
-                                        <td>{{ policy.age }}</td>
                                     </tr>
-                                    {% else %}
-                                    <tr>
-                                        <td class="text-center text-muted" colspan="6">No BackendTLSPolicies found</td>
-                                    </tr>
-                                    {% endfor %}
                                 </tbody>
                             </table>
                         </div>
@@ -597,41 +384,662 @@
 
 {% block add_tail_js %}
 <script>
-$(document).ready(function() {
-    // Initialize DataTables - only initialize if table has data rows
+    const escapeHtml = (text) => {
+        if (text === null || text === undefined) return '';
+        const map = {
+            '&': '&amp;',
+            '<': '&lt;',
+            '>': '&gt;',
+            '"': '&quot;',
+            "'": '&#039;'
+        };
+        return String(text).replace(/[&<>"']/g, m => map[m]);
+    };
+    
+    // Get namespace from topbar selector or use default
+    function getSelectedNamespace() {
+        const topbarSelect = document.getElementById('inputGroupSelect04');
+        if (topbarSelect) {
+            return topbarSelect.value;
+        }
+        return sessionStorage.getItem('ns_select') || 'default';
+    }
+    
+    // Get active tab from URL or default
+    function getActiveTab() {
+        const urlParams = new URLSearchParams(window.location.search);
+        return urlParams.get('tab') || 'gatewayclasses';
+    }
+    
+    // Data storage for fetched resources
+    const gatewayApiData = {
+        gateway_api_status: null,
+        gateway_classes: [],
+        gateways: [],
+        httproutes: [],
+        grpcroutes: [],
+        tcproutes: [],
+        tlsroutes: [],
+        referencegrants: [],
+        backendtlspolicies: []
+    };
+    
+    // DataTables protection
+    (function() {
+        const tableIds = ['gatewayClassTable', 'gatewayTable', 'httpRouteTable', 'grpcRouteTable', 
+                         'tcpRouteTable', 'tlsRouteTable', 'referenceGrantTable', 'backendTLSPolicyTable'];
+        
+        if (typeof $ !== 'undefined' && $.fn.DataTable) {
+            const originalDataTable = $.fn.DataTable;
+            $.fn.DataTable = function(opts) {
+                const $this = $(this);
+                if ($this.find('tbody tr td[colspan]').length > 0) {
+                    console.log('Blocked DataTable initialization on loading row');
+                    return $this;
+                }
+                return originalDataTable.apply(this, arguments);
+            };
+        }
+    })();
+    
+    const initializedTables = new Set();
+    
     function safeInitDataTable(selector, orderCol) {
-        var $table = $(selector);
-        if ($table.length) {
-            // Check if table has actual data rows (not just empty message)
-            var hasData = $table.find('tbody tr').filter(function() {
-                return !$(this).find('td[colspan]').length;
-            }).length > 0;
-            
-            if (hasData) {
-                $table.DataTable({
-                    "order": [orderCol],
-                    "pageLength": 25
-                });
+        const $table = $(selector);
+        if (!$table.length) return;
+        
+        if (initializedTables.has(selector)) {
+            if (typeof $.fn.DataTable.isDataTable === 'function' && $.fn.DataTable.isDataTable(selector)) {
+                return;
+            } else {
+                initializedTables.delete(selector);
             }
+        }
+        
+        try {
+            let isInitialized = false;
+            if (typeof $.fn.DataTable.isDataTable === 'function' && $.fn.DataTable.isDataTable(selector)) {
+                isInitialized = true;
+            } else if ($table.data('DataTable')) {
+                isInitialized = true;
+            }
+            
+            if (isInitialized) {
+                try {
+                    $table.DataTable().destroy();
+                    $table.removeData('DataTable');
+                    initializedTables.delete(selector);
+                } catch (destroyError) {
+                    console.warn('Error destroying DataTable:', destroyError);
+                    initializedTables.delete(selector);
+                }
+            }
+            
+            setTimeout(function() {
+                try {
+                    if (typeof $.fn.DataTable.isDataTable === 'function' && $.fn.DataTable.isDataTable(selector)) {
+                        initializedTables.add(selector);
+                        return;
+                    }
+                    
+                    const hasDataRows = $table.find('tbody tr').filter(function() {
+                        return !$(this).find('td[colspan]').length;
+                    }).length > 0;
+                    
+                    if (!hasDataRows) {
+                        return;
+                    }
+                    
+                    $table.DataTable({
+                        "order": [orderCol],
+                        "pageLength": 25
+                    });
+                    
+                    initializedTables.add(selector);
+                } catch (initError) {
+                    console.warn('Error initializing DataTable:', initError);
+                    initializedTables.delete(selector);
+                }
+            }, 10);
+        } catch (e) {
+            console.warn('Error in safeInitDataTable:', e);
+            initializedTables.delete(selector);
         }
     }
     
-    safeInitDataTable('#gatewayClassTable', [1, "asc"]);
-    safeInitDataTable('#gatewayTable', [1, "asc"]);
-    safeInitDataTable('#httpRouteTable', [1, "asc"]);
-    safeInitDataTable('#grpcRouteTable', [0, "asc"]);
-    safeInitDataTable('#tcpRouteTable', [1, "asc"]);
-    safeInitDataTable('#tlsRouteTable', [1, "asc"]);
-    safeInitDataTable('#referenceGrantTable', [0, "asc"]);
-    safeInitDataTable('#backendTLSPolicyTable', [1, "asc"]);
+    function updateStatusBadges() {
+        const badgesContainer = document.getElementById('gateway-api-status-badges');
+        if (!badgesContainer) return;
+        
+        const status = gatewayApiData.gateway_api_status || {};
+        let html = '';
+        
+        if (status.installed) {
+            html += '<span class="badge bg-success me-2"><i class="cil-check-circle"></i> Gateway API Installed</span>';
+        }
+        
+        if (status.experimental && status.experimental.length > 0) {
+            html += `<span class="badge bg-info">Experimental APIs: ${status.experimental.length}</span>`;
+        }
+        
+        badgesContainer.innerHTML = html;
+    }
     
-    // Store active tab in URL
-    $('a[data-bs-toggle="tab"]').on('shown.bs.tab', function (e) {
-        var tabId = $(e.target).attr('href').replace('#nav-', '');
-        var url = new URL(window.location);
-        url.searchParams.set('tab', tabId);
-        window.history.replaceState({}, '', url);
+    function updateTabVisibility() {
+        const status = gatewayApiData.gateway_api_status || {};
+        const experimental = status.experimental || [];
+        const standard = status.standard || [];
+        
+        // Show/hide tabs based on data or API availability
+        const grpcroutesTab = document.getElementById('grpcroutes-tab-container');
+        if (grpcroutesTab) {
+            grpcroutesTab.style.display = (gatewayApiData.grpcroutes.length > 0 || experimental.includes('grpcroutes')) ? '' : 'none';
+        }
+        
+        const tcproutesTab = document.getElementById('tcproutes-tab-container');
+        if (tcproutesTab) {
+            tcproutesTab.style.display = (gatewayApiData.tcproutes.length > 0 || experimental.includes('tcproutes')) ? '' : 'none';
+        }
+        
+        const tlsroutesTab = document.getElementById('tlsroutes-tab-container');
+        if (tlsroutesTab) {
+            tlsroutesTab.style.display = (gatewayApiData.tlsroutes.length > 0 || experimental.includes('tlsroutes')) ? '' : 'none';
+        }
+        
+        const referencegrantsTab = document.getElementById('referencegrants-tab-container');
+        if (referencegrantsTab) {
+            referencegrantsTab.style.display = (gatewayApiData.referencegrants.length > 0 || standard.includes('referencegrants')) ? '' : 'none';
+        }
+        
+        const backendtlspoliciesTab = document.getElementById('backendtlspolicies-tab-container');
+        if (backendtlspoliciesTab) {
+            backendtlspoliciesTab.style.display = (gatewayApiData.backendtlspolicies.length > 0 || experimental.includes('backendtlspolicies')) ? '' : 'none';
+        }
+    }
+    
+    function updateBadgeCounts() {
+        document.getElementById('gatewayclasses-badge').textContent = gatewayApiData.gateway_classes.length || 0;
+        document.getElementById('gateways-badge').textContent = gatewayApiData.gateways.length || 0;
+        document.getElementById('httproutes-badge').textContent = gatewayApiData.httproutes.length || 0;
+        document.getElementById('grpcroutes-badge').textContent = gatewayApiData.grpcroutes.length || 0;
+        document.getElementById('tcproutes-badge').textContent = gatewayApiData.tcproutes.length || 0;
+        document.getElementById('tlsroutes-badge').textContent = gatewayApiData.tlsroutes.length || 0;
+        document.getElementById('referencegrants-badge').textContent = gatewayApiData.referencegrants.length || 0;
+        document.getElementById('backendtlspolicies-badge').textContent = gatewayApiData.backendtlspolicies.length || 0;
+    }
+    
+    function populateGatewayClassesTable(classes) {
+        const tbody = document.getElementById('gatewayclasses-tbody');
+        
+        if (!classes || classes.length === 0) {
+            tbody.innerHTML = '<tr><td colspan="5" class="text-center text-muted">No GatewayClasses found</td></tr>';
+            return;
+        }
+        
+        const rows = classes.map(gc => {
+            const status = gc.status === 'True' 
+                ? `<span class="badge bg-success">${escapeHtml(gc.status_reason || 'Accepted')}</span>`
+                : `<span class="badge bg-danger">${escapeHtml(gc.status_reason || 'Pending')}</span>`;
+            
+            return `
+                <tr>
+                    <td>${status}</td>
+                    <td><a href="/plugins/gateway-api/gatewayclass/${escapeHtml(gc.name)}">${escapeHtml(gc.name)}</a></td>
+                    <td><code>${escapeHtml(gc.controller || '')}</code></td>
+                    <td>${escapeHtml(gc.description || '-')}</td>
+                    <td>${escapeHtml(gc.age || '')}</td>
+                </tr>
+            `;
+        }).join('');
+        
+        tbody.innerHTML = rows;
+        setTimeout(() => safeInitDataTable('#gatewayClassTable', [1, "asc"]), 100);
+    }
+    
+    function populateGatewaysTable(gateways, namespace) {
+        const tbody = document.getElementById('gateways-tbody');
+        
+        if (!gateways || gateways.length === 0) {
+            tbody.innerHTML = `<tr><td colspan="8" class="text-center text-muted">No Gateways found in namespace ${escapeHtml(namespace || 'default')}</td></tr>`;
+            return;
+        }
+        
+        const rows = gateways.map(gw => {
+            let statusBadge = '';
+            if (gw.programmed_status === 'True') {
+                statusBadge = '<span class="badge bg-success">Programmed</span>';
+            } else if (gw.accepted_status === 'True') {
+                statusBadge = '<span class="badge bg-info">Accepted</span>';
+            } else {
+                statusBadge = `<span class="badge bg-warning text-dark">${escapeHtml(gw.programmed_reason || 'Pending')}</span>`;
+            }
+            
+            const listenersHtml = (gw.listeners || []).map(listener => 
+                `<span class="badge bg-light text-dark me-1">${escapeHtml(listener.protocol || '')}:${escapeHtml(String(listener.port || ''))}</span>`
+            ).join('');
+            
+            const addressesHtml = (gw.addresses || []).length > 0
+                ? (gw.addresses || []).map(addr => `<code>${escapeHtml(String(addr).split(':').pop())}</code>`).join('')
+                : '<span class="text-muted">-</span>';
+            
+            return `
+                <tr>
+                    <td>${statusBadge}</td>
+                    <td><a href="/plugins/gateway-api/gateway/${escapeHtml(gw.namespace)}/${escapeHtml(gw.name)}">${escapeHtml(gw.name)}</a></td>
+                    <td>${escapeHtml(gw.namespace || '')}</td>
+                    <td><a href="/plugins/gateway-api/gatewayclass/${escapeHtml(gw.gateway_class)}">${escapeHtml(gw.gateway_class || '')}</a></td>
+                    <td>${listenersHtml || '-'}</td>
+                    <td>${addressesHtml}</td>
+                    <td><span class="badge bg-primary">${escapeHtml(String(gw.attached_routes || 0))}</span></td>
+                    <td>${escapeHtml(gw.age || '')}</td>
+                </tr>
+            `;
+        }).join('');
+        
+        tbody.innerHTML = rows;
+        setTimeout(() => safeInitDataTable('#gatewayTable', [1, "asc"]), 100);
+    }
+    
+    function populateHTTPRoutesTable(routes, namespace) {
+        const tbody = document.getElementById('httproutes-tbody');
+        
+        if (!routes || routes.length === 0) {
+            tbody.innerHTML = `<tr><td colspan="8" class="text-center text-muted">No HTTPRoutes found in namespace ${escapeHtml(namespace || 'default')}</td></tr>`;
+            return;
+        }
+        
+        const rows = routes.map(route => {
+            let statusBadge = '';
+            if (route.accepted_parents === route.total_parents) {
+                statusBadge = `<span class="badge bg-success">${route.accepted_parents}/${route.total_parents}</span>`;
+            } else if (route.accepted_parents > 0) {
+                statusBadge = `<span class="badge bg-warning text-dark">${route.accepted_parents}/${route.total_parents}</span>`;
+            } else {
+                statusBadge = `<span class="badge bg-danger">${route.accepted_parents}/${route.total_parents}</span>`;
+            }
+            
+            const hostnamesHtml = (route.hostnames || []).slice(0, 3).map(h => 
+                `<span class="badge bg-light text-dark">${escapeHtml(h)}</span>`
+            ).join('') + ((route.hostnames || []).length > 3 ? `<span class="badge bg-secondary">+${(route.hostnames || []).length - 3}</span>` : '');
+            
+            const gatewaysHtml = (route.gateways || []).map(gw => {
+                const gwName = String(gw).split('/').pop();
+                return `<a href="/plugins/gateway-api/gateway/${escapeHtml(String(gw).replace('/', '/'))}" class="badge bg-info text-decoration-none">${escapeHtml(gwName)}</a>`;
+            }).join('');
+            
+            const backendsHtml = (route.backends || []).slice(0, 2).map(b => 
+                `<code class="small">${escapeHtml(b)}</code>`
+            ).join('') + ((route.backends || []).length > 2 ? `<span class="badge bg-secondary">+${(route.backends || []).length - 2}</span>` : '');
+            
+            return `
+                <tr>
+                    <td>${statusBadge}</td>
+                    <td><a href="/plugins/gateway-api/httproute/${escapeHtml(route.namespace)}/${escapeHtml(route.name)}">${escapeHtml(route.name)}</a></td>
+                    <td>${escapeHtml(route.namespace || '')}</td>
+                    <td>${hostnamesHtml || '-'}</td>
+                    <td>${gatewaysHtml || '-'}</td>
+                    <td><span class="badge bg-secondary">${escapeHtml(String(route.rules_count || 0))}</span></td>
+                    <td>${backendsHtml || '-'}</td>
+                    <td>${escapeHtml(route.age || '')}</td>
+                </tr>
+            `;
+        }).join('');
+        
+        tbody.innerHTML = rows;
+        setTimeout(() => safeInitDataTable('#httpRouteTable', [1, "asc"]), 100);
+    }
+    
+    function populateGRPCRoutesTable(routes) {
+        const tbody = document.getElementById('grpcroutes-tbody');
+        
+        if (!routes || routes.length === 0) {
+            tbody.innerHTML = '<tr><td colspan="7" class="text-center text-muted">No GRPCRoutes found</td></tr>';
+            return;
+        }
+        
+        const rows = routes.map(route => {
+            const hostnamesHtml = (route.hostnames || []).map(h => 
+                `<span class="badge bg-light text-dark">${escapeHtml(h)}</span>`
+            ).join('');
+            
+            const gatewaysHtml = (route.gateways || []).map(gw => 
+                `<span class="badge bg-info">${escapeHtml(String(gw).split('/').pop())}</span>`
+            ).join('');
+            
+            const servicesHtml = (route.services || []).slice(0, 2).map(s => 
+                `<code class="small">${escapeHtml(s)}</code>`
+            ).join('');
+            
+            const backendsHtml = (route.backends || []).map(b => 
+                `<code class="small">${escapeHtml(b)}</code>`
+            ).join('');
+            
+            return `
+                <tr>
+                    <td>${escapeHtml(route.name || '')}</td>
+                    <td>${escapeHtml(route.namespace || '')}</td>
+                    <td>${hostnamesHtml || '-'}</td>
+                    <td>${gatewaysHtml || '-'}</td>
+                    <td>${servicesHtml || '-'}</td>
+                    <td>${backendsHtml || '-'}</td>
+                    <td>${escapeHtml(route.age || '')}</td>
+                </tr>
+            `;
+        }).join('');
+        
+        tbody.innerHTML = rows;
+        setTimeout(() => safeInitDataTable('#grpcRouteTable', [0, "asc"]), 100);
+    }
+    
+    function populateTCPRoutesTable(routes) {
+        const tbody = document.getElementById('tcproutes-tbody');
+        
+        if (!routes || routes.length === 0) {
+            tbody.innerHTML = '<tr><td colspan="6" class="text-center text-muted">No TCPRoutes found</td></tr>';
+            return;
+        }
+        
+        const rows = routes.map(route => {
+            const statusBadge = route.accepted_parents === route.total_parents
+                ? `<span class="badge bg-success">${route.accepted_parents}/${route.total_parents}</span>`
+                : `<span class="badge bg-warning text-dark">${route.accepted_parents}/${route.total_parents}</span>`;
+            
+            const gatewaysHtml = (route.gateways || []).map(gw => 
+                `<span class="badge bg-info">${escapeHtml(String(gw).split('/').pop())}</span>`
+            ).join('');
+            
+            const backendsHtml = (route.backends || []).map(b => 
+                `<code class="small">${escapeHtml(b)}</code>`
+            ).join('');
+            
+            return `
+                <tr>
+                    <td>${statusBadge}</td>
+                    <td>${escapeHtml(route.name || '')}</td>
+                    <td>${escapeHtml(route.namespace || '')}</td>
+                    <td>${gatewaysHtml || '-'}</td>
+                    <td>${backendsHtml || '-'}</td>
+                    <td>${escapeHtml(route.age || '')}</td>
+                </tr>
+            `;
+        }).join('');
+        
+        tbody.innerHTML = rows;
+        setTimeout(() => safeInitDataTable('#tcpRouteTable', [1, "asc"]), 100);
+    }
+    
+    function populateTLSRoutesTable(routes) {
+        const tbody = document.getElementById('tlsroutes-tbody');
+        
+        if (!routes || routes.length === 0) {
+            tbody.innerHTML = '<tr><td colspan="7" class="text-center text-muted">No TLSRoutes found</td></tr>';
+            return;
+        }
+        
+        const rows = routes.map(route => {
+            const statusBadge = route.accepted_parents === route.total_parents
+                ? `<span class="badge bg-success">${route.accepted_parents}/${route.total_parents}</span>`
+                : `<span class="badge bg-warning text-dark">${route.accepted_parents}/${route.total_parents}</span>`;
+            
+            const hostnamesHtml = (route.hostnames || []).map(h => 
+                `<span class="badge bg-light text-dark">${escapeHtml(h)}</span>`
+            ).join('');
+            
+            const gatewaysHtml = (route.gateways || []).map(gw => 
+                `<span class="badge bg-info">${escapeHtml(String(gw).split('/').pop())}</span>`
+            ).join('');
+            
+            const backendsHtml = (route.backends || []).map(b => 
+                `<code class="small">${escapeHtml(b)}</code>`
+            ).join('');
+            
+            return `
+                <tr>
+                    <td>${statusBadge}</td>
+                    <td>${escapeHtml(route.name || '')}</td>
+                    <td>${escapeHtml(route.namespace || '')}</td>
+                    <td>${hostnamesHtml || '-'}</td>
+                    <td>${gatewaysHtml || '-'}</td>
+                    <td>${backendsHtml || '-'}</td>
+                    <td>${escapeHtml(route.age || '')}</td>
+                </tr>
+            `;
+        }).join('');
+        
+        tbody.innerHTML = rows;
+        setTimeout(() => safeInitDataTable('#tlsRouteTable', [1, "asc"]), 100);
+    }
+    
+    function populateReferenceGrantsTable(grants) {
+        const tbody = document.getElementById('referencegrants-tbody');
+        
+        if (!grants || grants.length === 0) {
+            tbody.innerHTML = '<tr><td colspan="5" class="text-center text-muted">No ReferenceGrants found</td></tr>';
+            return;
+        }
+        
+        const rows = grants.map(grant => {
+            const fromHtml = (grant.from || []).map(ref => 
+                `<span class="badge bg-secondary me-1">${escapeHtml(ref.kind || '')}@${escapeHtml(ref.namespace || '')}</span>`
+            ).join('');
+            
+            const toHtml = (grant.to || []).map(ref => 
+                `<span class="badge bg-info me-1">${escapeHtml(ref.kind || '')}/${escapeHtml(ref.name || '*')}</span>`
+            ).join('');
+            
+            return `
+                <tr>
+                    <td>${escapeHtml(grant.name || '')}</td>
+                    <td>${escapeHtml(grant.namespace || '')}</td>
+                    <td>${fromHtml || '-'}</td>
+                    <td>${toHtml || '-'}</td>
+                    <td>${escapeHtml(grant.age || '')}</td>
+                </tr>
+            `;
+        }).join('');
+        
+        tbody.innerHTML = rows;
+        setTimeout(() => safeInitDataTable('#referenceGrantTable', [0, "asc"]), 100);
+    }
+    
+    function populateBackendTLSPoliciesTable(policies) {
+        const tbody = document.getElementById('backendtlspolicies-tbody');
+        
+        if (!policies || policies.length === 0) {
+            tbody.innerHTML = '<tr><td colspan="6" class="text-center text-muted">No BackendTLSPolicies found</td></tr>';
+            return;
+        }
+        
+        const rows = policies.map(policy => {
+            const statusBadge = policy.status === 'True'
+                ? `<span class="badge bg-success">${escapeHtml(policy.status_reason || 'Accepted')}</span>`
+                : `<span class="badge bg-warning text-dark">${escapeHtml(policy.status_reason || 'Pending')}</span>`;
+            
+            return `
+                <tr>
+                    <td>${statusBadge}</td>
+                    <td>${escapeHtml(policy.name || '')}</td>
+                    <td>${escapeHtml(policy.namespace || '')}</td>
+                    <td><code>${escapeHtml(policy.target || '')}</code></td>
+                    <td>${escapeHtml(policy.hostname || '-')}</td>
+                    <td>${escapeHtml(policy.age || '')}</td>
+                </tr>
+            `;
+        }).join('');
+        
+        tbody.innerHTML = rows;
+        setTimeout(() => safeInitDataTable('#backendTLSPolicyTable', [1, "asc"]), 100);
+    }
+    
+    // Load Gateway API status
+    async function loadGatewayAPIStatus() {
+        try {
+            const response = await fetch('/api/v1/plugins/gateway-api/status');
+            if (!response.ok) {
+                throw new Error(`HTTP error! status: ${response.status}`);
+            }
+            const data = await response.json();
+            gatewayApiData.gateway_api_status = data.data || { installed: false };
+            
+            // Show/hide status alert
+            const alertDiv = document.getElementById('gateway-api-status-alert');
+            if (alertDiv) {
+                alertDiv.style.display = gatewayApiData.gateway_api_status.installed ? 'none' : 'block';
+            }
+        } catch (error) {
+            console.error('Error loading Gateway API status:', error);
+            gatewayApiData.gateway_api_status = { installed: false };
+        }
+    }
+    
+    // Load all Gateway API resources
+    async function loadGatewayAPIResources(namespace) {
+        try {
+            const [statusRes, classesRes, gatewaysRes, httproutesRes, grpcroutesRes, 
+                   tcproutesRes, tlsroutesRes, referencegrantsRes, backendtlspoliciesRes] = await Promise.all([
+                fetch('/api/v1/plugins/gateway-api/status'),
+                fetch('/api/v1/plugins/gateway-api/gateway-classes'),
+                fetch(`/api/v1/plugins/gateway-api/gateways?namespace=${encodeURIComponent(namespace)}`),
+                fetch(`/api/v1/plugins/gateway-api/httproutes?namespace=${encodeURIComponent(namespace)}`),
+                fetch(`/api/v1/plugins/gateway-api/grpcroutes?namespace=${encodeURIComponent(namespace)}`),
+                fetch(`/api/v1/plugins/gateway-api/tcproutes?namespace=${encodeURIComponent(namespace)}`),
+                fetch(`/api/v1/plugins/gateway-api/tlsroutes?namespace=${encodeURIComponent(namespace)}`),
+                fetch(`/api/v1/plugins/gateway-api/reference-grants?namespace=${encodeURIComponent(namespace)}`),
+                fetch(`/api/v1/plugins/gateway-api/backend-tls-policies?namespace=${encodeURIComponent(namespace)}`)
+            ]);
+            
+            if (statusRes.ok) {
+                const statusData = await statusRes.json();
+                gatewayApiData.gateway_api_status = statusData.data || { installed: false };
+            }
+            
+            if (classesRes.ok) {
+                const classesData = await classesRes.json();
+                gatewayApiData.gateway_classes = classesData.data || [];
+            }
+            
+            if (gatewaysRes.ok) {
+                const gatewaysData = await gatewaysRes.json();
+                gatewayApiData.gateways = gatewaysData.data || [];
+            }
+            
+            if (httproutesRes.ok) {
+                const httproutesData = await httproutesRes.json();
+                gatewayApiData.httproutes = httproutesData.data || [];
+            }
+            
+            if (grpcroutesRes.ok) {
+                const grpcroutesData = await grpcroutesRes.json();
+                gatewayApiData.grpcroutes = grpcroutesData.data || [];
+            }
+            
+            if (tcproutesRes.ok) {
+                const tcproutesData = await tcproutesRes.json();
+                gatewayApiData.tcproutes = tcproutesData.data || [];
+            }
+            
+            if (tlsroutesRes.ok) {
+                const tlsroutesData = await tlsroutesRes.json();
+                gatewayApiData.tlsroutes = tlsroutesData.data || [];
+            }
+            
+            if (referencegrantsRes.ok) {
+                const referencegrantsData = await referencegrantsRes.json();
+                gatewayApiData.referencegrants = referencegrantsData.data || [];
+            }
+            
+            if (backendtlspoliciesRes.ok) {
+                const backendtlspoliciesData = await backendtlspoliciesRes.json();
+                gatewayApiData.backendtlspolicies = backendtlspoliciesData.data || [];
+            }
+            
+            // Update UI with loaded data
+            updateStatusBadges();
+            updateTabVisibility();
+            updateBadgeCounts();
+            
+            populateGatewayClassesTable(gatewayApiData.gateway_classes);
+            populateGatewaysTable(gatewayApiData.gateways, namespace);
+            populateHTTPRoutesTable(gatewayApiData.httproutes, namespace);
+            populateGRPCRoutesTable(gatewayApiData.grpcroutes);
+            populateTCPRoutesTable(gatewayApiData.tcproutes);
+            populateTLSRoutesTable(gatewayApiData.tlsroutes);
+            populateReferenceGrantsTable(gatewayApiData.referencegrants);
+            populateBackendTLSPoliciesTable(gatewayApiData.backendtlspolicies);
+            
+        } catch (error) {
+            console.error('Error loading Gateway API resources:', error);
+        }
+    }
+    
+    // Load data when page loads
+    document.addEventListener('DOMContentLoaded', async function() {
+        const namespace = getSelectedNamespace();
+        const activeTab = getActiveTab();
+        
+        // Load Gateway API status first
+        await loadGatewayAPIStatus();
+        
+        // Show/hide status alert
+        const alertDiv = document.getElementById('gateway-api-status-alert');
+        if (alertDiv && gatewayApiData.gateway_api_status) {
+            alertDiv.style.display = gatewayApiData.gateway_api_status.installed ? 'none' : 'block';
+        }
+        
+        // Load all resources
+        await loadGatewayAPIResources(namespace);
+        
+        // Switch to the correct tab if specified
+        if (activeTab) {
+            setTimeout(function() {
+                const tabId = '#nav-' + activeTab + '-tab';
+                if (typeof $ !== 'undefined') {
+                    $(tabId).tab('show');
+                }
+            }, 200);
+        }
+        
+        // Reload data when namespace changes
+        const namespaceSelect = document.getElementById('inputGroupSelect04');
+        if (namespaceSelect) {
+            namespaceSelect.addEventListener('change', async function() {
+                const newNamespace = this.value;
+                sessionStorage.setItem('ns_select', newNamespace);
+                await loadGatewayAPIResources(newNamespace);
+            });
+        }
+        
+        // Store active tab in URL
+        $('a[data-bs-toggle="tab"]').on('shown.bs.tab', function (e) {
+            const tabId = $(e.target).attr('href').replace('#nav-', '');
+            const url = new URL(window.location);
+            url.searchParams.set('tab', tabId);
+            window.history.replaceState({}, '', url);
+        });
+        
+        // Initialize DataTables when tabs become visible
+        $('a[data-bs-toggle="tab"]').on('shown.bs.tab', function (e) {
+            setTimeout(function() {
+                const tabId = $(e.target).attr('href');
+                if (tabId === '#nav-gatewayclasses') {
+                    safeInitDataTable('#gatewayClassTable', [1, "asc"]);
+                } else if (tabId === '#nav-gateways') {
+                    safeInitDataTable('#gatewayTable', [1, "asc"]);
+                } else if (tabId === '#nav-httproutes') {
+                    safeInitDataTable('#httpRouteTable', [1, "asc"]);
+                } else if (tabId === '#nav-grpcroutes') {
+                    safeInitDataTable('#grpcRouteTable', [0, "asc"]);
+                } else if (tabId === '#nav-tcproutes') {
+                    safeInitDataTable('#tcpRouteTable', [1, "asc"]);
+                } else if (tabId === '#nav-tlsroutes') {
+                    safeInitDataTable('#tlsRouteTable', [1, "asc"]);
+                } else if (tabId === '#nav-referencegrants') {
+                    safeInitDataTable('#referenceGrantTable', [0, "asc"]);
+                } else if (tabId === '#nav-backendtlspolicies') {
+                    safeInitDataTable('#backendTLSPolicyTable', [1, "asc"]);
+                }
+            }, 100);
+        });
     });
-});
 </script>
 {% endblock %}
