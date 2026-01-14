@@ -7,7 +7,7 @@
         <ol class="breadcrumb my-0">
           <li class="breadcrumb-item"><span>Storage</span></li>
           <li class="breadcrumb-item active"><a href="/storage/configmap">ConfigMap</a></li>
-          <li class="breadcrumb-item active"><span>{{ configmap_data.name }}</span></li>
+          <li class="breadcrumb-item active"><span id="configmap-name-breadcrumb">Loading...</span></li>
         </ol>
       </nav>
     </div>
@@ -29,11 +29,11 @@
                     <table class="table table-bordered" id="podInfoTable" width="100%" cellspacing="0">
                         <tr>
                             <th>Name:</th>
-                            <td>{{ configmap_data.name }}</td>
+                            <td id="configmap-name">Loading...</td>
                         </tr>
                         <tr>
                             <th>Namespace:</th>
-                            <td>{{ namespace }}</td>
+                            <td id="configmap-namespace">Loading...</td>
                         </tr>
                         <tr>
                             <th>Kind:</th>
@@ -41,57 +41,27 @@
                         </tr>
                         <tr>
                             <th>Created:</th>
-                            <td>{{ configmap_data.created }}</td>
+                            <td id="configmap-created">Loading...</td>
                         </tr>
                         <tr>
                             <th>Annotations:</th>
-                            <td>
-                                {% if configmap_data.annotations %}
-                                <table class="table table-bordered" id="annotationTable" width="100%" cellspacing="0">
-                                    <thead>
-                                        <tr>
-                                            <th width="50%">Key</th>
-                                            <th width="50%">Value</th>
-                                        </tr>
-                                    </thead>
-                                    <tbody>
-                                    {% for key, value in configmap_data.annotations.items() %}
-                                        <tr>
-                                            <td width="50%">{{ key }}</td>
-                                            <td width="50%">{{ value }}</td>
-                                        </tr>
-                                    {% endfor %}
-                                    </tbody>
-                                </table>
-                                {% endif %}
+                            <td id="configmap-annotations-container">
+                                <div class="spinner-border spinner-border-sm text-primary" role="status">
+                                    <span class="visually-hidden">Loading...</span>
+                                </div>
                             </td>
                         </tr>
                         <tr>
-                            <th>Lables:</th>
-                            <td>
-                                {% if configmap_data.labels %}
-                                <table class="table table-bordered" id="labelsTable" width="100%" cellspacing="0">
-                                    <thead>
-                                        <tr>
-                                            <th width="50%">Key</th>
-                                            <th width="50%">Value</th>
-                                        </tr>
-                                    </thead>
-                                    <tbody>
-                                    {% for key, value in configmap_data.labels.items() %}
-                                        <tr>
-                                            <td width="50%">{{ key }}</td>
-                                            <td width="50%">{{ value }}</td>
-                                        </tr>
-                                    {% endfor %}
-                                    </tbody>
-                                </table>
-                                {% endif %}
+                            <th>Labels:</th>
+                            <td id="configmap-labels-container">
+                                <div class="spinner-border spinner-border-sm text-primary" role="status">
+                                    <span class="visually-hidden">Loading...</span>
+                                </div>
                             </td>
                         </tr>
                         <tr>
                             <th>Version:</th>
-                            <td>{{ configmap_data.version }}</td>
+                            <td id="configmap-version">Loading...</td>
                         </tr>
                     </table>
                 </div>
@@ -101,26 +71,16 @@
         
         </div>
     </div>
-    {% if configmap_data.data %}
-    <div class="card-body">
+    <div class="card-body" id="configmap-data-container" style="display: none;">
         <div class="card shadow mb-2">
             <div class="card-body">
                 <div class="table-responsive">
-                    <table class="table table-bordered" id="podInfoTable" width="100%" cellspacing="0">
-                        {% for da_key, da_value in configmap_data.data.items() %}
-                        <tr>
-                            <th>{{ da_key }}:</th>
-                            <td>
-                                <pre><code>{% autoescape false %}{{ da_value |replace("<", "&lt;")  |replace(">", "&gt;")  }}{% endautoescape %}</code></pre>
-                            </td>
-                        </tr>
-                        {% endfor %}
+                    <table class="table table-bordered" id="configmapDataTable" width="100%" cellspacing="0">
                     </table>
                 </div>
             </div>
         </div>
     </div>
-    {% endif %}
 </div>
 {% endblock %}
 
@@ -128,4 +88,244 @@
 {% include "segments/datatable_snippet.html.j2" %}
 {% include "segments/highlight_snippet.html.j2"%}
 {% include "segments/functions_snippet.j2"%}
+{% endblock %}
+
+{% block add_tail_js %}
+<script>
+    const escapeHtml = (text) => {
+        if (text === null || text === undefined) return '';
+        const map = {
+            '&': '&amp;',
+            '<': '&lt;',
+            '>': '&gt;',
+            '"': '&quot;',
+            "'": '&#039;'
+        };
+        return String(text).replace(/[&<>"']/g, m => map[m]);
+    };
+    
+    // Detect language for syntax highlighting
+    function detectLanguage(key, value) {
+        if (!value) return null;
+        
+        const keyLower = key.toLowerCase();
+        const valueStr = String(value).trim();
+        
+        // Check key name patterns
+        if (keyLower.endsWith('.json') || keyLower.endsWith('json')) {
+            return 'json';
+        }
+        if (keyLower.endsWith('.yaml') || keyLower.endsWith('.yml') || keyLower.endsWith('yaml') || keyLower.endsWith('yml')) {
+            return 'yaml';
+        }
+        if (keyLower.endsWith('.xml')) {
+            return 'xml';
+        }
+        if (keyLower.endsWith('.sh') || keyLower.endsWith('.bash')) {
+            return 'bash';
+        }
+        if (keyLower.endsWith('.py')) {
+            return 'python';
+        }
+        if (keyLower.endsWith('.js') || keyLower.endsWith('.javascript')) {
+            return 'javascript';
+        }
+        if (keyLower.endsWith('.properties') || keyLower.endsWith('.ini') || keyLower.endsWith('.conf')) {
+            return 'properties';
+        }
+        
+        // Check content patterns
+        if (valueStr.startsWith('{') && valueStr.endsWith('}')) {
+            try {
+                JSON.parse(valueStr);
+                return 'json';
+            } catch (e) {
+                // Not valid JSON
+            }
+        }
+        
+        if (valueStr.startsWith('---') || (valueStr.includes(':') && valueStr.includes('\n'))) {
+            // Likely YAML
+            return 'yaml';
+        }
+        
+        // Check for shell script patterns
+        if (valueStr.startsWith('#!') || valueStr.includes('#!/bin/')) {
+            return 'bash';
+        }
+        
+        // Default to plain text
+        return null;
+    }
+    
+    // Get configmap name and namespace from form POST, sessionStorage, or topbar selector
+    function getConfigMapInfo() {
+        // Try to get from URL parameters first (if redirected with query params)
+        const urlParams = new URLSearchParams(window.location.search);
+        let configmapName = urlParams.get('configmap_name');
+        let namespace = urlParams.get('namespace');
+        
+        // Fallback to sessionStorage (set by form submission)
+        if (!configmapName) {
+            configmapName = sessionStorage.getItem('configmap_data_name');
+        }
+        if (!namespace) {
+            namespace = sessionStorage.getItem('ns_select');
+        }
+        
+        // Fallback to topbar selector
+        if (!namespace) {
+            const topbarSelect = document.getElementById('inputGroupSelect04');
+            if (topbarSelect) {
+                namespace = topbarSelect.value;
+            }
+        }
+        
+        // Final fallback
+        if (!namespace) {
+            namespace = 'default';
+        }
+        
+        return { configmapName, namespace };
+    }
+    
+    function populateConfigMapInfo(configmap) {
+        if (!configmap) {
+            document.getElementById('configmap-name').textContent = 'N/A';
+            document.getElementById('configmap-namespace').textContent = 'N/A';
+            document.getElementById('configmap-created').textContent = 'N/A';
+            document.getElementById('configmap-version').textContent = 'N/A';
+            return;
+        }
+        
+        document.getElementById('configmap-name').textContent = escapeHtml(configmap.name || 'N/A');
+        document.getElementById('configmap-namespace').textContent = escapeHtml(configmap.namespace || 'N/A');
+        document.getElementById('configmap-created').textContent = escapeHtml(configmap.created || 'N/A');
+        document.getElementById('configmap-version').textContent = escapeHtml(configmap.version || 'N/A');
+        
+        // Update breadcrumb
+        const breadcrumb = document.getElementById('configmap-name-breadcrumb');
+        if (breadcrumb) {
+            breadcrumb.textContent = escapeHtml(configmap.name || 'Loading...');
+        }
+        
+        // Populate annotations
+        const annotationsContainer = document.getElementById('configmap-annotations-container');
+        if (configmap.annotations && Object.keys(configmap.annotations).length > 0) {
+            let annotationsHtml = '<table class="table table-bordered" id="annotationTable" width="100%" cellspacing="0"><thead><tr><th width="50%">Key</th><th width="50%">Value</th></tr></thead><tbody>';
+            for (const [key, value] of Object.entries(configmap.annotations)) {
+                if (key !== "kubectl.kubernetes.io/last-applied-configuration") {
+                    annotationsHtml += `<tr><td width="50%">${escapeHtml(key)}</td><td width="50%">${escapeHtml(value)}</td></tr>`;
+                }
+            }
+            annotationsHtml += '</tbody></table>';
+            annotationsContainer.innerHTML = annotationsHtml;
+        } else {
+            annotationsContainer.innerHTML = '<span class="text-muted">No annotations</span>';
+        }
+        
+        // Populate labels
+        const labelsContainer = document.getElementById('configmap-labels-container');
+        if (configmap.labels && Object.keys(configmap.labels).length > 0) {
+            let labelsHtml = '<table class="table table-bordered" id="labelsTable" width="100%" cellspacing="0"><thead><tr><th width="50%">Key</th><th width="50%">Value</th></tr></thead><tbody>';
+            for (const [key, value] of Object.entries(configmap.labels)) {
+                labelsHtml += `<tr><td width="50%">${escapeHtml(key)}</td><td width="50%">${escapeHtml(value)}</td></tr>`;
+            }
+            labelsHtml += '</tbody></table>';
+            labelsContainer.innerHTML = labelsHtml;
+        } else {
+            labelsContainer.innerHTML = '<span class="text-muted">No labels</span>';
+        }
+        
+        // Populate configmap data
+        const dataContainer = document.getElementById('configmap-data-container');
+        const dataTable = document.getElementById('configmapDataTable');
+        if (configmap.data && Object.keys(configmap.data).length > 0) {
+            let dataHtml = '';
+            for (const [key, value] of Object.entries(configmap.data)) {
+                // Create unique ID for each code block
+                const codeId = `configmap-data-${escapeHtml(key).replace(/[^a-zA-Z0-9]/g, '-')}`;
+                // Escape HTML but keep newlines for proper code formatting
+                const escapedValue = escapeHtml(value);
+                // Try to detect language based on key or content
+                let language = detectLanguage(key, value);
+                const langAttr = language ? ` class="language-${language}"` : '';
+                dataHtml += `<tr><th>${escapeHtml(key)}:</th><td><pre><code id="${codeId}"${langAttr}>${escapedValue}</code></pre></td></tr>`;
+            }
+            dataTable.innerHTML = dataHtml;
+            dataContainer.style.display = 'block';
+            
+            // Apply highlight.js to all code blocks after a short delay to ensure DOM is ready
+            setTimeout(function() {
+                if (typeof hljs !== 'undefined') {
+                    // Highlight all code blocks in the configmap data table
+                    const codeBlocks = dataTable.querySelectorAll('code');
+                    codeBlocks.forEach(function(block) {
+                        hljs.highlightElement(block);
+                    });
+                }
+            }, 100);
+        } else {
+            dataContainer.style.display = 'none';
+        }
+    }
+    
+    async function loadConfigMapData() {
+        try {
+            const { configmapName, namespace } = getConfigMapInfo();
+            
+            console.log('ConfigMap info:', { configmapName, namespace });
+            console.log('URL params:', new URLSearchParams(window.location.search).toString());
+            console.log('SessionStorage configmap_data_name:', sessionStorage.getItem('configmap_data_name'));
+            console.log('SessionStorage ns_select:', sessionStorage.getItem('ns_select'));
+            
+            if (!configmapName) {
+                throw new Error('ConfigMap name not found. Please select a ConfigMap from the list page.');
+            }
+            
+            const apiUrl = `/api/v1/storage/configmaps/${encodeURIComponent(configmapName)}?namespace=${encodeURIComponent(namespace)}`;
+            console.log('Fetching configmap data from:', apiUrl);
+            
+            const response = await fetch(apiUrl);
+            if (!response.ok) {
+                if (response.status === 404) {
+                    throw new Error(`ConfigMap '${configmapName}' not found in namespace '${namespace}'`);
+                }
+                throw new Error(`HTTP error! status: ${response.status}`);
+            }
+            
+            const result = await response.json();
+            console.log('ConfigMap API response:', result);
+            
+            if (result.error) {
+                throw new Error(result.message || 'Failed to load configmap');
+            }
+            
+            const configmap = result.data;
+            if (!configmap) {
+                throw new Error('No configmap data received');
+            }
+            
+            // Add namespace to configmap object for display
+            configmap.namespace = result.metadata?.namespace || namespace;
+            
+            populateConfigMapInfo(configmap);
+            
+        } catch (error) {
+            console.error('Error loading configmap data:', error);
+            document.getElementById('configmap-name').textContent = 'Error';
+            document.getElementById('configmap-namespace').textContent = 'Error';
+            document.getElementById('configmap-created').textContent = 'Error';
+            document.getElementById('configmap-version').textContent = 'Error';
+            document.getElementById('configmap-annotations-container').innerHTML = 
+                '<span class="text-danger">Error loading configmap: ' + escapeHtml(error.message) + '</span>';
+            document.getElementById('configmap-labels-container').innerHTML = '';
+        }
+    }
+    
+    // Load data when page loads
+    document.addEventListener('DOMContentLoaded', function() {
+        loadConfigMapData();
+    });
+</script>
 {% endblock %}

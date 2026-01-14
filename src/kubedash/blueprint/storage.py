@@ -34,6 +34,10 @@ def storage_class():
     Data is now loaded client-side via JavaScript API calls.
     This route only renders the template structure.
     """
+    # Handle POST requests for backward compatibility
+    if request.method == 'POST':
+        selected = request.form.get('selected') or request.form.get('sc_name')
+    
     # Template now loads data via JavaScript from /api/v1/storage/storage-classes
     return render_template('storage/storage-class.html.j2')
 
@@ -46,6 +50,17 @@ def storage_class_data():
     Data is now loaded client-side via JavaScript API calls.
     This route only renders the template structure.
     """
+    # Handle POST requests - redirect with query parameters
+    if request.method == 'POST':
+        selected = request.form.get('selected') or request.form.get('sc_name')
+        
+        # Redirect with query parameters so JavaScript can read them
+        if selected:
+            return redirect(url_for('storage.storage_class_data', selected=selected, sc_name=selected))
+        else:
+            # If no storage class name, just redirect to list
+            return redirect(url_for('storage.storage_class'))
+    
     # Template now loads data via JavaScript from /api/v1/storage/storage-classes/<name>
     return render_template('storage/storage-class-data.html.j2')
 
@@ -62,6 +77,10 @@ def snapshot_class():
     Data is now loaded client-side via JavaScript API calls.
     This route only renders the template structure.
     """
+    # Handle POST requests for backward compatibility
+    if request.method == 'POST':
+        selected = request.form.get('selected') or request.form.get('sc_name')
+    
     # Template now loads data via JavaScript from /api/v1/storage/snapshot-classes
     return render_template('storage/snapshot-class.html.j2')
 
@@ -74,6 +93,17 @@ def snapshot_class_data():
     Data is now loaded client-side via JavaScript API calls.
     This route only renders the template structure.
     """
+    # Handle POST requests - redirect with query parameters
+    if request.method == 'POST':
+        selected = request.form.get('selected') or request.form.get('sc_name')
+        
+        # Redirect with query parameters so JavaScript can read them
+        if selected:
+            return redirect(url_for('storage.snapshot_class_data', selected=selected, sc_name=selected))
+        else:
+            # If no snapshot class name, just redirect to list
+            return redirect(url_for('storage.snapshot_class'))
+    
     # Template now loads data via JavaScript from /api/v1/storage/snapshot-classes/<name>
     return render_template('storage/snapshot-class-data.html.j2')
 
@@ -96,8 +126,13 @@ def pvc():
             session['ns_select'] = request.form.get('ns_select')
         selected = request.form.get('selected')
 
+    # Get namespaces for topbar selector
+    user_token = get_user_token(session)
+    namespace_list, error = k8sNamespaceListGet(session['user_role'], user_token)
+    namespaces = namespace_list if not error else []
+
     # Template now loads data via JavaScript from /api/v1/storage/pvcs and /api/v1/storage/pvcs/metrics
-    return render_template('storage/pvc.html.j2')
+    return render_template('storage/pvc.html.j2', namespaces=namespaces)
 
 @storage_bp.route('/pvc/data', methods=['GET', 'POST'])
 @login_required
@@ -108,8 +143,28 @@ def pvc_data():
     Data is now loaded client-side via JavaScript API calls.
     This route only renders the template structure.
     """
+    # Handle POST requests - redirect with query parameters
+    if request.method == 'POST':
+        selected = request.form.get('selected')
+        ns_select = request.form.get('ns_select', session.get('ns_select', 'default'))
+        
+        if 'ns_select' in request.form:
+            session['ns_select'] = ns_select
+        
+        # Redirect with query parameters so JavaScript can read them
+        if selected:
+            return redirect(url_for('storage.pvc_data', selected=selected, namespace=ns_select))
+        else:
+            # If no PVC name, just redirect to list
+            return redirect(url_for('storage.pvc'))
+    
+    # Get namespaces for topbar selector
+    user_token = get_user_token(session)
+    namespace_list, error = k8sNamespaceListGet(session['user_role'], user_token)
+    namespaces = namespace_list if not error else []
+
     # Template now loads data via JavaScript from /api/v1/storage/pvcs/<name>
-    return render_template('storage/pvc-data.html.j2')
+    return render_template('storage/pvc-data.html.j2', namespaces=namespaces)
 
 ##############################################################
 ## Persistent Volume
@@ -130,8 +185,13 @@ def pv():
             session['ns_select'] = request.form.get('ns_select')
         selected = request.form.get('selected')
 
+    # Get namespaces for topbar selector
+    user_token = get_user_token(session)
+    namespace_list, error = k8sNamespaceListGet(session['user_role'], user_token)
+    namespaces = namespace_list if not error else []
+
     # Template now loads data via JavaScript from /api/v1/storage/pvs
-    return render_template('storage/pv.html.j2')
+    return render_template('storage/pv.html.j2', namespaces=namespaces)
 
 @storage_bp.route('/pv/data', methods=['GET', 'POST'])
 @login_required
@@ -142,8 +202,28 @@ def pv_data():
     Data is now loaded client-side via JavaScript API calls.
     This route only renders the template structure.
     """
+    # Handle POST requests - redirect with query parameters
+    if request.method == 'POST':
+        selected = request.form.get('selected')
+        ns_select = request.form.get('ns_select', session.get('ns_select', 'default'))
+        
+        if 'ns_select' in request.form:
+            session['ns_select'] = ns_select
+        
+        # Redirect with query parameters so JavaScript can read them
+        if selected:
+            return redirect(url_for('storage.pv_data', selected=selected, namespace=ns_select))
+        else:
+            # If no PV name, just redirect to list
+            return redirect(url_for('storage.pv'))
+    
+    # Get namespaces for topbar selector
+    user_token = get_user_token(session)
+    namespace_list, error = k8sNamespaceListGet(session['user_role'], user_token)
+    namespaces = namespace_list if not error else []
+    
     # Template now loads data via JavaScript from /api/v1/storage/pvs/<name>
-    return render_template('storage/pv-data.html.j2')
+    return render_template('storage/pv-data.html.j2', namespaces=namespaces)
 
 ##############################################################
 ## Volume Snapshot
@@ -160,10 +240,49 @@ def volumesnapshots():
     """
     # Handle POST requests for backward compatibility
     if request.method == 'POST':
+        if 'ns_select' in request.form:
+            session['ns_select'] = request.form.get('ns_select')
         selected = request.form.get('selected')
 
+    # Get namespaces for topbar selector
+    user_token = get_user_token(session)
+    namespace_list, error = k8sNamespaceListGet(session['user_role'], user_token)
+    namespaces = namespace_list if not error else []
+
     # Template now loads data via JavaScript from /api/v1/storage/volume-snapshots
-    return render_template('storage/volumesnapshot.html.j2')
+    return render_template('storage/volumesnapshot.html.j2', namespaces=namespaces)
+
+@storage_bp.route('/volumesnapshot/data', methods=['GET', 'POST'])
+@login_required
+def volumesnapshot_data():
+    """
+    Volume Snapshot detail page.
+    
+    Data is now loaded client-side via JavaScript API calls.
+    This route only renders the template structure.
+    """
+    # Handle POST requests - redirect with query parameters
+    if request.method == 'POST':
+        selected = request.form.get('selected')
+        ns_select = request.form.get('ns_select', session.get('ns_select', 'default'))
+        
+        if 'ns_select' in request.form:
+            session['ns_select'] = ns_select
+        
+        # Redirect with query parameters so JavaScript can read them
+        if selected:
+            return redirect(url_for('storage.volumesnapshot_data', selected=selected, namespace=ns_select))
+        else:
+            # If no snapshot name, just redirect to list
+            return redirect(url_for('storage.volumesnapshots'))
+    
+    # Get namespaces for topbar selector
+    user_token = get_user_token(session)
+    namespace_list, error = k8sNamespaceListGet(session['user_role'], user_token)
+    namespaces = namespace_list if not error else []
+    
+    # Template now loads data via JavaScript from /api/v1/storage/volume-snapshots/<name>
+    return render_template('storage/volumesnapshot-data.html.j2', namespaces=namespaces)
 
 ##############################################################
 ## ConfigMap
@@ -184,8 +303,13 @@ def configmap():
             session['ns_select'] = request.form.get('ns_select')
         selected = request.form.get('selected')
 
+    # Get namespaces for topbar selector
+    user_token = get_user_token(session)
+    namespace_list, error = k8sNamespaceListGet(session['user_role'], user_token)
+    namespaces = namespace_list if not error else []
+
     # Template now loads data via JavaScript from /api/v1/storage/configmaps
-    return render_template('storage/configmap.html.j2')
+    return render_template('storage/configmap.html.j2', namespaces=namespaces)
 
 @storage_bp.route('/configmap/data', methods=['GET', 'POST'])
 @login_required
@@ -196,5 +320,25 @@ def configmap_data():
     Data is now loaded client-side via JavaScript API calls.
     This route only renders the template structure.
     """
+    # Handle POST requests - redirect with query parameters
+    if request.method == 'POST':
+        configmap_name = request.form.get('configmap_name')
+        ns_select = request.form.get('ns_select', session.get('ns_select', 'default'))
+        
+        if 'ns_select' in request.form:
+            session['ns_select'] = ns_select
+        
+        # Redirect with query parameters so JavaScript can read them
+        if configmap_name:
+            return redirect(url_for('storage.configmap_data', configmap_name=configmap_name, namespace=ns_select))
+        else:
+            # If no configmap name, just redirect to list
+            return redirect(url_for('storage.configmap'))
+    
+    # Get namespaces for topbar selector
+    user_token = get_user_token(session)
+    namespace_list, error = k8sNamespaceListGet(session['user_role'], user_token)
+    namespaces = namespace_list if not error else []
+
     # Template now loads data via JavaScript from /api/v1/storage/configmaps/<name>
-    return render_template('storage/configmap-data.html.j2')
+    return render_template('storage/configmap-data.html.j2', namespaces=namespaces)

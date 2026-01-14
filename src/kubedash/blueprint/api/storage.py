@@ -9,7 +9,7 @@ from flask_login import login_required
 from flask_smorest import Blueprint
 
 from lib.helper_functions import get_logger
-from lib.k8s.metrics import k8sPVCMetric
+from lib.k8s.metrics import k8sPVCMetric, k8sPVMetric
 from lib.k8s.storage import (
     k8sConfigmapListGet,
     k8sPersistentVolumeClaimListGet,
@@ -185,19 +185,65 @@ class PVsListResource(MethodView):
         """
         List persistent volumes
         
+        Query Parameters:
+            namespace (str): Filter PVs by claim namespace (optional, defaults to session namespace)
+        
         Returns:
             dict: List of PVs with metadata
         """
         user_token = get_user_token(session)
+        # Note: PVs are cluster-scoped, but the function can filter by claim namespace
+        # Get namespace from query params or session, default to session namespace
+        namespace = request.args.get('namespace', session.get('ns_select', 'default'))
         
-        pvs = k8sPersistentVolumeListGet(session['user_role'], user_token)
+        pvs = k8sPersistentVolumeListGet(session['user_role'], user_token, namespace)
         
         return jsonify({
             "data": pvs,
             "metadata": {
-                "count": len(pvs)
+                "count": len(pvs),
+                "namespace": namespace
             }
         })
+
+
+@storage_api_bp.route('/pvs/metrics')
+class PVMetricsResource(MethodView):
+    """
+    PV metrics endpoint.
+    """
+    
+    @storage_api_bp.response(200, description="Successfully retrieved PV metrics")
+    @storage_api_bp.doc(tags=['Storage'])
+    @login_required
+    def get(self):
+        """
+        Get PV metrics
+        
+        Query Parameters:
+            namespace (str): Kubernetes namespace (default: from session)
+        
+        Returns:
+            dict: PV metrics
+        """
+        namespace = request.args.get('namespace', session.get('ns_select', 'default'))
+        
+        with tracer.start_as_current_span(
+            "pv-metrics",
+            attributes={
+                "http.route": "/api/v1/storage/pvs/metrics",
+                "http.method": "GET",
+                "namespace": namespace,
+            }
+        ) if tracer else nullcontext():
+            metrics = k8sPVMetric(namespace)
+            
+            return jsonify({
+                "data": metrics,
+                "metadata": {
+                    "namespace": namespace
+                }
+            })
 
 
 @storage_api_bp.route('/pvs/<name>')
@@ -230,7 +276,7 @@ class PVResource(MethodView):
                 "pv.name": name,
             }
         ) if tracer else nullcontext():
-            pvs = k8sPersistentVolumeListGet(session['user_role'], user_token, session.get('ns_select', 'default'))
+            pvs = k8sPersistentVolumeListGet(session['user_role'], user_token, 'all')
             pv_data = None
             for pv in pvs:
                 if pv["name"] == name:
@@ -441,24 +487,88 @@ class VolumeSnapshotsListResource(MethodView):
         """
         List volume snapshots
         
+        Query Parameters:
+            namespace (str): Kubernetes namespace (default: from session, use 'all' for all namespaces)
+        
         Returns:
             dict: List of volume snapshots with metadata
         """
         user_token = get_user_token(session)
+        # Get namespace from query params or session, default to session namespace
+        namespace = request.args.get('namespace', session.get('ns_select', 'default'))
         
         with tracer.start_as_current_span(
             "volume-snapshots-list",
             attributes={
                 "http.route": "/api/v1/storage/volume-snapshots",
                 "http.method": "GET",
+                "namespace": namespace,
             }
         ) if tracer else nullcontext():
-            snapshots = k8sPersistentVolumeSnapshotListGet(session['user_role'], user_token)
+            snapshots = k8sPersistentVolumeSnapshotListGet(session['user_role'], user_token, namespace)
             
             return jsonify({
                 "data": snapshots,
                 "metadata": {
-                    "count": len(snapshots)
+                    "count": len(snapshots),
+                    "namespace": namespace
+                }
+            })
+
+
+@storage_api_bp.route('/volume-snapshots/<name>')
+class VolumeSnapshotResource(MethodView):
+    """
+    Individual volume snapshot endpoint.
+    """
+    
+    @storage_api_bp.response(200, description="Successfully retrieved volume snapshot details")
+    @storage_api_bp.response(404, description="Volume snapshot not found")
+    @storage_api_bp.doc(tags=['Storage'])
+    @login_required
+    def get(self, name):
+        """
+        Get volume snapshot details
+        
+        Path Parameters:
+            name (str): Name of the volume snapshot
+        
+        Query Parameters:
+            namespace (str): Kubernetes namespace (default: from session)
+        
+        Returns:
+            dict: Volume snapshot details
+        """
+        user_token = get_user_token(session)
+        namespace = request.args.get('namespace', session.get('ns_select', 'default'))
+        
+        with tracer.start_as_current_span(
+            "volume-snapshot-get",
+            attributes={
+                "http.route": "/api/v1/storage/volume-snapshots/{name}",
+                "http.method": "GET",
+                "volume-snapshot.name": name,
+                "namespace": namespace,
+            }
+        ) if tracer else nullcontext():
+            snapshots = k8sPersistentVolumeSnapshotListGet(session['user_role'], user_token, namespace)
+            snapshot_data = None
+            for snapshot in snapshots:
+                if snapshot["name"] == name:
+                    snapshot_data = snapshot
+                    break
+            
+            if not snapshot_data:
+                return jsonify({
+                    "error": "NotFound",
+                    "message": f"Volume snapshot '{name}' not found in namespace '{namespace}'"
+                }), 404
+            
+            return jsonify({
+                "data": snapshot_data,
+                "metadata": {
+                    "name": name,
+                    "namespace": namespace
                 }
             })
 

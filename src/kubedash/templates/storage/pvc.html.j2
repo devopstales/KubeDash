@@ -34,60 +34,15 @@
                       <th>Usage</th>
                     </tr>
                   </thead>
-                  <tbody>
-                    {% for pvc in pvc_list %}
-                    {% if selected == pvc.name %}
-                      <tr class="selected" >
-                    {% else %}
-                      <tr>
-                    {% endif %}
-                    {% if pvc.status == "Bound" %}
-                        <td>
-                          <span class="badge text-bg-success text-bg-tag">{{ pvc.status }}</span>
-                        </td>
-                    {% elif  pvc.status == "Terminating" %}
-                        <td>
-                          <span class="badge text-bg-danger text-bg-tag">{{ pvc.status }}</span>
-                        </td>
-                    {% else %}
-                        <td>
-                          <span class="badge text-bg-warning text-bg-tag">{{ pvc.status }}</span>
-                        </td>
-                    {% endif %}
-                        <td>
-                          <form action="/storage/pvc/data" method="POST">
-                            <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
-                            <input type="hidden" name="ns_select" value="{{ session['ns_select'] }}" />
-                            <input type="hidden" name="selected" value="{{ pvc.name }}" />
-                            <a href="javascript:;" onclick="parentNode.submit();">{{ pvc.name }}</a>
-                          </form>
-                        </td>
-                        <td>
-                          <form action="/storage/storage-class" method="POST">
-                            <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
-                            <input type="hidden" name="ns_select" value="{{ session['ns_select'] }}" />
-                            <input type="hidden" name="selected" value="{{ pvc.storage_class_name }}" />
-                            <a href="javascript:;" onclick="parentNode.submit();">{{ pvc.storage_class_name }}</a>
-                          </form>
-                        </td>
-                        <td>
-                          <form action="/storage/pv" method="POST">
-                            <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
-                            <input type="hidden" name="ns_select" value="{{ session['ns_select'] }}" />
-                            <input type="hidden" name="selected" value="{{ pvc.volume_name }}" />
-                            <a href="javascript:;" onclick="parentNode.submit();">{{ pvc.volume_name }}</a>
-                          </form>
-                        </td>
-                        <td>{{ pvc.capacity }}</td>
-                        <td>
-                          {% for metric in pvc_metrics %}
-                          {% if metric.name == pvc.name %}
-                          {{ metric.percentageUsed|round(1) }} %
-                          {% endif %}
-                          {% endfor %}
+                  <tbody id="pvcs-tbody">
+                    <tr>
+                        <td colspan="6" class="text-center">
+                            <div class="spinner-border spinner-border-sm text-primary" role="status">
+                                <span class="visually-hidden">Loading...</span>
+                            </div>
+                            <span class="ms-2">Loading persistent volume claims...</span>
                         </td>
                       </tr>
-                    {% endfor %}
                   </tbody>
             </table>
         </div>
@@ -97,4 +52,295 @@
 
 {% block add_head_css %}
 {% include "segments/datatable_snippet.html.j2" %}
+{% endblock %}
+
+{% block add_tail_js %}
+<script>
+    const escapeHtml = (text) => {
+        if (text === null || text === undefined) return '';
+        const map = {
+            '&': '&amp;',
+            '<': '&lt;',
+            '>': '&gt;',
+            '"': '&quot;',
+            "'": '&#039;'
+        };
+        return String(text).replace(/[&<>"']/g, m => map[m]);
+    };
+    
+    const csrf_token = {{ csrf_token()|tojson }};
+    
+    // DataTables protection - prevent auto-initialization on loading rows
+    (function() {
+        const originalTableId = 'dataTable';
+        const tempTableId = 'pvcsTable_' + Date.now();
+        
+        // Temporarily change table ID to prevent auto-initialization
+        document.addEventListener('DOMContentLoaded', function() {
+            const table = document.getElementById(originalTableId);
+            if (table) {
+                table.id = tempTableId;
+            }
+        });
+        
+        // Override DataTable initialization to prevent on colspan rows
+        if (typeof $ !== 'undefined' && $.fn.DataTable) {
+            const originalDataTable = $.fn.DataTable;
+            $.fn.DataTable = function(opts) {
+                const $this = $(this);
+                // Check if this is a loading row with colspan
+                if ($this.find('tbody tr td[colspan]').length > 0) {
+                    console.log('Blocked DataTable initialization on loading row');
+                    return $this;
+                }
+                return originalDataTable.apply(this, arguments);
+            };
+        }
+        
+        // Clean up any auto-initialized DataTables
+        setTimeout(function() {
+            if (typeof $ !== 'undefined' && $.fn.DataTable) {
+                const table = document.getElementById(tempTableId);
+                if (table) {
+                    try {
+                        const $table = $('#' + tempTableId);
+                        if ($table.length && $table.data('DataTable')) {
+                            $table.DataTable().destroy();
+                        }
+                    } catch (e) {
+                        // DataTable not initialized or error, ignore
+                    }
+                    table.id = originalTableId;
+                }
+            }
+        }, 100);
+        
+        setTimeout(function() {
+            if (typeof $ !== 'undefined' && $.fn.DataTable) {
+                const table = document.getElementById(tempTableId);
+                if (table) {
+                    try {
+                        const $table = $('#' + tempTableId);
+                        if ($table.length && $table.data('DataTable')) {
+                            $table.DataTable().destroy();
+                        }
+                    } catch (e) {
+                        // DataTable not initialized or error, ignore
+                    }
+                    table.id = originalTableId;
+                }
+            }
+        }, 500);
+    })();
+    
+    // Get namespace from topbar selector or use default
+    function getSelectedNamespace() {
+        const topbarSelect = document.getElementById('inputGroupSelect04');
+        if (topbarSelect) {
+            return topbarSelect.value;
+        }
+        // Fallback to sessionStorage or default
+        return sessionStorage.getItem('ns_select') || 'default';
+    }
+    
+    function populatePVCsTable(pvcs, metrics) {
+        const tbody = document.getElementById('pvcs-tbody');
+        
+        if (!pvcs || pvcs.length === 0) {
+            tbody.innerHTML = '<tr><td colspan="6" class="text-center">No persistent volume claims found</td></tr>';
+            return;
+        }
+        
+        // Create a lookup map for metrics by PVC name
+        const metricsMap = {};
+        if (metrics && Array.isArray(metrics)) {
+            metrics.forEach(metric => {
+                if (metric.name) {
+                    metricsMap[metric.name] = metric;
+                }
+            });
+        }
+        
+        // Get selected PVC from URL
+        const urlParams = new URLSearchParams(window.location.search);
+        const selectedPVC = urlParams.get('selected');
+        const namespace = getSelectedNamespace();
+        
+        const rows = pvcs.map(pvc => {
+            const name = escapeHtml(pvc.name || '');
+            const status = pvc.status || 'Unknown';
+            const storageClass = escapeHtml(pvc.storage_class_name || '-');
+            const volumeName = escapeHtml(pvc.volume_name || '-');
+            const capacity = escapeHtml(pvc.capacity || '-');
+            
+            const isSelected = selectedPVC === pvc.name;
+            const rowClass = isSelected ? 'selected' : '';
+            
+            // Status badge
+            let statusBadge = '';
+            if (status === 'Bound') {
+                statusBadge = '<span class="badge text-bg-success text-bg-tag">' + escapeHtml(status) + '</span>';
+            } else if (status === 'Terminating') {
+                statusBadge = '<span class="badge text-bg-danger text-bg-tag">' + escapeHtml(status) + '</span>';
+            } else {
+                statusBadge = '<span class="badge text-bg-warning text-bg-tag">' + escapeHtml(status) + '</span>';
+            }
+            
+            // StorageClass link
+            let storageClassCell = '<td>-</td>';
+            if (storageClass && storageClass !== '-') {
+                storageClassCell = `
+                    <td>
+                        <form action="/storage/storage-class" method="POST" onsubmit="sessionStorage.setItem('ns_select', '${escapeHtml(namespace)}'); return true;">
+                            <input type="hidden" name="csrf_token" value="${escapeHtml(csrf_token)}">
+                            <input type="hidden" name="ns_select" value="${escapeHtml(namespace)}" />
+                            <input type="hidden" name="selected" value="${storageClass}" />
+                            <a href="javascript:;" onclick="parentNode.submit();">${storageClass}</a>
+                        </form>
+                    </td>
+                `;
+            }
+            
+            // Volume link
+            let volumeCell = '<td>-</td>';
+            if (volumeName && volumeName !== '-') {
+                volumeCell = `
+                    <td>
+                        <form action="/storage/pv" method="POST" onsubmit="sessionStorage.setItem('ns_select', '${escapeHtml(namespace)}'); return true;">
+                            <input type="hidden" name="csrf_token" value="${escapeHtml(csrf_token)}">
+                            <input type="hidden" name="ns_select" value="${escapeHtml(namespace)}" />
+                            <input type="hidden" name="selected" value="${volumeName}" />
+                            <a href="javascript:;" onclick="parentNode.submit();">${volumeName}</a>
+                        </form>
+                    </td>
+                `;
+            }
+            
+            // Usage metrics
+            let usageHtml = '<td>-</td>';
+            const pvcMetrics = metricsMap[pvc.name];
+            if (pvcMetrics && pvcMetrics.percentageUsed !== undefined) {
+                const usagePercent = Math.round(pvcMetrics.percentageUsed || 0);
+                // Determine progress bar color based on usage
+                let progressBarClass = 'bg-success';
+                if (usagePercent >= 90) {
+                    progressBarClass = 'bg-danger';
+                } else if (usagePercent >= 75) {
+                    progressBarClass = 'bg-warning';
+                }
+                
+                usageHtml = `
+                    <td>
+                        <div class="progress position-relative" style="height: 20px;">
+                            <div class="progress-bar ${progressBarClass}" role="progressbar" style="width: ${usagePercent}%" aria-valuenow="${usagePercent}" aria-valuemin="0" aria-valuemax="100"></div>
+                            <small class="justify-content-center d-flex position-absolute w-100">${usagePercent}%</small>
+                        </div>
+                    </td>
+                `;
+            }
+            
+            return `
+                <tr class="${rowClass}">
+                    <td>${statusBadge}</td>
+                    <td>
+                        <form action="/storage/pvc/data" method="POST" onsubmit="sessionStorage.setItem('pvc_data_name', '${name}'); sessionStorage.setItem('ns_select', '${escapeHtml(namespace)}'); return true;">
+                            <input type="hidden" name="csrf_token" value="${escapeHtml(csrf_token)}">
+                            <input type="hidden" name="ns_select" value="${escapeHtml(namespace)}" />
+                            <input type="hidden" name="selected" value="${name}" />
+                            <a href="javascript:;" onclick="parentNode.submit();">${name}</a>
+                        </form>
+                    </td>
+                    ${storageClassCell}
+                    ${volumeCell}
+                    <td>${capacity}</td>
+                    ${usageHtml}
+                </tr>
+            `;
+        }).join('');
+        
+        tbody.innerHTML = rows;
+        
+        // Initialize DataTables after a short delay to ensure DOM is updated
+        setTimeout(function() {
+            const table = document.getElementById('dataTable');
+            if (table && typeof $ !== 'undefined' && $.fn.DataTable) {
+                try {
+                    // Destroy existing DataTable if it exists
+                    const $table = $('#dataTable');
+                    if ($table.length && $table.data('DataTable')) {
+                        $table.DataTable().destroy();
+                    }
+                    
+                    // Initialize DataTables
+                    $('#dataTable').DataTable({
+                        responsive: true,
+                        order: [[1, 'asc']],
+                        pageLength: 25
+                    });
+                } catch (e) {
+                    console.warn('Error initializing DataTable:', e);
+                }
+            }
+        }, 50);
+    }
+    
+    async function loadPVCs(namespace) {
+        try {
+            // Fetch PVCs and metrics in parallel
+            const [pvcsResponse, metricsResponse] = await Promise.all([
+                fetch(`/api/v1/storage/pvcs${namespace ? '?namespace=' + encodeURIComponent(namespace) : ''}`),
+                fetch(`/api/v1/storage/pvcs/metrics${namespace ? '?namespace=' + encodeURIComponent(namespace) : ''}`)
+            ]);
+            
+            if (!pvcsResponse.ok) {
+                throw new Error(`HTTP error! status: ${pvcsResponse.status}`);
+            }
+            
+            const pvcsData = await pvcsResponse.json();
+            console.log('PVCs API response:', pvcsData);
+            
+            if (pvcsData.error) {
+                throw new Error(pvcsData.message || 'Failed to load persistent volume claims');
+            }
+            
+            let metrics = null;
+            if (metricsResponse.ok) {
+                const metricsData = await metricsResponse.json();
+                console.log('PVC Metrics API response:', metricsData);
+                metrics = metricsData.data || null;
+            } else {
+                console.warn('Failed to load PVC metrics:', metricsResponse.status);
+            }
+            
+            const pvcs = pvcsData.data || [];
+            populatePVCsTable(pvcs, metrics);
+            
+        } catch (error) {
+            console.error('Error loading PVCs:', error);
+            const tbody = document.getElementById('pvcs-tbody');
+            if (tbody) {
+                tbody.innerHTML = '<tr><td colspan="6" class="text-center text-danger">Error loading persistent volume claims: ' + escapeHtml(error.message) + '</td></tr>';
+            }
+        }
+    }
+    
+    // Load data when page loads
+    document.addEventListener('DOMContentLoaded', function() {
+        const namespace = getSelectedNamespace();
+        loadPVCs(namespace);
+    });
+    
+    // Reload data when namespace changes (if namespace selector exists)
+    document.addEventListener('DOMContentLoaded', function() {
+        const namespaceSelect = document.getElementById('inputGroupSelect04');
+        if (namespaceSelect) {
+            namespaceSelect.addEventListener('change', function() {
+                const namespace = this.value;
+                console.log('Namespace changed to:', namespace);
+                sessionStorage.setItem('ns_select', namespace);
+                loadPVCs(namespace);
+            });
+        }
+    });
+</script>
 {% endblock %}

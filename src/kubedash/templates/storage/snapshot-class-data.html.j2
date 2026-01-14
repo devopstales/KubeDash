@@ -7,7 +7,7 @@
         <ol class="breadcrumb my-0">
           <li class="breadcrumb-item"><span>Storage</span></li>
           <li class="breadcrumb-item"><a href="/storage/snapshot-class">SnapshotClass</a></li>
-          <li class="breadcrumb-item active"><span>{{ sc_data.name }}</span></li>
+          <li class="breadcrumb-item active"><span id="snapshotclass-name-breadcrumb">Loading...</span></li>
         </ol>
       </nav>
     </div>
@@ -29,92 +29,199 @@
                     <table class="table table-bordered" id="podInfoTable" width="100%" cellspacing="0">
                         <tr>
                             <th>Name:</th>
-                            <td>{{ sc_data.name }}</td>
+                            <td id="snapshotclass-name">Loading...</td>
                         </tr>
                         <tr>
                             <th>Created:</th>
-                            <td>{{ sc_data.created }}</td>
+                            <td id="snapshotclass-created">Loading...</td>
                         </tr>
                         <tr>
                             <th>Annotations:</th>
-                            <td>
-                                {% if sc_data.annotations %}
-                                <table class="table table-bordered" id="annotationTable" width="100%" cellspacing="0">
-                                    <thead>
-                                        <tr>
-                                            <th width="50%">Key</th>
-                                            <th width="50%">Value</th>
-                                        </tr>
-                                    </thead>
-                                    <tbody>
-                                    {% for key, value in sc_data.annotations.items() %}
-                                        <tr>
-                                            <td width="50%">{{ key }}</td>
-                                            <td width="50%">{{ value }}</td>
-                                        </tr>
-                                    {% endfor %}
-                                    </tbody>
-                                </table>
-                                {% endif %}
+                            <td id="snapshotclass-annotations-container">
+                                <div class="spinner-border spinner-border-sm text-primary" role="status">
+                                    <span class="visually-hidden">Loading...</span>
+                                </div>
                             </td>
                         </tr>
                         <tr>
-                            <th>Lables:</th>
-                            <td>
-                                {% if sc_data.labels %}
-                                <table class="table table-bordered" id="labelsTable" width="100%" cellspacing="0">
-                                    <thead>
-                                        <tr>
-                                            <th width="50%">Key</th>
-                                            <th width="50%">Value</th>
-                                        </tr>
-                                    </thead>
-                                    <tbody>
-                                    {% for key, value in sc_data.labels.items() %}
-                                        <tr>
-                                            <td width="50%">{{ key }}</td>
-                                            <td width="50%">{{ value }}</td>
-                                        </tr>
-                                    {% endfor %}
-                                    </tbody>
-                                </table>
-                                {% endif %}
+                            <th>Labels:</th>
+                            <td id="snapshotclass-labels-container">
+                                <div class="spinner-border spinner-border-sm text-primary" role="status">
+                                    <span class="visually-hidden">Loading...</span>
+                                </div>
                             </td>
                         </tr>
                         <tr>
                             <th>Deletion Policy:</th>
-                            <td>{{ sc_data.deletion_policy }}</td>
+                            <td id="snapshotclass-deletion-policy">Loading...</td>
                         </tr>
                         <tr>
                             <th>Driver:</th>
-                            <td>{{ sc_data.driver }}</td>
+                            <td id="snapshotclass-driver">Loading...</td>
                         </tr>
                     </table>
                 </div>
             </div>
         </div>
-        {% if sc_data.parameters %}
-        <div class="card-body">
-            <div class="card shadow mb-4">
-                <div class="card-body">
-                    <div class="table-responsive">
-                        <table class="table table-bordered" id="podInfoTable" width="100%" cellspacing="0">
-                            {% for da_key, da_value in sc_data.parameters.items() %}
-                            <tr>
-                                <th>{{ da_key }}:</th>
-                                <td>{{ da_value }}</td>
-                            </tr>
-                            {% endfor %}
-                        </table>
-                    </div>
+        <div class="card shadow mb-4" id="snapshotclass-parameters-card" style="display: none;">
+            <div class="card-header">
+                Snapshot Class Parameters
+            </div>
+            <div class="card-body">
+                <div class="table-responsive">
+                    <table class="table table-bordered" id="parametersTable" width="100%" cellspacing="0">
+                        <tbody id="snapshotclass-parameters-tbody">
+                        </tbody>
+                    </table>
                 </div>
             </div>
         </div>
-        {% endif %}
     </div>
 </div>
 {% endblock %}
 
 {% block add_head_css %}
 {% include "segments/datatable_snippet.html.j2" %}
+{% endblock %}
+
+{% block add_tail_js %}
+<script>
+    const escapeHtml = (text) => {
+        if (text === null || text === undefined) return '';
+        const map = {
+            '&': '&amp;',
+            '<': '&lt;',
+            '>': '&gt;',
+            '"': '&quot;',
+            "'": '&#039;'
+        };
+        return String(text).replace(/[&<>"']/g, m => map[m]);
+    };
+    
+    // Get snapshot class name from URL, sessionStorage, or form
+    function getSnapshotClassInfo() {
+        // Try to get from URL parameters first
+        const urlParams = new URLSearchParams(window.location.search);
+        let scName = urlParams.get('selected') || urlParams.get('sc_name');
+        
+        // Fallback to sessionStorage (set by form submission)
+        if (!scName) {
+            scName = sessionStorage.getItem('snapshotclass_data_name');
+        }
+        
+        return { scName };
+    }
+    
+    function populateSnapshotClassInfo(sc) {
+        if (!sc) {
+            document.getElementById('snapshotclass-name').textContent = 'N/A';
+            document.getElementById('snapshotclass-created').textContent = 'N/A';
+            return;
+        }
+        
+        // Basic info
+        document.getElementById('snapshotclass-name').textContent = escapeHtml(sc.name || 'N/A');
+        document.getElementById('snapshotclass-created').textContent = escapeHtml(sc.created || 'N/A');
+        document.getElementById('snapshotclass-deletion-policy').textContent = escapeHtml(sc.deletion_policy || '-');
+        document.getElementById('snapshotclass-driver').textContent = escapeHtml(sc.driver || '-');
+        
+        // Update breadcrumb
+        const breadcrumb = document.getElementById('snapshotclass-name-breadcrumb');
+        if (breadcrumb) {
+            breadcrumb.textContent = escapeHtml(sc.name || 'Loading...');
+        }
+        
+        // Annotations
+        const annotationsContainer = document.getElementById('snapshotclass-annotations-container');
+        if (sc.annotations && Object.keys(sc.annotations).length > 0) {
+            let annotationsHtml = '<table class="table table-bordered" id="annotationTable" width="100%" cellspacing="0"><thead><tr><th width="50%">Key</th><th width="50%">Value</th></tr></thead><tbody>';
+            for (const [key, value] of Object.entries(sc.annotations)) {
+                if (key !== "kubectl.kubernetes.io/last-applied-configuration") {
+                    annotationsHtml += `<tr><td width="50%">${escapeHtml(key)}</td><td width="50%">${escapeHtml(value)}</td></tr>`;
+                }
+            }
+            annotationsHtml += '</tbody></table>';
+            annotationsContainer.innerHTML = annotationsHtml;
+        } else {
+            annotationsContainer.innerHTML = '<span class="text-muted">No annotations</span>';
+        }
+        
+        // Labels
+        const labelsContainer = document.getElementById('snapshotclass-labels-container');
+        if (sc.labels && Object.keys(sc.labels).length > 0) {
+            let labelsHtml = '<table class="table table-bordered" id="labelsTable" width="100%" cellspacing="0"><thead><tr><th width="50%">Key</th><th width="50%">Value</th></tr></thead><tbody>';
+            for (const [key, value] of Object.entries(sc.labels)) {
+                labelsHtml += `<tr><td width="50%">${escapeHtml(key)}</td><td width="50%">${escapeHtml(value)}</td></tr>`;
+            }
+            labelsHtml += '</tbody></table>';
+            labelsContainer.innerHTML = labelsHtml;
+        } else {
+            labelsContainer.innerHTML = '<span class="text-muted">No labels</span>';
+        }
+        
+        // Parameters
+        const parametersCard = document.getElementById('snapshotclass-parameters-card');
+        const parametersTbody = document.getElementById('snapshotclass-parameters-tbody');
+        if (sc.parameters && Object.keys(sc.parameters).length > 0) {
+            let parametersHtml = '';
+            for (const [key, value] of Object.entries(sc.parameters)) {
+                parametersHtml += `<tr><th>${escapeHtml(key)}:</th><td>${escapeHtml(value)}</td></tr>`;
+            }
+            parametersTbody.innerHTML = parametersHtml;
+            parametersCard.style.display = 'block';
+        } else {
+            parametersCard.style.display = 'none';
+        }
+    }
+    
+    async function loadSnapshotClassData() {
+        try {
+            const { scName } = getSnapshotClassInfo();
+            
+            console.log('Snapshot Class info:', { scName });
+            
+            if (!scName) {
+                throw new Error('Snapshot class name not found. Please select a snapshot class from the list page.');
+            }
+            
+            const apiUrl = `/api/v1/storage/snapshot-classes/${encodeURIComponent(scName)}`;
+            console.log('Fetching snapshot class data from:', apiUrl);
+            
+            const response = await fetch(apiUrl);
+            if (!response.ok) {
+                if (response.status === 404) {
+                    throw new Error(`Snapshot class '${scName}' not found`);
+                }
+                throw new Error(`HTTP error! status: ${response.status}`);
+            }
+            
+            const result = await response.json();
+            console.log('Snapshot Class API response:', result);
+            
+            if (result.error) {
+                throw new Error(result.message || 'Failed to load snapshot class');
+            }
+            
+            const sc = result.data;
+            if (!sc) {
+                throw new Error('No snapshot class data received');
+            }
+            
+            populateSnapshotClassInfo(sc);
+            
+        } catch (error) {
+            console.error('Error loading snapshot class data:', error);
+            document.getElementById('snapshotclass-name').textContent = 'Error';
+            document.getElementById('snapshotclass-created').textContent = 'Error';
+            document.getElementById('snapshotclass-annotations-container').innerHTML = 
+                '<span class="text-danger">Error loading snapshot class: ' + escapeHtml(error.message) + '</span>';
+            document.getElementById('snapshotclass-labels-container').innerHTML = '';
+        }
+    }
+    
+    // Load data when page loads
+    document.addEventListener('DOMContentLoaded', function() {
+        loadSnapshotClassData();
+    });
+</script>
 {% endblock %}

@@ -7,7 +7,7 @@
         <ol class="breadcrumb my-0">
           <li class="breadcrumb-item"><span>Storage</span></li>
           <li class="breadcrumb-item"><a href="/storage/storage-class">StorageClass</a></li>
-          <li class="breadcrumb-item active"><span>{{ sc_data.name }}</span></li>
+          <li class="breadcrumb-item active"><span id="storageclass-name-breadcrumb">Loading...</span></li>
         </ol>
       </nav>
     </div>
@@ -29,97 +29,204 @@
                     <table class="table table-bordered" id="podInfoTable" width="100%" cellspacing="0">
                         <tr>
                             <th>Name:</th>
-                            <td>{{ sc_data.name }}</td>
+                            <td id="storageclass-name">Loading...</td>
                         </tr>
                         <tr>
                             <th>Created:</th>
-                            <td>{{ sc_data.created }}</td>
+                            <td id="storageclass-created">Loading...</td>
                         </tr>
                         <tr>
                             <th>Annotations:</th>
-                            <td>
-                                {% if sc_data.annotations %}
-                                <table class="table table-bordered" id="annotationTable" width="100%" cellspacing="0">
-                                    <thead>
-                                        <tr>
-                                            <th width="50%">Key</th>
-                                            <th width="50%">Value</th>
-                                        </tr>
-                                    </thead>
-                                    <tbody>
-                                    {% for key, value in sc_data.annotations.items() %}
-                                        <tr>
-                                            <td width="50%">{{ key }}</td>
-                                            <td width="50%">{{ value }}</td>
-                                        </tr>
-                                    {% endfor %}
-                                    </tbody>
-                                </table>
-                                {% endif %}
+                            <td id="storageclass-annotations-container">
+                                <div class="spinner-border spinner-border-sm text-primary" role="status">
+                                    <span class="visually-hidden">Loading...</span>
+                                </div>
                             </td>
                         </tr>
                         <tr>
-                            <th>Lables:</th>
-                            <td>
-                                {% if sc_data.labels %}
-                                <table class="table table-bordered" id="labelsTable" width="100%" cellspacing="0">
-                                    <thead>
-                                        <tr>
-                                            <th width="50%">Key</th>
-                                            <th width="50%">Value</th>
-                                        </tr>
-                                    </thead>
-                                    <tbody>
-                                    {% for key, value in sc_data.labels.items() %}
-                                        <tr>
-                                            <td width="50%">{{ key }}</td>
-                                            <td width="50%">{{ value }}</td>
-                                        </tr>
-                                    {% endfor %}
-                                    </tbody>
-                                </table>
-                                {% endif %}
+                            <th>Labels:</th>
+                            <td id="storageclass-labels-container">
+                                <div class="spinner-border spinner-border-sm text-primary" role="status">
+                                    <span class="visually-hidden">Loading...</span>
+                                </div>
                             </td>
                         </tr>
                         <tr>
                             <th>Reclaim Policy:</th>
-                            <td>{{ sc_data.reclaim_policy }}</td>
+                            <td id="storageclass-reclaim-policy">Loading...</td>
                         </tr>
                         <tr>
                             <th>Binding Mode:</th>
-                            <td>{{ sc_data.volume_binding_mode }}</td>
+                            <td id="storageclass-binding-mode">Loading...</td>
                         </tr>
                         <tr>
                             <th>Provisioner:</th>
-                            <td>{{ sc_data.provisioner }}</td>
+                            <td id="storageclass-provisioner">Loading...</td>
                         </tr>
                     </table>
                 </div>
             </div>
         </div>
-        {% if sc_data.parameters %}
-        <div class="card shadow mb-4">
+        <div class="card shadow mb-4" id="storageclass-parameters-card" style="display: none;">
             <div class="card-header">
                 Storage Class Parameters
             </div>
             <div class="card-body">
                 <div class="table-responsive">
-                    <table class="table table-bordered" id="podInfoTable" width="100%" cellspacing="0">
-                        {% for da_key, da_value in sc_data.parameters.items() %}
-                        <tr>
-                            <th>{{ da_key }}:</th>
-                            <td>{{ da_value }}</td>
-                        </tr>
-                        {% endfor %}
+                    <table class="table table-bordered" id="parametersTable" width="100%" cellspacing="0">
+                        <tbody id="storageclass-parameters-tbody">
+                        </tbody>
                     </table>
                 </div>
             </div>
         </div>
-        {% endif %}
     </div>
 </div>
 {% endblock %}
 
 {% block add_head_css %}
 {% include "segments/datatable_snippet.html.j2" %}
+{% endblock %}
+
+{% block add_tail_js %}
+<script>
+    const escapeHtml = (text) => {
+        if (text === null || text === undefined) return '';
+        const map = {
+            '&': '&amp;',
+            '<': '&lt;',
+            '>': '&gt;',
+            '"': '&quot;',
+            "'": '&#039;'
+        };
+        return String(text).replace(/[&<>"']/g, m => map[m]);
+    };
+    
+    // Get storage class name from URL, sessionStorage, or form
+    function getStorageClassInfo() {
+        // Try to get from URL parameters first
+        const urlParams = new URLSearchParams(window.location.search);
+        let scName = urlParams.get('selected') || urlParams.get('sc_name');
+        
+        // Fallback to sessionStorage (set by form submission)
+        if (!scName) {
+            scName = sessionStorage.getItem('storageclass_data_name');
+        }
+        
+        return { scName };
+    }
+    
+    function populateStorageClassInfo(sc) {
+        if (!sc) {
+            document.getElementById('storageclass-name').textContent = 'N/A';
+            document.getElementById('storageclass-created').textContent = 'N/A';
+            return;
+        }
+        
+        // Basic info
+        document.getElementById('storageclass-name').textContent = escapeHtml(sc.name || 'N/A');
+        document.getElementById('storageclass-created').textContent = escapeHtml(sc.created || 'N/A');
+        document.getElementById('storageclass-reclaim-policy').textContent = escapeHtml(sc.reclaim_policy || '-');
+        document.getElementById('storageclass-binding-mode').textContent = escapeHtml(sc.volume_binding_mode || '-');
+        document.getElementById('storageclass-provisioner').textContent = escapeHtml(sc.provisioner || '-');
+        
+        // Update breadcrumb
+        const breadcrumb = document.getElementById('storageclass-name-breadcrumb');
+        if (breadcrumb) {
+            breadcrumb.textContent = escapeHtml(sc.name || 'Loading...');
+        }
+        
+        // Annotations
+        const annotationsContainer = document.getElementById('storageclass-annotations-container');
+        if (sc.annotations && Object.keys(sc.annotations).length > 0) {
+            let annotationsHtml = '<table class="table table-bordered" id="annotationTable" width="100%" cellspacing="0"><thead><tr><th width="50%">Key</th><th width="50%">Value</th></tr></thead><tbody>';
+            for (const [key, value] of Object.entries(sc.annotations)) {
+                if (key !== "kubectl.kubernetes.io/last-applied-configuration") {
+                    annotationsHtml += `<tr><td width="50%">${escapeHtml(key)}</td><td width="50%">${escapeHtml(value)}</td></tr>`;
+                }
+            }
+            annotationsHtml += '</tbody></table>';
+            annotationsContainer.innerHTML = annotationsHtml;
+        } else {
+            annotationsContainer.innerHTML = '<span class="text-muted">No annotations</span>';
+        }
+        
+        // Labels
+        const labelsContainer = document.getElementById('storageclass-labels-container');
+        if (sc.labels && Object.keys(sc.labels).length > 0) {
+            let labelsHtml = '<table class="table table-bordered" id="labelsTable" width="100%" cellspacing="0"><thead><tr><th width="50%">Key</th><th width="50%">Value</th></tr></thead><tbody>';
+            for (const [key, value] of Object.entries(sc.labels)) {
+                labelsHtml += `<tr><td width="50%">${escapeHtml(key)}</td><td width="50%">${escapeHtml(value)}</td></tr>`;
+            }
+            labelsHtml += '</tbody></table>';
+            labelsContainer.innerHTML = labelsHtml;
+        } else {
+            labelsContainer.innerHTML = '<span class="text-muted">No labels</span>';
+        }
+        
+        // Parameters
+        const parametersCard = document.getElementById('storageclass-parameters-card');
+        const parametersTbody = document.getElementById('storageclass-parameters-tbody');
+        if (sc.parameters && Object.keys(sc.parameters).length > 0) {
+            let parametersHtml = '';
+            for (const [key, value] of Object.entries(sc.parameters)) {
+                parametersHtml += `<tr><th>${escapeHtml(key)}:</th><td>${escapeHtml(value)}</td></tr>`;
+            }
+            parametersTbody.innerHTML = parametersHtml;
+            parametersCard.style.display = 'block';
+        } else {
+            parametersCard.style.display = 'none';
+        }
+    }
+    
+    async function loadStorageClassData() {
+        try {
+            const { scName } = getStorageClassInfo();
+            
+            console.log('Storage Class info:', { scName });
+            
+            if (!scName) {
+                throw new Error('Storage class name not found. Please select a storage class from the list page.');
+            }
+            
+            const apiUrl = `/api/v1/storage/storage-classes/${encodeURIComponent(scName)}`;
+            console.log('Fetching storage class data from:', apiUrl);
+            
+            const response = await fetch(apiUrl);
+            if (!response.ok) {
+                if (response.status === 404) {
+                    throw new Error(`Storage class '${scName}' not found`);
+                }
+                throw new Error(`HTTP error! status: ${response.status}`);
+            }
+            
+            const result = await response.json();
+            console.log('Storage Class API response:', result);
+            
+            if (result.error) {
+                throw new Error(result.message || 'Failed to load storage class');
+            }
+            
+            const sc = result.data;
+            if (!sc) {
+                throw new Error('No storage class data received');
+            }
+            
+            populateStorageClassInfo(sc);
+            
+        } catch (error) {
+            console.error('Error loading storage class data:', error);
+            document.getElementById('storageclass-name').textContent = 'Error';
+            document.getElementById('storageclass-created').textContent = 'Error';
+            document.getElementById('storageclass-annotations-container').innerHTML = 
+                '<span class="text-danger">Error loading storage class: ' + escapeHtml(error.message) + '</span>';
+            document.getElementById('storageclass-labels-container').innerHTML = '';
+        }
+    }
+    
+    // Load data when page loads
+    document.addEventListener('DOMContentLoaded', function() {
+        loadStorageClassData();
+    });
+</script>
 {% endblock %}

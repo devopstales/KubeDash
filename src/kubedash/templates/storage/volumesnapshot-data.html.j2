@@ -1,0 +1,283 @@
+{% extends "base2.html.j2" %}
+
+{% block topmenu %}
+<ul class="header-nav d-lg-flex m-3">
+    <div class="container-fluid px-4">
+      <nav aria-label="breadcrumb">
+        <ol class="breadcrumb my-0">
+          <li class="breadcrumb-item"><span>Storage</span></li>
+          <li class="breadcrumb-item"><a href="/storage/volumesnapshot">Volume Snapshots</a></li>
+          <li class="breadcrumb-item active"><span id="volumesnapshot-name-breadcrumb">Loading...</span></li>
+        </ol>
+      </nav>
+    </div>
+</ul>
+<ul class="header-nav ms-auto"></ul>
+<ul class="header-nav d-lg-flex">
+{% include "segments/topmenu.html.j2" %}
+{% endblock %}
+
+{% block content %}
+<div class="card shadow mb-4">
+    <div class="card-header">
+        <h6 class="m-0 font-weight-bold text-primary">Volume Snapshot Data</h6>
+    </div>
+    <div class="card-body">
+        <div class="table-responsive">
+            <table class="table table-bordered" id="podInfoTable" width="100%" cellspacing="0">
+                <tr>
+                    <th>Status:</th>
+                    <td id="volumesnapshot-status">Loading...</td>
+                </tr>
+                <tr>
+                    <th>Name:</th>
+                    <td id="volumesnapshot-name">Loading...</td>
+                </tr>
+                <tr>
+                    <th>Namespace:</th>
+                    <td id="volumesnapshot-namespace">Loading...</td>
+                </tr>
+                <tr>
+                    <th>Created:</th>
+                    <td id="volumesnapshot-created">Loading...</td>
+                </tr>
+                <tr>
+                    <th>Annotations:</th>
+                    <td id="volumesnapshot-annotations-container">
+                        <div class="spinner-border spinner-border-sm text-primary" role="status">
+                            <span class="visually-hidden">Loading...</span>
+                        </div>
+                    </td>
+                </tr>
+                <tr>
+                    <th>Labels:</th>
+                    <td id="volumesnapshot-labels-container">
+                        <div class="spinner-border spinner-border-sm text-primary" role="status">
+                            <span class="visually-hidden">Loading...</span>
+                        </div>
+                    </td>
+                </tr>
+                <tr>
+                    <th>SnapshotClass:</th>
+                    <td id="volumesnapshot-snapshotclass">Loading...</td>
+                </tr>
+                <tr>
+                    <th>Persistent Volume Claim:</th>
+                    <td id="volumesnapshot-pvc">Loading...</td>
+                </tr>
+                <tr>
+                    <th>Volume Snapshot Content:</th>
+                    <td id="volumesnapshot-content">Loading...</td>
+                </tr>
+                <tr>
+                    <th>Snapshot Creation Time:</th>
+                    <td id="volumesnapshot-creation-time">Loading...</td>
+                </tr>
+                <tr>
+                    <th>Restore Size:</th>
+                    <td id="volumesnapshot-restore-size">Loading...</td>
+                </tr>
+            </table>
+        </div>
+    </div>
+</div>
+{% endblock %}
+
+{% block add_head_css %}
+{% include "segments/datatable_snippet.html.j2" %}
+{% endblock %}
+
+{% block add_tail_js %}
+<script>
+    const escapeHtml = (text) => {
+        if (text === null || text === undefined) return '';
+        const map = {
+            '&': '&amp;',
+            '<': '&lt;',
+            '>': '&gt;',
+            '"': '&quot;',
+            "'": '&#039;'
+        };
+        return String(text).replace(/[&<>"']/g, m => map[m]);
+    };
+    
+    const csrf_token = {{ csrf_token()|tojson }};
+    
+    // Get volume snapshot name and namespace from URL, sessionStorage, or topbar selector
+    function getVolumeSnapshotInfo() {
+        // Try to get from URL parameters first
+        const urlParams = new URLSearchParams(window.location.search);
+        let snapshotName = urlParams.get('selected') || urlParams.get('snapshot_name');
+        let namespace = urlParams.get('namespace');
+        
+        // Fallback to sessionStorage (set by form submission)
+        if (!snapshotName) {
+            snapshotName = sessionStorage.getItem('volumesnapshot_data_name');
+        }
+        if (!namespace) {
+            namespace = sessionStorage.getItem('ns_select');
+        }
+        
+        // Fallback to topbar selector
+        if (!namespace) {
+            const topbarSelect = document.getElementById('inputGroupSelect04');
+            if (topbarSelect) {
+                namespace = topbarSelect.value;
+            }
+        }
+        
+        // Final fallback
+        if (!namespace) {
+            namespace = 'default';
+        }
+        
+        return { snapshotName, namespace };
+    }
+    
+    function populateVolumeSnapshotInfo(snapshot) {
+        if (!snapshot) {
+            document.getElementById('volumesnapshot-name').textContent = 'N/A';
+            document.getElementById('volumesnapshot-status').textContent = 'N/A';
+            document.getElementById('volumesnapshot-created').textContent = 'N/A';
+            return;
+        }
+        
+        // Basic info
+        document.getElementById('volumesnapshot-name').textContent = escapeHtml(snapshot.name || 'N/A');
+        document.getElementById('volumesnapshot-namespace').textContent = escapeHtml(snapshot.namespace || 'N/A');
+        document.getElementById('volumesnapshot-created').textContent = escapeHtml(snapshot.created || 'N/A');
+        
+        // Status with badge
+        const status = snapshot.status;
+        let statusBadge = '';
+        if (status === true || status === 'True' || status === 'true') {
+            statusBadge = '<span class="badge text-bg-success text-bg-tag">Ready</span>';
+        } else {
+            statusBadge = '<span class="badge text-bg-danger text-bg-tag">Not Ready</span>';
+        }
+        document.getElementById('volumesnapshot-status').innerHTML = statusBadge;
+        
+        // Update breadcrumb
+        const breadcrumb = document.getElementById('volumesnapshot-name-breadcrumb');
+        if (breadcrumb) {
+            breadcrumb.textContent = escapeHtml(snapshot.name || 'Loading...');
+        }
+        
+        // Annotations
+        const annotationsContainer = document.getElementById('volumesnapshot-annotations-container');
+        if (snapshot.annotations && Object.keys(snapshot.annotations).length > 0) {
+            let annotationsHtml = '<table class="table table-bordered" id="annotationTable" width="100%" cellspacing="0"><thead><tr><th width="50%">Key</th><th width="50%">Value</th></tr></thead><tbody>';
+            for (const [key, value] of Object.entries(snapshot.annotations)) {
+                if (key !== "kubectl.kubernetes.io/last-applied-configuration") {
+                    annotationsHtml += `<tr><td width="50%">${escapeHtml(key)}</td><td width="50%">${escapeHtml(value)}</td></tr>`;
+                }
+            }
+            annotationsHtml += '</tbody></table>';
+            annotationsContainer.innerHTML = annotationsHtml;
+        } else {
+            annotationsContainer.innerHTML = '<span class="text-muted">No annotations</span>';
+        }
+        
+        // Labels
+        const labelsContainer = document.getElementById('volumesnapshot-labels-container');
+        if (snapshot.labels && Object.keys(snapshot.labels).length > 0) {
+            let labelsHtml = '<table class="table table-bordered" id="labelsTable" width="100%" cellspacing="0"><thead><tr><th width="50%">Key</th><th width="50%">Value</th></tr></thead><tbody>';
+            for (const [key, value] of Object.entries(snapshot.labels)) {
+                labelsHtml += `<tr><td width="50%">${escapeHtml(key)}</td><td width="50%">${escapeHtml(value)}</td></tr>`;
+            }
+            labelsHtml += '</tbody></table>';
+            labelsContainer.innerHTML = labelsHtml;
+        } else {
+            labelsContainer.innerHTML = '<span class="text-muted">No labels</span>';
+        }
+        
+        // SnapshotClass
+        const namespace = snapshot.namespace || sessionStorage.getItem('ns_select') || 'default';
+        if (snapshot.volume_snapshot_class) {
+            document.getElementById('volumesnapshot-snapshotclass').innerHTML = `
+                <form action="/storage/snapshot-class" method="POST" onsubmit="sessionStorage.setItem('ns_select', '${escapeHtml(namespace)}'); return true;">
+                    <input type="hidden" name="csrf_token" value="${escapeHtml(csrf_token)}">
+                    <input type="hidden" name="ns_select" value="${escapeHtml(namespace)}" />
+                    <input type="hidden" name="selected" value="${escapeHtml(snapshot.volume_snapshot_class)}" />
+                    <a href="javascript:;" onclick="parentNode.submit();">${escapeHtml(snapshot.volume_snapshot_class)}</a>
+                </form>
+            `;
+        } else {
+            document.getElementById('volumesnapshot-snapshotclass').textContent = '-';
+        }
+        
+        // Persistent Volume Claim
+        if (snapshot.pvc) {
+            document.getElementById('volumesnapshot-pvc').innerHTML = `
+                <form action="/storage/pvc" method="POST" onsubmit="sessionStorage.setItem('ns_select', '${escapeHtml(namespace)}'); return true;">
+                    <input type="hidden" name="csrf_token" value="${escapeHtml(csrf_token)}">
+                    <input type="hidden" name="ns_select" value="${escapeHtml(namespace)}" />
+                    <input type="hidden" name="selected" value="${escapeHtml(snapshot.pvc)}" />
+                    <a href="javascript:;" onclick="parentNode.submit();">${escapeHtml(snapshot.pvc)}</a>
+                </form>
+            `;
+        } else {
+            document.getElementById('volumesnapshot-pvc').textContent = '-';
+        }
+        
+        document.getElementById('volumesnapshot-content').textContent = escapeHtml(snapshot.volume_snapshot_content || '-');
+        document.getElementById('volumesnapshot-creation-time').textContent = escapeHtml(snapshot.snapshot_creation_time || '-');
+        document.getElementById('volumesnapshot-restore-size').textContent = escapeHtml(snapshot.restore_size || '-');
+    }
+    
+    async function loadVolumeSnapshotData() {
+        try {
+            const { snapshotName, namespace } = getVolumeSnapshotInfo();
+            
+            console.log('Volume Snapshot info:', { snapshotName, namespace });
+            
+            if (!snapshotName) {
+                throw new Error('Volume snapshot name not found. Please select a volume snapshot from the list page.');
+            }
+            
+            const apiUrl = `/api/v1/storage/volume-snapshots/${encodeURIComponent(snapshotName)}?namespace=${encodeURIComponent(namespace)}`;
+            console.log('Fetching volume snapshot data from:', apiUrl);
+            
+            const response = await fetch(apiUrl);
+            if (!response.ok) {
+                if (response.status === 404) {
+                    throw new Error(`Volume snapshot '${snapshotName}' not found in namespace '${namespace}'`);
+                }
+                throw new Error(`HTTP error! status: ${response.status}`);
+            }
+            
+            const result = await response.json();
+            console.log('Volume Snapshot API response:', result);
+            
+            if (result.error) {
+                throw new Error(result.message || 'Failed to load volume snapshot');
+            }
+            
+            const snapshot = result.data;
+            if (!snapshot) {
+                throw new Error('No volume snapshot data received');
+            }
+            
+            // Add namespace to snapshot object for display
+            snapshot.namespace = result.metadata?.namespace || namespace;
+            
+            populateVolumeSnapshotInfo(snapshot);
+            
+        } catch (error) {
+            console.error('Error loading volume snapshot data:', error);
+            document.getElementById('volumesnapshot-name').textContent = 'Error';
+            document.getElementById('volumesnapshot-status').textContent = 'Error';
+            document.getElementById('volumesnapshot-created').textContent = 'Error';
+            document.getElementById('volumesnapshot-annotations-container').innerHTML = 
+                '<span class="text-danger">Error loading volume snapshot: ' + escapeHtml(error.message) + '</span>';
+            document.getElementById('volumesnapshot-labels-container').innerHTML = '';
+        }
+    }
+    
+    // Load data when page loads
+    document.addEventListener('DOMContentLoaded', function() {
+        loadVolumeSnapshotData();
+    });
+</script>
+{% endblock %}
+
