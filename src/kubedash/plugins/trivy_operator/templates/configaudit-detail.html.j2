@@ -6,9 +6,9 @@
         <nav aria-label="breadcrumb">
             <ol class="breadcrumb my-0">
                 <li class="breadcrumb-item"><span>Plugins</span></li>
-                <li class="breadcrumb-item"><a href="/plugins/trivy-operator">Trivy Operator</a></li>
+                <li class="breadcrumb-item"><a href="/plugins/trivy-operator/namespace">Trivy Operator</a></li>
                 <li class="breadcrumb-item"><span>Config Audit Report</span></li>
-                <li class="breadcrumb-item active"><span>{{ report.namespace }}/{{ report.name }}</span></li>
+                <li class="breadcrumb-item active"><span id="breadcrumb-namespace-name">Loading...</span></li>
             </ol>
         </nav>
     </div>
@@ -21,20 +21,11 @@
 {% block content %}
 <div class="card shadow mb-4">
     <div class="card-header py-3 d-flex justify-content-between align-items-center">
-        <h6 class="m-0 font-weight-bold text-primary">Config Audit Report: {{ report.name }}</h6>
-        <div>
-            {% if report.summary.criticalCount > 0 %}
-            <span class="badge bg-danger">Critical: {{ report.summary.criticalCount }}</span>
-            {% endif %}
-            {% if report.summary.highCount > 0 %}
-            <span class="badge bg-warning text-dark">High: {{ report.summary.highCount }}</span>
-            {% endif %}
-            {% if report.summary.mediumCount > 0 %}
-            <span class="badge bg-info">Medium: {{ report.summary.mediumCount }}</span>
-            {% endif %}
-            {% if report.summary.lowCount > 0 %}
-            <span class="badge bg-secondary">Low: {{ report.summary.lowCount }}</span>
-            {% endif %}
+        <h6 class="m-0 font-weight-bold text-primary" id="report-title">Config Audit Report: Loading...</h6>
+        <div id="report-badges">
+            <div class="spinner-border spinner-border-sm text-primary" role="status">
+                <span class="visually-hidden">Loading...</span>
+            </div>
         </div>
     </div>
     <div class="card-body">
@@ -43,10 +34,10 @@
                 <a class="nav-link active" id="nav-overview-tab" href="#nav-overview" role="tab" aria-controls="nav-overview" aria-selected="true" data-bs-toggle="tab">Overview</a>
             </li>
             <li class="nav-item">
-                <a class="nav-link" id="nav-checks-tab" href="#nav-checks" role="tab" aria-controls="nav-checks" aria-selected="false" data-bs-toggle="tab">Checks ({{ report.checks|length }})</a>
+                <a class="nav-link" id="nav-checks-tab" href="#nav-checks" role="tab" aria-controls="nav-checks" aria-selected="false" data-bs-toggle="tab">Checks (<span id="checks-count">-</span>)</a>
             </li>
             <li class="nav-item">
-                <a class="nav-link" id="nav-events-tab" href="#nav-events" role="tab" aria-controls="nav-events" aria-selected="false" data-bs-toggle="tab">Events ({{ events|length }})</a>
+                <a class="nav-link" id="nav-events-tab" href="#nav-events" role="tab" aria-controls="nav-events" aria-selected="false" data-bs-toggle="tab">Events (<span id="events-count">-</span>)</a>
             </li>
             <li class="nav-item">
                 <a class="nav-link" id="nav-yaml-tab" href="#nav-yaml" role="tab" aria-controls="nav-yaml" aria-selected="false" data-bs-toggle="tab">YAML</a>
@@ -63,27 +54,17 @@
                                 <h6 class="m-0 font-weight-bold text-primary">Metadata</h6>
                             </div>
                             <div class="card-body">
-                                <table class="table table-bordered" width="100%" cellspacing="0">
-                                    <tr>
-                                        <th style="width: 30%;">Name</th>
-                                        <td>{{ report.name }}</td>
+                                <table class="table table-bordered" width="100%" cellspacing="0" id="metadata-table">
+                                    <tbody>
+                                        <tr>
+                                            <td colspan="2" class="text-center">
+                                                <div class="spinner-border spinner-border-sm text-primary" role="status">
+                                                    <span class="visually-hidden">Loading...</span>
+                                                </div>
+                                                <span class="ms-2">Loading metadata...</span>
+                                            </td>
                                     </tr>
-                                    <tr>
-                                        <th>Namespace</th>
-                                        <td>{{ report.namespace }}</td>
-                                    </tr>
-                                    <tr>
-                                        <th>Resource</th>
-                                        <td>{{ report.resource_kind }}/{{ report.resource_name }}</td>
-                                    </tr>
-                                    <tr>
-                                        <th>Age</th>
-                                        <td>{{ report.age }}</td>
-                                    </tr>
-                                    <tr>
-                                        <th>Created</th>
-                                        <td>{{ report.creation_timestamp }}</td>
-                                    </tr>
+                                    </tbody>
                                 </table>
                             </div>
                         </div>
@@ -95,27 +76,17 @@
                                 <h6 class="m-0 font-weight-bold text-primary">Summary</h6>
                             </div>
                             <div class="card-body">
-                                <table class="table table-bordered" width="100%" cellspacing="0">
-                                    <tr>
-                                        <th style="width: 50%;">Critical</th>
-                                        <td><span class="badge bg-danger">{{ report.summary.get('criticalCount', 0) or 0 }}</span></td>
+                                <table class="table table-bordered" width="100%" cellspacing="0" id="summary-table">
+                                    <tbody>
+                                        <tr>
+                                            <td colspan="2" class="text-center">
+                                                <div class="spinner-border spinner-border-sm text-primary" role="status">
+                                                    <span class="visually-hidden">Loading...</span>
+                                                </div>
+                                                <span class="ms-2">Loading summary...</span>
+                                            </td>
                                     </tr>
-                                    <tr>
-                                        <th>High</th>
-                                        <td><span class="badge bg-warning text-dark">{{ report.summary.get('highCount', 0) or 0 }}</span></td>
-                                    </tr>
-                                    <tr>
-                                        <th>Medium</th>
-                                        <td><span class="badge bg-info">{{ report.summary.get('mediumCount', 0) or 0 }}</span></td>
-                                    </tr>
-                                    <tr>
-                                        <th>Low</th>
-                                        <td><span class="badge bg-secondary">{{ report.summary.get('lowCount', 0) or 0 }}</span></td>
-                                    </tr>
-                                    <tr>
-                                        <th>Total</th>
-                                        <td><strong>{{ (report.summary.get('criticalCount', 0) or 0) + (report.summary.get('highCount', 0) or 0) + (report.summary.get('mediumCount', 0) or 0) + (report.summary.get('lowCount', 0) or 0) }}</strong></td>
-                                    </tr>
+                                    </tbody>
                                 </table>
                             </div>
                         </div>
@@ -139,62 +110,15 @@
                                         <th>Description</th>
                                     </tr>
                                 </thead>
-                                <tbody>
-                                    {% for check in report.checks %}
+                                <tbody id="checks-tbody">
                                     <tr>
-                                        <td>
-                                            {% if check.success %}
-                                            <span class="badge bg-success">Pass</span>
-                                            {% elif check.severity == 'CRITICAL' %}
-                                            <span class="badge bg-danger">Critical</span>
-                                            {% elif check.severity == 'HIGH' %}
-                                            <span class="badge bg-warning text-dark">High</span>
-                                            {% elif check.severity == 'MEDIUM' %}
-                                            <span class="badge bg-info">Medium</span>
-                                            {% elif check.severity == 'LOW' %}
-                                            <span class="badge bg-secondary">Low</span>
-                                            {% else %}
-                                            <span class="badge bg-secondary">{{ check.severity }}</span>
-                                            {% endif %}
-                                        </td>
-                                        <td><code>{{ check.checkID }}</code></td>
-                                        <td>{{ check.title or '-' }}</td>
-                                        <td>
-                                            {% if check.severity == 'CRITICAL' %}
-                                            <span class="badge bg-danger">{{ check.severity }}</span>
-                                            {% elif check.severity == 'HIGH' %}
-                                            <span class="badge bg-warning text-dark">{{ check.severity }}</span>
-                                            {% elif check.severity == 'MEDIUM' %}
-                                            <span class="badge bg-info">{{ check.severity }}</span>
-                                            {% elif check.severity == 'LOW' %}
-                                            <span class="badge bg-secondary">{{ check.severity }}</span>
-                                            {% else %}
-                                            <span class="badge bg-secondary">{{ check.severity }}</span>
-                                            {% endif %}
-                                        </td>
-                                        <td>{{ check.category or '-' }}</td>
-                                        <td>
-                                            <small>{{ check.description or '-' }}</small>
-                                            {% if check.remediation %}
-                                            <br><br>
-                                            <strong>Remediation:</strong> <small>{{ check.remediation }}</small>
-                                            {% endif %}
-                                            {% if check.messages %}
-                                            <br><br>
-                                            <strong>Messages:</strong>
-                                            <ul class="mb-0">
-                                                {% for msg in check.messages %}
-                                                <li><small>{{ msg }}</small></li>
-                                                {% endfor %}
-                                            </ul>
-                                            {% endif %}
+                                        <td colspan="6" class="text-center">
+                                            <div class="spinner-border spinner-border-sm text-primary" role="status">
+                                                <span class="visually-hidden">Loading...</span>
+                                            </div>
+                                            <span class="ms-2">Loading checks...</span>
                                         </td>
                                     </tr>
-                                    {% else %}
-                                    <tr>
-                                        <td class="text-center text-muted" colspan="6">No checks found</td>
-                                    </tr>
-                                    {% endfor %}
                                 </tbody>
                             </table>
                         </div>
@@ -206,7 +130,6 @@
             <div class="tab-pane fade" id="nav-events" role="tabpanel" aria-labelledby="nav-events-tab">
                 <div class="card shadow mb-4 mt-3">
                     <div class="card-body">
-                        {% if events %}
                         <div class="table-responsive">
                             <table class="table table-bordered table-hover" width="100%" cellspacing="0">
                                 <thead>
@@ -218,28 +141,18 @@
                                         <th>Last Seen</th>
                                     </tr>
                                 </thead>
-                                <tbody>
-                                    {% for event in events %}
+                                <tbody id="events-tbody">
                                     <tr>
-                                        <td>
-                                            {% if event.type == 'Warning' %}
-                                            <span class="badge bg-warning text-dark">{{ event.type }}</span>
-                                            {% else %}
-                                            <span class="badge bg-info">{{ event.type }}</span>
-                                            {% endif %}
+                                        <td colspan="5" class="text-center">
+                                            <div class="spinner-border spinner-border-sm text-primary" role="status">
+                                                <span class="visually-hidden">Loading...</span>
+                                            </div>
+                                            <span class="ms-2">Loading events...</span>
                                         </td>
-                                        <td><code>{{ event.reason }}</code></td>
-                                        <td>{{ event.message }}</td>
-                                        <td>{{ event.count }}</td>
-                                        <td>{{ event.last_timestamp or event.first_timestamp or '-' }}</td>
                                     </tr>
-                                    {% endfor %}
                                 </tbody>
                             </table>
                         </div>
-                        {% else %}
-                        <p class="text-muted">No events found</p>
-                        {% endif %}
                     </div>
                 </div>
             </div>
@@ -251,7 +164,7 @@
                         <h6 class="m-0 font-weight-bold text-primary">Resource YAML</h6>
                     </div>
                     <div class="card-body">
-                        <pre><code class="language-yaml">{% autoescape false %}{{ report.raw | tojson(indent=2) | replace("<", "&lt;") | replace(">", "&gt;") }}{% endautoescape %}</code></pre>
+                        <pre><code class="language-yaml" id="yaml-content">Loading YAML...</code></pre>
                     </div>
                 </div>
             </div>
@@ -267,11 +180,294 @@
 
 {% block add_tail_js %}
 <script>
-$(document).ready(function() {
+(function() {
+    'use strict';
+    
+    const escapeHtml = (text) => {
+        if (text === null || text === undefined) return '';
+        const map = {
+            '&': '&amp;',
+            '<': '&lt;',
+            '>': '&gt;',
+            '"': '&quot;',
+            "'": '&#039;'
+        };
+        return String(text).replace(/[&<>"']/g, m => map[m]);
+    };
+    
+    const namespace = '{{ namespace }}';
+    const name = '{{ name }}';
+    
+    function updateBreadcrumb(report) {
+        const breadcrumb = document.getElementById('breadcrumb-namespace-name');
+        if (breadcrumb && report) {
+            breadcrumb.textContent = `${escapeHtml(report.namespace)}/${escapeHtml(report.name)}`;
+        }
+    }
+    
+    function updateTitle(report) {
+        const title = document.getElementById('report-title');
+        if (title && report) {
+            title.textContent = `Config Audit Report: ${escapeHtml(report.name)}`;
+        }
+    }
+    
+    function updateBadges(report) {
+        const badgesDiv = document.getElementById('report-badges');
+        if (!badgesDiv || !report || !report.summary) return;
+        
+        const summary = report.summary;
+        let badgesHtml = '';
+        
+        if (summary.criticalCount > 0) {
+            badgesHtml += `<span class="badge bg-danger me-2">Critical: ${summary.criticalCount}</span>`;
+        }
+        if (summary.highCount > 0) {
+            badgesHtml += `<span class="badge bg-warning text-dark me-2">High: ${summary.highCount}</span>`;
+        }
+        if (summary.mediumCount > 0) {
+            badgesHtml += `<span class="badge bg-info me-2">Medium: ${summary.mediumCount}</span>`;
+        }
+        if (summary.lowCount > 0) {
+            badgesHtml += `<span class="badge bg-secondary me-2">Low: ${summary.lowCount}</span>`;
+        }
+        
+        badgesDiv.innerHTML = badgesHtml || '<span class="badge bg-success">No issues</span>';
+    }
+    
+    function populateMetadata(report) {
+        const tbody = document.querySelector('#metadata-table tbody');
+        if (!tbody || !report) return;
+        
+        tbody.innerHTML = `
+            <tr><th style="width: 30%;">Name</th><td>${escapeHtml(report.name)}</td></tr>
+            <tr><th>Namespace</th><td>${escapeHtml(report.namespace)}</td></tr>
+            <tr><th>Resource</th><td>${escapeHtml(report.resource_kind)}/${escapeHtml(report.resource_name)}</td></tr>
+            <tr><th>Age</th><td>${escapeHtml(report.age)}</td></tr>
+            <tr><th>Created</th><td>${escapeHtml(report.creation_timestamp || '-')}</td></tr>
+        `;
+    }
+    
+    function populateSummary(report) {
+        const tbody = document.querySelector('#summary-table tbody');
+        if (!tbody || !report || !report.summary) return;
+        
+        const summary = report.summary;
+        const critical = summary.criticalCount || 0;
+        const high = summary.highCount || 0;
+        const medium = summary.mediumCount || 0;
+        const low = summary.lowCount || 0;
+        const total = critical + high + medium + low;
+        
+        tbody.innerHTML = `
+            <tr><th style="width: 50%;">Critical</th><td><span class="badge bg-danger">${critical}</span></td></tr>
+            <tr><th>High</th><td><span class="badge bg-warning text-dark">${high}</span></td></tr>
+            <tr><th>Medium</th><td><span class="badge bg-info">${medium}</span></td></tr>
+            <tr><th>Low</th><td><span class="badge bg-secondary">${low}</span></td></tr>
+            <tr><th>Total</th><td><strong>${total}</strong></td></tr>
+        `;
+    }
+    
+    function populateChecks(report) {
+        const tbody = document.getElementById('checks-tbody');
+        if (!tbody || !report || !report.checks) return;
+        
+        const checks = report.checks;
+        const countSpan = document.getElementById('checks-count');
+        if (countSpan) {
+            countSpan.textContent = checks.length;
+        }
+        
+        if (checks.length === 0) {
+            tbody.innerHTML = '<tr><td class="text-center text-muted" colspan="6">No checks found</td></tr>';
+            return;
+        }
+        
+        const rows = checks.map(check => {
+            const success = check.success || false;
+            const severity = (check.severity || '').toUpperCase();
+            
+            let statusBadge = '';
+            if (success) {
+                statusBadge = '<span class="badge bg-success">Pass</span>';
+            } else if (severity === 'CRITICAL') {
+                statusBadge = '<span class="badge bg-danger">Critical</span>';
+            } else if (severity === 'HIGH') {
+                statusBadge = '<span class="badge bg-warning text-dark">High</span>';
+            } else if (severity === 'MEDIUM') {
+                statusBadge = '<span class="badge bg-info">Medium</span>';
+            } else if (severity === 'LOW') {
+                statusBadge = '<span class="badge bg-secondary">Low</span>';
+            } else {
+                statusBadge = `<span class="badge bg-secondary">${escapeHtml(severity)}</span>`;
+            }
+            
+            let severityBadge = '';
+            if (severity === 'CRITICAL') {
+                severityBadge = '<span class="badge bg-danger">CRITICAL</span>';
+            } else if (severity === 'HIGH') {
+                severityBadge = '<span class="badge bg-warning text-dark">HIGH</span>';
+            } else if (severity === 'MEDIUM') {
+                severityBadge = '<span class="badge bg-info">MEDIUM</span>';
+            } else if (severity === 'LOW') {
+                severityBadge = '<span class="badge bg-secondary">LOW</span>';
+            } else {
+                severityBadge = `<span class="badge bg-secondary">${escapeHtml(severity || '-')}</span>`;
+            }
+            
+            let descriptionHtml = escapeHtml(check.description || '-');
+            if (check.remediation) {
+                descriptionHtml += `<br><br><strong>Remediation:</strong> <small>${escapeHtml(check.remediation)}</small>`;
+            }
+            if (check.messages && Array.isArray(check.messages) && check.messages.length > 0) {
+                descriptionHtml += '<br><br><strong>Messages:</strong><ul class="mb-0">';
+                check.messages.forEach(msg => {
+                    descriptionHtml += `<li><small>${escapeHtml(msg)}</small></li>`;
+                });
+                descriptionHtml += '</ul>';
+            }
+            
+            return `
+                <tr>
+                    <td>${statusBadge}</td>
+                    <td><code>${escapeHtml(check.checkID || '-')}</code></td>
+                    <td>${escapeHtml(check.title || '-')}</td>
+                    <td>${severityBadge}</td>
+                    <td>${escapeHtml(check.category || '-')}</td>
+                    <td><small>${descriptionHtml}</small></td>
+                </tr>
+            `;
+        }).join('');
+        
+        tbody.innerHTML = rows;
+        
+        setTimeout(() => {
+            if ($.fn.DataTable && !$.fn.DataTable.isDataTable('#checksTable')) {
     $('#checksTable').DataTable({
-        "order": [[0, "asc"]], // Sort by status
+                    "order": [[0, "asc"]],
         "pageLength": 25
     });
-});
+            }
+        }, 50);
+    }
+    
+    function populateEvents(events) {
+        const tbody = document.getElementById('events-tbody');
+        if (!tbody) return;
+        
+        const countSpan = document.getElementById('events-count');
+        if (countSpan) {
+            countSpan.textContent = events ? events.length : 0;
+        }
+        
+        if (!events || events.length === 0) {
+            tbody.innerHTML = '<tr><td class="text-center text-muted" colspan="5">No events found</td></tr>';
+            return;
+        }
+        
+        const rows = events.map(event => {
+            const typeBadge = event.type === 'Warning' 
+                ? '<span class="badge bg-warning text-dark">Warning</span>'
+                : '<span class="badge bg-info">Normal</span>';
+            
+            return `
+                <tr>
+                    <td>${typeBadge}</td>
+                    <td><code>${escapeHtml(event.reason || '-')}</code></td>
+                    <td>${escapeHtml(event.message || '-')}</td>
+                    <td>${event.count || 1}</td>
+                    <td>${escapeHtml(event.last_timestamp || event.first_timestamp || '-')}</td>
+                </tr>
+            `;
+        }).join('');
+        
+        tbody.innerHTML = rows;
+    }
+    
+    function populateYAML(report) {
+        const yamlContent = document.getElementById('yaml-content');
+        if (!yamlContent || !report || !report.raw) return;
+        
+        try {
+            const yamlText = JSON.stringify(report.raw, null, 2);
+            yamlContent.textContent = yamlText;
+            if (typeof hljs !== 'undefined') {
+                hljs.highlightElement(yamlContent);
+            }
+        } catch (e) {
+            yamlContent.textContent = 'Error formatting YAML: ' + e.message;
+        }
+    }
+    
+    async function loadReport() {
+        try {
+            const apiUrl = `/api/v1/plugins/trivy-operator/config-audit-reports/${encodeURIComponent(namespace)}/${encodeURIComponent(name)}`;
+            console.log('Loading config audit report from:', apiUrl);
+            
+            const response = await fetch(apiUrl, {
+                method: 'GET',
+                headers: {
+                    'Accept': 'application/json',
+                },
+                credentials: 'same-origin'
+            });
+            
+            if (!response.ok) {
+                if (response.status === 404) {
+                    throw new Error('Config audit report not found');
+                }
+                const errorText = await response.text();
+                throw new Error(`HTTP error! status: ${response.status} - ${errorText}`);
+            }
+            
+            const data = await response.json();
+            console.log('Config audit report data received:', data);
+            
+            if (data.error) {
+                throw new Error(data.message || 'Failed to load config audit report');
+            }
+            
+            const report = data.data;
+            if (!report) {
+                throw new Error('No report data received');
+            }
+            
+            // Populate all sections
+            updateBreadcrumb(report);
+            updateTitle(report);
+            updateBadges(report);
+            populateMetadata(report);
+            populateSummary(report);
+            populateChecks(report);
+            populateEvents(report.events || []);
+            populateYAML(report);
+            
+        } catch (error) {
+            console.error('Error loading config audit report:', error);
+            const errorMsg = escapeHtml(error.message);
+            
+            const title = document.getElementById('report-title');
+            if (title) {
+                title.textContent = 'Error loading report';
+            }
+            
+            const badges = document.getElementById('report-badges');
+            if (badges) {
+                badges.innerHTML = `<span class="badge bg-danger">Error: ${errorMsg}</span>`;
+            }
+            
+            const metadataTbody = document.querySelector('#metadata-table tbody');
+            if (metadataTbody) {
+                metadataTbody.innerHTML = `<tr><td colspan="2" class="text-center text-danger">Error: ${errorMsg}</td></tr>`;
+            }
+        }
+    }
+    
+    if (document.readyState === 'loading') {
+        document.addEventListener('DOMContentLoaded', loadReport);
+    } else {
+        loadReport();
+    }
+})();
 </script>
 {% endblock %}

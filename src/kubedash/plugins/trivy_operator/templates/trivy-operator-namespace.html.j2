@@ -47,35 +47,42 @@
                 <a class="nav-link {% if active_tab == 'vulnerabilityreports' %}active{% endif %}" 
                    id="nav-vulnerabilityreports-tab" data-bs-toggle="tab" href="#nav-vulnerabilityreports" 
                    role="tab" aria-controls="nav-vulnerabilityreports" aria-selected="{% if active_tab == 'vulnerabilityreports' %}true{% else %}false{% endif %}">
-                    Vulnerability Reports <span class="badge bg-secondary">{{ vulnerability_reports|length }}</span>
+                    Vulnerability Reports <span class="badge bg-secondary" id="vulnerabilityreports-count">-</span>
                 </a>
             </li>
             <li class="nav-item">
                 <a class="nav-link {% if active_tab == 'configauditreports' %}active{% endif %}" 
                    id="nav-configauditreports-tab" data-bs-toggle="tab" href="#nav-configauditreports" 
                    role="tab" aria-controls="nav-configauditreports" aria-selected="{% if active_tab == 'configauditreports' %}true{% else %}false{% endif %}">
-                    Config Audit Reports <span class="badge bg-secondary">{{ configaudit_reports|length }}</span>
+                    Config Audit Reports <span class="badge bg-secondary" id="configauditreports-count">-</span>
                 </a>
             </li>
             <li class="nav-item">
                 <a class="nav-link {% if active_tab == 'exposedsecretreports' %}active{% endif %}" 
                    id="nav-exposedsecretreports-tab" data-bs-toggle="tab" href="#nav-exposedsecretreports" 
                    role="tab" aria-controls="nav-exposedsecretreports" aria-selected="{% if active_tab == 'exposedsecretreports' %}true{% else %}false{% endif %}">
-                    Exposed Secret Reports <span class="badge bg-secondary">{{ exposedsecret_reports|length }}</span>
+                    Exposed Secret Reports <span class="badge bg-secondary" id="exposedsecretreports-count">-</span>
                 </a>
             </li>
             <li class="nav-item">
                 <a class="nav-link {% if active_tab == 'rbacassessmentreports' %}active{% endif %}" 
                    id="nav-rbacassessmentreports-tab" data-bs-toggle="tab" href="#nav-rbacassessmentreports" 
                    role="tab" aria-controls="nav-rbacassessmentreports" aria-selected="{% if active_tab == 'rbacassessmentreports' %}true{% else %}false{% endif %}">
-                    RBAC Assessment Reports <span class="badge bg-secondary">{{ rbacassessment_reports|length }}</span>
+                    RBAC Assessment Reports <span class="badge bg-secondary" id="rbacassessmentreports-count">-</span>
                 </a>
             </li>
             <li class="nav-item">
                 <a class="nav-link {% if active_tab == 'sbomreports' %}active{% endif %}" 
                    id="nav-sbomreports-tab" data-bs-toggle="tab" href="#nav-sbomreports" 
                    role="tab" aria-controls="nav-sbomreports" aria-selected="{% if active_tab == 'sbomreports' %}true{% else %}false{% endif %}">
-                    SBOM Reports <span class="badge bg-secondary">{{ sbom_reports|length }}</span>
+                    SBOM Reports <span class="badge bg-secondary" id="sbomreports-count">-</span>
+                </a>
+            </li>
+            <li class="nav-item">
+                <a class="nav-link {% if active_tab == 'infraassessmentreports' %}active{% endif %}" 
+                   id="nav-infraassessmentreports-tab" data-bs-toggle="tab" href="#nav-infraassessmentreports" 
+                   role="tab" aria-controls="nav-infraassessmentreports" aria-selected="{% if active_tab == 'infraassessmentreports' %}true{% else %}false{% endif %}">
+                    Infra Assessment Reports <span class="badge bg-secondary" id="infraassessmentreports-count">-</span>
                 </a>
             </li>
         </ul>
@@ -102,53 +109,15 @@
                                         <th>Age</th>
                                     </tr>
                                 </thead>
-                                <tbody>
-                                    {% for report in vulnerability_reports %}
+                                <tbody id="vulnerability-tbody">
                                     <tr>
-                                        <td>
-                                            <a href="/plugins/trivy-operator/vulnerability/{{ report.namespace }}/{{ report.name }}">
-                                                {{ report.resource_kind }}/{{ report.resource_name }}
-                                            </a>
-                                            <br>
-                                            <small class="text-muted">{{ report.namespace }}</small>
+                                        <td colspan="8" class="text-center">
+                                            <div class="spinner-border spinner-border-sm text-primary" role="status">
+                                                <span class="visually-hidden">Loading...</span>
+                                            </div>
+                                            <span class="ms-2">Loading vulnerability reports...</span>
                                         </td>
-                                        <td><code>{{ report.container_name }}</code></td>
-                                        <td>
-                                            {% if report.critical > 0 %}
-                                            <span class="badge bg-danger">{{ report.critical }}</span>
-                                            {% else %}
-                                            <span class="badge bg-secondary">0</span>
-                                            {% endif %}
-                                        </td>
-                                        <td>
-                                            {% if report.high > 0 %}
-                                            <span class="badge bg-warning text-dark">{{ report.high }}</span>
-                                            {% else %}
-                                            <span class="badge bg-secondary">0</span>
-                                            {% endif %}
-                                        </td>
-                                        <td>
-                                            {% if report.medium > 0 %}
-                                            <span class="badge bg-info">{{ report.medium }}</span>
-                                            {% else %}
-                                            <span class="badge bg-secondary">0</span>
-                                            {% endif %}
-                                        </td>
-                                        <td>
-                                            {% if report.low > 0 %}
-                                            <span class="badge bg-primary">{{ report.low }}</span>
-                                            {% else %}
-                                            <span class="badge bg-secondary">0</span>
-                                            {% endif %}
-                                        </td>
-                                        <td><strong>{{ report.total }}</strong></td>
-                                        <td>{{ report.age }}</td>
                                     </tr>
-                                    {% else %}
-                                    <tr>
-                                        <td class="text-center text-muted" colspan="8">No Vulnerability Reports found</td>
-                                    </tr>
-                                    {% endfor %}
                                 </tbody>
                             </table>
                         </div>
@@ -174,52 +143,15 @@
                                         <th>Age</th>
                                     </tr>
                                 </thead>
-                                <tbody>
-                                    {% for report in configaudit_reports %}
+                                <tbody id="configaudit-tbody">
                                     <tr>
-                                        <td>
-                                            <a href="/plugins/trivy-operator/configaudit/{{ report.namespace }}/{{ report.name }}">
-                                                {{ report.resource_kind }}/{{ report.resource_name }}
-                                            </a>
-                                            <br>
-                                            <small class="text-muted">{{ report.namespace }}</small>
+                                        <td colspan="7" class="text-center">
+                                            <div class="spinner-border spinner-border-sm text-primary" role="status">
+                                                <span class="visually-hidden">Loading...</span>
+                                            </div>
+                                            <span class="ms-2">Loading config audit reports...</span>
                                         </td>
-                                        <td>
-                                            {% if report.critical > 0 %}
-                                            <span class="badge bg-danger">{{ report.critical }}</span>
-                                            {% else %}
-                                            <span class="badge bg-secondary">0</span>
-                                            {% endif %}
-                                        </td>
-                                        <td>
-                                            {% if report.high > 0 %}
-                                            <span class="badge bg-warning text-dark">{{ report.high }}</span>
-                                            {% else %}
-                                            <span class="badge bg-secondary">0</span>
-                                            {% endif %}
-                                        </td>
-                                        <td>
-                                            {% if report.medium > 0 %}
-                                            <span class="badge bg-info">{{ report.medium }}</span>
-                                            {% else %}
-                                            <span class="badge bg-secondary">0</span>
-                                            {% endif %}
-                                        </td>
-                                        <td>
-                                            {% if report.low > 0 %}
-                                            <span class="badge bg-secondary">{{ report.low }}</span>
-                                            {% else %}
-                                            <span class="badge bg-secondary">0</span>
-                                            {% endif %}
-                                        </td>
-                                        <td><strong>{{ report.total }}</strong></td>
-                                        <td>{{ report.age }}</td>
                                     </tr>
-                                    {% else %}
-                                    <tr>
-                                        <td class="text-center text-muted" colspan="6">No Config Audit Reports found</td>
-                                    </tr>
-                                    {% endfor %}
                                 </tbody>
                             </table>
                         </div>
@@ -245,52 +177,15 @@
                                         <th>Age</th>
                                     </tr>
                                 </thead>
-                                <tbody>
-                                    {% for report in exposedsecret_reports %}
+                                <tbody id="exposedsecret-tbody">
                                     <tr>
-                                        <td>
-                                            <a href="/plugins/trivy-operator/exposedsecret/{{ report.namespace }}/{{ report.name }}">
-                                                {{ report.resource_kind }}/{{ report.resource_name }}
-                                            </a>
-                                            <br>
-                                            <small class="text-muted">{{ report.namespace }}</small>
+                                        <td colspan="7" class="text-center">
+                                            <div class="spinner-border spinner-border-sm text-primary" role="status">
+                                                <span class="visually-hidden">Loading...</span>
+                                            </div>
+                                            <span class="ms-2">Loading exposed secret reports...</span>
                                         </td>
-                                        <td>
-                                            {% if report.critical > 0 %}
-                                            <span class="badge bg-danger">{{ report.critical }}</span>
-                                            {% else %}
-                                            <span class="badge bg-secondary">0</span>
-                                            {% endif %}
-                                        </td>
-                                        <td>
-                                            {% if report.high > 0 %}
-                                            <span class="badge bg-warning text-dark">{{ report.high }}</span>
-                                            {% else %}
-                                            <span class="badge bg-secondary">0</span>
-                                            {% endif %}
-                                        </td>
-                                        <td>
-                                            {% if report.medium > 0 %}
-                                            <span class="badge bg-info">{{ report.medium }}</span>
-                                            {% else %}
-                                            <span class="badge bg-secondary">0</span>
-                                            {% endif %}
-                                        </td>
-                                        <td>
-                                            {% if report.low > 0 %}
-                                            <span class="badge bg-primary">{{ report.low }}</span>
-                                            {% else %}
-                                            <span class="badge bg-secondary">0</span>
-                                            {% endif %}
-                                        </td>
-                                        <td><strong>{{ report.total }}</strong></td>
-                                        <td>{{ report.age }}</td>
                                     </tr>
-                                    {% else %}
-                                    <tr>
-                                        <td class="text-center text-muted" colspan="7">No Exposed Secret Reports found</td>
-                                    </tr>
-                                    {% endfor %}
                                 </tbody>
                             </table>
                         </div>
@@ -315,45 +210,15 @@
                                         <th>Age</th>
                                     </tr>
                                 </thead>
-                                <tbody>
-                                    {% for report in rbacassessment_reports %}
+                                <tbody id="rbacassessment-tbody">
                                     <tr>
-                                        <td>
-                                            <a href="/plugins/trivy-operator/rbacassessment/{{ report.namespace }}/{{ report.name }}">
-                                                {{ report.resource_kind }}/{{ report.resource_name }}
-                                            </a>
-                                            <br>
-                                            <small class="text-muted">{{ report.namespace }}</small>
+                                        <td colspan="6" class="text-center">
+                                            <div class="spinner-border spinner-border-sm text-primary" role="status">
+                                                <span class="visually-hidden">Loading...</span>
+                                            </div>
+                                            <span class="ms-2">Loading RBAC assessment reports...</span>
                                         </td>
-                                        <td>
-                                            {% if report.danger > 0 %}
-                                            <span class="badge bg-danger">{{ report.danger }}</span>
-                                            {% else %}
-                                            <span class="badge bg-secondary">0</span>
-                                            {% endif %}
-                                        </td>
-                                        <td>
-                                            {% if report.warning > 0 %}
-                                            <span class="badge bg-warning text-dark">{{ report.warning }}</span>
-                                            {% else %}
-                                            <span class="badge bg-secondary">0</span>
-                                            {% endif %}
-                                        </td>
-                                        <td>
-                                            {% if report.pass > 0 %}
-                                            <span class="badge bg-success">{{ report.pass }}</span>
-                                            {% else %}
-                                            <span class="badge bg-secondary">0</span>
-                                            {% endif %}
-                                        </td>
-                                        <td><strong>{{ report.total }}</strong></td>
-                                        <td>{{ report.age }}</td>
                                     </tr>
-                                    {% else %}
-                                    <tr>
-                                        <td class="text-center text-muted" colspan="6">No RBAC Assessment Reports found</td>
-                                    </tr>
-                                    {% endfor %}
                                 </tbody>
                             </table>
                         </div>
@@ -378,33 +243,15 @@
                                         <th>Age</th>
                                     </tr>
                                 </thead>
-                                <tbody>
-                                    {% for report in sbom_reports %}
+                                <tbody id="sbom-tbody">
                                     <tr>
-                                        <td>
-                                            <a href="/plugins/trivy-operator/sbom/{{ report.namespace }}/{{ report.name }}">
-                                                {{ report.resource_kind }}/{{ report.resource_name }}
-                                            </a>
-                                            <br>
-                                            <small class="text-muted">{{ report.namespace }}</small>
+                                        <td colspan="6" class="text-center">
+                                            <div class="spinner-border spinner-border-sm text-primary" role="status">
+                                                <span class="visually-hidden">Loading...</span>
+                                            </div>
+                                            <span class="ms-2">Loading SBOM reports...</span>
                                         </td>
-                                        <td><code>{{ report.container_name }}</code></td>
-                                        <td>
-                                            {% if report.image_ref %}
-                                            <code>{{ report.image_ref }}</code>
-                                            {% else %}
-                                            <span class="text-muted">-</span>
-                                            {% endif %}
-                                        </td>
-                                        <td><span class="badge bg-info">{{ report.components_count }}</span></td>
-                                        <td><span class="badge bg-secondary">{{ report.dependencies_count }}</span></td>
-                                        <td>{{ report.age }}</td>
                                     </tr>
-                                    {% else %}
-                                    <tr>
-                                        <td class="text-center text-muted" colspan="6">No SBOM Reports found</td>
-                                    </tr>
-                                    {% endfor %}
                                 </tbody>
                             </table>
                         </div>
@@ -430,52 +277,15 @@
                                         <th>Age</th>
                                     </tr>
                                 </thead>
-                                <tbody>
-                                    {% for report in infraassessment_reports %}
+                                <tbody id="infraassessment-tbody">
                                     <tr>
-                                        <td>
-                                            <a href="/plugins/trivy-operator/infraassessment/{{ report.namespace }}/{{ report.name }}">
-                                                {{ report.resource_kind }}/{{ report.resource_name }}
-                                            </a>
-                                            <br>
-                                            <small class="text-muted">{{ report.namespace }}</small>
+                                        <td colspan="7" class="text-center">
+                                            <div class="spinner-border spinner-border-sm text-primary" role="status">
+                                                <span class="visually-hidden">Loading...</span>
+                                            </div>
+                                            <span class="ms-2">Loading infra assessment reports...</span>
                                         </td>
-                                        <td>
-                                            {% if report.critical > 0 %}
-                                            <span class="badge bg-danger">{{ report.critical }}</span>
-                                            {% else %}
-                                            <span class="badge bg-secondary">0</span>
-                                            {% endif %}
-                                        </td>
-                                        <td>
-                                            {% if report.high > 0 %}
-                                            <span class="badge bg-warning text-dark">{{ report.high }}</span>
-                                            {% else %}
-                                            <span class="badge bg-secondary">0</span>
-                                            {% endif %}
-                                        </td>
-                                        <td>
-                                            {% if report.medium > 0 %}
-                                            <span class="badge bg-info">{{ report.medium }}</span>
-                                            {% else %}
-                                            <span class="badge bg-secondary">0</span>
-                                            {% endif %}
-                                        </td>
-                                        <td>
-                                            {% if report.low > 0 %}
-                                            <span class="badge bg-secondary">{{ report.low }}</span>
-                                            {% else %}
-                                            <span class="badge bg-secondary">0</span>
-                                            {% endif %}
-                                        </td>
-                                        <td><strong>{{ report.total }}</strong></td>
-                                        <td>{{ report.age }}</td>
                                     </tr>
-                                    {% else %}
-                                    <tr>
-                                        <td class="text-center text-muted" colspan="7">No Infra Assessment Reports found</td>
-                                    </tr>
-                                    {% endfor %}
                                 </tbody>
                             </table>
                         </div>
@@ -487,32 +297,369 @@
 </div>
 
 <script>
-// Initialize DataTables for all tables
-$(document).ready(function() {
-    $('#vulnerabilityTable').DataTable({
-        "order": [[6, "desc"]], // Sort by total descending
-        "pageLength": 25
-    });
-    $('#configauditTable').DataTable({
-        "order": [[4, "desc"]], // Sort by total descending
-        "pageLength": 25
-    });
-    $('#exposedsecretTable').DataTable({
-        "order": [[5, "desc"]], // Sort by total descending
-        "pageLength": 25
-    });
-    $('#rbacassessmentTable').DataTable({
-        "order": [[4, "desc"]], // Sort by total descending
-        "pageLength": 25
-    });
-    $('#sbomTable').DataTable({
-        "order": [[3, "desc"]], // Sort by components count descending
-        "pageLength": 25
-    });
-    $('#infraassessmentTable').DataTable({
-        "order": [[5, "desc"]], // Sort by total descending
-        "pageLength": 25
-    });
-});
+(function() {
+    'use strict';
+    
+    const escapeHtml = (text) => {
+        if (text === null || text === undefined) return '';
+        const map = {
+            '&': '&amp;',
+            '<': '&lt;',
+            '>': '&gt;',
+            '"': '&quot;',
+            "'": '&#039;'
+        };
+        return String(text).replace(/[&<>"']/g, m => map[m]);
+    };
+    
+    function getSelectedNamespace() {
+        const topbarSelect = document.getElementById('inputGroupSelect04');
+        if (topbarSelect) {
+            return topbarSelect.value || 'default';
+        }
+        return 'default';
+    }
+    
+    function updateBadgeCount(reportType, count) {
+        const badge = document.getElementById(reportType + '-count');
+        if (badge) {
+            badge.textContent = count;
+        }
+    }
+    
+    function populateVulnerabilityTable(reports) {
+        const tbody = document.getElementById('vulnerability-tbody');
+        if (!reports || reports.length === 0) {
+            tbody.innerHTML = '<tr><td class="text-center text-muted" colspan="8">No Vulnerability Reports found</td></tr>';
+            updateBadgeCount('vulnerabilityreports', 0);
+            return;
+        }
+        
+        updateBadgeCount('vulnerabilityreports', reports.length);
+        
+        const rows = reports.map(report => {
+            const resourceLink = `/plugins/trivy-operator/vulnerability/${escapeHtml(report.namespace)}/${escapeHtml(report.name)}`;
+            return `
+                <tr>
+                    <td>
+                        <a href="${resourceLink}">${escapeHtml(report.resource_kind)}/${escapeHtml(report.resource_name)}</a>
+                        <br>
+                        <small class="text-muted">${escapeHtml(report.namespace)}</small>
+                    </td>
+                    <td><code>${escapeHtml(report.container_name)}</code></td>
+                    <td>${report.critical > 0 ? `<span class="badge bg-danger">${report.critical}</span>` : '<span class="badge bg-secondary">0</span>'}</td>
+                    <td>${report.high > 0 ? `<span class="badge bg-warning text-dark">${report.high}</span>` : '<span class="badge bg-secondary">0</span>'}</td>
+                    <td>${report.medium > 0 ? `<span class="badge bg-info">${report.medium}</span>` : '<span class="badge bg-secondary">0</span>'}</td>
+                    <td>${report.low > 0 ? `<span class="badge bg-primary">${report.low}</span>` : '<span class="badge bg-secondary">0</span>'}</td>
+                    <td><strong>${report.total}</strong></td>
+                    <td>${escapeHtml(report.age)}</td>
+                </tr>
+            `;
+        }).join('');
+        
+        tbody.innerHTML = rows;
+        
+        setTimeout(() => {
+            if ($.fn.DataTable && !$.fn.DataTable.isDataTable('#vulnerabilityTable')) {
+                $('#vulnerabilityTable').DataTable({
+                    "order": [[6, "desc"]],
+                    "pageLength": 25
+                });
+            }
+        }, 50);
+    }
+    
+    function populateConfigAuditTable(reports) {
+        const tbody = document.getElementById('configaudit-tbody');
+        if (!reports || reports.length === 0) {
+            tbody.innerHTML = '<tr><td class="text-center text-muted" colspan="7">No Config Audit Reports found</td></tr>';
+            updateBadgeCount('configauditreports', 0);
+            return;
+        }
+        
+        updateBadgeCount('configauditreports', reports.length);
+        
+        const rows = reports.map(report => {
+            const resourceLink = `/plugins/trivy-operator/configaudit/${escapeHtml(report.namespace)}/${escapeHtml(report.name)}`;
+            return `
+                <tr>
+                    <td>
+                        <a href="${resourceLink}">${escapeHtml(report.resource_kind)}/${escapeHtml(report.resource_name)}</a>
+                        <br>
+                        <small class="text-muted">${escapeHtml(report.namespace)}</small>
+                    </td>
+                    <td>${report.critical > 0 ? `<span class="badge bg-danger">${report.critical}</span>` : '<span class="badge bg-secondary">0</span>'}</td>
+                    <td>${report.high > 0 ? `<span class="badge bg-warning text-dark">${report.high}</span>` : '<span class="badge bg-secondary">0</span>'}</td>
+                    <td>${report.medium > 0 ? `<span class="badge bg-info">${report.medium}</span>` : '<span class="badge bg-secondary">0</span>'}</td>
+                    <td>${report.low > 0 ? `<span class="badge bg-secondary">${report.low}</span>` : '<span class="badge bg-secondary">0</span>'}</td>
+                    <td><strong>${report.total}</strong></td>
+                    <td>${escapeHtml(report.age)}</td>
+                </tr>
+            `;
+        }).join('');
+        
+        tbody.innerHTML = rows;
+        
+        setTimeout(() => {
+            if ($.fn.DataTable && !$.fn.DataTable.isDataTable('#configauditTable')) {
+                $('#configauditTable').DataTable({
+                    "order": [[5, "desc"]],
+                    "pageLength": 25
+                });
+            }
+        }, 50);
+    }
+    
+    function populateExposedSecretTable(reports) {
+        const tbody = document.getElementById('exposedsecret-tbody');
+        if (!reports || reports.length === 0) {
+            tbody.innerHTML = '<tr><td class="text-center text-muted" colspan="7">No Exposed Secret Reports found</td></tr>';
+            updateBadgeCount('exposedsecretreports', 0);
+            return;
+        }
+        
+        updateBadgeCount('exposedsecretreports', reports.length);
+        
+        const rows = reports.map(report => {
+            const resourceLink = `/plugins/trivy-operator/exposedsecret/${escapeHtml(report.namespace)}/${escapeHtml(report.name)}`;
+            return `
+                <tr>
+                    <td>
+                        <a href="${resourceLink}">${escapeHtml(report.resource_kind)}/${escapeHtml(report.resource_name)}</a>
+                        <br>
+                        <small class="text-muted">${escapeHtml(report.namespace)}</small>
+                    </td>
+                    <td>${report.critical > 0 ? `<span class="badge bg-danger">${report.critical}</span>` : '<span class="badge bg-secondary">0</span>'}</td>
+                    <td>${report.high > 0 ? `<span class="badge bg-warning text-dark">${report.high}</span>` : '<span class="badge bg-secondary">0</span>'}</td>
+                    <td>${report.medium > 0 ? `<span class="badge bg-info">${report.medium}</span>` : '<span class="badge bg-secondary">0</span>'}</td>
+                    <td>${report.low > 0 ? `<span class="badge bg-primary">${report.low}</span>` : '<span class="badge bg-secondary">0</span>'}</td>
+                    <td><strong>${report.total}</strong></td>
+                    <td>${escapeHtml(report.age)}</td>
+                </tr>
+            `;
+        }).join('');
+        
+        tbody.innerHTML = rows;
+        
+        setTimeout(() => {
+            if ($.fn.DataTable && !$.fn.DataTable.isDataTable('#exposedsecretTable')) {
+                $('#exposedsecretTable').DataTable({
+                    "order": [[5, "desc"]],
+                    "pageLength": 25
+                });
+            }
+        }, 50);
+    }
+    
+    function populateRbacAssessmentTable(reports) {
+        const tbody = document.getElementById('rbacassessment-tbody');
+        if (!reports || reports.length === 0) {
+            tbody.innerHTML = '<tr><td class="text-center text-muted" colspan="6">No RBAC Assessment Reports found</td></tr>';
+            updateBadgeCount('rbacassessmentreports', 0);
+            return;
+        }
+        
+        updateBadgeCount('rbacassessmentreports', reports.length);
+        
+        const rows = reports.map(report => {
+            const resourceLink = `/plugins/trivy-operator/rbacassessment/${escapeHtml(report.namespace)}/${escapeHtml(report.name)}`;
+            return `
+                <tr>
+                    <td>
+                        <a href="${resourceLink}">${escapeHtml(report.resource_kind)}/${escapeHtml(report.resource_name)}</a>
+                        <br>
+                        <small class="text-muted">${escapeHtml(report.namespace)}</small>
+                    </td>
+                    <td>${report.danger > 0 ? `<span class="badge bg-danger">${report.danger}</span>` : '<span class="badge bg-secondary">0</span>'}</td>
+                    <td>${report.warning > 0 ? `<span class="badge bg-warning text-dark">${report.warning}</span>` : '<span class="badge bg-secondary">0</span>'}</td>
+                    <td>${report.pass > 0 ? `<span class="badge bg-success">${report.pass}</span>` : '<span class="badge bg-secondary">0</span>'}</td>
+                    <td><strong>${report.total}</strong></td>
+                    <td>${escapeHtml(report.age)}</td>
+                </tr>
+            `;
+        }).join('');
+        
+        tbody.innerHTML = rows;
+        
+        setTimeout(() => {
+            if ($.fn.DataTable && !$.fn.DataTable.isDataTable('#rbacassessmentTable')) {
+                $('#rbacassessmentTable').DataTable({
+                    "order": [[4, "desc"]],
+                    "pageLength": 25
+                });
+            }
+        }, 50);
+    }
+    
+    function populateSbomTable(reports) {
+        const tbody = document.getElementById('sbom-tbody');
+        if (!reports || reports.length === 0) {
+            tbody.innerHTML = '<tr><td class="text-center text-muted" colspan="6">No SBOM Reports found</td></tr>';
+            updateBadgeCount('sbomreports', 0);
+            return;
+        }
+        
+        updateBadgeCount('sbomreports', reports.length);
+        
+        const rows = reports.map(report => {
+            const resourceLink = `/plugins/trivy-operator/sbom/${escapeHtml(report.namespace)}/${escapeHtml(report.name)}`;
+            return `
+                <tr>
+                    <td>
+                        <a href="${resourceLink}">${escapeHtml(report.resource_kind)}/${escapeHtml(report.resource_name)}</a>
+                        <br>
+                        <small class="text-muted">${escapeHtml(report.namespace)}</small>
+                    </td>
+                    <td><code>${escapeHtml(report.container_name)}</code></td>
+                    <td>${report.image_ref ? `<code>${escapeHtml(report.image_ref)}</code>` : '<span class="text-muted">-</span>'}</td>
+                    <td><span class="badge bg-info">${report.components_count}</span></td>
+                    <td><span class="badge bg-secondary">${report.dependencies_count}</span></td>
+                    <td>${escapeHtml(report.age)}</td>
+                </tr>
+            `;
+        }).join('');
+        
+        tbody.innerHTML = rows;
+        
+        setTimeout(() => {
+            if ($.fn.DataTable && !$.fn.DataTable.isDataTable('#sbomTable')) {
+                $('#sbomTable').DataTable({
+                    "order": [[3, "desc"]],
+                    "pageLength": 25
+                });
+            }
+        }, 50);
+    }
+    
+    function populateInfraAssessmentTable(reports) {
+        const tbody = document.getElementById('infraassessment-tbody');
+        if (!reports || reports.length === 0) {
+            tbody.innerHTML = '<tr><td class="text-center text-muted" colspan="7">No Infra Assessment Reports found</td></tr>';
+            updateBadgeCount('infraassessmentreports', 0);
+            return;
+        }
+        
+        updateBadgeCount('infraassessmentreports', reports.length);
+        
+        const rows = reports.map(report => {
+            const resourceLink = `/plugins/trivy-operator/infraassessment/${escapeHtml(report.namespace)}/${escapeHtml(report.name)}`;
+            return `
+                <tr>
+                    <td>
+                        <a href="${resourceLink}">${escapeHtml(report.resource_kind)}/${escapeHtml(report.resource_name)}</a>
+                        <br>
+                        <small class="text-muted">${escapeHtml(report.namespace)}</small>
+                    </td>
+                    <td>${report.critical > 0 ? `<span class="badge bg-danger">${report.critical}</span>` : '<span class="badge bg-secondary">0</span>'}</td>
+                    <td>${report.high > 0 ? `<span class="badge bg-warning text-dark">${report.high}</span>` : '<span class="badge bg-secondary">0</span>'}</td>
+                    <td>${report.medium > 0 ? `<span class="badge bg-info">${report.medium}</span>` : '<span class="badge bg-secondary">0</span>'}</td>
+                    <td>${report.low > 0 ? `<span class="badge bg-secondary">${report.low}</span>` : '<span class="badge bg-secondary">0</span>'}</td>
+                    <td><strong>${report.total}</strong></td>
+                    <td>${escapeHtml(report.age)}</td>
+                </tr>
+            `;
+        }).join('');
+        
+        tbody.innerHTML = rows;
+        
+        setTimeout(() => {
+            if ($.fn.DataTable && !$.fn.DataTable.isDataTable('#infraassessmentTable')) {
+                $('#infraassessmentTable').DataTable({
+                    "order": [[5, "desc"]],
+                    "pageLength": 25
+                });
+            }
+        }, 50);
+    }
+    
+    async function loadReports(reportType, namespace) {
+        try {
+            const apiUrl = `/api/v1/plugins/trivy-operator/${reportType}?namespace=${encodeURIComponent(namespace)}`;
+            console.log(`Loading ${reportType} from:`, apiUrl);
+            
+            const response = await fetch(apiUrl, {
+                method: 'GET',
+                headers: {
+                    'Accept': 'application/json',
+                },
+                credentials: 'same-origin'
+            });
+            
+            if (!response.ok) {
+                const errorText = await response.text();
+                console.error(`HTTP error for ${reportType}:`, response.status, errorText);
+                throw new Error(`HTTP error! status: ${response.status}`);
+            }
+            
+            const data = await response.json();
+            console.log(`${reportType} data received:`, data);
+            
+            if (data.error) {
+                throw new Error(data.message || `Failed to load ${reportType}`);
+            }
+            
+            const reports = data.data || [];
+            
+            switch(reportType) {
+                case 'vulnerability-reports':
+                    populateVulnerabilityTable(reports);
+                    break;
+                case 'config-audit-reports':
+                    populateConfigAuditTable(reports);
+                    break;
+                case 'exposed-secret-reports':
+                    populateExposedSecretTable(reports);
+                    break;
+                case 'rbac-assessment-reports':
+                    populateRbacAssessmentTable(reports);
+                    break;
+                case 'sbom-reports':
+                    populateSbomTable(reports);
+                    break;
+                case 'infra-assessment-reports':
+                    populateInfraAssessmentTable(reports);
+                    break;
+            }
+        } catch (error) {
+            console.error(`Error loading ${reportType}:`, error);
+            const tbodyId = reportType.replace(/-reports$/, '').replace(/-/g, '') + '-tbody';
+            const tbody = document.getElementById(tbodyId);
+            if (tbody) {
+                tbody.innerHTML = `<tr><td class="text-center text-danger" colspan="10">Error loading ${reportType}: ${escapeHtml(error.message)}</td></tr>`;
+            }
+        }
+    }
+    
+    function initializePage() {
+        console.log('Trivy Operator namespace page initializing...');
+        const namespace = getSelectedNamespace();
+        console.log('Selected namespace:', namespace);
+        
+        // Load all reports in parallel
+        loadReports('vulnerability-reports', namespace);
+        loadReports('config-audit-reports', namespace);
+        loadReports('exposed-secret-reports', namespace);
+        loadReports('rbac-assessment-reports', namespace);
+        loadReports('sbom-reports', namespace);
+        loadReports('infra-assessment-reports', namespace);
+        
+        // Listen for namespace changes
+        const topbarSelect = document.getElementById('inputGroupSelect04');
+        if (topbarSelect) {
+            topbarSelect.addEventListener('change', function() {
+                const newNamespace = this.value || 'default';
+                console.log('Namespace changed to:', newNamespace);
+                initializePage();
+            });
+        }
+    }
+    
+    // Initialize when DOM is ready
+    if (document.readyState === 'loading') {
+        document.addEventListener('DOMContentLoaded', initializePage);
+    } else {
+        setTimeout(initializePage, 100);
+    }
+})();
 </script>
 {% endblock %}

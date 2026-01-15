@@ -171,6 +171,7 @@ class NetworkPoliciesListResource(MethodView):
 class NetworkPolicyResource(MethodView):
     """
     Individual network policy endpoint.
+    Supports NetworkPolicy, CiliumNetworkPolicy, and CiliumClusterwideNetworkPolicy.
     """
     
     @security_api_bp.response(200, description="Successfully retrieved network policy details")
@@ -186,12 +187,14 @@ class NetworkPolicyResource(MethodView):
         
         Query Parameters:
             namespace (str): Kubernetes namespace (default: from session)
+            kind (str): Optional policy kind (NetworkPolicy, CiliumNetworkPolicy, CiliumClusterwideNetworkPolicy)
         
         Returns:
             dict: Network policy details
         """
         user_token = get_user_token(session)
         namespace = request.args.get('namespace', session.get('ns_select', 'default'))
+        kind = request.args.get('kind', None)
         
         with tracer.start_as_current_span(
             "network-policy-get",
@@ -204,10 +207,14 @@ class NetworkPolicyResource(MethodView):
         ) if tracer else nullcontext():
             policies = k8sPolicyListGet(session['user_role'], user_token, namespace)
             policy_data = None
+            
+            # Find policy by name and optionally by kind
             for policy in policies:
                 if policy["name"] == name:
-                    policy_data = policy
-                    break
+                    # If kind is specified, match it; otherwise take first match
+                    if not kind or policy.get("kind") == kind:
+                        policy_data = policy
+                        break
             
             if not policy_data:
                 return jsonify({
@@ -219,7 +226,8 @@ class NetworkPolicyResource(MethodView):
                 "data": policy_data,
                 "metadata": {
                     "name": name,
-                    "namespace": namespace
+                    "namespace": policy_data.get("namespace") or namespace,
+                    "kind": policy_data.get("kind", "NetworkPolicy")
                 }
             })
 

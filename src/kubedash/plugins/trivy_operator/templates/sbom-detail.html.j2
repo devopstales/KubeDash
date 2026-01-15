@@ -6,9 +6,9 @@
         <nav aria-label="breadcrumb">
             <ol class="breadcrumb my-0">
                 <li class="breadcrumb-item"><span>Plugins</span></li>
-                <li class="breadcrumb-item"><a href="/plugins/trivy-operator">Trivy Operator</a></li>
+                <li class="breadcrumb-item"><a href="/plugins/trivy-operator/namespace">Trivy Operator</a></li>
                 <li class="breadcrumb-item"><span>SBOM Report</span></li>
-                <li class="breadcrumb-item active"><span>{{ report.namespace }}/{{ report.name }}</span></li>
+                <li class="breadcrumb-item active"><span id="breadcrumb-namespace-name">Loading...</span></li>
             </ol>
         </nav>
     </div>
@@ -21,14 +21,11 @@
 {% block content %}
 <div class="card shadow mb-4">
     <div class="card-header py-3 d-flex justify-content-between align-items-center">
-        <h6 class="m-0 font-weight-bold text-primary">SBOM Report: {{ report.name }}</h6>
-        <div>
-            {% if report.summary.componentsCount > 0 %}
-            <span class="badge bg-info">Components: {{ report.summary.componentsCount }}</span>
-            {% endif %}
-            {% if report.summary.dependenciesCount > 0 %}
-            <span class="badge bg-secondary">Dependencies: {{ report.summary.dependenciesCount }}</span>
-            {% endif %}
+        <h6 class="m-0 font-weight-bold text-primary" id="report-title">SBOM Report: Loading...</h6>
+        <div id="report-badges">
+            <div class="spinner-border spinner-border-sm text-primary" role="status">
+                <span class="visually-hidden">Loading...</span>
+            </div>
         </div>
     </div>
     <div class="card-body">
@@ -37,10 +34,10 @@
                 <a class="nav-link active" id="nav-overview-tab" href="#nav-overview" role="tab" aria-controls="nav-overview" aria-selected="true" data-bs-toggle="tab">Overview</a>
             </li>
             <li class="nav-item">
-                <a class="nav-link" id="nav-components-tab" href="#nav-components" role="tab" aria-controls="nav-components" aria-selected="false" data-bs-toggle="tab">Components ({{ report.components|length }})</a>
+                <a class="nav-link" id="nav-components-tab" href="#nav-components" role="tab" aria-controls="nav-components" aria-selected="false" data-bs-toggle="tab">Components (<span id="components-count">-</span>)</a>
             </li>
             <li class="nav-item">
-                <a class="nav-link" id="nav-events-tab" href="#nav-events" role="tab" aria-controls="nav-events" aria-selected="false" data-bs-toggle="tab">Events ({{ events|length }})</a>
+                <a class="nav-link" id="nav-events-tab" href="#nav-events" role="tab" aria-controls="nav-events" aria-selected="false" data-bs-toggle="tab">Events (<span id="events-count">-</span>)</a>
             </li>
             <li class="nav-item">
                 <a class="nav-link" id="nav-yaml-tab" href="#nav-yaml" role="tab" aria-controls="nav-yaml" aria-selected="false" data-bs-toggle="tab">YAML</a>
@@ -57,61 +54,17 @@
                                 <h6 class="m-0 font-weight-bold text-primary">Metadata</h6>
                             </div>
                             <div class="card-body">
-                                <table class="table table-bordered" width="100%" cellspacing="0">
-                                    <tr>
-                                        <th style="width: 30%;">Name</th>
-                                        <td>{{ report.name }}</td>
-                                    </tr>
-                                    <tr>
-                                        <th>Namespace</th>
-                                        <td>{{ report.namespace }}</td>
-                                    </tr>
-                                    <tr>
-                                        <th>Resource</th>
-                                        <td>{{ report.resource_kind }}/{{ report.resource_name }}</td>
-                                    </tr>
-                                    <tr>
-                                        <th>Container</th>
-                                        <td><code>{{ report.container_name }}</code></td>
-                                    </tr>
-                                    {% if report.image_ref %}
-                                    <tr>
-                                        <th>Image</th>
-                                        <td><code>{{ report.image_ref }}</code></td>
-                                    </tr>
-                                    {% endif %}
-                                    {% if report.registry and report.registry.server %}
-                                    <tr>
-                                        <th>Registry</th>
-                                        <td><code>{{ report.registry.server }}</code></td>
-                                    </tr>
-                                    {% endif %}
-                                    {% if report.image.repository %}
-                                    <tr>
-                                        <th>Repository</th>
-                                        <td><code>{{ report.image.repository }}</code></td>
-                                    </tr>
-                                    {% endif %}
-                                    {% if report.image.tag %}
-                                    <tr>
-                                        <th>Tag</th>
-                                        <td><code>{{ report.image.tag }}</code></td>
-                                    </tr>
-                                    {% endif %}
-                                    <tr>
-                                        <th>Age</th>
-                                        <td>{{ report.age }}</td>
-                                    </tr>
-                                    <tr>
-                                        <th>Created</th>
-                                        <td>{{ report.creation_timestamp }}</td>
-                                    </tr>
-                                    {% if report.update_timestamp %}
-                                    <tr>
-                                        <th>Updated</th>
-                                        <td>{{ report.update_timestamp }}</td>
-                                    </tr>
-                                    {% endif %}
+                                <table class="table table-bordered" width="100%" cellspacing="0" id="metadata-table">
+                                    <tbody>
+                                        <tr>
+                                            <td colspan="2" class="text-center">
+                                                <div class="spinner-border spinner-border-sm text-primary" role="status">
+                                                    <span class="visually-hidden">Loading...</span>
+                                                </div>
+                                                <span class="ms-2">Loading metadata...</span>
+                                            </td>
+                                        </tr>
+                                    </tbody>
                                 </table>
                             </div>
                         </div>
@@ -123,40 +76,18 @@
                                 <h6 class="m-0 font-weight-bold text-primary">Summary</h6>
                             </div>
                             <div class="card-body">
-                                <table class="table table-bordered" width="100%" cellspacing="0">
-                                    <tr>
-                                        <th style="width: 50%;">Components</th>
-                                        <td><span class="badge bg-info">{{ report.summary.get('componentsCount', 0) or 0 }}</span></td>
-                                    </tr>
-                                    <tr>
-                                        <th>Dependencies</th>
-                                        <td><span class="badge bg-secondary">{{ report.summary.get('dependenciesCount', 0) or 0 }}</span></td>
-                                    </tr>
+                                <table class="table table-bordered" width="100%" cellspacing="0" id="summary-table">
+                                    <tbody>
+                                        <tr>
+                                            <td colspan="2" class="text-center">
+                                                <div class="spinner-border spinner-border-sm text-primary" role="status">
+                                                    <span class="visually-hidden">Loading...</span>
+                                                </div>
+                                                <span class="ms-2">Loading summary...</span>
+                                            </td>
+                                        </tr>
+                                    </tbody>
                                 </table>
-                                {% if report.scanner %}
-                                <hr>
-                                <h6 class="font-weight-bold">Scanner</h6>
-                                <table class="table table-bordered" width="100%" cellspacing="0">
-                                    {% if report.scanner.name %}
-                                    <tr>
-                                        <th style="width: 50%;">Name</th>
-                                        <td>{{ report.scanner.name }}</td>
-                                    </tr>
-                                    {% endif %}
-                                    {% if report.scanner.vendor %}
-                                    <tr>
-                                        <th>Vendor</th>
-                                        <td>{{ report.scanner.vendor }}</td>
-                                    </tr>
-                                    {% endif %}
-                                    {% if report.scanner.version %}
-                                    <tr>
-                                        <th>Version</th>
-                                        <td>{{ report.scanner.version }}</td>
-                                    </tr>
-                                    {% endif %}
-                                </table>
-                                {% endif %}
                             </div>
                         </div>
                     </div>
@@ -179,55 +110,15 @@
                                         <th>Supplier</th>
                                     </tr>
                                 </thead>
-                                <tbody>
-                                    {% for component in report.components %}
+                                <tbody id="components-tbody">
                                     <tr>
-                                        <td><strong>{{ component.name or '-' }}</strong></td>
-                                        <td>{{ component.version or '-' }}</td>
-                                        <td>
-                                            {% if component.type == 'library' %}
-                                            <span class="badge bg-primary">Library</span>
-                                            {% elif component.type == 'operating-system' %}
-                                            <span class="badge bg-info">OS</span>
-                                            {% elif component.type == 'container' %}
-                                            <span class="badge bg-secondary">Container</span>
-                                            {% else %}
-                                            <span class="badge bg-secondary">{{ component.type or '-' }}</span>
-                                            {% endif %}
-                                        </td>
-                                        <td>
-                                            {% if component.purl %}
-                                            <code style="font-size: 0.85em;">{{ component.purl }}</code>
-                                            {% else %}
-                                            <span class="text-muted">-</span>
-                                            {% endif %}
-                                        </td>
-                                        <td>
-                                            {% if component.licenses %}
-                                                {% for license in component.licenses %}
-                                                    {% if license.expression %}
-                                                    <span class="badge bg-light text-dark">{{ license.expression }}</span>
-                                                    {% elif license.license and license.license.id %}
-                                                    <span class="badge bg-light text-dark">{{ license.license.id }}</span>
-                                                    {% endif %}
-                                                {% endfor %}
-                                            {% else %}
-                                            <span class="text-muted">-</span>
-                                            {% endif %}
-                                        </td>
-                                        <td>
-                                            {% if component.supplier and component.supplier.name %}
-                                            {{ component.supplier.name }}
-                                            {% else %}
-                                            <span class="text-muted">-</span>
-                                            {% endif %}
+                                        <td colspan="6" class="text-center">
+                                            <div class="spinner-border spinner-border-sm text-primary" role="status">
+                                                <span class="visually-hidden">Loading...</span>
+                                            </div>
+                                            <span class="ms-2">Loading components...</span>
                                         </td>
                                     </tr>
-                                    {% else %}
-                                    <tr>
-                                        <td class="text-center text-muted" colspan="6">No components found</td>
-                                    </tr>
-                                    {% endfor %}
                                 </tbody>
                             </table>
                         </div>
@@ -239,7 +130,6 @@
             <div class="tab-pane fade" id="nav-events" role="tabpanel" aria-labelledby="nav-events-tab">
                 <div class="card shadow mb-4 mt-3">
                     <div class="card-body">
-                        {% if events %}
                         <div class="table-responsive">
                             <table class="table table-bordered table-hover" width="100%" cellspacing="0">
                                 <thead>
@@ -251,28 +141,18 @@
                                         <th>Last Seen</th>
                                     </tr>
                                 </thead>
-                                <tbody>
-                                    {% for event in events %}
+                                <tbody id="events-tbody">
                                     <tr>
-                                        <td>
-                                            {% if event.type == 'Warning' %}
-                                            <span class="badge bg-warning text-dark">{{ event.type }}</span>
-                                            {% else %}
-                                            <span class="badge bg-info">{{ event.type }}</span>
-                                            {% endif %}
+                                        <td colspan="5" class="text-center">
+                                            <div class="spinner-border spinner-border-sm text-primary" role="status">
+                                                <span class="visually-hidden">Loading...</span>
+                                            </div>
+                                            <span class="ms-2">Loading events...</span>
                                         </td>
-                                        <td><code>{{ event.reason }}</code></td>
-                                        <td>{{ event.message }}</td>
-                                        <td>{{ event.count }}</td>
-                                        <td>{{ event.last_timestamp or event.first_timestamp or '-' }}</td>
                                     </tr>
-                                    {% endfor %}
                                 </tbody>
                             </table>
                         </div>
-                        {% else %}
-                        <p class="text-muted">No events found</p>
-                        {% endif %}
                     </div>
                 </div>
             </div>
@@ -284,7 +164,7 @@
                         <h6 class="m-0 font-weight-bold text-primary">Resource YAML</h6>
                     </div>
                     <div class="card-body">
-                        <pre><code class="language-yaml">{% autoescape false %}{{ report.raw | tojson(indent=2) | replace("<", "&lt;") | replace(">", "&gt;") }}{% endautoescape %}</code></pre>
+                        <pre><code class="language-yaml" id="yaml-content">Loading YAML...</code></pre>
                     </div>
                 </div>
             </div>
@@ -300,11 +180,309 @@
 
 {% block add_tail_js %}
 <script>
-$(document).ready(function() {
-    $('#componentsTable').DataTable({
-        "order": [[0, "asc"]], // Sort by name
-        "pageLength": 25
-    });
-});
+(function() {
+    'use strict';
+    
+    const escapeHtml = (text) => {
+        if (text === null || text === undefined) return '';
+        const map = {
+            '&': '&amp;',
+            '<': '&lt;',
+            '>': '&gt;',
+            '"': '&quot;',
+            "'": '&#039;'
+        };
+        return String(text).replace(/[&<>"']/g, m => map[m]);
+    };
+    
+    const namespace = '{{ namespace }}';
+    const name = '{{ name }}';
+    
+    function updateBreadcrumb(report) {
+        const breadcrumb = document.getElementById('breadcrumb-namespace-name');
+        if (breadcrumb && report) {
+            breadcrumb.textContent = `${escapeHtml(report.namespace)}/${escapeHtml(report.name)}`;
+        }
+    }
+    
+    function updateTitle(report) {
+        const title = document.getElementById('report-title');
+        if (title && report) {
+            title.textContent = `SBOM Report: ${escapeHtml(report.name)}`;
+        }
+    }
+    
+    function updateBadges(report) {
+        const badgesDiv = document.getElementById('report-badges');
+        if (!badgesDiv || !report || !report.summary) return;
+        
+        const summary = report.summary;
+        let badgesHtml = '';
+        
+        if (summary.componentsCount > 0) {
+            badgesHtml += `<span class="badge bg-info me-2">Components: ${summary.componentsCount}</span>`;
+        }
+        if (summary.dependenciesCount > 0) {
+            badgesHtml += `<span class="badge bg-secondary me-2">Dependencies: ${summary.dependenciesCount}</span>`;
+        }
+        
+        badgesDiv.innerHTML = badgesHtml || '<span class="badge bg-success">No components</span>';
+    }
+    
+    function populateMetadata(report) {
+        const tbody = document.querySelector('#metadata-table tbody');
+        if (!tbody || !report) return;
+        
+        let rows = `
+            <tr><th style="width: 30%;">Name</th><td>${escapeHtml(report.name)}</td></tr>
+            <tr><th>Namespace</th><td>${escapeHtml(report.namespace)}</td></tr>
+            <tr><th>Resource</th><td>${escapeHtml(report.resource_kind)}/${escapeHtml(report.resource_name)}</td></tr>
+            <tr><th>Container</th><td><code>${escapeHtml(report.container_name)}</code></td></tr>
+        `;
+        
+        if (report.image_ref) {
+            rows += `<tr><th>Image</th><td><code>${escapeHtml(report.image_ref)}</code></td></tr>`;
+        }
+        if (report.registry && report.registry.server) {
+            rows += `<tr><th>Registry</th><td><code>${escapeHtml(report.registry.server)}</code></td></tr>`;
+        }
+        if (report.image && report.image.repository) {
+            rows += `<tr><th>Repository</th><td><code>${escapeHtml(report.image.repository)}</code></td></tr>`;
+        }
+        if (report.image && report.image.tag) {
+            rows += `<tr><th>Tag</th><td><code>${escapeHtml(report.image.tag)}</code></td></tr>`;
+        }
+        
+        rows += `
+            <tr><th>Age</th><td>${escapeHtml(report.age)}</td></tr>
+            <tr><th>Created</th><td>${escapeHtml(report.creation_timestamp || '-')}</td></tr>
+        `;
+        
+        if (report.update_timestamp) {
+            rows += `<tr><th>Updated</th><td>${escapeHtml(report.update_timestamp)}</td></tr>`;
+        }
+        
+        tbody.innerHTML = rows;
+    }
+    
+    function populateSummary(report) {
+        const tbody = document.querySelector('#summary-table tbody');
+        if (!tbody || !report || !report.summary) return;
+        
+        const summary = report.summary;
+        const componentsCount = summary.componentsCount || 0;
+        const dependenciesCount = summary.dependenciesCount || 0;
+        
+        let summaryHtml = `
+            <tr><th style="width: 50%;">Components</th><td><span class="badge bg-info">${componentsCount}</span></td></tr>
+            <tr><th>Dependencies</th><td><span class="badge bg-secondary">${dependenciesCount}</span></td></tr>
+        `;
+        
+        if (report.scanner) {
+            summaryHtml += '</table><hr><h6 class="font-weight-bold">Scanner</h6><table class="table table-bordered" width="100%" cellspacing="0">';
+            if (report.scanner.name) {
+                summaryHtml += `<tr><th style="width: 50%;">Name</th><td>${escapeHtml(report.scanner.name)}</td></tr>`;
+            }
+            if (report.scanner.vendor) {
+                summaryHtml += `<tr><th>Vendor</th><td>${escapeHtml(report.scanner.vendor)}</td></tr>`;
+            }
+            if (report.scanner.version) {
+                summaryHtml += `<tr><th>Version</th><td>${escapeHtml(report.scanner.version)}</td></tr>`;
+            }
+        }
+        
+        tbody.innerHTML = summaryHtml;
+    }
+    
+    function populateComponents(report) {
+        const tbody = document.getElementById('components-tbody');
+        if (!tbody || !report || !report.components) return;
+        
+        const components = report.components;
+        const countSpan = document.getElementById('components-count');
+        if (countSpan) {
+            countSpan.textContent = components.length;
+        }
+        
+        if (components.length === 0) {
+            tbody.innerHTML = '<tr><td class="text-center text-muted" colspan="6">No components found</td></tr>';
+            return;
+        }
+        
+        const rows = components.map(component => {
+            const type = component.type || '';
+            let typeBadge = '';
+            if (type === 'library') {
+                typeBadge = '<span class="badge bg-primary">Library</span>';
+            } else if (type === 'operating-system') {
+                typeBadge = '<span class="badge bg-info">OS</span>';
+            } else if (type === 'container') {
+                typeBadge = '<span class="badge bg-secondary">Container</span>';
+            } else {
+                typeBadge = `<span class="badge bg-secondary">${escapeHtml(type || '-')}</span>`;
+            }
+            
+            const purl = component.purl 
+                ? `<code style="font-size: 0.85em;">${escapeHtml(component.purl)}</code>`
+                : '<span class="text-muted">-</span>';
+            
+            let licensesHtml = '<span class="text-muted">-</span>';
+            if (component.licenses && Array.isArray(component.licenses) && component.licenses.length > 0) {
+                licensesHtml = component.licenses.map(license => {
+                    if (license.expression) {
+                        return `<span class="badge bg-light text-dark me-1">${escapeHtml(license.expression)}</span>`;
+                    } else if (license.license && license.license.id) {
+                        return `<span class="badge bg-light text-dark me-1">${escapeHtml(license.license.id)}</span>`;
+                    }
+                    return '';
+                }).filter(x => x).join('') || '<span class="text-muted">-</span>';
+            }
+            
+            const supplier = (component.supplier && component.supplier.name) 
+                ? escapeHtml(component.supplier.name)
+                : '<span class="text-muted">-</span>';
+            
+            return `
+                <tr>
+                    <td><strong>${escapeHtml(component.name || '-')}</strong></td>
+                    <td>${escapeHtml(component.version || '-')}</td>
+                    <td>${typeBadge}</td>
+                    <td>${purl}</td>
+                    <td>${licensesHtml}</td>
+                    <td>${supplier}</td>
+                </tr>
+            `;
+        }).join('');
+        
+        tbody.innerHTML = rows;
+        
+        setTimeout(() => {
+            if ($.fn.DataTable && !$.fn.DataTable.isDataTable('#componentsTable')) {
+                $('#componentsTable').DataTable({
+                    "order": [[0, "asc"]],
+                    "pageLength": 25
+                });
+            }
+        }, 50);
+    }
+    
+    function populateEvents(events) {
+        const tbody = document.getElementById('events-tbody');
+        if (!tbody) return;
+        
+        const countSpan = document.getElementById('events-count');
+        if (countSpan) {
+            countSpan.textContent = events ? events.length : 0;
+        }
+        
+        if (!events || events.length === 0) {
+            tbody.innerHTML = '<tr><td class="text-center text-muted" colspan="5">No events found</td></tr>';
+            return;
+        }
+        
+        const rows = events.map(event => {
+            const typeBadge = event.type === 'Warning' 
+                ? '<span class="badge bg-warning text-dark">Warning</span>'
+                : '<span class="badge bg-info">Normal</span>';
+            
+            return `
+                <tr>
+                    <td>${typeBadge}</td>
+                    <td><code>${escapeHtml(event.reason || '-')}</code></td>
+                    <td>${escapeHtml(event.message || '-')}</td>
+                    <td>${event.count || 1}</td>
+                    <td>${escapeHtml(event.last_timestamp || event.first_timestamp || '-')}</td>
+                </tr>
+            `;
+        }).join('');
+        
+        tbody.innerHTML = rows;
+    }
+    
+    function populateYAML(report) {
+        const yamlContent = document.getElementById('yaml-content');
+        if (!yamlContent || !report || !report.raw) return;
+        
+        try {
+            const yamlText = JSON.stringify(report.raw, null, 2);
+            yamlContent.textContent = yamlText;
+            if (typeof hljs !== 'undefined') {
+                hljs.highlightElement(yamlContent);
+            }
+        } catch (e) {
+            yamlContent.textContent = 'Error formatting YAML: ' + e.message;
+        }
+    }
+    
+    async function loadReport() {
+        try {
+            const apiUrl = `/api/v1/plugins/trivy-operator/sbom-reports/${encodeURIComponent(namespace)}/${encodeURIComponent(name)}`;
+            console.log('Loading SBOM report from:', apiUrl);
+            
+            const response = await fetch(apiUrl, {
+                method: 'GET',
+                headers: {
+                    'Accept': 'application/json',
+                },
+                credentials: 'same-origin'
+            });
+            
+            if (!response.ok) {
+                if (response.status === 404) {
+                    throw new Error('SBOM report not found');
+                }
+                const errorText = await response.text();
+                throw new Error(`HTTP error! status: ${response.status} - ${errorText}`);
+            }
+            
+            const data = await response.json();
+            console.log('SBOM report data received:', data);
+            
+            if (data.error) {
+                throw new Error(data.message || 'Failed to load SBOM report');
+            }
+            
+            const report = data.data;
+            if (!report) {
+                throw new Error('No report data received');
+            }
+            
+            // Populate all sections
+            updateBreadcrumb(report);
+            updateTitle(report);
+            updateBadges(report);
+            populateMetadata(report);
+            populateSummary(report);
+            populateComponents(report);
+            populateEvents(report.events || []);
+            populateYAML(report);
+            
+        } catch (error) {
+            console.error('Error loading SBOM report:', error);
+            const errorMsg = escapeHtml(error.message);
+            
+            const title = document.getElementById('report-title');
+            if (title) {
+                title.textContent = 'Error loading report';
+            }
+            
+            const badges = document.getElementById('report-badges');
+            if (badges) {
+                badges.innerHTML = `<span class="badge bg-danger">Error: ${errorMsg}</span>`;
+            }
+            
+            const metadataTbody = document.querySelector('#metadata-table tbody');
+            if (metadataTbody) {
+                metadataTbody.innerHTML = `<tr><td colspan="2" class="text-center text-danger">Error: ${errorMsg}</td></tr>`;
+            }
+        }
+    }
+    
+    if (document.readyState === 'loading') {
+        document.addEventListener('DOMContentLoaded', loadReport);
+    } else {
+        loadReport();
+    }
+})();
 </script>
 {% endblock %}

@@ -7,7 +7,7 @@
         <ol class="breadcrumb my-0">
           <li class="breadcrumb-item"><span>Security</span></li>
           <li class="breadcrumb-item active"><a href="/security/network-policy">Network Policies</a></li>
-          <li class="breadcrumb-item"><span>{{ policy_data.name }}</span></li>
+          <li class="breadcrumb-item active"><span id="policy-name-breadcrumb">Loading...</span></li>
         </ol>
       </nav>
     </div>
@@ -25,106 +25,39 @@
     <div class="card-body">
         <ul class="nav nav-tabs" id="nav-tab" role="tablist">
             <li class="nav-item">
-                <a class="nav-link active" id="nav-policy-tab" data-bs-toggle="tab" href="#nav-policy" role="tab" aria-controls="nav-policy" aria-selected="true" data-bs-toggle="tab">Policy</a>
+                <a class="nav-link active" id="nav-policy-tab" data-bs-toggle="tab" href="#nav-policy" role="tab" aria-controls="nav-policy" aria-selected="true">Policy</a>
             </li>
             <li class="nav-item">
-                <a class="nav-link" id="nav-ingress-tab" data-bs-toggle="tab" href="#nav-ingress" role="tab" aria-controls="nav-ingress" aria-selected="false" data-bs-toggle="tab">Ingress</a>
+                <a class="nav-link" id="nav-ingress-tab" data-bs-toggle="tab" href="#nav-ingress" role="tab" aria-controls="nav-ingress" aria-selected="false">Ingress</a>
             </li>
             <li class="nav-item">
-                <a class="nav-link" id="nav-egress-tab" data-bs-toggle="tab" href="#nav-egress" role="tab" aria-controls="nav-egress" aria-selected="false" data-bs-toggle="tab">Egress</a>
+                <a class="nav-link" id="nav-egress-tab" data-bs-toggle="tab" href="#nav-egress" role="tab" aria-controls="nav-egress" aria-selected="false">Egress</a>
             </li>
         </ul>
         <div class="tab-content" id="nav-tabContent">
-            <!-- policy -->
+            <!-- Policy Tab -->
             <div class="tab-pane fade show active" id="nav-policy" role="tabpanel" aria-labelledby="nav-policy-tab">
                 <div class="card shadow mb-4">
                     <div class="card-body">
                         <div class="table-responsive">
                             <table class="table table-bordered" id="policyInfoTable" width="100%" cellspacing="0">
-                                <tr>
-                                    <th>Namespace:</th>
-                                    <td>{{ policy_data.namespace }}</td>
-                                </tr>
-                                <tr>
-                                    <th>Name:</th>
-                                    <td>{{ policy_data.name }}</td>
-                                </tr>
-                                <tr>
-                                    <th>Annotations:</th>
-                                    <td>
-                                        {% if policy_data.annotations %}
-                                        <table class="table table-bordered" id="annotationTable" width="100%" cellspacing="0">
-                                            <thead>
-                                                <tr>
-                                                    <th width="50%">Key</th>
-                                                    <th width="50%">Value</th>
-                                                </tr>
-                                            </thead>
-                                            <tbody>
-                                            {% for key, value in policy_data.annotations.items() %}
-                                                <tr>
-                                                    <td width="50%">{{ key }}</td>
-                                                    <td width="50%">{{ value }}</td>
-                                                </tr>
-                                            {% endfor %}
-                                            </tbody>
-                                        </table>
-                                        {% endif %}
+                                <tbody id="policy-info-tbody">
+                                    <tr>
+                                        <td colspan="2" class="text-center">
+                                            <div class="spinner-border spinner-border-sm text-primary" role="status">
+                                                <span class="visually-hidden">Loading...</span>
+                                            </div>
+                                            <span class="ms-2">Loading policy data...</span>
                                     </td>
                                 </tr>
-                               <tr>
-                                    <th>Lables:</th>
-                                    <td>
-                                        {% if policy_data.labels %}
-                                        <table class="table table-bordered" id="labelsTable" width="100%" cellspacing="0">
-                                            <thead>
-                                                <tr>
-                                                    <th width="50%">Key</th>
-                                                    <th width="50%">Value</th>
-                                                </tr>
-                                            </thead>
-                                            <tbody>
-                                            {% for key, value in policy_data.labels.items() %}
-                                                <tr>
-                                                    <td width="50%">{{ key }}</td>
-                                                    <td width="50%">{{ value }}</td>
-                                                </tr>
-                                            {% endfor %}
                                             </tbody>
-                                        </table>
-                                        {% endif %}
-                                    </td>
-                                </tr>
-                                <tr>
-                                    <th>Selectors:</th>
-                                    <td>
-                                        {% if policy_data.selectors %}
-                                        <table class="table table-bordered" id="selectorsTable" width="100%" cellspacing="0">
-                                            <thead>
-                                                <tr>
-                                                    <th width="50%">Key</th>
-                                                    <th width="50%">Value</th>
-                                                </tr>
-                                            </thead>
-                                            <tbody>
-                                            {% for key, value in policy_data.selectors.items() %}
-                                                <tr>
-                                                    <td width="50%">{{ key }}</td>
-                                                    <td width="50%">{{ value }}</td>
-                                                </tr>
-                                            {% endfor %}
-                                            </tbody>
-                                        </table>
-                                        {% endif %}
-                                    </td>
-                                </tr>
                             </table>
                         </div>
                     </div>
                 </div>
             </div>
-            <!-- Ingress -->
-            <div class="tab-pane fade show" id="nav-ingress" role="tabpanel" aria-labelledby="nav-ingress-tab">
+            <!-- Ingress Tab -->
+            <div class="tab-pane fade" id="nav-ingress" role="tabpanel" aria-labelledby="nav-ingress-tab">
                 <div class="card shadow mb-4">
                     <div class="card-body">
                          <div class="table-responsive">
@@ -140,111 +73,23 @@
                                         <th>Dst Port</th>
                                     </tr>
                                 </thead>
-                                <tbody>
-                                {% if policy_data.ingress_rules %}
-                                    {% for ir in policy_data.ingress_rules %}
-                                        {% if ir._from %}
-                                            {% for src in ir._from %}
-                                            <tr>
-                                                <!-- Source Namespace -->
-                                                <td>
-                                                    {% if src.namespace_selector and src.namespace_selector.match_labels %}
-                                                        {% for l_key, l_value in src.namespace_selector.match_labels.items() %}
-                                                            <span class="badge text-bg-tag text-bg-secondary">{{ l_key }}: {{ l_value }}</span>
-                                                            {% if not loop.last %}<br>{% endif %}
-                                                        {% endfor %}
-                                                    {% elif src.pod_selector and src.pod_selector.match_labels %}
-                                                        {{ policy_data.namespace }}
-                                                    {% else %}
-                                                        Any
-                                                    {% endif %}
-                                                </td>
-                                                
-                                                <!-- Source Pods -->
-                                                <td>
-                                                    {% if src.pod_selector and src.pod_selector.match_labels %}
-                                                        {% for l_key, l_value in src.pod_selector.match_labels.items() %}
-                                                            <span class="badge text-bg-tag text-bg-secondary">{{ l_key }}: {{ l_value }}</span>
-                                                            {% if not loop.last %}<br>{% endif %}
-                                                        {% endfor %}
-                                                    {% elif src.namespace_selector and src.namespace_selector.match_labels %}
-                                                        Any
-                                                    {% else %}
-                                                        Any
-                                                    {% endif %}
-                                                </td>
-                                                
-                                                <!-- Source Subnet and Exception -->
-                                                {% if src.ip_block %}
-                                                    <td>{{ src.ip_block.cidr if src.ip_block.cidr else 'Any' }}</td>
-                                                    <td>
-                                                        {% if src.ip_block._except %}
-                                                            {% for exception in src.ip_block._except %}
-                                                                {{ exception }}{% if not loop.last %}<br>{% endif %}
-                                                            {% endfor %}
-                                                        {% else %}
-                                                            None
-                                                        {% endif %}
-                                                    </td>
-                                                {% else %}
-                                                    <td>Any</td>
-                                                    <td>None</td>
-                                                {% endif %}
-                                                
-                                                <!-- Destination Namespace -->
-                                                <td>{{ policy_data.namespace }}</td>
-                                                
-                                                <!-- Destination Pods -->
-                                                <td>
-                                                    {% if policy_data.pod_selector and policy_data.pod_selector.match_labels %}
-                                                        {% for l_key, l_value in policy_data.pod_selector.match_labels.items() %}
-                                                            <span class="badge text-bg-tag text-bg-secondary">{{ l_key }}: {{ l_value }}</span>
-                                                            {% if not loop.last %}<br>{% endif %}
-                                                        {% endfor %}
-                                                    {% else %}
-                                                        Any
-                                                    {% endif %}
-                                                </td>
-                                                
-                                                <!-- Destination Ports -->
-                                                <td>
-                                                    {% if ir.ports %}
-                                                        {% for port in ir.ports %}
-                                                            {{ port.protocol|upper }}: {{ port.port }}{% if not loop.last %}<br>{% endif %}
-                                                        {% endfor %}
-                                                    {% else %}
-                                                        Any
-                                                    {% endif %}
-                                                </td>
-                                            </tr>
-                                            {% endfor %}
-                                        {% else %}
-                                            <!-- Fallback for empty '_from' rules -->
-                                            <tr>
-                                                <td>Any</td>
-                                                <td>Any</td>
-                                                <td>Any</td>
-                                                <td>None</td>
-                                                <td>{{ policy_data.namespace }}</td>
-                                                <td>Any</td>
-                                                <td>Any</td>
-                                            </tr>
-                                        {% endif %}
-                                    {% endfor %}
-                                {% else %}
-                                    <!-- Fallback for no ingress rules -->
+                                <tbody id="ingress-rules-tbody">
                                     <tr>
-                                        <td colspan="7" class="text-center">No ingress communication is allowed</td>
+                                        <td colspan="7" class="text-center">
+                                            <div class="spinner-border spinner-border-sm text-primary" role="status">
+                                                <span class="visually-hidden">Loading...</span>
+                                            </div>
+                                            <span class="ms-2">Loading ingress rules...</span>
+                                        </td>
                                     </tr>
-                                {% endif %}
                                 </tbody>
                             </table>
                          </div>
                     </div>
                 </div>
             </div>
-            <!-- Egress -->
-            <div class="tab-pane fade show" id="nav-egress" role="tabpanel" aria-labelledby="nav-egress-tab">
+            <!-- Egress Tab -->
+            <div class="tab-pane fade" id="nav-egress" role="tabpanel" aria-labelledby="nav-egress-tab">
                 <div class="card shadow mb-4">
                     <div class="card-body">
                          <div class="table-responsive">
@@ -260,115 +105,21 @@
                                         <th>Dst Port</th>
                                     </tr>
                                 </thead>
-                                <tbody>
-                                {% if policy_data.egress_rules %}
-                                    {% for er in policy_data.egress_rules %}
-                                        {% if er['to'] %}
-                                            {% for dst in er['to'] %}
-                                            <tr>
-                                                <!-- Source Namespace -->
-                                                <td>{{ policy_data.namespace }}</td>
-                                                
-                                                <!-- Source Pods -->
-                                                <td>
-                                                    {% if policy_data.pod_selector and policy_data.pod_selector.match_labels %}
-                                                        {% for l_key, l_value in policy_data.pod_selector.match_labels.items() %}
-                                                            <span class="badge text-bg-tag text-bg-secondary">{{ l_key }}: {{ l_value }}</span>
-                                                            {% if not loop.last %}<br>{% endif %}
-                                                        {% endfor %}
-                                                    {% else %}
-                                                        Any
-                                                    {% endif %}
-                                                </td>
-                                                
-                                                <!-- Destination Namespace -->
-                                                <td>
-                                                    {% if dst.namespace_selector and dst.namespace_selector.match_labels %}
-                                                        {% for l_key, l_value in dst.namespace_selector.match_labels.items() %}
-                                                            <span class="badge text-bg-tag text-bg-secondary">{{ l_key }}: {{ l_value }}</span>
-                                                            {% if not loop.last %}<br>{% endif %}
-                                                        {% endfor %}
-                                                    {% elif dst.pod_selector and dst.pod_selector.match_labels %}
-                                                        {{ policy_data.namespace }}
-                                                    {% else %}
-                                                        Any
-                                                    {% endif %}
-                                                </td>
-                                                
-                                                <!-- Destination Pods -->
-                                                <td>
-                                                    {% if dst.pod_selector and dst.pod_selector.match_labels %}
-                                                        {% for l_key, l_value in dst.pod_selector.match_labels.items() %}
-                                                            <span class="badge text-bg-tag text-bg-secondary">{{ l_key }}: {{ l_value }}</span>
-                                                            {% if not loop.last %}<br>{% endif %}
-                                                        {% endfor %}
-                                                    {% elif dst.namespace_selector and dst.namespace_selector.match_labels %}
-                                                        Any
-                                                    {% else %}
-                                                        Any
-                                                    {% endif %}
-                                                </td>
-                                                
-                                                <!-- Destination Subnet and Exception -->
-                                                {% if dst.ip_block %}
-                                                    <td>{{ dst.ip_block.cidr if dst.ip_block.cidr else 'Any' }}</td>
-                                                    <td>
-                                                        {% if dst.ip_block._except %}
-                                                            {% for exception in dst.ip_block._except %}
-                                                                {{ exception }}{% if not loop.last %}<br>{% endif %}
-                                                            {% endfor %}
-                                                        {% else %}
-                                                            None
-                                                        {% endif %}
-                                                    </td>
-                                                {% else %}
-                                                    <td>Any</td>
-                                                    <td>None</td>
-                                                {% endif %}
-                                                
-                                                <!-- Destination Ports -->
-                                                <td>
-                                                    {% if er.ports %}
-                                                        {% for port in er.ports %}
-                                                            {{ port.protocol|upper }}: {{ port.port }}{% if not loop.last %}<br>{% endif %}
-                                                        {% endfor %}
-                                                    {% else %}
-                                                        Any
-                                                    {% endif %}
-                                                </td>
-                                            </tr>
-                                            {% endfor %}
-                                        {% else %}
-                                            <!-- Fallback for empty 'to' rules -->
-                                            <tr>
-                                                <td>{{ policy_data.namespace }}</td>
-                                                <td>Any</td>
-                                                <td>Any</td>
-                                                <td>Any</td>
-                                                <td>Any</td>
-                                                <td>None</td>
-                                                <td>Any</td>
-                                            </tr>
-                                        {% endif %}
-                                    {% endfor %}
-                                {% else %}
-                                    <!-- Fallback for no egress rules -->
+                                <tbody id="egress-rules-tbody">
                                     <tr>
-                                        <td>{{ policy_data.namespace }}</td>
-                                        <td>Any</td>
-                                        <td>Any</td>
-                                        <td>Any</td>
-                                        <td>Any</td>
-                                        <td>None</td>
-                                        <td>Any</td>
+                                        <td colspan="7" class="text-center">
+                                            <div class="spinner-border spinner-border-sm text-primary" role="status">
+                                                <span class="visually-hidden">Loading...</span>
+                                            </div>
+                                            <span class="ms-2">Loading egress rules...</span>
+                                        </td>
                                     </tr>
-                                {% endif %}
                                 </tbody>
-                            </table>                         </div>
+                            </table>
+                         </div>
                     </div>
                 </div>
             </div>
-            <!-- END -->
         </div>
     </div>
 </div>
@@ -376,4 +127,441 @@
 
 {% block add_head_css %}
 {% include "segments/datatable_snippet.html.j2" %}
+{% endblock %}
+
+{% block add_tail_js %}
+<script>
+    const escapeHtml = (text) => {
+        if (text === null || text === undefined) return '';
+        const map = {
+            '&': '&amp;',
+            '<': '&lt;',
+            '>': '&gt;',
+            '"': '&quot;',
+            "'": '&#039;'
+        };
+        return String(text).replace(/[&<>"']/g, m => map[m]);
+    };
+    
+    const csrf_token = {{ csrf_token()|tojson }};
+    
+    // Format labels as badges
+    function formatLabels(labels) {
+        if (!labels || Object.keys(labels).length === 0) {
+            return '<span class="text-muted">Any</span>';
+        }
+        let html = '';
+        const keys = Object.keys(labels);
+        keys.forEach((key, index) => {
+            html += `<span class="badge text-bg-tag text-bg-secondary">${escapeHtml(key)}: ${escapeHtml(labels[key])}</span>`;
+            if (index < keys.length - 1) {
+                html += '<br>';
+            }
+        });
+        return html;
+    }
+    
+    // Format pod selector (handles both K8s and Cilium formats)
+    function formatPodSelector(podSelector) {
+        if (!podSelector) {
+            return '<span class="text-muted">Any</span>';
+        }
+        
+        // Handle Cilium format (endpointSelector with matchLabels)
+        let labels = null;
+        if (podSelector.matchLabels) {
+            labels = podSelector.matchLabels;
+        } else if (podSelector.match_labels) {
+            labels = podSelector.match_labels;
+        }
+        
+        if (!labels || Object.keys(labels).length === 0) {
+            return '<span class="text-muted">Any</span>';
+        }
+        
+        return formatLabels(labels);
+    }
+    
+    // Get policy name and namespace from URL, sessionStorage, or topbar selector
+    function getPolicyInfo() {
+        const urlParams = new URLSearchParams(window.location.search);
+        let policyName = urlParams.get('policy_name');
+        let namespace = urlParams.get('namespace');
+        let kind = urlParams.get('kind');
+        
+        // Fallback to sessionStorage
+        if (!policyName) {
+            policyName = sessionStorage.getItem('policy_data_name');
+        }
+        if (!namespace) {
+            namespace = sessionStorage.getItem('ns_select');
+        }
+        if (!kind) {
+            kind = sessionStorage.getItem('policy_kind');
+        }
+        
+        // Fallback to topbar selector
+        if (!namespace) {
+            const topbarSelect = document.getElementById('inputGroupSelect04');
+            if (topbarSelect) {
+                namespace = topbarSelect.value;
+            }
+        }
+        
+        // Final fallback
+        if (!namespace) {
+            namespace = 'default';
+        }
+        if (!kind) {
+            kind = 'NetworkPolicy';
+        }
+        
+        return { policyName, namespace, kind };
+    }
+    
+    function populatePolicyInfo(policy, namespace) {
+        const tbody = document.getElementById('policy-info-tbody');
+        if (!tbody) return;
+        
+        // Update breadcrumb
+        const breadcrumb = document.getElementById('policy-name-breadcrumb');
+        if (breadcrumb) {
+            breadcrumb.textContent = escapeHtml(policy.name || 'Loading...');
+        }
+        
+        const policyKind = policy.kind || 'NetworkPolicy';
+        const policyNamespace = policy.namespace || namespace;
+        
+        let html = `
+            <tr>
+                <th>Kind:</th>
+                <td>${escapeHtml(policyKind)}</td>
+            </tr>
+            <tr>
+                <th>Name:</th>
+                <td>${escapeHtml(policy.name || 'N/A')}</td>
+            </tr>
+        `;
+        
+        // Only show namespace if it's not a cluster-wide policy
+        if (policyKind !== 'CiliumClusterwideNetworkPolicy' && policyNamespace) {
+            html += `
+                <tr>
+                    <th>Namespace:</th>
+                    <td>${escapeHtml(policyNamespace)}</td>
+                </tr>
+            `;
+        }
+        
+        // Annotations
+        if (policy.annotations && Object.keys(policy.annotations).length > 0) {
+            let annotationsHtml = '<table class="table table-bordered" id="annotationTable" width="100%" cellspacing="0"><thead><tr><th width="50%">Key</th><th width="50%">Value</th></tr></thead><tbody>';
+            for (const [key, value] of Object.entries(policy.annotations)) {
+                if (key !== "kubectl.kubernetes.io/last-applied-configuration") {
+                    annotationsHtml += `<tr><td width="50%">${escapeHtml(key)}</td><td width="50%">${escapeHtml(value)}</td></tr>`;
+                }
+            }
+            annotationsHtml += '</tbody></table>';
+            html += `<tr><th>Annotations:</th><td>${annotationsHtml}</td></tr>`;
+        } else {
+            html += `<tr><th>Annotations:</th><td><span class="text-muted">No annotations</span></td></tr>`;
+        }
+        
+        // Labels
+        if (policy.labels && Object.keys(policy.labels).length > 0) {
+            let labelsHtml = '<table class="table table-bordered" id="labelsTable" width="100%" cellspacing="0"><thead><tr><th width="50%">Key</th><th width="50%">Value</th></tr></thead><tbody>';
+            for (const [key, value] of Object.entries(policy.labels)) {
+                labelsHtml += `<tr><td width="50%">${escapeHtml(key)}</td><td width="50%">${escapeHtml(value)}</td></tr>`;
+            }
+            labelsHtml += '</tbody></table>';
+            html += `<tr><th>Labels:</th><td>${labelsHtml}</td></tr>`;
+        } else {
+            html += `<tr><th>Labels:</th><td><span class="text-muted">No labels</span></td></tr>`;
+        }
+        
+        // Selectors (pod selector or endpoint selector for Cilium)
+        const selector = policy.pod_selector || policy.endpointSelector;
+        if (selector) {
+            const selectorLabel = policyKind.includes('Cilium') ? 'Endpoint Selector:' : 'Pod Selector:';
+            const selectorHtml = formatPodSelector(selector);
+            html += `<tr><th>${selectorLabel}</th><td>${selectorHtml}</td></tr>`;
+        } else {
+            const selectorLabel = policyKind.includes('Cilium') ? 'Endpoint Selector:' : 'Pod Selector:';
+            html += `<tr><th>${selectorLabel}</th><td><span class="text-muted">Any</span></td></tr>`;
+        }
+        
+        // Policy Types
+        if (policy.policy_types && policy.policy_types.length > 0) {
+            html += `<tr><th>Policy Types:</th><td>${escapeHtml(policy.policy_types.join(', '))}</td></tr>`;
+        }
+        
+        tbody.innerHTML = html;
+    }
+    
+    function populateIngressRules(policy) {
+        const tbody = document.getElementById('ingress-rules-tbody');
+        if (!tbody) return;
+        
+        // Handle both 'ingress_rules' and 'imgress_rules' (typo in backend)
+        // Also handle Cilium format which uses 'ingress' directly
+        const ingressRules = policy.ingress_rules || policy.imgress_rules || policy.ingress || [];
+        
+        if (!ingressRules || ingressRules.length === 0) {
+            tbody.innerHTML = '<tr><td colspan="7" class="text-center text-muted">No ingress communication is allowed</td></tr>';
+            return;
+        }
+        
+        let rows = [];
+        const namespace = policy.namespace || 'default';
+        const podSelector = policy.pod_selector || policy.endpointSelector;
+        const isCilium = policy.kind && policy.kind.includes('Cilium');
+        
+        ingressRules.forEach(rule => {
+            // Cilium uses 'fromEndpoints' instead of '_from' or 'from'
+            const fromList = rule._from || rule.from || rule.fromEndpoints || [];
+            
+            if (fromList.length === 0) {
+                // Fallback for empty '_from' rules
+                rows.push(`
+                    <tr>
+                        <td>Any</td>
+                        <td>Any</td>
+                        <td>Any</td>
+                        <td>None</td>
+                        <td>${escapeHtml(namespace)}</td>
+                        <td>${formatPodSelector(podSelector)}</td>
+                        <td>Any</td>
+                    </tr>
+                `);
+            } else {
+                fromList.forEach(src => {
+                    // Source Namespace
+                    let srcNamespace = 'Any';
+                    if (src.namespace_selector && src.namespace_selector.match_labels) {
+                        srcNamespace = formatLabels(src.namespace_selector.match_labels);
+                    } else if (src.pod_selector && src.pod_selector.match_labels) {
+                        srcNamespace = escapeHtml(namespace);
+                    }
+                    
+                    // Source Pods
+                    let srcPods = 'Any';
+                    if (src.pod_selector && src.pod_selector.match_labels) {
+                        srcPods = formatLabels(src.pod_selector.match_labels);
+                    } else if (src.namespace_selector && src.namespace_selector.match_labels) {
+                        srcPods = 'Any';
+                    }
+                    
+                    // Source Subnet and Exception
+                    let srcSubnet = 'Any';
+                    let srcException = 'None';
+                    if (src.ip_block) {
+                        srcSubnet = escapeHtml(src.ip_block.cidr || 'Any');
+                        if (src.ip_block._except && src.ip_block._except.length > 0) {
+                            srcException = src.ip_block._except.map(e => escapeHtml(e)).join('<br>');
+                        }
+                    }
+                    
+                    // Destination Ports
+                    let dstPort = 'Any';
+                    if (rule.ports && rule.ports.length > 0) {
+                        dstPort = rule.ports.map(p => {
+                            // Handle both K8s format (object with protocol/port) and Cilium format (object with protocol/ports array)
+                            const protocol = (p.protocol || 'TCP').toUpperCase();
+                            if (p.ports && Array.isArray(p.ports)) {
+                                // Cilium format: ports is an array
+                                return `${protocol}: ${p.ports.join(', ')}`;
+                            } else {
+                                const port = p.port || 'Any';
+                                return `${protocol}: ${port}`;
+                            }
+                        }).join('<br>');
+                    }
+                    
+                    rows.push(`
+                        <tr>
+                            <td>${srcNamespace}</td>
+                            <td>${srcPods}</td>
+                            <td>${srcSubnet}</td>
+                            <td>${srcException}</td>
+                            <td>${escapeHtml(namespace)}</td>
+                            <td>${formatPodSelector(podSelector)}</td>
+                            <td>${dstPort}</td>
+                        </tr>
+                    `);
+                });
+            }
+        });
+        
+        tbody.innerHTML = rows.join('');
+    }
+    
+    function populateEgressRules(policy) {
+        const tbody = document.getElementById('egress-rules-tbody');
+        if (!tbody) return;
+        
+        // Handle Cilium format which uses 'egress' directly
+        const egressRules = policy.egress_rules || policy.egress || [];
+        const namespace = policy.namespace || 'default';
+        const podSelector = policy.pod_selector || policy.endpointSelector;
+        const isCilium = policy.kind && policy.kind.includes('Cilium');
+        
+        if (!egressRules || egressRules.length === 0) {
+            tbody.innerHTML = `
+                <tr>
+                    <td>${escapeHtml(namespace)}</td>
+                    <td>${formatPodSelector(podSelector)}</td>
+                    <td>Any</td>
+                    <td>Any</td>
+                    <td>Any</td>
+                    <td>None</td>
+                    <td>Any</td>
+                </tr>
+            `;
+            return;
+        }
+        
+        let rows = [];
+        
+        egressRules.forEach(rule => {
+            // Cilium uses 'toEndpoints' instead of 'to'
+            const toList = rule.to || rule.toEndpoints || [];
+            
+            if (toList.length === 0) {
+                // Fallback for empty 'to' rules
+                rows.push(`
+                    <tr>
+                        <td>${escapeHtml(namespace)}</td>
+                        <td>${formatPodSelector(podSelector)}</td>
+                        <td>Any</td>
+                        <td>Any</td>
+                        <td>Any</td>
+                        <td>None</td>
+                        <td>Any</td>
+                    </tr>
+                `);
+            } else {
+                toList.forEach(dst => {
+                    // Destination Namespace
+                    let dstNamespace = 'Any';
+                    if (dst.namespace_selector && dst.namespace_selector.match_labels) {
+                        dstNamespace = formatLabels(dst.namespace_selector.match_labels);
+                    } else if (dst.pod_selector && dst.pod_selector.match_labels) {
+                        dstNamespace = escapeHtml(namespace);
+                    }
+                    
+                    // Destination Pods
+                    let dstPods = 'Any';
+                    if (dst.pod_selector && dst.pod_selector.match_labels) {
+                        dstPods = formatLabels(dst.pod_selector.match_labels);
+                    } else if (dst.namespace_selector && dst.namespace_selector.match_labels) {
+                        dstPods = 'Any';
+                    }
+                    
+                    // Destination Subnet and Exception
+                    let dstSubnet = 'Any';
+                    let dstException = 'None';
+                    if (dst.ip_block) {
+                        dstSubnet = escapeHtml(dst.ip_block.cidr || 'Any');
+                        if (dst.ip_block._except && dst.ip_block._except.length > 0) {
+                            dstException = dst.ip_block._except.map(e => escapeHtml(e)).join('<br>');
+                        }
+                    }
+                    
+                    // Destination Ports
+                    let dstPort = 'Any';
+                    if (rule.ports && rule.ports.length > 0) {
+                        dstPort = rule.ports.map(p => {
+                            const protocol = (p.protocol || 'TCP').toUpperCase();
+                            const port = p.port || 'Any';
+                            return `${protocol}: ${port}`;
+                        }).join('<br>');
+                    }
+                    
+                    rows.push(`
+                        <tr>
+                            <td>${escapeHtml(namespace)}</td>
+                            <td>${formatPodSelector(podSelector)}</td>
+                            <td>${dstNamespace}</td>
+                            <td>${dstPods}</td>
+                            <td>${dstSubnet}</td>
+                            <td>${dstException}</td>
+                            <td>${dstPort}</td>
+                        </tr>
+                    `);
+                });
+            }
+        });
+        
+        tbody.innerHTML = rows.join('');
+    }
+    
+    async function loadPolicyData() {
+        try {
+            const { policyName, namespace, kind } = getPolicyInfo();
+            
+            console.log('Policy info:', { policyName, namespace, kind });
+            console.log('URL params:', new URLSearchParams(window.location.search).toString());
+            console.log('SessionStorage policy_data_name:', sessionStorage.getItem('policy_data_name'));
+            console.log('SessionStorage ns_select:', sessionStorage.getItem('ns_select'));
+            
+            if (!policyName) {
+                throw new Error('Policy name not found. Please select a policy from the list page.');
+            }
+            
+            let apiUrl = `/api/v1/security/network-policies/${encodeURIComponent(policyName)}?namespace=${encodeURIComponent(namespace)}`;
+            if (kind) {
+                apiUrl += `&kind=${encodeURIComponent(kind)}`;
+            }
+            console.log('Fetching policy data from:', apiUrl);
+            
+            const response = await fetch(apiUrl);
+            if (!response.ok) {
+                if (response.status === 404) {
+                    throw new Error(`NetworkPolicy '${policyName}' not found in namespace '${namespace}'`);
+                }
+                throw new Error(`HTTP error! status: ${response.status}`);
+            }
+            
+            const result = await response.json();
+            console.log('Policy API response:', result);
+            
+            if (result.error) {
+                throw new Error(result.message || 'Failed to load policy');
+            }
+            
+            const policy = result.data || {};
+            const policyNamespace = policy.namespace || namespace;
+            populatePolicyInfo(policy, policyNamespace);
+            populateIngressRules(policy);
+            populateEgressRules(policy);
+            
+        } catch (error) {
+            console.error('Error loading policy data:', error);
+            const tbody = document.getElementById('policy-info-tbody');
+            if (tbody) {
+                tbody.innerHTML = '<tr><td colspan="2" class="text-center text-danger">Error loading policy: ' + escapeHtml(error.message) + '</td></tr>';
+            }
+            const breadcrumb = document.getElementById('policy-name-breadcrumb');
+            if (breadcrumb) {
+                breadcrumb.textContent = 'Error';
+            }
+        }
+    }
+    
+    // Load data when page loads
+    document.addEventListener('DOMContentLoaded', function() {
+        loadPolicyData();
+        
+        // Reload data when namespace changes (if namespace selector exists)
+        const namespaceSelect = document.getElementById('inputGroupSelect04');
+        if (namespaceSelect) {
+            namespaceSelect.addEventListener('change', function() {
+                const namespace = this.value;
+                console.log('Namespace changed to:', namespace);
+                sessionStorage.setItem('ns_select', namespace);
+                loadPolicyData();
+            });
+        }
+    });
+</script>
 {% endblock %}

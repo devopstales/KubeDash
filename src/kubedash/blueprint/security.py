@@ -36,8 +36,13 @@ def secrets():
             session['ns_select'] = request.form.get('ns_select')
         selected = request.form.get('selected')
 
+    # Get namespaces for topbar selector
+    user_token = get_user_token(session)
+    namespace_list, error = k8sNamespaceListGet(session['user_role'], user_token)
+    namespaces = namespace_list if not error else []
+
     # Template now loads data via JavaScript from /api/v1/security/secrets
-    return render_template('security/secret.html.j2')
+    return render_template('security/secret.html.j2', namespaces=namespaces)
 
 @security_bp.route('/secret/data', methods=['GET', 'POST'])
 @login_required
@@ -48,8 +53,13 @@ def secrets_data():
     Data is now loaded client-side via JavaScript API calls.
     This route only renders the template structure.
     """
+    # Get namespaces for topbar selector
+    user_token = get_user_token(session)
+    namespace_list, error = k8sNamespaceListGet(session['user_role'], user_token)
+    namespaces = namespace_list if not error else []
+
     # Template now loads data via JavaScript from /api/v1/security/secrets/<name>
-    return render_template('security/secret-data.html.j2')
+    return render_template('security/secret-data.html.j2', namespaces=namespaces)
     
 ##############################################################
 ## Network Policies
@@ -70,8 +80,13 @@ def policies_list():
             session['ns_select'] = request.form.get('ns_select')
         selected = request.form.get('selected')
 
+    # Get namespaces for topbar selector
+    user_token = get_user_token(session)
+    namespace_list, error = k8sNamespaceListGet(session['user_role'], user_token)
+    namespaces = namespace_list if not error else []
+
     # Template now loads data via JavaScript from /api/v1/security/network-policies
-    return render_template('security/network-policy.html.j2')
+    return render_template('security/network-policy.html.j2', namespaces=namespaces)
 
 @security_bp.route('/network-policy/data', methods=['GET', 'POST'])
 @login_required
@@ -82,8 +97,13 @@ def policies_data():
     Data is now loaded client-side via JavaScript API calls.
     This route only renders the template structure.
     """
+    # Get namespaces for topbar selector
+    user_token = get_user_token(session)
+    namespace_list, error = k8sNamespaceListGet(session['user_role'], user_token)
+    namespaces = namespace_list if not error else []
+
     # Template now loads data via JavaScript from /api/v1/security/network-policies/<name>
-    return render_template('security/network-policy-data.html.j2')
+    return render_template('security/network-policy-data.html.j2', namespaces=namespaces)
 
 ##############################################################
 ## PriorityClass
