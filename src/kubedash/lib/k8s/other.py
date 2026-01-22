@@ -128,8 +128,8 @@ def k8sHPAListGet(username_role, user_token, ns_name):
                 "namespace": hpa.metadata.namespace,
                 "annotations": trimAnnotations(hpa.metadata.annotations),
                 "labels": hpa.metadata.labels,
-                "spec": hpa.spec,
-                "status": hpa.status,
+                "spec": hpa.spec.to_dict() if hpa.spec and hasattr(hpa.spec, 'to_dict') else None,
+                "status": hpa.status.to_dict() if hpa.status and hasattr(hpa.status, 'to_dict') else None,
                 "created": hpa.metadata.creation_timestamp.strftime('%Y-%m-%d %H:%M:%S'),
             }
             for key, value in hpa.metadata.annotations.items():
@@ -174,15 +174,16 @@ def k8sPodDisruptionBudgetListGet(username_role, user_token, ns_name):
                 "selector": pdb.spec.selector.match_labels,
                 "max_unavailable": pdb.spec.max_unavailable,
                 "min_available": pdb.spec.min_available,
-                "status": pdb.status,
+                "status": pdb.status.to_dict() if pdb.status and hasattr(pdb.status, 'to_dict') else None,
                 "created": pdb.metadata.creation_timestamp.strftime('%Y-%m-%d %H:%M:%S'),
+                "creation_timestamp": pdb.metadata.creation_timestamp.strftime('%Y-%m-%d %H:%M:%S'),
             }
             if "unhealthy_pod_eviction_policy" in pdb.spec.to_dict():
                 PDB_DATA["unhealthy_pod_eviction_policy"] =  pdb.spec.unhealthy_pod_eviction_policy,
-            conditions = pdb.status.conditions
+            conditions = pdb.status.conditions if pdb.status else []
             condition_list = list()
             for condition in conditions:
-                condition_list.append(condition.to_dict()) 
+                condition_list.append(condition.to_dict() if hasattr(condition, 'to_dict') else condition) 
             PDB_DATA["conditions"] = condition_list
             PDB_LIST.append(PDB_DATA)
         return PDB_LIST
@@ -221,10 +222,11 @@ def k8sQuotaListGet(username_role, user_token, ns_name):
                 "namespace": rq.metadata.namespace,
                 "annotations": trimAnnotations(rq.metadata.annotations),
                 "labels": rq.metadata.labels,
-                "status": rq.status,
+                "status": rq.status.to_dict() if rq.status and hasattr(rq.status, 'to_dict') else None,
                 "selectors": None,
-                "scope": rq.spec.scopes,
+                "scope": rq.spec.scopes if rq.spec.scopes else [],
                 "created": rq.metadata.creation_timestamp.strftime('%Y-%m-%d %H:%M:%S'),
+                "creation_timestamp": rq.metadata.creation_timestamp.strftime('%Y-%m-%d %H:%M:%S'),
             }
             if rq.spec.scope_selector:
                 for expressions in rq.spec.scope_selector.match_expressions:
@@ -261,12 +263,35 @@ def k8sLimitRangeListGet(username_role, user_token, ns_name):
     try:
         lrs = k8s_client.CoreV1Api().list_namespaced_limit_range(ns_name, _request_timeout=1)
         for lr in lrs.items:
+            # Convert limits to dictionaries for JSON serialization
+            limits_list = []
+            if lr.spec.limits:
+                for limit_item in lr.spec.limits:
+                    if hasattr(limit_item, 'to_dict'):
+                        limit_dict = limit_item.to_dict()
+                    else:
+                        # Manual conversion if to_dict() is not available
+                        limit_dict = {}
+                        if hasattr(limit_item, 'type'):
+                            limit_dict['type'] = limit_item.type
+                        if hasattr(limit_item, 'min') and limit_item.min:
+                            limit_dict['min'] = limit_item.min.to_dict() if hasattr(limit_item.min, 'to_dict') else (limit_item.min if isinstance(limit_item.min, dict) else {})
+                        if hasattr(limit_item, 'max') and limit_item.max:
+                            limit_dict['max'] = limit_item.max.to_dict() if hasattr(limit_item.max, 'to_dict') else (limit_item.max if isinstance(limit_item.max, dict) else {})
+                        if hasattr(limit_item, 'default') and limit_item.default:
+                            limit_dict['default'] = limit_item.default.to_dict() if hasattr(limit_item.default, 'to_dict') else (limit_item.default if isinstance(limit_item.default, dict) else {})
+                        if hasattr(limit_item, 'default_request') and limit_item.default_request:
+                            limit_dict['default_request'] = limit_item.default_request.to_dict() if hasattr(limit_item.default_request, 'to_dict') else (limit_item.default_request if isinstance(limit_item.default_request, dict) else {})
+                        if hasattr(limit_item, 'max_limit_request_ratio') and limit_item.max_limit_request_ratio:
+                            limit_dict['max_limit_request_ratio'] = limit_item.max_limit_request_ratio.to_dict() if hasattr(limit_item.max_limit_request_ratio, 'to_dict') else (limit_item.max_limit_request_ratio if isinstance(limit_item.max_limit_request_ratio, dict) else {})
+                    limits_list.append(limit_dict)
+            
             LR_DATA = {
                 "name": lr.metadata.name,
                 "namespace": lr.metadata.namespace,
                 "annotations": trimAnnotations(lr.metadata.annotations),
                 "labels": lr.metadata.labels,
-                "limits": lr.spec.limits,
+                "limits": limits_list,
                 "created": lr.metadata.creation_timestamp.strftime('%Y-%m-%d %H:%M:%S'),
             }
             LR_LIST.append(LR_DATA)

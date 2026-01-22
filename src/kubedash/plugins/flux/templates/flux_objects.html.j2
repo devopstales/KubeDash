@@ -17,6 +17,14 @@
 {% endblock %}
 
 {% block content %}
+<div id="flux-loading" class="text-center p-4">
+    <div class="spinner-border text-primary" role="status">
+        <span class="visually-hidden">Loading...</span>
+    </div>
+    <p class="mt-2">Loading Flux CD objects...</p>
+</div>
+
+<div id="flux-content" style="display: none;">
 <div class="card shadow mb-4">
     <div class="card-header py-3">
         <h6 class="m-0 font-weight-bold text-primary">Flux CD Objects</h6>
@@ -42,55 +50,671 @@
         <div class="tab-content" id="nav-tabContent">
             <!-- SOURCES TAB -->
             <div class="tab-pane fade show active pt-3" id="nav-sources" role="tabpanel" aria-labelledby="nav-sources-tab">
-                {% for kind in ['GitRepositories', 'HelmRepositories', 'OCIRepositories', 'Buckets'] %}
-                    {% include "segments/flux_table.html.j2" %}
-                {% endfor %}
+                    <div id="gitRepositories-container"></div>
+                    <div id="helmRepositories-container"></div>
+                    <div id="ociRepositories-container"></div>
+                    <div id="buckets-container"></div>
             </div>
 
             <!-- KUSTOMIZATIONS TAB -->
             <div class="tab-pane fade pt-3" id="nav-kustomizations" role="tabpanel" aria-labelledby="nav-kustomizations-tab">
-                {% set kind = 'Kustomizations' %}
-                {% include "segments/flux_table.html.j2" %}
+                    <div id="kustomizations-container"></div>
             </div>
 
             <!-- HELM RELEASES TAB -->
             <div class="tab-pane fade pt-3" id="nav-helm" role="tabpanel" aria-labelledby="nav-helm-tab">
-                {% set kind = 'HelmReleases' %}
-                {% include "segments/flux_table.html.j2" %}
+                    <div id="helmReleases-container"></div>
             </div>
 
             <!-- NOTIFICATIONS TAB -->
             <div class="tab-pane fade pt-3" id="nav-notifications" role="tabpanel" aria-labelledby="nav-notifications-tab">
-                {% for kind in ['Alerts', 'Providers', 'Receivers'] %}
-                    {% include "segments/flux_table.html.j2" %}
-                {% endfor %}
+                    <div id="alerts-container"></div>
+                    <div id="providers-container"></div>
+                    <div id="receivers-container"></div>
             </div>
 
             <!-- GRAPH TAB -->
             <div class="tab-pane fade pt-3" id="nav-graph" role="tabpanel" aria-labelledby="nav-graph-tab">
-                {% include "segments/flux_graph.html.j2" %}
+                    <div id="flux-graph-container"></div>
+                </div>
             </div>
         </div>
     </div>
+</div>
+
+<div id="flux-error" style="display: none;" class="alert alert-danger">
+    <h4>Error Loading Flux Objects</h4>
+    <p id="error-message"></p>
 </div>
 {% endblock %}
 
 {% block add_head_css %}
 {% include "segments/datatable_snippet.html.j2" %}
+<!-- Cytoscape.js for graph visualization -->
+<script src="https://unpkg.com/cytoscape@3.28.1/dist/cytoscape.min.js"></script>
+<script src="https://unpkg.com/dagre@0.8.5/dist/dagre.min.js"></script>
+<script src="https://unpkg.com/cytoscape-dagre@2.5.0/cytoscape-dagre.js"></script>
 {% endblock %}
 
 {% block add_tail_js %}
 <script>
-$(document).ready(function() {
-    $('#gitRepositoriesTable').DataTable();
-    $('#helmRepositoriesTable').DataTable();
-    $('#ociRepositoriesTable').DataTable();
-    $('#bucketsTable').DataTable();
-    $('#kustomizationsTable').DataTable();
-    $('#helmReleasesTable').DataTable();
-    $('#alertsTable').DataTable();
-    $('#providersTable').DataTable();
-    $('#receiversTable').DataTable();
+    // Helper function to escape HTML
+    function escapeHtml(text) {
+        if (text == null) return '';
+        const div = document.createElement('div');
+        div.textContent = text;
+        return div.innerHTML;
+    }
+    
+    // Get user role from session
+    const user_role = {{ session.get('user_role', '')|tojson }};
+    const is_admin = user_role === 'Admin';
+    const csrf_token = {{ csrf_token()|tojson }};
+    
+    // Map plural kind names to singular for detail view URLs
+    const kindMap = {
+        'GitRepositories': 'GitRepository',
+        'HelmRepositories': 'HelmRepository',
+        'OCIRepositories': 'OCIRepository',
+        'Buckets': 'Bucket',
+        'HelmCharts': 'HelmChart',
+        'Kustomizations': 'Kustomization',
+        'HelmReleases': 'HelmRelease',
+        'Alerts': 'Alert',
+        'Providers': 'Provider',
+        'Receivers': 'Receiver'
+    };
+    
+    // Map kind to table ID for DataTables
+    const tableIdMap = {
+        'GitRepositories': 'gitRepositoriesTable',
+        'HelmRepositories': 'helmRepositoriesTable',
+        'OCIRepositories': 'ociRepositoriesTable',
+        'Buckets': 'bucketsTable',
+        'HelmCharts': 'helmChartsTable',
+        'Kustomizations': 'kustomizationsTable',
+        'HelmReleases': 'helmReleasesTable',
+        'Alerts': 'alertsTable',
+        'Providers': 'providersTable',
+        'Receivers': 'receiversTable'
+    };
+    
+    // Get namespace from topbar selector or use default
+    function getSelectedNamespace() {
+        // First check URL parameter
+        const urlParams = new URLSearchParams(window.location.search);
+        let namespace = urlParams.get('namespace');
+        
+        // Then check topbar selector
+        if (!namespace) {
+            const topbarSelect = document.getElementById('inputGroupSelect04');
+            if (topbarSelect && topbarSelect.value) {
+                namespace = topbarSelect.value;
+            }
+        }
+        
+        // Fallback to sessionStorage
+        if (!namespace) {
+            namespace = sessionStorage.getItem('ns_select');
+        }
+        
+        // Final fallback to default
+        return namespace || 'default';
+    }
+    
+    // Load flux objects from API
+    async function loadFluxObjects() {
+        const namespace = getSelectedNamespace();
+        const loadingDiv = document.getElementById('flux-loading');
+        const contentDiv = document.getElementById('flux-content');
+        const errorDiv = document.getElementById('flux-error');
+        
+        try {
+            const apiUrl = `/api/v1/plugins/flux/objects?namespace=${encodeURIComponent(namespace)}`;
+            console.log('Fetching flux objects from:', apiUrl);
+            
+            const response = await fetch(apiUrl);
+            if (!response.ok) {
+                const errorData = await response.json().catch(() => ({ message: `HTTP error! status: ${response.status}` }));
+                throw new Error(errorData.message || `HTTP error! status: ${response.status}`);
+            }
+            
+            const result = await response.json();
+            console.log('Flux objects API response:', result);
+            
+            if (result.data) {
+                populateAllTables(result.data);
+                initializeGraph(result.graph);
+                loadingDiv.style.display = 'none';
+                contentDiv.style.display = 'block';
+            } else {
+                throw new Error(result.message || 'No flux objects data returned');
+            }
+        } catch (error) {
+            console.error('Error loading flux objects:', error);
+            loadingDiv.style.display = 'none';
+            contentDiv.style.display = 'none';
+            showError(error.message);
+        }
+    }
+    
+    // Show error message
+    function showError(message) {
+        const errorDiv = document.getElementById('flux-error');
+        const errorMessage = document.getElementById('error-message');
+        errorMessage.textContent = message;
+        errorDiv.style.display = 'block';
+    }
+    
+    // Populate a table for a specific kind
+    function populateTable(kind, objects, containerId) {
+        const container = document.getElementById(containerId);
+        if (!container) return;
+        
+        const tableId = tableIdMap[kind] || (kind.toLowerCase() + 'Table');
+        const singularKind = kindMap[kind] || kind;
+        
+        if (!objects || objects.length === 0) {
+            container.innerHTML = `
+                <div class="card shadow mb-4">
+                    <div class="card-header py-3">
+                        <h6 class="m-0 font-weight-bold text-primary">${escapeHtml(kind)}</h6>
+                    </div>
+                    <div class="card-body">
+                        <p class="text-muted">No ${escapeHtml(kind)} found</p>
+                    </div>
+                </div>
+            `;
+            return;
+        }
+        
+        let tableHtml = `
+            <div class="card shadow mb-4">
+                <div class="card-header py-3">
+                    <h6 class="m-0 font-weight-bold text-primary">${escapeHtml(kind)}</h6>
+                </div>
+                <div class="card-body">
+                    <div class="table-responsive">
+                        <table class="table table-bordered" id="${tableId}" width="100%" cellspacing="0">
+                            <thead>
+                                <tr>
+                                    <th>Status</th>
+                                    <th>Name</th>
+                                    <th>Namespace</th>
+                                    <th>Message</th>
+                                    <th>Age</th>
+                                    ${is_admin ? '<th>Actions</th>' : ''}
+                                </tr>
+                            </thead>
+                            <tbody>
+        `;
+        
+        objects.forEach(item => {
+            if (!item || typeof item !== 'object') return;
+            
+            const metadata = item.metadata || {};
+            const status = item.status || {};
+            const spec = item.spec || {};
+            const conditions = status.conditions || [];
+            
+            const isReady = conditions.length > 0 && conditions[0].status === 'True';
+            const isSuspended = spec.suspend === true;
+            const conditionType = conditions.length > 0 ? conditions[0].type : 'Unknown';
+            const conditionMessage = conditions.length > 0 ? (conditions[0].message || '') : '';
+            const name = metadata.name || '';
+            const namespace = metadata.namespace || '';
+            const created = metadata.creationTimestamp || 'N/A';
+            
+            let statusBadge = '';
+            if (isSuspended) {
+                statusBadge = '<span class="badge text-bg-tag text-bg-secondary">Suspended</span>';
+            } else if (isReady) {
+                statusBadge = `<span class="badge text-bg-tag text-bg-success">${escapeHtml(conditionType)}</span>`;
+            } else {
+                statusBadge = `<span class="badge text-bg-tag text-bg-danger">${escapeHtml(conditionType)}</span>`;
+            }
+            
+            const messageDisplay = conditionMessage.length > 80 
+                ? escapeHtml(conditionMessage.substring(0, 80)) + '...' 
+                : escapeHtml(conditionMessage);
+            
+            let actionsHtml = '';
+            if (is_admin) {
+                // Sync action for reconcilable objects
+                if (['GitRepositories', 'HelmRepositories', 'OCIRepositories', 'Buckets', 'HelmCharts', 'Kustomizations', 'HelmReleases'].includes(kind)) {
+                    actionsHtml += `
+                        <form action="/plugins/flux/sync" method="post" class="d-inline">
+                            <input type="hidden" name="csrf_token" value="${escapeHtml(csrf_token)}">
+                            <input type="hidden" name="flux_object" value="${escapeHtml(JSON.stringify(item))}"/>
+                            <button type="submit" class="btn btn-primary btn-sm" title="Sync">
+                                <i class="fa fa-sync"></i>
+                            </button>
+                        </form>
+                    `;
+                }
+                
+                // Suspend/Resume action
+                if (['GitRepositories', 'HelmRepositories', 'OCIRepositories', 'Buckets', 'HelmCharts', 'Kustomizations', 'HelmReleases', 'Alerts', 'Receivers'].includes(kind)) {
+                    if (isSuspended) {
+                        actionsHtml += `
+                            <form action="/plugins/flux/resume" method="post" class="d-inline">
+                                <input type="hidden" name="csrf_token" value="${escapeHtml(csrf_token)}">
+                                <input type="hidden" name="flux_object" value="${escapeHtml(JSON.stringify(item))}"/>
+                                <button type="submit" class="btn btn-success btn-sm" title="Resume">
+                                    <i class="fa fa-play"></i>
+                                </button>
+                            </form>
+                        `;
+                    } else {
+                        actionsHtml += `
+                            <form action="/plugins/flux/suspend" method="post" class="d-inline">
+                                <input type="hidden" name="csrf_token" value="${escapeHtml(csrf_token)}">
+                                <input type="hidden" name="flux_object" value="${escapeHtml(JSON.stringify(item))}"/>
+                                <button type="submit" class="btn btn-warning btn-sm" title="Suspend">
+                                    <i class="fa fa-pause"></i>
+                                </button>
+                            </form>
+                        `;
+                    }
+                }
+            }
+            
+            tableHtml += `
+                <tr>
+                    <td>${statusBadge}</td>
+                    <td>
+                        <a href="/plugins/flux/detail/${escapeHtml(singularKind)}/${escapeHtml(namespace)}/${escapeHtml(name)}">
+                            ${escapeHtml(name)}
+                        </a>
+                    </td>
+                    <td>${escapeHtml(namespace)}</td>
+                    <td title="${escapeHtml(conditionMessage)}">${messageDisplay}</td>
+                    <td>${escapeHtml(created)}</td>
+                    ${is_admin ? `<td>${actionsHtml}</td>` : ''}
+                </tr>
+            `;
+        });
+        
+        tableHtml += `
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+            </div>
+        `;
+        
+        container.innerHTML = tableHtml;
+        
+        // Initialize DataTable
+        setTimeout(() => {
+            const $table = $(`#${tableId}`);
+            if ($table.length && !$.fn.DataTable.isDataTable($table)) {
+                $table.DataTable({
+                    responsive: true,
+                    pageLength: 25,
+                    order: [[1, 'asc']] // Sort by Name
+                });
+            }
+        }, 100);
+    }
+    
+    // Populate all tables
+    function populateAllTables(fluxObjects) {
+        // Sources tab
+        populateTable('GitRepositories', fluxObjects.GitRepositories, 'gitRepositories-container');
+        populateTable('HelmRepositories', fluxObjects.HelmRepositories, 'helmRepositories-container');
+        populateTable('OCIRepositories', fluxObjects.OCIRepositories, 'ociRepositories-container');
+        populateTable('Buckets', fluxObjects.Buckets, 'buckets-container');
+        
+        // Kustomizations tab
+        populateTable('Kustomizations', fluxObjects.Kustomizations, 'kustomizations-container');
+        
+        // Helm Releases tab
+        populateTable('HelmReleases', fluxObjects.HelmReleases, 'helmReleases-container');
+        
+        // Notifications tab
+        populateTable('Alerts', fluxObjects.Alerts, 'alerts-container');
+        populateTable('Providers', fluxObjects.Providers, 'providers-container');
+        populateTable('Receivers', fluxObjects.Receivers, 'receivers-container');
+    }
+    
+    // Initialize graph (will be implemented in next step)
+    function initializeGraph(graphData) {
+        const container = document.getElementById('flux-graph-container');
+        if (!container || !graphData) return;
+        
+        // Load the graph segment dynamically
+        // For now, we'll include it via a separate script that uses the graph data
+        container.innerHTML = `
+            <div class="card shadow mb-4">
+                <div class="card-header py-3 d-flex justify-content-between align-items-center">
+                    <h6 class="m-0 font-weight-bold text-primary">Flux Object Dependencies</h6>
+                    <div>
+                        <button type="button" class="btn btn-sm btn-secondary" onclick="fitGraph()" title="Fit to view">
+                            <i class="fa fa-expand"></i>
+                        </button>
+                        <button type="button" class="btn btn-sm btn-secondary" onclick="resetLayout()" title="Reset layout">
+                            <i class="fa fa-redo"></i>
+                        </button>
+                    </div>
+                </div>
+                <div class="card-body p-0">
+                    <div id="flux-graph-wrapper" style="position: relative; height: 500px; width: 100%;">
+                        <div id="flux-graph-cy-container" style="height: 100%; width: 100%;"></div>
+                        <div id="node-tooltip" style="display: none; position: absolute; z-index: 1000; max-width: 350px; pointer-events: none;"></div>
+                    </div>
+                    <div class="p-3 border-top">
+                        <div class="d-flex flex-wrap align-items-center gap-3">
+                            <small class="text-muted">
+                                <strong>Legend:</strong>
+                                <span class="ms-2"><span style="display:inline-block;width:12px;height:12px;background:#6f42c1;border-radius:2px;vertical-align:middle;"></span> GitRepository</span>
+                                <span class="ms-2"><span style="display:inline-block;width:12px;height:12px;background:#0d6efd;border-radius:2px;vertical-align:middle;"></span> HelmRepository</span>
+                                <span class="ms-2"><span style="display:inline-block;width:12px;height:12px;background:#20c997;border-radius:2px;vertical-align:middle;"></span> OCIRepository</span>
+                                <span class="ms-2"><span style="display:inline-block;width:12px;height:12px;background:#198754;border-radius:2px;vertical-align:middle;"></span> Kustomization</span>
+                                <span class="ms-2"><span style="display:inline-block;width:12px;height:12px;background:#dc3545;border-radius:2px;vertical-align:middle;"></span> HelmRelease</span>
+                            </small>
+                            <small class="text-muted border-start ps-3">
+                                <strong>Status:</strong>
+                                <span class="ms-2" style="color:#198754;">● Ready</span>
+                                <span class="ms-2" style="color:#dc3545;">● Error</span>
+                                <span class="ms-2" style="color:#6c757d;">● Suspended</span>
+                            </small>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        `;
+        
+        // Wait for Cytoscape libraries to be available
+        function waitForCytoscape() {
+            return new Promise((resolve, reject) => {
+                let attempts = 0;
+                const maxAttempts = 50; // 5 seconds max wait
+                
+                const checkLibraries = () => {
+                    if (typeof cytoscape !== 'undefined') {
+                        // Wait a bit more for dagre extension to register
+                        setTimeout(() => {
+                            resolve();
+                        }, 100);
+                    } else if (attempts < maxAttempts) {
+                        attempts++;
+                        setTimeout(checkLibraries, 100);
+                    } else {
+                        reject(new Error('Cytoscape libraries failed to load'));
+                    }
+                };
+                
+                checkLibraries();
+            });
+        }
+        
+        waitForCytoscape().then(() => {
+            initializeCytoscapeGraph(graphData);
+        }).catch(error => {
+            console.error('Failed to load Cytoscape libraries:', error);
+            container.innerHTML = `
+                <div class="alert alert-warning">
+                    <h5>Graph Visualization Unavailable</h5>
+                    <p>Failed to load graph visualization libraries. Please refresh the page.</p>
+                    <p class="small text-muted">Error: ${escapeHtml(error.message)}</p>
+                </div>
+            `;
+        });
+    }
+    
+    
+    // Initialize Cytoscape graph
+    let cy = null;
+    let tooltip = null;
+    
+    function initializeCytoscapeGraph(graphData) {
+        const container = document.getElementById('flux-graph-cy-container');
+        const wrapper = document.getElementById('flux-graph-wrapper');
+        if (!container || !graphData) {
+            console.warn('Graph container or data not available');
+            return;
+        }
+        
+        if (typeof cytoscape === 'undefined') {
+            console.error('Cytoscape library not loaded');
+            return;
+        }
+        
+        tooltip = document.getElementById('node-tooltip');
+        
+        const elements = [];
+        
+        if (graphData.nodes) {
+            graphData.nodes.forEach(node => {
+                elements.push({ group: 'nodes', data: node.data });
+            });
+        }
+        
+        if (graphData.edges) {
+            graphData.edges.forEach(edge => {
+                elements.push({ group: 'edges', data: edge.data });
+            });
+        }
+        
+        const colors = getThemeColors();
+        
+        // Set wrapper background
+        if (wrapper) {
+            wrapper.style.background = colors.background;
+        }
+        
+        // Layout configuration - dagre should be available if scripts loaded correctly
+        const layoutConfig = {
+            name: 'dagre',
+            rankDir: 'LR',
+            nodeSep: 60,
+            rankSep: 100,
+            padding: 20
+        };
+        
+        cy = cytoscape({
+            container: container,
+            elements: elements,
+            style: [
+                {
+                    selector: 'node',
+                    style: {
+                        'background-color': 'data(color)',
+                        'label': 'data(label)',
+                        'color': colors.textColor,
+                        'text-outline-color': colors.textOutline,
+                        'text-outline-width': 2,
+                        'font-size': '11px',
+                        'text-valign': 'bottom',
+                        'text-margin-y': 6,
+                        'width': 35,
+                        'height': 35,
+                        'border-width': 2,
+                        'border-color': function(ele) {
+                            const status = ele.data('status');
+                            if (status === 'Ready') return '#198754';
+                            if (status === 'Not Ready') return '#dc3545';
+                            if (status === 'Suspended') return '#6c757d';
+                            return '#ffc107';
+                        }
+                    }
+                },
+                {
+                    selector: 'node:selected',
+                    style: {
+                        'border-width': 4,
+                        'border-color': '#0d6efd'
+                    }
+                },
+                {
+                    selector: 'edge',
+                    style: {
+                        'width': 2,
+                        'line-color': colors.edgeColor,
+                        'target-arrow-color': colors.edgeColor,
+                        'target-arrow-shape': 'triangle',
+                        'curve-style': 'bezier',
+                        'label': 'data(label)',
+                        'font-size': '9px',
+                        'color': colors.edgeColor
+                    }
+                }
+            ],
+            layout: {
+                name: 'dagre',
+                rankDir: 'LR',
+                nodeSep: 60,
+                rankSep: 100,
+                padding: 20
+            },
+            minZoom: 0.3,
+            maxZoom: 2,
+            wheelSensitivity: 0.3
+        });
+        
+        cy.on('tap', 'node', function(evt) {
+            const node = evt.target;
+            const kind = node.data('kind');
+            const namespace = node.data('namespace');
+            const label = node.data('label');
+            window.location.href = `/plugins/flux/detail/${kind}/${namespace}/${label}`;
+        });
+        
+        cy.on('mouseover', 'node', function(evt) {
+            document.body.style.cursor = 'pointer';
+            showTooltip(evt);
+        });
+        
+        cy.on('mouseout', 'node', function() {
+            document.body.style.cursor = 'default';
+            hideTooltip();
+        });
+        
+        cy.on('mousemove', 'node', function(evt) {
+            moveTooltip(evt);
+        });
+        
+        cy.fit(30);
+    }
+    
+    function getThemeColors() {
+        const dark = document.documentElement.getAttribute('data-coreui-theme') === 'dark';
+        return {
+            background: dark ? '#1e1e1e' : '#f8f9fa',
+            textColor: dark ? '#e4e4e4' : '#212529',
+            textOutline: dark ? '#1e1e1e' : '#fff',
+            edgeColor: dark ? '#6c757d' : '#adb5bd',
+            tooltipBg: dark ? '#2d2d2d' : '#ffffff',
+            tooltipBorder: dark ? '#444' : '#dee2e6',
+            tooltipText: dark ? '#e4e4e4' : '#212529'
+        };
+    }
+    
+    function showTooltip(evt) {
+        if (!tooltip) return;
+        const node = evt.target;
+        const data = node.data();
+        const colors = getThemeColors();
+        
+        let statusBadge = '';
+        if (data.status === 'Ready') {
+            statusBadge = '<span style="background:#198754;color:#fff;padding:2px 8px;border-radius:4px;font-size:11px;">✓ Ready</span>';
+        } else if (data.status === 'Suspended') {
+            statusBadge = '<span style="background:#6c757d;color:#fff;padding:2px 8px;border-radius:4px;font-size:11px;">⏸ Suspended</span>';
+        } else {
+            statusBadge = '<span style="background:#dc3545;color:#fff;padding:2px 8px;border-radius:4px;font-size:11px;">✗ Not Ready</span>';
+        }
+        
+        const kindColor = data.color || '#6c757d';
+        let html = `<div style="background:${colors.tooltipBg};border:1px solid ${colors.tooltipBorder};border-radius:8px;padding:12px 14px;box-shadow:0 4px 16px rgba(0,0,0,0.2);color:${colors.tooltipText};min-width:280px;">`;
+        html += `<div style="display:flex;align-items:center;gap:8px;margin-bottom:10px;padding-bottom:8px;border-bottom:1px solid ${colors.tooltipBorder};">`;
+        html += `<span style="background:${kindColor};color:#fff;padding:2px 8px;border-radius:4px;font-size:10px;text-transform:uppercase;">${data.kind || '-'}</span>`;
+        html += `<span style="font-weight:bold;font-size:14px;">${data.label || '-'}</span>`;
+        html += '</div>';
+        html += `<table style="font-size:12px;width:100%;border-collapse:collapse;">`;
+        html += `<tr><td style="padding:3px 10px 3px 0;color:#6c757d;width:90px;">Namespace:</td><td style="padding:3px 0;"><code style="background:${colors.background === '#1e1e1e' ? '#333' : '#f1f3f5'};padding:1px 4px;border-radius:3px;font-size:11px;">${data.namespace || '-'}</code></td></tr>`;
+        html += `<tr><td style="padding:3px 10px 3px 0;color:#6c757d;">Status:</td><td style="padding:3px 0;">${statusBadge}</td></tr>`;
+        if (data.url) {
+            html += `<tr><td style="padding:3px 10px 3px 0;color:#6c757d;vertical-align:top;">URL:</td><td style="padding:3px 0;word-break:break-all;font-size:11px;">${data.url.length > 45 ? data.url.substring(0, 45) + '...' : data.url}</td></tr>`;
+        }
+        html += '</table></div>';
+        
+        tooltip.innerHTML = html;
+        tooltip.style.display = 'block';
+        moveTooltip(evt);
+    }
+    
+    function moveTooltip(evt) {
+        if (!tooltip) return;
+        const wrapper = document.getElementById('flux-graph-wrapper');
+        if (!wrapper) return;
+        
+        const wrapperRect = wrapper.getBoundingClientRect();
+        const renderedPos = evt.target.renderedPosition();
+        
+        let x = renderedPos.x + 20;
+        let y = renderedPos.y - 10;
+        
+        const tooltipRect = tooltip.getBoundingClientRect();
+        const tooltipWidth = tooltipRect.width || 300;
+        const tooltipHeight = tooltipRect.height || 150;
+        
+        if (x + tooltipWidth > wrapperRect.width - 10) {
+            x = renderedPos.x - tooltipWidth - 20;
+        }
+        if (x < 10) x = 10;
+        
+        if (y + tooltipHeight > wrapperRect.height - 10) {
+            y = wrapperRect.height - tooltipHeight - 10;
+        }
+        if (y < 10) y = 10;
+        
+        tooltip.style.left = x + 'px';
+        tooltip.style.top = y + 'px';
+    }
+    
+    function hideTooltip() {
+        if (tooltip) {
+            tooltip.style.display = 'none';
+        }
+    }
+    
+    window.fitGraph = function() {
+        if (cy) cy.fit(30);
+    };
+    
+    window.resetLayout = function() {
+        if (cy) {
+            cy.layout({
+                name: 'dagre',
+                rankDir: 'LR',
+                nodeSep: 60,
+                rankSep: 100,
+                padding: 20
+            }).run();
+            cy.fit(30);
+        }
+    };
+    
+    // Initialize namespace selector and load data
+    document.addEventListener('DOMContentLoaded', function() {
+        const namespaceSelect = document.getElementById('inputGroupSelect04');
+        if (namespaceSelect) {
+            const savedNamespace = sessionStorage.getItem('ns_select');
+            if (savedNamespace && namespaceSelect.querySelector(`option[value="${savedNamespace}"]`)) {
+                namespaceSelect.value = savedNamespace;
+            }
+            
+            // Reload data when namespace changes
+            namespaceSelect.addEventListener('change', function() {
+                sessionStorage.setItem('ns_select', this.value);
+                loadFluxObjects();
+            });
+        }
+        
+        // Initial load
+        loadFluxObjects();
 });
 </script>
 {% endblock %}

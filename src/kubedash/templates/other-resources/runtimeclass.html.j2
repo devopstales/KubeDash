@@ -6,7 +6,7 @@
       <nav aria-label="breadcrumb">
         <ol class="breadcrumb my-0">
           <li class="breadcrumb-item"><span>Other Resources</span></li>
-          <li class="breadcrumb-item active"><span>Resource Quotas</span></li>
+          <li class="breadcrumb-item active"><span>Runtime Classes</span></li>
         </ol>
       </nav>
     </div>
@@ -19,7 +19,7 @@
 {% block content %}
 <div class="card shadow mb-4">
     <div class="card-header py-3">
-        <h6 class="m-0 font-weight-bold text-primary">Resource Quota List</h6>
+        <h6 class="m-0 font-weight-bold text-primary">Runtime Class List</h6>
     </div>
     <div class="card-body">
         <div class="table-responsive">
@@ -27,18 +27,17 @@
                 <thead>
                     <tr>
                       <th>Name</th>
-                      <th>Namespace</th>
-                      <th>Request</th>
-                      <th>Limit</th>
+                      <th>Handler</th>
+                      <th>Creation</th>
                     </tr>
                   </thead>
-                  <tbody id="quotas-tbody">
+                  <tbody id="runtime-classes-tbody">
                     <tr>
-                        <td colspan="4" class="text-center">
+                        <td colspan="3" class="text-center">
                             <div class="spinner-border spinner-border-sm text-primary" role="status">
                                 <span class="visually-hidden">Loading...</span>
                             </div>
-                            <span class="ms-2">Loading Resource Quotas...</span>
+                            <span class="ms-2">Loading Runtime Classes...</span>
                         </td>
                     </tr>
                   </tbody>
@@ -71,7 +70,7 @@
     // DataTables protection - prevent auto-initialization on loading rows
     (function() {
         const originalTableId = 'dataTable';
-        const tempTableId = 'quotasTable_' + Date.now();
+        const tempTableId = 'runtimeClassesTable_' + Date.now();
         
         // Temporarily change table ID to prevent auto-initialization
         document.addEventListener('DOMContentLoaded', function() {
@@ -131,29 +130,6 @@
         }, 500);
     })();
     
-    // Get namespace from topbar selector or use default
-    function getSelectedNamespace() {
-        // First check URL parameter
-        const urlParams = new URLSearchParams(window.location.search);
-        let namespace = urlParams.get('namespace');
-        
-        // Then check topbar selector
-        if (!namespace) {
-            const topbarSelect = document.getElementById('inputGroupSelect04');
-            if (topbarSelect && topbarSelect.value) {
-                namespace = topbarSelect.value;
-            }
-        }
-        
-        // Fallback to sessionStorage
-        if (!namespace) {
-            namespace = sessionStorage.getItem('ns_select');
-        }
-        
-        // Final fallback to default
-        return namespace || 'default';
-    }
-    
     // Initialize namespace selector with sessionStorage value on page load
     document.addEventListener('DOMContentLoaded', function() {
         const namespaceSelect = document.getElementById('inputGroupSelect04');
@@ -165,60 +141,37 @@
         }
     });
     
-    function populateQuotaTable(quotas) {
-        const tbody = document.getElementById('quotas-tbody');
+    function populateRuntimeClassTable(runtimeClasses) {
+        const tbody = document.getElementById('runtime-classes-tbody');
         
-        if (!quotas || quotas.length === 0) {
-            tbody.innerHTML = '<tr><td colspan="4" class="text-center">No Resource Quotas found</td></tr>';
+        if (!runtimeClasses || runtimeClasses.length === 0) {
+            tbody.innerHTML = '<tr><td colspan="3" class="text-center">No Runtime Classes found</td></tr>';
             return;
         }
         
-        // Get selected quota from URL
+        // Get selected runtime class from URL
         const urlParams = new URLSearchParams(window.location.search);
-        const selectedQuota = urlParams.get('selected');
-        const namespace = getSelectedNamespace();
+        const selectedRC = urlParams.get('selected');
         
-        const rows = quotas.map(quota => {
-            const name = escapeHtml(quota.name || '');
-            const ns = escapeHtml(quota.namespace || '');
+        const rows = runtimeClasses.map(rc => {
+            const name = escapeHtml(rc.name || '');
+            const handler = escapeHtml(rc.handler || 'N/A');
+            const created = escapeHtml(rc.created || 'N/A');
             
-            // Handle both snake_case and camelCase from Kubernetes API
-            const status = quota.status || {};
-            const used = status.used || {};
-            const hard = status.hard || {};
-            
-            const requestsCpu = used['requests.cpu'] || used['requestsCpu'] || 'N/A';
-            const requestsMemory = used['requests.memory'] || used['requestsMemory'] || 'N/A';
-            const hardRequestsCpu = hard['requests.cpu'] || hard['requestsCpu'] || 'N/A';
-            const hardRequestsMemory = hard['requests.memory'] || hard['requestsMemory'] || 'N/A';
-            
-            const limitsCpu = used['limits.cpu'] || used['limitsCpu'] || 'N/A';
-            const limitsMemory = used['limits.memory'] || used['limitsMemory'] || 'N/A';
-            const hardLimitsCpu = hard['limits.cpu'] || hard['limitsCpu'] || 'N/A';
-            const hardLimitsMemory = hard['limits.memory'] || hard['limitsMemory'] || 'N/A';
-            
-            const isSelected = selectedQuota === quota.name;
+            const isSelected = selectedRC === rc.name;
             const rowClass = isSelected ? 'selected' : '';
             
             return `
                 <tr class="${rowClass}">
                     <td>
-                        <form action="/other-resource/resource-quota/data" method="POST" onsubmit="sessionStorage.setItem('ns_select', '${escapeHtml(ns)}'); sessionStorage.setItem('quota_data_name', '${name}'); return true;">
+                        <form action="/other-resource/runtimeclass/data" method="POST" onsubmit="sessionStorage.setItem('runtime_class_data_name', '${name}'); return true;">
                             <input type="hidden" name="csrf_token" value="${escapeHtml(csrf_token)}">
-                            <input type="hidden" name="ns_select" value="${escapeHtml(ns)}" />
-                            <input type="hidden" name="quota_name" value="${name}" />
+                            <input type="hidden" name="rc_name" value="${name}" />
                             <a href="javascript:;" onclick="parentNode.submit();">${name}</a>
                         </form>
                     </td>
-                    <td>${ns}</td>
-                    <td>
-                        <span class="badge text-bg-tag text-bg-secondary">requests.cpu: ${escapeHtml(String(requestsCpu))} / ${escapeHtml(String(hardRequestsCpu))}</span><br>
-                        <span class="badge text-bg-tag text-bg-secondary">requests.memory: ${escapeHtml(String(requestsMemory))} / ${escapeHtml(String(hardRequestsMemory))}</span>
-                    </td>
-                    <td>
-                        <span class="badge text-bg-tag text-bg-secondary">limits.cpu: ${escapeHtml(String(limitsCpu))} / ${escapeHtml(String(hardLimitsCpu))}</span><br>
-                        <span class="badge text-bg-tag text-bg-secondary">limits.memory: ${escapeHtml(String(limitsMemory))} / ${escapeHtml(String(hardLimitsMemory))}</span>
-                    </td>
+                    <td>${handler}</td>
+                    <td>${created}</td>
                 </tr>
             `;
         }).join('');
@@ -269,10 +222,11 @@
         }, 50);
     }
     
-    async function loadQuotas(namespace) {
+    async function loadRuntimeClasses() {
         try {
-            const apiUrl = `/api/v1/other-resources/quotas${namespace ? '?namespace=' + encodeURIComponent(namespace) : ''}`;
-            console.log('Fetching Resource Quotas from:', apiUrl);
+            // RuntimeClass is cluster-scoped, so no namespace parameter needed
+            const apiUrl = `/api/v1/other-resources/runtime-classes`;
+            console.log('Fetching Runtime Classes from:', apiUrl);
             
             const response = await fetch(apiUrl);
             if (!response.ok) {
@@ -280,41 +234,27 @@
             }
             
             const data = await response.json();
-            console.log('Resource Quotas API response:', data);
+            console.log('Runtime Classes API response:', data);
             
             if (data.error) {
-                throw new Error(data.message || 'Failed to load Resource Quotas');
+                throw new Error(data.message || 'Failed to load Runtime Classes');
             }
             
-            const quotas = data.data || [];
-            populateQuotaTable(quotas);
+            const runtimeClasses = data.data || [];
+            populateRuntimeClassTable(runtimeClasses);
             
         } catch (error) {
-            console.error('Error loading Resource Quotas:', error);
-            const tbody = document.getElementById('quotas-tbody');
+            console.error('Error loading Runtime Classes:', error);
+            const tbody = document.getElementById('runtime-classes-tbody');
             if (tbody) {
-                tbody.innerHTML = '<tr><td colspan="4" class="text-center text-danger">Error loading Resource Quotas: ' + escapeHtml(error.message) + '</td></tr>';
+                tbody.innerHTML = '<tr><td colspan="3" class="text-center text-danger">Error loading Runtime Classes: ' + escapeHtml(error.message) + '</td></tr>';
             }
         }
     }
     
     // Load data when page loads
     document.addEventListener('DOMContentLoaded', function() {
-        const namespace = getSelectedNamespace();
-        loadQuotas(namespace);
-    });
-    
-    // Reload data when namespace changes (if namespace selector exists)
-    document.addEventListener('DOMContentLoaded', function() {
-        const namespaceSelect = document.getElementById('inputGroupSelect04');
-        if (namespaceSelect) {
-            namespaceSelect.addEventListener('change', function() {
-                const namespace = this.value;
-                console.log('Namespace changed to:', namespace);
-                sessionStorage.setItem('ns_select', namespace);
-                loadQuotas(namespace);
-            });
-        }
+        loadRuntimeClasses();
     });
 </script>
 {% endblock %}

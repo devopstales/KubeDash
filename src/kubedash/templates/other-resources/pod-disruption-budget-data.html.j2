@@ -7,7 +7,7 @@
         <ol class="breadcrumb my-0">
           <li class="breadcrumb-item"><span>Other Resources</span></li>
           <li class="breadcrumb-item"><a href="/other-resource/pod-disruption-budget">Pod Disruption Budgets</a></li>
-          <li class="breadcrumb-item active"><span>{{ pdp_data.name }}</span></li>
+          <li class="breadcrumb-item active"><span id="pdb-name-breadcrumb">Loading...</span></li>
         </ol>
       </nav>
     </div>
@@ -31,97 +31,47 @@
                             <table class="table table-bordered" id="policyInfoTable" width="100%" cellspacing="0">
                                 <tr>
                                     <th>Name:</th>
-                                    <td>{{ pdp_data.name }}</td>
+                                    <td id="pdb-name">Loading...</td>
                                 </tr>
                                 <tr>
                                     <th>Created:</th>
-                                    <td>{{ pdp_data.created }}</td>
+                                    <td id="pdb-created">Loading...</td>
                                 </tr>
                                 <tr>
                                     <th>Namespace:</th>
-                                    <td>{{ pdp_data.namespace }}</td>
+                                    <td id="pdb-namespace">Loading...</td>
                                 </tr>
                                 <tr>
-                                    <th>Creation:</th>
-                                    <td>{{ pdp_data.creation_timestamp }}</td>
+                                    <th>Creation Timestamp:</th>
+                                    <td id="pdb-creation-timestamp">Loading...</td>
                                 </tr>
                                 <tr>
                                     <th>Annotations:</th>
-                                    <td>
-                                        {% if pdp_data.annotations %}
-                                        <table class="table table-bordered" id="annotationTable" width="100%" cellspacing="0">
-                                            <thead>
-                                                <tr>
-                                                    <th width="50%">Key</th>
-                                                    <th width="50%">Value</th>
-                                                </tr>
-                                            </thead>
-                                            <tbody>
-                                            {% for key, value in pdp_data.annotations.items() %}
-                                                <tr>
-                                                    <td width="50%">{{ key }}</td>
-                                                    <td width="50%">{{ value }}</td>
-                                                </tr>
-                                            {% endfor %}
-                                            </tbody>
-                                        </table>
-                                        {% endif %}
+                                    <td id="pdb-annotations-container">
+                                        <div class="spinner-border spinner-border-sm text-primary" role="status">
+                                            <span class="visually-hidden">Loading...</span>
+                                        </div>
                                     </td>
                                 </tr>
                                <tr>
-                                    <th>Lables:</th>
-                                    <td>
-                                        {% if pdp_data.labels %}
-                                        <table class="table table-bordered" id="labelsTable" width="100%" cellspacing="0">
-                                            <thead>
-                                                <tr>
-                                                    <th width="50%">Key</th>
-                                                    <th width="50%">Value</th>
-                                                </tr>
-                                            </thead>
-                                            <tbody>
-                                            {% for key, value in pdp_data.labels.items() %}
-                                                <tr>
-                                                    <td width="50%">{{ key }}</td>
-                                                    <td width="50%">{{ value }}</td>
-                                                </tr>
-                                            {% endfor %}
-                                            </tbody>
-                                        </table>
-                                        {% endif %}
+                                    <th>Labels:</th>
+                                    <td id="pdb-labels-container">
+                                        <div class="spinner-border spinner-border-sm text-primary" role="status">
+                                            <span class="visually-hidden">Loading...</span>
+                                        </div>
                                     </td>
                                 </tr>
                                 <tr>
                                     <th>Selector:</th>
-                                    <td>
-                                    {% if pdp_data.selector %}
-                                        {% for key, value in pdp_data.selector.items() %}
-                                            {{ key }}: {{ value }}{% if not loop.last %}<br>{% endif %}
-                                        {% endfor %}
-                                    {% endif %}
-                                    </td>
+                                    <td id="pdb-selector">Loading...</td>
                                 </tr>
                                 <tr>
                                     <th>Eviction Policy:</th>
-                                    <td>
-                                    {% if pdp_data.unhealthy_pod_eviction_policy %}
-                                        {% for policy in pdp_data.unhealthy_pod_eviction_policy %}
-                                            {% if policy is not none %}
-                                                {{policy}}{% if not loop.last %}<br>{% endif %}
-                                            {% else %}
-                                                None{% if not loop.last %}<br>{% endif %}
-                                            {% endif %}
-                                        {% endfor %}
-                                    {% endif %}
-                                    </td>
+                                    <td id="pdb-eviction-policy">Loading...</td>
                                 </tr>
                                 <tr>
                                     <th>Status:</th>
-                                    <td>
-                                    Allowed disruptions: {{ pdp_data.status.disruptions_allowed }}<br>
-                                    Current: {{ pdp_data.status.current_healthy }}<br>
-                                    Desired: {% if pdp_data.min_available %}{{ pdp_data.min_available }}{% else %}0{% endif %}<br>
-                                    </td>
+                                    <td id="pdb-status">Loading...</td>
                                 </tr>
                             </table>
                         </div>
@@ -141,26 +91,24 @@
                 <div class="card shadow mb-4">
                     <div class="card-body">
                         <div class="table-responsive">
-                            <table class="table table-bordered" id="policyInfoTable" width="100%" cellspacing="0">
-                            <thead>
+                            <table class="table table-bordered" id="conditionsTable" width="100%" cellspacing="0">
+                            <thead id="conditions-thead">
                                 <tr>
-                                {% for condition in pdp_data.conditions %}
-                                <tr>
-                                    {% for key, value in condition.items() %}
-                                    <th>{{ key }}</th>
-                                    {% endfor %}
-                                </tr>
-                                {% endfor %}
+                                    <td colspan="5" class="text-center">
+                                        <div class="spinner-border spinner-border-sm text-primary" role="status">
+                                            <span class="visually-hidden">Loading...</span>
+                                        </div>
+                                    </td>
                                 </tr>
                             </thead>
-                            <tbody>
-                                {% for condition in pdp_data.conditions %}
+                            <tbody id="conditions-tbody">
                                 <tr>
-                                    {% for key, value in condition.items() %}
-                                    <td>{{ value }}</td>
-                                    {% endfor %}
+                                    <td colspan="5" class="text-center">
+                                        <div class="spinner-border spinner-border-sm text-primary" role="status">
+                                            <span class="visually-hidden">Loading...</span>
+                                        </div>
+                                    </td>
                                 </tr>
-                                {% endfor %}
                             </tbody>
                             </table>
                         </div>
@@ -173,4 +121,243 @@
 
 {% block add_head_css %}
 {% include "segments/datatable_snippet.html.j2" %}
+{% endblock %}
+
+{% block add_tail_js %}
+<script>
+    const escapeHtml = (text) => {
+        if (text === null || text === undefined) return '';
+        const map = {
+            '&': '&amp;',
+            '<': '&lt;',
+            '>': '&gt;',
+            '"': '&quot;',
+            "'": '&#039;'
+        };
+        return String(text).replace(/[&<>"']/g, m => map[m]);
+    };
+    
+    const csrf_token = {{ csrf_token()|tojson }};
+    
+    // Get PDB name and namespace from URL, sessionStorage, or topbar selector
+    function getPDBInfo() {
+        const urlParams = new URLSearchParams(window.location.search);
+        let pdbName = urlParams.get('pdp_name') || urlParams.get('pdb_name');
+        let namespace = urlParams.get('namespace');
+        
+        // Fallback to sessionStorage
+        if (!pdbName) {
+            pdbName = sessionStorage.getItem('pdb_data_name');
+        }
+        if (!namespace) {
+            namespace = sessionStorage.getItem('ns_select');
+        }
+        
+        // Fallback to topbar selector
+        if (!namespace) {
+            const topbarSelect = document.getElementById('inputGroupSelect04');
+            if (topbarSelect && topbarSelect.value) {
+                namespace = topbarSelect.value;
+                // Store it in sessionStorage for consistency
+                sessionStorage.setItem('ns_select', namespace);
+            }
+        }
+        
+        // Final fallback
+        if (!namespace) {
+            namespace = 'default';
+        }
+        
+        return { pdbName, namespace };
+    }
+    
+    // Initialize namespace selector with sessionStorage value on page load
+    document.addEventListener('DOMContentLoaded', function() {
+        const namespaceSelect = document.getElementById('inputGroupSelect04');
+        if (namespaceSelect) {
+            const savedNamespace = sessionStorage.getItem('ns_select');
+            if (savedNamespace && namespaceSelect.querySelector(`option[value="${savedNamespace}"]`)) {
+                namespaceSelect.value = savedNamespace;
+            }
+        }
+    });
+    
+    function populatePDBInfo(pdb) {
+        if (!pdb) {
+            document.getElementById('pdb-name').textContent = 'N/A';
+            document.getElementById('pdb-created').textContent = 'N/A';
+            document.getElementById('pdb-namespace').textContent = 'N/A';
+            return;
+        }
+        
+        // Update breadcrumb
+        const breadcrumb = document.getElementById('pdb-name-breadcrumb');
+        if (breadcrumb) {
+            breadcrumb.textContent = pdb.name || 'N/A';
+        }
+        
+        // Basic info
+        document.getElementById('pdb-name').textContent = escapeHtml(pdb.name || 'N/A');
+        document.getElementById('pdb-created').textContent = escapeHtml(pdb.created || 'N/A');
+        document.getElementById('pdb-namespace').textContent = escapeHtml(pdb.namespace || 'N/A');
+        document.getElementById('pdb-creation-timestamp').textContent = escapeHtml(pdb.creation_timestamp || pdb.creationTimestamp || 'N/A');
+        
+        // Annotations
+        const annotationsContainer = document.getElementById('pdb-annotations-container');
+        if (pdb.annotations && Object.keys(pdb.annotations).length > 0) {
+            let annotationsHtml = '<table class="table table-bordered" id="annotationTable" width="100%" cellspacing="0">';
+            annotationsHtml += '<thead><tr><th width="50%">Key</th><th width="50%">Value</th></tr></thead><tbody>';
+            for (const [key, value] of Object.entries(pdb.annotations)) {
+                annotationsHtml += `<tr><td width="50%">${escapeHtml(key)}</td><td width="50%">${escapeHtml(String(value))}</td></tr>`;
+            }
+            annotationsHtml += '</tbody></table>';
+            annotationsContainer.innerHTML = annotationsHtml;
+        } else {
+            annotationsContainer.innerHTML = '<span class="text-muted">None</span>';
+        }
+        
+        // Labels
+        const labelsContainer = document.getElementById('pdb-labels-container');
+        if (pdb.labels && Object.keys(pdb.labels).length > 0) {
+            let labelsHtml = '<table class="table table-bordered" id="labelsTable" width="100%" cellspacing="0">';
+            labelsHtml += '<thead><tr><th width="50%">Key</th><th width="50%">Value</th></tr></thead><tbody>';
+            for (const [key, value] of Object.entries(pdb.labels)) {
+                labelsHtml += `<tr><td width="50%">${escapeHtml(key)}</td><td width="50%">${escapeHtml(String(value))}</td></tr>`;
+            }
+            labelsHtml += '</tbody></table>';
+            labelsContainer.innerHTML = labelsHtml;
+        } else {
+            labelsContainer.innerHTML = '<span class="text-muted">None</span>';
+        }
+        
+        // Selector
+        const selectorContainer = document.getElementById('pdb-selector');
+        if (pdb.selector && Object.keys(pdb.selector).length > 0) {
+            let selectorHtml = '';
+            for (const [key, value] of Object.entries(pdb.selector)) {
+                selectorHtml += `${escapeHtml(key)}: ${escapeHtml(String(value))}<br>`;
+            }
+            selectorContainer.innerHTML = selectorHtml;
+        } else {
+            selectorContainer.innerHTML = '<span class="text-muted">None</span>';
+        }
+        
+        // Eviction Policy
+        const evictionPolicyContainer = document.getElementById('pdb-eviction-policy');
+        const evictionPolicy = pdb.unhealthy_pod_eviction_policy || pdb.unhealthyPodEvictionPolicy;
+        if (evictionPolicy) {
+            if (Array.isArray(evictionPolicy)) {
+                evictionPolicyContainer.innerHTML = evictionPolicy.map(p => escapeHtml(String(p || 'None'))).join('<br>');
+            } else {
+                evictionPolicyContainer.textContent = escapeHtml(String(evictionPolicy));
+            }
+        } else {
+            evictionPolicyContainer.innerHTML = '<span class="text-muted">None</span>';
+        }
+        
+        // Status
+        const statusContainer = document.getElementById('pdb-status');
+        const status = pdb.status || {};
+        const disruptionsAllowed = status.disruptions_allowed || status.disruptionsAllowed || 0;
+        const currentHealthy = status.current_healthy || status.currentHealthy || 0;
+        const minAvailable = pdb.min_available || pdb.minAvailable || 0;
+        
+        statusContainer.innerHTML = `
+            Allowed disruptions: ${escapeHtml(String(disruptionsAllowed))}<br>
+            Current: ${escapeHtml(String(currentHealthy))}<br>
+            Desired: ${escapeHtml(String(minAvailable))}<br>
+        `;
+    }
+    
+    function populateConditions(conditions) {
+        const thead = document.getElementById('conditions-thead');
+        const tbody = document.getElementById('conditions-tbody');
+        
+        if (!conditions || conditions.length === 0) {
+            thead.innerHTML = '<tr><th colspan="5" class="text-center text-muted">No conditions</th></tr>';
+            tbody.innerHTML = '';
+            return;
+        }
+        
+        // Build header from first condition's keys
+        if (conditions.length > 0) {
+            const firstCondition = conditions[0];
+            const keys = Object.keys(firstCondition);
+            let headerHtml = '<tr>';
+            for (const key of keys) {
+                headerHtml += `<th>${escapeHtml(key)}</th>`;
+            }
+            headerHtml += '</tr>';
+            thead.innerHTML = headerHtml;
+            
+            // Build rows
+            const rows = conditions.map(condition => {
+                let rowHtml = '<tr>';
+                for (const key of keys) {
+                    const value = condition[key];
+                    rowHtml += `<td>${escapeHtml(String(value !== null && value !== undefined ? value : 'N/A'))}</td>`;
+                }
+                rowHtml += '</tr>';
+                return rowHtml;
+            }).join('');
+            
+            tbody.innerHTML = rows;
+        }
+    }
+    
+    async function loadPDBData() {
+        const { pdbName, namespace } = getPDBInfo();
+        
+        if (!pdbName) {
+            console.error('No PDB name provided');
+            document.getElementById('pdb-name-breadcrumb').textContent = 'Error';
+            document.getElementById('pdb-name').textContent = 'Error: PDB name not provided';
+            return;
+        }
+        
+        // Update breadcrumb
+        document.getElementById('pdb-name-breadcrumb').textContent = pdbName;
+        
+        try {
+            const apiUrl = `/api/v1/other-resources/pdb/${encodeURIComponent(pdbName)}?namespace=${encodeURIComponent(namespace)}`;
+            console.log('Fetching PDB from:', apiUrl);
+            
+            const response = await fetch(apiUrl);
+            if (!response.ok) {
+                if (response.status === 404) {
+                    throw new Error(`Pod Disruption Budget '${pdbName}' not found in namespace '${namespace}'`);
+                }
+                throw new Error(`HTTP error! status: ${response.status}`);
+            }
+            
+            const data = await response.json();
+            console.log('PDB API response:', data);
+            
+            if (data.error) {
+                throw new Error(data.message || 'Failed to load Pod Disruption Budget');
+            }
+            
+            const pdb = data.data || {};
+            populatePDBInfo(pdb);
+            
+            // Load conditions if available
+            if (pdb.conditions && Array.isArray(pdb.conditions)) {
+                populateConditions(pdb.conditions);
+            } else {
+                populateConditions([]);
+            }
+            
+        } catch (error) {
+            console.error('Error loading PDB:', error);
+            document.getElementById('pdb-name').textContent = 'Error: ' + escapeHtml(error.message);
+            document.getElementById('pdb-created').textContent = 'N/A';
+            document.getElementById('pdb-namespace').textContent = 'N/A';
+        }
+    }
+    
+    // Load data when page loads
+    document.addEventListener('DOMContentLoaded', function() {
+        loadPDBData();
+    });
+</script>
 {% endblock %}

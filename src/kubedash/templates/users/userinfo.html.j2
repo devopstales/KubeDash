@@ -27,7 +27,7 @@
 
 {% block content %}
 <div class="card shadow mb-4">
-  <form action="" method="POST">
+  <form id="user-info-form" action="" method="POST">
         <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
         <div class="card-body">
             <div class="container">
@@ -36,31 +36,39 @@
                         <img width="80" height="80" src="{{ url_for('static',filename='/assets/img/avatars/undraw_profile.svg') }}" class="rounded">
                     </div>
                 </div>
-                <div class="row">
-                    <div class="col-sm">
-                        <div class="form-group">
-                            <label>Name:</label>
-                            <input class="form-control user" name="username" type="text" placeholder="{{ user.username }}" readonly>
-                        </div>
+                <div id="user-info-loading" class="text-center py-4">
+                    <div class="spinner-border spinner-border-sm text-primary" role="status">
+                        <span class="visually-hidden">Loading...</span>
                     </div>
-                    <div class="col-sm">
-                        <div class="form-group">
-                            <label>Email:</label>
-                            <input class="form-control user" name="email" type="text" placeholder="{{ user.email }}" readonly>
-                        </div>
-                    </div>
+                    <span class="ms-2">Loading user information...</span>
                 </div>
-                <div class="row">
-                    <div class="col-sm">
-                        <div class="form-group">
-                            <label>Role:</label>
-                            <input class="form-control user" name="role" type="text" placeholder="{{ user_role }}" readonly>
+                <div id="user-info-content" style="display: none;">
+                    <div class="row">
+                        <div class="col-sm">
+                            <div class="form-group">
+                                <label>Name:</label>
+                                <input class="form-control user" id="username" name="username" type="text" placeholder="" readonly>
+                            </div>
+                        </div>
+                        <div class="col-sm">
+                            <div class="form-group">
+                                <label>Email:</label>
+                                <input class="form-control user" id="email" name="email" type="text" placeholder="" readonly>
+                            </div>
                         </div>
                     </div>
-                    <div class="col-sm">
-                        <div class="form-group">
-                            <label>Type:</label>
-                            <input class="form-control user" name="type" type="text" placeholder="{{ user.user_type }}" readonly>
+                    <div class="row">
+                        <div class="col-sm">
+                            <div class="form-group">
+                                <label>Role:</label>
+                                <input class="form-control user" id="role" name="role" type="text" placeholder="" readonly>
+                            </div>
+                        </div>
+                        <div class="col-sm">
+                            <div class="form-group">
+                                <label>Type:</label>
+                                <input class="form-control user" id="type" name="type" type="text" placeholder="" readonly>
+                            </div>
                         </div>
                     </div>
                 </div>
@@ -134,6 +142,7 @@
         </div>
         <div id="hiddenFOOTER" class="modal-footer m-3" hidden=true>
             <div class="form-group">
+                <div id="password-form-messages"></div>
                 <button type="button" class="btn btn-secondary m-1" onclick="unhideElementsById(['hiddenDIV','hiddenHR','hiddenFOOTER'])">Close</button>
                 <button type="submit" class="btn btn-primary m-1" >Update Profile</button>
             </div>
@@ -153,16 +162,145 @@
     <script src="{{ url_for('static',filename='/vendor/check-strength-password/password-strength.js') }}"></script>
 
     <script>
-        $('#new_password').keyup(function(event) {
-            var old_password = $('#old_password').val();
-            var new_password = $('#new_password').val();
-            checkPasswordStrength(old_password, new_password);
+        // Escape HTML helper
+        function escapeHtml(text) {
+            if (!text) return '';
+            const map = {
+                '&': '&amp;',
+                '<': '&lt;',
+                '>': '&gt;',
+                '"': '&quot;',
+                "'": '&#039;'
+            };
+            return text.toString().replace(/[&<>"']/g, m => map[m]);
+        }
+        
+        // Load user info from API
+        async function loadUserInfo() {
+            try {
+                const apiUrl = '/api/v1/users/info';
+                console.log('Fetching user info from:', apiUrl);
+                
+                const response = await fetch(apiUrl);
+                if (!response.ok) {
+                    throw new Error(`HTTP error! status: ${response.status}`);
+                }
+                
+                const data = await response.json();
+                console.log('User info API response:', data);
+                
+                if (data.error) {
+                    throw new Error(data.message || 'Failed to load user information');
+                }
+                
+                const user = data.data || {};
+                
+                // Populate form fields
+                document.getElementById('username').value = user.username || '';
+                document.getElementById('username').placeholder = user.username || '';
+                document.getElementById('email').value = user.email || '';
+                document.getElementById('email').placeholder = user.email || '';
+                document.getElementById('role').value = user.role || '';
+                document.getElementById('role').placeholder = user.role || '';
+                document.getElementById('type').value = user.user_type || '';
+                document.getElementById('type').placeholder = user.user_type || '';
+                
+                // Hide loading, show content
+                document.getElementById('user-info-loading').style.display = 'none';
+                document.getElementById('user-info-content').style.display = 'block';
+                
+            } catch (error) {
+                console.error('Error loading user information:', error);
+                document.getElementById('user-info-loading').innerHTML = 
+                    '<div class="alert alert-danger">Error loading user information: ' + escapeHtml(error.message) + '</div>';
+            }
+        }
+        
+        // Handle form submission for password update
+        document.addEventListener('DOMContentLoaded', function() {
+            loadUserInfo();
+            
+            const form = document.getElementById('user-info-form');
+            if (form) {
+                form.addEventListener('submit', async function(e) {
+                    e.preventDefault();
+                    
+                    const messagesDiv = document.getElementById('password-form-messages');
+                    messagesDiv.innerHTML = '';
+                    
+                    const oldPassword = document.getElementById('old_password').value.trim();
+                    const newPassword = document.getElementById('new_password').value.trim();
+                    const confirmPassword = document.getElementById('confirm_new_password').value.trim();
+                    const username = document.getElementById('username').value.trim();
+                    
+                    // Validate
+                    if (!oldPassword || !newPassword || !confirmPassword) {
+                        messagesDiv.innerHTML = '<div class="alert alert-danger">All password fields are required.</div>';
+                        return;
+                    }
+                    
+                    if (newPassword !== confirmPassword) {
+                        messagesDiv.innerHTML = '<div class="alert alert-danger">New password and confirmation do not match.</div>';
+                        return;
+                    }
+                    
+                    try {
+                        const apiUrl = `/api/v1/users/${encodeURIComponent(username)}/password`;
+                        console.log('Updating password:', apiUrl);
+                        
+                        const response = await fetch(apiUrl, {
+                            method: 'PUT',
+                            headers: {
+                                'Content-Type': 'application/json',
+                            },
+                            body: JSON.stringify({
+                                old_password: oldPassword,
+                                new_password: newPassword
+                            })
+                        });
+                        
+                        const data = await response.json();
+                        
+                        if (!response.ok) {
+                            throw new Error(data.message || `HTTP error! status: ${response.status}`);
+                        }
+                        
+                        // Show success message
+                        messagesDiv.innerHTML = '<div class="alert alert-success">' + escapeHtml(data.message || 'Password updated successfully') + '</div>';
+                        
+                        // Reset password fields
+                        document.getElementById('old_password').value = '';
+                        document.getElementById('new_password').value = '';
+                        document.getElementById('confirm_new_password').value = '';
+                        
+                        // Hide password form
+                        unhideElementsById(['hiddenDIV','hiddenHR','hiddenFOOTER']);
+                        
+                    } catch (error) {
+                        console.error('Error updating password:', error);
+                        messagesDiv.innerHTML = '<div class="alert alert-danger">Error: ' + escapeHtml(error.message) + '</div>';
+                    }
+                });
+            }
         });
+        
+        // Password strength checking (wait for DOM to be ready)
+        $(document).ready(function() {
+            $('#new_password').on('keyup', function(event) {
+                var old_password = $('#old_password').val();
+                var new_password = $('#new_password').val();
+                if (typeof checkPasswordStrength === 'function') {
+                    checkPasswordStrength(old_password, new_password);
+                }
+            });
 
-        $('#confirm_new_password').keyup(function(event) {
-            var confirm_new_password = $('#confirm_new_password').val();
-            var new_password = $('#new_password').val();
-            checkPasswordConformation(new_password, confirm_new_password);
+            $('#confirm_new_password').on('keyup', function(event) {
+                var confirm_new_password = $('#confirm_new_password').val();
+                var new_password = $('#new_password').val();
+                if (typeof checkPasswordConformation === 'function') {
+                    checkPasswordConformation(new_password, confirm_new_password);
+                }
+            });
         });
     </script>
 {% endblock %}

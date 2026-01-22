@@ -11,7 +11,8 @@ from flask_smorest import Blueprint
 from lib.helper_functions import get_logger
 from lib.k8s.other import (
     k8sHPAListGet, k8sVPAListGet, k8sLimitRangeListGet,
-    k8sPodDisruptionBudgetListGet, k8sQuotaListGet, k8sPriorityClassList
+    k8sPodDisruptionBudgetListGet, k8sQuotaListGet, k8sPriorityClassList,
+    k8sRuntimeClassListGet
 )
 from lib.k8s.crds import get_custom_resources, get_custom_resource_data
 from lib.opentelemetry import get_tracer
@@ -697,4 +698,87 @@ class CRDDataResource(MethodView):
                     "plural": crd_name
                 }
             }), 500
+
+
+##############################################################
+## Runtime Classes
+##############################################################
+
+@other_resources_api_bp.route('/runtime-classes')
+class RuntimeClassesListResource(MethodView):
+    """
+    Runtime classes list endpoint.
+    """
+    
+    @other_resources_api_bp.response(200, description="Successfully retrieved runtime classes list")
+    @other_resources_api_bp.doc(tags=['Other Resources'])
+    @login_required
+    def get(self):
+        """
+        List runtime classes
+        
+        Returns:
+            dict: List of runtime classes with metadata
+        """
+        user_token = get_user_token(session)
+        
+        runtime_classes = k8sRuntimeClassListGet(session['user_role'], user_token)
+        
+        return jsonify({
+            "data": runtime_classes,
+            "metadata": {
+                "count": len(runtime_classes)
+            }
+        })
+
+
+@other_resources_api_bp.route('/runtime-classes/<name>')
+class RuntimeClassResource(MethodView):
+    """
+    Individual runtime class endpoint.
+    """
+    
+    @other_resources_api_bp.response(200, description="Successfully retrieved runtime class details")
+    @other_resources_api_bp.response(404, description="Runtime class not found")
+    @other_resources_api_bp.doc(tags=['Other Resources'])
+    @login_required
+    def get(self, name):
+        """
+        Get runtime class details
+        
+        Path Parameters:
+            name (str): Name of the runtime class
+        
+        Returns:
+            dict: Runtime class details
+        """
+        user_token = get_user_token(session)
+        
+        with tracer.start_as_current_span(
+            "runtime-class-get",
+            attributes={
+                "http.route": "/api/v1/other-resources/runtime-classes/{name}",
+                "http.method": "GET",
+                "runtime-class.name": name,
+            }
+        ) if tracer else nullcontext():
+            runtime_classes = k8sRuntimeClassListGet(session['user_role'], user_token)
+            runtime_class_data = None
+            for rc in runtime_classes:
+                if rc["name"] == name:
+                    runtime_class_data = rc
+                    break
+            
+            if not runtime_class_data:
+                return jsonify({
+                    "error": "NotFound",
+                    "message": f"RuntimeClass '{name}' not found"
+                }), 404
+            
+            return jsonify({
+                "data": runtime_class_data,
+                "metadata": {
+                    "name": name
+                }
+            })
 

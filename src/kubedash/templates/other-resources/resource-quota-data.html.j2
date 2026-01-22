@@ -6,9 +6,8 @@
       <nav aria-label="breadcrumb">
         <ol class="breadcrumb my-0">
           <li class="breadcrumb-item"><span>Other Resources</span></li>
-          <li class="breadcrumb-item active"><a href="/other-resource/resource-quota">Resource Quotas</a></li>
-          <li class="breadcrumb-item active"><span>{{ quota_data.name }}</span></li>
-
+          <li class="breadcrumb-item"><a href="/other-resource/resource-quota">Resource Quotas</a></li>
+          <li class="breadcrumb-item active"><span id="quota-name-breadcrumb">Loading...</span></li>
         </ol>
       </nav>
     </div>
@@ -32,135 +31,54 @@
                             <table class="table table-bordered" id="policyInfoTable" width="100%" cellspacing="0">
                                 <tr>
                                     <th>Name:</th>
-                                    <td>{{ quota_data.name }}</td>
+                                    <td id="quota-name">Loading...</td>
                                 </tr>
                                 <tr>
                                     <th>Created:</th>
-                                    <td>{{ quota_data.created }}</td>
+                                    <td id="quota-created">Loading...</td>
                                 </tr>
                                 <tr>
                                     <th>Namespace:</th>
-                                    <td>{{ quota_data.namespace }}</td>
+                                    <td id="quota-namespace">Loading...</td>
                                 </tr>
                                 <tr>
                                     <th>Creation:</th>
-                                    <td>{{ quota_data.creation_timestamp }}</td>
+                                    <td id="quota-creation-timestamp">Loading...</td>
                                 </tr>
+                                <tr>
                                     <th>Selectors:</th>
-                                    <td>
-                                        {% if quota_data.selectors %}
-                                        <table class="table table-bordered" id="selectorsTable" width="100%" cellspacing="0">
-                                            <thead>
-                                                <tr>
-                                                    <th width="50%">Key</th>
-                                                    <th width="50%">Value</th>
-                                                </tr>
-                                            </thead>
-                                            <tbody>
-                                            {% for key, value in quota_data.selectors.items() %}
-                                                <tr>
-                                                    <td width="50%">{{ key }}</td>
-                                                    <td width="50%">{{ value }}</td>
-                                                </tr>
-                                            {% endfor %}
-                                            </tbody>
-                                        </table>
-                                        {% endif %}
+                                    <td id="quota-selectors-container">
+                                        <div class="spinner-border spinner-border-sm text-primary" role="status">
+                                            <span class="visually-hidden">Loading...</span>
+                                        </div>
                                     </td>
                                 </tr>
                                 <tr>
                                     <th>Scopes:</th>
-                                    <td>
-                                        {% if quota_data.scope %}
-                                            {% for scope in quota_data.scope %}
-                                                <span class="badge text-bg-tag text-bg-secondary">{{ scope }}</span>
-                                                {% if not loop.last %}<br>{% endif %}
-                                            {% endfor %}
-                                        {% endif %}
-                                    </td>
+                                    <td id="quota-scopes">Loading...</td>
                                 </tr>
                                 <tr>
                                     <th>Annotations:</th>
-                                    <td>
-                                        {% if quota_data.annotations %}
-                                        <table class="table table-bordered" id="annotationTable" width="100%" cellspacing="0">
-                                            <thead>
-                                                <tr>
-                                                    <th width="50%">Key</th>
-                                                    <th width="50%">Value</th>
-                                                </tr>
-                                            </thead>
-                                            <tbody>
-                                            {% for key, value in quota_data.annotations.items() %}
-                                                <tr>
-                                                {% if key != "kubectl.kubernetes.io/last-applied-configuration" %}
-                                                    <td width="50%">{{ key }}</td>
-                                                    <td width="50%">{{ value }}</td>
-                                                {% endif %}
-                                                </tr>
-                                            {% endfor %}
-                                            </tbody>
-                                        </table>
-                                        {% endif %}
+                                    <td id="quota-annotations-container">
+                                        <div class="spinner-border spinner-border-sm text-primary" role="status">
+                                            <span class="visually-hidden">Loading...</span>
+                                        </div>
                                     </td>
                                 </tr>
                                <tr>
-                                    <th>Lables:</th>
-                                    <td>
-                                        {% if quota_data.labels %}
-                                        <table class="table table-bordered" id="labelsTable" width="100%" cellspacing="0">
-                                            <thead>
-                                                <tr>
-                                                    <th width="50%">Key</th>
-                                                    <th width="50%">Value</th>
-                                                </tr>
-                                            </thead>
-                                            <tbody>
-                                            {% for key, value in quota_data.labels.items() %}
-                                                <tr>
-                                                    <td width="50%">{{ key }}</td>
-                                                    <td width="50%">{{ value }}</td>
-                                                </tr>
-                                            {% endfor %}
-                                            </tbody>
-                                        </table>
-                                        {% endif %}
+                                    <th>Labels:</th>
+                                    <td id="quota-labels-container">
+                                        <div class="spinner-border spinner-border-sm text-primary" role="status">
+                                            <span class="visually-hidden">Loading...</span>
+                                        </div>
                                     </td>
                                 </tr>
                                 <tr>
                                     <th>Status:</th>
-                                    <td>
-                                        <table class="table table-bordered" id="policyInfoTable" width="100%" cellspacing="0">
-                                            <thead>
-                                                <tr>
-                                                    <th>Resource</th>
-                                                    <th>Used</th>
-                                                    <th>Hard Limit</th>
-                                                </tr>
-                                            </thead>
-                                            <tbody>
-                                                <tr>
-                                                    <td>limits.cpu</td>
-                                                    <td>{{ quota_data.status.used["limits.cpu"] }}</td>
-                                                    <td>{{ quota_data.status.hard["limits.cpu"] }}</td>
-                                                </tr>
-                                                <tr>
-                                                    <td>limits.memory</td>
-                                                    <td>{{ quota_data.status.used["limits.memory"] }}</td>
-                                                    <td>{{ quota_data.status.hard["limits.memory"] }}</td>
-                                                </tr>
-                                                <tr>
-                                                    <td>requests.cpu</td>
-                                                    <td>{{ quota_data.status.used["requests.cpu"] }}</td>
-                                                    <td>{{ quota_data.status.hard["requests.cpu"] }}</td>
-                                                </tr>
-                                                <tr>
-                                                    <td>requests.memory</td>
-                                                    <td>{{ quota_data.status.used["requests.memory"] }}</td>
-                                                    <td>{{ quota_data.status.hard["requests.memory"] }}</td>
-                                                </tr>
-                                            </tbody>
-                                        </table>
+                                    <td id="quota-status-container">
+                                        <div class="spinner-border spinner-border-sm text-primary" role="status">
+                                            <span class="visually-hidden">Loading...</span>
+                                        </div>
                                     </td>
                                 </tr>
                             </table>
@@ -174,4 +92,244 @@
 
 {% block add_head_css %}
 {% include "segments/datatable_snippet.html.j2" %}
+{% endblock %}
+
+{% block add_tail_js %}
+<script>
+    const escapeHtml = (text) => {
+        if (text === null || text === undefined) return '';
+        const map = {
+            '&': '&amp;',
+            '<': '&lt;',
+            '>': '&gt;',
+            '"': '&quot;',
+            "'": '&#039;'
+        };
+        return String(text).replace(/[&<>"']/g, m => map[m]);
+    };
+    
+    const csrf_token = {{ csrf_token()|tojson }};
+    
+    // Get Quota name and namespace from URL, sessionStorage, or topbar selector
+    function getQuotaInfo() {
+        const urlParams = new URLSearchParams(window.location.search);
+        let quotaName = urlParams.get('quota_name');
+        let namespace = urlParams.get('namespace');
+        
+        // Fallback to sessionStorage
+        if (!quotaName) {
+            quotaName = sessionStorage.getItem('quota_data_name');
+        }
+        if (!namespace) {
+            namespace = sessionStorage.getItem('ns_select');
+        }
+        
+        // Fallback to topbar selector
+        if (!namespace) {
+            const topbarSelect = document.getElementById('inputGroupSelect04');
+            if (topbarSelect && topbarSelect.value) {
+                namespace = topbarSelect.value;
+                // Store it in sessionStorage for consistency
+                sessionStorage.setItem('ns_select', namespace);
+            }
+        }
+        
+        // Final fallback
+        if (!namespace) {
+            namespace = 'default';
+        }
+        
+        return { quotaName, namespace };
+    }
+    
+    // Initialize namespace selector with sessionStorage value on page load
+    document.addEventListener('DOMContentLoaded', function() {
+        const namespaceSelect = document.getElementById('inputGroupSelect04');
+        if (namespaceSelect) {
+            const savedNamespace = sessionStorage.getItem('ns_select');
+            if (savedNamespace && namespaceSelect.querySelector(`option[value="${savedNamespace}"]`)) {
+                namespaceSelect.value = savedNamespace;
+            }
+        }
+    });
+    
+    function populateQuotaInfo(quota) {
+        if (!quota) {
+            document.getElementById('quota-name').textContent = 'N/A';
+            document.getElementById('quota-created').textContent = 'N/A';
+            document.getElementById('quota-namespace').textContent = 'N/A';
+            return;
+        }
+        
+        // Update breadcrumb
+        const breadcrumb = document.getElementById('quota-name-breadcrumb');
+        if (breadcrumb) {
+            breadcrumb.textContent = quota.name || 'N/A';
+        }
+        
+        // Basic info
+        document.getElementById('quota-name').textContent = escapeHtml(quota.name || 'N/A');
+        document.getElementById('quota-created').textContent = escapeHtml(quota.created || 'N/A');
+        document.getElementById('quota-namespace').textContent = escapeHtml(quota.namespace || 'N/A');
+        document.getElementById('quota-creation-timestamp').textContent = escapeHtml(quota.creation_timestamp || quota.creationTimestamp || 'N/A');
+        
+        // Selectors
+        const selectorsContainer = document.getElementById('quota-selectors-container');
+        if (quota.selectors && Object.keys(quota.selectors).length > 0) {
+            let selectorsHtml = '<table class="table table-bordered" id="selectorsTable" width="100%" cellspacing="0">';
+            selectorsHtml += '<thead><tr><th width="50%">Key</th><th width="50%">Value</th></tr></thead><tbody>';
+            for (const [key, value] of Object.entries(quota.selectors)) {
+                selectorsHtml += `<tr><td width="50%">${escapeHtml(key)}</td><td width="50%">${escapeHtml(String(value))}</td></tr>`;
+            }
+            selectorsHtml += '</tbody></table>';
+            selectorsContainer.innerHTML = selectorsHtml;
+        } else {
+            selectorsContainer.innerHTML = '<span class="text-muted">None</span>';
+        }
+        
+        // Scopes
+        const scopesContainer = document.getElementById('quota-scopes');
+        const scopes = quota.scope || quota.scopes || [];
+        if (Array.isArray(scopes) && scopes.length > 0) {
+            scopesContainer.innerHTML = scopes.map(scope => 
+                `<span class="badge text-bg-tag text-bg-secondary">${escapeHtml(String(scope))}</span>`
+            ).join('<br>');
+        } else if (scopes && !Array.isArray(scopes)) {
+            // Handle case where scope might be a single value
+            scopesContainer.innerHTML = `<span class="badge text-bg-tag text-bg-secondary">${escapeHtml(String(scopes))}</span>`;
+        } else {
+            scopesContainer.innerHTML = '<span class="text-muted">None</span>';
+        }
+        
+        // Annotations (excluding kubectl.kubernetes.io/last-applied-configuration)
+        const annotationsContainer = document.getElementById('quota-annotations-container');
+        if (quota.annotations && Object.keys(quota.annotations).length > 0) {
+            let annotationsHtml = '<table class="table table-bordered" id="annotationTable" width="100%" cellspacing="0">';
+            annotationsHtml += '<thead><tr><th width="50%">Key</th><th width="50%">Value</th></tr></thead><tbody>';
+            for (const [key, value] of Object.entries(quota.annotations)) {
+                if (key !== 'kubectl.kubernetes.io/last-applied-configuration') {
+                    annotationsHtml += `<tr><td width="50%">${escapeHtml(key)}</td><td width="50%">${escapeHtml(String(value))}</td></tr>`;
+                }
+            }
+            annotationsHtml += '</tbody></table>';
+            annotationsContainer.innerHTML = annotationsHtml;
+        } else {
+            annotationsContainer.innerHTML = '<span class="text-muted">None</span>';
+        }
+        
+        // Labels
+        const labelsContainer = document.getElementById('quota-labels-container');
+        if (quota.labels && Object.keys(quota.labels).length > 0) {
+            let labelsHtml = '<table class="table table-bordered" id="labelsTable" width="100%" cellspacing="0">';
+            labelsHtml += '<thead><tr><th width="50%">Key</th><th width="50%">Value</th></tr></thead><tbody>';
+            for (const [key, value] of Object.entries(quota.labels)) {
+                labelsHtml += `<tr><td width="50%">${escapeHtml(key)}</td><td width="50%">${escapeHtml(String(value))}</td></tr>`;
+            }
+            labelsHtml += '</tbody></table>';
+            labelsContainer.innerHTML = labelsHtml;
+        } else {
+            labelsContainer.innerHTML = '<span class="text-muted">None</span>';
+        }
+        
+        // Status
+        const statusContainer = document.getElementById('quota-status-container');
+        const status = quota.status || {};
+        const used = status.used || {};
+        const hard = status.hard || {};
+        
+        let statusHtml = '<table class="table table-bordered" id="statusTable" width="100%" cellspacing="0">';
+        statusHtml += '<thead><tr><th>Resource</th><th>Used</th><th>Hard Limit</th></tr></thead><tbody>';
+        
+        // Common resources to display
+        const resources = [
+            { key: 'limits.cpu', display: 'limits.cpu' },
+            { key: 'limits.memory', display: 'limits.memory' },
+            { key: 'requests.cpu', display: 'requests.cpu' },
+            { key: 'requests.memory', display: 'requests.memory' }
+        ];
+        
+        for (const resource of resources) {
+            const usedValue = used[resource.key] || used[resource.key.replace('.', '')] || 'N/A';
+            const hardValue = hard[resource.key] || hard[resource.key.replace('.', '')] || 'N/A';
+            statusHtml += `
+                <tr>
+                    <td>${escapeHtml(resource.display)}</td>
+                    <td>${escapeHtml(String(usedValue))}</td>
+                    <td>${escapeHtml(String(hardValue))}</td>
+                </tr>
+            `;
+        }
+        
+        // Also display any other resources that might be present
+        const allResourceKeys = new Set([
+            ...Object.keys(used),
+            ...Object.keys(hard)
+        ]);
+        
+        for (const key of allResourceKeys) {
+            if (!resources.some(r => r.key === key || r.key.replace('.', '') === key)) {
+                const usedValue = used[key] || 'N/A';
+                const hardValue = hard[key] || 'N/A';
+                statusHtml += `
+                    <tr>
+                        <td>${escapeHtml(key)}</td>
+                        <td>${escapeHtml(String(usedValue))}</td>
+                        <td>${escapeHtml(String(hardValue))}</td>
+                    </tr>
+                `;
+            }
+        }
+        
+        statusHtml += '</tbody></table>';
+        statusContainer.innerHTML = statusHtml;
+    }
+    
+    async function loadQuotaData() {
+        const { quotaName, namespace } = getQuotaInfo();
+        
+        if (!quotaName) {
+            console.error('No Quota name provided');
+            document.getElementById('quota-name-breadcrumb').textContent = 'Error';
+            document.getElementById('quota-name').textContent = 'Error: Quota name not provided';
+            return;
+        }
+        
+        // Update breadcrumb
+        document.getElementById('quota-name-breadcrumb').textContent = quotaName;
+        
+        try {
+            const apiUrl = `/api/v1/other-resources/quotas/${encodeURIComponent(quotaName)}?namespace=${encodeURIComponent(namespace)}`;
+            console.log('Fetching Resource Quota from:', apiUrl);
+            
+            const response = await fetch(apiUrl);
+            if (!response.ok) {
+                if (response.status === 404) {
+                    throw new Error(`Resource Quota '${quotaName}' not found in namespace '${namespace}'`);
+                }
+                throw new Error(`HTTP error! status: ${response.status}`);
+            }
+            
+            const data = await response.json();
+            console.log('Resource Quota API response:', data);
+            
+            if (data.error) {
+                throw new Error(data.message || 'Failed to load Resource Quota');
+            }
+            
+            const quota = data.data || {};
+            populateQuotaInfo(quota);
+            
+        } catch (error) {
+            console.error('Error loading Resource Quota:', error);
+            document.getElementById('quota-name').textContent = 'Error: ' + escapeHtml(error.message);
+            document.getElementById('quota-created').textContent = 'N/A';
+            document.getElementById('quota-namespace').textContent = 'N/A';
+        }
+    }
+    
+    // Load data when page loads
+    document.addEventListener('DOMContentLoaded', function() {
+        loadQuotaData();
+    });
+</script>
 {% endblock %}

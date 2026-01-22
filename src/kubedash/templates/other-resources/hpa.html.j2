@@ -6,7 +6,8 @@
       <nav aria-label="breadcrumb">
         <ol class="breadcrumb my-0">
           <li class="breadcrumb-item"><span>Other Resources</span></li>
-          <li class="breadcrumb-item active"><span>HPAs</span></li>  </ol>
+          <li class="breadcrumb-item active"><span>HPAs</span></li>
+        </ol>
       </nav>
     </div>
 </ul>
@@ -34,41 +35,15 @@
                       <th>Replicas</th>
                     </tr>
                   </thead>
-                  <tbody>
-                    {% for hpa in hpas %}
-                    {% if selected == hpa.name %} 
-                      <tr class="selected" >
-                    {% else %}
-                      <tr>
-                    {% endif %}
-                        <td>
-                          <form action="/other-resource/horizontal-pod-autoscaler/data" method="POST">
-                            <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
-                            <input type="hidden" name="hpa_name" value="{{ hpa.name }}" />
-                            <a href="javascript:;" onclick="parentNode.submit();">{{ hpa.name }}</a>
-                          </form>
+                  <tbody id="hpas-tbody">
+                    <tr>
+                        <td colspan="7" class="text-center">
+                            <div class="spinner-border spinner-border-sm text-primary" role="status">
+                                <span class="visually-hidden">Loading...</span>
+                            </div>
+                            <span class="ms-2">Loading HPAs...</span>
                         </td>
-                        <td>{{ hpa.namespace }}</td>
-                        <td>
-                          <form action="/workload/{{ hpa.spec.scale_target_ref.kind | lower}}s" method="POST">
-                              <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
-                              <input type="hidden" name="ns_select" value="{{ hpa.namespace }}" />
-                              <input type="hidden" name="selected" value="{{ hpa.spec.scale_target_ref.name }}" />
-                              <a href="javascript:;" onclick="parentNode.submit();">{{ hpa.spec.scale_target_ref.name }}</a>
-                          </form>
-                        </td>
-                        <td>
-                          {% if hpa.status.current_cpu_utilization_percentage %}
-                            <span class="badge text-bg-tag text-bg-secondary">{{ hpa.status.current_cpu_utilization_percentage }} / {{ hpa.spec.target_cpu_utilization_percentage }} %</span>
-                          {% else %}
-                            <span class="badge text-bg-tag text-bg-secondary">UNKNOWN / {{ hpa.spec.target_cpu_utilization_percentage }} %</span>
-                          {% endif %}
-                        </td>
-                        <td>{{ hpa.spec.max_replicas }}</td>
-                        <td>{{ hpa.spec.min_replicas }}</td>
-                        <td>{{ hpa.status.current_replicas }}</td>
-                      </tr>
-                    {% endfor %}
+                    </tr>
                   </tbody>
             </table>
         </div>
@@ -78,4 +53,285 @@
 
 {% block add_head_css %}
 {% include "segments/datatable_snippet.html.j2" %}
+{% endblock %}
+
+{% block add_tail_js %}
+<script>
+    const escapeHtml = (text) => {
+        if (text === null || text === undefined) return '';
+        const map = {
+            '&': '&amp;',
+            '<': '&lt;',
+            '>': '&gt;',
+            '"': '&quot;',
+            "'": '&#039;'
+        };
+        return String(text).replace(/[&<>"']/g, m => map[m]);
+    };
+    
+    const csrf_token = {{ csrf_token()|tojson }};
+    
+    // DataTables protection - prevent auto-initialization on loading rows
+    (function() {
+        const originalTableId = 'dataTable';
+        const tempTableId = 'hpasTable_' + Date.now();
+        
+        // Temporarily change table ID to prevent auto-initialization
+        document.addEventListener('DOMContentLoaded', function() {
+            const table = document.getElementById(originalTableId);
+            if (table) {
+                table.id = tempTableId;
+            }
+        });
+        
+        // Override DataTable initialization to prevent on colspan rows
+        if (typeof $ !== 'undefined' && $.fn.DataTable) {
+            const originalDataTable = $.fn.DataTable;
+            $.fn.DataTable = function(opts) {
+                const $this = $(this);
+                // Check if this is a loading row with colspan
+                if ($this.find('tbody tr td[colspan]').length > 0) {
+                    console.log('Blocked DataTable initialization on loading row');
+                    return $this;
+                }
+                return originalDataTable.apply(this, arguments);
+            };
+        }
+        
+        // Clean up any auto-initialized DataTables
+        setTimeout(function() {
+            if (typeof $ !== 'undefined' && $.fn.DataTable) {
+                const table = document.getElementById(tempTableId);
+                if (table) {
+                    try {
+                        const $table = $('#' + tempTableId);
+                        if ($table.length && $table.data('DataTable')) {
+                            $table.DataTable().destroy();
+                        }
+                    } catch (e) {
+                        // DataTable not initialized or error, ignore
+                    }
+                    table.id = originalTableId;
+                }
+            }
+        }, 100);
+        
+        setTimeout(function() {
+            if (typeof $ !== 'undefined' && $.fn.DataTable) {
+                const table = document.getElementById(tempTableId);
+                if (table) {
+                    try {
+                        const $table = $('#' + tempTableId);
+                        if ($table.length && $table.data('DataTable')) {
+                            $table.DataTable().destroy();
+                        }
+                    } catch (e) {
+                        // DataTable not initialized or error, ignore
+                    }
+                    table.id = originalTableId;
+                }
+            }
+        }, 500);
+    })();
+    
+    // Get namespace from topbar selector or use default
+    function getSelectedNamespace() {
+        // First check URL parameter
+        const urlParams = new URLSearchParams(window.location.search);
+        let namespace = urlParams.get('namespace');
+        
+        // Then check topbar selector
+        if (!namespace) {
+            const topbarSelect = document.getElementById('inputGroupSelect04');
+            if (topbarSelect && topbarSelect.value) {
+                namespace = topbarSelect.value;
+            }
+        }
+        
+        // Fallback to sessionStorage
+        if (!namespace) {
+            namespace = sessionStorage.getItem('ns_select');
+        }
+        
+        // Final fallback to default
+        return namespace || 'default';
+    }
+    
+    // Initialize namespace selector with sessionStorage value on page load
+    document.addEventListener('DOMContentLoaded', function() {
+        const namespaceSelect = document.getElementById('inputGroupSelect04');
+        if (namespaceSelect) {
+            const savedNamespace = sessionStorage.getItem('ns_select');
+            if (savedNamespace && namespaceSelect.querySelector(`option[value="${savedNamespace}"]`)) {
+                namespaceSelect.value = savedNamespace;
+            }
+        }
+    });
+    
+    function populateHPATable(hpas) {
+        const tbody = document.getElementById('hpas-tbody');
+        
+        if (!hpas || hpas.length === 0) {
+            tbody.innerHTML = '<tr><td colspan="7" class="text-center">No HPAs found</td></tr>';
+            return;
+        }
+        
+        // Get selected HPA from URL
+        const urlParams = new URLSearchParams(window.location.search);
+        const selectedHPA = urlParams.get('selected');
+        const namespace = getSelectedNamespace();
+        
+        const rows = hpas.map(hpa => {
+            const name = escapeHtml(hpa.name || '');
+            const ns = escapeHtml(hpa.namespace || '');
+            
+            // Handle both snake_case and camelCase from Kubernetes API
+            const spec = hpa.spec || {};
+            const status = hpa.status || {};
+            const scaleTargetRef = spec.scale_target_ref || spec.scaleTargetRef || {};
+            
+            const ownerKind = escapeHtml(scaleTargetRef.kind || '');
+            const ownerName = escapeHtml(scaleTargetRef.name || '');
+            
+            // Handle CPU utilization (check both naming conventions)
+            const currentCpu = status.current_cpu_utilization_percentage || 
+                              status.currentCpuUtilizationPercentage || 
+                              'UNKNOWN';
+            const targetCpu = spec.target_cpu_utilization_percentage || 
+                             spec.targetCpuUtilizationPercentage || 
+                             'N/A';
+            
+            // Handle replicas (check both naming conventions)
+            const minReplicas = spec.min_replicas || spec.minReplicas || 'N/A';
+            const maxReplicas = spec.max_replicas || spec.maxReplicas || 'N/A';
+            const currentReplicas = status.current_replicas || status.currentReplicas || 'N/A';
+            
+            const isSelected = selectedHPA === hpa.name;
+            const rowClass = isSelected ? 'selected' : '';
+            
+            const ownerLink = ownerName ? `
+                <form action="/workload/${ownerKind.toLowerCase()}s" method="POST" onsubmit="sessionStorage.setItem('ns_select', '${escapeHtml(ns)}'); return true;">
+                    <input type="hidden" name="csrf_token" value="${escapeHtml(csrf_token)}">
+                    <input type="hidden" name="ns_select" value="${escapeHtml(ns)}" />
+                    <input type="hidden" name="selected" value="${ownerName}" />
+                    <a href="javascript:;" onclick="parentNode.submit();">${ownerName}</a>
+                </form>
+            ` : '-';
+            
+            return `
+                <tr class="${rowClass}">
+                    <td>
+                        <form action="/other-resource/horizontal-pod-autoscaler/data" method="POST" onsubmit="sessionStorage.setItem('ns_select', '${escapeHtml(ns)}'); sessionStorage.setItem('hpa_data_name', '${name}'); return true;">
+                            <input type="hidden" name="csrf_token" value="${escapeHtml(csrf_token)}">
+                            <input type="hidden" name="ns_select" value="${escapeHtml(ns)}" />
+                            <input type="hidden" name="hpa_name" value="${name}" />
+                            <a href="javascript:;" onclick="parentNode.submit();">${name}</a>
+                        </form>
+                    </td>
+                    <td>${ns}</td>
+                    <td>${ownerLink}</td>
+                    <td>
+                        <span class="badge text-bg-tag text-bg-secondary">${escapeHtml(String(currentCpu))} / ${escapeHtml(String(targetCpu))} %</span>
+                    </td>
+                    <td>${escapeHtml(String(minReplicas))}</td>
+                    <td>${escapeHtml(String(maxReplicas))}</td>
+                    <td>${escapeHtml(String(currentReplicas))}</td>
+                </tr>
+            `;
+        }).join('');
+        
+        tbody.innerHTML = rows;
+        
+        // Initialize DataTables after a short delay to ensure DOM is updated
+        setTimeout(function() {
+            const table = document.getElementById('dataTable');
+            if (table && typeof $ !== 'undefined' && $.fn.DataTable) {
+                try {
+                    const $table = $('#dataTable');
+                    
+                    // Check if DataTable is already initialized
+                    let isInitialized = false;
+                    if ($table.length) {
+                        // Use the recommended DataTables API to check if already initialized
+                        if (typeof $.fn.DataTable.isDataTable === 'function' && $.fn.DataTable.isDataTable('#dataTable')) {
+                            isInitialized = true;
+                        }
+                        // Fallback: Check if DataTable instance exists via jQuery data
+                        else if ($table.data('DataTable')) {
+                            isInitialized = true;
+                        }
+                    }
+                    
+                    // Destroy existing DataTable if it exists
+                    if (isInitialized) {
+                        try {
+                            $table.DataTable().destroy();
+                        } catch (destroyError) {
+                            console.warn('Error destroying DataTable:', destroyError);
+                        }
+                    }
+                    
+                    // Initialize DataTables (only if not already initialized or after destroy)
+                    if (!isInitialized) {
+                        $('#dataTable').DataTable({
+                            responsive: true,
+                            order: [[0, 'asc']],
+                            pageLength: 25
+                        });
+                    }
+                } catch (e) {
+                    console.warn('Error initializing DataTable:', e);
+                }
+            }
+        }, 50);
+    }
+    
+    async function loadHPAs(namespace) {
+        try {
+            const apiUrl = `/api/v1/other-resources/hpa${namespace ? '?namespace=' + encodeURIComponent(namespace) : ''}`;
+            console.log('Fetching HPAs from:', apiUrl);
+            
+            const response = await fetch(apiUrl);
+            if (!response.ok) {
+                throw new Error(`HTTP error! status: ${response.status}`);
+            }
+            
+            const data = await response.json();
+            console.log('HPAs API response:', data);
+            
+            if (data.error) {
+                throw new Error(data.message || 'Failed to load HPAs');
+            }
+            
+            const hpas = data.data || [];
+            populateHPATable(hpas);
+            
+        } catch (error) {
+            console.error('Error loading HPAs:', error);
+            const tbody = document.getElementById('hpas-tbody');
+            if (tbody) {
+                tbody.innerHTML = '<tr><td colspan="7" class="text-center text-danger">Error loading HPAs: ' + escapeHtml(error.message) + '</td></tr>';
+            }
+        }
+    }
+    
+    // Load data when page loads
+    document.addEventListener('DOMContentLoaded', function() {
+        const namespace = getSelectedNamespace();
+        loadHPAs(namespace);
+    });
+    
+    // Reload data when namespace changes (if namespace selector exists)
+    document.addEventListener('DOMContentLoaded', function() {
+        const namespaceSelect = document.getElementById('inputGroupSelect04');
+        if (namespaceSelect) {
+            namespaceSelect.addEventListener('change', function() {
+                const namespace = this.value;
+                console.log('Namespace changed to:', namespace);
+                sessionStorage.setItem('ns_select', namespace);
+                loadHPAs(namespace);
+            });
+        }
+    });
+</script>
 {% endblock %}

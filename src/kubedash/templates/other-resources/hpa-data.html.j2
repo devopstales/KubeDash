@@ -7,7 +7,7 @@
         <ol class="breadcrumb my-0">
           <li class="breadcrumb-item"><span>Other Resources</span></li>
           <li class="breadcrumb-item"><a href="/other-resource/horizontal-pod-autoscaler">HPAs</a></li>
-          <li class="breadcrumb-item active"><span>{{ hpa_data.name }}</span></li>
+          <li class="breadcrumb-item active"><span id="hpa-name-breadcrumb">Loading...</span></li>
         </ol>
       </nav>
     </div>
@@ -31,94 +31,51 @@
                             <table class="table table-bordered" id="policyInfoTable" width="100%" cellspacing="0">
                                 <tr>
                                     <th>Name:</th>
-                                    <td>{{ hpa_data.name }}</td>
+                                    <td id="hpa-name">Loading...</td>
                                 </tr>
                                 <tr>
                                     <th>Created:</th>
-                                    <td>{{ hpa_data.created }}</td>
+                                    <td id="hpa-created">Loading...</td>
                                 </tr>
                                 <tr>
                                     <th>Namespace:</th>
-                                    <td>{{ hpa_data.namespace }}</td>
+                                    <td id="hpa-namespace">Loading...</td>
                                 </tr>
                                 <tr>
                                     <th>Annotations:</th>
-                                    <td>
-                                        {% if hpa_data.annotations %}
-                                        <table class="table table-bordered" id="annotationTable" width="100%" cellspacing="0">
-                                            <thead>
-                                                <tr>
-                                                    <th width="50%">Key</th>
-                                                    <th width="50%">Value</th>
-                                                </tr>
-                                            </thead>
-                                            <tbody>
-                                            {% for key, value in hpa_data.annotations.items() %}
-                                                <tr>
-                                                    <td width="50%">{{ key }}</td>
-                                                    <td width="50%">{{ value }}</td>
-                                                </tr>
-                                            {% endfor %}
-                                            </tbody>
-                                        </table>
-                                        {% endif %}
+                                    <td id="hpa-annotations-container">
+                                        <div class="spinner-border spinner-border-sm text-primary" role="status">
+                                            <span class="visually-hidden">Loading...</span>
+                                        </div>
                                     </td>
                                 </tr>
                                <tr>
-                                    <th>Lables:</th>
-                                    <td>
-                                        {% if hpa_data.labels %}
-                                        <table class="table table-bordered" id="labelsTable" width="100%" cellspacing="0">
-                                            <thead>
-                                                <tr>
-                                                    <th width="50%">Key</th>
-                                                    <th width="50%">Value</th>
-                                                </tr>
-                                            </thead>
-                                            <tbody>
-                                            {% for key, value in hpa_data.labels.items() %}
-                                                <tr>
-                                                    <td width="50%">{{ key }}</td>
-                                                    <td width="50%">{{ value }}</td>
-                                                </tr>
-                                            {% endfor %}
-                                            </tbody>
-                                        </table>
-                                        {% endif %}
+                                    <th>Labels:</th>
+                                    <td id="hpa-labels-container">
+                                        <div class="spinner-border spinner-border-sm text-primary" role="status">
+                                            <span class="visually-hidden">Loading...</span>
+                                        </div>
                                     </td>
                                 </tr>
                                 <tr>
                                     <th>Owner:</th>
-                                    <td>
-                                        <form action="/workload/{{ hpa_data.spec.scale_target_ref.kind | lower}}s" method="POST">
-                                            <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
-                                            <input type="hidden" name="ns_select" value="{{ hpa_data.namespace }}" />
-                                            <input type="hidden" name="selected" value="{{ hpa_data.spec.scale_target_ref.name }}" />
-                                            <a href="javascript:;" onclick="parentNode.submit();">{{ hpa_data.spec.scale_target_ref.name }}</a>
-                                        </form>
-                                    </td>
+                                    <td id="hpa-owner-container">Loading...</td>
                                 </tr>
                                 <tr>
                                     <th>Metrics:</th>
-                                    <td>
-                                        {% if hpa_data.status.current_cpu_utilization_percentage %}
-                                            <span class="badge text-bg-tag text-bg-secondary">{{ hpa_data.status.current_cpu_utilization_percentage }} / {{ hpa_data.spec.target_cpu_utilization_percentage }} %</span>
-                                        {% else %}
-                                            <span class="badge text-bg-tag text-bg-secondary">UNKNOWN / {{ hpa_data.spec.target_cpu_utilization_percentage }} %</span>
-                                        {% endif %}
-                                    </td>
+                                    <td id="hpa-metrics">Loading...</td>
                                 </tr>
                                 <tr>
                                     <th>MinReplicas:</th>
-                                    <td>{{ hpa_data.spec.min_replicas }}</td>
+                                    <td id="hpa-min-replicas">Loading...</td>
                                 </tr>
                                 <tr>
                                     <th>MaxReplicas:</th>
-                                    <td>{{ hpa_data.spec.max_replicas }}</td>
+                                    <td id="hpa-max-replicas">Loading...</td>
                                 </tr>
                                 <tr>
                                     <th>Deployment pods:</th>
-                                    <td>{{ hpa_data.status.current_replicas }} Current / {{ hpa_data.status.desired_replicas }} Desired</td>
+                                    <td id="hpa-replicas">Loading...</td>
                                 </tr>
                             </table>
                         </div>
@@ -138,7 +95,7 @@
                 <div class="card shadow mb-4">
                     <div class="card-body">
                         <div class="table-responsive">
-                            <table class="table table-bordered" id="policyInfoTable" width="100%" cellspacing="0">
+                            <table class="table table-bordered" id="conditionsTable" width="100%" cellspacing="0">
                             <thead>
                                 <tr>
                                     <th>Type</th>
@@ -148,14 +105,14 @@
                                     <th>Message</th>
                                 </tr>
                             </thead>
-                            <tbody>
-                                {% for condition in hpa_data.conditions %}
+                            <tbody id="conditions-tbody">
                                 <tr>
-                                    {% for key, value in condition.items() %}
-                                    <td>{{ value }}</td>
-                                    {% endfor %}
+                                    <td colspan="5" class="text-center">
+                                        <div class="spinner-border spinner-border-sm text-primary" role="status">
+                                            <span class="visually-hidden">Loading...</span>
+                                        </div>
+                                    </td>
                                 </tr>
-                                {% endfor %}
                             </tbody>
                             </table>
                         </div>
@@ -168,4 +125,243 @@
 
 {% block add_head_css %}
 {% include "segments/datatable_snippet.html.j2" %}
+{% endblock %}
+
+{% block add_tail_js %}
+<script>
+    const escapeHtml = (text) => {
+        if (text === null || text === undefined) return '';
+        const map = {
+            '&': '&amp;',
+            '<': '&lt;',
+            '>': '&gt;',
+            '"': '&quot;',
+            "'": '&#039;'
+        };
+        return String(text).replace(/[&<>"']/g, m => map[m]);
+    };
+    
+    const csrf_token = {{ csrf_token()|tojson }};
+    
+    // Get HPA name and namespace from URL, sessionStorage, or topbar selector
+    function getHPAInfo() {
+        const urlParams = new URLSearchParams(window.location.search);
+        let hpaName = urlParams.get('hpa_name');
+        let namespace = urlParams.get('namespace');
+        
+        // Fallback to sessionStorage
+        if (!hpaName) {
+            hpaName = sessionStorage.getItem('hpa_data_name');
+        }
+        if (!namespace) {
+            namespace = sessionStorage.getItem('ns_select');
+        }
+        
+        // Fallback to topbar selector
+        if (!namespace) {
+            const topbarSelect = document.getElementById('inputGroupSelect04');
+            if (topbarSelect && topbarSelect.value) {
+                namespace = topbarSelect.value;
+                // Store it in sessionStorage for consistency
+                sessionStorage.setItem('ns_select', namespace);
+            }
+        }
+        
+        // Final fallback
+        if (!namespace) {
+            namespace = 'default';
+        }
+        
+        return { hpaName, namespace };
+    }
+    
+    // Initialize namespace selector with sessionStorage value on page load
+    document.addEventListener('DOMContentLoaded', function() {
+        const namespaceSelect = document.getElementById('inputGroupSelect04');
+        if (namespaceSelect) {
+            const savedNamespace = sessionStorage.getItem('ns_select');
+            if (savedNamespace && namespaceSelect.querySelector(`option[value="${savedNamespace}"]`)) {
+                namespaceSelect.value = savedNamespace;
+            }
+        }
+    });
+    
+    function populateHPAInfo(hpa) {
+        if (!hpa) {
+            document.getElementById('hpa-name').textContent = 'N/A';
+            document.getElementById('hpa-created').textContent = 'N/A';
+            document.getElementById('hpa-namespace').textContent = 'N/A';
+            return;
+        }
+        
+        // Update breadcrumb
+        const breadcrumb = document.getElementById('hpa-name-breadcrumb');
+        if (breadcrumb) {
+            breadcrumb.textContent = hpa.name || 'N/A';
+        }
+        
+        // Basic info
+        document.getElementById('hpa-name').textContent = escapeHtml(hpa.name || 'N/A');
+        document.getElementById('hpa-created').textContent = escapeHtml(hpa.created || 'N/A');
+        document.getElementById('hpa-namespace').textContent = escapeHtml(hpa.namespace || 'N/A');
+        
+        // Annotations
+        const annotationsContainer = document.getElementById('hpa-annotations-container');
+        if (hpa.annotations && Object.keys(hpa.annotations).length > 0) {
+            let annotationsHtml = '<table class="table table-bordered" id="annotationTable" width="100%" cellspacing="0">';
+            annotationsHtml += '<thead><tr><th width="50%">Key</th><th width="50%">Value</th></tr></thead><tbody>';
+            for (const [key, value] of Object.entries(hpa.annotations)) {
+                annotationsHtml += `<tr><td width="50%">${escapeHtml(key)}</td><td width="50%">${escapeHtml(String(value))}</td></tr>`;
+            }
+            annotationsHtml += '</tbody></table>';
+            annotationsContainer.innerHTML = annotationsHtml;
+        } else {
+            annotationsContainer.innerHTML = '<span class="text-muted">No annotations</span>';
+        }
+        
+        // Labels
+        const labelsContainer = document.getElementById('hpa-labels-container');
+        if (hpa.labels && Object.keys(hpa.labels).length > 0) {
+            let labelsHtml = '<table class="table table-bordered" id="labelsTable" width="100%" cellspacing="0">';
+            labelsHtml += '<thead><tr><th width="50%">Key</th><th width="50%">Value</th></tr></thead><tbody>';
+            for (const [key, value] of Object.entries(hpa.labels)) {
+                labelsHtml += `<tr><td width="50%">${escapeHtml(key)}</td><td width="50%">${escapeHtml(String(value))}</td></tr>`;
+            }
+            labelsHtml += '</tbody></table>';
+            labelsContainer.innerHTML = labelsHtml;
+        } else {
+            labelsContainer.innerHTML = '<span class="text-muted">No labels</span>';
+        }
+        
+        // Owner (scale target ref)
+        const ownerContainer = document.getElementById('hpa-owner-container');
+        const spec = hpa.spec || {};
+        const scaleTargetRef = spec.scale_target_ref || spec.scaleTargetRef || {};
+        const ownerKind = scaleTargetRef.kind || '';
+        const ownerName = scaleTargetRef.name || '';
+        const ns = hpa.namespace || '';
+        
+        if (ownerName && ownerKind) {
+            ownerContainer.innerHTML = `
+                <form action="/workload/${ownerKind.toLowerCase()}s" method="POST" onsubmit="sessionStorage.setItem('ns_select', '${escapeHtml(ns)}'); return true;">
+                    <input type="hidden" name="csrf_token" value="${escapeHtml(csrf_token)}">
+                    <input type="hidden" name="ns_select" value="${escapeHtml(ns)}" />
+                    <input type="hidden" name="selected" value="${escapeHtml(ownerName)}" />
+                    <a href="javascript:;" onclick="parentNode.submit();">${escapeHtml(ownerName)}</a>
+                </form>
+            `;
+        } else {
+            ownerContainer.innerHTML = '<span class="text-muted">N/A</span>';
+        }
+        
+        // Metrics
+        const metricsContainer = document.getElementById('hpa-metrics');
+        const status = hpa.status || {};
+        const currentCpu = status.current_cpu_utilization_percentage || status.currentCpuUtilizationPercentage;
+        const targetCpu = spec.target_cpu_utilization_percentage || spec.targetCpuUtilizationPercentage;
+        
+        if (currentCpu !== undefined && targetCpu !== undefined) {
+            metricsContainer.innerHTML = `<span class="badge text-bg-tag text-bg-secondary">${escapeHtml(String(currentCpu))} / ${escapeHtml(String(targetCpu))} %</span>`;
+        } else if (targetCpu !== undefined) {
+            metricsContainer.innerHTML = `<span class="badge text-bg-tag text-bg-secondary">UNKNOWN / ${escapeHtml(String(targetCpu))} %</span>`;
+        } else {
+            metricsContainer.innerHTML = '<span class="text-muted">N/A</span>';
+        }
+        
+        // Min/Max Replicas
+        const minReplicas = spec.min_replicas || spec.minReplicas || 'N/A';
+        const maxReplicas = spec.max_replicas || spec.maxReplicas || 'N/A';
+        document.getElementById('hpa-min-replicas').textContent = escapeHtml(String(minReplicas));
+        document.getElementById('hpa-max-replicas').textContent = escapeHtml(String(maxReplicas));
+        
+        // Current/Desired Replicas
+        const currentReplicas = status.current_replicas || status.currentReplicas || 'N/A';
+        const desiredReplicas = status.desired_replicas || status.desiredReplicas || 'N/A';
+        document.getElementById('hpa-replicas').textContent = `${escapeHtml(String(currentReplicas))} Current / ${escapeHtml(String(desiredReplicas))} Desired`;
+    }
+    
+    function populateConditions(conditions) {
+        const tbody = document.getElementById('conditions-tbody');
+        
+        if (!conditions || conditions.length === 0) {
+            tbody.innerHTML = '<tr><td colspan="5" class="text-center text-muted">No conditions</td></tr>';
+            return;
+        }
+        
+        const rows = conditions.map(condition => {
+            const type = escapeHtml(condition.type || condition.Type || 'N/A');
+            const status = escapeHtml(condition.status || condition.Status || 'N/A');
+            const lastTransitionTime = escapeHtml(condition.last_transition_time || condition.lastTransitionTime || condition.LastTransitionTime || 'N/A');
+            const reason = escapeHtml(condition.reason || condition.Reason || 'N/A');
+            const message = escapeHtml(condition.message || condition.Message || 'N/A');
+            
+            return `
+                <tr>
+                    <td>${type}</td>
+                    <td>${status}</td>
+                    <td>${lastTransitionTime}</td>
+                    <td>${reason}</td>
+                    <td>${message}</td>
+                </tr>
+            `;
+        }).join('');
+        
+        tbody.innerHTML = rows;
+    }
+    
+    async function loadHPAData() {
+        const { hpaName, namespace } = getHPAInfo();
+        
+        if (!hpaName) {
+            console.error('No HPA name provided');
+            document.getElementById('hpa-name-breadcrumb').textContent = 'Error';
+            document.getElementById('hpa-name').textContent = 'Error: HPA name not provided';
+            return;
+        }
+        
+        // Update breadcrumb
+        document.getElementById('hpa-name-breadcrumb').textContent = hpaName;
+        
+        try {
+            const apiUrl = `/api/v1/other-resources/hpa/${encodeURIComponent(hpaName)}?namespace=${encodeURIComponent(namespace)}`;
+            console.log('Fetching HPA from:', apiUrl);
+            
+            const response = await fetch(apiUrl);
+            if (!response.ok) {
+                if (response.status === 404) {
+                    throw new Error(`HPA '${hpaName}' not found in namespace '${namespace}'`);
+                }
+                throw new Error(`HTTP error! status: ${response.status}`);
+            }
+            
+            const data = await response.json();
+            console.log('HPA API response:', data);
+            
+            if (data.error) {
+                throw new Error(data.message || 'Failed to load HPA');
+            }
+            
+            const hpa = data.data || {};
+            populateHPAInfo(hpa);
+            
+            // Load conditions if available
+            if (hpa.conditions && Array.isArray(hpa.conditions)) {
+                populateConditions(hpa.conditions);
+            } else {
+                populateConditions([]);
+            }
+            
+        } catch (error) {
+            console.error('Error loading HPA:', error);
+            document.getElementById('hpa-name').textContent = 'Error: ' + escapeHtml(error.message);
+            document.getElementById('hpa-created').textContent = 'N/A';
+            document.getElementById('hpa-namespace').textContent = 'N/A';
+        }
+    }
+    
+    // Load data when page loads
+    document.addEventListener('DOMContentLoaded', function() {
+        loadHPAData();
+    });
+</script>
 {% endblock %}

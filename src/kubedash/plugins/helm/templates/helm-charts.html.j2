@@ -35,48 +35,16 @@
             <th>Updated</th>
           </tr>
         </thead>
-        {% if has_chart %}
-        <tbody>
-          {% for name, release in chart_list.items() %}
-          {% for rd in release %}
-          {% if selected == name %}
-            <tr class="selected" >
-          {% else %}
-            <tr>
-          {% endif %}
-            {% if rd.icon and rd.icon|check_url_exists %}
-            <td><img src="{{ rd.icon }}" width="50" height="50"> </td>
-            {% else %}
-            <td><img src="/img/helm-icon-color.svg" width="50" height="50"> </td>
-            {% endif %}
-            <td>
-              <form action="/plugins/helm-charts/data" method="POST">
-                <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
-                <input type="hidden" name="ns_select" value="{{ session['ns_select'] }}" />
-                <input type="hidden" name="helm_release_name" value="{{ name }}" />
-                <input type="hidden" name="helm_release_version" value="{{ rd.release_version }}" />
-                <a href="javascript:;" onclick="parentNode.submit();">{{ name }}</a>
-              </form>
+        <tbody id="charts-tbody">
+          <tr>
+            <td colspan="7" class="text-center">
+              <div class="spinner-border text-primary" role="status">
+                <span class="visually-hidden">Loading...</span>
+              </div>
+              <p class="mt-2">Loading helm charts...</p>
             </td>
-            <td>
-              {% if rd.status == "deployed" %}
-                <span class="badge text-bg-tag text-bg-success">{{ rd.status }}</span>
-              {% else %}
-                <span class="badge text-bg-tag text-bg-danger">{{ rd.status }}</span>
-              {% endif %}
-            </td>
-            <td>{{ rd.chart_name }}-{{ rd.chart_version }}</td>
-            <td>{{ rd.app_version }}</td>
-            <td>{{ rd.release_version }}</td>
-            <td>{{ rd.updated }}</td>
           </tr>
-          {% endfor %}
-          {% endfor %}
         </tbody>
-        {% else %}
-        <tbody>
-        </tbody>
-        {% endif %}
       </table>
     </div>
   </div>
@@ -85,4 +53,388 @@
 
 {% block add_head_css %}
 {% include "segments/datatable_snippet.html.j2" %}
+<style>
+    /* Helm icon styling for dark mode */
+    .helm-chart-icon {
+        filter: brightness(0) invert(1);
+        transition: filter 0.2s ease;
+    }
+    
+    /* In light mode, use original colors */
+    [data-coreui-theme="light"] .helm-chart-icon,
+    :not([data-coreui-theme]) .helm-chart-icon {
+        filter: none;
+    }
+    
+    /* In dark mode, invert to white */
+    [data-coreui-theme="dark"] .helm-chart-icon,
+    .dark .helm-chart-icon {
+        filter: brightness(0) invert(1);
+    }
+    
+    /* For auto mode, use media query */
+    @media (prefers-color-scheme: dark) {
+        [data-coreui-theme="auto"] .helm-chart-icon {
+            filter: brightness(0) invert(1);
+        }
+    }
+</style>
+{% endblock %}
+
+{% block add_tail_js %}
+<script>
+    // Helper function to escape HTML
+    function escapeHtml(text) {
+        if (text == null) return '';
+        const div = document.createElement('div');
+        div.textContent = text;
+        return div.innerHTML;
+    }
+    
+    // Helper function to check if URL exists (for icon validation)
+    function checkUrlExists(url) {
+        // Simple check - in production, you might want to do an actual fetch
+        return url && (url.startsWith('http://') || url.startsWith('https://'));
+    }
+    
+    // IMMEDIATE: Prevent datatables-demo.js from initializing on loading row
+    // This must run BEFORE datatables-demo.js loads
+    console.log('Helm charts script loaded');
+    
+    (function() {
+        // Override when jQuery loads
+        function setupOverride() {
+            if (typeof $ !== 'undefined' && $.fn) {
+                // Only set up once globally
+                if (window._datatableOverrideSetup) {
+                    return;
+                }
+                window._datatableOverrideSetup = true;
+                console.log('Setting up DataTable override');
+                
+                // Intercept DataTable calls on #dataTable
+                const originalDataTable = $.fn.DataTable;
+                $.fn.DataTable = function(options) {
+                    const table = this[0];
+                    if (table && table.id === 'dataTable') {
+                        const tbody = table.querySelector('tbody');
+                        if (tbody) {
+                            const rows = tbody.querySelectorAll('tr');
+                            const hasColspanRow = Array.from(rows).some(row => {
+                                const cells = row.querySelectorAll('td');
+                                return Array.from(cells).some(cell => cell.hasAttribute('colspan'));
+                            });
+                            if (hasColspanRow) {
+                                console.log('Blocked DataTable initialization on loading row');
+                                return this; // Return jQuery object, don't initialize
+                            }
+                        }
+                    }
+                    return originalDataTable.apply(this, arguments);
+                };
+                
+                // Copy static methods
+                Object.setPrototypeOf($.fn.DataTable, originalDataTable);
+                Object.keys(originalDataTable).forEach(key => {
+                    $.fn.DataTable[key] = originalDataTable[key];
+                });
+            }
+        }
+        
+        // Try immediately and on intervals
+        setupOverride();
+        setTimeout(setupOverride, 0);
+        setTimeout(setupOverride, 50);
+        setTimeout(setupOverride, 100);
+        setTimeout(setupOverride, 200);
+        setTimeout(setupOverride, 500);
+        
+        // Also try when jQuery is ready
+        if (typeof document !== 'undefined') {
+            document.addEventListener('DOMContentLoaded', setupOverride);
+        }
+    })();
+    
+    // Get namespace from topbar selector or use default
+    function getSelectedNamespace() {
+        // First check URL parameter
+        const urlParams = new URLSearchParams(window.location.search);
+        let namespace = urlParams.get('namespace');
+        
+        // Then check topbar selector
+        if (!namespace) {
+            const topbarSelect = document.getElementById('inputGroupSelect04');
+            if (topbarSelect && topbarSelect.value) {
+                namespace = topbarSelect.value;
+            }
+        }
+        
+        // Fallback to sessionStorage
+        if (!namespace) {
+            namespace = sessionStorage.getItem('ns_select');
+        }
+        
+        // Final fallback to default
+        return namespace || 'default';
+    }
+    
+    // Initialize namespace selector with sessionStorage value on page load
+    document.addEventListener('DOMContentLoaded', async function() {
+        console.log('DOMContentLoaded fired for helm charts');
+        
+        // Wait for jQuery and DataTables
+        let retries = 0;
+        while ((typeof $ === 'undefined' || typeof $.fn.DataTable === 'undefined') && retries < 20) {
+            await new Promise(resolve => setTimeout(resolve, 100));
+            retries++;
+        }
+        
+        if (typeof $ === 'undefined' || typeof $.fn.DataTable === 'undefined') {
+            console.error('jQuery or DataTables not loaded after', retries, 'retries');
+            // Still try to load data even without DataTables
+        } else {
+            console.log('jQuery and DataTables loaded');
+        }
+        
+        // CRITICAL: Destroy any auto-initialized DataTable instance
+        // This prevents initialization on the loading row with colspan
+        const table = document.getElementById('dataTable');
+        if (table) {
+            console.log('Found dataTable element');
+            // Check if DataTable was auto-initialized on a loading row
+            if (typeof $ !== 'undefined' && $.fn.DataTable && $.fn.DataTable.isDataTable(table)) {
+                console.log('DataTable is already initialized, checking for colspan row');
+                const tbody = table.querySelector('tbody');
+                if (tbody) {
+                    const rows = tbody.querySelectorAll('tr');
+                    const hasColspanRow = Array.from(rows).some(row => {
+                        const cells = row.querySelectorAll('td');
+                        return Array.from(cells).some(cell => cell.hasAttribute('colspan'));
+                    });
+                    if (hasColspanRow) {
+                        console.log('Destroying auto-initialized DataTable instance on loading row');
+                        try {
+                            $(table).DataTable().destroy();
+                            console.log('DataTable destroyed successfully');
+                        } catch (e) {
+                            console.warn('Error destroying DataTable:', e);
+                        }
+                    }
+                } else {
+                    // No tbody or empty, destroy anyway
+                    console.log('Destroying auto-initialized DataTable instance (no valid tbody)');
+                    try {
+                        $(table).DataTable().destroy();
+                        console.log('DataTable destroyed successfully');
+                    } catch (e) {
+                        console.warn('Error destroying DataTable:', e);
+                    }
+                }
+            } else {
+                console.log('DataTable is not initialized yet');
+            }
+        } else {
+            console.warn('dataTable element not found');
+        }
+        
+        const namespaceSelect = document.getElementById('inputGroupSelect04');
+        if (namespaceSelect) {
+            console.log('Found namespace selector');
+            const savedNamespace = sessionStorage.getItem('ns_select');
+            if (savedNamespace && namespaceSelect.querySelector(`option[value="${savedNamespace}"]`)) {
+                namespaceSelect.value = savedNamespace;
+                console.log('Set namespace selector to:', savedNamespace);
+            }
+            
+            // Prevent form submission and handle via JavaScript
+            const namespaceForm = namespaceSelect.closest('form');
+            if (namespaceForm) {
+                namespaceForm.addEventListener('submit', function(e) {
+                    e.preventDefault();
+                    const selectedNamespace = namespaceSelect.value;
+                    console.log('Namespace form submitted, selected:', selectedNamespace);
+                    sessionStorage.setItem('ns_select', selectedNamespace);
+                    loadCharts();
+                });
+            }
+            
+            // Also reload data when namespace changes (for direct select changes)
+            namespaceSelect.addEventListener('change', function() {
+                const selectedNamespace = this.value;
+                console.log('Namespace changed to:', selectedNamespace);
+                sessionStorage.setItem('ns_select', selectedNamespace);
+                loadCharts();
+            });
+        } else {
+            console.warn('Namespace selector not found');
+        }
+        
+        // Initial load
+        console.log('Calling loadCharts()');
+        loadCharts();
+    });
+    
+    // Load helm charts from API
+    async function loadCharts() {
+        const tbody = document.getElementById('charts-tbody');
+        const namespace = getSelectedNamespace();
+        
+        console.log('Loading helm charts for namespace:', namespace);
+        
+        // Destroy any existing DataTable first
+        const $table = $('#dataTable');
+        if ($.fn.DataTable.isDataTable('#dataTable')) {
+            try {
+                $table.DataTable().destroy();
+            } catch (e) {
+                console.warn('Error destroying DataTable before load:', e);
+            }
+        }
+        
+        // Show loading state
+        tbody.innerHTML = `
+            <tr>
+                <td colspan="7" class="text-center">
+                    <div class="spinner-border text-primary" role="status">
+                        <span class="visually-hidden">Loading...</span>
+                    </div>
+                    <p class="mt-2">Loading helm charts...</p>
+                </td>
+            </tr>
+        `;
+        
+        try {
+            const apiUrl = `/api/v1/plugins/helm/charts?namespace=${encodeURIComponent(namespace)}`;
+            console.log('Fetching helm charts from:', apiUrl);
+            
+            const response = await fetch(apiUrl);
+            console.log('Response status:', response.status, response.statusText);
+            
+            if (!response.ok) {
+                const errorText = await response.text();
+                console.error('API error response:', errorText);
+                throw new Error(`HTTP error! status: ${response.status} - ${errorText}`);
+            }
+            
+            const result = await response.json();
+            console.log('Helm charts API response:', result);
+            
+            if (result.data && Array.isArray(result.data) && result.data.length > 0) {
+                console.log('Found', result.data.length, 'helm charts');
+                populateChartsTable(result.data);
+            } else {
+                console.log('No helm charts found');
+                tbody.innerHTML = `
+                    <tr>
+                        <td colspan="7" class="text-center">No helm charts found in namespace "${escapeHtml(namespace)}"</td>
+                    </tr>
+                `;
+            }
+        } catch (error) {
+            console.error('Error loading helm charts:', error);
+            tbody.innerHTML = `
+                <tr>
+                    <td colspan="7" class="text-center text-danger">
+                        Error loading helm charts: ${escapeHtml(error.message)}
+                        <br><small>Check browser console for details</small>
+                    </td>
+                </tr>
+            `;
+        }
+    }
+    
+    // Populate the charts table
+    function populateChartsTable(charts) {
+        const tbody = document.getElementById('charts-tbody');
+        const namespace = getSelectedNamespace();
+        
+        console.log('Populating charts table with', charts.length, 'charts');
+        
+        // Destroy existing DataTable if it exists
+        const $table = $('#dataTable');
+        if ($.fn.DataTable.isDataTable('#dataTable')) {
+            try {
+                $table.DataTable().destroy();
+                console.log('Destroyed existing DataTable');
+            } catch (e) {
+                console.warn('Error destroying DataTable:', e);
+            }
+        }
+        
+        // Clear tbody
+        tbody.innerHTML = '';
+        
+        // Generate rows
+        charts.forEach((chart, index) => {
+            // Always use default icon to avoid CSP violations with external images
+            // CSP only allows 'self' and 'data:' sources, so external URLs will be blocked
+            const iconUrl = '/img/helm-icon-color.svg';
+            
+            const statusClass = chart.status === 'deployed' 
+                ? 'text-bg-success' 
+                : 'text-bg-danger';
+            
+            const row = document.createElement('tr');
+            row.innerHTML = `
+                <td>
+                    <img src="${escapeHtml(iconUrl)}" 
+                         class="helm-chart-icon"
+                         width="50" 
+                         height="50" 
+                         alt="Chart icon"
+                         onerror="this.src='/img/helm-icon-color.svg'; this.onerror=null;">
+                </td>
+                <td>
+                    <a href="javascript:;" onclick="navigateToChartData('${escapeHtml(chart.release_name)}', ${chart.release_version}, '${escapeHtml(namespace)}')">
+                        ${escapeHtml(chart.release_name)}
+                    </a>
+                </td>
+                <td>
+                    <span class="badge text-bg-tag ${statusClass}">${escapeHtml(chart.status || 'unknown')}</span>
+                </td>
+                <td>${escapeHtml(chart.chart_name || '')}-${escapeHtml(chart.chart_version || '')}</td>
+                <td>${escapeHtml(chart.app_version || '')}</td>
+                <td>${chart.release_version || ''}</td>
+                <td>${escapeHtml(chart.updated || '')}</td>
+            `;
+            tbody.appendChild(row);
+        });
+        
+        console.log('Generated', tbody.children.length, 'rows');
+        
+        // Initialize DataTable only if we have valid rows
+        if (tbody.children.length > 0) {
+            // Check if all rows have the correct number of cells (7)
+            const firstRow = tbody.children[0];
+            if (firstRow && firstRow.children.length === 7) {
+                // Wait a bit to ensure DOM is ready
+                setTimeout(function() {
+                    try {
+                        $table.DataTable({
+                            responsive: true,
+                            pageLength: 25,
+                            order: [[1, 'asc']] // Sort by Release name
+                        });
+                        console.log('DataTable initialized successfully');
+                    } catch (e) {
+                        console.error('Error initializing DataTable:', e);
+                    }
+                }, 100);
+            } else {
+                console.warn('First row has', firstRow ? firstRow.children.length : 0, 'cells, expected 7');
+            }
+        }
+    }
+    
+    // Navigate to chart data page
+    function navigateToChartData(releaseName, releaseVersion, namespace) {
+        // Store in sessionStorage for the data page
+        sessionStorage.setItem('ns_select', namespace);
+        sessionStorage.setItem('helm_release_name', releaseName);
+        sessionStorage.setItem('helm_release_version', releaseVersion);
+        
+        // Navigate to chart data page
+        window.location.href = `/plugins/helm-charts/data?release_name=${encodeURIComponent(releaseName)}&release_version=${releaseVersion}&namespace=${encodeURIComponent(namespace)}`;
+    }
+</script>
 {% endblock %}

@@ -51,9 +51,9 @@
           <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
       </div>
       <div class="modal-body">
-          <form action="/plugins/registry" method="POST">
+          <form id="registry-create-form">
               <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
-              <input type="hidden" name="request_type" value="create" />
+              <div id="create-form-messages"></div>
               <div class="form-group">
                   <label for="registry_server_url">Registry Hostname</label>
                   <input type="text" class="form-control" id="registry_server_url" name="registry_server_url" placeholder="Server Hostname">
@@ -92,60 +92,8 @@
   </div>
 </div>
 
-<!-- Modal Edit Config -->
-{% for server in registries %}
-<div class="modal fade" id="modaledit-{{ server.registry_server_url|replace('.','_') }}" tabindex="-1" role="dialog" aria-labelledby="modaleditLabel" aria-hidden="true">
-    <div class="modal-dialog">
-        <div class="modal-content">
-            <div class="modal-header">
-                <h5 class="modal-title" id="modaleditLabel">Update Information</h5>
-                <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close">
-                    
-                </button>
-            </div>
-            <div class="modal-body">
-                <form action="/plugins/registry" method="POST">
-                    <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
-                    <input type="hidden" name="request_type" value="edit" />
-                    <input type="hidden" name="registry_server_url_old" value="{{ server.registry_server_url }}" />
-                    <div class="form-group">
-                        <label for="registry_server_url">Registry Hostname</label>
-                        <input type="text" class="form-control" id="registry_server_url" name="registry_server_url" value="{{ server.registry_server_url }}">
-                    </div>
-                    <div class="form-group">
-                        <label for="registry_server_port">Registry Port</label>
-                        <input type="text" class="form-control" id="registry_server_port" name="registry_server_port" value="{{ server.registry_server_port }}">
-                    </div>
-                    <div class="form-group">
-                        <label for="registry_server_auth_user">Username</label>
-                        <input type="text" class="form-control" id="registry_server_auth_user" name="registry_server_auth_user" value="{{ server.registry_server_auth_user|replace('None','') }}">
-                    </div>
-                    <div class="form-group">
-                        <label for="registry_server_auth_pass">Password</label>
-                        <input type="password" class="form-control" id="registry_server_auth_pass" name="registry_server_auth_pass" value="{{ server.registry_server_auth_pass|replace('None','') }}">
-                    </div>
-                    <div class="custom-control custom-switch">
-                        <input type="checkbox" class="custom-control-input" id="registry_server_tls_edit" onclick="checkbox('registry_server_tls_edit')" checked>
-                        <label class="custom-control-label" for="registry_server_tls_edit">TLS</label>
-                        <input type="hidden" name="registry_server_tls_edit_value" id="registry_server_tls_edit_value" value="True">
-                    </div>
-                    <div class="custom-control custom-switch">
-                        <input type="checkbox" class="custom-control-input" id="insecure_tls_edit" onclick="checkbox('insecure_tls_edit')">
-                        <label class="custom-control-label" for="insecure_tls_edit">Insecure TLS</label>
-                        <input type="hidden" name="insecure_tls_edit_value" id="insecure_tls_edit_value" value="False">
-                    </div>
-                    <div class="modal-footer">
-                        <div class="form-group mt-2">
-                            <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Close</button>
-                            <button type="submit" class="btn btn-primary" onClick="save();" value="Add" id="add">Add</button>
-                        </div>
-                    </div>
-                </form>
-            </div>
-        </div>
-    </div>
-</div>
-{% endfor %}
+<!-- Modal Edit Config (dynamically created) -->
+<div id="edit-modals-container"></div>
 
 <!-- Modal Config -->
 <div class="card shadow mb-4">
@@ -165,38 +113,15 @@
                       <th>Action</th>
                     </tr>
                 </thead>
-                <tbody>
-                    {% for server in registries %}
+                <tbody id="registries-tbody">
                     <tr>
-                        <td>
-                          <form action="/plugins/registry/image/list" method="POST">
-                            <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
-                            <input type="hidden" name="registry_server_url" value="{{ server.registry_server_url }}" />
-                            <a href="javascript:;" onclick="parentNode.submit();">{{ server.registry_server_url }}</a>
-                          </form>
-                        </td>
-                        <td>{{ server.registry_server_port }}</td>
-                        <td>{{ server.registry_server_auth }}</td>
-                        <td>{{ server.registry_server_tls }}</td>
-                        <td>{{ server.insecure_tls }}</td>
-                        <td>
-                            {% if session['user_role'] == "Admin" %}
-                            <!-- Button trigger modal edit -->
-                            <form action="/plugins/registry" method="POST">
-                                <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
-                                <button type="button" class="btn btn-success btn-just-icon btn-xs" data-bs-toggle="modal" data-bs-target="#modaledit-{{ server.registry_server_url|replace('.','_') }}">
-                                    <i class="material-icons">edit</i>
-                                </button>
-                                <input type="hidden" name="request_type" value="delete" />
-                                <input type="hidden" name="registry_server_url" value="{{ server.registry_server_url }}" />
-                                <button type="submit" rel="tooltip" class="btn btn-danger btn-just-icon btn-sm" value="upvote">
-                                    <i class="material-icons">delete</i>
-                                </button>
-                            </form>
-                            {% endif %}
+                        <td colspan="6" class="text-center">
+                            <div class="spinner-border spinner-border-sm text-primary" role="status">
+                                <span class="visually-hidden">Loading...</span>
+                            </div>
+                            <span class="ms-2">Loading registries...</span>
                         </td>
                     </tr>
-                    {% endfor %}
                 </tbody>
             </table>
 
@@ -208,4 +133,504 @@
 
 {% block add_head_css %}
 {% include "segments/datatable_snippet.html.j2" %}
+{% endblock %}
+
+{% block add_tail_js %}
+<script>
+    // IMMEDIATE: Prevent datatables-demo.js from initializing on loading row
+    // Override jQuery ready to intercept datatables-demo.js initialization
+    (function() {
+        // Override when jQuery loads
+        function setupOverride() {
+            if (typeof $ !== 'undefined' && $.fn && !window._datatableOverrideSetup) {
+                window._datatableOverrideSetup = true;
+                
+                // Intercept DataTable calls on #dataTable
+                const originalDataTable = $.fn.DataTable;
+                $.fn.DataTable = function(options) {
+                    const table = this[0];
+                    if (table && table.id === 'dataTable') {
+                        const tbody = table.querySelector('tbody');
+                        if (tbody) {
+                            const rows = tbody.querySelectorAll('tr');
+                            const hasColspanRow = Array.from(rows).some(row => {
+                                const cells = row.querySelectorAll('td');
+                                return Array.from(cells).some(cell => cell.hasAttribute('colspan'));
+                            });
+                            if (hasColspanRow) {
+                                console.log('Blocked DataTable initialization on loading row');
+                                return this; // Return jQuery object, don't initialize
+                            }
+                        }
+                    }
+                    return originalDataTable.apply(this, arguments);
+                };
+                
+                // Copy static methods
+                Object.setPrototypeOf($.fn.DataTable, originalDataTable);
+                Object.keys(originalDataTable).forEach(key => {
+                    $.fn.DataTable[key] = originalDataTable[key];
+                });
+            }
+        }
+        
+        // Try immediately and on intervals
+        setupOverride();
+        setTimeout(setupOverride, 0);
+        setTimeout(setupOverride, 50);
+        setTimeout(setupOverride, 100);
+        setTimeout(setupOverride, 200);
+        
+        // Also try when DOM is ready
+        if (document.readyState === 'loading') {
+            document.addEventListener('DOMContentLoaded', setupOverride);
+        } else {
+            setupOverride();
+        }
+    })();
+    
+    // Escape HTML helper
+    function escapeHtml(text) {
+        if (!text) return '';
+        const map = {
+            '&': '&amp;',
+            '<': '&lt;',
+            '>': '&gt;',
+            '"': '&quot;',
+            "'": '&#039;'
+        };
+        return text.toString().replace(/[&<>"']/g, m => map[m]);
+    }
+    
+    // Get user role from session (if available in template)
+    const is_admin = '{{ session.get("user_role", "") }}' === 'Admin';
+    
+    // Checkbox helper function (if not already defined)
+    if (typeof checkbox === 'undefined') {
+        window.checkbox = function(id) {
+            const checkbox = document.getElementById(id);
+            const hiddenInput = document.getElementById(id + '_value');
+            if (checkbox && hiddenInput) {
+                hiddenInput.value = checkbox.checked ? 'True' : 'False';
+            }
+        };
+    }
+    
+    // Populate registries table
+    function populateRegistriesTable(registries) {
+        const tbody = document.getElementById('registries-tbody');
+        const table = document.getElementById('dataTable');
+        
+        // Destroy existing DataTable if it exists (before clearing tbody)
+        if (typeof $ !== 'undefined' && $.fn.DataTable) {
+            try {
+                const $table = $('#dataTable');
+                if ($table.length && typeof $.fn.DataTable.isDataTable === 'function' && $.fn.DataTable.isDataTable('#dataTable')) {
+                    $table.DataTable().destroy();
+                }
+            } catch (e) {
+                console.warn('Error destroying DataTable:', e);
+            }
+        }
+        
+        if (!registries || registries.length === 0) {
+            tbody.innerHTML = '<tr><td colspan="6" class="text-center">No registries found</td></tr>';
+            return;
+        }
+        
+        const rows = registries.map(server => {
+            const url = server.registry_server_url || '';
+            const port = server.registry_server_port || '';
+            const auth = server.registry_server_auth ? 'Yes' : 'No';
+            const tls = server.registry_server_tls ? 'Yes' : 'No';
+            const insecure = server.insecure_tls ? 'Yes' : 'No';
+            const safeId = url.replace(/[^a-zA-Z0-9]/g, '_');
+            
+            // Escape for HTML display
+            const urlEscaped = escapeHtml(url);
+            const portEscaped = escapeHtml(port);
+            
+            let actionCell = '';
+            if (is_admin) {
+                // Use raw url for JavaScript, but escape single quotes
+                const urlForJS = url.replace(/'/g, "\\'").replace(/"/g, '\\"');
+                actionCell = `
+                    <button type="button" class="btn btn-success btn-just-icon btn-xs" data-bs-toggle="modal" data-bs-target="#modaledit-${safeId}">
+                        <i class="material-icons">edit</i>
+                    </button>
+                    <button type="button" class="btn btn-danger btn-just-icon btn-sm" onclick="window.deleteRegistry('${urlForJS}')">
+                        <i class="material-icons">delete</i>
+                    </button>
+                `;
+            } else {
+                actionCell = '-';
+            }
+            
+            // Encode URL for use in query parameter
+            const urlEncoded = encodeURIComponent(url);
+            
+            return `
+                <tr>
+                    <td>
+                        <a href="javascript:;" onclick="sessionStorage.setItem('registry_server_url', '${urlEscaped.replace(/'/g, "\\'")}'); window.location.href='/plugins/registry/image/list?registry_server_url=${urlEncoded}';">${urlEscaped}</a>
+                    </td>
+                    <td>${portEscaped}</td>
+                    <td>${auth}</td>
+                    <td>${tls}</td>
+                    <td>${insecure}</td>
+                    <td>${actionCell}</td>
+                </tr>
+            `;
+        }).join('');
+        
+        tbody.innerHTML = rows;
+        
+        // Create edit modals
+        createEditModals(registries);
+        
+        // Initialize DataTables after a short delay to ensure DOM is updated
+        setTimeout(function() {
+            const finalTable = document.getElementById('dataTable');
+            if (finalTable && typeof $ !== 'undefined' && $.fn.DataTable) {
+                try {
+                    const $table = $('#dataTable');
+                    
+                    // Double-check if already initialized
+                    if (typeof $.fn.DataTable.isDataTable === 'function' && $.fn.DataTable.isDataTable('#dataTable')) {
+                        $table.DataTable().destroy();
+                    }
+                    
+                    // Verify table structure before initializing
+                    const tbody = finalTable.querySelector('tbody');
+                    if (tbody) {
+                        const rows = tbody.querySelectorAll('tr');
+                        let hasValidRows = false;
+                        for (const row of rows) {
+                            const cells = row.querySelectorAll('td');
+                            // Check if row has 6 cells (not a colspan row)
+                            if (cells.length === 6) {
+                                hasValidRows = true;
+                                break;
+                            }
+                        }
+                        
+                        if (hasValidRows) {
+                            // Count valid rows to ensure we have data
+                            const validRowCount = Array.from(rows).filter(row => {
+                                const cells = row.querySelectorAll('td');
+                                return cells.length === 6;
+                            }).length;
+                            
+                            if (validRowCount > 0) {
+                                // Initialize DataTables
+                                $('#dataTable').DataTable({
+                                    responsive: true,
+                                    pageLength: 25,
+                                    destroy: true  // Destroy any existing instance first
+                                });
+                                console.log('DataTables initialized successfully with', validRowCount, 'rows');
+                            } else {
+                                console.warn('No valid data rows found, skipping DataTables initialization');
+                            }
+                        } else {
+                            console.warn('No valid data rows found, skipping DataTables initialization');
+                        }
+                    }
+                } catch (e) {
+                    console.warn('Error initializing DataTable:', e);
+                }
+            }
+        }, 100);
+    }
+    
+    // Create edit modals dynamically
+    function createEditModals(registries) {
+        const container = document.getElementById('edit-modals-container');
+        container.innerHTML = '';
+        
+        registries.forEach(server => {
+            const url = server.registry_server_url || '';
+            const port = server.registry_server_port || '';
+            const authUser = server.registry_server_auth_user || '';
+            const tls = server.registry_server_tls || false;
+            const insecure = server.insecure_tls || false;
+            const safeId = url.replace(/[^a-zA-Z0-9]/g, '_');
+            
+            const modalHtml = `
+<div class="modal fade" id="modaledit-${safeId}" tabindex="-1" role="dialog" aria-labelledby="modaleditLabel-${safeId}" aria-hidden="true">
+    <div class="modal-dialog">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h5 class="modal-title" id="modaleditLabel-${safeId}">Update Information</h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+            </div>
+            <div class="modal-body">
+                <form id="registry-edit-form-${safeId}">
+                    <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+                    <input type="hidden" name="registry_server_url_old" value="${escapeHtml(url)}" />
+                    <div id="edit-form-messages-${safeId}"></div>
+                    <div class="form-group">
+                        <label for="registry_server_url_${safeId}">Registry Hostname</label>
+                        <input type="text" class="form-control" id="registry_server_url_${safeId}" name="registry_server_url" value="${escapeHtml(url)}">
+                    </div>
+                    <div class="form-group">
+                        <label for="registry_server_port_${safeId}">Registry Port</label>
+                        <input type="text" class="form-control" id="registry_server_port_${safeId}" name="registry_server_port" value="${escapeHtml(port)}">
+                    </div>
+                    <div class="form-group">
+                        <label for="registry_server_auth_user_${safeId}">Username</label>
+                        <input type="text" class="form-control" id="registry_server_auth_user_${safeId}" name="registry_server_auth_user" value="${escapeHtml(authUser)}">
+                    </div>
+                    <div class="form-group">
+                        <label for="registry_server_auth_pass_${safeId}">Password</label>
+                        <input type="password" class="form-control" id="registry_server_auth_pass_${safeId}" name="registry_server_auth_pass" placeholder="Leave empty to keep existing">
+                    </div>
+                    <div class="custom-control custom-switch">
+                        <input type="checkbox" class="custom-control-input" id="registry_server_tls_edit_${safeId}" onclick="checkbox('registry_server_tls_edit_${safeId}')" ${tls ? 'checked' : ''}>
+                        <label class="custom-control-label" for="registry_server_tls_edit_${safeId}">TLS</label>
+                        <input type="hidden" name="registry_server_tls_edit_value" id="registry_server_tls_edit_value_${safeId}" value="${tls ? 'True' : 'False'}">
+                    </div>
+                    <div class="custom-control custom-switch">
+                        <input type="checkbox" class="custom-control-input" id="insecure_tls_edit_${safeId}" onclick="checkbox('insecure_tls_edit_${safeId}')" ${insecure ? 'checked' : ''}>
+                        <label class="custom-control-label" for="insecure_tls_edit_${safeId}">Insecure TLS</label>
+                        <input type="hidden" name="insecure_tls_edit_value" id="insecure_tls_edit_value_${safeId}" value="${insecure ? 'True' : 'False'}">
+                    </div>
+                    <div class="modal-footer">
+                        <div class="form-group mt-2">
+                            <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Close</button>
+                            <button type="submit" class="btn btn-primary">Update</button>
+                        </div>
+                    </div>
+                </form>
+            </div>
+        </div>
+    </div>
+</div>
+            `;
+            container.innerHTML += modalHtml;
+        });
+    }
+    
+    // Load registries from API
+    async function loadRegistries() {
+        try {
+            const apiUrl = '/api/v1/plugins/registry';
+            console.log('Fetching registries from:', apiUrl);
+            
+            const response = await fetch(apiUrl);
+            if (!response.ok) {
+                throw new Error(`HTTP error! status: ${response.status}`);
+            }
+            
+            const result = await response.json();
+            console.log('Registries API response:', result);
+            
+            if (result.error) {
+                throw new Error(result.message || 'Failed to load registries');
+            }
+            
+            const registries = result.data || [];
+            populateRegistriesTable(registries);
+            
+        } catch (error) {
+            console.error('Error loading registries:', error);
+            const tbody = document.getElementById('registries-tbody');
+            if (tbody) {
+                tbody.innerHTML = '<tr><td colspan="6" class="text-center text-danger">Error loading registries: ' + escapeHtml(error.message) + '</td></tr>';
+            }
+        }
+    }
+    
+    // Delete registry (make it global)
+    window.deleteRegistry = async function(registry_server_url) {
+        if (!confirm(`Are you sure you want to delete registry "${registry_server_url}"?`)) {
+            return;
+        }
+        
+        try {
+            const apiUrl = `/api/v1/plugins/registry/${encodeURIComponent(registry_server_url)}`;
+            console.log('Deleting registry:', apiUrl);
+            
+            const response = await fetch(apiUrl, {
+                method: 'DELETE',
+                headers: {
+                    'Content-Type': 'application/json',
+                }
+            });
+            
+            const data = await response.json();
+            
+            if (!response.ok) {
+                throw new Error(data.message || `HTTP error! status: ${response.status}`);
+            }
+            
+            // Reload the list
+            loadRegistries();
+            
+        } catch (error) {
+            console.error('Error deleting registry:', error);
+            alert('Error deleting registry: ' + error.message);
+        }
+    };
+    
+    // Handle create form submission
+    document.addEventListener('DOMContentLoaded', function() {
+        // CRITICAL: Destroy any auto-initialized DataTable instance from datatables-demo.js
+        // This prevents initialization on the loading row with colspan
+        const table = document.getElementById('dataTable');
+        if (table && typeof $ !== 'undefined' && $.fn.DataTable) {
+            if ($.fn.DataTable.isDataTable && $.fn.DataTable.isDataTable(table)) {
+                const tbody = table.querySelector('tbody');
+                if (tbody) {
+                    const rows = tbody.querySelectorAll('tr');
+                    const hasColspanRow = Array.from(rows).some(row => {
+                        const cells = row.querySelectorAll('td');
+                        return Array.from(cells).some(cell => cell.hasAttribute('colspan'));
+                    });
+                    if (hasColspanRow) {
+                        console.log('Destroying auto-initialized DataTable instance on loading row');
+                        $(table).DataTable().destroy();
+                    }
+                }
+            }
+        }
+        
+        loadRegistries();
+        
+        // Create form
+        const createForm = document.getElementById('registry-create-form');
+        if (createForm) {
+            createForm.addEventListener('submit', async function(e) {
+                e.preventDefault();
+                
+                const messagesDiv = document.getElementById('create-form-messages');
+                messagesDiv.innerHTML = '';
+                
+                const formData = {
+                    registry_server_url: document.getElementById('registry_server_url').value.trim(),
+                    registry_server_port: document.getElementById('registry_server_port').value.trim(),
+                    registry_server_tls: document.getElementById('registry_server_tls_register_value').value === 'True',
+                    insecure_tls: document.getElementById('insecure_tls_register_value').value === 'True',
+                    registry_server_auth_user: document.getElementById('registry_server_auth_user').value.trim(),
+                    registry_server_auth_pass: document.getElementById('registry_server_auth_pass').value.trim()
+                };
+                
+                // Validate
+                if (!formData.registry_server_url || !formData.registry_server_port) {
+                    messagesDiv.innerHTML = '<div class="alert alert-danger">Registry URL and Port are required.</div>';
+                    return;
+                }
+                
+                try {
+                    const apiUrl = '/api/v1/plugins/registry';
+                    console.log('Creating registry:', apiUrl);
+                    
+                    const response = await fetch(apiUrl, {
+                        method: 'POST',
+                        headers: {
+                            'Content-Type': 'application/json',
+                        },
+                        body: JSON.stringify(formData)
+                    });
+                    
+                    const data = await response.json();
+                    
+                    if (!response.ok) {
+                        throw new Error(data.message || `HTTP error! status: ${response.status}`);
+                    }
+                    
+                    // Show success and close modal
+                    messagesDiv.innerHTML = '<div class="alert alert-success">' + escapeHtml(data.message || 'Registry created successfully') + '</div>';
+                    
+                    // Close modal and reload
+                    const modal = bootstrap.Modal.getInstance(document.getElementById('modaladd'));
+                    if (modal) {
+                        modal.hide();
+                    }
+                    
+                    // Reset form
+                    createForm.reset();
+                    document.getElementById('registry_server_tls_register_value').value = 'True';
+                    document.getElementById('insecure_tls_register_value').value = 'False';
+                    
+                    // Reload the list
+                    setTimeout(() => {
+                        loadRegistries();
+                    }, 500);
+                    
+                } catch (error) {
+                    console.error('Error creating registry:', error);
+                    messagesDiv.innerHTML = '<div class="alert alert-danger">Error: ' + escapeHtml(error.message) + '</div>';
+                }
+            });
+        }
+        
+        // Edit form submissions (dynamically attached)
+        document.addEventListener('submit', async function(e) {
+            if (e.target && e.target.id && e.target.id.startsWith('registry-edit-form-')) {
+                e.preventDefault();
+                
+                const formId = e.target.id;
+                const safeId = formId.replace('registry-edit-form-', '');
+                const messagesDiv = document.getElementById(`edit-form-messages-${safeId}`);
+                messagesDiv.innerHTML = '';
+                
+                const registry_server_url_old = document.querySelector(`#${formId} input[name="registry_server_url_old"]`).value;
+                
+                const formData = {
+                    registry_server_url: document.getElementById(`registry_server_url_${safeId}`).value.trim(),
+                    registry_server_port: document.getElementById(`registry_server_port_${safeId}`).value.trim(),
+                    registry_server_tls: document.getElementById(`registry_server_tls_edit_value_${safeId}`).value === 'True',
+                    insecure_tls: document.getElementById(`insecure_tls_edit_value_${safeId}`).value === 'True',
+                    registry_server_auth_user: document.getElementById(`registry_server_auth_user_${safeId}`).value.trim(),
+                    registry_server_auth_pass: document.getElementById(`registry_server_auth_pass_${safeId}`).value.trim()
+                };
+                
+                // Validate
+                if (!formData.registry_server_url || !formData.registry_server_port) {
+                    messagesDiv.innerHTML = '<div class="alert alert-danger">Registry URL and Port are required.</div>';
+                    return;
+                }
+                
+                try {
+                    const apiUrl = `/api/v1/plugins/registry/${encodeURIComponent(registry_server_url_old)}`;
+                    console.log('Updating registry:', apiUrl);
+                    
+                    const response = await fetch(apiUrl, {
+                        method: 'PUT',
+                        headers: {
+                            'Content-Type': 'application/json',
+                        },
+                        body: JSON.stringify(formData)
+                    });
+                    
+                    const data = await response.json();
+                    
+                    if (!response.ok) {
+                        throw new Error(data.message || `HTTP error! status: ${response.status}`);
+                    }
+                    
+                    // Show success and close modal
+                    messagesDiv.innerHTML = '<div class="alert alert-success">' + escapeHtml(data.message || 'Registry updated successfully') + '</div>';
+                    
+                    // Close modal
+                    const modalElement = document.getElementById(`modaledit-${safeId}`);
+                    const modal = bootstrap.Modal.getInstance(modalElement);
+                    if (modal) {
+                        modal.hide();
+                    }
+                    
+                    // Reload the list
+                    setTimeout(() => {
+                        loadRegistries();
+                    }, 500);
+                    
+                } catch (error) {
+                    console.error('Error updating registry:', error);
+                    messagesDiv.innerHTML = '<div class="alert alert-danger">Error: ' + escapeHtml(error.message) + '</div>';
+                }
+            }
+        });
+    });
+</script>
 {% endblock %}

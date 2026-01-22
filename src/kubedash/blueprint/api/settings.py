@@ -66,14 +66,23 @@ class SSOConfigResource(MethodView):
                 "message": "No SSO configuration has been set up"
             }), 404
         
+        # Handle scope - it's stored as a MutableList, so convert to regular list
+        scope = sso_server.scope if sso_server.scope else []
+        if isinstance(scope, list):
+            scope = list(scope)  # Convert MutableList to regular list
+        elif isinstance(scope, str):
+            scope = [s.strip() for s in scope.split(',') if s.strip()]
+        else:
+            scope = []
+        
         return jsonify({
             "data": {
                 "oauth_server_uri": sso_server.oauth_server_uri,
                 "oauth_server_ca": sso_server.oauth_server_ca,
                 "client_id": sso_server.client_id,
-                "client_secret": "***",  # Never return actual secret
+                "client_secret": sso_server.client_secret,  # Return actual secret for UI display
                 "base_uri": sso_server.base_uri,
-                "scope": sso_server.scope.split(',') if sso_server.scope else []
+                "scope": scope
             }
         })
     
@@ -117,11 +126,30 @@ class SSOConfigResource(MethodView):
             scope = [s.strip() for s in scope.split(',') if s.strip()]
         
         # Validate required fields
-        if not all([oauth_server_uri, client_id, client_secret]):
+        if not all([oauth_server_uri, client_id]):
             return jsonify({
                 "error": "BadRequest",
-                "message": "oauth_server_uri, client_id, and client_secret are required"
+                "message": "oauth_server_uri and client_id are required"
             }), 400
+        
+        # Client secret is required for create, optional for edit
+        if request_type == "create" and not client_secret:
+            return jsonify({
+                "error": "BadRequest",
+                "message": "client_secret is required when creating SSO configuration"
+            }), 400
+        
+        # If editing and client_secret is empty, get the existing one from database
+        if request_type == "edit" and not client_secret:
+            from lib.sso import SSOSererGet
+            existing_sso = SSOSererGet()
+            if existing_sso:
+                client_secret = existing_sso.client_secret
+            else:
+                return jsonify({
+                    "error": "NotFound",
+                    "message": "Cannot update: SSO configuration not found"
+                }), 404
         
         if oauth_server_ca:
             oauth_server_ca = str(base64_encode(oauth_server_ca.strip()), 'UTF-8')
@@ -201,7 +229,16 @@ class K8sConfigsResource(MethodView):
         Returns:
             dict: List of K8s server configurations
         """
-        configs, config_list_length = k8sServerConfigList()
+        configs_query, config_list_length = k8sServerConfigList()
+        
+        # Convert SQLAlchemy query results to list of dictionaries
+        configs = []
+        for config in configs_query.all():
+            configs.append({
+                "k8s_context": config.k8s_context,
+                "k8s_server_url": config.k8s_server_url,
+                "k8s_server_ca": config.k8s_server_ca  # This is base64 encoded
+            })
         
         return jsonify({
             "data": configs,

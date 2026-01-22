@@ -51,31 +51,21 @@ logger = get_logger()
 def get_flux_objects():
     """
     Main Flux objects list view.
-    Displays all Flux objects in a tabbed interface.
+    
+    Data is now loaded client-side via JavaScript API calls.
+    This route only renders the template structure and provides namespaces.
     """
-    selected = None
     user_token = get_user_token(session)
-    namespace_list, error = k8sNamespaceListGet(session['user_role'], user_token)
-
+    
     if request.method == 'POST':
         if request.form.get('ns_select', None):
             session['ns_select'] = request.form.get('ns_select')
-        selected = request.form.get('selected')
-            
-    flux_objects = _fetch_all_flux_objects(user_token)
     
-    # Build graph data for the connections tab
-    graph_data = build_flux_graph(flux_objects)
-    graph_stats = get_graph_stats(graph_data)
+    # Get namespace list for the dropdown
+    namespace_list, error = k8sNamespaceListGet(session['user_role'], user_token)
+    namespaces = namespace_list if not error else []
        
-    return render_template("flux_objects.html.j2",
-        namespaces=namespace_list,
-        selected=selected,
-        flux_objects=flux_objects,
-        graph_data=json.dumps(graph_data),
-        graph_stats=graph_stats,
-        ns_select=session.get('ns_select', 'default'),
-    )
+    return render_template("flux_objects.html.j2", namespaces=namespaces)
 
 
 ##############################################################
