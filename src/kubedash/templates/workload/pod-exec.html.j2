@@ -38,14 +38,8 @@
           <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
           <input type="hidden" name="po_name" value="{{ po_name }}">
           <div class="input-group">
-              <select name= "container_select" class="form-select" id="containers" aria-label="Select Container">
-                {% for container in pod_containers %}
-                {% if container == container_select %}
-                <option value="{{ container }}" selected>{{ container }}</option>
-                {% else %}
-                <option value="{{ container }}">{{ container }}</option>
-                {% endif %}
-                {% endfor %}
+              <select name="container_select" class="form-select" id="containers" aria-label="Select Container">
+                <option value="" selected disabled>Loading containers...</option>
               </select>
               <button type="submit" class="btn btn-primary" type="button">Submit</button>
           </div>
@@ -85,11 +79,100 @@
 
         const socket = io.connect('/exec');
         const status = document.getElementById("status");
+        const containersSelect = document.getElementById("containers");
+        const podName = "{{ po_name | e }}";
+        const namespace = "{{ session['ns_select'] | e }}";
+        const initialContainer = "{{ container_select | default('', true) | e }}";
+
+        let socketConnected = false;
+        let selectedContainer = "";
+
+        function sendExecRequest(containerName) {
+          if (!containerName) {
+            return;
+          }
+          selectedContainer = containerName;
+          if (socketConnected) {
+            socket.send(podName, containerName);
+            term.reset();
+          }
+        }
+
+        function buildContainerOptions(containers, initContainers) {
+          containersSelect.innerHTML = "";
+
+          if ((!containers || containers.length === 0) && (!initContainers || initContainers.length === 0)) {
+            const option = document.createElement("option");
+            option.value = "";
+            option.textContent = "No containers found";
+            option.disabled = true;
+            option.selected = true;
+            containersSelect.appendChild(option);
+            return;
+          }
+
+          if (initContainers && initContainers.length > 0) {
+            const initGroup = document.createElement("optgroup");
+            initGroup.label = "Init containers";
+            initContainers.forEach((name) => {
+              const option = document.createElement("option");
+              option.value = name;
+              option.textContent = name;
+              initGroup.appendChild(option);
+            });
+            containersSelect.appendChild(initGroup);
+          }
+
+          if (containers && containers.length > 0) {
+            const mainGroup = document.createElement("optgroup");
+            mainGroup.label = "Containers";
+            containers.forEach((name) => {
+              const option = document.createElement("option");
+              option.value = name;
+              option.textContent = name;
+              mainGroup.appendChild(option);
+            });
+            containersSelect.appendChild(mainGroup);
+          }
+        }
+
+        async function loadContainers() {
+          try {
+            const url = `/api/v1/workloads/pods/${encodeURIComponent(podName)}/containers?namespace=${encodeURIComponent(namespace)}`;
+            const response = await fetch(url, { headers: { "Accept": "application/json" } });
+            if (!response.ok) {
+              throw new Error(`Container fetch failed: ${response.status}`);
+            }
+            const payload = await response.json();
+            const containers = (payload.data && payload.data.containers) || [];
+            const initContainers = (payload.data && payload.data.init_containers) || [];
+
+            buildContainerOptions(containers, initContainers);
+
+            const desired = initialContainer || (containers[0] || initContainers[0] || "");
+            if (desired) {
+              containersSelect.value = desired;
+              sendExecRequest(desired);
+            }
+          } catch (error) {
+            containersSelect.innerHTML = "";
+            const option = document.createElement("option");
+            option.value = "";
+            option.textContent = "Failed to load containers";
+            option.disabled = true;
+            option.selected = true;
+            containersSelect.appendChild(option);
+            console.error(error);
+          }
+        }
 
         socket.on("connect", () => {
-          socket.send("{{ po_name }}", "{{ container_select }}");
-          term.reset();
+          socketConnected = true;
           status.innerHTML = '<span class="connected">connected</span>';
+          if (selectedContainer) {
+            socket.send(podName, selectedContainer);
+            term.reset();
+          }
         });
 
         socket.on("response", function(msg){
@@ -101,6 +184,12 @@
             '<span class="disconnected">disconnected</span>';
         });
 
+        containersSelect.addEventListener("change", (event) => {
+          sendExecRequest(event.target.value);
+        });
+
+        loadContainers();
+
         /**
         * Handle copy and paste events
         */
@@ -108,8 +197,26 @@
           if (e.type !== "keydown") {
             return true;
           }
+          const key = e.key.toLowerCase();
+          if (e.ctrlKey && !e.shiftKey && !e.altKey && !e.metaKey) {
+            if (key === "v") {
+              // ctrl+v: paste whatever is in the clipboard
+              navigator.clipboard.readText().then((toPaste) => {
+                term.writeText(toPaste);
+              });
+              return false;
+            }
+            if (key === "c") {
+              // ctrl+c: copy selection if any, otherwise allow SIGINT
+              const toCopy = term.getSelection();
+              if (toCopy) {
+                navigator.clipboard.writeText(toCopy);
+                term.focus();
+                return false;
+              }
+            }
+          }
           if (e.ctrlKey && e.shiftKey) {
-            const key = e.key.toLowerCase();
             if (key === "v") {
               // ctrl+shift+v: paste whatever is in the clipboard
               navigator.clipboard.readText().then((toPaste) => {

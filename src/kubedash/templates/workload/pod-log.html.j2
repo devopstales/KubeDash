@@ -39,21 +39,7 @@
           <input type="hidden" name="po_name" value="{{ po_name }}">
           <div class="input-group">
               <select name="container_select" class="form-select" id="containers" aria-label="Select Container">
-                {% for container in pod_init_containers %}
-                {% if container == container_select %}
-                <option value="{{ container }}" selected>{{ container }}</option>
-                {% else %}
-                <option value="{{ container }}">{{ container }}</option>
-                {% endif %}
-                {% endfor %}
-                <option disabled>-----------</option>
-                {% for container in pod_containers %}
-                {% if container == container_select %}
-                <option value="{{ container }}" selected>{{ container }}</option>
-                {% else %}
-                <option value="{{ container }}">{{ container }}</option>
-                {% endif %}
-                {% endfor %}
+                <option value="" selected disabled>Loading containers...</option>
               </select>
               <button type="submit" class="btn btn-primary" type="button">Submit</button>
           </div>
@@ -90,11 +76,100 @@
 
       const socket = io.connect('/log');
       const status = document.getElementById("status");
+      const containersSelect = document.getElementById("containers");
+      const podName = "{{ po_name | e }}";
+      const namespace = "{{ session['ns_select'] | e }}";
+      const initialContainer = "{{ container_select | default('', true) | e }}";
+
+      let socketConnected = false;
+      let selectedContainer = "";
+
+      function sendLogRequest(containerName) {
+        if (!containerName) {
+          return;
+        }
+        selectedContainer = containerName;
+        if (socketConnected) {
+          socket.send(podName, containerName);
+          term.reset();
+        }
+      }
+
+      function buildContainerOptions(containers, initContainers) {
+        containersSelect.innerHTML = "";
+
+        if ((!containers || containers.length === 0) && (!initContainers || initContainers.length === 0)) {
+          const option = document.createElement("option");
+          option.value = "";
+          option.textContent = "No containers found";
+          option.disabled = true;
+          option.selected = true;
+          containersSelect.appendChild(option);
+          return;
+        }
+
+        if (initContainers && initContainers.length > 0) {
+          const initGroup = document.createElement("optgroup");
+          initGroup.label = "Init containers";
+          initContainers.forEach((name) => {
+            const option = document.createElement("option");
+            option.value = name;
+            option.textContent = name;
+            initGroup.appendChild(option);
+          });
+          containersSelect.appendChild(initGroup);
+        }
+
+        if (containers && containers.length > 0) {
+          const mainGroup = document.createElement("optgroup");
+          mainGroup.label = "Containers";
+          containers.forEach((name) => {
+            const option = document.createElement("option");
+            option.value = name;
+            option.textContent = name;
+            mainGroup.appendChild(option);
+          });
+          containersSelect.appendChild(mainGroup);
+        }
+      }
+
+      async function loadContainers() {
+        try {
+          const url = `/api/v1/workloads/pods/${encodeURIComponent(podName)}/containers?namespace=${encodeURIComponent(namespace)}`;
+          const response = await fetch(url, { headers: { "Accept": "application/json" } });
+          if (!response.ok) {
+            throw new Error(`Container fetch failed: ${response.status}`);
+          }
+          const payload = await response.json();
+          const containers = (payload.data && payload.data.containers) || [];
+          const initContainers = (payload.data && payload.data.init_containers) || [];
+
+          buildContainerOptions(containers, initContainers);
+
+          const desired = initialContainer || (containers[0] || initContainers[0] || "");
+          if (desired) {
+            containersSelect.value = desired;
+            sendLogRequest(desired);
+          }
+        } catch (error) {
+          containersSelect.innerHTML = "";
+          const option = document.createElement("option");
+          option.value = "";
+          option.textContent = "Failed to load containers";
+          option.disabled = true;
+          option.selected = true;
+          containersSelect.appendChild(option);
+          console.error(error);
+        }
+      }
 
       socket.on("connect", () => {
-        socket.send("{{ po_name }}", "{{ container_select}}");
-        term.reset();
+        socketConnected = true;
         status.innerHTML = '<span class="connected">connected</span>';
+        if (selectedContainer) {
+          socket.send(podName, selectedContainer);
+          term.reset();
+        }
       });
 
       socket.on('response', function(msg) {
@@ -105,5 +180,11 @@
         status.innerHTML =
           '<span class="disconnected">disconnected</span>';
       });
+
+      containersSelect.addEventListener("change", (event) => {
+        sendLogRequest(event.target.value);
+      });
+
+      loadContainers();
     </script>
 {% endblock %}
