@@ -148,6 +148,7 @@ kubectl create -f project.yaml
 * **Cert-Manager Plugin** - Certificate and issuer visualization
 * **External LoadBalancer Plugin** - MetalLB and Cilium support
 * **Flux Plugin** - GitOps visualization and management
+* **Application Catalog** - Manage and embed external applications
 * **Extension API** - Kubernetes-style API for Projects
 
 ### Extension API
