@@ -1051,13 +1051,51 @@ def initialize_app_security(app: Flask):
     @app.after_request
     def set_security_headers(response):
         """Add security headers for response"""
+        # Relax security headers for embedded app pages to allow iframe embedding
+        is_embedded_app = (
+            request.endpoint and 
+            (request.endpoint.startswith('app_catalog.') or 
+             request.endpoint.startswith('iframe_proxy.'))
+        )
+        
         # CORS
         response.headers['Access-Control-Allow-Origin'] = request.root_url.rstrip(request.root_url[-1])
         response.headers['X-Permitted-Cross-Domain-Policies'] = "none"
-        response.headers['Cross-Origin-Resource-Policy'] = "same-origin"
-        response.headers['Cross-Origin-Embedder-Policy'] = "require-corp"
-        response.headers['Cross-Origin-Opener-Policy']   = "same-origin"
-        response.headers['Cross-Origin-Resource-Policy'] = "same-origin"
+        
+        if is_embedded_app:
+            # Relaxed headers for embedded applications
+            response.headers['Cross-Origin-Resource-Policy'] = "cross-origin"
+            # Don't set Cross-Origin-Embedder-Policy for embedded apps
+            # Don't set Cross-Origin-Opener-Policy for embedded apps
+            
+            # Remove Talisman's CSP header and set a relaxed one for embedded apps
+            # Embedded apps need more flexibility (blob workers, external frames, etc.)
+            # Remove all CSP-related headers that Talisman might have set
+            response.headers.pop('Content-Security-Policy', None)
+            response.headers.pop('Content-Security-Policy-Report-Only', None)
+            
+            # Set relaxed CSP as a string (Talisman might override dict format)
+            relaxed_csp_str = (
+                "default-src 'self' 'unsafe-inline' 'unsafe-eval' blob: data: *; "
+                "script-src 'self' 'unsafe-inline' 'unsafe-eval' blob: data: *; "
+                "style-src 'self' 'unsafe-inline' *; "
+                "img-src 'self' data: blob: *; "
+                "font-src 'self' data: blob: *; "
+                "connect-src 'self' wss: ws: *; "
+                "frame-src 'self' *; "
+                "worker-src 'self' blob: *; "
+                "object-src 'none'; "
+                "base-uri 'self'; "
+                "form-action 'self' *;"
+            )
+            
+            response.headers['Content-Security-Policy'] = relaxed_csp_str
+        else:
+            # Strict headers for main application
+            response.headers['Cross-Origin-Resource-Policy'] = "same-origin"
+            response.headers['Cross-Origin-Embedder-Policy'] = "require-corp"
+            response.headers['Cross-Origin-Opener-Policy'] = "same-origin"
+        
         response.headers["Access-Control-Max-Age"] = "600"
 
         # Cache

@@ -1,0 +1,44 @@
+{% extends "base2.html.j2" %}
+
+{% block topmenu %}
+<ul class="header-nav d-lg-flex m-3">
+    <div class="container-fluid px-4">
+      <nav aria-label="breadcrumb">
+        <ol class="breadcrumb my-0">
+          <li class="breadcrumb-item"><a href="/plugins/app-catalog/settings">Applications</a></li>
+          <li class="breadcrumb-item active"><span>{{ app_name }}</span></li>
+        </ol>
+      </nav>
+    </div>
+</ul>
+<ul class="header-nav ms-auto"></ul>
+<ul class="header-nav d-lg-flex">
+{% include "segments/topmenu.html.j2" %}
+{% endblock %}
+
+{% block content %}
+<div class="card shadow mb-4" style="height: calc(100vh - 200px);">
+    <div class="card-body p-0" style="height: 100%;">
+        {% if embed_mode and app_url %}
+        <iframe 
+            src="{{ app_url }}" 
+            style="width: 100%; height: 100%; border: none;"
+            sandbox="allow-same-origin allow-scripts allow-forms allow-popups allow-popups-to-escape-sandbox allow-top-navigation-by-user-activation"
+            title="{{ app_name }}"
+        ></iframe>
+        {% elif app_url %}
+        <div class="p-4 text-center">
+            <p class="mb-3">This application is configured to open in a new tab.</p>
+            <a href="{{ app_url }}" target="_blank" rel="noopener" class="btn btn-primary">
+                Open {{ app_name }} in New Tab
+            </a>
+        </div>
+        {% else %}
+        <div class="p-4 text-center">
+            <p class="text-danger">Application not found or not configured.</p>
+        </div>
+        {% endif %}
+    </div>
+</div>
+{% endblock %}
+

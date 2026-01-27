@@ -161,6 +161,9 @@
                 <ul class="nav-group-items compact">
                     <li class="nav-item"><a class="nav-link" href="/settings/sso-config"> Auth Provider </a></li>
                     <li class="nav-item"><a class="nav-link" href="/settings/cluster-config"> Cluster Configuration </a></li>
+                    {% if config.plugins["application_catalog"] %}
+                    <li class="nav-item"><a class="nav-link" href="/plugins/app-catalog/settings"> Applications </a></li>
+                    {% endif %}
                 </ul>
             </li>
             {% endif %}
