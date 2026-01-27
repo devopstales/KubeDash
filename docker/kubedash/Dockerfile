@@ -9,7 +9,7 @@ RUN apk add --no-cache postgresql-libs && \
     apk add --no-cache --virtual .build-deps gcc build-base freetype-dev libpng-dev openblas-dev libffi-dev musl-dev postgresql-dev
 RUN apk -U upgrade
 RUN pip install --no-cache-dir --prefix=/install-dir -r /code/requirements.txt &&\
-    pip install --no-cache-dir --prefix=/install-dir -U pip setuptools wheel 
+    pip install --no-cache-dir --prefix=/install-dir -U "pip>=25.3" "setuptools>=80.10.2" "wheel>=0.46.3" 
 
 # main Contaiber
 ARG BUILDPLATFORM=linux/amd64

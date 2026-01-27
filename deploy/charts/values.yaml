@@ -389,6 +389,18 @@ extensionApi:
   # -- Version priority for API version ordering
   versionPriority: 100
 
+# -- DNS configuration for pods
+# Useful for Alpine-based images which can have DNS resolution issues in Kubernetes
+dnsConfig:
+  # -- Enable custom DNS configuration
+  enabled: false
+  # -- DNS options (e.g., ndots setting)
+  # Setting ndots to "2" can help with DNS resolution in Alpine containers
+  # Default Kubernetes ndots is 5, which can cause delays with short service names
+  options:
+    - name: ndots
+      value: "2"
+
 # -- list of the pos's SecurityContexts
 podSecurityContext:
   runAsNonRoot: true

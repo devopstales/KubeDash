@@ -8,6 +8,7 @@ CA.crt
 *manage.py
 src/kubedash/run.sh
 src/kubedash/kubedash.ini
+*kubedash.ini
 
 # helm
 .cr-index/
