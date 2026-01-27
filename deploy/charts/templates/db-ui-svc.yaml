@@ -14,6 +14,6 @@ spec:
       protocol: TCP
       name: http
   selector:
-    app: adminer
+    app: "db-ui"
     {{ include "kubedash.labels" . | nindent 4 }}
 {{ end }}

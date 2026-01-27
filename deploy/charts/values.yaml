@@ -20,7 +20,7 @@ image:
   # -- The docker image pull policy
   pullPolicy: Always
   # -- The docker image tag to use
-  tag: 3.1.0
+  tag: 4.1.0
   statsdExporter:
     # -- The docker image repository to use
     repository: prom/statsd-exporter
@@ -154,19 +154,45 @@ postgresql:
       #namespace: "monitoring"
 # https://artifacthub.io/packages/helm/bitnami/postgresql
 
-# -- redis ui
-redisui:
+# -- deploy redis-commander
+redisCommander:
+  # -- Enable redis-commander
+  enabled: false
   image:
-      repository: patrikx3/p3x-redis-ui
-      tag: latest
-      pullPolicy: Always
+    repository: ghcr.io/joeferner/redis-commander
+    tag: latest
+    pullPolicy: IfNotPresent
   resources: {}
-    # requests:
-    #   cpu: 100m
-    #   memory: 100M
-    # limits:
-    #   cpu: 200m
-  #   memory: 200M
+  # -- Redis host configuration
+  redisHost: ""
+  # -- Redis port
+  redisPort: 6379
+
+# -- deploy jaeger
+jaeger:
+  # -- Enable jaeger
+  enabled: false
+  image:
+    repository: jaegertracing/all-in-one
+    tag: latest
+    pullPolicy: IfNotPresent
+  resources: {}
+  # -- Jaeger log level
+  logLevel: info
+
+# -- deploy kubeview
+kubeview:
+  # -- Enable kubeview
+  enabled: false
+  image:
+    repository: ghcr.io/benc-uk/kubeview
+    tag: latest
+    pullPolicy: IfNotPresent
+  resources: {}
+  # -- Kubeview port
+  port: 8003
+  # -- Namespace filter (regex pattern)
+  namespaceFilter: "^kube-"
 
 # -- enable redis for caching
 redis:
@@ -237,7 +263,7 @@ plugins:
     # -- Enable helm dashboard plugin
     enabled: true
   certManager:
-    # -- Enable helm dashboard plugin
+    # -- Enable cert-manager plugin
     enabled: true
   externalLoadbalancer:
     # -- Enable external loadbalancer plugin
@@ -245,6 +271,34 @@ plugins:
   flux:
     # -- Enable flux plugin
     enabled: true
+  gatewayApi:
+    # -- Enable gateway API plugin
+    enabled: false
+  trivyOperator:
+    # -- Enable trivy operator plugin
+    enabled: false
+  iframeProxy:
+    # -- Enable iframe proxy plugin
+    enabled: false
+  applicationCatalog:
+    # -- Enable application catalog plugin
+    enabled: false
+
+# -- performance settings
+performance:
+  # -- Skip cluster metrics fetching for faster initial page loads
+  skipClusterMetrics: false
+  # -- Timeout for initial cluster metrics fetch (seconds)
+  initialMetricsTimeout: 3
+
+# -- application links configuration
+applicationList: {}
+  # Example configuration:
+  # app_0_name: Kubeview
+  # app_0_url: http://127.0.0.1:8003
+  # app_0_icon: ""
+  # app_0_embed: true
+  # app_0_enable: true
 
 # -- enable persistence
 persistence:
@@ -311,6 +365,29 @@ route:
   url: "kubedash.mydomain.intra"
   # -- Extra annotation to the OpenShift Route object
   annotations: {}
+
+# -- Kubernetes API Extension (APIService) configuration
+extensionApi:
+  # -- Enable Kubernetes API Extension registration
+  enabled: false
+  # -- API group name
+  group: "kubedash.devopstales.github.io"
+  # -- API version
+  version: "v1"
+  # -- Service port for the extension API (must be 443 for API aggregation)
+  servicePort: 443
+  # -- Target port on the KubeDash service
+  targetPort: 8000
+  # -- CA bundle (base64-encoded) for TLS verification (recommended for production)
+  # Leave empty to use insecureSkipTLSVerify (development only)
+  caBundle: ""
+  # -- Skip TLS verification (development only, still requires HTTPS endpoint)
+  # WARNING: Should never be used in production
+  insecureSkipTLSVerify: false
+  # -- Group priority minimum for API group ordering
+  groupPriorityMinimum: 1000
+  # -- Version priority for API version ordering
+  versionPriority: 100
 
 # -- list of the pos's SecurityContexts
 podSecurityContext:

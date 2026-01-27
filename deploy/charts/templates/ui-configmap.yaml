@@ -44,11 +44,22 @@ data:
     redis_host = {{ .Release.Name }}-redis-master
     redis_port = 6379
     redis_db = 0
+    redis_password =
+    # redis cluster
+    cluster_enabled = false
+    cluster_startup_nodes =
     # cache time
     short_cache_time = 60
     long_cache_time = 900
     {{ else }}
     redis_enabled = false
+    redis_host = 127.0.0.1
+    redis_port = 6379
+    redis_db = 0
+    redis_password =
+    # redis cluster
+    cluster_enabled = false
+    cluster_startup_nodes =
     # cache time
     short_cache_time = 60
     long_cache_time = 900
@@ -82,17 +93,68 @@ data:
     #################################### Monitoring Settings ###########################
     [monitoring]
 
-    jaeger_enabled = false
+    jaeger_enabled = {{ .Values.jaeger.enabled }}
+    {{- if .Values.jaeger.enabled }}
+    jaeger_http_endpoint = http://{{ include "kubedash.fullname" . }}-jaeger:4318
+    {{- else }}
     jaeger_http_endpoint = http://127.0.0.1:4318
+    {{- end }}
 
     #################################### Plugin Settings ###########################
     [plugin_settings]
     registry = {{ .Values.plugins.registryUi.enabled }}
     helm = {{ .Values.plugins.helmDashboard.enabled }}
-    gateway_api = false
+    gateway_api = {{ .Values.plugins.gatewayApi.enabled }}
     cert_manager = {{ .Values.plugins.certManager.enabled }}
     external_loadbalancer = {{ .Values.plugins.externalLoadbalancer.enabled }}
     flux = {{ .Values.plugins.flux.enabled }}
+    trivy_operator = {{ .Values.plugins.trivyOperator.enabled }}
+    iframe_proxy = {{ .Values.plugins.iframeProxy.enabled }}
+    application_catalog = {{ .Values.plugins.applicationCatalog.enabled }}
+
+    #################################### Performance Settings ###########################
+    [performance]
+    # Skip cluster metrics fetching for faster initial page loads
+    # Useful for large clusters or when metrics server is unavailable
+    skip_cluster_metrics = {{ .Values.performance.skipClusterMetrics }}
+    # Timeout for initial cluster metrics fetch (seconds) - reduced for faster loading
+    initial_metrics_timeout = {{ .Values.performance.initialMetricsTimeout }}
+
+    #################################### Application links ###########################
+    [application_list]
+    {{- if .Values.kubeview.enabled }}
+    app_0_name = Kubeview
+    app_0_url = http://{{ include "kubedash.fullname" . }}-kubeview:{{ .Values.kubeview.port }}
+    app_0_icon =
+    app_0_embed = true
+    app_0_enable = true
+    {{- end }}
+    {{- if and .Values.redisCommander.enabled .Values.redis.enabled }}
+    app_1_name = redis-commander
+    app_1_url = http://{{ include "kubedash.fullname" . }}-redis-commander:8081
+    app_1_icon =
+    app_1_embed = true
+    app_1_enable = true
+    {{- end }}
+    {{- if or .Values.externalDatabase.enabled .Values.postgresql.enabled }}
+    app_2_name = psql-ui
+    app_2_url = http://{{ include "kubedash.fullname" . }}-db-ui:8080
+    app_2_icon =
+    app_2_embed = true
+    app_2_enable = true
+    {{- end }}
+    {{- if .Values.jaeger.enabled }}
+    app_3_name = Jaeger
+    app_3_url = http://{{ include "kubedash.fullname" . }}-jaeger:16686
+    app_3_icon =
+    app_3_embed = true
+    app_3_enable = true
+    {{- end }}
+    {{- if .Values.applicationList }}
+    {{- range $key, $value := .Values.applicationList }}
+    {{ $key }} = {{ $value }}
+    {{- end }}
+    {{- end }}
     #################################### End of Settings ###########################
 {{- if .Values.metrics.enabled }}
 ---

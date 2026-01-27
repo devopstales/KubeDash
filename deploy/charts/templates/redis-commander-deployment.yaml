@@ -1,0 +1,45 @@
+{{- if and .Values.redisCommander.enabled .Values.redis.enabled }}
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: {{ include "kubedash.fullname" . }}-redis-commander
+  labels:
+    app: "redis-commander"
+    {{- include "kubedash.labels" . | nindent 4 }}
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: "redis-commander"
+      {{- include "kubedash.labels" . | nindent 6 }}
+  template:
+    metadata:
+      labels:
+        app: "redis-commander"
+        {{- include "kubedash.labels" . | nindent 8 }}
+    spec:
+      containers:
+        - name: redis-commander
+          image: "{{ .Values.redisCommander.image.repository }}:{{ .Values.redisCommander.image.tag }}"
+          imagePullPolicy: {{ .Values.redisCommander.image.pullPolicy }}
+          ports:
+            - name: http
+              containerPort: 8081
+              protocol: TCP
+          env:
+            - name: REDIS_HOSTS
+              value: "local:{{ .Release.Name }}-redis-master:{{ .Values.redisCommander.redisPort }}"
+            - name: REDIS_COMMANDER_HTTP_AUTH_USER
+              value: ""
+            - name: REDIS_COMMANDER_HTTP_AUTH_PASSWORD
+              value: ""
+            - name: REDIS_COMMANDER_HTTP_AUTH
+              value: "no"
+            - name: REDIS_COMMANDER_NOAUTH
+              value: "true"
+          {{- with .Values.redisCommander.resources }}
+          resources:
+            {{- toYaml . | nindent 12 }}
+          {{- end }}
+{{- end }}
+

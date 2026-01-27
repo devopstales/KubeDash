@@ -1,0 +1,48 @@
+{{- if .Values.jaeger.enabled }}
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: {{ include "kubedash.fullname" . }}-jaeger
+  labels:
+    app: "jaeger"
+    {{- include "kubedash.labels" . | nindent 4 }}
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: "jaeger"
+      {{- include "kubedash.labels" . | nindent 6 }}
+  template:
+    metadata:
+      labels:
+        app: "jaeger"
+        {{- include "kubedash.labels" . | nindent 8 }}
+    spec:
+      containers:
+        - name: jaeger
+          image: "{{ .Values.jaeger.image.repository }}:{{ .Values.jaeger.image.tag }}"
+          imagePullPolicy: {{ .Values.jaeger.image.pullPolicy }}
+          ports:
+            - name: query-http
+              containerPort: 16686
+              protocol: TCP
+            - name: collector-http
+              containerPort: 14269
+              protocol: TCP
+            - name: otlp-grpc
+              containerPort: 4317
+              protocol: TCP
+            - name: otlp-http
+              containerPort: 4318
+              protocol: TCP
+          env:
+            - name: COLLECTOR_OTLP_ENABLED
+              value: "true"
+            - name: LOG_LEVEL
+              value: {{ .Values.jaeger.logLevel | quote }}
+          {{- with .Values.jaeger.resources }}
+          resources:
+            {{- toYaml . | nindent 12 }}
+          {{- end }}
+{{- end }}
+

@@ -37,6 +37,7 @@ nav:
       - Helm Chart: integrations/helm.md
       - Cert Manager: integrations/cert-manager.md
       - External LoadBalancer: integrations/external-load-balancer.md
+      - Application Catalog: integrations/application-catalog.md
       - Extension API: integrations/extension-api.md
       - Project Data: integrations/project-data.md
       - Trivy Operator: integrations/trivy-operator.md
@@ -62,6 +63,7 @@ nav:
       - Flux Plugin: prd/plugin-flux.md
       - Trivy Operator Plugin: prd/plugin-trivy-operator.md
       - Gateway API Plugin: prd/plugin-gateway-api.md
+      - Application Catalog Plugin: prd/plugin-application-catalog.md
     - Contributing: contributing.md
     - FAQ:
       - Technical: faq/technical.md

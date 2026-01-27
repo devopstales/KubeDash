@@ -1,0 +1,32 @@
+{{- if .Values.jaeger.enabled }}
+apiVersion: v1
+kind: Service
+metadata:
+  name: {{ include "kubedash.fullname" . }}-jaeger
+  labels:
+    app: "jaeger"
+    {{- include "kubedash.labels" . | nindent 4 }}
+spec:
+  type: ClusterIP
+  ports:
+    - name: query-http
+      port: 16686
+      targetPort: query-http
+      protocol: TCP
+    - name: collector-http
+      port: 14269
+      targetPort: collector-http
+      protocol: TCP
+    - name: otlp-grpc
+      port: 4317
+      targetPort: otlp-grpc
+      protocol: TCP
+    - name: otlp-http
+      port: 4318
+      targetPort: otlp-http
+      protocol: TCP
+  selector:
+    app: "jaeger"
+    {{- include "kubedash.labels" . | nindent 4 }}
+{{- end }}
+

@@ -1,8 +1,8 @@
 ### KubeDash
 
-![Version: 4.0.0](https://img.shields.io/badge/Version-4.0.0-informational?style=for-the-badge)
+![Version: 4.1.0](https://img.shields.io/badge/Version-4.1.0-informational?style=for-the-badge)
 ![Type: application](https://img.shields.io/badge/Type-application-informational?style=for-the-badge)
-![AppVersion: 4.0.0](https://img.shields.io/badge/AppVersion-4.0.0-informational?style=for-the-badge)
+![AppVersion: 4.1.0](https://img.shields.io/badge/AppVersion-4.1.0-informational?style=for-the-badge)
 
 ![Alpine Linux 3.15.0](https://img.shields.io/badge/alpine_linux_3.15.0-0D597F?style=for-the-badge&logo=alpine-linux&logoColor=white)
 ![Helm](https://img.shields.io/badge/helm-0F1689?style=for-the-badge&logo=helm&logoColor=white)
@@ -49,7 +49,7 @@ The following tables lists configurable parameters of the KubeDash chart and the
 | image.repository | string | `"devopstales/kubedash"` | The docker image repository to use |
 | image.statsdExporter.repository | string | `"prom/statsd-exporter"` | The docker image repository to use |
 | image.statsdExporter.tag | string | `"v0.22.4"` | The docker image tag to use |
-| image.tag | string | `"3.1.0"` | The docker image tag to use |
+| image.tag | string | `"4.1.0"` | The docker image tag to use |
 | imagePullSecrets | list | `[]` | pullsecrets |
 | ingress.annotations | object | `{"nginx.ingress.kubernetes.io/proxy-body-size":"10m","nginx.ingress.kubernetes.io/proxy-read-timeout":"3600","nginx.ingress.kubernetes.io/proxy-send-timeout":"3600","nginx.ingress.kubernetes.io/server-snippets":"location / {\n  proxy_set_header Upgrade $http_upgrade;\n  proxy_http_version 1.1;\n  proxy_set_header X-Forwarded-Host $http_host;\n  proxy_set_header X-Forwarded-Proto $scheme;\n  proxy_set_header X-Forwarded-For $remote_addr;\n  proxy_set_header Host $host;\n  proxy_set_header Connection \"upgrade\";\n  proxy_cache_bypass $http_upgrade;\n}\n"}` | Extra annotation to the Ingress object |
 | ingress.className | string | `"nginx"` | Ingress class name |
@@ -119,7 +119,6 @@ The following tables lists configurable parameters of the KubeDash chart and the
 | redis.metrics.enabled | bool | `true` | Enable redis metrics |
 | redis.metrics.serviceMonitor.additionalLabels | object | `{"release":"kube-prometheus-stack"}` | Prometheus service monitor namespace namespace: "monitoring" |
 | redis.metrics.serviceMonitor.enabled | bool | `false` | Enable prometheus service monitor |
-| redisui | object | `{"image":{"pullPolicy":"Always","repository":"patrikx3/p3x-redis-ui","tag":"latest"},"resources":{}}` | redis ui |
 | replicas | int | `1` | replica number - for multiple replicas you need to enable externalDatabase support |
 | route.annotations | object | `{}` | Extra annotation to the OpenShift Route object |
 | route.enabled | bool | `false` | Enable OpenShift Route object creation |
