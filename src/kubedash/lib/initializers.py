@@ -916,7 +916,7 @@ def initialize_plugin_apis(app: Flask):
                 # The blueprint's url_prefix (e.g., /gateway-api) will be combined with /api/v1/plugins
                 # Final path: /api/v1/plugins/gateway-api/...
                 plugins_api_bp.register_blueprint(api_blueprint)
-                app.logger.info(f"  Plugin API {plugin_name}: Registered (blueprint: {api_blueprint.name}, url_prefix: {api_blueprint.url_prefix})")
+                app.logger.info(f"  Plugin API {plugin_name} Registered")
             else:
                 # Try to find any blueprint ending with _api_bp
                 found = False
@@ -928,7 +928,7 @@ def initialize_plugin_apis(app: Flask):
                         csrf.exempt(api_blueprint)
                         # Register as sub-blueprint of plugins_api_bp
                         plugins_api_bp.register_blueprint(api_blueprint)
-                        app.logger.info(f"  Plugin API {plugin_name}: Registered (found as {attr_name}, blueprint: {api_blueprint.name}, url_prefix: {api_blueprint.url_prefix})")
+                        app.logger.info(f"  Plugin API {plugin_name} Registered")
                         found = True
                         break
                 if not found:

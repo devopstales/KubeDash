@@ -119,6 +119,36 @@
     </div>
 </div>
 
+{% if applications %}
+<div class="card shadow mb-4">
+    <div class="card-header py-3">
+        <h6 class="m-0 font-weight-bold text-primary">Links</h6>
+    </div>
+    <div class="card-body">
+        <div class="d-flex flex-wrap justify-content-center gap-3">
+            {% for app in applications %}
+            {% if app.application_icon %}
+            <a href="{{ app.application_url }}" 
+               target="_blank" rel="noopener"
+               class="d-inline-flex align-items-center text-decoration-none">
+                <img src="{{ app.application_icon }}" 
+                     alt="{{ app.application_name }} icon" 
+                     style="height: 32px; width: 32px; margin-right: 8px;">
+                <span>{{ app.application_name }}</span>
+            </a>
+            {% else %}
+            <a href="{{ app.application_url }}" 
+               target="_blank" rel="noopener"
+               class="btn btn-outline-primary btn-sm">
+                {{ app.application_name }}
+            </a>
+            {% endif %}
+            {% endfor %}
+        </div>
+    </div>
+</div>
+{% endif %}
+
 <div class="card shadow mb-4">
     <div class="card-header">
         <h6 class="m-0 font-weight-bold text-primary">Cluster Events</h6>

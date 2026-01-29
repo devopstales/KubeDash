@@ -57,6 +57,9 @@
             <li class="nav-item">
                 <a class="nav-link" id="nav-resources-tab" data-bs-toggle="tab" href="#nav-resources" role="tab" aria-controls="nav-resources" aria-selected="false" data-bs-toggle="tab">Related Resources</a>
             </li>
+            <li class="nav-item">
+                <a class="nav-link" id="nav-events-tab" data-bs-toggle="tab" href="#nav-events" role="tab" aria-controls="nav-events" aria-selected="false" data-bs-toggle="tab">Events</a>
+            </li>
         </ul>
         <div class="tab-content" id="nav-tabContent">
             <!-- pod -->
@@ -387,6 +390,37 @@
                     </div>
                 </div>
             </div>
+            <!-- events -->
+            <div class="tab-pane fade" id="nav-events" role="tabpanel" aria-labelledby="nav-events-tab">
+                <div class="card shadow mb-4">
+                    <div class="card-body">
+                        <div class="table-responsive">
+                            <table class="table table-bordered" id="eventsTable" width="100%" cellspacing="0">
+                                <thead>
+                                    <tr>
+                                        <th>Type</th>
+                                        <th>Reason</th>
+                                        <th>Message</th>
+                                        <th>Count</th>
+                                        <th>First Seen</th>
+                                        <th>Last Seen</th>
+                                        <th>Source</th>
+                                    </tr>
+                                </thead>
+                                <tbody id="events-tbody">
+                                    <tr>
+                                        <td colspan="7" class="text-center">
+                                            <div class="spinner-border spinner-border-sm text-primary" role="status">
+                                                <span class="visually-hidden">Loading...</span>
+                                            </div>
+                                        </td>
+                                    </tr>
+                                </tbody>
+                            </table>
+                        </div>
+                    </div>
+                </div>
+            </div>
             <!-- END -->
         </div>
     </div>
@@ -587,6 +621,9 @@
         
         // Populate related resources
         populateRelatedResources(podData, namespace);
+        
+        // Load events
+        loadPodEvents(podData.name || podName, podData.namespace || namespace);
     }
     
     function populateContainers(podData) {
@@ -826,6 +863,77 @@
             refersToTbody.innerHTML = refersToRows.join('');
         } else {
             refersToTbody.innerHTML = '<tr><td colspan="3" class="text-center text-muted">No related resources found</td></tr>';
+        }
+    }
+    
+    function populateEvents(events) {
+        const tbody = document.getElementById('events-tbody');
+        if (events && events.length > 0) {
+            tbody.innerHTML = events.map(event => {
+                // Type badge
+                let typeBadge = '';
+                if (event.type === 'Normal') {
+                    typeBadge = '<span class="badge text-bg-success">' + escapeHtml(event.type) + '</span>';
+                } else if (event.type === 'Warning') {
+                    typeBadge = '<span class="badge text-bg-warning">' + escapeHtml(event.type) + '</span>';
+                } else {
+                    typeBadge = '<span class="badge text-bg-secondary">' + escapeHtml(event.type || 'Unknown') + '</span>';
+                }
+                
+                // Format timestamps
+                const firstTimestamp = event.first_timestamp ? new Date(event.first_timestamp).toLocaleString() : '-';
+                const lastTimestamp = event.last_timestamp ? new Date(event.last_timestamp).toLocaleString() : '-';
+                
+                return `
+                    <tr>
+                        <td>${typeBadge}</td>
+                        <td>${escapeHtml(event.reason || '-')}</td>
+                        <td>${escapeHtml(event.message || '-')}</td>
+                        <td>${escapeHtml(event.count || '1')}</td>
+                        <td>${escapeHtml(firstTimestamp)}</td>
+                        <td>${escapeHtml(lastTimestamp)}</td>
+                        <td>${escapeHtml(event.source || event.reporting_controller || '-')}</td>
+                    </tr>
+                `;
+            }).join('');
+        } else {
+            tbody.innerHTML = '<tr><td colspan="7" class="text-center text-muted">No events found</td></tr>';
+        }
+    }
+    
+    async function loadPodEvents(podName, namespace) {
+        if (!podName || !namespace) {
+            const tbody = document.getElementById('events-tbody');
+            tbody.innerHTML = '<tr><td colspan="7" class="text-center text-muted">Pod information not available</td></tr>';
+            return;
+        }
+        
+        try {
+            const apiUrl = `/api/v1/workloads/pods/${encodeURIComponent(podName)}/events?namespace=${encodeURIComponent(namespace)}&limit=100`;
+            console.log('Fetching pod events from:', apiUrl);
+            console.log('Pod name:', podName, 'Namespace:', namespace);
+            
+            const response = await fetch(apiUrl);
+            if (!response.ok) {
+                const errorText = await response.text();
+                console.error('API error response:', response.status, errorText);
+                throw new Error(`HTTP error! status: ${response.status}`);
+            }
+            
+            const data = await response.json();
+            console.log('Pod events API response:', data);
+            console.log('Number of events found:', data.data ? data.data.length : 0);
+            
+            if (data.error) {
+                throw new Error(data.message || 'Failed to load pod events');
+            }
+            
+            populateEvents(data.data || []);
+            
+        } catch (error) {
+            console.error('Error loading pod events:', error);
+            const tbody = document.getElementById('events-tbody');
+            tbody.innerHTML = '<tr><td colspan="7" class="text-center text-danger">Error: ' + escapeHtml(error.message) + '</td></tr>';
         }
     }
     

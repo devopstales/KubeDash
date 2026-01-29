@@ -5,6 +5,7 @@ from flask_login import login_required
 import requests
 from urllib.parse import urljoin, urlparse, quote
 import re
+import json
 
 from lib.helper_functions import get_logger
 from lib.components import csrf
@@ -200,17 +201,31 @@ def proxy_app(app_name, path=''):
             )
         except requests.exceptions.ConnectionError as e:
             logger.error(f"Connection error proxying to {target_url}: {e}")
+            error_msg = {
+                "error": "ConnectionError",
+                "message": f"Cannot connect to application at {target_url}",
+                "details": str(e),
+                "application": app_name,
+                "target_url": target_url
+            }
             return Response(
-                f"Cannot connect to application: {str(e)}",
+                json.dumps(error_msg),
                 status=502,
-                mimetype='text/plain'
+                mimetype='application/json'
             )
         except requests.exceptions.RequestException as e:
             logger.error(f"Error proxying to {target_url}: {e}")
+            error_msg = {
+                "error": "RequestException",
+                "message": f"Error proxying request to {target_url}",
+                "details": str(e),
+                "application": app_name,
+                "target_url": target_url
+            }
             return Response(
-                f"Error proxying request: {str(e)}",
+                json.dumps(error_msg),
                 status=500,
-                mimetype='text/plain'
+                mimetype='application/json'
             )
         
         # Prepare response headers
@@ -331,6 +346,153 @@ def proxy_app(app_name, path=''):
                 # Pattern for CSS url() functions
                 css_url_pattern = r'url\((["\']?)([^"\')]+)\1\)'
                 content_str = re.sub(css_url_pattern, rewrite_css_url, content_str, flags=re.IGNORECASE)
+                
+                # Inject JavaScript to intercept fetch() and XMLHttpRequest calls
+                # This ensures dynamic API calls (like /api/features) go through the proxy
+                # Escape proxy_base for safe JavaScript string embedding
+                import json
+                proxy_base_escaped = json.dumps(proxy_base)
+                js_interceptor = f'''
+<script>
+(function() {{
+    'use strict';
+    const PROXY_BASE = {proxy_base_escaped};
+    
+    // Helper function to rewrite relative URLs to go through proxy
+    function rewriteUrl(url) {{
+        if (!url || typeof url !== 'string') {{
+            return url;
+        }}
+        
+        // Skip if already proxied
+        if (url.startsWith(PROXY_BASE) || 
+            url.startsWith('/plugins/iframe-proxy/')) {{
+            return url;
+        }}
+        
+        // Skip data URLs, blob URLs, protocol-relative URLs
+        if (url.startsWith('data:') || 
+            url.startsWith('blob:') ||
+            url.startsWith('//')) {{
+            return url;
+        }}
+        
+        // Handle absolute URLs that match current origin - extract path and rewrite
+        try {{
+            const currentOrigin = window.location.origin;
+            if (url.startsWith(currentOrigin)) {{
+                // Extract the path from the absolute URL
+                const urlObj = new URL(url);
+                const path = urlObj.pathname + urlObj.search + urlObj.hash;
+                // Only rewrite if it's not already proxied
+                if (!path.startsWith(PROXY_BASE) && !path.startsWith('/plugins/iframe-proxy/')) {{
+                    return PROXY_BASE + path;
+                }}
+                return url;
+            }}
+        }} catch (e) {{
+            // If URL parsing fails, continue with relative URL check
+        }}
+        
+        // Skip other absolute URLs (different origin)
+        if (url.startsWith('http://') || url.startsWith('https://')) {{
+            return url;
+        }}
+        
+        // Handle relative URLs (starting with /)
+        if (url.startsWith('/')) {{
+            return PROXY_BASE + url;
+        }}
+        
+        // For other relative URLs (without leading /), return as-is
+        return url;
+    }}
+    
+    // Intercept fetch() API
+    if (window.fetch) {{
+        const originalFetch = window.fetch;
+        window.fetch = function(input, init) {{
+            if (typeof input === 'string') {{
+                // String URL - rewrite and pass through
+                return originalFetch.call(this, rewriteUrl(input), init);
+            }} else if (input instanceof Request) {{
+                // Request object - extract URL, rewrite, and create new Request
+                const originalUrl = input.url;
+                const newUrl = rewriteUrl(originalUrl);
+                if (newUrl !== originalUrl) {{
+                    // Try to clone the request first (preserves body if readable)
+                    try {{
+                        const clonedRequest = input.clone();
+                        // Create new Request with rewritten URL, using cloned request for body
+                        const newRequest = new Request(newUrl, clonedRequest);
+                        return originalFetch.call(this, newRequest, init);
+                    }} catch (e) {{
+                        // If clone fails (body already consumed), create new Request without body
+                        const newRequest = new Request(newUrl, {{
+                            method: input.method,
+                            headers: input.headers,
+                            mode: input.mode,
+                            credentials: input.credentials,
+                            cache: input.cache,
+                            redirect: input.redirect,
+                            referrer: input.referrer,
+                            referrerPolicy: input.referrerPolicy,
+                            integrity: input.integrity
+                        }});
+                        return originalFetch.call(this, newRequest, init);
+                    }}
+                }}
+            }}
+            // For other cases, pass through as-is
+            return originalFetch.call(this, input, init);
+        }};
+    }}
+    
+    // Intercept XMLHttpRequest
+    if (window.XMLHttpRequest) {{
+        const OriginalXHR = window.XMLHttpRequest;
+        // Store original open method
+        const originalOpen = OriginalXHR.prototype.open;
+        
+        // Override the open method on the prototype
+        OriginalXHR.prototype.open = function(method, url, async, user, password) {{
+            // Rewrite the URL before calling the original open
+            const rewrittenUrl = rewriteUrl(url);
+            return originalOpen.call(this, method, rewrittenUrl, 
+                async !== undefined ? async : true, 
+                user, password);
+        }};
+        
+        // Also intercept send to handle any URL modifications there
+        const originalSend = OriginalXHR.prototype.send;
+        OriginalXHR.prototype.send = function(data) {{
+            return originalSend.call(this, data);
+        }};
+    }}
+}})();
+</script>
+'''
+                # Inject the script right after <head> or before </head>
+                # Try to inject after <head> tag first
+                if '<head' in content_str.lower():
+                    head_pattern = r'(<head[^>]*>)'
+                    # Check if we already injected (avoid double injection)
+                    if 'PROXY_BASE' not in content_str:
+                        content_str = re.sub(head_pattern, r'\1\n' + js_interceptor, content_str, count=1, flags=re.IGNORECASE)
+                elif '</head>' in content_str.lower():
+                    # Fallback: inject before </head>
+                    if 'PROXY_BASE' not in content_str:
+                        content_str = content_str.replace('</head>', js_interceptor + '\n</head>', 1)
+                else:
+                    # Last resort: inject at the beginning of body or html
+                    if '<body' in content_str.lower():
+                        body_pattern = r'(<body[^>]*>)'
+                        if 'PROXY_BASE' not in content_str:
+                            content_str = re.sub(body_pattern, r'\1\n' + js_interceptor, content_str, count=1, flags=re.IGNORECASE)
+                    elif '<html' in content_str.lower():
+                        html_pattern = r'(<html[^>]*>)'
+                        if 'PROXY_BASE' not in content_str:
+                            content_str = re.sub(html_pattern, r'\1\n' + js_interceptor, content_str, count=1, flags=re.IGNORECASE)
                 
                 # Update content
                 content = content_str.encode('utf-8')

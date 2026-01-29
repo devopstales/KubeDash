@@ -42,9 +42,9 @@ def ApplicationListGet(enabled_only=False):
         if enabled_only:
             applications = ApplicationCatalog.query.filter_by(
                 application_enabled=True
-            ).all()
+            ).order_by(ApplicationCatalog.id.asc()).all()
         else:
-            applications = ApplicationCatalog.query.all()
+            applications = ApplicationCatalog.query.order_by(ApplicationCatalog.id.asc()).all()
         return applications
     except Exception as error:
         ErrorHandler(logger, error, f"Error getting application list: {error}")

@@ -1,3 +1,5 @@
+from typing import Dict, List, Optional, Tuple, Any
+
 from flask import flash
 from kubernetes import client as k8s_client
 from kubernetes import watch
@@ -920,3 +922,121 @@ def k8sWorkloadList(username_role, user_token, namespace):
         WORKLOAD_LIST.append(WORKLOAD)
 
     return WORKLOAD_LIST
+
+
+##############################################################
+## Pod Events
+##############################################################
+
+def k8sPodGetEvents(
+    username_role: str,
+    user_token: str,
+    namespace: str,
+    pod_name: str,
+    limit: int = 50
+) -> Tuple[List[Dict[str, Any]], Optional[str]]:
+    """
+    Fetch Kubernetes events related to a pod.
+    
+    Args:
+        username_role: User role for authorization
+        user_token: User token for authentication
+        namespace: The namespace of the pod
+        pod_name: The name of the pod
+        limit: Maximum number of events to return (default: 50)
+        
+    Returns:
+        Tuple of (events_list, error_message)
+        - On success: (events_list, None)
+        - On error: ([], error_message)
+    """
+    k8sClientConfigGet(username_role, user_token)
+    core_api = k8s_client.CoreV1Api()
+    
+    try:
+        # First, try to get the pod to get its UID for more precise matching
+        pod_uid = None
+        try:
+            pod = core_api.read_namespaced_pod(pod_name, namespace, _request_timeout=2)
+            pod_uid = pod.metadata.uid
+        except ApiException:
+            # If we can't get the pod, continue with name-based matching
+            pass
+        except Exception:
+            # If we can't get the pod, continue with name-based matching
+            pass
+        
+        # Field selector to filter events by involved object
+        # Use UID if available (more precise), otherwise use name+kind
+        if pod_uid:
+            field_selector = f"involvedObject.uid={pod_uid}"
+        else:
+            field_selector = f"involvedObject.name={pod_name},involvedObject.kind=Pod"
+        
+        try:
+            events = core_api.list_namespaced_event(
+                namespace=namespace,
+                field_selector=field_selector,
+                limit=limit,
+                _request_timeout=5
+            )
+        except ApiException as e:
+            # If field selector fails, try without it and filter manually
+            logger.warning(f"Field selector failed for pod {pod_name}, trying without selector: {e}")
+            events = core_api.list_namespaced_event(
+                namespace=namespace,
+                limit=limit * 2,  # Get more events to filter from
+                _request_timeout=5
+            )
+        
+        # Convert to list of dicts and sort by last timestamp (newest first)
+        event_list = []
+        for event in events.items:
+            # Additional filter: ensure the event actually matches our pod
+            # This is important because field selectors might match multiple objects
+            if event.involved_object.kind == "Pod":
+                if pod_uid:
+                    # If we have UID, match by UID
+                    if event.involved_object.uid == pod_uid:
+                        event_dict = {
+                            "type": event.type,
+                            "reason": event.reason,
+                            "message": event.message,
+                            "count": event.count or 1,
+                            "first_timestamp": event.first_timestamp.isoformat() if event.first_timestamp else None,
+                            "last_timestamp": event.last_timestamp.isoformat() if event.last_timestamp else None,
+                            "source": event.source.component if event.source else None,
+                            "reporting_controller": getattr(event, 'reporting_controller', None),
+                        }
+                        event_list.append(event_dict)
+                else:
+                    # Match by name and namespace
+                    if (event.involved_object.name == pod_name and 
+                        event.involved_object.namespace == namespace):
+                        event_dict = {
+                            "type": event.type,
+                            "reason": event.reason,
+                            "message": event.message,
+                            "count": event.count or 1,
+                            "first_timestamp": event.first_timestamp.isoformat() if event.first_timestamp else None,
+                            "last_timestamp": event.last_timestamp.isoformat() if event.last_timestamp else None,
+                            "source": event.source.component if event.source else None,
+                            "reporting_controller": getattr(event, 'reporting_controller', None),
+                        }
+                        event_list.append(event_dict)
+        
+        # Sort by last_timestamp descending (newest first)
+        event_list.sort(
+            key=lambda x: x.get("last_timestamp") or x.get("first_timestamp") or "",
+            reverse=True
+        )
+        
+        return event_list, None
+        
+    except ApiException as error:
+        if error.status != 404:
+            ErrorHandler(logger, error, f"get events for Pod {pod_name} in namespace {namespace}")
+        return [], None  # Return empty list instead of error for 404
+    except Exception as error:
+        ErrorHandler(logger, error, f"get events for Pod {pod_name} in namespace {namespace}")
+        return [], f"Failed to connect to Kubernetes: {str(error)}"

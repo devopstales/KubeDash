@@ -11,7 +11,7 @@ from kubernetes.client.rest import ApiException
 
 from lib.helper_functions import get_logger
 from lib.k8s.workload import (
-    k8sPodListGet, k8sPodGet, k8sPodDelete, k8sPodGetContainers,
+    k8sPodListGet, k8sPodGet, k8sPodDelete, k8sPodGetContainers, k8sPodGetEvents,
     k8sDeploymentsGet, k8sDeploymentsPatchReplica,
     k8sStatefulSetsGet, k8sStatefulSetPatchReplica,
     k8sDaemonSetsGet, k8sDaemonsetPatch,
@@ -704,6 +704,65 @@ class PodContainersResource(MethodView):
                 "metadata": {
                     "name": name,
                     "namespace": namespace
+                }
+            })
+
+
+@workloads_api_bp.route('/pods/<name>/events')
+class PodEventsResource(MethodView):
+    """
+    Pod events endpoint.
+    """
+    
+    @workloads_api_bp.response(200, description="Successfully retrieved pod events")
+    @workloads_api_bp.response(404, description="Pod not found")
+    @workloads_api_bp.doc(tags=['Workloads'])
+    @login_required
+    def get(self, name):
+        """
+        Get pod events
+        
+        Retrieves Kubernetes events related to a specific pod.
+        
+        Path Parameters:
+            name (str): Name of the pod
+        
+        Query Parameters:
+            namespace (str): Kubernetes namespace (default: from session)
+            limit (int): Maximum number of events to return (default: 50)
+        
+        Returns:
+            dict: Pod events information
+        """
+        user_token = get_user_token(session)
+        namespace = request.args.get('namespace', session.get('ns_select', 'default'))
+        limit = request.args.get('limit', 50, type=int)
+        
+        with tracer.start_as_current_span(
+            "pod-events-get",
+            attributes={
+                "http.route": "/api/v1/workloads/pods/{name}/events",
+                "http.method": "GET",
+                "pod.name": name,
+                "namespace": namespace,
+            }
+        ) if tracer else nullcontext():
+            events, error = k8sPodGetEvents(session['user_role'], user_token, namespace, name, limit)
+            
+            if error:
+                return jsonify({
+                    "error": "InternalError",
+                    "message": error,
+                    "data": []
+                }), 500
+            
+            return jsonify({
+                "data": events,
+                "metadata": {
+                    "name": name,
+                    "namespace": namespace,
+                    "count": len(events),
+                    "limit": limit
                 }
             })
 

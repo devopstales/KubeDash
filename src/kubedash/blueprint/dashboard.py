@@ -1,4 +1,4 @@
-from flask import Blueprint, flash, render_template, request, session
+from flask import Blueprint, current_app, flash, render_template, request, session
 from flask_login import login_required
 from werkzeug.security import check_password_hash
 
@@ -55,8 +55,19 @@ def cluster_metrics():
                 "log.message": "You should change the default password!",
             })
 
+    # Get application catalog links if enabled (only non-embedded ones)
+    applications = []
+    if current_app.config.get("plugins", {}).get("application_catalog", False):
+        try:
+            from plugins.application_catalog.application import ApplicationListGet
+            all_apps = ApplicationListGet(enabled_only=True)
+            # Filter to only show non-embedded applications
+            applications = [app for app in all_apps if not app.application_embedded]
+        except Exception as e:
+            logger.warning(f"Failed to load application catalog: {e}")
+    
     # Template now loads data via JavaScript from /api/v1/cluster/metrics and /api/v1/cluster/events
-    return render_template('dashboards/cluster-metric.html.j2')
+    return render_template('dashboards/cluster-metric.html.j2', applications=applications)
 
 ##############################################################
 ## Workload Map
