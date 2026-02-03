@@ -57,9 +57,7 @@ flask-caching = "^2.3.1"
 plotly = "^6.0.0"
 redis = "^5.2.1"
 colorlog = "^6.9.0"
-protobuf = "^5.29.6"
-# AI Chat plugin dependencies
-aiohttp = "^3.9.0"
+protobuf = "6.33.5"
 statsd = "^4.0.1"
 prometheus-client = "^0.22.1"
 gunicorn = {extras = ["statsd"], version = "^23.0.0"}
