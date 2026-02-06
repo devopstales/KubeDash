@@ -143,6 +143,49 @@
       // showToast('error', 'Failed to save item', 'Error');
     </script>
 
+    <!-- Global Namespace Selector Handler -->
+    <script>
+      // Global handler for namespace selector persistence across all pages
+      document.addEventListener('DOMContentLoaded', function() {
+        const namespaceSelect = document.getElementById('inputGroupSelect04');
+        if (namespaceSelect) {
+          // Initialize dropdown from sessionStorage on page load
+          const savedNamespace = sessionStorage.getItem('ns_select');
+          if (savedNamespace) {
+            // Check if the saved namespace exists in the options
+            const optionExists = Array.from(namespaceSelect.options).some(
+              option => option.value === savedNamespace || option.text === savedNamespace
+            );
+            if (optionExists) {
+              namespaceSelect.value = savedNamespace;
+            }
+          }
+          
+          // Save to sessionStorage when dropdown changes
+          namespaceSelect.addEventListener('change', function() {
+            const selectedNamespace = this.value;
+            console.log('Namespace changed to:', selectedNamespace);
+            sessionStorage.setItem('ns_select', selectedNamespace);
+            
+            // Dispatch a custom event so pages can listen for namespace changes
+            const event = new CustomEvent('namespaceChanged', {
+              detail: { namespace: selectedNamespace }
+            });
+            window.dispatchEvent(event);
+          });
+          
+          // Also save to sessionStorage when form is submitted
+          const namespaceForm = namespaceSelect.closest('form');
+          if (namespaceForm) {
+            namespaceForm.addEventListener('submit', function() {
+              const selectedNamespace = namespaceSelect.value;
+              sessionStorage.setItem('ns_select', selectedNamespace);
+              console.log('Namespace saved to sessionStorage on form submit:', selectedNamespace);
+            });
+          }
+        }
+      });
+    </script>
 
     <!-- Page tail_js -->
     {% block add_tail_js %}
