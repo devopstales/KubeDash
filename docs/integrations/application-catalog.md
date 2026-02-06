@@ -32,12 +32,136 @@ Applications can be embedded directly in KubeDash pages using iframes. The plugi
 
 ### Configuration Sync
 
-Applications can be configured in two ways:
+Applications can be configured in three ways:
 
 1. **Configuration File**: Define applications in `kubedash.ini` under `[application_list]` section
-2. **Database**: Manage applications through the UI or API, stored in the database
+2. **Kubernetes Ingress Annotations**: Automatically discover applications from Ingress resources with annotations
+3. **Database**: Manage applications through the UI or API, stored in the database
 
-The plugin automatically syncs configuration file entries with the database on startup.
+The plugin automatically syncs configuration file entries and discovers Ingress-based applications on startup.
+
+### Kubernetes Ingress Discovery
+
+The Application Catalog plugin can automatically discover and register applications from Kubernetes Ingress resources. This allows you to manage applications declaratively using Kubernetes annotations, making it easy to integrate applications deployed in your cluster.
+
+#### How It Works
+
+On startup, the plugin scans all Ingress resources across all namespaces looking for the `metadata.k8s.io/application-catalog` annotation. When found, it automatically extracts application information and registers it in the catalog.
+
+#### Required Annotations
+
+To enable automatic discovery for an Ingress, add the following annotations:
+
+| Annotation | Required | Description | Example |
+|------------|----------|-------------|---------|
+| `metadata.k8s.io/application-catalog` | Yes | Must be set to `"true"` to enable discovery | `"true"` |
+| `metadata.k8s.io/application-catalog-name` | Yes | Display name for the application in the catalog | `"Jaeger Tracing"` |
+
+#### Optional Annotations
+
+Additional annotations can be used to customize the application:
+
+| Annotation | Required | Default | Description | Example |
+|------------|----------|---------|-------------|---------|
+| `metadata.k8s.io/application-catalog-icon` | No | None | URL to the application icon | `"https://example.com/icon.svg"` |
+| `metadata.k8s.io/application-catalog-enabled` | No | `"true"` | Whether the application is enabled (`"true"`/`"false"`) | `"true"` |
+| `metadata.k8s.io/application-catalog-embedded` | No | `"false"` | Whether to embed in iframe (`"true"`/`"false"`) | `"true"` |
+
+#### URL Construction
+
+The application URL is automatically constructed from the Ingress resource:
+
+- **Scheme**: Uses `https` if TLS is configured on the Ingress, otherwise `http`
+- **Host**: Uses the first host from the Ingress rules
+- **Path**: Uses the root path (no path component)
+
+#### Example Ingress Resource
+
+Here's an example Ingress resource that will be automatically discovered:
+
+```yaml
+apiVersion: networking.k8s.io/v1
+kind: Ingress
+metadata:
+  name: jaeger-ingress
+  namespace: observability
+  annotations:
+    # Enable application catalog discovery
+    metadata.k8s.io/application-catalog: "true"
+    # Application name (required)
+    metadata.k8s.io/application-catalog-name: "Jaeger Tracing"
+    # Optional: Icon URL
+    metadata.k8s.io/application-catalog-icon: "https://www.jaegertracing.io/img/jaeger-icon.svg"
+    # Optional: Enable embedding in iframe
+    metadata.k8s.io/application-catalog-embedded: "true"
+    # Optional: Enable/disable (default: true)
+    metadata.k8s.io/application-catalog-enabled: "true"
+spec:
+  rules:
+    - host: jaeger.example.com
+      http:
+        paths:
+          - path: /
+            pathType: Prefix
+            backend:
+              service:
+                name: jaeger-query
+                port:
+                  number: 16686
+  tls:
+    - hosts:
+        - jaeger.example.com
+      secretName: jaeger-tls
+```
+
+This Ingress will be discovered and registered as:
+- **Name**: "Jaeger Tracing"
+- **URL**: `https://jaeger.example.com` (https because TLS is configured)
+- **Icon**: `https://www.jaegertracing.io/img/jaeger-icon.svg`
+- **Embedded**: `true`
+- **Enabled**: `true`
+
+#### Discovery Process
+
+1. On KubeDash startup, the plugin queries the Kubernetes API for all Ingress resources
+2. Each Ingress is checked for the `metadata.k8s.io/application-catalog = "true"` annotation
+3. If found, the plugin extracts:
+   - Application name from `metadata.k8s.io/application-catalog-name`
+   - URL from the Ingress spec (host + scheme based on TLS)
+   - Optional fields from other annotations
+4. The application is registered or updated in the database
+5. If an application with the same URL already exists, it's updated with the new information
+
+#### Update Behavior
+
+- **URL-based matching**: If an application with the same URL already exists, it will be updated with information from the Ingress
+- **Name conflicts**: If the name conflicts with an existing application (different URL), the name is preserved and other fields are updated
+- **Automatic sync**: Changes to Ingress annotations require a KubeDash restart to be reflected
+
+#### Permissions
+
+The discovery process requires Kubernetes API access with permissions to:
+- List Ingress resources across all namespaces
+
+If the KubeDash service account doesn't have these permissions, discovery will be skipped with a warning message in the logs.
+
+#### Troubleshooting
+
+**Ingress not discovered:**
+- Verify the `metadata.k8s.io/application-catalog` annotation is set to `"true"` (case-insensitive)
+- Check that `metadata.k8s.io/application-catalog-name` is present
+- Ensure the Ingress has at least one rule with a host
+- Check KubeDash logs for discovery errors
+
+**URL incorrect:**
+- The URL is constructed from the first Ingress rule's host
+- Scheme is determined by TLS configuration (https if TLS exists, http otherwise)
+- Verify the Ingress spec is correctly configured
+
+**Application not updating:**
+- Changes to Ingress annotations require a KubeDash restart
+- Check for name or URL conflicts in the database
+- Review KubeDash logs for update errors
 
 ## Configuration
 

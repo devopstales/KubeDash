@@ -1,28 +1,51 @@
 # syntax = docker/dockerfile:1.2
+# ========== Stage 1: Base Image ==========
 ARG BUILDPLATFORM=linux/amd64
-FROM --platform=$BUILDPLATFORM python:3.12-alpine AS builder
+FROM --platform=$BUILDPLATFORM amazonlinux:2023 AS base
+
+
+ENV PYTHON_VERSION=3.12
+
+RUN --mount=type=cache,target=/var/cache/dnf \
+    dnf -y update && \
+    dnf install -y python${PYTHON_VERSION} python${PYTHON_VERSION}-pip shadow-utils && \
+    update-alternatives --install /usr/bin/python python /usr/bin/python${PYTHON_VERSION} 20 && \
+    update-alternatives --install /usr/bin/pip pip /usr/bin/pip-${PYTHON_VERSION} 20 && \
+    update-alternatives --install /usr/bin/pip3 pip3 /usr/bin/pip-${PYTHON_VERSION} 20 && \
+    update-alternatives --set python /usr/bin/python${PYTHON_VERSION} && \
+    dnf clean all
+
+# ========== Stage 2: Build Image ==========
+FROM base AS builder
 
 WORKDIR /code
 COPY requirements.txt  /code/
-RUN apk add --no-cache postgresql-libs && \
-    apk add --no-cache bash gcc musl-dev linux-headers && \
-    apk add --no-cache --virtual .build-deps gcc build-base freetype-dev libpng-dev openblas-dev libffi-dev musl-dev postgresql-dev
-RUN apk -U upgrade
-RUN pip install --no-cache-dir --prefix=/install-dir -r /code/requirements.txt &&\
-    pip install --no-cache-dir --prefix=/install-dir -U "pip>=25.3" "setuptools>=78.1.1" "wheel>=0.46.2" 
 
-# main Contaiber
-ARG BUILDPLATFORM=linux/amd64
-ARG VERSION
-ARG BUILD_DATE
-FROM --platform=$BUILDPLATFORM python:3.11-alpine3.20
-ARG BUILDPLATFORM=linux/amd64
+# Install system dependencies
+RUN dnf install -y \
+    postgresql-libs \
+    gcc \
+    python3-devel \
+    postgresql-devel \
+    freetype-devel \
+    libpng-devel \
+    openblas-devel \
+    libffi-devel \
+    make \
+    && dnf clean all
+
+RUN pip install --no-cache-dir --prefix=/install-dir -U "pip>=25.3" "setuptools>=78.1.1" "wheel>=0.46.2" && \
+    /install-dir/bin/pip install --no-cache-dir --prefix=/install-dir -r requirements.txt
+
+# ========== Stage 3: Runtime Image ==========
+FROM base AS runtime
 ARG VERSION
 ARG BUILD_DATE
 
 ENV FLASK_CONFIG="production" \
     FLASK_APP="kubedash" \
-    KUBEDASH_VERSION=${VERSION}
+    KUBEDASH_VERSION=${VERSION} \
+    PYTHONPATH=/usr/local/lib64/python3.12/site-packages:/usr/local/lib/python3.12/site-packages
 
 # https://github.com/opencontainers/image-spec/blob/main/annotations.md#back-compatibility-with-label-schema
 LABEL org.opencontainers.image.vendor="devopstales" \
@@ -38,32 +61,34 @@ LABEL org.opencontainers.image.vendor="devopstales" \
 
 WORKDIR /code/kubedash
 
-RUN addgroup -S -g 10001 kubedash && \
-    adduser -S -u 10001 kubedash -G kubedash && \
+# Copy virtual environment from builder
+COPY --from=builder /install-dir /usr/local
+ENV PATH=/usr/local/bin:$PATH
+
+# Update the system
+RUN --mount=type=cache,target=/var/cache/dnf \
+    dnf -y update && \
+    dnf clean all
+
+# Runtime configuration
+RUN useradd -u 10001 -d /code/kubedash kubedash && \
     mkdir -p /code && \
     mkdir -p /code/certs && \
     mkdir -p /code/kubedash/certs && \
     mkdir /tmp/kubedash && \
     chown -R kubedash:kubedash /code && \
-    chown -R kubedash:kubedash /tmp/kubedash
-
-COPY entrypoint.sh /entrypoint.sh
-
-RUN apk add --no-cache bash
-RUN apk -U upgrade
-
-COPY --from=builder /install-dir /usr/local
-ENV PATH=/usr/local/bin:$PATH
-
+    chown -R kubedash:kubedash /tmp/kubedash && \
+    touch /code/kubedash/CA.crt && \
+    chown kubedash:kubedash /code/kubedash/CA.crt && \
+    touch /code/kubedash/app-release && \
+    chown kubedash:kubedash /code/kubedash/app-release
+    
 COPY --chown=kubedash:kubedash ./kubedash /code/kubedash
 
 # Ensure /code and all subdirectories are owned by kubedash after COPY
 RUN chown -R kubedash:kubedash /code
 
-RUN touch /code/kubedash/CA.crt && chown kubedash:kubedash /code/kubedash/CA.crt
-RUN touch /code/kubedash/app-release && chown kubedash:kubedash /code/kubedash/app-release
-
-USER 10001:10001
-
+COPY entrypoint.sh /entrypoint.sh
+USER kubedash
 EXPOSE 8000
-ENTRYPOINT ["/entrypoint.sh"]
+CMD ["/entrypoint.sh"]
