@@ -28,7 +28,7 @@ spec:
               protocol: TCP
           env:
             - name: REDIS_HOSTS
-              value: "local:{{ .Release.Name }}-redis-master:{{ .Values.redisCommander.redisPort }}"
+              value: "local:{{ .Release.Name }}-redis:{{ .Values.redisCommander.redisPort }}"
             - name: REDIS_COMMANDER_HTTP_AUTH_USER
               value: ""
             - name: REDIS_COMMANDER_HTTP_AUTH_PASSWORD

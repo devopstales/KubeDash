@@ -335,6 +335,12 @@ def initialize_app_database(app: Flask, filename: str):
             app.logger.info("   Add Contant to Tables")
             app.logger.info(separator_short)
             
+            # Print separator_long before migration runs (only in 'db' mode)
+            # Use stderr to match Alembic's output stream for proper ordering
+            if len(sys.argv) > 1 and sys.argv[1] == 'db':
+                sys.stderr.write(separator_long + '\n')
+                sys.stderr.flush()
+            
             if sys.argv[1] != 'cli' and sys.argv[1] != 'db':
                 oidc_init(app.config['kubedash.ini'])
                 k8s_config_int(app.config['kubedash.ini'])
@@ -614,12 +620,16 @@ def initialize_app_caching(app: Flask):
                 sock.close()
 
                 if result == 0:
+                    # Test Redis connection - use socket_keepalive to avoid eventlet greenio issues
+                    # when running in restricted security contexts
                     test_redis = redis.StrictRedis(
                         host=redis_host,
                         port=redis_port,
                         db=redis_db,
                         password=redis_password,
-                        socket_connect_timeout=2
+                        socket_connect_timeout=2,
+                        socket_keepalive=True,
+                        socket_keepalive_options={}
                     )
                     test_redis.ping()
                     app.logger.info(f"Redis connection established at {endpoint}")
@@ -629,11 +639,21 @@ def initialize_app_caching(app: Flask):
                     app.config['CACHE_REDIS_PORT'] = redis_port
                     app.config['CACHE_REDIS_DB'] = redis_db
                     app.config['CACHE_REDIS_PASSWORD'] = redis_password
+                    # Configure Redis to avoid eventlet greenio issues in restricted environments
+                    app.config['CACHE_REDIS_SOCKET_KEEPALIVE'] = True
                     cache_ready = True
                 else:
                     app.logger.error(f"Cannot connect to Redis socket at {endpoint}")
             except (AuthenticationError, ConnectionError, RedisError) as e:
                 app.logger.error(f"Redis error at {endpoint}: {e}")
+            except (PermissionError, OSError) as e:
+                # Handle EPERM errors when eventlet greenio can't create sockets
+                # due to restricted security contexts (e.g., dropped capabilities)
+                if hasattr(e, 'errno') and e.errno == 1:  # EPERM
+                    app.logger.warning(f"Redis connection blocked by security context (EPERM) at {endpoint}. "
+                                     f"Falling back to in-memory cache. Error: {e}")
+                else:
+                    app.logger.error(f"Permission/system error connecting to Redis at {endpoint}: {e}")
             except Exception as e:
                 app.logger.exception(f"Unexpected Redis error at {endpoint}: {e}")
 
@@ -648,6 +668,42 @@ def initialize_app_caching(app: Flask):
     # Finalize cache setup
     cache.init_app(app)
     app.cache = cache
+
+    # Post-initialization test: Verify cache actually works (catches EPERM at runtime)
+    # This is important because eventlet's greenio may fail even if initial connection test passed
+    if cache_ready and app.config.get('CACHE_TYPE') in ('RedisCache', 'RedisClusterCache'):
+        try:
+            # Test actual cache operations which will use eventlet's greenio if available
+            test_key = '__kubedash_cache_test__'
+            test_value = 'test'
+            cache.set(test_key, test_value, timeout=1)
+            retrieved = cache.get(test_key)
+            if retrieved == test_value:
+                cache.delete(test_key)
+                app.logger.info("Cache operations verified successfully")
+            else:
+                app.logger.warning("Cache test failed: value mismatch. Falling back to SimpleCache")
+                cache_ready = False
+                app.config['CACHE_TYPE'] = 'SimpleCache'
+        except (PermissionError, OSError) as e:
+            # Handle EPERM errors when eventlet greenio can't create sockets at runtime
+            if hasattr(e, 'errno') and e.errno == 1:  # EPERM
+                app.logger.warning(f"Cache operations blocked by security context (EPERM). "
+                                 f"Falling back to in-memory cache. Error: {e}")
+                cache_ready = False
+                app.config['CACHE_TYPE'] = 'SimpleCache'
+                # Re-initialize cache with SimpleCache
+                cache.init_app(app)
+            else:
+                app.logger.error(f"Permission/system error during cache operations: {e}")
+                cache_ready = False
+                app.config['CACHE_TYPE'] = 'SimpleCache'
+                cache.init_app(app)
+        except Exception as e:
+            app.logger.warning(f"Cache test failed with unexpected error: {e}. Falling back to SimpleCache")
+            cache_ready = False
+            app.config['CACHE_TYPE'] = 'SimpleCache'
+            cache.init_app(app)
 
     # Register decorators or cache-bound setup
     cached_base(app)
@@ -665,9 +721,9 @@ def initialize_instrumentors(app: Flask):
         # 1. First try Flask's g context (this will work after before_request)
         if has_request_context() and hasattr(g, 'correlation_id'):
             return g.correlation_id
-        # 2. Check request headers
-        if has_request_context() and 'X-Correlation-ID' in request.headers:
-            return request.headers['X-Correlation-ID']
+        # 2. Check request headers (standard X-Request-ID header from ingress)
+        if has_request_context() and 'X-Request-ID' in request.headers:
+            return request.headers['X-Request-ID']
         ## 3. Generate new if none exists
         #return str(uuid.uuid4())
         return None
@@ -675,8 +731,8 @@ def initialize_instrumentors(app: Flask):
     def request_hook(span, environ):
         """Set correlation ID on spans, but don't generate new ones here"""
         # Don't generate new ID here - let before_request handle it
-        if has_request_context() and 'X-Correlation-ID' in request.headers:
-            span.set_attribute("correlation_id", request.headers['X-Correlation-ID'])
+        if has_request_context() and 'X-Request-ID' in request.headers:
+            span.set_attribute("correlation_id", request.headers['X-Request-ID'])
         
         # Mirror important HTTP attributes
         span.set_attribute("http.route", environ.get('PATH_INFO'))
@@ -688,13 +744,13 @@ def initialize_instrumentors(app: Flask):
             span.set_attribute("http.user_agent", "Unknown")
 
     def response_hook(span, status, response_headers):
-        """Ensure correlation ID header exists"""
+        """Ensure request ID header exists"""
         correlation_id = get_correlation_id()
         
         if correlation_id:
-            # Add header if not present
-            if not any(k.lower() == 'x-correlation-id' for k, _ in response_headers):
-                response_headers.append(('X-Correlation-ID', correlation_id))
+            # Add header if not present (standard X-Request-ID header)
+            if not any(k.lower() == 'x-request-id' for k, _ in response_headers):
+                response_headers.append(('X-Request-ID', correlation_id))
         
         # Record final status
         span.set_attribute("http.status_code", status.split()[0])
@@ -959,6 +1015,9 @@ def initialize_app_socket(app: Flask):
     """Initialize socketIO"""
     app.logger.info("Initialize SocketIO")
     socketio.init_app(app)
+    # Store app reference for use in background threads
+    from lib.components import set_flask_app
+    set_flask_app(app)
 
 def initialize_app_security(app: Flask):
     """Initialize application security options:

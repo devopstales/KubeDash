@@ -32,3 +32,24 @@ csrf = CSRFProtect()
 socketio = SocketIO()
 api_doc = Api()
 cache = Cache()
+
+# Global reference to Flask app for use in background threads
+# This will be set when socketio.init_app() is called
+_flask_app = None
+
+def set_flask_app(app):
+    """Store Flask app instance for use in background threads"""
+    global _flask_app
+    _flask_app = app
+
+def get_flask_app():
+    """Get Flask app instance for use in background threads"""
+    global _flask_app
+    if _flask_app is not None:
+        return _flask_app
+    # Fallback: try to import from kubedash module
+    try:
+        from kubedash import app
+        return app
+    except (ImportError, AttributeError):
+        raise RuntimeError("No Flask app instance available. App may not be initialized yet.")

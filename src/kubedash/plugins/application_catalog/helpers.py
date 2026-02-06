@@ -40,22 +40,25 @@ def application_links_init(app_config):
         
         # Sync with database
         from lib.components import db
-        with db.session.begin():
-            for index, data in app_map.items():
-                app_name = data.get("name")
-                app_url = data.get("url")
-                
-                if not app_name or not app_url:
-                    continue
-                
+        from sqlalchemy.exc import IntegrityError
+        
+        for index, data in app_map.items():
+            app_name = data.get("name")
+            app_url = data.get("url")
+            
+            if not app_name or not app_url:
+                continue
+            
+            app_enabled = section.getboolean(f"app_{index}_enable", fallback=True)
+            app_embedded = section.getboolean(f"app_{index}_embed", fallback=False)
+            app_icon = data.get("icon", "")
+            
+            # Use no_autoflush to prevent premature flush during query
+            with db.session.no_autoflush:
                 # Check if application exists
                 existing = ApplicationCatalog.query.filter_by(
                     application_name=app_name
                 ).first()
-                
-                app_enabled = section.getboolean(f"app_{index}_enable", fallback=True)
-                app_embedded = section.getboolean(f"app_{index}_embed", fallback=False)
-                app_icon = data.get("icon", "")
                 
                 if existing:
                     # Update existing application
@@ -73,6 +76,28 @@ def application_links_init(app_config):
                         application_embedded=app_embedded
                     )
                     db.session.add(new_app)
+            
+            # Commit each application individually to handle race conditions
+            try:
+                db.session.commit()
+            except IntegrityError as e:
+                # Handle race condition: another request might have inserted the same app
+                db.session.rollback()
+                # Try to update instead
+                existing = ApplicationCatalog.query.filter_by(
+                    application_name=app_name
+                ).first()
+                if existing:
+                    existing.application_url = app_url
+                    existing.application_icon = app_icon if app_icon else None
+                    existing.application_enabled = app_enabled
+                    existing.application_embedded = app_embedded
+                    db.session.commit()
+                else:
+                    logger.warning(f"Failed to create or update application '{app_name}': {e}")
+                    # Re-raise if it's not a duplicate key error
+                    if "duplicate key" not in str(e).lower() and "unique constraint" not in str(e).lower():
+                        raise
         
         logger.info(f"Initialized {len(app_map)} applications from config")
     except Exception as error:

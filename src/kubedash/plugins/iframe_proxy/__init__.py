@@ -231,10 +231,15 @@ def proxy_app(app_name, path=''):
         # Prepare response headers
         response_headers = {}
         
-        # Copy relevant headers from proxied response
+        # Prevent caching of iframe-proxy responses to ensure theme sync code updates are served
+        response_headers['Cache-Control'] = 'no-cache, no-store, must-revalidate, max-age=0'
+        response_headers['Pragma'] = 'no-cache'
+        response_headers['Expires'] = '0'
+        
+        # Copy relevant headers from proxied response (but override Cache-Control)
         copy_headers = [
             'Content-Type', 'Content-Length', 'Content-Encoding',
-            'Cache-Control', 'Expires', 'Last-Modified', 'ETag',
+            'Last-Modified', 'ETag',
             'Content-Disposition'
         ]
         
@@ -281,21 +286,89 @@ def proxy_app(app_name, path=''):
                 
                 # Generate proxy base URL - use the app's base path, not the current request path
                 # This ensures we always use the same base for rewriting
-                from flask import url_for
+                # Use _external=False to get relative URL, but ensure it works in both Docker and K8s
                 proxy_base = url_for('iframe_proxy.proxy_app', app_name=app_name, path='', _external=False).rstrip('/')
+                
+                # In K8s behind ingress, we might need to ensure the path is correct
+                # If the proxy_base doesn't start with /, something is wrong
+                if not proxy_base.startswith('/'):
+                    # Fallback: construct from request path
+                    proxy_base = request.path.rsplit('/', 1)[0] if '/' in request.path else f'/plugins/iframe-proxy/{app_name}'
+                # Ensure it starts with /plugins/iframe-proxy/
+                if not proxy_base.startswith('/plugins/iframe-proxy/'):
+                    proxy_base = f'/plugins/iframe-proxy/{app_name}'
+                
+                # Preserve color-scheme meta tag if it exists (important for theme support)
+                # This ensures embedded apps can use their own color scheme
+                color_scheme_pattern = r'<meta\s+[^>]*name\s*=\s*["\']color-scheme["\'][^>]*>'
+                color_scheme_match = re.search(color_scheme_pattern, content_str, re.IGNORECASE)
+                color_scheme_tag = color_scheme_match.group(0) if color_scheme_match else None
                 
                 # Update or add <base> tag - some apps (like Jaeger, AngularJS apps) require it
                 # Replace existing <base> tags with our proxy base
+                # Ensure base tag has trailing slash for proper path resolution
+                base_href = proxy_base.rstrip('/') + '/'
                 base_pattern = r'<base\s+[^>]*href\s*=\s*["\']([^"\']*)["\'][^>]*>'
                 def rewrite_base(match):
-                    return f'<base href="{proxy_base}/">'
+                    return f'<base href="{base_href}">'
                 content_str = re.sub(base_pattern, rewrite_base, content_str, flags=re.IGNORECASE)
                 
                 # If no base tag exists, add one after <head>
                 # Some apps (Jaeger, AngularJS) require a base tag
                 if '<base' not in content_str.lower() and '<head' in content_str.lower():
                     head_pattern = r'(<head[^>]*>)'
-                    content_str = re.sub(head_pattern, r'\1\n<base href="' + proxy_base + '/">', content_str, count=1, flags=re.IGNORECASE)
+                    content_str = re.sub(head_pattern, r'\1\n<base href="' + base_href + '">', content_str, count=1, flags=re.IGNORECASE)
+                
+                # Ensure color-scheme meta tag is preserved or added after base tag
+                # This is important for apps like Jaeger that use color-scheme for theming
+                # If the tag doesn't exist, add one to prevent inheritance from parent page
+                if color_scheme_tag and '<meta' in content_str.lower():
+                    # Check if color-scheme tag still exists after our modifications
+                    if not re.search(color_scheme_pattern, content_str, re.IGNORECASE):
+                        # Re-add it after the base tag or at the start of head
+                        if '<base' in content_str.lower():
+                            content_str = re.sub(
+                                r'(<base[^>]*>)',
+                                r'\1\n' + color_scheme_tag,
+                                content_str,
+                                count=1,
+                                flags=re.IGNORECASE
+                            )
+                        elif '<head' in content_str.lower():
+                            head_pattern = r'(<head[^>]*>)'
+                            content_str = re.sub(
+                                head_pattern,
+                                r'\1\n' + color_scheme_tag,
+                                content_str,
+                                count=1,
+                                flags=re.IGNORECASE
+                            )
+                elif not color_scheme_tag:
+                    # Color-scheme tag doesn't exist - add one to prevent parent theme inheritance
+                    # This fixes issues where embedded apps (like Jaeger) have broken color schemes
+                    # when the parent page is in dark mode
+                    color_scheme_meta = '<meta name="color-scheme" content="light dark">'
+                    # Also inject CSS to explicitly set color-scheme on html element
+                    # This ensures the iframe has its own color scheme independent of parent
+                    color_scheme_css = '<style id="kubedash-color-scheme-fix">html { color-scheme: light dark !important; }</style>'
+                    # Add after base tag if it exists, otherwise at the start of head
+                    if '<base' in content_str.lower():
+                        content_str = re.sub(
+                            r'(<base[^>]*>)',
+                            r'\1\n' + color_scheme_meta + '\n' + color_scheme_css,
+                            content_str,
+                            count=1,
+                            flags=re.IGNORECASE
+                        )
+                    elif '<head' in content_str.lower():
+                        head_pattern = r'(<head[^>]*>)'
+                        content_str = re.sub(
+                            head_pattern,
+                            r'\1\n' + color_scheme_meta + '\n' + color_scheme_css,
+                            content_str,
+                            count=1,
+                            flags=re.IGNORECASE
+                        )
                 
                 # Rewrite relative URLs (starting with /) to go through proxy
                 # Match: href="/path", src="/path", action="/path", etc.
@@ -358,6 +431,19 @@ def proxy_app(app_name, path=''):
     'use strict';
     const PROXY_BASE = {proxy_base_escaped};
     
+    // Safe JSON parsing helper to prevent console errors
+    window.safeJsonParse = function(text, fallback = null) {{
+        if (!text || typeof text !== 'string' || text.trim() === '') {{
+            return fallback;
+        }}
+        try {{
+            return JSON.parse(text);
+        }} catch (e) {{
+            console.debug('Failed to parse JSON (non-critical):', e.message);
+            return fallback;
+        }}
+    }};
+    
     // Helper function to rewrite relative URLs to go through proxy
     function rewriteUrl(url) {{
         if (!url || typeof url !== 'string') {{
@@ -370,25 +456,48 @@ def proxy_app(app_name, path=''):
             return url;
         }}
         
-        // Skip data URLs, blob URLs, protocol-relative URLs
-        if (url.startsWith('data:') || 
-            url.startsWith('blob:') ||
-            url.startsWith('//')) {{
+        // Skip data URLs, blob URLs
+        if (url.startsWith('data:') || url.startsWith('blob:')) {{
             return url;
         }}
         
         // Handle absolute URLs that match current origin - extract path and rewrite
         try {{
             const currentOrigin = window.location.origin;
+            
+            // Check if URL starts with current origin
             if (url.startsWith(currentOrigin)) {{
                 // Extract the path from the absolute URL
                 const urlObj = new URL(url);
-                const path = urlObj.pathname + urlObj.search + urlObj.hash;
+                let path = urlObj.pathname + urlObj.search + urlObj.hash;
+                
                 // Only rewrite if it's not already proxied
                 if (!path.startsWith(PROXY_BASE) && !path.startsWith('/plugins/iframe-proxy/')) {{
+                    // Ensure path starts with / for proper joining
+                    if (!path.startsWith('/')) {{
+                        path = '/' + path;
+                    }}
                     return PROXY_BASE + path;
                 }}
                 return url;
+            }}
+            
+            // Handle protocol-relative URLs (//example.com/path) that match current origin
+            if (url.startsWith('//')) {{
+                try {{
+                    const urlObj = new URL(url, window.location.href);
+                    if (urlObj.origin === currentOrigin) {{
+                        let path = urlObj.pathname + urlObj.search + urlObj.hash;
+                        if (!path.startsWith(PROXY_BASE) && !path.startsWith('/plugins/iframe-proxy/')) {{
+                            if (!path.startsWith('/')) {{
+                                path = '/' + path;
+                            }}
+                            return PROXY_BASE + path;
+                        }}
+                    }}
+                }} catch (e) {{
+                    // If parsing fails, return as-is (might be external)
+                }}
             }}
         }} catch (e) {{
             // If URL parsing fails, continue with relative URL check
@@ -408,43 +517,58 @@ def proxy_app(app_name, path=''):
         return url;
     }}
     
-    // Intercept fetch() API
+    // Intercept fetch() API with safe JSON parsing
     if (window.fetch) {{
         const originalFetch = window.fetch;
         window.fetch = function(input, init) {{
-            if (typeof input === 'string') {{
-                // String URL - rewrite and pass through
-                return originalFetch.call(this, rewriteUrl(input), init);
-            }} else if (input instanceof Request) {{
-                // Request object - extract URL, rewrite, and create new Request
-                const originalUrl = input.url;
-                const newUrl = rewriteUrl(originalUrl);
-                if (newUrl !== originalUrl) {{
-                    // Try to clone the request first (preserves body if readable)
-                    try {{
-                        const clonedRequest = input.clone();
-                        // Create new Request with rewritten URL, using cloned request for body
-                        const newRequest = new Request(newUrl, clonedRequest);
-                        return originalFetch.call(this, newRequest, init);
-                    }} catch (e) {{
-                        // If clone fails (body already consumed), create new Request without body
-                        const newRequest = new Request(newUrl, {{
-                            method: input.method,
-                            headers: input.headers,
-                            mode: input.mode,
-                            credentials: input.credentials,
-                            cache: input.cache,
-                            redirect: input.redirect,
-                            referrer: input.referrer,
-                            referrerPolicy: input.referrerPolicy,
-                            integrity: input.integrity
-                        }});
-                        return originalFetch.call(this, newRequest, init);
-                    }}
+            const fetchPromise = typeof input === 'string' 
+                ? originalFetch.call(this, rewriteUrl(input), init)
+                : input instanceof Request
+                    ? (function() {{
+                        const originalUrl = input.url;
+                        const newUrl = rewriteUrl(originalUrl);
+                        if (newUrl !== originalUrl) {{
+                            try {{
+                                const clonedRequest = input.clone();
+                                const newRequest = new Request(newUrl, clonedRequest);
+                                return originalFetch.call(this, newRequest, init);
+                            }} catch (e) {{
+                                const newRequest = new Request(newUrl, {{
+                                    method: input.method,
+                                    headers: input.headers,
+                                    mode: input.mode,
+                                    credentials: input.credentials,
+                                    cache: input.cache,
+                                    redirect: input.redirect,
+                                    referrer: input.referrer,
+                                    referrerPolicy: input.referrerPolicy,
+                                    integrity: input.integrity
+                                }});
+                                return originalFetch.call(this, newRequest, init);
+                            }}
+                        }}
+                        return originalFetch.call(this, input, init);
+                    }})()
+                    : originalFetch.call(this, input, init);
+            
+            // Wrap response.json() to handle parsing errors gracefully
+            return fetchPromise.then(response => {{
+                if (!response || typeof response.json !== 'function') {{
+                    return response;
                 }}
-            }}
-            // For other cases, pass through as-is
-            return originalFetch.call(this, input, init);
+                
+                const originalJson = response.json;
+                response.json = function() {{
+                    return originalJson.call(this).catch(error => {{
+                        // If JSON parsing fails, return null instead of throwing
+                        // This prevents console errors for non-JSON responses
+                        console.debug('Response is not valid JSON, returning null');
+                        return null;
+                    }});
+                }};
+                
+                return response;
+            }});
         }};
     }}
     
@@ -472,27 +596,31 @@ def proxy_app(app_name, path=''):
 }})();
 </script>
 '''
+                # No theme synchronization - let Jaeger UI use its default appearance
+                # Only inject the URL rewriting script
+                combined_script = js_interceptor
+                
                 # Inject the script right after <head> or before </head>
                 # Try to inject after <head> tag first
                 if '<head' in content_str.lower():
                     head_pattern = r'(<head[^>]*>)'
                     # Check if we already injected (avoid double injection)
                     if 'PROXY_BASE' not in content_str:
-                        content_str = re.sub(head_pattern, r'\1\n' + js_interceptor, content_str, count=1, flags=re.IGNORECASE)
+                        content_str = re.sub(head_pattern, r'\1\n' + combined_script, content_str, count=1, flags=re.IGNORECASE)
                 elif '</head>' in content_str.lower():
                     # Fallback: inject before </head>
                     if 'PROXY_BASE' not in content_str:
-                        content_str = content_str.replace('</head>', js_interceptor + '\n</head>', 1)
+                        content_str = content_str.replace('</head>', combined_script + '\n</head>', 1)
                 else:
                     # Last resort: inject at the beginning of body or html
                     if '<body' in content_str.lower():
                         body_pattern = r'(<body[^>]*>)'
                         if 'PROXY_BASE' not in content_str:
-                            content_str = re.sub(body_pattern, r'\1\n' + js_interceptor, content_str, count=1, flags=re.IGNORECASE)
+                            content_str = re.sub(body_pattern, r'\1\n' + combined_script, content_str, count=1, flags=re.IGNORECASE)
                     elif '<html' in content_str.lower():
                         html_pattern = r'(<html[^>]*>)'
                         if 'PROXY_BASE' not in content_str:
-                            content_str = re.sub(html_pattern, r'\1\n' + js_interceptor, content_str, count=1, flags=re.IGNORECASE)
+                            content_str = re.sub(html_pattern, r'\1\n' + combined_script, content_str, count=1, flags=re.IGNORECASE)
                 
                 # Update content
                 content = content_str.encode('utf-8')

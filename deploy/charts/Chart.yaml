@@ -19,12 +19,13 @@ deprecated: false
 
 dependencies:
   - name: redis
-    version: ">=21.1.4"
-    repository: "https://charts.bitnami.com/bitnami"
+    version: ">=0.21.3"
+    repository: "oci://docker.io/cloudpirates"
     condition: redis.enabled
-  - name: postgresql
-    version: ">=11.9.4"
-    repository: "https://charts.bitnami.com/bitnami"
+  - name: postgres
+    version: ">=0.14.6"
+    repository: "oci://docker.io/cloudpirates"
+    alias: postgresql
     condition: postgresql.enabled
   - name: metrics-server
     version: "3.8.4"

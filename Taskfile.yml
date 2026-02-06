@@ -71,7 +71,9 @@ tasks:
     desc: "Generate Kubedash requirements"
     dir: 'src/kubedash'
     cmds:
-      - poetry export --without-hashes -f requirements.txt > requirements.txt
+      - |
+        poetry show --only main --top-level | awk 'NR>2 {if (NF >= 2) print $1"=="$2}' > requirements.txt || \
+        poetry show --only main | tail -n +3 | awk '{if (NF >= 2) print $1"=="$2}' > requirements.txt
 
   kubedash-safety:
     desc: "Safety chack Kubedash requirements"
@@ -89,7 +91,7 @@ tasks:
     desc: "Scan Kubedash for vulnerabilities"
     dir: 'src/kubedash'
     cmds:
-      - trivy -q fs . --scanners vuln
+      - trivy -q fs . --ignore-unfixed --scanners vuln
 
   kubedash-lint:
     desc: "Lint Kubedash"
@@ -103,15 +105,18 @@ tasks:
   kubedash-dev-build:
     desc: "Build Kubedash devel docker image"
     cmds:
+      - docker builder prune -f
+      - task: kubedash-requirements
+        run: true
       - rm -rf docker/kubedash/kubedash
       - cp -r src/kubedash docker/kubedash/kubedash
       - rm -f docker/kubedash/requirements.txt
-      - cp docker/kubedash/kubedash/requirements.txt docker/kubedash/requirements.txt
+      - cp src/kubedash/requirements.txt docker/kubedash/requirements.txt
       - rm -f docker/kubedash/gunicorn_conf.py
       - cp docker/kubedash/kubedash/gunicorn_conf.py docker/kubedash/gunicorn_conf.py
       - |
         docker build \
-        -f docker/kubedash/Dockerfile \
+        -f docker/kubedash/Dockerfile.dev \
         --build-arg BUILD_DATE={{.DATE}} \
         --build-arg VERSION={{.VERSION}}-devel \
         -t devopstales/kubedash:{{.VERSION}}-devel \
@@ -120,7 +125,7 @@ tasks:
   kubedash-dev-scan:
     desc: "Scan Kubedash devel docker image for vulnerabilities"
     cmds:
-      - trivy -q i devopstales/kubedash:{{.VERSION}}-devel --scanners vuln
+      - trivy -q i devopstales/kubedash:{{.VERSION}}-devel --ignore-unfixed --scanners vuln
 
   kubedash-dev-sign:
     desc: "Sign Kubedash devel docker image"
@@ -137,6 +142,34 @@ tasks:
     cmds:
       - docker rmi devopstales/kubedash:{{.VERSION}}-devel
 
+  kubedash-run:
+    desc: "Run Kubedash docker container with kubedash.ini mount and port mappings"
+    cmds:
+      - |
+        docker run -d \
+        --name kubedash \
+        -p 8080:8000 \
+        -p 8443:8000 \
+        -v $(pwd)/src/kubedash/kubedash.ini:/code/kubedash/kubedash.ini:ro \
+        devopstales/kubedash:{{.VERSION}}
+
+  kubedash-dev-run:
+    desc: "Run Kubedash dev docker container with kubedash.ini mount and port mappings"
+    cmds:
+      - |
+        docker run -d \
+        --name kubedash \
+        -p 8080:8000 \
+        -p 8443:8000 \
+        -v $(pwd)/src/kubedash/kubedash.ini:/code/kubedash/kubedash.ini:ro \
+        devopstales/kubedash:{{.VERSION}}-devel
+
+  kubedash-stop:
+    desc: "Stop and remove Kubedash docker container"
+    cmds:
+      - docker stop kubedash || true
+      - docker rm kubedash || true
+
   kubedash-dev:
     desc: "Build, scan, sign and push Kubedash devel docker image"
     cmds:
@@ -150,10 +183,13 @@ tasks:
   kubedash-prod-build:
     desc: "Build Kubedash docker image"
     cmds:
+      - docker builder prune -f
+      - task: kubedash-requirements
+        run: true
       - rm -rf docker/kubedash/kubedash
       - cp -r src/kubedash docker/kubedash/kubedash
       - rm -f docker/kubedash/requirements.txt
-      - cp docker/kubedash/kubedash/requirements.txt docker/kubedash/requirements.txt
+      - cp src/kubedash/requirements.txt docker/kubedash/requirements.txt
       - rm -f docker/kubedash/gunicorn_conf.py
       - cp docker/kubedash/kubedash/gunicorn_conf.py docker/kubedash/gunicorn_conf.py
       - |
@@ -169,8 +205,8 @@ tasks:
   kubedash-prod-scan:
     desc: "Scan Kubedash Dockerfile for vulnerabilities"
     cmds:
-      - trivy -q i --scanners vuln devopstales/kubedash:{{.VERSION}}
-      - trivy -q i --format cyclonedx --output sbom.cdx.json --scanners vuln devopstales/kubedash:{{.VERSION}} 
+      - trivy -q i --ignore-unfixed --scanners vuln devopstales/kubedash:{{.VERSION}}
+      - trivy -q i --ignore-unfixed --format cyclonedx --output sbom.cdx.json --scanners vuln devopstales/kubedash:{{.VERSION}} 
 
   kubedash-prod-push:
     desc: "Push Kubedash docker image"

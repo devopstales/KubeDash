@@ -1,6 +1,6 @@
 # syntax = docker/dockerfile:1.2
 ARG BUILDPLATFORM=linux/amd64
-FROM --platform=$BUILDPLATFORM python:3.11-alpine3.20 AS builder
+FROM --platform=$BUILDPLATFORM python:3.12-alpine AS builder
 
 WORKDIR /code
 COPY requirements.txt  /code/
@@ -9,7 +9,7 @@ RUN apk add --no-cache postgresql-libs && \
     apk add --no-cache --virtual .build-deps gcc build-base freetype-dev libpng-dev openblas-dev libffi-dev musl-dev postgresql-dev
 RUN apk -U upgrade
 RUN pip install --no-cache-dir --prefix=/install-dir -r /code/requirements.txt &&\
-    pip install --no-cache-dir --prefix=/install-dir -U "pip>=25.3" "setuptools>=80.10.2" "wheel>=0.46.3" 
+    pip install --no-cache-dir --prefix=/install-dir -U "pip>=25.3" "setuptools>=78.1.1" "wheel>=0.46.2" 
 
 # main Contaiber
 ARG BUILDPLATFORM=linux/amd64
@@ -40,7 +40,11 @@ WORKDIR /code/kubedash
 
 RUN addgroup -S -g 10001 kubedash && \
     adduser -S -u 10001 kubedash -G kubedash && \
+    mkdir -p /code && \
+    mkdir -p /code/certs && \
+    mkdir -p /code/kubedash/certs && \
     mkdir /tmp/kubedash && \
+    chown -R kubedash:kubedash /code && \
     chown -R kubedash:kubedash /tmp/kubedash
 
 COPY entrypoint.sh /entrypoint.sh
@@ -52,6 +56,9 @@ COPY --from=builder /install-dir /usr/local
 ENV PATH=/usr/local/bin:$PATH
 
 COPY --chown=kubedash:kubedash ./kubedash /code/kubedash
+
+# Ensure /code and all subdirectories are owned by kubedash after COPY
+RUN chown -R kubedash:kubedash /code
 
 RUN touch /code/kubedash/CA.crt && chown kubedash:kubedash /code/kubedash/CA.crt
 RUN touch /code/kubedash/app-release && chown kubedash:kubedash /code/kubedash/app-release

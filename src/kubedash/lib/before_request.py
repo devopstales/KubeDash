@@ -36,10 +36,10 @@ def init_before_request(app: Flask):
         # Start timer
         g._start_time = time.time()
         
-        # Get correlation ID from headers or generate new
-        correlation_id = request.headers.get('X-Correlation-ID', None) #str(uuid.uuid4()))
-        if correlation_id:
-            g.correlation_id = correlation_id
+        # Get request ID from headers (standard X-Request-ID header from ingress)
+        request_id = request.headers.get('X-Request-ID', None)
+        if request_id:
+            g.correlation_id = request_id
         
         # Skip page cache for API paths (they don't use HTML templates)
         if not any(path.startswith(p) for p in SKIP_PAGE_CACHE_PATH):
@@ -63,8 +63,8 @@ def init_before_request(app: Flask):
                 REQUEST_LATENCY.labels(endpoint=request.endpoint).observe(latency)
                 REQUEST_COUNT.labels(method=request.method, endpoint=request.endpoint).inc()
             
-        # Ensure correlation ID is in response headers
+        # Ensure request ID is in response headers
         if hasattr(g, 'correlation_id'):
-            response.headers['X-Correlation-ID'] = g.correlation_id
+            response.headers['X-Request-ID'] = g.correlation_id
 
         return response

@@ -46,19 +46,19 @@ def get_header_value(headers, key):
 def pre_request(worker, req):
     """Executed before each request."""
     try:
-        # Get correlation ID from headers or generate new
-        correlation_id = get_header_value(req.headers, 'X-Correlation-ID') or None #str(uuid.uuid4())
+        # Get request ID from headers (standard X-Request-ID header from ingress)
+        request_id = get_header_value(req.headers, 'X-Request-ID') or None
         
-        if correlation_id:
+        if request_id:
             # Store in worker environment
-            worker.correlation_id = correlation_id   
+            worker.correlation_id = request_id   
             # Log the request start
-            #worker.log.info(f"Request started | {correlation_id} | {req.method} {req.path}")
+            #worker.log.info(f"Request started | {request_id} | {req.method} {req.path}")
         
         # Store start time for duration calculation
         worker.start_time = time.time()
         
-        return correlation_id
+        return request_id
     except Exception as e:
         worker.log.error(f"Error in pre_request: {str(e)}")
         return str(uuid.uuid4())  # Fallback ID

@@ -6,7 +6,7 @@ from kubernetes import watch
 from kubernetes.client.rest import ApiException
 from kubernetes.stream import stream
 
-from lib.components import socketio
+from lib.components import socketio, get_flask_app
 from lib.helper_functions import (
     ErrorHandler, trimAnnotations
 )
@@ -570,31 +570,55 @@ def k8sPodDelete(username_role, user_token, ns, po):
 ##############################################################
 
 def k8sPodLogsStream(username_role, user_token, namespace, pod_name, container):
-    k8sClientConfigGet(username_role, user_token)
-    try:
-        w = watch.Watch()
-        for line in w.stream(
-                k8s_client.CoreV1Api().read_namespaced_pod_log, 
-                name=pod_name, 
-                namespace=namespace,
-                container=container,
-                tail_lines=100,
-                _request_timeout=300
-            ):
-            socketio.emit('response',
-                                {'data': str(line)}, namespace="/log")
-    except ApiException as error:
-            ErrorHandler(logger, error, "get logStream - %s" % error.status)
-    except Exception as error:
-        ERROR = "k8sPodLogsStream: %s" % error
-        ErrorHandler(logger, "error", ERROR)
+    # Push application context for background thread
+    # Background threads created by socketio don't have Flask app context
+    app = get_flask_app()
+    with app.app_context():
+        k8sClientConfigGet(username_role, user_token)
+        try:
+            w = watch.Watch()
+            for line in w.stream(
+                    k8s_client.CoreV1Api().read_namespaced_pod_log, 
+                    name=pod_name, 
+                    namespace=namespace,
+                    container=container,
+                    tail_lines=100,
+                    _request_timeout=300
+                ):
+                try:
+                    socketio.emit('response',
+                                        {'data': str(line)}, namespace="/log")
+                except (OSError, BrokenPipeError, ConnectionError) as emit_error:
+                    # Handle socket errors gracefully (client disconnected, bad file descriptor, etc.)
+                    logger.debug(f"Socket emit error (client likely disconnected): {emit_error}")
+                    break
+                except Exception as emit_error:
+                    logger.warning(f"Unexpected error emitting socket message: {emit_error}")
+                    # Continue streaming even if one emit fails
+        except ApiException as error:
+                ErrorHandler(logger, error, "get logStream - %s" % error.status)
+        except (OSError, BrokenPipeError, ConnectionError) as error:
+            # Handle connection errors gracefully
+            logger.debug(f"Connection error in log stream (client likely disconnected): {error}")
+        except Exception as error:
+            ERROR = "k8sPodLogsStream: %s" % error
+            ErrorHandler(logger, "error", ERROR)
 
 ##############################################################
 ## Pod Exec
 ##############################################################
 
 def k8sPodExecSocket(username_role, user_token, namespace, pod_name, container):
-    k8sClientConfigGet(username_role, user_token)
+    # This is called from socketio handler which should have app context
+    # But to be safe, ensure we have app context
+    from flask import has_app_context
+    if not has_app_context():
+        # Get app and push context
+        app = get_flask_app()
+        with app.app_context():
+            k8sClientConfigGet(username_role, user_token)
+    else:
+        k8sClientConfigGet(username_role, user_token)
     try:
         wsclient = stream(k8s_client.CoreV1Api().connect_get_namespaced_pod_exec,
                 pod_name,
@@ -646,8 +670,16 @@ def k8sPodExecStream(wsclient, username_role, user_token, namespace, pod_name, c
             output = wsclient.read_all()
             if output:
                 """write back to socket"""
-                socketio.emit(
-                    "response", {"output": output}, namespace="/exec")
+                try:
+                    socketio.emit(
+                        "response", {"output": output}, namespace="/exec")
+                except (OSError, BrokenPipeError, ConnectionError) as emit_error:
+                    # Handle socket errors gracefully (client disconnected, bad file descriptor, etc.)
+                    logger.debug(f"Socket emit error in exec stream (client likely disconnected): {emit_error}")
+                    break
+                except Exception as emit_error:
+                    logger.warning(f"Unexpected error emitting socket message in exec stream: {emit_error}")
+                    # Continue streaming even if one emit fails
         #except:
         #    try:
         #        print("Failed to read")

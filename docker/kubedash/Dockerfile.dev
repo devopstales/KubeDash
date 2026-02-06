@@ -34,8 +34,8 @@ RUN dnf install -y \
     make \
     && dnf clean all
 
-RUN pip install --no-cache-dir --prefix=/install-dir -U pip setuptools wheel && \
-    pip install --no-cache-dir --prefix=/install-dir -r requirements.txt
+RUN pip install --no-cache-dir --prefix=/install-dir -U "pip>=25.3" "setuptools>=78.1.1" "wheel>=0.46.2" && \
+    /install-dir/bin/pip install --no-cache-dir --prefix=/install-dir -r requirements.txt
 
 # ========== Stage 3: Runtime Image ==========
 FROM base AS runtime
@@ -44,7 +44,8 @@ ARG BUILD_DATE
 
 ENV FLASK_CONFIG="production" \
     FLASK_APP="kubedash" \
-    KUBEDASH_VERSION=${VERSION}
+    KUBEDASH_VERSION=${VERSION} \
+    PYTHONPATH=/usr/local/lib64/python3.12/site-packages:/usr/local/lib/python3.12/site-packages
 
 # https://github.com/opencontainers/image-spec/blob/main/annotations.md#back-compatibility-with-label-schema
 LABEL org.opencontainers.image.vendor="devopstales" \
@@ -64,10 +65,18 @@ WORKDIR /code/kubedash
 COPY --from=builder /install-dir /usr/local
 ENV PATH=/usr/local/bin:$PATH
 
+# Update the system
+RUN --mount=type=cache,target=/var/cache/dnf \
+    dnf -y update && \
+    dnf clean all
+
 # Runtime configuration
 RUN useradd -u 10001 -d /code/kubedash kubedash && \
-    chown -R kubedash:kubedash /code/kubedash && \
+    mkdir -p /code && \
+    mkdir -p /code/certs && \
+    mkdir -p /code/kubedash/certs && \
     mkdir /tmp/kubedash && \
+    chown -R kubedash:kubedash /code && \
     chown -R kubedash:kubedash /tmp/kubedash && \
     touch /code/kubedash/CA.crt && \
     chown kubedash:kubedash /code/kubedash/CA.crt && \
@@ -75,6 +84,9 @@ RUN useradd -u 10001 -d /code/kubedash kubedash && \
     chown kubedash:kubedash /code/kubedash/app-release
     
 COPY --chown=kubedash:kubedash ./kubedash /code/kubedash
+
+# Ensure /code and all subdirectories are owned by kubedash after COPY
+RUN chown -R kubedash:kubedash /code
 
 COPY entrypoint.sh /entrypoint.sh
 USER kubedash

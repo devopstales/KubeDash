@@ -18,29 +18,79 @@
 
 {% block content %}
 <style>
-    /* Remove padding from body content area for iframe */
+    /* Remove padding and margin from body content area for iframe */
     .body.flex-grow-1 {
         padding-left: 0 !important;
         padding-right: 0 !important;
         padding-top: 0 !important;
         padding-bottom: 0 !important;
+        margin: 0 !important;
         overflow: hidden !important;
-        height: 100% !important;
-        max-height: 100vh !important;
+        height: calc(100vh - var(--header-height, 0px)) !important;
+        display: flex !important;
+        flex-direction: column !important;
     }
-    /* Prevent wrapper from causing scroll */
+    /* Prevent wrapper from causing scroll - preserve CoreUI sidebar spacing */
     .wrapper {
         overflow: hidden !important;
-        height: 100vh;
+        height: 100vh !important;
+        display: flex !important;
+        flex-direction: column !important;
+        margin-top: 0 !important;
+        margin-bottom: 0 !important;
+        margin-right: 0 !important;
+        padding-top: 0 !important;
+        padding-bottom: 0 !important;
+        padding-right: 0 !important;
+        /* Preserve padding-left for sidebar spacing - CoreUI uses var(--cui-sidebar-occupy-start) */
+        gap: 0 !important;
+    }
+    /* Remove margin-bottom and border from header for iframe pages */
+    header.header {
+        flex-shrink: 0 !important;
+        margin-bottom: 0 !important;
+        border-bottom: none !important;
+    }
+    /* Remove spacing from topmenu block */
+    header.header .header-nav,
+    header.header ul.header-nav {
+        margin-bottom: 0 !important;
+        margin-top: 0 !important;
+    }
+    /* Remove any border or line between header and body */
+    header.header + .body,
+    .body.flex-grow-1 {
+        border-top: none !important;
+    }
+    /* Remove any spacing from content area */
+    .body.flex-grow-1 > * {
+        margin-top: 0 !important;
+    }
+    /* Container for iframe */
+    #iframe-container {
+        width: 100% !important;
+        height: 100% !important;
+        flex: 1 1 auto !important;
+        position: relative !important;
+        overflow: hidden !important;
+        min-height: 0 !important;
+        margin: 0 !important;
+        padding: 0 !important;
     }
     /* Make iframe fill available space */
     #app-iframe {
-        width: 100%;
-        border: none;
-        display: block;
-        margin: 0;
-        padding: 0;
-        overflow: hidden;
+        width: 100% !important;
+        height: 100% !important;
+        min-height: 0 !important;
+        border: none !important;
+        display: block !important;
+        margin: 0 !important;
+        padding: 0 !important;
+        position: absolute !important;
+        top: 0 !important;
+        left: 0 !important;
+        right: 0 !important;
+        bottom: 0 !important;
     }
     /* Hide footer for iframe pages */
     footer.footer {
@@ -48,62 +98,158 @@
     }
     /* Prevent html/body scroll for this page only */
     html, body {
-        height: 100vh;
-        overflow: hidden;
+        height: 100vh !important;
+        overflow: hidden !important;
+        margin: 0 !important;
+        padding: 0 !important;
+    }
+    /* Ensure header doesn't cause layout issues */
+    header.header {
+        flex-shrink: 0 !important;
     }
 </style>
 {% if embed_mode and app_url %}
-<iframe 
-    id="app-iframe"
-    src="{{ app_url }}" 
-    sandbox="allow-same-origin allow-scripts allow-forms allow-popups allow-popups-to-escape-sandbox allow-top-navigation-by-user-activation"
-    title="{{ app_name }}"
-></iframe>
+<div id="iframe-container" style="width: 100%; height: 100%; position: relative; background: transparent; isolation: isolate;">
+    <iframe 
+        id="app-iframe"
+        src="{{ app_url }}" 
+        sandbox="allow-same-origin allow-scripts allow-forms allow-popups allow-popups-to-escape-sandbox allow-top-navigation-by-user-activation"
+        title="{{ app_name }}"
+        style="width: 100%; height: 100%; border: none; background: transparent; display: block; position: absolute; top: 0; left: 0; right: 0; bottom: 0;"
+        allow="fullscreen"
+        loading="lazy"
+    ></iframe>
+</div>
 <script>
-    function resizeIframe() {
-        const iframe = document.getElementById('app-iframe');
-        if (!iframe) return;
+    (function() {
+        'use strict';
         
-        // Get all elements that take up vertical space
-        const header = document.querySelector('header.header');
-        const body = document.querySelector('.body.flex-grow-1');
-        const wrapper = document.querySelector('.wrapper');
+        // Suppress iframe sandbox security warning (expected when both allow-scripts and allow-same-origin are needed)
+        const originalWarn = console.warn;
+        console.warn = function(...args) {
+            const message = args.join(' ');
+            if (message.includes('sandbox') && message.includes('allow-scripts') && message.includes('allow-same-origin')) {
+                // Suppress expected sandbox warning - both permissions are required for embedded apps like Jaeger
+                return;
+            }
+            originalWarn.apply(console, args);
+        };
         
-        if (header && body) {
-            // Calculate using the body element's position
-            const bodyRect = body.getBoundingClientRect();
-            const viewportHeight = window.innerHeight;
-            const bodyTop = bodyRect.top;
-            const availableHeight = viewportHeight - bodyTop;
+        function resizeIframe() {
+            const iframe = document.getElementById('app-iframe');
+            if (!iframe) return;
             
-            // Set iframe height to fill available space
-            iframe.style.height = Math.max(availableHeight, 100) + 'px';
-        } else {
-            // Fallback: use header height
-            const headerHeight = header ? header.offsetHeight : 0;
-            const viewportHeight = window.innerHeight;
-            iframe.style.height = (viewportHeight - headerHeight) + 'px';
+            // Get all elements that take up vertical space
+            const header = document.querySelector('header.header');
+            const body = document.querySelector('.body.flex-grow-1');
+            const wrapper = document.querySelector('.wrapper');
+            
+            if (body) {
+                // Use flexbox approach - calculate available height
+                const viewportHeight = window.innerHeight;
+                let usedHeight = 0;
+                
+                // Calculate header height including topmenu - use offsetHeight for more accurate measurement
+                if (header) {
+                    usedHeight = header.offsetHeight;
+                    // Also check if there's a topmenu below the header
+                    const topmenu = document.querySelector('.header-nav');
+                    if (topmenu) {
+                        const topmenuRect = topmenu.getBoundingClientRect();
+                        if (topmenuRect.top > header.getBoundingClientRect().bottom) {
+                            usedHeight += topmenuRect.height;
+                        } else {
+                            // Topmenu might be inside header, use the header's full height
+                            const headerRect = header.getBoundingClientRect();
+                            usedHeight = headerRect.bottom;
+                        }
+                    }
+                }
+                
+                // Calculate available height for iframe
+                const availableHeight = Math.max(viewportHeight - usedHeight, 100);
+                
+                // Set CSS variable for header height
+                if (header) {
+                    document.documentElement.style.setProperty('--header-height', usedHeight + 'px');
+                }
+                
+                // Set iframe container and iframe height explicitly
+                const container = document.getElementById('iframe-container');
+                if (container) {
+                    container.style.height = availableHeight + 'px';
+                    container.style.marginTop = '0px';
+                }
+                iframe.style.height = availableHeight + 'px';
+                
+                // Also ensure body has correct height and no margin
+                if (body) {
+                    body.style.height = availableHeight + 'px';
+                    body.style.marginTop = '0px';
+                }
+            }
         }
-    }
-    
-    // Use requestAnimationFrame for smoother updates
-    function scheduleResize() {
-        requestAnimationFrame(resizeIframe);
-    }
-    
-    // Resize on load
-    window.addEventListener('load', scheduleResize);
-    // Resize on window resize
-    window.addEventListener('resize', scheduleResize);
-    // Resize immediately (in case DOM is already loaded)
-    if (document.readyState === 'loading') {
-        document.addEventListener('DOMContentLoaded', scheduleResize);
-    } else {
-        scheduleResize();
-    }
-    
-    // Also resize after a short delay to catch any late-loading elements
-    setTimeout(scheduleResize, 100);
+        
+        // Wait for stylesheets to load before resizing to prevent FOUC
+        function waitForStylesheets(callback) {
+            const stylesheets = Array.from(document.styleSheets);
+            let loadedCount = 0;
+            
+            function checkComplete() {
+                loadedCount++;
+                if (loadedCount >= stylesheets.length) {
+                    callback();
+                }
+            }
+            
+            if (stylesheets.length === 0) {
+                callback();
+                return;
+            }
+            
+            stylesheets.forEach((sheet) => {
+                if (sheet.href) {
+                    const link = document.querySelector(`link[href="${sheet.href}"]`);
+                    if (link) {
+                        if (link.sheet) {
+                            checkComplete();
+                        } else {
+                            link.addEventListener('load', checkComplete);
+                            link.addEventListener('error', checkComplete);
+                        }
+                    } else {
+                        checkComplete();
+                    }
+                } else {
+                    checkComplete();
+                }
+            });
+        }
+        
+        // Use requestAnimationFrame for smoother updates
+        function scheduleResize() {
+            requestAnimationFrame(resizeIframe);
+        }
+        
+        // Wait for stylesheets before initial resize
+        waitForStylesheets(() => {
+            scheduleResize();
+        });
+        
+        // Resize on load (after all resources)
+        window.addEventListener('load', () => {
+            waitForStylesheets(scheduleResize);
+        });
+        
+        // Resize on window resize
+        window.addEventListener('resize', scheduleResize);
+        
+        // Resize when iframe loads (in case it affects layout)
+        const iframe = document.getElementById('app-iframe');
+        if (iframe) {
+            iframe.addEventListener('load', scheduleResize);
+        }
+    })();
 </script>
 {% elif app_url %}
 <div class="p-4 text-center">

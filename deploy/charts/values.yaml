@@ -27,6 +27,11 @@ image:
     # -- The docker image tag to use
     tag: v0.22.4
 
+# -- Service configuration
+service:
+  # -- Service port for the KubeDash application
+  port: 5000
+
 # -- pullsecrets
 imagePullSecrets: []
 
@@ -64,8 +69,6 @@ metrics:
     # -- Prometheus service monitor labels
     labels:
       release: kube-prometheus-stack
-    # -- Prometheus service monitor job labels
-    jobLabel: {}
     # -- Prometheus service monitor annotations
     annotations: {}
     # -- Prometheus service monitor interval
@@ -74,7 +77,8 @@ metrics:
     scrapeTimeout: "10s"
     relabelings: []
     metricRelabelings: []
-    honorLabels: {}
+    # -- Honor metrics labels (boolean)
+    honorLabels: false
   grafana:
     # -- Enable grafana dashboard deploy
     enabled: true 
@@ -97,13 +101,11 @@ dbui:
     # -- adminer plugins
     plugins: "tables-filter,adminer-auto-login"
 
-# -- deploy postgresql
+# -- deploy postgresql (CloudPirates chart)
 postgresql:
   # -- Enable postgresql
   enabled: true
   
-  rbac:
-    create: true
   auth:
     # -- Postgresql database
     database: "kubedash"
@@ -111,48 +113,51 @@ postgresql:
     username: "kubedash"
     # -- Postgresql password
     password: "kubedash"
-    # -- Postgresql replication password
-    replicationPassword: "change-me"
-    # -- Postgresql postgres user password
-    postgresPassword: "change-me"
+    # -- Name of existing secret to use for PostgreSQL credentials
+    existingSecret: ""
 
-  volumePermissions:
-    # -- Enable init container to set permissions on data volume
+  persistence:
+    # -- Enable persistence using Persistent Volume Claims
+    enabled: true
+    # -- Persistent Volume storage class
+    storageClass: ""
+    # -- Persistent Volume size
+    size: 10Gi
+    # -- Persistent Volume access mode
+    accessModes:
+      - ReadWriteOnce
+
+  ingress:
+    # -- Enable ingress for PostgreSQL
     enabled: false
-    securityContext:
-      runAsUser: "auto"
-
-  securityContext:
-    # -- Enable postgresql security context
-    enabled: false
-
-  shmVolume:
-    # -- Enable postgresql shared memory volume
-    chmod:
-      enabled: false
-
-  primary:
-    persistence:
-      size: 10Gi
-  readReplicas:
-    # -- Number of read replicas to create
-    replicaCount: 0
+    # -- Ingress TLS configuration (array format as expected by schema)
+    tls: []
 
   metrics:
     # -- Enable postgresql metrics
     enabled: true
     serviceMonitor:
       # -- Enable prometheus service monitor
-      enabled: false
-      # -- Prometheus service monitor labels
-      labels:
-        release: kube-prometheus-stack
-      # -- Set serviceMonitor labels
-      jobLabel: {}
-      honorLabels: {}
+      enabled: true
       # -- Prometheus service monitor namespace
-      #namespace: "monitoring"
-# https://artifacthub.io/packages/helm/bitnami/postgresql
+      namespace: ""
+      # -- Prometheus service monitor interval
+      interval: 30s
+      # -- Prometheus service monitor scrape timeout
+      scrapeTimeout: 10s
+      # -- Prometheus service monitor selector labels
+      selector: {}
+      # -- Prometheus service monitor annotations
+      annotations: {}
+      # -- Honor metrics labels (boolean)
+      honorLabels: false
+      # -- Prometheus service monitor relabelings
+      relabelings: []
+      # -- Prometheus service monitor metric relabelings
+      metricRelabelings: []
+      # -- Prometheus service monitor namespace selector
+      namespaceSelector: {}
+# https://artifacthub.io/packages/helm/cloudpirates-postgres/postgres
 
 # -- deploy redis-commander
 redisCommander:
@@ -194,22 +199,56 @@ kubeview:
   # -- Namespace filter (regex pattern)
   namespaceFilter: "^kube-"
 
-# -- enable redis for caching
+# -- enable redis for caching (CloudPirates chart)
 redis:
   # -- Enable redis
   enabled: true
-  # -- Redis cluster architecture
+  # -- Redis cluster architecture (standalone, replication, cluster)
   architecture: standalone
+  # -- Number of Redis instances to deploy (only when architecture=(replication|cluster))
+  replicaCount: 1
+  auth:
+    # -- Enable Redis authentication
+    enabled: false
+    # -- Redis password (if empty, random password will be generated)
+    password: ""
+    # -- Name of existing secret containing Redis password
+    existingSecret: ""
+  persistence:
+    # -- Enable persistence using Persistent Volume Claims
+    enabled: true
+    # -- Persistent Volume storage class
+    storageClass: ""
+    # -- Persistent Volume size
+    size: 8Gi
+    # -- Persistent Volume access mode
+    accessModes:
+      - ReadWriteOnce
   metrics:
     # -- Enable redis metrics
     enabled: true
     serviceMonitor:
       # -- Enable prometheus service monitor
-      enabled: false
+      enabled: true
       # -- Prometheus service monitor namespace
-      #namespace: "monitoring"
-      additionalLabels:
-        release: kube-prometheus-stack
+      namespace: ""
+      # -- Prometheus service monitor interval
+      interval: 30s
+      # -- Prometheus service monitor scrape timeout
+      scrapeTimeout: ""
+      # -- Prometheus service monitor relabelings
+      relabelings: []
+      # -- Prometheus service monitor metric relabelings
+      metricRelabelings: []
+      # -- Honor metrics labels (boolean)
+      honorLabels: false
+      # -- Prometheus instance selector labels
+      selector: {}
+      # -- Prometheus service monitor annotations
+      annotations: {}
+      # -- Prometheus service monitor namespace selector
+      namespaceSelector: {}
+# https://artifacthub.io/packages/helm/cloudpirates-redis/redis
 
 # -- enable metrics-server
 metricsServer:
@@ -243,7 +282,7 @@ oidc:
     # -- oidc issuer url
     oidcUrl: "https://sso.mydomain.intra/auth/realms/k8s"
     # -- oidc scope
-    oidcScopes: "openid email"
+    oidcScopes: "email openid profile"
     # -- oidc client id
     oidcClientId: ""
     # -- oidc client secret
@@ -376,14 +415,15 @@ extensionApi:
   version: "v1"
   # -- Service port for the extension API (must be 443 for API aggregation)
   servicePort: 443
-  # -- Target port on the KubeDash service
-  targetPort: 8000
+  # -- Target port on the KubeDash service (defaults to service.port)
+  targetPort: 5000
   # -- CA bundle (base64-encoded) for TLS verification (recommended for production)
   # Leave empty to use insecureSkipTLSVerify (development only)
   caBundle: ""
   # -- Skip TLS verification (development only, still requires HTTPS endpoint)
-  # WARNING: Should never be used in production
-  insecureSkipTLSVerify: false
+  # Set to true when using self-signed certificates
+  # WARNING: Should never be used in production with proper certificates
+  insecureSkipTLSVerify: true
   # -- Group priority minimum for API group ordering
   groupPriorityMinimum: 1000
   # -- Version priority for API version ordering

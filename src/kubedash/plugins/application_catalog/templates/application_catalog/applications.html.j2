@@ -342,7 +342,17 @@
                     window.location.href = `/?next=${nextUrl}`;
                     return;
                 }
-                const data = await response.json();
+                // Safe JSON parsing with error handling
+                let data;
+                try {
+                    const text = await response.text();
+                    if (!text || text.trim() === '') {
+                        throw new Error('Empty response from server');
+                    }
+                    data = JSON.parse(text);
+                } catch (parseError) {
+                    throw new Error(`Failed to parse JSON response: ${parseError.message}`);
+                }
                 if (data.error) {
                     throw new Error(data.message || 'Failed to load applications');
                 }
@@ -372,7 +382,29 @@
                     }
                 });
                 
-                const data = await response.json();
+                // Safe JSON parsing with error handling
+                let data;
+                try {
+                    const contentType = response.headers.get('content-type') || '';
+                    if (contentType.includes('application/json')) {
+                        const text = await response.text();
+                        if (text && text.trim() !== '') {
+                            data = JSON.parse(text);
+                        } else {
+                            data = {};
+                        }
+                    } else {
+                        // Not JSON, might be HTML error page
+                        const text = await response.text();
+                        throw new Error(`Unexpected content type: ${contentType}. Response: ${text.substring(0, 100)}`);
+                    }
+                } catch (parseError) {
+                    if (!response.ok) {
+                        throw new Error(`HTTP error! status: ${response.status}. Parse error: ${parseError.message}`);
+                    }
+                    throw new Error(`Failed to parse response: ${parseError.message}`);
+                }
+                
                 if (!response.ok) {
                     throw new Error(data.message || `HTTP error! status: ${response.status}`);
                 }

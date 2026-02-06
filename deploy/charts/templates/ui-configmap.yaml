@@ -41,7 +41,7 @@ data:
     {{ if .Values.redis.enabled }}
     redis_enabled = true
     # cache connection string options
-    redis_host = {{ .Release.Name }}-redis-master
+    redis_host = {{ .Release.Name }}-redis
     redis_port = 6379
     redis_db = 0
     redis_password =
