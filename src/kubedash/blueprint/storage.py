@@ -34,9 +34,19 @@ def storage_class():
     Data is now loaded client-side via JavaScript API calls.
     This route only renders the template structure.
     """
-    # Handle POST requests for backward compatibility
+    # Handle POST requests (from form submission) - redirect to GET with selected parameter
     if request.method == 'POST':
         selected = request.form.get('selected') or request.form.get('sc_name')
+        
+        # Build query parameters
+        params = {}
+        if selected:
+            params['selected'] = selected
+        
+        # Redirect to GET request with parameters
+        if params:
+            return redirect(url_for('storage.storage_class', **params))
+        return redirect(url_for('storage.storage_class'))
     
     # Template now loads data via JavaScript from /api/v1/storage/storage-classes
     return render_template('storage/storage-class.html.j2')
@@ -77,9 +87,19 @@ def snapshot_class():
     Data is now loaded client-side via JavaScript API calls.
     This route only renders the template structure.
     """
-    # Handle POST requests for backward compatibility
+    # Handle POST requests (from form submission) - redirect to GET with selected parameter
     if request.method == 'POST':
         selected = request.form.get('selected') or request.form.get('sc_name')
+        
+        # Build query parameters
+        params = {}
+        if selected:
+            params['selected'] = selected
+        
+        # Redirect to GET request with parameters
+        if params:
+            return redirect(url_for('storage.snapshot_class', **params))
+        return redirect(url_for('storage.snapshot_class'))
     
     # Template now loads data via JavaScript from /api/v1/storage/snapshot-classes
     return render_template('storage/snapshot-class.html.j2')
@@ -120,11 +140,21 @@ def pvc():
     Data is now loaded client-side via JavaScript API calls.
     This route only renders the template structure.
     """
-    # Handle POST requests for backward compatibility
+    # Handle POST requests (from form submission) - redirect to GET with selected parameter
     if request.method == 'POST':
         if 'ns_select' in request.form:
             session['ns_select'] = request.form.get('ns_select')
         selected = request.form.get('selected')
+        
+        # Build query parameters
+        params = {}
+        if selected:
+            params['selected'] = selected
+        
+        # Redirect to GET request with parameters
+        if params:
+            return redirect(url_for('storage.pvc', **params))
+        return redirect(url_for('storage.pvc'))
 
     # Get namespaces for topbar selector
     user_token = get_user_token(session)
@@ -179,11 +209,21 @@ def pv():
     Data is now loaded client-side via JavaScript API calls.
     This route only renders the template structure.
     """
-    # Handle POST requests for backward compatibility
+    # Handle POST requests (from form submission) - redirect to GET with selected parameter
     if request.method == 'POST':
         if 'ns_select' in request.form:
             session['ns_select'] = request.form.get('ns_select')
         selected = request.form.get('selected')
+        
+        # Build query parameters
+        params = {}
+        if selected:
+            params['selected'] = selected
+        
+        # Redirect to GET request with parameters
+        if params:
+            return redirect(url_for('storage.pv', **params))
+        return redirect(url_for('storage.pv'))
 
     # Get namespaces for topbar selector
     user_token = get_user_token(session)
@@ -238,11 +278,21 @@ def volumesnapshots():
     Data is now loaded client-side via JavaScript API calls.
     This route only renders the template structure.
     """
-    # Handle POST requests for backward compatibility
+    # Handle POST requests (from form submission) - redirect to GET with selected parameter
     if request.method == 'POST':
         if 'ns_select' in request.form:
             session['ns_select'] = request.form.get('ns_select')
         selected = request.form.get('selected')
+        
+        # Build query parameters
+        params = {}
+        if selected:
+            params['selected'] = selected
+        
+        # Redirect to GET request with parameters
+        if params:
+            return redirect(url_for('storage.volumesnapshots', **params))
+        return redirect(url_for('storage.volumesnapshots'))
 
     # Get namespaces for topbar selector
     user_token = get_user_token(session)
@@ -297,11 +347,21 @@ def configmap():
     Data is now loaded client-side via JavaScript API calls.
     This route only renders the template structure.
     """
-    # Handle POST requests for backward compatibility
+    # Handle POST requests (from form submission) - redirect to GET with selected parameter
     if request.method == 'POST':
         if 'ns_select' in request.form:
             session['ns_select'] = request.form.get('ns_select')
         selected = request.form.get('selected')
+        
+        # Build query parameters
+        params = {}
+        if selected:
+            params['selected'] = selected
+        
+        # Redirect to GET request with parameters
+        if params:
+            return redirect(url_for('storage.configmap', **params))
+        return redirect(url_for('storage.configmap'))
 
     # Get namespaces for topbar selector
     user_token = get_user_token(session)

@@ -33,11 +33,21 @@ def vpa():
     Data is now loaded client-side via JavaScript API calls.
     This route only renders the template structure.
     """
-    # Handle POST requests for backward compatibility
+    # Handle POST requests (from form submission) - redirect to GET with selected parameter
     if request.method == 'POST':
         if 'ns_select' in request.form:
             session['ns_select'] = request.form.get('ns_select')
         selected = request.form.get('selected')
+        
+        # Build query parameters
+        params = {}
+        if selected:
+            params['selected'] = selected
+        
+        # Redirect to GET request with parameters
+        if params:
+            return redirect(url_for('other_resources.vpa', **params))
+        return redirect(url_for('other_resources.vpa'))
 
     # Get namespaces for topbar selector
     user_token = get_user_token(session)
@@ -93,11 +103,21 @@ def hpa():
     Data is now loaded client-side via JavaScript API calls.
     This route only renders the template structure.
     """
-    # Handle POST requests for backward compatibility
+    # Handle POST requests (from form submission) - redirect to GET with selected parameter
     if request.method == 'POST':
         if 'ns_select' in request.form:
             session['ns_select'] = request.form.get('ns_select')
         selected = request.form.get('selected')
+        
+        # Build query parameters
+        params = {}
+        if selected:
+            params['selected'] = selected
+        
+        # Redirect to GET request with parameters
+        if params:
+            return redirect(url_for('other_resources.hpa', **params))
+        return redirect(url_for('other_resources.hpa'))
 
     # Get namespaces for topbar selector
     user_token = get_user_token(session)
@@ -152,11 +172,21 @@ def pdp():
     Data is now loaded client-side via JavaScript API calls.
     This route only renders the template structure.
     """
-    # Handle POST requests for backward compatibility
+    # Handle POST requests (from form submission) - redirect to GET with selected parameter
     if request.method == 'POST':
         if 'ns_select' in request.form:
             session['ns_select'] = request.form.get('ns_select')
         selected = request.form.get('selected')
+        
+        # Build query parameters
+        params = {}
+        if selected:
+            params['selected'] = selected
+        
+        # Redirect to GET request with parameters
+        if params:
+            return redirect(url_for('other_resources.pdp', **params))
+        return redirect(url_for('other_resources.pdp'))
 
     # Get namespaces for topbar selector
     user_token = get_user_token(session)
@@ -211,11 +241,21 @@ def resource_quota():
     Data is now loaded client-side via JavaScript API calls.
     This route only renders the template structure.
     """
-    # Handle POST requests for backward compatibility
+    # Handle POST requests (from form submission) - redirect to GET with selected parameter
     if request.method == 'POST':
         if 'ns_select' in request.form:
             session['ns_select'] = request.form.get('ns_select')
         selected = request.form.get('selected')
+        
+        # Build query parameters
+        params = {}
+        if selected:
+            params['selected'] = selected
+        
+        # Redirect to GET request with parameters
+        if params:
+            return redirect(url_for('other_resources.resource_quota', **params))
+        return redirect(url_for('other_resources.resource_quota'))
 
     # Get namespaces for topbar selector
     user_token = get_user_token(session)
@@ -270,11 +310,21 @@ def limit_range():
     Data is now loaded client-side via JavaScript API calls.
     This route only renders the template structure.
     """
-    # Handle POST requests for backward compatibility
+    # Handle POST requests (from form submission) - redirect to GET with selected parameter
     if request.method == 'POST':
         if 'ns_select' in request.form:
             session['ns_select'] = request.form.get('ns_select')
         selected = request.form.get('selected')
+        
+        # Build query parameters
+        params = {}
+        if selected:
+            params['selected'] = selected
+        
+        # Redirect to GET request with parameters
+        if params:
+            return redirect(url_for('other_resources.limit_range', **params))
+        return redirect(url_for('other_resources.limit_range'))
 
     # Get namespaces for topbar selector
     user_token = get_user_token(session)
@@ -329,11 +379,21 @@ def runtimeclass():
     Data is now loaded client-side via JavaScript API calls.
     This route only renders the template structure.
     """
-    # Handle POST requests for backward compatibility
+    # Handle POST requests (from form submission) - redirect to GET with selected parameter
     if request.method == 'POST':
         if 'ns_select' in request.form:
             session['ns_select'] = request.form.get('ns_select')
         selected = request.form.get('selected')
+        
+        # Build query parameters
+        params = {}
+        if selected:
+            params['selected'] = selected
+        
+        # Redirect to GET request with parameters
+        if params:
+            return redirect(url_for('other_resources.runtimeclass', **params))
+        return redirect(url_for('other_resources.runtimeclass'))
 
     # Get namespaces for topbar selector (RuntimeClass is cluster-scoped, but namespace dropdown is available for consistency)
     user_token = get_user_token(session)

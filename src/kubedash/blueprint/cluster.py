@@ -136,9 +136,13 @@ def node_list():
     Data is now loaded client-side via JavaScript API calls.
     This route only renders the template structure.
     """
-    # Handle POST requests for backward compatibility
+    # Handle POST requests (from form submission) - redirect to GET with selected parameter
     if request.method == 'POST':
         selected = request.form.get('selected')
+        if selected:
+            # Redirect to GET request with selected as query parameter
+            return redirect(url_for('.node_list', selected=selected))
+        return redirect(url_for('.node_list'))
 
     # Template now loads data via JavaScript from /api/v1/nodes and /api/v1/cluster/metrics
     return render_template('cluster/node.html.j2')

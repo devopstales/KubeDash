@@ -301,10 +301,17 @@
         
         const namespace = getSelectedNamespace();
         
+        // Get selected ingress from URL
+        const urlParams = new URLSearchParams(window.location.search);
+        const selectedIngress = urlParams.get('selected');
+        
         const rows = ingresses.map(ingress => {
             const name = escapeHtml(ingress.name || '');
             const ingressClass = ingress.ingressClass || '';
             const hosts = ingress.hosts || [];
+            
+            const isSelected = selectedIngress === ingress.name;
+            const rowClass = isSelected ? 'selected' : '';
             
             let ingressClassCell = '<td>-</td>';
             if (ingressClass) {
@@ -325,12 +332,13 @@
             }
             
             return `
-                <tr>
+                <tr class="${rowClass}">
                     <td>
                         <form action="/network/ingress/data" method="POST" onsubmit="sessionStorage.setItem('ns_select', '${escapeHtml(namespace)}'); return true;">
                             <input type="hidden" name="csrf_token" value="${escapeHtml(csrf_token)}">
                             <input type="hidden" name="ns_select" value="${escapeHtml(namespace)}" />
                             <input type="hidden" name="i_name" value="${name}" />
+                            <input type="hidden" name="selected" value="${name}" />
                             <a href="javascript:;" onclick="parentNode.submit();">${name}</a>
                         </form>
                     </td>
@@ -344,7 +352,32 @@
         
         // Initialize DataTables after a short delay to ensure DOM is updated
         setTimeout(function() {
-        safeInitDataTable('#ingressTable', [0, "asc"]);
+            safeInitDataTable('#ingressTable', [0, "asc"]);
+            
+            // Navigate to selected row if present
+            if (selectedIngress && typeof $ !== 'undefined' && $.fn.DataTable) {
+                setTimeout(function() {
+                    if ($.fn.DataTable.isDataTable('#ingressTable')) {
+                        const dataTable = $('#ingressTable').DataTable();
+                        let foundRowIndex = -1;
+                        dataTable.rows().every(function(rowIdx) {
+                            const rowNode = this.node();
+                            const rowName = $(rowNode).find('input[name="selected"]').val();
+                            if (rowName === selectedIngress) {
+                                foundRowIndex = rowIdx;
+                                return false; // break
+                            }
+                            return true;
+                        });
+                        
+                        if (foundRowIndex >= 0) {
+                            const pageLength = dataTable.page.len();
+                            const targetPage = Math.floor(foundRowIndex / pageLength);
+                            dataTable.page(targetPage).draw('page');
+                        }
+                    }
+                }, 200);
+            }
         }, 100);
     }
     

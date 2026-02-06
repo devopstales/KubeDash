@@ -197,11 +197,31 @@
                     }
                     
                     // Initialize DataTables
-                    $('#dataTable').DataTable({
+                    const dataTable = $('#dataTable').DataTable({
                         responsive: true,
                         order: [[0, 'asc']],
                         pageLength: 25
                     });
+                    
+                    // Navigate to selected row if present
+                    if (selectedDaemonSet) {
+                        let foundRowIndex = -1;
+                        dataTable.rows().every(function(rowIdx) {
+                            const rowNode = this.node();
+                            const rowName = $(rowNode).find('input[name="selected"]').val();
+                            if (rowName === selectedDaemonSet) {
+                                foundRowIndex = rowIdx;
+                                return false; // break
+                            }
+                            return true;
+                        });
+                        
+                        if (foundRowIndex >= 0) {
+                            const pageLength = dataTable.page.len();
+                            const targetPage = Math.floor(foundRowIndex / pageLength);
+                            dataTable.page(targetPage).draw('page');
+                        }
+                    }
                 } catch (e) {
                     console.warn('Error initializing DataTable:', e);
                 }

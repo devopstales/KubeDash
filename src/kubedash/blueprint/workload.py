@@ -52,11 +52,21 @@ def pod_list():
     Data is now loaded client-side via JavaScript API calls.
     This route only renders the template structure.
     """
-    # Handle POST requests for backward compatibility
+    # Handle POST requests (from form submission) - redirect to GET with selected parameter
     if request.method == 'POST':
         selected = request.form.get('selected')
         if 'ns_select' in request.form:
             session['ns_select'] = request.form.get('ns_select')
+        
+        # Build query parameters
+        params = {}
+        if selected:
+            params['selected'] = selected
+        
+        # Redirect to GET request with parameters
+        if params:
+            return redirect(url_for('.pod_list', **params))
+        return redirect(url_for('.pod_list'))
 
     # Get namespaces for topbar selector
     user_token = get_user_token(session)
@@ -226,11 +236,21 @@ def statefulsets():
     Data is now loaded client-side via JavaScript API calls.
     This route only renders the template structure.
     """
-    # Handle POST requests for backward compatibility
+    # Handle POST requests (from form submission) - redirect to GET with selected parameter
     if request.method == 'POST':
         if 'ns_select' in request.form:
             session['ns_select'] = request.form.get('ns_select')
         selected = request.form.get('selected', None)
+        
+        # Build query parameters
+        params = {}
+        if selected:
+            params['selected'] = selected
+        
+        # Redirect to GET request with parameters
+        if params:
+            return redirect(url_for('.statefulsets', **params))
+        return redirect(url_for('.statefulsets'))
 
     # Get namespaces for topbar selector
     user_token = get_user_token(session)
@@ -300,11 +320,21 @@ def daemonsets():
     Data is now loaded client-side via JavaScript API calls.
     This route only renders the template structure.
     """
-    # Handle POST requests for backward compatibility
+    # Handle POST requests (from form submission) - redirect to GET with selected parameter
     if request.method == 'POST':
         if 'ns_select' in request.form:
             session['ns_select'] = request.form.get('ns_select')
         selected = request.form.get('selected')
+        
+        # Build query parameters
+        params = {}
+        if selected:
+            params['selected'] = selected
+        
+        # Redirect to GET request with parameters
+        if params:
+            return redirect(url_for('.daemonsets', **params))
+        return redirect(url_for('.daemonsets'))
 
     # Get namespaces for topbar selector
     user_token = get_user_token(session)
@@ -383,11 +413,21 @@ def deployments():
     Data is now loaded client-side via JavaScript API calls.
     This route only renders the template structure.
     """
-    # Handle POST requests for backward compatibility
+    # Handle POST requests (from form submission) - redirect to GET with selected parameter
     if request.method == 'POST':
         if 'ns_select' in request.form:
             session['ns_select'] = request.form.get('ns_select')
         selected = request.form.get('selected')
+        
+        # Build query parameters
+        params = {}
+        if selected:
+            params['selected'] = selected
+        
+        # Redirect to GET request with parameters
+        if params:
+            return redirect(url_for('.deployments', **params))
+        return redirect(url_for('.deployments'))
 
     # Get namespaces for topbar selector
     user_token = get_user_token(session)
@@ -457,11 +497,21 @@ def replicasets():
     Data is now loaded client-side via JavaScript API calls.
     This route only renders the template structure.
     """
-    # Handle POST requests for backward compatibility
+    # Handle POST requests (from form submission) - redirect to GET with selected parameter
     if request.method == 'POST':
         if 'ns_select' in request.form:
             session['ns_select'] = request.form.get('ns_select')
         selected = request.form.get('selected')
+        
+        # Build query parameters
+        params = {}
+        if selected:
+            params['selected'] = selected
+        
+        # Redirect to GET request with parameters
+        if params:
+            return redirect(url_for('.replicasets', **params))
+        return redirect(url_for('.replicasets'))
 
     # Get namespaces for topbar selector
     user_token = get_user_token(session)

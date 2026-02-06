@@ -33,11 +33,21 @@ def service_accounts():
     Data is now loaded client-side via JavaScript API calls.
     This route only renders the template structure.
     """
-    # Handle POST requests for backward compatibility
+    # Handle POST requests (from form submission) - redirect to GET with selected parameter
     if request.method == 'POST':
         if 'ns_select' in request.form:
             session['ns_select'] = request.form.get('ns_select')
         selected = request.form.get('selected')
+        
+        # Build query parameters
+        params = {}
+        if selected:
+            params['selected'] = selected
+        
+        # Redirect to GET request with parameters
+        if params:
+            return redirect(url_for('cluster_permission.service_accounts', **params))
+        return redirect(url_for('cluster_permission.service_accounts'))
 
     # Get namespaces for topbar selector
     user_token = get_user_token(session)
@@ -61,11 +71,21 @@ def roles():
     Data is now loaded client-side via JavaScript API calls.
     This route only renders the template structure.
     """
-    # Handle POST requests for backward compatibility
+    # Handle POST requests (from form submission) - redirect to GET with selected parameter
     if request.method == 'POST':
         if 'ns_select' in request.form:
             session['ns_select'] = request.form.get('ns_select')
         selected = request.form.get('selected')
+        
+        # Build query parameters
+        params = {}
+        if selected:
+            params['selected'] = selected
+        
+        # Redirect to GET request with parameters
+        if params:
+            return redirect(url_for('cluster_permission.roles', **params))
+        return redirect(url_for('cluster_permission.roles'))
 
     # Get namespaces for topbar selector
     user_token = get_user_token(session)
@@ -114,11 +134,21 @@ def role_bindings():
     Data is now loaded client-side via JavaScript API calls.
     This route only renders the template structure.
     """
-    # Handle POST requests for backward compatibility
+    # Handle POST requests (from form submission) - redirect to GET with selected parameter
     if request.method == 'POST':
         if 'ns_select' in request.form:
             session['ns_select'] = request.form.get('ns_select')
-        selected = request.form.get('rb_name')
+        selected = request.form.get('selected') or request.form.get('rb_name')
+        
+        # Build query parameters
+        params = {}
+        if selected:
+            params['selected'] = selected
+        
+        # Redirect to GET request with parameters
+        if params:
+            return redirect(url_for('cluster_permission.role_bindings', **params))
+        return redirect(url_for('cluster_permission.role_bindings'))
 
     # Get namespaces for topbar selector
     user_token = get_user_token(session)
@@ -141,9 +171,19 @@ def cluster_roles():
     Data is now loaded client-side via JavaScript API calls.
     This route only renders the template structure.
     """
-    # Handle POST requests for backward compatibility
+    # Handle POST requests (from form submission) - redirect to GET with selected parameter
     if request.method == 'POST':
         selected = request.form.get('selected')
+        
+        # Build query parameters
+        params = {}
+        if selected:
+            params['selected'] = selected
+        
+        # Redirect to GET request with parameters
+        if params:
+            return redirect(url_for('cluster_permission.cluster_roles', **params))
+        return redirect(url_for('cluster_permission.cluster_roles'))
 
     # Cluster roles are cluster-scoped, no namespace selector needed
     # Template now loads data via JavaScript from /api/v1/rbac/cluster-roles
@@ -181,9 +221,19 @@ def cluster_role_bindings():
     Data is now loaded client-side via JavaScript API calls.
     This route only renders the template structure.
     """
-    # Handle POST requests for backward compatibility
+    # Handle POST requests (from form submission) - redirect to GET with selected parameter
     if request.method == 'POST':
-        crb_name = request.form.get('crb_name')
+        selected = request.form.get('selected') or request.form.get('crb_name')
+        
+        # Build query parameters
+        params = {}
+        if selected:
+            params['selected'] = selected
+        
+        # Redirect to GET request with parameters
+        if params:
+            return redirect(url_for('cluster_permission.cluster_role_bindings', **params))
+        return redirect(url_for('cluster_permission.cluster_role_bindings'))
 
     # Cluster role bindings are cluster-scoped, no namespace selector needed
     # Template now loads data via JavaScript from /api/v1/rbac/cluster-role-bindings

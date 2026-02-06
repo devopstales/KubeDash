@@ -210,6 +210,7 @@
                         <form action="/cluster/node/data" method="POST" onsubmit="sessionStorage.setItem('node_data_name', '${nodeName}'); return true;">
                             <input type="hidden" name="csrf_token" value="${escapeHtml(csrf_token)}">
                             <input type="hidden" name="no_name" value="${nodeName}" />
+                            <input type="hidden" name="selected" value="${nodeName}" />
                             <a href="javascript:;" onclick="parentNode.submit();">${nodeName}</a>
                         </form>
                     </td>
@@ -237,11 +238,31 @@
                     }
                     
                     // Initialize DataTables
-                    $('#dataTable').DataTable({
+                    const dataTable = $('#dataTable').DataTable({
                         responsive: true,
                         order: [[1, 'asc']],
                         pageLength: 25
                     });
+                    
+                    // Navigate to selected row if present
+                    if (selectedNode) {
+                        let foundRowIndex = -1;
+                        dataTable.rows().every(function(rowIdx) {
+                            const rowNode = this.node();
+                            const rowName = $(rowNode).find('input[name="selected"]').val();
+                            if (rowName === selectedNode) {
+                                foundRowIndex = rowIdx;
+                                return false; // break
+                            }
+                            return true;
+                        });
+                        
+                        if (foundRowIndex >= 0) {
+                            const pageLength = dataTable.page.len();
+                            const targetPage = Math.floor(foundRowIndex / pageLength);
+                            dataTable.page(targetPage).draw('page');
+                        }
+                    }
                 } catch (e) {
                     console.warn('Error initializing DataTable:', e);
                 }

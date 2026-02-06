@@ -30,11 +30,21 @@ def secrets():
     Data is now loaded client-side via JavaScript API calls.
     This route only renders the template structure.
     """
-    # Handle POST requests for backward compatibility
+    # Handle POST requests (from form submission) - redirect to GET with selected parameter
     if request.method == 'POST':
         if 'ns_select' in request.form:
             session['ns_select'] = request.form.get('ns_select')
         selected = request.form.get('selected')
+        
+        # Build query parameters
+        params = {}
+        if selected:
+            params['selected'] = selected
+        
+        # Redirect to GET request with parameters
+        if params:
+            return redirect(url_for('security.secrets', **params))
+        return redirect(url_for('security.secrets'))
 
     # Get namespaces for topbar selector
     user_token = get_user_token(session)
@@ -74,11 +84,21 @@ def policies_list():
     Data is now loaded client-side via JavaScript API calls.
     This route only renders the template structure.
     """
-    # Handle POST requests for backward compatibility
+    # Handle POST requests (from form submission) - redirect to GET with selected parameter
     if request.method == 'POST':
         if 'ns_select' in request.form:
             session['ns_select'] = request.form.get('ns_select')
         selected = request.form.get('selected')
+        
+        # Build query parameters
+        params = {}
+        if selected:
+            params['selected'] = selected
+        
+        # Redirect to GET request with parameters
+        if params:
+            return redirect(url_for('security.policies_list', **params))
+        return redirect(url_for('security.policies_list'))
 
     # Get namespaces for topbar selector
     user_token = get_user_token(session)
@@ -117,9 +137,19 @@ def priorityclass_list():
     Data is now loaded client-side via JavaScript API calls.
     This route only renders the template structure.
     """
-    # Handle POST requests for backward compatibility
+    # Handle POST requests (from form submission) - redirect to GET with selected parameter
     if request.method == 'POST':
         selected = request.form.get('selected')
+        
+        # Build query parameters
+        params = {}
+        if selected:
+            params['selected'] = selected
+        
+        # Redirect to GET request with parameters
+        if params:
+            return redirect(url_for('security.priorityclass_list', **params))
+        return redirect(url_for('security.priorityclass_list'))
 
     # Template now loads data via JavaScript from /api/v1/other-resources/priority-classes
     return render_template('security/priority-class.html.j2')
