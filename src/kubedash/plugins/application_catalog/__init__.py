@@ -3,6 +3,7 @@
 from flask import (
     Blueprint,
     current_app,
+    redirect,
     render_template,
     url_for,
 )
@@ -11,7 +12,7 @@ from flask_login import login_required
 
 from lib.helper_functions import get_logger, is_valid_url, ErrorHandler
 
-from .helpers import application_links_init, update_security_policies
+from .helpers import application_links_init, update_security_policies, discover_ingress_applications
 from .application import ApplicationGet
 
 ##############################################################
@@ -65,27 +66,21 @@ def initialize_application_catalog(app):
             # Sync database with config file
             application_links_init(app_config)
             
-            # Build applications list for CSP update
+            # Discover and register ingresses with application-catalog annotation
+            discover_ingress_applications()
+            
+            # Build applications list for CSP update from all sources (config + discovered ingresses)
+            # Get all enabled applications from database (includes both config and discovered)
+            from .application import ApplicationListGet
+            all_apps = ApplicationListGet(enabled_only=True)
             applications = []
-            if hasattr(app_config, "has_section") and app_config.has_section("application_list"):
-                section = app_config["application_list"]
-                app_map = {}
-                for key, value in section.items():
-                    match = re.match(r"app_(\d+)_(name|url|icon|embed|enable|enabled)$", key)
-                    if not match:
-                        continue
-                    index, field = match.groups()
-                    # Normalize 'enabled' to 'enable'
-                    if field == 'enabled':
-                        field = 'enable'
-                    app_map.setdefault(index, {})[field] = value
-                for index, data in app_map.items():
-                    applications.append({
-                        "name": data.get("name"),
-                        "url": data.get("url"),
-                        "enable": section.getboolean(f"app_{index}_enable", fallback=True),
-                        "embed": section.getboolean(f"app_{index}_embed", fallback=False),
-                    })
+            for app_obj in all_apps:
+                applications.append({
+                    "name": app_obj.application_name,
+                    "url": app_obj.application_url,
+                    "enable": app_obj.application_enabled,
+                    "embed": app_obj.application_embedded,
+                })
 
             # Update CSP with embedded applications
             update_security_policies(app, applications)
@@ -142,4 +137,11 @@ def _render_app_embed(app_name):
 @application_catalog_bp.route('/<app_name>/', methods=['GET'])
 @login_required
 def embedded_app(app_name):
+    app_object = ApplicationGet(app_name)
+    
+    # If app is not embedded, redirect directly to the URL
+    if app_object and app_object.application_url:
+        if not (app_object.application_enabled and app_object.application_embedded):
+            return redirect(app_object.application_url)
+    
     return _render_app_embed(app_name)

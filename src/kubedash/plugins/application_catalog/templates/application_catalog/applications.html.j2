@@ -255,13 +255,17 @@
                        <button class="btn btn-sm btn-danger" onclick="deleteApplication('${nameForJs}')">Delete</button>`
                     : '-';
                 
+                // If embedded, use catalog route; if not embedded, use direct URL in new tab
                 const linkTarget = app.application_enabled
-                    ? `/plugins/app-catalog/${encodeURIComponent(app.application_name)}`
+                    ? (app.application_embedded 
+                        ? `/plugins/app-catalog/${encodeURIComponent(app.application_name)}`
+                        : app.application_url)
                     : app.application_url;
                 const iconSrc = getIconSrc(app.application_icon);
                 const iconHtml = iconSrc
                     ? `<img src="${escapeHtml(iconSrc)}" alt="${escapeHtml(app.application_name)} icon" style="height: 24px; width: 24px;">`
                     : '';
+                // Non-embedded apps open in new tab
                 const linkAttrs = app.application_embedded ? '' : 'target="_blank" rel="noopener"';
                 row.innerHTML = `
                     <td><a href="${escapeHtml(linkTarget)}" ${linkAttrs}>${escapeHtml(app.application_name)}</a></td>

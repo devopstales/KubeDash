@@ -161,3 +161,220 @@ def update_security_policies(app, applications):
         
     except Exception as error:
         ErrorHandler(logger, error, f"Error updating security policies: {error}")
+
+
+def discover_ingress_applications():
+    """
+    Discover ingresses from all namespaces that have the application-catalog annotation
+    and register them as applications in the database.
+    
+    Looks for ingresses with annotation: metadata.k8s.io/application-catalog = "true"
+    """
+    try:
+        from kubernetes import client as k8s_client
+        from kubernetes.client.rest import ApiException
+        from lib.k8s.server import k8sClientConfigGet
+        from lib.components import db
+        from sqlalchemy.exc import IntegrityError
+        
+        # Use Admin role to access Kubernetes API
+        k8sClientConfigGet("Admin", None)
+        
+        # List all ingresses across all namespaces
+        networking_api = k8s_client.NetworkingV1Api()
+        ingress_list = networking_api.list_ingress_for_all_namespaces(_request_timeout=10)
+        
+        discovered_count = 0
+        registered_count = 0
+        
+        for ingress in ingress_list.items:
+            # Check for the application-catalog annotation
+            annotations = ingress.metadata.annotations or {}
+            app_catalog_annotation = annotations.get("metadata.k8s.io/application-catalog", "").lower()
+            
+            if app_catalog_annotation != "true":
+                continue
+            
+            discovered_count += 1
+            
+            # Extract application name from annotation (required)
+            app_name = annotations.get("metadata.k8s.io/application-catalog-name")
+            if not app_name:
+                logger.warning(f"Ingress {ingress.metadata.namespace}/{ingress.metadata.name} has application-catalog annotation but missing metadata.k8s.io/application-catalog-name, skipping")
+                continue
+            
+            # Construct URL from ingress
+            app_url = _extract_url_from_ingress(ingress)
+            if not app_url:
+                logger.warning(f"Could not extract URL from ingress {ingress.metadata.namespace}/{ingress.metadata.name}, skipping")
+                continue
+            
+            # Extract optional fields from annotations
+            # Default: enabled=true, embedded=false
+            app_icon = annotations.get("metadata.k8s.io/application-catalog-icon")
+            app_enabled_str = annotations.get("metadata.k8s.io/application-catalog-enabled", "true").lower()
+            app_enabled = app_enabled_str in ("true", "1", "yes")
+            app_embedded_str = annotations.get("metadata.k8s.io/application-catalog-embedded", "false").lower()
+            app_embedded = app_embedded_str in ("true", "1", "yes")
+            
+            # Register in database
+            try:
+                with db.session.no_autoflush:
+                    # Priority: URL is unique and ingress points to this URL, so URL is source of truth
+                    # Check if URL already exists
+                    existing_by_url = ApplicationCatalog.query.filter_by(
+                        application_url=app_url
+                    ).first()
+                    
+                    if existing_by_url:
+                        # URL exists - always update this application from ingress (ingress points to this URL)
+                        # Check if name would conflict before updating
+                        existing_by_name = ApplicationCatalog.query.filter_by(
+                            application_name=app_name
+                        ).first()
+                        
+                        if existing_by_name and existing_by_name.id != existing_by_url.id:
+                            # Name already exists on different application - don't update name, just other fields
+                            if app_icon:
+                                existing_by_url.application_icon = app_icon
+                            existing_by_url.application_enabled = app_enabled
+                            existing_by_url.application_embedded = app_embedded
+                            logger.debug(f"Updated existing application (URL: {app_url}, kept existing name due to conflict) from ingress {ingress.metadata.namespace}/{ingress.metadata.name}")
+                        else:
+                            # No name conflict - update all fields including name
+                            existing_by_url.application_name = app_name
+                            if app_icon:
+                                existing_by_url.application_icon = app_icon
+                            existing_by_url.application_enabled = app_enabled
+                            existing_by_url.application_embedded = app_embedded
+                            logger.debug(f"Updated existing application (URL: {app_url}) from ingress {ingress.metadata.namespace}/{ingress.metadata.name}")
+                    else:
+                        # URL doesn't exist, check if name exists
+                        existing_by_name = ApplicationCatalog.query.filter_by(
+                            application_name=app_name
+                        ).first()
+                        
+                        if existing_by_name:
+                            # Name exists but URL is different and not used - update from ingress
+                            existing_by_name.application_url = app_url
+                            if app_icon:
+                                existing_by_name.application_icon = app_icon
+                            existing_by_name.application_enabled = app_enabled
+                            existing_by_name.application_embedded = app_embedded
+                            logger.debug(f"Updated existing application '{app_name}' (changed URL to {app_url}) from ingress {ingress.metadata.namespace}/{ingress.metadata.name}")
+                        else:
+                            # Create new application from ingress
+                            new_app = ApplicationCatalog(
+                                application_name=app_name,
+                                application_url=app_url,
+                                application_icon=app_icon if app_icon else None,
+                                application_enabled=app_enabled,
+                                application_embedded=app_embedded
+                            )
+                            db.session.add(new_app)
+                            logger.debug(f"Created new application '{app_name}' from ingress {ingress.metadata.namespace}/{ingress.metadata.name}")
+                
+                # Commit each application individually to handle race conditions
+                try:
+                    db.session.commit()
+                    registered_count += 1
+                except IntegrityError as e:
+                    # Handle race condition or constraint violation
+                    db.session.rollback()
+                    # Check again after rollback - prioritize URL
+                    existing_by_url = ApplicationCatalog.query.filter_by(
+                        application_url=app_url
+                    ).first()
+                    
+                    if existing_by_url:
+                        # URL exists - always update this application (ingress points to this URL)
+                        # Check if name would conflict
+                        existing_by_name = ApplicationCatalog.query.filter_by(
+                            application_name=app_name
+                        ).first()
+                        
+                        if existing_by_name and existing_by_name.id != existing_by_url.id:
+                            # Name conflict - don't update name, just other fields
+                            if app_icon:
+                                existing_by_url.application_icon = app_icon
+                            existing_by_url.application_enabled = app_enabled
+                            existing_by_url.application_embedded = app_embedded
+                        else:
+                            # No conflict - update all fields
+                            existing_by_url.application_name = app_name
+                            if app_icon:
+                                existing_by_url.application_icon = app_icon
+                            existing_by_url.application_enabled = app_enabled
+                            existing_by_url.application_embedded = app_embedded
+                        db.session.commit()
+                        registered_count += 1
+                    else:
+                        # Check by name only if URL doesn't exist
+                        existing_by_name = ApplicationCatalog.query.filter_by(
+                            application_name=app_name
+                        ).first()
+                        if existing_by_name:
+                            # Name exists and URL doesn't - safe to update URL
+                            existing_by_name.application_url = app_url
+                            if app_icon:
+                                existing_by_name.application_icon = app_icon
+                            existing_by_name.application_enabled = app_enabled
+                            existing_by_name.application_embedded = app_embedded
+                            db.session.commit()
+                            registered_count += 1
+                        else:
+                            logger.warning(f"Failed to create or update application '{app_name}' from ingress: {e}")
+                            # Re-raise if it's not a duplicate key error
+                            if "duplicate key" not in str(e).lower() and "unique constraint" not in str(e).lower():
+                                raise
+            except Exception as e:
+                db.session.rollback()
+                logger.warning(f"Error registering application '{app_name}' from ingress {ingress.metadata.namespace}/{ingress.metadata.name}: {e}")
+                continue
+        
+        if discovered_count > 0:
+            logger.info(f"Discovered {discovered_count} ingresses with application-catalog annotation, registered {registered_count} applications")
+        else:
+            logger.debug("No ingresses found with application-catalog annotation")
+            
+    except ApiException as error:
+        if error.status == 403:
+            logger.warning("Permission denied when listing ingresses. Application catalog ingress discovery skipped.")
+        else:
+            ErrorHandler(logger, error, f"Error discovering ingress applications: {error}")
+    except Exception as error:
+        ErrorHandler(logger, error, f"Error discovering ingress applications: {error}")
+
+
+def _extract_url_from_ingress(ingress):
+    """
+    Extract URL from an ingress resource.
+    Uses the first host from ingress rules.
+    If TLS is configured, uses https, otherwise http.
+    
+    Args:
+        ingress: Kubernetes V1Ingress object
+        
+    Returns:
+        str: Constructed URL (scheme://host) or None if cannot be determined
+    """
+    try:
+        # Determine scheme based on TLS configuration
+        scheme = "https" if ingress.spec.tls else "http"
+        
+        # Get the first host from ingress rules
+        if not ingress.spec.rules or len(ingress.spec.rules) == 0:
+            return None
+        
+        first_rule = ingress.spec.rules[0]
+        host = first_rule.host
+        if not host:
+            return None
+        
+        # Construct URL using just the host (no path)
+        url = f"{scheme}://{host}"
+        return url
+        
+    except Exception as e:
+        logger.warning(f"Error extracting URL from ingress: {e}")
+        return None
