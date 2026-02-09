@@ -1,18 +1,22 @@
 # syntax = docker/dockerfile:1.2
 # ========== Stage 1: Base Image ==========
 ARG BUILDPLATFORM=linux/amd64
-FROM --platform=$BUILDPLATFORM amazonlinux:2023 AS base
+FROM --platform=$BUILDPLATFORM public.ecr.aws/amazonlinux/amazonlinux:2023 AS base
 
+# dist upgrade all packages to the latest version
+RUN dnf clean all && dnf update -y --releasever=latest
 
 ENV PYTHON_VERSION=3.12
 
 RUN --mount=type=cache,target=/var/cache/dnf \
+    dnf makecache && \
     dnf -y update && \
     dnf install -y python${PYTHON_VERSION} python${PYTHON_VERSION}-pip shadow-utils && \
     update-alternatives --install /usr/bin/python python /usr/bin/python${PYTHON_VERSION} 20 && \
     update-alternatives --install /usr/bin/pip pip /usr/bin/pip-${PYTHON_VERSION} 20 && \
     update-alternatives --install /usr/bin/pip3 pip3 /usr/bin/pip-${PYTHON_VERSION} 20 && \
     update-alternatives --set python /usr/bin/python${PYTHON_VERSION} && \
+    dnf -y update && \
     dnf clean all
 
 # ========== Stage 2: Build Image ==========
@@ -21,8 +25,10 @@ FROM base AS builder
 WORKDIR /code
 COPY requirements.txt  /code/
 
-# Install system dependencies
-RUN dnf install -y \
+# Install system dependencies and ensure all packages are up to date
+RUN dnf makecache && \
+    dnf -y update && \
+    dnf install -y \
     postgresql-libs \
     gcc \
     python3-devel \
@@ -32,9 +38,10 @@ RUN dnf install -y \
     openblas-devel \
     libffi-devel \
     make \
-    && dnf clean all
+    && dnf -y update && \
+    dnf clean all
 
-RUN pip install --no-cache-dir --prefix=/install-dir -U "pip>=25.3" "setuptools>=78.1.1" "wheel>=0.46.2" && \
+RUN pip install --no-cache-dir --prefix=/install-dir -U "pip>=26.0" "setuptools>=78.1.1" "wheel>=0.46.2" && \
     /install-dir/bin/pip install --no-cache-dir --prefix=/install-dir -r requirements.txt
 
 # ========== Stage 3: Runtime Image ==========
@@ -65,8 +72,10 @@ WORKDIR /code/kubedash
 COPY --from=builder /install-dir /usr/local
 ENV PATH=/usr/local/bin:$PATH
 
-# Update the system
+# Update the system to ensure all security patches are applied
+# This updates all packages including: libcap, libtasn1, libxml2, openssl, python3-pip packages
 RUN --mount=type=cache,target=/var/cache/dnf \
+    dnf makecache && \
     dnf -y update && \
     dnf clean all
 

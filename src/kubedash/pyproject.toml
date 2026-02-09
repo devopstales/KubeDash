@@ -57,7 +57,7 @@ flask-caching = "^2.3.1"
 plotly = "^6.0.0"
 redis = "^5.2.1"
 colorlog = "^6.9.0"
-protobuf = "^5.29.5"
+protobuf = "^5.29.6"
 statsd = "^4.0.1"
 prometheus-client = "^0.22.1"
 gunicorn = {extras = ["statsd"], version = "^23.0.0"}
@@ -75,13 +75,15 @@ wrapt = "^1.17.2"
 bs4 = "^0.0.2"
 validators = "^0.35.0"
 # Security fixes for transitive dependencies
-authlib = "^1.6.5"
+authlib = "^1.6.6"  # Fixed CVE-2025-68158
 python-socketio = "^5.14.0"
 fonttools = "^4.60.2"
 brotli = "^1.2.0"
 marshmallow = "^4.1.2"
 pyasn1 = "^0.6.2"
 tinycss2 = "^1.5.0"
+safety = "^3.7.0"
+detect-secrets = "^1.5.0"
 
 
 [tool.poetry.group.dev.dependencies]
@@ -93,7 +95,9 @@ pip-audit = "^2.4.4"
 autoflake = "^1.6.1"
 safety = "^3.3.1"
 flake8 = "^7.1.2"
-pip = ">=25.3"
+pip = ">=26.0"
+bandit = "^1.7.5"
+GitPython = "^3.1.0"
 
 #[tool.poetry.requires-plugins]
 #poetry-plugin-export = ">=1.8"

@@ -12,7 +12,7 @@ from flask_login import login_required
 
 from lib.helper_functions import get_logger, is_valid_url, ErrorHandler
 
-from .helpers import application_links_init, update_security_policies, discover_ingress_applications
+from .helpers import application_links_init, update_security_policies, discover_ingress_applications, discover_service_applications
 from .application import ApplicationGet
 
 ##############################################################
@@ -68,6 +68,9 @@ def initialize_application_catalog(app):
             
             # Discover and register ingresses with application-catalog annotation
             discover_ingress_applications()
+            
+            # Discover and register services with application-catalog annotation
+            discover_service_applications()
             
             # Build applications list for CSP update from all sources (config + discovered ingresses)
             # Get all enabled applications from database (includes both config and discovered)

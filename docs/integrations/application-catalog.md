@@ -32,13 +32,14 @@ Applications can be embedded directly in KubeDash pages using iframes. The plugi
 
 ### Configuration Sync
 
-Applications can be configured in three ways:
+Applications can be configured in four ways:
 
 1. **Configuration File**: Define applications in `kubedash.ini` under `[application_list]` section
 2. **Kubernetes Ingress Annotations**: Automatically discover applications from Ingress resources with annotations
-3. **Database**: Manage applications through the UI or API, stored in the database
+3. **Kubernetes Service Annotations**: Automatically discover applications from Service resources with annotations
+4. **Database**: Manage applications through the UI or API, stored in the database
 
-The plugin automatically syncs configuration file entries and discovers Ingress-based applications on startup.
+The plugin automatically syncs configuration file entries and discovers Ingress and Service-based applications on startup.
 
 ### Kubernetes Ingress Discovery
 
@@ -89,7 +90,7 @@ metadata:
     # Enable application catalog discovery
     metadata.k8s.io/application-catalog: "true"
     # Application name (required)
-    metadata.k8s.io/application-catalog-name: "Jaeger Tracing"
+    metadata.k8s.io/application-catalog-name: "Jaeger"
     # Optional: Icon URL
     metadata.k8s.io/application-catalog-icon: "https://www.jaegertracing.io/img/jaeger-icon.svg"
     # Optional: Enable embedding in iframe
@@ -160,6 +161,125 @@ If the KubeDash service account doesn't have these permissions, discovery will b
 
 **Application not updating:**
 - Changes to Ingress annotations require a KubeDash restart
+- Check for name or URL conflicts in the database
+- Review KubeDash logs for update errors
+
+### Kubernetes Service Discovery
+
+The Application Catalog plugin can automatically discover and register applications from Kubernetes Service resources. This allows you to manage applications declaratively using Kubernetes annotations, making it easy to integrate services deployed in your cluster.
+
+#### How It Works
+
+On startup, the plugin scans all Service resources across all namespaces looking for the `metadata.k8s.io/application-catalog` annotation. When found, it automatically extracts application information and registers it in the catalog.
+
+#### Required Annotations
+
+To enable automatic discovery for a Service, add the following annotations:
+
+| Annotation | Required | Description | Example |
+|------------|----------|-------------|---------|
+| `metadata.k8s.io/application-catalog` | Yes | Must be set to `"true"` to enable discovery | `"true"` |
+| `metadata.k8s.io/application-catalog-name` | Yes | Display name for the application in the catalog | `"Grafana Dashboard"` |
+
+#### Optional Annotations
+
+Additional annotations can be used to customize the application:
+
+| Annotation | Required | Default | Description | Example |
+|------------|----------|---------|-------------|---------|
+| `metadata.k8s.io/application-catalog-icon` | No | None | URL to the application icon | `"https://example.com/icon.svg"` |
+| `metadata.k8s.io/application-catalog-enabled` | No | `"true"` | Whether the application is enabled (`"true"`/`"false"`) | `"true"` |
+| `metadata.k8s.io/application-catalog-embedded` | No | `"true"` | Whether to embed in iframe (`"true"`/`"false"`) | `"false"` |
+
+!!! note
+    For Services, the `embedded` option defaults to `"true"` (unlike Ingress where it defaults to `"false"`). This can be overridden using the `metadata.k8s.io/application-catalog-embedded` annotation.
+
+#### URL Construction
+
+The application URL is automatically constructed from the Service resource:
+
+- **LoadBalancer Services**: Uses external IP or hostname from `status.load_balancer.ingress` if available
+- **Other Service Types**: Uses Kubernetes service DNS name format: `http://service-name.namespace.svc.cluster.local:port`
+- **Scheme**: Defaults to `http` (services don't have TLS configuration in spec)
+- **Port**: Uses the first port from the service spec
+
+#### Example Service Resource
+
+Here's an example Service resource that will be automatically discovered:
+
+```yaml
+apiVersion: v1
+kind: Service
+metadata:
+  name: grafana-service
+  namespace: monitoring
+  annotations:
+    # Enable application catalog discovery
+    metadata.k8s.io/application-catalog: "true"
+    # Application name (required)
+    metadata.k8s.io/application-catalog-name: "Grafana"
+    # Optional: Icon URL
+    metadata.k8s.io/application-catalog-icon: "https://grafana.com/static/img/menu/grafana2.svg"
+    # Optional: Disable embedding (default: true for services)
+    metadata.k8s.io/application-catalog-embedded: "false"
+    # Optional: Enable/disable (default: true)
+    metadata.k8s.io/application-catalog-enabled: "true"
+spec:
+  type: LoadBalancer
+  ports:
+    - port: 3000
+      targetPort: 3000
+      protocol: TCP
+  selector:
+    app: grafana
+```
+
+This Service will be discovered and registered as:
+- **Name**: "Grafana Dashboard"
+- **URL**: `http://<external-ip>:3000` (if LoadBalancer) or `http://grafana-service.monitoring.svc.cluster.local:3000` (if ClusterIP)
+- **Icon**: `https://grafana.com/static/img/menu/grafana2.svg`
+- **Embedded**: `false` (overridden by annotation)
+- **Enabled**: `true`
+
+#### Discovery Process
+
+1. On KubeDash startup, the plugin queries the Kubernetes API for all Service resources
+2. Each Service is checked for the `metadata.k8s.io/application-catalog = "true"` annotation
+3. If found, the plugin extracts:
+   - Application name from `metadata.k8s.io/application-catalog-name`
+   - URL from the Service spec (LoadBalancer external IP or service DNS name + port)
+   - Optional fields from other annotations
+4. The application is registered or updated in the database
+5. If an application with the same URL already exists, it's updated with the new information
+
+#### Update Behavior
+
+- **URL-based matching**: If an application with the same URL already exists, it will be updated with information from the Service
+- **Name conflicts**: If the name conflicts with an existing application (different URL), the name is preserved and other fields are updated
+- **Automatic sync**: Changes to Service annotations require a KubeDash restart to be reflected
+
+#### Permissions
+
+The discovery process requires Kubernetes API access with permissions to:
+- List Service resources across all namespaces
+
+If the KubeDash service account doesn't have these permissions, discovery will be skipped with a warning message in the logs.
+
+#### Troubleshooting
+
+**Service not discovered:**
+- Verify the `metadata.k8s.io/application-catalog` annotation is set to `"true"` (case-insensitive)
+- Check that `metadata.k8s.io/application-catalog-name` is present
+- Ensure the Service has at least one port configured
+- Check KubeDash logs for discovery errors
+
+**URL incorrect:**
+- For LoadBalancer services, verify that external IP is assigned (check `kubectl get svc`)
+- For ClusterIP/NodePort services, the URL uses Kubernetes DNS format which works within the cluster
+- Verify the Service spec has ports configured
+
+**Application not updating:**
+- Changes to Service annotations require a KubeDash restart
 - Check for name or URL conflicts in the database
 - Review KubeDash logs for update errors
 

@@ -1078,7 +1078,7 @@ def initialize_app_security(app: Flask):
         'includeSubDomains': True
     }
 
-    app.config['SECRET_KEY'] = os.urandom(12).hex()
+    app.config['SECRET_KEY'] = os.urandom(34).hex()
     # add rootCA folder # MissingImplementation
     
     """Init Talisman"""
