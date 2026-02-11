@@ -81,7 +81,7 @@ opentelemetry-util-http==0.56b0 ; python_version >= "3.11" and python_version < 
 packaging==25.0 ; python_version >= "3.11" and python_version < "3.13"
 parso==0.8.4 ; python_version >= "3.11" and python_version < "3.13"
 pexpect==4.9.0 ; python_version >= "3.11" and python_version < "3.13" and sys_platform != "win32" and sys_platform != "emscripten"
-pillow==11.3.0 ; python_version >= "3.11" and python_version < "3.13"
+pillow==12.1.1 ; python_version >= "3.11" and python_version < "3.13"
 plotly==6.2.0 ; python_version >= "3.11" and python_version < "3.13"
 prometheus-client==0.22.1 ; python_version >= "3.11" and python_version < "3.13"
 prometheus-flask-exporter==0.23.1 ; python_version >= "3.11" and python_version < "3.13"
