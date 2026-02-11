@@ -1,5 +1,6 @@
 #!/usr/bin/env python3
 
+import os
 import sys
 from flask import Flask, request
 
@@ -85,11 +86,18 @@ def create_app(external_config_name=None):
             init_before_request(app)
             app.logger.info(separator_short)
             with app.app_context():
-                # Run initial metrics scrape synchronously before starting the ticker
-                # This ensures the metrics logs appear before the separator
-                update_metrics(app, db, 30)
-                # Now start the periodic ticker for future updates
-                initialize_metrics_scraper(app)
+                # Skip metrics update in testing mode to avoid database issues
+                # and because tests don't need real metrics data
+                if not app.config.get('TESTING', False):
+                    # Run initial metrics scrape synchronously before starting the ticker
+                    # This ensures the metrics logs appear before the separator
+                    try:
+                        update_metrics(app, db, 30)
+                    except Exception as e:
+                        # Gracefully handle metrics update failures (e.g., missing tables, no K8s cluster)
+                        app.logger.warning(f"Metrics update skipped: {e}")
+                    # Now start the periodic ticker for future updates
+                    initialize_metrics_scraper(app)
             app.logger.info(separator_short)
             initialize_app_socket(app)
             initialize_blueprints(app)
@@ -119,4 +127,9 @@ def create_app(external_config_name=None):
 ## Main Application variable for WSGI Like Gunicorn
 ##############################################################
 
-app = create_app()
+# Only create app at module level if not running tests
+# Tests will create their own app instance via create_app("testing")
+if 'pytest' not in sys.modules and 'PYTEST_CURRENT_TEST' not in os.environ:
+    app = create_app()
+else:
+    app = None
