@@ -5,6 +5,7 @@ from flask import g, Flask, request
 from lib.cache import cached_base, cached_base2
 from lib.helper_functions import get_logger
 from lib.prometheus import REQUEST_COUNT, REQUEST_LATENCY
+from lib.components import db
 
 ##############################################################
 ## Helpers
@@ -68,3 +69,8 @@ def init_before_request(app: Flask):
             response.headers['X-Request-ID'] = g.correlation_id
 
         return response
+    
+    @app.teardown_appcontext
+    def shutdown_session(exception=None):
+        """Remove database session after each request to prevent connection leaks"""
+        db.session.remove()

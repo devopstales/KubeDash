@@ -249,20 +249,32 @@ def flux_suspend():
     Suspend action for Flux objects.
     """
     if request.method == 'POST':
-        flux_object = json.loads(request.form.get('flux_object'))
-        user_token = get_user_token(session)
-        
-        SuspendAction(flux_object, session['user_role'], user_token)
-        
-        # Check if this came from detail view
-        if request.form.get('return_to_detail'):
-            return redirect(url_for('flux.get_flux_detail',
-                kind=flux_object.get('kind'),
-                namespace=flux_object.get('metadata', {}).get('namespace'),
-                name=flux_object.get('metadata', {}).get('name')
-            ))
-        
-        return redirect(url_for('flux.get_flux_objects'))
+        try:
+            flux_object_str = request.form.get('flux_object')
+            if not flux_object_str:
+                logger.error("Missing 'flux_object' in form data for suspend action")
+                return redirect(url_for('flux.get_flux_objects'))
+            
+            flux_object = json.loads(flux_object_str)
+            user_token = get_user_token(session)
+            
+            SuspendAction(flux_object, session['user_role'], user_token)
+            
+            # Check if this came from detail view
+            if request.form.get('return_to_detail'):
+                return redirect(url_for('flux.get_flux_detail',
+                    kind=flux_object.get('kind'),
+                    namespace=flux_object.get('metadata', {}).get('namespace'),
+                    name=flux_object.get('metadata', {}).get('name')
+                ))
+            
+            return redirect(url_for('flux.get_flux_objects'))
+        except json.JSONDecodeError as e:
+            logger.error(f"JSON decode error in flux_suspend: {str(e)}. Form data: {request.form.get('flux_object', '')[:200]}")
+            return redirect(url_for('flux.get_flux_objects'))
+        except Exception as e:
+            logger.error(f"Unexpected error in flux_suspend: {str(e)}", exc_info=True)
+            return redirect(url_for('flux.get_flux_objects'))
     else:
         return redirect(url_for('flux.get_flux_objects'))
     
@@ -274,20 +286,32 @@ def flux_resume():
     Resume action for Flux objects.
     """
     if request.method == 'POST':
-        flux_object = json.loads(request.form.get('flux_object'))
-        user_token = get_user_token(session)
-        
-        ResumeAction(flux_object, session['user_role'], user_token)
-        
-        # Check if this came from detail view
-        if request.form.get('return_to_detail'):
-            return redirect(url_for('flux.get_flux_detail',
-                kind=flux_object.get('kind'),
-                namespace=flux_object.get('metadata', {}).get('namespace'),
-                name=flux_object.get('metadata', {}).get('name')
-            ))
-        
-        return redirect(url_for('flux.get_flux_objects'))
+        try:
+            flux_object_str = request.form.get('flux_object')
+            if not flux_object_str:
+                logger.error("Missing 'flux_object' in form data for resume action")
+                return redirect(url_for('flux.get_flux_objects'))
+            
+            flux_object = json.loads(flux_object_str)
+            user_token = get_user_token(session)
+            
+            ResumeAction(flux_object, session['user_role'], user_token)
+            
+            # Check if this came from detail view
+            if request.form.get('return_to_detail'):
+                return redirect(url_for('flux.get_flux_detail',
+                    kind=flux_object.get('kind'),
+                    namespace=flux_object.get('metadata', {}).get('namespace'),
+                    name=flux_object.get('metadata', {}).get('name')
+                ))
+            
+            return redirect(url_for('flux.get_flux_objects'))
+        except json.JSONDecodeError as e:
+            logger.error(f"JSON decode error in flux_resume: {str(e)}. Form data: {request.form.get('flux_object', '')[:200]}")
+            return redirect(url_for('flux.get_flux_objects'))
+        except Exception as e:
+            logger.error(f"Unexpected error in flux_resume: {str(e)}", exc_info=True)
+            return redirect(url_for('flux.get_flux_objects'))
     else:
         return redirect(url_for('flux.get_flux_objects'))
     
@@ -299,20 +323,32 @@ def flux_sync():
     Sync action for Flux objects.
     """
     if request.method == 'POST':
-        flux_object = json.loads(request.form.get('flux_object'))
-        user_token = get_user_token(session)
-        
-        SyncAction(flux_object, session['user_role'], user_token)
-        
-        # Check if this came from detail view
-        if request.form.get('return_to_detail'):
-            return redirect(url_for('flux.get_flux_detail',
-                kind=flux_object.get('kind'),
-                namespace=flux_object.get('metadata', {}).get('namespace'),
-                name=flux_object.get('metadata', {}).get('name')
-            ))
-        
-        return redirect(url_for('flux.get_flux_objects'))
+        try:
+            flux_object_str = request.form.get('flux_object')
+            if not flux_object_str:
+                logger.error("Missing 'flux_object' in form data for sync action")
+                return redirect(url_for('flux.get_flux_objects'))
+            
+            flux_object = json.loads(flux_object_str)
+            user_token = get_user_token(session)
+            
+            SyncAction(flux_object, session['user_role'], user_token)
+            
+            # Check if this came from detail view
+            if request.form.get('return_to_detail'):
+                return redirect(url_for('flux.get_flux_detail',
+                    kind=flux_object.get('kind'),
+                    namespace=flux_object.get('metadata', {}).get('namespace'),
+                    name=flux_object.get('metadata', {}).get('name')
+                ))
+            
+            return redirect(url_for('flux.get_flux_objects'))
+        except json.JSONDecodeError as e:
+            logger.error(f"JSON decode error in flux_sync: {str(e)}. Form data: {request.form.get('flux_object', '')[:200]}")
+            return redirect(url_for('flux.get_flux_objects'))
+        except Exception as e:
+            logger.error(f"Unexpected error in flux_sync: {str(e)}", exc_info=True)
+            return redirect(url_for('flux.get_flux_objects'))
     else:
         return redirect(url_for('flux.get_flux_objects'))
 

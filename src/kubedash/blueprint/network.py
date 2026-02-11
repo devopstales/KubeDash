@@ -30,12 +30,27 @@ def ingresses():
     Data is now loaded client-side via JavaScript API calls.
     This route only renders the template structure.
     """
+    from lib.helper_functions import validate_namespace, validate_no_path_traversal
+    
     # Handle POST requests for backward compatibility
     if request.method == 'POST':
+        # Validate namespace to prevent path traversal and injection
         if 'ns_select' in request.form:
-            session['ns_select'] = request.form.get('ns_select')
-        if request.form.get('active_tab'):
-            active_tab = request.form.get('active_tab')
+            namespace = request.form.get('ns_select', '').strip()
+            if namespace:
+                is_valid, error_msg = validate_namespace(namespace)
+                if is_valid:
+                    session['ns_select'] = namespace
+                else:
+                    flash(f"Invalid namespace: {error_msg}", "danger")
+        
+        # Validate active_tab parameter
+        active_tab = request.form.get('active_tab', '').strip()
+        if active_tab:
+            is_valid_tab, error_msg_tab = validate_no_path_traversal(active_tab)
+            if not is_valid_tab:
+                flash(f"Invalid tab selection: {error_msg_tab}", "danger")
+                active_tab = ''
 
     # Get namespaces for topbar selector
     user_token = get_user_token(session)
@@ -82,10 +97,25 @@ def ingresses_data():
     Data is now loaded client-side via JavaScript API calls.
     This route only renders the template structure.
     """
+    from lib.helper_functions import validate_namespace, validate_k8s_resource_name
+    
     # Handle POST requests (from form submission) - redirect to GET with parameters
     if request.method == 'POST':
-        i_name = request.form.get('i_name')
-        ns_select = request.form.get('ns_select')
+        # Validate ingress name
+        i_name = request.form.get('i_name', '').strip()
+        if i_name:
+            is_valid_name, error_msg_name = validate_k8s_resource_name(i_name, "ingress")
+            if not is_valid_name:
+                flash(f"Invalid ingress name: {error_msg_name}", "danger")
+                i_name = ''
+        
+        # Validate namespace
+        ns_select = request.form.get('ns_select', '').strip()
+        if ns_select:
+            is_valid_ns, error_msg_ns = validate_namespace(ns_select)
+            if not is_valid_ns:
+                flash(f"Invalid namespace: {error_msg_ns}", "danger")
+                ns_select = ''
         
         # Build query parameters
         params = {}

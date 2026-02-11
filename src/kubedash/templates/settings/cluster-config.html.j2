@@ -125,68 +125,50 @@
         const user_role = {{ session.get('user_role', '')|tojson }};
         const is_admin = user_role === 'Admin';
         
-        // DataTables protection - prevent auto-initialization on loading rows
-        (function() {
-            const originalTableId = 'dataTable';
-            const tempTableId = 'k8sConfigsTable_' + Date.now();
-            
-            // Temporarily change table ID to prevent auto-initialization
-            document.addEventListener('DOMContentLoaded', function() {
-                const table = document.getElementById(originalTableId);
-                if (table) {
-                    table.id = tempTableId;
-                }
-            });
-            
-            // Override DataTable initialization to prevent on colspan rows
-            if (typeof $ !== 'undefined' && $.fn.DataTable) {
-                const originalDataTable = $.fn.DataTable;
-                $.fn.DataTable = function(opts) {
-                    const $this = $(this);
-                    // Check if this is a loading row with colspan
-                    if ($this.find('tbody tr td[colspan]').length > 0) {
-                        console.log('Blocked DataTable initialization on loading row');
-                        return $this;
-                    }
-                    return originalDataTable.apply(this, arguments);
-                };
+        // DataTables protection - prevent auto-initialization
+        // Store reference to DataTable instance
+        let dataTableInstance = null;
+        let isInitializing = false;
+        
+        // Helper function to safely destroy DataTable
+        function destroyDataTable() {
+            if (typeof $ === 'undefined' || !$.fn.DataTable) {
+                return;
             }
             
-            // Clean up any auto-initialized DataTables
-            setTimeout(function() {
-                if (typeof $ !== 'undefined' && $.fn.DataTable) {
-                    const table = document.getElementById(tempTableId);
-                    if (table) {
-                        try {
-                            const $table = $('#' + tempTableId);
-                            if ($table.length && $table.data('DataTable')) {
-                                $table.DataTable().destroy();
-                            }
-                        } catch (e) {
-                            // DataTable not initialized or error, ignore
-                        }
-                        table.id = originalTableId;
-                    }
+            try {
+                const $table = $('#dataTable');
+                if (!$table.length) {
+                    return;
                 }
-            }, 100);
-            
-            setTimeout(function() {
-                if (typeof $ !== 'undefined' && $.fn.DataTable) {
-                    const table = document.getElementById(tempTableId);
-                    if (table) {
-                        try {
-                            const $table = $('#' + tempTableId);
-                            if ($table.length && $table.data('DataTable')) {
-                                $table.DataTable().destroy();
-                            }
-                        } catch (e) {
-                            // DataTable not initialized or error, ignore
-                        }
-                        table.id = originalTableId;
+                
+                // Check if DataTable is already initialized using the official method
+                if (typeof $.fn.DataTable.isDataTable === 'function' && $.fn.DataTable.isDataTable('#dataTable')) {
+                    const dt = $table.DataTable();
+                    if (dt) {
+                        dt.destroy();
                     }
+                    dataTableInstance = null;
                 }
-            }, 500);
-        })();
+                
+                // Also check jQuery data (for older versions or edge cases)
+                const dtData = $table.data('DataTable') || $table.data('dataTable');
+                if (dtData) {
+                    try {
+                        $table.DataTable().destroy();
+                    } catch (e) {
+                        // Ignore errors during destroy
+                    }
+                    $table.removeData('DataTable');
+                    $table.removeData('dataTable');
+                    dataTableInstance = null;
+                }
+            } catch (e) {
+                // DataTable not initialized or error, ignore
+                console.debug('DataTable destroy (no instance):', e.message);
+                dataTableInstance = null;
+            }
+        }
         
         // Base64 decode function
         function base64Decode(str) {
@@ -219,22 +201,8 @@
             const tbody = document.getElementById('k8s-configs-tbody');
             const table = document.getElementById('dataTable');
             
-            // Ensure table has correct ID (restore from temp if needed)
-            if (table && table.id !== 'dataTable') {
-                table.id = 'dataTable';
-            }
-            
-            // Destroy existing DataTable if it exists
-            if (typeof $ !== 'undefined' && $.fn.DataTable) {
-                try {
-                    const $table = $('#dataTable');
-                    if ($table.length && typeof $.fn.DataTable.isDataTable === 'function' && $.fn.DataTable.isDataTable('#dataTable')) {
-                        $table.DataTable().destroy();
-                    }
-                } catch (e) {
-                    console.warn('Error destroying DataTable:', e);
-                }
-            }
+            // Destroy existing DataTable if it exists (must be done before modifying table content)
+            destroyDataTable();
             
             if (!configs || configs.length === 0) {
                 tbody.innerHTML = '<tr><td colspan="3" class="text-center">No cluster configurations found</td></tr>';
@@ -292,55 +260,68 @@
             
             // Initialize DataTables after a short delay to ensure DOM is updated
             setTimeout(function() {
-                // Make sure table has correct ID
-                const table = document.getElementById('dataTable');
-                if (!table) {
-                    // Try to find table by any ID and restore it
-                    const tempTable = document.querySelector('table[class*="table"]');
-                    if (tempTable && tempTable.id !== 'dataTable') {
-                        tempTable.id = 'dataTable';
-                    }
+                // Prevent concurrent initialization
+                if (isInitializing) {
+                    return;
                 }
                 
                 const finalTable = document.getElementById('dataTable');
-                if (finalTable && typeof $ !== 'undefined' && $.fn.DataTable) {
-                    try {
-                        const $table = $('#dataTable');
-                        if ($table.length) {
-                            // Check if already initialized and destroy
-                            if (typeof $.fn.DataTable.isDataTable === 'function' && $.fn.DataTable.isDataTable('#dataTable')) {
-                                $table.DataTable().destroy();
-                            }
-                            
-                            // Verify table structure before initializing
-                            const tbody = finalTable.querySelector('tbody');
-                            if (tbody) {
-                                const rows = tbody.querySelectorAll('tr');
-                                let hasValidRows = false;
-                                for (const row of rows) {
-                                    const cells = row.querySelectorAll('td');
-                                    if (cells.length === 3) {
-                                        hasValidRows = true;
-                                        break;
-                                    }
-                                }
-                                
-                                if (hasValidRows) {
-                                    // Initialize DataTables without pagination (only one config allowed)
-                                    $('#dataTable').DataTable({
-                                        responsive: true,
-                                        paging: false,
-                                        searching: false,
-                                        info: false
-                                    });
-                                } else {
-                                    console.warn('Table structure invalid, skipping DataTables initialization');
-                                }
-                            }
-                        }
-                    } catch (e) {
-                        console.warn('Error initializing DataTable:', e);
+                if (!finalTable || typeof $ === 'undefined' || !$.fn.DataTable) {
+                    return;
+                }
+                
+                try {
+                    const $table = $('#dataTable');
+                    if (!$table.length) {
+                        return;
                     }
+                    
+                    // Double-check: destroy any existing instance
+                    destroyDataTable();
+                    
+                    // Verify table structure before initializing
+                    const tbody = finalTable.querySelector('tbody');
+                    if (!tbody) {
+                        return;
+                    }
+                    
+                    const rows = tbody.querySelectorAll('tr');
+                    let hasValidRows = false;
+                    for (const row of rows) {
+                        const cells = row.querySelectorAll('td');
+                        // Skip rows with colspan (loading/empty rows)
+                        if (cells.length > 0 && cells[0].hasAttribute('colspan')) {
+                            continue;
+                        }
+                        if (cells.length === 3) {
+                            hasValidRows = true;
+                            break;
+                        }
+                    }
+                    
+                    if (hasValidRows) {
+                        isInitializing = true;
+                        
+                        // Final check: make sure DataTable is not already initialized
+                        if (typeof $.fn.DataTable.isDataTable === 'function' && $.fn.DataTable.isDataTable('#dataTable')) {
+                            isInitializing = false;
+                            return;
+                        }
+                        
+                        // Initialize DataTables without pagination (only one config allowed)
+                        dataTableInstance = $table.DataTable({
+                            responsive: true,
+                            paging: false,
+                            searching: false,
+                            info: false
+                        });
+                        
+                        isInitializing = false;
+                    }
+                } catch (e) {
+                    console.warn('Error initializing DataTable:', e);
+                    dataTableInstance = null;
+                    isInitializing = false;
                 }
             }, 150);
         }

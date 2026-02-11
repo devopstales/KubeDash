@@ -9,8 +9,10 @@ CA.crt
 src/kubedash/run.sh
 src/kubedash/kubedash.ini
 *kubedash.ini
+
 *sbom.cdx.json
 *bandit-report.json
+*.bandit
 
 # helm
 .cr-index/

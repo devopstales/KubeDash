@@ -80,9 +80,24 @@ def pod_list():
 @login_required
 def pod_delete():
     if request.method == 'POST':
-        pod_name = request.form.get('pod_name')
-        if 'ns_select' in request.form:
-            session['ns_select'] = request.form.get('ns_select')
+        from lib.helper_functions import validate_pod_name, validate_namespace
+        
+        pod_name = request.form.get('pod_name', '').strip()
+        namespace = request.form.get('ns_select', '').strip()
+        
+        # Validate pod name to prevent XSS and path traversal
+        is_valid, error_msg = validate_pod_name(pod_name)
+        if not is_valid:
+            flash(f"Invalid pod name: {error_msg}", "danger")
+            return redirect(url_for('.pod_list'))
+        
+        # Validate namespace
+        if namespace:
+            is_valid_ns, error_msg_ns = validate_namespace(namespace)
+            if not is_valid_ns:
+                flash(f"Invalid namespace: {error_msg_ns}", "danger")
+                return redirect(url_for('.pod_list'))
+            session['ns_select'] = namespace
 
         user_token = get_user_token(session)
         
@@ -143,10 +158,27 @@ def pod_logs():
     Containers are loaded client-side via JavaScript API calls.
     Websocket connection is handled server-side for log streaming.
     """
+    from lib.helper_functions import validate_pod_name, validate_namespace
+    
     # Get pod name and namespace from query params or form
-    po_name = request.args.get('po_name') or request.form.get('po_name')
-    if 'ns_select' in request.form:
-        session['ns_select'] = request.form.get('ns_select')
+    po_name = request.args.get('po_name') or request.form.get('po_name', '')
+    namespace = request.form.get('ns_select', '')
+    
+    # Validate pod name to prevent XSS and path traversal
+    if po_name:
+        is_valid, error_msg = validate_pod_name(po_name)
+        if not is_valid:
+            flash(f"Invalid pod name: {error_msg}", "danger")
+            po_name = ''
+    
+    # Validate namespace
+    if namespace:
+        is_valid_ns, error_msg_ns = validate_namespace(namespace)
+        if not is_valid_ns:
+            flash(f"Invalid namespace: {error_msg_ns}", "danger")
+            namespace = ''
+        else:
+            session['ns_select'] = namespace
     
     # Template loads containers via JavaScript from /api/v1/workloads/pods/<name>/containers
     # Websocket connection is handled by the template's JavaScript
@@ -164,8 +196,33 @@ def log_connect():
 @socketio.on("message", namespace="/log")
 @authenticated_only
 def log_message(po_name, container):
+    from lib.helper_functions import validate_pod_name, validate_namespace
+    
+    # Validate pod name to prevent XSS and path traversal
+    if not po_name or not isinstance(po_name, str):
+        logger.warning(f"Invalid pod name in log_message: {po_name}")
+        return
+    
+    is_valid, error_msg = validate_pod_name(po_name)
+    if not is_valid:
+        logger.warning(f"Invalid pod name in log_message: {error_msg}")
+        return
+    
+    # Validate namespace
+    namespace = session.get('ns_select', 'default')
+    if namespace:
+        is_valid_ns, error_msg_ns = validate_namespace(namespace)
+        if not is_valid_ns:
+            logger.warning(f"Invalid namespace in log_message: {error_msg_ns}")
+            return
+    
+    # Validate container name (basic check)
+    if container and not isinstance(container, str):
+        logger.warning(f"Invalid container name in log_message: {container}")
+        return
+    
     user_token = get_user_token(session)
-    socketio.start_background_task(k8sPodLogsStream, session['user_role'], user_token, session['ns_select'], po_name, container)
+    socketio.start_background_task(k8sPodLogsStream, session['user_role'], user_token, namespace, po_name, container)
 
 ##############################################################
 ## Pod Exec
@@ -180,10 +237,27 @@ def pod_exec():
     Containers are loaded client-side via JavaScript API calls.
     Websocket connection is handled server-side for exec streaming.
     """
+    from lib.helper_functions import validate_pod_name, validate_namespace
+    
     # Get pod name and namespace from query params or form
-    po_name = request.args.get('po_name') or request.form.get('po_name')
-    if 'ns_select' in request.form:
-        session['ns_select'] = request.form.get('ns_select')
+    po_name = request.args.get('po_name') or request.form.get('po_name', '')
+    namespace = request.form.get('ns_select', '')
+    
+    # Validate pod name to prevent XSS and path traversal
+    if po_name:
+        is_valid, error_msg = validate_pod_name(po_name)
+        if not is_valid:
+            flash(f"Invalid pod name: {error_msg}", "danger")
+            po_name = ''
+    
+    # Validate namespace
+    if namespace:
+        is_valid_ns, error_msg_ns = validate_namespace(namespace)
+        if not is_valid_ns:
+            flash(f"Invalid namespace: {error_msg_ns}", "danger")
+            namespace = ''
+        else:
+            session['ns_select'] = namespace
     
     # Template loads containers via JavaScript from /api/v1/workloads/pods/<name>/containers
     # Websocket connection is handled by the template's JavaScript
@@ -201,12 +275,37 @@ def connect():
 @socketio.on("message", namespace="/exec")
 @authenticated_only
 def message(po_name, container):
+    from lib.helper_functions import validate_pod_name, validate_namespace
+    
+    # Validate pod name to prevent XSS and path traversal
+    if not po_name or not isinstance(po_name, str):
+        logger.warning(f"Invalid pod name in exec message: {po_name}")
+        return
+    
+    is_valid, error_msg = validate_pod_name(po_name)
+    if not is_valid:
+        logger.warning(f"Invalid pod name in exec message: {error_msg}")
+        return
+    
+    # Validate namespace
+    namespace = session.get('ns_select', 'default')
+    if namespace:
+        is_valid_ns, error_msg_ns = validate_namespace(namespace)
+        if not is_valid_ns:
+            logger.warning(f"Invalid namespace in exec message: {error_msg_ns}")
+            return
+    
+    # Validate container name (basic check)
+    if container and not isinstance(container, str):
+        logger.warning(f"Invalid container name in exec message: {container}")
+        return
+    
     user_token = get_user_token(session)
 
     global wsclient
-    wsclient = k8sPodExecSocket(session['user_role'], user_token, session['ns_select'], po_name, container)
+    wsclient = k8sPodExecSocket(session['user_role'], user_token, namespace, po_name, container)
 
-    socketio.start_background_task(k8sPodExecStream, wsclient, session['user_role'], user_token, session['ns_select'], po_name, container)
+    socketio.start_background_task(k8sPodExecStream, wsclient, session['user_role'], user_token, namespace, po_name, container)
 
 @socketio.on("exec-input", namespace="/exec")
 @authenticated_only

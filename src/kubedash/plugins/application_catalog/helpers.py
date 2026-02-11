@@ -55,27 +55,58 @@ def application_links_init(app_config):
             
             # Use no_autoflush to prevent premature flush during query
             with db.session.no_autoflush:
-                # Check if application exists
-                existing = ApplicationCatalog.query.filter_by(
-                    application_name=app_name
+                # Priority: URL has unique constraint, so check URL first
+                existing_by_url = ApplicationCatalog.query.filter_by(
+                    application_url=app_url
                 ).first()
                 
-                if existing:
-                    # Update existing application
-                    existing.application_url = app_url
-                    existing.application_icon = app_icon if app_icon else None
-                    existing.application_enabled = app_enabled
-                    existing.application_embedded = app_embedded
+                if existing_by_url:
+                    # URL exists - update this application (config points to this URL)
+                    # Check if name would conflict before updating
+                    existing_by_name = ApplicationCatalog.query.filter_by(
+                        application_name=app_name
+                    ).first()
+                    
+                    if existing_by_name and existing_by_name.id != existing_by_url.id:
+                        # Name already exists on different application - don't update name, just other fields
+                        if app_icon:
+                            existing_by_url.application_icon = app_icon
+                        existing_by_url.application_enabled = app_enabled
+                        existing_by_url.application_embedded = app_embedded
+                        logger.debug(f"Updated existing application (URL: {app_url}, kept existing name '{existing_by_url.application_name}' due to conflict)")
+                    else:
+                        # No name conflict - update all fields including name
+                        existing_by_url.application_name = app_name
+                        if app_icon:
+                            existing_by_url.application_icon = app_icon
+                        existing_by_url.application_enabled = app_enabled
+                        existing_by_url.application_embedded = app_embedded
+                        logger.debug(f"Updated existing application (URL: {app_url}) to name '{app_name}'")
                 else:
-                    # Create new application
-                    new_app = ApplicationCatalog(
-                        application_name=app_name,
-                        application_url=app_url,
-                        application_icon=app_icon if app_icon else None,
-                        application_enabled=app_enabled,
-                        application_embedded=app_embedded
-                    )
-                    db.session.add(new_app)
+                    # URL doesn't exist, check if name exists
+                    existing_by_name = ApplicationCatalog.query.filter_by(
+                        application_name=app_name
+                    ).first()
+                    
+                    if existing_by_name:
+                        # Name exists but URL is different - update from config
+                        existing_by_name.application_url = app_url
+                        if app_icon:
+                            existing_by_name.application_icon = app_icon
+                        existing_by_name.application_enabled = app_enabled
+                        existing_by_name.application_embedded = app_embedded
+                        logger.debug(f"Updated existing application '{app_name}' (changed URL to {app_url})")
+                    else:
+                        # Create new application
+                        new_app = ApplicationCatalog(
+                            application_name=app_name,
+                            application_url=app_url,
+                            application_icon=app_icon if app_icon else None,
+                            application_enabled=app_enabled,
+                            application_embedded=app_embedded
+                        )
+                        db.session.add(new_app)
+                        logger.debug(f"Created new application '{app_name}' with URL {app_url}")
             
             # Commit each application individually to handle race conditions
             try:
@@ -83,21 +114,50 @@ def application_links_init(app_config):
             except IntegrityError as e:
                 # Handle race condition: another request might have inserted the same app
                 db.session.rollback()
-                # Try to update instead
-                existing = ApplicationCatalog.query.filter_by(
-                    application_name=app_name
+                # Check again after rollback - prioritize URL
+                existing_by_url = ApplicationCatalog.query.filter_by(
+                    application_url=app_url
                 ).first()
-                if existing:
-                    existing.application_url = app_url
-                    existing.application_icon = app_icon if app_icon else None
-                    existing.application_enabled = app_enabled
-                    existing.application_embedded = app_embedded
+                
+                if existing_by_url:
+                    # URL exists - always update this application (config points to this URL)
+                    # Check if name would conflict
+                    existing_by_name = ApplicationCatalog.query.filter_by(
+                        application_name=app_name
+                    ).first()
+                    
+                    if existing_by_name and existing_by_name.id != existing_by_url.id:
+                        # Name conflict - don't update name, just other fields
+                        if app_icon:
+                            existing_by_url.application_icon = app_icon
+                        existing_by_url.application_enabled = app_enabled
+                        existing_by_url.application_embedded = app_embedded
+                    else:
+                        # No conflict - update all fields
+                        existing_by_url.application_name = app_name
+                        if app_icon:
+                            existing_by_url.application_icon = app_icon
+                        existing_by_url.application_enabled = app_enabled
+                        existing_by_url.application_embedded = app_embedded
                     db.session.commit()
                 else:
-                    logger.warning(f"Failed to create or update application '{app_name}': {e}")
-                    # Re-raise if it's not a duplicate key error
-                    if "duplicate key" not in str(e).lower() and "unique constraint" not in str(e).lower():
-                        raise
+                    # Check by name only if URL doesn't exist
+                    existing_by_name = ApplicationCatalog.query.filter_by(
+                        application_name=app_name
+                    ).first()
+                    if existing_by_name:
+                        # Name exists and URL doesn't - safe to update URL
+                        existing_by_name.application_url = app_url
+                        if app_icon:
+                            existing_by_name.application_icon = app_icon
+                        existing_by_name.application_enabled = app_enabled
+                        existing_by_name.application_embedded = app_embedded
+                        db.session.commit()
+                    else:
+                        logger.warning(f"Failed to create or update application '{app_name}': {e}")
+                        # Re-raise if it's not a duplicate key error
+                        if "duplicate key" not in str(e).lower() and "unique constraint" not in str(e).lower():
+                            raise
         
         logger.info(f"Initialized {len(app_map)} applications from config")
     except Exception as error:

@@ -234,10 +234,17 @@ class K8sConfigsResource(MethodView):
         # Convert SQLAlchemy query results to list of dictionaries
         configs = []
         for config in configs_query.all():
+            # Ensure k8s_server_ca is a string (it's stored as base64 encoded text)
+            k8s_server_ca = config.k8s_server_ca
+            if isinstance(k8s_server_ca, bytes):
+                k8s_server_ca = k8s_server_ca.decode('utf-8')
+            elif k8s_server_ca is None:
+                k8s_server_ca = ""
+            
             configs.append({
                 "k8s_context": config.k8s_context,
                 "k8s_server_url": config.k8s_server_url,
-                "k8s_server_ca": config.k8s_server_ca  # This is base64 encoded
+                "k8s_server_ca": k8s_server_ca
             })
         
         return jsonify({
@@ -330,7 +337,7 @@ class K8sConfigResource(MethodView):
                 "message": "k8s_server_url and k8s_server_ca are required"
             }), 400
         
-        k8s_server_ca = base64_encode(k8s_server_ca.strip())
+        k8s_server_ca = str(base64_encode(k8s_server_ca.strip()), 'UTF-8')
         k8sServerConfigUpdate(k8s_context_old, k8s_server_url, k8s_context, k8s_server_ca)
         
         return jsonify({

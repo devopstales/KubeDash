@@ -33,11 +33,27 @@ def service_accounts():
     Data is now loaded client-side via JavaScript API calls.
     This route only renders the template structure.
     """
+    from lib.helper_functions import validate_namespace, validate_no_path_traversal
+    
     # Handle POST requests (from form submission) - redirect to GET with selected parameter
     if request.method == 'POST':
+        # Validate namespace to prevent path traversal
         if 'ns_select' in request.form:
-            session['ns_select'] = request.form.get('ns_select')
-        selected = request.form.get('selected')
+            namespace = request.form.get('ns_select', '').strip()
+            if namespace:
+                is_valid, error_msg = validate_namespace(namespace)
+                if is_valid:
+                    session['ns_select'] = namespace
+                else:
+                    flash(f"Invalid namespace: {error_msg}", "danger")
+        
+        # Validate selected parameter to prevent path traversal
+        selected = request.form.get('selected', '').strip()
+        if selected:
+            is_valid_path, error_msg_path = validate_no_path_traversal(selected)
+            if not is_valid_path:
+                flash(f"Invalid selection: {error_msg_path}", "danger")
+                selected = ''
         
         # Build query parameters
         params = {}
@@ -104,11 +120,28 @@ def role_data():
     Data is now loaded client-side via JavaScript API calls.
     This route only renders the template structure.
     """
+    from lib.helper_functions import validate_namespace, validate_k8s_resource_name, validate_no_path_traversal
+    
     # Handle POST requests - redirect to GET with query parameters
     if request.method == 'POST':
+        # Validate namespace to prevent path traversal and injection
         if 'ns_select' in request.form:
-            session['ns_select'] = request.form.get('ns_select')
-        r_name = request.form.get('r_name')
+            namespace = request.form.get('ns_select', '').strip()
+            if namespace:
+                is_valid, error_msg = validate_namespace(namespace)
+                if is_valid:
+                    session['ns_select'] = namespace
+                else:
+                    flash(f"Invalid namespace: {error_msg}", "danger")
+        
+        # Validate role name
+        r_name = request.form.get('r_name', '').strip()
+        if r_name:
+            is_valid_name, error_msg_name = validate_k8s_resource_name(r_name, "role")
+            if not is_valid_name:
+                flash(f"Invalid role name: {error_msg_name}", "danger")
+                r_name = ''
+        
         namespace = request.form.get('ns_select', session.get('ns_select', 'default'))
         if r_name:
             return redirect(url_for('cluster_permission.role_data', r_name=r_name, namespace=namespace))
@@ -134,11 +167,27 @@ def role_bindings():
     Data is now loaded client-side via JavaScript API calls.
     This route only renders the template structure.
     """
+    from lib.helper_functions import validate_namespace, validate_no_path_traversal
+    
     # Handle POST requests (from form submission) - redirect to GET with selected parameter
     if request.method == 'POST':
+        # Validate namespace to prevent path traversal
         if 'ns_select' in request.form:
-            session['ns_select'] = request.form.get('ns_select')
-        selected = request.form.get('selected') or request.form.get('rb_name')
+            namespace = request.form.get('ns_select', '').strip()
+            if namespace:
+                is_valid, error_msg = validate_namespace(namespace)
+                if is_valid:
+                    session['ns_select'] = namespace
+                else:
+                    flash(f"Invalid namespace: {error_msg}", "danger")
+        
+        # Validate selected parameter to prevent path traversal
+        selected = request.form.get('selected') or request.form.get('rb_name', '')
+        if selected:
+            is_valid_path, error_msg_path = validate_no_path_traversal(selected)
+            if not is_valid_path:
+                flash(f"Invalid selection: {error_msg_path}", "danger")
+                selected = ''
         
         # Build query parameters
         params = {}

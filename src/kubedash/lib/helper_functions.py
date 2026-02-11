@@ -12,7 +12,7 @@ from urllib.parse import urlparse, urljoin
 import six
 import yaml
 from flask import g, flash, has_request_context, Request
-from typing import Optional, Union
+from typing import Optional, Union, Tuple
 
 ##############################################################
 ## Helpers
@@ -475,3 +475,167 @@ def ResponseHandler(message, status):
         status (str): The status of the message (e.g., "success", "danger", etc.)
     """
     flash(message, status)
+
+##############################################################
+## Security Validation Functions
+##############################################################
+
+def validate_k8s_resource_name(name: str, resource_type: str = "resource") -> Tuple[bool, Optional[str]]:
+    """
+    Validate Kubernetes resource name according to RFC 1123 subdomain format.
+    
+    Kubernetes resource names must:
+    - Be lowercase alphanumeric characters or '-'
+    - Start and end with an alphanumeric character
+    - Be at most 253 characters
+    - Not contain '..' or path separators
+    
+    Args:
+        name: The resource name to validate
+        resource_type: Type of resource for error messages (e.g., "pod", "namespace")
+    
+    Returns:
+        tuple: (is_valid, error_message)
+    """
+    if not name or not isinstance(name, str):
+        return False, f"Invalid {resource_type} name: must be a non-empty string"
+    
+    # Check for path traversal attempts
+    if '..' in name or '/' in name or '\\' in name:
+        return False, f"Invalid {resource_type} name: contains path traversal characters"
+    
+    # Check length
+    if len(name) > 253:
+        return False, f"Invalid {resource_type} name: exceeds maximum length of 253 characters"
+    
+    # Kubernetes DNS-1123 subdomain format: [a-z0-9]([-a-z0-9]*[a-z0-9])?
+    # Must start and end with alphanumeric, can contain hyphens in between
+    if not re.match(r'^[a-z0-9]([-a-z0-9]*[a-z0-9])?$', name):
+        return False, f"Invalid {resource_type} name: must match DNS-1123 subdomain format (lowercase alphanumeric and hyphens)"
+    
+    return True, None
+
+def validate_namespace(name: str) -> Tuple[bool, Optional[str]]:
+    """
+    Validate Kubernetes namespace name.
+    
+    Args:
+        name: The namespace name to validate
+    
+    Returns:
+        tuple: (is_valid, error_message)
+    """
+    return validate_k8s_resource_name(name, "namespace")
+
+def validate_pod_name(name: str) -> Tuple[bool, Optional[str]]:
+    """
+    Validate Kubernetes pod name.
+    
+    Args:
+        name: The pod name to validate
+    
+    Returns:
+        tuple: (is_valid, error_message)
+    """
+    return validate_k8s_resource_name(name, "pod")
+
+def sanitize_html(text: str) -> str:
+    """
+    Sanitize HTML to prevent XSS attacks.
+    Escapes HTML special characters.
+    
+    Args:
+        text: The text to sanitize
+    
+    Returns:
+        str: Sanitized text safe for HTML output
+    """
+    if not text or not isinstance(text, str):
+        return ""
+    
+    # Escape HTML special characters
+    html_escape_map = {
+        '&': '&amp;',
+        '<': '&lt;',
+        '>': '&gt;',
+        '"': '&quot;',
+        "'": '&#x27;',
+        '/': '&#x2F;'
+    }
+    
+    # Replace each character
+    sanitized = ""
+    for char in text:
+        sanitized += html_escape_map.get(char, char)
+    
+    return sanitized
+
+def validate_no_path_traversal(path: str) -> Tuple[bool, Optional[str]]:
+    """
+    Validate that a path does not contain path traversal sequences.
+    
+    Args:
+        path: The path to validate
+    
+    Returns:
+        tuple: (is_valid, error_message)
+    """
+    if not path or not isinstance(path, str):
+        return False, "Invalid path: must be a non-empty string"
+    
+    # Check for path traversal patterns
+    dangerous_patterns = [
+        '..',
+        '../',
+        '..\\',
+        '/etc/',
+        'c:/',
+        'c:\\',
+        '//',
+        '\\\\'
+    ]
+    
+    path_lower = path.lower()
+    for pattern in dangerous_patterns:
+        if pattern in path_lower:
+            return False, f"Invalid path: contains path traversal pattern '{pattern}'"
+    
+    return True, None
+
+def sanitize_input(value: str, input_type: str = "text") -> str:
+    """
+    Sanitize user input based on expected type.
+    
+    Args:
+        value: The input value to sanitize
+        input_type: Type of input ("text", "pod_name", "namespace", "url")
+    
+    Returns:
+        str: Sanitized value
+    """
+    if not value or not isinstance(value, str):
+        return ""
+    
+    if input_type in ("pod_name", "namespace"):
+        # For K8s resource names, validate and return cleaned version
+        is_valid, _ = validate_k8s_resource_name(value, input_type)
+        if not is_valid:
+            # Return empty string if invalid
+            return ""
+        return value.strip().lower()
+    
+    elif input_type == "url":
+        # For URLs, validate and sanitize
+        value = value.strip()
+        # Basic URL validation - should start with http:// or https://
+        if not value.startswith(('http://', 'https://')):
+            return ""
+        return value
+    
+    else:
+        # For general text, strip whitespace and limit length
+        value = value.strip()
+        # Limit to reasonable length to prevent DoS
+        if len(value) > 10000:
+            value = value[:10000]
+        return value

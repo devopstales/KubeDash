@@ -66,11 +66,14 @@ def get_database_url(app: Flask, filename: string) -> string:
         
     """Create Database URL"""
     basedir = os.path.abspath(os.path.dirname(filename))
-    if app.config['ENV'] == 'testing':
-        SQLALCHEMY_DATABASE_URI = "sqlite:///"+basedir+"/database/"+ app.config['ENV'] +".db"
-    elif EXTERNAL_DATABASE_ENABLED and SQLALCHEMY_DATABASE_USER and SQLALCHEMY_DATABASE_PASSWORD and SQLALCHEMY_DATABASE_HOST and SQLALCHEMY_DATABASE_DB:
+    # Check if PostgreSQL is configured and all credentials are present
+    if EXTERNAL_DATABASE_ENABLED and SQLALCHEMY_DATABASE_USER and SQLALCHEMY_DATABASE_PASSWORD and SQLALCHEMY_DATABASE_HOST and SQLALCHEMY_DATABASE_DB:
+        # Use PostgreSQL if configured, even in testing mode
         SQLALCHEMY_DATABASE_URI = "postgresql://%s:%s@%s/%s" % \
             (SQLALCHEMY_DATABASE_USER, SQLALCHEMY_DATABASE_PASSWORD, SQLALCHEMY_DATABASE_HOST, SQLALCHEMY_DATABASE_DB)
+    elif app.config['ENV'] == 'testing':
+        # Fall back to SQLite only if PostgreSQL is not configured
+        SQLALCHEMY_DATABASE_URI = "sqlite:///"+basedir+"/database/"+ app.config['ENV'] +".db"
     else:
         SQLALCHEMY_DATABASE_URI = "sqlite:///"+basedir+"/database/"+ app.config['ENV'] +".db"
         

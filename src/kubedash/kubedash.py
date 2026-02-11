@@ -98,7 +98,6 @@ def create_app(external_config_name=None):
                         app.logger.warning(f"Metrics update skipped: {e}")
                     # Now start the periodic ticker for future updates
                     initialize_metrics_scraper(app)
-            app.logger.info(separator_short)
             initialize_app_socket(app)
             initialize_blueprints(app)
             initialize_plugin_apis(app)
