@@ -88,7 +88,7 @@
 
 {% block add_tail_js %}
     <script src="{{ url_for('static',filename='/vendor/use-bootstrap-tag@2.2.2/use-bootstrap-tag.min.js') }}"></script>
-    <script>
+    <script nonce="{{ csp_nonce }}">
       const escapeHtml = (text) => {
         if (text === null || text === undefined) return '';
         const map = {

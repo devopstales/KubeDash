@@ -43,7 +43,7 @@ OPTIONS:
     -o, --output FORMAT      Output format: html, xml, term (default: term)
     -d, --docker-start       Start docker containers before running tests
     -D, --docker-stop        Stop docker containers after running tests
-    -s, --security-scan      Run security scans (bandit, safety, pip-audit)
+    -s, --security-scan      Run security scans (semgrep, safety, pip-audit)
     -h, --help               Show this help message
 
 EXAMPLES:
@@ -57,7 +57,7 @@ EXAMPLES:
     $0 -d -D                             # Start docker, run tests, then stop docker
     $0 -D                                # Run tests and stop docker containers after
     $0 -t security                      # Run security tests only
-    $0 -s                                # Run security scans (bandit, safety, pip-audit)
+    $0 -s                                # Run security scans (semgrep, safety, pip-audit)
     $0 -t security -s                   # Run security tests and scans
 
 EOF
@@ -238,14 +238,20 @@ if [ "$SECURITY_SCAN" = true ]; then
     echo -e "${YELLOW}Running security scans...${NC}"
     echo ""
     
-    # Bandit static analysis
-    if command -v poetry &> /dev/null && poetry run bandit --version &> /dev/null; then
-        echo -e "${YELLOW}Running Bandit security scan...${NC}"
-        poetry run bandit -r blueprint lib plugins -f json -o reports/bandit.json -ll || true
-        poetry run bandit -r blueprint lib plugins -ll || true
+    # Semgrep static analysis (replaces Bandit)
+    if command -v poetry &> /dev/null && poetry run semgrep --version &> /dev/null; then
+        echo -e "${YELLOW}Running Semgrep security scan...${NC}"
+        poetry run semgrep --config=auto \
+          --exclude-rule python.lang.security.audit.assert_used.assert_used \
+          --exclude-rule python.lang.security.audit.subprocess-shell-true.subprocess-shell-true \
+          --json -o reports/semgrep.json . 2>/dev/null || true
+        poetry run semgrep --config=auto \
+          --exclude-rule python.lang.security.audit.assert_used.assert_used \
+          --exclude-rule python.lang.security.audit.subprocess-shell-true.subprocess-shell-true \
+          . || true
         echo ""
     else
-        echo -e "${YELLOW}Bandit not available, skipping...${NC}"
+        echo -e "${YELLOW}Semgrep not available, skipping...${NC}"
     fi
     
     # Safety dependency check

@@ -1,0 +1,17 @@
+{# 
+CSP Nonce Helper Template
+
+Include this in templates that have inline scripts to ensure nonces are used.
+
+Usage in templates:
+{% include "segments/csp_nonce_helper.j2" %}
+
+Then use {{ csp_nonce }} in your script tags:
+<script nonce="{{ csp_nonce }}">
+  // Your script here
+</script>
+#}
+
+{# This file ensures csp_nonce is available in templates #}
+{# The nonce is already set globally in initializers.py, but this serves as documentation #}
+

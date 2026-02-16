@@ -11,7 +11,7 @@
 <html lang="en">
   <head>
     <!-- Critical Theme Loader (MUST be first) -->
-    <script>
+    <script nonce="{{ csp_nonce }}">
       (function(){
         // 1. Immediately set theme from localStorage (fallback to light)
         const savedTheme = localStorage.getItem('coreui-theme') || 'light';
@@ -22,7 +22,7 @@
 
         // 3. Hide body until fully loaded (prevents flash)
         document.write(`
-          <style id="temp-hide">
+          <style id="temp-hide" nonce="{{ csp_nonce }}">
             body { opacity: 0 !important; }
             .light { color-scheme: light; }
             .dark { color-scheme: dark; }
@@ -59,7 +59,7 @@
     {% endblock %}
 
     <!-- Add this right before </head> -->
-    <script>
+    <script nonce="{{ csp_nonce }}">
       document.addEventListener('DOMContentLoaded', function() {
         // Remove the temporary hide style
         const tempStyle = document.getElementById('temp-hide');
@@ -100,7 +100,7 @@
     <script src="{{ url_for('static',filename='/js/config.js') }}"></script>
     <script src="{{ url_for('static',filename='/js/color-modes.js') }}"></script>
 
-    <script>
+    <script nonce="{{ csp_nonce }}">
       const header = document.querySelector('header.header');
 
       document.addEventListener('scroll', () => {
@@ -111,7 +111,7 @@
     </script>
 
     <!-- Toast notification script -->
-    <script>
+    <script nonce="{{ csp_nonce }}">
       function showToast(type, message, title = 'Notification') {
         const container = document.getElementById('toastStack');
         const template = document.getElementById('toastTemplate');
@@ -144,7 +144,7 @@
     </script>
 
     <!-- Global Namespace Selector Handler -->
-    <script>
+    <script nonce="{{ csp_nonce }}">
       // Global handler for namespace selector persistence across all pages
       document.addEventListener('DOMContentLoaded', function() {
         const namespaceSelect = document.getElementById('inputGroupSelect04');

@@ -75,7 +75,7 @@
 
 
 {% block add_tail_js %}
-    <script>
+    <script nonce="{{ csp_nonce }}">
         function getThemeColor() {
             return document.documentElement.getAttribute('data-coreui-theme') === 'dark' ? '#181a1b' : '#ffffff';
         }
@@ -209,7 +209,7 @@
         window.onload = updateNetworkTheme;
     </script>
 
-    <script type="text/javascript">
+    <script type="text/javascript" nonce="{{ csp_nonce }}">
         // initialize global variables.
         var edges;
         var nodes;

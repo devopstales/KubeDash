@@ -8,7 +8,7 @@ from flask.views import MethodView
 from flask_login import login_required
 from flask_smorest import Blueprint
 
-from lib.helper_functions import get_logger
+from lib.helper_functions import get_logger, validate_namespace, validate_k8s_resource_name, validate_no_path_traversal
 from lib.k8s.security import (
     k8sRoleListGet, k8sRoleGet,
     k8sClusterRoleListGet, k8sClusterRoleGet,
@@ -98,6 +98,15 @@ class RolesListResource(MethodView):
         user_token = get_user_token(session)
         namespace = request.args.get('namespace', session.get('ns_select', 'default'))
         
+        # Validate namespace to prevent path traversal
+        if namespace:
+            is_valid, error_msg = validate_namespace(namespace)
+            if not is_valid:
+                return jsonify({
+                    "error": "BadRequest",
+                    "message": f"Invalid namespace: {error_msg}"
+                }), 400
+        
         roles = k8sRoleListGet(session['user_role'], user_token, namespace)
         
         # Serialize V1PolicyRule objects in rules for each role
@@ -122,6 +131,7 @@ class RoleResource(MethodView):
     
     @rbac_api_bp.response(200, description="Successfully retrieved role details")
     @rbac_api_bp.response(404, description="Role not found")
+    @rbac_api_bp.response(400, description="Invalid parameters")
     @rbac_api_bp.doc(tags=['RBAC'])
     @login_required
     def get(self, name):
@@ -137,8 +147,34 @@ class RoleResource(MethodView):
         Returns:
             dict: Role details
         """
+        # Validate name parameter to prevent path traversal
+        if name:
+            is_valid_name, error_msg_name = validate_k8s_resource_name(name, "role")
+            if not is_valid_name:
+                return jsonify({
+                    "error": "BadRequest",
+                    "message": f"Invalid role name: {error_msg_name}"
+                }), 400
+            
+            # Additional path traversal check
+            is_valid_path, error_msg_path = validate_no_path_traversal(name)
+            if not is_valid_path:
+                return jsonify({
+                    "error": "BadRequest",
+                    "message": f"Invalid role name: {error_msg_path}"
+                }), 400
+        
         user_token = get_user_token(session)
         namespace = request.args.get('namespace', session.get('ns_select', 'default'))
+        
+        # Validate namespace to prevent path traversal
+        if namespace:
+            is_valid, error_msg = validate_namespace(namespace)
+            if not is_valid:
+                return jsonify({
+                    "error": "BadRequest",
+                    "message": f"Invalid namespace: {error_msg}"
+                }), 400
         
         with tracer.start_as_current_span(
             "role-get",
@@ -215,6 +251,7 @@ class ClusterRoleResource(MethodView):
     
     @rbac_api_bp.response(200, description="Successfully retrieved cluster role details")
     @rbac_api_bp.response(404, description="Cluster role not found")
+    @rbac_api_bp.response(400, description="Invalid parameters")
     @rbac_api_bp.doc(tags=['RBAC'])
     @login_required
     def get(self, name):
@@ -227,6 +264,23 @@ class ClusterRoleResource(MethodView):
         Returns:
             dict: Cluster role details
         """
+        # Validate name parameter to prevent path traversal
+        if name:
+            is_valid_name, error_msg_name = validate_k8s_resource_name(name, "clusterrole")
+            if not is_valid_name:
+                return jsonify({
+                    "error": "BadRequest",
+                    "message": f"Invalid cluster role name: {error_msg_name}"
+                }), 400
+            
+            # Additional path traversal check
+            is_valid_path, error_msg_path = validate_no_path_traversal(name)
+            if not is_valid_path:
+                return jsonify({
+                    "error": "BadRequest",
+                    "message": f"Invalid cluster role name: {error_msg_path}"
+                }), 400
+        
         user_token = get_user_token(session)
         
         with tracer.start_as_current_span(
@@ -268,6 +322,7 @@ class RoleBindingsListResource(MethodView):
     """
     
     @rbac_api_bp.response(200, description="Successfully retrieved role bindings list")
+    @rbac_api_bp.response(400, description="Invalid parameters")
     @rbac_api_bp.doc(tags=['RBAC'])
     @login_required
     def get(self):
@@ -282,6 +337,20 @@ class RoleBindingsListResource(MethodView):
         """
         user_token = get_user_token(session)
         namespace = request.args.get('namespace', session.get('ns_select', 'default'))
+        
+        # Validate namespace to prevent path traversal
+        if namespace:
+            is_valid, error_msg = validate_namespace(namespace)
+            if not is_valid:
+                return jsonify({
+                    "error": "BadRequest",
+                    "message": f"Invalid namespace: {error_msg}",
+                    "data": [],
+                    "metadata": {
+                        "namespace": namespace,
+                        "count": 0
+                    }
+                }), 400
         
         role_bindings, error = k8sRoleBindingListGet(session['user_role'], user_token, namespace)
         
@@ -358,6 +427,7 @@ class ServiceAccountsListResource(MethodView):
     """
     
     @rbac_api_bp.response(200, description="Successfully retrieved service accounts list")
+    @rbac_api_bp.response(400, description="Invalid parameters")
     @rbac_api_bp.doc(tags=['RBAC'])
     @login_required
     def get(self):
@@ -372,6 +442,20 @@ class ServiceAccountsListResource(MethodView):
         """
         user_token = get_user_token(session)
         namespace = request.args.get('namespace', session.get('ns_select', 'default'))
+        
+        # Validate namespace to prevent path traversal
+        if namespace:
+            is_valid, error_msg = validate_namespace(namespace)
+            if not is_valid:
+                return jsonify({
+                    "error": "BadRequest",
+                    "message": f"Invalid namespace: {error_msg}",
+                    "data": [],
+                    "metadata": {
+                        "namespace": namespace,
+                        "count": 0
+                    }
+                }), 400
         
         service_accounts = k8sSaListGet(session['user_role'], user_token, namespace)
         

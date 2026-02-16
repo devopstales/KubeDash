@@ -12,7 +12,7 @@
 <html lang="en">
   <head>
     <!-- Critical Theme Loader (MUST be first) -->
-    <script>
+    <script nonce="{{ csp_nonce }}">
       (function(){
         // 1. Immediately set theme from localStorage (fallback to light)
         const savedTheme = localStorage.getItem('coreui-theme') || 'light';
@@ -23,7 +23,7 @@
 
         // 3. Hide body until fully loaded (prevents flash)
         document.write(`
-          <style id="temp-hide">
+          <style id="temp-hide" nonce="{{ csp_nonce }}">
             body { opacity: 0 !important; }
             .light { color-scheme: light; }
             .dark { color-scheme: dark; }
@@ -74,7 +74,7 @@
     <script src="{{ url_for('static',filename='/vendor/custom/alert.js') }}"></script>
 
     <!-- Add this right before </head> -->
-    <script>
+    <script nonce="{{ csp_nonce }}">
       document.addEventListener('DOMContentLoaded', function() {
         // Remove the temporary hide style
         const tempStyle = document.getElementById('temp-hide');
@@ -191,7 +191,7 @@
     <script src="{{ url_for('static',filename='/vendor/datatables@2.2.2/datatables-demo.js') }}"></script>
 
     <!-- custom scripts -->
-    <script type="text/javascript">
+    <script type="text/javascript" nonce="{{ csp_nonce }}">
         function setClipboard(value) {
             var tempInput = document.createElement("input");
             tempInput.style = "position: absolute; left: -1000px; top: -1000px";
@@ -206,14 +206,14 @@
             location.reload(true);
         };
     </script>
-    <script type="text/javascript">
+    <script type="text/javascript" nonce="{{ csp_nonce }}">
         setTimeout(function() {
             $('#flashMessage').fadeOut('fast');
         }, 30000);
     </script>
 
     <!-- Vendors scripts -->
-    <script>
+    <script nonce="{{ csp_nonce }}">
       const header = document.querySelector('header.header');
 
       document.addEventListener('scroll', () => {
@@ -224,7 +224,7 @@
     </script>
 
     <!-- Global Namespace Selector Handler -->
-    <script>
+    <script nonce="{{ csp_nonce }}">
       // Global handler for namespace selector persistence across all pages
       document.addEventListener('DOMContentLoaded', function() {
         const namespaceSelect = document.getElementById('inputGroupSelect04');

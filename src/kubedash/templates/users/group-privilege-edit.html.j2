@@ -106,7 +106,7 @@
 {% include "segments/datatable_snippet.html.j2" %}
 
     <script src="{{ url_for('static',filename='/vendor/select2@4.0.13/select2.full.min.js') }}"></script>
-    <script>
+    <script nonce="{{ csp_nonce }}">
         // Session data - rendered server-side using Flask tojson filter
         const csrf_token = {{ csrf_token()|tojson }};
         

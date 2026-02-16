@@ -156,7 +156,7 @@
 {% endblock %}
 
 {% block add_tail_js %}
-<script>
+<script nonce="{{ csp_nonce }}">
     const escapeHtml = (text) => {
         if (text === null || text === undefined) return '';
         const map = {
@@ -341,7 +341,7 @@
                 <tr>
                     <td>${statusBadge}</td>
                     <td>
-                        <form action="/workload/pod/data" method="POST" onsubmit="sessionStorage.setItem('ns_select', '${escapeHtml(namespace)}'); sessionStorage.setItem('pod_data_name', '${name}'); return true;">
+                        <form action="/workload/pods/data" method="POST" onsubmit="sessionStorage.setItem('ns_select', '${escapeHtml(namespace)}'); sessionStorage.setItem('pod_data_name', '${name}'); return true;">
                             <input type="hidden" name="csrf_token" value="${escapeHtml(csrf_token)}">
                             <input type="hidden" name="ns_select" value="${escapeHtml(namespace)}" />
                             <input type="hidden" name="po_name" value="${name}" />

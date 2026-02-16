@@ -11,8 +11,12 @@ src/kubedash/kubedash.ini
 *kubedash.ini
 
 *sbom.cdx.json
-*bandit-report.json
-*.bandit
+*semgrep-report.json
+*semgrep.json
+
+# Security scan reports (ZAP, Semgrep) - keep directory via .gitkeep
+security/reports/*
+!security/reports/.gitkeep
 
 # helm
 .cr-index/

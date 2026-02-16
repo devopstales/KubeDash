@@ -35,6 +35,7 @@ tasks:
   docker-images:
     desc: "Copy docker images"
     dir: '/tmp'
+    silent: true
     cmds:
       # - skopeo login --tls-verify=false 127.0.0.1:4000
       # - skopeo login docker.io
@@ -71,6 +72,7 @@ tasks:
   kubedash-requirements:
     desc: "Generate Kubedash requirements"
     dir: 'src/kubedash'
+    silent: true
     cmds:
       - |
         poetry show --only main --top-level | awk 'NR>2 {if (NF >= 2) print $1"=="$2}' > requirements.txt || \
@@ -87,12 +89,14 @@ tasks:
         echo "Skipping deprecated safety check..."
         echo "✅ Use 'task kubedash-audit' for dependency vulnerability scanning"
         exit 0
+    silent: true
 
   kubedash-audit:
     desc: "Run pip-audit for dependency vulnerabilities"
     dir: 'src/kubedash'
     cmds:
       - poetry run pip-audit || echo "⚠️  Vulnerabilities found - run 'task kubedash-fix-vulns' to update"
+    silent: true
 
   kubedash-audit-strict:
     desc: "Run pip-audit and fail on vulnerabilities (for CI)"
@@ -104,7 +108,9 @@ tasks:
     desc: "Scan Kubedash filesystem for vulnerabilities"
     dir: 'src/kubedash'
     cmds:
+      - mkdir -p ../../security/reports
       - trivy -q fs . --ignore-unfixed --scanners vuln
+      - trivy -q fs . --ignore-unfixed --scanners vuln --format json -o ../../security/reports/trivy-fs-report.json 2>/dev/null || true
 
   kubedash-security-check:
     desc: "Run comprehensive security checks (hardcoded secrets, weak crypto, etc.) - logs warnings only"
@@ -186,6 +192,7 @@ tasks:
           echo "   ✅ No CSRF exemptions found"
         fi
       - echo "✅ Security checks completed (warnings logged above)"
+    silent: true
 
   kubedash-secret-scan:
     desc: "Scan for hardcoded secrets and credentials using detect-secrets (optional)"
@@ -234,38 +241,34 @@ tasks:
           echo "   Or: pip install detect-secrets"
           echo "   Skipping secret scan (optional tool)"
         fi
-
-  kubedash-bandit:
-    desc: "Run Bandit security linter for common Python security issues"
-    dir: 'src/kubedash'
-    cmds:
-      - |
-        if poetry run bandit --version >/dev/null 2>&1; then
-          echo "🔍 Running Bandit security scan..."
-          # Run bandit with quiet mode to suppress verbose warnings
-          # Only show actual security issues, not test name warnings
-          poetry run bandit -r . -f json -o bandit-report.json 2>/dev/null || true
-          # Run with quiet flag to suppress manager/tester warnings
-          poetry run bandit -r . -ll -q 2>&1 | grep -v "WARNING.*Test in comment" | grep -v "WARNING.*nosec encountered" | grep -v "Working..." || true
-          if [ -f bandit-report.json ]; then
-            echo "   📄 Report saved to bandit-report.json"
-          fi
-        else
-          echo "⚠️  Bandit not installed. Add to pyproject.toml: bandit = {version = \"^1.7.5\", group = \"dev\"}"
-        fi
+    silent: true
 
   kubedash-semgrep:
-    desc: "Run Semgrep security scanner for code vulnerabilities"
+    desc: "Run Semgrep security scanner for code vulnerabilities (replaces Bandit)"
     dir: 'src/kubedash'
     cmds:
       - |
-        if command -v semgrep >/dev/null 2>&1; then
-          semgrep --config=auto --json -o semgrep-report.json . || true
-          semgrep --config=auto .
+        if poetry run semgrep --version >/dev/null 2>&1; then
+          echo "🔍 Running Semgrep security scan..."
+          mkdir -p ../../security/reports
+          poetry run semgrep --config=auto \
+            --exclude-rule python.lang.security.audit.assert_used.assert_used \
+            --exclude-rule python.lang.security.audit.subprocess-shell-true.subprocess-shell-true \
+            --json -o ../../security/reports/semgrep-report.json . 2>/dev/null || true
+          poetry run semgrep --config=auto \
+            --exclude-rule python.lang.security.audit.assert_used.assert_used \
+            --exclude-rule python.lang.security.audit.subprocess-shell-true.subprocess-shell-true \
+            --exclude=tests \
+            --exclude=static \
+            .
+          if [ -f ../../security/reports/semgrep-report.json ]; then
+            echo "   📄 Report saved to security/reports/semgrep-report.json"
+          fi
         else
-          echo "⚠️  Semgrep not installed. Install with: pip install semgrep"
-          echo "   Or use: brew install semgrep"
+          echo "⚠️  Semgrep not installed. Run: poetry install --with dev"
+          echo "   (semgrep in pyproject.toml dev/test groups)"
         fi
+    silent: true
 
   kubedash-fix-vulns:
     desc: "Automatically detect and update vulnerable dependencies to fixed versions"
@@ -378,6 +381,52 @@ tasks:
           echo "   poetry update <package-name>"
           echo "   poetry lock"
         fi
+    silent: true
+        
+  # --- ZAP API scan (security/zaproxy) ---
+  # Official image: https://hub.docker.com/r/zaproxy/zap-stable (was softwaresecurityproject/zap-stable)
+  zap-pull:
+    desc: "Pull OWASP ZAP Docker image for API scanning"
+    cmds:
+      - docker pull zaproxy/zap-stable
+
+  zap-scan:
+    desc: "Run ZAP API scan against KubeDash (OpenAPI spec loaded from app at /api/openapi.json; KubeDash must be at localhost:5000)"
+    dir: 'security/zaproxy'
+    silent: true
+    cmds:
+      - |
+        mkdir -p ../reports
+        echo "Running ZAP scan with plan plans/kubedash-plan.yaml (OpenAPI from app)..."
+        docker container run --platform linux/amd64 \
+          -v "$(pwd):/zap/wrk:rw" \
+          -v "$(pwd)/../reports:/zap/wrk/reports:rw" \
+          -t zaproxy/zap-stable \
+          bash -c "zap.sh -cmd -addoninstall ascanrules -addoninstall openapi; zap.sh -cmd -autorun /zap/wrk/plans/kubedash-plan.yaml"
+        echo "Reports: security/reports/"
+
+  # --- Nikto / Nuclei: web scans (target hardcoded https://localhost:5000, like zaproxy plan) ---
+  kubedash-nikto-scan:
+    desc: "Run Nikto web server scan; JSON report to security/reports/nikto-report.json (KubeDash at localhost:5000)"
+    silent: true
+    cmds:
+      - bash security/scripts/nikto-scan.sh
+
+  kubedash-nuclei-scan:
+    desc: "Run Nuclei scan; JSON report to security/reports/nuclei-report.json (KubeDash at localhost:5000)"
+    silent: true
+    cmds:
+      - bash security/scripts/nuclei-scan.sh
+
+  # --- DefectDojo: upload security reports ---
+  # Requires: DOJO_HOST (e.g. https://defectdojo.example.com), DOJO_API (API token)
+  # Optional: DOJO_PRODUCT_NAME (default KubeDash), DOJO_ENGAGEMENT_NAME (default security-scan)
+  # Optional: DOJO_REIMPORT=1 to use reimport-scan (updates existing test) instead of import-scan
+  defectdojo-upload:
+    desc: "Upload security reports (ZAP SARIF, Semgrep, Trivy, Nikto, Nuclei) to DefectDojo (set DOJO_HOST and DOJO_API)"
+    silent: true
+    cmds:
+      - bash security/scripts/defectdojo-upload.sh
 
   kubedash-security-all:
     desc: "Run all security checks (dependencies, secrets, code analysis)"
@@ -395,13 +444,21 @@ tasks:
       - task: kubedash-secret-scan
         run: true
         silent: true
-      - task: kubedash-bandit
+      - task: kubedash-semgrep
+        run: true
+        silent: true
+      - task: zap-scan
+        run: true
+        silent: true
+      - task: kubedash-nikto-scan
+        run: true
+        silent: true
+      - task: kubedash-nuclei-scan
         run: true
         silent: true
       - |
         echo "✅ All security checks completed (warnings may be present)"
         echo "💡 Note: safety check is deprecated - using pip-audit instead"
-        
 
   kubedash-lint:
     desc: "Lint Kubedash"
@@ -414,6 +471,7 @@ tasks:
 
   kubedash-dev-build:
     desc: "Build Kubedash devel docker image"
+    silent: true
     cmds:
       - docker builder prune -f
       - task: kubedash-requirements
@@ -454,6 +512,7 @@ tasks:
 
   kubedash-run:
     desc: "Run Kubedash docker container with kubedash.ini mount and port mappings"
+    silent: true
     cmds:
       - |
         docker run -d \
@@ -465,6 +524,7 @@ tasks:
 
   kubedash-dev-run:
     desc: "Run Kubedash dev docker container with kubedash.ini mount and port mappings"
+    silent: true
     cmds:
       - |
         docker run -d \
@@ -492,6 +552,7 @@ tasks:
 
   kubedash-prod-build:
     desc: "Build Kubedash docker image"
+    silent: true
     cmds:
       - docker builder prune -f
       - task: kubedash-requirements
@@ -515,11 +576,14 @@ tasks:
   kubedash-prod-scan:
     desc: "Scan Kubedash Dockerfile for vulnerabilities"
     cmds:
+      - mkdir -p security/reports
       - trivy -q i --ignore-unfixed --scanners vuln devopstales/kubedash:{{.VERSION}}
-      - trivy -q i --ignore-unfixed --format cyclonedx --output sbom.cdx.json --scanners vuln devopstales/kubedash:{{.VERSION}} 
+      - trivy -q i --ignore-unfixed --scanners vuln --format json -o security/reports/trivy-image-report.json devopstales/kubedash:{{.VERSION}} 2>/dev/null || true
+      - trivy -q i --ignore-unfixed --format cyclonedx --output security/reports/trivy-sbom.cdx.json --scanners vuln devopstales/kubedash:{{.VERSION}} 
 
   kubedash-prod-push:
     desc: "Push Kubedash docker image"
+    silent: true
     cmds:
       - docker push devopstales/kubedash:{{.VERSION}}
       - docker push devopstales/kubedash:latest
@@ -534,7 +598,7 @@ tasks:
         --annotation "org.cyclonedx.bom.version=1.4" \
         --annotation "org.opencontainers.ref.name=kubedash-{{.VERSION}}" \
         --annotation "org.opencontainers.created=$(date -u +%Y-%m-%dT%H:%M:%SZ)" \
-        sbom.cdx.json
+        security/reports/trivy-sbom.cdx.json
       - |
         oras attach docker.io/devopstales/kubedash:latest \
         --artifact-type application/vnd.cyclonedx+json \
@@ -544,7 +608,7 @@ tasks:
         --annotation "org.cyclonedx.bom.version=1.4" \
         --annotation "org.opencontainers.ref.name=kubedash-{{.VERSION}}" \
         --annotation "org.opencontainers.created=$(date -u +%Y-%m-%dT%H:%M:%SZ)" \
-        sbom.cdx.json
+        security/reports/trivy-sbom.cdx.json
       - |
         oras attach ghcr.io/devopstales/kubedash:{{.VERSION}} \
         --artifact-type application/vnd.cyclonedx+json \
@@ -554,7 +618,7 @@ tasks:
         --annotation "org.cyclonedx.bom.version=1.4" \
         --annotation "org.opencontainers.ref.name=kubedash-{{.VERSION}}" \
         --annotation "org.opencontainers.created=$(date -u +%Y-%m-%dT%H:%M:%SZ)" \
-        sbom.cdx.json
+        security/reports/trivy-sbom.cdx.json
       - |
         oras attach ghcr.io/devopstales/kubedash:latest \
         --artifact-type application/vnd.cyclonedx+json \
@@ -564,8 +628,7 @@ tasks:
         --annotation "org.cyclonedx.bom.version=1.4" \
         --annotation "org.opencontainers.ref.name=kubedash-{{.VERSION}}" \
         --annotation "org.opencontainers.created=$(date -u +%Y-%m-%dT%H:%M:%SZ)" \
-        sbom.cdx.json
-      - rm -f sbom.cdx.json
+        security/reports/trivy-sbom.cdx.json
 
   kubedash-prod-sign:
     desc: "Sign Kubedash docker image"
@@ -578,7 +641,6 @@ tasks:
   kubedash-prod-rm:
     desc: "Remove Kubedash docker image"
     cmds:
-      - rm sbom.cdx.json
       - docker rmi devopstales/kubedash:{{.VERSION}}
       - docker rmi ghcr.io/devopstales/kubedash:{{.VERSION}}
 
@@ -601,6 +663,7 @@ tasks:
   kdlogin-build:
     desc: "Build kubectl-kdlogin"
     dir: 'src/kdlogin'
+    silent: true
     cmds:
       - go mod tidy
       - >-
@@ -623,7 +686,9 @@ tasks:
    desc: "Scan kubectl-kdlogin for vulnerabilities"
    dir: 'src/kdlogin'
    cmds:
+     - mkdir -p ../../security/reports
      - trivy -q fs .
+     - trivy -q fs . --format json -o ../../security/reports/trivy-kdlogin-fs-report.json 2>/dev/null || true
 
   kdlogin-security:
    desc: "Run security checks on kubectl-kdlogin Go code"
@@ -646,6 +711,7 @@ tasks:
        if grep -r "exec.Command" . --include="*.go" | grep -v "url\|xdg-open\|open\|rundll32"; then
          echo "⚠️  WARNING: Command execution detected - ensure input validation"
        fi
+   silent: true
 
   helm-docs:
    desc: "Generate Helm Chart documentation"
@@ -742,3 +808,4 @@ tasks:
       - |
         echo "✅ All CI security checks completed"
         echo "💡 Note: Using pip-audit instead of deprecated safety check"
+    silent: true

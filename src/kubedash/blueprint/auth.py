@@ -180,6 +180,8 @@ def login_post():
     else:
         remote_addr = request.environ['HTTP_X_FORWARDED_FOR'].split(',')[0].strip()
 
+    # Use SQLAlchemy ORM filter which automatically uses parameterized queries (SQL injection safe)
+    # The username parameter is safely bound as a parameter, not concatenated into SQL
     user = User.query.filter(User.username == username, User.user_type != "OpenID").first()
     user2 = KubectlConfig.query.filter_by(name=username).first()
     

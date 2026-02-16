@@ -94,7 +94,7 @@ autoflake = "^1.6.1"
 safety = "^3.3.1"
 flake8 = "^7.1.2"
 pip = ">=26.0"
-bandit = "^1.7.5"
+semgrep = "^1.45.0"
 GitPython = "^3.1.0"
 
 [tool.poetry.group.test.dependencies]
@@ -106,7 +106,7 @@ pytest-playwright = "^0.3.1"
 coverage = "^6.4.4"
 responses = "^0.22.0"
 selenium = "^4.15.1"
-bandit = "^1.7.5"
+semgrep = "^1.45.0"
 safety = "^3.7.0"
 pip-audit = "^2.4.4"
 
@@ -155,13 +155,7 @@ exclude_lines = [
 ]
 fail_under = 70
 
-[tool.bandit]
-exclude_dirs = ["tests", "migrations", "venv", ".venv", "__pycache__", ".pytest_cache"]
-skips = ["B101", "B601"]  # Skip assert_used and shell_injection_subprocess
-tests = ["tests/security"]
-
-[tool.bandit.assert_used]
-skips = ["*_test.py", "test_*.py"]
+# Semgrep: exclusions (B101/B601 equivalents) via CLI --exclude-rule; paths via .semgrepignore
 
 [tool.autoflake]
 recursive = true

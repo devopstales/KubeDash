@@ -102,7 +102,7 @@
 {% block add_tail_js %}
 {% include "segments/datatable_snippet.html.j2" %}
 {% include "segments/functions_snippet.j2"%}
-    <script>
+    <script nonce="{{ csp_nonce }}">
         const escapeHtml = (text) => {
             if (text === null || text === undefined) return '';
             const map = {

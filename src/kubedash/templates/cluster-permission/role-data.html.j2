@@ -54,7 +54,7 @@
 {% endblock %}
 
 {% block add_tail_js %}
-<script>
+<script nonce="{{ csp_nonce }}">
     // IMMEDIATE: Prevent datatables-demo.js from initializing on loading row
     (function() {
         function setupOverride() {

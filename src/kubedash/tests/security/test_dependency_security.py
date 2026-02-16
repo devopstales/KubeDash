@@ -81,42 +81,44 @@ class TestStaticAnalysisSecurity:
         not os.getenv("RUN_STATIC_ANALYSIS", "false").lower() == "true",
         reason="Static analysis is slow - set RUN_STATIC_ANALYSIS=true to run"
     )
-    def test_bandit_scan(self):
-        """Test code with bandit for security issues"""
+    def test_semgrep_scan(self):
+        """Test code with semgrep for security issues (replaces bandit)"""
+        import json
+        cwd = os.path.dirname(os.path.dirname(os.path.dirname(__file__)))
         try:
-            # Run bandit on source code
             result = subprocess.run(
-                [sys.executable, "-m", "bandit", "-r", "blueprint", "lib", "plugins", 
-                 "-f", "json", "-ll"],
+                [
+                    sys.executable, "-m", "semgrep", "--config=auto",
+                    "--exclude-rule", "python.lang.security.audit.assert_used.assert_used",
+                    "--exclude-rule", "python.lang.security.audit.subprocess-shell-true.subprocess-shell-true",
+                    "--json", ".",
+                ],
                 capture_output=True,
                 text=True,
                 timeout=300,
-                cwd=os.path.dirname(os.path.dirname(os.path.dirname(__file__)))
+                cwd=cwd,
             )
-            
-            # Parse bandit output
-            import json
+            # Semgrep exits 1 when findings exist; stdout is still valid JSON
             try:
                 report = json.loads(result.stdout)
-                # Check for high severity issues
-                high_severity = [issue for issue in report.get("results", []) 
-                               if issue.get("issue_severity") == "HIGH"]
-                medium_severity = [issue for issue in report.get("results", [])
-                                 if issue.get("issue_severity") == "MEDIUM"]
-                
-                if high_severity:
-                    pytest.fail(f"Bandit found {len(high_severity)} HIGH severity issues: "
-                              f"{json.dumps(high_severity, indent=2)}")
-                
-                # Warn about medium severity (don't fail)
-                if medium_severity:
-                    pytest.warns(UserWarning, f"Bandit found {len(medium_severity)} MEDIUM severity issues")
+                results = report.get("results", [])
+                errors = [r for r in results if r.get("extra", {}).get("severity") == "ERROR"]
+                warnings_list = [r for r in results if r.get("extra", {}).get("severity") == "WARNING"]
+                if errors:
+                    pytest.fail(
+                        f"Semgrep found {len(errors)} ERROR severity issues: "
+                        f"{json.dumps(errors[:5], indent=2)}"
+                        + (f" ... and {len(errors) - 5} more" if len(errors) > 5 else "")
+                    )
+                # WARNING severity is reported but does not fail the test
+                if warnings_list:
+                    import warnings
+                    warnings.warn(f"Semgrep found {len(warnings_list)} WARNING severity issues", UserWarning)
             except json.JSONDecodeError:
-                # If not JSON, check for errors in output
-                if "ERROR" in result.stdout or result.returncode != 0:
-                    pytest.fail(f"Bandit scan failed: {result.stdout}\n{result.stderr}")
+                if result.returncode not in (0, 1):
+                    pytest.fail(f"Semgrep scan failed: {result.stdout}\n{result.stderr}")
         except subprocess.TimeoutExpired:
-            pytest.skip("Bandit scan timed out")
+            pytest.skip("Semgrep scan timed out")
         except FileNotFoundError:
-            pytest.skip("bandit not installed - run: poetry install --with test")
+            pytest.skip("semgrep not installed - run: poetry install --with test")
 

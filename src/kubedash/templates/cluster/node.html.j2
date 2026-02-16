@@ -57,7 +57,7 @@
 {% endblock %}
 
 {% block add_tail_js %}
-<script>
+<script nonce="{{ csp_nonce }}">
     const escapeHtml = (text) => {
         if (text === null || text === undefined) return '';
         const map = {
@@ -203,14 +203,16 @@
                 `;
             }
             
+            // Use JSON.stringify for JavaScript string values to prevent XSS
+            const nodeNameJson = JSON.stringify(node.name || '');
             return `
                 <tr class="${rowClass}">
                     <td>${statusBadge}</td>
                     <td>
-                        <form action="/cluster/node/data" method="POST" onsubmit="sessionStorage.setItem('node_data_name', '${nodeName}'); return true;">
+                        <form action="/cluster/node/data" method="POST" data-node-name="${escapeHtml(nodeName)}" onsubmit="sessionStorage.setItem('node_data_name', this.dataset.nodeName); return true;">
                             <input type="hidden" name="csrf_token" value="${escapeHtml(csrf_token)}">
-                            <input type="hidden" name="no_name" value="${nodeName}" />
-                            <input type="hidden" name="selected" value="${nodeName}" />
+                            <input type="hidden" name="no_name" value="${escapeHtml(nodeName)}" />
+                            <input type="hidden" name="selected" value="${escapeHtml(nodeName)}" />
                             <a href="javascript:;" onclick="parentNode.submit();">${nodeName}</a>
                         </form>
                     </td>

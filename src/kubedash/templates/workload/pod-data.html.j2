@@ -432,7 +432,7 @@
 {% endblock %}
 
 {% block add_tail_js %}
-    <script>
+    <script nonce="{{ csp_nonce }}">
     const escapeHtml = (text) => {
         if (text === null || text === undefined) return '';
         const map = {
@@ -508,31 +508,33 @@
         document.getElementById('pod-restarts').textContent = podData.restarts || '0';
         document.getElementById('pod-created').textContent = escapeHtml(podData.created || '');
         
-        // Node link
+        // Node link - Use data attributes to prevent XSS
         const node = podData.node || '';
         if (node) {
+            const safeNode = escapeHtml(node);
             document.getElementById('pod-node').innerHTML = `
-                <form action="/cluster/node" method="POST" onsubmit="sessionStorage.setItem('node_data_name', '${escapeHtml(node)}'); return true;">
+                <form action="/cluster/node" method="POST" data-node-name="${safeNode}" onsubmit="sessionStorage.setItem('node_data_name', this.dataset.nodeName); return true;">
                     <input type="hidden" name="csrf_token" value="${escapeHtml(csrf_token)}">
-                    <input type="hidden" name="selected" value="${escapeHtml(node)}" />
-                    <a href="javascript:;" onclick="parentNode.submit();">${escapeHtml(node)}</a>
+                    <input type="hidden" name="selected" value="${safeNode}" />
+                    <a href="javascript:;" onclick="parentNode.submit();">${safeNode}</a>
                 </form>
             `;
         } else {
             document.getElementById('pod-node').textContent = '-';
         }
         
-        // Owner link
+        // Owner link - Use data attributes to prevent XSS
         const owner = podData.owner || '';
         if (owner) {
             const ownerParts = owner.split('/');
             if (ownerParts.length >= 2) {
-                const ownerKind = ownerParts[0].toLowerCase();
+                const ownerKind = escapeHtml(ownerParts[0].toLowerCase());
                 const ownerName = escapeHtml(ownerParts[1]);
+                const safeNamespace = escapeHtml(podData.namespace || namespace || '');
                 document.getElementById('pod-owner').innerHTML = `
-                    <form action="/workload/${ownerKind}" method="POST" onsubmit="sessionStorage.setItem('ns_select', '${escapeHtml(podData.namespace || namespace)}'); return true;">
+                    <form action="/workload/${ownerKind}" method="POST" data-namespace="${safeNamespace}" onsubmit="sessionStorage.setItem('ns_select', this.dataset.namespace); return true;">
                         <input type="hidden" name="csrf_token" value="${escapeHtml(csrf_token)}">
-                        <input type="hidden" name="ns_select" value="${escapeHtml(podData.namespace || namespace)}" />
+                        <input type="hidden" name="ns_select" value="${safeNamespace}" />
                         <input type="hidden" name="selected" value="${ownerName}" />
                         <a href="javascript:;" onclick="parentNode.submit();">${escapeHtml(owner)}</a>
                     </form>
@@ -729,18 +731,19 @@
             if (ownerParts.length >= 2) {
                 const ownerKind = ownerParts[0].toLowerCase();
                 const ownerName = escapeHtml(ownerParts[1]);
+                const safeNs = escapeHtml(ns);
                 referredByTbody.innerHTML = `
                     <tr>
                         <td>${escapeHtml(ownerParts[0])}</td>
                         <td>
-                            <form action="/workload/${ownerKind}" method="POST" onsubmit="sessionStorage.setItem('ns_select', '${escapeHtml(ns)}'); return true;">
+                            <form action="/workload/${ownerKind}" method="POST" data-namespace="${safeNs}" onsubmit="sessionStorage.setItem('ns_select', this.dataset.namespace); return true;">
                                 <input type="hidden" name="csrf_token" value="${escapeHtml(csrf_token)}">
-                                <input type="hidden" name="ns_select" value="${escapeHtml(ns)}" />
+                                <input type="hidden" name="ns_select" value="${safeNs}" />
                                 <input type="hidden" name="selected" value="${ownerName}" />
                                 <a href="javascript:;" onclick="parentNode.submit();">${ownerName}</a>
                             </form>
                         </td>
-                        <td>${escapeHtml(ns)}</td>
+                        <td>${safeNs}</td>
                     </tr>
                 `;
             } else {
@@ -761,18 +764,19 @@
                     Object.entries(ips).forEach(([key, value]) => {
                         if (key === 'name' || value) {
                             const secretName = escapeHtml(value || '');
+                            const safeNs = escapeHtml(ns);
                             refersToRows.push(`
                                 <tr>
                                     <td>ImagePullSecret</td>
                                     <td>
-                                        <form action="/security/secret" method="POST" onsubmit="sessionStorage.setItem('ns_select', '${escapeHtml(ns)}'); return true;">
+                                        <form action="/security/secret" method="POST" data-namespace="${safeNs}" onsubmit="sessionStorage.setItem('ns_select', this.dataset.namespace); return true;">
                                             <input type="hidden" name="csrf_token" value="${escapeHtml(csrf_token)}">
-                                            <input type="hidden" name="ns_select" value="${escapeHtml(ns)}" />
+                                            <input type="hidden" name="ns_select" value="${safeNs}" />
                                             <input type="hidden" name="selected" value="${secretName}" />
                                             <a href="javascript:;" onclick="parentNode.submit();">${secretName}</a>
                                         </form>
                                     </td>
-                                    <td>${escapeHtml(ns)}</td>
+                                    <td>${safeNs}</td>
                                 </tr>
                             `);
                         }
@@ -781,79 +785,87 @@
             });
         }
         
-        // Service account
+        // Service account - Use data attributes to prevent XSS
         if (podData.service_account) {
+            const safeNs = escapeHtml(ns);
+            const safeServiceAccount = escapeHtml(podData.service_account);
             refersToRows.push(`
                 <tr>
                     <td>ServiceAccount</td>
                     <td>
-                        <form action="/cluster-permission/service-account" method="POST" onsubmit="sessionStorage.setItem('ns_select', '${escapeHtml(ns)}'); return true;">
+                        <form action="/cluster-permission/service-account" method="POST" data-namespace="${safeNs}" onsubmit="sessionStorage.setItem('ns_select', this.dataset.namespace); return true;">
                             <input type="hidden" name="csrf_token" value="${escapeHtml(csrf_token)}">
-                            <input type="hidden" name="ns_select" value="${escapeHtml(ns)}" />
-                            <input type="hidden" name="selected" value="${escapeHtml(podData.service_account)}" />
-                            <a href="javascript:;" onclick="parentNode.submit();">${escapeHtml(podData.service_account)}</a>
+                            <input type="hidden" name="ns_select" value="${safeNs}" />
+                            <input type="hidden" name="selected" value="${safeServiceAccount}" />
+                            <a href="javascript:;" onclick="parentNode.submit();">${safeServiceAccount}</a>
                         </form>
                     </td>
-                    <td>${escapeHtml(ns)}</td>
+                    <td>${safeNs}</td>
                 </tr>
             `);
         }
         
-        // Secrets
+        // Secrets - Use data attributes to prevent XSS
         if (podData.secrets && podData.secrets.length > 0) {
+            const safeNs = escapeHtml(ns);
             podData.secrets.forEach(secret => {
+                const safeSecret = escapeHtml(secret);
                 refersToRows.push(`
                     <tr>
                         <td>Secret</td>
                         <td>
-                            <form action="/security/secret" method="POST" onsubmit="sessionStorage.setItem('ns_select', '${escapeHtml(ns)}'); return true;">
+                            <form action="/security/secret" method="POST" data-namespace="${safeNs}" onsubmit="sessionStorage.setItem('ns_select', this.dataset.namespace); return true;">
                                 <input type="hidden" name="csrf_token" value="${escapeHtml(csrf_token)}">
-                                <input type="hidden" name="ns_select" value="${escapeHtml(ns)}" />
-                                <input type="hidden" name="selected" value="${escapeHtml(secret)}" />
-                                <a href="javascript:;" onclick="parentNode.submit();">${escapeHtml(secret)}</a>
+                                <input type="hidden" name="ns_select" value="${safeNs}" />
+                                <input type="hidden" name="selected" value="${safeSecret}" />
+                                <a href="javascript:;" onclick="parentNode.submit();">${safeSecret}</a>
                             </form>
                         </td>
-                        <td>${escapeHtml(ns)}</td>
+                        <td>${safeNs}</td>
                     </tr>
                 `);
             });
         }
         
-        // ConfigMaps
+        // ConfigMaps - Use data attributes to prevent XSS
         if (podData.cm && podData.cm.length > 0) {
+            const safeNs = escapeHtml(ns);
             podData.cm.forEach(cm => {
+                const safeCm = escapeHtml(cm);
                 refersToRows.push(`
                     <tr>
                         <td>ConfigMap</td>
                         <td>
-                            <form action="/storage/configmap" method="POST" onsubmit="sessionStorage.setItem('ns_select', '${escapeHtml(ns)}'); return true;">
+                            <form action="/storage/configmap" method="POST" data-namespace="${safeNs}" onsubmit="sessionStorage.setItem('ns_select', this.dataset.namespace); return true;">
                                 <input type="hidden" name="csrf_token" value="${escapeHtml(csrf_token)}">
-                                <input type="hidden" name="ns_select" value="${escapeHtml(ns)}" />
-                                <input type="hidden" name="selected" value="${escapeHtml(cm)}" />
-                                <a href="javascript:;" onclick="parentNode.submit();">${escapeHtml(cm)}</a>
+                                <input type="hidden" name="ns_select" value="${safeNs}" />
+                                <input type="hidden" name="selected" value="${safeCm}" />
+                                <a href="javascript:;" onclick="parentNode.submit();">${safeCm}</a>
                             </form>
                         </td>
-                        <td>${escapeHtml(ns)}</td>
+                        <td>${safeNs}</td>
                     </tr>
                 `);
             });
         }
         
-        // PVCs
+        // PVCs - Use data attributes to prevent XSS
         if (podData.pvc && podData.pvc.length > 0) {
+            const safeNs = escapeHtml(ns);
             podData.pvc.forEach(pvc => {
+                const safePvc = escapeHtml(pvc);
                 refersToRows.push(`
                     <tr>
                         <td>PersistentVolumeClaim</td>
                         <td>
-                            <form action="/storage/pvc" method="POST" onsubmit="sessionStorage.setItem('ns_select', '${escapeHtml(ns)}'); return true;">
+                            <form action="/storage/pvc" method="POST" data-namespace="${safeNs}" onsubmit="sessionStorage.setItem('ns_select', this.dataset.namespace); return true;">
                                 <input type="hidden" name="csrf_token" value="${escapeHtml(csrf_token)}">
-                                <input type="hidden" name="ns_select" value="${escapeHtml(ns)}" />
-                                <input type="hidden" name="selected" value="${escapeHtml(pvc)}" />
-                                <a href="javascript:;" onclick="parentNode.submit();">${escapeHtml(pvc)}</a>
+                                <input type="hidden" name="ns_select" value="${safeNs}" />
+                                <input type="hidden" name="selected" value="${safePvc}" />
+                                <a href="javascript:;" onclick="parentNode.submit();">${safePvc}</a>
                             </form>
                         </td>
-                        <td>${escapeHtml(ns)}</td>
+                        <td>${safeNs}</td>
                     </tr>
                 `);
             });

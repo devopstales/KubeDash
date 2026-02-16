@@ -1,5 +1,5 @@
 from math import e
-from flask import (Blueprint, redirect, render_template, request, session,
+from flask import (Blueprint, flash, redirect, render_template, request, session,
                    url_for)
 from flask_login import login_required
 
@@ -33,7 +33,7 @@ def service_accounts():
     Data is now loaded client-side via JavaScript API calls.
     This route only renders the template structure.
     """
-    from lib.helper_functions import validate_namespace, validate_no_path_traversal
+    from lib.helper_functions import validate_namespace, validate_no_path_traversal, validate_k8s_resource_name
     
     # Handle POST requests (from form submission) - redirect to GET with selected parameter
     if request.method == 'POST':
@@ -50,10 +50,17 @@ def service_accounts():
         # Validate selected parameter to prevent path traversal
         selected = request.form.get('selected', '').strip()
         if selected:
-            is_valid_path, error_msg_path = validate_no_path_traversal(selected)
-            if not is_valid_path:
-                flash(f"Invalid selection: {error_msg_path}", "danger")
+            # Validate as Kubernetes resource name to prevent path traversal
+            is_valid_name, error_msg_name = validate_k8s_resource_name(selected, "serviceaccount")
+            if not is_valid_name:
+                flash(f"Invalid service account name: {error_msg_name}", "danger")
                 selected = ''
+            else:
+                # Also check for path traversal patterns as additional security
+                is_valid_path, error_msg_path = validate_no_path_traversal(selected)
+                if not is_valid_path:
+                    flash(f"Invalid selection: {error_msg_path}", "danger")
+                    selected = ''
         
         # Build query parameters
         params = {}
@@ -64,6 +71,19 @@ def service_accounts():
         if params:
             return redirect(url_for('cluster_permission.service_accounts', **params))
         return redirect(url_for('cluster_permission.service_accounts'))
+
+    # Handle GET requests - validate query parameters to prevent path traversal
+    selected = request.args.get('selected', '').strip()
+    if selected:
+        is_valid_name, error_msg_name = validate_k8s_resource_name(selected, "serviceaccount")
+        if not is_valid_name:
+            flash(f"Invalid service account name: {error_msg_name}", "danger")
+            selected = ''
+        else:
+            is_valid_path, error_msg_path = validate_no_path_traversal(selected)
+            if not is_valid_path:
+                flash(f"Invalid selection: {error_msg_path}", "danger")
+                selected = ''
 
     # Get namespaces for topbar selector
     user_token = get_user_token(session)
@@ -167,7 +187,7 @@ def role_bindings():
     Data is now loaded client-side via JavaScript API calls.
     This route only renders the template structure.
     """
-    from lib.helper_functions import validate_namespace, validate_no_path_traversal
+    from lib.helper_functions import validate_namespace, validate_no_path_traversal, validate_k8s_resource_name
     
     # Handle POST requests (from form submission) - redirect to GET with selected parameter
     if request.method == 'POST':
@@ -184,10 +204,18 @@ def role_bindings():
         # Validate selected parameter to prevent path traversal
         selected = request.form.get('selected') or request.form.get('rb_name', '')
         if selected:
-            is_valid_path, error_msg_path = validate_no_path_traversal(selected)
-            if not is_valid_path:
-                flash(f"Invalid selection: {error_msg_path}", "danger")
+            selected = selected.strip()
+            # Validate as Kubernetes resource name to prevent path traversal
+            is_valid_name, error_msg_name = validate_k8s_resource_name(selected, "rolebinding")
+            if not is_valid_name:
+                flash(f"Invalid role binding name: {error_msg_name}", "danger")
                 selected = ''
+            else:
+                # Also check for path traversal patterns as additional security
+                is_valid_path, error_msg_path = validate_no_path_traversal(selected)
+                if not is_valid_path:
+                    flash(f"Invalid selection: {error_msg_path}", "danger")
+                    selected = ''
         
         # Build query parameters
         params = {}
@@ -198,6 +226,19 @@ def role_bindings():
         if params:
             return redirect(url_for('cluster_permission.role_bindings', **params))
         return redirect(url_for('cluster_permission.role_bindings'))
+
+    # Handle GET requests - validate query parameters to prevent path traversal
+    selected = request.args.get('selected', '').strip()
+    if selected:
+        is_valid_name, error_msg_name = validate_k8s_resource_name(selected, "rolebinding")
+        if not is_valid_name:
+            flash(f"Invalid role binding name: {error_msg_name}", "danger")
+            selected = ''
+        else:
+            is_valid_path, error_msg_path = validate_no_path_traversal(selected)
+            if not is_valid_path:
+                flash(f"Invalid selection: {error_msg_path}", "danger")
+                selected = ''
 
     # Get namespaces for topbar selector
     user_token = get_user_token(session)

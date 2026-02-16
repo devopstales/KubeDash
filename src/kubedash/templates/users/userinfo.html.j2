@@ -161,7 +161,7 @@
     <!-- https://www.jqueryscript.net/form/check-strength-password.html -->
     <script src="{{ url_for('static',filename='/vendor/check-strength-password/password-strength.js') }}"></script>
 
-    <script>
+    <script nonce="{{ csp_nonce }}">
         // Escape HTML helper
         function escapeHtml(text) {
             if (!text) return '';

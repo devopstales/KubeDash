@@ -168,7 +168,7 @@
 {% endblock %}
 
 {% block add_tail_js %}
-<script>
+<script nonce="{{ csp_nonce }}">
     // IMMEDIATE: Prevent datatables-demo.js from initializing on loading row
     // Override jQuery ready to intercept datatables-demo.js initialization
     (function() {
@@ -344,29 +344,35 @@
             
             let usernameCell = escapeHtml(user.username);
             if (canEdit || canViewSelf) {
-                usernameCell = `<form action="/user/privilege" method="POST" onsubmit="sessionStorage.setItem('privilege_username', '${escapeHtml(user.username)}'); return true;">
-                    <input type="hidden" name="csrf_token" value="${csrf_token}">
-                    <input type="hidden" name="username" value="${escapeHtml(user.username)}"/>
-                    <a href="javascript:;" onclick="sessionStorage.setItem('privilege_username', '${escapeHtml(user.username)}'); parentNode.submit();">${escapeHtml(user.username)}</a>
+                // Use data attribute instead of inline JavaScript to prevent XSS
+                const safeUsername = escapeHtml(user.username);
+                usernameCell = `<form action="/user/privilege" method="POST" data-username="${safeUsername}" onsubmit="sessionStorage.setItem('privilege_username', this.dataset.username); return true;">
+                    <input type="hidden" name="csrf_token" value="${escapeHtml(csrf_token)}">
+                    <input type="hidden" name="username" value="${safeUsername}"/>
+                    <a href="javascript:;" onclick="const form = this.closest('form'); sessionStorage.setItem('privilege_username', form.dataset.username); form.submit();">${safeUsername}</a>
                 </form>`;
             }
             
             let actionCell = '';
             if (canEdit) {
+                // Use data attributes to prevent XSS in onclick handlers
+                const safeUsername = escapeHtml(user.username);
+                const safeRole = escapeHtml(user.role || '');
+                const safeUserType = escapeHtml(user.user_type || '');
                 actionCell = `<div class="d-flex flex-row">
                     <form action="/user/delete" method="POST">
-                        <input type="hidden" name="csrf_token" value="${csrf_token}">
-                        <button type="button" class="btn btn-success btn-just-icon btn-xs" onclick="openEditModal('${escapeHtml(user.username)}', '${escapeHtml(user.role || '')}', '${escapeHtml(user.user_type || '')}')">
+                        <input type="hidden" name="csrf_token" value="${escapeHtml(csrf_token)}">
+                        <button type="button" class="btn btn-success btn-just-icon btn-xs" data-username="${safeUsername}" data-role="${safeRole}" data-user-type="${safeUserType}" onclick="openEditModal(this.dataset.username, this.dataset.role, this.dataset.userType)">
                             <i class="material-icons">edit</i>
                         </button>
                         ${user.username !== current_username ? `
-                        <input type="hidden" name="username" value="${escapeHtml(user.username)}"/>
+                        <input type="hidden" name="username" value="${safeUsername}"/>
                         <button type="submit" rel="tooltip" class="btn btn-danger btn-just-icon btn-sm" value="upvote">
                             <i class="material-icons">delete</i>
                         </button>
                         ` : ''}
                     </form>
-                    <form action="/user/privilege/edit" method="POST" onsubmit="sessionStorage.setItem('privilege_edit_username', '${escapeHtml(user.username)}'); return true;">
+                    <form action="/user/privilege/edit" method="POST" data-username="${safeUsername}" onsubmit="sessionStorage.setItem('privilege_edit_username', this.dataset.username); return true;">
                         <input type="hidden" name="csrf_token" value="${csrf_token}">
                         <input type="hidden" name="username" value="${escapeHtml(user.username)}"/>
                         <button type="submit" rel="tooltip" class="btn btn-secondary btn-just-icon btn-sm" value="upvote">

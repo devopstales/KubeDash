@@ -188,7 +188,7 @@
 
 {% block add_tail_js %}
 {% include "segments/chartjs_snippet.html.j2" %}
-    <script>
+    <script nonce="{{ csp_nonce }}">
         // Function to detect Bootstrap dark mode and return appropriate text color
         function getThemeColor() {
             const isDark = document.documentElement.getAttribute('data-coreui-theme') === 'dark';
@@ -226,7 +226,7 @@
 
         observer.observe(document.documentElement, { attributes: true, attributeFilter: ['data-coreui-theme'] });
     </script>
-    <script>
+    <script nonce="{{ csp_nonce }}">
         // IMMEDIATE: Prevent datatables-demo.js from initializing on loading row
         // Override jQuery ready to intercept datatables-demo.js initialization
         (function() {
@@ -689,7 +689,7 @@
             
             if (!events || events.length === 0) {
                 console.log('No events to display');
-                // Clear tbody and add a single row with proper structure for DataTables
+                // Clear tbody - DataTables will show empty message
                 tbody.innerHTML = '';
                 // Initialize DataTable with language option to customize empty message
                 if ($.fn.DataTable && $(table).length) {
@@ -701,7 +701,15 @@
                         pageLength: 25,
                         language: {
                             emptyTable: "No cluster events found. This is normal if there are no recent warning or error events."
-                        }
+                        },
+                        columns: [
+                            { data: null, orderable: true },   // Type
+                            { data: null, orderable: true },   // Name
+                            { data: null, orderable: true },   // Namespace
+                            { data: null, orderable: true },   // Reason
+                            { data: null, orderable: true },   // Message
+                            { data: null, orderable: true }   // Count
+                        ]
                     });
                 }
                 return;
@@ -783,14 +791,25 @@
                         return;
                     }
                     
-                    // Initialize DataTable
+                    // Initialize DataTable with explicit column configuration
                     $(table).DataTable({
                         responsive: true,
                         pageLength: 25,
                         order: [[5, 'desc']], // Sort by Count column descending
                         language: {
                             emptyTable: "No cluster events found"
-                        }
+                        },
+                        columns: [
+                            { data: null, orderable: true },   // Type
+                            { data: null, orderable: true },   // Name
+                            { data: null, orderable: true },   // Namespace
+                            { data: null, orderable: true },   // Reason
+                            { data: null, orderable: true },   // Message
+                            { data: null, orderable: true }   // Count
+                        ],
+                        columnDefs: [
+                            { targets: '_all', defaultContent: '' }
+                        ]
                     });
                     
                     console.log('DataTable initialized successfully');

@@ -1,0 +1,7 @@
+# Same exclusions as former Bandit exclude_dirs
+tests
+migrations
+venv
+.venv
+__pycache__
+.pytest_cache

@@ -183,7 +183,7 @@
 
 {% block add_tail_js %}
 {% include "segments/chartjs_snippet.html.j2" %}
-<script>
+<script nonce="{{ csp_nonce }}">
     const escapeHtml = (text) => {
         if (text === null || text === undefined) return '';
         const map = {
@@ -852,7 +852,7 @@
         }
     });
 </script>
-    <script>
+    <script nonce="{{ csp_nonce }}">
         // Function to detect Bootstrap dark mode and return appropriate text color
         function getThemeColor() {
             const isDark = document.documentElement.getAttribute('data-coreui-theme') === 'dark';

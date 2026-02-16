@@ -713,10 +713,14 @@ jobs:
     steps:
       - uses: actions/checkout@v4
       
-      - name: Run Bandit SAST
+      - name: Run Semgrep SAST
         run: |
-          pip install bandit
-          bandit -r src/kubedash -f json -o bandit-report.json
+          pip install semgrep
+          mkdir -p security/reports
+          cd src/kubedash && semgrep --config=auto \
+            --exclude-rule python.lang.security.audit.assert_used.assert_used \
+            --exclude-rule python.lang.security.audit.subprocess-shell-true.subprocess-shell-true \
+            --json -o ../../security/reports/semgrep-report.json .
       
       - name: Run Safety Check
         run: |
@@ -728,6 +732,18 @@ jobs:
           pip install pip-audit
           pip-audit -r src/kubedash/requirements.txt
 ```
+
+### DefectDojo upload
+
+Reports under `security/reports/` (ZAP SARIF, Semgrep JSON, Trivy, Nikto, Nuclei) can be pushed to [DefectDojo](https://defectdojo.org/) via the Taskfile:
+
+```bash
+export DOJO_HOST="https://defectdojo.example.com"
+export DOJO_API="your-api-token"
+task defectdojo-upload
+```
+
+Optional: `DOJO_PRODUCT_NAME` (default `KubeDash`), `DOJO_ENGAGEMENT_NAME` (default `security-scan`), and `DOJO_REIMPORT=1` to use reimport-scan for updating an existing engagement. Create the product and a CI/CD engagement (e.g. `security-scan`) in DefectDojo first. See [Semgrep–DefectDojo integration](https://semgrep.dev/docs/kb/integrations/defect-dojo-integration) and the `defectdojo-upload` task in the Taskfile. `task kubedash-security-all` runs ZAP, Semgrep, Trivy, Nikto, and Nuclei (Nikto/Nuclei target is hardcoded to https://localhost:5000, like the ZAP plan).
 
 ---
 

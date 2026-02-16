@@ -1123,6 +1123,22 @@ def initialize_app_security(app: Flask):
     login_manager.session_protection = "strong"
 
     from flask_talisman import Talisman
+    import secrets
+    
+    # Generate CSP nonce for inline scripts (XSS protection)
+    # This will be set per-request in before_request handler
+    @app.before_request
+    def set_csp_nonce():
+        """Generate CSP nonce for inline scripts to prevent XSS"""
+        from flask import g
+        g.csp_nonce = secrets.token_urlsafe(16)
+        # Make nonce available to templates
+        app.jinja_env.globals['csp_nonce'] = g.csp_nonce
+    
+    # Build CSP policy - nonce will be added dynamically in after_request
+    # Note: 'unsafe-eval' removed for better XSS protection
+    # 'unsafe-inline' can be removed after migrating all inline scripts to use nonces
+    # The nonce is added dynamically in after_request handler
     csp = {
         'default-src': "'self'",
         'font-src': [
@@ -1132,14 +1148,16 @@ def initialize_app_security(app: Flask):
         ],
         'style-src': [
             "'self'",
-            "'unsafe-inline'",  # Needed for some frameworks
+            "'unsafe-inline'",  # Still needed for CSS frameworks and inline style attributes
+            # Nonce support can be added for <style> tags if needed
             'fonts.googleapis.com',
             'cdnjs.cloudflare.com',
         ],
         'script-src': [
             "'self'",
-            "'unsafe-inline'",  # Only if absolutely necessary
-            "'unsafe-eval'",
+            # Nonce will be added dynamically in after_request
+            # All templates now use nonces - 'unsafe-inline' removed for better security
+            # 'unsafe-eval' removed - significantly improves XSS protection
             'cdnjs.cloudflare.com',
             'www.googletagmanager.com',
             'unpkg.com',  # For Cytoscape.js (Flux plugin graph)
@@ -1185,7 +1203,9 @@ def initialize_app_security(app: Flask):
     """Init CSRF"""
     csrf.init_app(app)
 
-    app.talisman.content_security_policy = csp
+    # Disable Talisman's CSP - we'll set it manually in after_request with nonces
+    # Talisman processes CSP after our after_request handler, so we need to handle it ourselves
+    app.talisman.content_security_policy = None
     app.talisman.x_xss_protection = True
     app.talisman.session_cookie_secure = True
     app.talisman.session_cookie_samesite = 'Lax'
@@ -1193,6 +1213,10 @@ def initialize_app_security(app: Flask):
     @app.after_request
     def set_security_headers(response):
         """Add security headers for response"""
+        # Get the nonce from Flask's g context (set in before_request)
+        from flask import g
+        nonce_value = getattr(g, 'csp_nonce', None)
+        
         # Relax security headers for embedded app pages to allow iframe embedding
         is_embedded_app = (
             request.endpoint and 
@@ -1237,6 +1261,40 @@ def initialize_app_security(app: Flask):
             response.headers['Cross-Origin-Resource-Policy'] = "same-origin"
             response.headers['Cross-Origin-Embedder-Policy'] = "require-corp"
             response.headers['Cross-Origin-Opener-Policy'] = "same-origin"
+            
+            # Build CSP string with nonce support
+            # All templates now use nonces - 'unsafe-inline' removed from script-src
+            # 'unsafe-eval' already removed (prevents eval() and similar functions)
+            # 
+            # All inline scripts in templates now have nonce="{{ csp_nonce }}"
+            # 'unsafe-inline' removed from script-src for better security
+            
+            if nonce_value:
+                csp_parts = []
+                csp_parts.append("default-src 'self'")
+                csp_parts.append("font-src 'self' fonts.gstatic.com cdnjs.cloudflare.com")
+                csp_parts.append("style-src 'self' 'unsafe-inline' fonts.googleapis.com cdnjs.cloudflare.com")
+                
+                # Build script-src with nonce only (no 'unsafe-inline')
+                # All inline scripts now use nonces, so 'unsafe-inline' is not needed
+                script_src = f"'self' 'nonce-{nonce_value}' cdnjs.cloudflare.com www.googletagmanager.com unpkg.com cdn.socket.io"
+                csp_parts.append(f"script-src {script_src}")
+                
+                csp_parts.append("connect-src 'self' wss: ws:")
+                csp_parts.append("img-src 'self' data:")
+                
+                # Set the CSP header with nonce
+                response.headers['Content-Security-Policy'] = "; ".join(csp_parts)
+            else:
+                # Fallback if nonce not available (shouldn't happen, but safety check)
+                csp_parts = []
+                csp_parts.append("default-src 'self'")
+                csp_parts.append("font-src 'self' fonts.gstatic.com cdnjs.cloudflare.com")
+                csp_parts.append("style-src 'self' 'unsafe-inline' fonts.googleapis.com cdnjs.cloudflare.com")
+                csp_parts.append("script-src 'self' 'unsafe-inline' cdnjs.cloudflare.com www.googletagmanager.com unpkg.com cdn.socket.io")
+                csp_parts.append("connect-src 'self' wss: ws:")
+                csp_parts.append("img-src 'self' data:")
+                response.headers['Content-Security-Policy'] = "; ".join(csp_parts)
         
         response.headers["Access-Control-Max-Age"] = "600"
 

@@ -96,6 +96,8 @@ def UserTest(user):
         user (User): user object
     """
     with tracer.start_as_current_span("test-user") if tracer else nullcontext() as span:
+        # Use filter_by which automatically uses parameterized queries (SQL injection safe)
+        # SQLAlchemy ORM ensures user input is properly escaped
         user = User.query.filter_by(username=user).first()
         return user
 

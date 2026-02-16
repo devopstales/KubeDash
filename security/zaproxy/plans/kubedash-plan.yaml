@@ -1,0 +1,150 @@
+# ZAP API scan plan for KubeDash (ZAP-APIScan-AutomationFramework style)
+# Run with: task zap-scan (from repo root) or see README.md
+---
+env:
+  contexts:
+    - name: "kubedashContext"
+      urls:
+        - "https://host.docker.internal:5000/"
+      includePaths:
+        - "https://host.docker.internal:5000/.*"
+      excludePaths: []
+      authentication:
+        parameters: {}
+      verification:
+        method: "response"
+        pollFrequency: 60
+        pollUnits: "requests"
+      sessionManagement:
+        method: "cookie"
+        parameters: {}
+  parameters:
+    failOnError: true
+    failOnWarning: false
+    progressToStdout: true
+jobs:
+  - type: script
+    parameters:
+      action: "add"
+      type: "httpsender"
+      engine: "Oracle Nashorn"
+      name: "GetToken_kubedash"
+      file: "/zap/wrk/scripts/GetToken_kubedash.js"
+  - type: alertFilter
+    alertFilters:
+      - ruleId: 10021
+        ruleName: "X-Content-Type-Options Header Missing"
+        newRisk: "False Positive"
+        url: "https://host.docker.internal:5000/.*"
+        urlRegex: true
+  - type: openapi
+    parameters:
+      apiUrl: "https://host.docker.internal:5000/api/openapi.json"
+      targetUrl: "https://host.docker.internal:5000/"
+  - name: "activeScan"
+    type: "activeScan"
+    policyDefinition:
+      rules: []
+  - parameters:
+      template: "risk-confidence-html"
+      theme: "original"
+      reportDir: "/zap/wrk/reports/"
+      reportFile: "kubedashHtmlReport"
+      reportTitle: "KubeDash ZAP API Scan Report"
+      reportDescription: ""
+      displayReport: false
+      risks:
+        - "info"
+        - "low"
+        - "medium"
+        - "high"
+      confidences:
+        - "falsepositive"
+        - "low"
+        - "medium"
+        - "high"
+        - "confirmed"
+      sections:
+        - "siteRiskCounts"
+        - "responseBody"
+        - "appendix"
+        - "alertTypes"
+        - "responseHeader"
+        - "alertTypeCounts"
+        - "riskConfidenceCounts"
+        - "alerts"
+        - "aboutThisReport"
+        - "contents"
+        - "requestBody"
+        - "reportDescription"
+        - "reportParameters"
+        - "requestHeader"
+        - "summaries"
+      sites: []
+    name: "report"
+    type: "report"
+  - parameters:
+      template: "traditional-xml"
+      reportDir: "/zap/wrk/reports/"
+      reportFile: "kubedashXmlReport"
+      reportTitle: "KubeDash ZAP API Scan Report"
+      reportDescription: ""
+      displayReport: false
+      risks:
+        - "info"
+        - "low"
+        - "medium"
+        - "high"
+      confidences:
+        - "falsepositive"
+        - "low"
+        - "medium"
+        - "high"
+        - "confirmed"
+      sites: []
+    name: "report"
+    type: "report"
+  # JSON report (ZAP native format; usable by tooling / DefectDojo generic or conversion)
+  - parameters:
+      template: "traditional-json"
+      reportDir: "/zap/wrk/reports/"
+      reportFile: "kubedashJsonReport"
+      reportTitle: "KubeDash ZAP API Scan Report"
+      reportDescription: ""
+      displayReport: false
+      risks:
+        - "info"
+        - "low"
+        - "medium"
+        - "high"
+      confidences:
+        - "falsepositive"
+        - "low"
+        - "medium"
+        - "high"
+        - "confirmed"
+      sites: []
+    name: "report"
+    type: "report"
+  # SARIF JSON report for DefectDojo (Import Scan -> SARIF parser)
+  - parameters:
+      template: "sarif-json"
+      reportDir: "/zap/wrk/reports/"
+      reportFile: "kubedashSarifReport"
+      reportTitle: "KubeDash ZAP API Scan Report"
+      reportDescription: ""
+      displayReport: false
+      risks:
+        - "info"
+        - "low"
+        - "medium"
+        - "high"
+      confidences:
+        - "falsepositive"
+        - "low"
+        - "medium"
+        - "high"
+        - "confirmed"
+      sites: []
+    name: "report"
+    type: "report"

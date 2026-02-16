@@ -89,7 +89,7 @@ A convenient test runner script is provided:
 
 # Security tests and scans
 ./run_test.sh -t security          # Run security tests only
-./run_test.sh -s                   # Run security scans (bandit, safety, pip-audit)
+./run_test.sh -s                   # Run security scans (semgrep, safety, pip-audit)
 ./run_test.sh -t security -s       # Run security tests and scans
 
 # Show help
@@ -318,7 +318,7 @@ KubeDash includes comprehensive security tests to ensure the application is prot
 10. **Dependency Security** (`tests/security/test_dependency_security.py`)
     - Tests for known vulnerabilities in dependencies
     - Uses `safety` and `pip-audit` for scanning
-    - Static code analysis with `bandit`
+    - Static code analysis with `semgrep`
 
 ### Running Security Tests
 
@@ -329,7 +329,7 @@ KubeDash includes comprehensive security tests to ensure the application is prot
 # Run security tests with coverage
 ./run_test.sh -t security -c
 
-# Run security scans (bandit, safety, pip-audit)
+# Run security scans (semgrep, safety, pip-audit)
 ./run_test.sh -s
 
 # Run security tests and scans together
@@ -340,15 +340,17 @@ KubeDash includes comprehensive security tests to ensure the application is prot
 
 The test suite includes integration with security scanning tools:
 
-- **Bandit**: Static code analysis for security issues
+- **Semgrep**: Static code analysis for security issues (replaces Bandit)
 - **Safety**: Checks for known vulnerabilities in dependencies
 - **pip-audit**: Alternative dependency vulnerability scanner
 
 These tools are run automatically when using the `-s` flag or can be run manually:
 
 ```bash
-# Run Bandit
-poetry run bandit -r blueprint lib plugins -ll
+# Run Semgrep (with B101/B601 exclusions; paths in .semgrepignore)
+poetry run semgrep --config=auto \
+  --exclude-rule python.lang.security.audit.assert_used.assert_used \
+  --exclude-rule python.lang.security.audit.subprocess-shell-true.subprocess-shell-true .
 
 # Run Safety
 poetry run safety check
@@ -360,8 +362,9 @@ poetry run pip-audit
 ### Security Test Configuration
 
 Security tests are configured in:
-- `pyproject.toml` - Bandit configuration
-- `.bandit` - Bandit exclusion rules
+- `pyproject.toml` - dev/test dependencies (semgrep)
+- `.semgrepignore` - path exclusions (tests, migrations, venv, etc.)
+- CLI `--exclude-rule` - rule exclusions (assert_used, subprocess-shell-true, matching former Bandit B101/B601)
 - Test files use environment variables for optional slow scans:
   - `RUN_DEPENDENCY_SCANS=true` - Enable dependency vulnerability scans
   - `RUN_STATIC_ANALYSIS=true` - Enable static code analysis
