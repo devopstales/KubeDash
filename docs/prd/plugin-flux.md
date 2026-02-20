@@ -1,7 +1,7 @@
 # Product Requirements Document: Flux Plugin
 
 **Document Version**: 1.0  
-**Last Updated**: December 2025  
+**Last Updated**: February 2026  
 **Product**: KubeDash  
 **Feature Area**: Flux GitOps Plugin  
 **Status**: Active  

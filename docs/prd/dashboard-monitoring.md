@@ -1,7 +1,7 @@
 # Product Requirements Document: Dashboard & Monitoring
 
 **Document Version**: 1.0  
-**Last Updated**: December 2025  
+**Last Updated**: February 2026  
 **Product**: KubeDash  
 **Feature Area**: Dashboard & Monitoring  
 **Status**: Active  

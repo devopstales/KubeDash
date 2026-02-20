@@ -1,7 +1,7 @@
 # Product Requirements Document: Trivy Operator Plugin
 
 **Document Version**: 1.1  
-**Last Updated**: January 2025  
+**Last Updated**: February 2026  
 **Product**: KubeDash  
 **Feature Area**: Trivy Operator Security Plugin  
 **Status**: Active - MVP Implemented  

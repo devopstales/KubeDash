@@ -1,7 +1,7 @@
 # Product Requirements Document: Application Catalog Plugin
 
 **Document Version**: 1.0  
-**Last Updated**: December 2025  
+**Last Updated**: February 2026  
 **Product**: KubeDash  
 **Feature Area**: Application Catalog Plugin  
 **Status**: Active  

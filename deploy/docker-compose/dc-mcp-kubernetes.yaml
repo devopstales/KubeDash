@@ -1,0 +1,31 @@
+# Kubernetes MCP Server - part of main dev stack (see containers/kubernetes-mcp-server for standalone)
+# See: https://github.com/containers/kubernetes-mcp-server
+#
+# The kubeconfig file must exist on the host. Default: ~/.kube/config
+# Override host path: KUBECONFIG_HOST_PATH=/path/to/config docker compose -f ... up
+# Ensure the file exists (e.g. run kubectl, or copy from Docker Desktop / your cluster).
+#
+# OpenTelemetry (OTEL): run with dc-jaeger.yaml so traces go to Jaeger. Example:
+#   docker compose -f deploy/docker-compose/dc-jaeger.yaml -f deploy/docker-compose/dc-mcp-kubernetes.yaml up
+# See: https://github.com/containers/kubernetes-mcp-server/blob/main/docs/OTEL.md
+services:
+  kubernetes-mcp-server:
+    container_name: kubedash-kubernetes-mcp-server
+    image: quay.io/containers/kubernetes_mcp_server:latest
+    stdin_open: true   # keep process running (avoids exit on stdin EOF)
+    ports:
+      - "8082:8080"   # MCP HTTP/SSE (path /mcp and /sse)
+    environment:
+      TZ: Europe/Budapest
+      KUBECONFIG: /app/.kube/config
+      # OpenTelemetry: OTLP endpoint (use service name when run with dc-jaeger.yaml)
+      OTEL_EXPORTER_OTLP_ENDPOINT: "${OTEL_EXPORTER_OTLP_ENDPOINT:-http://kubedash-jaeger:4317}"
+      OTEL_METRICS_EXPORTER: "none"   # Jaeger is traces-only; avoids MetricsService warnings
+      OTEL_TRACES_SAMPLER: "${OTEL_TRACES_SAMPLER:-always_on}"
+    volumes:
+      # Mount kubeconfig file (not directory) so path is explicit; override with KUBECONFIG_HOST_PATH if needed
+      - "${KUBECONFIG_HOST_PATH:-$HOME/.kube/config}:/app/.kube/config:ro"
+    logging:
+      options:
+        max-size: "10k"
+        max-file: "3"

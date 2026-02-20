@@ -1,9 +1,9 @@
-# Product Requirements Document: Extension API
+# Product Requirements Document: API Extension
 
 **Document Version**: 1.0  
 **Last Updated**: February 2026  
 **Product**: KubeDash  
-**Feature Area**: Extension API (Kubernetes API Aggregation Layer)  
+**Feature Area**: API Extension (Kubernetes API Aggregation Layer)  
 **Status**: Active  
 
 ---
@@ -12,7 +12,7 @@
 
 > **Overall Progress: ~95% Complete**
 
-This section tracks the current implementation status against the requirements defined in this PRD.
+This PRD defines requirements for the **API Extension** feature: KubeDash registered as a Kubernetes API Extension Server (API Aggregation Layer), exposing Projects via a Kubernetes-native API for `kubectl` and other clients. For setup and integration details, see [Extension API](../integrations/extension-api.md).
 
 ### Feature Implementation Matrix
 
@@ -40,8 +40,8 @@ This section tracks the current implementation status against the requirements d
 #### Authentication
 | User Story | Status | Implementation File |
 |------------|--------|---------------------|
-| US-AUTH-001: ServiceAccount Token Auth | ✅ Done | `lib/extension_api.py` |
-| US-AUTH-002: Session Cookie Auth | ✅ Done | `lib/extension_api.py` |
+| US-AUTH-001: ServiceAccount Token Auth | ✅ Done | `lib/extension_api/` |
+| US-AUTH-002: Session Cookie Auth | ✅ Done | `lib/extension_api/` |
 | US-AUTH-003: Unauthenticated Rejection | ✅ Done | Returns 401 Status |
 
 #### Projects Resource
@@ -73,7 +73,7 @@ This section tracks the current implementation status against the requirements d
 - **Resource**: `projects` (cluster-scoped)
 - **CSRF Exemption**: Blueprint exempt for Bearer token auth
 - **Token Validation**: Uses Kubernetes TokenReview API
-- **Table Format**: Custom `_build_table_response()` for kubectl
+- **Table Format**: Custom table response for kubectl
 
 ### Endpoints Implemented
 
@@ -93,10 +93,10 @@ This section tracks the current implementation status against the requirements d
 
 ### Technical Debt & Known Issues
 
-1. **Watch support** - Not implemented, no real-time updates
-2. **Pagination** - Basic `limit` support, `continue` token not implemented
-3. **Field selectors** - Limited support
-4. **Subresources** - Status subresource not implemented
+1. **Watch support** — Not implemented; no real-time updates
+2. **Pagination** — Basic `limit` support; `continue` token not implemented
+3. **Field selectors** — Limited support
+4. **Subresources** — Status subresource not implemented
 
 ### Next Steps
 
@@ -111,12 +111,13 @@ This section tracks the current implementation status against the requirements d
 
 ### 1.1 Purpose
 
-This PRD defines the requirements for KubeDash's Extension API, which implements the Kubernetes API Aggregation Layer pattern. The Extension API exposes custom resources (Projects) through a Kubernetes-native API that can be consumed by kubectl, Kubernetes clients, and GitOps tools.
+This PRD defines the requirements for KubeDash’s **API Extension**: the component that implements the Kubernetes API Aggregation Layer pattern. The API Extension exposes custom resources (Projects) through a Kubernetes-native API that can be consumed by `kubectl`, Kubernetes clients, and GitOps tools.
 
 ### 1.2 Background
 
 Kubernetes API Aggregation allows extending the Kubernetes API with custom API servers. By implementing this pattern, KubeDash can expose its functionality through standard Kubernetes tooling. This enables:
-- Using kubectl to manage KubeDash resources
+
+- Using `kubectl` to manage KubeDash resources
 - GitOps workflows with ArgoCD, Flux
 - Automation via Kubernetes client libraries
 - Integration with existing Kubernetes toolchains
@@ -183,14 +184,7 @@ Kubernetes API Aggregation allows extending the Kubernetes API with custom API s
 
 **Acceptance Criteria**:
 - `GET /apis/kubedash.devopstales.github.io/v1` returns APIResourceList
-- Lists all resources with:
-  - Name (plural)
-  - Singular name
-  - Namespaced (boolean)
-  - Kind
-  - Verbs (get, list, create, update, patch, delete)
-  - Short names
-  - Categories
+- Lists all resources with: name (plural), singular name, namespaced (boolean), kind, verbs (get, list, create, update, patch, delete), short names, categories
 - Format matches Kubernetes conventions
 
 **Priority**: P0 (Critical)
@@ -204,8 +198,7 @@ Kubernetes API Aggregation allows extending the Kubernetes API with custom API s
 
 **Acceptance Criteria**:
 - `GET /apis/openapi/v2` returns OpenAPI spec
-- Spec documents all endpoints
-- Spec includes request/response schemas
+- Spec documents all endpoints and request/response schemas
 - Compatible with code generators
 
 **Priority**: P2 (Medium)
@@ -232,7 +225,7 @@ Kubernetes API Aggregation allows extending the Kubernetes API with custom API s
 
 #### US-AUTH-002: Session Cookie Authentication
 **As a** logged-in user  
-**I want to** use the Extension API from the browser  
+**I want to** use the API Extension from the browser  
 **So that** I can test API calls manually  
 
 **Acceptance Criteria**:
@@ -271,12 +264,8 @@ Kubernetes API Aggregation allows extending the Kubernetes API with custom API s
 - `GET /apis/kubedash.devopstales.github.io/v1/projects`
 - Returns ProjectList with items
 - Filters based on Kubernetes RBAC (namespace access)
-- Support query parameters:
-  - `labelSelector`: Filter by labels
-  - `fieldSelector`: Filter by fields
-  - `limit`: Maximum results
-  - `continue`: Pagination token
-- Support Table format for kubectl output
+- Support query parameters: `labelSelector`, `fieldSelector`, `limit`, `continue`
+- Support Table format for kubectl
 - Include resourceVersion for caching
 
 **Priority**: P0 (Critical)
@@ -290,11 +279,8 @@ Kubernetes API Aggregation allows extending the Kubernetes API with custom API s
 
 **Acceptance Criteria**:
 - `GET /apis/kubedash.devopstales.github.io/v1/projects/{name}`
-- Returns Project resource
-- 404 if project doesn't exist
-- 403 if user lacks permission
-- Includes all spec and status fields
-- Support Table format for kubectl
+- Returns Project resource; 404 if not found; 403 if user lacks permission
+- Includes all spec and status fields; supports Table format for kubectl
 
 **Priority**: P0 (Critical)
 
@@ -307,19 +293,9 @@ Kubernetes API Aggregation allows extending the Kubernetes API with custom API s
 
 **Acceptance Criteria**:
 - `POST /apis/kubedash.devopstales.github.io/v1/projects`
-- Request body includes:
-  - `apiVersion`: kubedash.devopstales.github.io/v1
-  - `kind`: Project
-  - `metadata.name`: Project name (required)
-  - `metadata.labels`: Optional labels
-  - `spec.protected`: Boolean (required)
-  - `spec.owner`: Optional, defaults to authenticated user
-  - `spec.repository`: Optional git repo URL
-  - `spec.pipeline`: Optional CI/CD URL
+- Request body: `apiVersion`, `kind`, `metadata.name` (required), `metadata.labels`, `spec.protected` (required), `spec.owner`, `spec.repository`, `spec.pipeline`
 - Creates corresponding Kubernetes namespace
-- Returns 201 Created with Project
-- Returns 409 Conflict if exists
-- Returns 403 if user lacks permission
+- Returns 201 Created; 409 Conflict if exists; 403 if user lacks permission
 - Validates name format (DNS compatible)
 
 **Priority**: P0 (Critical)
@@ -332,12 +308,8 @@ Kubernetes API Aggregation allows extending the Kubernetes API with custom API s
 **So that** I can modify its configuration  
 
 **Acceptance Criteria**:
-- `PUT /apis/kubedash.devopstales.github.io/v1/projects/{name}`
-- Full replacement of spec
-- Updates namespace annotations
-- Returns 200 OK with updated Project
-- Returns 404 if not found
-- Returns 403 if user lacks permission
+- `PUT /apis/kubedash.devopstales.github.io/v1/projects/{name}`; full replacement of spec
+- Updates namespace annotations; returns 200 OK; 404 if not found; 403 if user lacks permission
 - Supports resourceVersion for optimistic concurrency
 
 **Priority**: P1 (High)
@@ -350,12 +322,8 @@ Kubernetes API Aggregation allows extending the Kubernetes API with custom API s
 **So that** I can make targeted changes  
 
 **Acceptance Criteria**:
-- `PATCH /apis/kubedash.devopstales.github.io/v1/projects/{name}`
-- Merge patch of provided fields
-- Only updates specified fields
-- Returns 200 OK with updated Project
-- Returns 404 if not found
-- Returns 403 if user lacks permission
+- `PATCH /apis/kubedash.devopstales.github.io/v1/projects/{name}`; merge patch of provided fields
+- Returns 200 OK; 404 if not found; 403 if user lacks permission
 
 **Priority**: P1 (High)
 
@@ -369,11 +337,7 @@ Kubernetes API Aggregation allows extending the Kubernetes API with custom API s
 **Acceptance Criteria**:
 - `DELETE /apis/kubedash.devopstales.github.io/v1/projects/{name}`
 - Deletes corresponding Kubernetes namespace
-- Returns 200 OK with Status
-- Returns 404 if not found
-- Returns 403 if:
-  - User lacks permission
-  - Project is protected (`spec.protected: true`)
+- Returns 200 OK with Status; 404 if not found; 403 if user lacks permission or project is protected
 - Log deletion for audit
 
 **Priority**: P1 (High)
@@ -390,18 +354,7 @@ Kubernetes API Aggregation allows extending the Kubernetes API with custom API s
 **Acceptance Criteria**:
 - `kubectl get projects` works
 - Output shows: NAME, PROTECTED, OWNER, STATUS, AGE
-- Supports `-o wide`, `-o yaml`, `-o json`
-- Supports `-n` flag (ignored, projects are cluster-scoped)
-- Supports `--selector` for label filtering
-
-**Example**:
-```
-$ kubectl get projects
-NAME          PROTECTED   OWNER           STATUS   AGE
-production    true        platform-team   Active   30d
-staging       false       dev-team        Active   25d
-development   false       dev-team        Active   20d
-```
+- Supports `-o wide`, `-o yaml`, `-o json`, `--selector`
 
 **Priority**: P0 (Critical)
 
@@ -413,24 +366,8 @@ development   false       dev-team        Active   20d
 **So that** I can use declarative configuration  
 
 **Acceptance Criteria**:
-- `kubectl apply -f project.yaml` works
-- `kubectl create -f project.yaml` works
+- `kubectl apply -f project.yaml` and `kubectl create -f project.yaml` work
 - Supports stdin: `cat project.yaml | kubectl apply -f -`
-
-**Example YAML**:
-```yaml
-apiVersion: kubedash.devopstales.github.io/v1
-kind: Project
-metadata:
-  name: my-project
-  labels:
-    team: backend
-spec:
-  protected: false
-  owner: john.doe
-  repository: https://github.com/company/my-project
-  pipeline: https://ci.example.com/my-project
-```
 
 **Priority**: P0 (Critical)
 
@@ -443,9 +380,7 @@ spec:
 
 **Acceptance Criteria**:
 - `kubectl delete project my-project` works
-- Respects protected flag (returns error)
-- Supports `--force` (does not override protected)
-- Clear error message for protected projects
+- Respects protected flag (returns error); clear error message for protected projects
 
 **Priority**: P1 (High)
 
@@ -456,14 +391,12 @@ spec:
 #### US-HEALTH-001: Health Check Endpoint
 **As a** Kubernetes API server  
 **I want** a health check endpoint  
-**So that** I can verify Extension API is healthy  
+**So that** I can verify the API Extension is healthy  
 
 **Acceptance Criteria**:
 - `GET /apis/healthz` returns 'ok' (text/plain)
-- Used by APIService health checking
-- No authentication required
-- Returns 200 when healthy
-- Fast response (< 100ms)
+- Used by APIService health checking; no authentication required
+- Returns 200 when healthy; fast response (< 100ms)
 
 **Priority**: P0 (Critical)
 
@@ -545,7 +478,7 @@ spec:
 
 ### 6.1 API Registration
 
-To integrate with Kubernetes API discovery:
+To integrate with Kubernetes API discovery, register an APIService (see [Extension API - Registering](../integrations/extension-api.md#registering-kubedash-as-an-api-extension-server)):
 
 ```yaml
 apiVersion: apiregistration.k8s.io/v1
@@ -573,15 +506,14 @@ metadata:
   name: string              # Required: DNS-compatible name
   uid: string               # Auto-generated
   creationTimestamp: string # Auto-generated
-  labels: map[string]string # Optional
-  annotations: map[string]string # Optional
+  labels: map[string]string
+  annotations: map[string]string
 spec:
   protected: boolean        # Required: Deletion protection
-  owner: string             # Optional: Project owner
-  repository: string        # Optional: Git repository URL
-  pipeline: string          # Optional: CI/CD pipeline URL
-  finalizers:               # System-managed
-    - string
+  owner: string
+  repository: string
+  pipeline: string
+  finalizers: []
 status:
   phase: string             # Active | Terminating
   namespace: string         # Linked K8s namespace
@@ -589,86 +521,11 @@ status:
 
 ### 6.3 Token Validation
 
-```python
-# Validate ServiceAccount token
-def validate_serviceaccount_token(token):
-    """Validate token using Kubernetes TokenReview API"""
-    api = k8s_client.AuthenticationV1Api()
-    review = k8s_client.V1TokenReview(
-        spec=k8s_client.V1TokenReviewSpec(token=token)
-    )
-    result = api.create_token_review(review)
-    return result.status.authenticated
-```
+Token validation uses the Kubernetes TokenReview API to validate Bearer tokens and derive user identity. Implemented in `lib/extension_api/authentication`.
 
 ---
 
-## 7. User Interface Guidelines
-
-### 7.1 API Responses
-
-All responses follow Kubernetes conventions:
-
-**Success (List)**:
-```json
-{
-  "kind": "ProjectList",
-  "apiVersion": "kubedash.devopstales.github.io/v1",
-  "metadata": {
-    "resourceVersion": "12345"
-  },
-  "items": [...]
-}
-```
-
-**Error**:
-```json
-{
-  "kind": "Status",
-  "apiVersion": "v1",
-  "status": "Failure",
-  "message": "projects \"foo\" not found",
-  "reason": "NotFound",
-  "details": {
-    "name": "foo",
-    "group": "kubedash.devopstales.github.io",
-    "kind": "projects"
-  },
-  "code": 404
-}
-```
-
-### 7.2 Table Format
-
-For kubectl output:
-
-| Column | Source | Priority |
-|--------|--------|----------|
-| NAME | metadata.name | 0 |
-| PROTECTED | spec.protected | 0 |
-| OWNER | spec.owner | 0 |
-| STATUS | status.phase | 0 |
-| AGE | metadata.creationTimestamp | 0 |
-
----
-
-## 8. Dependencies
-
-### 8.1 Internal Dependencies
-
-- Authentication system (session validation)
-- Kubernetes library (namespace operations)
-- Database (optional, for caching)
-
-### 8.2 External Dependencies
-
-- Kubernetes API Server
-- TokenReview API
-- Namespace API
-
----
-
-## 9. Risks & Mitigations
+## 7. Risks & Mitigations
 
 | Risk | Impact | Probability | Mitigation |
 |------|--------|-------------|------------|
@@ -680,7 +537,7 @@ For kubectl output:
 
 ---
 
-## 10. Success Metrics
+## 8. Success Metrics
 
 | Metric | Target | Measurement |
 |--------|--------|-------------|
@@ -691,9 +548,9 @@ For kubectl output:
 
 ---
 
-## 11. Future Considerations
+## 9. Future Considerations
 
-### 11.1 Potential Enhancements
+### 9.1 Potential Enhancements
 
 1. **Watch Support**: Real-time updates via watch streams
 2. **Admission Webhooks**: Validate project configurations
@@ -703,7 +560,7 @@ For kubectl output:
 6. **Multi-cluster**: Cross-cluster project federation
 7. **Quota Management**: Project resource quotas
 
-### 11.2 Out of Scope (This Version)
+### 9.2 Out of Scope (This Version)
 
 - Watch/streaming API
 - Admission webhooks
@@ -713,9 +570,9 @@ For kubectl output:
 
 ---
 
-## 12. Appendix
+## 10. Appendix
 
-### 12.1 API Endpoints Summary
+### 10.1 API Endpoints Summary
 
 | Method | Path | Description |
 |--------|------|-------------|
@@ -731,7 +588,7 @@ For kubectl output:
 | GET | /apis/healthz | Health check |
 | GET | /apis/openapi/v2 | OpenAPI spec |
 
-### 12.2 HTTP Status Codes
+### 10.2 HTTP Status Codes
 
 | Code | Meaning |
 |------|---------|
@@ -743,6 +600,12 @@ For kubectl output:
 | 404 | Not Found |
 | 409 | Conflict (Already Exists) |
 | 500 | Internal Server Error |
+
+### 10.3 Related Documentation
+
+- [Extension API (integration guide)](../integrations/extension-api.md) — Setup, TLS, RBAC, APIService
+- [Extension API Testing](../development/extension-api-testing.md) — Testing with kubectl after install
+- [API Reference - Extension API](../development/api-reference.md#extension-api) — Full API reference
 
 ---
 

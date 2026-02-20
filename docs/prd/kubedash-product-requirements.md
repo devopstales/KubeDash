@@ -1,7 +1,7 @@
 # Product Requirements Document: KubeDash
 
 **Document Version**: 4.1  
-**Last Updated**: December 2025  
+**Last Updated**: February 2026  
 **Product**: KubeDash  
 **Status**: Active  
 
@@ -600,25 +600,30 @@ This master PRD references the following detailed PRD documents:
    - Projects resource
    - OpenAPI specification
 
-5. **[Plugin: Cert-Manager](./plugin-cert-manager.md)**
+5. **[MCP Integration](./mcp-integration.md)**
+   - AI chatbot with in-app chat panel
+   - MCP (Model Context Protocol) integration for cluster context
+   - Natural language cluster queries and optional actions
+
+6. **[Plugin: Cert-Manager](./plugin-cert-manager.md)**
    - Certificate management
 
-6. **[Plugin: Trivy Operator](./plugin-trivy-operator.md)**
+7. **[Plugin: Trivy Operator](./plugin-trivy-operator.md)**
    - Security scanning and compliance
 
-7. **[Plugin: FluxCD](./plugin-flux.md)**
+8. **[Plugin: FluxCD](./plugin-flux.md)**
    - GitOps visualization and management
 
-8. **[Plugin: Gateway API](./plugin-gateway-api.md)**
+9. **[Plugin: Gateway API](./plugin-gateway-api.md)**
    - Gateway and route management
 
-9. **[Plugin: Helm](./plugin-helm.md)**
+10. **[Plugin: Helm](./plugin-helm.md)**
    - Helm chart and release management
 
-10. **[Plugin: Registry](./plugin-registry.md)**
+11. **[Plugin: Registry](./plugin-registry.md)**
     - Docker registry integration
 
-11. **[Plugin: External LoadBalancer](./plugin-external-loadbalancer.md)**
+12. **[Plugin: External LoadBalancer](./plugin-external-loadbalancer.md)**
     - LoadBalancer service management
 
 ---
@@ -744,4 +749,4 @@ All missing resources should follow the same patterns as existing resources:
 
 *Document Owner: Product Management*  
 *Stakeholders: Engineering, UX, Security, Operations*  
-*Last Review Date: December 2025*
+*Last Review Date: February 2026*

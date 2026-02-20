@@ -214,7 +214,8 @@ def initialize_app_configuration(app: Flask, external_config_name: str) -> bool:
             'registry': 'false',
             'helm': 'true',
             'gateway_api': 'false',
-            'cert_manager': 'false'
+            'cert_manager': 'false',
+            'mcp_integration': 'false'
         }
 
     app.config['kubedash.ini'] = config_ini

@@ -45,6 +45,7 @@ nav:
       - Architecture: development/architecture.md
       - Developer Guide: development/developer-guide.md
       - Testing Guide: development/testing.md
+      - Extension API Testing: development/extension-api-testing.md
       - Security Guide: development/security.md
       - API Reference: development/api-reference.md
       - Product Overview: development/product-overview.md
@@ -55,6 +56,7 @@ nav:
       - Authentication & Users: prd/authentication-user-management.md
       - Workload Management: prd/workload-management.md
       - Dashboard & Monitoring: prd/dashboard-monitoring.md
+      - API Extension: prd/api-extension.md
       - Extension API: prd/extension-api.md
       - Helm Plugin: prd/plugin-helm.md
       - Registry Plugin: prd/plugin-registry.md

@@ -1,7 +1,7 @@
 # Product Requirements Document: Helm Plugin
 
 **Document Version**: 1.0  
-**Last Updated**: December 2025  
+**Last Updated**: February 2026  
 **Product**: KubeDash  
 **Feature Area**: Helm Plugin  
 **Status**: Active  

@@ -4,7 +4,7 @@ env:
   VERSION: "4.1.0"
   DATE: 
     sh: date "+%Y.%m.%d"
-  DCFILES: "-f dc-nginx.yaml -f dc-postgresql.yaml -f dc-redis.yaml -f dc-registry.yaml -f dc-exporter.yaml -f dc-jaeger.yaml -f dc-kubeview.yaml"
+  DCFILES: "-f dc-nginx.yaml -f dc-postgresql.yaml -f dc-redis.yaml -f dc-registry.yaml -f dc-exporter.yaml -f dc-jaeger.yaml -f dc-kubeview.yaml -f dc-mcp-kubernetes.yaml"
 
 tasks:
   default:
