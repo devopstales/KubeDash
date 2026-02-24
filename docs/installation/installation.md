@@ -33,6 +33,10 @@ You can uninstall the operator with the following command:
 helm uninstall kubedash
 ```
 
+### Air-gapped deployment
+
+KubeDash serves all JavaScript, CSS, and fonts from its own static assets. No CDNs or external URLs are used for the UI, so the application runs in air-gapped environments without internet access. Vendor libraries (e.g. Cytoscape for the Flux graph, Material Icons font) are bundled under `src/kubedash/static/vendor/`. To refresh these assets when building from source, run `./scripts/download-vendor-assets.sh` (requires network once); the downloaded files are then committed for offline use.
+
 [minikube]: https://minikube.sigs.k8s.io/docs/start/
 [kind]: https://kind.sigs.k8s.io/
 [microk8s]: https://microk8s.io

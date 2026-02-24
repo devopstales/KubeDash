@@ -1140,39 +1140,24 @@ def initialize_app_security(app: Flask):
     # Note: 'unsafe-eval' removed for better XSS protection
     # 'unsafe-inline' can be removed after migrating all inline scripts to use nonces
     # The nonce is added dynamically in after_request handler
+    # Air-gapped: no CDNs; all assets served from 'self' (local static files)
     csp = {
         'default-src': "'self'",
-        'font-src': [
-            "'self'",
-            'fonts.gstatic.com',
-            'cdnjs.cloudflare.com',
-        ],
+        'font-src': ["'self'"],
         'style-src': [
             "'self'",
             "'unsafe-inline'",  # Still needed for CSS frameworks and inline style attributes
-            # Nonce support can be added for <style> tags if needed
-            'fonts.googleapis.com',
-            'cdnjs.cloudflare.com',
         ],
         'script-src': [
             "'self'",
             # Nonce will be added dynamically in after_request
-            # All templates now use nonces - 'unsafe-inline' removed for better security
-            # 'unsafe-eval' removed - significantly improves XSS protection
-            'cdnjs.cloudflare.com',
-            'www.googletagmanager.com',
-            'unpkg.com',  # For Cytoscape.js (Flux plugin graph)
-            'cdn.socket.io',  # For Socket.IO (real-time updates)
         ],
         'connect-src': [
             "'self'",
             'wss:',  # WebSocket connections
             'ws:',   # WebSocket connections (dev)
         ],
-        'img-src': [
-            "'self'",
-            'data:',
-        ]
+        'img-src': ["'self'", 'data:'],
     }
 
     hsts = {
@@ -1273,12 +1258,10 @@ def initialize_app_security(app: Flask):
             if nonce_value:
                 csp_parts = []
                 csp_parts.append("default-src 'self'")
-                csp_parts.append("font-src 'self' fonts.gstatic.com cdnjs.cloudflare.com")
-                csp_parts.append("style-src 'self' 'unsafe-inline' fonts.googleapis.com cdnjs.cloudflare.com")
-                
-                # Build script-src with nonce only (no 'unsafe-inline')
-                # All inline scripts now use nonces, so 'unsafe-inline' is not needed
-                script_src = f"'self' 'nonce-{nonce_value}' cdnjs.cloudflare.com www.googletagmanager.com unpkg.com cdn.socket.io"
+                csp_parts.append("font-src 'self'")
+                csp_parts.append("style-src 'self' 'unsafe-inline'")
+                # Air-gapped: script-src only 'self' and nonce (no CDNs)
+                script_src = f"'self' 'nonce-{nonce_value}'"
                 csp_parts.append(f"script-src {script_src}")
                 
                 csp_parts.append("connect-src 'self' wss: ws:")
@@ -1290,9 +1273,9 @@ def initialize_app_security(app: Flask):
                 # Fallback if nonce not available (shouldn't happen, but safety check)
                 csp_parts = []
                 csp_parts.append("default-src 'self'")
-                csp_parts.append("font-src 'self' fonts.gstatic.com cdnjs.cloudflare.com")
-                csp_parts.append("style-src 'self' 'unsafe-inline' fonts.googleapis.com cdnjs.cloudflare.com")
-                csp_parts.append("script-src 'self' 'unsafe-inline' cdnjs.cloudflare.com www.googletagmanager.com unpkg.com cdn.socket.io")
+                csp_parts.append("font-src 'self'")
+                csp_parts.append("style-src 'self' 'unsafe-inline'")
+                csp_parts.append("script-src 'self' 'unsafe-inline'")
                 csp_parts.append("connect-src 'self' wss: ws:")
                 csp_parts.append("img-src 'self' data:")
                 response.headers['Content-Security-Policy'] = "; ".join(csp_parts)

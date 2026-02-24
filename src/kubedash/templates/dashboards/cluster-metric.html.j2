@@ -248,7 +248,6 @@
                                     return Array.from(cells).some(cell => cell.hasAttribute('colspan'));
                                 });
                                 if (hasColspanRow) {
-                                    console.log('Blocked DataTable initialization on loading row');
                                     return this; // Return jQuery object, don't initialize
                                 }
                             }
@@ -285,12 +284,9 @@
                                 return Array.from(cells).some(cell => cell.hasAttribute('colspan'));
                             });
                             if (hasColspanRow) {
-                                console.log('Destroying auto-initialized DataTable on loading row');
                                 try {
                                     $(table).DataTable().destroy();
-                                } catch(e) {
-                                    console.error('Error destroying DataTable:', e);
-                                }
+                                } catch (_) {}
                             }
                         }
                     }
@@ -665,17 +661,13 @@
         
         // Populate events table
         function populateEventsTable(events) {
-            console.log('populateEventsTable called with:', events); // Debug log
             const tbody = document.getElementById('events-tbody');
             const table = document.getElementById('dataTable');
             
-            // Destroy any existing DataTable instance first (in case it was auto-initialized)
             if (table && typeof $ !== 'undefined' && $.fn.DataTable && $.fn.DataTable.isDataTable(table)) {
-                console.log('Destroying existing DataTable before populating');
                 $(table).DataTable().destroy();
             }
             
-            // Show loading state while processing
             tbody.innerHTML = `
                 <tr>
                     <td colspan="6" class="text-center">
@@ -688,7 +680,6 @@
             `;
             
             if (!events || events.length === 0) {
-                console.log('No events to display');
                 // Clear tbody - DataTables will show empty message
                 tbody.innerHTML = '';
                 // Initialize DataTable with language option to customize empty message
@@ -701,49 +692,37 @@
                         pageLength: 25,
                         language: {
                             emptyTable: "No cluster events found. This is normal if there are no recent warning or error events."
-                        },
-                        columns: [
-                            { data: null, orderable: true },   // Type
-                            { data: null, orderable: true },   // Name
-                            { data: null, orderable: true },   // Namespace
-                            { data: null, orderable: true },   // Reason
-                            { data: null, orderable: true },   // Message
-                            { data: null, orderable: true }   // Count
-                        ]
+                        }
                     });
                 }
                 return;
             }
             
-            console.log('Processing', events.length, 'events');
-            
-            // Helper function to escape HTML (simple version)
             const escapeHtml = (text) => {
                 if (text === null || text === undefined) return '';
-                const map = {
-                    '&': '&amp;',
-                    '<': '&lt;',
-                    '>': '&gt;',
-                    '"': '&quot;',
-                    "'": '&#039;'
-                };
+                const map = { '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#039;' };
                 return String(text).replace(/[&<>"']/g, m => map[m]);
             };
+            const escapeAttr = (text) => {
+                if (text === null || text === undefined) return '';
+                return String(text).replace(/&/g, '&amp;').replace(/"/g, '&quot;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
+            };
             
-            // Build HTML rows
             const rowsHtml = events.map(event => {
                 const kind = escapeHtml(event.involvedObjectKind || '');
-                const name = escapeHtml(event.involvedObjectName || '');
-                const namespace = escapeHtml(event.namespace || '');
+                const rawName = (event.involvedObjectName != null && event.involvedObjectName !== '') ? String(event.involvedObjectName) : '';
+                const name = escapeHtml(rawName);
+                const rawNs = (event.namespace != null && event.namespace !== '') ? String(event.namespace) : '';
+                const namespace = escapeHtml(rawNs);
                 const reason = escapeHtml(event.reason || '');
                 const message = escapeHtml(event.message || '');
-                const count = event.count || 0;
+                const count = (event.count != null && event.count !== '') ? Number(event.count) : 0;
                 
-                const nameCell = event.involvedObjectKind === 'Pod' 
+                const nameCell = event.involvedObjectKind === 'Pod' && rawName
                     ? `<form action="/workload/pods" method="POST">
-                         <input type="hidden" name="csrf_token" value="${csrf_token}">
-                         <input type="hidden" name="ns_select" value="${namespace}" />
-                         <input type="hidden" name="selected" value="${name}" />                                
+                         <input type="hidden" name="csrf_token" value="${escapeAttr(csrf_token)}">
+                         <input type="hidden" name="ns_select" value="${escapeAttr(rawNs)}">
+                         <input type="hidden" name="selected" value="${escapeAttr(rawName)}">
                          <a href="javascript:;" onclick="parentNode.submit();">${name}</a>
                        </form>`
                     : name;
@@ -762,61 +741,23 @@
                 `;
             }).join('');
             
-            // Set innerHTML
             tbody.innerHTML = rowsHtml;
             
-            // Verify rows were added
-            const rowCount = tbody.querySelectorAll('tr').length;
-            console.log('Rows added to tbody:', rowCount);
-            
-            // Small delay to ensure DOM is updated, then initialize DataTable
             setTimeout(() => {
-                if ($.fn.DataTable && $(table).length) {
-                    // Check if DataTable is already initialized
+                if ($.fn.DataTable && $(table).length && tbody.querySelectorAll('tr').length > 0) {
                     if ($.fn.DataTable.isDataTable(table)) {
-                        console.log('Destroying existing DataTable');
-                        // Save the tbody HTML before destroying (destroy removes rows from DOM)
                         const savedRows = tbody.innerHTML;
                         $(table).DataTable().destroy();
-                        // Restore the rows after destroying
                         tbody.innerHTML = savedRows;
                     }
-                    
-                    // Verify rows still exist before initializing
-                    const currentRowCount = tbody.querySelectorAll('tr').length;
-                    console.log('Initializing DataTable with', currentRowCount, 'rows');
-                    
-                    if (currentRowCount === 0) {
-                        console.error('No rows found in tbody after DataTable destroy/restore');
-                        return;
-                    }
-                    
-                    // Initialize DataTable with explicit column configuration
                     $(table).DataTable({
                         responsive: true,
                         pageLength: 25,
-                        order: [[5, 'desc']], // Sort by Count column descending
-                        language: {
-                            emptyTable: "No cluster events found"
-                        },
-                        columns: [
-                            { data: null, orderable: true },   // Type
-                            { data: null, orderable: true },   // Name
-                            { data: null, orderable: true },   // Namespace
-                            { data: null, orderable: true },   // Reason
-                            { data: null, orderable: true },   // Message
-                            { data: null, orderable: true }   // Count
-                        ],
-                        columnDefs: [
-                            { targets: '_all', defaultContent: '' }
-                        ]
+                        order: [[5, 'desc']],
+                        language: { emptyTable: "No cluster events found" }
                     });
-                    
-                    console.log('DataTable initialized successfully');
-                } else {
-                    console.error('jQuery or DataTable not available for initialization');
                 }
-            }, 50); // Small delay to ensure DOM is fully updated
+            }, 50);
         }
         
         // Load data using fetch() - following Flask fetch pattern
@@ -829,7 +770,6 @@
             }
             
             if (typeof $ === 'undefined' || typeof $.fn.DataTable === 'undefined') {
-                console.error('jQuery or DataTables not loaded after waiting');
                 return;
             }
             
@@ -847,82 +787,85 @@
                             return Array.from(cells).some(cell => cell.hasAttribute('colspan'));
                         });
                         if (hasColspanRow) {
-                            console.log('Destroying auto-initialized DataTable instance on loading row');
                             $(table).DataTable().destroy();
                         }
                     } else {
-                        // No tbody or empty, destroy anyway
-                        console.log('Destroying auto-initialized DataTable instance (no valid tbody)');
                         $(table).DataTable().destroy();
                     }
                 }
             }
             
-            try {
-                // Fetch cluster metrics
-                const metricsResponse = await fetch(metrics_url);
-                if (!metricsResponse.ok) {
-                    throw new Error(`HTTP error! status: ${metricsResponse.status}`);
-                }
-                const metricsData = await metricsResponse.json();
-                
-                if (metricsData.error) {
-                    throw new Error(metricsData.message || 'Failed to load metrics');
-                }
-                
-                const metrics = metricsData.data;
-                
-                // Initialize charts with fetched data
-                initCPUChart(metrics);
-                initMemoryChart(metrics);
-                initPodChart(metrics);
-                
-                // Fetch cluster events
-                console.log('Fetching events from:', events_url);
-                const eventsResponse = await fetch(events_url + '?limit=100');
-                if (!eventsResponse.ok) {
-                    throw new Error(`HTTP error! status: ${eventsResponse.status}`);
-                }
-                const eventsData = await eventsResponse.json();
-                
-                console.log('Events API response:', eventsData); // Debug log
-                
-                if (eventsData.error) {
-                    throw new Error(eventsData.message || 'Failed to load events');
-                }
-                
-                // Check if data exists and is an array
-                if (!eventsData.data) {
-                    console.warn('Events data is missing or undefined');
-                    populateEventsTable([]);
-                } else if (!Array.isArray(eventsData.data)) {
-                    console.warn('Events data is not an array:', typeof eventsData.data, eventsData.data);
-                    populateEventsTable([]);
-                } else {
-                    console.log('Populating events table with', eventsData.data.length, 'events');
-                    // Populate events table
-                    populateEventsTable(eventsData.data);
-                }
-                
-            } catch (error) {
-                console.error('Error loading cluster metrics:', error);
-                
-                // Show error messages
+            function setEventsTableMessage(message, isError) {
                 const tbody = document.getElementById('events-tbody');
-                if (tbody) {
-                    tbody.innerHTML = '<tr><td colspan="6" class="text-center text-danger">Error loading events: ' + error.message + '</td></tr>';
-                    
-                    // Initialize DataTable even with error message
-                    const table = document.getElementById('dataTable');
-                    if ($.fn.DataTable && $(table).length && !$.fn.DataTable.isDataTable(table)) {
-                        $(table).DataTable({
-                            responsive: true,
-                            pageLength: 25
-                        });
+                const table = document.getElementById('dataTable');
+                if (!tbody || !table) return;
+                if ($.fn.DataTable && $.fn.DataTable.isDataTable(table)) {
+                    $(table).DataTable().destroy();
+                }
+                tbody.innerHTML = '<tr><td colspan="6" class="text-center ' + (isError ? 'text-danger' : 'text-warning') + '">' + message + '</td></tr>';
+                if ($.fn.DataTable && $(table).length) {
+                    $(table).DataTable({ responsive: true, pageLength: 25 });
+                }
+            }
+
+            function safeParseJson(text) {
+                const t = text && text.trim();
+                if (!t || (t[0] !== '{' && t[0] !== '[')) return null;
+                try {
+                    return JSON.parse(text);
+                } catch (_) {
+                    return null;
+                }
+            }
+
+            try {
+                // Fetch cluster metrics (never parse as JSON unless body clearly is JSON)
+                const metricsResponse = await fetch(metrics_url, { credentials: 'same-origin' });
+                if (metricsResponse.ok) {
+                    const metricsText = await metricsResponse.text();
+                    const metricsData = safeParseJson(metricsText);
+                    if (metricsData && !metricsData.error && metricsData.data) {
+                        initCPUChart(metricsData.data);
+                        initMemoryChart(metricsData.data);
+                        initPodChart(metricsData.data);
                     }
                 }
-                
-                // Update metric placeholders with error
+                const cpuCapacity = document.getElementById('cpu-capacity');
+                const memoryCapacity = document.getElementById('memory-capacity');
+                const podCurrent = document.getElementById('pod-current');
+                if (cpuCapacity && cpuCapacity.textContent === 'Loading...') cpuCapacity.textContent = '—';
+                if (memoryCapacity && memoryCapacity.textContent === 'Loading...') memoryCapacity.textContent = '—';
+                if (podCurrent && podCurrent.textContent === 'Loading...') podCurrent.textContent = '—';
+
+                const eventsResponse = await fetch(events_url + '?limit=100', { credentials: 'same-origin' });
+                if (!eventsResponse.ok) {
+                    setEventsTableMessage('Error loading events: HTTP ' + eventsResponse.status, true);
+                    return;
+                }
+                const eventsText = await eventsResponse.text();
+                let eventsData = safeParseJson(eventsText);
+                if (eventsData === null) {
+                    if (eventsText.trim()) {
+                        setEventsTableMessage('Unable to load events. If this persists, try refreshing the page or re-login.', false);
+                    } else {
+                        eventsData = { data: [] };
+                    }
+                }
+
+                if (eventsData) {
+                    if (eventsData.error) {
+                        setEventsTableMessage(eventsData.message || 'Failed to load events', true);
+                        return;
+                    }
+                    const list = eventsData.data;
+                    if (!Array.isArray(list)) {
+                        populateEventsTable([]);
+                    } else {
+                        populateEventsTable(list);
+                    }
+                }
+            } catch (error) {
+                setEventsTableMessage('Error loading events: ' + (error.message || 'Unknown error'), true);
                 const errorMsg = 'Error loading data';
                 const cpuCapacity = document.getElementById('cpu-capacity');
                 const memoryCapacity = document.getElementById('memory-capacity');
