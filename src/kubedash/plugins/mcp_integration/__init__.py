@@ -105,10 +105,16 @@ def _build_resource_list_map():
                         kind = r.get("kind")
                         if not name or not kind or "/" in name:
                             continue
-                        out[name] = (gv, kind)
+                        # Prefer core: do not overwrite existing keys (e.g. core "pods" -> Pod over metrics "pods" -> PodMetrics)
+                        if name not in out:
+                            out[name] = (gv, kind)
                         singular = (r.get("singularName") or "").strip()
-                        if singular and singular != name:
+                        if singular and singular != name and singular not in out:
                             out[singular] = (gv, kind)
+                        # Add kind as lowercase key so "list podmetrics" works (metrics.k8s.io PodMetrics)
+                        kind_key = kind.lower()
+                        if kind_key not in out:
+                            out[kind_key] = (gv, kind)
                 except ApiException as e:
                     if e.status != 404:
                         logger.debug("MCP plugin: discovery failed for %s: %s", gv, e.reason)

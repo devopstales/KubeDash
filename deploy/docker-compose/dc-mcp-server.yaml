@@ -1,0 +1,48 @@
+# MCP Servers - part of main dev stack
+# - kubernetes-mcp-server: K8s/Helm CRUD (list, get, logs, describe, Helm). See: https://github.com/containers/kubernetes-mcp-server
+# - k8sgpt: Diagnostics (troubleshoot, diagnose). See: https://github.com/k8sgpt-ai/k8sgpt
+#
+# Kubeconfig must exist on the host. Default: ~/.kube/config
+# Override: KUBECONFIG_HOST_PATH=/path/to/config docker compose -f ... up
+#
+# OpenTelemetry (kubernetes-mcp-server): run with dc-jaeger.yaml. Example:
+#   docker compose -f deploy/docker-compose/dc-jaeger.yaml -f deploy/docker-compose/dc-mcp-server.yaml up
+#
+services:
+  kubernetes-mcp-server:
+    container_name: kubedash-kubernetes-mcp-server
+    image: quay.io/containers/kubernetes_mcp_server:latest
+    stdin_open: true   # keep process running (avoids exit on stdin EOF)
+    ports:
+      - "8082:8080"   # MCP HTTP/SSE (path /mcp and /sse)
+    environment:
+      TZ: Europe/Budapest
+      KUBECONFIG: /app/.kube/config
+      # OpenTelemetry: OTLP endpoint (use service name when run with dc-jaeger.yaml)
+      OTEL_EXPORTER_OTLP_ENDPOINT: "${OTEL_EXPORTER_OTLP_ENDPOINT:-http://kubedash-jaeger:4317}"
+      OTEL_METRICS_EXPORTER: "none"   # Jaeger is traces-only; avoids MetricsService warnings
+      OTEL_TRACES_SAMPLER: "${OTEL_TRACES_SAMPLER:-always_on}"
+    volumes:
+      # Mount kubeconfig file (not directory) so path is explicit; override with KUBECONFIG_HOST_PATH if needed
+      - "${KUBECONFIG_HOST_PATH:-$HOME/.kube/config}:/app/.kube/config:ro"
+    logging:
+      options:
+        max-size: "10k"
+        max-file: "3"
+
+  k8sgpt:
+    container_name: kubedash-k8sgpt
+    image: ghcr.io/k8sgpt-ai/k8sgpt:latest
+    command: serve --mcp --mcp-http --mcp-port 8089
+    stdin_open: true
+    ports:
+      - "8089:8089"   # K8sGPT MCP HTTP (diagnostics)
+    environment:
+      TZ: Europe/Budapest
+      KUBECONFIG: /app/.kube/config
+    volumes:
+      - "${KUBECONFIG_HOST_PATH:-$HOME/.kube/config}:/app/.kube/config:ro"
+    logging:
+      options:
+        max-size: "10k"
+        max-file: "3"

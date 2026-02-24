@@ -76,6 +76,7 @@ This section provides a high-level view of implementation status across all feat
 | **Plugin: Helm** | ✅ Implemented | 85% | Helm chart browsing, release management |
 | **Plugin: Registry** | ✅ Implemented | 90% | Docker registry integration, image browsing |
 | **Plugin: External LoadBalancer** | ✅ Implemented | 85% | MetalLB, Cilium LB integration |
+| **Plugin: MCP Integration** | ✅ Implemented | 85% | In-app chat, intent-based MCP tool calls (list pods/resources, pod logs, describe pod, Helm releases, PodMetrics); configurable MCP server URL; RBAC; no LLM in v1 |
 
 ### 2.2 Critical Features Status
 

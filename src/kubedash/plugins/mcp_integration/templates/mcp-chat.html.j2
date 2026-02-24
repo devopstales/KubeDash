@@ -1,70 +1,362 @@
 {% extends "base2.html.j2" %}
 
+{% block body_extra_class %}mcp-chat-body-no-scroll{% endblock %}
+
 {% block add_head_css %}
+<link rel="stylesheet" href="{{ url_for('static', filename='/vendor/highlightjs@11.4.0/an-old-hope.min.css') }}">
 <style nonce="{{ csp_nonce }}">
-  /* MCP Chat: theme-aware, no white backgrounds in dark mode */
+  /* Body must not scroll; be a flex container so the chat fills height and input bar stays visible */
+  .mcp-chat-body-no-scroll {
+    overflow: hidden !important;
+    display: flex !important;
+    flex-direction: column !important;
+  }
+  /* Consistent spacing around the chat card on all sides */
+  .mcp-chat-page-wrapper {
+    flex: 1;
+    min-height: 0;
+    display: flex;
+    flex-direction: column;
+    padding: 1rem;
+  }
+  .mcp-chat-page-wrapper .mcp-chat-page {
+    flex: 1;
+    min-height: 0;
+  }
+  /* MCP Chat: edgy AI chatbot layout, theme-aware (no white in dark mode) */
+  .mcp-chat-page {
+    --mcp-accent: var(--cui-primary);
+    --mcp-radius: 12px;
+    --mcp-radius-sm: 8px;
+    overflow: hidden;
+    display: flex;
+    flex-direction: column;
+  }
   .mcp-chat-page .card {
     background-color: var(--cui-body-bg);
-    border-color: var(--cui-border-color);
+    border: 1px solid var(--cui-border-color);
+    border-radius: var(--mcp-radius);
+    overflow: hidden;
+    box-shadow: 0 4px 24px rgba(0, 0, 0, 0.08);
+    flex: 1;
+    min-height: 0;
+    display: flex;
+    flex-direction: column;
+    min-width: 0;
   }
-  .mcp-chat-page .card-header {
+  /* Card body: constrain height so pane scrolls and input bar stays visible */
+  .mcp-chat-page .card-body.d-flex.flex-column {
+    min-height: 0;
+    overflow: hidden;
+  }
+  .mcp-chat-input-bar {
+    flex-shrink: 0;
+    padding: 1rem 1.25rem;
     background-color: var(--cui-tertiary-bg);
-    border-color: var(--cui-border-color);
+    border-top: 1px solid var(--cui-border-color);
+  }
+  [data-coreui-theme="dark"] .mcp-chat-page .card {
+    box-shadow: 0 4px 24px rgba(0, 0, 0, 0.35);
+  }
+  .mcp-chat-header {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding: 1rem 1.25rem;
+    background-color: var(--cui-tertiary-bg);
+    border-bottom: 2px solid var(--mcp-accent);
     color: var(--cui-body-color);
   }
-  .mcp-chat-page .card-body {
+  .mcp-chat-header h6 {
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+    margin: 0;
+    font-weight: 600;
+    font-size: 1.05rem;
+    letter-spacing: 0.02em;
+  }
+  .mcp-chat-header .mcp-chat-icon {
+    width: 28px;
+    height: 28px;
+    border-radius: var(--mcp-radius-sm);
+    background: linear-gradient(135deg, var(--cui-primary), var(--cui-info));
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    color: #fff;
+    font-size: 0.85rem;
+  }
+  .mcp-chat-page .btn-outline-secondary {
+    border-radius: var(--mcp-radius-sm);
+    font-size: 0.875rem;
+    font-weight: 500;
+  }
+  .mcp-chat-pane {
+    flex: 1;
+    min-height: 0;
+    overflow-y: auto;
+    overflow-x: hidden;
+    padding: 1.25rem 1.5rem;
     background-color: var(--cui-body-bg);
     color: var(--cui-body-color);
   }
-  .mcp-chat-page #mcp-chat-messages {
-    background-color: var(--cui-body-bg);
-    color: var(--cui-body-color);
+  .mcp-chat-page .mcp-msg {
+    display: flex;
+    margin-bottom: 1.25rem;
+    max-width: 92%;
   }
-  .mcp-chat-page .mcp-assistant-bubble {
+  .mcp-chat-page .mcp-msg.mcp-msg-user {
+    margin-left: auto;
+    justify-content: flex-end;
+  }
+  .mcp-chat-page .mcp-bubble {
+    padding: 0.875rem 1.125rem;
+    border-radius: var(--mcp-radius);
+    font-size: 0.9375rem;
+    line-height: 1.5;
+  }
+  .mcp-chat-page .mcp-bubble-user {
+    background: linear-gradient(135deg, var(--cui-primary), #6261cc);
+    color: #fff;
+    border: none;
+    box-shadow: 0 2px 12px rgba(88, 86, 214, 0.35);
+    border-bottom-right-radius: 4px;
+  }
+  .mcp-chat-page .mcp-bubble-assistant {
     background-color: var(--cui-tertiary-bg);
     color: var(--cui-body-color);
     border: 1px solid var(--cui-border-color);
+    border-left: 3px solid var(--mcp-accent);
+    border-bottom-left-radius: 4px;
+    box-shadow: 0 1px 4px rgba(0, 0, 0, 0.04);
   }
-  .mcp-chat-page .mcp-assistant-bubble .table,
+  [data-coreui-theme="dark"] .mcp-chat-page .mcp-bubble-assistant {
+    box-shadow: 0 1px 4px rgba(0, 0, 0, 0.2);
+  }
+  .mcp-chat-page .mcp-bubble-assistant .table,
   .mcp-chat-page .mcp-assistant-content .table {
     --cui-table-bg: transparent;
-    --cui-table-striped-bg: var(--cui-tertiary-bg);
-    --cui-table-hover-bg: var(--cui-secondary-bg);
     color: var(--cui-body-color);
     border-color: var(--cui-border-color);
   }
-  .mcp-chat-page .mcp-assistant-bubble .table th,
-  .mcp-chat-page .mcp-assistant-bubble .table td,
+  .mcp-chat-page .mcp-bubble-assistant .table th,
+  .mcp-chat-page .mcp-bubble-assistant .table td,
   .mcp-chat-page .mcp-assistant-content .table th,
   .mcp-chat-page .mcp-assistant-content .table td {
     background-color: transparent;
     border-color: var(--cui-border-color);
     color: var(--cui-body-color);
   }
-  .mcp-chat-page .mcp-assistant-bubble code,
+  .mcp-chat-page .mcp-bubble-assistant code,
   .mcp-chat-page .mcp-assistant-content code {
     background-color: var(--cui-secondary-bg);
     color: var(--cui-code-color);
-    border-radius: 0.25rem;
-    padding: 0.1em 0.35em;
+    border-radius: 4px;
+    padding: 0.15em 0.4em;
+    font-size: 0.9em;
   }
-  .mcp-chat-page .border-top {
-    border-color: var(--cui-border-color) !important;
-    background-color: var(--cui-body-bg);
+  .mcp-chat-page .mcp-raw-block {
+    margin: 0.75rem 0;
+    border-radius: var(--mcp-radius-sm);
+    overflow: hidden;
+    border: 1px solid var(--cui-border-color);
+    background-color: var(--cui-secondary-bg);
   }
-  .mcp-chat-page .form-control {
-    background-color: var(--cui-body-bg);
-    border-color: var(--cui-border-color);
-    color: var(--cui-body-color);
+  .mcp-chat-page .mcp-raw-block pre {
+    margin: 0;
+    padding: 1rem;
+    overflow: auto;
+    max-height: 20rem;
+    font-size: 0.9375rem;
+    line-height: 1.5;
+    white-space: pre;
   }
-  .mcp-chat-page .form-control::placeholder {
+  .mcp-chat-page .mcp-raw-block pre code {
+    background: none;
+    padding: 0;
+    border-radius: 0;
+    font-size: inherit;
+  }
+  .mcp-chat-empty {
+    text-align: center;
+    padding: 3rem 1.5rem;
     color: var(--cui-secondary-color);
   }
-  .mcp-chat-page #mcp-chat-empty {
-    color: var(--cui-secondary-color);
+  .mcp-chat-empty .mcp-empty-icon {
+    width: 56px;
+    height: 56px;
+    margin: 0 auto 1.25rem;
+    border-radius: 50%;
+    background: var(--cui-tertiary-bg);
+    border: 2px solid var(--cui-border-color);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    color: var(--cui-primary);
+    font-size: 1.5rem;
+  }
+  .mcp-chat-empty p {
+    margin-bottom: 0.35rem;
+    font-size: 0.9375rem;
+  }
+  .mcp-chat-empty .mcp-empty-hint {
+    font-size: 0.8125rem;
+    opacity: 0.85;
+  }
+  .mcp-chat-input-wrap {
+    display: flex;
+    gap: 0.5rem;
+    align-items: flex-end;
+    background-color: var(--cui-body-bg);
+    border: 1px solid var(--cui-border-color);
+    border-radius: var(--mcp-radius);
+    padding: 0.5rem 0.75rem;
+    transition: border-color 0.2s, box-shadow 0.2s;
+  }
+  .mcp-chat-input-wrap:focus-within {
+    border-color: var(--mcp-accent);
+    box-shadow: 0 0 0 3px rgba(88, 86, 214, 0.15);
+  }
+  .mcp-chat-page #mcp-chat-input {
+    flex: 1;
+    border: none !important;
+    background: transparent !important;
+    resize: none;
+    min-height: 44px;
+    padding: 0.5rem 0;
+    font-size: 0.9375rem;
+  }
+  .mcp-chat-page #mcp-chat-input:focus {
+    outline: none;
+    box-shadow: none;
+  }
+  .mcp-chat-page .mcp-send-btn {
+    border-radius: var(--mcp-radius-sm);
+    padding: 0.5rem 1rem;
+    font-weight: 500;
+    flex-shrink: 0;
   }
   .mcp-chat-page #mcp-chat-error {
     color: var(--cui-danger);
+    font-size: 0.8125rem;
+    margin-top: 0.5rem;
+    padding-left: 0.25rem;
+  }
+  /* Sidebar: find your precious chats (mcp-chat style). This div must not scroll. */
+  .mcp-chat-layout {
+    display: flex;
+    flex: 1;
+    min-height: 0;
+    overflow: hidden;
+    overflow-y: hidden;
+  }
+  .mcp-chat-sidebar {
+    width: 260px;
+    min-width: 260px;
+    background-color: var(--cui-tertiary-bg);
+    border-right: 1px solid var(--cui-border-color);
+    display: flex;
+    flex-direction: column;
+    overflow: hidden;
+  }
+  .mcp-chat-sidebar-header {
+    padding: 0.75rem 1rem;
+    border-bottom: 1px solid var(--cui-border-color);
+    flex-shrink: 0;
+  }
+  .mcp-chat-sidebar-list {
+    flex: 1;
+    overflow-y: auto;
+    padding: 0.5rem 0;
+  }
+  .mcp-chat-sidebar-row {
+    display: flex;
+    align-items: center;
+    width: 100%;
+    border-left: 3px solid transparent;
+    background: transparent;
+    margin-bottom: 0;
+  }
+  .mcp-chat-sidebar-row:hover {
+    background-color: var(--cui-secondary-bg);
+  }
+  .mcp-chat-sidebar-row.active {
+    background-color: var(--cui-secondary-bg);
+    border-left-color: var(--mcp-accent);
+  }
+  .mcp-chat-sidebar-item {
+    display: block;
+    flex: 1;
+    width: 0;
+    text-align: left;
+    padding: 0.6rem 0.5rem 0.6rem 1rem;
+    border: none;
+    border-radius: 0;
+    background: transparent;
+    color: var(--cui-body-color);
+    font-size: 0.875rem;
+    line-height: 1.35;
+    cursor: pointer;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+  }
+  .mcp-chat-sidebar-item:hover {
+    background: transparent;
+  }
+  .mcp-chat-sidebar-row.active .mcp-chat-sidebar-item {
+    font-weight: 500;
+  }
+  .mcp-chat-sidebar-item .mcp-chat-sidebar-date {
+    display: block;
+    font-size: 0.75rem;
+    color: var(--cui-secondary-color);
+    margin-top: 0.2rem;
+  }
+  .mcp-chat-sidebar-delete {
+    flex-shrink: 0;
+    padding: 0.35rem 0.5rem;
+    border: none;
+    border-radius: 4px;
+    background: transparent;
+    color: var(--cui-secondary-color);
+    cursor: pointer;
+    opacity: 0.7;
+  }
+  .mcp-chat-sidebar-delete:hover {
+    color: var(--cui-danger);
+    opacity: 1;
+    background: rgba(220, 53, 69, 0.1);
+  }
+  .mcp-chat-sidebar-row:hover .mcp-chat-sidebar-delete {
+    opacity: 1;
+  }
+  .mcp-chat-main {
+    flex: 1;
+    min-height: 0;
+    display: flex;
+    flex-direction: column;
+    min-width: 0;
+    overflow: hidden;
+  }
+  @media (max-width: 768px) {
+    .mcp-chat-sidebar {
+      position: fixed;
+      left: 0;
+      top: 0;
+      bottom: 0;
+      z-index: 1020;
+      transform: translateX(-100%);
+      transition: transform 0.2s ease;
+      box-shadow: 4px 0 12px rgba(0,0,0,0.1);
+    }
+    .mcp-chat-sidebar.open {
+      transform: translateX(0);
+    }
+    .mcp-chat-main {
+      width: 100%;
+    }
   }
 </style>
 {% endblock %}
@@ -86,30 +378,49 @@
 {% endblock %}
 
 {% block content %}
-<div class="mcp-chat-page card shadow mb-4 flex-grow-1 d-flex flex-column" style="min-height: 70vh;">
-  <div class="card-header d-flex justify-content-between align-items-center">
-    <h6 class="m-0 font-weight-bold text-primary">MCP Chat</h6>
-    <button type="button" class="btn btn-sm btn-outline-secondary" id="mcp-chat-new" title="New conversation">New</button>
+<div class="mcp-chat-page-wrapper d-flex flex-column flex-grow-1">
+  <div class="mcp-chat-page card flex-grow-1 d-flex flex-column">
+  <div class="mcp-chat-layout">
+    <aside class="mcp-chat-sidebar" id="mcp-chat-sidebar" aria-label="Chat history">
+      <div class="mcp-chat-sidebar-header">
+        <button type="button" class="btn btn-primary btn-sm w-100" id="mcp-chat-new" title="New conversation"><i class="fas fa-plus me-1"></i> New chat</button>
+      </div>
+      <div class="mcp-chat-sidebar-list" id="mcp-chat-sidebar-list">
+        <div class="text-muted small px-3 py-2" id="mcp-chat-sidebar-empty">No chats yet. Start one with &quot;New chat&quot;.</div>
+      </div>
+    </aside>
+    <div class="mcp-chat-main d-flex flex-column">
+      <header class="mcp-chat-header">
+        <h6>
+          <button type="button" class="btn btn-link btn-sm p-0 me-2 d-md-none" id="mcp-chat-sidebar-toggle" title="Open chat list" aria-label="Open chat list"><i class="fas fa-bars"></i></button>
+          <span class="mcp-chat-icon" aria-hidden="true"><i class="fas fa-robot"></i></span>
+          MCP Chat
+        </h6>
+      </header>
+      <div class="card-body d-flex flex-column p-0" style="min-height: 0; flex: 1;">
+        <div id="mcp-chat-messages" class="mcp-chat-pane d-flex flex-column">
+          <div id="mcp-chat-empty" class="mcp-chat-empty">
+            <div class="mcp-empty-icon" aria-hidden="true"><i class="fas fa-comment-dots"></i></div>
+            <p class="mb-1">Ask about your cluster in plain language.</p>
+            <p class="mcp-empty-hint mb-0">e.g. &quot;List all namespaces&quot; · &quot;List pods in default&quot; · &quot;Helm releases in my-namespace&quot;</p>
+          </div>
+        </div>
+        <div class="mcp-chat-input-bar">
+          <div class="mcp-chat-input-wrap">
+            <textarea class="form-control" id="mcp-chat-input" rows="1" placeholder="Ask about your cluster..." maxlength="4096"></textarea>
+            <button class="btn btn-primary mcp-send-btn" type="button" id="mcp-chat-send" title="Send"><i class="fas fa-paper-plane me-1"></i> Send</button>
+          </div>
+          <div id="mcp-chat-error" style="display: none;"></div>
+        </div>
+      </div>
+    </div>
   </div>
-  <div class="card-body d-flex flex-column p-0" style="min-height: 0;">
-    <div id="mcp-chat-messages" class="flex-grow-1 overflow-auto p-3" style="min-height: 300px;">
-      <div id="mcp-chat-empty" class="text-center py-5">
-        <p class="mb-2">Ask about your cluster in plain language.</p>
-        <p class="small mb-0">Try: &quot;List all namespaces&quot; or &quot;List pods in default&quot;</p>
-      </div>
-    </div>
-    <div class="border-top p-3">
-      <div class="input-group">
-        <textarea class="form-control" id="mcp-chat-input" rows="2" placeholder="Ask about your cluster..." maxlength="4096"></textarea>
-        <button class="btn btn-primary" type="button" id="mcp-chat-send" title="Send">Send</button>
-      </div>
-      <div id="mcp-chat-error" class="small mt-2" style="display: none;"></div>
-    </div>
   </div>
 </div>
 {% endblock %}
 
 {% block add_tail_js %}
+<script src="{{ url_for('static', filename='/vendor/highlightjs@11.4.0/highlight.min.js') }}"></script>
 <script nonce="{{ csp_nonce }}">
 (function() {
   const messagesEl = document.getElementById('mcp-chat-messages');
@@ -118,6 +429,16 @@
   const sendBtn = document.getElementById('mcp-chat-send');
   const newBtn = document.getElementById('mcp-chat-new');
   const errorEl = document.getElementById('mcp-chat-error');
+  const sidebarListEl = document.getElementById('mcp-chat-sidebar-list');
+  const sidebarEmptyEl = document.getElementById('mcp-chat-sidebar-empty');
+  const sidebarEl = document.getElementById('mcp-chat-sidebar');
+  const sidebarToggleBtn = document.getElementById('mcp-chat-sidebar-toggle');
+  var currentConversationId = '';
+
+  function csrfHeader() {
+    var meta = document.querySelector('meta[name="csrf-token"]');
+    return meta ? meta.getAttribute('content') || '' : '';
+  }
 
   function hideEmpty() {
     if (emptyEl) emptyEl.style.display = 'none';
@@ -131,9 +452,21 @@
   }
 
   function escapeHtml(s) {
-    const div = document.createElement('div');
+    var div = document.createElement('div');
     div.textContent = s;
     return div.innerHTML;
+  }
+
+  function formatChatDate(iso) {
+    if (!iso) return '';
+    var d = new Date(iso);
+    var now = new Date();
+    var diff = (now - d) / 1000;
+    if (diff < 60) return 'Just now';
+    if (diff < 3600) return Math.floor(diff / 60) + 'm ago';
+    if (diff < 86400) return Math.floor(diff / 3600) + 'h ago';
+    if (diff < 604800) return Math.floor(diff / 86400) + 'd ago';
+    return d.toLocaleDateString();
   }
 
   function renderAssistantContent(text) {
@@ -145,7 +478,6 @@
       var line = lines[i];
       if (line.trim().match(/^\|.+\|$/) && i + 1 < lines.length && lines[i + 1].indexOf('---') !== -1 && lines[i + 1].trim().match(/^\|.+\|$/)) {
         var headerCells = line.split('|').slice(1, -1).map(function(c) { return c.trim(); });
-        var sep = lines[i + 1];
         i += 2;
         var rows = [];
         rows.push('<tr>' + headerCells.map(function(c) { return '<th scope="col">' + escapeHtml(c) + '</th>'; }).join('') + '</tr>');
@@ -157,6 +489,21 @@
         parts.push('<div class="table-responsive"><table class="table table-sm table-bordered mb-0">' + rows.join('') + '</table></div>');
         continue;
       }
+      var fenceMatch = line.trim().match(/^```(\w*)\s*$/);
+      if (fenceMatch) {
+        var lang = (fenceMatch[1] || 'log').toLowerCase();
+        if (lang === '') lang = 'log';
+        i++;
+        var codeLines = [];
+        while (i < lines.length && !lines[i].trim().match(/^```\s*$/)) {
+          codeLines.push(lines[i]);
+          i++;
+        }
+        if (i < lines.length) i++;
+        var codeContent = escapeHtml(codeLines.join('\n'));
+        parts.push('<div class="mcp-raw-block"><pre><code class="language-' + escapeHtml(lang) + '">' + codeContent + '</code></pre></div>');
+        continue;
+      }
       var para = escapeHtml(line);
       para = para.replace(/\*\*(.+?)\*\*/g, '<strong>$1</strong>');
       para = para.replace(/`([^`]+)`/g, '<code>$1</code>');
@@ -166,15 +513,20 @@
     return parts.join('');
   }
 
+  function highlightCodeInElement(el) {
+    if (typeof hljs === 'undefined') return;
+    var blocks = el.querySelectorAll('pre code');
+    for (var b = 0; b < blocks.length; b++) {
+      try { hljs.highlightElement(blocks[b]); } catch (e) {}
+    }
+  }
+
   function addMessage(role, content, isPlaceholder) {
     hideEmpty();
-    const wrap = document.createElement('div');
-    wrap.className = 'mb-3 d-flex ' + (role === 'user' ? 'justify-content-end' : 'justify-content-start');
-    const bubble = document.createElement('div');
-    bubble.className = role === 'user'
-      ? 'rounded px-3 py-2 bg-primary text-white'
-      : 'rounded px-3 py-2 mcp-assistant-bubble';
-    bubble.style.maxWidth = '95%';
+    var wrap = document.createElement('div');
+    wrap.className = 'mcp-msg' + (role === 'user' ? ' mcp-msg-user' : '');
+    var bubble = document.createElement('div');
+    bubble.className = role === 'user' ? 'mcp-bubble mcp-bubble-user' : 'mcp-bubble mcp-bubble-assistant';
     if (isPlaceholder) {
       bubble.id = 'mcp-chat-loading';
       bubble.innerHTML = '<span class="spinner-border spinner-border-sm me-2" role="status"></span>Thinking...';
@@ -188,17 +540,124 @@
     }
     wrap.appendChild(bubble);
     messagesEl.appendChild(wrap);
+    if (!isPlaceholder && role === 'assistant') highlightCodeInElement(bubble);
     messagesEl.scrollTop = messagesEl.scrollHeight;
     return bubble;
   }
 
+  function clearMessages() {
+    while (messagesEl.lastChild) messagesEl.removeChild(messagesEl.lastChild);
+    if (emptyEl) {
+      messagesEl.appendChild(emptyEl);
+      emptyEl.style.display = 'block';
+    }
+  }
+
   function removeLoading() {
-    const loading = document.getElementById('mcp-chat-loading');
-    if (loading && loading.closest) loading.closest('.mb-3').remove();
+    var loading = document.getElementById('mcp-chat-loading');
+    if (loading && loading.closest) loading.closest('.mcp-msg').remove();
+  }
+
+  function fetchConversations() {
+    return fetch('/api/v1/plugins/mcp-integration/chat/conversations?limit=50', {
+      headers: { 'X-CSRFToken': csrfHeader() }
+    }).then(function(res) {
+      if (!res.ok) return { conversations: [] };
+      return res.json().then(function(data) { return data || { conversations: [] }; }).catch(function() { return { conversations: [] }; });
+    });
+  }
+
+  function deleteConversation(id, ev) {
+    if (ev) ev.stopPropagation();
+    if (!id) return;
+    fetch('/api/v1/plugins/mcp-integration/chat/conversations/' + id, {
+      method: 'DELETE',
+      headers: { 'X-CSRFToken': csrfHeader() }
+    })
+      .then(function(res) {
+        if (!res.ok) return res.json().then(function(data) { throw new Error(data.message || res.statusText); });
+        return res.json();
+      })
+      .then(function() {
+        if (currentConversationId === id) {
+          currentConversationId = '';
+          clearMessages();
+        }
+        refreshSidebarThen(function() {
+          if (sidebarEmptyEl) sidebarEmptyEl.style.display = (window._mcpChatConversations || []).length ? 'none' : 'block';
+        });
+      })
+      .catch(function(err) {
+        showError(err.message || 'Failed to delete chat');
+      });
+  }
+
+  function renderSidebar(conversations) {
+    if (!sidebarListEl) return;
+    if (sidebarEmptyEl) sidebarEmptyEl.style.display = conversations.length ? 'none' : 'block';
+    sidebarListEl.querySelectorAll('.mcp-chat-sidebar-row').forEach(function(n) { n.remove(); });
+    conversations.forEach(function(c) {
+      var row = document.createElement('div');
+      row.className = 'mcp-chat-sidebar-row' + (c.id === currentConversationId ? ' active' : '');
+      row.setAttribute('data-conversation-id', c.id);
+
+      var btn = document.createElement('button');
+      btn.type = 'button';
+      btn.className = 'mcp-chat-sidebar-item';
+      btn.innerHTML = '<span class="mcp-chat-sidebar-title">' + escapeHtml(c.title || 'New chat') + '</span><span class="mcp-chat-sidebar-date">' + formatChatDate(c.updated_at) + '</span>';
+      btn.addEventListener('click', function() {
+        var id = row.getAttribute('data-conversation-id');
+        if (id === currentConversationId) return;
+        selectConversation(id);
+        if (sidebarEl && window.matchMedia('(max-width: 768px)').matches) sidebarEl.classList.remove('open');
+      });
+
+      var delBtn = document.createElement('button');
+      delBtn.type = 'button';
+      delBtn.className = 'mcp-chat-sidebar-delete';
+      delBtn.title = 'Delete chat';
+      delBtn.setAttribute('aria-label', 'Delete chat');
+      delBtn.innerHTML = '<i class="fas fa-trash-alt"></i>';
+      delBtn.addEventListener('click', function(e) {
+        deleteConversation(c.id, e);
+      });
+
+      row.appendChild(btn);
+      row.appendChild(delBtn);
+      sidebarListEl.appendChild(row);
+    });
+  }
+
+  function selectConversation(id) {
+    currentConversationId = id;
+    renderSidebar((window._mcpChatConversations || []).map(function(c) {
+      return { id: c.id, title: c.title, updated_at: c.updated_at };
+    }));
+    clearMessages();
+    fetch('/api/v1/plugins/mcp-integration/chat/conversations/' + id + '/messages', {
+      headers: { 'X-CSRFToken': csrfHeader() }
+    })
+      .then(function(res) { return res.ok ? res.json() : null; })
+      .then(function(data) {
+        if (!data || !data.messages) return;
+        data.messages.forEach(function(m) {
+          addMessage(m.role, m.content || '', false);
+        });
+      })
+      .catch(function() {});
+  }
+
+  function refreshSidebarThen(fn) {
+    fetchConversations().then(function(data) {
+      var convs = data.conversations || [];
+      window._mcpChatConversations = convs;
+      renderSidebar(convs);
+      if (fn) fn();
+    });
   }
 
   function sendMessage() {
-    const text = (inputEl && inputEl.value || '').trim();
+    var text = (inputEl && inputEl.value || '').trim();
     if (!text) return;
     if (sendBtn) sendBtn.disabled = true;
     showError('');
@@ -211,18 +670,24 @@
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',
-        'X-CSRFToken': document.querySelector('meta[name="csrf-token"]') && document.querySelector('meta[name="csrf-token"]').getAttribute('content') || ''
+        'X-CSRFToken': csrfHeader()
       },
-      body: JSON.stringify({ content: text })
+      body: JSON.stringify({ content: text, conversation_id: currentConversationId })
     })
       .then(function(res) {
-        if (!res.ok) throw new Error(res.statusText || 'Request failed');
-        return res.json();
+        return res.text().then(function(body) {
+          if (!res.ok) throw new Error(res.statusText || body.slice(0, 100) || 'Request failed');
+          var data;
+          try { data = body ? JSON.parse(body) : {}; } catch (parseErr) { throw new Error('Invalid response'); }
+          return data;
+        });
       })
       .then(function(data) {
         removeLoading();
-        const content = (data && data.message && data.message.content) ? data.message.content : (data && data.message) || 'No response.';
+        if (data && data.conversation_id) currentConversationId = data.conversation_id;
+        var content = (data && data.message && data.message.content) ? data.message.content : (data && data.message) || 'No response.';
         addMessage('assistant', content, false);
+        refreshSidebarThen();
       })
       .catch(function(err) {
         removeLoading();
@@ -245,14 +710,27 @@
   }
   if (newBtn) {
     newBtn.addEventListener('click', function() {
-      while (messagesEl.lastChild) messagesEl.removeChild(messagesEl.lastChild);
-      if (emptyEl) {
-        messagesEl.appendChild(emptyEl);
-        emptyEl.style.display = 'block';
-      }
+      currentConversationId = '';
+      clearMessages();
       showError('');
+      refreshSidebarThen(function() {
+        if (sidebarEmptyEl) sidebarEmptyEl.style.display = 'block';
+      });
+      if (sidebarEl && window.matchMedia('(max-width: 768px)').matches) sidebarEl.classList.remove('open');
     });
   }
+  if (sidebarToggleBtn && sidebarEl) {
+    sidebarToggleBtn.addEventListener('click', function() {
+      sidebarEl.classList.toggle('open');
+    });
+  }
+
+  refreshSidebarThen(function() {
+    var convs = window._mcpChatConversations || [];
+    if (convs.length > 0 && !currentConversationId) {
+      selectConversation(convs[0].id);
+    }
+  });
 })();
 </script>
 {% endblock %}

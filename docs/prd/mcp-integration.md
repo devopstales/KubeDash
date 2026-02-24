@@ -1,6 +1,6 @@
 # Product Requirements Document: MCP Integration (AI Chatbot)
 
-**Document Version**: 1.0  
+**Document Version**: 1.2  
 **Last Updated**: February 2026  
 **Product**: KubeDash  
 **Feature Area**: MCP Integration & AI Chatbot  
@@ -12,7 +12,9 @@
 
 ### 1.1 Purpose
 
-This PRD defines the requirements for **MCP (Model Context Protocol) integration** and an **in-app AI chatbot** in KubeDash. The feature enables users to interact with their Kubernetes cluster using natural language through a persistent chat interface. The chatbot is powered by an LLM (Large Language Model) with access to cluster context and actions via MCP servers (e.g. Kubernetes MCP server), providing a single-pane experience where dashboard and conversational AI are unified.
+This PRD defines the requirements for **MCP (Model Context Protocol) integration** and an **in-app AI chatbot** in KubeDash. The feature enables users to interact with their Kubernetes cluster using natural language through a persistent chat interface. The chatbot uses MCP servers (e.g. Kubernetes MCP server) to execute cluster operations in response to user messages, providing a single-pane experience where dashboard and conversational AI are unified.
+
+**Current implementation (v1)**: The plugin uses **intent-based parsing** (pattern matching on the user message) to map phrases to MCP tool calls. There is **no LLM in the loop**: the backend parses the message, selects a tool, calls the MCP server, and formats the response. This delivers fast, predictable answers for a defined set of queries. **LLM integration** (open-ended questions, multi-turn reasoning) is listed as a future enhancement.
 
 ### 1.2 Background
 
@@ -25,7 +27,7 @@ Integrating MCP into KubeDash allows platform and DevOps users to query and, whe
 ### 1.3 Goals
 
 1. **Unified experience**: Chat available from anywhere in KubeDash (global chat panel or entry point).
-2. **MCP-backed intelligence**: Chatbot uses at least one MCP server (e.g. Kubernetes MCP server) so answers and actions are grounded in real cluster data and safe, tool-defined operations.
+2. **MCP-backed intelligence**: Chatbot uses at least one MCP server (e.g. Kubernetes MCP server) so answers and actions are grounded in real cluster data and safe, tool-defined operations. **Target**: multi-MCP infrastructure—**containers/kubernetes-mcp-server** for Kubernetes and Helm CRUD, **k8sgpt-ai/k8sgpt** for diagnosing problems (see §7.4).
 3. **Familiar chat UX**: A dedicated chat UI with message history, user/assistant distinction, and input area, consistent with common in-app AI chat interfaces.
 4. **Security and consistency**: Reuse KubeDash authentication and RBAC; no exposure of LLM/MCP credentials to the browser; optional read-only or non-destructive mode for MCP tools.
 5. **Operational clarity**: Clear loading/error states, optional streaming, and audit-friendly logging for tool use.
@@ -75,7 +77,8 @@ Integrating MCP into KubeDash allows platform and DevOps users to query and, whe
 - The panel can be closed/collapsed so the main dashboard has full width.
 - Panel state (open/closed) can be remembered for the session (optional: persisted per user).
 
-**Priority**: P0 (Critical)
+**Priority**: P0 (Critical)  
+**Status**: ⚠️ Partial — Dedicated page `/plugins/mcp-chat`; no global panel from main layout
 
 ---
 
@@ -91,7 +94,8 @@ Integrating MCP into KubeDash allows platform and DevOps users to query and, whe
 - The assistant response appears after the backend responds; loading indicator is shown while waiting.
 - Empty or whitespace-only messages are not sent.
 
-**Priority**: P0 (Critical)
+**Priority**: P0 (Critical)  
+**Status**: ✅ Implemented
 
 ---
 
@@ -106,7 +110,8 @@ Integrating MCP into KubeDash allows platform and DevOps users to query and, whe
 - The thread scrolls so the latest message is in view when new content is added.
 - At least the current session’s messages are retained for the duration of the session.
 
-**Priority**: P0 (Critical)
+**Priority**: P0 (Critical)  
+**Status**: ✅ Implemented — Conversation history persisted per user in DB; on load the most recent conversation and its messages are restored.
 
 ---
 
@@ -121,7 +126,8 @@ Integrating MCP into KubeDash allows platform and DevOps users to query and, whe
 - Plain text remains readable when no markdown is used.
 - Copy action for code blocks is available (optional but recommended).
 
-**Priority**: P1 (High)
+**Priority**: P1 (High)  
+**Status**: ✅ Implemented
 
 ---
 
@@ -135,7 +141,8 @@ Integrating MCP into KubeDash allows platform and DevOps users to query and, whe
 - Starting a new conversation clears or archives the current thread and shows an empty state.
 - Previous thread is no longer shown in the active view (implementation may keep history server-side for audit).
 
-**Priority**: P1 (High)
+**Priority**: P1 (High)  
+**Status**: ✅ Implemented — "New" clears the view and conversation_id; next send creates a new conversation (persisted). Previous threads remain in DB for the user.
 
 ---
 
@@ -149,7 +156,8 @@ Integrating MCP into KubeDash allows platform and DevOps users to query and, whe
 - Empty state when there are no messages (e.g. short hint or suggested first questions).
 - Optional: retry control for failed requests.
 
-**Priority**: P1 (High)
+**Priority**: P1 (High)  
+**Status**: ✅ Implemented
 
 ---
 
@@ -166,7 +174,8 @@ Integrating MCP into KubeDash allows platform and DevOps users to query and, whe
 - Tool calls use the same cluster access as KubeDash (e.g. in-cluster config or kubeconfig) and respect RBAC.
 - Responses that depend on cluster state reflect the state at the time of the tool call.
 
-**Priority**: P0 (Critical)
+**Priority**: P0 (Critical)  
+**Status**: ✅ Implemented — Intent-based tool invocation; cluster data via MCP (no LLM)
 
 ---
 
@@ -180,7 +189,8 @@ Integrating MCP into KubeDash allows platform and DevOps users to query and, whe
 - Chat backend uses this configuration to connect to the MCP server.
 - Invalid or unreachable MCP configuration results in clear error state in the UI or logs (no silent failure).
 
-**Priority**: P1 (High)
+**Priority**: P1 (High)  
+**Status**: ✅ Implemented
 
 ---
 
@@ -194,7 +204,8 @@ Integrating MCP into KubeDash allows platform and DevOps users to query and, whe
 - When enabled, only tools that do not create/update/delete resources are exposed to the LLM (or the MCP server is started with equivalent flags).
 - Documentation describes how to enable and what is allowed.
 
-**Priority**: P2 (Medium)
+**Priority**: P2 (Medium)  
+**Status**: ✅ Implemented — `read_only` in `[mcp_integration]` in kubedash.ini; when true, only read intents (list, describe, logs, Helm list) are executed; write intents receive a message that write operations are disabled.
 
 ---
 
@@ -210,7 +221,8 @@ Integrating MCP into KubeDash allows platform and DevOps users to query and, whe
 - Unauthenticated requests to the chat API receive 401 and no response body that leaks internals.
 - Session timeout behavior is consistent with the rest of the application.
 
-**Priority**: P0 (Critical)
+**Priority**: P0 (Critical)  
+**Status**: ✅ Implemented
 
 ---
 
@@ -224,7 +236,8 @@ Integrating MCP into KubeDash allows platform and DevOps users to query and, whe
 - If the user has no access to a resource or namespace, tool results and answers reflect that (e.g. empty list or “access denied”) and do not expose other users’ data.
 - No privilege escalation: the chatbot cannot act with higher permissions than the logged-in user.
 
-**Priority**: P0 (Critical)
+**Priority**: P0 (Critical)  
+**Status**: ✅ Implemented
 
 ---
 
@@ -240,7 +253,8 @@ Integrating MCP into KubeDash allows platform and DevOps users to query and, whe
 - UI shows incremental updates in the assistant message area until the response is complete.
 - If streaming is not implemented, a single response after completion is acceptable for v1.
 
-**Priority**: P2 (Medium)
+**Priority**: P2 (Medium)  
+**Status**: ❌ Not implemented
 
 ---
 
@@ -254,7 +268,8 @@ Integrating MCP into KubeDash allows platform and DevOps users to query and, whe
 - Clicking a suggestion sends that message as the user message.
 - Suggestions are configurable or curated for Kubernetes/KubeDash (no reference to external products).
 
-**Priority**: P2 (Medium)
+**Priority**: P2 (Medium)  
+**Status**: ❌ Not implemented
 
 ---
 
@@ -262,42 +277,42 @@ Integrating MCP into KubeDash allows platform and DevOps users to query and, whe
 
 ### 4.1 Chat UI
 
-| ID | Requirement | Priority |
-|----|-------------|----------|
-| FR-CHAT-01 | Provide a persistent chat panel (sidebar or slide-over) accessible from the main layout | P0 |
-| FR-CHAT-02 | Display user and assistant messages in a single, ordered thread with clear visual distinction | P0 |
-| FR-CHAT-03 | Provide a text input and send control (Enter or button) to submit user messages | P0 |
-| FR-CHAT-04 | Show a loading state while waiting for the assistant response | P0 |
-| FR-CHAT-05 | Render assistant messages with markdown and code blocks | P1 |
-| FR-CHAT-06 | Support starting a new conversation (clear or archive current thread) | P1 |
-| FR-CHAT-07 | Show explicit error and empty states when the service is unavailable or no messages exist | P1 |
-| FR-CHAT-08 | Optional: support streaming of assistant responses | P2 |
-| FR-CHAT-09 | Optional: show suggested prompts when the conversation is empty | P2 |
+| ID | Requirement | Priority | Status |
+|----|-------------|----------|--------|
+| FR-CHAT-01 | Provide a persistent chat panel (sidebar or slide-over) accessible from the main layout | P0 | ⚠️ Partial — Dedicated page `/plugins/mcp-chat`; no global sidebar from main layout |
+| FR-CHAT-02 | Display user and assistant messages in a single, ordered thread with clear visual distinction | P0 | ✅ Implemented |
+| FR-CHAT-03 | Provide a text input and send control (Enter or button) to submit user messages | P0 | ✅ Implemented |
+| FR-CHAT-04 | Show a loading state while waiting for the assistant response | P0 | ✅ Implemented |
+| FR-CHAT-05 | Render assistant messages with markdown and code blocks | P1 | ✅ Implemented |
+| FR-CHAT-06 | Support starting a new conversation (clear or archive current thread) | P1 | ✅ Implemented — "New" clears thread and conversation_id; history persisted per user |
+| FR-CHAT-07 | Show explicit error and empty states when the service is unavailable or no messages exist | P1 | ✅ Implemented |
+| FR-CHAT-08 | Optional: support streaming of assistant responses | P2 | ❌ Not implemented |
+| FR-CHAT-09 | Optional: show suggested prompts when the conversation is empty | P2 | ❌ Not implemented |
 
 ### 4.2 MCP Integration
 
-| ID | Requirement | Priority |
-|----|-------------|----------|
-| FR-MCP-01 | Backend connects to at least one MCP server (e.g. Kubernetes MCP server) over HTTP/SSE | P0 |
-| FR-MCP-02 | LLM receives tool definitions from MCP and can invoke tools during a turn | P0 |
-| FR-MCP-03 | MCP server endpoint (URL, transport) is configurable (server-side config or env) | P1 |
-| FR-MCP-04 | Optional: read-only or non-destructive mode to restrict which MCP tools are used | P2 |
+| ID | Requirement | Priority | Status |
+|----|-------------|----------|--------|
+| FR-MCP-01 | Backend connects to at least one MCP server (e.g. Kubernetes MCP server) over HTTP/SSE | P0 | ✅ Implemented |
+| FR-MCP-02 | LLM receives tool definitions from MCP and can invoke tools during a turn | P0 | ⚠️ Partial — Intent-based tool invocation (no LLM); tools invoked directly from parsed intent |
+| FR-MCP-03 | MCP server endpoint (URL, transport) is configurable (server-side config or env) | P1 | ✅ Implemented — `kubedash.ini` [mcp_integration] mcp_server_url, helm_list_tool |
+| FR-MCP-04 | Optional: read-only or non-destructive mode to restrict which MCP tools are used | P2 | ✅ Implemented — `read_only` in `[mcp_integration]`; when true, only read intents are allowed; write intents return a message that write operations are disabled |
 
 ### 4.3 Authentication and Authorization
 
-| ID | Requirement | Priority |
-|----|-------------|----------|
-| FR-AUTH-01 | Chat API accepts only authenticated requests (e.g. KubeDash session cookie) | P0 |
-| FR-AUTH-02 | Cluster access used by MCP/backend is scoped to the logged-in user’s RBAC | P0 |
-| FR-AUTH-03 | LLM and MCP credentials (API keys, tokens) are not exposed to the browser | P0 |
+| ID | Requirement | Priority | Status |
+|----|-------------|----------|--------|
+| FR-AUTH-01 | Chat API accepts only authenticated requests (e.g. KubeDash session cookie) | P0 | ✅ Implemented — @login_required on chat endpoint |
+| FR-AUTH-02 | Cluster access used by MCP/backend is scoped to the logged-in user's RBAC | P0 | ✅ Implemented — SubjectAccessReview before namespace-scoped MCP calls |
+| FR-AUTH-03 | LLM and MCP credentials (API keys, tokens) are not exposed to the browser | P0 | ✅ Implemented — MCP URL server-side only; no LLM in v1 |
 
 ### 4.4 Backend and API
 
-| ID | Requirement | Priority |
-|----|-------------|----------|
-| FR-API-01 | Expose a chat API (e.g. POST for send message, optional GET/SSE for streaming) | P0 |
-| FR-API-02 | Request/response format supports conversation id, message content, and optional metadata | P0 |
-| FR-API-03 | Log or audit tool invocations (which tools, which user, timestamp) for security and debugging | P1 |
+| ID | Requirement | Priority | Status |
+|----|-------------|----------|--------|
+| FR-API-01 | Expose a chat API (e.g. POST for send message, optional GET/SSE for streaming) | P0 | ✅ Implemented — POST /api/v1/plugins/mcp-integration/chat/message |
+| FR-API-02 | Request/response format supports conversation id, message content, and optional metadata | P0 | ✅ Implemented |
+| FR-API-03 | Log or audit tool invocations (which tools, which user, timestamp) for security and debugging | P1 | ⚠️ Partial — Intent and tool success logged; warning on unmatched intent; tracing span attributes |
 
 ---
 
@@ -394,10 +409,24 @@ The following describes the target behavior and layout of the in-app chatbot so 
 - It exposes tools for pods, events, namespaces, resources, Helm, etc. Backend passes the user’s cluster access (in-cluster or kubeconfig) so that RBAC is respected.
 - Optional: run the server with `--read-only` or `--disable-destructive` when the platform requires a safe default.
 
-### 7.4 Data and Privacy
+### 7.4 Multi-MCP infrastructure (target)
 
-- Conversation content and tool calls may be sent to the LLM provider and to the MCP server. Document this in the privacy/security documentation and ensure configuration (e.g. which LLM, which MCP) is under platform control.
-- Avoid logging full message bodies or sensitive tool arguments; log tool name, user, and timestamp for audit.
+A **multi-MCP** setup is the target architecture: different MCP servers for different responsibilities, with the backend routing requests by intent or tool category.
+
+| Responsibility | MCP server | Purpose |
+|----------------|------------|---------|
+| **Kubernetes & Helm object CRUD** | [containers/kubernetes-mcp-server](https://github.com/containers/kubernetes-mcp-server) | List/get/create/update/delete cluster resources (pods, deployments, namespaces, etc.), pod logs, describe, and Helm release operations. Single, well-supported server for all cluster and Helm tooling. |
+| **Diagnose problems** | [k8sgpt-ai/k8sgpt](https://github.com/k8sgpt-ai/k8sgpt) | AI-assisted cluster diagnostics: analyze cluster state, surface issues (e.g. failing pods, image pull errors, resource limits), and suggest fixes. Used when the user asks to diagnose, troubleshoot, or explain problems. |
+
+**Routing**: The backend (or an LLM orchestrator) decides which MCP server to call based on intent or tool discovery—e.g. list/get/log/describe/Helm → kubernetes-mcp-server; diagnose/troubleshoot/why is X failing → k8sgpt. Configuration will expose at least two URLs (e.g. `mcp_server_url` for Kubernetes, `mcp_diagnostics_url` for k8sgpt) and optional tool-to-server mapping.
+
+**Benefits**: Separation of concerns; use of specialized diagnostics (k8sgpt) without overloading the general-purpose Kubernetes server; ability to add more MCP servers later (e.g. security, cost) with the same routing pattern.
+
+### 7.5 Data and Privacy
+
+- Conversation content and tool calls may be sent to the LLM provider and to the MCP server(s). Document this in the privacy/security documentation and ensure configuration (e.g. which LLM, which MCP servers) is under platform control.
+- In a multi-MCP setup, diagnostics (k8sgpt) may receive cluster metadata and resource state; ensure compliance with data and access policies for each server.
+- Avoid logging full message bodies or sensitive tool arguments; log tool name, server (when multiple), user, and timestamp for audit.
 
 ---
 
@@ -428,7 +457,9 @@ The following describes the target behavior and layout of the in-app chatbot so 
 
 ### 10.1 Potential Enhancements
 
-1. **Multiple MCP servers**: Support more than one MCP server (e.g. Kubernetes + custom tools).
+1. **Multi-MCP infrastructure (target)**: Support multiple MCP servers with role-based routing:
+   - **Kubernetes & Helm CRUD**: [containers/kubernetes-mcp-server](https://github.com/containers/kubernetes-mcp-server) for all cluster and Helm object operations (list, get, logs, describe, Helm releases, etc.).
+   - **Diagnose problems**: [k8sgpt-ai/k8sgpt](https://github.com/k8sgpt-ai/k8sgpt) for diagnostics and troubleshooting (e.g. "why are my pods failing?", "diagnose cluster issues"). The backend routes diagnose/troubleshoot intents to k8sgpt and resource/list/log/Helm intents to kubernetes-mcp-server. See §7.4.
 2. **Conversation persistence**: Save conversation history per user and allow resuming past threads.
 3. **Streaming**: Full streaming of assistant responses for better perceived performance.
 4. **Suggested prompts**: Configurable or admin-defined suggested questions.
@@ -446,30 +477,132 @@ The following describes the target behavior and layout of the in-app chatbot so 
 
 ## 11. Appendix
 
-### 11.1 Chat API (Conceptual)
+### 11.1 Chat API (Implemented)
 
 | Method | Path | Description |
 |--------|------|-------------|
-| POST | /chat/message (or similar) | Send a user message; return assistant reply (or stream URL) |
-| GET  | /chat/stream/{id} (optional) | SSE stream for streaming response |
-| POST | /chat/new (optional) | Start new conversation; return new conversation id |
+| POST | /api/v1/plugins/mcp-integration/chat/message | Send a user message; return assistant reply (JSON). Persists user and assistant messages when conversation_id is provided or created. |
+| GET | /api/v1/plugins/mcp-integration/chat/conversations | List conversations for the current user (query: `limit`, default 20, max 100). |
+| GET | /api/v1/plugins/mcp-integration/chat/conversations/<id>/messages | Get messages for a conversation (must belong to current user). |
 
-Request body (send message): `{ "conversation_id": "optional", "content": "user message text" }`.  
-Response: `{ "conversation_id": "...", "message": { "role": "assistant", "content": "..." } }` or stream.
+**POST message request body**: `{ "content": "user message text", "conversation_id": "optional" }`.  
+**POST message response**: `{ "conversation_id": "...", "message": { "role": "assistant", "content": "..." } }`.  
+**Authentication**: KubeDash session (login required). Unauthenticated requests receive 401.
 
-### 11.2 Related Documentation
+Optional (not implemented in v1): GET /chat/stream/{id} for SSE streaming.
 
-- [Kubernetes MCP server (containers/kubernetes-mcp-server)](../../containers/kubernetes-mcp-server/) — Docker Compose and runbooks for the MCP server.
-- [Deploy docker-compose (dc-mcp-kubernetes)](../../deploy/docker-compose/dc-mcp-kubernetes.yaml) — MCP server as part of the dev stack.
-- [KubeDash Product Requirements](./kubedash-product-requirements.md) — Overall product and feature areas.
-- [Authentication & User Management](./authentication-user-management.md) — Session and RBAC context for chat.
+### 11.2 Supported intents and MCP tool mapping (v1)
 
-### 11.3 Glossary
+The backend parses the user message and maps it to one of the following intents. Namespace can be specified with phrases like “in \<namespace\> namespace”.
+
+| Intent | Example user phrases | MCP tool(s) tried | Notes |
+|--------|----------------------|-------------------|--------|
+| **list_namespaces** | “List all namespaces”, “Show namespaces” | `namespaces_list` | No namespace filter. |
+| **list_resource** | “List pods in balazs-paldi namespace”, “List deployments”, “Get PodMetrics in \<ns\> namespace” | `resources_list` (apiVersion, kind, namespace) | Resource list from cluster discovery; core resources (e.g. Pod) preferred over extension (e.g. PodMetrics) when names collide. |
+| **PodMetrics** (special) | “List PodMetrics in \<namespace\>” | — | Fetched via cluster metrics API (CPU, MEMORY, WINDOW); not MCP. |
+| **pods** (list in ns) | “How many pods in \<ns\>?”, “List pods in \<ns\> namespace” (when not matching list_resource) | `pods_list_in_namespace` | Table with NAMESPACE, NAME, READY, STATUS, AGE. |
+| **pod_logs** | “Get logs of \<pod\> pod in \<ns\> namespace” | `pods_log` (args: `name`, `namespace`), then `pod_logs`, `show_logs`, `get_pod_logs`, `get_logs_for_pod_and_container` | Log output is collapsed: consecutive duplicate lines shown once with “… (repeated N more times)”. |
+| **describe_pod** | “Describe \<pod\>”, “Describe \<pod\> in \<ns\> namespace” | `describe_pod`, `get_pod`, `pod_describe`, `describe_resource` | Uses `namespace` (default if omitted) and `pod_name`. |
+| **helm_releases** | “List Helm releases”, “List Helm releases in \<ns\>” | `helm_list` (or configurable `helm_list_tool`) | Params: `all_namespaces`, `namespace`. |
+
+**Write intents** (create, update, delete, helm install, helm uninstall) are only executed when `read_only = false` in `[mcp_integration]`. When `read_only = true`, the assistant replies that write operations are disabled.
+
+| **create_resource** | "Create namespace \<name\>", "Create deployment \<name\> in namespace \<ns\>" | `namespace_create` / `create_namespace` (namespace only); `resource_create` / `create_resource` / `kubectl_create` (kind+name+ns) | Write. |
+| **update_resource** | "Update deployment \<name\> [in namespace \<ns\>]", "Patch pod \<name\> in \<ns\>" | `resource_update` / `kubectl_patch` / `patch_resource` | Write; some servers require a patch body. |
+| **delete_resource** | "Delete pod \<name\> [in namespace \<ns\>]", "Delete deployment \<name\> in \<ns\>" | `resource_delete` / `delete_resource` / `kubectl_delete` | Write. |
+| **helm_install** | "Install helm chart \<chart\> [as \<release\>] [in namespace \<ns\>]", "Helm install \<release\> \<chart\>" | `helm_install` / `install_helm_chart` / `helm_install_chart` | Write. |
+| **helm_uninstall** | "Uninstall helm release \<name\> [in namespace \<ns\>]", "Helm uninstall \<name\>" | `helm_uninstall` / `uninstall_helm_chart` / `helm_uninstall_release` | Write. |
+
+Unmatched or unsupported messages receive a fallback reply listing supported question types and a **warning** in server logs (for observability).
+
+### 11.3 Configuration (kubedash.ini)
+
+**Current (single MCP)** — Under `[mcp_integration]`:
+
+| Option | Description | Default |
+|--------|-------------|---------|
+| `mcp_server_url` | Base URL of the MCP server (e.g. `http://127.0.0.1:8082`). Empty disables chat MCP. | (empty) |
+| `read_only` | If **true**, only read operations are allowed (list, describe, logs, Helm list). When **false**, create/delete/update intents are allowed when implemented. When true and the user asks for a write operation, the assistant replies that write operations are disabled. | false |
+| `helm_list_tool` | Tool name for listing Helm releases (e.g. `helm_list`). | helm_list |
+
+**Target (multi-MCP)** — For the architecture in §7.4, configuration will support:
+
+| Option | Description | Purpose |
+|--------|-------------|---------|
+| `mcp_server_url` | Base URL of **containers/kubernetes-mcp-server**. | Kubernetes & Helm CRUD (list, get, logs, describe, Helm). |
+| `mcp_diagnostics_url` | Base URL of **k8sgpt-ai/k8sgpt** MCP server. Empty disables diagnostics routing. | Diagnose/troubleshoot intents. |
+| (optional) `mcp_diagnostics_intent_keywords` | Comma-separated keywords that route to diagnostics (e.g. `diagnose,troubleshoot,why failing`). | Override or extend default intent routing to k8sgpt. |
+
+### 11.4 Related Documentation
+
+- [containers/kubernetes-mcp-server](https://github.com/containers/kubernetes-mcp-server) — MCP server for Kubernetes and Helm CRUD (target: primary MCP for cluster operations).
+- [k8sgpt-ai/k8sgpt](https://github.com/k8sgpt-ai/k8sgpt) — AI-assisted Kubernetes diagnostics; target MCP for "diagnose problems" (see §7.4).
+- [Deploy docker-compose (dc-mcp-server)](../../deploy/docker-compose/dc-mcp-server.yaml) — Kubernetes MCP server as part of the dev stack.
+- [KubeDash Product Requirements](./kubedash-product-requirements.md) — Overall product and feature areas (if present).
+- [Authentication & User Management](./authentication-user-management.md) — Session and RBAC context for chat (if present).
+
+### 11.5 Glossary
 
 - **MCP (Model Context Protocol)**: Protocol for AI assistants to discover and invoke tools and resources from MCP servers.
 - **MCP server**: A service that exposes tools (and optionally prompts) over MCP (e.g. HTTP/SSE). Example: Kubernetes MCP server for cluster operations.
 - **Chat panel**: The dedicated UI region (sidebar or slide-over) that shows the conversation and input.
-- **Tool**: An MCP capability (e.g. “list pods”) that the LLM can call with parameters; the MCP server executes it and returns a result.
+- **Tool**: An MCP capability (e.g. “list pods”) that the backend or LLM can call with parameters; the MCP server executes it and returns a result.
+- **Intent**: A structured interpretation of the user message (e.g. list_resource, pod_logs) used in v1 to select which MCP tool to call without an LLM.
+- **Multi-MCP**: Target architecture with multiple MCP servers: **containers/kubernetes-mcp-server** for K8s/Helm CRUD and **k8sgpt-ai/k8sgpt** for diagnostics (see §7.4).
+
+---
+
+## 12. Current implementation (as-built)
+
+This section describes the implemented behavior of the MCP Integration plugin as of the last update.
+
+### 12.1 Architecture
+
+- **UI**: Dedicated chat page at `/plugins/mcp-chat` (GET). Renders a chat thread (user / assistant bubbles), text input, and send action. Calls `POST /api/v1/plugins/mcp-integration/chat/message` with `{ "content": "..." }`. Markdown and code blocks in assistant content are rendered.
+- **Backend**: Plugin blueprint `mcp_integration_api_bp` registered under `/api/v1/plugins` (prefix `mcp-integration`). Single endpoint: `POST /chat/message` (MethodView `post()`). No LLM: message is parsed with a single intent parser, then one of several code paths runs (list namespaces, list resource, pod logs, describe pod, Helm releases, list pods in namespace). Each path calls the MCP server via `query_mcp_tool(url, tool_name, arguments)` and formats the tool output for the reply.
+- **MCP client**: HTTP JSON-RPC to `{mcp_server_url}/mcp` (method `tools/call`). Also supports Streamable HTTP handshake (initialize, notifications/initialized, tools/call) and SSE where available. Implemented in `mcp_client.py` and `mcp_session.py`.
+- **RBAC**: Before namespace-scoped MCP calls, the backend checks namespace access via SubjectAccessReview (when extension_api is available). On failure, returns 403 with a clear message.
+- **Read-only**: If `[mcp_integration]` `read_only = true`, only intents in `READ_ONLY_INTENT_TYPES` (list_namespaces, pods, describe_pod, pod_logs, helm_releases, list_resource) are executed. Any other (e.g. future create/delete) intent returns an assistant message that write operations are disabled.
+
+### 12.2 Intent parsing
+
+- **Module**: `plugins.mcp_integration.mcp_client.parse_intent(text)`.
+- **Order**: Pattern-driven intents first (list_namespaces, helm_releases, pod_logs, describe_pod, helm_uninstall, helm_install, create_resource, delete_resource, update_resource), then list_resource (using cluster discovery resource list map, longer keys first so "list pods" matches Pod not PodMetrics), then pods fallback (whole-word pod/pods and namespace).
+- **Namespace extraction**: Phrases like "in X namespace", "in namespace X", "in X" at end of sentence. Default namespace for pod_logs and describe_pod when not specified: default.
+
+### 12.3 Resource list map
+
+- Built from Kubernetes API discovery at plugin load (`plugins.mcp_integration.__init__`). Core API resources (e.g. pods, pod) are not overwritten by extension API resources (e.g. metrics.k8s.io pods for PodMetrics). Kind name is also registered as a key (e.g. podmetrics) so "list podmetrics" works.
+
+### 12.4 Pod logs
+
+- Tool candidates: pods_log (with args name, namespace), then pod_logs, show_logs, get_pod_logs, get_logs_for_pod_and_container (with pod_name, namespace). First successful tool wins.
+- Log output is passed through _format_pod_log_output(): consecutive duplicate lines are collapsed to one line plus "... (repeated N more times)".
+
+### 12.5 PodMetrics
+
+- For "list PodMetrics in namespace", the backend does not call MCP for the list. It fetches PodMetrics from the cluster metrics API (metrics.k8s.io/v1beta1 pods), aggregates per pod (sum CPU/memory across containers), and formats a table with columns NAME, CPU, MEMORY, WINDOW. If the metrics API fails, the implementation falls back to MCP resources_list for PodMetrics (which may return only NAMESPACE/NAME).
+
+### 12.6 Write operations (create, update, delete, Helm install/uninstall)
+
+- **delete_resource**: Resource kind is resolved via `get_resource_list_map()` (e.g. "pod" → Pod). MCP tools tried: `resource_delete`, `delete_resource`, `kubectl_delete`, `resources_delete`. Namespace defaults to `default` if omitted.
+- **create_resource**: Two forms: (1) "Create namespace X" → `namespace_create` / `create_namespace` / `namespaces_create` with `name`; (2) "Create deployment Y in namespace Z" → kind resolved from resource map, then `resource_create` / `create_resource` / `kubectl_create` with namespace, kind, name (and optional apiVersion). Some servers require a YAML manifest for non-namespace resources.
+- **update_resource**: Kind resolved from resource map. MCP tools tried: `resource_update`, `kubectl_patch`, `patch_resource` with namespace, kind, name. Many servers require a patch body; the API may return an error suggesting `kubectl patch` if the server rejects the call.
+- **helm_install**: Chart name and optional release name, namespace (default `default`). Tools tried: `helm_install`, `install_helm_chart`, `helm_install_chart` with params `chart`, `namespace`, and optionally `release` or `name`.
+- **helm_uninstall**: Release name and optional namespace (default `default`). Tools tried: `helm_uninstall`, `uninstall_helm_chart`, `helm_uninstall_release` with `release` and `namespace` (or `name` for uninstall_helm_chart).
+- All write intents are blocked when `read_only = true` (intent types are not in `READ_ONLY_INTENT_TYPES`). Namespace access is validated with SubjectAccessReview before each write call.
+
+### 12.7 Observability
+
+- Unmatched or unsupported user messages trigger a warning log: "MCP chat: no intent matched or not supported, returning fallback reply" with content snippet. Intent type and key params are recorded in span attributes when tracing is enabled.
+
+### 12.8 Conversation persistence
+
+- **Models**: `McpConversation` (user_id, created_at, updated_at) and `McpMessage` (conversation_id, role, content, created_at). Stored in `mcp_conversations` and `mcp_messages` (migration `a1b2c3d4e5f6`).
+- **POST /chat/message**: Accepts optional `conversation_id`. If missing or invalid for the user, a new conversation is created. User message and assistant reply are persisted; response includes `conversation_id` for the thread.
+- **GET /chat/conversations**: Lists conversations for the current user (most recent first; optional `limit`, max 100).
+- **GET /chat/conversations/<id>/messages**: Returns messages for a conversation (404 if not found or not owned by user).
+- **UI**: On load, fetches the latest conversation and its messages and restores the thread. "New" clears the view and resets conversation_id; the next send creates a new conversation.
 
 ---
 

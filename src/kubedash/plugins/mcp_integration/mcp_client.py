@@ -160,9 +160,14 @@ def _mcp_post_notification(
 
 
 def _extract_content_text(result: dict) -> str:
-    """Extract concatenated text from MCP result.content[].text."""
+    """Extract concatenated text from MCP result.content[].text. Always returns a string."""
     content = result.get("content") or []
-    parts = [item.get("text", "") for item in content if isinstance(item, dict) and item.get("type") == "text"]
+    parts = []
+    for item in content:
+        if not isinstance(item, dict) or item.get("type") != "text":
+            continue
+        t = item.get("text", "")
+        parts.append(str(t) if t is not None else "")
     return "\n".join(parts).strip() if parts else ""
 
 
@@ -273,6 +278,100 @@ INTENT_PATTERNS = (
             (re.compile(_NS_IN_SUFFIX, re.I), 1),
         ],
     ),
+    # pod_logs: "get/show logs (of) <podname> (pod)" [in namespace X]
+    (
+        "pod_logs",
+        ("log",),
+        re.compile(
+            r"\b(?:get|show)\s+logs?\s+(?:of\s+)?(?P<pod>[a-z0-9][a-z0-9\-.]*)\s*(?:pod\b)?",
+            re.I,
+        ),
+        [
+            (re.compile(_NS_IN_SUFFIX_WORD, re.I), 1),
+            (re.compile(_NS_IN_SUFFIX, re.I), 1),
+            (re.compile(r"\bin\s+namespace\s+" + _NS_GROUP + r"\b", re.I), 1),
+        ],
+    ),
+    # describe_pod: "describe <podname>" or "describe pod <podname>" [in namespace X]
+    (
+        "describe_pod",
+        (),
+        re.compile(
+            r"\bdescribe\s+(?:pod\s+)?(?P<pod>[a-z0-9][a-z0-9\-.]*)\s*(?:pod\b)?",
+            re.I,
+        ),
+        [
+            (re.compile(_NS_IN_SUFFIX_WORD, re.I), 1),
+            (re.compile(_NS_IN_SUFFIX, re.I), 1),
+            (re.compile(r"\bin\s+namespace\s+" + _NS_GROUP + r"\b", re.I), 1),
+        ],
+    ),
+    # helm_uninstall: "uninstall helm release X" or "helm uninstall X" [in namespace Y]
+    (
+        "helm_uninstall",
+        ("helm",),
+        re.compile(
+            r"\b(?:helm\s+)?uninstall\s+(?:helm\s+release\s+)?(?P<release>[a-z0-9][a-z0-9\-.]*)\b",
+            re.I,
+        ),
+        [
+            (re.compile(_NS_IN_SUFFIX_WORD, re.I), 1),
+            (re.compile(r"\bin\s+namespace\s+" + _NS_GROUP + r"\b", re.I), 1),
+            (re.compile(_NS_IN_SUFFIX, re.I), 1),
+        ],
+    ),
+    # helm_install: "install helm chart X [as Y]" or "helm install Y X" [in namespace Z]
+    (
+        "helm_install",
+        ("helm", "install"),
+        re.compile(
+            r"\binstall\s+helm\s+(?:chart\s+)?(?P<chart>[a-z0-9][a-z0-9\-./]*)\b"
+            r"(?:\s+as\s+|\s+release\s+|\s+name\s+)(?P<release>[a-z0-9][a-z0-9\-.]*)?|"
+            r"\bhelm\s+install\s+(?P<release2>[a-z0-9][a-z0-9\-.]*)\s+(?P<chart2>[a-z0-9][a-z0-9\-./]*)\b",
+            re.I,
+        ),
+        [
+            (re.compile(_NS_IN_SUFFIX_WORD, re.I), 1),
+            (re.compile(r"\bin\s+namespace\s+" + _NS_GROUP + r"\b", re.I), 1),
+            (re.compile(_NS_IN_SUFFIX, re.I), 1),
+        ],
+    ),
+    # create_resource: "create namespace X" or "create [a] deployment [named] Y [with ...] in [namespace] Z"
+    # Also: "create a <name> <kind> in ... namespace" (name before kind, e.g. "create a hello-world configmap in X namespace")
+    (
+        "create_resource",
+        ("create",),
+        re.compile(
+            r"\bcreate\s+namespace\s+(?P<ns_name>[a-z0-9][a-z0-9\-]*)\b|"
+            r"\bcreate\s+(?:a\s+)?(?P<resource>\w+)\s+(?:named\s+)?(?P<name>[a-z0-9][a-z0-9\-.]*)\s+.+?\s+in\s+(?:the\s+)?(?:namespace\s+(?P<ns>[a-z0-9][a-z0-9\-_.]*)|(?P<ns_alt>[a-z0-9][a-z0-9\-_.]*)\s+namespace)\b|"
+            r"\bcreate\s+(?:a\s+)?(?P<resource2>\w+)\s+(?:named\s+)?(?P<name2>[a-z0-9][a-z0-9\-.]*)\s+in\s+(?:the\s+)?(?:namespace\s+(?P<ns2>[a-z0-9][a-z0-9\-_.]*)|(?P<ns2_alt>[a-z0-9][a-z0-9\-_.]*)\s+namespace)\b|"
+            r"\bcreate\s+(?:a\s+)?(?P<name_first>[a-z0-9][a-z0-9\-.]*)\s+(?P<kind_after>\w+)\s+.+?\s+in\s+(?:the\s+)?(?:namespace\s+(?P<ns_name_first>[a-z0-9][a-z0-9\-_.]*)|(?P<ns_alt_name_first>[a-z0-9][a-z0-9\-_.]*)\s+namespace)\b",
+            re.I,
+        ),
+        None,  # namespace for create <kind> <name> in namespace X is in the regex
+    ),
+    # delete_resource: "delete pod X" or "delete deployment Y in namespace Z"
+    (
+        "delete_resource",
+        ("delete",),
+        re.compile(r"\bdelete\s+(?P<resource>[a-z0-9][a-z0-9\-.]*)\s+(?P<name>[a-z0-9][a-z0-9\-.]*)\b", re.I),
+        [
+            (re.compile(_NS_IN_SUFFIX_WORD, re.I), 1),
+            (re.compile(r"\bin\s+namespace\s+" + _NS_GROUP + r"\b", re.I), 1),
+            (re.compile(_NS_IN_SUFFIX, re.I), 1),
+        ],
+    ),
+    # update_resource: "update deployment X" or "patch pod Y in namespace Z" ("udate" = typo for update)
+    (
+        "update_resource",
+        (),
+        re.compile(r"\b(?:update|udate|patch|edit)\s+(?P<resource>[a-z0-9][a-z0-9\-.]*)\s+(?P<name>[a-z0-9][a-z0-9\-.]*)\b", re.I),
+        [
+            (re.compile(_NS_IN_SUFFIX_WORD, re.I), 1),
+            (re.compile(r"\bin\s+namespace\s+" + _NS_GROUP + r"\b", re.I), 1),
+            (re.compile(_NS_IN_SUFFIX, re.I), 1),
+        ],
+    ),
 )
 
 # RESOURCE_LIST_MAP is built from cluster discovery in plugins.mcp_integration.__init__
@@ -301,12 +400,14 @@ def parse_intent(text: str) -> dict | None:
     """
     Single entry point for MCP chat intent parsing.
 
-    Matches in order: list_namespaces, helm_releases, list_resource, pods.
+    Matches in order: list_namespaces, helm_releases, pod_logs, describe_pod, list_resource, pods.
     Returns a structured intent dict or None if no intent matched.
 
     Return shapes:
       {"type": "list_namespaces"}
       {"type": "helm_releases", "all_namespaces": bool, "namespace": str | None}
+      {"type": "pod_logs", "pod_name": str, "namespace": str | None}
+      {"type": "describe_pod", "pod_name": str, "namespace": str | None}
       {"type": "list_resource", "api_version": str, "kind": str, "namespace": str | None}
       {"type": "pods", "namespace": str}
     """
@@ -327,21 +428,115 @@ def parse_intent(text: str) -> dict | None:
             ns = _extract_namespace(t, ns_extractors)
             logger.debug("MCP intent: helm_releases namespace=%r", ns)
             return {"type": "helm_releases", "all_namespaces": ns is None, "namespace": ns}
+        if intent_type == "pod_logs":
+            m = trigger_re.search(t)
+            pod_name = m.group("pod").strip() if m else None
+            if not pod_name:
+                continue
+            ns = _extract_namespace(t, ns_extractors)
+            logger.debug("MCP intent: pod_logs pod_name=%r namespace=%r", pod_name, ns)
+            return {"type": "pod_logs", "pod_name": pod_name, "namespace": ns}
+        if intent_type == "describe_pod":
+            m = trigger_re.search(t)
+            pod_name = m.group("pod").strip() if m else None
+            if not pod_name:
+                continue
+            ns = _extract_namespace(t, ns_extractors)
+            logger.debug("MCP intent: describe_pod pod_name=%r namespace=%r", pod_name, ns)
+            return {"type": "describe_pod", "pod_name": pod_name, "namespace": ns}
+        if intent_type == "helm_uninstall":
+            m = trigger_re.search(t)
+            release = (m.group("release") or "").strip() if m else None
+            if not release:
+                continue
+            ns = _extract_namespace(t, ns_extractors)
+            logger.debug("MCP intent: helm_uninstall release=%r namespace=%r", release, ns)
+            return {"type": "helm_uninstall", "release": release, "namespace": ns}
+        if intent_type == "helm_install":
+            m = trigger_re.search(t)
+            if not m:
+                continue
+            chart = (m.group("chart") or m.group("chart2") or "").strip()
+            release = (m.group("release") or m.group("release2") or "").strip() or None
+            if not chart:
+                continue
+            ns = _extract_namespace(t, ns_extractors)
+            logger.debug("MCP intent: helm_install chart=%r release=%r namespace=%r", chart, release, ns)
+            return {"type": "helm_install", "chart": chart, "release": release, "namespace": ns}
+        if intent_type == "create_resource":
+            m = trigger_re.search(t)
+            if not m:
+                continue
+            ns_name = (m.group("ns_name") or "").strip()
+            if ns_name:
+                logger.debug("MCP intent: create_resource (namespace only) name=%r", ns_name)
+                return {"type": "create_resource", "create_namespace": ns_name}
+            # "create a <name> <kind> in ... namespace" (name_first, kind_after)
+            name_first = (m.group("name_first") or "").strip()
+            kind_after = (m.group("kind_after") or "").strip()
+            ns_name_first = (m.group("ns_name_first") or m.group("ns_alt_name_first") or "").strip()
+            if name_first and kind_after and ns_name_first:
+                from plugins.mcp_integration import get_resource_list_map
+                resource_map = get_resource_list_map()
+                if kind_after.lower() in resource_map:
+                    logger.debug("MCP intent: create_resource (name-then-kind) kind=%r name=%r namespace=%r", kind_after, name_first, ns_name_first)
+                    return {"type": "create_resource", "resource": kind_after, "name": name_first, "namespace": ns_name_first}
+            res = (m.group("resource") or m.group("resource2") or "").strip()
+            name = (m.group("name") or m.group("name2") or "").strip()
+            ns = (m.group("ns") or m.group("ns_alt") or m.group("ns2") or m.group("ns2_alt") or "").strip()
+            if res and name and ns:
+                # If "resource" is an article, resolve actual kind from text (e.g. "create a hello-word configmap" -> kind=configmap)
+                if res.lower() in ("a", "an", "the"):
+                    from plugins.mcp_integration import get_resource_list_map
+                    resource_map = get_resource_list_map()
+                    for key in sorted(resource_map.keys(), key=lambda k: -len(k)):
+                        if re.search(r"\b" + re.escape(key) + r"\b", t):
+                            res = key
+                            break
+                    else:
+                        continue  # no known kind found, skip this match
+                logger.debug("MCP intent: create_resource kind=%r name=%r namespace=%r", res, name, ns)
+                return {"type": "create_resource", "resource": res, "name": name, "namespace": ns}
+        if intent_type == "delete_resource":
+            m = trigger_re.search(t)
+            if not m:
+                continue
+            res = (m.group("resource") or "").strip()
+            name = (m.group("name") or "").strip()
+            if not res or not name:
+                continue
+            ns = _extract_namespace(t, ns_extractors)
+            logger.debug("MCP intent: delete_resource resource=%r name=%r namespace=%r", res, name, ns)
+            return {"type": "delete_resource", "resource": res, "name": name, "namespace": ns}
+        if intent_type == "update_resource":
+            m = trigger_re.search(t)
+            if not m:
+                continue
+            res = (m.group("resource") or "").strip()
+            name = (m.group("name") or "").strip()
+            if not res or not name:
+                continue
+            ns = _extract_namespace(t, ns_extractors)
+            logger.debug("MCP intent: update_resource resource=%r name=%r namespace=%r", res, name, ns)
+            return {"type": "update_resource", "resource": res, "name": name, "namespace": ns}
         # extend with more pattern-driven types as needed
 
     # 2. list_resource: "list/show/get <resource>" [in namespace X]
+    # Require the resource key to be the direct object (right after the verb), so
+    # "list pods in balazs-paldi namespace" matches pods, not "namespace" from the phrase "in X namespace".
+    # Try longer keys first so "list pods" matches "pods" not "pod", and "get podmetrics" matches "podmetrics" not "pod".
     from plugins.mcp_integration import get_resource_list_map
-    for key, (api_version, kind) in get_resource_list_map().items():
-        if key not in t:
-            continue
-        if not re.search(r"\b(?:list|show|get)\s+[\w\s\-]*" + re.escape(key), t, re.I):
+    resource_map = get_resource_list_map()
+    for key in sorted(resource_map.keys(), key=lambda k: -len(k)):
+        api_version, kind = resource_map[key]
+        if not re.search(r"\b(?:list|show|get)\s+(?:all\s+)?" + re.escape(key) + r"\b", t, re.I):
             continue
         ns = _extract_namespace(t, _NS_EXTRACTORS)
         logger.debug("MCP intent: list_resource kind=%s namespace=%r", kind, ns)
         return {"type": "list_resource", "api_version": api_version, "kind": kind, "namespace": ns}
 
-    # 3. pods: "pods/pod ... in [namespace] X"
-    if "pod" in t:
+    # 3. pods: "pods/pod ... in [namespace] X" — require whole-word pod/pods so "podmetrics" doesn't match
+    if re.search(r"\b(?:pod|pods)\b", t):
         ns = _extract_namespace(t, _NS_EXTRACTORS)
         if ns is not None:
             logger.debug("MCP intent: pods namespace=%r", ns)

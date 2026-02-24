@@ -98,7 +98,7 @@ mcp_integration = false
 # Example with docker-compose: http://127.0.0.1:8082
 mcp_server_url =
 
-# Optional: run MCP tools in read-only mode
+# Optional: true = only read operations (list, describe, logs, Helm list); false = allow create/delete when supported
 read_only = false
 
 # Optional: LLM API endpoint (OpenAI-compatible). For future use.
