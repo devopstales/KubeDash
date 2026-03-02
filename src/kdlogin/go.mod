@@ -6,7 +6,7 @@ require (
 	github.com/gin-gonic/gin v1.10.1
 	github.com/go-playground/validator/v10 v10.25.0
 	k8s.io/apimachinery v0.35.2
-	k8s.io/client-go v0.35.2
+	k8s.io/client-go v0.34.1
 	sigs.k8s.io/yaml v1.6.0
 )
 
