@@ -38,7 +38,7 @@ class HelmChartsListResource(MethodView):
     """
     
     @helm_api_bp.response(200, description="Successfully retrieved helm charts list")
-    @helm_api_bp.doc(tags=['Helm'])
+    @helm_api_bp.doc(tags=['Plugins API - Helm'])
     @login_required
     def get(self):
         """
@@ -111,7 +111,7 @@ class HelmChartDataResource(MethodView):
     """
     
     @helm_api_bp.response(200, description="Successfully retrieved helm chart data")
-    @helm_api_bp.doc(tags=['Helm'])
+    @helm_api_bp.doc(tags=['Plugins API - Helm'])
     @login_required
     def get(self, release_name, release_version):
         """

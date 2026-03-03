@@ -41,7 +41,7 @@ class ApplicationsResource(MethodView):
     """
     
     @application_catalog_api_bp.response(200, description="Successfully retrieved applications list")
-    @application_catalog_api_bp.doc(tags=['Application Catalog'])
+    @application_catalog_api_bp.doc(tags=['Plugins API - Application Catalog'])
     @login_required
     def get(self):
         """
@@ -79,7 +79,7 @@ class ApplicationsResource(MethodView):
     
     @application_catalog_api_bp.response(201, description="Successfully created application")
     @application_catalog_api_bp.response(400, description="Bad request - Invalid input")
-    @application_catalog_api_bp.doc(tags=['Application Catalog'])
+    @application_catalog_api_bp.doc(tags=['Plugins API - Application Catalog'])
     @login_required
     def post(self):
         """
@@ -158,7 +158,7 @@ class ApplicationResource(MethodView):
     
     @application_catalog_api_bp.response(200, description="Successfully retrieved application")
     @application_catalog_api_bp.response(404, description="Application not found")
-    @application_catalog_api_bp.doc(tags=['Application Catalog'])
+    @application_catalog_api_bp.doc(tags=['Plugins API - Application Catalog'])
     @login_required
     def get(self, application_name):
         """
@@ -191,7 +191,7 @@ class ApplicationResource(MethodView):
     @application_catalog_api_bp.response(200, description="Successfully updated application")
     @application_catalog_api_bp.response(400, description="Bad request - Invalid input")
     @application_catalog_api_bp.response(404, description="Application not found")
-    @application_catalog_api_bp.doc(tags=['Application Catalog'])
+    @application_catalog_api_bp.doc(tags=['Plugins API - Application Catalog'])
     @login_required
     def put(self, application_name):
         """
@@ -267,7 +267,7 @@ class ApplicationResource(MethodView):
     
     @application_catalog_api_bp.response(200, description="Successfully deleted application")
     @application_catalog_api_bp.response(404, description="Application not found")
-    @application_catalog_api_bp.doc(tags=['Application Catalog'])
+    @application_catalog_api_bp.doc(tags=['Plugins API - Application Catalog'])
     @login_required
     def delete(self, application_name):
         """

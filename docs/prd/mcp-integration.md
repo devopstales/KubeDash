@@ -517,21 +517,15 @@ Unmatched or unsupported messages receive a fallback reply listing supported que
 
 ### 11.3 Configuration (kubedash.ini)
 
-**Current (single MCP)** — Under `[mcp_integration]`:
+**Current** — Under `[mcp_integration]`:
 
 | Option | Description | Default |
 |--------|-------------|---------|
 | `mcp_server_url` | Base URL of the MCP server (e.g. `http://127.0.0.1:8082`). Empty disables chat MCP. | (empty) |
-| `read_only` | If **true**, only read operations are allowed (list, describe, logs, Helm list). When **false**, create/delete/update intents are allowed when implemented. When true and the user asks for a write operation, the assistant replies that write operations are disabled. | false |
+| `read_only` | If **true**, only read operations are allowed (list, describe, logs, Helm list, diagnose). When **false**, create/delete/update intents are allowed when implemented. When true and the user asks for a write operation, the assistant replies that write operations are disabled. | false |
 | `helm_list_tool` | Tool name for listing Helm releases (e.g. `helm_list`). | helm_list |
-
-**Target (multi-MCP)** — For the architecture in §7.4, configuration will support:
-
-| Option | Description | Purpose |
-|--------|-------------|---------|
-| `mcp_server_url` | Base URL of **containers/kubernetes-mcp-server**. | Kubernetes & Helm CRUD (list, get, logs, describe, Helm). |
-| `mcp_diagnostics_url` | Base URL of **k8sgpt-ai/k8sgpt** MCP server. Empty disables diagnostics routing. | Diagnose/troubleshoot intents. |
-| (optional) `mcp_diagnostics_intent_keywords` | Comma-separated keywords that route to diagnostics (e.g. `diagnose,troubleshoot,why failing`). | Override or extend default intent routing to k8sgpt. |
+| `mcp_diagnostics_url` | Base URL of **k8sgpt-ai/k8sgpt** MCP server for error diagnosing. Empty disables diagnostics. Example: `http://127.0.0.1:8089` (k8sgpt serve --mcp --mcp-http --mcp-port 8089). | (empty) |
+| `mcp_diagnostics_intent_keywords` | Comma-separated keywords that route to diagnostics (for future use; intent is currently pattern-based). | diagnose,troubleshoot,why,failing,issues,problems |
 
 ### 11.4 Related Documentation
 
@@ -562,12 +556,13 @@ This section describes the implemented behavior of the MCP Integration plugin as
 - **Backend**: Plugin blueprint `mcp_integration_api_bp` registered under `/api/v1/plugins` (prefix `mcp-integration`). Single endpoint: `POST /chat/message` (MethodView `post()`). No LLM: message is parsed with a single intent parser, then one of several code paths runs (list namespaces, list resource, pod logs, describe pod, Helm releases, list pods in namespace). Each path calls the MCP server via `query_mcp_tool(url, tool_name, arguments)` and formats the tool output for the reply.
 - **MCP client**: HTTP JSON-RPC to `{mcp_server_url}/mcp` (method `tools/call`). Also supports Streamable HTTP handshake (initialize, notifications/initialized, tools/call) and SSE where available. Implemented in `mcp_client.py` and `mcp_session.py`.
 - **RBAC**: Before namespace-scoped MCP calls, the backend checks namespace access via SubjectAccessReview (when extension_api is available). On failure, returns 403 with a clear message.
-- **Read-only**: If `[mcp_integration]` `read_only = true`, only intents in `READ_ONLY_INTENT_TYPES` (list_namespaces, pods, describe_pod, pod_logs, helm_releases, list_resource) are executed. Any other (e.g. future create/delete) intent returns an assistant message that write operations are disabled.
+- **Read-only**: If `[mcp_integration]` `read_only = true`, only intents in `READ_ONLY_INTENT_TYPES` (list_namespaces, pods, describe_pod, pod_logs, helm_releases, list_resource, diagnose) are executed. Any other (e.g. future create/delete) intent returns an assistant message that write operations are disabled.
+- **K8sGPT diagnostics**: When `mcp_diagnostics_url` is set and the user message matches the diagnose intent (e.g. "diagnose cluster", "troubleshoot", "why are my pods failing"), the backend calls the K8sGPT MCP server's `analyze` tool (Streamable HTTP) with `explain: true` and optional `namespace`. Result is formatted as **Cluster diagnostics (K8sGPT)** or **Diagnostics for namespace \<ns\> (K8sGPT)**. Namespace-scoped diagnose is subject to RBAC (SubjectAccessReview).
 
 ### 12.2 Intent parsing
 
 - **Module**: `plugins.mcp_integration.mcp_client.parse_intent(text)`.
-- **Order**: Pattern-driven intents first (list_namespaces, helm_releases, pod_logs, describe_pod, helm_uninstall, helm_install, create_resource, delete_resource, update_resource), then list_resource (using cluster discovery resource list map, longer keys first so "list pods" matches Pod not PodMetrics), then pods fallback (whole-word pod/pods and namespace).
+- **Order**: Pattern-driven intents first (list_namespaces, diagnose, helm_releases, pod_logs, describe_pod, helm_uninstall, helm_install, create_resource, delete_resource, update_resource), then list_resource (using cluster discovery resource list map, longer keys first so "list pods" matches Pod not PodMetrics), then pods fallback (whole-word pod/pods and namespace).
 - **Namespace extraction**: Phrases like "in X namespace", "in namespace X", "in X" at end of sentence. Default namespace for pod_logs and describe_pod when not specified: default.
 
 ### 12.3 Resource list map

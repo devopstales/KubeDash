@@ -39,7 +39,7 @@ class FluxObjectsListResource(MethodView):
     """
     
     @flux_api_bp.response(200, description="Successfully retrieved flux objects list")
-    @flux_api_bp.doc(tags=['Flux'])
+    @flux_api_bp.doc(tags=['Plugins API - Flux'])
     @login_required
     def get(self):
         """

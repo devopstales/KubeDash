@@ -38,7 +38,7 @@ class GatewayAPIGatewayClassesResource(MethodView):
     """
     
     @gateway_api_api_bp.response(200, description="Successfully retrieved gateway classes")
-    @gateway_api_api_bp.doc(tags=['Gateway API'])
+    @gateway_api_api_bp.doc(tags=['Plugins API - Gateway API'])
     @login_required
     def get(self):
         """
@@ -77,7 +77,7 @@ class GatewayAPIGatewaysResource(MethodView):
     """
     
     @gateway_api_api_bp.response(200, description="Successfully retrieved gateways")
-    @gateway_api_api_bp.doc(tags=['Gateway API'])
+    @gateway_api_api_bp.doc(tags=['Plugins API - Gateway API'])
     @login_required
     def get(self):
         """
@@ -124,7 +124,7 @@ class GatewayAPIHTTPRoutesResource(MethodView):
     """
     
     @gateway_api_api_bp.response(200, description="Successfully retrieved HTTP routes")
-    @gateway_api_api_bp.doc(tags=['Gateway API'])
+    @gateway_api_api_bp.doc(tags=['Plugins API - Gateway API'])
     @login_required
     def get(self):
         """
@@ -166,7 +166,7 @@ class GatewayAPIHTTPRoutesResource(MethodView):
 class GatewayAPIGRPCRoutesResource(MethodView):
     """Gateway API GRPCRoutes endpoint."""
     @gateway_api_api_bp.response(200, description="Successfully retrieved GRPC routes")
-    @gateway_api_api_bp.doc(tags=['Gateway API'])
+    @gateway_api_api_bp.doc(tags=['Plugins API - Gateway API'])
     @login_required
     def get(self):
         from plugins.gateway_api.functions import GatewayApiGetGRPCRoutes
@@ -184,7 +184,7 @@ class GatewayAPIGRPCRoutesResource(MethodView):
 class GatewayAPITCPRoutesResource(MethodView):
     """Gateway API TCPRoutes endpoint."""
     @gateway_api_api_bp.response(200, description="Successfully retrieved TCP routes")
-    @gateway_api_api_bp.doc(tags=['Gateway API'])
+    @gateway_api_api_bp.doc(tags=['Plugins API - Gateway API'])
     @login_required
     def get(self):
         from plugins.gateway_api.functions import GatewayApiGetTCPRoutes
@@ -202,7 +202,7 @@ class GatewayAPITCPRoutesResource(MethodView):
 class GatewayAPITLSRoutesResource(MethodView):
     """Gateway API TLSRoutes endpoint."""
     @gateway_api_api_bp.response(200, description="Successfully retrieved TLS routes")
-    @gateway_api_api_bp.doc(tags=['Gateway API'])
+    @gateway_api_api_bp.doc(tags=['Plugins API - Gateway API'])
     @login_required
     def get(self):
         from plugins.gateway_api.functions import GatewayApiGetTLSRoutes
@@ -220,7 +220,7 @@ class GatewayAPITLSRoutesResource(MethodView):
 class GatewayAPIReferenceGrantsResource(MethodView):
     """Gateway API ReferenceGrants endpoint."""
     @gateway_api_api_bp.response(200, description="Successfully retrieved reference grants")
-    @gateway_api_api_bp.doc(tags=['Gateway API'])
+    @gateway_api_api_bp.doc(tags=['Plugins API - Gateway API'])
     @login_required
     def get(self):
         from plugins.gateway_api.functions import GatewayApiGetReferenceGrants
@@ -238,7 +238,7 @@ class GatewayAPIReferenceGrantsResource(MethodView):
 class GatewayAPIBackendTLSPoliciesResource(MethodView):
     """Gateway API BackendTLSPolicies endpoint."""
     @gateway_api_api_bp.response(200, description="Successfully retrieved backend TLS policies")
-    @gateway_api_api_bp.doc(tags=['Gateway API'])
+    @gateway_api_api_bp.doc(tags=['Plugins API - Gateway API'])
     @login_required
     def get(self):
         from plugins.gateway_api.functions import GatewayApiGetBackendTLSPolicies
@@ -256,7 +256,7 @@ class GatewayAPIBackendTLSPoliciesResource(MethodView):
 class GatewayAPIStatusResource(MethodView):
     """Gateway API installation status endpoint."""
     @gateway_api_api_bp.response(200, description="Successfully retrieved Gateway API status")
-    @gateway_api_api_bp.doc(tags=['Gateway API'])
+    @gateway_api_api_bp.doc(tags=['Plugins API - Gateway API'])
     @login_required
     def get(self):
         from plugins.gateway_api.functions import check_gateway_api_installed

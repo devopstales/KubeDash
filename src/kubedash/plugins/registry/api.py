@@ -41,7 +41,7 @@ class RegistryServersResource(MethodView):
     """
     
     @registry_api_bp.response(200, description="Successfully retrieved registry servers list")
-    @registry_api_bp.doc(tags=['Registry'])
+    @registry_api_bp.doc(tags=['Plugins API - Registry'])
     @login_required
     def get(self):
         """
@@ -92,7 +92,7 @@ class RegistryServersResource(MethodView):
     
     @registry_api_bp.response(201, description="Successfully created registry server")
     @registry_api_bp.response(400, description="Bad request - Invalid input")
-    @registry_api_bp.doc(tags=['Registry'])
+    @registry_api_bp.doc(tags=['Plugins API - Registry'])
     @login_required
     def post(self):
         """
@@ -159,7 +159,7 @@ class RegistryServerResource(MethodView):
     
     @registry_api_bp.response(200, description="Successfully retrieved registry server")
     @registry_api_bp.response(404, description="Registry server not found")
-    @registry_api_bp.doc(tags=['Registry'])
+    @registry_api_bp.doc(tags=['Plugins API - Registry'])
     @login_required
     def get(self, registry_server_url):
         """
@@ -204,7 +204,7 @@ class RegistryServerResource(MethodView):
     @registry_api_bp.response(200, description="Successfully updated registry server")
     @registry_api_bp.response(400, description="Bad request - Invalid input")
     @registry_api_bp.response(404, description="Registry server not found")
-    @registry_api_bp.doc(tags=['Registry'])
+    @registry_api_bp.doc(tags=['Plugins API - Registry'])
     @login_required
     def put(self, registry_server_url):
         """
@@ -288,7 +288,7 @@ class RegistryServerResource(MethodView):
     
     @registry_api_bp.response(200, description="Successfully deleted registry server")
     @registry_api_bp.response(404, description="Registry server not found")
-    @registry_api_bp.doc(tags=['Registry'])
+    @registry_api_bp.doc(tags=['Plugins API - Registry'])
     @login_required
     def delete(self, registry_server_url):
         """
@@ -334,7 +334,7 @@ class RegistryImagesResource(MethodView):
     
     @registry_api_bp.response(200, description="Successfully retrieved images list")
     @registry_api_bp.response(400, description="Bad request - Invalid registry server URL")
-    @registry_api_bp.doc(tags=['Registry'])
+    @registry_api_bp.doc(tags=['Plugins API - Registry'])
     @login_required
     def get(self, registry_server_url):
         """
@@ -383,7 +383,7 @@ class RegistryImageTagsResource(MethodView):
     
     @registry_api_bp.response(200, description="Successfully retrieved image tags")
     @registry_api_bp.response(400, description="Bad request - Invalid parameters")
-    @registry_api_bp.doc(tags=['Registry'])
+    @registry_api_bp.doc(tags=['Plugins API - Registry'])
     @login_required
     def get(self, registry_server_url, image_name):
         """
@@ -429,7 +429,7 @@ class RegistryImageTagDataResource(MethodView):
     
     @registry_api_bp.response(200, description="Successfully retrieved tag data")
     @registry_api_bp.response(400, description="Bad request - Invalid parameters")
-    @registry_api_bp.doc(tags=['Registry'])
+    @registry_api_bp.doc(tags=['Plugins API - Registry'])
     @login_required
     def get(self, registry_server_url, image_name, tag_name):
         """

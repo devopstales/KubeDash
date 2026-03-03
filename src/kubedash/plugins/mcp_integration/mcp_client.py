@@ -14,8 +14,10 @@ from lib.helper_functions import get_logger
 
 logger = get_logger()
 
-# Default timeout for MCP HTTP calls
+# Default timeout for MCP HTTP calls (seconds)
 MCP_REQUEST_TIMEOUT = 30
+# Longer timeout for diagnostics (K8sGPT analyze can take 60–120s with AI backend)
+MCP_DIAGNOSTICS_TIMEOUT = 120
 
 
 def _parse_sse_json(raw: str):
@@ -109,7 +111,12 @@ def _mcp_request(base_url: str, method: str, params: dict, request_id: int = 1) 
 
 
 def _mcp_post_with_headers(
-    base_url: str, method: str, params: dict, request_id: int = 1, extra_headers: dict | None = None
+    base_url: str,
+    method: str,
+    params: dict,
+    request_id: int = 1,
+    extra_headers: dict | None = None,
+    timeout: int | None = None,
 ) -> tuple[dict, dict]:
     """
     POST a JSON-RPC request to /mcp and return (response_headers_dict, parsed_response_dict).
@@ -122,8 +129,9 @@ def _mcp_post_with_headers(
     if extra_headers:
         headers.update(extra_headers)
     req = urllib.request.Request(url, data=data, headers=headers, method="POST")
+    _timeout = timeout if timeout is not None else MCP_REQUEST_TIMEOUT
     try:
-        resp = urllib.request.urlopen(req, timeout=MCP_REQUEST_TIMEOUT)
+        resp = urllib.request.urlopen(req, timeout=_timeout)
     except urllib.error.HTTPError as e:
         raw = e.read().decode("utf-8", errors="replace") if e.fp else ""
         out = json.loads(raw) if raw.strip().startswith("{") else _parse_sse_json(raw)
@@ -140,7 +148,11 @@ def _mcp_post_with_headers(
 
 
 def _mcp_post_notification(
-    base_url: str, method: str, params: dict | None = None, extra_headers: dict | None = None
+    base_url: str,
+    method: str,
+    params: dict | None = None,
+    extra_headers: dict | None = None,
+    timeout: int | None = None,
 ) -> None:
     """Send a JSON-RPC notification (no id). Server may return 202 or 200 with no body."""
     url = base_url.rstrip("/") + "/mcp"
@@ -150,8 +162,9 @@ def _mcp_post_notification(
     if extra_headers:
         headers.update(extra_headers)
     req = urllib.request.Request(url, data=data, headers=headers, method="POST")
+    _timeout = timeout if timeout is not None else MCP_REQUEST_TIMEOUT
     try:
-        with urllib.request.urlopen(req, timeout=MCP_REQUEST_TIMEOUT) as resp:
+        with urllib.request.urlopen(req, timeout=_timeout) as resp:
             resp.read()
     except urllib.error.HTTPError as e:
         if e.code != 202:
@@ -171,21 +184,24 @@ def _extract_content_text(result: dict) -> str:
     return "\n".join(parts).strip() if parts else ""
 
 
-def streamable_http_call_tool(base_url: str, tool_name: str, arguments: dict) -> str:
+def streamable_http_call_tool(
+    base_url: str, tool_name: str, arguments: dict, timeout: int | None = None
+) -> str:
     """
     Call an MCP tool using sync Streamable HTTP with full handshake:
     initialize -> notifications/initialized -> tools/call.
     Required by MCP spec; avoids "tools/call is invalid during session initialization".
     """
     url = base_url.rstrip("/") + "/mcp"
-    logger.info("MCP Streamable HTTP (sync): initialize -> initialized -> tool %s at %s", tool_name, url)
+    _timeout = timeout if timeout is not None else MCP_REQUEST_TIMEOUT
+    logger.info("MCP Streamable HTTP (sync): initialize -> initialized -> tool %s at %s (timeout=%ss)", tool_name, url, _timeout)
     init_params = {
         "protocolVersion": "2024-11-05",
         "capabilities": {},
         "clientInfo": {"name": "kubedash", "version": "1.0"},
     }
     try:
-        resp_headers, init_out = _mcp_post_with_headers(base_url, "initialize", init_params, request_id=1)
+        resp_headers, init_out = _mcp_post_with_headers(base_url, "initialize", init_params, request_id=1, timeout=_timeout)
     except (urllib.error.HTTPError, urllib.error.URLError, RuntimeError) as e:
         logger.warning("MCP Streamable HTTP: initialize failed: %s", e)
         raise
@@ -195,14 +211,15 @@ def streamable_http_call_tool(base_url: str, tool_name: str, arguments: dict) ->
     if not session_id and isinstance(init_out.get("result"), dict):
         session_id = init_out["result"].get("sessionId")
     if not session_id:
-        logger.warning("MCP Streamable HTTP: no session id in response")
-        raise RuntimeError("Server did not return a session id")
+        # Some MCP servers (e.g. K8sGPT) do not return a session id; try direct tools/call
+        logger.info("MCP Streamable HTTP: no session id in response, trying direct tools/call")
+        return _mcp_call_tool_direct(base_url, tool_name, arguments or {}, _timeout)
     if isinstance(session_id, list):
         session_id = session_id[0] if session_id else ""
     session_id = str(session_id).strip()
     extra = {"Mcp-Session-Id": session_id}
     try:
-        _mcp_post_notification(base_url, "notifications/initialized", extra_headers=extra)
+        _mcp_post_notification(base_url, "notifications/initialized", extra_headers=extra, timeout=_timeout)
     except Exception as e:
         logger.warning("MCP Streamable HTTP: notifications/initialized failed: %s", e)
         raise
@@ -213,15 +230,50 @@ def streamable_http_call_tool(base_url: str, tool_name: str, arguments: dict) ->
             {"name": tool_name, "arguments": arguments or {}},
             request_id=2,
             extra_headers=extra,
+            timeout=_timeout,
         )
     except (urllib.error.HTTPError, urllib.error.URLError, RuntimeError) as e:
         logger.warning("MCP Streamable HTTP: tools/call failed: %s", e)
         raise
     if "error" in call_out:
         raise RuntimeError(call_out["error"].get("message", "Tool call failed"))
-    out = _extract_content_text(call_out.get("result", {}))
+    result = call_out.get("result", {})
+    if tool_name == "analyze":
+        out = json.dumps(result)
+    else:
+        out = _extract_content_text(result)
     logger.debug("MCP Streamable HTTP (sync): tool %s returned %s chars", tool_name, len(out))
     return out
+
+
+def _mcp_call_tool_direct(base_url: str, tool_name: str, arguments: dict, timeout: int = MCP_REQUEST_TIMEOUT) -> str:
+    """
+    Call an MCP tool with a single tools/call request (no initialize handshake).
+    Used when the server does not return a session id (e.g. K8sGPT).
+    """
+    body = {"jsonrpc": "2.0", "id": 1, "method": "tools/call", "params": {"name": tool_name, "arguments": arguments}}
+    url = base_url.rstrip("/") + "/mcp"
+    data = json.dumps(body).encode("utf-8")
+    headers = {"Content-Type": "application/json", "Accept": "application/json, text/event-stream"}
+    req = urllib.request.Request(url, data=data, headers=headers, method="POST")
+    try:
+        with urllib.request.urlopen(req, timeout=timeout) as resp:
+            raw = resp.read().decode("utf-8", errors="replace")
+    except urllib.error.HTTPError as e:
+        raw = e.read().decode("utf-8", errors="replace") if e.fp else ""
+        out = json.loads(raw) if raw.strip().startswith("{") else _parse_sse_json(raw)
+        if out and "error" in out:
+            raise RuntimeError(out["error"].get("message", raw or str(e)))
+        raise RuntimeError(raw or "{} {}".format(e.code, e.reason))
+    out = json.loads(raw) if raw.strip().startswith("{") else _parse_sse_json(raw)
+    if out is None:
+        raise RuntimeError("Invalid MCP response (not JSON): " + (raw[:100] or "(empty)"))
+    if "error" in out:
+        raise RuntimeError(out["error"].get("message", "Tool call failed"))
+    result = out.get("result", {})
+    if tool_name == "analyze":
+        return json.dumps(result)
+    return _extract_content_text(result)
 
 
 def mcp_call_tool(base_url: str, tool_name: str, arguments: dict) -> str:
@@ -266,6 +318,24 @@ INTENT_PATTERNS = (
         (),
         re.compile(r"\b(?:list|show|get|what)\s+(?:all\s+)?namespaces?\b", re.I),
         None,
+    ),
+    # diagnose: "diagnose cluster", "troubleshoot", "why are pods failing", "cluster issues", "issues in namespace X" → k8sgpt
+    (
+        "diagnose",
+        (),
+        re.compile(
+            r"\b(?:diagnose|troubleshoot|troubleshooting)\b|"
+            r"\bwhy\s+(?:are|is)\s+.+?(?:failing|broken|not\s+working)\b|"
+            r"\b(?:cluster|namespace)\s+issues?\b|"
+            r"\bissues?\s+in\s+(?:the\s+)?(?:namespace\s+)" + _NS_GROUP + r"\b|"
+            r"\b(?:what|any)\s+problems?\s+in\s+(?:the\s+)?(?:cluster|namespace)\b",
+            re.I,
+        ),
+        [
+            (re.compile(_NS_IN_SUFFIX_WORD, re.I), 1),
+            (re.compile(_NS_IN_SUFFIX, re.I), 1),
+            (re.compile(r"\bin\s+namespace\s+" + _NS_GROUP + r"\b", re.I), 1),
+        ],
     ),
     # helm_releases: "list/show/get ... helm releases" [optional in namespace X]
     (
@@ -400,11 +470,12 @@ def parse_intent(text: str) -> dict | None:
     """
     Single entry point for MCP chat intent parsing.
 
-    Matches in order: list_namespaces, helm_releases, pod_logs, describe_pod, list_resource, pods.
+    Matches in order: list_namespaces, diagnose, helm_releases, pod_logs, describe_pod, list_resource, pods.
     Returns a structured intent dict or None if no intent matched.
 
     Return shapes:
       {"type": "list_namespaces"}
+      {"type": "diagnose", "namespace": str | None}
       {"type": "helm_releases", "all_namespaces": bool, "namespace": str | None}
       {"type": "pod_logs", "pod_name": str, "namespace": str | None}
       {"type": "describe_pod", "pod_name": str, "namespace": str | None}
@@ -424,6 +495,10 @@ def parse_intent(text: str) -> dict | None:
         if intent_type == "list_namespaces":
             logger.debug("MCP intent: list_namespaces")
             return {"type": "list_namespaces"}
+        if intent_type == "diagnose":
+            ns = _extract_namespace(t, ns_extractors)
+            logger.debug("MCP intent: diagnose namespace=%r", ns)
+            return {"type": "diagnose", "namespace": ns}
         if intent_type == "helm_releases":
             ns = _extract_namespace(t, ns_extractors)
             logger.debug("MCP intent: helm_releases namespace=%r", ns)

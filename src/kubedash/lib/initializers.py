@@ -1078,8 +1078,9 @@ def initialize_plugin_apis(app: Flask):
             app.logger.error(f"  Failed to import plugin API {plugin_name}: {str(e)}")
         except Exception as e:
             app.logger.error(f"  Error loading plugin API {plugin_name}: {str(e)}")
+            app.logger.exception("  Plugin API %s traceback:", plugin_name)
     
-    # Register the parent plugins blueprint with api_doc
+    # Register the parent plugins blueprint with api_doc (serves under /api/v1/plugins/...)
     api_doc.register_blueprint(plugins_api_bp)
     app.logger.info(separator_short)
 

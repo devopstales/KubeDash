@@ -504,6 +504,17 @@
         parts.push('<div class="mcp-raw-block"><pre><code class="language-' + escapeHtml(lang) + '">' + codeContent + '</code></pre></div>');
         continue;
       }
+      if (line.trim().match(/^[-*]\s+/)) {
+        var listItems = [];
+        while (i < lines.length && lines[i].trim().match(/^[-*]\s+/)) {
+          var bulletContent = lines[i].trim().replace(/^[-*]\s+/, '');
+          bulletContent = escapeHtml(bulletContent).replace(/\*\*(.+?)\*\*/g, '<strong>$1</strong>').replace(/`([^`]+)`/g, '<code>$1</code>');
+          listItems.push('<li>' + bulletContent + '</li>');
+          i++;
+        }
+        if (listItems.length) parts.push('<ul class="mb-2 list-unstyled">' + listItems.join('') + '</ul>');
+        continue;
+      }
       var para = escapeHtml(line);
       para = para.replace(/\*\*(.+?)\*\*/g, '<strong>$1</strong>');
       para = para.replace(/`([^`]+)`/g, '<code>$1</code>');
@@ -629,20 +640,24 @@
   }
 
   function selectConversation(id) {
-    currentConversationId = id;
+    if (id === currentConversationId) return;
     renderSidebar((window._mcpChatConversations || []).map(function(c) {
       return { id: c.id, title: c.title, updated_at: c.updated_at };
     }));
-    clearMessages();
     fetch('/api/v1/plugins/mcp-integration/chat/conversations/' + id + '/messages', {
       headers: { 'X-CSRFToken': csrfHeader() }
     })
       .then(function(res) { return res.ok ? res.json() : null; })
       .then(function(data) {
-        if (!data || !data.messages) return;
+        if (!data || !Array.isArray(data.messages)) return;
+        currentConversationId = id;
+        clearMessages();
         data.messages.forEach(function(m) {
           addMessage(m.role, m.content || '', false);
         });
+        renderSidebar((window._mcpChatConversations || []).map(function(c) {
+          return { id: c.id, title: c.title, updated_at: c.updated_at };
+        }));
       })
       .catch(function() {});
   }

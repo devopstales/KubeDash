@@ -4,10 +4,12 @@ MCP Integration plugin API: chat message endpoint.
 Registered under /api/v1/plugins/mcp-integration/ (see initialize_plugin_apis).
 """
 
+import json
 import re
 from contextlib import nullcontext
+from urllib.error import URLError
 
-from flask import current_app, jsonify, request
+from flask import current_app, jsonify, request, session
 from flask.views import MethodView
 from flask_login import current_user, login_required
 from flask_smorest import Blueprint
@@ -31,7 +33,11 @@ from plugins.mcp_integration.k8s_operations import (
     list_resource as k8s_list_resource,
     update_resource as k8s_update_resource,
 )
-from plugins.mcp_integration.mcp_client import parse_intent
+from plugins.mcp_integration.mcp_client import (
+    MCP_DIAGNOSTICS_TIMEOUT,
+    parse_intent,
+    streamable_http_call_tool,
+)
 from plugins.mcp_integration.models import McpConversation, McpMessage
 from plugins.mcp_integration.resource_yaml import extract_configmap_mount
 
@@ -51,56 +57,85 @@ tracer = get_tracer()
 
 def _validate_namespace_access(user, namespace: str) -> bool:
     """
-    Check if user has RBAC permission for namespace before MCP tool calls.
-
-    Option A: Use Kubernetes SubjectAccessReview (via lib/extension_api/authorization).
-    Option B: Check against allowed_namespaces from user config/claims.
-    Option C: Delegate to your existing authz layer.
-
-    Returns True if access is allowed or if authz cannot be determined (fail-open placeholder).
+    Check if the current user can access the namespace using the same credentials
+    as the rest of Kubedash (session user_role + token). For Admin we use the
+    Admin kubeconfig; for User we use their token. We validate by actually
+    listing pods in the namespace so the check matches the real K8s identity.
     """
     if not namespace or not namespace.strip():
         return True
+    ns = namespace.strip()
     try:
-        from lib.extension_api.authentication import AuthenticatedUser
-        from lib.extension_api.authorization import check_namespace_access
-        username = getattr(user, "username", None) or getattr(user, "name", None)
-        if not username and hasattr(user, "id"):
-            username = str(user.id)
-        if not username:
-            username = "unknown"
-        groups = getattr(user, "groups", None) or []
-        auth_user = AuthenticatedUser(username=username, groups=list(groups))
-        return check_namespace_access(
-            auth_user, namespace.strip(), verb="list", resource="pods", api_group=""
-        )
-    except ImportError:
-        logger.debug("MCP namespace validation: extension_api not available, allowing access")
+        from kubernetes import client as k8s_client
+        from kubernetes.client.rest import ApiException
+        from lib.k8s.server import k8sClientConfigGet
+        user_role = session.get("user_role", "Admin")
+        user_token = None
+        if user_role == "User":
+            try:
+                from lib.sso import get_user_token
+                user_token = get_user_token(session)
+            except Exception:
+                logger.debug("MCP namespace validation: no user token, denying")
+                return False
+        k8sClientConfigGet(user_role, user_token)
+        api = k8s_client.CoreV1Api()
+        api.list_namespaced_pod(ns, limit=1, _request_timeout=5)
         return True
+    except ApiException as e:
+        if e.status == 403:
+            logger.debug("MCP namespace validation: 403 for namespace %s", ns)
+            return False
+        logger.warning("MCP namespace validation failed for %s: %s", ns, e)
+        return False
     except Exception as e:
         logger.warning("MCP namespace validation failed for %s: %s", namespace, e)
         return False
 
 
-# Intent types that only read data (list, describe, logs). Write intents (create, delete, apply, etc.) must not be in this set.
+# Intent types that only read data (list, describe, logs, diagnose). Write intents (create, delete, apply, etc.) must not be in this set.
 READ_ONLY_INTENT_TYPES = frozenset({
-    "list_namespaces", "pods", "describe_pod", "pod_logs", "helm_releases", "list_resource",
+    "list_namespaces", "pods", "describe_pod", "pod_logs", "helm_releases", "list_resource", "diagnose",
 })
 
 
 def _get_mcp_config():
-    """Read [mcp_integration] from kubedash.ini. Returns dict with mcp_server_url, read_only, helm_list_tool."""
+    """Read [mcp_integration] from kubedash.ini. Returns dict with mcp_server_url, read_only, helm_list_tool, mcp_diagnostics_url, mcp_diagnostics_intent_keywords."""
     try:
         ini = current_app.config.get("kubedash.ini")
         if not ini or "mcp_integration" not in ini:
-            return {"mcp_server_url": "", "read_only": False, "helm_list_tool": "helm_list"}
+            return {
+                "mcp_server_url": "",
+                "read_only": False,
+                "helm_list_tool": "helm_list",
+                "mcp_diagnostics_url": "",
+                "mcp_diagnostics_intent_keywords": "diagnose,troubleshoot,why,failing,issues,problems",
+                "mcp_diagnostics_explain": False,
+            }
         section = ini["mcp_integration"]
         url = (section.get("mcp_server_url") or "").strip()
         read_only = section.getboolean("read_only", fallback=False)
         helm_list_tool = (section.get("helm_list_tool") or "helm_list").strip() or "helm_list"
-        return {"mcp_server_url": url, "read_only": read_only, "helm_list_tool": helm_list_tool}
+        diagnostics_url = (section.get("mcp_diagnostics_url") or "").strip()
+        diagnostics_keywords = (section.get("mcp_diagnostics_intent_keywords") or "diagnose,troubleshoot,why,failing,issues,problems").strip()
+        diagnostics_explain = section.getboolean("mcp_diagnostics_explain", fallback=False)
+        return {
+            "mcp_server_url": url,
+            "read_only": read_only,
+            "helm_list_tool": helm_list_tool,
+            "mcp_diagnostics_url": diagnostics_url,
+            "mcp_diagnostics_intent_keywords": diagnostics_keywords,
+            "mcp_diagnostics_explain": diagnostics_explain,
+        }
     except Exception:
-        return {"mcp_server_url": "", "read_only": False, "helm_list_tool": "helm_list"}
+        return {
+            "mcp_server_url": "",
+            "read_only": False,
+            "helm_list_tool": "helm_list",
+            "mcp_diagnostics_url": "",
+            "mcp_diagnostics_intent_keywords": "diagnose,troubleshoot,why,failing,issues,problems",
+            "mcp_diagnostics_explain": False,
+        }
 
 
 def _get_or_create_conversation(user_id: int, conversation_id_str: str | None):
@@ -414,6 +449,73 @@ def _format_pods_reply(namespace: str, raw: str, user_asked_count: bool) -> str:
     return "Pods in namespace `{}`:\n\n{}".format(namespace, normalized)
 
 
+def _format_diagnostics_reply(title: str, raw: str) -> str:
+    """Get the text from MCP result content (as JSON) and return it in the chat."""
+    text = (raw or "").strip()
+    if not text:
+        return "**{}** (K8sGPT)\n\nNo response.".format(title)
+    try:
+        data = json.loads(text)
+    except (json.JSONDecodeError, TypeError):
+        return "**{}** (K8sGPT)\n\n```\n{}\n```".format(title, text)
+    content = data.get("content")
+    if not isinstance(content, list):
+        return "**{}** (K8sGPT)\n\n```json\n{}\n```".format(
+            title, json.dumps(data, indent=2, ensure_ascii=False)
+        )
+    parts = []
+    for item in content:
+        if isinstance(item, dict) and item.get("type") == "text":
+            t = item.get("text")
+            if t is not None:
+                parts.append(str(t).strip())
+    if not parts:
+        return "**{}** (K8sGPT)\n\n```json\n{}\n```".format(
+            title, json.dumps(data, indent=2, ensure_ascii=False)
+        )
+    content_text = "\n".join(parts)
+    try:
+        content_data = json.loads(content_text)
+    except (json.JSONDecodeError, TypeError):
+        return "**{}** (K8sGPT)\n\n```\n{}\n```".format(title, content_text)
+    # Loop through results and print as: NAME KIND object has error: error.Text
+    items = None
+    if isinstance(content_data, list):
+        items = content_data
+    elif isinstance(content_data, dict):
+        for key in ("results", "Results", "problems", "Problems", "items", "data", "issues"):
+            if key in content_data and isinstance(content_data[key], list):
+                items = content_data[key]
+                break
+    if items:
+        lines = []
+        for obj in items:
+            if not isinstance(obj, dict):
+                continue
+            name = obj.get("name") or obj.get("Name") or ""
+            kind = obj.get("kind") or obj.get("Kind") or ""
+            err = obj.get("error") or obj.get("Error") or obj.get("failure") or obj.get("Failure") or []
+            err_text = ""
+            if isinstance(err, list) and len(err) > 0:
+                first = err[0]
+                if isinstance(first, dict):
+                    err_text = first.get("Text") or first.get("text") or first.get("Message") or first.get("message") or ""
+                else:
+                    err_text = str(first)
+            elif isinstance(err, dict):
+                err_text = err.get("Text") or err.get("text") or err.get("Message") or err.get("message") or ""
+            elif err:
+                err_text = str(err)
+            lines.append("{} {} object has error: {}".format(
+                name or "(no name)", kind or "(no kind)", err_text or "(no message)"
+            ).strip())
+        if lines:
+            return "**{}** (K8sGPT)\n\n{}".format(title, "\n".join(lines))
+    return "**{}** (K8sGPT)\n\n```json\n{}\n```".format(
+        title, json.dumps(content_data, indent=2, ensure_ascii=False)
+    )
+
+
 ##############################################################
 ## Chat message: MCP tool calls for supported intents
 ##############################################################
@@ -432,8 +534,9 @@ def _chat_message_impl():
 
         config = _get_mcp_config()
         mcp_url = config.get("mcp_server_url") or ""
+        diagnostics_url = (config.get("mcp_diagnostics_url") or "").strip()
         read_only = config.get("read_only", False)
-        logger.debug("MCP chat config: mcp_server_url=%r, read_only=%s", mcp_url or "(empty)", read_only)
+        logger.debug("MCP chat config: mcp_server_url=%r, mcp_diagnostics_url=%r, read_only=%s", mcp_url or "(empty)", diagnostics_url or "(empty)", read_only)
 
         # Single intent parse: returns {"type": "...", ...} or None
         intent = parse_intent(content)
@@ -478,6 +581,8 @@ def _chat_message_impl():
         update_res_name = intent.get("name") if intent and update_resource else None
         update_res_kind = intent.get("resource") if intent and update_resource else None
         update_res_namespace = intent.get("namespace") if intent and update_resource else None
+        diagnose = intent is not None and intent.get("type") == "diagnose"
+        diagnose_namespace = intent.get("namespace") if intent and diagnose else None
 
         logger.info(
             "MCP chat: content=%r, mcp_url=%r, intent=%s",
@@ -552,6 +657,54 @@ def _chat_message_impl():
             if update_resource and update_res_namespace and not _validate_namespace_access(current_user, update_res_namespace):
                 logger.warning("User %s denied access to namespace %s (update resource)", current_user, update_res_namespace)
                 return jsonify({"error": "Forbidden", "message": "No access to namespace {}".format(update_res_namespace)}), 403
+            if diagnose and diagnose_namespace and not _validate_namespace_access(current_user, diagnose_namespace):
+                logger.warning("User %s denied access to namespace %s (diagnose)", current_user, diagnose_namespace)
+                return jsonify({"error": "Forbidden", "message": "No access to namespace {} for diagnostics.".format(diagnose_namespace)}), 403
+
+            # k8sgpt diagnostics: route diagnose/troubleshoot intent to K8sGPT MCP server
+            if diagnose and not diagnostics_url:
+                reply = (
+                    "You asked for **cluster diagnostics**, but the diagnostics server (K8sGPT) is not configured. "
+                    "To use *\"diagnose\"*, *\"troubleshoot\"*, or *\"cluster issues\"*, set **`mcp_diagnostics_url`** in `[mcp_integration]` in kubedash.ini "
+                    "(e.g. `mcp_diagnostics_url = http://127.0.0.1:8089` for K8sGPT with `k8sgpt serve --mcp --mcp-http --mcp-port 8089`). "
+                    "The main MCP server at `{}` handles lists, logs, and Helm—diagnostics are provided by a separate K8sGPT MCP server."
+                ).format(mcp_url or "(configured URL)")
+                logger.info("MCP chat: diagnose intent but mcp_diagnostics_url not set")
+                return _chat_response(conversation, reply)
+            if diagnostics_url and diagnose:
+                try:
+                    args = {"explain": config.get("mcp_diagnostics_explain", False)}
+                    if diagnose_namespace:
+                        args["namespace"] = diagnose_namespace
+                    raw = streamable_http_call_tool(
+                        diagnostics_url, "analyze", args, timeout=MCP_DIAGNOSTICS_TIMEOUT
+                    )
+                    title = "Cluster diagnostics" if not diagnose_namespace else "Diagnostics for namespace `{}`".format(diagnose_namespace)
+                    reply = _format_diagnostics_reply(title, raw)
+                    logger.info("MCP chat: k8sgpt analyze namespace=%s", diagnose_namespace or "all")
+                    return _chat_response(conversation, reply)
+                except (TimeoutError, OSError) as e:
+                    if "timed out" in str(e).lower() or getattr(e, "errno", None) == 110:
+                        reply = (
+                            "The diagnostics server (K8sGPT) did not respond in time. "
+                            "Cluster analysis (especially with an AI backend like Ollama) can take 1–2 minutes. "
+                            "Try again, or check that K8sGPT at `{}` is not overloaded."
+                        ).format(diagnostics_url)
+                    else:
+                        reply = "The diagnostics server (K8sGPT) reported an error: **{}**.".format(str(e))
+                    logger.warning("MCP chat: k8sgpt timeout or error: %s", e)
+                    return _chat_response(conversation, reply)
+                except URLError as e:
+                    reason = getattr(e, "reason", None) or str(e)
+                    reply = (
+                        "The diagnostics server (K8sGPT) is unreachable at `{}`: **{}**. "
+                        "Start the K8sGPT MCP server (e.g. `k8sgpt serve --mcp --mcp-http --mcp-port=8089`) and ensure the URL is correct."
+                    ).format(diagnostics_url, reason)
+                    logger.warning("MCP chat: k8sgpt unreachable: %s", reason)
+                    return _chat_response(conversation, reply)
+                except RuntimeError as e:
+                    reply = "The diagnostics server (K8sGPT) returned an error: **{}**\n\nCheck that K8sGPT MCP server is running at `{}` and has cluster access.".format(str(e), diagnostics_url)
+                    return _chat_response(conversation, reply)
 
             if mcp_url and describe_pod and describe_pod_name:
                 ns = describe_namespace or "default"
@@ -760,20 +913,25 @@ def _chat_message_impl():
                     return _chat_response(conversation, reply)
 
             # No MCP URL or intent not supported
-            if mcp_url:
+            if mcp_url or diagnostics_url:
                 logger.warning(
                     "MCP chat: no intent matched or not supported, returning fallback reply. content=%r",
                     content[:500],
                 )
-                reply = (
-                    "MCP server is configured at `{}`. I can: **List** (*\"List all namespaces\"*, *\"List pods in &lt;ns&gt;\"*, *\"List Helm releases\"*), "
+                parts = [
+                    "**List** (*\"List all namespaces\"*, *\"List pods in &lt;ns&gt;\"*, *\"List Helm releases\"*), "
                     "**Read** (*\"Get logs of &lt;pod&gt;\"*, *\"Describe &lt;pod&gt;\"*), "
+                ]
+                if diagnostics_url:
+                    parts.append("**Diagnose** (*\"Diagnose cluster\"*, *\"Troubleshoot\"*, *\"Why are my pods failing?\"*), ")
+                parts.append(
                     "**Create** (*\"Create namespace &lt;name&gt;\"*, *\"Create deployment &lt;name&gt; in namespace &lt;ns&gt;\"*), "
                     "**Update** (*\"Update deployment &lt;name&gt; [in namespace &lt;ns&gt;]\"*), "
                     "**Delete** (*\"Delete pod &lt;name&gt; [in namespace &lt;ns&gt;]\"*), "
                     "**Helm** (*\"Install helm chart &lt;chart&gt; [as &lt;release&gt;] [in namespace &lt;ns&gt;]\"*, *\"Uninstall helm release &lt;name&gt;\"*). "
                     "Set `read_only = false` in kubedash.ini to allow create/update/delete/install/uninstall. You said: {}"
-                ).format(mcp_url, content[:200])
+                )
+                reply = ("MCP server is configured at `{}`. I can: " + "".join(parts)).format(mcp_url or "(K8s)", content[:200])
             else:
                 reply = (
                     "MCP server is not configured. Set `[mcp_integration]` `mcp_server_url` in kubedash.ini "
@@ -807,10 +965,12 @@ def _conversation_titles(conversation_ids: list[int]) -> dict[int, str]:
     return {cid: by_conv.get(cid, "New chat") for cid in conversation_ids}
 
 
-@mcp_integration_api_bp.route("/chat/conversations")
+@mcp_integration_api_bp.route("/chat/conversations", methods=["GET"])
 class ChatConversationsResource(MethodView):
     """List conversations for the current user, most recent first (like mcp-chat saved chats)."""
 
+    @mcp_integration_api_bp.response(200, description="List of conversations")
+    @mcp_integration_api_bp.doc(tags=["Plugins API - MCP Integration"])
     @login_required
     def get(self):
         limit = min(int(request.args.get("limit", 50)), 100)
@@ -834,10 +994,13 @@ class ChatConversationsResource(MethodView):
         })
 
 
-@mcp_integration_api_bp.route("/chat/conversations/<int:conversation_id>")
+@mcp_integration_api_bp.route("/chat/conversations/<int:conversation_id>", methods=["DELETE"])
 class ChatConversationResource(MethodView):
     """Get or delete a single conversation. Conversation must belong to current user."""
 
+    @mcp_integration_api_bp.response(200, description="Conversation deleted")
+    @mcp_integration_api_bp.response(404, description="Conversation not found")
+    @mcp_integration_api_bp.doc(tags=["Plugins API - MCP Integration"])
     @login_required
     def delete(self, conversation_id):
         conv = McpConversation.query.filter_by(id=conversation_id, user_id=current_user.id).first()
@@ -853,20 +1016,32 @@ class ChatConversationResource(MethodView):
             return jsonify({"error": "InternalError", "message": str(e)}), 500
 
 
-@mcp_integration_api_bp.route("/chat/conversations/<int:conversation_id>/messages")
+@mcp_integration_api_bp.route("/chat/conversations/<int:conversation_id>/messages", methods=["GET"])
 class ChatConversationMessagesResource(MethodView):
     """Get messages for a conversation. Conversation must belong to current user."""
 
+    @mcp_integration_api_bp.response(200, description="Messages for the conversation")
+    @mcp_integration_api_bp.response(404, description="Conversation not found")
+    @mcp_integration_api_bp.doc(tags=["Plugins API - MCP Integration"])
     @login_required
     def get(self, conversation_id):
         conv = McpConversation.query.filter_by(id=conversation_id, user_id=current_user.id).first()
         if not conv:
             return jsonify({"error": "NotFound", "message": "Conversation not found"}), 404
-        messages = [{"role": m.role, "content": m.content, "created_at": m.created_at.isoformat() if m.created_at else None} for m in conv.messages.all()]
+        # Explicit query so messages always load (avoids lazy="dynamic" relationship quirks)
+        message_list = (
+            McpMessage.query.filter_by(conversation_id=conv.id)
+            .order_by(McpMessage.created_at.asc())
+            .all()
+        )
+        messages = [
+            {"role": m.role, "content": m.content, "created_at": m.created_at.isoformat() if m.created_at else None}
+            for m in message_list
+        ]
         return jsonify({"conversation_id": str(conv.id), "messages": messages})
 
 
-@mcp_integration_api_bp.route("/chat/message")
+@mcp_integration_api_bp.route("/chat/message", methods=["POST"])
 class ChatMessageResource(MethodView):
     """
     Send a user message and return an assistant reply.
@@ -878,6 +1053,9 @@ class ChatMessageResource(MethodView):
     Otherwise returns a short status or suggests configuring LLM for open-ended questions.
     """
 
+    @mcp_integration_api_bp.response(200, description="Assistant reply")
+    @mcp_integration_api_bp.response(400, description="Bad request")
+    @mcp_integration_api_bp.doc(tags=["Plugins API - MCP Integration"])
     @login_required
     def post(self):
         result = _chat_message_impl()
