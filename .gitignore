@@ -10,6 +10,11 @@ src/kubedash/run.sh
 src/kubedash/kubedash.ini
 *kubedash.ini
 
+# SQLite databases
+*.db
+*.sqlite
+*.sqlite3
+
 *sbom.cdx.json
 *semgrep-report.json
 *semgrep.json

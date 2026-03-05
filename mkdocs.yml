@@ -41,16 +41,22 @@ nav:
       - Extension API: integrations/extension-api.md
       - Project Data: integrations/project-data.md
       - Trivy Operator: integrations/trivy-operator.md
+      - MCP Integration: plugins/mcp_integration.md
+      - Plugin reference (structure & config): plugins/README.md
     - Development:
       - Architecture: development/architecture.md
       - Developer Guide: development/developer-guide.md
+      - OpenTelemetry integration: development/opentelemetry-integration.md
+      - Plugin Development: development/plugin-development.md
+      - Extension API (reference): development/extension-api-reference.md
+      - Extension API Examples: development/extension-api-examples.md
       - Testing Guide: development/testing.md
       - Extension API Testing: development/extension-api-testing.md
       - Security Guide: development/security.md
       - API Reference: development/api-reference.md
       - Product Overview: development/product-overview.md
       - Environment Setup: development/env.md
-      - Database Migrations: development/dbmigrate.md
+      - Database Migrations: development/db-migrate.md
     - Product Requirements:
       - Overview: prd/kubedash-product-requirements.md
       - Authentication & Users: prd/authentication-user-management.md
@@ -58,6 +64,7 @@ nav:
       - Dashboard & Monitoring: prd/dashboard-monitoring.md
       - API Extension: prd/api-extension.md
       - Extension API: prd/extension-api.md
+      - MCP Integration: prd/mcp-integration.md
       - Helm Plugin: prd/plugin-helm.md
       - Registry Plugin: prd/plugin-registry.md
       - Cert-Manager Plugin: prd/plugin-cert-manager.md
