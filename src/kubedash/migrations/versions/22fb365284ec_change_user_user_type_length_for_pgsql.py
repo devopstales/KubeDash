@@ -4,6 +4,8 @@ Revision ID: 22fb365284ec
 Revises: da8ef7e783f7
 Create Date: 2025-06-17 14:29:15.036980
 
+Related Issue: PostgreSQL compatibility
+Related PR: Database compatibility fixes
 """
 from alembic import op
 import sqlalchemy as sa

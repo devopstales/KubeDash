@@ -4,6 +4,8 @@ Revision ID: 5062431c2bac
 Revises: f84ec038286c
 Create Date: 2025-03-08 17:07:21.028498
 
+Related Issue: Cluster metrics collection
+Related PR: Metrics dashboard implementation
 """
 from alembic import op
 import sqlalchemy as sa

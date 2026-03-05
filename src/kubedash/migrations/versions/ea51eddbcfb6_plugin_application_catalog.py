@@ -4,6 +4,8 @@ Revision ID: ea51eddbcfb6
 Revises: 22fb365284ec
 Create Date: 2025-07-21 20:45:31.546592
 
+Related Issue: Application catalog plugin
+Related PR: Plugin implementation
 """
 from alembic import op
 import sqlalchemy as sa

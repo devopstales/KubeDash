@@ -4,6 +4,8 @@ Revision ID: d372484d86c9
 Revises: 5598d31e675a
 Create Date: 2023-04-26 18:18:28.570849
 
+Related Issue: Registry event tracking
+Related PR: Registry webhook support
 """
 import sqlalchemy as sa
 from alembic import op

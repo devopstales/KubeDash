@@ -4,6 +4,8 @@ Revision ID: d0be67da4314
 Revises: 7253f5a7bfda
 Create Date: 2023-03-14 15:49:02.495648
 
+Related Issue: Kubectl config management
+Related PR: Initial commit
 """
 import sqlalchemy as sa
 from alembic import op

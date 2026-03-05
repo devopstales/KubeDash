@@ -4,6 +4,8 @@ Revision ID: 5598d31e675a
 Revises: d0be67da4314
 Create Date: 2023-04-12 20:38:27.620672
 
+Related Issue: Container registry integration
+Related PR: Registry plugin implementation
 """
 import sqlalchemy as sa
 from alembic import op

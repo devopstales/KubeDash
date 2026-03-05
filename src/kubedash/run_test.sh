@@ -237,17 +237,14 @@ fi
 if [ "$SECURITY_SCAN" = true ]; then
     echo -e "${YELLOW}Running security scans...${NC}"
     echo ""
-    
+
     # Semgrep static analysis (replaces Bandit)
     if command -v poetry &> /dev/null && poetry run semgrep --version &> /dev/null; then
         echo -e "${YELLOW}Running Semgrep security scan...${NC}"
+        # Rule exclusions are now in .semgrepignore (B101/B601 equivalents)
         poetry run semgrep --config=auto \
-          --exclude-rule python.lang.security.audit.assert_used.assert_used \
-          --exclude-rule python.lang.security.audit.subprocess-shell-true.subprocess-shell-true \
           --json -o reports/semgrep.json . 2>/dev/null || true
         poetry run semgrep --config=auto \
-          --exclude-rule python.lang.security.audit.assert_used.assert_used \
-          --exclude-rule python.lang.security.audit.subprocess-shell-true.subprocess-shell-true \
           . || true
         echo ""
     else

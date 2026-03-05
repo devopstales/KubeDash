@@ -22,7 +22,7 @@
       <a class="card-link float-right" data-bs-toggle="collapse" href="#" onclick="unhideElementsById(['hiddenDIV','hiddenHR','hiddenFOOTER'])" id="addBTN">
         <i class="material-icons">edit</i></a>
     </div>
-{% include "segments/topmenu.html.j2" %}
+{% include "segments/partials/topmenu.html.j2" %}
 {% endblock %}
 
 {% block content %}
@@ -153,7 +153,7 @@
 {% endblock %}
 
 {% block add_tail_js %}
-{% include "segments/functions_snippet.j2"%}
+{% include "segments/components/functions_snippet.j2"%}
 
     <!-- Core plugin JavaScript-->
     <script src="{{ url_for('static',filename='/vendor/jquery-easing/jquery.easing.min.js') }}"></script>

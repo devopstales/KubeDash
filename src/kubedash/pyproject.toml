@@ -86,6 +86,8 @@ safety = "^3.7.0"
 detect-secrets = "^1.5.0"
 # MCP (Model Context Protocol) client for Kubernetes MCP server integration
 mcp = "^1.26.0"
+# CLI dependencies
+click = "^8.1.0"
 
 
 [tool.poetry.group.dev.dependencies]
@@ -119,6 +121,9 @@ pip-audit = "^2.4.4"
 [build-system]
 requires = ["poetry-core>=2.0.0,<3.0.0"]
 build-backend = "poetry.core.masonry.api"
+
+[project.scripts]
+kubedash = "lib.cli:main"
 
 [tool.black]
 line-length = 120

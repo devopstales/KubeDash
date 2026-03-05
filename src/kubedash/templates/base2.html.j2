@@ -90,12 +90,12 @@
   <body>
 
     <!-- menu -->
-    {% include "segments/menu.html.j2" %}
+    {% include "segments/partials/menu.html.j2" %}
 
     <div class="wrapper d-flex flex-column min-vh-100" style="max-height: 100vh; overflow: hidden;">
       <header class="header header-sticky p-0 mb-4 flex-shrink-0">
       <!-- header -->
-      {% include "segments/header.html.j2" %}
+      {% include "segments/partials/header.html.j2" %}
       <!-- buttom of header to use topmenu block -->
       {% block topmenu %}{% endblock %}
       <!-- end header -->
@@ -149,7 +149,7 @@
       </div>
 
       <!-- Footer (stays at bottom of viewport) -->
-      {% include "segments/footer.html.j2" %}
+      {% include "segments/partials/footer.html.j2" %}
     </div>
 
     <!-- Logout Modal-->

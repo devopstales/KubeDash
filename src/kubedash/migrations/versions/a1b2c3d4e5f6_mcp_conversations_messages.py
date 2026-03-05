@@ -4,6 +4,8 @@ Revision ID: a1b2c3d4e5f6
 Revises: ea51eddbcfb6
 Create Date: 2026-02-20
 
+Related Issue: MCP integration plugin
+Related PR: MCP chat persistence
 """
 from alembic import op
 import sqlalchemy as sa
