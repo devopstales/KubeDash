@@ -717,6 +717,10 @@ logger.error("Error message")
 
 ### OpenTelemetry Tracing
 
+KubeDash uses OpenTelemetry for distributed tracing; see [OpenTelemetry integration](opentelemetry-integration.md) for configuration, running with Jaeger, and what is instrumented.
+
+Quick example for custom spans:
+
 ```python
 from lib.opentelemetry import get_tracer
 from opentelemetry import trace
