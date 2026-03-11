@@ -29,6 +29,8 @@ graph LR
 | [Developer Guide](development/developer-guide.md) | Development documentation |
 | [API Reference](development/api-reference.md) | REST and Extension API docs |
 | [Security Guide](development/security.md) | Security best practices |
+| [Logging](development/logging.md) | Log format, trace ID, and JSON logging |
+| [Audit logging](development/audit-logging.md) | Audit log UI, API, and emitting events |
 
 ## Key Highlights
 

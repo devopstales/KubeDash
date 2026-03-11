@@ -136,6 +136,18 @@ Response (example):
 
 Use the trace ID in Jaeger (e.g. “Find Trace”) to open the full trace.
 
+## Correlating logs with Jaeger
+
+Application and Gunicorn logs use a **correlation ID** in the same place as the trace ID: `[timestamp] [correlation_id] [logger] [LEVEL] message`. You can use that value in Jaeger in two ways:
+
+1. **Find by Trace ID**  
+   When tracing is enabled and no `X-Request-ID`/`X-Trace-ID` header is sent, the app uses the OpenTelemetry trace ID as the correlation ID (32 hex chars). Copy the ID from the log (e.g. `1c9d9f37c70705d80a2b5e1d7d528668`) and in Jaeger UI go to **Search** → **Trace ID** → paste the value → **Find Trace**.
+
+2. **Find by tag**  
+   Every span has a `correlation_id` attribute (from the request header or the OTEL trace ID). In Jaeger **Search**, add a tag: `correlation_id=<value>` (e.g. `correlation_id=1c9d9f37c70705d80a2b5e1d7d528668`) and run the search to get traces for that request.
+
+So: **log line** → copy the ID in the second bracket → use it in Jaeger as Trace ID or as tag `correlation_id`.
+
 ## Dependencies
 
 Relevant packages (see `pyproject.toml`):

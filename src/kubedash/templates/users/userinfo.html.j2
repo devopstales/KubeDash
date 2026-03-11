@@ -246,12 +246,15 @@
                     
                     try {
                         const apiUrl = `/api/v1/users/${encodeURIComponent(username)}/password`;
+                        const csrfInput = document.querySelector('input[name="csrf_token"]');
+                        const csrfToken = csrfInput ? csrfInput.value : '';
                         console.log('Updating password:', apiUrl);
                         
                         const response = await fetch(apiUrl, {
                             method: 'PUT',
                             headers: {
                                 'Content-Type': 'application/json',
+                                'X-CSRFToken': csrfToken,
                             },
                             body: JSON.stringify({
                                 old_password: oldPassword,

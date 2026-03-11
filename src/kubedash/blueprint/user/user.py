@@ -1,8 +1,9 @@
-from flask import (Blueprint, flash, redirect, render_template, request,
+from flask import (Blueprint, flash, g, redirect, render_template, request,
                    session, url_for)
-from flask_login import login_required
+from flask_login import current_user, login_required
 from werkzeug.security import check_password_hash
 
+from lib.audit import log_audit_event
 from lib.helper_functions import email_check, get_logger
 from lib.k8s.certificate import k8sCreateUser
 from lib.k8s.namespace import k8sNamespaceListGet
@@ -59,11 +60,38 @@ def users_list():
         user_type = request.form.get('type')
                
         if username and role and user_type:
+            actor = getattr(current_user, "username", None) or session.get("user_name", "unknown")
             if user_type != "Local":
-                private_key_base64, user_certificate_base64 = k8sCreateUser(username)
-                KubectlConfigStore(username, user_type, private_key_base64, user_certificate_base64)
-
+                try:
+                    private_key_base64, user_certificate_base64 = k8sCreateUser(username)
+                    KubectlConfigStore(username, user_type, private_key_base64, user_certificate_base64)
+                    log_audit_event(
+                        user_id=actor,
+                        action="auth_cert_generate",
+                        resource=f"user:{username}",
+                        result="success",
+                        trace_id=getattr(g, "correlation_id", None),
+                        details={"context": "user_update"},
+                    )
+                except Exception as e:
+                    log_audit_event(
+                        user_id=actor,
+                        action="auth_cert_generate",
+                        resource=f"user:{username}",
+                        result="failure",
+                        trace_id=getattr(g, "correlation_id", None),
+                        details={"context": "user_update", "error": str(e)},
+                    )
+                    raise
             UserUpdate(username, role, user_type)
+            log_audit_event(
+                user_id=actor,
+                action="user_update",
+                resource=f"user:{username}",
+                result="success",
+                trace_id=getattr(g, "correlation_id", None),
+                details={"role": role, "user_type": user_type},
+            )
             flash("User Updated Successfully", "success")
 
     # Template now loads data via JavaScript from /api/v1/users
@@ -88,11 +116,38 @@ def users_add():
             flash("Password must be 8 character in length", "danger")
             return redirect(url_for('users.users_list'))
         else:
+            actor = getattr(current_user, "username", None) or session.get("user_name", "unknown")
             if type != "Local":
-                private_key_base64, user_certificate_base64 = k8sCreateUser(username)
-                KubectlConfigStore(username, type, private_key_base64, user_certificate_base64)
-
+                try:
+                    private_key_base64, user_certificate_base64 = k8sCreateUser(username)
+                    KubectlConfigStore(username, type, private_key_base64, user_certificate_base64)
+                    log_audit_event(
+                        user_id=actor,
+                        action="auth_cert_generate",
+                        resource=f"user:{username}",
+                        result="success",
+                        trace_id=getattr(g, "correlation_id", None),
+                        details={"context": "user_create"},
+                    )
+                except Exception as e:
+                    log_audit_event(
+                        user_id=actor,
+                        action="auth_cert_generate",
+                        resource=f"user:{username}",
+                        result="failure",
+                        trace_id=getattr(g, "correlation_id", None),
+                        details={"context": "user_create", "error": str(e)},
+                    )
+                    raise
             UserCreate(username, password, email, type, role, None)
+            log_audit_event(
+                user_id=actor,
+                action="user_create",
+                resource=f"user:{username}",
+                result="success",
+                trace_id=getattr(g, "correlation_id", None),
+                details={"user_type": type, "role": role},
+            )
             flash("User Created Successfully", "success")
             return redirect(url_for('users.users_list'))
     else:
@@ -104,6 +159,14 @@ def users_delete():
     if request.method == 'POST':
         username = request.form['username']
         UserDelete(username)
+        actor = getattr(current_user, "username", None) or session.get("user_name", "unknown")
+        log_audit_event(
+            user_id=actor,
+            action="user_delete",
+            resource=f"user:{username}",
+            result="success",
+            trace_id=getattr(g, "correlation_id", None),
+        )
         flash("User Deleted Successfully", "success")
         return redirect(url_for('users.users_list'))
     else:

@@ -16,7 +16,6 @@ This PRD defines a unified logging strategy for KubeDash so that:
 - **Trace/correlation IDs** flow from proxy headers through Gunicorn, Flask, and OpenTelemetry for request tracing.
 - **Structured (JSON) logging** is available in production for ELK/Loki and other aggregators.
 - **Error handling and logging** are standardized across the codebase.
-- **Audit logging** records sensitive user actions for compliance.
 
 ### 1.2 Goals
 
@@ -24,7 +23,6 @@ This PRD defines a unified logging strategy for KubeDash so that:
 - **Trace ID propagation**: Read tracing ID from proxy headers (e.g. `X-Request-ID`, `X-Trace-ID`); use it in Gunicorn logs, Flask logs, and OpenTelemetry spans.
 - **Structured logging**: Add JSON logging option for production (ELK/Loki compatible); keep human-readable (optionally colored) format for development.
 - **Consistent error handling**: Standardize on explicit exception types and structured logging at error sites; avoid bare `except Exception` without logging.
-- **Audit logging**: Add an audit trail for user actions (login, logout, privilege changes, destructive operations) for compliance.
 
 ---
 
@@ -50,11 +48,11 @@ All KubeDash-originated logs MUST use this format so that grep, splunk, and log 
 
 **Current vs target examples:**
 
-| Source        | Current example | Target |
-|---------------|------------------|--------|
-| Flask/app     | `[2026-03-11 13:21:45,246] [no-id] [kubedash] [INFO] ...` | Already compliant |
-| Alembic       | `INFO  [alembic.env] Plugin models loaded: ...` | `[2026-03-11 13:21:45,246] [no-id] [alembic.env] [INFO] Plugin models loaded: ...` |
-| Gunicorn access | `[11/Mar/2026:13:22:07 +0100] [-] 127.0.0.1 "GET ..."` | Same format style where possible; include trace-id and timestamp in canonical form (see § 2.3) |
+| Source        | Before Phase 1 | After Phase 1 (target) |
+|---------------|-----------------|--------------------------|
+| Flask/app     | Already compliant | `[2026-03-11 13:21:45,246] [trace-id] [kubedash] [INFO] ...` |
+| Alembic       | `INFO  [alembic.env] ...` | `[2026-03-11 13:21:45,246] [no-id] [alembic.env] [INFO] ...` |
+| Gunicorn access | `[11/Mar/2026:13:22:07 +0100] [-] 127.0.0.1 "GET ..."` | `[2026-03-11 13:22:07,123] [trace-id] [gunicorn.access] [INFO] 127.0.0.1 "GET ..."` (via `CanonicalAccessLogger`) |
 
 ### 2.2 JSON Format (Production)
 
@@ -72,13 +70,13 @@ When structured logging is enabled (e.g. `logging_format = json`), each log line
 
 Optional fields: `user_id`, `request_path`, `duration_ms`, `error_type`, `stack_trace` (for errors). This enables ELK/Loki and other aggregators to index by trace_id, level, and logger.
 
-### 2.3 Gunicorn Access Logs
+### 2.3 Gunicorn Access Logs (Phase 1 implemented)
 
-Access logs SHOULD include the same trace-id and a consistent timestamp style:
+Access logs use the same trace-id and canonical timestamp via a custom Logger:
 
-- **Current:** `access_log_format = '%(t)s [%(correlation_id)s] %(h)s "%(r)s" %(s)s %(b)s "%(f)s" "%(a)s"'`
-- **Requirement:** Keep correlation_id in the format; ensure `%(t)s` is configurable so it can align with canonical timestamp format where needed. Optionally add a “canonical line” that matches the standard format for ingestion (e.g. one line per request in `[timestamp] [trace-id] [gunicorn.access] [INFO] method path status size`).
-
+- **Implementation:** `CanonicalAccessLogger` (in `gunicorn_conf.py`) overrides `now()` to return `[YYYY-MM-DD HH:MM:SS,mmm]` and `atoms()` to add `correlation_id` from request headers or WSGI environ (`HTTP_X_REQUEST_ID`, `HTTP_X_TRACE_ID`), default `no-id`.
+- **Format:** `access_log_format` includes `[gunicorn.access] [INFO]` and `%(correlation_id)s`; same config in `src/kubedash/gunicorn_conf.py` and `docker/kubedash/gunicorn_conf.py`.
+- **Verification:** Ensure the app is started with the config that sets `logger_class = CanonicalAccessLogger` (e.g. `gunicorn -c gunicorn_conf.py` from the directory containing that config).
 ---
 
 ## 3. Trace ID Propagation
@@ -134,37 +132,22 @@ Proxy / Ingress (X-Request-ID or X-Trace-ID)
 
 ---
 
-## 6. Audit Logging
+## 6. Alembic (Migrations) Logging
 
 ### 6.1 Problem
 
-- There is no audit trail for user actions (login, logout, privilege changes, destructive operations), which is often required for compliance.
-
-### 6.2 Requirements
-
-1. **Audit events**: Record at least: login success/failure, logout, user/group/privilege changes, and destructive or sensitive operations (e.g. delete conversation, delete resource) with user identity, timestamp, action, and outcome.
-2. **Storage**: Define a minimal audit log store (e.g. dedicated table or append-only log file) with retention considerations; query/export for compliance reviews.
-3. **Format**: Audit entries MUST use the same canonical format (§ 2.1) or the same JSON schema (§ 2.2) with an `audit: true` or `event_type: audit` marker and required fields (user_id, action, resource, result).
-4. **Performance**: Audit logging MUST be non-blocking (e.g. async write or fire-and-forget) so that request latency is not significantly impacted.
-
----
-
-## 7. Alembic (Migrations) Logging
-
-### 7.1 Problem
-
 - Alembic uses its own logging configuration (`fileConfig` in `env.py`), producing a different format: `INFO  [alembic.env] ...` instead of the canonical format.
 
-### 7.2 Requirements
+### 6.2 Requirements
 
 1. **Unify format**: When Alembic runs (e.g. `flask db upgrade`), configure its root and `alembic.*` loggers to use the same format as the application: `[timestamp] [trace-id] [logger_name] [LEVEL] message`. Use `no-id` for trace-id when not in an HTTP request.
 2. **Implementation options**: (a) Configure Alembic’s logging in `env.py` to use a custom formatter that matches the canonical format; or (b) run migrations in a context that attaches the same logging config as the app so that all output is consistent.
 
 ---
 
-## 8. Implementation Layout
+## 7. Implementation Layout
 
-### 8.1 Components
+### 7.1 Components
 
 | Component | Responsibility |
 |-----------|----------------|
@@ -173,9 +156,8 @@ Proxy / Ingress (X-Request-ID or X-Trace-ID)
 | `gunicorn_conf.py` | Read trace ID from headers; expose in access_log_format; ensure worker passes correlation_id to app. |
 | Flask before_request / middleware | Set `g.correlation_id` from `X-Request-ID` / `X-Trace-ID`. |
 | `migrations/env.py` | Configure Alembic loggers to use canonical format (and optional JSON when enabled). |
-| Audit module (new or plugin) | Emit audit events in canonical or JSON format; write to audit store. |
 
-### 8.2 Configuration (Proposed)
+### 7.2 Configuration (Proposed)
 
 ```ini
 [logging]
@@ -190,34 +172,36 @@ When `format = json`, the same trace_id and logger names as in text mode MUST be
 
 ---
 
-## 9. Phases and Status
+## 8. Phases and Status
 
-### Phase 1 – Unified Format & Trace ID (Priority)
+### Phase 1 – Unified Format & Trace ID (Priority) ✅
 
-- [ ] Define and document canonical format; ensure Flask/app logs already comply.
-- [ ] Propagate trace ID from proxy headers in Gunicorn and Flask; use in all app logs and Gunicorn access/error logs.
-- [ ] Align Alembic logging in `env.py` with canonical format (`[timestamp] [no-id] [alembic.env] [LEVEL] message`).
-- [ ] Optionally align Gunicorn access log line format (timestamp style + trace-id) for consistency.
+- [x] **Canonical format defined**: `[YYYY-MM-DD HH:MM:SS,mmm] [trace-id] [logger_name] [LEVEL] message` (Section 2).
+- [x] **Flask/app logs**: `get_logger()` uses `BooleanColorFormatter` with `formatTime()` for msecs; `CorrelationIDFilter` sets `correlation_id` from `g.correlation_id` or `no-id`.
+- [x] **Trace ID in Flask**: `before_request` sets `g.correlation_id` from `X-Request-ID` or `X-Trace-ID`, default `no-id` (`lib/before_request.py`).
+- [x] **Trace ID in Gunicorn**: `pre_request` always sets `worker.correlation_id` from same headers or `no-id` (`gunicorn_conf.py`).
+- [x] **Alembic**: `migrations/env.py` applies `CanonicalFormatter` to root handlers after `fileConfig`, so migration output uses `[timestamp] [no-id] [alembic.env] [LEVEL] message`.
+- [x] **Gunicorn error log**: `on_starting` sets `_CanonicalFormatter` on `server.log.error_log` handlers for timestamp consistency.
+- [x] **Gunicorn access log**: Custom `CanonicalAccessLogger` (subclasses `gunicorn_color.Logger`) overrides `now()` (canonical timestamp) and `atoms()` (adds `correlation_id` from request headers or WSGI `HTTP_X_REQUEST_ID`/`HTTP_X_TRACE_ID`). `logger_class = CanonicalAccessLogger`; `access_log_format` includes `[gunicorn.access] [INFO]`. Same logger and format in `docker/kubedash/gunicorn_conf.py`.
+- [x] **Cert and Ticker**: `lib/cert_utils.py` and `ThreadedTicker` in `helper_functions.py` use canonical timestamp formatter.
 
-### Phase 2 – Structured Logging & Error Handling
+**Verification**: If Gunicorn access lines still show `[11/Mar/2026:... +0100] [-]`, ensure the process is started with the config that defines `CanonicalAccessLogger` (e.g. `gunicorn -c gunicorn_conf.py` from `src/kubedash`, or the same config in Docker). With eventlet workers, the Logger is created from `cfg.logger_class`; both string and class reference are supported by Gunicorn.
 
-- [ ] Add `[logging]` config and JSON formatter; wire to get_logger / initializers.
-- [ ] Standardize error handling: reduce bare `except Exception`; use ErrorHandler or explicit log + re-raise; structured logging at error sites.
+### Phase 2 – Structured Logging & Error Handling ✅
 
-### Phase 3 – Audit Logging
+- [x] **`[logging]` config**: Added to `kubedash.ini.example` and default config when file missing: `format = text | json`, `level = INFO`. Read via `_get_logging_config(ini_config)` from file or from app config; `get_logger(ini_config=app.config['kubedash.ini'])` in `initialize_app_logging(app)`.
+- [x] **JSON formatter**: `JsonFormatter` in `lib/helper_functions.py` emits one JSON object per line with `timestamp` (ISO UTC), `trace_id`, `logger`, `level`, `message`; optional `error_type` and `stack_trace` when `exc_info` present. Same trace_id and logger names as text mode.
+- [x] **Wire to get_logger / initializers**: `get_logger()` uses `_get_logging_config()` to choose text (BooleanColorFormatter) or JSON formatter and root log level; `initialize_app_logging(app)` passes app ini so format/level come from app config.
+- [x] **ErrorHandler**: Enhanced to log with `exc_info=True` when error is a `BaseException`; docstring updated for structured use at API/critical paths.
+- [x] **Structured logging at error sites**: CorrelationIDFilter keeps intentional swallow with comment. Flux plugin `get_flux_objects` (and websocket equivalent) now use a `_get_or_empty` helper that logs `logger.warning(..., exc_info=True)` on failure instead of bare `except Exception`.
 
-- [ ] Design audit event schema and storage (table or file).
-- [ ] Implement audit logging for login/logout, user/privilege changes, and key destructive actions.
-- [ ] Use same canonical/JSON format and non-blocking write.
-
-### Phase 4 – Optional
+### Phase 3 – Optional
 
 - [ ] OpenTelemetry: ensure trace ID from header is linked to span context for log-trace correlation in backends.
-- [ ] Dashboard or API for audit log query/export for compliance.
 
 ---
 
-## 10. Appendix
+## 9. Appendix
 
 ### A. Example Canonical Lines
 
@@ -236,11 +220,14 @@ When `format = json`, the same trace_id and logger names as in text mode MUST be
 
 ### C. References
 
-- Platform Hardening & Observability PRD: `docs/prd/platform-hardening-observability.md` (Structured Logging, Audit Logging)
+- Platform Hardening & Observability PRD: `docs/prd/platform-hardening-observability.md` (Structured Logging)
 - OpenTelemetry integration: `docs/development/opentelemetry-integration.md`
+- Logging (developer doc): `docs/development/logging.md`
 - Gunicorn config: `src/kubedash/gunicorn_conf.py`
 - Logging init: `src/kubedash/lib/initializers/logging.py`
 - Logger helper: `src/kubedash/lib/helper_functions.py` (`get_logger`)
+
+**Related:** For audit events (user actions, compliance), see the separate [Audit Logging PRD](audit-logging.md) and [Audit logging](../development/audit-logging.md) doc.
 
 ---
 

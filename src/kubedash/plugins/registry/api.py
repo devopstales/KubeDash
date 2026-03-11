@@ -3,12 +3,13 @@ Registry API endpoints for OCI registry management.
 """
 
 from contextlib import nullcontext
-from flask import jsonify, request, session
+from flask import g, jsonify, request, session
 from flask.views import MethodView
-from flask_login import login_required
+from flask_login import current_user, login_required
 from flask_smorest import Blueprint
 from itsdangerous import base64_decode, base64_encode
 
+from lib.audit import log_audit_event
 from lib.helper_functions import get_logger
 from lib.opentelemetry import get_tracer
 from .registry_server import (

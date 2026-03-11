@@ -2,11 +2,12 @@ import json
 
 import requests
 import yaml
-from flask import (Blueprint, Response, flash, redirect, render_template,
+from flask import (Blueprint, Response, flash, g, redirect, render_template,
                    request, session, url_for)
 from flask_login import login_required, login_user
 from itsdangerous import base64_decode, base64_encode
 
+from lib.audit import log_audit_event
 from lib.helper_functions import get_logger
 from lib.k8s.server import (k8sServerConfigCreate, k8sServerConfigDelete,
                             k8sServerConfigGet, k8sServerConfigList,
@@ -48,6 +49,14 @@ def sso_config():
 @sso_bp.route("/callback", methods=["GET"])
 def callback():
     if 'error' in request.args:
+        log_audit_event(
+            user_id="unknown",
+            action="login",
+            resource="session",
+            result="failure",
+            trace_id=getattr(g, "correlation_id", None),
+            details={"method": "sso", "error": request.args.get("error", "")},
+        )
         if request.args.get('error') == 'access_denied':
             flash('Access denied.', "danger")
         else:
@@ -170,6 +179,14 @@ def callback():
         session['ns_select'] = "default"
 
         login_user(user)
+        log_audit_event(
+            user_id=username,
+            action="login",
+            resource="session",
+            result="success",
+            trace_id=getattr(g, "correlation_id", None),
+            details={"method": "sso"},
+        )
         return redirect(url_for('dashboard.cluster_metrics'))
     
 ##############################################################
@@ -187,6 +204,18 @@ def k8s_config():
     """
     # Template now loads data via JavaScript from /api/v1/settings/k8s/configs
     return render_template('settings/cluster-config.html.j2')
+
+@settings_bp.route('/audit-log')
+@login_required
+def audit_log():
+    """
+    Audit log page (Admin only). Query and export audit events for compliance.
+    """
+    if session.get('user_role') != 'Admin':
+        flash('Access denied. Admin role required.', 'danger')
+        return redirect(url_for('dashboard.cluster_metrics'))
+    return render_template('settings/audit-log.html.j2')
+
 
 @settings_bp.route('/export')
 @login_required

@@ -3,9 +3,9 @@ Users API endpoints for user management operations.
 """
 
 from contextlib import nullcontext
-from flask import jsonify, request, session
+from flask import g, jsonify, request, session
 from flask.views import MethodView
-from flask_login import login_required
+from flask_login import current_user, login_required
 from flask_smorest import Blueprint
 from werkzeug.security import check_password_hash
 
@@ -21,11 +21,12 @@ from lib.k8s.security import (
     k8sUserClusterRoleTemplateListGet, k8sUserPriviligeList,
     k8sUserRoleTemplateListGet
 )
+from lib.audit import log_audit_event
 from lib.sso import get_user_token
 from lib.user import (
     User, UsersRoles, Role, KubectlConfigStore,
     UserCreate, UserUpdate, UserDelete, UserUpdatePassword,
-    SSOGroupsList, SSOGroupsMemberList
+    SSOGroupsList, SSOGroupsMemberList, SSOGroupsDelete
 )
 
 ##############################################################
@@ -189,12 +190,38 @@ class UserResource(MethodView):
             }), 404
         
         # Update user
+        actor = getattr(current_user, "username", None) or session.get("user_name", "unknown")
         if user_type != "Local":
-            private_key_base64, user_certificate_base64 = k8sCreateUser(username)
-            KubectlConfigStore(username, user_type, private_key_base64, user_certificate_base64)
-        
+            try:
+                private_key_base64, user_certificate_base64 = k8sCreateUser(username)
+                KubectlConfigStore(username, user_type, private_key_base64, user_certificate_base64)
+                log_audit_event(
+                    user_id=actor,
+                    action="auth_cert_generate",
+                    resource=f"user:{username}",
+                    result="success",
+                    trace_id=getattr(g, "correlation_id", None),
+                    details={"context": "user_update"},
+                )
+            except Exception as e:
+                log_audit_event(
+                    user_id=actor,
+                    action="auth_cert_generate",
+                    resource=f"user:{username}",
+                    result="failure",
+                    trace_id=getattr(g, "correlation_id", None),
+                    details={"context": "user_update", "error": str(e)},
+                )
+                raise
         UserUpdate(username, role, user_type)
-        
+        log_audit_event(
+            user_id=actor,
+            action="user_update",
+            resource=f"user:{username}",
+            result="success",
+            trace_id=getattr(g, "correlation_id", None),
+            details={"role": role, "user_type": user_type},
+        )
         if email:
             user.email = email
             db.session.commit()
@@ -233,7 +260,14 @@ class UserResource(MethodView):
             }), 404
         
         UserDelete(username)
-        
+        actor = getattr(current_user, "username", None) or session.get("user_name", "unknown")
+        log_audit_event(
+            user_id=actor,
+            action="user_delete",
+            resource=f"user:{username}",
+            result="success",
+            trace_id=getattr(g, "correlation_id", None),
+        )
         return jsonify({
             "message": f"User '{username}' deleted successfully"
         })
@@ -309,12 +343,38 @@ class UserCreateResource(MethodView):
             }), 400
         
         # Create user
+        actor = getattr(current_user, "username", None) or session.get("user_name", "unknown")
         if user_type != "Local":
-            private_key_base64, user_certificate_base64 = k8sCreateUser(username)
-            KubectlConfigStore(username, user_type, private_key_base64, user_certificate_base64)
-        
+            try:
+                private_key_base64, user_certificate_base64 = k8sCreateUser(username)
+                KubectlConfigStore(username, user_type, private_key_base64, user_certificate_base64)
+                log_audit_event(
+                    user_id=actor,
+                    action="auth_cert_generate",
+                    resource=f"user:{username}",
+                    result="success",
+                    trace_id=getattr(g, "correlation_id", None),
+                    details={"context": "user_create"},
+                )
+            except Exception as e:
+                log_audit_event(
+                    user_id=actor,
+                    action="auth_cert_generate",
+                    resource=f"user:{username}",
+                    result="failure",
+                    trace_id=getattr(g, "correlation_id", None),
+                    details={"context": "user_create", "error": str(e)},
+                )
+                raise
         UserCreate(username, password, email, user_type, role, None)
-        
+        log_audit_event(
+            user_id=actor,
+            action="user_create",
+            resource=f"user:{username}",
+            result="success",
+            trace_id=getattr(g, "correlation_id", None),
+            details={"user_type": user_type, "role": role},
+        )
         return jsonify({
             "message": "User created successfully",
             "data": {
@@ -374,6 +434,15 @@ class UserPasswordResource(MethodView):
             }), 404
         
         if not check_password_hash(user.password_hash, old_password):
+            actor = getattr(current_user, "username", None) or session.get("user_name", "unknown")
+            log_audit_event(
+                user_id=actor,
+                action="password_change",
+                resource=f"user:{username}",
+                result="failure",
+                trace_id=getattr(g, "correlation_id", None),
+                details={"reason": "wrong_current_password"},
+            )
             return jsonify({
                 "error": "Unauthorized",
                 "message": "Wrong current password"
@@ -382,10 +451,27 @@ class UserPasswordResource(MethodView):
         updated = UserUpdatePassword(username, new_password)
         
         if updated:
+            actor = getattr(current_user, "username", None) or session.get("user_name", "unknown")
+            log_audit_event(
+                user_id=actor,
+                action="password_change",
+                resource=f"user:{username}",
+                result="success",
+                trace_id=getattr(g, "correlation_id", None),
+            )
             return jsonify({
                 "message": "Password updated successfully"
             })
         else:
+            actor = getattr(current_user, "username", None) or session.get("user_name", "unknown")
+            log_audit_event(
+                user_id=actor,
+                action="password_change",
+                resource=f"user:{username}",
+                result="failure",
+                trace_id=getattr(g, "correlation_id", None),
+                details={"reason": "update_failed"},
+            )
             return jsonify({
                 "error": "InternalError",
                 "message": "Could not update user password"
@@ -445,6 +531,54 @@ class SSOGroupsResource(MethodView):
                 "include_members": include_members
             }
         })
+
+
+@users_api_bp.route('/sso/groups/<group_name>', methods=['DELETE'])
+class SSOGroupResource(MethodView):
+    """
+    Single SSO group endpoint (delete).
+    """
+
+    @users_api_bp.response(200, description="Successfully deleted group")
+    @users_api_bp.response(404, description="Group not found")
+    @users_api_bp.doc(tags=['Users'])
+    @login_required
+    def delete(self, group_name):
+        """
+        Delete SSO group
+
+        Path Parameters:
+            group_name (str): Name of the SSO group to delete
+
+        Returns:
+            dict: Deletion confirmation
+        """
+        actor = getattr(current_user, "username", None) or session.get("user_name", "unknown")
+        deleted = SSOGroupsDelete(group_name)
+        if not deleted:
+            log_audit_event(
+                user_id=actor,
+                action="group_delete",
+                resource=f"group:{group_name}",
+                result="failure",
+                trace_id=getattr(g, "correlation_id", None),
+                details={"reason": "not_found"},
+            )
+            return jsonify({
+                "error": "NotFound",
+                "message": f"Group '{group_name}' not found"
+            }), 404
+        log_audit_event(
+            user_id=actor,
+            action="group_delete",
+            resource=f"group:{group_name}",
+            result="success",
+            trace_id=getattr(g, "correlation_id", None),
+        )
+        return jsonify({
+            "message": f"Group '{group_name}' deleted successfully",
+            "data": {"name": group_name}
+        }), 200
 
 
 ##############################################################
@@ -606,7 +740,15 @@ class UserPrivilegesUpdateResource(MethodView):
                 k8sRoleBindingAdd(user_namespaced_role_2, username, None, None, user_all_namespaces_2)
             else:
                 k8sRoleBindingAdd(user_namespaced_role_2, username, None, user_namespaces_2, user_all_namespaces_2)
-        
+
+        actor = getattr(current_user, "username", None) or session.get("user_name", "unknown")
+        log_audit_event(
+            user_id=actor,
+            action="user_privilege_update",
+            resource=f"user:{username}",
+            result="success",
+            trace_id=getattr(g, "correlation_id", None),
+        )
         return jsonify({
             "message": "User privileges updated successfully"
         })
@@ -791,7 +933,15 @@ class GroupPrivilegesUpdateResource(MethodView):
                 k8sRoleBindingAdd(user_namespaced_role_2, None, group_name, None, user_all_namespaces_2)
             else:
                 k8sRoleBindingAdd(user_namespaced_role_2, None, group_name, user_namespaces_2, user_all_namespaces_2)
-        
+
+        actor = getattr(current_user, "username", None) or session.get("user_name", "unknown")
+        log_audit_event(
+            user_id=actor,
+            action="group_privilege_update",
+            resource=f"group:{group_name}",
+            result="success",
+            trace_id=getattr(g, "correlation_id", None),
+        )
         return jsonify({
             "message": "Group privileges updated successfully"
         })

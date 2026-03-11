@@ -1,13 +1,14 @@
 import functools
 import logging
 
-from flask import (Blueprint, flash, redirect, render_template, request, session,
+from flask import (Blueprint, flash, g, redirect, render_template, request, session,
                    url_for)
 from flask_login import current_user, login_required
 from flask_socketio import disconnect
 from kubernetes.client.rest import ApiException
 
 from lib.components import socketio
+from lib.audit import log_audit_event
 from lib.helper_functions import get_logger
 from lib.k8s.namespace import k8sNamespaceListGet
 from lib.k8s.security import k8sPodListVulnsGet
@@ -100,11 +101,37 @@ def pod_delete():
             session['ns_select'] = namespace
 
         user_token = get_user_token(session)
-        
+        namespace = session['ns_select']
+        actor = getattr(current_user, "username", None) or session.get("user_name", "unknown")
         try:
-            k8sPodDelete(session['user_role'], user_token, session['ns_select'], pod_name)
+            k8sPodDelete(session['user_role'], user_token, namespace, pod_name)
+            log_audit_event(
+                user_id=actor,
+                action="delete_k8s_pod",
+                resource=f"pod:{namespace}/{pod_name}",
+                result="success",
+                trace_id=getattr(g, "correlation_id", None),
+            )
             return redirect(url_for('.pod_list'))
-        except ApiException:
+        except ApiException as e:
+            log_audit_event(
+                user_id=actor,
+                action="delete_k8s_pod",
+                resource=f"pod:{namespace}/{pod_name}",
+                result="failure",
+                trace_id=getattr(g, "correlation_id", None),
+                details={"error": str(e)},
+            )
+            return redirect(url_for('.pod_list'))
+        except Exception as e:
+            log_audit_event(
+                user_id=actor,
+                action="delete_k8s_pod",
+                resource=f"pod:{namespace}/{pod_name}",
+                result="failure",
+                trace_id=getattr(g, "correlation_id", None),
+                details={"error": str(e)},
+            )
             return redirect(url_for('.pod_list'))
         
             

@@ -15,10 +15,11 @@ import asyncio
 from datetime import datetime, timezone
 from typing import Optional, Dict, Any, List, Tuple
 
-from flask import current_app, jsonify, request, session
+from flask import current_app, g, jsonify, request, session
 from flask_login import login_required, current_user
 from flask_smorest import Blueprint
 
+from lib.audit import log_audit_event
 from lib.components import db, csrf
 from lib.helper_functions import get_logger, ErrorHandler
 from lib.opentelemetry import get_tracer
@@ -368,13 +369,36 @@ def delete_conversation(conv_id):
             ).first()
             if not conversation:
                 span.set_attribute("operation.status", "not_found")
+                log_audit_event(
+                    user_id=getattr(current_user, "username", None) or str(current_user.id),
+                    action="delete_conversation",
+                    resource=f"conversation:{conv_id}",
+                    result="failure",
+                    trace_id=getattr(g, "correlation_id", None),
+                    details={"reason": "not_found"},
+                )
                 return jsonify({"error": "NotFound", "message": "Conversation not found"}), 404
             db.session.delete(conversation)
             db.session.commit()
             span.set_attribute("operation.status", "success")
+            log_audit_event(
+                user_id=getattr(current_user, "username", None) or str(current_user.id),
+                action="delete_conversation",
+                resource=f"conversation:{conv_id}",
+                result="success",
+                trace_id=getattr(g, "correlation_id", None),
+            )
             return jsonify({'status': 'deleted'})
         except Exception as e:
             logger.error("Delete conversation error: %s", e, exc_info=True)
+            log_audit_event(
+                user_id=getattr(current_user, "username", None) or str(current_user.id),
+                action="delete_conversation",
+                resource=f"conversation:{conv_id}",
+                result="failure",
+                trace_id=getattr(g, "correlation_id", None),
+                details={"error": str(e)},
+            )
             ErrorHandler(logger, e, "ai_chat delete_conversation")
             return jsonify({"error": "InternalError", "message": str(e)}), 500
 

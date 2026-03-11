@@ -1,7 +1,8 @@
-from flask import (Blueprint, redirect, render_template, request, session,
+from flask import (Blueprint, g, redirect, render_template, request, session,
                    url_for)
 from flask_login import login_required
 
+from lib.audit import log_audit_event
 from lib.helper_functions import get_logger
 from lib.k8s.metrics import k8sGetClusterMetric, k8sGetNodeMetric
 from lib.k8s.namespace import (k8sNamespaceCreate, k8sNamespaceDelete,
@@ -85,7 +86,26 @@ def namespaces_delete():
             namespace = request.form['namespace']
         user_token = get_user_token(session)
 
-        k8sNamespaceDelete(session['user_role'], namespace)
+        try:
+            k8sNamespaceDelete(session['user_role'], user_token, namespace)
+            actor = session.get("user_name", "unknown")
+            log_audit_event(
+                user_id=actor,
+                action="delete_k8s_namespace",
+                resource=f"namespace:{namespace}",
+                result="success",
+                trace_id=getattr(g, "correlation_id", None),
+            )
+        except Exception as e:
+            actor = session.get("user_name", "unknown")
+            log_audit_event(
+                user_id=actor,
+                action="delete_k8s_namespace",
+                resource=f"namespace:{namespace}",
+                result="failure",
+                trace_id=getattr(g, "correlation_id", None),
+                details={"error": str(e)},
+            )
         return redirect(url_for('.namespace'))
     else:
         return redirect(url_for('.namespace'))

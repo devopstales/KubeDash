@@ -13,10 +13,11 @@ API Endpoints:
 
 from contextlib import nullcontext
 
-from flask import jsonify, request, session
+from flask import g, jsonify, request, session
 from flask.views import MethodView
 from flask_smorest import Blueprint
 
+from lib.audit import log_audit_event
 from lib.helper_functions import get_logger
 from lib.opentelemetry import get_tracer
 from lib.components import csrf
@@ -551,6 +552,14 @@ class ProjectListResource(MethodView):
                     "code": status_code
                 }), status_code
             
+            log_audit_event(
+                user_id=user.username,
+                action="project_create",
+                resource=f"project:{name}",
+                result="success",
+                trace_id=getattr(g, "correlation_id", None),
+                details={"protected": protected},
+            )
             logger.info(f"Project {name} created successfully by {user.username}")
             return jsonify(project), 201
 
@@ -781,6 +790,14 @@ class ProjectResource(MethodView):
             result, error, status_code = ext_delete_project(user, name)
             
             if error:
+                log_audit_event(
+                    user_id=user.username,
+                    action="delete_project",
+                    resource=f"project:{name}",
+                    result="failure",
+                    trace_id=getattr(g, "correlation_id", None),
+                    details={"error": error},
+                )
                 logger.warning(f"Failed to delete project {name}: {error}")
                 if tracer and span and span.is_recording():
                     span.set_attribute("error", error)
@@ -800,6 +817,13 @@ class ProjectResource(MethodView):
                     "code": status_code
                 }), status_code
             
+            log_audit_event(
+                user_id=user.username,
+                action="delete_project",
+                resource=f"project:{name}",
+                result="success",
+                trace_id=getattr(g, "correlation_id", None),
+            )
             logger.info(f"Project {name} deleted successfully by {user.username}")
             return jsonify(result)
 

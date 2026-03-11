@@ -303,53 +303,24 @@ def _fetch_all_flux_objects(
     Returns:
         Dictionary of Flux objects by type
     """
+    def _get_or_empty(label, getter):
+        try:
+            return getter() or []
+        except Exception as e:
+            logger.warning("Failed to load Flux %s: %s", label, e, exc_info=True)
+            return []
+
     flux_objects = {}
-    
-    try:
-        flux_objects["HelmReleases"] = FluxHelmReleaseGet(user_role, user_token, namespace) or []
-    except Exception:
-        flux_objects["HelmReleases"] = []
-    
-    try:
-        flux_objects["Kustomizations"] = FluxKustomizationGet(user_role, user_token, namespace) or []
-    except Exception:
-        flux_objects["Kustomizations"] = []
-    
-    try:
-        flux_objects["GitRepositories"] = FluxGitRepositoryGet(user_role, user_token, namespace) or []
-    except Exception:
-        flux_objects["GitRepositories"] = []
-    
-    try:
-        flux_objects["HelmRepositories"] = FluxHelmRepositoryGet(user_role, user_token, namespace) or []
-    except Exception:
-        flux_objects["HelmRepositories"] = []
-    
-    try:
-        flux_objects["OCIRepositories"] = FluxOCIRepositoryGet(user_role, user_token, namespace) or []
-    except Exception:
-        flux_objects["OCIRepositories"] = []
-    
-    try:
-        flux_objects["Buckets"] = FluxBucketRepositoryGet(user_role, user_token, namespace) or []
-    except Exception:
-        flux_objects["Buckets"] = []
-    
-    try:
-        flux_objects["Alerts"] = FluxAlertNotificationGet(user_role, user_token, namespace) or []
-    except Exception:
-        flux_objects["Alerts"] = []
-    
-    try:
-        flux_objects["Providers"] = FluxProviderNotificationGet(user_role, user_token, namespace) or []
-    except Exception:
-        flux_objects["Providers"] = []
-    
-    try:
-        flux_objects["Receivers"] = FluxReceiverNotificationGet(user_role, user_token, namespace) or []
-    except Exception:
-        flux_objects["Receivers"] = []
-    
+    flux_objects["HelmReleases"] = _get_or_empty("HelmReleases", lambda: FluxHelmReleaseGet(user_role, user_token, namespace))
+    flux_objects["Kustomizations"] = _get_or_empty("Kustomizations", lambda: FluxKustomizationGet(user_role, user_token, namespace))
+    flux_objects["GitRepositories"] = _get_or_empty("GitRepositories", lambda: FluxGitRepositoryGet(user_role, user_token, namespace))
+    flux_objects["HelmRepositories"] = _get_or_empty("HelmRepositories", lambda: FluxHelmRepositoryGet(user_role, user_token, namespace))
+    flux_objects["OCIRepositories"] = _get_or_empty("OCIRepositories", lambda: FluxOCIRepositoryGet(user_role, user_token, namespace))
+    flux_objects["Buckets"] = _get_or_empty("Buckets", lambda: FluxBucketRepositoryGet(user_role, user_token, namespace))
+    flux_objects["Alerts"] = _get_or_empty("Alerts", lambda: FluxAlertNotificationGet(user_role, user_token, namespace))
+    flux_objects["Providers"] = _get_or_empty("Providers", lambda: FluxProviderNotificationGet(user_role, user_token, namespace))
+    flux_objects["Receivers"] = _get_or_empty("Receivers", lambda: FluxReceiverNotificationGet(user_role, user_token, namespace))
+
     return flux_objects
 
 

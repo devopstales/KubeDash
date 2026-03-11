@@ -6,6 +6,18 @@
 # Application mode: production, development, testing
 app_mode = development
 
+#################################### Logging #############################
+[logging]
+# Format: text (human-readable, optional color) or json (one JSON object per line for ELK/Loki)
+format = text
+# Root log level: DEBUG, INFO, WARNING, ERROR
+level = INFO
+
+#################################### Audit ##############################
+[audit]
+# Enable audit logging (login/logout, privilege changes, destructive actions)
+enabled = true
+
 #################################### Security ############################
 [security]
 # Default admin password (change in production!)

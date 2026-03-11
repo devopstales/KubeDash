@@ -42,6 +42,8 @@ def initialize_app_configuration(app: Flask, external_config_name: str) -> bool:
         app.logger.warning("Config file kubedash.ini not found, using defaults")
         # Set default configuration
         config_ini['DEFAULT'] = {'app_mode': 'development'}
+        config_ini['logging'] = {'format': 'text', 'level': 'INFO'}
+        config_ini['audit'] = {'enabled': 'true'}
         config_ini['security'] = {'admin_password': 'admin'}
         config_ini['database'] = {
             'type': 'sqlite3',

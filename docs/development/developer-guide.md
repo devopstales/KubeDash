@@ -703,6 +703,8 @@ def test_authenticated_dashboard(client):
 
 ### Logging
 
+Application logs use a canonical format and support trace/correlation IDs. Use `get_logger()` from `lib.helper_functions`; see [Logging](logging.md) for configuration (text vs JSON), trace ID flow, and error-handling standards.
+
 ```python
 from lib.helper_functions import get_logger
 
@@ -714,6 +716,10 @@ logger.info("Info message")
 logger.warning("Warning message")
 logger.error("Error message")
 ```
+
+### Audit logging
+
+Sensitive and destructive actions are recorded in the audit log (Admin-only UI under Settings → Audit Log, and `/api/v1/audit`). To emit an event: `log_audit_event(user_id, action, resource, result, ...)` from `lib.audit`. See [Audit logging](audit-logging.md) for the schema, API, and usage.
 
 ### OpenTelemetry Tracing
 

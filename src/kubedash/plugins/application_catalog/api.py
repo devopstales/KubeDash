@@ -3,11 +3,12 @@ Application Catalog API endpoints for managing applications.
 """
 
 from contextlib import nullcontext
-from flask import jsonify, request, current_app
+from flask import current_app, g, jsonify, request, session
 from flask.views import MethodView
-from flask_login import login_required
+from flask_login import current_user, login_required
 from flask_smorest import Blueprint
 
+from lib.audit import log_audit_event
 from lib.helper_functions import get_logger
 from lib.opentelemetry import get_tracer
 from .application import (
@@ -127,7 +128,15 @@ class ApplicationsResource(MethodView):
                     'url': application_url,
                     'embed': application_embedded
                 }])
-            
+            actor = session.get("user_name", "unknown")
+            log_audit_event(
+                user_id=actor,
+                action="application_create",
+                resource=f"application:{application_name}",
+                result="success",
+                trace_id=getattr(g, "correlation_id", None),
+                details={"url": application_url},
+            )
             return jsonify({
                 "message": "Application created successfully",
                 "data": {
@@ -243,7 +252,15 @@ class ApplicationResource(MethodView):
                     'url': application_url,
                     'embed': application_embedded
                 }])
-            
+            actor = session.get("user_name", "unknown")
+            log_audit_event(
+                user_id=actor,
+                action="application_update",
+                resource=f"application:{new_application_name}",
+                result="success",
+                trace_id=getattr(g, "correlation_id", None),
+                details={"old_name": application_name, "url": application_url},
+            )
             return jsonify({
                 "message": "Application updated successfully",
                 "data": {
@@ -289,12 +306,28 @@ class ApplicationResource(MethodView):
         
         try:
             ApplicationDelete(application_name)
-            
+            actor = getattr(current_user, "username", None) or session.get("user_name", "unknown")
+            log_audit_event(
+                user_id=actor,
+                action="delete_application",
+                resource=f"application:{application_name}",
+                result="success",
+                trace_id=getattr(g, "correlation_id", None),
+            )
             return jsonify({
                 "message": "Application deleted successfully"
             })
         except Exception as e:
             logger.error(f"Error deleting application: {e}")
+            actor = getattr(current_user, "username", None) or session.get("user_name", "unknown")
+            log_audit_event(
+                user_id=actor,
+                action="delete_application",
+                resource=f"application:{application_name}",
+                result="failure",
+                trace_id=getattr(g, "correlation_id", None),
+                details={"error": str(e)},
+            )
             return jsonify({
                 "error": "InternalServerError",
                 "message": f"Failed to delete application: {str(e)}"

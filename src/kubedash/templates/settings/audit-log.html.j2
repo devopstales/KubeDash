@@ -1,0 +1,243 @@
+{% extends "base2.html.j2" %}
+
+{% block topmenu %}
+<ul class="header-nav d-lg-flex m-3">
+    <div class="container-fluid px-4">
+      <nav aria-label="breadcrumb">
+        <ol class="breadcrumb my-0">
+          <li class="breadcrumb-item"><a href="/settings/cluster-config">Settings</a></li>
+          <li class="breadcrumb-item active"><span>Audit Log</span></li>
+        </ol>
+      </nav>
+    </div>
+</ul>
+<ul class="header-nav ms-auto"></ul>
+<ul class="header-nav d-lg-flex">
+  <div class="col d-flex gap-2 align-items-center">
+    <a href="#" id="audit-export-csv" class="btn btn-sm btn-outline-secondary">Export CSV</a>
+    <a href="#" id="audit-export-json" class="btn btn-sm btn-outline-secondary">Export JSON</a>
+  </div>
+{% include "segments/partials/topmenu.html.j2" %}
+{% endblock %}
+
+{% block content %}
+<div class="card shadow mb-4">
+    <div class="card-header py-3 d-flex justify-content-between align-items-center flex-wrap gap-2">
+        <h6 class="m-0 font-weight-bold text-primary">Audit Log</h6>
+        <span class="badge bg-secondary" id="audit-total-label">—</span>
+    </div>
+    <div class="card-body">
+        <!-- Filters -->
+        <div class="row g-2 mb-3">
+            <div class="col-md-2">
+                <label class="form-label small">User</label>
+                <input type="text" class="form-control form-control-sm" id="filter-user_id" placeholder="user_id">
+            </div>
+            <div class="col-md-2">
+                <label class="form-label small">Action</label>
+                <input type="text" class="form-control form-control-sm" id="filter-action" placeholder="action">
+            </div>
+            <div class="col-md-2">
+                <label class="form-label small">Resource</label>
+                <input type="text" class="form-control form-control-sm" id="filter-resource" placeholder="resource">
+            </div>
+            <div class="col-md-2">
+                <label class="form-label small">Result</label>
+                <select class="form-select form-select-sm" id="filter-result">
+                    <option value="">All</option>
+                    <option value="success">success</option>
+                    <option value="failure">failure</option>
+                    <option value="denied">denied</option>
+                </select>
+            </div>
+            <div class="col-md-2">
+                <label class="form-label small">From (date)</label>
+                <input type="date" class="form-control form-control-sm" id="filter-date_from">
+            </div>
+            <div class="col-md-2">
+                <label class="form-label small">To (date)</label>
+                <input type="date" class="form-control form-control-sm" id="filter-date_to">
+            </div>
+            <div class="col-md-2 d-flex align-items-end">
+                <button type="button" class="btn btn-primary btn-sm me-1" id="audit-apply-filters">Apply</button>
+                <button type="button" class="btn btn-outline-secondary btn-sm" id="audit-reset-filters">Reset</button>
+            </div>
+        </div>
+        <div class="table-responsive">
+            <table class="table table-bordered table-sm" id="audit-table" width="100%" cellspacing="0">
+                <thead>
+                    <tr>
+                        <th>Time (UTC)</th>
+                        <th>User</th>
+                        <th>Action</th>
+                        <th>Resource</th>
+                        <th>Result</th>
+                        <th>Details</th>
+                    </tr>
+                </thead>
+                <tbody id="audit-tbody">
+                    <tr>
+                        <td colspan="6" class="text-center">
+                            <div class="spinner-border spinner-border-sm text-primary" role="status"></div>
+                            <span class="ms-2">Loading audit log...</span>
+                        </td>
+                    </tr>
+                </tbody>
+            </table>
+        </div>
+        <!-- Pagination -->
+        <nav aria-label="Audit log pagination" class="mt-2">
+            <ul class="pagination pagination-sm mb-0" id="audit-pagination"></ul>
+        </nav>
+    </div>
+</div>
+{% endblock %}
+
+{% block add_tail_js %}
+<script nonce="{{ csp_nonce }}">
+(function() {
+    const escapeHtml = (text) => {
+        if (text === null || text === undefined) return '';
+        const map = { '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#039;' };
+        return String(text).replace(/[&<>"']/g, m => map[m]);
+    };
+    const apiBase = '/api/v1/audit';
+    let currentPage = 1;
+    const perPage = 50;
+
+    function getFilterParams() {
+        const p = new URLSearchParams();
+        p.set('page', currentPage);
+        p.set('per_page', perPage);
+        const user_id = document.getElementById('filter-user_id').value.trim();
+        const action = document.getElementById('filter-action').value.trim();
+        const resource = document.getElementById('filter-resource').value.trim();
+        const result = document.getElementById('filter-result').value.trim();
+        const date_from = document.getElementById('filter-date_from').value;
+        const date_to = document.getElementById('filter-date_to').value;
+        if (user_id) p.set('user_id', user_id);
+        if (action) p.set('action', action);
+        if (resource) p.set('resource', resource);
+        if (result) p.set('result', result);
+        if (date_from) p.set('date_from', date_from + 'T00:00:00Z');
+        if (date_to) p.set('date_to', date_to + 'T23:59:59Z');
+        return p;
+    }
+
+    function buildExportUrl(format) {
+        const p = getFilterParams();
+        p.delete('page');
+        p.delete('per_page');
+        p.set('format', format);
+        return apiBase + '/export?' + p.toString();
+    }
+
+    function renderTable(rows) {
+        const tbody = document.getElementById('audit-tbody');
+        if (!rows || rows.length === 0) {
+            tbody.innerHTML = '<tr><td colspan="6" class="text-center text-muted">No audit events match the filters.</td></tr>';
+            return;
+        }
+        tbody.innerHTML = rows.map(r => {
+            const time = r.created_at ? escapeHtml(r.created_at.replace('T', ' ').replace('Z', '').slice(0, 23)) : '—';
+            const details = r.details && Object.keys(r.details).length
+                ? escapeHtml(JSON.stringify(r.details))
+                : (r.message ? escapeHtml(r.message) : '—');
+            return '<tr>' +
+                '<td class="text-nowrap">' + time + '</td>' +
+                '<td>' + escapeHtml(r.user_id || '—') + '</td>' +
+                '<td>' + escapeHtml(r.action || '—') + '</td>' +
+                '<td>' + escapeHtml(r.resource || '—') + '</td>' +
+                '<td><span class="badge bg-' + (r.result === 'success' ? 'success' : r.result === 'failure' ? 'danger' : 'warning') + '">' + escapeHtml(r.result || '—') + '</span></td>' +
+                '<td class="small text-break" style="max-width:240px">' + details + '</td>' +
+                '</tr>';
+        }).join('');
+    }
+
+    function renderPagination(meta) {
+        const ul = document.getElementById('audit-pagination');
+        if (!meta || meta.pages <= 1) {
+            ul.innerHTML = '';
+            return;
+        }
+        let html = '';
+        if (meta.page > 1) {
+            html += '<li class="page-item"><a class="page-link" href="#" data-page="' + (meta.page - 1) + '">Previous</a></li>';
+        }
+        const start = Math.max(1, meta.page - 2);
+        const end = Math.min(meta.pages, meta.page + 2);
+        for (let i = start; i <= end; i++) {
+            html += '<li class="page-item' + (i === meta.page ? ' active' : '') + '"><a class="page-link" href="#" data-page="' + i + '">' + i + '</a></li>';
+        }
+        if (meta.page < meta.pages) {
+            html += '<li class="page-item"><a class="page-link" href="#" data-page="' + (meta.page + 1) + '">Next</a></li>';
+        }
+        ul.innerHTML = html;
+        ul.querySelectorAll('a[data-page]').forEach(a => {
+            a.addEventListener('click', function(e) {
+                e.preventDefault();
+                currentPage = parseInt(this.getAttribute('data-page'), 10);
+                loadAudit();
+            });
+        });
+    }
+
+    async function loadAudit() {
+        const tbody = document.getElementById('audit-tbody');
+        tbody.innerHTML = '<tr><td colspan="6" class="text-center"><div class="spinner-border spinner-border-sm"></div><span class="ms-2">Loading...</span></td></tr>';
+        const url = apiBase + '?' + getFilterParams().toString();
+        try {
+            const res = await fetch(url);
+            const data = await res.json();
+            if (!res.ok) {
+                throw new Error(data.message || 'Failed to load audit log');
+            }
+            document.getElementById('audit-total-label').textContent = 'Total: ' + (data.metadata?.total ?? 0);
+            renderTable(data.data || []);
+            renderPagination(data.metadata || {});
+        } catch (err) {
+            tbody.innerHTML = '<tr><td colspan="6" class="text-center text-danger">' + escapeHtml(err.message) + '</td></tr>';
+            document.getElementById('audit-pagination').innerHTML = '';
+        }
+    }
+
+    document.getElementById('audit-apply-filters').addEventListener('click', function() {
+        currentPage = 1;
+        loadAudit();
+    });
+    document.getElementById('audit-reset-filters').addEventListener('click', function() {
+        document.getElementById('filter-user_id').value = '';
+        document.getElementById('filter-action').value = '';
+        document.getElementById('filter-resource').value = '';
+        document.getElementById('filter-result').value = '';
+        document.getElementById('filter-date_from').value = '';
+        document.getElementById('filter-date_to').value = '';
+        currentPage = 1;
+        loadAudit();
+    });
+    document.getElementById('audit-export-csv').addEventListener('click', function(e) {
+        e.preventDefault();
+        window.location.href = buildExportUrl('csv');
+    });
+    document.getElementById('audit-export-json').addEventListener('click', async function(e) {
+        e.preventDefault();
+        const url = buildExportUrl('json');
+        try {
+            const res = await fetch(url);
+            const data = await res.json();
+            if (!res.ok) throw new Error(data.message || 'Export failed');
+            const blob = new Blob([JSON.stringify(data, null, 2)], { type: 'application/json' });
+            const a = document.createElement('a');
+            a.href = URL.createObjectURL(blob);
+            a.download = 'audit-log.json';
+            a.click();
+            URL.revokeObjectURL(a.href);
+        } catch (err) {
+            alert('Export failed: ' + err.message);
+        }
+    });
+
+    loadAudit();
+})();
+</script>
+{% endblock %}

@@ -13,7 +13,9 @@ All k8s calls use (user_role, user_token) so RBAC respects the logged-in user.
 
 from typing import List, Dict, Optional, Any
 
-from flask import session
+from flask import g, session
+from flask_login import current_user
+from lib.audit import log_audit_event
 from lib.helper_functions import get_logger
 from lib.opentelemetry import get_tracer
 from lib.sso import get_user_token
@@ -282,6 +284,10 @@ def delete_resource(kind: str, name: str, namespace: Optional[str] = None) -> Di
     from kubernetes import client as k8s_client
     k8sClientConfigGet(role, token)
     kind_lower = kind.lower()
+    resource_ref = f"{kind_lower}:{namespace or 'default'}/{name}"
+    action_name = f"delete_k8s_{kind_lower}"
+    actor = getattr(current_user, "username", None) or session.get("user_name", "unknown")
+    trace_id = getattr(g, "correlation_id", None)
     try:
         if kind_lower == 'pod':
             if not namespace:
@@ -297,8 +303,23 @@ def delete_resource(kind: str, name: str, namespace: Optional[str] = None) -> Di
             apps_v1.delete_namespaced_deployment(name=name, namespace=namespace, _request_timeout=10)
         else:
             raise RuntimeError(f"Unsupported resource kind: {kind}")
+        log_audit_event(
+            user_id=actor,
+            action=action_name,
+            resource=resource_ref,
+            result="success",
+            trace_id=trace_id,
+        )
         return {'status': 'deleted', 'kind': kind, 'name': name}
     except Exception as e:
+        log_audit_event(
+            user_id=actor,
+            action=action_name,
+            resource=resource_ref,
+            result="failure",
+            trace_id=trace_id,
+            details={"error": str(e)},
+        )
         logger.error("delete_resource %s %s: %s", kind, name, e)
         raise RuntimeError(str(e)) from e
 

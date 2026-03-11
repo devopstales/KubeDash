@@ -138,6 +138,20 @@ def install_release(
         raise RuntimeError(f"Helm install failed: {result.stderr}")
 
     logger.info("Installed Helm release: %s/%s", namespace, name)
+    try:
+        from flask import g, session
+        from lib.audit import log_audit_event
+        actor = session.get("user_name", "unknown")
+        log_audit_event(
+            user_id=actor,
+            action="helm_install",
+            resource=f"helm_release:{namespace}/{name}",
+            result="success",
+            trace_id=getattr(g, "correlation_id", None),
+            details={"chart": chart},
+        )
+    except RuntimeError:
+        pass
     return {
         'status': 'installed',
         'name': name,
@@ -166,6 +180,19 @@ def uninstall_release(name: str, namespace: str) -> Dict[str, Any]:
         raise RuntimeError(f"Helm uninstall failed: {result.stderr}")
 
     logger.info("Uninstalled Helm release: %s/%s", namespace, name)
+    try:
+        from flask import g, session
+        from lib.audit import log_audit_event
+        actor = session.get("user_name", "unknown")
+        log_audit_event(
+            user_id=actor,
+            action="helm_uninstall",
+            resource=f"helm_release:{namespace}/{name}",
+            result="success",
+            trace_id=getattr(g, "correlation_id", None),
+        )
+    except RuntimeError:
+        pass
     return {
         'status': 'uninstalled',
         'name': name,

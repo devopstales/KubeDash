@@ -1,10 +1,11 @@
 import requests
-from flask import (Blueprint, flash, redirect, render_template, request,
+from flask import (Blueprint, flash, g, redirect, render_template, request,
                    session, url_for)
 from flask_login import login_required, login_user, logout_user
 from itsdangerous import base64_decode
 from werkzeug.security import check_password_hash
 
+from lib.audit import log_audit_event
 from lib.helper_functions import get_logger, is_safe_url
 from lib.k8s.server import k8sServerConfigGet
 from lib.sso import SSOSererGet, get_auth_server_info
@@ -190,6 +191,13 @@ def login_post():
     # check if user actually exists
     # take the user supplied password, hash it, and compare it to the hashed password in database
     if not user or not check_password_hash(user.password_hash, password):
+        log_audit_event(
+            user_id=username or "unknown",
+            action="login",
+            resource="session",
+            result="failure",
+            trace_id=getattr(g, "correlation_id", None),
+        )
         flash('Please check your login details and try again.', "warning")
         return redirect(url_for('.login')) # if user doesn't exist or password is wrong, reload the page
     else:
@@ -270,6 +278,13 @@ def login_post():
                     logger.error(f"Failed to connect to client: {str(e)}")
 
 
+        log_audit_event(
+            user_id=username,
+            action="login",
+            resource="session",
+            result="success",
+            trace_id=getattr(g, "correlation_id", None),
+        )
         next_url = request.args.get('next')
         if not next_url or not is_safe_url(next_url, request):  # <-- Security check!
             next_url = url_for('dashboard.cluster_metrics')  # Default fallback
@@ -278,10 +293,18 @@ def login_post():
 @auth_bp.route('/logout')
 @login_required
 def logout():
+    user_id = session.get("user_name", "unknown")
     logout_user()
     if "user_name" in session:
         session.pop('user_name', None)
     if "oauth_token" in session:
         session.pop('oauth_token')
     session.clear()
+    log_audit_event(
+        user_id=user_id,
+        action="logout",
+        resource="session",
+        result="success",
+        trace_id=getattr(g, "correlation_id", None),
+    )
     return redirect(url_for('.login'))

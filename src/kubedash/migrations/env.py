@@ -1,6 +1,7 @@
 import importlib
 import logging
 import sys
+from datetime import datetime as dt
 from logging.config import fileConfig
 from pathlib import Path
 
@@ -19,9 +20,28 @@ if str(_app_root) not in sys.path:
 config = context.config
 
 # Interpret the config file for Python logging.
-# This line sets up loggers basically.
 fileConfig(config.config_file_name)
 logger = logging.getLogger('alembic.env')
+
+# Canonical format (Logging PRD Phase 1): [timestamp] [no-id] [logger_name] [LEVEL] message
+class CanonicalFormatter(logging.Formatter):
+    def formatTime(self, record, datefmt=None):
+        ct = dt.fromtimestamp(record.created)
+        s = ct.strftime("%Y-%m-%d %H:%M:%S")
+        return "%s,%03d" % (s, record.msecs)
+
+
+def _apply_canonical_log_format():
+    """Apply canonical log format so migration output matches app logs (Logging PRD Phase 1)."""
+    canonical = CanonicalFormatter(
+        "[%(asctime)s] [no-id] [%(name)s] [%(levelname)s] %(message)s"
+    )
+    root = logging.getLogger()
+    for handler in root.handlers:
+        handler.setFormatter(canonical)
+
+
+_apply_canonical_log_format()
 
 # Plugin model module names (same convention as initialize_plugin_models)
 _PLUGIN_MODEL_NAMES = ("models", "model")

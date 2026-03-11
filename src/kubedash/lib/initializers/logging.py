@@ -7,15 +7,13 @@ from flask import Flask
 
 
 def initialize_app_logging(app: Flask):
-    """Initialize Flask app logging
-    Args:
-        app (Flask): Flask app object
-    """
+    """Initialize Flask app logging. Uses [logging] from app config (format=text|json, level)."""
     from lib.logfilters import (NoHealth, NoMetrics, NoPing, NoSocketIoGet,
                                 NoSocketIoPost)
     from lib.helper_functions import get_logger
 
-    logger = get_logger()
+    ini = app.config.get('kubedash.ini')
+    logger = get_logger(ini_config=ini)
 
     if sys.argv[1] != 'cli' and sys.argv[1] != 'db':
         app.logger.info("Initialize logging")

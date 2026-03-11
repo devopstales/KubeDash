@@ -30,6 +30,7 @@ from lib.metrics import (
 )
 from lib.components import db
 from lib.before_request import init_before_request
+from lib.audit import init_audit
 #############################################################
 ## Variables
 #############################################################
@@ -89,6 +90,7 @@ def create_app(external_config_name=None):
             initialize_app_database(app, __file__)
             initialize_plugin_models(app)
             init_before_request(app)
+            init_audit(app)
             app.logger.info(separator_short)
             with app.app_context():
                 # Skip metrics update in testing mode to avoid database issues
