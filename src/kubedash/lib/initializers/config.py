@@ -68,7 +68,7 @@ def initialize_app_configuration(app: Flask, external_config_name: str) -> bool:
             'helm': 'true',
             'gateway_api': 'false',
             'cert_manager': 'false',
-            'mcp_integration': 'false'
+            'ai_chat': 'false'
         }
 
     app.config['kubedash.ini'] = config_ini
@@ -100,7 +100,7 @@ def initialize_app_configuration(app: Flask, external_config_name: str) -> bool:
                 for section in app.config['kubedash.ini'].sections()
             }
             validate_config(dict(app.config), ini_dict)
-            app.logger.info("✅ Configuration validation passed")
+            app.logger.info("Configuration validation passed")
         except Exception as e:
             app.logger.error(f"❌ Configuration validation failed: {e}")
             raise

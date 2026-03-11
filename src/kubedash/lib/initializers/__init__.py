@@ -39,6 +39,8 @@ from lib.initializers.caching import initialize_app_caching
 from lib.initializers.plugins import (
     initialize_app_plugins,
     initialize_plugin_apis,
+    initialize_plugin_models,
+    ensure_plugin_models_loaded,
 )
 
 from lib.initializers.templates import add_custom_jinja2_filters
@@ -77,6 +79,8 @@ __all__ = [
     # Plugins
     'initialize_app_plugins',
     'initialize_plugin_apis',
+    'initialize_plugin_models',
+    'ensure_plugin_models_loaded',
     # Templates
     'add_custom_jinja2_filters',
     # SocketIO

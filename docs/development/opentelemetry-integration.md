@@ -76,6 +76,14 @@ The chart configures `jaeger_http_endpoint` in the UI ConfigMap (e.g. `http://<r
 | **Redis** | When Redis cache is enabled: commands, connection, optional commenter. |
 | **SQLAlchemy** | Database engine; framework/driver set for span attributes. |
 
+### Frontend–backend trace linking
+
+Page loads (e.g. `/dashboard/cluster-metric`) and the API calls that the page’s JavaScript makes (e.g. `/api/v1/cluster/metrics`) are linked in a single trace:
+
+- The server injects the current request’s [W3C Trace Context](https://www.w3.org/TR/trace-context/) (`traceparent`) into the HTML (meta tag and a global).
+- A small script in the base template wraps `fetch()` and adds the `traceparent` header to every same-origin request.
+- The Flask/WSGI instrumentation extracts that header on API requests and continues the same trace, so in Jaeger you see the page request and its API children (e.g. cluster metrics, events) as one trace.
+
 Span attributes added automatically include:
 
 - `http.url`, `http.method`, `http.route`, `http.status_code`, `http.user_agent`

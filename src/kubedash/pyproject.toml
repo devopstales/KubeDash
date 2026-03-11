@@ -58,6 +58,8 @@ plotly = "^6.0.0"
 redis = "^5.2.1"
 colorlog = "^6.9.0"
 protobuf = "^5.29.6"
+# AI Chat plugin dependencies
+aiohttp = "^3.9.0"
 statsd = "^4.0.1"
 prometheus-client = "^0.22.1"
 gunicorn = {extras = ["statsd"], version = "^23.0.0"}
@@ -84,8 +86,6 @@ pyasn1 = "^0.6.2"
 tinycss2 = "^1.5.0"
 safety = "^3.7.0"
 detect-secrets = "^1.5.0"
-# MCP (Model Context Protocol) client for Kubernetes MCP server integration
-mcp = "^1.26.0"
 # CLI dependencies
 click = "^8.1.0"
 

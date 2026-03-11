@@ -20,13 +20,14 @@ def initialize_app_logging(app: Flask):
     if sys.argv[1] != 'cli' and sys.argv[1] != 'db':
         app.logger.info("Initialize logging")
 
-    if app.config['DEBUG']:
-        app.logger.setLevel(logging.DEBUG)
-        logging.getLogger("werkzeug").setLevel(logging.DEBUG)
-    else:
-        app.logger.setLevel(logging.INFO)
-        logging.getLogger("werkzeug").addFilter(NoMetrics())
-        logging.getLogger("werkzeug").addFilter(NoHealth())
-        logging.getLogger("werkzeug").addFilter(NoPing())
-        logging.getLogger("werkzeug").addFilter(NoSocketIoGet())
-        logging.getLogger("werkzeug").addFilter(NoSocketIoPost())
+    # Use INFO in all modes (development and production). DEBUG is only for Flask (e.g. tracebacks).
+    app.logger.setLevel(logging.INFO)
+    logging.getLogger("werkzeug").addFilter(NoMetrics())
+    logging.getLogger("werkzeug").addFilter(NoHealth())
+    logging.getLogger("werkzeug").addFilter(NoPing())
+    logging.getLogger("werkzeug").addFilter(NoSocketIoGet())
+    logging.getLogger("werkzeug").addFilter(NoSocketIoPost())
+
+    # Reduce noise from third-party libs (MCP client, httpx)
+    logging.getLogger("httpx").setLevel(logging.WARNING)
+    logging.getLogger("mcp.client.streamable_http").setLevel(logging.WARNING)

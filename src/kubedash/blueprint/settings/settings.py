@@ -152,7 +152,15 @@ def callback():
                 logger.warning("No groups found for user %s" % username)
 
         user_role = UsersRoles.query.filter_by(user_id=user.id).first()
+        if not user_role:
+            flash('User role not assigned. Please contact administrator.', "danger")
+            logger.error(f"User {username} has no role assigned")
+            return redirect(url_for('dashboard.cluster_metrics'))
         role = Role.query.filter_by(id=user_role.role_id).first()
+        if not role:
+            flash('Invalid role configuration. Please contact administrator.', "danger")
+            logger.error(f"User {username} has invalid role_id {user_role.role_id}")
+            return redirect(url_for('dashboard.cluster_metrics'))
 
         session['oauth_token'] = token
         session['refresh_token'] = token.get("refresh_token")

@@ -5,6 +5,71 @@ import importlib
 from pathlib import Path
 from flask import Flask
 
+# Standard module names for plugin DB models (tried in order)
+PLUGIN_MODEL_NAMES = ("models", "model")
+
+
+def ensure_plugin_models_loaded(app: Flask):
+    """Import plugin model modules so they are on db.metadata (no db.create_all()).
+
+    Use this in the 'db' branch (flask db migrate/upgrade) so Alembic autogenerate
+    sees all plugin tables. Does not create tables; only imports so models register.
+    Discovers from filesystem (all plugins with model.py or models.py), not config.
+    """
+    plugins_dir = Path(__file__).parent.parent.parent / "plugins"
+    if not plugins_dir.is_dir():
+        return
+    with app.app_context():
+        from lib.components import db
+        for path in sorted(plugins_dir.iterdir()):
+            if not path.is_dir() or path.name.startswith("__"):
+                continue
+            plugin_name = path.name
+            for mod_name in PLUGIN_MODEL_NAMES:
+                try:
+                    importlib.import_module(f"plugins.{plugin_name}.{mod_name}")
+                    app.logger.info("Plugin models loaded for migrations: plugins.%s.%s", plugin_name, mod_name)
+                    break
+                except ImportError:
+                    continue
+
+
+def initialize_plugin_models(app: Flask):
+    """Initialize database tables for all enabled plugins that define models.
+
+    Call this after the database is initialized (after initialize_app_database).
+    Tries to import plugins.{name}.models or plugins.{name}.model for each enabled
+    plugin; when found, runs db.create_all() inside the application context.
+
+    No per-plugin registration needed: add model.py or models.py to a plugin and
+    enable it in [plugin_settings] to have tables created automatically.
+    """
+    plugins = app.config.get("plugins") or {}
+    if not plugins:
+        return
+
+    app.logger.info("Initializing plugin database tables")
+    with app.app_context():
+        from lib.components import db
+        if not hasattr(db, "engine") or db.engine is None:
+            app.logger.warning("Database not initialized; skipping plugin model init")
+            return
+
+        for plugin_name, is_enabled in plugins.items():
+            if not is_enabled:
+                continue
+            for mod_name in PLUGIN_MODEL_NAMES:
+                try:
+                    importlib.import_module(f"plugins.{plugin_name}.{mod_name}")
+                    app.logger.info("    %s: imported %s, creating tables", plugin_name, mod_name)
+                    db.create_all()
+                    break
+                except ImportError:
+                    continue
+                except Exception as e:
+                    app.logger.error("    %s: error loading %s: %s", plugin_name, mod_name, e)
+                    break
+
 
 def initialize_app_plugins(app: Flask):
     """Initialize and register plugins for the Flask application dynamically.
@@ -20,8 +85,8 @@ def initialize_app_plugins(app: Flask):
     # Initialize plugin system
     app.config["plugins"] = {}
 
-    # Get the plugins directory
-    plugins_dir = Path(__file__).parent.parent / "plugins"
+    # Get the plugins directory (src/kubedash/plugins/)
+    plugins_dir = Path(__file__).parent.parent.parent / "plugins"
 
     # Get all plugin folders
     plugin_folders = [f.name for f in plugins_dir.iterdir() if f.is_dir() and not f.name.startswith('__')]
@@ -52,13 +117,15 @@ def initialize_app_plugins(app: Flask):
                     blueprint = getattr(module, bp_name)
                     app.register_blueprint(blueprint)
 
-                    try:
-                        importlib.import_module(f"plugins.{plugin_name}.model")
-                        app.logger.info("    Import Database Models")
-                    except ImportError:
-                        continue
-                    except Exception as e:
-                        app.logger.error(f"    Error loading models for {plugin_name}: {str(e)}")
+                    # Initialize AI Chat LLM provider if this is the ai_chat plugin
+                    if plugin_name == 'ai_chat':
+                        try:
+                            from plugins.ai_chat import initialize_llm_provider
+                            initialize_llm_provider(app)
+                        except Exception as e:
+                            app.logger.warning(f"    Failed to initialize LLM provider: {e}")
+
+                    # Plugin DB models are initialized by initialize_plugin_models() after DB init
 
                 else:
                     app.logger.info(f"    No valid blueprint found for {plugin_name}")
@@ -92,8 +159,8 @@ def initialize_plugin_apis(app: Flask):
     )
     csrf.exempt(plugins_api_bp)
 
-    # Get the plugins directory
-    plugins_dir = Path(__file__).parent.parent / "plugins"
+    # Get the plugins directory (src/kubedash/plugins/)
+    plugins_dir = Path(__file__).parent.parent.parent / "plugins"
 
     # Get all plugin folders
     plugin_folders = [f.name for f in plugins_dir.iterdir() if f.is_dir() and not f.name.startswith('__')]
@@ -149,6 +216,8 @@ def initialize_plugin_apis(app: Flask):
             app.logger.error(f"  Error loading plugin API {plugin_name}: {str(e)}")
             app.logger.exception("  Plugin API %s traceback:", plugin_name)
 
-    # Register the parent plugins blueprint with api_doc (serves under /api/v1/plugins/...)
+    # Register the parent plugins blueprint with api_doc for Swagger documentation
+    # This also registers the routes with the Flask app
     api_doc.register_blueprint(plugins_api_bp)
+    app.logger.info(f"Plugin API blueprint registered: {plugins_api_bp.url_prefix}")
     app.logger.info("#######################################")

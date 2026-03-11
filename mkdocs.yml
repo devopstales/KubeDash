@@ -41,8 +41,13 @@ nav:
       - Extension API: integrations/extension-api.md
       - Project Data: integrations/project-data.md
       - Trivy Operator: integrations/trivy-operator.md
+      - AI Chat: ai-chat/index.md
       - MCP Integration: plugins/mcp_integration.md
       - Plugin reference (structure & config): plugins/README.md
+    - AI Chat:
+      - Overview: ai-chat/index.md
+      - Configuration: ai-chat/configuration.md
+      - Implementation: ai-chat/implementation.md
     - Development:
       - Architecture: development/architecture.md
       - Developer Guide: development/developer-guide.md
@@ -59,12 +64,13 @@ nav:
       - Database Migrations: development/db-migrate.md
     - Product Requirements:
       - Overview: prd/kubedash-product-requirements.md
+      - Platform Hardening & Observability: prd/platform-hardening-observability.md
       - Authentication & Users: prd/authentication-user-management.md
       - Workload Management: prd/workload-management.md
       - Dashboard & Monitoring: prd/dashboard-monitoring.md
       - API Extension: prd/api-extension.md
       - Extension API: prd/extension-api.md
-      - MCP Integration: prd/mcp-integration.md
+      - AI Chat & MCP: prd/ai-chat.md
       - Helm Plugin: prd/plugin-helm.md
       - Registry Plugin: prd/plugin-registry.md
       - Cert-Manager Plugin: prd/plugin-cert-manager.md

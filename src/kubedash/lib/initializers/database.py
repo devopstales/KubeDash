@@ -121,7 +121,19 @@ def initialize_app_database(app: Flask, filename: str):
             except Exception as e:
                 app.logger.warning(f"   Could not verify engine pool configuration: {e}")
 
-        sess.init_app(app)
+        # Allow sessions table to be redefined (e.g. on reloader restart) to avoid
+        # "Table 'sessions' is already defined for this MetaData instance"
+        import sqlalchemy as sa
+        _original_table = sa.Table
+        def _patched_table(*args, **kwargs):
+            if args and args[0] == 'sessions':
+                kwargs['extend_existing'] = True
+            return _original_table(*args, **kwargs)
+        try:
+            sa.Table = _patched_table
+            sess.init_app(app)
+        finally:
+            sa.Table = _original_table
 
         """Create Tables"""
         app.logger.info("   Create Tables")

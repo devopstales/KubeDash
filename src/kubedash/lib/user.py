@@ -188,14 +188,18 @@ def UserDelete(username):
     """
     with tracer.start_as_current_span("delete-user") if tracer else nullcontext() as span:
         user = User.query.filter_by(username=username).first()
+        if not user:
+            logger.warning(f"Delete user called for non-existent user {username}")
+            return
         user_role = UsersRoles.query.filter_by(user_id=user.id).first()
-        role = Role.query.filter_by(id=user_role.role_id).first()
+        role = Role.query.filter_by(id=user_role.role_id).first() if user_role else None
         user_kubectl = UsersKubectl.query.filter_by(user_id=user.id).first()
         kubectl_config = KubectlConfig.query.filter_by(name=username).first()
         if user:
             if tracer and span.is_recording():
                 span.set_attribute("enduser.name", username)
-                span.set_attribute("enduser.role", role.name)
+                if role:
+                    span.set_attribute("enduser.role", role.name)
                 span.set_attribute("enduser.type", user.user_type)
             if user_role:
                 db.session.delete(user_role)

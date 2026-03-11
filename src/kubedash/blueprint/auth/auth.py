@@ -194,7 +194,29 @@ def login_post():
         return redirect(url_for('.login')) # if user doesn't exist or password is wrong, reload the page
     else:
         user_role = UsersRoles.query.filter_by(user_id=user.id).first()
+        
+        # Fix: Auto-assign Admin role to default admin user if no role exists
+        if not user_role and username == 'admin' and user.user_type == 'Local':
+            from lib.user import RoleCreate, db
+            admin_role = Role.query.filter_by(name='Admin').first()
+            if not admin_role:
+                RoleCreate('Admin')
+                admin_role = Role.query.filter_by(name='Admin').first()
+            if admin_role:
+                user.roles.append(admin_role)
+                user_role = UsersRoles.query.filter_by(user_id=user.id).first()
+                db.session.commit()
+                logger.info(f"Auto-assigned Admin role to default admin user")
+        
+        if not user_role:
+            flash('User role not assigned. Please contact administrator.', "danger")
+            logger.error(f"User {username} has no role assigned")
+            return redirect(url_for('.login'))
         role = Role.query.filter_by(id=user_role.role_id).first()
+        if not role:
+            flash('Invalid role configuration. Please contact administrator.', "danger")
+            logger.error(f"User {username} has invalid role_id {user_role.role_id}")
+            return redirect(url_for('.login'))
         login_user(user, remember=remember)
         session['user_name'] = username
         session['user_role'] = role.name

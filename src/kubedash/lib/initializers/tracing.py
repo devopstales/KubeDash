@@ -11,6 +11,28 @@ from opentelemetry.instrumentation.requests import RequestsInstrumentor
 from opentelemetry.instrumentation.redis import RedisInstrumentor
 
 
+def inject_trace_context_processor():
+    """Inject W3C traceparent into template context so frontend can propagate it on API calls.
+
+    When the browser loads a page (e.g. /dashboard/cluster-metric), the server creates a trace span.
+    This makes the current span's traceparent available to the template. The base template then
+    exposes it to JavaScript and wraps fetch() so that subsequent API calls (e.g. /api/v1/cluster/metrics)
+    send the traceparent header. The backend continues the same trace, linking page load and API spans.
+    """
+    if not has_request_context():
+        return {}
+    span = trace.get_current_span()
+    if not span or not span.get_span_context().is_valid or not span.is_recording():
+        return {}
+    ctx = span.get_span_context()
+    # Avoid injecting all-zero (no-op) context
+    if ctx.trace_id == 0 and ctx.span_id == 0:
+        return {}
+    # W3C Trace Context: version-trace_id-span_id-flags (e.g. 00-4bf92f...-00f067aa...-01)
+    traceparent = f"00-{ctx.trace_id:032x}-{ctx.span_id:016x}-{ctx.trace_flags:02x}"
+    return {"traceparent": traceparent}
+
+
 def initialize_app_tracing(app: Flask):
     """Initialize OpenTelemetry tracing
 

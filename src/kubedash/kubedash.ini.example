@@ -1,106 +1,157 @@
-##################### KubeDash Configuration Defaults #####################
+##################### KubeDash Configuration Example #####################
+# Copy this file to kubedash.ini and adjust values for your environment
+# All sensitive values (passwords, API keys) should be set via environment variables
+
 [DEFAULT]
-# possible values : production, development
+# Application mode: production, development, testing
 app_mode = development
 
 #################################### Security ############################
 [security]
-
-# default admin password, can be changed before first start of grafana, or in profile settings
+# Default admin password (change in production!)
 admin_password = admin
 
 #################################### Database ############################
 [database]
-# You can configure the database connection by specifying type, host, name, user and password
-# as separate properties or as on string using the url property.
-
-# Either postgres or sqlite3, it's your choice
-type = sqlite3
+# Database type: postgres or sqlite3
+type = postgres
 host = 127.0.0.1:5432
 name = kubedash
-# user = root
-# password =
+user = kubedash
+password = kubedash
+
+# For SQLite (development):
+# type = sqlite3
+# db_path = /code/kubedash/data/kubedash.db
 
 #################################### Cache server #############################
 [remote_cache]
-# redis host
+# Redis configuration for caching
 redis_enabled = true
 redis_host = 127.0.0.1
-
-# Note: Caching can be completely disabled by setting the environment variable KUBEDASH_DISABLE_CACHE=true
-
-# redis cluster
-cluster_enabled = false
-cluster_startup_nodes = 10.0.0.1,10.0.0.2
-
-
-# cache connectionstring options
 redis_port = 6379
 redis_db = 0
 redis_password =
 
-# cache time
+# Cache timeouts (seconds)
 short_cache_time = 60
 long_cache_time = 900
 
 #################################### SSO Settings ###########################
 [sso_settings]
-
-issuer_url = https://keycloak.kdev.intra/auth/realms/k8s-apps
-callback_url = https://kubedash.kdev.intra
-scope = roles email openid profile good-service
+# OAuth2/OIDC configuration for SSO
+issuer_url = https://auth.example.com/realms/myrealm
+callback_url = https://kubedash.example.com
+scope = roles email openid profile
 client_id = kubedash
-secret = nkBeJzvrBxzRfGNDJENrEvwtnqczGLzk
+# Set via environment: KUBEDASH_SSO_SECRET
+# secret =
 
-#################################### K8S ###########################
+#################################### Kubernetes ###########################
 [k8s]
-
-cluster_name = kdev
-api_server = https://127.0.0.1:42377
-api_ca = LS0tLS1CRUdJTiBDRVJUSUZJQ0FURS0tLS0tCk1JSUMvakNDQWVhZ0F3SUJBZ0lCQURBTkJna3Foa2lHOXcwQkFRc0ZBREFWTVJNd0VRWURWUVFERXdwcmRXSmwKY201bGRHVnpNQjRYRFRJME1UQXdNekV3TWpnMU1Gb1hEVE0wTVRBd01URXdNamcxTUZvd0ZURVRNQkVHQTFVRQpBeE1LYTNWaVpYSnVaWFJsY3pDQ0FTSXdEUVlKS29aSWh2Y05BUUVCQlFBRGdnRVBBRENDQVFvQ2dnRUJBTWlGCng4L2UyMUxUTXltTDh2WG9yTXgxTTB1RmJtVnRmWXB2WTE4S1JtRFk0b1RWbnMxd1l5TkhxM1FkbU0ySElnSGkKVFRLU0dHcXB4T1VxejFjaS9xRllKRW9aZHVBT1FsTFZBSUF4dENQQWxjQUZwdEIvMmRWQXJSeldaWS9ObmUwUwpPOXRtT3pnUkJzUGxOWlk3clBKeVJ0a0YzZVhmVjNwOW5CbEI3NlkzaTdRdCtZWmt6cElaR1pKOCtkeHpWSno5CjB1TnNYL0ZmY1JlU0ZLYklnTHlibERMbnZ4UW5kOTlmMk5ITUhoTDlQd2tOa3V4UWs3SkttT2Q0TnN5NDdhR0QKZkpzVHRHT1p2b0pia2Q2WHJMNDBqTytzSHdaZ3JON3BreldMMWlTZHBqUG4vUW9CcENzOFdzZWV5TDVkNjNibQo1ZC9EQjdnMXJxK3dWQlFzSEtzQ0F3RUFBYU5aTUZjd0RnWURWUjBQQVFIL0JBUURBZ0trTUE4R0ExVWRFd0VCCi93UUZNQU1CQWY4d0hRWURWUjBPQkJZRUZNZFBYRyt3dXNCcm5abk4wZ0VKd1ZWNHNrUFNNQlVHQTFVZEVRUU8KTUF5Q0NtdDFZbVZ5Ym1WMFpYTXdEUVlKS29aSWh2Y05BUUVMQlFBRGdnRUJBSTh1N1ZxeUkrWkRtamY3QzgwWAovQXNKQnQxazdmWEVycTN6N1VDTVdXOFI4VVJDdVJjVjNwTnVXZVJSSGlVdmxGdkRzRG9uTjhJY3hwa3JCOGtuCm9MMjAzSTJVYmlSaXQzcXhWSFRVTjdsQ2ltOVorT2JjUGVncTFkclVIMU1ianRGVEp3ZXkrZjltaFgzdkVwSjcKUHVBL1E3OHU1cHpKc3VpaU1FQldwSGhMYlVuM2xqN1ZZSXoyUHBOeVRQcVBMK28xMVpmeTJMMEkrVmlQaFYwQgpHWDBIOHlrVjJnYTlsY01JcGdkVmpoL1Q5bTRZQ2ZLZFRGVUVoWmVSdmFjRDJQR0hOaGYzV2o2YUtOODJ4VjcvCktnMVR4b1pid0dnNDZzOEVXTEkwQU9RVXQzck8xNzB4YXZ3cGNBbGJmRktUOUREaDR1aVVDUE9vQmFxQ3JtMEkKMGJjPQotLS0tLUVORCBDRVJUSUZJQ0FURS0tLS0tCg==
+# Kubernetes cluster configuration
+cluster_name = my-cluster
+api_server = https://api.example.com:6443
+# Base64 encoded CA certificate
+api_ca = LS0tLS1CRUdJTi...
 
 #################################### Monitoring Settings ###########################
 [monitoring]
-
-jaeger_enabled = false
+# Jaeger/OpenTelemetry configuration
+jaeger_enabled = true
 jaeger_http_endpoint = http://127.0.0.1:4318
 
 #################################### Plugin Settings ###########################
 [plugin_settings]
+# Enable/disable plugins (true/false)
 
-# enable registry plugin
+# AI Chat plugin - AI-powered Kubernetes management
+ai_chat = true
+
+# Registry plugin - Container registry management
 registry = true
 
-# enable helm plugin
+# Helm plugin - Helm chart management
 helm = true
 
-# enable external loadbalancer plugin
+# External LoadBalancer plugin
 external_loadbalancer = true
 
-# enable cert-manager plugin
+# Cert-Manager plugin - Certificate management
 cert_manager = true
 
-# enable flux cd plugin
+# Flux CD plugin - GitOps operations
 flux = true
 
-# enable gateway api plugin
+# Gateway API plugin - API Gateway management
 gateway_api = true
 
-# enable trivy operator plugin
+# Trivy Operator plugin - Security scanning
 trivy_operator = true
 
-# enable MCP integration plugin (AI chatbot backed by MCP / Kubernetes MCP server)
-mcp_integration = false
+# Iframe Proxy plugin - External app integration
+iframe_proxy = true
 
-#################################### MCP Integration Settings ###########################
-[mcp_integration]
-# URL of the MCP server (e.g. Kubernetes MCP server). Leave empty if not configured.
-# Example with docker-compose: http://127.0.0.1:8082
-mcp_server_url =
+# Application Catalog plugin
+application_catalog = true
 
-# Optional: true = only read operations (list, describe, logs, Helm list); false = allow create/delete when supported
+#################################### AI Chat Settings ###########################
+[ai_chat]
+# Kubernetes operations use lib/k8s (same cluster and auth as KubeDash). No MCP server required.
+
+# Enable/disable AI Chat functionality
+enabled = true
+
+# Read-only mode: true = only list/describe/logs; false = allow create/delete
 read_only = false
 
-# Optional: LLM API endpoint (OpenAI-compatible). For future use.
-# llm_api_url =
-# llm_api_key_env = KUBEDASH_LLM_API_KEY
+# LLM Provider (optional - omit for air-gapped / pattern-based commands only)
+# Provider type: openai, ollama, gemini, azure
+llm_provider = ollama
+
+# LLM API base URL
+# Ollama: http://host:11434/v1  |  OpenAI: https://api.openai.com/v1  |  Azure: your-resource URL
+llm_base_url = http://127.0.0.1:11434/v1
+
+# Model name (e.g. llama3.1:8b, gpt-3.5-turbo, gemini-pro)
+llm_model = llama3.1:8b
+
+# LLM API key (optional for Ollama; required for OpenAI/Gemini/Azure). Or KUBEDASH_LLM_API_KEY
+# llm_api_key =
+
+llm_timeout = 60
+llm_max_tokens = 2000
+
+#################################### Performance Settings ###########################
+[performance]
+# Skip cluster metrics for faster page loads
+skip_cluster_metrics = false
+
+# Initial metrics timeout (seconds)
+initial_metrics_timeout = 3
+
+#################################### Application Links ###########################
+[application_list]
+# External applications to display in KubeDash
+
+app_0_name = Kubeview
+app_0_url = http://127.0.0.1:8003
+app_0_embed = true
+app_0_enable = true
+
+app_1_name = Jaeger
+app_1_url = http://127.0.0.1:16686
+app_1_embed = true
+app_1_enable = true
+
+app_2_name = Prometheus
+app_2_url = https://prometheus.example.com
+app_2_embed = false
+app_2_enable = true
+
+app_3_name = Grafana
+app_3_url = https://grafana.example.com
+app_3_embed = false
+app_3_enable = true
+
+# Add more applications as needed...

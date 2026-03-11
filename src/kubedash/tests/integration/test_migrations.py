@@ -168,13 +168,13 @@ class TestSpecificMigrations:
         # Upgrade again
         command.upgrade(alembic_cfg, "ea51eddbcfb6")
 
-    def test_mcp_conversations_migration(self, alembic_cfg):
-        """Test the MCP conversations migration."""
-        # Upgrade to MCP migration
-        command.upgrade(alembic_cfg, "a1b2c3d4e5f6")
+    def test_ai_chat_migration(self, alembic_cfg):
+        """Test the AI Chat (conversations/messages) migration."""
+        # Upgrade to AI Chat migration (after stub a1b2c3d4e5f6)
+        command.upgrade(alembic_cfg, "ai_chat_init")
 
         # Downgrade to previous
         command.downgrade(alembic_cfg, "ea51eddbcfb6")
 
         # Upgrade again
-        command.upgrade(alembic_cfg, "a1b2c3d4e5f6")
+        command.upgrade(alembic_cfg, "ai_chat_init")

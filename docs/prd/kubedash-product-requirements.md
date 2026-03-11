@@ -601,31 +601,38 @@ This master PRD references the following detailed PRD documents:
    - Projects resource
    - OpenAPI specification
 
-5. **[MCP Integration](./mcp-integration.md)**
+5. **[AI Chat](./ai-chat.md)**
    - AI chatbot with in-app chat panel
-   - MCP (Model Context Protocol) integration for cluster context
-   - Natural language cluster queries and optional actions
+   - Cluster operations via lib/k8s (same auth as dashboard; no MCP server)
+   - Natural language cluster queries and optional actions (list, describe, logs, helm; create/delete in minimal-provider path)
 
-6. **[Plugin: Cert-Manager](./plugin-cert-manager.md)**
+6. **[Plugin: Application Catalog](./plugin-application-catalog.md)**
+   - Application catalog and embedded apps
+
+7. **[Plugin: Cert-Manager](./plugin-cert-manager.md)**
    - Certificate management
 
-7. **[Plugin: Trivy Operator](./plugin-trivy-operator.md)**
+8. **[Plugin: Trivy Operator](./plugin-trivy-operator.md)**
    - Security scanning and compliance
 
-8. **[Plugin: FluxCD](./plugin-flux.md)**
+9. **[Plugin: FluxCD](./plugin-flux.md)**
    - GitOps visualization and management
 
-9. **[Plugin: Gateway API](./plugin-gateway-api.md)**
+10. **[Plugin: Gateway API](./plugin-gateway-api.md)**
    - Gateway and route management
 
-10. **[Plugin: Helm](./plugin-helm.md)**
+11. **[Plugin: Helm](./plugin-helm.md)**
    - Helm chart and release management
 
-11. **[Plugin: Registry](./plugin-registry.md)**
+12. **[Plugin: Registry](./plugin-registry.md)**
     - Docker registry integration
 
-12. **[Plugin: External LoadBalancer](./plugin-external-loadbalancer.md)**
+13. **[Plugin: External LoadBalancer](./plugin-external-loadbalancer.md)**
     - LoadBalancer service management
+
+14. **[Platform Hardening & Observability](./platform-hardening-observability.md)**
+    - Rate limiting, audit logging, structured logging
+    - Redis cluster clarity, i18n, Prometheus metrics (optional)
 
 ---
 

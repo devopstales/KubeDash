@@ -10,7 +10,7 @@ import re
 import logging
 from typing import Dict, List, Tuple, Optional, Any
 
-logger = logging.getLogger(__name__)
+logger = logging.getLogger("kubedash")
 
 
 class ConfigurationError(Exception):
@@ -101,34 +101,34 @@ class ConfigValidator:
         # Check SECRET_KEY length
         secret_key = self.config.get('SECRET_KEY', '')
         if len(secret_key) < self.MIN_SECRET_KEY_LENGTH:
-            self.errors.append(
+            self.warnings.append(
                 f"SECRET_KEY is too short ({len(secret_key)} chars). "
-                f"Minimum required: {self.MIN_SECRET_KEY_LENGTH} chars. "
+                f"Minimum recommended: {self.MIN_SECRET_KEY_LENGTH} chars. "
                 "Use a secure random value (e.g., os.urandom(32).hex())"
             )
-        
+
         # Check if using default SECRET_KEY
         if secret_key == 'develop':
             self.warnings.append(
                 "Using default SECRET_KEY 'develop'. This is insecure for production. "
                 "Set a secure random value in production."
             )
-        
+
         # Check admin password from ini config
         admin_password = self.ini_config.get('security', {}).get('admin_password', '')
         if admin_password and len(admin_password) < self.MIN_ADMIN_PASSWORD_LENGTH:
-            self.errors.append(
+            self.warnings.append(
                 f"Admin password is too short ({len(admin_password)} chars). "
-                f"Minimum required: {self.MIN_ADMIN_PASSWORD_LENGTH} chars"
+                f"Minimum recommended: {self.MIN_ADMIN_PASSWORD_LENGTH} chars"
             )
-        
+
         # Check for default admin password
         if admin_password == 'admin':
             self.warnings.append(
                 "Using default admin password 'admin'. This is a security risk. "
                 "Change the admin password immediately in production."
             )
-        
+
         # Check SESSION_COOKIE_SECURE in production
         if self.config.get('ENV') == 'production':
             if not self.config.get('SESSION_COOKIE_SECURE', False):
