@@ -15,7 +15,7 @@
 </ul>
 <ul class="header-nav ms-auto"></ul>
 <ul class="header-nav d-lg-flex">
-{% include "segments/topmenu.html.j2" %}
+{% include "segments/partials/topmenu.html.j2" %}
 {% endblock %}
 
 {% block content %}
@@ -174,8 +174,8 @@
 {% endblock %}
 
 {% block add_head_css %}
-{% include "segments/datatable_snippet.html.j2" %}
-{% include "segments/highlight_snippet.html.j2" %}
+{% include "segments/components/datatable_snippet.html.j2" %}
+{% include "segments/components/highlight_snippet.html.j2" %}
 {% endblock %}
 
 {% block add_tail_js %}

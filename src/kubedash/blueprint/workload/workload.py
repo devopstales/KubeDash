@@ -1,5 +1,6 @@
 import functools
 import logging
+import threading
 
 from flask import (Blueprint, flash, g, redirect, render_template, request, session,
                    url_for)
@@ -27,6 +28,11 @@ from lib.sso import get_user_token
 
 workload_bp = Blueprint("workload", __name__, url_prefix="/workload")
 logger = get_logger()
+
+# Per-connection exec state: sid -> {"wsclient": wsclient, "cancel": threading.Event}
+exec_streams = {}
+# Per-connection log cancel: sid -> threading.Event (set to stop the log task)
+log_cancel = {}
 
 def authenticated_only(f):
     """Test Current user is authenticated"""
@@ -218,38 +224,61 @@ def pod_logs():
 @socketio.on("connect", namespace="/log")
 @authenticated_only
 def log_connect():
-    socketio.emit('response', {'data': ''}, namespace="/log")
+    socketio.emit("response", {"data": ""}, room=request.sid, namespace="/log")
+
+
+@socketio.on("disconnect", namespace="/log")
+def log_disconnect():
+    sid = request.sid
+    ev = log_cancel.pop(sid, None)
+    if ev:
+        ev.set()
+
 
 @socketio.on("message", namespace="/log")
 @authenticated_only
 def log_message(po_name, container):
     from lib.helper_functions import validate_pod_name, validate_namespace
-    
-    # Validate pod name to prevent XSS and path traversal
+
     if not po_name or not isinstance(po_name, str):
         logger.warning(f"Invalid pod name in log_message: {po_name}")
         return
-    
+
     is_valid, error_msg = validate_pod_name(po_name)
     if not is_valid:
         logger.warning(f"Invalid pod name in log_message: {error_msg}")
         return
-    
-    # Validate namespace
+
     namespace = session.get('ns_select', 'default')
     if namespace:
         is_valid_ns, error_msg_ns = validate_namespace(namespace)
         if not is_valid_ns:
             logger.warning(f"Invalid namespace in log_message: {error_msg_ns}")
             return
-    
-    # Validate container name (basic check)
+
     if container and not isinstance(container, str):
         logger.warning(f"Invalid container name in log_message: {container}")
         return
-    
+
+    sid = request.sid
+    # Cancel previous log stream for this connection
+    old_ev = log_cancel.pop(sid, None)
+    if old_ev:
+        old_ev.set()
+    cancel_ev = threading.Event()
+    log_cancel[sid] = cancel_ev
+
     user_token = get_user_token(session)
-    socketio.start_background_task(k8sPodLogsStream, session['user_role'], user_token, namespace, po_name, container)
+    socketio.start_background_task(
+        k8sPodLogsStream,
+        session['user_role'],
+        user_token,
+        namespace,
+        po_name,
+        container,
+        sid,
+        cancel_ev,
+    )
 
 ##############################################################
 ## Pod Exec
@@ -297,7 +326,7 @@ def pod_exec():
 @socketio.on("connect", namespace="/exec")
 @authenticated_only
 def connect():
-    socketio.emit("response", {"output":  ''}, namespace="/exec")
+    socketio.emit("response", {"output": ''}, room=request.sid, namespace="/exec")
 
 @socketio.on("message", namespace="/exec")
 @authenticated_only
@@ -328,11 +357,52 @@ def message(po_name, container):
         return
     
     user_token = get_user_token(session)
+    sid = request.sid
 
-    global wsclient
+    # Cancel any existing exec for this connection
+    if sid in exec_streams:
+        exec_streams[sid].get("cancel").set()
+
     wsclient = k8sPodExecSocket(session['user_role'], user_token, namespace, po_name, container)
+    if wsclient is None:
+        return
+    cancel_ev = threading.Event()
+    exec_streams[sid] = {"wsclient": wsclient, "cancel": cancel_ev}
+    socketio.start_background_task(
+        k8sPodExecStream,
+        wsclient,
+        session['user_role'],
+        user_token,
+        namespace,
+        po_name,
+        container,
+        sid,
+        exec_streams,
+        cancel_ev,
+    )
 
-    socketio.start_background_task(k8sPodExecStream, wsclient, session['user_role'], user_token, namespace, po_name, container)
+
+@socketio.on("disconnect", namespace="/exec")
+def exec_disconnect():
+    sid = request.sid
+    entry = exec_streams.pop(sid, None)
+    if entry:
+        entry.get("cancel").set()
+
+
+@socketio.on("stop", namespace="/exec")
+@authenticated_only
+def exec_stop():
+    """Client requested disconnect; stop the exec stream for this connection."""
+    sid = request.sid
+    entry = exec_streams.pop(sid, None)
+    if entry:
+        entry.get("cancel").set()
+    try:
+        socketio.emit("closed", {"message": "Disconnected"}, room=sid, namespace="/exec")
+    except Exception:
+        pass
+
 
 @socketio.on("exec-input", namespace="/exec")
 @authenticated_only
@@ -341,10 +411,18 @@ def exec_input(data):
     Write to the child pty. The pty sees this as if you are typing in a real
     terminal.
     """
+    sid = request.sid
+    entry = exec_streams.get(sid)
+    wsclient = entry.get("wsclient") if entry else None
+    if not wsclient:
+        logger.debug("exec_input: no stream for sid %s", sid)
+        return
     try:
-        wsclient.write_stdin(data["input"].encode())
+        inp = data.get("input")
+        if inp is not None:
+            wsclient.write_stdin(inp.encode() if isinstance(inp, str) else inp)
     except ApiException as error:
-            ErrorHandler(logger, error, "exec_input")
+        ErrorHandler(logger, error, "exec_input")
     except Exception as error:
         ERROR = "exec_input: %s" % error
         ErrorHandler(logger, "error", ERROR)

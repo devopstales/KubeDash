@@ -569,40 +569,40 @@ def k8sPodDelete(username_role, user_token, ns, po):
 ## Pod Logs
 ##############################################################
 
-def k8sPodLogsStream(username_role, user_token, namespace, pod_name, container):
+def k8sPodLogsStream(username_role, user_token, namespace, pod_name, container, sid, cancel_event):
     # Push application context for background thread
-    # Background threads created by socketio don't have Flask app context
     app = get_flask_app()
     with app.app_context():
         k8sClientConfigGet(username_role, user_token)
         try:
             w = watch.Watch()
             for line in w.stream(
-                    k8s_client.CoreV1Api().read_namespaced_pod_log, 
-                    name=pod_name, 
+                    k8s_client.CoreV1Api().read_namespaced_pod_log,
+                    name=pod_name,
                     namespace=namespace,
                     container=container,
                     tail_lines=100,
                     _request_timeout=300
                 ):
+                if cancel_event and cancel_event.is_set():
+                    break
                 try:
-                    socketio.emit('response',
-                                        {'data': str(line)}, namespace="/log")
+                    socketio.emit("response", {"data": str(line)}, room=sid, namespace="/log")
                 except (OSError, BrokenPipeError, ConnectionError) as emit_error:
-                    # Handle socket errors gracefully (client disconnected, bad file descriptor, etc.)
                     logger.debug(f"Socket emit error (client likely disconnected): {emit_error}")
                     break
                 except Exception as emit_error:
                     logger.warning(f"Unexpected error emitting socket message: {emit_error}")
-                    # Continue streaming even if one emit fails
         except ApiException as error:
-                ErrorHandler(logger, error, "get logStream - %s" % error.status)
+            ErrorHandler(logger, error, "get logStream - %s" % error.status)
         except (OSError, BrokenPipeError, ConnectionError) as error:
-            # Handle connection errors gracefully
             logger.debug(f"Connection error in log stream (client likely disconnected): {error}")
         except Exception as error:
             ERROR = "k8sPodLogsStream: %s" % error
             ErrorHandler(logger, "error", ERROR)
+        finally:
+            if cancel_event:
+                cancel_event.set()
 
 ##############################################################
 ## Pod Exec
@@ -635,70 +635,33 @@ def k8sPodExecSocket(username_role, user_token, namespace, pod_name, container):
         ERROR = "k8sPodExecSocket: %s" % error
         ErrorHandler(logger, "error", ERROR)
         return None
-    
-"""
-    def terminal_start(self, namespace, pod_name, container):
-        command = [
-            "/bin/sh",
-            "-c",
-            'TERM=xterm-256color; export TERM; [ -x /bin/bash ] '
-            '&& ([ -x /usr/bin/script ] '
-            '&& /usr/bin/script -q -c "/bin/bash" /dev/null || exec /bin/bash) '
-            '|| exec /bin/sh']
-        client_v1 = self.get_client()
-        container_stream = stream(
-            client_v1.connect_get_namespaced_pod_exec,
-            name=pod_name,
-            namespace=namespace,
-            container=container,
-            command=command,
-            stderr=True, stdin=True,
-            stdout=True, tty=True,
-            _preload_content=False
-        )
 
-        return container_stream
-"""
-
-def k8sPodExecStream(wsclient, username_role, user_token, namespace, pod_name, container):
-    while True:
-        socketio.sleep(0.01)
+def k8sPodExecStream(wsclient, username_role, user_token, namespace, pod_name, container, sid, exec_streams, cancel_ev):
+    try:
+        while True:
+            if cancel_ev.is_set():
+                break
+            socketio.sleep(0.01)
+            try:
+                wsclient.update(timeout=5)
+                output = wsclient.read_all()
+                if output:
+                    try:
+                        socketio.emit("response", {"output": output}, room=sid, namespace="/exec")
+                    except (OSError, BrokenPipeError, ConnectionError) as emit_error:
+                        logger.debug(f"Socket emit error in exec stream (client likely disconnected): {emit_error}")
+                        break
+                    except Exception as emit_error:
+                        logger.warning(f"Unexpected error emitting socket message in exec stream: {emit_error}")
+            except Exception as error:
+                logger.error("k8sPodExecStream: %s" % error)
+                break
+    finally:
+        exec_streams.pop(sid, None)
         try:
-            wsclient.update(timeout=5)
-
-            """Read from wsclient"""
-            output = wsclient.read_all()
-            if output:
-                """write back to socket"""
-                try:
-                    socketio.emit(
-                        "response", {"output": output}, namespace="/exec")
-                except (OSError, BrokenPipeError, ConnectionError) as emit_error:
-                    # Handle socket errors gracefully (client disconnected, bad file descriptor, etc.)
-                    logger.debug(f"Socket emit error in exec stream (client likely disconnected): {emit_error}")
-                    break
-                except Exception as emit_error:
-                    logger.warning(f"Unexpected error emitting socket message in exec stream: {emit_error}")
-                    # Continue streaming even if one emit fails
-        #except:
-        #    try:
-        #        print("Failed to read")
-        #        wsclient = k8sPodExecSocket(username_role, user_token, namespace, pod_name, container)
-        #
-        #        """Read from wsclient"""
-        #        output = wsclient.read_all()
-        #        if output:
-        #            """write back to socket"""
-        #            socketio.emit(
-        #                "response", {"output": output}, namespace="/exec")
-        #            
-        #    except Exception as error:
-        #        # Show disconnected status on the UI
-        #        logger.error("k8sPodExecStream: %s" % error)
-
-        except Exception as error:
-            # Show disconnected status on the UI
-            logger.error("k8sPodExecStream: %s" % error)
+            socketio.emit("closed", {"message": "Stream ended"}, room=sid, namespace="/exec")
+        except Exception:
+            pass
 
 ##############################################################
 ## ReplicaSets

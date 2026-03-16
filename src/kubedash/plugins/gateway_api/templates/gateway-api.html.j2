@@ -13,7 +13,7 @@
 </ul>
 <ul class="header-nav ms-auto"></ul>
 <ul class="header-nav d-lg-flex">
-{% include "segments/topmenu.html.j2" %}
+{% include "segments/partials/topmenu.html.j2" %}
 {% endblock %}
 
 {% block content %}
@@ -371,7 +371,7 @@
 {% endblock %}
 
 {% block add_head_css %}
-{% include "segments/datatable_snippet.html.j2" %}
+{% include "segments/components/datatable_snippet.html.j2" %}
 <style>
     .badge.bg-light {
         border: 1px solid #dee2e6;
@@ -443,6 +443,24 @@
     })();
     
     const initializedTables = new Set();
+    
+    const TAB_TABLE_CONFIG = {
+        'gatewayclasses': ['#gatewayClassTable', [1, 'asc']],
+        'gateways': ['#gatewayTable', [1, 'asc']],
+        'httproutes': ['#httpRouteTable', [1, 'asc']],
+        'grpcroutes': ['#grpcRouteTable', [0, 'asc']],
+        'tcproutes': ['#tcpRouteTable', [1, 'asc']],
+        'tlsroutes': ['#tlsRouteTable', [1, 'asc']],
+        'referencegrants': ['#referenceGrantTable', [0, 'asc']],
+        'backendtlspolicies': ['#backendTLSPolicyTable', [1, 'asc']]
+    };
+    
+    function initDataTableForTab(tabName) {
+        const config = TAB_TABLE_CONFIG[tabName];
+        if (config) {
+            safeInitDataTable(config[0], config[1]);
+        }
+    }
     
     function safeInitDataTable(selector, orderCol) {
         const $table = $(selector);
@@ -593,7 +611,6 @@
         }).join('');
         
         tbody.innerHTML = rows;
-        setTimeout(() => safeInitDataTable('#gatewayClassTable', [1, "asc"]), 100);
     }
     
     function populateGatewaysTable(gateways, namespace) {
@@ -637,7 +654,6 @@
         }).join('');
         
         tbody.innerHTML = rows;
-        setTimeout(() => safeInitDataTable('#gatewayTable', [1, "asc"]), 100);
     }
     
     function populateHTTPRoutesTable(routes, namespace) {
@@ -686,7 +702,6 @@
         }).join('');
         
         tbody.innerHTML = rows;
-        setTimeout(() => safeInitDataTable('#httpRouteTable', [1, "asc"]), 100);
     }
     
     function populateGRPCRoutesTable(routes) {
@@ -728,7 +743,6 @@
         }).join('');
         
         tbody.innerHTML = rows;
-        setTimeout(() => safeInitDataTable('#grpcRouteTable', [0, "asc"]), 100);
     }
     
     function populateTCPRoutesTable(routes) {
@@ -765,7 +779,6 @@
         }).join('');
         
         tbody.innerHTML = rows;
-        setTimeout(() => safeInitDataTable('#tcpRouteTable', [1, "asc"]), 100);
     }
     
     function populateTLSRoutesTable(routes) {
@@ -807,7 +820,6 @@
         }).join('');
         
         tbody.innerHTML = rows;
-        setTimeout(() => safeInitDataTable('#tlsRouteTable', [1, "asc"]), 100);
     }
     
     function populateReferenceGrantsTable(grants) {
@@ -839,7 +851,6 @@
         }).join('');
         
         tbody.innerHTML = rows;
-        setTimeout(() => safeInitDataTable('#referenceGrantTable', [0, "asc"]), 100);
     }
     
     function populateBackendTLSPoliciesTable(policies) {
@@ -868,7 +879,6 @@
         }).join('');
         
         tbody.innerHTML = rows;
-        setTimeout(() => safeInitDataTable('#backendTLSPolicyTable', [1, "asc"]), 100);
     }
     
     // Load Gateway API status
@@ -989,14 +999,19 @@
         // Load all resources
         await loadGatewayAPIResources(namespace);
         
-        // Switch to the correct tab if specified
-        if (activeTab) {
+        // Switch to the correct tab if specified, then init its DataTable (via shown.bs.tab).
+        // If staying on default tab, init it explicitly since shown.bs.tab does not fire on initial load.
+        if (activeTab && activeTab !== 'gatewayclasses') {
             setTimeout(function() {
                 const tabId = '#nav-' + activeTab + '-tab';
                 if (typeof $ !== 'undefined') {
                     $(tabId).tab('show');
                 }
             }, 200);
+        } else {
+            setTimeout(function() {
+                initDataTableForTab('gatewayclasses');
+            }, 250);
         }
         
         // Reload data when namespace changes

@@ -42,6 +42,7 @@
                 <option value="" selected disabled>Loading containers...</option>
               </select>
               <button type="submit" class="btn btn-primary" type="button">Submit</button>
+              <button type="button" class="btn btn-outline-secondary" id="disconnectBtn" title="Disconnect from shell">Disconnect</button>
           </div>
         </form>
       </div>
@@ -75,6 +76,16 @@
 
         term.onKey(e => {
             socket.emit("exec-input", {"input": e.key})
+        });
+
+        // Paste: use paste event so it works on Windows (Ctrl+V), Linux (Ctrl+Shift+V), macOS (Cmd+V), and context menu.
+        // Only send to server; do not term.write() — the server echoes input back, so we'd get double output.
+        term.element.addEventListener("paste", function(e) {
+          const text = (e.clipboardData || window.clipboardData).getData("text/plain");
+          if (text && socket && socket.connected) {
+            socket.emit("exec-input", { input: text });
+          }
+          e.preventDefault();
         });
 
         const socket = io.connect('/exec');
@@ -179,6 +190,14 @@
             term.write(msg.output)
         });
 
+        socket.on("closed", function(msg){
+          status.innerHTML =
+            '<span class="disconnected">disconnected</span>';
+          if (msg && msg.message) {
+            term.writeln("\r\n" + (msg.message || "Stream ended."));
+          }
+        });
+
         socket.on("disconnect", () => {
           status.innerHTML =
             '<span class="disconnected">disconnected</span>';
@@ -188,52 +207,63 @@
           sendExecRequest(event.target.value);
         });
 
+        document.getElementById("disconnectBtn").addEventListener("click", () => {
+          if (socket && socket.connected) {
+            socket.emit("stop");
+          }
+        });
+
         loadContainers();
 
         /**
-        * Handle copy and paste events
-        */
+         * Handle copy and paste key shortcuts. We must do paste here for Cmd+V/Ctrl+V
+         * because preventing default stops the browser from firing the paste event.
+         * Context-menu paste still uses the "paste" event listener.
+         */
         function customKeyEventHandler(e) {
           if (e.type !== "keydown") {
             return true;
           }
           const key = e.key.toLowerCase();
-          if (e.ctrlKey && !e.shiftKey && !e.altKey && !e.metaKey) {
-            if (key === "v") {
-              // ctrl+v: paste whatever is in the clipboard
-              navigator.clipboard.readText().then((toPaste) => {
-                term.writeText(toPaste);
-              });
-              return false;
+          // Paste: Ctrl+V (Windows/Linux), Cmd+V (macOS), Ctrl+Shift+V — do it here so it works when we preventDefault
+          if (key === "v" && (e.ctrlKey || e.metaKey)) {
+            e.preventDefault();
+            if (navigator.clipboard && navigator.clipboard.readText) {
+              navigator.clipboard.readText().then(function(toPaste) {
+                if (toPaste && socket && socket.connected) {
+                  socket.emit("exec-input", { input: toPaste });
+                }
+              }).catch(function() {});
             }
-            if (key === "c") {
-              // ctrl+c: copy selection if any, otherwise allow SIGINT
-              const toCopy = term.getSelection();
-              if (toCopy) {
-                navigator.clipboard.writeText(toCopy);
-                term.focus();
-                return false;
+            return false;
+          }
+          // Copy: Ctrl+C / Cmd+C when there is selection
+          if ((e.ctrlKey || e.metaKey) && !e.shiftKey && (key === "c" || key === "x")) {
+            const toCopy = term.getSelection();
+            if (toCopy) {
+              const clip = (navigator.clipboard && navigator.clipboard.writeText) ? navigator.clipboard : null;
+              if (clip) {
+                clip.writeText(toCopy).catch(function() {});
+              } else if (window.clipboardData) {
+                window.clipboardData.setData("Text", toCopy);
               }
+              term.focus();
+              e.preventDefault();
+              return false;
             }
           }
-          if (e.ctrlKey && e.shiftKey) {
-            if (key === "v") {
-              // ctrl+shift+v: paste whatever is in the clipboard
-              navigator.clipboard.readText().then((toPaste) => {
-                term.writeText(toPaste);
-              });
-              return false;
-            } else if (key === "c" || key === "x") {
-              // ctrl+shift+x: copy whatever is highlighted to clipboard
-
-              // 'x' is used as an alternate to 'c' because ctrl+c is taken
-              // by the terminal (SIGINT) and ctrl+shift+c is taken by the browser
-              // (open devtools).
-              // I'm not aware of ctrl+shift+x being used by anything in the terminal
-              // or browser
-              const toCopy = term.getSelection();
-              navigator.clipboard.writeText(toCopy);
+          // Ctrl+Shift+C / Ctrl+Shift+X: copy selection (alternate when Ctrl+C is SIGINT)
+          if (e.ctrlKey && e.shiftKey && (key === "c" || key === "x")) {
+            const toCopy = term.getSelection();
+            if (toCopy) {
+              const clip = (navigator.clipboard && navigator.clipboard.writeText) ? navigator.clipboard : null;
+              if (clip) {
+                clip.writeText(toCopy).catch(function() {});
+              } else if (window.clipboardData) {
+                window.clipboardData.setData("Text", toCopy);
+              }
               term.focus();
+              e.preventDefault();
               return false;
             }
           }
