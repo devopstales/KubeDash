@@ -1,6 +1,6 @@
 # Logging
 
-KubeDash uses a unified logging strategy so that application logs, Gunicorn access/error logs, and Alembic migration logs share the same format and support trace/correlation IDs. This document summarizes how logging works and how to use it in code. For full requirements and status, see the [Logging PRD](../prd/logging.md).
+KubeDash uses a unified logging strategy so that application logs, Gunicorn access/error logs, and Alembic migration logs share the same format and support trace/correlation IDs. This document summarizes how logging works and how to use it in code.
 
 ## Overview
 
@@ -26,7 +26,7 @@ format = text
 level = INFO
 ```
 
-When `format = json`, each log line is a single JSON object with at least `timestamp`, `trace_id`, `logger`, `level`, and `message` (see [Logging PRD § 2.2](../prd/logging.md#22-json-format-production)).
+When `format = json`, each log line is a single JSON object with at least `timestamp`, `trace_id`, `logger`, `level`, and `message`.
 
 ## Using the logger in code
 
@@ -41,7 +41,7 @@ When `format = json`, each log line is a single JSON object with at least `times
 
 2. **Do not** configure your own handlers or formatters for application logs; initialization is done in `lib.initializers.logging` and uses the app’s config (format, level).
 
-3. **Error sites**: Prefer structured logging with `exc_info=True` for exceptions so that stack traces appear in logs. Use the shared `ErrorHandler` pattern where applicable (see [Logging PRD § 4](../prd/logging.md#4-error-handling--logging-standards)).
+3. **Error sites**: Prefer structured logging with `exc_info=True` for exceptions so that stack traces appear in logs. Use the shared `ErrorHandler` pattern where applicable.
 
 ## Trace ID flow
 
@@ -64,6 +64,4 @@ OpenTelemetry can use the same header for trace context so logs and traces can b
 
 ## References
 
-- [Logging PRD](../prd/logging.md) – Full format spec, phases, and implementation status.
 - [OpenTelemetry integration](opentelemetry-integration.md) – Tracing and log-trace correlation.
-- [Platform Hardening & Observability PRD](../prd/platform-hardening-observability.md) – Structured logging requirements.

@@ -375,13 +375,15 @@ class ProjectListResource(MethodView):
             label_selector = request.args.get('labelSelector')
             field_selector = request.args.get('fieldSelector')
             limit = request.args.get('limit', type=int)
+            continue_token = request.args.get('continue')
             
             # List projects with permission filtering
             project_list, error = ext_list_projects(
                 user=user,
                 label_selector=label_selector,
                 field_selector=field_selector,
-                limit=limit
+                limit=limit,
+                continue_token=continue_token
             )
             
             if error:
@@ -928,15 +930,27 @@ class OpenAPISpecResource(MethodView):
                                 "description": "Label selector for filtering"
                             },
                             {
+                                "name": "fieldSelector",
+                                "in": "query",
+                                "type": "string",
+                                "description": "Field selector for filtering. Supported fields: metadata.name (equality), spec.protected (true/false), status.phase (e.g. Active). Comma-separated for AND."
+                            },
+                            {
                                 "name": "limit",
-                                "in": "query", 
+                                "in": "query",
                                 "type": "integer",
-                                "description": "Maximum number of results"
+                                "description": "Maximum number of results per page"
+                            },
+                            {
+                                "name": "continue",
+                                "in": "query",
+                                "type": "string",
+                                "description": "Opaque token from a previous list response (metadata.continue) to retrieve the next page"
                             }
                         ],
                         "responses": {
                             "200": {
-                                "description": "ProjectList"
+                                "description": "ProjectList. When more results exist, metadata.continue is set for pagination."
                             }
                         }
                     },

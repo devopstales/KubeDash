@@ -223,8 +223,6 @@ The AI Chat plugin follows KubeDash plugin development standards:
 - Database (`lib.components.db`)
 - CSRF exemption on API blueprint (`lib.components.csrf.exempt()`)
 
-See [AI Chat PRD](../prd/ai-chat.md) for full architecture and implementation details.
-
 ## License
 
 Apache 2.0

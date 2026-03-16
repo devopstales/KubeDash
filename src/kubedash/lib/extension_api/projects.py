@@ -19,7 +19,13 @@ from .authorization import (
     check_namespace_access,
     filter_namespaces_by_permission
 )
-from .helpers import build_project_object, build_project_list, get_resource_version
+from .helpers import (
+    build_project_object,
+    build_project_list,
+    decode_continue_token,
+    encode_continue_token,
+    get_resource_version,
+)
 from lib.k8s.server import k8sClientConfigGet
 
 ##############################################################
@@ -133,7 +139,8 @@ def list_projects(
     user: AuthenticatedUser,
     label_selector: str = None,
     field_selector: str = None,
-    limit: int = None
+    limit: int = None,
+    continue_token: str = None
 ) -> Tuple[dict, Optional[str]]:
     """
     List projects (namespaces filtered by user permissions).
@@ -141,8 +148,9 @@ def list_projects(
     Args:
         user: The authenticated user
         label_selector: Label selector for filtering
-        field_selector: Field selector for filtering
-        limit: Maximum number of results
+        field_selector: Field selector for filtering (metadata.name, spec.protected, status.phase)
+        limit: Maximum number of results per page
+        continue_token: Opaque token from previous list response for pagination
         
     Returns:
         Tuple[dict, Optional[str]]: ProjectList object and error if any
@@ -171,12 +179,8 @@ def list_projects(
         logger.debug(f"User {user.username} is_cluster_admin: {is_cluster_admin}")
         
         if is_cluster_admin:
-            # User can see all namespaces
-            logger.debug(f"User {user.username} is cluster admin, showing all {len(namespaces)} namespaces")
             allowed_namespaces = namespaces
         else:
-            # Filter namespaces by permission
-            logger.debug(f"Filtering namespaces for user {user.username} (non-admin)")
             namespace_names = [ns["name"] for ns in namespaces]
             allowed_ns_names = filter_namespaces_by_permission(
                 user,
@@ -185,24 +189,57 @@ def list_projects(
                 resource=ACCESS_CHECK_RESOURCE
             )
             allowed_namespaces = [ns for ns in namespaces if ns["name"] in allowed_ns_names]
-            logger.debug(f"User {user.username} allowed namespaces: {len(allowed_ns_names)}/{len(namespace_names)}")
         
         # Apply label selector filter if provided
         if label_selector:
             allowed_namespaces = _filter_by_labels(allowed_namespaces, label_selector)
         
-        # Apply limit if provided
-        if limit and limit > 0:
-            allowed_namespaces = allowed_namespaces[:limit]
+        # Convert to Project objects, then apply field selector
+        projects = [build_project_object(ns) for ns in allowed_namespaces]
+        if field_selector:
+            projects = _filter_projects_by_field_selector(projects, field_selector)
+        
+        # Stable sort by metadata.name for deterministic pagination
+        projects = sorted(projects, key=lambda p: (p.get("metadata") or {}).get("name") or "")
+        
+        # Pagination: decode continue token (invalid -> first page)
+        page_limit = limit if limit and limit > 0 else None
+        start = 0
+        if continue_token and page_limit:
+            decoded = decode_continue_token(continue_token)
+            if decoded:
+                last_name, token_limit = decoded
+                # Find first index after last_name
+                for i, p in enumerate(projects):
+                    name = (p.get("metadata") or {}).get("name") or ""
+                    if name > last_name:
+                        start = i
+                        break
+                else:
+                    start = len(projects)  # past end
+                page_limit = min(page_limit, token_limit)
+        
+        if page_limit is not None and page_limit > 0:
+            page = projects[start:start + page_limit]
+            remaining = len(projects) - start - len(page)
+            next_token = None
+            if remaining > 0 and page:
+                last_in_page = page[-1]
+                last_name = (last_in_page.get("metadata") or {}).get("name") or ""
+                next_token = encode_continue_token(last_name, page_limit)
+            result = build_project_list(
+                page,
+                continue_token=next_token,
+                remaining=max(0, remaining)
+            )
+        else:
+            result = build_project_list(projects)
         
         if tracer and span and span.is_recording():
-            span.set_attribute("project.count", len(allowed_namespaces))
+            span.set_attribute("project.count", len(result.get("items", [])))
             span.set_attribute("user.is_cluster_admin", is_cluster_admin)
         
-        # Convert to Project objects
-        projects = [build_project_object(ns) for ns in allowed_namespaces]
-        
-        return build_project_list(projects), None
+        return result, None
 
 
 def get_project(user: AuthenticatedUser, name: str) -> Tuple[Optional[dict], Optional[str], int]:
@@ -642,6 +679,63 @@ def delete_project(
 ##############################################################
 ## Helper Functions
 ##############################################################
+
+# Supported field selector keys (equality only). Unsupported keys are ignored.
+FIELD_SELECTOR_KEYS = {"metadata.name", "spec.protected", "status.phase"}
+
+
+def _parse_field_selector(field_selector: str) -> List[Tuple[str, str]]:
+    """
+    Parse fieldSelector into list of (field, value) for supported keys.
+    Supports comma-separated equalities; unsupported fields are ignored.
+    """
+    if not field_selector or not field_selector.strip():
+        return []
+    pairs = []
+    for part in field_selector.split(","):
+        part = part.strip()
+        if "=" not in part:
+            continue
+        key, _, value = part.partition("=")
+        key = key.strip()
+        value = value.strip()
+        if key in FIELD_SELECTOR_KEYS:
+            pairs.append((key, value))
+    return pairs
+
+
+def _filter_projects_by_field_selector(
+    projects: List[dict],
+    field_selector: str
+) -> List[dict]:
+    """Filter Project objects by field selector (metadata.name, spec.protected, status.phase)."""
+    pairs = _parse_field_selector(field_selector)
+    if not pairs:
+        return projects
+    filtered = []
+    for proj in projects:
+        match = True
+        for key, want in pairs:
+            if key == "metadata.name":
+                val = (proj.get("metadata") or {}).get("name", "")
+                if str(val) != want:
+                    match = False
+                    break
+            elif key == "spec.protected":
+                val = (proj.get("spec") or {}).get("protected", False)
+                want_bool = want.lower() in ("true", "1", "yes")
+                if bool(val) != want_bool:
+                    match = False
+                    break
+            elif key == "status.phase":
+                val = (proj.get("status") or {}).get("phase", "")
+                if str(val) != want:
+                    match = False
+                    break
+        if match:
+            filtered.append(proj)
+    return filtered
+
 
 def _filter_by_labels(namespaces: List[dict], label_selector: str) -> List[dict]:
     """

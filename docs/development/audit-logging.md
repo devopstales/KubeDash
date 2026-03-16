@@ -1,10 +1,10 @@
 # Audit logging
 
-KubeDash records sensitive and destructive user actions in an **audit log** for compliance and security review. Events are stored in a database table and can be queried and exported by Admins via the UI or API. This document describes how audit logging works and how to use it. For full requirements and the list of instrumented actions, see the [Audit Logging PRD](../prd/audit-logging.md).
+KubeDash records sensitive and destructive user actions in an **audit log** for compliance and security review. Events are stored in a database table and can be queried and exported by Admins via the UI or API. This document describes how audit logging works and how to use it.
 
 ## Overview
 
-- **What is recorded**: Login/logout, user and group lifecycle (create, delete, update, privilege changes), configuration changes (K8s cluster config, registry, SSO), destructive operations (delete pod, namespace, deployment, project, application, conversation, registry image tag), application create/update, project create, Helm install/uninstall, role create, and audit log export. Each event includes user identity, timestamp, action, resource, and outcome (success/failure/denied). See the [Audit Logging PRD § 3](../prd/audit-logging.md#3-implemented-actions-current) for the full list.
+- **What is recorded**: Login/logout, user and group lifecycle (create, delete, update, privilege changes), configuration changes (K8s cluster config, registry, SSO), destructive operations (delete pod, namespace, deployment, project, application, conversation, registry image tag), application create/update, project create, Helm install/uninstall, role create, and audit log export. Each event includes user identity, timestamp, action, resource, and outcome (success/failure/denied).
 - **Storage**: Events are written to the `audit_log` table via a non-blocking queue and background worker so request latency is not impacted.
 - **Access**: Only users with the **Admin** role can view and export the audit log (Settings → Audit Log, or `/api/v1/audit`).
 
@@ -56,7 +56,7 @@ log_audit_event(
 ```
 
 - **user_id**: Username or identifier of the actor (use `session.get("user_name", "unknown")` or similar).
-- **action**: Verb or label from the PRD (e.g. `login`, `user_create`, `user_update`, `sso_config_create`, `registry_image_delete`, `helm_install`, `project_create`, `audit_export`). See PRD § 3 for all implemented actions.
+- **action**: Verb or label (e.g. `login`, `user_create`, `user_update`, `sso_config_create`, `registry_image_delete`, `helm_install`, `project_create`, `audit_export`).
 - **resource**: Affected resource; use a consistent pattern (e.g. `user:<name>`, `pod:<namespace>/<name>`).
 - **result**: `success`, `failure`, or `denied`.
 - **trace_id**: Optional; from `g.correlation_id` when in a request context.
@@ -66,7 +66,7 @@ Events are queued and written asynchronously; do not rely on them for request fl
 
 ## Schema (database)
 
-The `audit_log` table has: `id`, `created_at`, `trace_id`, `user_id`, `action`, `resource`, `result`, `details` (JSON), `message`. See [Audit Logging PRD § 2](../prd/audit-logging.md#2-audit-event-schema) for the full event schema.
+The `audit_log` table has: `id`, `created_at`, `trace_id`, `user_id`, `action`, `resource`, `result`, `details` (JSON), `message`.
 
 ## Key files
 
@@ -80,5 +80,4 @@ The `audit_log` table has: `id`, `created_at`, `trace_id`, `user_id`, `action`, 
 
 ## References
 
-- [Audit Logging PRD](../prd/audit-logging.md) – Schema, implemented actions, UI/API details, and ideas for more actions.
-- [Logging PRD](../prd/logging.md) – Application log format and trace ID (audit events are separate from application logs).
+- [Logging](logging.md) – Application log format and trace ID (audit events are separate from application logs).
