@@ -22,7 +22,7 @@
         <div class="d-flex justify-content-between align-items-center">
             <h6 class="m-0 font-weight-bold text-primary">
                 <i class="cil-comment"></i> AI Chat
-                <span id="provider-badge" class="badge bg-warning text-dark ms-2 d-none">Air-Gapped Mode</span>
+                <span id="provider-badge" class="badge bg-warning text-dark ms-2 d-none">Local</span>
             </h6>
             <div>
                 <button id="new-conversation-btn" class="btn btn-sm btn-outline-primary me-2">
@@ -412,7 +412,7 @@ document.addEventListener('DOMContentLoaded', function() {
     fetch(API + '/provider/info', { credentials: 'same-origin' })
         .then(function(res) { return res.ok ? res.json() : {}; })
         .then(function(info) {
-            if (providerBadge && info.air_gapped) providerBadge.classList.remove('d-none');
+            if (providerBadge && info.local) providerBadge.classList.remove('d-none');
         })
         .catch(function() {});
 
@@ -425,7 +425,7 @@ document.addEventListener('DOMContentLoaded', function() {
             .then(function(data) {
                 var p = data.provider || {};
                 contentEl.innerHTML = '<table class="table table-sm">' +
-                    '<tr><th>Mode</th><td>' + (p.air_gapped ? '<span class="badge bg-warning">Air-Gapped</span>' : '<span class="badge bg-success">LLM</span>') + '</td></tr>' +
+                    '<tr><th>Mode</th><td>' + (p.local ? '<span class="badge bg-warning">Local</span>' : '<span class="badge bg-success">LLM</span>') + '</td></tr>' +
                     '<tr><th>Provider</th><td>' + esc(p.provider_type) + '</td></tr>' +
                     '<tr><th>Model</th><td>' + esc(p.model) + '</td></tr>' +
                     '<tr><th>Base URL</th><td>' + esc(p.base_url) + '</td></tr>' +

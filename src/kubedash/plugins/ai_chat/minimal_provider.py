@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 """
-Minimal chat provider for air-gapped mode.
+Minimal chat provider for local mode.
 
 Pattern-based chatbot that works without external LLM dependencies.
 Uses intent detection and MCP tool calls for Kubernetes operations.
@@ -26,7 +26,7 @@ class LLMResponse:
 
 class MinimalChatbotProvider:
     """
-    Pattern-based chatbot for air-gapped mode (no LLM).
+    Pattern-based chatbot for local mode (no LLM).
 
     Detects intents from user messages and executes corresponding
     Kubernetes operations via MCP or direct function calls.

@@ -28,7 +28,7 @@ class ProviderRegistry:
     Manages:
     - Provider initialization based on configuration
     - Automatic fallback to minimal provider when LLM is unavailable
-    - Air-gapped mode detection
+    - Local mode detection
     - Provider health monitoring
     """
 
@@ -37,7 +37,7 @@ class ProviderRegistry:
         self.provider: Optional[LLMProvider] = None
         self.minimal_provider: Optional[MinimalChatbotProvider] = None
         self.config: Dict[str, Any] = {}
-        self.air_gapped: bool = False
+        self.local_mode: bool = False
 
     def initialize(self, config: Dict[str, Any]):
         """
@@ -61,10 +61,10 @@ class ProviderRegistry:
         llm_base_url = config.get('llm_base_url', '').strip()
 
         if not llm_base_url:
-            # No LLM configured - use air-gapped mode
-            self.air_gapped = True
+            # No LLM configured - use local mode
+            self.local_mode = True
             self.provider = None
-            logger.info("AI Chat: No LLM configured, using air-gapped mode (minimal chatbot)")
+            logger.info("AI Chat: No LLM configured, using local mode (minimal chatbot)")
             return
 
         # Initialize LLM provider based on type (coerce numbers from ini strings)
@@ -90,7 +90,7 @@ class ProviderRegistry:
             elif provider_type == 'gemini':
                 if not llm_api_key:
                     logger.warning("Gemini API key not provided, using minimal provider")
-                    self.air_gapped = True
+                    self.local_mode = True
                     return
                 self.provider = GeminiProvider(
                     api_key=llm_api_key,
@@ -100,7 +100,7 @@ class ProviderRegistry:
             elif provider_type == 'azure':
                 if not llm_api_key:
                     logger.warning("Azure API key not provided, using minimal provider")
-                    self.air_gapped = True
+                    self.local_mode = True
                     return
                 self.provider = AzureOpenAIProvider(
                     endpoint=llm_base_url,
@@ -117,11 +117,11 @@ class ProviderRegistry:
                     max_tokens=llm_max_tokens,
                 )
 
-            self.air_gapped = False
+            self.local_mode = False
 
         except Exception as e:
             logger.error("Failed to initialize LLM provider: %s", e)
-            self.air_gapped = True
+            self.local_mode = True
             self.provider = None
 
     async def chat(self, messages: list, tools: list = None) -> LLMResponse:
@@ -135,14 +135,14 @@ class ProviderRegistry:
         Returns:
             LLMResponse from provider
         """
-        # Try LLM provider first (if not in air-gapped mode)
-        if self.provider and not self.air_gapped:
+        # Try LLM provider first (if not in local mode)
+        if self.provider and not self.local_mode:
             try:
                 response = await self.provider.chat(messages, tools)
                 return response
             except Exception as e:
                 logger.warning("LLM provider failed, falling back to minimal: %s", e)
-                self.air_gapped = True
+                self.local_mode = True
 
         # Fallback to minimal provider
         if self.minimal_provider:
@@ -161,9 +161,9 @@ class ProviderRegistry:
         Returns:
             Dictionary with provider details
         """
-        if self.air_gapped or not self.provider:
+        if self.local_mode or not self.provider:
             return {
-                'air_gapped': True,
+                'local': True,
                 'provider_type': 'minimal',
                 'model': 'N/A (pattern-based)',
                 'base_url': 'N/A',
@@ -172,7 +172,7 @@ class ProviderRegistry:
 
         provider_type = self.config.get('llm_provider', 'openai')
         return {
-            'air_gapped': False,
+            'local': False,
             'provider_type': provider_type,
             'model': self.config.get('llm_model', 'default'),
             'base_url': self.config.get('llm_base_url', 'N/A'),
@@ -186,7 +186,7 @@ class ProviderRegistry:
         Returns:
             True if current provider is healthy
         """
-        if self.air_gapped or not self.provider:
+        if self.local_mode or not self.provider:
             return True
 
         try:

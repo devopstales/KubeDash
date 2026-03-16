@@ -6,7 +6,7 @@ Registered under /api/v1/plugins/ai-chat/ (see initialize_plugin_apis).
 
 Supports:
 - OpenAI-compatible LLM providers (ChatGPT, Ollama, Gemini, Azure)
-- Air-gapped mode with minimal chatbot (no external dependencies)
+- Local mode with minimal chatbot (no external dependencies)
 """
 
 import json
@@ -411,7 +411,7 @@ def provider_info():
         try:
             info = provider_registry.get_provider_info()
             span.set_attribute("provider.type", info.get('provider_type'))
-            span.set_attribute("provider.air_gapped", info.get('air_gapped', False))
+            span.set_attribute("provider.local", info.get('local', False))
             return jsonify(info)
         except Exception as e:
             logger.error("Provider info error: %s", e, exc_info=True)

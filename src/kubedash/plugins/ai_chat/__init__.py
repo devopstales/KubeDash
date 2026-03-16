@@ -7,7 +7,7 @@ Cluster operations use lib/k8s (same auth as the rest of KubeDash). No MCP serve
 
 Supports:
 - OpenAI-compatible LLM providers (ChatGPT, Ollama, Gemini, Azure)
-- Air-gapped mode with minimal chatbot (pattern-based; no external LLM)
+- Local mode with minimal chatbot (pattern-based; no external LLM)
 - Streaming responses for real-time feedback
 """
 
@@ -80,8 +80,8 @@ def initialize_llm_provider(app=None):
         # Log provider info
         info = registry.get_provider_info()
         if app and hasattr(app, 'logger'):
-            if info.get('air_gapped'):
-                app.logger.info("    AI Chat: Initialized in air-gapped mode (minimal chatbot)")
+            if info.get('local'):
+                app.logger.info("    AI Chat: Initialized in local mode (minimal chatbot)")
             else:
                 app.logger.info(f"    AI Chat: Initialized with LLM provider: {info.get('model')} @ {info.get('base_url')}")
 

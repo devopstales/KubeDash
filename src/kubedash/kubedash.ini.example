@@ -117,7 +117,7 @@ enabled = true
 # Read-only mode: true = only list/describe/logs; false = allow create/delete
 read_only = false
 
-# LLM Provider (optional - omit for air-gapped / pattern-based commands only)
+# LLM Provider (optional - omit for local / pattern-based commands only)
 # Provider type: openai, ollama, gemini, azure
 llm_provider = ollama
 
