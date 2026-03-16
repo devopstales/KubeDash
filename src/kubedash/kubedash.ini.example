@@ -142,6 +142,13 @@ skip_cluster_metrics = false
 # Initial metrics timeout (seconds)
 initial_metrics_timeout = 3
 
+# Cluster-metrics cache warm-up: background ticker that periodically fetches cluster
+# metrics so the cache is warm when users open the dashboard or call the API.
+# Set to false or set cluster_metrics_warm_interval_sec to 0 to disable.
+# Env: KUBEDASH_CLUSTER_METRICS_WARM_ENABLED, KUBEDASH_CLUSTER_METRICS_WARM_INTERVAL
+cluster_metrics_warm_enabled = true
+cluster_metrics_warm_interval_sec = 300
+
 #################################### Application Links ###########################
 [application_list]
 # External applications to display in KubeDash

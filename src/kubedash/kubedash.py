@@ -28,6 +28,7 @@ from lib.metrics import (
     initialize_metrics_scraper,
     update_metrics
 )
+from lib.initializers.cluster_metrics_warmup import initialize_cluster_metrics_warmup
 from lib.components import db
 from lib.before_request import init_before_request
 from lib.audit import init_audit
@@ -105,6 +106,8 @@ def create_app(external_config_name=None):
                         app.logger.warning(f"Metrics update skipped: {e}")
                     # Now start the periodic ticker for future updates
                     initialize_metrics_scraper(app)
+                    # Warm cluster-metrics cache periodically (configurable; can be disabled)
+                    initialize_cluster_metrics_warmup(app)
             app.logger.info(separator_short)
             initialize_app_socket(app)
             initialize_blueprints(app)
