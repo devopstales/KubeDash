@@ -298,6 +298,11 @@
     {% block add_tail_js %}
     {% endblock %}
 
+    <!-- AI Chat sliding drawer (bubble + panel from right) when plugin enabled -->
+    {% if config.plugins.get("ai_chat") %}
+    {% include "ai_chat_drawer.html.j2" %}
+    {% endif %}
+
     <!-- Page tail -->
     {% block tail %}
     {% endblock %}

@@ -47,18 +47,19 @@ def parse_intent(message: str) -> Optional[Dict[str, Any]]:
             groups = match.groups()
             intent = {'type': intent_type, 'original': message}
 
+            # Namespace from text only; when not mentioned, leave None so API can use session namespace
             if intent_type == 'list_pods':
-                intent['namespace'] = groups[2] if len(groups) > 2 and groups[2] else 'default'
+                intent['namespace'] = groups[2] if len(groups) > 2 and groups[2] else None
             elif intent_type in ('describe_pod', 'get_logs', 'diagnose_pod'):
                 intent['name'] = groups[1] if len(groups) > 1 and groups[1] else None
-                intent['namespace'] = groups[2] if len(groups) > 2 and groups[2] else 'default'
+                intent['namespace'] = groups[2] if len(groups) > 2 and groups[2] else None
             elif intent_type in ('list_deployments', 'list_daemonsets', 'list_statefulsets', 'list_services', 'list_configmaps', 'list_secrets'):
-                intent['namespace'] = groups[2] if len(groups) > 2 and groups[2] else 'default'
+                intent['namespace'] = groups[2] if len(groups) > 2 and groups[2] else None
             elif intent_type == 'helm_list':
                 intent['namespace'] = groups[2] if len(groups) > 2 and groups[2] else None
             elif intent_type == 'diagnose_deployment':
                 intent['name'] = groups[1] if len(groups) > 1 and groups[1] else None
-                intent['namespace'] = groups[2] if len(groups) > 2 and groups[2] else 'default'
+                intent['namespace'] = groups[2] if len(groups) > 2 and groups[2] else None
             elif intent_type == 'diagnose_cluster':
                 pass
 

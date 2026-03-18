@@ -173,11 +173,20 @@ def run_k8s_intent_sync(
             logger.warning("Minimal intent execution failed: %s", e)
             return None
 
-    # Build params from intent (parse_intent sets namespace/name, minimal_provider expects params)
+    # Build params from intent (parse_intent sets namespace/name, minimal_provider expects params).
+    # When namespace is not in the user text, use session's current namespace except for cluster-scoped intents.
+    session_ns = session.get("ns_select") or "default"
+    cluster_scoped_intents = {"list_namespaces", "create_namespace", "diagnose_cluster"}
+
     intent = dict(intent)
     if "params" not in intent:
         intent["params"] = {}
-    intent["params"].setdefault("namespace", intent.get("namespace") or "default")
+    if intent_type in cluster_scoped_intents:
+        intent["params"].setdefault("namespace", intent.get("namespace"))
+    elif intent_type == "helm_list":
+        intent["params"].setdefault("namespace", intent.get("namespace"))  # None = all namespaces
+    else:
+        intent["params"].setdefault("namespace", intent.get("namespace") or session_ns)
     intent["params"].setdefault("name", intent.get("name"))
 
     # Map list_* intents to resources_list so minimal_provider can handle them
@@ -192,7 +201,7 @@ def run_k8s_intent_sync(
     if intent_type in _LIST_TO_RESOURCE:
         intent["type"] = "resources_list"
         intent["params"]["resource_type"] = _LIST_TO_RESOURCE[intent_type]
-        intent["params"]["namespace"] = intent.get("namespace") or "default"
+        intent["params"]["namespace"] = intent.get("namespace") or session_ns
 
     # All other intents: run minimal provider _execute_intent (uses k8s_adapter)
     try:

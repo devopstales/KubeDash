@@ -12,6 +12,15 @@ data:
     [DEFAULT]
     app_mode = production
 
+    #################################### Logging #############################
+    [logging]
+    format = {{ .Values.logging.format }}
+    level = {{ .Values.logging.level }}
+
+    #################################### Audit ##############################
+    [audit]
+    enabled = {{ .Values.audit.enabled }}
+
     #################################### Security ############################
     [security]
 
@@ -111,6 +120,18 @@ data:
     trivy_operator = {{ .Values.plugins.trivyOperator.enabled }}
     iframe_proxy = {{ .Values.plugins.iframeProxy.enabled }}
     application_catalog = {{ .Values.plugins.applicationCatalog.enabled }}
+    ai_chat = {{ .Values.plugins.aiChat.enabled }}
+
+    #################################### AI Chat Settings ###########################
+    [ai_chat]
+    enabled = {{ .Values.plugins.aiChat.enabled }}
+    read_only = {{ .Values.aiChat.readOnly }}
+    llm_provider = {{ .Values.aiChat.llmProvider | quote }}
+    llm_base_url = {{ .Values.aiChat.llmBaseUrl | quote }}
+    llm_model = {{ .Values.aiChat.llmModel | quote }}
+    llm_api_key = {{ .Values.aiChat.llmApiKey | default "" | quote }}
+    llm_timeout = {{ .Values.aiChat.llmTimeout }}
+    llm_max_tokens = {{ .Values.aiChat.llmMaxTokens }}
 
     #################################### Performance Settings ###########################
     [performance]
@@ -119,6 +140,10 @@ data:
     skip_cluster_metrics = {{ .Values.performance.skipClusterMetrics }}
     # Timeout for initial cluster metrics fetch (seconds) - reduced for faster loading
     initial_metrics_timeout = {{ .Values.performance.initialMetricsTimeout }}
+    # Enable background cluster-metrics cache warming (periodic refresh)
+    cluster_metrics_warm_enabled = {{ .Values.performance.clusterMetricsWarmEnabled }}
+    # Cluster-metrics warmup interval in seconds (0 = disabled)
+    cluster_metrics_warm_interval_sec = {{ .Values.performance.clusterMetricsWarmIntervalSec }}
 
     #################################### Application links ###########################
     [application_list]

@@ -1,9 +1,21 @@
 # -- Time Zone in container
 TimeZone: "CET"
-# -- Log level
+# -- Log level (also used for [logging] level in kubedash.ini)
 logLevel: "INFO"
 # -- flask environment: production or development
 flaskConfig: "production"
+
+# -- logging section for kubedash.ini [logging]
+logging:
+  # -- Log format: text or json
+  format: "text"
+  # -- Log level: DEBUG, INFO, WARNING, ERROR
+  level: "INFO"
+
+# -- audit section for kubedash.ini [audit]
+audit:
+  # -- Enable audit logging (login/logout, privilege changes, destructive actions)
+  enabled: true
 
 # -- Enable ClusterRole creation. Disable if the role already exists.
 createClusterRole: true
@@ -322,6 +334,26 @@ plugins:
   applicationCatalog:
     # -- Enable application catalog plugin
     enabled: false
+  aiChat:
+    # -- Enable AI Chat plugin (natural language Kubernetes queries)
+    enabled: false
+
+# -- AI Chat settings (kubedash.ini [ai_chat]); only used when plugins.aiChat.enabled is true
+aiChat:
+  # -- Read-only mode: only list/describe/logs; no create/delete
+  readOnly: false
+  # -- LLM provider: openai, ollama, gemini, azure (leave empty for pattern-based only)
+  llmProvider: ""
+  # -- LLM API base URL (e.g. http://ollama:11434/v1)
+  llmBaseUrl: ""
+  # -- Model name (e.g. llama3.1:8b, gpt-3.5-turbo)
+  llmModel: ""
+  # -- LLM API key (optional; prefer KUBEDASH_LLM_API_KEY or secret)
+  llmApiKey: ""
+  # -- LLM request timeout (seconds)
+  llmTimeout: 60
+  # -- LLM max tokens per response
+  llmMaxTokens: 2000
 
 # -- performance settings
 performance:
@@ -329,6 +361,10 @@ performance:
   skipClusterMetrics: false
   # -- Timeout for initial cluster metrics fetch (seconds)
   initialMetricsTimeout: 3
+  # -- Enable background cluster-metrics cache warming (periodic k8sGetClusterMetric)
+  clusterMetricsWarmEnabled: true
+  # -- Cluster-metrics warmup interval in seconds (0 = disabled)
+  clusterMetricsWarmIntervalSec: 300
 
 # -- application links configuration
 applicationList: {}
