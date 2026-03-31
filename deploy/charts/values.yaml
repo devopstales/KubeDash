@@ -42,7 +42,7 @@ image:
 # -- Service configuration
 service:
   # -- Service port for the KubeDash application
-  port: 5000
+  port: 8000
 
 # -- pullsecrets
 imagePullSecrets: []
