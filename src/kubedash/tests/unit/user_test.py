@@ -11,6 +11,11 @@ from lib.user import Role, User, UserCreate, UserDelete, UserTest, UsersRoles, R
 def test_user_creation(client, app):
     """Test user creation with role assignment"""
     with app.app_context():
+        # Clean up any existing pytest user
+        existing_user = User.query.filter_by(username="pytest", user_type="Local").first()
+        if existing_user:
+            UserDelete("pytest")
+        
         RoleCreate("Admin")
         UserCreate("pytest", "pytest", None, "Local", "Admin")
         user = User.query.filter_by(username="pytest", user_type="Local").first()
@@ -18,6 +23,7 @@ def test_user_creation(client, app):
         assert user.password_hash != "pytest"
         assert check_password_hash(user.password_hash, "pytest")
         user_role = UsersRoles.query.filter_by(user_id=user.id).first()
+        assert user_role, "User role should be assigned"
         role = Role.query.filter_by(id=user_role.role_id).first()
         assert role.name == "Admin"
 

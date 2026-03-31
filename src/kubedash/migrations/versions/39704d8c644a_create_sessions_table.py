@@ -4,6 +4,8 @@ Revision ID: 39704d8c644a
 Revises: d372484d86c9
 Create Date: 2023-07-28 10:54:30.755177
 
+Related Issue: Session management
+Related PR: Flask session support
 """
 import sqlalchemy as sa
 from alembic import op

@@ -4,6 +4,8 @@ Revision ID: da8ef7e783f7
 Revises: 5062431c2bac
 Create Date: 2025-06-17 13:39:42.014526
 
+Related Issue: SSO server CA certificate support
+Related PR: SSO improvements
 """
 from alembic import op
 import sqlalchemy as sa

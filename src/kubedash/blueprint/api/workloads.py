@@ -3,12 +3,13 @@ Workloads API endpoints for managing Kubernetes workloads.
 """
 
 from contextlib import nullcontext
-from flask import jsonify, request, session
+from flask import g, jsonify, request, session
 from flask.views import MethodView
-from flask_login import login_required
+from flask_login import current_user, login_required
 from flask_smorest import Blueprint
 from kubernetes.client.rest import ApiException
 
+from lib.audit import log_audit_event
 from lib.helper_functions import get_logger
 from lib.k8s.workload import (
     k8sPodListGet, k8sPodGet, k8sPodDelete, k8sPodGetContainers, k8sPodGetEvents,
@@ -179,8 +180,16 @@ class PodResource(MethodView):
                 "namespace": namespace,
             }
         ) if tracer else nullcontext():
+            actor = getattr(current_user, "username", None) or session.get("user_name", "unknown")
             try:
                 k8sPodDelete(session['user_role'], user_token, namespace, name)
+                log_audit_event(
+                    user_id=actor,
+                    action="delete_k8s_pod",
+                    resource=f"pod:{namespace}/{name}",
+                    result="success",
+                    trace_id=getattr(g, "correlation_id", None),
+                )
                 return jsonify({
                     "message": f"Pod '{name}' deleted successfully",
                     "data": {
@@ -189,12 +198,28 @@ class PodResource(MethodView):
                     }
                 }), 200
             except ApiException as e:
+                log_audit_event(
+                    user_id=actor,
+                    action="delete_k8s_pod",
+                    resource=f"pod:{namespace}/{name}",
+                    result="failure",
+                    trace_id=getattr(g, "correlation_id", None),
+                    details={"error": str(e)},
+                )
                 logger.error(f"Error deleting pod {name}: {str(e)}")
                 return jsonify({
                     "error": "ApiException",
                     "message": str(e)
                 }), e.status if hasattr(e, 'status') else 500
             except Exception as e:
+                log_audit_event(
+                    user_id=actor,
+                    action="delete_k8s_pod",
+                    resource=f"pod:{namespace}/{name}",
+                    result="failure",
+                    trace_id=getattr(g, "correlation_id", None),
+                    details={"error": str(e)},
+                )
                 logger.error(f"Error deleting pod {name}: {str(e)}")
                 return jsonify({
                     "error": "InternalError",

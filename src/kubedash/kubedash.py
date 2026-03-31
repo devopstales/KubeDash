@@ -2,16 +2,19 @@
 
 import os
 import sys
+from datetime import datetime
 from flask import Flask, request
 
 from lib.initializers import (
-    initialize_app_configuration, 
+    initialize_app_configuration,
     initialize_app_logging,
     initialize_error_page,
     initialize_app_swagger,
     initialize_app_tracing,
     initialize_app_database,
     initialize_app_plugins,
+    initialize_plugin_models,
+    ensure_plugin_models_loaded,
     initialize_blueprints,
     initialize_plugin_apis,
     initialize_app_socket,
@@ -25,8 +28,10 @@ from lib.metrics import (
     initialize_metrics_scraper,
     update_metrics
 )
+from lib.initializers.cluster_metrics_warmup import initialize_cluster_metrics_warmup
 from lib.components import db
 from lib.before_request import init_before_request
+from lib.audit import init_audit
 #############################################################
 ## Variables
 #############################################################
@@ -75,7 +80,8 @@ def create_app(external_config_name=None):
         elif sys.argv[1] == 'db':
             initialize_app_plugins(app)
             initialize_app_database(app, __file__)
-            # separator_long will be printed after migration completes in entrypoint.sh
+            # Load plugin model modules into db.metadata for Alembic autogenerate (no db.create_all).
+            ensure_plugin_models_loaded(app)
         else:
             initialize_app_version(app)
             initialize_app_plugins(app)
@@ -83,7 +89,9 @@ def create_app(external_config_name=None):
             app.logger.info(separator_short)
             initialize_app_caching(app)
             initialize_app_database(app, __file__)
+            initialize_plugin_models(app)
             init_before_request(app)
+            init_audit(app)
             app.logger.info(separator_short)
             with app.app_context():
                 # Skip metrics update in testing mode to avoid database issues
@@ -98,10 +106,18 @@ def create_app(external_config_name=None):
                         app.logger.warning(f"Metrics update skipped: {e}")
                     # Now start the periodic ticker for future updates
                     initialize_metrics_scraper(app)
+                    # Warm cluster-metrics cache periodically (configurable; can be disabled)
+                    initialize_cluster_metrics_warmup(app)
+            app.logger.info(separator_short)
             initialize_app_socket(app)
             initialize_blueprints(app)
             initialize_plugin_apis(app)
             add_custom_jinja2_filters(app)
+            # Register trace context processor so HTML pages get traceparent for frontend propagation
+            from lib.initializers.tracing import inject_trace_context_processor
+            app.context_processor(inject_trace_context_processor)
+            # Inject current year for footer copyright (dynamic 2021-<year>)
+            app.context_processor(lambda: {"current_year": datetime.now().year})
             initialize_app_security(app)
             
             # Trigger application catalog initialization synchronously if needed
@@ -113,7 +129,7 @@ def create_app(external_config_name=None):
             except Exception:
                 # If it fails, it will be initialized on first request
                 pass
-            
+
             # Print separator_long at the end of all initialization (only once)
             # Use sys.stdout to ensure it's not buffered and appears only once
             sys.stdout.write(separator_long + '\n')

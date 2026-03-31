@@ -11,7 +11,8 @@ export KUBEDASH_VERSION=$(grep -m1 '^version' pyproject.toml | cut -d'"' -f2)
 export FLASK_APP="kubedash"
 export FLASK_DEBUG=1
 export TEMPLATES_AUTO_RELOAD=1
-export FLASK_ENV=testing
+#export FLASK_ENV=testing
+export FLASK_ENV=development
 export PYTHONFAULTHANDLER=1
 export JAEGER_HTTP_ENDPOINT="http://127.0.0.1:4318/v1/traces"
 

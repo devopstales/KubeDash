@@ -1,9 +1,11 @@
 """users table
 
 Revision ID: 7253f5a7bfda
-Revises: 
+Revises:
 Create Date: 2023-03-14 08:48:49.176178
 
+Related Issue: Initial database setup
+Related PR: Initial commit
 """
 import sqlalchemy as sa
 from alembic import op

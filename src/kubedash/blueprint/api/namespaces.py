@@ -3,11 +3,12 @@ Namespaces API endpoints for managing Kubernetes namespaces.
 """
 
 from contextlib import nullcontext
-from flask import jsonify, request, session
+from flask import g, jsonify, request, session
 from flask.views import MethodView
-from flask_login import login_required
+from flask_login import current_user, login_required
 from flask_smorest import Blueprint
 
+from lib.audit import log_audit_event
 from lib.helper_functions import get_logger
 from lib.k8s.namespace import (
     k8sNamespacesGet, k8sNamespaceListGet,
@@ -231,8 +232,17 @@ class NamespaceResource(MethodView):
         Returns:
             dict: Deletion confirmation
         """
+        user_token = get_user_token(session)
+        actor = getattr(current_user, "username", None) or session.get("user_name", "unknown")
         try:
-            k8sNamespaceDelete(session['user_role'], name)
+            k8sNamespaceDelete(session['user_role'], user_token, name)
+            log_audit_event(
+                user_id=actor,
+                action="delete_k8s_namespace",
+                resource=f"namespace:{name}",
+                result="success",
+                trace_id=getattr(g, "correlation_id", None),
+            )
             return jsonify({
                 "message": f"Namespace '{name}' deleted successfully",
                 "data": {
@@ -240,6 +250,14 @@ class NamespaceResource(MethodView):
                 }
             }), 200
         except Exception as e:
+            log_audit_event(
+                user_id=actor,
+                action="delete_k8s_namespace",
+                resource=f"namespace:{name}",
+                result="failure",
+                trace_id=getattr(g, "correlation_id", None),
+                details={"error": str(e)},
+            )
             logger.error(f"Error deleting namespace {name}: {str(e)}")
             return jsonify({
                 "error": "InternalError",

@@ -19,7 +19,7 @@
       <i class="material-icons">add</i>
     </button>
   </div>
-{% include "segments/topmenu.html.j2" %}
+{% include "segments/partials/topmenu.html.j2" %}
 {% endblock %}
 
 {% block content %}
@@ -100,8 +100,8 @@
 {% endblock %}
 
 {% block add_tail_js %}
-{% include "segments/datatable_snippet.html.j2" %}
-{% include "segments/functions_snippet.j2"%}
+{% include "segments/components/datatable_snippet.html.j2" %}
+{% include "segments/components/functions_snippet.j2"%}
     <script nonce="{{ csp_nonce }}">
         const escapeHtml = (text) => {
             if (text === null || text === undefined) return '';

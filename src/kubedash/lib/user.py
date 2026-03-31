@@ -85,6 +85,21 @@ def RoleCreate(name):
             role_data = Role(name=name)
             db.session.add(role_data)
             db.session.commit()
+            try:
+                from flask import g, session
+                actor = session.get("user_name", "system")
+                trace_id = getattr(g, "correlation_id", None)
+            except RuntimeError:
+                actor = "system"
+                trace_id = None
+            from lib.audit import log_audit_event
+            log_audit_event(
+                user_id=actor,
+                action="role_create",
+                resource=f"role:{name}",
+                result="success",
+                trace_id=trace_id,
+            )
 
 def UserTest(user):
     """Check if user exists in database
@@ -188,14 +203,18 @@ def UserDelete(username):
     """
     with tracer.start_as_current_span("delete-user") if tracer else nullcontext() as span:
         user = User.query.filter_by(username=username).first()
+        if not user:
+            logger.warning(f"Delete user called for non-existent user {username}")
+            return
         user_role = UsersRoles.query.filter_by(user_id=user.id).first()
-        role = Role.query.filter_by(id=user_role.role_id).first()
+        role = Role.query.filter_by(id=user_role.role_id).first() if user_role else None
         user_kubectl = UsersKubectl.query.filter_by(user_id=user.id).first()
         kubectl_config = KubectlConfig.query.filter_by(name=username).first()
         if user:
             if tracer and span.is_recording():
                 span.set_attribute("enduser.name", username)
-                span.set_attribute("enduser.role", role.name)
+                if role:
+                    span.set_attribute("enduser.role", role.name)
                 span.set_attribute("enduser.type", user.user_type)
             if user_role:
                 db.session.delete(user_role)
@@ -378,6 +397,19 @@ def SSOGroupsCreate(user_name, group_name):
             logger.debug("SSOGroupsCreate: Create %s group" % group_name)
             db.session.add(group)
             db.session.commit()
+            try:
+                from flask import g
+                from lib.audit import log_audit_event
+                log_audit_event(
+                    user_id=user_name,
+                    action="group_create",
+                    resource=f"group:{group_name}",
+                    result="success",
+                    trace_id=getattr(g, "correlation_id", None),
+                    details={"context": "sso_sync"},
+                )
+            except Exception:
+                pass
 
 def SSOGroupsUpdate(user_name, group_name):
     """Update SSOUserGroups object in database.
@@ -406,6 +438,27 @@ def SSOGroupsUpdate(user_name, group_name):
             SSOGroupsCreate(user_name, group_name)
             logger.debug("SSOGroupsUpdate: Add %s user to %s group" % (user_name, group_name))
             user.sso_groups.append(group)
+
+def SSOGroupsDelete(group_name):
+    """Delete an SSO group by name. User-group mappings are removed by CASCADE.
+
+    Args:
+        group_name (str): SSO group name
+
+    Returns:
+        bool: True if group was deleted, False if not found
+    """
+    with tracer.start_as_current_span("delete-sso-group") if tracer else nullcontext() as span:
+        group = SSOGroups.query.filter_by(name=group_name).first()
+        if not group:
+            return False
+        if tracer and span.is_recording():
+            span.set_attribute("group.name", group_name)
+        db.session.delete(group)
+        db.session.commit()
+        logger.debug("SSOGroupsDelete: Deleted group %s", group_name)
+        return True
+
 
 def SSOGroupsList():
     """List all SSO groups in database

@@ -2,9 +2,9 @@ version: '3'
 
 env:
   VERSION: "4.1.0"
-  DATE: 
+  DATE:
     sh: date "+%Y.%m.%d"
-  DCFILES: "-f dc-nginx.yaml -f dc-postgresql.yaml -f dc-redis.yaml -f dc-registry.yaml -f dc-exporter.yaml -f dc-jaeger.yaml -f dc-kubeview.yaml"
+  DCFILES: "-f dc-nginx.yaml -f dc-postgresql.yaml -f dc-redis.yaml -f dc-registry.yaml -f dc-exporter.yaml -f dc-jaeger.yaml -f dc-kubeview.yaml -f dc-mcp.yaml"
 
 tasks:
   default:
@@ -251,13 +251,10 @@ tasks:
         if poetry run semgrep --version >/dev/null 2>&1; then
           echo "🔍 Running Semgrep security scan..."
           mkdir -p ../../security/reports
+          # Rule exclusions are now in .semgrepignore (B101/B601 equivalents)
           poetry run semgrep --config=auto \
-            --exclude-rule python.lang.security.audit.assert_used.assert_used \
-            --exclude-rule python.lang.security.audit.subprocess-shell-true.subprocess-shell-true \
             --json -o ../../security/reports/semgrep-report.json . 2>/dev/null || true
           poetry run semgrep --config=auto \
-            --exclude-rule python.lang.security.audit.assert_used.assert_used \
-            --exclude-rule python.lang.security.audit.subprocess-shell-true.subprocess-shell-true \
             --exclude=tests \
             --exclude=static \
             .

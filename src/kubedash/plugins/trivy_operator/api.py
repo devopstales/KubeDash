@@ -63,7 +63,7 @@ class TrivyOperatorStatusResource(MethodView):
     """
     
     @trivy_operator_api_bp.response(200, description="Successfully retrieved Trivy Operator status")
-    @trivy_operator_api_bp.doc(tags=['Trivy Operator'])
+    @trivy_operator_api_bp.doc(tags=['Plugins API - Trivy Operator'])
     @login_required
     def get(self):
         """
@@ -98,7 +98,7 @@ class TrivyOperatorVulnerabilityReportsResource(MethodView):
     """VulnerabilityReports endpoint."""
     
     @trivy_operator_api_bp.response(200, description="Successfully retrieved vulnerability reports")
-    @trivy_operator_api_bp.doc(tags=['Trivy Operator'])
+    @trivy_operator_api_bp.doc(tags=['Plugins API - Trivy Operator'])
     @login_required
     def get(self):
         """Get vulnerability reports"""
@@ -129,7 +129,7 @@ class TrivyOperatorVulnerabilityReportResource(MethodView):
     """VulnerabilityReport detail endpoint."""
     
     @trivy_operator_api_bp.response(200, description="Successfully retrieved vulnerability report")
-    @trivy_operator_api_bp.doc(tags=['Trivy Operator'])
+    @trivy_operator_api_bp.doc(tags=['Plugins API - Trivy Operator'])
     @login_required
     def get(self, namespace, name):
         """Get a specific vulnerability report"""
@@ -169,7 +169,7 @@ class TrivyOperatorConfigAuditReportsResource(MethodView):
     """ConfigAuditReports endpoint."""
     
     @trivy_operator_api_bp.response(200, description="Successfully retrieved config audit reports")
-    @trivy_operator_api_bp.doc(tags=['Trivy Operator'])
+    @trivy_operator_api_bp.doc(tags=['Plugins API - Trivy Operator'])
     @login_required
     def get(self):
         """Get config audit reports"""
@@ -200,7 +200,7 @@ class TrivyOperatorConfigAuditReportResource(MethodView):
     """ConfigAuditReport detail endpoint."""
     
     @trivy_operator_api_bp.response(200, description="Successfully retrieved config audit report")
-    @trivy_operator_api_bp.doc(tags=['Trivy Operator'])
+    @trivy_operator_api_bp.doc(tags=['Plugins API - Trivy Operator'])
     @login_required
     def get(self, namespace, name):
         """Get a specific config audit report"""
@@ -240,7 +240,7 @@ class TrivyOperatorExposedSecretReportsResource(MethodView):
     """ExposedSecretReports endpoint."""
     
     @trivy_operator_api_bp.response(200, description="Successfully retrieved exposed secret reports")
-    @trivy_operator_api_bp.doc(tags=['Trivy Operator'])
+    @trivy_operator_api_bp.doc(tags=['Plugins API - Trivy Operator'])
     @login_required
     def get(self):
         """Get exposed secret reports"""
@@ -271,7 +271,7 @@ class TrivyOperatorExposedSecretReportResource(MethodView):
     """ExposedSecretReport detail endpoint."""
     
     @trivy_operator_api_bp.response(200, description="Successfully retrieved exposed secret report")
-    @trivy_operator_api_bp.doc(tags=['Trivy Operator'])
+    @trivy_operator_api_bp.doc(tags=['Plugins API - Trivy Operator'])
     @login_required
     def get(self, namespace, name):
         """Get a specific exposed secret report"""
@@ -311,7 +311,7 @@ class TrivyOperatorRbacAssessmentReportsResource(MethodView):
     """RbacAssessmentReports endpoint."""
     
     @trivy_operator_api_bp.response(200, description="Successfully retrieved RBAC assessment reports")
-    @trivy_operator_api_bp.doc(tags=['Trivy Operator'])
+    @trivy_operator_api_bp.doc(tags=['Plugins API - Trivy Operator'])
     @login_required
     def get(self):
         """Get RBAC assessment reports"""
@@ -342,7 +342,7 @@ class TrivyOperatorRbacAssessmentReportResource(MethodView):
     """RbacAssessmentReport detail endpoint."""
     
     @trivy_operator_api_bp.response(200, description="Successfully retrieved RBAC assessment report")
-    @trivy_operator_api_bp.doc(tags=['Trivy Operator'])
+    @trivy_operator_api_bp.doc(tags=['Plugins API - Trivy Operator'])
     @login_required
     def get(self, namespace, name):
         """Get a specific RBAC assessment report"""
@@ -382,7 +382,7 @@ class TrivyOperatorSbomReportsResource(MethodView):
     """SbomReports endpoint."""
     
     @trivy_operator_api_bp.response(200, description="Successfully retrieved SBOM reports")
-    @trivy_operator_api_bp.doc(tags=['Trivy Operator'])
+    @trivy_operator_api_bp.doc(tags=['Plugins API - Trivy Operator'])
     @login_required
     def get(self):
         """Get SBOM reports"""
@@ -413,7 +413,7 @@ class TrivyOperatorSbomReportResource(MethodView):
     """SbomReport detail endpoint."""
     
     @trivy_operator_api_bp.response(200, description="Successfully retrieved SBOM report")
-    @trivy_operator_api_bp.doc(tags=['Trivy Operator'])
+    @trivy_operator_api_bp.doc(tags=['Plugins API - Trivy Operator'])
     @login_required
     def get(self, namespace, name):
         """Get a specific SBOM report"""
@@ -453,7 +453,7 @@ class TrivyOperatorInfraAssessmentReportsResource(MethodView):
     """InfraAssessmentReports endpoint."""
     
     @trivy_operator_api_bp.response(200, description="Successfully retrieved infra assessment reports")
-    @trivy_operator_api_bp.doc(tags=['Trivy Operator'])
+    @trivy_operator_api_bp.doc(tags=['Plugins API - Trivy Operator'])
     @login_required
     def get(self):
         """Get infra assessment reports"""
@@ -484,7 +484,7 @@ class TrivyOperatorInfraAssessmentReportResource(MethodView):
     """InfraAssessmentReport detail endpoint."""
     
     @trivy_operator_api_bp.response(200, description="Successfully retrieved infra assessment report")
-    @trivy_operator_api_bp.doc(tags=['Trivy Operator'])
+    @trivy_operator_api_bp.doc(tags=['Plugins API - Trivy Operator'])
     @login_required
     def get(self, namespace, name):
         """Get a specific infra assessment report"""
@@ -527,7 +527,7 @@ class TrivyOperatorClusterComplianceReportsResource(MethodView):
     """ClusterComplianceReports endpoint."""
     
     @trivy_operator_api_bp.response(200, description="Successfully retrieved cluster compliance reports")
-    @trivy_operator_api_bp.doc(tags=['Trivy Operator'])
+    @trivy_operator_api_bp.doc(tags=['Plugins API - Trivy Operator'])
     @login_required
     def get(self):
         """Get cluster compliance reports"""
@@ -554,7 +554,7 @@ class TrivyOperatorClusterComplianceReportResource(MethodView):
     """ClusterComplianceReport detail endpoint."""
     
     @trivy_operator_api_bp.response(200, description="Successfully retrieved cluster compliance report")
-    @trivy_operator_api_bp.doc(tags=['Trivy Operator'])
+    @trivy_operator_api_bp.doc(tags=['Plugins API - Trivy Operator'])
     @login_required
     def get(self, name):
         """Get a specific cluster compliance report"""
@@ -594,7 +594,7 @@ class TrivyOperatorClusterVulnerabilityReportsResource(MethodView):
     """ClusterVulnerabilityReports endpoint."""
     
     @trivy_operator_api_bp.response(200, description="Successfully retrieved cluster vulnerability reports")
-    @trivy_operator_api_bp.doc(tags=['Trivy Operator'])
+    @trivy_operator_api_bp.doc(tags=['Plugins API - Trivy Operator'])
     @login_required
     def get(self):
         """Get cluster vulnerability reports"""
@@ -621,7 +621,7 @@ class TrivyOperatorClusterVulnerabilityReportResource(MethodView):
     """ClusterVulnerabilityReport detail endpoint."""
     
     @trivy_operator_api_bp.response(200, description="Successfully retrieved cluster vulnerability report")
-    @trivy_operator_api_bp.doc(tags=['Trivy Operator'])
+    @trivy_operator_api_bp.doc(tags=['Plugins API - Trivy Operator'])
     @login_required
     def get(self, name):
         """Get a specific cluster vulnerability report"""
@@ -661,7 +661,7 @@ class TrivyOperatorClusterConfigAuditReportsResource(MethodView):
     """ClusterConfigAuditReports endpoint."""
     
     @trivy_operator_api_bp.response(200, description="Successfully retrieved cluster config audit reports")
-    @trivy_operator_api_bp.doc(tags=['Trivy Operator'])
+    @trivy_operator_api_bp.doc(tags=['Plugins API - Trivy Operator'])
     @login_required
     def get(self):
         """Get cluster config audit reports"""
@@ -688,7 +688,7 @@ class TrivyOperatorClusterConfigAuditReportResource(MethodView):
     """ClusterConfigAuditReport detail endpoint."""
     
     @trivy_operator_api_bp.response(200, description="Successfully retrieved cluster config audit report")
-    @trivy_operator_api_bp.doc(tags=['Trivy Operator'])
+    @trivy_operator_api_bp.doc(tags=['Plugins API - Trivy Operator'])
     @login_required
     def get(self, name):
         """Get a specific cluster config audit report"""
@@ -728,7 +728,7 @@ class TrivyOperatorClusterInfraAssessmentReportsResource(MethodView):
     """ClusterInfraAssessmentReports endpoint."""
     
     @trivy_operator_api_bp.response(200, description="Successfully retrieved cluster infra assessment reports")
-    @trivy_operator_api_bp.doc(tags=['Trivy Operator'])
+    @trivy_operator_api_bp.doc(tags=['Plugins API - Trivy Operator'])
     @login_required
     def get(self):
         """Get cluster infra assessment reports"""
@@ -755,7 +755,7 @@ class TrivyOperatorClusterInfraAssessmentReportResource(MethodView):
     """ClusterInfraAssessmentReport detail endpoint."""
     
     @trivy_operator_api_bp.response(200, description="Successfully retrieved cluster infra assessment report")
-    @trivy_operator_api_bp.doc(tags=['Trivy Operator'])
+    @trivy_operator_api_bp.doc(tags=['Plugins API - Trivy Operator'])
     @login_required
     def get(self, name):
         """Get a specific cluster infra assessment report"""
@@ -795,7 +795,7 @@ class TrivyOperatorClusterRbacAssessmentReportsResource(MethodView):
     """ClusterRbacAssessmentReports endpoint."""
     
     @trivy_operator_api_bp.response(200, description="Successfully retrieved cluster RBAC assessment reports")
-    @trivy_operator_api_bp.doc(tags=['Trivy Operator'])
+    @trivy_operator_api_bp.doc(tags=['Plugins API - Trivy Operator'])
     @login_required
     def get(self):
         """Get cluster RBAC assessment reports"""
@@ -822,7 +822,7 @@ class TrivyOperatorClusterRbacAssessmentReportResource(MethodView):
     """ClusterRbacAssessmentReport detail endpoint."""
     
     @trivy_operator_api_bp.response(200, description="Successfully retrieved cluster RBAC assessment report")
-    @trivy_operator_api_bp.doc(tags=['Trivy Operator'])
+    @trivy_operator_api_bp.doc(tags=['Plugins API - Trivy Operator'])
     @login_required
     def get(self, name):
         """Get a specific cluster RBAC assessment report"""

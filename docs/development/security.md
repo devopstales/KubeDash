@@ -600,34 +600,14 @@ trivy image --severity HIGH,CRITICAL devopstales/kubedash:4.1.0
 # Initialize security headers
 from flask_talisman import Talisman
 
+# Air-gapped: no CDNs; all JS/CSS/fonts served from 'self' (local static files)
 csp = {
     'default-src': "'self'",
-    'font-src': [
-        "'self'",
-        'fonts.gstatic.com',
-        'cdnjs.cloudflare.com',
-    ],
-    'style-src': [
-        "'self'",
-        "'unsafe-inline'",
-        'fonts.googleapis.com',
-        'cdnjs.cloudflare.com',
-    ],
-    'script-src': [
-        "'self'",
-        "'unsafe-inline'",
-        "'unsafe-eval'",
-        'cdnjs.cloudflare.com',
-    ],
-    'connect-src': [
-        "'self'",
-        'wss:',
-        'ws:',
-    ],
-    'img-src': [
-        "'self'",
-        'data:',
-    ]
+    'font-src': ["'self'"],
+    'style-src': ["'self'", "'unsafe-inline'"],
+    'script-src': ["'self'"],  # nonce added dynamically for inline scripts
+    'connect-src': ["'self'", 'wss:', 'ws:'],
+    'img-src': ["'self'", 'data:'],
 }
 
 hsts = {

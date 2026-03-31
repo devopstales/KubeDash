@@ -2,10 +2,66 @@ import logging
 import os
 import uuid
 import time
+from datetime import datetime as dt
 from statsd import StatsClient
 
-from gunicorn.glogging import Logger as GunicornBaseLogger
+from gunicorn_color import Logger as GunicornColorLogger
 from lib.cert_utils import generate_self_signed_cert
+
+
+def _canonical_timestamp():
+    """Timestamp in canonical format: [YYYY-MM-DD HH:MM:SS,mmm]"""
+    now = time.time()
+    ct = dt.fromtimestamp(now)
+    s = ct.strftime("%Y-%m-%d %H:%M:%S")
+    msecs = int((now % 1) * 1000)
+    return "[%s,%03d]" % (s, msecs)
+
+
+class CanonicalAccessLogger(GunicornColorLogger):
+    """Gunicorn Logger that emits access logs in canonical format: [timestamp] [trace-id] [gunicorn.access] [INFO] ..."""
+
+    def now(self):
+        return _canonical_timestamp()
+
+    def atoms(self, resp, req, environ, request_time):
+        atoms = super().atoms(resp, req, environ, request_time)
+        # Correlation ID: OTEL trace_id first (set by Flask so log ID = Jaeger trace ID), then headers
+        cid = None
+        try:
+            if environ:
+                cid = environ.get("OTEL_TRACE_ID")
+            if not cid:
+                req_headers = getattr(req, "headers", None) if hasattr(req, "headers") else None
+                if req_headers is not None:
+                    if hasattr(req_headers, "get"):
+                        cid = req_headers.get("X-Request-ID") or req_headers.get("X-Trace-ID")
+                    else:
+                        cid = get_header_value(req_headers, "X-Request-ID") or get_header_value(req_headers, "X-Trace-ID")
+                if not cid and environ:
+                    cid = environ.get("HTTP_X_REQUEST_ID") or environ.get("HTTP_X_TRACE_ID")
+        except Exception:
+            pass
+        atoms["correlation_id"] = cid if cid else "no-id"
+        return atoms
+
+
+def get_header_value(headers, key):
+    """Helper to get header value from list of tuples or dict"""
+    if isinstance(headers, dict):
+        return headers.get(key)
+    if isinstance(headers, list):
+        return next((v for k, v in headers if k.lower() == key.lower()), None)
+    return None
+
+
+class _CanonicalFormatter(logging.Formatter):
+    """Same timestamp format as app logs: YYYY-MM-DD HH:MM:SS,mmm."""
+
+    def formatTime(self, record, datefmt=None):
+        ct = dt.fromtimestamp(record.created)
+        s = ct.strftime("%Y-%m-%d %H:%M:%S")
+        return "%s,%03d" % (s, record.msecs)
 
 cert_path, key_path, ca_cert_path = generate_self_signed_cert()
 # ========================
@@ -25,43 +81,29 @@ keepalive = 5
 # ========================
 # 2. Logging Configuration
 # ========================
-logger_class = "gunicorn_color.Logger"
+logger_class = CanonicalAccessLogger
 loglevel = "info"
 errorlog = "-"  # stderr
 accesslog = "-"  # stdout
-access_log_format = '%(t)s [%(correlation_id)s] %(h)s "%(r)s" %(s)s %(b)s "%(f)s" "%(a)s"'
+# Canonical format: [timestamp] [trace-id] [gunicorn.access] [INFO] method path status size ...
+access_log_format = '%(t)s [%(correlation_id)s] [gunicorn.access] [INFO] %(h)s "%(r)s" %(s)s %(b)s "%(f)s" "%(a)s"'
 
 # ========================
 # 3. Correlation ID Setup
 # ========================
 
-def get_header_value(headers, key):
-    """Helper to get header value from list of tuples or dict"""
-    if isinstance(headers, dict):
-        return headers.get(key)
-    if isinstance(headers, list):
-        return next((v for k, v in headers if k.lower() == key.lower()), None)
-    return None
-
 def pre_request(worker, req):
-    """Executed before each request."""
+    """Executed before each request. Set correlation_id for access/error logs (PRD: trace ID propagation)."""
     try:
-        # Get request ID from headers (standard X-Request-ID header from ingress)
-        request_id = get_header_value(req.headers, 'X-Request-ID') or None
-        
-        if request_id:
-            # Store in worker environment
-            worker.correlation_id = request_id   
-            # Log the request start
-            #worker.log.info(f"Request started | {request_id} | {req.method} {req.path}")
-        
-        # Store start time for duration calculation
+        # Trace ID from proxy: X-Request-ID or X-Trace-ID; always set for access_log_format %(correlation_id)s
+        request_id = get_header_value(req.headers, 'X-Request-ID') or get_header_value(req.headers, 'X-Trace-ID')
+        worker.correlation_id = request_id if request_id else 'no-id'
         worker.start_time = time.time()
-        
-        return request_id
+        return worker.correlation_id
     except Exception as e:
-        worker.log.error(f"Error in pre_request: {str(e)}")
-        return str(uuid.uuid4())  # Fallback ID
+        worker.correlation_id = str(uuid.uuid4())
+        worker.log.error("Error in pre_request: %s", e)
+        return worker.correlation_id
 
 def post_request(worker, req, environ, resp):
     """Executed after each request."""
@@ -127,6 +169,16 @@ class ExtensionAPIFilter(logging.Filter):
 
 def on_starting(server):
     """Executed when Gunicorn starts."""
+    # Use canonical timestamp format (YYYY-MM-DD HH:MM:SS,mmm) for error log
+    canonical = _CanonicalFormatter(
+        "[%(asctime)s] [%(process)d] [%(levelname)s] %(message)s"
+    )
+    try:
+        for handler in getattr(server.log.error_log, "handlers", []):
+            handler.setFormatter(canonical)
+    except Exception:
+        pass
+
     server.log.access_log.addFilter(NoPing())
     server.log.access_log.addFilter(NoHealth())
     server.log.access_log.addFilter(NoMetrics())

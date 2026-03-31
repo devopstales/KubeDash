@@ -35,7 +35,7 @@ class ExternalLoadBalancerIPAddressPoolsResource(MethodView):
     """
     
     @external_loadbalancer_api_bp.response(200, description="Successfully retrieved IP address pools")
-    @external_loadbalancer_api_bp.doc(tags=['External LoadBalancer'])
+    @external_loadbalancer_api_bp.doc(tags=['Plugins API - External LoadBalancer'])
     @login_required
     def get(self):
         """
@@ -81,7 +81,7 @@ class ExternalLoadBalancerL2AdvertisementsResource(MethodView):
     """
     
     @external_loadbalancer_api_bp.response(200, description="Successfully retrieved L2 advertisements")
-    @external_loadbalancer_api_bp.doc(tags=['External LoadBalancer'])
+    @external_loadbalancer_api_bp.doc(tags=['Plugins API - External LoadBalancer'])
     @login_required
     def get(self):
         """
@@ -127,7 +127,7 @@ class ExternalLoadBalancerBGPAdvertisementsResource(MethodView):
     """
     
     @external_loadbalancer_api_bp.response(200, description="Successfully retrieved BGP advertisements")
-    @external_loadbalancer_api_bp.doc(tags=['External LoadBalancer'])
+    @external_loadbalancer_api_bp.doc(tags=['Plugins API - External LoadBalancer'])
     @login_required
     def get(self):
         """
@@ -173,7 +173,7 @@ class ExternalLoadBalancerBGPPeersResource(MethodView):
     """
     
     @external_loadbalancer_api_bp.response(200, description="Successfully retrieved BGP peers")
-    @external_loadbalancer_api_bp.doc(tags=['External LoadBalancer'])
+    @external_loadbalancer_api_bp.doc(tags=['Plugins API - External LoadBalancer'])
     @login_required
     def get(self):
         """

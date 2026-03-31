@@ -36,7 +36,7 @@ class CertManagerIssuersResource(MethodView):
     """
     
     @cert_manager_api_bp.response(200, description="Successfully retrieved issuers")
-    @cert_manager_api_bp.doc(tags=['Cert-Manager'])
+    @cert_manager_api_bp.doc(tags=['Plugins API - Cert-Manager'])
     @login_required
     def get(self):
         """
@@ -83,7 +83,7 @@ class CertManagerClusterIssuersResource(MethodView):
     """
     
     @cert_manager_api_bp.response(200, description="Successfully retrieved cluster issuers")
-    @cert_manager_api_bp.doc(tags=['Cert-Manager'])
+    @cert_manager_api_bp.doc(tags=['Plugins API - Cert-Manager'])
     @login_required
     def get(self):
         """
@@ -122,7 +122,7 @@ class CertManagerCertificatesResource(MethodView):
     """
     
     @cert_manager_api_bp.response(200, description="Successfully retrieved certificates")
-    @cert_manager_api_bp.doc(tags=['Cert-Manager'])
+    @cert_manager_api_bp.doc(tags=['Plugins API - Cert-Manager'])
     @login_required
     def get(self):
         """
@@ -169,7 +169,7 @@ class CertManagerCertificateRequestsResource(MethodView):
     """
     
     @cert_manager_api_bp.response(200, description="Successfully retrieved certificate requests")
-    @cert_manager_api_bp.doc(tags=['Cert-Manager'])
+    @cert_manager_api_bp.doc(tags=['Plugins API - Cert-Manager'])
     @login_required
     def get(self):
         """
@@ -217,7 +217,7 @@ class CertManagerObjectResource(MethodView):
     
     @cert_manager_api_bp.response(200, description="Successfully retrieved object")
     @cert_manager_api_bp.response(404, description="Object not found")
-    @cert_manager_api_bp.doc(tags=['Cert-Manager'])
+    @cert_manager_api_bp.doc(tags=['Plugins API - Cert-Manager'])
     @login_required
     def get(self, object_type, name):
         """

@@ -36,6 +36,33 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0, shrink-to-fit=no">
     <meta name="description" content="KubeDash - Open Source Kubernetes Admin Dashboard">
     <meta name="author" content="Páldi Balázs">
+    {% if traceparent is defined and traceparent %}
+    <meta name="traceparent" content="{{ traceparent }}">
+    <script nonce="{{ csp_nonce }}">
+      (function() {
+        var tp = document.querySelector('meta[name="traceparent"]');
+        if (tp && tp.content) {
+          window.__TRACEPARENT__ = tp.content;
+          var origFetch = window.fetch;
+          window.fetch = function(input, init) {
+            if (!window.__TRACEPARENT__) return origFetch.apply(this, arguments);
+            init = init || {};
+            var headers = init.headers;
+            if (headers instanceof Headers) {
+              headers = new Headers(headers);
+              headers.append('traceparent', window.__TRACEPARENT__);
+              init = Object.assign({}, init, { headers: headers });
+            } else if (headers && typeof headers === 'object' && !Array.isArray(headers)) {
+              init = Object.assign({}, init, { headers: Object.assign({}, headers, { traceparent: window.__TRACEPARENT__ }) });
+            } else {
+              init = Object.assign({}, init, { headers: Object.assign({}, headers || {}, { traceparent: window.__TRACEPARENT__ }) });
+            }
+            return origFetch.call(this, input, init);
+          };
+        }
+      })();
+    </script>
+    {% endif %}
     <title>KubeDash</title>
 
     <!-- favicon -->

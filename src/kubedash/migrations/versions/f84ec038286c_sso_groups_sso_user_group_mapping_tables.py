@@ -4,6 +4,8 @@ Revision ID: f84ec038286c
 Revises: 39704d8c644a
 Create Date: 2024-02-23 14:46:40.405792
 
+Related Issue: SSO group management
+Related PR: SSO integration
 """
 import sqlalchemy as sa
 from alembic import op

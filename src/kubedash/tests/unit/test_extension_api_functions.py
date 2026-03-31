@@ -19,7 +19,9 @@ from lib.extension_api.projects import (
     create_project,
     update_project,
     delete_project,
-    _filter_by_labels
+    _filter_by_labels,
+    _filter_projects_by_field_selector,
+    _parse_field_selector,
 )
 from lib.extension_api.authentication import (
     AuthenticatedUser,
@@ -41,7 +43,9 @@ from lib.extension_api.helpers import (
     build_status_response,
     build_not_found_response,
     build_forbidden_response,
-    build_unauthorized_response
+    build_unauthorized_response,
+    encode_continue_token,
+    decode_continue_token,
 )
 
 
@@ -117,6 +121,30 @@ class TestHelperFunctions:
         assert project_list["apiVersion"] == "kubedash.devopstales.github.io/v1"
         assert len(project_list["items"]) == 2
         assert "resourceVersion" in project_list["metadata"]
+        assert "continue" not in project_list["metadata"]
+
+    def test_build_project_list_with_continue(self):
+        """Test ProjectList with pagination continue token"""
+        projects = [
+            build_project_object({"name": "ns1", "uid": "uid1", "status": "Active"}),
+        ]
+        project_list = build_project_list(
+            projects,
+            continue_token="dGVzdA==",
+            remaining=5
+        )
+        assert project_list["metadata"].get("continue") == "dGVzdA=="
+        project_list_no_continue = build_project_list(projects, remaining=0)
+        assert "continue" not in project_list_no_continue["metadata"]
+
+    def test_encode_decode_continue_token(self):
+        """Test continue token encoding and decoding"""
+        token = encode_continue_token("last-ns", 10)
+        assert isinstance(token, str)
+        decoded = decode_continue_token(token)
+        assert decoded == ("last-ns", 10)
+        assert decode_continue_token("") is None
+        assert decode_continue_token("invalid!") is None
     
     def test_build_status_response(self):
         """Test building a Status response"""
@@ -567,6 +595,98 @@ class TestProjectFunctions:
         assert len(projects["items"]) == 1
         assert projects["items"][0]["metadata"]["name"] == "ns1"
         mock_filter.assert_called_once()
+
+    @patch('lib.extension_api.projects.list_all_namespaces')
+    @patch('lib.extension_api.projects.can_user_list_all_namespaces')
+    @patch('lib.extension_api.projects.filter_namespaces_by_permission')
+    def test_list_projects_first_page_with_limit(self, mock_filter, mock_can_list, mock_list_all):
+        """Test list projects returns first page and continue token when more results exist"""
+        mock_list_all.return_value = ([
+            {"name": "a", "uid": "1", "status": "Active", "labels": {}, "annotations": {}, "resource_version": "1"},
+            {"name": "b", "uid": "2", "status": "Active", "labels": {}, "annotations": {}, "resource_version": "2"},
+            {"name": "c", "uid": "3", "status": "Active", "labels": {}, "annotations": {}, "resource_version": "3"},
+        ], None)
+        mock_can_list.return_value = True
+        user = AuthenticatedUser("admin")
+        projects, error = list_projects(user, limit=2)
+        assert error is None
+        assert len(projects["items"]) == 2
+        assert projects["items"][0]["metadata"]["name"] == "a"
+        assert projects["items"][1]["metadata"]["name"] == "b"
+        assert "continue" in projects["metadata"]
+        assert projects["metadata"]["continue"]
+
+    @patch('lib.extension_api.projects.list_all_namespaces')
+    @patch('lib.extension_api.projects.can_user_list_all_namespaces')
+    @patch('lib.extension_api.projects.filter_namespaces_by_permission')
+    def test_list_projects_next_page_with_continue(self, mock_filter, mock_can_list, mock_list_all):
+        """Test list projects with continue token returns next page"""
+        mock_list_all.return_value = ([
+            {"name": "a", "uid": "1", "status": "Active", "labels": {}, "annotations": {}, "resource_version": "1"},
+            {"name": "b", "uid": "2", "status": "Active", "labels": {}, "annotations": {}, "resource_version": "2"},
+            {"name": "c", "uid": "3", "status": "Active", "labels": {}, "annotations": {}, "resource_version": "3"},
+        ], None)
+        mock_can_list.return_value = True
+        user = AuthenticatedUser("admin")
+        first_page, _ = list_projects(user, limit=2)
+        continue_token = first_page["metadata"]["continue"]
+        next_page, error = list_projects(user, limit=2, continue_token=continue_token)
+        assert error is None
+        assert len(next_page["items"]) == 1
+        assert next_page["items"][0]["metadata"]["name"] == "c"
+        assert "continue" not in next_page["metadata"] or not next_page["metadata"].get("continue")
+
+    @patch('lib.extension_api.projects.list_all_namespaces')
+    @patch('lib.extension_api.projects.can_user_list_all_namespaces')
+    @patch('lib.extension_api.projects.filter_namespaces_by_permission')
+    def test_list_projects_field_selector_name(self, mock_filter, mock_can_list, mock_list_all):
+        """Test list projects with fieldSelector=metadata.name"""
+        mock_list_all.return_value = ([
+            {"name": "ns1", "uid": "1", "status": "Active", "labels": {}, "annotations": {}, "resource_version": "1"},
+            {"name": "ns2", "uid": "2", "status": "Active", "labels": {}, "annotations": {}, "resource_version": "2"},
+        ], None)
+        mock_can_list.return_value = True
+        user = AuthenticatedUser("admin")
+        projects, error = list_projects(user, field_selector="metadata.name=ns2")
+        assert error is None
+        assert len(projects["items"]) == 1
+        assert projects["items"][0]["metadata"]["name"] == "ns2"
+
+    @patch('lib.extension_api.projects.list_all_namespaces')
+    @patch('lib.extension_api.projects.can_user_list_all_namespaces')
+    @patch('lib.extension_api.projects.filter_namespaces_by_permission')
+    def test_list_projects_field_selector_protected(self, mock_filter, mock_can_list, mock_list_all):
+        """Test list projects with fieldSelector=spec.protected=true"""
+        mock_list_all.return_value = ([
+            {"name": "n1", "uid": "1", "status": "Active", "labels": {}, "annotations": {"kubedash.devopstales.github.io/protected": "true"}, "resource_version": "1"},
+            {"name": "n2", "uid": "2", "status": "Active", "labels": {}, "annotations": {}, "resource_version": "2"},
+        ], None)
+        mock_can_list.return_value = True
+        user = AuthenticatedUser("admin")
+        projects, error = list_projects(user, field_selector="spec.protected=true")
+        assert error is None
+        assert len(projects["items"]) == 1
+        assert projects["items"][0]["spec"]["protected"] is True
+
+    def test_parse_field_selector(self):
+        """Test field selector parsing"""
+        pairs = _parse_field_selector("metadata.name=default,spec.protected=true")
+        assert ("metadata.name", "default") in pairs
+        assert ("spec.protected", "true") in pairs
+        assert _parse_field_selector("") == []
+        assert _parse_field_selector("unsupported=foo") == []
+
+    def test_filter_projects_by_field_selector(self):
+        """Test filtering projects by field selector"""
+        projects = [
+            build_project_object({"name": "p1", "uid": "1", "status": "Active", "labels": {}, "annotations": {"kubedash.devopstales.github.io/protected": "true"}, "resource_version": "1"}),
+            build_project_object({"name": "p2", "uid": "2", "status": "Active", "labels": {}, "annotations": {}, "resource_version": "2"}),
+        ]
+        filtered = _filter_projects_by_field_selector(projects, "spec.protected=true")
+        assert len(filtered) == 1
+        assert filtered[0]["metadata"]["name"] == "p1"
+        filtered = _filter_projects_by_field_selector(projects, "status.phase=Active")
+        assert len(filtered) == 2
     
     def test_filter_by_labels(self):
         """Test filtering namespaces by labels"""

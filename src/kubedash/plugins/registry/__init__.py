@@ -1,9 +1,10 @@
 from datetime import datetime
 
-from flask import (Blueprint, flash, jsonify, redirect, render_template,
+from flask import (Blueprint, flash, g, jsonify, redirect, render_template,
                    request, session, url_for)
 from flask_login import login_required
 
+from lib.audit import log_audit_event
 from lib.components import csrf
 from lib.helper_functions import get_logger
 
@@ -70,7 +71,28 @@ def image_tag_delete():
     if request.method == 'POST':
         tag_name = request.form.get('tag_name')
         image_name = request.form.get('image_name')
-        RegistryDeleteTag(session['registry_server_url'], image_name, tag_name)
+        registry_url = session.get('registry_server_url', '')
+        actor = session.get('user_name', 'unknown')
+        resource = f"registry_image:{registry_url}/{image_name}:{tag_name}" if registry_url else f"registry_image:{image_name}:{tag_name}"
+        try:
+            RegistryDeleteTag(registry_url, image_name, tag_name)
+            log_audit_event(
+                user_id=actor,
+                action="registry_image_delete",
+                resource=resource,
+                result="success",
+                trace_id=getattr(g, "correlation_id", None),
+            )
+        except Exception as e:
+            log_audit_event(
+                user_id=actor,
+                action="registry_image_delete",
+                resource=resource,
+                result="failure",
+                trace_id=getattr(g, "correlation_id", None),
+                details={"error": str(e)},
+            )
+            raise
         return redirect(url_for('.image_tags'), code=307)
     else:
         return redirect(url_for('auth.login'))

@@ -13,7 +13,7 @@
 </ul>
 <ul class="header-nav ms-auto"></ul>
 <ul class="header-nav d-lg-flex">
-{% include "segments/topmenu.html.j2" %}
+{% include "segments/partials/topmenu.html.j2" %}
 {% endblock %}
 
 {% block content %}
@@ -89,11 +89,11 @@
 {% endblock %}
 
 {% block add_head_css %}
-{% include "segments/datatable_snippet.html.j2" %}
-<!-- Cytoscape.js for graph visualization -->
-<script src="https://unpkg.com/cytoscape@3.28.1/dist/cytoscape.min.js"></script>
-<script src="https://unpkg.com/dagre@0.8.5/dist/dagre.min.js"></script>
-<script src="https://unpkg.com/cytoscape-dagre@2.5.0/cytoscape-dagre.js"></script>
+{% include "segments/components/datatable_snippet.html.j2" %}
+<!-- Cytoscape.js for graph visualization (local, air-gapped) -->
+<script src="{{ url_for('static', filename='/vendor/cytoscape@3.28.1/cytoscape.min.js') }}"></script>
+<script src="{{ url_for('static', filename='/vendor/dagre@0.8.5/dist/dagre.min.js') }}"></script>
+<script src="{{ url_for('static', filename='/vendor/cytoscape-dagre@2.5.0/cytoscape-dagre.js') }}"></script>
 {% endblock %}
 
 {% block add_tail_js %}

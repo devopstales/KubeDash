@@ -1,7 +1,9 @@
 import json
 import logging
+import os
 import re
 import sys
+from datetime import datetime as dt, timezone
 import colorlog
 import validators
 from colorlog.escape_codes import escape_codes
@@ -50,9 +52,15 @@ class ThreadedTicker:
         ch = logging.StreamHandler()
         ch.setLevel(logging.DEBUG)
 
-        # Create formatter and add to handler
-        formatter = logging.Formatter(
-            '[%(asctime)s] [%(name)s] [%(levelname)s] %(message)s'
+        # Canonical format (same as get_logger): [timestamp] [no-id] [logger] [LEVEL] message
+        class CanonicalFormatter(logging.Formatter):
+            def formatTime(self, record, datefmt=None):
+                ct = dt.fromtimestamp(record.created)
+                s = ct.strftime("%Y-%m-%d %H:%M:%S")
+                return "%s,%03d" % (s, record.msecs)
+
+        formatter = CanonicalFormatter(
+            '[%(asctime)s] [no-id] [%(name)s] [%(levelname)s] %(message)s'
         )
         ch.setFormatter(formatter)
 
@@ -86,9 +94,65 @@ class ThreadedTicker:
                 continue
         self.logger.debug("Ticker loop has exited.")
 
+
+# Cached logging config from kubedash.ini so we don't re-read on every get_logger() call
+_log_config_cache = None
+
+
+def _get_logging_config(ini_config=None):
+    """Read [logging] from kubedash.ini or from provided ConfigParser. Returns dict with 'format' and 'level'."""
+    global _log_config_cache
+    if ini_config is not None and ini_config.has_section('logging'):
+        format_val = ini_config.get('logging', 'format', fallback='text').strip().lower()
+        if format_val not in ('text', 'json'):
+            format_val = 'text'
+        level_val = ini_config.get('logging', 'level', fallback='INFO').strip().upper()
+        return {'format': format_val, 'level': level_val}
+    if _log_config_cache is not None:
+        return _log_config_cache
+    import configparser
+    config = configparser.ConfigParser()
+    ini_path = os.environ.get('KUBEDASH_INI_PATH', 'kubedash.ini')
+    if os.path.isfile(ini_path):
+        config.read(ini_path)
+    format_val = 'text'
+    level_val = 'INFO'
+    if config.has_section('logging'):
+        format_val = config.get('logging', 'format', fallback='text').strip().lower()
+        if format_val not in ('text', 'json'):
+            format_val = 'text'
+        level_val = config.get('logging', 'level', fallback='INFO').strip().upper()
+    _log_config_cache = {'format': format_val, 'level': level_val}
+    return _log_config_cache
+
+
+class JsonFormatter(logging.Formatter):
+    """Emit one JSON object per log line for ELK/Loki. Same trace_id and logger names as text mode."""
+
+    def format(self, record):
+        if not hasattr(record, 'correlation_id'):
+            record.correlation_id = 'no-id'
+        if not record.correlation_id:
+            record.correlation_id = 'no-id'
+        # ISO timestamp with Z (UTC)
+        ct = dt.fromtimestamp(record.created, tz=timezone.utc)
+        ts = ct.strftime('%Y-%m-%dT%H:%M:%S') + '.%03dZ' % (record.msecs,)
+        obj = {
+            'timestamp': ts,
+            'trace_id': record.correlation_id,
+            'logger': record.name,
+            'level': record.levelname,
+            'message': record.getMessage(),
+        }
+        if record.exc_info:
+            obj['error_type'] = record.exc_info[0].__name__ if record.exc_info[0] else None
+            obj['stack_trace'] = self.formatException(record.exc_info) if record.exc_info else None
+        return json.dumps(obj, default=str)
+
+
 @tracer.start_as_current_span("get_logger")
-def get_logger() -> Logger:
-    """Generate a Logger for the given module name with correlation ID support"""
+def get_logger(ini_config=None) -> Logger:
+    """Generate a Logger with correlation ID support. Uses [logging] from kubedash.ini or ini_config if provided."""
     span = trace.get_current_span()
 
     # Remove existing handlers (avoid duplicate logs if reconfigured)
@@ -103,6 +167,14 @@ def get_logger() -> Logger:
     RED = '\033[31m'
 
     class BooleanColorFormatter(colorlog.ColoredFormatter):
+        """Canonical log format: [YYYY-MM-DD HH:MM:SS,mmm] [trace-id] [logger] [LEVEL] message."""
+
+        def formatTime(self, record, datefmt=None):
+            """Produce timestamp in canonical form with milliseconds."""
+            ct = dt.fromtimestamp(record.created)
+            s = ct.strftime("%Y-%m-%d %H:%M:%S")
+            return "%s,%03d" % (s, record.msecs)
+
         def format(self, record):
             # Ensure correlation_id exists on the record
             if not hasattr(record, 'correlation_id'):
@@ -128,12 +200,17 @@ def get_logger() -> Logger:
         }
     )
 
-    # Set up stream handler with color
+    log_config = _get_logging_config(ini_config)
+    if log_config['format'] == 'json':
+        formatter = JsonFormatter()
+
     handler = logging.StreamHandler()
     handler.setFormatter(formatter)
 
     logger = logging.getLogger()
-    logger.setLevel(logging.INFO)
+    level_name = log_config.get('level', 'INFO')
+    level = getattr(logging, level_name, logging.INFO)
+    logger.setLevel(level)
     logger.addHandler(handler)
     logger.propagate = False
 
@@ -143,18 +220,18 @@ def get_logger() -> Logger:
             if not hasattr(record, 'correlation_id'):
                 corr_id = 'no-id'
                 try:
-                    # Only try to get from Flask's g context if we're in an app context
                     from flask import has_app_context, g
                     if has_app_context():
                         corr_id = getattr(g, 'correlation_id', 'no-id')
                     else:
-                        # Try to get from active span if not in app context
                         current_span = tracer.get_current_span()
                         if current_span.is_recording():
-                            corr_id = current_span.get_span_context().trace_id
+                            ctx = current_span.get_span_context()
+                            if ctx.is_valid:
+                                corr_id = f"{ctx.trace_id:032x}"
                 except Exception:
+                    # Intentionally swallow so logging never fails; record keeps no-id
                     pass
-                
                 record.correlation_id = corr_id
             return True
 
@@ -417,15 +494,17 @@ def calcPercent(x, y, integer = False):
 ##############################################################
 
 def ErrorHandler(logger, error, action):
-    """Handle errors and flash messages
-    
+    """Log and optionally flash errors. Use for API and critical paths so format and level are consistent.
+    When error is an Exception, logs with exc_info=True so stack traces appear in logs.
+
     Args:
-        logger (Logger): The Logger for the module.
-        error (str): The error to handle.
-        action (str): The action being performed.
+        logger: The Logger for the module.
+        error: The error (Exception instance, or object with .status for API errors).
+        action: Description of the action being performed.
     """
+    exc_info = isinstance(error, BaseException)
     if hasattr(error, '__iter__'):
-        if 'status' in error:
+        if hasattr(error, 'status'):
             if error.status == 401:
                 if has_request_context():
                     flash("401 - Unauthorized: User cannot connect to Kubernetes", "danger")
@@ -434,14 +513,18 @@ def ErrorHandler(logger, error, action):
                 if has_request_context():
                     flash("403 - Forbidden: User cannot %s" % action, "danger")
                 logger.error("403 - Forbidden: User cannot %s" % action)
+            else:
+                if has_request_context():
+                    flash("Exception: %s" % action, "danger")
+                logger.error("Exception: %s %s", action, error, exc_info=exc_info)
         else:
             if has_request_context():
                 flash("Exception: %s" % action, "danger")
-            logger.error("Exception: %s %s \n" % (action, error))
+            logger.error("Exception: %s %s", action, error, exc_info=exc_info)
     else:
         if has_request_context():
             flash("Exception: %s" % action, "danger")
-        logger.error("Exception: %s %s \n" % (action, error))
+        logger.error("Exception: %s %s", action, error, exc_info=exc_info)
         
 def WarningHandler(logger, warning, action):
     """Handle warnings and flash messages

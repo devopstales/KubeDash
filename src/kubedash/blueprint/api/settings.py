@@ -3,12 +3,13 @@ Settings API endpoints for application configuration.
 """
 
 from contextlib import nullcontext
-from flask import jsonify, request, session
+from flask import g, jsonify, request, session
 from flask.views import MethodView
-from flask_login import login_required
+from flask_login import current_user, login_required
 from flask_smorest import Blueprint
 from itsdangerous import base64_encode, base64_decode
 
+from lib.audit import log_audit_event
 from lib.helper_functions import get_logger
 from lib.k8s.server import (
     k8sServerConfigList, k8sServerContextsList, k8sServerConfigCreate,
@@ -154,17 +155,34 @@ class SSOConfigResource(MethodView):
         if oauth_server_ca:
             oauth_server_ca = str(base64_encode(oauth_server_ca.strip()), 'UTF-8')
         
+        actor = session.get("user_name", "unknown")
         if request_type == "edit":
             oauth_server_uri_old = data.get('oauth_server_uri_old', oauth_server_uri)
             SSOServerUpdate(
                 oauth_server_uri_old, oauth_server_uri, oauth_server_ca,
                 client_id, client_secret, base_uri, scope
             )
+            log_audit_event(
+                user_id=actor,
+                action="sso_config_update",
+                resource="sso_config",
+                result="success",
+                trace_id=getattr(g, "correlation_id", None),
+                details={"oauth_server_uri": oauth_server_uri},
+            )
             status_code = 200
         else:
             SSOServerCreate(
                 oauth_server_uri, oauth_server_ca, client_id,
                 client_secret, base_uri, scope
+            )
+            log_audit_event(
+                user_id=actor,
+                action="sso_config_create",
+                resource="sso_config",
+                result="success",
+                trace_id=getattr(g, "correlation_id", None),
+                details={"oauth_server_uri": oauth_server_uri},
             )
             status_code = 201
         
@@ -287,7 +305,15 @@ class K8sConfigsResource(MethodView):
         
         k8s_server_ca = str(base64_encode(k8s_server_ca.strip()), 'UTF-8')
         k8sServerConfigCreate(k8s_server_url, k8s_context, k8s_server_ca)
-        
+        actor = getattr(current_user, "username", None) or session.get("user_name", "unknown")
+        log_audit_event(
+            user_id=actor,
+            action="k8s_config_create",
+            resource=f"k8s_config:{k8s_context}",
+            result="success",
+            trace_id=getattr(g, "correlation_id", None),
+            details={"k8s_server_url": k8s_server_url},
+        )
         return jsonify({
             "message": "Kubernetes Config Created Successfully",
             "data": {
@@ -339,7 +365,15 @@ class K8sConfigResource(MethodView):
         
         k8s_server_ca = str(base64_encode(k8s_server_ca.strip()), 'UTF-8')
         k8sServerConfigUpdate(k8s_context_old, k8s_server_url, k8s_context, k8s_server_ca)
-        
+        actor = getattr(current_user, "username", None) or session.get("user_name", "unknown")
+        log_audit_event(
+            user_id=actor,
+            action="k8s_config_update",
+            resource=f"k8s_config:{k8s_context}",
+            result="success",
+            trace_id=getattr(g, "correlation_id", None),
+            details={"k8s_context_old": k8s_context_old, "k8s_server_url": k8s_server_url},
+        )
         return jsonify({
             "message": "Kubernetes Config Updated Successfully",
             "data": {
@@ -362,7 +396,14 @@ class K8sConfigResource(MethodView):
             dict: Deletion confirmation
         """
         k8sServerConfigDelete(context)
-        
+        actor = getattr(current_user, "username", None) or session.get("user_name", "unknown")
+        log_audit_event(
+            user_id=actor,
+            action="k8s_config_delete",
+            resource=f"k8s_config:{context}",
+            result="success",
+            trace_id=getattr(g, "correlation_id", None),
+        )
         return jsonify({
             "message": "Kubernetes Config Deleted Successfully"
         })
