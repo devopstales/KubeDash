@@ -1,0 +1,7 @@
+{
+  "mcpServers": {
+    "deepwiki-http": {
+      "httpUrl": "https://mcp.deepwiki.com/mcp"
+    }
+  }
+}

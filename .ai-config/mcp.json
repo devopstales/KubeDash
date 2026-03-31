@@ -1,0 +1,8 @@
+{
+  "mcpServers": {
+    "deepwiki-http": {
+      "type": "streamable-http",
+      "url": "https://mcp.deepwiki.com/mcp"
+    }
+  }
+}

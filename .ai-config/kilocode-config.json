@@ -1,0 +1,9 @@
+{
+    "provider": "qwen",
+    "model": "qwen-coder-32b",
+    "mode": "orchestrator",
+    "indexing": {
+      "enabled": true,
+      "provider": "qdrant"
+    }
+  }
