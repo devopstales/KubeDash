@@ -1,17 +1,83 @@
+import importlib
 import logging
+import sys
+from datetime import datetime as dt
 from logging.config import fileConfig
+from pathlib import Path
 
 from alembic import context
 from flask import current_app
+
+# Ensure the app root (parent of migrations/) is on sys.path so "plugins" is importable
+# when running "flask db migrate" from project root or other cwd.
+_env_file = Path(__file__).resolve()
+_app_root = _env_file.parent.parent
+if str(_app_root) not in sys.path:
+    sys.path.insert(0, str(_app_root))
 
 # this is the Alembic Config object, which provides
 # access to the values within the .ini file in use.
 config = context.config
 
 # Interpret the config file for Python logging.
-# This line sets up loggers basically.
 fileConfig(config.config_file_name)
 logger = logging.getLogger('alembic.env')
+
+# Canonical format (Logging PRD Phase 1): [timestamp] [no-id] [logger_name] [LEVEL] message
+class CanonicalFormatter(logging.Formatter):
+    def formatTime(self, record, datefmt=None):
+        ct = dt.fromtimestamp(record.created)
+        s = ct.strftime("%Y-%m-%d %H:%M:%S")
+        return "%s,%03d" % (s, record.msecs)
+
+
+def _apply_canonical_log_format():
+    """Apply canonical log format so migration output matches app logs (Logging PRD Phase 1)."""
+    canonical = CanonicalFormatter(
+        "[%(asctime)s] [no-id] [%(name)s] [%(levelname)s] %(message)s"
+    )
+    root = logging.getLogger()
+    for handler in root.handlers:
+        handler.setFormatter(canonical)
+
+
+_apply_canonical_log_format()
+
+# Plugin model module names (same convention as initialize_plugin_models)
+_PLUGIN_MODEL_NAMES = ("models", "model")
+
+
+def _discover_and_import_plugin_models(target_db):
+    """Import plugin model modules so they are in target_db.metadata for autogenerate.
+
+    Discovers plugin dirs from the filesystem (plugins/ next to this migrations dir)
+    and tries plugins.{name}.model or .models for each. Does not rely on
+    [plugin_settings]: all plugin models present in the repo are visible to Alembic.
+    """
+    migrations_dir = _env_file.parent
+    plugins_dir = migrations_dir.parent / "plugins"
+    if not plugins_dir.is_dir():
+        logger.warning("Plugin models: plugins dir not found at %s", plugins_dir)
+        return
+    for path in sorted(plugins_dir.iterdir()):
+        if not path.is_dir() or path.name.startswith("__"):
+            continue
+        plugin_name = path.name
+        for mod_name in _PLUGIN_MODEL_NAMES:
+            try:
+                importlib.import_module(f"plugins.{plugin_name}.{mod_name}")
+                logger.info("Plugin models loaded: plugins.%s.%s", plugin_name, mod_name)
+                break
+            except ImportError as e:
+                logger.debug("Plugin %s.%s: %s", plugin_name, mod_name, e)
+                continue
+    # Guarantee ai_chat models are in metadata (e.g. if discovery missed them)
+    if "ai_chat_conversations" not in target_db.metadata.tables:
+        try:
+            importlib.import_module("plugins.ai_chat.model")
+            logger.info("Plugin models loaded: plugins.ai_chat.model (explicit fallback)")
+        except ImportError as e:
+            logger.warning("Could not load plugins.ai_chat.model for autogenerate: %s", e)
 
 
 def get_engine():
@@ -38,6 +104,10 @@ def get_engine_url():
 config.set_main_option('sqlalchemy.url', get_engine_url())
 target_db = current_app.extensions['migrate'].db
 
+# Import all plugin models from the filesystem so they are in target_db.metadata
+# for autogenerate (independent of [plugin_settings] so ai_chat etc. are always detected).
+# Plugin models loaded inside get_metadata() so autogenerate always sees them
+
 # other values from the config, defined by the needs of env.py,
 # can be acquired:
 # my_important_option = config.get_main_option("my_important_option")
@@ -45,6 +115,8 @@ target_db = current_app.extensions['migrate'].db
 
 
 def get_metadata():
+    """Return db metadata for Alembic. Load plugin models first so autogenerate sees them."""
+    _discover_and_import_plugin_models(target_db)
     if hasattr(target_db, 'metadatas'):
         return target_db.metadatas[None]
     return target_db.metadata

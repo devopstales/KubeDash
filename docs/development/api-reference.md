@@ -100,6 +100,73 @@ username=admin&password=admin
 
 ## REST API Endpoints
 
+The KubeDash REST API is organized into logical groups under `/api/v1/`. All endpoints require authentication via session cookies (web UI) or can be accessed programmatically.
+
+### API Structure
+
+```
+/api/
+├── /api/                    # Base API (health, ping, debug)
+│   ├── /ping               # Health check
+│   ├── /health/live        # Liveness probe
+│   ├── /health/ready       # Readiness probe
+│   └── /debug-trace        # Debug trace info
+│
+└── /api/v1/                # Main REST API v1
+    ├── /workloads/         # Pods, Deployments, StatefulSets, etc.
+    ├── /cluster/           # Cluster metrics, events, status
+    ├── /network/           # Services, Ingress, IngressClasses
+    ├── /storage/           # PVCs, PVs, StorageClasses, ConfigMaps
+    ├── /security/          # Secrets, NetworkPolicies, PriorityClasses
+    ├── /nodes/             # Cluster nodes
+    ├── /namespaces/        # Namespace management
+    ├── /rbac/              # Roles, ClusterRoles, Bindings, ServiceAccounts
+    ├── /other-resources/   # HPA, VPA, LimitRanges, Quotas, PDBs, CRDs
+    ├── /users/             # User management, privileges, SSO groups
+    ├── /settings/          # SSO config, K8s configs, export
+    └── /plugins/           # Plugin APIs (dynamically registered)
+        ├── /application-catalog/
+        ├── /cert-manager/
+        ├── /external-loadbalancer/
+        ├── /flux/
+        ├── /gateway-api/
+        ├── /helm/
+        ├── /registry/
+        └── /trivy-operator/
+```
+
+### Response Format
+
+All API endpoints return JSON responses in a consistent format:
+
+**Success Response:**
+```json
+{
+  "data": { ... },
+  "metadata": {
+    "count": 10,
+    "namespace": "default"
+  }
+}
+```
+
+**Error Response:**
+```json
+{
+  "error": "ErrorType",
+  "message": "Human-readable error message"
+}
+```
+
+### Common Query Parameters
+
+Most endpoints support these query parameters:
+
+| Parameter | Type | Description | Default |
+|-----------|------|-------------|---------|
+| `namespace` | string | Kubernetes namespace | Session namespace |
+| `all_namespaces` | boolean | List from all namespaces | `false` |
+
 ### Health Endpoints
 
 #### Liveness Probe
@@ -201,9 +268,868 @@ flask_http_request_total{method="GET",status="200"} 1234
 
 ---
 
+## REST API v1
+
+The REST API v1 provides comprehensive endpoints for managing Kubernetes resources and KubeDash application features. All endpoints are under `/api/v1/` and require authentication.
+
+### Workloads API
+
+#### List Pods
+
+```http
+GET /api/v1/workloads/pods?namespace=default&all_namespaces=false
+```
+
+**Query Parameters:**
+- `namespace` (string): Kubernetes namespace (default: session namespace)
+- `all_namespaces` (boolean): List pods from all namespaces (default: false)
+
+**Response** `200 OK`
+```json
+{
+  "data": [
+    {
+      "name": "my-pod",
+      "namespace": "default",
+      "status": "Running",
+      "node": "node-1",
+      "age": "2d"
+    }
+  ],
+  "metadata": {
+    "namespace": "default",
+    "count": 1
+  }
+}
+```
+
+#### Get Pod
+
+```http
+GET /api/v1/workloads/pods/{name}?namespace=default
+```
+
+#### Delete Pod
+
+```http
+DELETE /api/v1/workloads/pods/{name}?namespace=default
+```
+
+#### Get Pod Containers
+
+```http
+GET /api/v1/workloads/pods/{name}/containers?namespace=default
+```
+
+**Response** `200 OK`
+```json
+{
+  "data": {
+    "containers": ["container1", "container2"],
+    "init_containers": ["init-container"]
+  },
+  "metadata": {
+    "name": "my-pod",
+    "namespace": "default"
+  }
+}
+```
+
+#### List Deployments
+
+```http
+GET /api/v1/workloads/deployments?namespace=default
+```
+
+#### Get Deployment
+
+```http
+GET /api/v1/workloads/deployments/{name}?namespace=default
+```
+
+#### Scale Deployment
+
+```http
+PATCH /api/v1/workloads/deployments/{name}?namespace=default
+Content-Type: application/json
+
+{
+  "replicas": 3
+}
+```
+
+#### List StatefulSets
+
+```http
+GET /api/v1/workloads/statefulsets?namespace=default
+```
+
+#### Scale StatefulSet
+
+```http
+PATCH /api/v1/workloads/statefulsets/{name}?namespace=default
+Content-Type: application/json
+
+{
+  "replicas": 5
+}
+```
+
+#### List DaemonSets
+
+```http
+GET /api/v1/workloads/daemonsets?namespace=default
+```
+
+#### Enable/Disable DaemonSet
+
+```http
+PATCH /api/v1/workloads/daemonsets/{name}?namespace=default
+Content-Type: application/json
+
+{
+  "enabled": false
+}
+```
+
+#### List ReplicaSets
+
+```http
+GET /api/v1/workloads/replicasets?namespace=default
+```
+
+### Cluster API
+
+#### Get Cluster Metrics
+
+```http
+GET /api/v1/cluster/metrics
+```
+
+**Response** `200 OK`
+```json
+{
+  "data": {
+    "cpu": {
+      "capacity": "8",
+      "allocatable": "7.5",
+      "requests": "2.5",
+      "limits": "4",
+      "usage": "1.2"
+    },
+    "memory": {
+      "capacity": "32Gi",
+      "allocatable": "30Gi",
+      "requests": "10Gi",
+      "limits": "20Gi",
+      "usage": "8Gi"
+    },
+    "pods": {
+      "allocatable": 110,
+      "current": 45
+    }
+  },
+  "metadata": {
+    "source": "kubernetes"
+  }
+}
+```
+
+#### Get Cluster Events
+
+```http
+GET /api/v1/cluster/events?limit=100&namespace=default&kind=Pod
+```
+
+**Query Parameters:**
+- `limit` (integer): Maximum number of events (default: 100)
+- `namespace` (string): Filter by namespace (optional)
+- `kind` (string): Filter by object kind (optional)
+
+#### Get Cluster Status
+
+```http
+GET /api/v1/cluster/status
+```
+
+**Response** `200 OK`
+```json
+{
+  "data": {
+    "connected": true,
+    "message": "Cluster is accessible",
+    "timestamp": "2025-12-09T10:00:00Z"
+  }
+}
+```
+
+#### Get Workload Map
+
+```http
+GET /api/v1/cluster/workload-map?namespace=default
+```
+
+**Response** `200 OK`
+```json
+{
+  "data": {
+    "nodes": [
+      {"id": "pod-1", "label": "my-pod", "type": "pod"},
+      {"id": "svc-1", "label": "my-service", "type": "service"}
+    ],
+    "edges": [
+      {"from": "pod-1", "to": "svc-1"}
+    ]
+  },
+  "metadata": {
+    "namespace": "default",
+    "nodes_count": 2,
+    "edges_count": 1
+  }
+}
+```
+
+#### List Runtime Classes
+
+```http
+GET /api/v1/cluster/runtime-classes
+```
+
+### Network API
+
+#### List Services
+
+```http
+GET /api/v1/network/services?namespace=default
+```
+
+#### Get Service
+
+```http
+GET /api/v1/network/services/{name}?namespace=default
+```
+
+**Response** `200 OK`
+```json
+{
+  "data": {
+    "service": {
+      "name": "my-service",
+      "namespace": "default",
+      "type": "ClusterIP",
+      "cluster_ip": "10.96.0.1",
+      "ports": [{"port": 80, "target_port": 8080}],
+      "selector": {"app": "my-app"}
+    },
+    "pods": [
+      {"name": "pod-1", "status": "Running"}
+    ]
+  },
+  "metadata": {
+    "name": "my-service",
+    "namespace": "default"
+  }
+}
+```
+
+#### List Ingress
+
+```http
+GET /api/v1/network/ingress?namespace=default
+```
+
+#### Get Ingress
+
+```http
+GET /api/v1/network/ingress/{name}?namespace=default
+```
+
+#### List Ingress Classes
+
+```http
+GET /api/v1/network/ingress-classes
+```
+
+#### Get Ingress Class
+
+```http
+GET /api/v1/network/ingress-classes/{name}
+```
+
+### Storage API
+
+#### List PVCs
+
+```http
+GET /api/v1/storage/pvcs?namespace=default
+```
+
+#### Get PVC
+
+```http
+GET /api/v1/storage/pvcs/{name}?namespace=default
+```
+
+#### Get PVC Metrics
+
+```http
+GET /api/v1/storage/pvcs/metrics?namespace=default
+```
+
+#### List PVs
+
+```http
+GET /api/v1/storage/pvs?namespace=default
+```
+
+#### Get PV
+
+```http
+GET /api/v1/storage/pvs/{name}
+```
+
+#### Get PV Metrics
+
+```http
+GET /api/v1/storage/pvs/metrics?namespace=default
+```
+
+#### List Storage Classes
+
+```http
+GET /api/v1/storage/storage-classes
+```
+
+#### Get Storage Class
+
+```http
+GET /api/v1/storage/storage-classes/{name}
+```
+
+#### List Snapshot Classes
+
+```http
+GET /api/v1/storage/snapshot-classes
+```
+
+#### List Volume Snapshots
+
+```http
+GET /api/v1/storage/volume-snapshots?namespace=default
+```
+
+#### List ConfigMaps
+
+```http
+GET /api/v1/storage/configmaps?namespace=default
+```
+
+#### Get ConfigMap
+
+```http
+GET /api/v1/storage/configmaps/{name}?namespace=default
+```
+
+### Security API
+
+#### List Secrets
+
+```http
+GET /api/v1/security/secrets?namespace=default
+```
+
+#### Get Secret
+
+```http
+GET /api/v1/security/secrets/{name}?namespace=default
+```
+
+**Note:** Secret values are not returned for security reasons, only metadata.
+
+#### List Network Policies
+
+```http
+GET /api/v1/security/network-policies?namespace=default
+```
+
+#### Get Network Policy
+
+```http
+GET /api/v1/security/network-policies/{name}?namespace=default
+```
+
+#### List Priority Classes
+
+```http
+GET /api/v1/security/priority-classes
+```
+
+### Nodes API
+
+#### List Nodes
+
+```http
+GET /api/v1/nodes
+```
+
+#### Get Node
+
+```http
+GET /api/v1/nodes/{name}
+```
+
+**Response** `200 OK`
+```json
+{
+  "data": {
+    "name": "node-1",
+    "status": "Ready",
+    "roles": ["worker"],
+    "cpu": {"capacity": "4", "allocatable": "3.9"},
+    "memory": {"capacity": "16Gi", "allocatable": "15Gi"},
+    "pods": {"allocatable": 110, "current": 45},
+    "conditions": [...],
+    "taints": [...]
+  },
+  "metadata": {
+    "name": "node-1"
+  }
+}
+```
+
+#### Get Node Metrics
+
+```http
+GET /api/v1/nodes/{name}/metrics
+```
+
+### Namespaces API
+
+#### List Namespaces
+
+```http
+GET /api/v1/namespaces
+```
+
+#### Get Namespace
+
+```http
+GET /api/v1/namespaces/{name}
+```
+
+#### Create Namespace
+
+```http
+POST /api/v1/namespaces
+Content-Type: application/json
+
+{
+  "name": "my-namespace",
+  "labels": {"team": "backend"}
+}
+```
+
+#### Delete Namespace
+
+```http
+DELETE /api/v1/namespaces/{name}
+```
+
+#### List Namespaces with Permissions
+
+```http
+GET /api/v1/namespaces/list
+```
+
+Returns namespaces with user permission information.
+
+### RBAC API
+
+#### List Roles
+
+```http
+GET /api/v1/rbac/roles?namespace=default
+```
+
+#### Get Role
+
+```http
+GET /api/v1/rbac/roles/{name}?namespace=default
+```
+
+**Response** `200 OK`
+```json
+{
+  "data": {
+    "name": "my-role",
+    "namespace": "default",
+    "rules": [
+      {
+        "apiGroups": [""],
+        "resources": ["pods"],
+        "verbs": ["get", "list"]
+      }
+    ]
+  },
+  "metadata": {
+    "name": "my-role",
+    "namespace": "default"
+  }
+}
+```
+
+#### List Cluster Roles
+
+```http
+GET /api/v1/rbac/cluster-roles
+```
+
+#### Get Cluster Role
+
+```http
+GET /api/v1/rbac/cluster-roles/{name}
+```
+
+#### List Role Bindings
+
+```http
+GET /api/v1/rbac/role-bindings?namespace=default
+```
+
+#### List Cluster Role Bindings
+
+```http
+GET /api/v1/rbac/cluster-role-bindings
+```
+
+#### List Service Accounts
+
+```http
+GET /api/v1/rbac/service-accounts?namespace=default
+```
+
+### Other Resources API
+
+#### List HPAs
+
+```http
+GET /api/v1/other-resources/hpa?namespace=default
+```
+
+#### Get HPA
+
+```http
+GET /api/v1/other-resources/hpa/{name}?namespace=default
+```
+
+#### List VPAs
+
+```http
+GET /api/v1/other-resources/vpa?namespace=default
+```
+
+#### List Limit Ranges
+
+```http
+GET /api/v1/other-resources/limit-ranges?namespace=default
+```
+
+#### List Resource Quotas
+
+```http
+GET /api/v1/other-resources/quota?namespace=default
+```
+
+#### List Pod Disruption Budgets
+
+```http
+GET /api/v1/other-resources/pdb?namespace=default
+```
+
+#### List CRDs
+
+```http
+GET /api/v1/other-resources/crds
+```
+
+#### Get CRD
+
+```http
+GET /api/v1/other-resources/crds/{group}/{version}/{kind}?name={crd_name}
+```
+
+#### Get CRD Instances
+
+```http
+GET /api/v1/other-resources/crds/{group}/{version}/{kind}/instances?namespace=default&name={crd_name}
+```
+
+### Users API
+
+#### List Users
+
+```http
+GET /api/v1/users
+```
+
+**Response** `200 OK`
+```json
+{
+  "data": [
+    {
+      "id": 1,
+      "username": "admin",
+      "email": "admin@example.com",
+      "user_type": "Local",
+      "role": "Admin",
+      "kubectl_configs": ["k8s-main"]
+    }
+  ],
+  "metadata": {
+    "count": 1,
+    "available_roles": ["Admin", "User"],
+    "k8s_contexts": ["k8s-main"]
+  }
+}
+```
+
+#### Get User
+
+```http
+GET /api/v1/users/{username}
+```
+
+#### Create User
+
+```http
+POST /api/v1/users
+Content-Type: application/json
+
+{
+  "username": "newuser",
+  "password": "securepassword",
+  "email": "user@example.com",
+  "type": "Local",
+  "role": "User"
+}
+```
+
+#### Update User
+
+```http
+PUT /api/v1/users/{username}
+Content-Type: application/json
+
+{
+  "role": "Admin",
+  "type": "Kubernetes",
+  "email": "newemail@example.com"
+}
+```
+
+#### Delete User
+
+```http
+DELETE /api/v1/users/{username}
+```
+
+#### Update User Password
+
+```http
+PUT /api/v1/users/{username}/password
+Content-Type: application/json
+
+{
+  "old_password": "oldpass",
+  "new_password": "newpass"
+}
+```
+
+#### Get User Info
+
+```http
+GET /api/v1/users/info
+```
+
+Returns information about the currently authenticated user.
+
+#### Get User Privileges
+
+```http
+GET /api/v1/users/{username}/privileges
+```
+
+**Response** `200 OK`
+```json
+{
+  "data": {
+    "user_cluster_roles": ["cluster-admin"],
+    "user_roles": [
+      {
+        "name": "admin",
+        "namespace": "default"
+      }
+    ]
+  },
+  "metadata": {
+    "username": "admin"
+  }
+}
+```
+
+#### Update User Privileges
+
+```http
+POST /api/v1/users/{username}/privileges
+Content-Type: application/json
+
+{
+  "user_cluster_role": "cluster-admin",
+  "user_namespaced_role_1": "admin",
+  "user_all_namespaces_1": true,
+  "user_namespaces_1": ["default", "kube-system"]
+}
+```
+
+#### Get Privilege Templates
+
+```http
+GET /api/v1/users/privileges/templates
+```
+
+Returns available role templates for assigning privileges.
+
+#### List SSO Groups
+
+```http
+GET /api/v1/users/sso/groups?include_members=false
+```
+
+#### Get Group Privileges
+
+```http
+GET /api/v1/users/groups/{group_name}/privileges
+```
+
+#### Update Group Privileges
+
+```http
+POST /api/v1/users/groups/{group_name}/privileges
+Content-Type: application/json
+
+{
+  "user_cluster_role": "view",
+  "user_namespaced_role_1": "edit",
+  "user_namespaces_1": ["default"]
+}
+```
+
+### Settings API
+
+#### Get SSO Configuration
+
+```http
+GET /api/v1/settings/sso
+```
+
+#### Create/Update SSO Configuration
+
+```http
+POST /api/v1/settings/sso
+Content-Type: application/json
+
+{
+  "oauth_server_uri": "https://auth.example.com",
+  "oauth_server_ca": "base64-encoded-ca",
+  "client_id": "kubedash",
+  "client_secret": "secret",
+  "base_uri": "https://kubedash.example.com",
+  "scope": ["openid", "email", "profile"],
+  "request_type": "create"
+}
+```
+
+#### List K8s Contexts
+
+```http
+GET /api/v1/settings/k8s/contexts
+```
+
+#### List K8s Configs
+
+```http
+GET /api/v1/settings/k8s/configs
+```
+
+#### Create K8s Config
+
+```http
+POST /api/v1/settings/k8s/configs
+Content-Type: application/json
+
+{
+  "k8s_context": "my-cluster",
+  "k8s_server_url": "https://k8s.example.com:6443",
+  "k8s_server_ca": "base64-encoded-ca"
+}
+```
+
+#### Update K8s Config
+
+```http
+PUT /api/v1/settings/k8s/configs/{context}
+Content-Type: application/json
+
+{
+  "k8s_context": "updated-cluster",
+  "k8s_server_url": "https://k8s.example.com:6443",
+  "k8s_server_ca": "base64-encoded-ca"
+}
+```
+
+#### Delete K8s Config
+
+```http
+DELETE /api/v1/settings/k8s/configs/{context}
+```
+
+#### Export Kubectl Config
+
+```http
+GET /api/v1/settings/export
+```
+
+Returns kubectl configuration data for the current user (OIDC or certificate-based).
+
+### Plugin APIs
+
+Plugin APIs are dynamically registered under `/api/v1/plugins/`. Each plugin can expose its own API endpoints.
+
+#### Application Catalog API
+
+See [Application Catalog Documentation](../integrations/application-catalog.md#api-reference) for details.
+
+**Base Path:** `/api/v1/plugins/application-catalog`
+
+- `GET /api/v1/plugins/application-catalog` - List applications
+- `POST /api/v1/plugins/application-catalog` - Create application
+- `GET /api/v1/plugins/application-catalog/{name}` - Get application
+- `PUT /api/v1/plugins/application-catalog/{name}` - Update application
+- `DELETE /api/v1/plugins/application-catalog/{name}` - Delete application
+
+#### Other Plugin APIs
+
+Other plugins (Cert Manager, External LoadBalancer, Flux, Gateway API, Helm, Registry, Trivy Operator) may expose their own API endpoints under `/api/v1/plugins/{plugin-name}/`.
+
+---
+
 ## Extension API
 
 The Extension API implements the Kubernetes API Aggregation Layer, allowing kubectl and other Kubernetes clients to interact with KubeDash resources.
+
+KubeDash can be registered as a Kubernetes API Extension Server using an `APIService` resource, making it appear as a native Kubernetes API endpoint. This enables seamless integration with `kubectl` and other Kubernetes tooling.
+
+For detailed instructions on registering KubeDash as an API extension server, see the [Extension API documentation](../integrations/extension-api.md#registering-kubedash-as-an-api-extension-server).
 
 ### API Discovery
 
@@ -810,15 +1736,51 @@ curl -X DELETE "https://kubedash.example.com/apis/kubedash.devopstales.github.io
 
 ---
 
-## OpenAPI Specification
+## API Documentation & Interactive UI
 
-The Extension API provides an OpenAPI v2 specification at:
+### Swagger UI
 
+KubeDash provides an interactive Swagger UI for exploring and testing all REST API endpoints:
+
+```http
+GET /api/swagger-ui
+```
+
+The Swagger UI provides:
+- Interactive API documentation
+- Try-it-out functionality for all endpoints
+- Request/response examples
+- Authentication support (session-based)
+
+!!! note
+    Swagger UI requires authentication. You must be logged in to access it.
+
+### OpenAPI Specification
+
+The REST API provides OpenAPI specifications:
+
+**REST API OpenAPI Spec:**
+```http
+GET /api/openapi.json
+```
+
+**Extension API OpenAPI v2:**
 ```http
 GET /apis/openapi/v2
 ```
 
-This can be used to generate client SDKs or import into API development tools like Postman.
+These specifications can be used to:
+- Generate client SDKs
+- Import into API development tools (Postman, Insomnia, etc.)
+- Generate API documentation
+- Validate API requests/responses
+
+### API Discovery
+
+All API endpoints are automatically documented and discoverable through:
+- Swagger UI at `/api/swagger-ui`
+- OpenAPI JSON at `/api/openapi.json`
+- Extension API discovery at `/apis/`
 
 ---
 

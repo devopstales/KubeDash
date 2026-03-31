@@ -7,14 +7,14 @@
         <ol class="breadcrumb my-0">
           <li class="breadcrumb-item"><span>Workloads</span></li>
           <li class="breadcrumb-item"><a href="/workload/daemonsets">DaemonSets</a></li>
-          <li class="breadcrumb-item active"><span>{{ daemonset_data.name }}</span></li>
+          <li class="breadcrumb-item active"><span id="daemonset-name-breadcrumb">Loading...</span></li>
         </ol>
       </nav>
     </div>
 </ul>
 <ul class="header-nav ms-auto"></ul>
 <ul class="header-nav d-lg-flex">
-{% include "segments/topmenu.html.j2" %}
+{% include "segments/partials/topmenu.html.j2" %}
 {% endblock %}
 
 {% block content %}
@@ -25,7 +25,7 @@
     <div class="card-body">
         <ul class="nav nav-tabs" id="nav-tab" role="tablist">
             <li class="nav-item">
-                <a class="nav-link active" id="nav-daemonset-tab" data-bs-toggle="tab" href="#nav-daemonset" role="tab" aria-controls="nav-daemonset" aria-selected="true" data-bs-toggle="tab">Deployment</a>
+                <a class="nav-link active" id="nav-daemonset-tab" data-bs-toggle="tab" href="#nav-daemonset" role="tab" aria-controls="nav-daemonset" aria-selected="true" data-bs-toggle="tab">DaemonSet</a>
             </li>
             <li class="nav-item">
                 <a class="nav-link" id="nav-containers-tab" data-bs-toggle="tab" href="#nav-containers" role="tab" aria-controls="nav-containers" aria-selected="false" data-bs-toggle="tab">Containers</a>
@@ -49,97 +49,42 @@
                             <table class="table table-bordered" id="daemonsetInfoTable" width="100%" cellspacing="0">
                                 <tr>
                                     <th>Namespace:</th>
-                                    <td>{{ daemonset_data.namespace }}</td>
+                                    <td id="daemonset-namespace">Loading...</td>
                                 </tr>
                                 <tr>
                                     <th>Name:</th>
-                                    <td>{{ daemonset_data.name }}</td>
+                                    <td id="daemonset-name">Loading...</td>
                                 </tr>
                                 <tr>
                                     <th>Created:</th>
-                                    <td>{{ daemonset_data.created }}</td>
+                                    <td id="daemonset-created">Loading...</td>
                                 </tr>
                                 <tr>
                                     <th>Replicas:</th>
-                                {% if session['user_role'] == "Admin" %}
-                                    <td>
-                                        <div class="input-group">
-                                            <input type="text" class="spinner" id="spinner" readonly="readonly" 
-                                                value="{{ daemonset_data.desired }}"  k8s_type="daemonset" 
-                                                csrf_token="{{ csrf_token() }}" selected="{{ daemonset_data.name }}"
-                                                namespace="{{ daemonset_data.namespace }}">
-                                          </div>
-                                    </td>
-                                {% else %}
-                                    <td>{{ daemonset_data.desired }}</td>
-                                {% endif %}
+                                    <td id="daemonset-replicas">Loading...</td>
                                 </tr>
                                 <tr>
                                     <th>Annotations:</th>
-                                    <td>
-                                        {% if daemonset_data.annotations %}
-                                        <table class="table table-bordered" id="annotationTable" width="100%" cellspacing="0">
-                                            <thead>
-                                                <tr>
-                                                    <th width="50%">Key</th>
-                                                    <th width="50%">Value</th>
-                                                </tr>
-                                            </thead>
-                                            <tbody>
-                                            {% for key, value in daemonset_data.annotations.items() %}
-                                                <tr>
-                                                    <td width="50%">{{ key }}</td>
-                                                    <td width="50%">{{ value }}</td>
-                                                </tr>
-                                            {% endfor %}
-                                            </tbody>
-                                        </table>
-                                        {% endif %}
+                                    <td id="daemonset-annotations-container">
+                                        <div class="spinner-border spinner-border-sm text-primary" role="status">
+                                            <span class="visually-hidden">Loading...</span>
+                                        </div>
                                     </td>
                                 </tr>
-                               <tr>
-                                    <th>Lables:</th>
-                                    <td>
-                                        {% if daemonset_data.labels %}
-                                        <table class="table table-bordered" id="labelsTable" width="100%" cellspacing="0">
-                                            <thead>
-                                                <tr>
-                                                    <th width="50%">Key</th>
-                                                    <th width="50%">Value</th>
-                                                </tr>
-                                            </thead>
-                                            <tbody>
-                                            {% for key, value in daemonset_data.labels.items() %}
-                                                <tr>
-                                                    <td width="50%">{{ key }}</td>
-                                                    <td width="50%">{{ value }}</td>
-                                                </tr>
-                                            {% endfor %}
-                                            </tbody>
-                                        </table>
-                                        {% endif %}
+                                <tr>
+                                    <th>Labels:</th>
+                                    <td id="daemonset-labels-container">
+                                        <div class="spinner-border spinner-border-sm text-primary" role="status">
+                                            <span class="visually-hidden">Loading...</span>
+                                        </div>
                                     </td>
                                 </tr>
+                                <tr>
                                     <th>Selectors:</th>
-                                    <td>
-                                        {% if daemonset_data.selectors %}
-                                        <table class="table table-bordered" id="selectorsTable" width="100%" cellspacing="0">
-                                            <thead>
-                                                <tr>
-                                                    <th width="50%">Key</th>
-                                                    <th width="50%">Value</th>
-                                                </tr>
-                                            </thead>
-                                            <tbody>
-                                            {% for key, value in daemonset_data.selectors.items() %}
-                                                <tr>
-                                                    <td width="50%">{{ key }}</td>
-                                                    <td width="50%">{{ value }}</td>
-                                                </tr>
-                                            {% endfor %}
-                                            </tbody>
-                                        </table>
-                                        {% endif %}
+                                    <td id="daemonset-selectors-container">
+                                        <div class="spinner-border spinner-border-sm text-primary" role="status">
+                                            <span class="visually-hidden">Loading...</span>
+                                        </div>
                                     </td>
                                 </tr>
                             </table>
@@ -152,28 +97,28 @@
                 <div id="accordion">
                     <div class="card shadow mb-4">
                         <div class="card-body">
-                            {% if daemonset_data.init_containers %}
-                            <h3>Init Containers</h3>
-                            
-                            <div class="table-responsive">
-                                <table class="table table-bordered" id="initContainersTable" width="100%" cellspacing="0">
-                                    <thead>
-                                        <tr>
-                                            <th>Name</th>
-                                            <th>Image</th>
-                                        </tr>
-                                    </thead>
-                                    <tbody>
-                                        {% for ic in daemonset_data.init_containers %}
-                                        <tr>
-                                            <td>{{ ic.name }}</td>
-                                            <td>{{ ic.image }}</td>
-                                        </tr>
-                                        {% endfor %}
-                                    </tbody>
-                                </table>
+                            <div id="init-containers-section" style="display: none;">
+                                <h3>Init Containers</h3>
+                                <div class="table-responsive">
+                                    <table class="table table-bordered" id="initContainersTable" width="100%" cellspacing="0">
+                                        <thead>
+                                            <tr>
+                                                <th>Name</th>
+                                                <th>Image</th>
+                                            </tr>
+                                        </thead>
+                                        <tbody id="init-containers-tbody">
+                                            <tr>
+                                                <td colspan="2" class="text-center">
+                                                    <div class="spinner-border spinner-border-sm text-primary" role="status">
+                                                        <span class="visually-hidden">Loading...</span>
+                                                    </div>
+                                                </td>
+                                            </tr>
+                                        </tbody>
+                                    </table>
+                                </div>
                             </div>
-                            {% endif %}
                             <h3>Containers</h3>
                             <div class="table-responsive">
                                 <table class="table table-bordered" id="containersTable" width="100%" cellspacing="0">
@@ -183,13 +128,14 @@
                                             <th>Image</th>
                                         </tr>
                                     </thead>
-                                    <tbody>
-                                        {% for c in daemonset_data.containers %}
+                                    <tbody id="containers-tbody">
                                         <tr>
-                                            <td>{{ c.name }}</td>
-                                            <td>{{ c.image }}</td>
+                                            <td colspan="2" class="text-center">
+                                                <div class="spinner-border spinner-border-sm text-primary" role="status">
+                                                    <span class="visually-hidden">Loading...</span>
+                                                </div>
+                                            </td>
                                         </tr>
-                                        {% endfor %}
                                     </tbody>
                                 </table>
                             </div>
@@ -209,17 +155,14 @@
                                         <th>Value</th>
                                     </tr>
                                 </thead>
-                                <tbody>
-                                    {% for variables in daemonset_data.environment_variables %}
+                                <tbody id="variables-tbody">
                                     <tr>
-                                        {% if variables %}
-                                        {% for key, var in variables.items() %}
-                                            <td>{{ key }}</td>
-                                            <td>{{ var }}</td>
-                                        {% endfor %}
-                                        {% endif %}
+                                        <td colspan="2" class="text-center">
+                                            <div class="spinner-border spinner-border-sm text-primary" role="status">
+                                                <span class="visually-hidden">Loading...</span>
+                                            </div>
+                                        </td>
                                     </tr>
-                                    {% endfor %}
                                 </tbody>
                             </table>
                         </div>
@@ -234,19 +177,18 @@
                             <table class="table table-bordered" id="securityTable" width="100%" cellspacing="0">
                                 <thead>
                                     <tr>
-                                    <th>Context</th>
-                                    <th>State</th>
+                                        <th>Context</th>
+                                        <th>State</th>
                                     </tr>
                                 </thead>
-                                <tbody>
-                                {% if daemonset_data.security_context %}
-                                {% for item in daemonset_data.security_context.items() %}
+                                <tbody id="security-tbody">
                                     <tr>
-                                        <td>{{ item[0] }}</td>
-                                        <td>{{ item[1] }}</td>
+                                        <td colspan="2" class="text-center">
+                                            <div class="spinner-border spinner-border-sm text-primary" role="status">
+                                                <span class="visually-hidden">Loading...</span>
+                                            </div>
+                                        </td>
                                     </tr>
-                                {% endfor%}
-                                {% endif %}
                                 </tbody>
                             </table>
                         </div>
@@ -260,93 +202,21 @@
                         <h3>Refers To</h3>
                         <div class="table-responsive">
                             <table class="table table-bordered" id="refersTable" width="100%" cellspacing="0">
-                                <!-- service account, secret, configmap, volume-->
                                 <thead>
-                                    <th>Type</th>
-                                    <th>Name</th>
-                                    <th>Namespace</th>
+                                    <tr>
+                                        <th>Type</th>
+                                        <th>Name</th>
+                                        <th>Namespace</th>
+                                    </tr>
                                 </thead>
-                                <tbody>
-                                {% if daemonset_data.image_pull_secrets %}
-                                    {% for dict_item in daemonset_data.image_pull_secrets %}
-                                    {% for key, value in dict_item.items() %}
+                                <tbody id="refers-to-tbody">
                                     <tr>
-                                        <td>ImagePullSecret</td>
-                                        <td>
-                                            <form action="/security/secret" method="POST">
-                                                <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
-                                                <input type="hidden" name="ns_select" value="{{ daemonset_data.namespace }}" />
-                                                <input type="hidden" name="selected" value="{{ value }}" />
-                                                <a href="javascript:;" onclick="parentNode.submit();">{{ value }}</a>
-                                            </form>
+                                        <td colspan="3" class="text-center">
+                                            <div class="spinner-border spinner-border-sm text-primary" role="status">
+                                                <span class="visually-hidden">Loading...</span>
+                                            </div>
                                         </td>
-                                        <td>{{ daemonset_data.namespace }}</td>
                                     </tr>
-                                    {% endfor %}
-                                    {% endfor %}
-                                {% endif %}
-                                {% if daemonset_data.service_account %}
-                                    <tr>
-                                        <td>ServiceAccount</td>
-                                        <td>
-                                            <form action="/cluster-permission/service-account" method="POST">
-                                                <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
-                                                <input type="hidden" name="ns_select" value="{{ daemonset_data.namespace }}" />
-                                                <input type="hidden" name="selected" value="{{ daemonset_data.service_account }}" />
-                                                <a href="javascript:;" onclick="parentNode.submit();">{{ daemonset_data.service_account }}</a>
-                                            </form>
-                                        </td>
-                                        <td>{{ daemonset_data.namespace }}</td>
-                                    </tr>
-                                {% endif %}
-                                {% if daemonset_data.secrets %}
-                                    {% for secret in daemonset_data.secrets %}
-                                    <tr>
-                                        <td>Secret</td>
-                                        <td>
-                                            <form action="/security/secret" method="POST">
-                                                <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
-                                                <input type="hidden" name="ns_select" value="{{ daemonset_data.namespace }}" />
-                                                <input type="hidden" name="selected" value="{{ secret }}" />
-                                                <a href="javascript:;" onclick="parentNode.submit();">{{ secret }}</a>
-                                            </form>
-                                        </td>
-                                        <td>{{ daemonset_data.namespace }}</td>
-                                    </tr>
-                                    {% endfor %}
-                                {% endif %}
-                                {% if daemonset_data.cm %}
-                                    {% for cm in daemonset_data.cm %}
-                                    <tr>
-                                        <td>Configmap</td>
-                                        <td>
-                                            <form action="/storage/configmap" method="POST">
-                                                <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
-                                                <input type="hidden" name="ns_select" value="{{ daemonset_data.namespace }}" />
-                                                <input type="hidden" name="selected" value="{{ cm }}" />
-                                                <a href="javascript:;" onclick="parentNode.submit();">{{ cm }}</a>
-                                            </form>
-                                        </td>
-                                        <td>{{ daemonset_data.namespace }}</td>
-                                    </tr>
-                                    {% endfor %}
-                                {% endif %}
-                                {% if daemonset_data.pvc %}
-                                    {% for pvc in daemonset_data.pvc %}
-                                    <tr>
-                                        <td>PeristentVolumeClame</td>
-                                        <td>
-                                            <form action="/storage/pvc" method="POST">
-                                                <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
-                                                <input type="hidden" name="ns_select" value="{{ daemonset_data.namespace }}" />
-                                                <input type="hidden" name="selected" value="{{ pvc }}" />
-                                                <a href="javascript:;" onclick="parentNode.submit();">{{ pvc }}</a>
-                                            </form>
-                                        </td>
-                                        <td>{{ daemonset_data.namespace }}</td>
-                                    </tr>
-                                    {% endfor %}
-                                {% endif %}
                                 </tbody>
                             </table>
                         </div>
@@ -360,31 +230,504 @@
 {% endblock %}
 
 {% block add_head_css %}
-{% include "segments/datatable_snippet.html.j2" %}
+{% include "segments/components/datatable_snippet.html.j2" %}
 {% endblock %}
 
 {% block add_tail_js %}
-    {% for c in daemonset_data.containers %}
-    <script>
-        $(document).ready(function () {
-            $('#vulnTable{{ c.name }}').DataTable({
-               responsive: true,
-               order: [[1, 'asc']],
+<script nonce="{{ csp_nonce }}">
+    const escapeHtml = (text) => {
+        if (text === null || text === undefined) return '';
+        const map = {
+            '&': '&amp;',
+            '<': '&lt;',
+            '>': '&gt;',
+            '"': '&quot;',
+            "'": '&#039;'
+        };
+        return String(text).replace(/[&<>"']/g, m => map[m]);
+    };
+    
+    const csrf_token = {{ csrf_token()|tojson }};
+    const is_admin = {{ (session.get('user_role') == 'Admin')|tojson }};
+    
+    // Get daemonset name and namespace from URL, sessionStorage, or form
+    function getDaemonSetInfo() {
+        const urlParams = new URLSearchParams(window.location.search);
+        let daemonsetName = urlParams.get('daemonset_name');
+        let namespace = urlParams.get('namespace');
+        
+        if (!daemonsetName) {
+            daemonsetName = sessionStorage.getItem('daemonset_data_name');
+        }
+        if (!namespace) {
+            namespace = sessionStorage.getItem('daemonset_data_namespace');
+        }
+        
+        // Fallback to topbar selector
+        if (!namespace) {
+            const topbarSelect = document.getElementById('inputGroupSelect04');
+            if (topbarSelect) {
+                namespace = topbarSelect.value;
+            }
+        }
+        
+        // Final fallback
+        if (!namespace) {
+            namespace = sessionStorage.getItem('ns_select') || 'default';
+        }
+        
+        return { daemonsetName, namespace };
+    }
+    
+    function populateDaemonSetData(daemonsetData) {
+        const { daemonsetName, namespace } = getDaemonSetInfo();
+        
+        // Update breadcrumb
+        const breadcrumb = document.getElementById('daemonset-name-breadcrumb');
+        if (breadcrumb) {
+            breadcrumb.textContent = daemonsetData.name || daemonsetName || 'DaemonSet';
+        }
+        
+        // Update daemonset info table
+        document.getElementById('daemonset-namespace').textContent = escapeHtml(daemonsetData.namespace || namespace || '');
+        document.getElementById('daemonset-name').textContent = escapeHtml(daemonsetData.name || '');
+        document.getElementById('daemonset-created').textContent = escapeHtml(daemonsetData.created || '');
+        
+        // Replicas (with spinner for admin)
+        const replicasContainer = document.getElementById('daemonset-replicas');
+        if (is_admin) {
+            replicasContainer.innerHTML = `
+                <div class="input-group">
+                    <input type="text" class="spinner" id="spinner" readonly="readonly" 
+                        value="${daemonsetData.desired || 0}" k8s_type="daemonset" 
+                        csrf_token="${escapeHtml(csrf_token)}" selected="${escapeHtml(daemonsetData.name || daemonsetName || '')}"
+                        namespace="${escapeHtml(daemonsetData.namespace || namespace || '')}">
+                </div>
+            `;
+            // Load spinner script if not already loaded
+            if (!document.getElementById('spinner-script')) {
+                const script = document.createElement('script');
+                script.id = 'spinner-script';
+                script.src = "{{ url_for('static',filename='/vendor/custom-input-spinner/inputt-spinner-ds.js') }}";
+                document.body.appendChild(script);
+            }
+        } else {
+            replicasContainer.textContent = daemonsetData.desired || 0;
+        }
+        
+        // Annotations
+        const annotationsContainer = document.getElementById('daemonset-annotations-container');
+        if (daemonsetData.annotations && Array.isArray(daemonsetData.annotations) && daemonsetData.annotations.length > 0) {
+            // Handle array format
+            const annotations = {};
+            daemonsetData.annotations.forEach(ann => {
+                if (typeof ann === 'object' && ann !== null) {
+                    Object.assign(annotations, ann);
+                }
             });
-        });
-    </script>
-    {% endfor %}
-    {% for ic in daemonset_data.init_containers %}
-    <script>
-        $(document).ready(function () {
-            $('#intVulnTable{{ ic.name }}').DataTable({
-               responsive: true,
-               order: [[1, 'asc']],
+            if (Object.keys(annotations).length > 0) {
+                annotationsContainer.innerHTML = `
+                    <table class="table table-bordered" id="annotationTable" width="100%" cellspacing="0">
+                        <thead>
+                            <tr>
+                                <th width="50%">Key</th>
+                                <th width="50%">Value</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            ${Object.entries(annotations).map(([key, value]) => `
+                                <tr>
+                                    <td width="50%">${escapeHtml(key)}</td>
+                                    <td width="50%">${escapeHtml(value)}</td>
+                                </tr>
+                            `).join('')}
+                        </tbody>
+                    </table>
+                `;
+            } else {
+                annotationsContainer.innerHTML = '<span class="text-muted">No annotations</span>';
+            }
+        } else if (daemonsetData.annotations && typeof daemonsetData.annotations === 'object' && Object.keys(daemonsetData.annotations).length > 0) {
+            // Handle object format
+            annotationsContainer.innerHTML = `
+                <table class="table table-bordered" id="annotationTable" width="100%" cellspacing="0">
+                    <thead>
+                        <tr>
+                            <th width="50%">Key</th>
+                            <th width="50%">Value</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        ${Object.entries(daemonsetData.annotations).map(([key, value]) => `
+                            <tr>
+                                <td width="50%">${escapeHtml(key)}</td>
+                                <td width="50%">${escapeHtml(value)}</td>
+                            </tr>
+                        `).join('')}
+                    </tbody>
+                </table>
+            `;
+        } else {
+            annotationsContainer.innerHTML = '<span class="text-muted">No annotations</span>';
+        }
+        
+        // Labels
+        const labelsContainer = document.getElementById('daemonset-labels-container');
+        if (daemonsetData.labels && Array.isArray(daemonsetData.labels) && daemonsetData.labels.length > 0) {
+            // Handle array format
+            const labels = {};
+            daemonsetData.labels.forEach(label => {
+                if (typeof label === 'object' && label !== null) {
+                    Object.assign(labels, label);
+                }
             });
-        });
-    </script>
-    {% endfor %}
-
-    <!-- Custom input spinner -->
-    <script id="spinner" src="{{ url_for('static',filename='/vendor/custom-input-spinner/inputt-spinner-ds.js') }}" ></script>
+            if (Object.keys(labels).length > 0) {
+                labelsContainer.innerHTML = `
+                    <table class="table table-bordered" id="labelsTable" width="100%" cellspacing="0">
+                        <thead>
+                            <tr>
+                                <th width="50%">Key</th>
+                                <th width="50%">Value</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            ${Object.entries(labels).map(([key, value]) => `
+                                <tr>
+                                    <td width="50%">${escapeHtml(key)}</td>
+                                    <td width="50%">${escapeHtml(value)}</td>
+                                </tr>
+                            `).join('')}
+                        </tbody>
+                    </table>
+                `;
+            } else {
+                labelsContainer.innerHTML = '<span class="text-muted">No labels</span>';
+            }
+        } else if (daemonsetData.labels && typeof daemonsetData.labels === 'object' && Object.keys(daemonsetData.labels).length > 0) {
+            // Handle object format
+            labelsContainer.innerHTML = `
+                <table class="table table-bordered" id="labelsTable" width="100%" cellspacing="0">
+                    <thead>
+                        <tr>
+                            <th width="50%">Key</th>
+                            <th width="50%">Value</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        ${Object.entries(daemonsetData.labels).map(([key, value]) => `
+                            <tr>
+                                <td width="50%">${escapeHtml(key)}</td>
+                                <td width="50%">${escapeHtml(value)}</td>
+                            </tr>
+                        `).join('')}
+                    </tbody>
+                </table>
+            `;
+        } else {
+            labelsContainer.innerHTML = '<span class="text-muted">No labels</span>';
+        }
+        
+        // Selectors
+        const selectorsContainer = document.getElementById('daemonset-selectors-container');
+        if (daemonsetData.selectors && Array.isArray(daemonsetData.selectors) && daemonsetData.selectors.length > 0) {
+            // Handle array format
+            const selectors = {};
+            daemonsetData.selectors.forEach(sel => {
+                if (typeof sel === 'object' && sel !== null) {
+                    Object.assign(selectors, sel);
+                }
+            });
+            if (Object.keys(selectors).length > 0) {
+                selectorsContainer.innerHTML = `
+                    <table class="table table-bordered" id="selectorsTable" width="100%" cellspacing="0">
+                        <thead>
+                            <tr>
+                                <th width="50%">Key</th>
+                                <th width="50%">Value</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            ${Object.entries(selectors).map(([key, value]) => `
+                                <tr>
+                                    <td width="50%">${escapeHtml(key)}</td>
+                                    <td width="50%">${escapeHtml(value)}</td>
+                                </tr>
+                            `).join('')}
+                        </tbody>
+                    </table>
+                `;
+            } else {
+                selectorsContainer.innerHTML = '<span class="text-muted">No selectors</span>';
+            }
+        } else if (daemonsetData.selectors && typeof daemonsetData.selectors === 'object' && Object.keys(daemonsetData.selectors).length > 0) {
+            // Handle object format
+            selectorsContainer.innerHTML = `
+                <table class="table table-bordered" id="selectorsTable" width="100%" cellspacing="0">
+                    <thead>
+                        <tr>
+                            <th width="50%">Key</th>
+                            <th width="50%">Value</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        ${Object.entries(daemonsetData.selectors).map(([key, value]) => `
+                            <tr>
+                                <td width="50%">${escapeHtml(key)}</td>
+                                <td width="50%">${escapeHtml(value)}</td>
+                            </tr>
+                        `).join('')}
+                    </tbody>
+                </table>
+            `;
+        } else {
+            selectorsContainer.innerHTML = '<span class="text-muted">No selectors</span>';
+        }
+        
+        // Populate containers
+        populateContainers(daemonsetData);
+        
+        // Populate variables
+        populateVariables(daemonsetData.environment_variables || []);
+        
+        // Populate security contexts
+        populateSecurityContext(daemonsetData.security_context || {});
+        
+        // Populate related resources
+        populateRelatedResources(daemonsetData, namespace);
+    }
+    
+    function populateContainers(daemonsetData) {
+        // Init containers
+        const initContainersSection = document.getElementById('init-containers-section');
+        const initContainersTbody = document.getElementById('init-containers-tbody');
+        
+        if (daemonsetData.init_containers && daemonsetData.init_containers.length > 0) {
+            initContainersSection.style.display = 'block';
+            initContainersTbody.innerHTML = daemonsetData.init_containers.map(ic => {
+                return `
+                    <tr>
+                        <td>${escapeHtml(ic.name || '')}</td>
+                        <td>${escapeHtml(ic.image || '')}</td>
+                    </tr>
+                `;
+            }).join('');
+        } else {
+            initContainersSection.style.display = 'none';
+            initContainersTbody.innerHTML = '';
+        }
+        
+        // Containers
+        const containersTbody = document.getElementById('containers-tbody');
+        if (daemonsetData.containers && daemonsetData.containers.length > 0) {
+            containersTbody.innerHTML = daemonsetData.containers.map(c => {
+                return `
+                    <tr>
+                        <td>${escapeHtml(c.name || '')}</td>
+                        <td>${escapeHtml(c.image || '')}</td>
+                    </tr>
+                `;
+            }).join('');
+        } else {
+            containersTbody.innerHTML = '<tr><td colspan="2" class="text-center text-muted">No containers found</td></tr>';
+        }
+    }
+    
+    function populateVariables(environmentVariables) {
+        const tbody = document.getElementById('variables-tbody');
+        if (environmentVariables && environmentVariables.length > 0) {
+            tbody.innerHTML = environmentVariables.map(vars => {
+                if (vars && typeof vars === 'object') {
+                    return Object.entries(vars).map(([key, value]) => `
+                        <tr>
+                            <td>${escapeHtml(key)}</td>
+                            <td>${escapeHtml(value)}</td>
+                        </tr>
+                    `).join('');
+                }
+                return '';
+            }).join('');
+        } else {
+            tbody.innerHTML = '<tr><td colspan="2" class="text-center text-muted">No environment variables found</td></tr>';
+        }
+    }
+    
+    function populateSecurityContext(securityContext) {
+        const tbody = document.getElementById('security-tbody');
+        if (securityContext && Object.keys(securityContext).length > 0) {
+            tbody.innerHTML = Object.entries(securityContext).map(([key, value]) => {
+                const valueStr = typeof value === 'object' ? JSON.stringify(value) : String(value);
+                return `
+                    <tr>
+                        <td>${escapeHtml(key)}</td>
+                        <td>${escapeHtml(valueStr)}</td>
+                    </tr>
+                `;
+            }).join('');
+        } else {
+            tbody.innerHTML = '<tr><td colspan="2" class="text-center text-muted">No security context found</td></tr>';
+        }
+    }
+    
+    function populateRelatedResources(daemonsetData, namespace) {
+        const ns = daemonsetData.namespace || namespace || '';
+        const tbody = document.getElementById('refers-to-tbody');
+        let rows = [];
+        
+        // Image pull secrets
+        if (daemonsetData.image_pull_secrets && daemonsetData.image_pull_secrets.length > 0) {
+            daemonsetData.image_pull_secrets.forEach(ips => {
+                if (typeof ips === 'object' && ips !== null) {
+                    Object.entries(ips).forEach(([key, value]) => {
+                        if (key === 'name' || value) {
+                            const secretName = escapeHtml(value || '');
+                            rows.push(`
+                                <tr>
+                                    <td>ImagePullSecret</td>
+                                    <td>
+                                        <form action="/security/secret" method="POST" onsubmit="sessionStorage.setItem('ns_select', '${escapeHtml(ns)}'); return true;">
+                                            <input type="hidden" name="csrf_token" value="${escapeHtml(csrf_token)}">
+                                            <input type="hidden" name="ns_select" value="${escapeHtml(ns)}" />
+                                            <input type="hidden" name="selected" value="${secretName}" />
+                                            <a href="javascript:;" onclick="parentNode.submit();">${secretName}</a>
+                                        </form>
+                                    </td>
+                                    <td>${escapeHtml(ns)}</td>
+                                </tr>
+                            `);
+                        }
+                    });
+                }
+            });
+        }
+        
+        // Service account
+        if (daemonsetData.service_account) {
+            const saName = Array.isArray(daemonsetData.service_account) 
+                ? daemonsetData.service_account[0] 
+                : daemonsetData.service_account;
+            if (saName) {
+                rows.push(`
+                    <tr>
+                        <td>ServiceAccount</td>
+                        <td>
+                            <form action="/cluster-permission/service-account" method="POST" onsubmit="sessionStorage.setItem('ns_select', '${escapeHtml(ns)}'); return true;">
+                                <input type="hidden" name="csrf_token" value="${escapeHtml(csrf_token)}">
+                                <input type="hidden" name="ns_select" value="${escapeHtml(ns)}" />
+                                <input type="hidden" name="selected" value="${escapeHtml(saName)}" />
+                                <a href="javascript:;" onclick="parentNode.submit();">${escapeHtml(saName)}</a>
+                            </form>
+                        </td>
+                        <td>${escapeHtml(ns)}</td>
+                    </tr>
+                `);
+            }
+        }
+        
+        // Secrets
+        if (daemonsetData.secrets && daemonsetData.secrets.length > 0) {
+            daemonsetData.secrets.forEach(secret => {
+                rows.push(`
+                    <tr>
+                        <td>Secret</td>
+                        <td>
+                            <form action="/security/secret" method="POST" onsubmit="sessionStorage.setItem('ns_select', '${escapeHtml(ns)}'); return true;">
+                                <input type="hidden" name="csrf_token" value="${escapeHtml(csrf_token)}">
+                                <input type="hidden" name="ns_select" value="${escapeHtml(ns)}" />
+                                <input type="hidden" name="selected" value="${escapeHtml(secret)}" />
+                                <a href="javascript:;" onclick="parentNode.submit();">${escapeHtml(secret)}</a>
+                            </form>
+                        </td>
+                        <td>${escapeHtml(ns)}</td>
+                    </tr>
+                `);
+            });
+        }
+        
+        // ConfigMaps
+        if (daemonsetData.cm && daemonsetData.cm.length > 0) {
+            daemonsetData.cm.forEach(cm => {
+                rows.push(`
+                    <tr>
+                        <td>ConfigMap</td>
+                        <td>
+                            <form action="/storage/configmap" method="POST" onsubmit="sessionStorage.setItem('ns_select', '${escapeHtml(ns)}'); return true;">
+                                <input type="hidden" name="csrf_token" value="${escapeHtml(csrf_token)}">
+                                <input type="hidden" name="ns_select" value="${escapeHtml(ns)}" />
+                                <input type="hidden" name="selected" value="${escapeHtml(cm)}" />
+                                <a href="javascript:;" onclick="parentNode.submit();">${escapeHtml(cm)}</a>
+                            </form>
+                        </td>
+                        <td>${escapeHtml(ns)}</td>
+                    </tr>
+                `);
+            });
+        }
+        
+        // PVCs
+        if (daemonsetData.pvc && daemonsetData.pvc.length > 0) {
+            daemonsetData.pvc.forEach(pvc => {
+                rows.push(`
+                    <tr>
+                        <td>PersistentVolumeClaim</td>
+                        <td>
+                            <form action="/storage/pvc" method="POST" onsubmit="sessionStorage.setItem('ns_select', '${escapeHtml(ns)}'); return true;">
+                                <input type="hidden" name="csrf_token" value="${escapeHtml(csrf_token)}">
+                                <input type="hidden" name="ns_select" value="${escapeHtml(ns)}" />
+                                <input type="hidden" name="selected" value="${escapeHtml(pvc)}" />
+                                <a href="javascript:;" onclick="parentNode.submit();">${escapeHtml(pvc)}</a>
+                            </form>
+                        </td>
+                        <td>${escapeHtml(ns)}</td>
+                    </tr>
+                `);
+            });
+        }
+        
+        if (rows.length > 0) {
+            tbody.innerHTML = rows.join('');
+        } else {
+            tbody.innerHTML = '<tr><td colspan="3" class="text-center text-muted">No related resources found</td></tr>';
+        }
+    }
+    
+    async function loadDaemonSetData() {
+        const { daemonsetName, namespace } = getDaemonSetInfo();
+        
+        if (!daemonsetName) {
+            console.error('DaemonSet name not found in URL, sessionStorage, or form.');
+            document.getElementById('daemonset-name-breadcrumb').textContent = 'Error';
+            document.getElementById('daemonset-name').textContent = 'Error: DaemonSet name not provided.';
+            return;
+        }
+        
+        try {
+            const apiUrl = `/api/v1/workloads/daemonsets/${encodeURIComponent(daemonsetName)}?namespace=${encodeURIComponent(namespace)}`;
+            console.log('Fetching daemonset data from:', apiUrl);
+            
+            const response = await fetch(apiUrl);
+            if (!response.ok) {
+                throw new Error(`HTTP error! status: ${response.status}`);
+            }
+            
+            const data = await response.json();
+            console.log('DaemonSet data API response:', data);
+            
+            if (data.error) {
+                throw new Error(data.message || 'Failed to load daemonset data');
+            }
+            
+            populateDaemonSetData(data.data);
+            
+        } catch (error) {
+            console.error('Error loading daemonset data:', error);
+            document.getElementById('daemonset-name-breadcrumb').textContent = 'Error';
+            document.getElementById('daemonset-name').textContent = 'Error: ' + escapeHtml(error.message);
+        }
+    }
+    
+    // Load data when page loads
+    document.addEventListener('DOMContentLoaded', function() {
+        loadDaemonSetData();
+    });
+</script>
 {% endblock %}

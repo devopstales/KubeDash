@@ -1,0 +1,6 @@
+# Minimal K8sGPT config for NoOpAI backend (no API key required).
+# Used by dc-mcp-server.yaml so the k8sgpt container can start without interactive "k8sgpt auth".
+# See: https://docs.k8sgpt.ai/reference/providers/backend/#fakeai
+defaultBackend: noopai
+backends:
+  noopai: {}

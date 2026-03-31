@@ -7,7 +7,7 @@
         <ol class="breadcrumb my-0">
           <li class="breadcrumb-item"><span>Storage</span></li>
           <li class="breadcrumb-item"><a href="/storage/pvc">PVC</a></li>
-          <li class="breadcrumb-item active"><span>{{ pvc_data.name }}</span></li>
+          <li class="breadcrumb-item active"><span id="pvc-name-breadcrumb">Loading...</span></li>
 
         </ol>
       </nav>
@@ -15,7 +15,7 @@
 </ul>
 <ul class="header-nav ms-auto"></ul>
 <ul class="header-nav d-lg-flex">
-{% include "segments/topmenu.html.j2" %}
+{% include "segments/partials/topmenu.html.j2" %}
 {% endblock %}
 
 {% block content %}
@@ -28,99 +28,59 @@
             <table class="table table-bordered" id="podInfoTable" width="100%" cellspacing="0">
                 <tr>
                     <th>Status:</th>
-                    <td>{{ pvc_data.status }}</td>
+                    <td id="pvc-status">Loading...</td>
                 </tr>
                 <tr>
                     <th>Name:</th>
-                    <td>{{ pvc_data.name }}</td>
+                    <td id="pvc-name">Loading...</td>
                 </tr>
                 <tr>
                     <th>Namespace:</th>
-                    <td>{{ namespace }}</td>
+                    <td id="pvc-namespace">Loading...</td>
                 </tr>
                 <tr>
                     <th>Created:</th>
-                    <td>{{ pvc_data.created }}</td>
+                    <td id="pvc-created">Loading...</td>
                 </tr>
                 <tr>
                     <th>Annotations:</th>
-                    <td>
-                        {% if pvc_data.annotations %}
-                        <table class="table table-bordered" id="annotationTable" width="100%" cellspacing="0">
-                            <thead>
-                                <tr>
-                                    <th width="50%">Key</th>
-                                    <th width="50%">Value</th>
-                                </tr>
-                            </thead>
-                            <tbody>
-                            {% for key, value in pvc_data.annotations.items() %}
-                                <tr>
-                                    <td width="50%">{{ key }}</td>
-                                    <td width="50%">{{ value }}</td>
-                                </tr>
-                            {% endfor %}
-                            </tbody>
-                        </table>
-                        {% endif %}
+                    <td id="pvc-annotations-container">
+                        <div class="spinner-border spinner-border-sm text-primary" role="status">
+                            <span class="visually-hidden">Loading...</span>
+                        </div>
                     </td>
                 </tr>
                 <tr>
-                    <th>Lables:</th>
-                    <td>
-                        {% if pvc_data.labels %}
-                        <table class="table table-bordered" id="labelsTable" width="100%" cellspacing="0">
-                            <thead>
-                                <tr>
-                                    <th width="50%">Key</th>
-                                    <th width="50%">Value</th>
-                                </tr>
-                            </thead>
-                            <tbody>
-                            {% for key, value in pvc_data.labels.items() %}
-                                <tr>
-                                    <td width="50%">{{ key }}</td>
-                                    <td width="50%">{{ value }}</td>
-                                </tr>
-                            {% endfor %}
-                            </tbody>
-                        </table>
-                        {% endif %}
+                    <th>Labels:</th>
+                    <td id="pvc-labels-container">
+                        <div class="spinner-border spinner-border-sm text-primary" role="status">
+                            <span class="visually-hidden">Loading...</span>
+                        </div>
                     </td>
                 </tr>
                 <tr>
                     <th>StorageClass:</th>
-                    <td>
-                        <form action="/storage/storage-class" method="POST">
-                            <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
-                            <input type="hidden" name="ns_select" value="{{ session['ns_select'] }}" />
-                            <input type="hidden" name="selected" value="{{ pvc_data.storage_class_name }}" />
-                            <a href="javascript:;" onclick="parentNode.submit();">{{ pvc_data.storage_class_name }}</a>
-                        </form>
-                    </td>
+                    <td id="pvc-storageclass">Loading...</td>
                 </tr>
                 <tr>
                     <th>Persistent Volume:</th>
-                    <td>
-                        <form action="/storage/pv" method="POST">
-                            <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
-                            <input type="hidden" name="ns_select" value="{{ session['ns_select'] }}" />
-                            <input type="hidden" name="pv_name" value="{{ pvc_data.volume_name }}" />
-                            <a href="javascript:;" onclick="parentNode.submit();">{{ pvc_data.volume_name }}</a>
-                        </form>
-                    </td>
+                    <td id="pvc-volume">Loading...</td>
                 </tr>
                 <tr>
                     <th>Access Mode:</th>
-                    <td>{{ pvc_data.access_modes }}</td>
+                    <td id="pvc-access-modes">Loading...</td>
                 </tr>
                 <tr>
                     <th>VolumeMode:</th>
-                    <td>{{ pvc_data.volume_mode }}</td>
+                    <td id="pvc-volume-mode">Loading...</td>
                 </tr>
                 <tr>
                     <th>Capacity:</th>
-                    <td>{{ pvc_data.capacity }}</td>
+                    <td id="pvc-capacity">Loading...</td>
+                </tr>
+                <tr>
+                    <th>Usage:</th>
+                    <td id="pvc-usage">Loading...</td>
                 </tr>
             </table>
         </div>
@@ -129,5 +89,238 @@
 {% endblock %}
 
 {% block add_head_css %}
-{% include "segments/datatable_snippet.html.j2" %}
+{% include "segments/components/datatable_snippet.html.j2" %}
+{% endblock %}
+
+{% block add_tail_js %}
+<script nonce="{{ csp_nonce }}">
+    const escapeHtml = (text) => {
+        if (text === null || text === undefined) return '';
+        const map = {
+            '&': '&amp;',
+            '<': '&lt;',
+            '>': '&gt;',
+            '"': '&quot;',
+            "'": '&#039;'
+        };
+        return String(text).replace(/[&<>"']/g, m => map[m]);
+    };
+    
+    const csrf_token = {{ csrf_token()|tojson }};
+    
+    // Get PVC name and namespace from URL, sessionStorage, or topbar selector
+    function getPVCInfo() {
+        // Try to get from URL parameters first
+        const urlParams = new URLSearchParams(window.location.search);
+        let pvcName = urlParams.get('selected') || urlParams.get('pvc_name');
+        let namespace = urlParams.get('namespace');
+        
+        // Fallback to sessionStorage (set by form submission)
+        if (!pvcName) {
+            pvcName = sessionStorage.getItem('pvc_data_name');
+        }
+        if (!namespace) {
+            namespace = sessionStorage.getItem('ns_select');
+        }
+        
+        // Fallback to topbar selector
+        if (!namespace) {
+            const topbarSelect = document.getElementById('inputGroupSelect04');
+            if (topbarSelect) {
+                namespace = topbarSelect.value;
+            }
+        }
+        
+        // Final fallback
+        if (!namespace) {
+            namespace = 'default';
+        }
+        
+        return { pvcName, namespace };
+    }
+    
+    function populatePVCInfo(pvc, metrics) {
+        if (!pvc) {
+            document.getElementById('pvc-name').textContent = 'N/A';
+            document.getElementById('pvc-status').textContent = 'N/A';
+            document.getElementById('pvc-created').textContent = 'N/A';
+            return;
+        }
+        
+        // Basic info
+        document.getElementById('pvc-name').textContent = escapeHtml(pvc.name || 'N/A');
+        document.getElementById('pvc-namespace').textContent = escapeHtml(pvc.namespace || 'N/A');
+        document.getElementById('pvc-created').textContent = escapeHtml(pvc.created || 'N/A');
+        
+        // Status with badge
+        const status = pvc.status || 'Unknown';
+        let statusBadge = '';
+        if (status === 'Bound') {
+            statusBadge = '<span class="badge text-bg-success text-bg-tag">' + escapeHtml(status) + '</span>';
+        } else if (status === 'Terminating') {
+            statusBadge = '<span class="badge text-bg-danger text-bg-tag">' + escapeHtml(status) + '</span>';
+        } else {
+            statusBadge = '<span class="badge text-bg-warning text-bg-tag">' + escapeHtml(status) + '</span>';
+        }
+        document.getElementById('pvc-status').innerHTML = statusBadge;
+        
+        // Update breadcrumb
+        const breadcrumb = document.getElementById('pvc-name-breadcrumb');
+        if (breadcrumb) {
+            breadcrumb.textContent = escapeHtml(pvc.name || 'Loading...');
+        }
+        
+        // Annotations
+        const annotationsContainer = document.getElementById('pvc-annotations-container');
+        if (pvc.annotations && Object.keys(pvc.annotations).length > 0) {
+            let annotationsHtml = '<table class="table table-bordered" id="annotationTable" width="100%" cellspacing="0"><thead><tr><th width="50%">Key</th><th width="50%">Value</th></tr></thead><tbody>';
+            for (const [key, value] of Object.entries(pvc.annotations)) {
+                if (key !== "kubectl.kubernetes.io/last-applied-configuration") {
+                    annotationsHtml += `<tr><td width="50%">${escapeHtml(key)}</td><td width="50%">${escapeHtml(value)}</td></tr>`;
+                }
+            }
+            annotationsHtml += '</tbody></table>';
+            annotationsContainer.innerHTML = annotationsHtml;
+        } else {
+            annotationsContainer.innerHTML = '<span class="text-muted">No annotations</span>';
+        }
+        
+        // Labels
+        const labelsContainer = document.getElementById('pvc-labels-container');
+        if (pvc.labels && Object.keys(pvc.labels).length > 0) {
+            let labelsHtml = '<table class="table table-bordered" id="labelsTable" width="100%" cellspacing="0"><thead><tr><th width="50%">Key</th><th width="50%">Value</th></tr></thead><tbody>';
+            for (const [key, value] of Object.entries(pvc.labels)) {
+                labelsHtml += `<tr><td width="50%">${escapeHtml(key)}</td><td width="50%">${escapeHtml(value)}</td></tr>`;
+            }
+            labelsHtml += '</tbody></table>';
+            labelsContainer.innerHTML = labelsHtml;
+        } else {
+            labelsContainer.innerHTML = '<span class="text-muted">No labels</span>';
+        }
+        
+        // StorageClass
+        const namespace = pvc.namespace || sessionStorage.getItem('ns_select') || 'default';
+        if (pvc.storage_class_name) {
+            document.getElementById('pvc-storageclass').innerHTML = `
+                <form action="/storage/storage-class" method="POST" onsubmit="sessionStorage.setItem('ns_select', '${escapeHtml(namespace)}'); return true;">
+                    <input type="hidden" name="csrf_token" value="${escapeHtml(csrf_token)}">
+                    <input type="hidden" name="ns_select" value="${escapeHtml(namespace)}" />
+                    <input type="hidden" name="selected" value="${escapeHtml(pvc.storage_class_name)}" />
+                    <a href="javascript:;" onclick="parentNode.submit();">${escapeHtml(pvc.storage_class_name)}</a>
+                </form>
+            `;
+        } else {
+            document.getElementById('pvc-storageclass').textContent = '-';
+        }
+        
+        // Persistent Volume
+        if (pvc.volume_name) {
+            document.getElementById('pvc-volume').innerHTML = `
+                <form action="/storage/pv" method="POST" onsubmit="sessionStorage.setItem('ns_select', '${escapeHtml(namespace)}'); return true;">
+                    <input type="hidden" name="csrf_token" value="${escapeHtml(csrf_token)}">
+                    <input type="hidden" name="ns_select" value="${escapeHtml(namespace)}" />
+                    <input type="hidden" name="selected" value="${escapeHtml(pvc.volume_name)}" />
+                    <a href="javascript:;" onclick="parentNode.submit();">${escapeHtml(pvc.volume_name)}</a>
+                </form>
+            `;
+        } else {
+            document.getElementById('pvc-volume').textContent = '-';
+        }
+        
+        document.getElementById('pvc-access-modes').textContent = escapeHtml(pvc.access_modes || '-');
+        document.getElementById('pvc-volume-mode').textContent = escapeHtml(pvc.volume_mode || '-');
+        document.getElementById('pvc-capacity').textContent = escapeHtml(pvc.capacity || '-');
+        
+        // Usage metrics
+        const usageContainer = document.getElementById('pvc-usage');
+        if (metrics && metrics.percentageUsed !== undefined) {
+            const usagePercent = Math.round(metrics.percentageUsed || 0);
+            // Determine progress bar color based on usage
+            let progressBarClass = 'bg-success';
+            if (usagePercent >= 90) {
+                progressBarClass = 'bg-danger';
+            } else if (usagePercent >= 75) {
+                progressBarClass = 'bg-warning';
+            }
+            
+            usageContainer.innerHTML = `
+                <div class="progress position-relative" style="height: 20px;">
+                    <div class="progress-bar ${progressBarClass}" role="progressbar" style="width: ${usagePercent}%" aria-valuenow="${usagePercent}" aria-valuemin="0" aria-valuemax="100"></div>
+                    <small class="justify-content-center d-flex position-absolute w-100">${usagePercent}%</small>
+                </div>
+                <div class="mt-2 small text-muted">
+                    Used: ${(metrics.usedBytes || 0).toFixed(2)} KB / Capacity: ${(metrics.capacityBytes || 0).toFixed(2)} KB
+                </div>
+            `;
+        } else {
+            usageContainer.textContent = '-';
+        }
+    }
+    
+    async function loadPVCData() {
+        try {
+            const { pvcName, namespace } = getPVCInfo();
+            
+            console.log('PVC info:', { pvcName, namespace });
+            
+            if (!pvcName) {
+                throw new Error('PVC name not found. Please select a PVC from the list page.');
+            }
+            
+            // Fetch PVC data and metrics in parallel
+            const [pvcResponse, metricsResponse] = await Promise.all([
+                fetch(`/api/v1/storage/pvcs/${encodeURIComponent(pvcName)}?namespace=${encodeURIComponent(namespace)}`),
+                fetch(`/api/v1/storage/pvcs/metrics?namespace=${encodeURIComponent(namespace)}`)
+            ]);
+            
+            if (!pvcResponse.ok) {
+                if (pvcResponse.status === 404) {
+                    throw new Error(`PVC '${pvcName}' not found in namespace '${namespace}'`);
+                }
+                throw new Error(`HTTP error! status: ${pvcResponse.status}`);
+            }
+            
+            const pvcResult = await pvcResponse.json();
+            console.log('PVC API response:', pvcResult);
+            
+            if (pvcResult.error) {
+                throw new Error(pvcResult.message || 'Failed to load PVC');
+            }
+            
+            const pvc = pvcResult.data;
+            if (!pvc) {
+                throw new Error('No PVC data received');
+            }
+            
+            // Add namespace to PVC object for display
+            pvc.namespace = pvcResult.metadata?.namespace || namespace;
+            
+            // Get metrics for this PVC
+            let metrics = null;
+            if (metricsResponse.ok) {
+                const metricsData = await metricsResponse.json();
+                console.log('PVC Metrics API response:', metricsData);
+                const allMetrics = metricsData.data || [];
+                // Find metrics for this specific PVC
+                metrics = allMetrics.find(m => m.name === pvcName) || null;
+            }
+            
+            populatePVCInfo(pvc, metrics);
+            
+        } catch (error) {
+            console.error('Error loading PVC data:', error);
+            document.getElementById('pvc-name').textContent = 'Error';
+            document.getElementById('pvc-status').textContent = 'Error';
+            document.getElementById('pvc-created').textContent = 'Error';
+            document.getElementById('pvc-annotations-container').innerHTML = 
+                '<span class="text-danger">Error loading PVC: ' + escapeHtml(error.message) + '</span>';
+            document.getElementById('pvc-labels-container').innerHTML = '';
+        }
+    }
+    
+    // Load data when page loads
+    document.addEventListener('DOMContentLoaded', function() {
+        loadPVCData();
+    });
+</script>
 {% endblock %}

@@ -2,8 +2,10 @@
 Helper functions for Kubernetes Extension API Server.
 """
 
+import base64
+import json
 from datetime import datetime, timezone
-from typing import List
+from typing import List, Optional, Tuple
 
 ##############################################################
 ## Constants
@@ -16,6 +18,32 @@ API_GROUP_VERSION = f"{API_GROUP}/{API_VERSION}"
 ##############################################################
 ## Helper Functions
 ##############################################################
+
+def encode_continue_token(last_name: str, limit: int) -> str:
+    """
+    Encode an opaque continue token for list pagination.
+    Token encodes the last-seen name and page limit so the next request
+    can resume after that name. Invalid tokens are treated as first page.
+    """
+    payload = {"n": last_name, "l": limit}
+    return base64.urlsafe_b64encode(json.dumps(payload).encode()).decode()
+
+
+def decode_continue_token(token: str) -> Optional[Tuple[str, int]]:
+    """
+    Decode a continue token. Returns (last_name, limit) or None if invalid.
+    Caller should treat None as first page (no continue).
+    """
+    if not token or not token.strip():
+        return None
+    try:
+        payload = json.loads(base64.urlsafe_b64decode(token.encode()).decode())
+        if isinstance(payload, dict) and "n" in payload and "l" in payload:
+            return (str(payload["n"]), int(payload["l"]))
+    except (ValueError, TypeError, KeyError):
+        pass
+    return None
+
 
 def get_resource_version() -> str:
     """
@@ -87,22 +115,32 @@ def build_project_object(namespace_data: dict) -> dict:
     }
 
 
-def build_project_list(projects: List[dict]) -> dict:
+def build_project_list(
+    projects: List[dict],
+    continue_token: str = None,
+    remaining: int = 0
+) -> dict:
     """
     Build a ProjectList object from a list of Project objects.
     
     Args:
         projects: List of Project objects
+        continue_token: Opaque token for the next page (when remaining > 0)
+        remaining: Number of items after this page; when > 0 and continue_token
+            is set, metadata.continue is set
         
     Returns:
         dict: ProjectList object in Kubernetes API format
     """
+    metadata = {
+        "resourceVersion": get_resource_version()
+    }
+    if remaining > 0 and continue_token:
+        metadata["continue"] = continue_token
     return {
         "kind": "ProjectList",
         "apiVersion": API_GROUP_VERSION,
-        "metadata": {
-            "resourceVersion": get_resource_version()
-        },
+        "metadata": metadata,
         "items": projects
     }
 

@@ -1,4 +1,3 @@
-
 {% extends "base2.html.j2" %}
 
 {% block topmenu %}
@@ -8,15 +7,15 @@
         <ol class="breadcrumb my-0">
           <li class="breadcrumb-item"><span>Plugins</span></li>
           <li class="breadcrumb-item"><a href="/plugins/cert-manager">Cert-Manager</a></li>
-          <li class="breadcrumb-item">{{ object_type|replace("_", " ")|capitalize }}</li>
-          <li class="breadcrumb-item active" aria-current="page">{{ object_data.name }}</li>
+          <li class="breadcrumb-item" id="object-type-breadcrumb">Loading...</li>
+          <li class="breadcrumb-item active" aria-current="page" id="object-name-breadcrumb">Loading...</li>
         </ol>
       </nav>
     </div>
 </ul>
 <ul class="header-nav ms-auto"></ul>
 <ul class="header-nav d-lg-flex">
-{% include "segments/topmenu.html.j2" %}
+{% include "segments/partials/topmenu.html.j2" %}
 {% endblock %}
 
 {% block content %}
@@ -27,126 +26,46 @@
     <div class="card-body">
         <div class="table-responsive">
             <table class="table table-bordered" id="podInfoTable" width="100%" cellspacing="0">
-                {% if object_type == "cluster_issuer" %}
                 <tr>
                     <th>Name:</th>
-                    <td>{{ object_data.name }}</td>
+                    <td id="object-name">Loading...</td>
                 </tr>
-                <tr>
+                <tr id="status-row" style="display: none;">
                     <th>Status:</th>
-                    <td>
-                    {% if object_data.status == 'True' %}
-                        <span class="badge bg-success">{{ object_data.reason }}</span>
-                    {% else %}
-                        <span class="badge bg-danger">{{ object_data.reason }}</span>
-                    {% endif %}
-                    </td>
+                    <td id="object-status">Loading...</td>
                 </tr>
-                <tr>
+                <tr id="status-message-row" style="display: none;">
                     <th>Status message:</th>
-                    <td>{{ object_data.message }}</td>
+                    <td id="object-status-message">Loading...</td>
                 </tr>
-                <tr>
+                <tr id="issuer-type-row" style="display: none;">
                     <th>Issuer Type:</th>
-                    <td>{{ object_data.type }}</td>
+                    <td id="object-issuer-type">Loading...</td>
                 </tr>
-                <tr>
+                <tr id="issuer-data-row" style="display: none;">
                     <th>Issuer Data:</th>
-                    <td>{{ object_data.issuer_data }}</td>
+                    <td id="object-issuer-data">Loading...</td>
                 </tr>
-                {% elif object_type == "issuer" %}
-                <tr>
-                    <th>Name:</th>
-                    <td>{{ object_data.name }}</td>
-                </tr>
-                <tr>
-                    <th>Status:</th>
-                    <td>
-                    {% if object_data.status == 'True' %}
-                        <span class="badge bg-success">{{ object_data.reason }}</span>
-                    {% else %}
-                        <span class="badge bg-danger">{{ object_data.reason }}</span>
-                    {% endif %}
-                    </td>
-                </tr>
-                <tr>
-                    <th>Status message:</th>
-                    <td>{{ object_data.message }}</td>
-                </tr>
-                <tr>
-                    <th>Issuer Data:</th>
-                    <td>{{ object_data.issuer_data }}</td>
-                </tr>
-                {% elif object_type == "certificate_request" %}
-                <tr>
-                    <th>Name:</th>
-                    <td>{{ object_data.name }}</td>
-                </tr>
-                <tr>
-                    <th>Status:</th>
-                    <td>
-                    {% if object_data.status == 'True' %}
-                        <span class="badge bg-success">{{ object_data.reason }}</span>
-                    {% else %}
-                        <span class="badge bg-danger">{{ object_data.reason }}</span>
-                    {% endif %}
-                    </td>
-                </tr>
-                <tr>
-                    <th>Status message:</th>
-                    <td>{{ object_data.message }}</td>
-                </tr>
-                <tr>
-                    <th>Issuer:</th>
-                    <td>{{ object_data.issuer_type }}/{{ object_data.issuer }}</td>
-                </tr>
-                <tr>
-                    <th>Owner:</th>
-                    <td>{{ object_data.owner_type }}/{{ object_data.owner }}</td>
-                </tr>
-                {% elif object_type == "certificate" %}
-                <tr>
-                    <th>Name:</th>
-                    <td>{{ object_data.name }}</td>
-                </tr>
-                <tr>
-                    <th>Status:</th>
-                    <td>
-                    {% if object_data.status == 'True' %}
-                        <span class="badge bg-success">{{ object_data.reason }}</span>
-                    {% else %}
-                        <span class="badge bg-danger">{{ object_data.reason }}</span>
-                    {% endif %}
-                    </td>
-                </tr>
-                <tr>
-                    <th>Status message:</th>
-                    <td>{{ object_data.message }}</td>
-                </tr>
-                <tr>
+                <tr id="cert-valid-row" style="display: none;">
                     <th>Validity Not After:</th>
-                    <td>{{ object_data.cert_valid }}</td>
+                    <td id="object-cert-valid">Loading...</td>
                 </tr>
-                <tr>
+                <tr id="certificate-row" style="display: none;">
                     <th>Certificate:</th>
-                    <td>
-                        <form action="/security/secrets" method="POST">
-                            <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
-                            <input type="hidden" name="ns_select" value="{{ session['ns_select'] }}" />
-                            <input type="hidden" name="selected" value="{{ object_data.secret_name }}" />
-                            <a href="javascript:;" onclick="parentNode.submit();">{{ object_data.secret_name }}</a>
-                        </form>
-                    </td>
+                    <td id="object-certificate">Loading...</td>
                 </tr>
-                <tr>
+                <tr id="hostnames-row" style="display: none;">
                     <th>Hostnames:</th>
-                    <td>
-                        {% for hostname in object_data.hostnames %}
-                            {{ hostname }}<br>
-                        {% endfor %}
-                    </td>
+                    <td id="object-hostnames">Loading...</td>
                 </tr>
-                {% endif %}
+                <tr id="issuer-row" style="display: none;">
+                    <th>Issuer:</th>
+                    <td id="object-issuer">Loading...</td>
+                </tr>
+                <tr id="owner-row" style="display: none;">
+                    <th>Owner:</th>
+                    <td id="object-owner">Loading...</td>
+                </tr>
             </table>
         </div>
     </div>
@@ -154,8 +73,383 @@
 {% endblock %}
 
 {% block add_head_css %}
-{% include "segments/datatable_snippet.html.j2" %}
+{% include "segments/components/datatable_snippet.html.j2" %}
 {% endblock %}
 
-{% block tail_js %}
+{% block add_tail_js %}
+<script>
+    const escapeHtml = (text) => {
+        if (text === null || text === undefined) return '';
+        const map = {
+            '&': '&amp;',
+            '<': '&lt;',
+            '>': '&gt;',
+            '"': '&quot;',
+            "'": '&#039;'
+        };
+        return String(text).replace(/[&<>"']/g, m => map[m]);
+    };
+    
+    const csrf_token = {{ csrf_token()|tojson }};
+    
+    // Get object data and type from URL, sessionStorage, or form data
+    function getCertManagerInfo() {
+        const urlParams = new URLSearchParams(window.location.search);
+        let objectType = urlParams.get('object_type');
+        let namespace = urlParams.get('namespace');
+        let selected = urlParams.get('selected'); // Object name from URL
+        
+        // Fallback to sessionStorage
+        if (!objectType) {
+            objectType = sessionStorage.getItem('cert_manager_object_type');
+        }
+        if (!selected) {
+            // Try to get from sessionStorage or form
+            selected = sessionStorage.getItem('cert_manager_selected');
+        }
+        if (!namespace) {
+            namespace = sessionStorage.getItem('ns_select');
+        }
+        
+        // Get object data from sessionStorage
+        const objectDataStr = sessionStorage.getItem('cert_manager_object_data');
+        let objectData = null;
+        if (objectDataStr) {
+            try {
+                objectData = JSON.parse(objectDataStr);
+            } catch (e) {
+                console.error('Error parsing object data from sessionStorage:', e);
+            }
+        }
+        
+        // For cluster-scoped resources (cluster_issuer), namespace is not needed
+        if (objectType === 'cluster_issuer') {
+            namespace = null;
+        }
+        
+        // Fallback to topbar selector for namespace (only for namespaced resources)
+        if (!namespace && objectType !== 'cluster_issuer') {
+            const topbarSelect = document.getElementById('inputGroupSelect04');
+            if (topbarSelect) {
+                namespace = topbarSelect.value;
+            }
+        }
+        
+        // Final fallback (only for namespaced resources)
+        if (!namespace && objectType !== 'cluster_issuer') {
+            namespace = 'default';
+        }
+        
+        return { objectType, objectData, namespace, selected };
+    }
+    
+    function formatIssuerData(issuerData, namespace = null) {
+        if (!issuerData || typeof issuerData !== 'object') {
+            return '-';
+        }
+        
+        // Get namespace if not provided
+        if (!namespace) {
+            namespace = getCertManagerInfo().namespace || 'default';
+        }
+        
+        let html = '<ul>';
+        for (const [key, value] of Object.entries(issuerData)) {
+            if (value !== null && value !== undefined) {
+                if (Array.isArray(value)) {
+                    html += `<li><strong>${escapeHtml(key)}:</strong> ${value.map(v => escapeHtml(String(v))).join(', ')}</li>`;
+                } else if (typeof value === 'object') {
+                    html += `<li><strong>${escapeHtml(key)}:</strong> ${formatIssuerData(value, namespace)}</li>`;
+                } else {
+                    const valueStr = String(value);
+                    const keyLower = key.toLowerCase();
+                    // Check if this is a secret reference (key is 'secret', 'secretname', or value contains 'secret/')
+                    // Display in format "secret/secretname" where secret name is clickable
+                    if ((keyLower === 'secret' || keyLower === 'secretname' || keyLower.includes('secret')) && valueStr) {
+                        // Extract secret name (might be "secret/name" or just "name")
+                        let secretName = valueStr;
+                        if (secretName.includes('/')) {
+                            secretName = secretName.split('/').pop();
+                        }
+                        secretName = escapeHtml(secretName);
+                        // Display as "secret/ca-key-pair" format (no key label, just the formatted value)
+                        html += `<li>secret/<form action="/security/secrets/data" method="POST" style="display: inline;" onsubmit="sessionStorage.setItem('ns_select', '${escapeHtml(namespace)}'); return true;">
+                            <input type="hidden" name="csrf_token" value="${escapeHtml(csrf_token)}">
+                            <input type="hidden" name="ns_select" value="${escapeHtml(namespace)}" />
+                            <input type="hidden" name="selected" value="${secretName}" />
+                            <a href="javascript:;" onclick="parentNode.submit();">${secretName}</a>
+                        </form></li>`;
+                    } else {
+                        html += `<li><strong>${escapeHtml(key)}:</strong> ${escapeHtml(valueStr)}</li>`;
+                    }
+                }
+            }
+        }
+        html += '</ul>';
+        return html;
+    }
+    
+    function populateCertManagerData(objectData, objectType) {
+        if (!objectData || !objectType) {
+            document.getElementById('object-name').textContent = 'Error: Data not available';
+            return;
+        }
+        
+        // Update breadcrumbs
+        const objectTypeBreadcrumb = document.getElementById('object-type-breadcrumb');
+        const objectNameBreadcrumb = document.getElementById('object-name-breadcrumb');
+        if (objectTypeBreadcrumb) {
+            objectTypeBreadcrumb.textContent = objectType.replace('_', ' ').replace(/\b\w/g, l => l.toUpperCase());
+        }
+        if (objectNameBreadcrumb) {
+            objectNameBreadcrumb.textContent = escapeHtml(objectData.name || 'N/A');
+        }
+        
+        // Populate name
+        document.getElementById('object-name').textContent = escapeHtml(objectData.name || 'N/A');
+        
+        // Show/hide and populate rows based on object type
+        if (objectType === 'cluster_issuer' || objectType === 'issuer') {
+            // Status
+            if (objectData.status) {
+                document.getElementById('status-row').style.display = '';
+                const statusElement = document.getElementById('object-status');
+                const status = objectData.status === 'True';
+                const reason = escapeHtml(objectData.reason || '');
+                if (status) {
+                    statusElement.innerHTML = `<span class="badge bg-success">${reason}</span>`;
+                } else {
+                    statusElement.innerHTML = `<span class="badge bg-danger">${reason}</span>`;
+                }
+            }
+            
+            // Status message
+            if (objectData.message) {
+                document.getElementById('status-message-row').style.display = '';
+                document.getElementById('object-status-message').textContent = escapeHtml(objectData.message);
+            }
+            
+            // Issuer type and data (for cluster_issuer)
+            if (objectType === 'cluster_issuer' && objectData.type) {
+                document.getElementById('issuer-type-row').style.display = '';
+                document.getElementById('object-issuer-type').textContent = escapeHtml(objectData.type);
+            }
+            
+            // Issuer data
+            if (objectData.issuer_data) {
+                document.getElementById('issuer-data-row').style.display = '';
+                const namespace = getCertManagerInfo().namespace || 'default';
+                document.getElementById('object-issuer-data').innerHTML = formatIssuerData(objectData.issuer_data, namespace);
+            }
+        } else if (objectType === 'certificate_request') {
+            // Status
+            if (objectData.status) {
+                document.getElementById('status-row').style.display = '';
+                const statusElement = document.getElementById('object-status');
+                const status = objectData.status === 'True';
+                const reason = escapeHtml(objectData.reason || '');
+                if (status) {
+                    statusElement.innerHTML = `<span class="badge bg-success">${reason}</span>`;
+                } else {
+                    statusElement.innerHTML = `<span class="badge bg-danger">${reason}</span>`;
+                }
+            }
+            
+            // Status message
+            if (objectData.message) {
+                document.getElementById('status-message-row').style.display = '';
+                document.getElementById('object-status-message').textContent = escapeHtml(objectData.message);
+            }
+            
+            // Issuer
+            if (objectData.issuer && objectData.issuer_type) {
+                document.getElementById('issuer-row').style.display = '';
+                document.getElementById('object-issuer').textContent = `${escapeHtml(objectData.issuer_type)}/${escapeHtml(objectData.issuer)}`;
+            }
+            
+            // Owner
+            if (objectData.owner && objectData.owner_type) {
+                document.getElementById('owner-row').style.display = '';
+                const ownerType = escapeHtml(objectData.owner_type);
+                const ownerName = escapeHtml(objectData.owner);
+                const namespace = getCertManagerInfo().namespace;
+                
+                // Make owner a link if it's a Certificate
+                if (objectData.owner_type === 'Certificate') {
+                    const ownerHtml = `
+                        <form action="/plugins/cert-manager/data" method="POST" onsubmit="sessionStorage.setItem('cert_manager_object_type', 'certificate'); sessionStorage.setItem('cert_manager_selected', '${ownerName}'); return true;">
+                            <input type="hidden" name="csrf_token" value="${escapeHtml(csrf_token)}">
+                            <input type="hidden" name="object_type" value="certificate" />
+                            <input type="hidden" name="selected" value="${ownerName}" />
+                            <input type="hidden" name="ns_select" value="${escapeHtml(namespace)}" />
+                            <a href="javascript:;" onclick="parentNode.submit();">${ownerType}/${ownerName}</a>
+                        </form>
+                    `;
+                    document.getElementById('object-owner').innerHTML = ownerHtml;
+                } else {
+                    document.getElementById('object-owner').textContent = `${ownerType}/${ownerName}`;
+                }
+            }
+        } else if (objectType === 'certificate') {
+            // Status
+            if (objectData.status) {
+                document.getElementById('status-row').style.display = '';
+                const statusElement = document.getElementById('object-status');
+                const status = objectData.status === 'True';
+                const reason = escapeHtml(objectData.reason || '');
+                if (status) {
+                    statusElement.innerHTML = `<span class="badge bg-success">${reason}</span>`;
+                } else {
+                    statusElement.innerHTML = `<span class="badge bg-danger">${reason}</span>`;
+                }
+            }
+            
+            // Status message
+            if (objectData.message) {
+                document.getElementById('status-message-row').style.display = '';
+                document.getElementById('object-status-message').textContent = escapeHtml(objectData.message);
+            }
+            
+            // Cert validity
+            if (objectData.cert_valid) {
+                document.getElementById('cert-valid-row').style.display = '';
+                document.getElementById('object-cert-valid').textContent = escapeHtml(objectData.cert_valid);
+            }
+            
+            // Certificate secret
+            if (objectData.secret_name) {
+                document.getElementById('certificate-row').style.display = '';
+                const namespace = getCertManagerInfo().namespace;
+                const secretName = escapeHtml(objectData.secret_name);
+                document.getElementById('object-certificate').innerHTML = `
+                    <form action="/security/secrets/data" method="POST" onsubmit="sessionStorage.setItem('ns_select', '${escapeHtml(namespace)}'); return true;">
+                        <input type="hidden" name="csrf_token" value="${escapeHtml(csrf_token)}">
+                        <input type="hidden" name="ns_select" value="${escapeHtml(namespace)}" />
+                        <input type="hidden" name="selected" value="${secretName}" />
+                        <a href="javascript:;" onclick="parentNode.submit();">${secretName}</a>
+                    </form>
+                `;
+            }
+            
+            // Hostnames
+            if (objectData.hostnames && objectData.hostnames.length > 0) {
+                document.getElementById('hostnames-row').style.display = '';
+                document.getElementById('object-hostnames').innerHTML = objectData.hostnames.map(h => escapeHtml(h)).join('<br>');
+            }
+        }
+    }
+    
+    async function loadCertManagerObject(objectType, name, namespace) {
+        try {
+            // Normalize object type for API
+            let apiObjectType = objectType;
+            if (objectType === 'cluster_issuer') {
+                apiObjectType = 'cluster-issuer';
+            } else if (objectType === 'certificate_request') {
+                apiObjectType = 'certificate-request';
+            }
+            
+            let apiUrl = `/api/v1/plugins/cert-manager/${encodeURIComponent(apiObjectType)}/${encodeURIComponent(name)}`;
+            if (namespace && objectType !== 'cluster_issuer') {
+                apiUrl += `?namespace=${encodeURIComponent(namespace)}`;
+            }
+            
+            console.log('Fetching cert-manager object from:', apiUrl);
+            
+            const response = await fetch(apiUrl);
+            if (!response.ok) {
+                if (response.status === 404) {
+                    throw new Error(`${objectType} '${name}' not found`);
+                }
+                throw new Error(`HTTP error! status: ${response.status}`);
+            }
+            
+            const data = await response.json();
+            console.log('Cert-manager object API response:', data);
+            
+            if (data.error) {
+                throw new Error(data.message || 'Failed to load object data');
+            }
+            
+            return data.data;
+        } catch (error) {
+            console.error('Error loading cert-manager object:', error);
+            throw error;
+        }
+    }
+    
+    // Load data when page loads
+    document.addEventListener('DOMContentLoaded', async function() {
+        const { objectType, objectData, namespace, selected } = getCertManagerInfo();
+        
+        console.log('Cert-Manager Data Page - Loaded:', { objectType, hasObjectData: !!objectData, namespace, selected });
+        
+        // Update breadcrumbs with available info
+        const objectTypeBreadcrumb = document.getElementById('object-type-breadcrumb');
+        const objectNameBreadcrumb = document.getElementById('object-name-breadcrumb');
+        const objectNameElement = document.getElementById('object-name');
+        
+        // Always update breadcrumbs with available info first
+        if (objectType) {
+            if (objectTypeBreadcrumb) {
+                objectTypeBreadcrumb.textContent = objectType.replace('_', ' ').replace(/\b\w/g, l => l.toUpperCase());
+            }
+        } else if (objectTypeBreadcrumb) {
+            objectTypeBreadcrumb.textContent = 'Error';
+        }
+        
+        if (selected) {
+            if (objectNameBreadcrumb) {
+                objectNameBreadcrumb.textContent = escapeHtml(selected);
+            }
+        } else if (objectNameBreadcrumb) {
+            objectNameBreadcrumb.textContent = 'Not Found';
+        }
+        
+        // Check for errors and display them immediately
+        if (!objectType) {
+            console.error('Object type not found');
+            if (objectNameElement) {
+                objectNameElement.innerHTML = '<span class="text-danger">Error: Object type not provided.</span><br><small class="text-muted">Please navigate from the <a href="/plugins/cert-manager">Cert-Manager list page</a>.</small>';
+            }
+            return;
+        }
+        
+        if (!selected) {
+            console.error('Object name not found');
+            if (objectNameElement) {
+                objectNameElement.innerHTML = '<span class="text-danger">Error: Object name not provided.</span><br><small class="text-muted">Please navigate from the <a href="/plugins/cert-manager">Cert-Manager list page</a>.</small>';
+            }
+            return;
+        }
+        
+        // Try to load from API if objectData is not available
+        let finalObjectData = objectData;
+        if (!finalObjectData) {
+            try {
+                finalObjectData = await loadCertManagerObject(objectType, selected, namespace);
+            } catch (error) {
+                console.error('Error loading object from API:', error);
+                const errorMsg = `<span class="text-danger">Error: ${escapeHtml(error.message)}</span><br><small class="text-muted">Please navigate to this page from the <a href="/plugins/cert-manager">Cert-Manager list page</a>.</small>`;
+                if (objectNameElement) {
+                    objectNameElement.innerHTML = errorMsg;
+                }
+                // Hide all data rows
+                document.getElementById('status-row').style.display = 'none';
+                document.getElementById('status-message-row').style.display = 'none';
+                document.getElementById('issuer-type-row').style.display = 'none';
+                document.getElementById('issuer-data-row').style.display = 'none';
+                document.getElementById('cert-valid-row').style.display = 'none';
+                document.getElementById('certificate-row').style.display = 'none';
+                document.getElementById('hostnames-row').style.display = 'none';
+                document.getElementById('issuer-row').style.display = 'none';
+                document.getElementById('owner-row').style.display = 'none';
+                return;
+            }
+        }
+        
+        console.log('Populating cert-manager data for:', finalObjectData.name, objectType);
+        populateCertManagerData(finalObjectData, objectType);
+    });
+</script>
 {% endblock %}

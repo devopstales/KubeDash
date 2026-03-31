@@ -12,7 +12,7 @@
 <html lang="en">
   <head>
     <!-- Critical Theme Loader (MUST be first) -->
-    <script>
+    <script nonce="{{ csp_nonce }}">
       (function(){
         // 1. Immediately set theme from localStorage (fallback to light)
         const savedTheme = localStorage.getItem('coreui-theme') || 'light';
@@ -23,7 +23,7 @@
 
         // 3. Hide body until fully loaded (prevents flash)
         document.write(`
-          <style id="temp-hide">
+          <style id="temp-hide" nonce="{{ csp_nonce }}">
             body { opacity: 0 !important; }
             .light { color-scheme: light; }
             .dark { color-scheme: dark; }
@@ -74,7 +74,7 @@
     <script src="{{ url_for('static',filename='/vendor/custom/alert.js') }}"></script>
 
     <!-- Add this right before </head> -->
-    <script>
+    <script nonce="{{ csp_nonce }}">
       document.addEventListener('DOMContentLoaded', function() {
         // Remove the temporary hide style
         const tempStyle = document.getElementById('temp-hide');
@@ -90,12 +90,12 @@
   <body>
 
     <!-- menu -->
-    {% include "segments/menu.html.j2" %}
+    {% include "segments/partials/menu.html.j2" %}
 
     <div class="wrapper d-flex flex-column min-vh-100">
       <header class="header header-sticky p-0">
       <!-- header -->
-      {% include "segments/header.html.j2" %}
+      {% include "segments/partials/header.html.j2" %}
       <!-- buttom of header to use topmenu block -->
       {% block topmenu %}{% endblock %}
       <!-- end header -->
@@ -149,7 +149,7 @@
       </div>
 
       <!-- Footer -->
-      {% include "segments/footer.html.j2" %}
+      {% include "segments/partials/footer.html.j2" %}
     </div>
 
     <!-- Logout Modal-->
@@ -191,7 +191,7 @@
     <script src="{{ url_for('static',filename='/vendor/datatables@2.2.2/datatables-demo.js') }}"></script>
 
     <!-- custom scripts -->
-    <script type="text/javascript">
+    <script type="text/javascript" nonce="{{ csp_nonce }}">
         function setClipboard(value) {
             var tempInput = document.createElement("input");
             tempInput.style = "position: absolute; left: -1000px; top: -1000px";
@@ -206,19 +206,63 @@
             location.reload(true);
         };
     </script>
-    <script type="text/javascript">
+    <script type="text/javascript" nonce="{{ csp_nonce }}">
         setTimeout(function() {
             $('#flashMessage').fadeOut('fast');
         }, 30000);
     </script>
 
     <!-- Vendors scripts -->
-    <script>
+    <script nonce="{{ csp_nonce }}">
       const header = document.querySelector('header.header');
 
       document.addEventListener('scroll', () => {
         if (header) {
           header.classList.toggle('shadow-sm', document.documentElement.scrollTop > 0);
+        }
+      });
+    </script>
+
+    <!-- Global Namespace Selector Handler -->
+    <script nonce="{{ csp_nonce }}">
+      // Global handler for namespace selector persistence across all pages
+      document.addEventListener('DOMContentLoaded', function() {
+        const namespaceSelect = document.getElementById('inputGroupSelect04');
+        if (namespaceSelect) {
+          // Initialize dropdown from sessionStorage on page load
+          const savedNamespace = sessionStorage.getItem('ns_select');
+          if (savedNamespace) {
+            // Check if the saved namespace exists in the options
+            const optionExists = Array.from(namespaceSelect.options).some(
+              option => option.value === savedNamespace || option.text === savedNamespace
+            );
+            if (optionExists) {
+              namespaceSelect.value = savedNamespace;
+            }
+          }
+          
+          // Save to sessionStorage when dropdown changes
+          namespaceSelect.addEventListener('change', function() {
+            const selectedNamespace = this.value;
+            console.log('Namespace changed to:', selectedNamespace);
+            sessionStorage.setItem('ns_select', selectedNamespace);
+            
+            // Dispatch a custom event so pages can listen for namespace changes
+            const event = new CustomEvent('namespaceChanged', {
+              detail: { namespace: selectedNamespace }
+            });
+            window.dispatchEvent(event);
+          });
+          
+          // Also save to sessionStorage when form is submitted
+          const namespaceForm = namespaceSelect.closest('form');
+          if (namespaceForm) {
+            namespaceForm.addEventListener('submit', function() {
+              const selectedNamespace = namespaceSelect.value;
+              sessionStorage.setItem('ns_select', selectedNamespace);
+              console.log('Namespace saved to sessionStorage on form submit:', selectedNamespace);
+            });
+          }
         }
       });
     </script>

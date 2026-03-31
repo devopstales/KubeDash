@@ -13,7 +13,7 @@
 </ul>
 <ul class="header-nav ms-auto"></ul>
 <ul class="header-nav d-lg-flex">
-{% include "segments/topmenu.html.j2" %}
+{% include "segments/partials/topmenu.html.j2" %}
 {% endblock %}
 
 {% block content %}
@@ -32,26 +32,15 @@
                       <th>External IP</th>
                     </tr>
                   </thead>
-                  <tbody>
-                    {% for service in services %}
-                    {% if selected == service.name %}
-                      <tr class="selected" >
-                    {% else %}
-                      <tr>
-                    {% endif %}
-                        <td>
-                          <form action="/network/service/data" method="POST">
-                            <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
-                            <input type="hidden" name="ns_select" value="{{ session['ns_select'] }}" />
-                            <input type="hidden" name="service_name" value="{{ service.name }}" />
-                            <a href="javascript:;" onclick="parentNode.submit();">{{ service.name }}</a>
-                          </form>
+                  <tbody id="services-tbody">
+                    <tr>
+                        <td colspan="4" class="text-center">
+                            <div class="spinner-border spinner-border-sm text-primary" role="status">
+                                <span class="visually-hidden">Loading...</span>
+                            </div>
+                            <span class="ms-2">Loading services...</span>
                         </td>
-                        <td>{{ service.type }}</td>
-                        <td>{{ service.cluster_ip }}</td>
-                        <td>{{ service.external_ip }}</td>
-                      </tr>
-                    {% endfor %}
+                    </tr>
                   </tbody>
             </table>
         </div>
@@ -60,5 +49,250 @@
 {% endblock %}
 
 {% block add_head_css %}
-{% include "segments/datatable_snippet.html.j2" %}
+{% include "segments/components/datatable_snippet.html.j2" %}
+{% endblock %}
+
+{% block add_tail_js %}
+<script nonce="{{ csp_nonce }}">
+    const escapeHtml = (text) => {
+        if (text === null || text === undefined) return '';
+        const map = {
+            '&': '&amp;',
+            '<': '&lt;',
+            '>': '&gt;',
+            '"': '&quot;',
+            "'": '&#039;'
+        };
+        return String(text).replace(/[&<>"']/g, m => map[m]);
+    };
+    
+    const csrf_token = {{ csrf_token()|tojson }};
+    
+    // DataTables protection - prevent auto-initialization on loading rows
+    (function() {
+        const originalTableId = 'dataTable';
+        const tempTableId = 'servicesTable_' + Date.now();
+        
+        // Temporarily change table ID to prevent auto-initialization
+        document.addEventListener('DOMContentLoaded', function() {
+            const table = document.getElementById(originalTableId);
+            if (table) {
+                table.id = tempTableId;
+            }
+        });
+        
+        // Override DataTable initialization to prevent on colspan rows
+        if (typeof $ !== 'undefined' && $.fn.DataTable) {
+            const originalDataTable = $.fn.DataTable;
+            $.fn.DataTable = function(opts) {
+                const $this = $(this);
+                // Check if this is a loading row with colspan
+                if ($this.find('tbody tr td[colspan]').length > 0) {
+                    console.log('Blocked DataTable initialization on loading row');
+                    return $this;
+                }
+                return originalDataTable.apply(this, arguments);
+            };
+        }
+        
+        // Clean up any auto-initialized DataTables
+        setTimeout(function() {
+            if (typeof $ !== 'undefined' && $.fn.DataTable) {
+                const table = document.getElementById(tempTableId);
+                if (table) {
+                    try {
+                        const $table = $('#' + tempTableId);
+                        if ($table.length && $table.data('DataTable')) {
+                            $table.DataTable().destroy();
+                        }
+                    } catch (e) {
+                        // DataTable not initialized or error, ignore
+                    }
+                    table.id = originalTableId;
+                }
+            }
+        }, 100);
+        
+        setTimeout(function() {
+            if (typeof $ !== 'undefined' && $.fn.DataTable) {
+                const table = document.getElementById(tempTableId);
+                if (table) {
+                    try {
+                        const $table = $('#' + tempTableId);
+                        if ($table.length && $table.data('DataTable')) {
+                            $table.DataTable().destroy();
+                        }
+                    } catch (e) {
+                        // DataTable not initialized or error, ignore
+                    }
+                    table.id = originalTableId;
+                }
+            }
+        }, 500);
+    })();
+    
+    // Get namespace from topbar selector or use default
+    function getSelectedNamespace() {
+        const topbarSelect = document.getElementById('inputGroupSelect04');
+        if (topbarSelect) {
+            return topbarSelect.value;
+        }
+        // Fallback to sessionStorage or default
+        return sessionStorage.getItem('ns_select') || 'default';
+    }
+    
+    function populateServicesTable(services) {
+        const tbody = document.getElementById('services-tbody');
+        
+        if (!services || services.length === 0) {
+            tbody.innerHTML = '<tr><td colspan="4" class="text-center">No services found</td></tr>';
+            return;
+        }
+        
+        // Get selected service from URL
+        const urlParams = new URLSearchParams(window.location.search);
+        const selectedService = urlParams.get('selected');
+        const namespace = getSelectedNamespace();
+        
+        const rows = services.map(service => {
+            const name = escapeHtml(service.name || '');
+            const type = escapeHtml(service.type || '');
+            const clusterIp = escapeHtml(service.cluster_ip || '-');
+            const externalIp = service.external_ip ? escapeHtml(service.external_ip) : '-';
+            
+            const isSelected = selectedService === service.name;
+            const rowClass = isSelected ? 'selected' : '';
+            
+            return `
+                <tr class="${rowClass}">
+                    <td>
+                        <form action="/network/service/data" method="POST" onsubmit="sessionStorage.setItem('ns_select', '${escapeHtml(namespace)}'); return true;">
+                            <input type="hidden" name="csrf_token" value="${escapeHtml(csrf_token)}">
+                            <input type="hidden" name="ns_select" value="${escapeHtml(namespace)}" />
+                            <input type="hidden" name="service_name" value="${name}" />
+                            <input type="hidden" name="selected" value="${name}" />
+                            <a href="javascript:;" onclick="parentNode.submit();">${name}</a>
+                        </form>
+                    </td>
+                    <td>${type}</td>
+                    <td>${clusterIp}</td>
+                    <td>${externalIp}</td>
+                </tr>
+            `;
+        }).join('');
+        
+        tbody.innerHTML = rows;
+        
+        // Initialize DataTables after a short delay to ensure DOM is updated
+        setTimeout(function() {
+            const table = document.getElementById('dataTable');
+            if (table && typeof $ !== 'undefined' && $.fn.DataTable) {
+                try {
+                    const $table = $('#dataTable');
+                    
+                    // Check if DataTable is already initialized
+                    let isInitialized = false;
+                    if ($table.length) {
+                        // Use the recommended DataTables API to check if already initialized
+                        if (typeof $.fn.DataTable.isDataTable === 'function' && $.fn.DataTable.isDataTable('#dataTable')) {
+                            isInitialized = true;
+                        }
+                        // Fallback: Check if DataTable instance exists via jQuery data
+                        else if ($table.data('DataTable')) {
+                            isInitialized = true;
+                        }
+                    }
+                    
+                    // Destroy existing DataTable if it exists
+                    if (isInitialized) {
+                        try {
+                            $table.DataTable().destroy();
+                        } catch (destroyError) {
+                            console.warn('Error destroying DataTable:', destroyError);
+                        }
+                    }
+                    
+                    // Initialize DataTables (only if not already initialized or after destroy)
+                    if (!isInitialized) {
+                        const dataTable = $('#dataTable').DataTable({
+                            responsive: true,
+                            order: [[0, 'asc']],
+                            pageLength: 25
+                        });
+                        
+                        // Navigate to selected row if present
+                        if (selectedService) {
+                            let foundRowIndex = -1;
+                            dataTable.rows().every(function(rowIdx) {
+                                const rowNode = this.node();
+                                const rowName = $(rowNode).find('input[name="selected"]').val();
+                                if (rowName === selectedService) {
+                                    foundRowIndex = rowIdx;
+                                    return false; // break
+                                }
+                                return true;
+                            });
+                            
+                            if (foundRowIndex >= 0) {
+                                const pageLength = dataTable.page.len();
+                                const targetPage = Math.floor(foundRowIndex / pageLength);
+                                dataTable.page(targetPage).draw('page');
+                            }
+                        }
+                    }
+                } catch (e) {
+                    console.warn('Error initializing DataTable:', e);
+                }
+            }
+        }, 50);
+    }
+    
+    async function loadServices(namespace) {
+        try {
+            const apiUrl = `/api/v1/network/services${namespace ? '?namespace=' + encodeURIComponent(namespace) : ''}`;
+            console.log('Fetching services from:', apiUrl);
+            
+            const response = await fetch(apiUrl);
+            if (!response.ok) {
+                throw new Error(`HTTP error! status: ${response.status}`);
+            }
+            
+            const data = await response.json();
+            console.log('Services API response:', data);
+            
+            if (data.error) {
+                throw new Error(data.message || 'Failed to load services');
+            }
+            
+            const services = data.data || [];
+            populateServicesTable(services);
+            
+        } catch (error) {
+            console.error('Error loading services:', error);
+            const tbody = document.getElementById('services-tbody');
+            if (tbody) {
+                tbody.innerHTML = '<tr><td colspan="4" class="text-center text-danger">Error loading services: ' + escapeHtml(error.message) + '</td></tr>';
+            }
+        }
+    }
+    
+    // Load data when page loads
+    document.addEventListener('DOMContentLoaded', function() {
+        const namespace = getSelectedNamespace();
+        loadServices(namespace);
+    });
+    
+    // Reload data when namespace changes (if namespace selector exists)
+    document.addEventListener('DOMContentLoaded', function() {
+        const namespaceSelect = document.getElementById('inputGroupSelect04');
+        if (namespaceSelect) {
+            namespaceSelect.addEventListener('change', function() {
+                const namespace = this.value;
+                console.log('Namespace changed to:', namespace);
+                sessionStorage.setItem('ns_select', namespace);
+                loadServices(namespace);
+            });
+        }
+    });
+</script>
 {% endblock %}

@@ -1,0 +1,561 @@
+{% extends "base2.html.j2" %}
+
+{% block topmenu %}
+<ul class="header-nav d-lg-flex m-3">
+    <div class="container-fluid px-4">
+      <nav aria-label="breadcrumb">
+        <ol class="breadcrumb my-0">
+          <li class="breadcrumb-item"><span>Settings</span></li>
+          <li class="breadcrumb-item active"><span>Applications</span></li>
+        </ol>
+      </nav>
+    </div>
+</ul>
+<ul class="header-nav ms-auto"></ul>
+<ul class="header-nav d-lg-flex">
+  <!-- Button trigger modal add -->
+  <div class="col" id="add-button-container" style="display: none;">
+    <button class="header-toggler" type="button" data-bs-toggle="modal" data-bs-target="#modaladd">
+      <i class="material-icons">add</i>
+    </button>
+  </div>
+{% include "segments/partials/topmenu.html.j2" %}
+{% endblock %}
+
+{% block content %}
+<div class="card shadow mb-4">
+    <div class="card-header py-3">
+        <h6 class="m-0 font-weight-bold text-primary">Application Catalog</h6>
+    </div>
+    <div class="card-body">
+        <div class="table-responsive">
+            <table class="table table-bordered" id="dataTable" width="100%" cellspacing="0">
+                <thead>
+                    <tr>
+                      <th>Name</th>
+                      <th>Link</th>
+                      <th>Enabled</th>
+                      <th>Embedded</th>
+                      <th>Icon</th>
+                      <th>Action</th>
+                    </tr>
+                </thead>
+                <tbody id="applications-tbody">
+                    <tr>
+                        <td colspan="6" class="text-center">
+                            <div class="spinner-border spinner-border-sm text-primary" role="status">
+                                <span class="visually-hidden">Loading...</span>
+                            </div>
+                            <span class="ms-2">Loading applications...</span>
+                        </td>
+                    </tr>
+                </tbody>
+            </table>
+
+        </div>
+    </div>
+</div>
+
+<!-- Modal Add Application -->
+<div class="modal fade" id="modaladd" tabindex="-1" role="dialog" aria-labelledby="modaladdLabel" aria-hidden="true">
+  <div class="modal-dialog" role="document">
+    <div class="modal-content">
+      <div class="modal-header">
+        <h5 class="modal-title" id="modaladdLabel">Create Application</h5>
+        <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+      </div>
+      <div class="modal-body">
+        <form id="application-add-form" name="ApplicationAdd">
+          <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+          <div id="add-form-messages"></div>
+          <div class="form-group">
+              <label for="application_name">Application Name</label>
+              <input type="text" class="form-control" id="application_name" name="application_name" placeholder="Name" required>
+          </div>
+          <div class="form-group">
+              <label for="application_url">Application Link</label>
+              <input type="text" class="form-control" id="application_url" name="application_url" placeholder="https://example.com" required>
+          </div>
+          <div class="form-group">
+              <label for="application_icon">Application Icon (optional)</label>
+              <input type="text" class="form-control" id="application_icon" name="application_icon" placeholder="Icon URL or base64">
+          </div>
+          <div class="form-check mt-2">
+              <input class="form-check-input" type="checkbox" id="application_enabled" name="application_enabled" checked>
+              <label class="form-check-label" for="application_enabled">Enabled</label>
+          </div>
+          <div class="form-check mt-2">
+              <input class="form-check-input" type="checkbox" id="application_embedded" name="application_embedded">
+              <label class="form-check-label" for="application_embedded">Embed in Dashboard</label>
+          </div>
+          <div class="modal-footer">
+              <div class="form-group mt-2">
+                  <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Close</button>
+                  <button type="submit" class="btn btn-primary">Add</button>
+              </div>
+          </div>
+        </form>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- Modal Edit Application - will be dynamically created -->
+<div id="edit-modals-container"></div>
+{% endblock %}
+
+{% block add_tail_js %}
+{% include "segments/components/datatable_snippet.html.j2" %}
+{% include "segments/components/functions_snippet.j2"%}
+    <script>
+        const escapeHtml = (text) => {
+            if (text === null || text === undefined) return '';
+            const map = {
+                '&': '&amp;',
+                '<': '&lt;',
+                '>': '&gt;',
+                '"': '&quot;',
+                "'": '&#039;'
+            };
+            return String(text).replace(/[&<>"']/g, m => map[m]);
+        };
+        
+        const csrf_token = {{ csrf_token()|tojson }};
+        const user_role = {{ session.get('user_role', '')|tojson }};
+        const is_admin = user_role === 'Admin';
+        
+        // IMMEDIATE: Prevent datatables-demo.js from initializing on loading row
+        (function() {
+            function setupOverride() {
+                if (typeof $ !== 'undefined' && $.fn && !window._datatableOverrideSetup) {
+                    window._datatableOverrideSetup = true;
+                    const originalDataTable = $.fn.DataTable;
+                    $.fn.DataTable = function(options) {
+                        const table = this[0];
+                        if (table && table.id === 'dataTable') {
+                            const tbody = table.querySelector('tbody');
+                            if (tbody) {
+                                const rows = tbody.querySelectorAll('tr');
+                                const hasColspanRow = Array.from(rows).some(row => {
+                                    const cells = row.querySelectorAll('td');
+                                    return Array.from(cells).some(cell => cell.hasAttribute('colspan'));
+                                });
+                                if (hasColspanRow) {
+                                    console.log('Blocked DataTable initialization on loading row');
+                                    return this;
+                                }
+                            }
+                        }
+                        return originalDataTable.apply(this, arguments);
+                    };
+                    Object.setPrototypeOf($.fn.DataTable, originalDataTable);
+                    Object.keys(originalDataTable).forEach(key => {
+                        $.fn.DataTable[key] = originalDataTable[key];
+                    });
+                }
+            }
+            setupOverride();
+            setTimeout(setupOverride, 0);
+            setTimeout(setupOverride, 50);
+            setTimeout(setupOverride, 100);
+        })();
+        
+        function renderBoolean(value) {
+            return value ? '<span class="badge bg-success">Yes</span>' : '<span class="badge bg-secondary">No</span>';
+        }
+
+        function getIconSrc(iconValue) {
+            if (!iconValue) {
+                return '';
+            }
+            const value = String(iconValue).trim();
+            if (!value) {
+                return '';
+            }
+            if (value.startsWith('data:') || value.startsWith('http://') || value.startsWith('https://')) {
+                return value;
+            }
+            return `data:image/png;base64,${value}`;
+        }
+        
+        function createEditModals(apps) {
+            const container = document.getElementById('edit-modals-container');
+            container.innerHTML = '';
+            
+            apps.forEach((app) => {
+                const safeId = String(app.application_name || '').replace(/[^a-zA-Z0-9]/g, '_');
+                const modalHtml = `
+<div class="modal fade" id="modaledit${safeId}" tabindex="-1" role="dialog" aria-labelledby="modaleditLabel${safeId}" aria-hidden="true">
+  <div class="modal-dialog" role="document">
+    <div class="modal-content">
+      <div class="modal-header">
+        <h5 class="modal-title" id="modaleditLabel${safeId}">Edit Application</h5>
+        <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+      </div>
+      <div class="modal-body">
+        <form id="application-edit-form-${safeId}" name="ApplicationEdit">
+          <input type="hidden" name="csrf_token" value="${csrf_token}">
+          <input type="hidden" name="application_name_old" value="${escapeHtml(app.application_name)}">
+          <div id="edit-form-messages-${safeId}"></div>
+          <div class="form-group">
+              <label for="application_name_${safeId}">Application Name</label>
+              <input type="text" class="form-control" id="application_name_${safeId}" name="application_name" value="${escapeHtml(app.application_name)}" required>
+          </div>
+          <div class="form-group">
+              <label for="application_url_${safeId}">Application Link</label>
+              <input type="text" class="form-control" id="application_url_${safeId}" name="application_url" value="${escapeHtml(app.application_url)}" required>
+          </div>
+          <div class="form-group">
+              <label for="application_icon_${safeId}">Application Icon (optional)</label>
+              <input type="text" class="form-control" id="application_icon_${safeId}" name="application_icon" value="${escapeHtml(app.application_icon || '')}">
+          </div>
+          <div class="form-check mt-2">
+              <input class="form-check-input" type="checkbox" id="application_enabled_${safeId}" name="application_enabled" ${app.application_enabled ? 'checked' : ''}>
+              <label class="form-check-label" for="application_enabled_${safeId}">Enabled</label>
+          </div>
+          <div class="form-check mt-2">
+              <input class="form-check-input" type="checkbox" id="application_embedded_${safeId}" name="application_embedded" ${app.application_embedded ? 'checked' : ''}>
+              <label class="form-check-label" for="application_embedded_${safeId}">Embed in Dashboard</label>
+          </div>
+          <div class="modal-footer">
+              <div class="form-group mt-2">
+                  <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Close</button>
+                  <button type="submit" class="btn btn-primary">Save</button>
+              </div>
+          </div>
+        </form>
+      </div>
+    </div>
+  </div>
+</div>`;
+                container.innerHTML += modalHtml;
+            });
+        }
+        
+        function populateApplicationsTable(apps) {
+            const tbody = document.getElementById('applications-tbody');
+            const addButtonContainer = document.getElementById('add-button-container');
+            
+            if (is_admin && addButtonContainer) {
+                addButtonContainer.style.display = 'block';
+            }
+            
+            if (!apps || apps.length === 0) {
+                tbody.innerHTML = '<tr><td colspan="6" class="text-center">No applications found</td></tr>';
+                return;
+            }
+            
+            tbody.innerHTML = '';
+            apps.forEach((app) => {
+                const row = document.createElement('tr');
+                const safeId = String(app.application_name || '').replace(/[^a-zA-Z0-9]/g, '_');
+                const nameForJs = String(app.application_name || '').replace(/'/g, "\\'").replace(/"/g, '\\"');
+                const actionHtml = is_admin
+                    ? `<button class="btn btn-sm btn-primary me-2" data-bs-toggle="modal" data-bs-target="#modaledit${safeId}">Edit</button>
+                       <button class="btn btn-sm btn-danger" onclick="deleteApplication('${nameForJs}')">Delete</button>`
+                    : '-';
+                
+                // If embedded, use catalog route; if not embedded, use direct URL in new tab
+                const linkTarget = app.application_enabled
+                    ? (app.application_embedded 
+                        ? `/plugins/app-catalog/${encodeURIComponent(app.application_name)}`
+                        : app.application_url)
+                    : app.application_url;
+                const iconSrc = getIconSrc(app.application_icon);
+                const iconHtml = iconSrc
+                    ? `<img src="${escapeHtml(iconSrc)}" alt="${escapeHtml(app.application_name)} icon" style="height: 24px; width: 24px;">`
+                    : '';
+                // Non-embedded apps open in new tab
+                const linkAttrs = app.application_embedded ? '' : 'target="_blank" rel="noopener"';
+                row.innerHTML = `
+                    <td><a href="${escapeHtml(linkTarget)}" ${linkAttrs}>${escapeHtml(app.application_name)}</a></td>
+                    <td>${escapeHtml(app.application_url)}</td>
+                    <td>${renderBoolean(app.application_enabled)}</td>
+                    <td>${renderBoolean(app.application_embedded)}</td>
+                    <td>${iconHtml}</td>
+                    <td>${actionHtml}</td>
+                `;
+                tbody.appendChild(row);
+            });
+            
+            createEditModals(apps);
+            
+            // Initialize DataTables after data is populated
+            const table = document.getElementById('dataTable');
+            if (table) {
+                setTimeout(() => {
+                    const rows = tbody.querySelectorAll('tr');
+                    let hasDataRows = false;
+                    rows.forEach(row => {
+                        const cells = row.querySelectorAll('td');
+                        const hasColspan = Array.from(cells).some(cell => cell.hasAttribute('colspan'));
+                        if (!hasColspan && cells.length === 6) {
+                            hasDataRows = true;
+                        }
+                    });
+                    
+                    if (!hasDataRows) return;
+                    
+                    if ($.fn.DataTable && $(table).length) {
+                        if ($.fn.DataTable.isDataTable(table)) {
+                            const savedRows = tbody.innerHTML;
+                            $(table).DataTable().destroy();
+                            tbody.innerHTML = savedRows;
+                        }
+                        
+                        const dataRows = Array.from(tbody.querySelectorAll('tr')).filter(row => {
+                            const cells = row.querySelectorAll('td');
+                            return !Array.from(cells).some(cell => cell.hasAttribute('colspan')) && cells.length === 6;
+                        });
+                        
+                        if (dataRows.length > 0) {
+                            $(table).DataTable({
+                                responsive: true,
+                                pageLength: 25,
+                                order: [[0, 'asc']],
+                                stateSave: true,
+                                stateDuration: 60 * 60 * 24, // 24 hours
+                                columnDefs: [
+                                    {
+                                        targets: [5], // Action column
+                                        orderable: false,
+                                        searchable: false
+                                    }
+                                ]
+                            });
+                        }
+                    }
+                }, 50);
+            }
+        }
+        
+        async function loadApplications() {
+            try {
+                const apiUrl = '/api/v1/plugins/application-catalog';
+                const response = await fetch(apiUrl);
+                if (response.redirected) {
+                    window.location.href = response.url;
+                    return;
+                }
+                if (!response.ok) {
+                    throw new Error(`HTTP error! status: ${response.status}`);
+                }
+                const contentType = response.headers.get('content-type') || '';
+                if (!contentType.includes('application/json')) {
+                    const nextUrl = encodeURIComponent(window.location.pathname + window.location.search);
+                    window.location.href = `/?next=${nextUrl}`;
+                    return;
+                }
+                // Safe JSON parsing with error handling
+                let data;
+                try {
+                    const text = await response.text();
+                    if (!text || text.trim() === '') {
+                        throw new Error('Empty response from server');
+                    }
+                    data = JSON.parse(text);
+                } catch (parseError) {
+                    throw new Error(`Failed to parse JSON response: ${parseError.message}`);
+                }
+                if (data.error) {
+                    throw new Error(data.message || 'Failed to load applications');
+                }
+                
+                const apps = data.data || [];
+                populateApplicationsTable(apps);
+            } catch (error) {
+                const tbody = document.getElementById('applications-tbody');
+                if (tbody) {
+                    tbody.innerHTML = '<tr><td colspan="6" class="text-center text-danger">Error loading applications: ' + escapeHtml(error.message) + '</td></tr>';
+                }
+            }
+        }
+        
+        window.deleteApplication = async function(name) {
+            if (!confirm(`Are you sure you want to delete application "${name}"?`)) {
+                return;
+            }
+            
+            try {
+                const apiUrl = `/api/v1/plugins/application-catalog/${encodeURIComponent(name)}`;
+                const response = await fetch(apiUrl, {
+                    method: 'DELETE',
+                    headers: {
+                        'Content-Type': 'application/json',
+                        'X-CSRF-Token': csrf_token,
+                    }
+                });
+                
+                // Safe JSON parsing with error handling
+                let data;
+                try {
+                    const contentType = response.headers.get('content-type') || '';
+                    if (contentType.includes('application/json')) {
+                        const text = await response.text();
+                        if (text && text.trim() !== '') {
+                            data = JSON.parse(text);
+                        } else {
+                            data = {};
+                        }
+                    } else {
+                        // Not JSON, might be HTML error page
+                        const text = await response.text();
+                        throw new Error(`Unexpected content type: ${contentType}. Response: ${text.substring(0, 100)}`);
+                    }
+                } catch (parseError) {
+                    if (!response.ok) {
+                        throw new Error(`HTTP error! status: ${response.status}. Parse error: ${parseError.message}`);
+                    }
+                    throw new Error(`Failed to parse response: ${parseError.message}`);
+                }
+                
+                if (!response.ok) {
+                    throw new Error(data.message || `HTTP error! status: ${response.status}`);
+                }
+                
+                loadApplications();
+            } catch (error) {
+                alert('Error deleting application: ' + error.message);
+            }
+        };
+        
+        // Reinitialize DataTable after form submissions
+        function reinitializeDataTable() {
+            setTimeout(function() {
+                initializeDataTable();
+            }, 100);
+        }
+        
+        document.addEventListener('DOMContentLoaded', function() {
+            loadApplications();
+            
+            const addForm = document.getElementById('application-add-form');
+            if (addForm) {
+                addForm.addEventListener('submit', async function(e) {
+                    e.preventDefault();
+                    const messagesDiv = document.getElementById('add-form-messages');
+                    messagesDiv.innerHTML = '';
+                    
+                    const formData = {
+                        application_name: document.getElementById('application_name').value.trim(),
+                        application_url: document.getElementById('application_url').value.trim(),
+                        application_icon: document.getElementById('application_icon').value.trim(),
+                        application_embedded: document.getElementById('application_embedded').checked,
+                        application_enabled: document.getElementById('application_enabled').checked
+                    };
+                    
+                    if (!formData.application_name || !formData.application_url) {
+                        messagesDiv.innerHTML = '<div class="alert alert-danger">Name and link are required.</div>';
+                        return;
+                    }
+                    
+                    try {
+                        const apiUrl = '/api/v1/plugins/application-catalog';
+                        const response = await fetch(apiUrl, {
+                            method: 'POST',
+                            headers: {
+                                'Content-Type': 'application/json',
+                                'X-CSRF-Token': csrf_token,
+                            },
+                            body: JSON.stringify(formData)
+                        });
+                        
+                        const data = await response.json();
+                        if (!response.ok) {
+                            throw new Error(data.message || `HTTP error! status: ${response.status}`);
+                        }
+                        
+                        messagesDiv.innerHTML = '<div class="alert alert-success">' + escapeHtml(data.message || 'Application created successfully') + '</div>';
+                        
+                        const modal = bootstrap.Modal.getInstance(document.getElementById('modaladd'));
+                        if (modal) {
+                            modal.hide();
+                        }
+                        
+                        addForm.reset();
+                        document.getElementById('application_enabled').checked = true;
+                        
+                        setTimeout(() => {
+                            loadApplications();
+                        }, 500);
+                    } catch (error) {
+                        messagesDiv.innerHTML = '<div class="alert alert-danger">Error: ' + escapeHtml(error.message) + '</div>';
+                    }
+                });
+            }
+            
+            document.addEventListener('submit', async function(e) {
+                if (e.target && e.target.id && e.target.id.startsWith('application-edit-form-')) {
+                    e.preventDefault();
+                    
+                    const formId = e.target.id;
+                    const safeId = formId.replace('application-edit-form-', '');
+                    const messagesDiv = document.getElementById(`edit-form-messages-${safeId}`);
+                    messagesDiv.innerHTML = '';
+                    
+                    const formData = {
+                        application_name: document.getElementById(`application_name_${safeId}`).value.trim(),
+                        application_url: document.getElementById(`application_url_${safeId}`).value.trim(),
+                        application_icon: document.getElementById(`application_icon_${safeId}`).value.trim(),
+                        application_embedded: document.getElementById(`application_embedded_${safeId}`).checked,
+                        application_enabled: document.getElementById(`application_enabled_${safeId}`).checked
+                    };
+                    
+                    const application_name_old = document.querySelector(`#${formId} input[name="application_name_old"]`).value;
+                    
+                    if (!formData.application_name || !formData.application_url) {
+                        messagesDiv.innerHTML = '<div class="alert alert-danger">Name and link are required.</div>';
+                        return;
+                    }
+                    
+                    try {
+                        const apiUrl = `/api/v1/plugins/application-catalog/${encodeURIComponent(application_name_old)}`;
+                        const response = await fetch(apiUrl, {
+                            method: 'PUT',
+                            headers: {
+                                'Content-Type': 'application/json',
+                                'X-CSRF-Token': csrf_token,
+                            },
+                            body: JSON.stringify(formData)
+                        });
+                        
+                        const data = await response.json();
+                        if (!response.ok) {
+                            throw new Error(data.message || `HTTP error! status: ${response.status}`);
+                        }
+                        
+                        messagesDiv.innerHTML = '<div class="alert alert-success">' + escapeHtml(data.message || 'Application updated successfully') + '</div>';
+                        
+                        const modalElement = document.getElementById(`modaledit${safeId}`);
+                        const modal = bootstrap.Modal.getInstance(modalElement);
+                        if (modal) {
+                            modal.hide();
+                        }
+                        
+                        setTimeout(() => {
+                            loadApplications();
+                        }, 500);
+                    } catch (error) {
+                        messagesDiv.innerHTML = '<div class="alert alert-danger">Error: ' + escapeHtml(error.message) + '</div>';
+                    }
+                }
+            });
+        });
+        
+        document.addEventListener('DOMContentLoaded', async function() {
+            let retries = 0;
+            while ((typeof $ === 'undefined' || typeof $.fn.DataTable === 'undefined') && retries < 10) {
+                await new Promise(resolve => setTimeout(resolve, 100));
+                retries++;
+            }
+            
+            if (typeof $ === 'undefined' || typeof $.fn.DataTable === 'undefined') {
+                console.warn('DataTables not available after retries');
+                return;
+            }
+            
+            loadApplications();
+        });
+    </script>
+{% endblock %}
+

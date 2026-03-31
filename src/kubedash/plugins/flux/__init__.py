@@ -51,31 +51,21 @@ logger = get_logger()
 def get_flux_objects():
     """
     Main Flux objects list view.
-    Displays all Flux objects in a tabbed interface.
+    
+    Data is now loaded client-side via JavaScript API calls.
+    This route only renders the template structure and provides namespaces.
     """
-    selected = None
     user_token = get_user_token(session)
-    namespace_list, error = k8sNamespaceListGet(session['user_role'], user_token)
-
+    
     if request.method == 'POST':
         if request.form.get('ns_select', None):
             session['ns_select'] = request.form.get('ns_select')
-        selected = request.form.get('selected')
-            
-    flux_objects = _fetch_all_flux_objects(user_token)
     
-    # Build graph data for the connections tab
-    graph_data = build_flux_graph(flux_objects)
-    graph_stats = get_graph_stats(graph_data)
+    # Get namespace list for the dropdown
+    namespace_list, error = k8sNamespaceListGet(session['user_role'], user_token)
+    namespaces = namespace_list if not error else []
        
-    return render_template("flux_objects.html.j2",
-        namespaces=namespace_list,
-        selected=selected,
-        flux_objects=flux_objects,
-        graph_data=json.dumps(graph_data),
-        graph_stats=graph_stats,
-        ns_select=session.get('ns_select', 'default'),
-    )
+    return render_template("flux_objects.html.j2", namespaces=namespaces)
 
 
 ##############################################################
@@ -259,20 +249,32 @@ def flux_suspend():
     Suspend action for Flux objects.
     """
     if request.method == 'POST':
-        flux_object = json.loads(request.form.get('flux_object'))
-        user_token = get_user_token(session)
-        
-        SuspendAction(flux_object, session['user_role'], user_token)
-        
-        # Check if this came from detail view
-        if request.form.get('return_to_detail'):
-            return redirect(url_for('flux.get_flux_detail',
-                kind=flux_object.get('kind'),
-                namespace=flux_object.get('metadata', {}).get('namespace'),
-                name=flux_object.get('metadata', {}).get('name')
-            ))
-        
-        return redirect(url_for('flux.get_flux_objects'))
+        try:
+            flux_object_str = request.form.get('flux_object')
+            if not flux_object_str:
+                logger.error("Missing 'flux_object' in form data for suspend action")
+                return redirect(url_for('flux.get_flux_objects'))
+            
+            flux_object = json.loads(flux_object_str)
+            user_token = get_user_token(session)
+            
+            SuspendAction(flux_object, session['user_role'], user_token)
+            
+            # Check if this came from detail view
+            if request.form.get('return_to_detail'):
+                return redirect(url_for('flux.get_flux_detail',
+                    kind=flux_object.get('kind'),
+                    namespace=flux_object.get('metadata', {}).get('namespace'),
+                    name=flux_object.get('metadata', {}).get('name')
+                ))
+            
+            return redirect(url_for('flux.get_flux_objects'))
+        except json.JSONDecodeError as e:
+            logger.error(f"JSON decode error in flux_suspend: {str(e)}. Form data: {request.form.get('flux_object', '')[:200]}")
+            return redirect(url_for('flux.get_flux_objects'))
+        except Exception as e:
+            logger.error(f"Unexpected error in flux_suspend: {str(e)}", exc_info=True)
+            return redirect(url_for('flux.get_flux_objects'))
     else:
         return redirect(url_for('flux.get_flux_objects'))
     
@@ -284,20 +286,32 @@ def flux_resume():
     Resume action for Flux objects.
     """
     if request.method == 'POST':
-        flux_object = json.loads(request.form.get('flux_object'))
-        user_token = get_user_token(session)
-        
-        ResumeAction(flux_object, session['user_role'], user_token)
-        
-        # Check if this came from detail view
-        if request.form.get('return_to_detail'):
-            return redirect(url_for('flux.get_flux_detail',
-                kind=flux_object.get('kind'),
-                namespace=flux_object.get('metadata', {}).get('namespace'),
-                name=flux_object.get('metadata', {}).get('name')
-            ))
-        
-        return redirect(url_for('flux.get_flux_objects'))
+        try:
+            flux_object_str = request.form.get('flux_object')
+            if not flux_object_str:
+                logger.error("Missing 'flux_object' in form data for resume action")
+                return redirect(url_for('flux.get_flux_objects'))
+            
+            flux_object = json.loads(flux_object_str)
+            user_token = get_user_token(session)
+            
+            ResumeAction(flux_object, session['user_role'], user_token)
+            
+            # Check if this came from detail view
+            if request.form.get('return_to_detail'):
+                return redirect(url_for('flux.get_flux_detail',
+                    kind=flux_object.get('kind'),
+                    namespace=flux_object.get('metadata', {}).get('namespace'),
+                    name=flux_object.get('metadata', {}).get('name')
+                ))
+            
+            return redirect(url_for('flux.get_flux_objects'))
+        except json.JSONDecodeError as e:
+            logger.error(f"JSON decode error in flux_resume: {str(e)}. Form data: {request.form.get('flux_object', '')[:200]}")
+            return redirect(url_for('flux.get_flux_objects'))
+        except Exception as e:
+            logger.error(f"Unexpected error in flux_resume: {str(e)}", exc_info=True)
+            return redirect(url_for('flux.get_flux_objects'))
     else:
         return redirect(url_for('flux.get_flux_objects'))
     
@@ -309,20 +323,32 @@ def flux_sync():
     Sync action for Flux objects.
     """
     if request.method == 'POST':
-        flux_object = json.loads(request.form.get('flux_object'))
-        user_token = get_user_token(session)
-        
-        SyncAction(flux_object, session['user_role'], user_token)
-        
-        # Check if this came from detail view
-        if request.form.get('return_to_detail'):
-            return redirect(url_for('flux.get_flux_detail',
-                kind=flux_object.get('kind'),
-                namespace=flux_object.get('metadata', {}).get('namespace'),
-                name=flux_object.get('metadata', {}).get('name')
-            ))
-        
-        return redirect(url_for('flux.get_flux_objects'))
+        try:
+            flux_object_str = request.form.get('flux_object')
+            if not flux_object_str:
+                logger.error("Missing 'flux_object' in form data for sync action")
+                return redirect(url_for('flux.get_flux_objects'))
+            
+            flux_object = json.loads(flux_object_str)
+            user_token = get_user_token(session)
+            
+            SyncAction(flux_object, session['user_role'], user_token)
+            
+            # Check if this came from detail view
+            if request.form.get('return_to_detail'):
+                return redirect(url_for('flux.get_flux_detail',
+                    kind=flux_object.get('kind'),
+                    namespace=flux_object.get('metadata', {}).get('namespace'),
+                    name=flux_object.get('metadata', {}).get('name')
+                ))
+            
+            return redirect(url_for('flux.get_flux_objects'))
+        except json.JSONDecodeError as e:
+            logger.error(f"JSON decode error in flux_sync: {str(e)}. Form data: {request.form.get('flux_object', '')[:200]}")
+            return redirect(url_for('flux.get_flux_objects'))
+        except Exception as e:
+            logger.error(f"Unexpected error in flux_sync: {str(e)}", exc_info=True)
+            return redirect(url_for('flux.get_flux_objects'))
     else:
         return redirect(url_for('flux.get_flux_objects'))
 
@@ -346,49 +372,21 @@ def _fetch_all_flux_objects(user_token: str) -> dict:
     
     flux_objects = {}
     
-    try:
-        flux_objects["HelmReleases"] = FluxHelmReleaseGet(user_role, user_token, ns_select) or []
-    except Exception:
-        flux_objects["HelmReleases"] = []
-    
-    try:
-        flux_objects["Kustomizations"] = FluxKustomizationGet(user_role, user_token, ns_select) or []
-    except Exception:
-        flux_objects["Kustomizations"] = []
-    
-    try:
-        flux_objects["Alerts"] = FluxAlertNotificationGet(user_role, user_token, ns_select) or []
-    except Exception:
-        flux_objects["Alerts"] = []
-    
-    try:
-        flux_objects["Providers"] = FluxProviderNotificationGet(user_role, user_token, ns_select) or []
-    except Exception:
-        flux_objects["Providers"] = []
-    
-    try:
-        flux_objects["Receivers"] = FluxReceiverNotificationGet(user_role, user_token, ns_select) or []
-    except Exception:
-        flux_objects["Receivers"] = []
-    
-    try:
-        flux_objects["Buckets"] = FluxBucketRepositoryGet(user_role, user_token, ns_select) or []
-    except Exception:
-        flux_objects["Buckets"] = []
-    
-    try:
-        flux_objects["GitRepositories"] = FluxGitRepositoryGet(user_role, user_token, ns_select) or []
-    except Exception:
-        flux_objects["GitRepositories"] = []
-    
-    try:
-        flux_objects["HelmRepositories"] = FluxHelmRepositoryGet(user_role, user_token, ns_select) or []
-    except Exception:
-        flux_objects["HelmRepositories"] = []
-    
-    try:
-        flux_objects["OCIRepositories"] = FluxOCIRepositoryGet(user_role, user_token, ns_select) or []
-    except Exception:
-        flux_objects["OCIRepositories"] = []
+    def _get_or_empty(label, getter):
+        try:
+            return getter() or []
+        except Exception as e:
+            logger.warning("Failed to load Flux %s: %s", label, e, exc_info=True)
+            return []
+
+    flux_objects["HelmReleases"] = _get_or_empty("HelmReleases", lambda: FluxHelmReleaseGet(user_role, user_token, ns_select))
+    flux_objects["Kustomizations"] = _get_or_empty("Kustomizations", lambda: FluxKustomizationGet(user_role, user_token, ns_select))
+    flux_objects["Alerts"] = _get_or_empty("Alerts", lambda: FluxAlertNotificationGet(user_role, user_token, ns_select))
+    flux_objects["Providers"] = _get_or_empty("Providers", lambda: FluxProviderNotificationGet(user_role, user_token, ns_select))
+    flux_objects["Receivers"] = _get_or_empty("Receivers", lambda: FluxReceiverNotificationGet(user_role, user_token, ns_select))
+    flux_objects["Buckets"] = _get_or_empty("Buckets", lambda: FluxBucketRepositoryGet(user_role, user_token, ns_select))
+    flux_objects["GitRepositories"] = _get_or_empty("GitRepositories", lambda: FluxGitRepositoryGet(user_role, user_token, ns_select))
+    flux_objects["HelmRepositories"] = _get_or_empty("HelmRepositories", lambda: FluxHelmRepositoryGet(user_role, user_token, ns_select))
+    flux_objects["OCIRepositories"] = _get_or_empty("OCIRepositories", lambda: FluxOCIRepositoryGet(user_role, user_token, ns_select))
     
     return flux_objects

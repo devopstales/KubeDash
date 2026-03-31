@@ -1118,31 +1118,313 @@ def k8sSecretListGet(username_role, user_token, namespace):
 ## Network Policies
 ##############################################################
 
+def get_cilium_network_policies(username_role, user_token, namespace):
+    """
+    Fetch CiliumNetworkPolicy resources (namespaced).
+    
+    Args:
+        username_role: User role
+        user_token: User token
+        namespace: Namespace to fetch from
+        
+    Returns:
+        list: List of CiliumNetworkPolicy dictionaries
+    """
+    k8sClientConfigGet(username_role, user_token)
+    cilium_policies = []
+    
+    try:
+        custom_api = k8s_client.CustomObjectsApi()
+        api_group = "cilium.io"
+        api_version = "v2"
+        api_plural = "ciliumnetworkpolicies"
+        
+        response = custom_api.list_namespaced_custom_object(
+            group=api_group,
+            version=api_version,
+            namespace=namespace,
+            plural=api_plural,
+            _request_timeout=1
+        )
+        
+        for item in response.get('items', []):
+            metadata = item.get('metadata', {})
+            spec = item.get('spec', {})
+            
+            policy_data = {
+                "name": metadata.get('name'),
+                "namespace": metadata.get('namespace', namespace),
+                "kind": "CiliumNetworkPolicy",
+                "apiVersion": f"{api_group}/{api_version}",
+                "annotations": trimAnnotations(metadata.get('annotations')),
+                "labels": metadata.get('labels'),
+                "created": metadata.get('creationTimestamp', '').replace('T', ' ').split('.')[0] if metadata.get('creationTimestamp') else None,
+                "pod_selector": spec.get('endpointSelector', {}),
+                "ingress_rules": spec.get('ingress', []),
+                "egress_rules": spec.get('egress', []),
+                "policy_types": []
+            }
+            
+            # Determine policy types based on rules
+            if spec.get('ingress'):
+                policy_data["policy_types"].append("Ingress")
+            if spec.get('egress'):
+                policy_data["policy_types"].append("Egress")
+            if not spec.get('ingress') and not spec.get('egress'):
+                policy_data["policy_types"] = ["Ingress", "Egress"]
+            
+            cilium_policies.append(policy_data)
+            
+    except ApiException as error:
+        if error.status != 404:
+            ErrorHandler(logger, error, f"get CiliumNetworkPolicy list - {error.status}")
+    except Exception as error:
+        ErrorHandler(logger, error, f"get CiliumNetworkPolicy list: {error}")
+    
+    return cilium_policies
+
+def get_cilium_clusterwide_network_policies(username_role, user_token):
+    """
+    Fetch CiliumClusterwideNetworkPolicy resources (cluster-scoped).
+    
+    Args:
+        username_role: User role
+        user_token: User token
+        
+    Returns:
+        list: List of CiliumClusterwideNetworkPolicy dictionaries
+    """
+    k8sClientConfigGet(username_role, user_token)
+    cilium_policies = []
+    
+    try:
+        custom_api = k8s_client.CustomObjectsApi()
+        api_group = "cilium.io"
+        api_version = "v2"
+        api_plural = "ciliumclusterwidenetworkpolicies"
+        
+        response = custom_api.list_cluster_custom_object(
+            group=api_group,
+            version=api_version,
+            plural=api_plural,
+            _request_timeout=1
+        )
+        
+        for item in response.get('items', []):
+            metadata = item.get('metadata', {})
+            spec = item.get('spec', {})
+            
+            policy_data = {
+                "name": metadata.get('name'),
+                "namespace": None,  # Cluster-wide policies don't have a namespace
+                "kind": "CiliumClusterwideNetworkPolicy",
+                "apiVersion": f"{api_group}/{api_version}",
+                "annotations": trimAnnotations(metadata.get('annotations')),
+                "labels": metadata.get('labels'),
+                "created": metadata.get('creationTimestamp', '').replace('T', ' ').split('.')[0] if metadata.get('creationTimestamp') else None,
+                "pod_selector": spec.get('endpointSelector', {}),
+                "ingress_rules": spec.get('ingress', []),
+                "egress_rules": spec.get('egress', []),
+                "policy_types": []
+            }
+            
+            # Determine policy types based on rules
+            if spec.get('ingress'):
+                policy_data["policy_types"].append("Ingress")
+            if spec.get('egress'):
+                policy_data["policy_types"].append("Egress")
+            if not spec.get('ingress') and not spec.get('egress'):
+                policy_data["policy_types"] = ["Ingress", "Egress"]
+            
+            cilium_policies.append(policy_data)
+            
+    except ApiException as error:
+        if error.status != 404:
+            ErrorHandler(logger, error, f"get CiliumClusterwideNetworkPolicy list - {error.status}")
+    except Exception as error:
+        ErrorHandler(logger, error, f"get CiliumClusterwideNetworkPolicy list: {error}")
+    
+    return cilium_policies
+
+def serialize_network_policy_rule(rule):
+    """
+    Convert V1NetworkPolicyIngressRule or V1NetworkPolicyEgressRule to dictionary.
+    
+    Args:
+        rule: V1NetworkPolicyIngressRule or V1NetworkPolicyEgressRule object
+        
+    Returns:
+        dict: Serialized rule dictionary
+    """
+    if not rule:
+        return None
+    
+    if hasattr(rule, 'to_dict'):
+        return rule.to_dict()
+    elif isinstance(rule, dict):
+        return rule
+    else:
+        # Manual conversion
+        rule_dict = {}
+        
+        # Handle 'from' (ingress) or 'to' (egress)
+        if hasattr(rule, 'from'):
+            rule_dict['_from'] = serialize_network_policy_peer_list(getattr(rule, 'from', []))
+        elif hasattr(rule, 'to'):
+            rule_dict['to'] = serialize_network_policy_peer_list(getattr(rule, 'to', []))
+        
+        # Handle ports
+        if hasattr(rule, 'ports'):
+            ports = getattr(rule, 'ports', [])
+            rule_dict['ports'] = []
+            for port in ports:
+                if hasattr(port, 'to_dict'):
+                    rule_dict['ports'].append(port.to_dict())
+                elif isinstance(port, dict):
+                    rule_dict['ports'].append(port)
+                else:
+                    rule_dict['ports'].append({
+                        'protocol': getattr(port, 'protocol', None),
+                        'port': getattr(port, 'port', None)
+                    })
+        
+        return rule_dict
+
+def serialize_network_policy_peer_list(peer_list):
+    """
+    Convert list of V1NetworkPolicyPeer objects to list of dictionaries.
+    
+    Args:
+        peer_list: List of V1NetworkPolicyPeer objects
+        
+    Returns:
+        list: List of serialized peer dictionaries
+    """
+    if not peer_list:
+        return []
+    
+    serialized_peers = []
+    for peer in peer_list:
+        if hasattr(peer, 'to_dict'):
+            peer_dict = peer.to_dict()
+            # Convert 'from' to '_from' for consistency with template
+            if 'from' in peer_dict:
+                peer_dict['_from'] = peer_dict.pop('from')
+            serialized_peers.append(peer_dict)
+        elif isinstance(peer, dict):
+            serialized_peers.append(peer)
+        else:
+            # Manual conversion
+            peer_dict = {}
+            
+            # Pod selector
+            if hasattr(peer, 'pod_selector') and peer.pod_selector:
+                if hasattr(peer.pod_selector, 'to_dict'):
+                    peer_dict['pod_selector'] = peer.pod_selector.to_dict()
+                else:
+                    peer_dict['pod_selector'] = {
+                        'match_labels': getattr(peer.pod_selector, 'match_labels', {}) or {},
+                        'match_expressions': getattr(peer.pod_selector, 'match_expressions', []) or []
+                    }
+            
+            # Namespace selector
+            if hasattr(peer, 'namespace_selector') and peer.namespace_selector:
+                if hasattr(peer.namespace_selector, 'to_dict'):
+                    peer_dict['namespace_selector'] = peer.namespace_selector.to_dict()
+                else:
+                    peer_dict['namespace_selector'] = {
+                        'match_labels': getattr(peer.namespace_selector, 'match_labels', {}) or {},
+                        'match_expressions': getattr(peer.namespace_selector, 'match_expressions', []) or []
+                    }
+            
+            # IP block
+            if hasattr(peer, 'ip_block') and peer.ip_block:
+                if hasattr(peer.ip_block, 'to_dict'):
+                    ip_block_dict = peer.ip_block.to_dict()
+                    # Convert 'except' to '_except' for consistency
+                    if 'except' in ip_block_dict:
+                        ip_block_dict['_except'] = ip_block_dict.pop('except')
+                    peer_dict['ip_block'] = ip_block_dict
+                else:
+                    peer_dict['ip_block'] = {
+                        'cidr': getattr(peer.ip_block, 'cidr', None),
+                        '_except': getattr(peer.ip_block, 'except', []) or getattr(peer.ip_block, '_except', []) or []
+                    }
+            
+            serialized_peers.append(peer_dict)
+    
+    return serialized_peers
+
 @cache.memoize(timeout=short_cache_time)
 def k8sPolicyListGet(username_role, user_token, ns_name):
     POLICY_LIST = list()
     k8sClientConfigGet(username_role, user_token)
-    policy_list = k8s_client.NetworkingV1Api().list_namespaced_network_policy(ns_name, _request_timeout=1)
+    
+    # Get standard Kubernetes NetworkPolicies
     try:
-      for policy in policy_list.items:
-          POLICY_DATA = {
-              "name": policy.metadata.name,
-              "namespace": policy.metadata.namespace,
-              "annotations": trimAnnotations(policy.metadata.annotations),
-              "labels": policy.metadata.labels,
-              "pod_selector": policy.spec.pod_selector,
-              "policy_types": policy.spec.policy_types,
-              "imgress_rules": eval(str(policy.spec.ingress)),
-              "egress_rules": eval(str(policy.spec.egress)),
-              "created": policy.metadata.creation_timestamp.strftime('%Y-%m-%d %H:%M:%S'),
-          }
-          POLICY_LIST.append(POLICY_DATA)
-      return POLICY_LIST
+        policy_list = k8s_client.NetworkingV1Api().list_namespaced_network_policy(ns_name, _request_timeout=1)
+        for policy in policy_list.items:
+            # Serialize pod selector
+            pod_selector = None
+            if policy.spec.pod_selector:
+                if hasattr(policy.spec.pod_selector, 'to_dict'):
+                    pod_selector = policy.spec.pod_selector.to_dict()
+                else:
+                    pod_selector = {
+                        'match_labels': getattr(policy.spec.pod_selector, 'match_labels', {}) or {},
+                        'match_expressions': getattr(policy.spec.pod_selector, 'match_expressions', []) or []
+                    }
+            
+            # Serialize ingress rules
+            ingress_rules = []
+            if policy.spec.ingress:
+                for rule in policy.spec.ingress:
+                    serialized_rule = serialize_network_policy_rule(rule)
+                    if serialized_rule:
+                        ingress_rules.append(serialized_rule)
+            
+            # Serialize egress rules
+            egress_rules = []
+            if policy.spec.egress:
+                for rule in policy.spec.egress:
+                    serialized_rule = serialize_network_policy_rule(rule)
+                    if serialized_rule:
+                        egress_rules.append(serialized_rule)
+            
+            POLICY_DATA = {
+                "name": policy.metadata.name,
+                "namespace": policy.metadata.namespace,
+                "kind": "NetworkPolicy",
+                "apiVersion": "networking.k8s.io/v1",
+                "annotations": trimAnnotations(policy.metadata.annotations),
+                "labels": policy.metadata.labels,
+                "pod_selector": pod_selector,
+                "policy_types": policy.spec.policy_types or [],
+                "ingress_rules": ingress_rules,
+                "imgress_rules": ingress_rules,  # Keep typo for backward compatibility
+                "egress_rules": egress_rules,
+                "created": policy.metadata.creation_timestamp.strftime('%Y-%m-%d %H:%M:%S'),
+            }
+            POLICY_LIST.append(POLICY_DATA)
     except ApiException as error:
         if error.status != 404:
             ErrorHandler(logger, error, "get network policy list - %s" % error.status)
-        return POLICY_LIST
     except Exception as error:
         ERROR = "k8sNetworkPolicyListGet: %s" % error
         ErrorHandler(logger, "error", ERROR)
-        return POLICY_LIST
+    
+    # Get CiliumNetworkPolicy (namespaced)
+    try:
+        cilium_policies = get_cilium_network_policies(username_role, user_token, ns_name)
+        POLICY_LIST.extend(cilium_policies)
+    except Exception as error:
+        ErrorHandler(logger, error, "get CiliumNetworkPolicy list")
+    
+    # Get CiliumClusterwideNetworkPolicy (cluster-scoped, show in all namespaces)
+    try:
+        cilium_clusterwide_policies = get_cilium_clusterwide_network_policies(username_role, user_token)
+        POLICY_LIST.extend(cilium_clusterwide_policies)
+    except Exception as error:
+        ErrorHandler(logger, error, "get CiliumClusterwideNetworkPolicy list")
+    
+    return POLICY_LIST

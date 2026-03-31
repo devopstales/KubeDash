@@ -7,301 +7,34 @@
         <ol class="breadcrumb my-0">
           <li class="breadcrumb-item"><span>Plugins</span></li>
           <li class="breadcrumb-item"><a href="/plugins/external-loadbalancer">LoadBalancers</a></li>
-          <li class="breadcrumb-item">{{ object_type|replace("_", " ")|capitalize }}</li>
-          <li class="breadcrumb-item active" aria-current="page">{{ object_data.name }}</li>
+          <li class="breadcrumb-item" id="object-type-breadcrumb">Loading...</li>
+          <li class="breadcrumb-item active" aria-current="page" id="object-name-breadcrumb">Loading...</li>
         </ol>
       </nav>
     </div>
 </ul>
 <ul class="header-nav ms-auto"></ul>
 <ul class="header-nav d-lg-flex">
-{% include "segments/topmenu.html.j2" %}
+{% include "segments/partials/topmenu.html.j2" %}
 {% endblock %}
 
 {% block content %}
 <div class="card shadow mb-4">
     <div class="card-header py-3">
-        <h6 class="m-0 fw-bold text-primary">{{ object_type }} Objects</h6>
+        <h6 class="m-0 fw-bold text-primary" id="object-type-header">Loading...</h6>
     </div>
     <div class="card-body">
         <div class="table-responsive">
             <table class="table table-bordered" id="lbInfoTable" width="100%">
-                <tbody>
+                <tbody id="lb-info-tbody">
                     <tr>
-                        <th class="w-25">Name:</th>
-                        <td>{{ object_data.name }}</td>
-                    </tr>
-                    <tr>
-                        <th>Type:</th>
-                        <td>{{ object_data.type }}</td>
-                    </tr>
-                    
-                    {% if object_type == "ipaddresspool" %}
-                    <tr>
-                        <th>Addresses:</th>
-                        <td>
-                            {% if object_data.type == "cilium" %}
-                                <div class="table-responsive">
-                                    <table class="table table-bordered table-sm">
-                                        {% for address in object_data.blocks %}
-                                        <tr>
-                                            {% for key, value in address.items() %}
-                                                {% if key == "start"%}
-                                                    <td>{{ value }} -</td>
-                                                {% elif key == "stop"%}
-                                                    <td>{{ value }}</td>
-                                                {% elif key == "cidr"%}
-                                                    <td>{{ value }}</td>
-                                                {% endif %}
-                                            {% endfor %}
-                                        </tr>
-                                        {% endfor %}
-                                    </table>
-                                </div>
-                            {% else %}
-                                {% for address in object_data.addresses %}
-                                {{ address }}<br>
-                                {% endfor %}
-                            {% endif %}
-                        </td>
-                    </tr>
-                    
-                    {% if object_data.type != "cilium" %}
-                    <tr>
-                        <th>Auto assign:</th>
-                        <td>{{ object_data.autoAssign }}</td>
-                    </tr>
-                    {% endif %}
-                    
-                    <tr>
-                        <th>Avoid buggy IPs:</th>
-                        <td>
-                            {% if object_data.type == "cilium" %}
-                                {{ object_data.allowFirstLastIPs }}
-                            {% else %}
-                                {{ object_data.avoidBuggyIPs }}
-                            {% endif %}
-                        </td>
-                    </tr>
-                    
-                    {% if object_data.ServiceAllocation_namespaces is defined %}
-                    <tr>
-                        <th>Allocation Namespaces:</th>
-                        <td>
-                            {% for namespace in object_data.ServiceAllocation_namespaces %}
-                            {{ namespace }}<br>
-                            {% endfor %}
-                        </td>
-                    </tr>
-                    {% endif %}
-                    
-                    {% if object_data.ServiceAllocation_namespaceSelectors is defined %}
-                    <tr>
-                        <th>Allocation Namespace Selectors:</th>
-                        <td>
-                            <h6 class="fw-bold">Labels:</h6>
-                            <div class="table-responsive">
-                                <table class="table table-bordered table-sm">
-                                    {% for selector in object_data.ServiceAllocation_namespaceSelectors %}
-                                        {% for key, value in selector.matchLabels.items() %}
-                                        <tr>
-                                            <td>{{ key }}</td>
-                                            <td>{{ value }}</td>
-                                        </tr>
-                                        {% endfor %}
-                                    {% endfor %}
-                                </table>
+                        <td colspan="2" class="text-center">
+                            <div class="spinner-border spinner-border-sm text-primary" role="status">
+                                <span class="visually-hidden">Loading...</span>
                             </div>
+                            <span class="ms-2">Loading data...</span>
                         </td>
                     </tr>
-                    {% endif %}
-                    
-                    {% if object_data.ServiceAllocation_serviceSelectors is defined %}
-                    <tr>
-                        <th>Service Selectors:</th>
-                        <td>
-                            <h6 class="fw-bold">Match Expressions</h6>
-                            <div class="table-responsive">
-                                <table class="table table-bordered table-sm">
-                                    {% for selector in object_data.ServiceAllocation_serviceSelectors %}
-                                        {% for expressions in selector.matchExpressions %}
-                                        <tr>
-                                            {% for expression in expressions %}
-                                            <td>{{ expressions[expression] }}</td>
-                                            {% endfor %}
-                                        </tr>
-                                        {% endfor %}
-                                    {% endfor %}
-                                </table>
-                            </div>
-                        </td>
-                    </tr>
-                    {% endif %}
-                    
-                    {% if object_data.serviceSelector is defined %}
-                    <tr>
-                        <th>Allocation Service Selectors:</th>
-                        <td>
-                            <div class="table-responsive">
-                                <table class="table table-bordered table-sm">
-                                    <tr>
-                                    {% for key, value in object_data.serviceSelector.matchLabels.items() %}
-                                        <td>{{ key }}</td>
-                                        <td>{{ value }}</td>
-                                    {% endfor %}
-                                    </tr>
-                                </table>
-                            </div>
-                        </td>
-                    </tr>
-                    {% endif %}
-                    
-                    {% elif object_type == "l2advertisement" %}
-                    {% if object_data.type != 'cilium' %}
-                    <tr>
-                        <th>IP Address Pools:</th>
-                        <td>
-                            {% for pool in object_data.ipAddressPools %}
-                            <form action="/plugins/external-loadbalancer" method="POST">
-                                <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
-                                <input type="hidden" name="ns_select" value="{{ session['ns_select'] }}" />
-                                <input type="hidden" name="selected" value="{{ pool }}" />
-                                <input type="hidden" name="object_type" value="ipaddresspool" />
-                                <a href="javascript:;" onclick="parentNode.submit();" class="text-decoration-none">{{ pool }}</a>
-                            </form>
-                            <br>
-                            {% endfor %}
-                        </td>
-                    </tr>
-                    {% else %}
-                    <tr>
-                        <th>Interfaces:</th>
-                        <td>
-                            {% for interface in object_data.interfaces %}
-                            {{ interface }}<br>
-                            {% endfor %}
-                        </td>
-                    </tr>
-                    
-                    {% if object_data.nodeSelector is defined %}
-                    <tr>
-                        <th>Node Selectors:</th>
-                        <td>
-                            <h6 class="fw-bold">Node Labels</h6>
-                            <div class="table-responsive">
-                                <table class="table table-bordered table-sm">
-                                    <tr>
-                                    {% for key, value in object_data.nodeSelector.matchLabels.items() %}
-                                        <td>{{ key }}</td>
-                                        <td>{{ value }}</td>
-                                    {% endfor %}
-                                    </tr>
-                                </table>
-                            </div>
-                        </td>
-                    </tr>
-                    {% endif %}
-                    {% endif %}
-                    
-                    {% if object_data.ipAddressPoolSelectors is defined %}
-                    <tr>
-                        <th>IP Address Pool Selectors:</th>
-                        <td>{{ object_data.ipAddressPoolSelectors }}</td>
-                    </tr>
-                    {% endif %}
-                    
-                    {% if object_data.nodeSelectors is defined %}
-                    <tr>
-                        <th>Node Selectors:</th>
-                        <td>{{ object_data.nodeSelectors }}</td>
-                    </tr>
-                    {% endif %}
-                    
-                    {% elif object_type == "bgppeers" %}
-                    <tr>
-                        <th>My ASN:</th>
-                        {% if object_data.type == "cilium" %}
-                            <td>
-                            {% for router in object_data.virtual_routers %}
-                            {{ router.localASN }}<br>
-                            {% endfor %}
-                            </td>
-                        {% else %}
-                            <td>{{ object_data.myASN }}</td>
-                        {% endif %}
-                    </tr>
-                    
-                    <tr>
-                        <th>Peer Address:</th>
-                        {% if object_data.type == "cilium" %}
-                        <td>
-                            {% for router in object_data.virtual_routers %}
-                                {% for neighbor in router.neighbors %}
-                                    {{ neighbor.peerAddress }}<br>
-                                {% endfor %}
-                            {% endfor %}
-                        </td>
-                        {% else %}
-                            <td>{{ object_data.peerAddress }}</td>
-                        {% endif %}
-                    </tr>
-                    
-                    <tr>
-                        <th>Peer ASN:</th>
-                        {% if object_data.type == "cilium" %}
-                        <td>
-                            {% for router in object_data.virtual_routers %}
-                                {% for neighbor in router.neighbors %}
-                                    {{ neighbor.peerASN }}<br>
-                                {% endfor %}
-                            {% endfor %}
-                        </td>
-                        {% else %}
-                            <td>{{ object_data.peerASN }}</td>
-                        {% endif %}
-                    </tr>
-                    
-                    {% if object_data.nodeSelectors is defined %}
-                    <tr>
-                        <th>Node Selectors:</th>
-                        <td>
-                            <h6 class="fw-bold">Node Selectors</h6>
-                            <div class="table-responsive">
-                                <table class="table table-bordered table-sm">
-                                {% for selector in object_data.nodeSelectors %}
-                                    {% for expressions in selector.matchExpressions %}
-                                    <tr>
-                                        {% for expression in expressions %}
-                                        <td>{{ expressions[expression] }}</td>
-                                        {% endfor %}
-                                    </tr>
-                                    {% endfor %}
-                                {% endfor %}
-                                </table>
-                            </div>
-                        </td>
-                    </tr>
-                    {% endif %}
-                    
-                    {% if object_data.nodeSelector is defined %}
-                    <tr>
-                        <th>Node Selectors:</th>
-                        <td>
-                            <h6 class="fw-bold">Node Labels</h6>
-                            <div class="table-responsive">
-                                <table class="table table-bordered table-sm">
-                                    <tr>
-                                    {% for key, value in object_data.nodeSelector.matchLabels.items() %}
-                                        <td>{{ key }}</td>
-                                        <td>{{ value }}</td>
-                                    {% endfor %}
-                                    </tr>
-                                </table>
-                            </div>
-                        </td>
-                    </tr>
-                    {% endif %}
-                    {% endif %}
                 </tbody>
             </table>
         </div>
@@ -310,8 +43,525 @@
 {% endblock %}
 
 {% block add_head_css %}
-{% include "segments/datatable_snippet.html.j2" %}
+{% include "segments/components/datatable_snippet.html.j2" %}
 {% endblock %}
 
-{% block tail_js %}
+{% block add_tail_js %}
+<script>
+(function() {
+    'use strict';
+    try {
+        console.log('=== External LoadBalancer Data Script Starting ===');
+        
+    const escapeHtml = (text) => {
+        if (text === null || text === undefined) return '';
+        const map = {
+            '&': '&amp;',
+            '<': '&lt;',
+            '>': '&gt;',
+            '"': '&quot;',
+            "'": '&#039;'
+        };
+        return String(text).replace(/[&<>"']/g, m => map[m]);
+    };
+    
+    const csrf_token = {{ csrf_token()|tojson }};
+    
+    // Get object data and type from URL, sessionStorage, or form data
+    function getLoadBalancerInfo() {
+        const urlParams = new URLSearchParams(window.location.search);
+        let objectType = urlParams.get('object_type');
+        let namespace = urlParams.get('namespace');
+        
+        // Fallback to sessionStorage
+        if (!objectType) {
+            objectType = sessionStorage.getItem('loadbalancer_object_type');
+        }
+        if (!namespace) {
+            namespace = sessionStorage.getItem('ns_select');
+        }
+        
+        // Get object data from sessionStorage
+        const objectDataStr = sessionStorage.getItem('loadbalancer_object_data');
+        let objectData = null;
+        if (objectDataStr) {
+            try {
+                objectData = JSON.parse(objectDataStr);
+            } catch (e) {
+                console.error('Error parsing object data from sessionStorage:', e);
+            }
+        }
+        
+        // Fallback to topbar selector for namespace
+        if (!namespace) {
+            const topbarSelect = document.getElementById('inputGroupSelect04');
+            if (topbarSelect) {
+                namespace = topbarSelect.value;
+            }
+        }
+        
+        // Final fallback
+        if (!namespace) {
+            namespace = 'default';
+        }
+        
+        return { objectType, objectData, namespace };
+    }
+    
+    function formatTableRows(rows) {
+        return rows.map(row => `<tr>${row}</tr>`).join('');
+    }
+    
+    function formatLabelTable(labels) {
+        if (!labels || typeof labels !== 'object') return '';
+        let html = '<div class="table-responsive"><table class="table table-bordered table-sm"><tr>';
+        for (const [key, value] of Object.entries(labels)) {
+            html += `<td>${escapeHtml(key)}</td><td>${escapeHtml(String(value))}</td>`;
+        }
+        html += '</tr></table></div>';
+        return html;
+    }
+    
+    function formatMatchExpressionsTable(expressions) {
+        if (!expressions || !Array.isArray(expressions)) return '';
+        let html = '<div class="table-responsive"><table class="table table-bordered table-sm">';
+        expressions.forEach(expr => {
+            html += '<tr>';
+            if (typeof expr === 'object') {
+                for (const [key, value] of Object.entries(expr)) {
+                    html += `<td>${escapeHtml(String(value))}</td>`;
+                }
+            }
+            html += '</tr>';
+        });
+        html += '</table></div>';
+        return html;
+    }
+    
+    function populateLoadBalancerData(objectData, objectType, namespace) {
+        if (!objectData || !objectType) {
+            document.getElementById('lb-info-tbody').innerHTML = '<tr><td colspan="2" class="text-center text-danger">Error: Data not available</td></tr>';
+            return;
+        }
+        
+        // Update breadcrumbs and header
+        const objectTypeBreadcrumb = document.getElementById('object-type-breadcrumb');
+        const objectNameBreadcrumb = document.getElementById('object-name-breadcrumb');
+        const objectTypeHeader = document.getElementById('object-type-header');
+        
+        const typeDisplay = objectType.replace(/_/g, ' ').replace(/\b\w/g, l => l.toUpperCase());
+        if (objectTypeBreadcrumb) {
+            objectTypeBreadcrumb.textContent = typeDisplay;
+        }
+        if (objectNameBreadcrumb) {
+            objectNameBreadcrumb.textContent = escapeHtml(objectData.name || 'N/A');
+        }
+        if (objectTypeHeader) {
+            objectTypeHeader.textContent = typeDisplay + ' Objects';
+        }
+        
+        const rows = [];
+        
+        // Common fields
+        rows.push(`<th class="w-25">Name:</th><td>${escapeHtml(objectData.name || 'N/A')}</td>`);
+        rows.push(`<th>Type:</th><td>${escapeHtml(objectData.type || 'N/A')}</td>`);
+        
+        // Object type specific fields
+        if (objectType === 'ipaddresspool') {
+            // Addresses
+            let addressesHtml = '';
+            if (objectData.type === 'cilium' && objectData.blocks) {
+                addressesHtml = '<div class="table-responsive"><table class="table table-bordered table-sm">';
+                objectData.blocks.forEach(address => {
+                    if (typeof address === 'object') {
+                        addressesHtml += '<tr>';
+                        if (address.start) addressesHtml += `<td>${escapeHtml(String(address.start))} -</td>`;
+                        if (address.stop) addressesHtml += `<td>${escapeHtml(String(address.stop))}</td>`;
+                        if (address.cidr) addressesHtml += `<td>${escapeHtml(String(address.cidr))}</td>`;
+                        addressesHtml += '</tr>';
+                    }
+                });
+                addressesHtml += '</table></div>';
+            } else if (objectData.addresses && Array.isArray(objectData.addresses)) {
+                addressesHtml = objectData.addresses.map(addr => escapeHtml(String(addr))).join('<br>');
+            }
+            if (addressesHtml) {
+                rows.push(`<th>Addresses:</th><td>${addressesHtml}</td>`);
+            }
+            
+            // Auto assign (not for cilium)
+            if (objectData.type !== 'cilium' && objectData.autoAssign !== undefined) {
+                rows.push(`<th>Auto assign:</th><td>${escapeHtml(String(objectData.autoAssign))}</td>`);
+            }
+            
+            // Avoid buggy IPs
+            if (objectData.type === 'cilium' && objectData.allowFirstLastIPs !== undefined) {
+                rows.push(`<th>Avoid buggy IPs:</th><td>${escapeHtml(String(objectData.allowFirstLastIPs))}</td>`);
+            } else if (objectData.avoidBuggyIPs !== undefined) {
+                rows.push(`<th>Avoid buggy IPs:</th><td>${escapeHtml(String(objectData.avoidBuggyIPs))}</td>`);
+            }
+            
+            // Service Allocation namespaces
+            if (objectData.ServiceAllocation_namespaces && Array.isArray(objectData.ServiceAllocation_namespaces)) {
+                const namespacesHtml = objectData.ServiceAllocation_namespaces.map(ns => escapeHtml(ns)).join('<br>');
+                rows.push(`<th>Allocation Namespaces:</th><td>${namespacesHtml}</td>`);
+            }
+            
+            // Service Allocation namespace selectors
+            if (objectData.ServiceAllocation_namespaceSelectors && Array.isArray(objectData.ServiceAllocation_namespaceSelectors)) {
+                let selectorsHtml = '<h6 class="fw-bold">Labels:</h6>';
+                objectData.ServiceAllocation_namespaceSelectors.forEach(selector => {
+                    if (selector.matchLabels) {
+                        selectorsHtml += formatLabelTable(selector.matchLabels);
+                    }
+                });
+                rows.push(`<th>Allocation Namespace Selectors:</th><td>${selectorsHtml}</td>`);
+            }
+            
+            // Service Allocation service selectors
+            if (objectData.ServiceAllocation_serviceSelectors && Array.isArray(objectData.ServiceAllocation_serviceSelectors)) {
+                let selectorsHtml = '<h6 class="fw-bold">Match Expressions</h6>';
+                objectData.ServiceAllocation_serviceSelectors.forEach(selector => {
+                    if (selector.matchExpressions) {
+                        selectorsHtml += formatMatchExpressionsTable(selector.matchExpressions);
+                    }
+                });
+                rows.push(`<th>Service Selectors:</th><td>${selectorsHtml}</td>`);
+            }
+            
+            // serviceSelector
+            if (objectData.serviceSelector && objectData.serviceSelector.matchLabels) {
+                rows.push(`<th>Allocation Service Selectors:</th><td>${formatLabelTable(objectData.serviceSelector.matchLabels)}</td>`);
+            }
+            
+        } else if (objectType === 'l2advertisement') {
+            if (objectData.type !== 'cilium') {
+                // IP Address Pools
+                if (objectData.ipAddressPools && Array.isArray(objectData.ipAddressPools)) {
+                    let poolsHtml = '';
+                    objectData.ipAddressPools.forEach(pool => {
+                        poolsHtml += `
+                            <form action="/plugins/external-loadbalancer" method="POST" onsubmit="sessionStorage.setItem('ns_select', '${escapeHtml(namespace)}'); return true;">
+                                <input type="hidden" name="csrf_token" value="${escapeHtml(csrf_token)}">
+                                <input type="hidden" name="ns_select" value="${escapeHtml(namespace)}" />
+                                <input type="hidden" name="selected" value="${escapeHtml(pool)}" />
+                                <input type="hidden" name="object_type" value="ipaddresspool" />
+                                <a href="javascript:;" onclick="parentNode.submit();" class="text-decoration-none">${escapeHtml(pool)}</a>
+                            </form><br>
+                        `;
+                    });
+                    rows.push(`<th>IP Address Pools:</th><td>${poolsHtml}</td>`);
+                }
+            } else {
+                // Interfaces (cilium)
+                if (objectData.interfaces && Array.isArray(objectData.interfaces)) {
+                    const interfacesHtml = objectData.interfaces.map(iface => escapeHtml(String(iface))).join('<br>');
+                    rows.push(`<th>Interfaces:</th><td>${interfacesHtml}</td>`);
+                }
+                
+                // Node Selectors (cilium)
+                if (objectData.nodeSelector && objectData.nodeSelector.matchLabels) {
+                    rows.push(`<th>Node Selectors:</th><td><h6 class="fw-bold">Node Labels</h6>${formatLabelTable(objectData.nodeSelector.matchLabels)}</td>`);
+                }
+            }
+            
+            // IP Address Pool Selectors
+            if (objectData.ipAddressPoolSelectors !== undefined) {
+                rows.push(`<th>IP Address Pool Selectors:</th><td>${escapeHtml(String(objectData.ipAddressPoolSelectors))}</td>`);
+            }
+            
+            // Node Selectors
+            if (objectData.nodeSelectors !== undefined) {
+                rows.push(`<th>Node Selectors:</th><td>${escapeHtml(String(objectData.nodeSelectors))}</td>`);
+            }
+            
+        } else if (objectType === 'bgppeers') {
+            // My ASN
+            let myASNHtml = '';
+            if (objectData.type === 'cilium' && objectData.virtual_routers && Array.isArray(objectData.virtual_routers)) {
+                myASNHtml = objectData.virtual_routers.map(router => escapeHtml(String(router.localASN || ''))).join('<br>');
+            } else if (objectData.myASN !== undefined) {
+                myASNHtml = escapeHtml(String(objectData.myASN));
+            }
+            if (myASNHtml) {
+                rows.push(`<th>My ASN:</th><td>${myASNHtml}</td>`);
+            }
+            
+            // Peer Address
+            let peerAddressHtml = '';
+            if (objectData.type === 'cilium' && objectData.virtual_routers && Array.isArray(objectData.virtual_routers)) {
+                objectData.virtual_routers.forEach(router => {
+                    if (router.neighbors && Array.isArray(router.neighbors)) {
+                        router.neighbors.forEach(neighbor => {
+                            peerAddressHtml += escapeHtml(String(neighbor.peerAddress || '')) + '<br>';
+                        });
+                    }
+                });
+            } else if (objectData.peerAddress !== undefined) {
+                peerAddressHtml = escapeHtml(String(objectData.peerAddress));
+            }
+            if (peerAddressHtml) {
+                rows.push(`<th>Peer Address:</th><td>${peerAddressHtml}</td>`);
+            }
+            
+            // Peer ASN
+            let peerASNHtml = '';
+            if (objectData.type === 'cilium' && objectData.virtual_routers && Array.isArray(objectData.virtual_routers)) {
+                objectData.virtual_routers.forEach(router => {
+                    if (router.neighbors && Array.isArray(router.neighbors)) {
+                        router.neighbors.forEach(neighbor => {
+                            peerASNHtml += escapeHtml(String(neighbor.peerASN || '')) + '<br>';
+                        });
+                    }
+                });
+            } else if (objectData.peerASN !== undefined) {
+                peerASNHtml = escapeHtml(String(objectData.peerASN));
+            }
+            if (peerASNHtml) {
+                rows.push(`<th>Peer ASN:</th><td>${peerASNHtml}</td>`);
+            }
+            
+            // Node Selectors (array of matchExpressions)
+            if (objectData.nodeSelectors && Array.isArray(objectData.nodeSelectors)) {
+                let selectorsHtml = '<h6 class="fw-bold">Node Selectors</h6>';
+                objectData.nodeSelectors.forEach(selector => {
+                    if (selector.matchExpressions) {
+                        selectorsHtml += formatMatchExpressionsTable(selector.matchExpressions);
+                    }
+                });
+                rows.push(`<th>Node Selectors:</th><td>${selectorsHtml}</td>`);
+            }
+            
+            // Node Selector (single matchLabels)
+            if (objectData.nodeSelector && objectData.nodeSelector.matchLabels) {
+                rows.push(`<th>Node Selectors:</th><td><h6 class="fw-bold">Node Labels</h6>${formatLabelTable(objectData.nodeSelector.matchLabels)}</td>`);
+            }
+        }
+        
+        // Populate table
+        const tbody = document.getElementById('lb-info-tbody');
+        if (rows.length > 0) {
+            tbody.innerHTML = formatTableRows(rows);
+        } else {
+            tbody.innerHTML = '<tr><td colspan="2" class="text-center text-muted">No data available</td></tr>';
+        }
+    }
+    
+    async function fetchObjectsList(objectType, namespace) {
+        try {
+            let apiUrl = '';
+            
+            // Map object type to API endpoint
+            if (objectType === 'ipaddresspool') {
+                apiUrl = `/api/v1/plugins/external-loadbalancer/ip-address-pools?namespace=${encodeURIComponent(namespace)}`;
+            } else if (objectType === 'l2advertisement') {
+                apiUrl = `/api/v1/plugins/external-loadbalancer/l2-advertisements?namespace=${encodeURIComponent(namespace)}`;
+            } else if (objectType === 'bgpadvertisement') {
+                apiUrl = `/api/v1/plugins/external-loadbalancer/bgp-advertisements?namespace=${encodeURIComponent(namespace)}`;
+            } else if (objectType === 'bgppeers') {
+                apiUrl = `/api/v1/plugins/external-loadbalancer/bgp-peers?namespace=${encodeURIComponent(namespace)}`;
+            }
+            
+            if (!apiUrl) {
+                throw new Error(`Unknown object type: ${objectType}`);
+            }
+            
+            console.log('Fetching objects list from:', apiUrl);
+            const response = await fetch(apiUrl, {
+                method: 'GET',
+                headers: {
+                    'Accept': 'application/json',
+                },
+                credentials: 'same-origin'
+            });
+            
+            console.log('Response status:', response.status, response.statusText);
+            
+            if (!response.ok) {
+                const errorText = await response.text();
+                console.error('HTTP error response:', errorText);
+                throw new Error(`HTTP error! status: ${response.status} - ${errorText}`);
+            }
+            
+            const data = await response.json();
+            console.log('Objects list received:', data);
+            
+            if (data.error) {
+                throw new Error(data.message || 'Failed to load objects list');
+            }
+            
+            const objects = data.data || [];
+            console.log('Returning objects list, count:', objects.length);
+            return objects;
+        } catch (error) {
+            console.error('Error fetching objects list:', error);
+            throw error;
+        }
+    }
+    
+    async function fetchObjectData(objectType, objectName, namespace) {
+        try {
+            const objects = await fetchObjectsList(objectType, namespace);
+            
+            // Find the specific object by name
+            const objectData = objects.find(obj => obj.name === objectName);
+            
+            if (!objectData) {
+                throw new Error(`Object ${objectName} not found`);
+            }
+            
+            return objectData;
+        } catch (error) {
+            console.error('Error fetching object data:', error);
+            throw error;
+        }
+    }
+    
+    // Load data when page loads
+    document.addEventListener('DOMContentLoaded', async function() {
+        console.log('External LoadBalancer data page loading...');
+        let { objectType, objectData, namespace } = getLoadBalancerInfo();
+        
+        // Get object name from URL if not in data
+        const urlParams = new URLSearchParams(window.location.search);
+        let objectName = urlParams.get('selected') || (objectData && objectData.name);
+        
+        console.log('Initial state:', { objectType, objectData: !!objectData, objectName, namespace });
+        
+        // If we have object data, use it
+        if (objectData && objectData.name) {
+            objectName = objectData.name;
+            console.log('Using object data from sessionStorage');
+        }
+        // If we don't have object data but have type and name, fetch from API
+        else if (!objectData && objectType && objectName && namespace) {
+            console.log('Object data not in sessionStorage, fetching from API...');
+            try {
+                objectData = await fetchObjectData(objectType, objectName, namespace);
+                // Store in sessionStorage for future use
+                if (objectData) {
+                    sessionStorage.setItem('loadbalancer_object_data', JSON.stringify(objectData));
+                    sessionStorage.setItem('loadbalancer_object_type', objectType);
+                    console.log('Object data fetched and stored:', objectData.name);
+                }
+            } catch (error) {
+                console.error('Failed to fetch object data:', error);
+                const tbody = document.getElementById('lb-info-tbody');
+                if (tbody) {
+                    tbody.innerHTML = 
+                        '<tr><td colspan="2" class="text-center text-danger">Error: ' + escapeHtml(error.message) + 
+                        '<br><small>Please ensure the object name is specified in the URL as ?selected=&lt;object-name&gt;</small></td></tr>';
+                }
+                return;
+            }
+        }
+        // If we still don't have what we need, show helpful error
+        else if (!objectType) {
+            console.error('Object type not found');
+            const tbody = document.getElementById('lb-info-tbody');
+            if (tbody) {
+                tbody.innerHTML = 
+                    '<tr><td colspan="2" class="text-center text-danger">Error: Object type not specified. ' +
+                    'Please navigate from the list page or include ?object_type=&lt;type&gt; in the URL.</td></tr>';
+            }
+            return;
+        }
+        else if (!objectName) {
+            console.error('Object name not found, attempting to fetch list and auto-select...');
+            console.log('Attempting fetch with:', { objectType, namespace });
+            // Try to fetch the list and auto-select if there's only one object
+            if (objectType && namespace) {
+                try {
+                    console.log('Calling fetchObjectsList...');
+                    const objects = await fetchObjectsList(objectType, namespace);
+                    console.log('Fetched objects list, count:', objects.length, objects);
+                    
+                    if (objects.length === 0) {
+                        console.log('No objects found');
+                        const tbody = document.getElementById('lb-info-tbody');
+                        if (tbody) {
+                            tbody.innerHTML = 
+                                '<tr><td colspan="2" class="text-center text-warning">No ' + escapeHtml(objectType) + 
+                                ' objects found in namespace ' + escapeHtml(namespace) + '.</td></tr>';
+                        }
+                        return;
+                    } else if (objects.length === 1) {
+                        // Auto-select the only object
+                        objectName = objects[0].name;
+                        objectData = objects[0];
+                        console.log('Auto-selected single object:', objectName, objectData);
+                        sessionStorage.setItem('loadbalancer_object_data', JSON.stringify(objectData));
+                        sessionStorage.setItem('loadbalancer_object_type', objectType);
+                    } else {
+                        // Multiple objects - show a selection list
+                        console.log('Multiple objects found, showing selection list');
+                        const tbody = document.getElementById('lb-info-tbody');
+                        if (tbody) {
+                            let listHtml = '<tr><th colspan="2">Multiple objects found. Please select one:</th></tr>';
+                            objects.forEach(obj => {
+                                const detailUrl = `/plugins/external-loadbalancer/data?object_type=${encodeURIComponent(objectType)}&namespace=${encodeURIComponent(namespace)}&selected=${encodeURIComponent(obj.name)}`;
+                                listHtml += `<tr><td colspan="2"><a href="${detailUrl}" class="text-decoration-none">${escapeHtml(obj.name)}</a></td></tr>`;
+                            });
+                            tbody.innerHTML = listHtml;
+                        }
+                        return;
+                    }
+                } catch (error) {
+                    console.error('Failed to fetch objects list:', error);
+                    console.error('Error details:', error.stack);
+                    const tbody = document.getElementById('lb-info-tbody');
+                    if (tbody) {
+                        tbody.innerHTML = 
+                            '<tr><td colspan="2" class="text-center text-danger">Error: Object name not specified and could not fetch objects list. ' +
+                            'Please navigate from the list page or include ?selected=&lt;object-name&gt; in the URL.<br>' +
+                            '<small>Error: ' + escapeHtml(error.message) + '</small></td></tr>';
+                    }
+                    return;
+                }
+            } else {
+                console.error('Missing required parameters:', { objectType, namespace });
+                const tbody = document.getElementById('lb-info-tbody');
+                if (tbody) {
+                    tbody.innerHTML = 
+                        '<tr><td colspan="2" class="text-center text-danger">Error: Object name not specified. ' +
+                        'Please navigate from the list page or include ?selected=&lt;object-name&gt; in the URL.</td></tr>';
+                }
+                return;
+            }
+        }
+        else if (!namespace) {
+            console.error('Namespace not found');
+            const tbody = document.getElementById('lb-info-tbody');
+            if (tbody) {
+                tbody.innerHTML = 
+                    '<tr><td colspan="2" class="text-center text-danger">Error: Namespace not specified. ' +
+                    'Please navigate from the list page or include ?namespace=&lt;namespace&gt; in the URL.</td></tr>';
+            }
+            return;
+        }
+        
+        if (!objectData) {
+            console.error('Object data not found after all attempts', { objectType, objectName, namespace });
+            const tbody = document.getElementById('lb-info-tbody');
+            if (tbody) {
+                tbody.innerHTML = 
+                    '<tr><td colspan="2" class="text-center text-danger">Error: Could not load object data. ' +
+                    'Please ensure the object exists and you have access to it.</td></tr>';
+            }
+            return;
+        }
+        
+        console.log('Populating data for:', { objectType, objectName, namespace });
+        populateLoadBalancerData(objectData, objectType, namespace);
+    });
+    } catch (error) {
+        console.error('Error in External LoadBalancer data script:', error);
+        const tbody = document.getElementById('lb-info-tbody');
+        if (tbody) {
+            const errorMsg = error && error.message ? String(error.message).replace(/[&<>"']/g, '') : 'Unknown error';
+            tbody.innerHTML = '<tr><td colspan="2" class="text-center text-danger">Error loading page: ' + errorMsg + '</td></tr>';
+        }
+    }
+})();
+</script>
 {% endblock %}

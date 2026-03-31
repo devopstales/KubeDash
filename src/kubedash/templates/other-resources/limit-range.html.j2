@@ -13,7 +13,7 @@
 </ul>
 <ul class="header-nav ms-auto"></ul>
 <ul class="header-nav d-lg-flex">
-{% include "segments/topmenu.html.j2" %}
+{% include "segments/partials/topmenu.html.j2" %}
 {% endblock %}
 
 {% block content %}
@@ -31,24 +31,15 @@
                       <th>Creation</th>
                     </tr>
                   </thead>
-                  <tbody>
-                    {% for limit in limits %}
-                    {% if selected == limit.name %} 
-                      <tr class="selected" >
-                    {% else %}
-                      <tr>
-                    {% endif %}
-                        <td>
-                          <form action="/other-resource/limit-range/data" method="POST">
-                            <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
-                            <input type="hidden" name="limit_name" value="{{ limit.name }}" />
-                            <a href="javascript:;" onclick="parentNode.submit();">{{ limit.name }}</a>
-                          </form>
+                  <tbody id="limit-ranges-tbody">
+                    <tr>
+                        <td colspan="3" class="text-center">
+                            <div class="spinner-border spinner-border-sm text-primary" role="status">
+                                <span class="visually-hidden">Loading...</span>
+                            </div>
+                            <span class="ms-2">Loading Limit Ranges...</span>
                         </td>
-                        <td>{{ limit.namespace }}</td>
-                        <td>{{ limit.created }}</td>
-                      </tr>
-                    {% endfor %}
+                    </tr>
                   </tbody>
             </table>
         </div>
@@ -57,5 +48,272 @@
 {% endblock %}
 
 {% block add_head_css %}
-{% include "segments/datatable_snippet.html.j2" %}
+{% include "segments/components/datatable_snippet.html.j2" %}
+{% endblock %}
+
+{% block add_tail_js %}
+<script nonce="{{ csp_nonce }}">
+    const escapeHtml = (text) => {
+        if (text === null || text === undefined) return '';
+        const map = {
+            '&': '&amp;',
+            '<': '&lt;',
+            '>': '&gt;',
+            '"': '&quot;',
+            "'": '&#039;'
+        };
+        return String(text).replace(/[&<>"']/g, m => map[m]);
+    };
+    
+    const csrf_token = {{ csrf_token()|tojson }};
+    
+    // DataTables protection - prevent auto-initialization on loading rows
+    (function() {
+        const originalTableId = 'dataTable';
+        const tempTableId = 'limitRangesTable_' + Date.now();
+        
+        // Temporarily change table ID to prevent auto-initialization
+        document.addEventListener('DOMContentLoaded', function() {
+            const table = document.getElementById(originalTableId);
+            if (table) {
+                table.id = tempTableId;
+            }
+        });
+        
+        // Override DataTable initialization to prevent on colspan rows
+        if (typeof $ !== 'undefined' && $.fn.DataTable) {
+            const originalDataTable = $.fn.DataTable;
+            $.fn.DataTable = function(opts) {
+                const $this = $(this);
+                // Check if this is a loading row with colspan
+                if ($this.find('tbody tr td[colspan]').length > 0) {
+                    console.log('Blocked DataTable initialization on loading row');
+                    return $this;
+                }
+                return originalDataTable.apply(this, arguments);
+            };
+        }
+        
+        // Clean up any auto-initialized DataTables
+        setTimeout(function() {
+            if (typeof $ !== 'undefined' && $.fn.DataTable) {
+                const table = document.getElementById(tempTableId);
+                if (table) {
+                    try {
+                        const $table = $('#' + tempTableId);
+                        if ($table.length && $table.data('DataTable')) {
+                            $table.DataTable().destroy();
+                        }
+                    } catch (e) {
+                        // DataTable not initialized or error, ignore
+                    }
+                    table.id = originalTableId;
+                }
+            }
+        }, 100);
+        
+        setTimeout(function() {
+            if (typeof $ !== 'undefined' && $.fn.DataTable) {
+                const table = document.getElementById(tempTableId);
+                if (table) {
+                    try {
+                        const $table = $('#' + tempTableId);
+                        if ($table.length && $table.data('DataTable')) {
+                            $table.DataTable().destroy();
+                        }
+                    } catch (e) {
+                        // DataTable not initialized or error, ignore
+                    }
+                    table.id = originalTableId;
+                }
+            }
+        }, 500);
+    })();
+    
+    // Get namespace from topbar selector or use default
+    function getSelectedNamespace() {
+        // First check URL parameter
+        const urlParams = new URLSearchParams(window.location.search);
+        let namespace = urlParams.get('namespace');
+        
+        // Then check topbar selector
+        if (!namespace) {
+            const topbarSelect = document.getElementById('inputGroupSelect04');
+            if (topbarSelect && topbarSelect.value) {
+                namespace = topbarSelect.value;
+            }
+        }
+        
+        // Fallback to sessionStorage
+        if (!namespace) {
+            namespace = sessionStorage.getItem('ns_select');
+        }
+        
+        // Final fallback to default
+        return namespace || 'default';
+    }
+    
+    // Initialize namespace selector with sessionStorage value on page load
+    document.addEventListener('DOMContentLoaded', function() {
+        const namespaceSelect = document.getElementById('inputGroupSelect04');
+        if (namespaceSelect) {
+            const savedNamespace = sessionStorage.getItem('ns_select');
+            if (savedNamespace && namespaceSelect.querySelector(`option[value="${savedNamespace}"]`)) {
+                namespaceSelect.value = savedNamespace;
+            }
+        }
+    });
+    
+    function populateLimitRangeTable(limitRanges) {
+        const tbody = document.getElementById('limit-ranges-tbody');
+        
+        if (!limitRanges || limitRanges.length === 0) {
+            tbody.innerHTML = '<tr><td colspan="3" class="text-center">No Limit Ranges found</td></tr>';
+            return;
+        }
+        
+        // Get selected limit range from URL
+        const urlParams = new URLSearchParams(window.location.search);
+        const selectedLimitRange = urlParams.get('selected');
+        const namespace = getSelectedNamespace();
+        
+        const rows = limitRanges.map(lr => {
+            const name = escapeHtml(lr.name || '');
+            const ns = escapeHtml(lr.namespace || '');
+            const created = escapeHtml(lr.created || 'N/A');
+            
+            const isSelected = selectedLimitRange === lr.name;
+            const rowClass = isSelected ? 'selected' : '';
+            
+            return `
+                <tr class="${rowClass}">
+                    <td>
+                        <form action="/other-resource/limit-range/data" method="POST" onsubmit="sessionStorage.setItem('ns_select', '${escapeHtml(ns)}'); sessionStorage.setItem('limit_range_data_name', '${name}'); return true;">
+                            <input type="hidden" name="csrf_token" value="${escapeHtml(csrf_token)}">
+                            <input type="hidden" name="ns_select" value="${escapeHtml(ns)}" />
+                            <input type="hidden" name="limit_name" value="${name}" />
+                            <input type="hidden" name="selected" value="${name}" />
+                            <a href="javascript:;" onclick="parentNode.submit();">${name}</a>
+                        </form>
+                    </td>
+                    <td>${ns}</td>
+                    <td>${created}</td>
+                </tr>
+            `;
+        }).join('');
+        
+        tbody.innerHTML = rows;
+        
+        // Initialize DataTables after a short delay to ensure DOM is updated
+        setTimeout(function() {
+            const table = document.getElementById('dataTable');
+            if (table && typeof $ !== 'undefined' && $.fn.DataTable) {
+                try {
+                    const $table = $('#dataTable');
+                    
+                    // Check if DataTable is already initialized
+                    let isInitialized = false;
+                    if ($table.length) {
+                        // Use the recommended DataTables API to check if already initialized
+                        if (typeof $.fn.DataTable.isDataTable === 'function' && $.fn.DataTable.isDataTable('#dataTable')) {
+                            isInitialized = true;
+                        }
+                        // Fallback: Check if DataTable instance exists via jQuery data
+                        else if ($table.data('DataTable')) {
+                            isInitialized = true;
+                        }
+                    }
+                    
+                    // Destroy existing DataTable if it exists
+                    if (isInitialized) {
+                        try {
+                            $table.DataTable().destroy();
+                        } catch (destroyError) {
+                            console.warn('Error destroying DataTable:', destroyError);
+                        }
+                    }
+                    
+                    // Initialize DataTables (only if not already initialized or after destroy)
+                    if (!isInitialized) {
+                        const dataTable = $('#dataTable').DataTable({
+                            responsive: true,
+                            order: [[0, 'asc']],
+                            pageLength: 25
+                        });
+                        
+                        // Navigate to selected row if present
+                        if (selectedLimitRange) {
+                            let foundRowIndex = -1;
+                            dataTable.rows().every(function(rowIdx) {
+                                const rowNode = this.node();
+                                const rowName = $(rowNode).find('input[name="selected"]').val();
+                                if (rowName === selectedLimitRange) {
+                                    foundRowIndex = rowIdx;
+                                    return false; // break
+                                }
+                                return true;
+                            });
+                            
+                            if (foundRowIndex >= 0) {
+                                const pageLength = dataTable.page.len();
+                                const targetPage = Math.floor(foundRowIndex / pageLength);
+                                dataTable.page(targetPage).draw('page');
+                            }
+                        }
+                    }
+                } catch (e) {
+                    console.warn('Error initializing DataTable:', e);
+                }
+            }
+        }, 50);
+    }
+    
+    async function loadLimitRanges(namespace) {
+        try {
+            const apiUrl = `/api/v1/other-resources/limit-ranges${namespace ? '?namespace=' + encodeURIComponent(namespace) : ''}`;
+            console.log('Fetching Limit Ranges from:', apiUrl);
+            
+            const response = await fetch(apiUrl);
+            if (!response.ok) {
+                throw new Error(`HTTP error! status: ${response.status}`);
+            }
+            
+            const data = await response.json();
+            console.log('Limit Ranges API response:', data);
+            
+            if (data.error) {
+                throw new Error(data.message || 'Failed to load Limit Ranges');
+            }
+            
+            const limitRanges = data.data || [];
+            populateLimitRangeTable(limitRanges);
+            
+        } catch (error) {
+            console.error('Error loading Limit Ranges:', error);
+            const tbody = document.getElementById('limit-ranges-tbody');
+            if (tbody) {
+                tbody.innerHTML = '<tr><td colspan="3" class="text-center text-danger">Error loading Limit Ranges: ' + escapeHtml(error.message) + '</td></tr>';
+            }
+        }
+    }
+    
+    // Load data when page loads
+    document.addEventListener('DOMContentLoaded', function() {
+        const namespace = getSelectedNamespace();
+        loadLimitRanges(namespace);
+    });
+    
+    // Reload data when namespace changes (if namespace selector exists)
+    document.addEventListener('DOMContentLoaded', function() {
+        const namespaceSelect = document.getElementById('inputGroupSelect04');
+        if (namespaceSelect) {
+            namespaceSelect.addEventListener('change', function() {
+                const namespace = this.value;
+                console.log('Namespace changed to:', namespace);
+                sessionStorage.setItem('ns_select', namespace);
+                loadLimitRanges(namespace);
+            });
+        }
+    });
+</script>
 {% endblock %}

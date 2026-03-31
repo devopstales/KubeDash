@@ -7,17 +7,25 @@
         <ol class="breadcrumb my-0">
           <li class="breadcrumb-item"><span>Plugins</span></li>
           <li class="breadcrumb-item"><a href="/plugins/helm-chart">Helm Charts</a></li>
-          <li class="breadcrumb-item active"><span>{{ chart_name }}</span></li>
+          <li class="breadcrumb-item active"><span id="chart-name-breadcrumb">Loading...</span></li>
         </ol>
       </nav>
     </div>
 </ul>
 <ul class="header-nav ms-auto"></ul>
 <ul class="header-nav d-lg-flex">
-{% include "segments/topmenu.html.j2" %}
+{% include "segments/partials/topmenu.html.j2" %}
 {% endblock %}
 
 {% block content %}
+<div id="chart-data-loading" class="text-center p-4">
+    <div class="spinner-border text-primary" role="status">
+        <span class="visually-hidden">Loading...</span>
+    </div>
+    <p class="mt-2">Loading helm chart data...</p>
+</div>
+
+<div id="chart-data-content" style="display: none;">
 <div class="card shadow mb-4">
     <div class="card-header">
         <h6 class="m-0 font-weight-bold text-primary">Chart Data</h6>
@@ -26,24 +34,17 @@
         <!-- Chart releases -->
         <ul class="nav nav-tabs" id="nav-tab" role="tablist">
             <li class="nav-item">
-                <a class="nav-link active" id="nav-release-tab" data-bs-toggle="tab" href="#nav-release" role="tab" aria-controls="nav-release" aria-selected="true" data-bs-toggle="tab">Release</a>
+                    <a class="nav-link active" id="nav-release-tab" data-bs-toggle="tab" href="#nav-release" role="tab" aria-controls="nav-release" aria-selected="true">Release</a>
             </li>
             <li class="nav-item">
-                <a class="nav-link" id="nav-values-tab" data-bs-toggle="tab" href="#nav-values" role="tab" aria-controls="nav-values" aria-selected="false" data-bs-toggle="tab">Values</a>
+                    <a class="nav-link" id="nav-values-tab" data-bs-toggle="tab" href="#nav-values" role="tab" aria-controls="nav-values" aria-selected="false">Values</a>
             </li>
             <li class="nav-item">
-                <a class="nav-link" id="nav-manifests-tab" data-bs-toggle="tab" href="#nav-manifests" role="tab" aria-controls="nav-manifests" aria-selected="false" data-bs-toggle="tab">Manifests</a>
+                    <a class="nav-link" id="nav-manifests-tab" data-bs-toggle="tab" href="#nav-manifests" role="tab" aria-controls="nav-manifests" aria-selected="false">Manifests</a>
             </li>
             <li class="nav-item">
-                <a class="nav-link" id="nav-resources-tab" data-bs-toggle="tab" href="#nav-resources" role="tab" aria-controls="nav-resources" aria-selected="false" data-bs-toggle="tab">Resources</a>
+                    <a class="nav-link" id="nav-resources-tab" data-bs-toggle="tab" href="#nav-resources" role="tab" aria-controls="nav-resources" aria-selected="false">Resources</a>
             </li>
-            {#
-            {% if chart_data.dependencies %}
-            <li class="nav-item">
-                <a class="nav-link" id="nav-dependencies-tab" data-bs-toggle="tab" href="#nav-dependencies" role="tab" aria-controls="nav-dependencies" aria-selected="false" data-bs-toggle="tab">Dependencies</a>
-            </li>
-            {% endif %}
-            #}
         </ul>
 
         <div class="tab-content" id="nav-tabContent">
@@ -53,244 +54,349 @@
                     <div class="card-body">
                         <div class="table-responsive">
                             <table class="table table-bordered" id="releaseInfoTable" width="100%" cellspacing="0">
+                                    <tbody id="release-info-tbody">
                             <tr>
-                                <th>Name:</th>
-                                <td>{{ chart_name }}</td>
+                                            <td colspan="2" class="text-center">Loading...</td>
                             </tr>
-                            <tr>
-                                <th>Namespace:</th>
-                                <td>
-                                    <form action="/cluster/namespace" method="POST">
-                                        <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
-                                        <input type="hidden" name="ns_select" value="{{ session['ns_select'] }}" />
-                                        <input type="hidden" name="selected" value="{{ session['ns_select'] }}" />
-                                        <a href="javascript:;" onclick="parentNode.submit();">{{ session['ns_select'] }}</a>
-                                    </form>
-                                </td>
-                            </tr>
-                            <tr>
-                                <th>Status:</th>
-                                <td>
-                                    {% if chart_data.status == "deployed" %}
-                                        <span class="badge text-bg-tag text-bg-success">{{ chart_data.status }}</span>
-                                    {% else %}
-                                        <span class="badge text-bg-tag text-bg-danger">{{ chart_data.status }}</span>
-                                    {% endif %}
-                                </td>
-                            </tr>
-                            <tr>
-                                <th>Revision:</th>
-                                <td>{{ chart_data.release_version }}</td>
-                            </tr>
-                            <tr>
-                                <th>Chart Version:</th>
-                                <td>{{ chart_data.chart_name }}-{{ chart_data.chart_version }}</td>
-                            </tr>
-                            <tr>
-                                <th>App Version:</th>
-                                <td>{{ chart_data.app_version }}</td>
-                            </tr>
-                            <tr>
-                                <th>Created:</th>
-                                <td>{{ chart_data.updated }}</td>
-                            </tr>
+                                    </tbody>
                             </table>
-                        </div>
+                            </div>
                     </div>
                 </div>
             </div>
             <!-- Values -->
-            <div class="tab-pane fade" id="nav-values" role="tabpanel" aria-labelledby="nav-profile-tab">
+                <div class="tab-pane fade" id="nav-values" role="tabpanel" aria-labelledby="nav-values-tab">
                 <div id="accordion">
                     <div class="card shadow mb-4">
                         <div class="card-body">
                             <h3>Values</h3>
-                            
                             <div class="table-responsive">
-                                <pre><code>{{ chart_data["values"] }}</code></pre>
-                            </div>
+                                    <pre id="values-code"><code class="language-yaml">Loading...</code></pre>
+                                </div>
                         </div>
                     </div>
                 </div>
             </div>
             <!-- Manifests -->
-            <div class="tab-pane fade" id="nav-manifests" role="tabpanel" aria-labelledby="nav-profile-tab">
+                <div class="tab-pane fade" id="nav-manifests" role="tabpanel" aria-labelledby="nav-manifests-tab">
                 <div id="accordion">
                     <div class="card shadow mb-4">
                         <div class="card-body">
                             <h3>Manifests</h3>
-                            
                             <div class="table-responsive">
-                                <pre><code>{{ chart_data.manifests }}</code></pre>
-                            </div>
+                                    <pre id="manifests-code"><code class="language-yaml">Loading...</code></pre>
+                                </div>
                         </div>
                     </div>
                 </div>
             </div>
             <!-- resources -->
-            <div class="tab-pane fade" id="nav-resources" role="tabpanel" aria-labelledby="nav-profile-tab">
+                <div class="tab-pane fade" id="nav-resources" role="tabpanel" aria-labelledby="nav-resources-tab">
                 <div id="accordion">
                     <div class="card shadow mb-4">
                         <div class="card-body">
                             <h3>Resources</h3>
-                            
                             <div class="table-responsive">
-                                <table class="table table-bordered" id="initContainersTable" width="100%" cellspacing="0">
+                                    <table class="table table-bordered" id="resourcesTable" width="100%" cellspacing="0">
                                     <thead>
                                         <tr>
                                             <th>Resource Type</th>
                                             <th>Name</th>
                                         </tr>
                                     </thead>
-                                    <tbody>
-                                        {% for deployment in chart_data.deployments %}
-                                        <tr>
-                                            <td>Deployment</td>
-                                            <td>
-                                                <form action="/workload/deployments" method="POST">
-                                                    <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
-                                                    <input type="hidden" name="ns_select" value="{{ session['ns_select'] }}" />
-                                                    <input type="hidden" name="selected" value="{{ deployment }}" />
-                                                    <a href="javascript:;" onclick="parentNode.submit();">{{ deployment }}</a>
-                                                </form>
-                                            </td>
-                                        </tr>
-                                        {% endfor %}
-                                        {% for daemonset in chart_data.daemonset %}
-                                        <tr>
-                                            <td>Daemonset</td>
-                                            <td>
-                                                <form action="/workload/daemonsets" method="POST">
-                                                    <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
-                                                    <input type="hidden" name="ns_select" value="{{ session['ns_select'] }}" />
-                                                    <input type="hidden" name="selected" value="{{ daemonset }}" />
-                                                    <a href="javascript:;" onclick="parentNode.submit();">{{ daemonset }}</a>
-                                                </form>
-                                            </td>
-                                        </tr>
-                                        {% endfor %}
-                                        {% for ss in chart_data.statefulsets %}
-                                        <tr>
-                                            <td>Stateful Set</td>
-                                            <td>
-                                                <form action="/workload/statefulsets" method="POST">
-                                                    <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
-                                                    <input type="hidden" name="ns_select" value="{{ session['ns_select'] }}" />
-                                                    <input type="hidden" name="selected" value="{{ ss }}" />
-                                                    <a href="javascript:;" onclick="parentNode.submit();">{{ ss }}</a>
-                                                </form>
-                                            </td>
-                                        </tr>
-                                        {% endfor %}
-                                        {% for service in chart_data.services %}
-                                        <tr>
-                                            <td>Service</td>
-                                            <td>
-                                                <form action="/network/service" method="POST">
-                                                    <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
-                                                    <input type="hidden" name="ns_select" value="{{ session['ns_select'] }}" />
-                                                    <input type="hidden" name="selected" value="{{ service }}" />
-                                                    <a href="javascript:;" onclick="parentNode.submit();">{{ service }}</a>
-                                                </form>
-                                            </td>
-                                        </tr>
-                                        {% endfor %}
-                                        {% for ingress in chart_data.ingresses %}
-                                        <tr>
-                                            <td>Ingress</td>
-                                            <td>
-                                                <form action="/network/ingress" method="POST">
-                                                    <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
-                                                    <input type="hidden" name="ns_select" value="{{ session['ns_select'] }}" />
-                                                    <input type="hidden" name="selected" value="{{ ingress }}" />
-                                                    <a href="javascript:;" onclick="parentNode.submit();">{{ ingress }}</a>
-                                                </form>
-                                            </td>
-                                        </tr>
-                                        {% endfor %}
-                                        {% for sa in chart_data.service_accounts %}
-                                        <tr>
-                                            <td>Aervice Account</td>
-                                            <td>
-                                                <form action="/cluster-permission/service-account" method="POST">
-                                                    <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
-                                                    <input type="hidden" name="ns_select" value="{{ session['ns_select'] }}" />
-                                                    <input type="hidden" name="selected" value="{{ sa }}" />
-                                                    <a href="javascript:;" onclick="parentNode.submit();">{{ sa }}</a>
-                                                </form>
-                                            </td>
-                                        </tr>
-                                        {% endfor %}
-                                        {% for secret in chart_data.secrets %}
-                                        <tr>
-                                            <td>Secret</td>
-                                            <td>
-                                                <form action="/security/secret" method="POST">
-                                                    <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
-                                                    <input type="hidden" name="ns_select" value="{{ session['ns_select'] }}" />
-                                                    <input type="hidden" name="selected" value="{{ secret }}" />
-                                                    <a href="javascript:;" onclick="parentNode.submit();">{{ secret }}</a>
-                                                </form>
+                                        <tbody id="resources-tbody">
+                                            <tr>
+                                                <td colspan="2" class="text-center">Loading...</td>
                                             </tr>
-                                        </tr>
-                                        {% endfor %}
-                                        {% for configmap in chart_data.configmaps %}
-                                        <tr>
-                                            <td>Configmap</td>
-                                            <td>
-                                                <form action="/storage/configmap" method="POST">
-                                                    <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
-                                                    <input type="hidden" name="ns_select" value="{{ session['ns_select'] }}" />
-                                                    <input type="hidden" name="selected" value="{{ configmap }}" />
-                                                    <a href="javascript:;" onclick="parentNode.submit();">{{ configmap }}</a>
-                                                </form>
-                                            </td>
-                                        </tr>
-                                        {% endfor %}
-                                        {% for pvc in chart_data.persistent_volume_claims %}
-                                        <tr>
-                                            <td>Persistent Volume Claim</td>
-                                            <td>
-                                                <form action="/storage/pvc" method="POST">
-                                                    <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
-                                                    <input type="hidden" name="ns_select" value="{{ session['ns_select'] }}" />
-                                                    <input type="hidden" name="selected" value="{{ pvc }}" />
-                                                    <a href="javascript:;" onclick="parentNode.submit();">{{ pvc }}</a>
-                                                </form>
-                                            </td>
-                                        </tr>
-                                        {% endfor %}
                                     </tbody>
                                 </table>
                             </div>
-                        </div>
-                    </div>
-                </div>
-            </div>
-            <!-- dependencies -->
-            {#
-            {% if chart_data.dependencies %}
-            <div class="tab-pane fade" id="nav-dependencies" role="tabpanel" aria-labelledby="nav-profile-tab">
-                <div id="accordion">
-                    <div class="card shadow mb-4">
-                        <div class="card-body">
-                            <h3>Dependencies</h3>
-                            
-                            <div class="table-responsive">
                             </div>
                         </div>
                     </div>
                 </div>
             </div>
-            {% endif %}
-            #}
         </div>
-        <!-- End Of Chart releases -->
     </div>
+</div>
+
+<div id="chart-data-error" style="display: none;" class="alert alert-danger">
+    <h4>Error Loading Chart Data</h4>
+    <p id="error-message"></p>
 </div>
 {% endblock %}
 
 {% block add_head_css %}
-{% include "segments/datatable_snippet.html.j2" %}
-{% include "segments/highlight_snippet.html.j2"%}
+{% include "segments/components/datatable_snippet.html.j2" %}
+{% include "segments/components/highlight_snippet.html.j2"%}
+{% endblock %}
+
+{% block add_tail_js %}
+<script>
+    // Helper function to escape HTML
+    function escapeHtml(text) {
+        if (text == null) return '';
+        const div = document.createElement('div');
+        div.textContent = text;
+        return div.innerHTML;
+    }
+    
+    // Get parameters from URL query string or sessionStorage
+    function getChartParams() {
+        const urlParams = new URLSearchParams(window.location.search);
+        let releaseName = urlParams.get('release_name');
+        let releaseVersion = urlParams.get('release_version');
+        let namespace = urlParams.get('namespace');
+        
+        // Fallback to sessionStorage
+        if (!releaseName) {
+            releaseName = sessionStorage.getItem('helm_release_name');
+        }
+        if (!releaseVersion) {
+            releaseVersion = sessionStorage.getItem('helm_release_version');
+        }
+        if (!namespace) {
+            namespace = sessionStorage.getItem('ns_select');
+        }
+        
+        // Fallback to topbar selector
+        if (!namespace) {
+            const topbarSelect = document.getElementById('inputGroupSelect04');
+            if (topbarSelect && topbarSelect.value) {
+                namespace = topbarSelect.value;
+            }
+        }
+        
+        // Final fallback
+        if (!namespace) {
+            namespace = 'default';
+        }
+        
+        return { releaseName, releaseVersion, namespace };
+    }
+    
+    // Load helm chart data from API
+    async function loadChartData() {
+        const { releaseName, releaseVersion, namespace } = getChartParams();
+        
+        if (!releaseName || !releaseVersion) {
+            showError('Missing required parameters: release_name and release_version');
+            return;
+        }
+        
+        const loadingDiv = document.getElementById('chart-data-loading');
+        const contentDiv = document.getElementById('chart-data-content');
+        const errorDiv = document.getElementById('chart-data-error');
+        
+        try {
+            const apiUrl = `/api/v1/plugins/helm/charts/${encodeURIComponent(releaseName)}/${releaseVersion}/data?namespace=${encodeURIComponent(namespace)}`;
+            console.log('Fetching helm chart data from:', apiUrl);
+            
+            const response = await fetch(apiUrl);
+            if (!response.ok) {
+                const errorData = await response.json().catch(() => ({ message: `HTTP error! status: ${response.status}` }));
+                throw new Error(errorData.message || `HTTP error! status: ${response.status}`);
+            }
+            
+            const result = await response.json();
+            console.log('Helm chart data API response:', result);
+            console.log('Chart data keys:', result.data ? Object.keys(result.data) : 'No data');
+            console.log('Deployments:', result.data?.deployments);
+            console.log('Daemonset:', result.data?.daemonset);
+            console.log('Statefulsets:', result.data?.statefulsets);
+            console.log('Services:', result.data?.services);
+            
+            if (result.data) {
+                populateChartData(result.data, releaseName, namespace);
+                loadingDiv.style.display = 'none';
+                contentDiv.style.display = 'block';
+            } else {
+                throw new Error(result.message || 'No chart data returned');
+            }
+        } catch (error) {
+            console.error('Error loading helm chart data:', error);
+            loadingDiv.style.display = 'none';
+            contentDiv.style.display = 'none';
+            showError(error.message);
+        }
+    }
+    
+    // Show error message
+    function showError(message) {
+        const errorDiv = document.getElementById('chart-data-error');
+        const errorMessage = document.getElementById('error-message');
+        errorMessage.textContent = message;
+        errorDiv.style.display = 'block';
+    }
+    
+    // Populate chart data in all tabs
+    function populateChartData(chartData, releaseName, namespace) {
+        // Update breadcrumb
+        const breadcrumb = document.getElementById('chart-name-breadcrumb');
+        if (breadcrumb) {
+            breadcrumb.textContent = releaseName;
+        }
+        
+        // Populate Release tab
+        populateReleaseTab(chartData, releaseName, namespace);
+        
+        // Populate Values tab
+        populateValuesTab(chartData);
+        
+        // Populate Manifests tab
+        populateManifestsTab(chartData);
+        
+        // Populate Resources tab
+        populateResourcesTab(chartData, namespace);
+    }
+    
+    // Populate Release tab
+    function populateReleaseTab(chartData, releaseName, namespace) {
+        const tbody = document.getElementById('release-info-tbody');
+        const statusClass = chartData.status === 'deployed' 
+            ? 'text-bg-success' 
+            : 'text-bg-danger';
+        
+        tbody.innerHTML = `
+            <tr>
+                <th>Name:</th>
+                <td>${escapeHtml(releaseName)}</td>
+            </tr>
+            <tr>
+                <th>Namespace:</th>
+                <td>
+                    <a href="/cluster/namespace?namespace=${encodeURIComponent(namespace)}">${escapeHtml(namespace)}</a>
+                </td>
+            </tr>
+            <tr>
+                <th>Status:</th>
+                <td>
+                    <span class="badge text-bg-tag ${statusClass}">${escapeHtml(chartData.status || 'unknown')}</span>
+                </td>
+            </tr>
+            <tr>
+                <th>Revision:</th>
+                <td>${chartData.release_version || ''}</td>
+            </tr>
+            <tr>
+                <th>Chart Version:</th>
+                <td>${escapeHtml(chartData.chart_name || '')}-${escapeHtml(chartData.chart_version || '')}</td>
+            </tr>
+            <tr>
+                <th>App Version:</th>
+                <td>${escapeHtml(chartData.app_version || '')}</td>
+            </tr>
+            <tr>
+                <th>Created:</th>
+                <td>${escapeHtml(chartData.updated || '')}</td>
+            </tr>
+        `;
+    }
+    
+    // Populate Values tab
+    function populateValuesTab(chartData) {
+        const codeElement = document.getElementById('values-code').querySelector('code');
+        if (chartData.values) {
+            codeElement.textContent = chartData.values;
+            codeElement.className = 'language-yaml';
+            
+            // Apply syntax highlighting
+            setTimeout(function() {
+                if (typeof hljs !== 'undefined') {
+                    hljs.highlightElement(codeElement);
+                }
+            }, 100);
+        } else {
+            codeElement.textContent = 'No values available';
+        }
+    }
+    
+    // Populate Manifests tab
+    function populateManifestsTab(chartData) {
+        const codeElement = document.getElementById('manifests-code').querySelector('code');
+        if (chartData.manifests) {
+            codeElement.textContent = chartData.manifests;
+            codeElement.className = 'language-yaml';
+            
+            // Apply syntax highlighting
+            setTimeout(function() {
+                if (typeof hljs !== 'undefined') {
+                    hljs.highlightElement(codeElement);
+                }
+            }, 100);
+        } else {
+            codeElement.textContent = 'No manifests available';
+        }
+    }
+    
+    // Populate Resources tab
+    function populateResourcesTab(chartData, namespace) {
+        const tbody = document.getElementById('resources-tbody');
+        let resourcesHtml = '';
+        
+        console.log('Populating resources tab with chartData:', chartData);
+        
+        // Helper function to create resource row
+        function addResourceRow(resourceType, resourceName, resourceUrl) {
+            resourcesHtml += `
+                <tr>
+                    <td>${escapeHtml(resourceType)}</td>
+                    <td>
+                        <a href="${escapeHtml(resourceUrl)}?namespace=${encodeURIComponent(namespace)}&selected=${encodeURIComponent(resourceName)}">${escapeHtml(resourceName)}</a>
+                    </td>
+                </tr>
+            `;
+        }
+        
+        // Helper function to add resources from array
+        function addResourcesFromArray(resourceType, resourceArray, resourceUrl) {
+            if (resourceArray && Array.isArray(resourceArray) && resourceArray.length > 0) {
+                console.log(`Adding ${resourceArray.length} ${resourceType}:`, resourceArray);
+                resourceArray.forEach(name => {
+                    if (name) {
+                        addResourceRow(resourceType, name, resourceUrl);
+                    }
+                });
+            } else {
+                console.log(`No ${resourceType} found or empty array:`, resourceArray);
+            }
+        }
+        
+        // Add all resources
+        addResourcesFromArray('Deployment', chartData.deployments, '/workload/deployments');
+        addResourcesFromArray('Daemonset', chartData.daemonset, '/workload/daemonsets');
+        addResourcesFromArray('Stateful Set', chartData.statefulsets, '/workload/statefulsets');
+        addResourcesFromArray('Service', chartData.services, '/network/service');
+        addResourcesFromArray('Ingress', chartData.ingresses, '/network/ingress');
+        addResourcesFromArray('Service Account', chartData.service_accounts, '/cluster-permission/service-account');
+        addResourcesFromArray('Secret', chartData.secrets, '/security/secret');
+        addResourcesFromArray('Configmap', chartData.configmaps, '/storage/configmap');
+        addResourcesFromArray('Persistent Volume Claim', chartData.persistent_volume_claims, '/storage/pvc');
+        
+        console.log('Total resources HTML length:', resourcesHtml.length);
+        
+        if (resourcesHtml === '') {
+            console.warn('No resources found via label selector. This may mean resources use different labels.');
+            console.warn('You can check the Manifests tab to see all resources created by this Helm release.');
+            tbody.innerHTML = `
+                <tr>
+                    <td colspan="2" class="text-center">
+                        <p>No resources found via label selector.</p>
+                        <p class="text-muted small">
+                            Resources may use different labels than expected.<br>
+                            Check the <strong>Manifests</strong> tab to see all resources created by this Helm release.
+                        </p>
+                    </td>
+                </tr>
+            `;
+        } else {
+            tbody.innerHTML = resourcesHtml;
+        }
+    }
+    
+    // Load data when page loads
+    document.addEventListener('DOMContentLoaded', function() {
+        loadChartData();
+    });
+</script>
 {% endblock %}

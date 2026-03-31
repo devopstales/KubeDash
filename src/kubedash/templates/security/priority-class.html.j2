@@ -13,9 +13,8 @@
 </ul>
 <ul class="header-nav ms-auto"></ul>
 <ul class="header-nav d-lg-flex">
-{% include "segments/topmenu.html.j2" %}
+{% include "segments/partials/topmenu.html.j2" %}
 {% endblock %}
-
 
 {% block content %}
 <div class="card shadow mb-4">
@@ -32,32 +31,15 @@
                       <th>Global Default</th>
                     </tr>
                   </thead>
-                  <tbody>
-                    {% for pc in priorityclass %}
-                    {% if selected == pc.name %}
-                      <tr class="selected" >
-                    {% else %}
-                      <tr>
-                    {% endif %}
-                        <td>
-                          <form action="/security/priorityclass/data" method="POST">
-                            <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
-                            <input type="hidden" name="pc_name" value="{{ pc.name }}" />
-                            <a href="javascript:;" onclick="parentNode.submit();">{{ pc.name }}</a>
-                          </form>
+                  <tbody id="priority-classes-tbody">
+                    <tr>
+                        <td colspan="3" class="text-center">
+                            <div class="spinner-border spinner-border-sm text-primary" role="status">
+                                <span class="visually-hidden">Loading...</span>
+                            </div>
+                            <span class="ms-2">Loading priority classes...</span>
                         </td>
-                        <td>
-                            <span class="badge text-bg-tag text-bg-secondary">{{ pc.value }}</span>
-                        </td>
-                        <td>
-                          {% if pc.global_default %}
-                              True
-                          {% else %}
-                              False
-                          {% endif %}
-                        </td>
-                      </tr>
-                    {% endfor %}
+                    </tr>
                   </tbody>
             </table>
         </div>
@@ -66,5 +48,172 @@
 {% endblock %}
 
 {% block add_head_css %}
-{% include "segments/datatable_snippet.html.j2" %}
+{% include "segments/components/datatable_snippet.html.j2" %}
+{% endblock %}
+
+{% block add_tail_js %}
+<script nonce="{{ csp_nonce }}">
+    const escapeHtml = (text) => {
+        if (text === null || text === undefined) return '';
+        const map = {
+            '&': '&amp;',
+            '<': '&lt;',
+            '>': '&gt;',
+            '"': '&quot;',
+            "'": '&#039;'
+        };
+        return String(text).replace(/[&<>"']/g, m => map[m]);
+    };
+    
+    const csrf_token = {{ csrf_token()|tojson }};
+    
+    // DataTables protection - prevent auto-initialization on loading rows
+    (function() {
+        const originalTableId = 'dataTable';
+        const tempTableId = 'priorityClassesTable_' + Date.now();
+        
+        // Temporarily change table ID to prevent auto-initialization
+        document.addEventListener('DOMContentLoaded', function() {
+            const table = document.getElementById(originalTableId);
+            if (table) {
+                table.id = tempTableId;
+            }
+        });
+        
+        // Override DataTable initialization to prevent on colspan rows
+        if (typeof $ !== 'undefined' && $.fn.DataTable) {
+            const originalDataTable = $.fn.DataTable;
+            $.fn.DataTable = function(opts) {
+                const $this = $(this);
+                // Check if this is a loading row with colspan
+                if ($this.find('tbody tr td[colspan]').length > 0) {
+                    console.log('Blocked DataTable initialization on loading row');
+                    return $this;
+                }
+                return originalDataTable.apply(this, arguments);
+            };
+        }
+        
+        // Clean up any auto-initialized DataTables
+        setTimeout(function() {
+            if (typeof $ !== 'undefined' && $.fn.DataTable) {
+                const table = document.getElementById(tempTableId);
+                if (table) {
+                    try {
+                        const $table = $('#' + tempTableId);
+                        if ($table.length && $table.data('DataTable')) {
+                            $table.DataTable().destroy();
+                        }
+                    } catch (e) {
+                        // DataTable not initialized or error, ignore
+                    }
+                    table.id = originalTableId;
+                }
+            }
+        }, 100);
+        
+        setTimeout(function() {
+            if (typeof $ !== 'undefined' && $.fn.DataTable) {
+                const table = document.getElementById(tempTableId);
+                if (table) {
+                    try {
+                        const $table = $('#' + tempTableId);
+                        if ($table.length && $table.data('DataTable')) {
+                            $table.DataTable().destroy();
+                        }
+                    } catch (e) {
+                        // DataTable not initialized or error, ignore
+                    }
+                    table.id = originalTableId;
+                }
+            }
+        }, 500);
+    })();
+    
+    function populatePriorityClassesTable(priorityClasses) {
+        const tbody = document.getElementById('priority-classes-tbody');
+        if (!tbody) return;
+        
+        if (!priorityClasses || priorityClasses.length === 0) {
+            tbody.innerHTML = '<tr><td colspan="3" class="text-center text-muted">No priority classes found</td></tr>';
+            return;
+        }
+        
+        // Get selected priority class from URL
+        const urlParams = new URLSearchParams(window.location.search);
+        const selectedPC = urlParams.get('selected');
+        
+        let rows = [];
+        priorityClasses.forEach(pc => {
+            const isSelected = selectedPC === pc.name;
+            const rowClass = isSelected ? 'selected' : '';
+            const globalDefault = pc.global_default ? 'True' : 'False';
+            
+            rows.push(`
+                <tr class="${rowClass}">
+                    <td>
+                        <a href="/security/priorityclass/data?pc_name=${encodeURIComponent(pc.name)}" 
+                           onclick="sessionStorage.setItem('priority_class_data_name', '${escapeHtml(pc.name)}'); return true;">
+                            ${escapeHtml(pc.name)}
+                        </a>
+                    </td>
+                    <td>
+                        <span class="badge text-bg-tag text-bg-secondary">${escapeHtml(pc.value || 'N/A')}</span>
+                    </td>
+                    <td>${escapeHtml(globalDefault)}</td>
+                </tr>
+            `);
+        });
+        
+        tbody.innerHTML = rows.join('');
+        
+        // Initialize DataTable after populating
+        setTimeout(function() {
+            if (typeof $ !== 'undefined' && $.fn.DataTable) {
+                const table = document.getElementById('dataTable');
+                if (table && !$.fn.dataTable.isDataTable('#dataTable')) {
+                    $('#dataTable').DataTable({
+                        order: [[0, 'asc']],
+                        pageLength: 25,
+                        responsive: true
+                    });
+                }
+            }
+        }, 50);
+    }
+    
+    async function loadPriorityClasses() {
+        try {
+            const apiUrl = `/api/v1/other-resources/priority-classes`;
+            console.log('Fetching priority classes from:', apiUrl);
+            
+            const response = await fetch(apiUrl);
+            if (!response.ok) {
+                throw new Error(`HTTP error! status: ${response.status}`);
+            }
+            
+            const data = await response.json();
+            console.log('Priority classes API response:', data);
+            
+            if (data.error) {
+                throw new Error(data.message || 'Failed to load priority classes');
+            }
+            
+            const priorityClasses = data.data || [];
+            populatePriorityClassesTable(priorityClasses);
+            
+        } catch (error) {
+            console.error('Error loading priority classes:', error);
+            const tbody = document.getElementById('priority-classes-tbody');
+            if (tbody) {
+                tbody.innerHTML = '<tr><td colspan="3" class="text-center text-danger">Error loading priority classes: ' + escapeHtml(error.message) + '</td></tr>';
+            }
+        }
+    }
+    
+    // Load data when page loads
+    document.addEventListener('DOMContentLoaded', function() {
+        loadPriorityClasses();
+    });
+</script>
 {% endblock %}

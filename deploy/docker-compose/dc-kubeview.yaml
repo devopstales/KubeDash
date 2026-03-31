@@ -7,7 +7,7 @@ services:
       PORT: 8003
       NAMESPACE_FILTER: "^kube-"
     volumes:
-      - "$HOME/.kube/cl06:/root/.kube/config"
+      - "$HOME/.kube/config:/root/.kube/config"
     ports:
       - 8003:8003
     logging:

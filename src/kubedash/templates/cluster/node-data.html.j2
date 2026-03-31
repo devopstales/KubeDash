@@ -6,22 +6,21 @@
       <nav aria-label="breadcrumb">
         <ol class="breadcrumb my-0">
           <li class="breadcrumb-item"><span>Cluster</span></li>
-          <li class="breadcrumb-item"><a href="/cluster/nodes">Nodes</a></li>
-          <li class="breadcrumb-item active"><span>{{ node_data.name }}</span></li>
+          <li class="breadcrumb-item"><a href="/cluster/node">Nodes</a></li>
+          <li class="breadcrumb-item active" id="node-name-breadcrumb">Loading...</li>
         </ol>
       </nav>
     </div>
 </ul>
 <ul class="header-nav ms-auto"></ul>
 <ul class="header-nav d-lg-flex">
-{% include "segments/topmenu.html.j2" %}
+{% include "segments/partials/topmenu.html.j2" %}
 {% endblock %}
 
 {% block content %}
-{% if node_metrics and node_metrics.cpu and node_metrics.memory and node_metrics.pod_count %}
-<div class="card shadow mb-4">
+<div id="metrics-card" class="card shadow mb-4" style="display: none;">
     <div class="card-header py-3">
-        <h6 class="m-0 font-weight-bold text-primary">Node Resource Metrics - {{ node_data.name }}</h6>
+        <h6 class="m-0 font-weight-bold text-primary" id="metrics-card-title">Node Resource Metrics</h6>
     </div>
     <div class="card-body">
         <div class="row g-4">
@@ -36,23 +35,23 @@
                             <div class="row text-start small">
                                 <div class="col-6 mb-2">
                                     <strong>Capacity:</strong><br>
-                                    <span class="text-muted">{{ node_metrics.cpu.capacity |round(1) }} cores</span>
+                                    <span class="text-muted" id="cpu-capacity">-</span>
                                 </div>
                                 <div class="col-6 mb-2">
                                     <strong>Allocatable:</strong><br>
-                                    <span class="text-muted">{{ node_metrics.cpu.allocatable |round(1) }} cores</span>
+                                    <span class="text-muted" id="cpu-allocatable">-</span>
                                 </div>
                                 <div class="col-6 mb-2">
                                     <strong>Requests:</strong><br>
-                                    <span class="text-muted">{{ node_metrics.cpu.requests |round(1) }} cores</span>
+                                    <span class="text-muted" id="cpu-requests">-</span>
                                 </div>
                                 <div class="col-6 mb-2">
                                     <strong>Limits:</strong><br>
-                                    <span class="text-muted">{{ node_metrics.cpu.limits |round(1) }} cores</span>
+                                    <span class="text-muted" id="cpu-limits">-</span>
                                 </div>
                                 <div class="col-6 mb-2">
                                     <strong>Usage:</strong><br>
-                                    <span class="text-muted">{{ node_metrics.cpu.usage |round(1) }} cores</span>
+                                    <span class="text-muted" id="cpu-usage">-</span>
                                 </div>
                             </div>
                         </div>
@@ -71,23 +70,23 @@
                             <div class="row text-start small">
                                 <div class="col-6 mb-2">
                                     <strong>Capacity:</strong><br>
-                                    <span class="text-muted">{{ (node_metrics.memory.capacity / 1024 / 1024 / 1024) |round(2) }} GB</span>
+                                    <span class="text-muted" id="memory-capacity">-</span>
                                 </div>
                                 <div class="col-6 mb-2">
                                     <strong>Allocatable:</strong><br>
-                                    <span class="text-muted">{{ (node_metrics.memory.allocatable / 1024 / 1024 / 1024) |round(2) }} GB</span>
+                                    <span class="text-muted" id="memory-allocatable">-</span>
                                 </div>
                                 <div class="col-6 mb-2">
                                     <strong>Requests:</strong><br>
-                                    <span class="text-muted">{{ (node_metrics.memory.requests / 1024 / 1024 / 1024) |round(2) }} GB</span>
+                                    <span class="text-muted" id="memory-requests">-</span>
                                 </div>
                                 <div class="col-6 mb-2">
                                     <strong>Limits:</strong><br>
-                                    <span class="text-muted">{{ (node_metrics.memory.limits / 1024 / 1024 / 1024) |round(2) }} GB</span>
+                                    <span class="text-muted" id="memory-limits">-</span>
                                 </div>
                                 <div class="col-6 mb-2">
                                     <strong>Usage:</strong><br>
-                                    <span class="text-muted">{{ (node_metrics.memory.usage / 1024 / 1024 / 1024) |round(2) }} GB</span>
+                                    <span class="text-muted" id="memory-usage">-</span>
                                 </div>
                             </div>
                         </div>
@@ -106,11 +105,11 @@
                             <div class="row text-start small">
                                 <div class="col-6 mb-2">
                                     <strong>Current:</strong><br>
-                                    <span class="text-muted">{{ node_metrics.pod_count.current }} pods</span>
+                                    <span class="text-muted" id="pod-current">-</span>
                                 </div>
                                 <div class="col-6 mb-2">
                                     <strong>Allocatable:</strong><br>
-                                    <span class="text-muted">{{ node_metrics.pod_count.allocatable |round(0) |int }} pods</span>
+                                    <span class="text-muted" id="pod-allocatable">-</span>
                                 </div>
                             </div>
                         </div>
@@ -120,7 +119,6 @@
         </div>
     </div>
 </div>
-{% endif %}
 
 <div class="card shadow mb-4">
     <div class="card-header">
@@ -128,144 +126,23 @@
     </div>
     <div class="card-body">
         <div class="table-responsive">
-            <table class="table table-bordered" id="podInfoTable" width="100%" cellspacing="0">
-                <tr>
-                    <th>Status:</th>
-                    <td>
-                        {% if node_data.status == "Ready" %}
-                            <span class="badge text-bg-tag text-bg-success">{{ node_data.status }}</span>
-                        {% else %}
-                            <span class="badge text-bg-tag text-bg-danger">{{ node_data.status }}</span>
-                        {% endif %}
+            <table class="table table-bordered" id="nodeInfoTable" width="100%" cellspacing="0">
+                <tbody id="node-info-tbody">
+                    <tr>
+                        <td colspan="2" class="text-center">
+                            <div class="spinner-border spinner-border-sm text-primary" role="status">
+                                <span class="visually-hidden">Loading...</span>
+                            </div>
+                            <span class="ms-2">Loading node data...</span>
                     </td>
                 </tr>
-                <tr>
-                    <th>Name:</th>
-                    <td>{{node_data.name }}</td>
-                </tr>
-                <tr>
-                    <th>Role:</th>
-                    <td>{{node_data.role }}</td>
-                </tr>
-                {% if node_data.labels %}
-                    {% set region = False %}
-                    {% set zone = False %}
-                    {% set engine = False %}
-                    {% for no_key, no_value in node_data.labels.items() %}
-                        {% if no_key == "failure-domain.beta.kubernetes.io/region" and no_value %}
-                        {% set region = True %}
-                        <tr>
-                            <th>Region:</th>
-                            <td>{{ no_value }}</td>
-                        </tr>
-                        {% elif no_key == "topology.kubernetes.io/region" and no_value and region is sameas True %}
-                        <tr>
-                            <th>Region:</th>
-                            <td>{{ no_value }}</td>
-                        </tr>
-                        {% endif %}
-                        {% if no_key == "failure-domain.beta.kubernetes.io/zone" and no_value %}
-                        {% set zone = True %}
-                        <tr>
-                            <th>Zone:</th>
-                            <td>{{ no_value }}</td>
-                        </tr>
-                        {% elif no_key == "topology.kubernetes.io/zone" and no_value and zone is sameas True %}
-                        <tr>
-                            <th>Zone:</th>
-                            <td>{{ no_value }}</td>
-                        </tr>
-                        {% endif %}
-                        {% if no_key == "beta.kubernetes.io/instance-type" and no_value %}
-                        {% set engine = True %}
-                        <tr>
-                            <th>Kubernetes Distribution:</th>
-                            <td>{{ no_value }}</td>
-                        </tr>
-                        {% elif no_key == "node.kubernetes.io/instance-type" and no_value and engine is sameas True %}
-                        <tr>
-                            <th>Kubernetes Distribution:</th>
-                            <td>{{ no_value }}</td>
-                        </tr>
-                        {% endif %}
-                    {% endfor %}
-                {% endif %}
-                <tr>
-                    <th>Version:</th>
-                    <td>{{node_data.version }}</td>
-                </tr>
-                <tr>
-                    <th>Operation System:</th>
-                    <td>{{node_data.os }}</td>
-                </tr>
-                <tr>
-                    <th>Runtime:</th>
-                    <td>{{node_data.runtime }}</td>
-                </tr>
-                <tr>
-                    <th>Taints:</th>
-                    <td>
-                        {% for taint in node_data.taint %}
-                        <span class="badge text-bg-tag text-bg-tag text-bg-secondary">{{ taint }}</span>
-                        {% if not loop.last %}<br>{% endif %}
-                        {% endfor %}
-                    </td>
-                </tr>
-                <tr>
-                    <th>Annotations:</th>
-                    <td>
-                        {% if node_data.annotations %}
-                        <table class="table table-bordered" id="annotationTable" width="100%" cellspacing="0">
-                            <thead>
-                                <tr>
-                                    <th width="50%">Key</th>
-                                    <th width="50%">Value</th>
-                                </tr>
-                            </thead>
-                            <tbody>
-                            {% for key, value in node_data.annotations.items() %}
-                                <tr>
-                                {% if key != "kubectl.kubernetes.io/last-applied-configuration" %}
-                                    <td width="50%">{{ key }}</td>
-                                    <td width="50%">{{ value }}</td>
-                                {% endif %}
-                                </tr>
-                            {% endfor %}
                             </tbody>
-                        </table>
-                        {% endif %}
-                    </td>
-                </tr>
-                <tr>
-                    <th>Lables:</th>
-                    <td>
-                        {% if node_data.labels %}
-                        <table class="table table-bordered" id="labelsTable" width="100%" cellspacing="0">
-                            <thead>
-                                <tr>
-                                    <th width="50%">Key</th>
-                                    <th width="50%">Value</th>
-                                </tr>
-                            </thead>
-                            <tbody>
-                            {% for key, value in node_data.labels.items() %}
-                                <tr>
-                                    <td width="50%">{{ key }}</td>
-                                    <td width="50%">{{ value }}</td>
-                                </tr>
-                            {% endfor %}
-                            </tbody>
-                        </table>
-                        {% endif %}
-                    </td>
-                </tr>
             </table>
         </div> 
     </div>
 </div>
 
-{% if node_data.conditions %}
-<div class="card shadow mb-4">
+<div id="conditions-card" class="card shadow mb-4" style="display: none;">
     <div class="card-header">
         <h6 class="m-0 font-weight-bold text-primary">Conditions</h6>
     </div>
@@ -273,7 +150,7 @@
         <div class="card shadow mb-4">
             <div class="card-body">
                 <div class="table-responsive">
-                    <table class="table table-bordered" id="podInfoTable" width="100%" cellspacing="0">
+                    <table class="table table-bordered" id="conditionsTable" width="100%" cellspacing="0">
                         <thead>
                             <tr>
                                 <th>Type</th>
@@ -282,33 +159,15 @@
                                 <th>Message</th>
                             </tr>
                         </thead>
-                        <tbody>
-                        {% for co_type, co_status, co_reason, co_message in node_data.conditions|reverse %}
+                        <tbody id="conditions-tbody">
                             <tr>
-                                <td>{{ co_type }}</th>
-                                {% if co_type == "Ready" %}
-                                    <td>
-                                    {% if co_status == "True" %}
-                                        <span class="badge text-bg-tag text-bg-success">{{ co_status }}</span>
-                                    {% else %}
-                                        <span class="badge text-bg-tag text-bg-danger">{{ co_status }}</span>
-                                    {% endif %}
+                                <td colspan="4" class="text-center">
+                                    <div class="spinner-border spinner-border-sm text-primary" role="status">
+                                        <span class="visually-hidden">Loading...</span>
+                                    </div>
+                                    <span class="ms-2">Loading conditions...</span>
                                     </td>
-                                {% else %}
-                                    <td>
-                                    {% if co_status == "True" %}
-                                        <span class="badge text-bg-tag text-bg-danger">{{ co_status }}</span>
-                                    {% elif co_status == "Unknown" %}
-                                        <span class="badge text-bg-tag text-bg-danger">{{ co_status }}</span>
-                                    {% else %}
-                                        <span class="badge text-bg-tag text-bg-success">{{ co_status }}</span>
-                                    {% endif %}
-                                    </td>
-                                {% endif %}
-                                <td>{{ co_reason }}</th>
-                                <td>{{ co_message }}</td>
                             </tr>
-                        {% endfor %}
                         </tbody>
                     </table>
                 </div>
@@ -316,17 +175,684 @@
         </div>
     </div>
 </div>
-    {% endif %}
 {% endblock %}
 
 {% block add_head_css %}
-{% include "segments/datatable_snippet.html.j2" %}
+{% include "segments/components/datatable_snippet.html.j2" %}
 {% endblock %}
 
 {% block add_tail_js %}
-{% if node_metrics and node_metrics.cpu and node_metrics.memory and node_metrics.pod_count %}
-{% include "segments/chartjs_snippet.html.j2" %}
-    <script>
+{% include "segments/components/chartjs_snippet.html.j2" %}
+<script nonce="{{ csp_nonce }}">
+    const escapeHtml = (text) => {
+        if (text === null || text === undefined) return '';
+        const map = {
+            '&': '&amp;',
+            '<': '&lt;',
+            '>': '&gt;',
+            '"': '&quot;',
+            "'": '&#039;'
+        };
+        return String(text).replace(/[&<>"']/g, m => map[m]);
+    };
+    
+    // Function to format GB
+    function formatGB(bytes) {
+        if (!bytes) return '0 GB';
+        return (bytes / 1024 / 1024 / 1024).toFixed(2) + ' GB';
+    }
+    
+    // Function to detect Bootstrap dark mode and return appropriate text color
+    function getThemeColor() {
+        const isDark = document.documentElement.getAttribute('data-coreui-theme') === 'dark';
+        return isDark ? '#ffffff' : '#212529';
+    }
+    
+    // Function to get background color based on theme
+    function getThemeBgColor() {
+        const isDark = document.documentElement.getAttribute('data-coreui-theme') === 'dark';
+        return isDark ? '#1e1e1e' : '#f8f9fa';
+    }
+    
+    // Listen for theme change and update chart colors
+    const observer = new MutationObserver(() => {
+        const themeColor = getThemeColor();
+        if (typeof CPUChart !== 'undefined') {
+            CPUChart.options.plugins.title.color = themeColor;
+            CPUChart.options.plugins.legend.labels.color = themeColor;
+            CPUChart.update();
+        }
+        if (typeof MemoryChart !== 'undefined') {
+            MemoryChart.options.plugins.title.color = themeColor;
+            MemoryChart.options.plugins.legend.labels.color = themeColor;
+            MemoryChart.update();
+        }
+        if (typeof PodChart !== 'undefined') {
+            PodChart.options.plugins.title.color = themeColor;
+            PodChart.options.plugins.legend.labels.color = themeColor;
+            PodChart.update();
+        }
+    });
+    observer.observe(document.documentElement, { attributes: true, attributeFilter: ['data-coreui-theme'] });
+    
+    // Get node name from URL query parameter, form data, or sessionStorage
+    function getNodeName() {
+        const urlParams = new URLSearchParams(window.location.search);
+        let nodeName = urlParams.get('no_name');
+        
+        // If not in query, check sessionStorage
+        if (!nodeName) {
+            nodeName = sessionStorage.getItem('node_data_name');
+            if (nodeName) {
+                sessionStorage.removeItem('node_data_name');
+            }
+        }
+        
+        // If still not found, check form data
+        if (!nodeName) {
+            const form = document.querySelector('form[action="/cluster/node/data"]');
+            if (form) {
+                const noInput = form.querySelector('input[name="no_name"]');
+                if (noInput) {
+                    nodeName = noInput.value;
+                }
+            }
+        }
+        
+        return nodeName;
+    }
+    
+    let CPUChart, MemoryChart, PodChart;
+    
+    function initCPUChart(metrics) {
+        const cpu = metrics.cpu;
+        const usagePercent = cpu.usagePercent || 0;
+        const usagePercentFree = Math.max(0, 100 - usagePercent);
+        const requestsPercent = cpu.requestsPercent || 0;
+        const requestsPercentFree = Math.max(0, 100 - requestsPercent);
+        const limitsPercent = cpu.limitsPercent || 0;
+        const limitsPercentFree = Math.max(0, 100 - limitsPercent);
+        
+        // Update text values
+        document.getElementById('cpu-capacity').textContent = (cpu.capacity || 0).toFixed(1) + ' cores';
+        document.getElementById('cpu-allocatable').textContent = (cpu.allocatable || 0).toFixed(1) + ' cores';
+        document.getElementById('cpu-requests').textContent = (cpu.requests || 0).toFixed(1) + ' cores';
+        document.getElementById('cpu-limits').textContent = (cpu.limits || 0).toFixed(1) + ' cores';
+        document.getElementById('cpu-usage').textContent = (cpu.usage || 0).toFixed(1) + ' cores';
+        
+        const ctx1 = document.getElementById('cpu').getContext('2d');
+        CPUChart = new Chart(ctx1, {
+            type: 'doughnut',
+            data: {
+                datasets: [
+                    {
+                        label: 'CPU Usage',
+                        data: [usagePercent, usagePercentFree],
+                        backgroundColor: ['#FF6384', '#36A2EB'],
+                        hoverBackgroundColor: ['#FF4365', '#2496D1']
+                    },
+                    {
+                        label: 'CPU Request',
+                        data: [requestsPercent, requestsPercentFree],
+                        backgroundColor: ['#FF9F40', '#4BC0C0'],
+                        hoverBackgroundColor: ['#E68935', '#3AA7A3']
+                    },
+                    {
+                        label: 'CPU Limit',
+                        data: [limitsPercent, limitsPercentFree],
+                        backgroundColor: ['#FFCD56', '#9966FF'],
+                        hoverBackgroundColor: ['#E6B94D', '#8053CC']
+                    }
+                ],
+                labels: ['Used', 'Free', 'Requests', 'Not Requested', 'Limits', 'Not Limited']
+            },
+            options: {
+                responsive: true,
+                maintainAspectRatio: false,
+                plugins: {
+                    title: {
+                        display: true,
+                        text: 'CPU Allocation',
+                        font: { size: 18, weight: 'bold' },
+                        color: getThemeColor(),
+                        padding: { top: 10, bottom: 15 }
+                    },
+                    legend: {
+                        display: true,
+                        position: 'bottom',
+                        labels: {
+                            color: getThemeColor(),
+                            usePointStyle: true,
+                            padding: 12,
+                            font: { size: 12 },
+                            generateLabels: function(chart) {
+                                let labels = [];
+                                let datasetIndex = 0;
+                                const themeColor = getThemeColor();
+                                chart.data.datasets.forEach((dataset) => {
+                                    dataset.data.forEach((value, index) => {
+                                        if (!isNaN(value) && value > 0) {
+                                            labels.push({
+                                                text: chart.data.labels[datasetIndex * 2 + index] + ' (' + value.toFixed(1) + '%)',
+                                                fillStyle: dataset.backgroundColor[index],
+                                                strokeStyle: dataset.backgroundColor[index],
+                                                lineWidth: 1,
+                                                fontColor: themeColor,
+                                                hidden: false
+                                            });
+                                        }
+                                    });
+                                    datasetIndex++;
+                                });
+                                return labels;
+                            }
+                        }
+                    },
+                    tooltip: {
+                        callbacks: {
+                            label: function(context) {
+                                let label = context.label || '';
+                                if (label) label += ': ';
+                                label += context.parsed + '%';
+                                return label;
+                            }
+                        }
+                    }
+                }
+            }
+        });
+    }
+    
+    function initMemoryChart(metrics) {
+        const memory = metrics.memory;
+        const usagePercent = memory.usagePercent || 0;
+        const usagePercentFree = Math.max(0, 100 - usagePercent);
+        const requestsPercent = memory.requestsPercent || 0;
+        const requestsPercentFree = Math.max(0, 100 - requestsPercent);
+        const limitsPercent = memory.limitsPercent || 0;
+        const limitsPercentFree = Math.max(0, 100 - limitsPercent);
+        
+        // Update text values
+        document.getElementById('memory-capacity').textContent = formatGB(memory.capacity);
+        document.getElementById('memory-allocatable').textContent = formatGB(memory.allocatable);
+        document.getElementById('memory-requests').textContent = formatGB(memory.requests);
+        document.getElementById('memory-limits').textContent = formatGB(memory.limits);
+        document.getElementById('memory-usage').textContent = formatGB(memory.usage);
+        
+        const ctx2 = document.getElementById('memory').getContext('2d');
+        MemoryChart = new Chart(ctx2, {
+            type: 'doughnut',
+            data: {
+                datasets: [
+                    {
+                        label: 'Memory Usage',
+                        data: [usagePercent, usagePercentFree],
+                        backgroundColor: ['#FF6384', '#36A2EB'],
+                        hoverBackgroundColor: ['#FF4365', '#2496D1']
+                    },
+                    {
+                        label: 'Memory Request',
+                        data: [requestsPercent, requestsPercentFree],
+                        backgroundColor: ['#FF9F40', '#4BC0C0'],
+                        hoverBackgroundColor: ['#E68935', '#3AA7A3']
+                    },
+                    {
+                        label: 'Memory Limit',
+                        data: [limitsPercent, limitsPercentFree],
+                        backgroundColor: ['#FFCD56', '#9966FF'],
+                        hoverBackgroundColor: ['#E6B94D', '#8053CC']
+                    }
+                ],
+                labels: ['Used', 'Free', 'Requests', 'Not Requested', 'Limits', 'Not Limited']
+            },
+            options: {
+                responsive: true,
+                maintainAspectRatio: false,
+                plugins: {
+                    title: {
+                        display: true,
+                        text: 'Memory Allocation',
+                        font: { size: 18, weight: 'bold' },
+                        color: getThemeColor(),
+                        padding: { top: 10, bottom: 15 }
+                    },
+                    legend: {
+                        display: true,
+                        position: 'bottom',
+                        labels: {
+                            color: getThemeColor(),
+                            usePointStyle: true,
+                            padding: 12,
+                            font: { size: 12 },
+                            generateLabels: function(chart) {
+                                let labels = [];
+                                let datasetIndex = 0;
+                                const themeColor = getThemeColor();
+                                chart.data.datasets.forEach((dataset) => {
+                                    dataset.data.forEach((value, index) => {
+                                        if (!isNaN(value) && value > 0) {
+                                            labels.push({
+                                                text: chart.data.labels[datasetIndex * 2 + index] + ' (' + value.toFixed(1) + '%)',
+                                                fillStyle: dataset.backgroundColor[index],
+                                                strokeStyle: dataset.backgroundColor[index],
+                                                lineWidth: 1,
+                                                fontColor: themeColor,
+                                                hidden: false
+                                            });
+                                        }
+                                    });
+                                    datasetIndex++;
+                                });
+                                return labels;
+                            }
+                        }
+                    },
+                    tooltip: {
+                        callbacks: {
+                            label: function(context) {
+                                let label = context.label || '';
+                                if (label) label += ': ';
+                                label += context.parsed + '%';
+                                return label;
+                            }
+                        }
+                    }
+                }
+            }
+        });
+    }
+    
+    function initPodChart(metrics) {
+        const podCount = metrics.pod_count;
+        const usagePercent = podCount.currentPercent || 0;
+        const usagePercentFree = Math.max(0, 100 - usagePercent);
+        
+        // Update text values
+        document.getElementById('pod-current').textContent = (podCount.current || 0) + ' pods';
+        document.getElementById('pod-allocatable').textContent = Math.round(podCount.allocatable || 0) + ' pods';
+        
+        const ctx3 = document.getElementById('pod').getContext('2d');
+        PodChart = new Chart(ctx3, {
+            type: 'doughnut',
+            data: {
+                datasets: [{
+                    label: 'Pod Usage',
+                    data: [usagePercent, usagePercentFree],
+                    backgroundColor: ['#FF6384', '#36A2EB'],
+                    hoverBackgroundColor: ['#FF4365', '#2496D1']
+                }],
+                labels: ['Used', 'Free']
+            },
+            options: {
+                responsive: true,
+                maintainAspectRatio: false,
+                plugins: {
+                    title: {
+                        display: true,
+                        text: 'Pod Allocation',
+                        font: { size: 18, weight: 'bold' },
+                        color: getThemeColor(),
+                        padding: { top: 10, bottom: 15 }
+                    },
+                    legend: {
+                        display: true,
+                        position: 'bottom',
+                        labels: {
+                            color: getThemeColor(),
+                            usePointStyle: true,
+                            padding: 12,
+                            font: { size: 12 },
+                            generateLabels: function(chart) {
+                                let labels = [];
+                                const themeColor = getThemeColor();
+                                chart.data.datasets.forEach((dataset) => {
+                                    dataset.data.forEach((value, index) => {
+                                        if (!isNaN(value) && value > 0) {
+                                            labels.push({
+                                                text: chart.data.labels[index] + ' (' + value.toFixed(1) + '%)',
+                                                fillStyle: dataset.backgroundColor[index],
+                                                strokeStyle: dataset.backgroundColor[index],
+                                                lineWidth: 1,
+                                                fontColor: themeColor,
+                                                hidden: false
+                                            });
+                                        }
+                                    });
+                                });
+                                return labels;
+                            }
+                        }
+                    },
+                    tooltip: {
+                        callbacks: {
+                            label: function(context) {
+                                let label = context.label || '';
+                                if (label) label += ': ';
+                                label += context.parsed + '%';
+                                return label;
+                            }
+                        }
+                    }
+                }
+            }
+        });
+    }
+    
+    function populateNodeData(node) {
+        const tbody = document.getElementById('node-info-tbody');
+        
+        if (!node) {
+            tbody.innerHTML = '<tr><td colspan="2" class="text-center text-danger">Error: Node data not found</td></tr>';
+            return;
+        }
+        
+        const name = escapeHtml(node.name || '');
+        const status = node.status || 'Unknown';
+        const role = escapeHtml(node.role || '');
+        const version = escapeHtml(node.version || '');
+        const os = escapeHtml(node.os || '');
+        const runtime = escapeHtml(node.runtime || '');
+        
+        // Status badge
+        const statusBadge = status === 'Ready'
+            ? '<span class="badge text-bg-tag text-bg-success">' + escapeHtml(status) + '</span>'
+            : '<span class="badge text-bg-tag text-bg-danger">' + escapeHtml(status) + '</span>';
+        
+        // Taints
+        let taintsHtml = '<p class="text-muted">No taints</p>';
+        if (node.taint && Array.isArray(node.taint) && node.taint.length > 0) {
+            taintsHtml = node.taint.map(taint => 
+                '<span class="badge text-bg-tag text-bg-secondary">' + escapeHtml(taint) + '</span>'
+            ).join('<br>');
+        }
+        
+        // Annotations table
+        let annotationsHtml = '<p class="text-muted">No annotations</p>';
+        if (node.annotations) {
+            let annotations = node.annotations;
+            if (Array.isArray(annotations)) {
+                annotations = Object.fromEntries(annotations.map(([k, v]) => [k, v]));
+            }
+            if (typeof annotations === 'object' && annotations !== null) {
+                const annotationEntries = Object.entries(annotations).filter(([key]) => 
+                    key !== 'kubectl.kubernetes.io/last-applied-configuration'
+                );
+                if (annotationEntries.length > 0) {
+                    annotationsHtml = `
+                        <table class="table table-bordered" id="annotationTable" width="100%" cellspacing="0">
+                            <thead>
+                                <tr>
+                                    <th width="50%">Key</th>
+                                    <th width="50%">Value</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                ${annotationEntries.map(([key, value]) => `
+                                    <tr>
+                                        <td width="50%">${escapeHtml(key)}</td>
+                                        <td width="50%">${escapeHtml(String(value))}</td>
+                                    </tr>
+                                `).join('')}
+                            </tbody>
+                        </table>
+                    `;
+                }
+            }
+        }
+        
+        // Labels table
+        let labelsHtml = '<p class="text-muted">No labels</p>';
+        let region = null;
+        let zone = null;
+        let instanceType = null;
+        
+        if (node.labels) {
+            let labels = node.labels;
+            if (Array.isArray(labels)) {
+                labels = Object.fromEntries(labels.map(([k, v]) => [k, v]));
+            }
+            if (typeof labels === 'object' && labels !== null) {
+                const labelEntries = Object.entries(labels);
+                
+                // Extract special labels
+                for (const [key, value] of labelEntries) {
+                    if ((key === 'failure-domain.beta.kubernetes.io/region' || key === 'topology.kubernetes.io/region') && value) {
+                        region = value;
+                    }
+                    if ((key === 'failure-domain.beta.kubernetes.io/zone' || key === 'topology.kubernetes.io/zone') && value) {
+                        zone = value;
+                    }
+                    if ((key === 'beta.kubernetes.io/instance-type' || key === 'node.kubernetes.io/instance-type') && value) {
+                        instanceType = value;
+                    }
+                }
+                
+                if (labelEntries.length > 0) {
+                    labelsHtml = `
+                        <table class="table table-bordered" id="labelsTable" width="100%" cellspacing="0">
+                            <thead>
+                                <tr>
+                                    <th width="50%">Key</th>
+                                    <th width="50%">Value</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                ${labelEntries.map(([key, value]) => `
+                                    <tr>
+                                        <td width="50%">${escapeHtml(key)}</td>
+                                        <td width="50%">${escapeHtml(String(value))}</td>
+                                    </tr>
+                                `).join('')}
+                            </tbody>
+                        </table>
+                    `;
+                }
+            }
+        }
+        
+        // Build rows
+        let rows = `
+            <tr>
+                <th>Status:</th>
+                <td>${statusBadge}</td>
+            </tr>
+            <tr>
+                <th>Name:</th>
+                <td>${name}</td>
+            </tr>
+            <tr>
+                <th>Role:</th>
+                <td>${role}</td>
+            </tr>
+        `;
+        
+        if (region) {
+            rows += `
+                <tr>
+                    <th>Region:</th>
+                    <td>${escapeHtml(region)}</td>
+                </tr>
+            `;
+        }
+        
+        if (zone) {
+            rows += `
+                <tr>
+                    <th>Zone:</th>
+                    <td>${escapeHtml(zone)}</td>
+                </tr>
+            `;
+        }
+        
+        if (instanceType) {
+            rows += `
+                <tr>
+                    <th>Kubernetes Distribution:</th>
+                    <td>${escapeHtml(instanceType)}</td>
+                </tr>
+            `;
+        }
+        
+        rows += `
+            <tr>
+                <th>Version:</th>
+                <td>${version}</td>
+            </tr>
+            <tr>
+                <th>Operation System:</th>
+                <td>${os}</td>
+            </tr>
+            <tr>
+                <th>Runtime:</th>
+                <td>${runtime}</td>
+            </tr>
+            <tr>
+                <th>Taints:</th>
+                <td>${taintsHtml}</td>
+            </tr>
+            <tr>
+                <th>Annotations:</th>
+                <td>${annotationsHtml}</td>
+            </tr>
+            <tr>
+                <th>Labels:</th>
+                <td>${labelsHtml}</td>
+            </tr>
+        `;
+        
+        tbody.innerHTML = rows;
+    }
+    
+    function populateConditions(conditions) {
+        const tbody = document.getElementById('conditions-tbody');
+        const card = document.getElementById('conditions-card');
+        
+        if (!conditions || !Array.isArray(conditions) || conditions.length === 0) {
+            card.style.display = 'none';
+            return;
+        }
+        
+        card.style.display = 'block';
+        
+        // Reverse conditions array
+        const reversedConditions = [...conditions].reverse();
+        
+        const rows = reversedConditions.map(condition => {
+            const type = escapeHtml(condition[0] || '');
+            const status = escapeHtml(condition[1] || '');
+            const reason = escapeHtml(condition[2] || '');
+            const message = escapeHtml(condition[3] || '');
+            
+            let statusBadge;
+            if (type === 'Ready') {
+                statusBadge = status === 'True'
+                    ? '<span class="badge text-bg-tag text-bg-success">' + status + '</span>'
+                    : '<span class="badge text-bg-tag text-bg-danger">' + status + '</span>';
+            } else {
+                if (status === 'True' || status === 'Unknown') {
+                    statusBadge = '<span class="badge text-bg-tag text-bg-danger">' + status + '</span>';
+                } else {
+                    statusBadge = '<span class="badge text-bg-tag text-bg-success">' + status + '</span>';
+                }
+            }
+            
+            return `
+                <tr>
+                    <td>${type}</td>
+                    <td>${statusBadge}</td>
+                    <td>${reason}</td>
+                    <td>${message}</td>
+                </tr>
+            `;
+        }).join('');
+        
+        tbody.innerHTML = rows;
+    }
+    
+    document.addEventListener('DOMContentLoaded', async function() {
+        const nodeName = getNodeName();
+        
+        if (!nodeName) {
+            console.error('No node name provided');
+            const breadcrumb = document.getElementById('node-name-breadcrumb');
+            const tbody = document.getElementById('node-info-tbody');
+            if (breadcrumb) breadcrumb.textContent = 'Error';
+            if (tbody) tbody.innerHTML = '<tr><td colspan="2" class="text-center text-danger">Error: Node name not provided</td></tr>';
+            return;
+        }
+        
+        // Update breadcrumb
+        const breadcrumb = document.getElementById('node-name-breadcrumb');
+        if (breadcrumb) {
+            breadcrumb.textContent = nodeName;
+        }
+        
+        try {
+            // Fetch node data and metrics in parallel
+            const [nodeResponse, metricsResponse] = await Promise.all([
+                fetch(`/api/v1/nodes/${encodeURIComponent(nodeName)}`),
+                fetch(`/api/v1/nodes/${encodeURIComponent(nodeName)}/metrics`)
+            ]);
+            
+            if (!nodeResponse.ok) {
+                if (nodeResponse.status === 404) {
+                    throw new Error(`Node '${nodeName}' not found`);
+                }
+                throw new Error(`HTTP error! status: ${nodeResponse.status}`);
+            }
+            
+            const nodeData = await nodeResponse.json();
+            console.log('Node API response:', nodeData);
+            
+            if (nodeData.error) {
+                throw new Error(nodeData.message || 'Failed to load node');
+            }
+            
+            const node = nodeData.data || {};
+            populateNodeData(node);
+            
+            // Handle metrics
+            let metrics = null;
+            if (metricsResponse.ok) {
+                const metricsData = await metricsResponse.json();
+                console.log('Node metrics API response:', metricsData);
+                metrics = metricsData.data || null;
+                
+                if (metrics && metrics.cpu && metrics.memory && metrics.pod_count) {
+                    // Show metrics card
+                    const metricsCard = document.getElementById('metrics-card');
+                    const metricsCardTitle = document.getElementById('metrics-card-title');
+                    if (metricsCard) {
+                        metricsCard.style.display = 'block';
+                        if (metricsCardTitle) {
+                            metricsCardTitle.textContent = `Node Resource Metrics - ${nodeName}`;
+                        }
+                    }
+                    
+                    // Initialize charts
+                    initCPUChart(metrics);
+                    initMemoryChart(metrics);
+                    initPodChart(metrics);
+                }
+            } else {
+                console.warn('Failed to load node metrics:', metricsResponse.status);
+            }
+            
+            // Handle conditions
+            if (node.conditions && Array.isArray(node.conditions)) {
+                populateConditions(node.conditions);
+            }
+            
+        } catch (error) {
+            console.error('Error loading node:', error);
+            const tbody = document.getElementById('node-info-tbody');
+            if (tbody) {
+                tbody.innerHTML = '<tr><td colspan="2" class="text-center text-danger">Error loading node: ' + escapeHtml(error.message) + '</td></tr>';
+            }
+        }
+    });
+</script>
+    <script nonce="{{ csp_nonce }}">
         // Function to detect Bootstrap dark mode and return appropriate text color
         function getThemeColor() {
             const isDark = document.documentElement.getAttribute('data-coreui-theme') === 'dark';
@@ -364,26 +890,6 @@
         });
 
         observer.observe(document.documentElement, { attributes: true, attributeFilter: ['data-coreui-theme'] });
-    </script>
-    <script>
-        var usagePercent = {{ node_metrics.cpu.usagePercent }};
-        var usagePercentFree = (100 - usagePercent)
-        if (usagePercentFree <= 0) {
-            usagePercentFree = 0
-        }
-        var requestsPercent = {{ node_metrics.cpu.requestsPercent }};
-        var requestsPercentFree = (100 - requestsPercent)
-        if (requestsPercentFree <= 0) {
-            requestsPercentFree = 0
-        }
-        var limitsPercent = {{ node_metrics.cpu.limitsPercent }};
-        var limitsPercentFree = (100 - limitsPercent)
-        if (limitsPercentFree <= 0) {
-            limitsPercentFree = 0
-        }
-        const ctx1 = document.getElementById('cpu').getContext('2d');
-        const CPUChart = new Chart(ctx1, {
-            type: 'doughnut',
             data: {
                 datasets: [
                     {
@@ -474,25 +980,6 @@
                 }
             }
         });
-    </script>
-    <script>
-        var usagePercent = {{ node_metrics.memory.usagePercent }};
-        var usagePercentFree = (100 - usagePercent)
-        if (usagePercentFree <= 0) {
-            usagePercentFree = 0
-        }
-        var requestsPercent = {{ node_metrics.memory.requestsPercent }};
-        var requestsPercentFree = (100 - requestsPercent)
-        if (requestsPercentFree <= 0) {
-            requestsPercentFree = 0
-        }
-        var limitsPercent = {{ node_metrics.memory.limitsPercent }};
-        var limitsPercentFree = (100 - limitsPercent)
-        if (limitsPercentFree <= 0) {
-            limitsPercentFree = 0
-        }
-        const ctx2 = document.getElementById('memory').getContext('2d');
-        const MemoryChart = new Chart(ctx2, {
             type: 'doughnut',
             data: {
                 datasets: [
@@ -584,15 +1071,6 @@
                 }
             }
         });
-    </script>
-    <script>
-        var usagePercent = {{ node_metrics.pod_count.currentPercent }};
-        var usagePercentFree = (100 - usagePercent)
-        if (usagePercentFree <= 0) {
-            usagePercentFree = 0
-        }
-        const ctx3 = document.getElementById('pod').getContext('2d');
-        const PodChart = new Chart(ctx3, {
             type: 'doughnut',
             data: {
                 datasets: [
@@ -668,6 +1146,4 @@
                 }
             }
         });
-    </script>
-{% endif %}
 {% endblock %}

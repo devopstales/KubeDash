@@ -2,6 +2,8 @@
 
 KubeDash provides a Kubernetes-style API server that exposes custom resources following the Kubernetes API conventions. This allows you to interact with KubeDash resources using standard Kubernetes tools like `kubectl`.
 
+KubeDash can be registered as a Kubernetes API Extension Server using the API Aggregation Layer, making it appear as a native Kubernetes API endpoint.
+
 ## Overview
 
 The Extension API implements the Kubernetes API Aggregation Layer pattern, providing:
@@ -10,6 +12,7 @@ The Extension API implements the Kubernetes API Aggregation Layer pattern, provi
 - **Custom Resources**: Project resources for namespace management
 - **Bearer Token Auth**: Authentication using Kubernetes ServiceAccount tokens
 - **RBAC Integration**: Authorization based on Kubernetes RBAC permissions
+- **Native kubectl Integration**: Works seamlessly with `kubectl` and other Kubernetes clients
 
 ## API Group
 
@@ -32,6 +35,221 @@ Projects represent Kubernetes namespaces filtered by user permissions. They prov
 | Short Name | `proj` |
 | Scope | Cluster |
 | Verbs | get, list, watch, create, update, patch, delete |
+
+## Registering KubeDash as an API Extension Server
+
+To integrate KubeDash with Kubernetes API discovery and enable native `kubectl` support, you need to register it as an APIService.
+
+### Prerequisites
+
+1. **KubeDash must be accessible via HTTPS** (required for API aggregation)
+2. **Service and Endpoints** must be created in Kubernetes
+3. **APIService** resource must be created to register the extension
+
+### Step 1: Create Service and Endpoints
+
+Create a Service that points to your KubeDash instance:
+
+```yaml
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: kubedash-extension-api
+  namespace: kubedash  # Adjust namespace as needed
+  labels:
+    app: kubedash
+spec:
+  ports:
+    - name: https
+      port: 443
+      targetPort: 8000  # Adjust to your KubeDash port
+      protocol: TCP
+  # No selector - we'll use Endpoints below
+---
+apiVersion: v1
+kind: Endpoints
+metadata:
+  name: kubedash-extension-api  # Must match Service name
+  namespace: kubedash
+subsets:
+  - addresses:
+      - ip: 10.0.0.100  # IP address of your KubeDash instance
+    ports:
+      - name: https
+        port: 8000  # KubeDash port
+        protocol: TCP
+```
+
+!!! note
+    If KubeDash is running inside the cluster, you can use a regular Service with selectors instead of Endpoints.
+
+### Step 2: Create APIService Resource
+
+Register KubeDash as an API extension:
+
+```yaml
+apiVersion: apiregistration.k8s.io/v1
+kind: APIService
+metadata:
+  name: v1.kubedash.devopstales.github.io
+spec:
+  group: kubedash.devopstales.github.io
+  version: v1
+  service:
+    name: kubedash-extension-api
+    namespace: kubedash
+    port: 443
+  # Option 1: Provide CA bundle (recommended for production)
+  caBundle: <base64-encoded-ca-certificate>
+  # Option 2: Skip TLS verification (development only, still requires HTTPS!)
+  # insecureSkipTLSVerify: true
+  groupPriorityMinimum: 1000
+  versionPriority: 100
+```
+
+### Step 3: Verify Registration
+
+Check that the APIService is registered:
+
+```bash
+# Check APIService status
+kubectl get apiservice v1.kubedash.devopstales.github.io
+
+# Verify API discovery
+kubectl api-resources | grep kubedash
+
+# Test with kubectl
+kubectl get projects
+```
+
+### APIService Configuration Options
+
+| Field | Description | Required |
+|-------|-------------|----------|
+| `group` | API group name | Yes |
+| `version` | API version | Yes |
+| `service.name` | Service name | Yes |
+| `service.namespace` | Service namespace | Yes |
+| `service.port` | Service port | Yes |
+| `caBundle` | Base64-encoded CA certificate | Recommended |
+| `insecureSkipTLSVerify` | Skip TLS verification | Dev only |
+| `groupPriorityMinimum` | Priority for API group | Recommended |
+| `versionPriority` | Priority for API version | Recommended |
+
+### TLS Configuration
+
+Kubernetes API aggregation **requires HTTPS**. You have two options:
+
+#### Option 1: CA Bundle (Recommended)
+
+Provide the CA certificate that signed KubeDash's TLS certificate:
+
+```yaml
+spec:
+  caBundle: LS0tLS1CRUdJTi...  # Base64-encoded CA cert
+```
+
+#### Option 2: Skip TLS Verification (Development Only)
+
+For development/testing only:
+
+```yaml
+spec:
+  insecureSkipTLSVerify: true
+```
+
+!!! warning
+    `insecureSkipTLSVerify: true` should **never** be used in production. It bypasses TLS certificate validation.
+
+### Troubleshooting
+
+#### APIService Not Available
+
+```bash
+# Check APIService status
+kubectl get apiservice v1.kubedash.devopstales.github.io -o yaml
+
+# Check for conditions
+kubectl describe apiservice v1.kubedash.devopstales.github.io
+```
+
+Common issues:
+- **Service not found**: Verify Service and Endpoints exist
+- **TLS errors**: Ensure HTTPS is enabled and CA bundle is correct
+- **Connection refused**: Verify KubeDash is accessible at the specified IP/port
+
+#### Verify API Discovery
+
+```bash
+# Check if API group is discovered
+kubectl get --raw /apis/kubedash.devopstales.github.io/v1
+
+# List API resources
+kubectl api-resources --api-group=kubedash.devopstales.github.io
+```
+
+### Using with kubectl
+
+Once registered, you can use `kubectl` directly:
+
+```bash
+# List projects
+kubectl get projects
+kubectl get proj  # Short name
+
+# Get specific project
+kubectl get project my-project
+
+# Create project
+kubectl create -f project.yaml
+
+# Delete project
+kubectl delete project my-project
+```
+
+### Example: Complete Setup
+
+Here's a complete example for registering KubeDash:
+
+```yaml
+---
+# Service (if KubeDash is in-cluster)
+apiVersion: v1
+kind: Service
+metadata:
+  name: kubedash-extension-api
+  namespace: kubedash
+spec:
+  selector:
+    app: kubedash
+  ports:
+    - name: https
+      port: 443
+      targetPort: 8000
+---
+# APIService
+apiVersion: apiregistration.k8s.io/v1
+kind: APIService
+metadata:
+  name: v1.kubedash.devopstales.github.io
+spec:
+  group: kubedash.devopstales.github.io
+  version: v1
+  service:
+    name: kubedash-extension-api
+    namespace: kubedash
+    port: 443
+  caBundle: <your-ca-bundle>
+  groupPriorityMinimum: 1000
+  versionPriority: 100
+```
+
+Apply with:
+
+```bash
+kubectl apply -f kubedash-apiservice.yaml
+```
 
 ## Authentication
 

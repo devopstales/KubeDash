@@ -13,7 +13,7 @@
 </ul>
 <ul class="header-nav ms-auto"></ul>
 <ul class="header-nav d-lg-flex">
-{% include "segments/topmenu.html.j2" %}
+{% include "segments/partials/topmenu.html.j2" %}
 {% endblock %}
 
 {% block content %}
@@ -23,71 +23,54 @@
   </div>
   
   <div class="card-body">
-    <form action="/settings/sso-config" method="POST">
+    <div id="loading-message" class="text-center py-3">
+      <div class="spinner-border spinner-border-sm text-primary" role="status">
+        <span class="visually-hidden">Loading...</span>
+      </div>
+      <span class="ms-2">Loading SSO configuration...</span>
+    </div>
+    <form id="sso-config-form" style="display: none;">
       <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
-      <div class="messages"></div>
-      {% if oauth_server_uri %}
-      <input type="hidden" name="request_type" value="edit" />
-      <input type="hidden" name="oauth_server_uri_old" value="{{ oauth_server_uri }}" />
-      {% if oauth_server_ca %}
-      <input type="hidden" name="oauth_server_ca" value="{{ oauth_server_ca }}" />
-      {% else %}
-      {% endif %}
-      {% else %}
-      <input type="hidden" name="request_type" value="create" />
-      {% endif %}
+      <div class="messages" id="form-messages"></div>
+      <input type="hidden" name="request_type" id="request_type" value="create" />
+      <input type="hidden" name="oauth_server_uri_old" id="oauth_server_uri_old" value="" />
       <div class="col-sm-4">
         <div class="form-group">
           <label for="base_uri">Redirect URI</label>
-          <input type="text" class="form-control" id="base_uri" name="base_uri" value="{{ base_uri }}">
+          <input type="text" class="form-control" id="base_uri" name="base_uri" value="">
         </div>
       </div>
       <div class="col-sm-4">
         <div class="form-group">
           <label for="oauth_server_uri">Identity Provider URL</label>
-          {% if oauth_server_uri %}
-          <input type="text" class="form-control" id="oauth_server_uri" name= "oauth_server_uri" value="{{ oauth_server_uri }}">
-          {% else %}
-          <input type="text" class="form-control" id="oauth_server_uri" name= "oauth_server_uri" placeholder="URL">
-          {% endif %}
-          {% if oauth_server_ca %}
-          <input type="hidden" name="oauth_server_ca" value="{{ oauth_server_ca }}" />
-          {% else %}
-          <input type="hidden" name="oauth_server_ca" placeholder="" />
-          {% endif %}
+          <input type="text" class="form-control" id="oauth_server_uri" name="oauth_server_uri" placeholder="URL">
+          <input type="hidden" name="oauth_server_ca_encoded" id="oauth_server_ca_encoded" value="" />
         </div>
       </div>
       <div class="col-sm-8 mt-2">
         <p>Identity Provider CA Certificate</p>
-        {% if oauth_server_ca %}
-        <textarea class="form-control" id="oauth_server_ca" name="oauth_server_ca" rows="3">{{ oauth_server_ca | j2_b64decode }}</textarea>
-        {% else %}
-        <textarea class="form-control" id="oauth_server_ca" name="oauth_server_ca" rows="3" value=""></textarea>
-        {% endif %}
+        <textarea class="form-control" id="oauth_server_ca" name="oauth_server_ca" rows="3"></textarea>
       </div>
       <div class="col-sm-8">
         <div class="row">
           <div class="col">
             <label for="client_id">Identity Provider Client ID</label>
-            {% if client_id %}
-            <input type="text" class="form-control" id="client_id" name="client_id" value="{{ client_id }}">
-            {% else %}
             <input type="text" class="form-control" id="client_id" name="client_id" placeholder="Client ID">
-            {% endif %}
           </div>
           <div class="col">
-            <label for="client_id">Identity Provider Client Secret</label>
-            {% if client_secret %}
-            <input type="text" class="form-control" id="client_secret" name="client_secret" value="{{ client_secret }}">
-            {% else %}
-            <input type="text" class="form-control" id="client_secret" name="client_secret" placeholder="Client Secret">
-            {% endif %}
+            <label for="client_secret">Identity Provider Client Secret</label>
+            <div class="input-group">
+              <input type="password" class="form-control" id="client_secret" name="client_secret" placeholder="Client Secret">
+              <button class="btn btn-outline-secondary" type="button" id="toggle-secret-visibility" title="Show/Hide Secret">
+                <i id="toggle-secret-icon" class="material-icons">visibility_off</i>
+              </button>
+            </div>
           </div>
         </div>
       </div>
       <div class="col-sm-8 mt-2">
         <p>Press enter or add a comma after each tag</p>
-        <input type="text" class="form-control" name="scope" value="{% for s in scope %}{{ s }}{{ ',' if not loop.last else '' }}{% endfor %}" id="example-basic" />
+        <input type="text" class="form-control" name="scope" id="example-basic" />
       </div>
       <div class="col-sm-4 mt-2">
         <div class="form-group">
@@ -105,7 +88,221 @@
 
 {% block add_tail_js %}
     <script src="{{ url_for('static',filename='/vendor/use-bootstrap-tag@2.2.2/use-bootstrap-tag.min.js') }}"></script>
-    <script>
-      UseBootstrapTag(document.getElementById('example-basic'))
+    <script nonce="{{ csp_nonce }}">
+      const escapeHtml = (text) => {
+        if (text === null || text === undefined) return '';
+        const map = {
+          '&': '&amp;',
+          '<': '&lt;',
+          '>': '&gt;',
+          '"': '&quot;',
+          "'": '&#039;'
+        };
+        return String(text).replace(/[&<>"']/g, m => map[m]);
+      };
+      
+      const csrf_token = {{ csrf_token()|tojson }};
+      
+      // Base64 decode function (if needed for CA certificate)
+      function base64Decode(str) {
+        try {
+          // Remove any whitespace
+          str = str.trim();
+          // Decode base64
+          return atob(str);
+        } catch (e) {
+          console.error('Error decoding base64:', e);
+          return str;
+        }
+      }
+      
+      function populateSSOForm(ssoConfig) {
+        if (!ssoConfig) {
+          // No SSO config exists, show form for creation
+          document.getElementById('request_type').value = 'create';
+          document.getElementById('sso-config-form').style.display = 'block';
+          document.getElementById('loading-message').style.display = 'none';
+          // Initialize bootstrap tag input
+          UseBootstrapTag(document.getElementById('example-basic'));
+          return;
+        }
+        
+        // SSO config exists, populate form for editing
+        document.getElementById('request_type').value = 'edit';
+        document.getElementById('oauth_server_uri_old').value = escapeHtml(ssoConfig.oauth_server_uri || '');
+        
+        // Populate form fields
+        document.getElementById('base_uri').value = escapeHtml(ssoConfig.base_uri || '');
+        document.getElementById('oauth_server_uri').value = escapeHtml(ssoConfig.oauth_server_uri || '');
+        
+        // Handle CA certificate (decode if it's base64 encoded)
+        if (ssoConfig.oauth_server_ca) {
+          try {
+            // Try to decode if it's base64
+            const decoded = base64Decode(ssoConfig.oauth_server_ca);
+            document.getElementById('oauth_server_ca').value = decoded;
+            document.getElementById('oauth_server_ca_encoded').value = ssoConfig.oauth_server_ca;
+          } catch (e) {
+            // If decoding fails, use as-is
+            document.getElementById('oauth_server_ca').value = escapeHtml(ssoConfig.oauth_server_ca);
+            document.getElementById('oauth_server_ca_encoded').value = ssoConfig.oauth_server_ca;
+          }
+        }
+        
+        document.getElementById('client_id').value = escapeHtml(ssoConfig.client_id || '');
+        // Populate client_secret with actual value from API
+        const secretField = document.getElementById('client_secret');
+        if (ssoConfig.client_secret) {
+          secretField.value = escapeHtml(ssoConfig.client_secret);
+          secretField.type = 'password'; // Start with password type for security
+        } else {
+          secretField.value = '';
+          secretField.placeholder = 'Client Secret';
+        }
+        
+        // Handle scope - join array into comma-separated string
+        if (ssoConfig.scope && Array.isArray(ssoConfig.scope)) {
+          document.getElementById('example-basic').value = ssoConfig.scope.join(',');
+        } else if (ssoConfig.scope) {
+          document.getElementById('example-basic').value = ssoConfig.scope;
+        }
+        
+        // Show form and hide loading message
+        document.getElementById('sso-config-form').style.display = 'block';
+        document.getElementById('loading-message').style.display = 'none';
+        
+        // Initialize bootstrap tag input
+        UseBootstrapTag(document.getElementById('example-basic'));
+      }
+      
+      async function loadSSOConfig() {
+        try {
+          const apiUrl = '/api/v1/settings/sso';
+          console.log('Fetching SSO configuration from:', apiUrl);
+          
+          const response = await fetch(apiUrl);
+          
+          if (response.status === 404) {
+            // No SSO config exists yet
+            console.log('No SSO configuration found, showing create form');
+            populateSSOForm(null);
+            return;
+          }
+          
+          if (!response.ok) {
+            throw new Error(`HTTP error! status: ${response.status}`);
+          }
+          
+          const data = await response.json();
+          console.log('SSO configuration API response:', data);
+          
+          if (data.error) {
+            throw new Error(data.message || 'Failed to load SSO configuration');
+          }
+          
+          const ssoConfig = data.data || {};
+          populateSSOForm(ssoConfig);
+          
+        } catch (error) {
+          console.error('Error loading SSO configuration:', error);
+          document.getElementById('loading-message').innerHTML = 
+            '<div class="alert alert-danger">Error loading SSO configuration: ' + escapeHtml(error.message) + '</div>';
+        }
+      }
+      
+      // Toggle secret visibility
+      function setupSecretVisibilityToggle() {
+        const toggleButton = document.getElementById('toggle-secret-visibility');
+        const secretField = document.getElementById('client_secret');
+        const toggleIcon = document.getElementById('toggle-secret-icon');
+        
+        if (toggleButton && secretField && toggleIcon) {
+          toggleButton.addEventListener('click', function() {
+            if (secretField.type === 'password') {
+              secretField.type = 'text';
+              toggleIcon.textContent = 'visibility';
+            } else {
+              secretField.type = 'password';
+              toggleIcon.textContent = 'visibility_off';
+            }
+          });
+        }
+      }
+      
+      // Handle form submission
+      document.addEventListener('DOMContentLoaded', function() {
+        loadSSOConfig();
+        setupSecretVisibilityToggle();
+        
+        const form = document.getElementById('sso-config-form');
+        if (form) {
+          form.addEventListener('submit', async function(e) {
+            e.preventDefault();
+            
+            const messagesDiv = document.getElementById('form-messages');
+            messagesDiv.innerHTML = '';
+            
+            // Get form data
+            const caValue = document.getElementById('oauth_server_ca').value.trim();
+            const formData = {
+              request_type: document.getElementById('request_type').value,
+              oauth_server_uri: document.getElementById('oauth_server_uri').value.trim(),
+              oauth_server_ca: caValue, // API will handle base64 encoding
+              client_id: document.getElementById('client_id').value.trim(),
+              client_secret: document.getElementById('client_secret').value.trim(),
+              base_uri: document.getElementById('base_uri').value.trim(),
+              scope: document.getElementById('example-basic').value.split(',').map(s => s.trim()).filter(s => s)
+            };
+            
+            // If editing, include old URI
+            if (formData.request_type === 'edit') {
+              formData.oauth_server_uri_old = document.getElementById('oauth_server_uri_old').value;
+            }
+            
+            // Validate required fields
+            if (!formData.oauth_server_uri || !formData.client_id) {
+              messagesDiv.innerHTML = '<div class="alert alert-danger">Identity Provider URL and Client ID are required.</div>';
+              return;
+            }
+            
+            // Client secret is required for create, optional for edit (will keep existing if empty)
+            if (formData.request_type === 'create' && !formData.client_secret) {
+              messagesDiv.innerHTML = '<div class="alert alert-danger">Client Secret is required when creating SSO configuration.</div>';
+              return;
+            }
+            
+            try {
+              const apiUrl = '/api/v1/settings/sso';
+              console.log('Submitting SSO configuration to:', apiUrl);
+              
+              const response = await fetch(apiUrl, {
+                method: 'POST',
+                headers: {
+                  'Content-Type': 'application/json',
+                },
+                body: JSON.stringify(formData)
+              });
+              
+              const data = await response.json();
+              
+              if (!response.ok) {
+                throw new Error(data.message || `HTTP error! status: ${response.status}`);
+              }
+              
+              // Show success message
+              messagesDiv.innerHTML = '<div class="alert alert-success">' + escapeHtml(data.message || 'SSO configuration saved successfully') + '</div>';
+              
+              // Reload the configuration to update the form
+              setTimeout(() => {
+                loadSSOConfig();
+              }, 1000);
+              
+            } catch (error) {
+              console.error('Error submitting SSO configuration:', error);
+              messagesDiv.innerHTML = '<div class="alert alert-danger">Error: ' + escapeHtml(error.message) + '</div>';
+            }
+          });
+        }
+      });
     </script>
 {% endblock %}

@@ -14,7 +14,7 @@
 </ul>
 <ul class="header-nav ms-auto"></ul>
 <ul class="header-nav d-lg-flex">
-{% include "segments/topmenu.html.j2" %}
+{% include "segments/partials/topmenu.html.j2" %}
 {% endblock %}
 
 {% block content %}
@@ -30,22 +30,15 @@
                       <th>Image</th>
                     </tr>
                 </thead>
-                <tbody>
-                    {% for image in image_list %}
-                    {% if selected == image.name %}
-                      <tr class="selected" >
-                    {% else %}
-                      <tr>
-                    {% endif %}
-                        <td>
-                          <form action="/plugins/registry/image/tags" method="POST">
-                            <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
-                            <input type="hidden" name="image_name" value="{{ image }}" />
-                            <a href="javascript:;" onclick="parentNode.submit();">{{ image }}</a>
-                          </form>
+                <tbody id="images-tbody">
+                    <tr>
+                        <td colspan="1" class="text-center">
+                            <div class="spinner-border spinner-border-sm text-primary" role="status">
+                                <span class="visually-hidden">Loading...</span>
+                            </div>
+                            <span class="ms-2">Loading images...</span>
                         </td>
                     </tr>
-                    {% endfor %}
                 </tbody>
             </table>
 
@@ -55,5 +48,247 @@
 {% endblock %}
 
 {% block add_head_css %}
-{% include "segments/datatable_snippet.html.j2" %}
+{% include "segments/components/datatable_snippet.html.j2" %}
+{% endblock %}
+
+{% block add_tail_js %}
+<script>
+    // IMMEDIATE: Prevent datatables-demo.js from initializing on loading row
+    (function() {
+        function setupOverride() {
+            if (typeof $ !== 'undefined' && $.fn && !window._datatableOverrideSetup) {
+                window._datatableOverrideSetup = true;
+                
+                const originalDataTable = $.fn.DataTable;
+                $.fn.DataTable = function(options) {
+                    const table = this[0];
+                    if (table && table.id === 'dataTable') {
+                        const tbody = table.querySelector('tbody');
+                        if (tbody) {
+                            const rows = tbody.querySelectorAll('tr');
+                            const hasColspanRow = Array.from(rows).some(row => {
+                                const cells = row.querySelectorAll('td');
+                                return Array.from(cells).some(cell => cell.hasAttribute('colspan'));
+                            });
+                            if (hasColspanRow) {
+                                console.log('Blocked DataTable initialization on loading row');
+                                return this;
+                            }
+                        }
+                    }
+                    return originalDataTable.apply(this, arguments);
+                };
+                
+                Object.setPrototypeOf($.fn.DataTable, originalDataTable);
+                Object.keys(originalDataTable).forEach(key => {
+                    $.fn.DataTable[key] = originalDataTable[key];
+                });
+            }
+        }
+        
+        setupOverride();
+        setTimeout(setupOverride, 0);
+        setTimeout(setupOverride, 50);
+        setTimeout(setupOverride, 100);
+        setTimeout(setupOverride, 200);
+        
+        if (document.readyState === 'loading') {
+            document.addEventListener('DOMContentLoaded', setupOverride);
+        } else {
+            setupOverride();
+        }
+    })();
+    
+    // Escape HTML helper
+    function escapeHtml(text) {
+        if (!text) return '';
+        const map = {
+            '&': '&amp;',
+            '<': '&lt;',
+            '>': '&gt;',
+            '"': '&quot;',
+            "'": '&#039;'
+        };
+        return text.toString().replace(/[&<>"']/g, m => map[m]);
+    }
+    
+    // Get registry server URL from sessionStorage or URL params
+    function getRegistryServerUrl() {
+        // Try URL query parameter first (most reliable)
+        const urlParams = new URLSearchParams(window.location.search);
+        const fromUrl = urlParams.get('registry_server_url');
+        if (fromUrl) {
+            // Store in sessionStorage for consistency
+            sessionStorage.setItem('registry_server_url', fromUrl);
+            return fromUrl;
+        }
+        
+        // Try sessionStorage (set by previous page)
+        const fromStorage = sessionStorage.getItem('registry_server_url');
+        if (fromStorage) {
+            return fromStorage;
+        }
+        
+        return null;
+    }
+    
+    // Populate images table
+    function populateImagesTable(images, selectedImage, registryServerUrl) {
+        const tbody = document.getElementById('images-tbody');
+        const table = document.getElementById('dataTable');
+        
+        // Destroy existing DataTable if it exists
+        if (typeof $ !== 'undefined' && $.fn.DataTable) {
+            try {
+                const $table = $('#dataTable');
+                if ($table.length && typeof $.fn.DataTable.isDataTable === 'function' && $.fn.DataTable.isDataTable('#dataTable')) {
+                    $table.DataTable().destroy();
+                }
+            } catch (e) {
+                console.warn('Error destroying DataTable:', e);
+            }
+        }
+        
+        if (!images || images.length === 0) {
+            tbody.innerHTML = '<tr><td colspan="1" class="text-center">No images found</td></tr>';
+            return;
+        }
+        
+        const rows = images.map(image => {
+            const imageName = image.name || image;
+            const imageNameEscaped = escapeHtml(imageName);
+            const isSelected = selectedImage === imageName;
+            const rowClass = isSelected ? 'selected' : '';
+            
+            // Encode image name for use in query parameter
+            const imageNameEncoded = encodeURIComponent(imageName);
+            const registryUrlEncoded = encodeURIComponent(registryServerUrl);
+            
+            return `
+                <tr class="${rowClass}">
+                    <td>
+                        <a href="javascript:;" onclick="sessionStorage.setItem('image_name', '${imageNameEscaped.replace(/'/g, "\\'")}'); sessionStorage.setItem('registry_server_url', '${registryServerUrl.replace(/'/g, "\\'")}'); window.location.href='/plugins/registry/image/tags?registry_server_url=${registryUrlEncoded}&image_name=${imageNameEncoded}';">${imageNameEscaped}</a>
+                    </td>
+                </tr>
+            `;
+        }).join('');
+        
+        tbody.innerHTML = rows;
+        
+        // Initialize DataTables after a short delay
+        setTimeout(function() {
+            const finalTable = document.getElementById('dataTable');
+            if (finalTable && typeof $ !== 'undefined' && $.fn.DataTable) {
+                try {
+                    const $table = $('#dataTable');
+                    
+                    if (typeof $.fn.DataTable.isDataTable === 'function' && $.fn.DataTable.isDataTable('#dataTable')) {
+                        $table.DataTable().destroy();
+                    }
+                    
+                    // Verify table structure
+                    const tbody = finalTable.querySelector('tbody');
+                    if (tbody) {
+                        const rows = tbody.querySelectorAll('tr');
+                        let hasValidRows = false;
+                        for (const row of rows) {
+                            const cells = row.querySelectorAll('td');
+                            if (cells.length === 1) {
+                                hasValidRows = true;
+                                break;
+                            }
+                        }
+                        
+                        if (hasValidRows) {
+                            const validRowCount = Array.from(rows).filter(row => {
+                                const cells = row.querySelectorAll('td');
+                                return cells.length === 1;
+                            }).length;
+                            
+                            if (validRowCount > 0) {
+                                $('#dataTable').DataTable({
+                                    responsive: true,
+                                    pageLength: 25,
+                                    destroy: true
+                                });
+                                console.log('DataTables initialized successfully with', validRowCount, 'rows');
+                            }
+                        }
+                    }
+                } catch (e) {
+                    console.warn('Error initializing DataTable:', e);
+                }
+            }
+        }, 100);
+    }
+    
+    // Load images from API
+    async function loadImages() {
+        try {
+            const registryServerUrl = getRegistryServerUrl();
+            
+            if (!registryServerUrl) {
+                throw new Error('Registry server URL not found. Please select a registry server first.');
+            }
+            
+            // Store in sessionStorage for consistency
+            sessionStorage.setItem('registry_server_url', registryServerUrl);
+            
+            // Encode the URL for the API path
+            const encodedUrl = encodeURIComponent(registryServerUrl);
+            const apiUrl = `/api/v1/plugins/registry/${encodedUrl}/images`;
+            console.log('Fetching images from:', apiUrl);
+            
+            const response = await fetch(apiUrl);
+            if (!response.ok) {
+                throw new Error(`HTTP error! status: ${response.status}`);
+            }
+            
+            const result = await response.json();
+            console.log('Images API response:', result);
+            
+            if (result.error) {
+                throw new Error(result.message || 'Failed to load images');
+            }
+            
+            const images = result.data || [];
+            const selectedImage = new URLSearchParams(window.location.search).get('selected');
+            // Use registryServerUrl from metadata if available, otherwise use the one we already have
+            const finalRegistryUrl = result.metadata?.registry_server_url || registryServerUrl;
+            
+            populateImagesTable(images, selectedImage, finalRegistryUrl);
+            
+        } catch (error) {
+            console.error('Error loading images:', error);
+            const tbody = document.getElementById('images-tbody');
+            if (tbody) {
+                tbody.innerHTML = '<tr><td colspan="1" class="text-center text-danger">Error loading images: ' + escapeHtml(error.message) + '</td></tr>';
+            }
+        }
+    }
+    
+    // Load data on page load
+    document.addEventListener('DOMContentLoaded', function() {
+        // Destroy any auto-initialized DataTable instance
+        const table = document.getElementById('dataTable');
+        if (table && typeof $ !== 'undefined' && $.fn.DataTable) {
+            if ($.fn.DataTable.isDataTable && $.fn.DataTable.isDataTable(table)) {
+                const tbody = table.querySelector('tbody');
+                if (tbody) {
+                    const rows = tbody.querySelectorAll('tr');
+                    const hasColspanRow = Array.from(rows).some(row => {
+                        const cells = row.querySelectorAll('td');
+                        return Array.from(cells).some(cell => cell.hasAttribute('colspan'));
+                    });
+                    if (hasColspanRow) {
+                        console.log('Destroying auto-initialized DataTable instance on loading row');
+                        $(table).DataTable().destroy();
+                    }
+                }
+            }
+        }
+        
+        loadImages();
+    });
+</script>
 {% endblock %}

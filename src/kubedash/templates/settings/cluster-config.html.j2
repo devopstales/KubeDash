@@ -14,16 +14,12 @@
 <ul class="header-nav ms-auto"></ul>
 <ul class="header-nav d-lg-flex">
   <!-- Button trigger modal add -->
-  {% if session['user_role'] == "Admin" %}
-  {% if k8s_config_list_length == 0 %}
-  <div class="col">
+  <div class="col" id="add-button-container" style="display: none;">
     <button class="header-toggler" type="button" data-bs-toggle="modal" data-bs-target="#modaladd">
       <i class="material-icons">add</i>
     </button>
   </div>
-  {% endif %}
-  {% endif %}
-{% include "segments/topmenu.html.j2" %}
+{% include "segments/partials/topmenu.html.j2" %}
 {% endblock %}
 
 {% block content %}
@@ -41,29 +37,15 @@
                       <th>Action</th>
                     </tr>
                 </thead>
-                <tbody>
-                    {% for server in k8s_servers %}
+                <tbody id="k8s-configs-tbody">
                     <tr>
-                        <td>{{ server.k8s_context }}</td>
-                        <td>{{ server.k8s_server_url }}</td>
-                        <td>
-                            {% if session['user_role'] == "Admin" %}
-                            <!-- Button trigger modal edit -->
-                            <form action="/settings/cluster-config" method="POST">
-                                <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
-                                <button type="button" class="btn btn-success btn-just-icon btn-xs" data-bs-toggle="modal" data-bs-target="#modaledit{{ server.k8s_context }}">
-                                    <i class="material-icons">edit</i>
-                                </button>
-                                <input type="hidden" name="request_type" value="delete" />
-                                <input type="hidden" name="k8s_context" value="{{ server.k8s_context }}" />
-                                <button type="submit" rel="tooltip" class="btn btn-danger btn-just-icon btn-sm" value="upvote">
-                                    <i class="material-icons">delete</i>
-                                </button>
-                            </form>
-                            {% endif %}
+                        <td colspan="3" class="text-center">
+                            <div class="spinner-border spinner-border-sm text-primary" role="status">
+                                <span class="visually-hidden">Loading...</span>
+                            </div>
+                            <span class="ms-2">Loading cluster configurations...</span>
                         </td>
                     </tr>
-                    {% endfor %}
                 </tbody>
             </table>
 
@@ -80,9 +62,9 @@
         <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
       </div>
       <div class="modal-body">
-        <form name="ClusterAdd" onsubmit="return validateClusterForm('ClusterAdd')" action="/settings/cluster-config" method="POST">
+        <form id="cluster-add-form" name="ClusterAdd">
           <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
-          <input type="hidden" name="request_type" value="create" />
+          <div id="add-form-messages"></div>
           <div class="form-group">
               <label for="k8s_context">Kubernetes Config Context</label>
               <input type="text" class="form-control" id="k8s_context" name= "k8s_context" placeholder="Server Context" required>
@@ -118,30 +100,266 @@
 </div>
 <!-- Modal Add User -->
 
-<!-- Modal Edit Config -->
-{% for server in k8s_servers %}
-<div class="modal fade" id="modaledit{{ server.k8s_context }}" tabindex="-1" role="dialog" aria-labelledby="modaleditLabel" aria-hidden="true">
+<!-- Modal Edit Config - will be dynamically created -->
+<div id="edit-modals-container"></div>
+<!-- Modal Edit User -->
+{% endblock %}
+
+{% block add_tail_js %}
+{% include "segments/components/datatable_snippet.html.j2" %}
+{% include "segments/components/functions_snippet.j2"%}
+    <script nonce="{{ csp_nonce }}">
+        const escapeHtml = (text) => {
+            if (text === null || text === undefined) return '';
+            const map = {
+                '&': '&amp;',
+                '<': '&lt;',
+                '>': '&gt;',
+                '"': '&quot;',
+                "'": '&#039;'
+            };
+            return String(text).replace(/[&<>"']/g, m => map[m]);
+        };
+        
+        const csrf_token = {{ csrf_token()|tojson }};
+        const user_role = {{ session.get('user_role', '')|tojson }};
+        const is_admin = user_role === 'Admin';
+        
+        // DataTables protection - prevent auto-initialization
+        // Store reference to DataTable instance
+        let dataTableInstance = null;
+        let isInitializing = false;
+        
+        // Helper function to safely destroy DataTable
+        function destroyDataTable() {
+            if (typeof $ === 'undefined' || !$.fn.DataTable) {
+                return;
+            }
+            
+            try {
+                const $table = $('#dataTable');
+                if (!$table.length) {
+                    return;
+                }
+                
+                // Check if DataTable is already initialized using the official method
+                if (typeof $.fn.DataTable.isDataTable === 'function' && $.fn.DataTable.isDataTable('#dataTable')) {
+                    const dt = $table.DataTable();
+                    if (dt) {
+                        dt.destroy();
+                    }
+                    dataTableInstance = null;
+                }
+                
+                // Also check jQuery data (for older versions or edge cases)
+                const dtData = $table.data('DataTable') || $table.data('dataTable');
+                if (dtData) {
+                    try {
+                        $table.DataTable().destroy();
+                    } catch (e) {
+                        // Ignore errors during destroy
+                    }
+                    $table.removeData('DataTable');
+                    $table.removeData('dataTable');
+                    dataTableInstance = null;
+                }
+            } catch (e) {
+                // DataTable not initialized or error, ignore
+                console.debug('DataTable destroy (no instance):', e.message);
+                dataTableInstance = null;
+            }
+        }
+        
+        // Base64 decode function
+        function base64Decode(str) {
+            try {
+                if (!str) return '';
+                str = String(str).trim();
+                // Replace URL-safe base64 characters if present
+                str = str.replace(/-/g, '+').replace(/_/g, '/');
+                // Add padding if needed
+                while (str.length % 4) {
+                    str += '=';
+                }
+                return atob(str);
+            } catch (e) {
+                console.error('Error decoding base64:', e);
+                return str;
+            }
+        }
+        
+        // Initialize popovers
+        function initPopovers() {
+            const popoverTriggerList = [].slice.call(document.querySelectorAll('[data-bs-toggle="CertTooltip"]'));
+            const popoverList = popoverTriggerList.map(function (popoverTriggerEl) {
+                return new bootstrap.Popover(popoverTriggerEl);
+            });
+        }
+        
+        // Populate table with cluster configs
+        function populateConfigsTable(configs) {
+            const tbody = document.getElementById('k8s-configs-tbody');
+            const table = document.getElementById('dataTable');
+            
+            // Destroy existing DataTable if it exists (must be done before modifying table content)
+            destroyDataTable();
+            
+            if (!configs || configs.length === 0) {
+                tbody.innerHTML = '<tr><td colspan="3" class="text-center">No cluster configurations found</td></tr>';
+                // Show add button only if admin and no configs exist
+                if (is_admin) {
+                    document.getElementById('add-button-container').style.display = 'block';
+                }
+                return;
+            }
+            
+            // Hide add button if configs exist (only one config allowed)
+            document.getElementById('add-button-container').style.display = 'none';
+            
+            const rows = configs.map((config, index) => {
+                const context = config.k8s_context || '';
+                const url = config.k8s_server_url || '';
+                const safeId = context.replace(/[^a-zA-Z0-9]/g, '_');
+                
+                // Escape for HTML display
+                const contextEscaped = escapeHtml(context);
+                const urlEscaped = escapeHtml(url);
+                
+                let actionCell = '';
+                if (is_admin) {
+                    // Use raw context for JavaScript, but escape single quotes
+                    const contextForJS = context.replace(/'/g, "\\'").replace(/"/g, '\\"');
+                    actionCell = `
+                        <button type="button" class="btn btn-success btn-just-icon btn-xs" data-bs-toggle="modal" data-bs-target="#modaledit${safeId}">
+                            <i class="material-icons">edit</i>
+                        </button>
+                        <button type="button" class="btn btn-danger btn-just-icon btn-sm" onclick="window.deleteConfig('${contextForJS}')">
+                            <i class="material-icons">delete</i>
+                        </button>
+                    `;
+                } else {
+                    actionCell = '-';
+                }
+                
+                return `
+                    <tr>
+                        <td>${contextEscaped}</td>
+                        <td>${urlEscaped}</td>
+                        <td>${actionCell}</td>
+                    </tr>
+                `;
+            }).join('');
+            
+            console.log('Generated rows HTML length:', rows.length);
+            console.log('Number of rows to insert:', configs.length);
+            tbody.innerHTML = rows;
+            console.log('Table body updated, row count:', tbody.querySelectorAll('tr').length);
+            
+            // Create edit modals for each config
+            createEditModals(configs);
+            
+            // Initialize DataTables after a short delay to ensure DOM is updated
+            setTimeout(function() {
+                // Prevent concurrent initialization
+                if (isInitializing) {
+                    return;
+                }
+                
+                const finalTable = document.getElementById('dataTable');
+                if (!finalTable || typeof $ === 'undefined' || !$.fn.DataTable) {
+                    return;
+                }
+                
+                try {
+                    const $table = $('#dataTable');
+                    if (!$table.length) {
+                        return;
+                    }
+                    
+                    // Double-check: destroy any existing instance
+                    destroyDataTable();
+                    
+                    // Verify table structure before initializing
+                    const tbody = finalTable.querySelector('tbody');
+                    if (!tbody) {
+                        return;
+                    }
+                    
+                    const rows = tbody.querySelectorAll('tr');
+                    let hasValidRows = false;
+                    for (const row of rows) {
+                        const cells = row.querySelectorAll('td');
+                        // Skip rows with colspan (loading/empty rows)
+                        if (cells.length > 0 && cells[0].hasAttribute('colspan')) {
+                            continue;
+                        }
+                        if (cells.length === 3) {
+                            hasValidRows = true;
+                            break;
+                        }
+                    }
+                    
+                    if (hasValidRows) {
+                        isInitializing = true;
+                        
+                        // Final check: make sure DataTable is not already initialized
+                        if (typeof $.fn.DataTable.isDataTable === 'function' && $.fn.DataTable.isDataTable('#dataTable')) {
+                            isInitializing = false;
+                            return;
+                        }
+                        
+                        // Initialize DataTables without pagination (only one config allowed)
+                        dataTableInstance = $table.DataTable({
+                            responsive: true,
+                            paging: false,
+                            searching: false,
+                            info: false
+                        });
+                        
+                        isInitializing = false;
+                    }
+                } catch (e) {
+                    console.warn('Error initializing DataTable:', e);
+                    dataTableInstance = null;
+                    isInitializing = false;
+                }
+            }, 150);
+        }
+        
+        // Create edit modals dynamically
+        function createEditModals(configs) {
+            const container = document.getElementById('edit-modals-container');
+            container.innerHTML = '';
+            
+            configs.forEach(config => {
+                const context = config.k8s_context || '';
+                const safeId = context.replace(/[^a-zA-Z0-9]/g, '_');
+                const url = escapeHtml(config.k8s_server_url || '');
+                const caCert = config.k8s_server_ca ? base64Decode(config.k8s_server_ca) : '';
+                
+                const modalHtml = `
+                    <div class="modal fade" id="modaledit${safeId}" tabindex="-1" role="dialog" aria-labelledby="modaleditLabel${safeId}" aria-hidden="true">
     <div class="modal-dialog">
         <div class="modal-content">
             <div class="modal-header">
-                <h5 class="modal-title" id="modaleditLabel">Update Information</h5>
+                                    <h5 class="modal-title" id="modaleditLabel${safeId}">Update Information</h5>
                 <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
             </div>
             <div class="modal-body">
-                <form name="ClusterEdit" onsubmit="return validateClusterForm('ClusterEdit')" action="/cluster-config" method="POST">
-                    <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
-                    <input type="hidden" name="request_type" value="edit" />
-                    <input type="hidden" name="k8s_context_old" value="{{ server.k8s_context }}" />
+                                    <form id="cluster-edit-form-${safeId}" name="ClusterEdit">
+                                        <input type="hidden" name="csrf_token" value="${csrf_token}">
+                                        <input type="hidden" name="k8s_context_old" value="${escapeHtml(context)}" />
+                                        <div id="edit-form-messages-${safeId}"></div>
                     <div class="form-group">
-                        <label for="k8s_context">Kubernetes Config Context</label>
-                        <input type="text" class="form-control" id="k8s_context" name= "k8s_context" value="{{ server.k8s_context }}">
+                                            <label for="k8s_context_${safeId}">Kubernetes Config Context</label>
+                                            <input type="text" class="form-control" id="k8s_context_${safeId}" name="k8s_context" value="${escapeHtml(context)}">
                     </div>
                     <div class="form-group">
-                        <label for="k8s_server_url">Kubernetes API URL</label>
-                        <input type="text" class="form-control" id="k8s_server_url" name= "k8s_server_url" value="{{ server.k8s_server_url }}">
+                                            <label for="k8s_server_url_${safeId}">Kubernetes API URL</label>
+                                            <input type="text" class="form-control" id="k8s_server_url_${safeId}" name="k8s_server_url" value="${url}">
                     </div>
                     <div class="form-group">
-                        <label for="k8s_server_ca">
+                                            <label for="k8s_server_ca_${safeId}">
                             Kubernetes API CA Certificate
                             <a class="card-link float-right" data-bs-toggle="collapse" href="#">
                                 <i class="material-icons"
@@ -152,12 +370,12 @@
                                 </i>
                             </a>
                         </label>
-                        <textarea class="form-control" id="k8s_server_ca" name= "k8s_server_ca" rows="3">{{ server.k8s_server_ca | j2_b64decode }}</textarea>
+                                            <textarea class="form-control" id="k8s_server_ca_${safeId}" name="k8s_server_ca" rows="3">${escapeHtml(caCert)}</textarea>
                     </div>
                     <div class="modal-footer">
                         <div class="form-group mt-2">
                             <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Close</button>
-                            <button type="submit" class="btn btn-primary" >Add</button>
+                                                <button type="submit" class="btn btn-primary">Update</button>
                         </div>
                     </div>
                 </form>
@@ -165,17 +383,227 @@
         </div>
     </div>
 </div>
-{% endfor %}
-<!-- Modal Edit User -->
-{% endblock %}
-
-{% block add_tail_js %}
-{% include "segments/datatable_snippet.html.j2" %}
-{% include "segments/functions_snippet.j2"%}
-    <script>
-        var popoverTriggerList = [].slice.call(document.querySelectorAll('[data-bs-toggle="CertTooltip"]'))
-        var popoverList = popoverTriggerList.map(function (popoverTriggerEl) {
-          return new bootstrap.Popover(popoverTriggerEl)
-        })
+                `;
+                container.innerHTML += modalHtml;
+            });
+            
+            // Initialize popovers after modals are created
+            initPopovers();
+        }
+        
+        // Load cluster configs from API
+        async function loadClusterConfigs() {
+            try {
+                const apiUrl = '/api/v1/settings/k8s/configs';
+                console.log('Fetching cluster configurations from:', apiUrl);
+                
+                const response = await fetch(apiUrl);
+                if (!response.ok) {
+                    throw new Error(`HTTP error! status: ${response.status}`);
+                }
+                
+                const data = await response.json();
+                console.log('Cluster configs API response:', data);
+                
+                if (data.error) {
+                    throw new Error(data.message || 'Failed to load cluster configurations');
+                }
+                
+                const configs = data.data || [];
+                console.log('Configs to populate:', configs);
+                console.log('Number of configs:', configs.length);
+                try {
+                    populateConfigsTable(configs);
+                } catch (error) {
+                    console.error('Error in populateConfigsTable:', error);
+                    const tbody = document.getElementById('k8s-configs-tbody');
+                    if (tbody) {
+                        tbody.innerHTML = '<tr><td colspan="3" class="text-center text-danger">Error populating table: ' + escapeHtml(error.message) + '</td></tr>';
+                    }
+                }
+                
+            } catch (error) {
+                console.error('Error loading cluster configurations:', error);
+                const tbody = document.getElementById('k8s-configs-tbody');
+                if (tbody) {
+                    tbody.innerHTML = '<tr><td colspan="3" class="text-center text-danger">Error loading cluster configurations: ' + escapeHtml(error.message) + '</td></tr>';
+                }
+            }
+        }
+        
+        // Delete cluster config (make it global)
+        window.deleteConfig = async function(context) {
+            if (!confirm(`Are you sure you want to delete cluster configuration "${context}"?`)) {
+                return;
+            }
+            
+            try {
+                const apiUrl = `/api/v1/settings/k8s/configs/${encodeURIComponent(context)}`;
+                console.log('Deleting cluster configuration:', apiUrl);
+                
+                const response = await fetch(apiUrl, {
+                    method: 'DELETE',
+                    headers: {
+                        'Content-Type': 'application/json',
+                    }
+                });
+                
+                const data = await response.json();
+                
+                if (!response.ok) {
+                    throw new Error(data.message || `HTTP error! status: ${response.status}`);
+                }
+                
+                // Reload the list
+                loadClusterConfigs();
+                
+            } catch (error) {
+                console.error('Error deleting cluster configuration:', error);
+                alert('Error deleting cluster configuration: ' + error.message);
+            }
+        };
+        
+        // Handle add form submission
+        document.addEventListener('DOMContentLoaded', function() {
+            loadClusterConfigs();
+            initPopovers();
+            
+            // Add form submission
+            const addForm = document.getElementById('cluster-add-form');
+            if (addForm) {
+                addForm.addEventListener('submit', async function(e) {
+                    e.preventDefault();
+                    
+                    const messagesDiv = document.getElementById('add-form-messages');
+                    messagesDiv.innerHTML = '';
+                    
+                    const formData = {
+                        k8s_context: document.getElementById('k8s_context').value.trim(),
+                        k8s_server_url: document.getElementById('k8s_server_url').value.trim(),
+                        k8s_server_ca: document.getElementById('k8s_server_ca').value.trim()
+                    };
+                    
+                    // Validate
+                    if (!formData.k8s_context || !formData.k8s_server_url || !formData.k8s_server_ca) {
+                        messagesDiv.innerHTML = '<div class="alert alert-danger">All fields are required.</div>';
+                        return;
+                    }
+                    
+                    // Validate URL
+                    if (!validateClusterForm('ClusterAdd')) {
+                        return;
+                    }
+                    
+                    try {
+                        const apiUrl = '/api/v1/settings/k8s/configs';
+                        console.log('Creating cluster configuration:', apiUrl);
+                        
+                        const response = await fetch(apiUrl, {
+                            method: 'POST',
+                            headers: {
+                                'Content-Type': 'application/json',
+                            },
+                            body: JSON.stringify(formData)
+                        });
+                        
+                        const data = await response.json();
+                        
+                        if (!response.ok) {
+                            throw new Error(data.message || `HTTP error! status: ${response.status}`);
+                        }
+                        
+                        // Show success and close modal
+                        messagesDiv.innerHTML = '<div class="alert alert-success">' + escapeHtml(data.message || 'Cluster configuration created successfully') + '</div>';
+                        
+                        // Close modal and reload
+                        const modal = bootstrap.Modal.getInstance(document.getElementById('modaladd'));
+                        if (modal) {
+                            modal.hide();
+                        }
+                        
+                        // Reset form
+                        addForm.reset();
+                        
+                        // Reload the list
+                        setTimeout(() => {
+                            loadClusterConfigs();
+                        }, 500);
+                        
+                    } catch (error) {
+                        console.error('Error creating cluster configuration:', error);
+                        messagesDiv.innerHTML = '<div class="alert alert-danger">Error: ' + escapeHtml(error.message) + '</div>';
+                    }
+                });
+            }
+            
+            // Edit form submissions (dynamically attached)
+            document.addEventListener('submit', async function(e) {
+                if (e.target && e.target.id && e.target.id.startsWith('cluster-edit-form-')) {
+                    e.preventDefault();
+                    
+                    const formId = e.target.id;
+                    const safeId = formId.replace('cluster-edit-form-', '');
+                    const messagesDiv = document.getElementById(`edit-form-messages-${safeId}`);
+                    messagesDiv.innerHTML = '';
+                    
+                    const formData = {
+                        k8s_context: document.getElementById(`k8s_context_${safeId}`).value.trim(),
+                        k8s_server_url: document.getElementById(`k8s_server_url_${safeId}`).value.trim(),
+                        k8s_server_ca: document.getElementById(`k8s_server_ca_${safeId}`).value.trim()
+                    };
+                    
+                    const k8s_context_old = document.querySelector(`#${formId} input[name="k8s_context_old"]`).value;
+                    
+                    // Validate
+                    if (!formData.k8s_server_url || !formData.k8s_server_ca) {
+                        messagesDiv.innerHTML = '<div class="alert alert-danger">URL and CA Certificate are required.</div>';
+                        return;
+                    }
+                    
+                    // Validate URL
+                    if (!validateClusterForm(`ClusterEdit`)) {
+                        return;
+                    }
+                    
+                    try {
+                        const apiUrl = `/api/v1/settings/k8s/configs/${encodeURIComponent(k8s_context_old)}`;
+                        console.log('Updating cluster configuration:', apiUrl);
+                        
+                        const response = await fetch(apiUrl, {
+                            method: 'PUT',
+                            headers: {
+                                'Content-Type': 'application/json',
+                            },
+                            body: JSON.stringify(formData)
+                        });
+                        
+                        const data = await response.json();
+                        
+                        if (!response.ok) {
+                            throw new Error(data.message || `HTTP error! status: ${response.status}`);
+                        }
+                        
+                        // Show success and close modal
+                        messagesDiv.innerHTML = '<div class="alert alert-success">' + escapeHtml(data.message || 'Cluster configuration updated successfully') + '</div>';
+                        
+                        // Close modal
+                        const modalElement = document.getElementById(`modaledit${safeId}`);
+                        const modal = bootstrap.Modal.getInstance(modalElement);
+                        if (modal) {
+                            modal.hide();
+                        }
+                        
+                        // Reload the list
+                        setTimeout(() => {
+                            loadClusterConfigs();
+                        }, 500);
+                        
+                    } catch (error) {
+                        console.error('Error updating cluster configuration:', error);
+                        messagesDiv.innerHTML = '<div class="alert alert-danger">Error: ' + escapeHtml(error.message) + '</div>';
+                    }
+                }
+            });
+        });
     </script>
 {% endblock %}

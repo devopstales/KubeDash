@@ -13,7 +13,7 @@
 </ul>
 <ul class="header-nav ms-auto"></ul>
 <ul class="header-nav d-lg-flex">
-{% include "segments/topmenu.html.j2" %}
+{% include "segments/partials/topmenu.html.j2" %}
 {% endblock %}
 
 {% block content %}
@@ -27,36 +27,19 @@
                 <thead>
                     <tr>
                       <th>Name</th>
+                      <th>Type</th>
                       <th>Pod Selector</th>
                     </tr>
                   </thead>
-                  <tbody>
-                    {% for policy in policies %}
-                    {% if selected == policy.name %}
-                      <tr class="selected" >
-                    {% else %}
-                      <tr>
-                    {% endif %}
-                        <td>
-                          <form action="/security/network-policy/data" method="POST">
-                            <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
-                            <input type="hidden" name="ns_select" value="{{ session['ns_select'] }}" />
-                            <input type="hidden" name="policy_name" value="{{ policy.name }}" />
-                            <a href="javascript:;" onclick="parentNode.submit();">{{ policy.name }}</a>
-                          </form>
+                  <tbody id="policies-tbody">
+                    <tr>
+                        <td colspan="3" class="text-center">
+                            <div class="spinner-border spinner-border-sm text-primary" role="status">
+                                <span class="visually-hidden">Loading...</span>
+                            </div>
+                            <span class="ms-2">Loading network policies...</span>
                         </td>
-                        <td>
-                          {% if policy.pod_selector.match_labels %}
-                          {% for l_key, l_value in policy.pod_selector.match_labels.items() %}
-                            <span class="badge text-bg-tag text-bg-secondary">{{ l_key }}: {{ l_value }}</span>
-                            {% if not loop.last %}<br>{% endif %}
-                          {% endfor %}
-                          {% else %}
-                            {{ policy.pod_selector.match_labels }}
-                          {% endif %}
-                        </td>
-                      </tr>
-                    {% endfor %}
+                    </tr>
                   </tbody>
             </table>
         </div>
@@ -65,5 +48,238 @@
 {% endblock %}
 
 {% block add_head_css %}
-{% include "segments/datatable_snippet.html.j2" %}
+{% include "segments/components/datatable_snippet.html.j2" %}
+{% endblock %}
+
+{% block add_tail_js %}
+<script nonce="{{ csp_nonce }}">
+    const escapeHtml = (text) => {
+        if (text === null || text === undefined) return '';
+        const map = {
+            '&': '&amp;',
+            '<': '&lt;',
+            '>': '&gt;',
+            '"': '&quot;',
+            "'": '&#039;'
+        };
+        return String(text).replace(/[&<>"']/g, m => map[m]);
+    };
+    
+    const csrf_token = {{ csrf_token()|tojson }};
+    
+    // DataTables protection - prevent auto-initialization on loading rows
+    (function() {
+        const originalTableId = 'dataTable';
+        const tempTableId = 'policiesTable_' + Date.now();
+        
+        // Temporarily change table ID to prevent auto-initialization
+        document.addEventListener('DOMContentLoaded', function() {
+            const table = document.getElementById(originalTableId);
+            if (table) {
+                table.id = tempTableId;
+            }
+        });
+        
+        // Override DataTable initialization to prevent on colspan rows
+        if (typeof $ !== 'undefined' && $.fn.DataTable) {
+            const originalDataTable = $.fn.DataTable;
+            $.fn.DataTable = function(opts) {
+                const $this = $(this);
+                // Check if this is a loading row with colspan
+                if ($this.find('tbody tr td[colspan]').length > 0) {
+                    console.log('Blocked DataTable initialization on loading row');
+                    return $this;
+                }
+                return originalDataTable.apply(this, arguments);
+            };
+        }
+        
+        // Clean up any auto-initialized DataTables
+        setTimeout(function() {
+            if (typeof $ !== 'undefined' && $.fn.DataTable) {
+                const table = document.getElementById(tempTableId);
+                if (table) {
+                    try {
+                        const $table = $('#' + tempTableId);
+                        if ($table.length && $table.data('DataTable')) {
+                            $table.DataTable().destroy();
+                        }
+                    } catch (e) {
+                        // DataTable not initialized or error, ignore
+                    }
+                    table.id = originalTableId;
+                }
+            }
+        }, 100);
+        
+        setTimeout(function() {
+            if (typeof $ !== 'undefined' && $.fn.DataTable) {
+                const table = document.getElementById(tempTableId);
+                if (table) {
+                    try {
+                        const $table = $('#' + tempTableId);
+                        if ($table.length && $table.data('DataTable')) {
+                            $table.DataTable().destroy();
+                        }
+                    } catch (e) {
+                        // DataTable not initialized or error, ignore
+                    }
+                    table.id = originalTableId;
+                }
+            }
+        }, 500);
+    })();
+    
+    // Get namespace from topbar selector or use default
+    function getSelectedNamespace() {
+        const topbarSelect = document.getElementById('inputGroupSelect04');
+        if (topbarSelect) {
+            return topbarSelect.value;
+        }
+        // Fallback to sessionStorage or default
+        return sessionStorage.getItem('ns_select') || 'default';
+    }
+    
+    // Format pod selector labels (handles both K8s and Cilium formats)
+    function formatPodSelector(podSelector) {
+        if (!podSelector) {
+            return '<span class="text-muted">Any</span>';
+        }
+        
+        // Handle Cilium format (endpointSelector with matchLabels)
+        let labels = null;
+        if (podSelector.matchLabels) {
+            labels = podSelector.matchLabels;
+        } else if (podSelector.match_labels) {
+            labels = podSelector.match_labels;
+        }
+        
+        if (!labels || Object.keys(labels).length === 0) {
+            return '<span class="text-muted">Any</span>';
+        }
+        
+        let html = '';
+        const keys = Object.keys(labels);
+        keys.forEach((key, index) => {
+            html += `<span class="badge text-bg-tag text-bg-secondary">${escapeHtml(key)}: ${escapeHtml(labels[key])}</span>`;
+            if (index < keys.length - 1) {
+                html += '<br>';
+            }
+        });
+        return html;
+    }
+    
+    // Get policy type badge
+    function getPolicyTypeBadge(policy) {
+        const kind = policy.kind || 'NetworkPolicy';
+        if (kind === 'CiliumNetworkPolicy') {
+            return '<span class="badge bg-info">Cilium</span>';
+        } else if (kind === 'CiliumClusterwideNetworkPolicy') {
+            return '<span class="badge bg-primary">Cilium Cluster</span>';
+        } else {
+            return '<span class="badge bg-secondary">K8s</span>';
+        }
+    }
+    
+    function populatePoliciesTable(policies) {
+        const tbody = document.getElementById('policies-tbody');
+        if (!tbody) return;
+        
+        if (!policies || policies.length === 0) {
+            tbody.innerHTML = '<tr><td colspan="3" class="text-center text-muted">No network policies found</td></tr>';
+            return;
+        }
+        
+        // Get selected policy from URL
+        const urlParams = new URLSearchParams(window.location.search);
+        const selectedPolicy = urlParams.get('selected');
+        const namespace = getSelectedNamespace();
+        
+        let rows = [];
+        policies.forEach(policy => {
+            const isSelected = selectedPolicy === policy.name;
+            const rowClass = isSelected ? 'selected' : '';
+            const podSelectorHtml = formatPodSelector(policy.pod_selector || policy.endpointSelector);
+            const typeBadge = getPolicyTypeBadge(policy);
+            const policyNamespace = policy.namespace || namespace;
+            
+            rows.push(`
+                <tr class="${rowClass}">
+                    <td>
+                        <a href="/security/network-policy/data?policy_name=${encodeURIComponent(policy.name)}&namespace=${encodeURIComponent(policyNamespace)}&kind=${encodeURIComponent(policy.kind || 'NetworkPolicy')}" 
+                           onclick="sessionStorage.setItem('ns_select', '${escapeHtml(policyNamespace)}'); sessionStorage.setItem('policy_data_name', '${escapeHtml(policy.name)}'); sessionStorage.setItem('policy_kind', '${escapeHtml(policy.kind || 'NetworkPolicy')}'); return true;">
+                            ${escapeHtml(policy.name)}
+                        </a>
+                    </td>
+                    <td>${typeBadge}</td>
+                    <td>${podSelectorHtml}</td>
+                </tr>
+            `);
+        });
+        
+        tbody.innerHTML = rows.join('');
+        
+        // Initialize DataTable after populating
+        setTimeout(function() {
+            if (typeof $ !== 'undefined' && $.fn.DataTable) {
+                const table = document.getElementById('dataTable');
+                if (table && !$.fn.dataTable.isDataTable('#dataTable')) {
+                    $('#dataTable').DataTable({
+                        order: [[0, 'asc']],
+                        pageLength: 25,
+                        responsive: true
+                    });
+                }
+            }
+        }, 50);
+    }
+    
+    async function loadPolicies(namespace) {
+        try {
+            const apiUrl = `/api/v1/security/network-policies${namespace ? '?namespace=' + encodeURIComponent(namespace) : ''}`;
+            console.log('Fetching network policies from:', apiUrl);
+            
+            const response = await fetch(apiUrl);
+            if (!response.ok) {
+                throw new Error(`HTTP error! status: ${response.status}`);
+            }
+            
+            const data = await response.json();
+            console.log('Network policies API response:', data);
+            
+            if (data.error) {
+                throw new Error(data.message || 'Failed to load network policies');
+            }
+            
+            const policies = data.data || [];
+            populatePoliciesTable(policies);
+            
+        } catch (error) {
+            console.error('Error loading network policies:', error);
+            const tbody = document.getElementById('policies-tbody');
+            if (tbody) {
+                tbody.innerHTML = '<tr><td colspan="2" class="text-center text-danger">Error loading network policies: ' + escapeHtml(error.message) + '</td></tr>';
+            }
+        }
+    }
+    
+    // Load data when page loads
+    document.addEventListener('DOMContentLoaded', function() {
+        const namespace = getSelectedNamespace();
+        loadPolicies(namespace);
+    });
+    
+    // Reload data when namespace changes (if namespace selector exists)
+    document.addEventListener('DOMContentLoaded', function() {
+        const namespaceSelect = document.getElementById('inputGroupSelect04');
+        if (namespaceSelect) {
+            namespaceSelect.addEventListener('change', function() {
+                const namespace = this.value;
+                console.log('Namespace changed to:', namespace);
+                sessionStorage.setItem('ns_select', namespace);
+                loadPolicies(namespace);
+            });
+        }
+    });
+</script>
 {% endblock %}

@@ -11,14 +11,6 @@ services:
       - 6379:6379
     command: ["redis-server"]
 
-  redis-ui:
-    container_name: kubedash-redis-ui
-    image: patrikx3/p3x-redis-ui
-    volumes:
-      - ./config/redis-ui.json:/settings/.p3xrs-conns.json
-    ports:
-      - 8002:7843
-
   redis-commander:
     container_name: kubedash-redis-commander
     hostname: redis-commander

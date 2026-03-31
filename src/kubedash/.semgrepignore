@@ -1,0 +1,71 @@
+# Semgrep Ignore File
+# This file contains path exclusions and rule exclusions for Semgrep security scanning
+# Replaces CLI --exclude-rule flags for centralized configuration
+
+# =============================================================================
+# Path Exclusions (directories and files to skip)
+# =============================================================================
+# Test directories
+tests/
+test/
+
+# Migration files (contain raw SQL that triggers false positives)
+migrations/
+
+# Virtual environments
+venv/
+.venv/
+env/
+.env/
+
+# Python cache
+__pycache__/
+*.pyc
+*.pyo
+*.pyd
+.Python
+*.so
+
+# IDE and editor files
+.pytest_cache/
+.mypy_cache/
+.ruff_cache/
+.idea/
+.vscode/
+*.swp
+*.swo
+
+# Build artifacts
+build/
+dist/
+*.egg-info/
+.eggs/
+
+# Cache directories
+.cache/
+.pytest_cache/
+
+# =============================================================================
+# Rule Exclusions (false positives and intentional patterns)
+# =============================================================================
+# These rules are excluded globally as they are either:
+# - Intentional patterns (assert statements in tests)
+# - False positives for our use case
+# - Already handled by other security measures
+
+# B101 equivalent - assert_used
+# We use assertions in tests and development code intentionally
+python.lang.security.audit.assert_used.assert_used
+
+# B601 equivalent - subprocess_shell_true
+# Shell=True is used intentionally in controlled environments
+# All subprocess calls are reviewed and sanitized
+python.lang.security.audit.subprocess-shell-true.subprocess-shell-true
+
+# =============================================================================
+# Severity Filters (optional)
+# =============================================================================
+# Uncomment to filter by severity level
+# INFO
+# WARNING
+# ERROR

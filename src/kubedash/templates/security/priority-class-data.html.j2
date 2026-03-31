@@ -6,15 +6,15 @@
       <nav aria-label="breadcrumb">
         <ol class="breadcrumb my-0">
           <li class="breadcrumb-item"><span>Security</span></li>
-          <li class="breadcrumb-item"><a href="/security/priorityclass">Priority Classes</a></li>
-          <li class="breadcrumb-item active"><span>{{ pc_data.name }}</span></li>
+          <li class="breadcrumb-item active"><a href="/security/priorityclass">Priority Classes</a></li>
+          <li class="breadcrumb-item active"><span id="priority-class-name-breadcrumb">Loading...</span></li>
         </ol>
       </nav>
     </div>
 </ul>
 <ul class="header-nav ms-auto"></ul>
 <ul class="header-nav d-lg-flex">
-{% include "segments/topmenu.html.j2" %}
+{% include "segments/partials/topmenu.html.j2" %}
 {% endblock %}
 
 {% block content %}
@@ -24,96 +24,177 @@
     </div>
     <div class="card-body">
         <div class="tab-content" id="nav-tabContent">
-            <!-- policy -->
-                <div class="card shadow mb-4">
-                    <div class="card-body">
-                        <div class="table-responsive">
-                            <table class="table table-bordered" id="policyInfoTable" width="100%" cellspacing="0">
+            <div class="card shadow mb-4">
+                <div class="card-body">
+                    <div class="table-responsive">
+                        <table class="table table-bordered" id="priorityClassInfoTable" width="100%" cellspacing="0">
+                            <tbody id="priority-class-info-tbody">
                                 <tr>
-                                    <th>Name:</th>
-                                    <td>{{ pc_data.name }}</td>
-                                </tr>
-                                <tr>
-                                    <th>Description:</th>
-                                    <td>{{ pc_data.description }}</td>
-                                </tr>
-                                <tr>
-                                    <th>Value:</th>
-                                    <td>{{ pc_data.value }}</td>
-                                </tr>
-                                <tr>
-                                    <th>Preemption Policy:</th>
-                                    <td>{{ pc_data.preemption_policy }}</td>
-                                </tr>
-                                <tr>
-                                    <th>Global Default:</th>
-                                    <td>
-                                        {% if pc_data.global_default %}
-                                            True
-                                        {% else %}
-                                            False
-                                        {% endif %}
+                                    <td colspan="2" class="text-center">
+                                        <div class="spinner-border spinner-border-sm text-primary" role="status">
+                                            <span class="visually-hidden">Loading...</span>
+                                        </div>
+                                        <span class="ms-2">Loading priority class data...</span>
                                     </td>
                                 </tr>
-                                <tr>
-                                    <th>Creation:</th>
-                                    <td>{{ pc_data.creation }}</td>
-                                </tr>
-                                <tr>
-                                    <th>Annotations:</th>
-                                    <td>
-                                        {% if pc_data.annotations %}
-                                        <table class="table table-bordered" id="annotationTable" width="100%" cellspacing="0">
-                                            <thead>
-                                                <tr>
-                                                    <th width="50%">Key</th>
-                                                    <th width="50%">Value</th>
-                                                </tr>
-                                            </thead>
-                                            <tbody>
-                                            {% for key, value in pc_data.annotations.items() %}
-                                                <tr>
-                                                    <td width="50%">{{ key }}</td>
-                                                    <td width="50%">{{ value }}</td>
-                                                </tr>
-                                            {% endfor %}
-                                            </tbody>
-                                        </table>
-                                        {% endif %}
-                                    </td>
-                                </tr>
-                               <tr>
-                                    <th>Lables:</th>
-                                    <td>
-                                        {% if pc_data.labels %}
-                                        <table class="table table-bordered" id="labelsTable" width="100%" cellspacing="0">
-                                            <thead>
-                                                <tr>
-                                                    <th width="50%">Key</th>
-                                                    <th width="50%">Value</th>
-                                                </tr>
-                                            </thead>
-                                            <tbody>
-                                            {% for key, value in pc_data.labels.items() %}
-                                                <tr>
-                                                    <td width="50%">{{ key }}</td>
-                                                    <td width="50%">{{ value }}</td>
-                                                </tr>
-                                            {% endfor %}
-                                            </tbody>
-                                        </table>
-                                        {% endif %}
-                                    </td>
-                                </tr>
-                            </table>
-                        </div>
+                            </tbody>
+                        </table>
                     </div>
                 </div>
+            </div>
         </div>
     </div>
 </div>
 {% endblock %}
 
 {% block add_head_css %}
-{% include "segments/datatable_snippet.html.j2" %}
+{% include "segments/components/datatable_snippet.html.j2" %}
+{% endblock %}
+
+{% block add_tail_js %}
+<script nonce="{{ csp_nonce }}">
+    const escapeHtml = (text) => {
+        if (text === null || text === undefined) return '';
+        const map = {
+            '&': '&amp;',
+            '<': '&lt;',
+            '>': '&gt;',
+            '"': '&quot;',
+            "'": '&#039;'
+        };
+        return String(text).replace(/[&<>"']/g, m => map[m]);
+    };
+    
+    const csrf_token = {{ csrf_token()|tojson }};
+    
+    // Get priority class name from URL or sessionStorage
+    function getPriorityClassInfo() {
+        const urlParams = new URLSearchParams(window.location.search);
+        let pcName = urlParams.get('pc_name');
+        
+        // Fallback to sessionStorage
+        if (!pcName) {
+            pcName = sessionStorage.getItem('priority_class_data_name');
+        }
+        
+        return { pcName };
+    }
+    
+    function populatePriorityClassInfo(pc) {
+        const tbody = document.getElementById('priority-class-info-tbody');
+        if (!tbody) return;
+        
+        // Update breadcrumb
+        const breadcrumb = document.getElementById('priority-class-name-breadcrumb');
+        if (breadcrumb) {
+            breadcrumb.textContent = escapeHtml(pc.name || 'Loading...');
+        }
+        
+        let html = `
+            <tr>
+                <th>Name:</th>
+                <td>${escapeHtml(pc.name || 'N/A')}</td>
+            </tr>
+            <tr>
+                <th>Description:</th>
+                <td>${escapeHtml(pc.description || 'N/A')}</td>
+            </tr>
+            <tr>
+                <th>Value:</th>
+                <td>${escapeHtml(pc.value !== undefined && pc.value !== null ? pc.value : 'N/A')}</td>
+            </tr>
+            <tr>
+                <th>Preemption Policy:</th>
+                <td>${escapeHtml(pc.preemption_policy || 'N/A')}</td>
+            </tr>
+            <tr>
+                <th>Global Default:</th>
+                <td>${pc.global_default ? 'True' : 'False'}</td>
+            </tr>
+            <tr>
+                <th>Created:</th>
+                <td>${escapeHtml(pc.created || 'N/A')}</td>
+            </tr>
+        `;
+        
+        // Annotations
+        if (pc.annotations && Object.keys(pc.annotations).length > 0) {
+            let annotationsHtml = '<table class="table table-bordered" id="annotationTable" width="100%" cellspacing="0"><thead><tr><th width="50%">Key</th><th width="50%">Value</th></tr></thead><tbody>';
+            for (const [key, value] of Object.entries(pc.annotations)) {
+                if (key !== "kubectl.kubernetes.io/last-applied-configuration") {
+                    annotationsHtml += `<tr><td width="50%">${escapeHtml(key)}</td><td width="50%">${escapeHtml(value)}</td></tr>`;
+                }
+            }
+            annotationsHtml += '</tbody></table>';
+            html += `<tr><th>Annotations:</th><td>${annotationsHtml}</td></tr>`;
+        } else {
+            html += `<tr><th>Annotations:</th><td><span class="text-muted">No annotations</span></td></tr>`;
+        }
+        
+        // Labels
+        if (pc.labels && Object.keys(pc.labels).length > 0) {
+            let labelsHtml = '<table class="table table-bordered" id="labelsTable" width="100%" cellspacing="0"><thead><tr><th width="50%">Key</th><th width="50%">Value</th></tr></thead><tbody>';
+            for (const [key, value] of Object.entries(pc.labels)) {
+                labelsHtml += `<tr><td width="50%">${escapeHtml(key)}</td><td width="50%">${escapeHtml(value)}</td></tr>`;
+            }
+            labelsHtml += '</tbody></table>';
+            html += `<tr><th>Labels:</th><td>${labelsHtml}</td></tr>`;
+        } else {
+            html += `<tr><th>Labels:</th><td><span class="text-muted">No labels</span></td></tr>`;
+        }
+        
+        tbody.innerHTML = html;
+    }
+    
+    async function loadPriorityClassData() {
+        try {
+            const { pcName } = getPriorityClassInfo();
+            
+            console.log('Priority class info:', { pcName });
+            console.log('URL params:', new URLSearchParams(window.location.search).toString());
+            console.log('SessionStorage priority_class_data_name:', sessionStorage.getItem('priority_class_data_name'));
+            
+            if (!pcName) {
+                throw new Error('Priority class name not found. Please select a priority class from the list page.');
+            }
+            
+            const apiUrl = `/api/v1/other-resources/priority-classes/${encodeURIComponent(pcName)}`;
+            console.log('Fetching priority class data from:', apiUrl);
+            
+            const response = await fetch(apiUrl);
+            if (!response.ok) {
+                if (response.status === 404) {
+                    throw new Error(`PriorityClass '${pcName}' not found`);
+                }
+                throw new Error(`HTTP error! status: ${response.status}`);
+            }
+            
+            const result = await response.json();
+            console.log('Priority class API response:', result);
+            
+            if (result.error) {
+                throw new Error(result.message || 'Failed to load priority class');
+            }
+            
+            const pc = result.data || {};
+            populatePriorityClassInfo(pc);
+            
+        } catch (error) {
+            console.error('Error loading priority class data:', error);
+            const tbody = document.getElementById('priority-class-info-tbody');
+            if (tbody) {
+                tbody.innerHTML = '<tr><td colspan="2" class="text-center text-danger">Error loading priority class: ' + escapeHtml(error.message) + '</td></tr>';
+            }
+            const breadcrumb = document.getElementById('priority-class-name-breadcrumb');
+            if (breadcrumb) {
+                breadcrumb.textContent = 'Error';
+            }
+        }
+    }
+    
+    // Load data when page loads
+    document.addEventListener('DOMContentLoaded', function() {
+        loadPriorityClassData();
+    });
+</script>
 {% endblock %}

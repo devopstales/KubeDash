@@ -66,11 +66,31 @@ def get_database_url(app: Flask, filename: string) -> string:
         
     """Create Database URL"""
     basedir = os.path.abspath(os.path.dirname(filename))
-    if app.config['ENV'] == 'testing':
+    # Check if PostgreSQL is configured and all credentials are present
+    if EXTERNAL_DATABASE_ENABLED and SQLALCHEMY_DATABASE_USER and SQLALCHEMY_DATABASE_PASSWORD and SQLALCHEMY_DATABASE_HOST and SQLALCHEMY_DATABASE_DB:
+        # Use PostgreSQL if configured, even in testing mode
+        # Use urllib.parse.quote_plus to properly encode URL components to prevent injection
+        from urllib.parse import quote_plus
+        
+        # Parse host and port - host may contain "host:port" format
+        # Split host:port if present, otherwise use default port 5432
+        if ':' in SQLALCHEMY_DATABASE_HOST:
+            host, port = SQLALCHEMY_DATABASE_HOST.rsplit(':', 1)
+        else:
+            host = SQLALCHEMY_DATABASE_HOST
+            port = app.config['kubedash.ini'].get('database', 'port', fallback='5432')
+        
+        # Encode components (host should not include port)
+        encoded_user = quote_plus(SQLALCHEMY_DATABASE_USER)
+        encoded_password = quote_plus(SQLALCHEMY_DATABASE_PASSWORD)
+        encoded_host = quote_plus(host)
+        encoded_db = quote_plus(SQLALCHEMY_DATABASE_DB)
+        
+        # Construct PostgreSQL URL with proper host:port format
+        SQLALCHEMY_DATABASE_URI = f"postgresql://{encoded_user}:{encoded_password}@{encoded_host}:{port}/{encoded_db}"
+    elif app.config['ENV'] == 'testing':
+        # Fall back to SQLite only if PostgreSQL is not configured
         SQLALCHEMY_DATABASE_URI = "sqlite:///"+basedir+"/database/"+ app.config['ENV'] +".db"
-    elif EXTERNAL_DATABASE_ENABLED and SQLALCHEMY_DATABASE_USER and SQLALCHEMY_DATABASE_PASSWORD and SQLALCHEMY_DATABASE_HOST and SQLALCHEMY_DATABASE_DB:
-        SQLALCHEMY_DATABASE_URI = "postgresql://%s:%s@%s/%s" % \
-            (SQLALCHEMY_DATABASE_USER, SQLALCHEMY_DATABASE_PASSWORD, SQLALCHEMY_DATABASE_HOST, SQLALCHEMY_DATABASE_DB)
     else:
         SQLALCHEMY_DATABASE_URI = "sqlite:///"+basedir+"/database/"+ app.config['ENV'] +".db"
         

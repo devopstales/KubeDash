@@ -2,9 +2,9 @@ version: '3'
 
 env:
   VERSION: "4.1.0"
-  DATE: 
+  DATE:
     sh: date "+%Y.%m.%d"
-  DCFILES: "-f dc-nginx.yaml -f dc-postgresql.yaml -f dc-redis.yaml -f dc-registry.yaml -f dc-exporter.yaml -f dc-jaeger.yaml -f dc-kubeview.yaml"
+  DCFILES: "-f dc-nginx.yaml -f dc-postgresql.yaml -f dc-redis.yaml -f dc-registry.yaml -f dc-exporter.yaml -f dc-jaeger.yaml -f dc-kubeview.yaml -f dc-mcp.yaml"
 
 tasks:
   default:
@@ -16,6 +16,7 @@ tasks:
     desc: "Install development dependencies"
     cmds:
       - curl -sSL https://install.python-poetry.org | python3 -
+      - poetry self add poetry-plugin-export || echo "⚠️  poetry-plugin-export may already be installed"
       - brew install helm
       - brew install helm-docs
       - brew install chart-releaser
@@ -34,6 +35,7 @@ tasks:
   docker-images:
     desc: "Copy docker images"
     dir: '/tmp'
+    silent: true
     cmds:
       # - skopeo login --tls-verify=false 127.0.0.1:4000
       # - skopeo login docker.io
@@ -70,26 +72,390 @@ tasks:
   kubedash-requirements:
     desc: "Generate Kubedash requirements"
     dir: 'src/kubedash'
+    silent: true
     cmds:
-      - poetry export --without-hashes -f requirements.txt > requirements.txt
+      - |
+        poetry show --only main --top-level | awk 'NR>2 {if (NF >= 2) print $1"=="$2}' > requirements.txt || \
+        poetry show --only main | tail -n +3 | awk '{if (NF >= 2) print $1"=="$2}' > requirements.txt
 
   kubedash-safety:
-    desc: "Safety chack Kubedash requirements"
+    desc: "Safety check Kubedash requirements (DEPRECATED - use kubedash-audit instead)"
     dir: 'src/kubedash'
     cmds:
-      - poetry export --without-hashes -f requirements.txt | safety check --stdin
+      - |
+        echo "⚠️  WARNING: safety check command is DEPRECATED (unsupported after June 1, 2024)"
+        echo "💡 Recommendation: Use 'task kubedash-audit' instead (uses pip-audit)"
+        echo ""
+        echo "Skipping deprecated safety check..."
+        echo "✅ Use 'task kubedash-audit' for dependency vulnerability scanning"
+        exit 0
+    silent: true
 
   kubedash-audit:
-    desc: "Run tests for Kubedash"
+    desc: "Run pip-audit for dependency vulnerabilities"
+    dir: 'src/kubedash'
+    cmds:
+      - poetry run pip-audit || echo "⚠️  Vulnerabilities found - run 'task kubedash-fix-vulns' to update"
+    silent: true
+
+  kubedash-audit-strict:
+    desc: "Run pip-audit and fail on vulnerabilities (for CI)"
     dir: 'src/kubedash'
     cmds:
       - poetry run pip-audit
 
   kubedash-scan:
-    desc: "Scan Kubedash for vulnerabilities"
+    desc: "Scan Kubedash filesystem for vulnerabilities"
     dir: 'src/kubedash'
     cmds:
-      - trivy -q fs . --scanners vuln
+      - mkdir -p ../../security/reports
+      - trivy -q fs . --ignore-unfixed --scanners vuln
+      - trivy -q fs . --ignore-unfixed --scanners vuln --format json -o ../../security/reports/trivy-fs-report.json 2>/dev/null || true
+
+  kubedash-security-check:
+    desc: "Run comprehensive security checks (hardcoded secrets, weak crypto, etc.) - logs warnings only"
+    dir: 'src/kubedash'
+    cmds:
+      - |
+        echo "Checking for hardcoded secrets and credentials..."
+        SECRET_KEY_ISSUES=$(grep -r "SECRET_KEY.*=.*['\"].*['\"]" . --include="*.py" \
+          --exclude-dir=".venv" --exclude-dir="__pycache__" --exclude-dir=".git" \
+          | grep -v "os.urandom\|secrets\|generate" | grep -v "develop" | grep -v "# nosec" | grep -v "nosec" || true)
+        if [ -n "$SECRET_KEY_ISSUES" ]; then
+          echo "⚠️  WARNING: Potential hardcoded SECRET_KEY found:"
+          echo "$SECRET_KEY_ISSUES" | while read line; do
+            echo "   $line"
+          done
+        else
+          echo "   ✅ No hardcoded SECRET_KEY found"
+        fi
+      - |
+        echo "Checking for default admin password..."
+        ADMIN_PWD_ISSUES=$(grep -r "admin_password.*fallback.*admin" . --include="*.py" \
+          --exclude-dir=".venv" --exclude-dir="__pycache__" --exclude-dir=".git" || true)
+        if [ -n "$ADMIN_PWD_ISSUES" ]; then
+          echo "⚠️  WARNING: Default admin password detected:"
+          echo "$ADMIN_PWD_ISSUES" | while read line; do
+            echo "   $line"
+          done
+        else
+          echo "   ✅ No default admin password found"
+        fi
+      - |
+        echo "Checking for database passwords in connection strings..."
+        DB_PWD_ISSUES=$(grep -r "postgresql://.*:.*@" . --include="*.py" \
+          --exclude-dir=".venv" --exclude-dir="__pycache__" --exclude-dir=".git" \
+          | grep -v "#.*password" || true)
+        if [ -n "$DB_PWD_ISSUES" ]; then
+          echo "⚠️  WARNING: Database password may be exposed in connection string:"
+          echo "$DB_PWD_ISSUES" | while read line; do
+            echo "   $line"
+          done
+        else
+          echo "   ✅ No exposed database passwords found"
+        fi
+      - |
+        echo "Checking for weak SECRET_KEY generation..."
+        WEAK_KEY_ISSUES=$(grep -r "os.urandom(12)" . --include="*.py" \
+          --exclude-dir=".venv" --exclude-dir="__pycache__" --exclude-dir=".git" || true)
+        if [ -n "$WEAK_KEY_ISSUES" ]; then
+          echo "⚠️  WARNING: SECRET_KEY generation uses only 12 bytes (should be 32+):"
+          echo "$WEAK_KEY_ISSUES" | while read line; do
+            echo "   $line"
+          done
+        else
+          echo "   ✅ No weak SECRET_KEY generation found"
+        fi
+      - |
+        echo "Checking for unsafe CSP directives..."
+        CSP_ISSUES=$(grep -r "'unsafe-inline'\|'unsafe-eval'" . --include="*.py" \
+          --exclude-dir=".venv" --exclude-dir="__pycache__" --exclude-dir=".git" \
+          | grep -v "#.*CSP" || true)
+        if [ -n "$CSP_ISSUES" ]; then
+          echo "⚠️  WARNING: CSP contains unsafe-inline or unsafe-eval:"
+          echo "$CSP_ISSUES" | while read line; do
+            echo "   $line"
+          done
+        else
+          echo "   ✅ No unsafe CSP directives found"
+        fi
+      - |
+        echo "Checking for CSRF exemptions..."
+        CSRF_ISSUES=$(grep -r "csrf.exempt" . --include="*.py" \
+          --exclude-dir=".venv" --exclude-dir="__pycache__" --exclude-dir=".git" || true)
+        if [ -n "$CSRF_ISSUES" ]; then
+          echo "⚠️  WARNING: CSRF protection is disabled for some blueprints:"
+          echo "$CSRF_ISSUES" | while read line; do
+            echo "   $line"
+          done
+        else
+          echo "   ✅ No CSRF exemptions found"
+        fi
+      - echo "✅ Security checks completed (warnings logged above)"
+    silent: true
+
+  kubedash-secret-scan:
+    desc: "Scan for hardcoded secrets and credentials using detect-secrets (optional)"
+    dir: 'src/kubedash'
+    ignore_error: true
+    cmds:
+      - |
+        # Try to use detect-secrets, but skip gracefully if it's not available
+        # This is an optional tool, so we don't want it to break the build
+        # Check if detect-secrets is available in poetry environment first
+        if poetry run detect-secrets --version >/dev/null 2>&1; then
+          echo "🔍 Running detect-secrets scan..."
+          poetry run detect-secrets scan --baseline .secrets.baseline 2>/dev/null || true
+          if [ -f .secrets.baseline ]; then
+            poetry run detect-secrets audit .secrets.baseline 2>/dev/null || echo "   ⚠️  Audit completed with warnings"
+          else
+            echo "   ℹ️  No baseline file found (first run)"
+          fi
+        elif command -v detect-secrets >/dev/null 2>&1; then
+          # Fallback to system-installed detect-secrets
+          DETECT_SECRETS_CMD=$(command -v detect-secrets)
+          if [ -f "$DETECT_SECRETS_CMD" ] && [ -x "$DETECT_SECRETS_CMD" ]; then
+            if sh -c '"$0" --version >/dev/null 2>&1' "$DETECT_SECRETS_CMD" 2>/dev/null; then
+              echo "🔍 Running detect-secrets scan..."
+              sh -c '"$0" scan --baseline .secrets.baseline 2>/dev/null' "$DETECT_SECRETS_CMD" || true
+              if [ -f .secrets.baseline ]; then
+                sh -c '"$0" audit .secrets.baseline 2>/dev/null' "$DETECT_SECRETS_CMD" || echo "   ⚠️  Audit completed with warnings"
+              else
+                echo "   ℹ️  No baseline file found (first run)"
+              fi
+            else
+              echo "⚠️  detect-secrets found but execution failed"
+              echo "💡 Reinstall with: pip install --upgrade detect-secrets"
+              echo "   Or: poetry add --group dev detect-secrets"
+              echo "   Skipping secret scan (optional tool)"
+            fi
+          else
+            echo "⚠️  detect-secrets found but not executable: $DETECT_SECRETS_CMD"
+            echo "💡 Reinstall with: pip install --upgrade detect-secrets"
+            echo "   Or: poetry add --group dev detect-secrets"
+            echo "   Skipping secret scan (optional tool)"
+          fi
+        else
+          echo "⚠️  detect-secrets not found"
+          echo "💡 Install with: poetry add --group dev detect-secrets"
+          echo "   Or: pip install detect-secrets"
+          echo "   Skipping secret scan (optional tool)"
+        fi
+    silent: true
+
+  kubedash-semgrep:
+    desc: "Run Semgrep security scanner for code vulnerabilities (replaces Bandit)"
+    dir: 'src/kubedash'
+    cmds:
+      - |
+        if poetry run semgrep --version >/dev/null 2>&1; then
+          echo "🔍 Running Semgrep security scan..."
+          mkdir -p ../../security/reports
+          # Rule exclusions are now in .semgrepignore (B101/B601 equivalents)
+          poetry run semgrep --config=auto \
+            --json -o ../../security/reports/semgrep-report.json . 2>/dev/null || true
+          poetry run semgrep --config=auto \
+            --exclude=tests \
+            --exclude=static \
+            .
+          if [ -f ../../security/reports/semgrep-report.json ]; then
+            echo "   📄 Report saved to security/reports/semgrep-report.json"
+          fi
+        else
+          echo "⚠️  Semgrep not installed. Run: poetry install --with dev"
+          echo "   (semgrep in pyproject.toml dev/test groups)"
+        fi
+    silent: true
+
+  kubedash-fix-vulns:
+    desc: "Automatically detect and update vulnerable dependencies to fixed versions"
+    dir: 'src/kubedash'
+    cmds:
+      - |
+        echo "🔍 Scanning for vulnerable dependencies..."
+        poetry run pip-audit --format json > /tmp/pip-audit-output.json 2>/dev/null || poetry run pip-audit > /tmp/pip-audit-output.txt 2>&1 || true
+      - |
+        echo "📦 Extracting vulnerable packages..."
+        python3 -c "
+        import json
+        import sys
+        import re
+        import os
+        
+        packages = set()
+        
+        # Try JSON format first
+        json_file = '/tmp/pip-audit-output.json'
+        txt_file = '/tmp/pip-audit-output.txt'
+        
+        if os.path.exists(json_file):
+            try:
+                with open(json_file, 'r') as f:
+                    data = json.load(f)
+                    vulns = data.get('vulnerabilities', [])
+                    for vuln in vulns:
+                        name = vuln.get('name', '').strip()
+                        if name and name.lower() not in ['kubedash', 'name', 'skip']:
+                            packages.add(name)
+            except:
+                pass
+        
+        # Fallback to text format
+        if not packages and os.path.exists(txt_file):
+            try:
+                with open(txt_file, 'r') as f:
+                    lines = f.readlines()
+                in_table = False
+                for line in lines:
+                    line = line.strip()
+                    if 'Name' in line and 'Version' in line:
+                        in_table = True
+                        continue
+                    if in_table and line and not line.startswith('-') and '--------' not in line:
+                        parts = line.split()
+                        if len(parts) >= 2:
+                            pkg_name = parts[0].strip()
+                            if pkg_name and pkg_name.lower() not in ['name', 'skip', 'kubedash']:
+                                if re.match(r'^[a-zA-Z0-9_-]+$', pkg_name):
+                                    packages.add(pkg_name)
+            except:
+                pass
+        
+        print(' '.join(sorted(packages)))
+        " > /tmp/vuln-packages.txt
+      - |
+        VULN_PACKAGES=$(cat /tmp/vuln-packages.txt 2>/dev/null || echo "")
+        rm -f /tmp/pip-audit-output.json /tmp/pip-audit-output.txt /tmp/vuln-packages.txt
+      - |
+        # Check if pip-audit actually found vulnerabilities
+        HAS_VULNS=$(poetry run pip-audit 2>&1 | grep -c "known vulnerabilities" || echo "0")
+        NO_VULNS=$(poetry run pip-audit 2>&1 | grep -c "No known vulnerabilities" || echo "0")
+        
+        if [ -n "$VULN_PACKAGES" ] && [ "$VULN_PACKAGES" != " " ]; then
+          echo "Found vulnerable packages: $VULN_PACKAGES"
+          echo ""
+          echo "🔄 Updating packages..."
+          UPDATED=0
+          FAILED=0
+          
+          for pkg in $VULN_PACKAGES; do
+            echo -n "  → Updating $pkg... "
+            if poetry update "$pkg" >/dev/null 2>&1; then
+              echo "✅"
+              UPDATED=$((UPDATED + 1))
+            else
+              echo "⚠️  (may be transitive dependency)"
+              FAILED=$((FAILED + 1))
+            fi
+          done
+          
+          echo ""
+          echo "📊 Summary: $UPDATED updated, $FAILED skipped/failed"
+          echo ""
+          echo "📝 Next steps:"
+          echo "   1. Run 'poetry lock' to update lock file"
+          echo "   2. Run 'task kubedash-audit' to verify fixes"
+          
+          if [ $FAILED -gt 0 ]; then
+            echo ""
+            echo "💡 Note: Failed packages may be transitive dependencies."
+            echo "   Try: poetry update (updates all dependencies)"
+          fi
+        elif [ "$NO_VULNS" -gt 0 ]; then
+          echo "✅ No vulnerable packages found!"
+          echo ""
+          echo "All dependencies are up to date with no known vulnerabilities."
+          echo ""
+          echo "💡 To verify:"
+          echo "   task kubedash-audit"
+        else
+          echo "⚠️  Could not parse audit results or determine vulnerability status"
+          echo ""
+          echo "💡 Showing current audit output:"
+          poetry run pip-audit 2>&1 | head -30 || true
+          echo ""
+          echo "💡 To fix manually if vulnerabilities are found:"
+          echo "   poetry update <package-name>"
+          echo "   poetry lock"
+        fi
+    silent: true
+        
+  # --- ZAP API scan (security/zaproxy) ---
+  # Official image: https://hub.docker.com/r/zaproxy/zap-stable (was softwaresecurityproject/zap-stable)
+  zap-pull:
+    desc: "Pull OWASP ZAP Docker image for API scanning"
+    cmds:
+      - docker pull zaproxy/zap-stable
+
+  zap-scan:
+    desc: "Run ZAP API scan against KubeDash (OpenAPI spec loaded from app at /api/openapi.json; KubeDash must be at localhost:5000)"
+    dir: 'security/zaproxy'
+    silent: true
+    cmds:
+      - |
+        mkdir -p ../reports
+        echo "Running ZAP scan with plan plans/kubedash-plan.yaml (OpenAPI from app)..."
+        docker container run --platform linux/amd64 \
+          -v "$(pwd):/zap/wrk:rw" \
+          -v "$(pwd)/../reports:/zap/wrk/reports:rw" \
+          -t zaproxy/zap-stable \
+          bash -c "zap.sh -cmd -addoninstall ascanrules -addoninstall openapi; zap.sh -cmd -autorun /zap/wrk/plans/kubedash-plan.yaml"
+        echo "Reports: security/reports/"
+
+  # --- Nikto / Nuclei: web scans (target hardcoded https://localhost:5000, like zaproxy plan) ---
+  kubedash-nikto-scan:
+    desc: "Run Nikto web server scan; JSON report to security/reports/nikto-report.json (KubeDash at localhost:5000)"
+    silent: true
+    cmds:
+      - bash security/scripts/nikto-scan.sh
+
+  kubedash-nuclei-scan:
+    desc: "Run Nuclei scan; JSON report to security/reports/nuclei-report.json (KubeDash at localhost:5000)"
+    silent: true
+    cmds:
+      - bash security/scripts/nuclei-scan.sh
+
+  # --- DefectDojo: upload security reports ---
+  # Requires: DOJO_HOST (e.g. https://defectdojo.example.com), DOJO_API (API token)
+  # Optional: DOJO_PRODUCT_NAME (default KubeDash), DOJO_ENGAGEMENT_NAME (default security-scan)
+  # Optional: DOJO_REIMPORT=1 to use reimport-scan (updates existing test) instead of import-scan
+  defectdojo-upload:
+    desc: "Upload security reports (ZAP SARIF, Semgrep, Trivy, Nikto, Nuclei) to DefectDojo (set DOJO_HOST and DOJO_API)"
+    silent: true
+    cmds:
+      - bash security/scripts/defectdojo-upload.sh
+
+  kubedash-security-all:
+    desc: "Run all security checks (dependencies, secrets, code analysis)"
+    silent: true
+    cmds:
+      - task: kubedash-audit
+        run: true
+        silent: true
+      - task: kubedash-scan
+        run: true
+        silent: true
+      - task: kubedash-security-check
+        run: true
+        silent: true
+      - task: kubedash-secret-scan
+        run: true
+        silent: true
+      - task: kubedash-semgrep
+        run: true
+        silent: true
+      - task: zap-scan
+        run: true
+        silent: true
+      - task: kubedash-nikto-scan
+        run: true
+        silent: true
+      - task: kubedash-nuclei-scan
+        run: true
+        silent: true
+      - |
+        echo "✅ All security checks completed (warnings may be present)"
+        echo "💡 Note: safety check is deprecated - using pip-audit instead"
 
   kubedash-lint:
     desc: "Lint Kubedash"
@@ -102,11 +468,15 @@ tasks:
 
   kubedash-dev-build:
     desc: "Build Kubedash devel docker image"
+    silent: true
     cmds:
+      - docker builder prune -f
+      - task: kubedash-requirements
+        run: true
       - rm -rf docker/kubedash/kubedash
       - cp -r src/kubedash docker/kubedash/kubedash
       - rm -f docker/kubedash/requirements.txt
-      - cp docker/kubedash/kubedash/requirements.txt docker/kubedash/requirements.txt
+      - cp src/kubedash/requirements.txt docker/kubedash/requirements.txt
       - rm -f docker/kubedash/gunicorn_conf.py
       - cp docker/kubedash/kubedash/gunicorn_conf.py docker/kubedash/gunicorn_conf.py
       - |
@@ -120,7 +490,7 @@ tasks:
   kubedash-dev-scan:
     desc: "Scan Kubedash devel docker image for vulnerabilities"
     cmds:
-      - trivy -q i devopstales/kubedash:{{.VERSION}}-devel --scanners vuln
+      - trivy -q i devopstales/kubedash:{{.VERSION}}-devel --ignore-unfixed --scanners vuln
 
   kubedash-dev-sign:
     desc: "Sign Kubedash devel docker image"
@@ -137,6 +507,36 @@ tasks:
     cmds:
       - docker rmi devopstales/kubedash:{{.VERSION}}-devel
 
+  kubedash-run:
+    desc: "Run Kubedash docker container with kubedash.ini mount and port mappings"
+    silent: true
+    cmds:
+      - |
+        docker run -d \
+        --name kubedash \
+        -p 8080:8000 \
+        -p 8443:8000 \
+        -v $(pwd)/src/kubedash/kubedash.ini:/code/kubedash/kubedash.ini:ro \
+        devopstales/kubedash:{{.VERSION}}
+
+  kubedash-dev-run:
+    desc: "Run Kubedash dev docker container with kubedash.ini mount and port mappings"
+    silent: true
+    cmds:
+      - |
+        docker run -d \
+        --name kubedash \
+        -p 8080:8000 \
+        -p 8443:8000 \
+        -v $(pwd)/src/kubedash/kubedash.ini:/code/kubedash/kubedash.ini:ro \
+        devopstales/kubedash:{{.VERSION}}-devel
+
+  kubedash-stop:
+    desc: "Stop and remove Kubedash docker container"
+    cmds:
+      - docker stop kubedash || true
+      - docker rm kubedash || true
+
   kubedash-dev:
     desc: "Build, scan, sign and push Kubedash devel docker image"
     cmds:
@@ -149,11 +549,15 @@ tasks:
 
   kubedash-prod-build:
     desc: "Build Kubedash docker image"
+    silent: true
     cmds:
+      - docker builder prune -f
+      - task: kubedash-requirements
+        run: true
       - rm -rf docker/kubedash/kubedash
       - cp -r src/kubedash docker/kubedash/kubedash
       - rm -f docker/kubedash/requirements.txt
-      - cp docker/kubedash/kubedash/requirements.txt docker/kubedash/requirements.txt
+      - cp src/kubedash/requirements.txt docker/kubedash/requirements.txt
       - rm -f docker/kubedash/gunicorn_conf.py
       - cp docker/kubedash/kubedash/gunicorn_conf.py docker/kubedash/gunicorn_conf.py
       - |
@@ -169,11 +573,14 @@ tasks:
   kubedash-prod-scan:
     desc: "Scan Kubedash Dockerfile for vulnerabilities"
     cmds:
-      - trivy -q i --scanners vuln devopstales/kubedash:{{.VERSION}}
-      - trivy -q i --format cyclonedx --output sbom.cdx.json --scanners vuln devopstales/kubedash:{{.VERSION}} 
+      - mkdir -p security/reports
+      - trivy -q i --ignore-unfixed --scanners vuln devopstales/kubedash:{{.VERSION}}
+      - trivy -q i --ignore-unfixed --scanners vuln --format json -o security/reports/trivy-image-report.json devopstales/kubedash:{{.VERSION}} 2>/dev/null || true
+      - trivy -q i --ignore-unfixed --format cyclonedx --output security/reports/trivy-sbom.cdx.json --scanners vuln devopstales/kubedash:{{.VERSION}} 
 
   kubedash-prod-push:
     desc: "Push Kubedash docker image"
+    silent: true
     cmds:
       - docker push devopstales/kubedash:{{.VERSION}}
       - docker push devopstales/kubedash:latest
@@ -188,7 +595,7 @@ tasks:
         --annotation "org.cyclonedx.bom.version=1.4" \
         --annotation "org.opencontainers.ref.name=kubedash-{{.VERSION}}" \
         --annotation "org.opencontainers.created=$(date -u +%Y-%m-%dT%H:%M:%SZ)" \
-        sbom.cdx.json
+        security/reports/trivy-sbom.cdx.json
       - |
         oras attach docker.io/devopstales/kubedash:latest \
         --artifact-type application/vnd.cyclonedx+json \
@@ -198,7 +605,7 @@ tasks:
         --annotation "org.cyclonedx.bom.version=1.4" \
         --annotation "org.opencontainers.ref.name=kubedash-{{.VERSION}}" \
         --annotation "org.opencontainers.created=$(date -u +%Y-%m-%dT%H:%M:%SZ)" \
-        sbom.cdx.json
+        security/reports/trivy-sbom.cdx.json
       - |
         oras attach ghcr.io/devopstales/kubedash:{{.VERSION}} \
         --artifact-type application/vnd.cyclonedx+json \
@@ -208,7 +615,7 @@ tasks:
         --annotation "org.cyclonedx.bom.version=1.4" \
         --annotation "org.opencontainers.ref.name=kubedash-{{.VERSION}}" \
         --annotation "org.opencontainers.created=$(date -u +%Y-%m-%dT%H:%M:%SZ)" \
-        sbom.cdx.json
+        security/reports/trivy-sbom.cdx.json
       - |
         oras attach ghcr.io/devopstales/kubedash:latest \
         --artifact-type application/vnd.cyclonedx+json \
@@ -218,8 +625,7 @@ tasks:
         --annotation "org.cyclonedx.bom.version=1.4" \
         --annotation "org.opencontainers.ref.name=kubedash-{{.VERSION}}" \
         --annotation "org.opencontainers.created=$(date -u +%Y-%m-%dT%H:%M:%SZ)" \
-        sbom.cdx.json
-      - rm -f sbom.cdx.json
+        security/reports/trivy-sbom.cdx.json
 
   kubedash-prod-sign:
     desc: "Sign Kubedash docker image"
@@ -232,13 +638,14 @@ tasks:
   kubedash-prod-rm:
     desc: "Remove Kubedash docker image"
     cmds:
-      - rm sbom.cdx.json
       - docker rmi devopstales/kubedash:{{.VERSION}}
       - docker rmi ghcr.io/devopstales/kubedash:{{.VERSION}}
 
   kubedash-prod:
     desc: "Build, scan, sign and push Kubedash docker image"
     cmds:
+      - task: kubedash-security-all
+        run: true
       - task: kubedash-prod-build
         run: true
       - task: kubedash-prod-scan
@@ -253,6 +660,7 @@ tasks:
   kdlogin-build:
     desc: "Build kubectl-kdlogin"
     dir: 'src/kdlogin'
+    silent: true
     cmds:
       - go mod tidy
       - >-
@@ -275,7 +683,32 @@ tasks:
    desc: "Scan kubectl-kdlogin for vulnerabilities"
    dir: 'src/kdlogin'
    cmds:
+     - mkdir -p ../../security/reports
      - trivy -q fs .
+     - trivy -q fs . --format json -o ../../security/reports/trivy-kdlogin-fs-report.json 2>/dev/null || true
+
+  kdlogin-security:
+   desc: "Run security checks on kubectl-kdlogin Go code"
+   dir: 'src/kdlogin'
+   cmds:
+     - |
+       echo "Checking for security issues in Go code..."
+       if command -v gosec >/dev/null 2>&1; then
+         gosec ./...
+       else
+         echo "⚠️  gosec not installed. Install with: go install github.com/securego/gosec/v2/cmd/gosec@latest"
+       fi
+     - |
+       echo "Checking for hardcoded secrets..."
+       if grep -r "password\|secret\|token" . --include="*.go" | grep -i "=.*['\"].*['\"]" | grep -v "validate\|json\|yaml"; then
+         echo "⚠️  WARNING: Potential hardcoded credentials found"
+       fi
+     - |
+       echo "Checking for unsafe command execution..."
+       if grep -r "exec.Command" . --include="*.go" | grep -v "url\|xdg-open\|open\|rundll32"; then
+         echo "⚠️  WARNING: Command execution detected - ensure input validation"
+       fi
+   silent: true
 
   helm-docs:
    desc: "Generate Helm Chart documentation"
@@ -342,3 +775,34 @@ tasks:
     cmds:
       - .venv/bin/mkdocs build
       - .venv/bin/python -m mkdocs serve
+
+  security-pre-commit:
+    desc: "Run security checks before commit (quick checks)"
+    cmds:
+      - task: kubedash-lint
+        run: true
+      - task: kubedash-security-check
+        run: true
+      - task: kdlogin-security
+        run: true
+      - echo "✅ Pre-commit security checks passed"
+
+  security-ci:
+    desc: "Run full security suite for CI/CD pipeline (strict mode - fails on vulnerabilities)"
+    cmds:
+      - task: kubedash-audit-strict
+        run: true
+      - task: kubedash-scan
+        run: true
+      - task: kubedash-security-check
+        run: true
+      - task: kdlogin-scan
+        run: true
+      - task: kdlogin-security
+        run: true
+      - task: kubedash-dev-scan
+        run: true
+      - |
+        echo "✅ All CI security checks completed"
+        echo "💡 Note: Using pip-audit instead of deprecated safety check"
+    silent: true

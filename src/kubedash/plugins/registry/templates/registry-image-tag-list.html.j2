@@ -8,14 +8,14 @@
           <li class="breadcrumb-item"><span>Plugins</span></li>
           <li class="breadcrumb-item"><a href="/plugins/registry">Registry</a></li>
           <li class="breadcrumb-item"><a href="/plugins/registry/image/list">Images</a></li>
-          <li class="breadcrumb-item active"><span>{{ image_name }}</span></li>
+          <li class="breadcrumb-item active"><span id="breadcrumb-image-name">Image</span></li>
         </ol>
       </nav>
     </div>
 </ul>
 <ul class="header-nav ms-auto"></ul>
 <ul class="header-nav d-lg-flex">
-{% include "segments/topmenu.html.j2" %}
+{% include "segments/partials/topmenu.html.j2" %}
 {% endblock %}
 
 {% block content %}
@@ -25,7 +25,14 @@
     </div>
     <div class="card-body">
         <div class="table-responsive">
-        {% if tag_list.tags %}
+        <div id="tags-loading" class="text-center py-4">
+            <div class="spinner-border spinner-border-sm text-primary" role="status">
+                <span class="visually-hidden">Loading...</span>
+            </div>
+            <span class="ms-2">Loading tags...</span>
+        </div>
+        
+        <div id="tags-content" style="display: none;">
             <table class="table table-bordered" id="dataTable" width="100%" cellspacing="0">
                 <thead>
                     <tr>
@@ -33,51 +40,405 @@
                       <th>Action</th>
                     </tr>
                 </thead>
-                <tbody>
-                    {% for tag in tag_list.tags %}
-                        {% if selected == tag %}
-                          <tr class="selected" >
-                        {% else %}
-                          <tr>
-                        {% endif %}
-                            <td>
-                              <form action="/plugins/registry/image/data" method="POST">
-                                <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
-                                <input type="hidden" name="tag_name" value="{{ tag }}" />
-                                <a href="javascript:;" onclick="parentNode.submit();">{{ tag }}</a>
-                              </form>
-                            </td>
-                            <td>
-                                {% if session['user_role'] == "Admin" %}
-                                <!-- Button trigger modal edit -->
-                                <form action="/plugins/registry/image/tag/delete" method="POST">
-                                    <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
-                                    <input type="hidden" name="image_name" value="{{ image_name }}" />
-                                    <input type="hidden" name="tag_name" value="{{ tag }}" />
-                                    <button type="submit" rel="tooltip" class="btn btn-danger btn-just-icon btn-sm" value="upvote">
-                                        <i class="material-icons">delete</i>
-                                    </button>
-                                </form>
-                                {% endif %}
-                            </td>
-                        </tr>
-                    {% endfor %}
+                <tbody id="tags-tbody">
                 </tbody>
             </table>
-        {% else %}
-          <tr>
-            <td>
-              <img class="center" src="{{ url_for('static',filename='/img/blank-tags.png') }}">
-              <h2 class="center">No Tags</h2>
-              <h4 class="center">No tags are available at the moment.</h4>
-            </td>
-          </tr>
-        {% endif %}
+        </div>
+        
+        <div id="tags-empty" style="display: none;">
+            <img class="center" src="{{ url_for('static',filename='/img/blank-tags.png') }}">
+            <h2 class="center">No Tags</h2>
+            <h4 class="center">No tags are available at the moment.</h4>
+        </div>
         </div>
     </div>
 </div>
 {% endblock %}
 
 {% block add_head_css %}
-{% include "segments/datatable_snippet.html.j2" %}
+{% include "segments/components/datatable_snippet.html.j2" %}
+{% endblock %}
+
+{% block add_tail_js %}
+<script>
+    // IMMEDIATE: Prevent datatables-demo.js from initializing on loading row
+    (function() {
+        function setupOverride() {
+            if (typeof $ !== 'undefined' && $.fn && !window._datatableOverrideSetup) {
+                window._datatableOverrideSetup = true;
+                
+                const originalDataTable = $.fn.DataTable;
+                $.fn.DataTable = function(options) {
+                    const table = this[0];
+                    if (table && table.id === 'dataTable') {
+                        const tbody = table.querySelector('tbody');
+                        if (tbody) {
+                            const rows = tbody.querySelectorAll('tr');
+                            const hasColspanRow = Array.from(rows).some(row => {
+                                const cells = row.querySelectorAll('td');
+                                return Array.from(cells).some(cell => cell.hasAttribute('colspan'));
+                            });
+                            if (hasColspanRow) {
+                                console.log('Blocked DataTable initialization on loading row');
+                                return this;
+                            }
+                        }
+                    }
+                    return originalDataTable.apply(this, arguments);
+                };
+                
+                Object.setPrototypeOf($.fn.DataTable, originalDataTable);
+                Object.keys(originalDataTable).forEach(key => {
+                    $.fn.DataTable[key] = originalDataTable[key];
+                });
+            }
+        }
+        
+        setupOverride();
+        setTimeout(setupOverride, 0);
+        setTimeout(setupOverride, 50);
+        setTimeout(setupOverride, 100);
+        setTimeout(setupOverride, 200);
+        
+        if (document.readyState === 'loading') {
+            document.addEventListener('DOMContentLoaded', setupOverride);
+        } else {
+            setupOverride();
+        }
+    })();
+    
+    // Escape HTML helper
+    function escapeHtml(text) {
+        if (!text) return '';
+        const map = {
+            '&': '&amp;',
+            '<': '&lt;',
+            '>': '&gt;',
+            '"': '&quot;',
+            "'": '&#039;'
+        };
+        return text.toString().replace(/[&<>"']/g, m => map[m]);
+    }
+    
+    // Get registry server URL and image name from query params or sessionStorage
+    function getRegistryParams() {
+        const urlParams = new URLSearchParams(window.location.search);
+        const registryUrl = urlParams.get('registry_server_url') || sessionStorage.getItem('registry_server_url');
+        const imageName = urlParams.get('image_name') || sessionStorage.getItem('image_name');
+        
+        if (registryUrl) sessionStorage.setItem('registry_server_url', registryUrl);
+        if (imageName) sessionStorage.setItem('image_name', imageName);
+        
+        return { registryUrl, imageName };
+    }
+    
+    // Get user role (if available)
+    const is_admin = '{{ session.get("user_role", "") }}' === 'Admin';
+    
+    // Populate tags table
+    function populateTagsTable(tags, imageName, selectedTag) {
+        const tbody = document.getElementById('tags-tbody');
+        const loading = document.getElementById('tags-loading');
+        const content = document.getElementById('tags-content');
+        const empty = document.getElementById('tags-empty');
+        
+        // Hide loading
+        loading.style.display = 'none';
+        
+        // Update breadcrumb
+        const breadcrumb = document.getElementById('breadcrumb-image-name');
+        if (breadcrumb) {
+            breadcrumb.textContent = imageName || 'Image';
+        }
+        
+        // Destroy existing DataTable if it exists
+        if (typeof $ !== 'undefined' && $.fn.DataTable) {
+            try {
+                const $table = $('#dataTable');
+                if ($table.length && typeof $.fn.DataTable.isDataTable === 'function') {
+                    if ($.fn.DataTable.isDataTable('#dataTable')) {
+                        const dt = $table.DataTable();
+                        if (dt && typeof dt.destroy === 'function') {
+                            dt.destroy();
+                        }
+                    }
+                }
+            } catch (e) {
+                console.warn('Error destroying DataTable:', e);
+            }
+        }
+        
+        if (!tags || tags.length === 0) {
+            empty.style.display = 'block';
+            content.style.display = 'none';
+            return;
+        }
+        
+        empty.style.display = 'none';
+        if (content) {
+            content.style.display = 'block';
+            console.log('Content div set to display: block');
+            console.log('Content div computed style:', window.getComputedStyle(content).display);
+            console.log('Table element:', document.getElementById('dataTable'));
+        } else {
+            console.error('Content div element not found!');
+        }
+        
+        console.log('Populating tags table with', tags.length, 'tags');
+        console.log('Tags:', tags);
+        
+        const { registryUrl } = getRegistryParams();
+        console.log('Registry URL:', registryUrl);
+        if (!registryUrl) {
+            console.error('Registry URL not found in getRegistryParams()');
+        }
+        
+        if (!imageName) {
+            console.error('Image name not found');
+        }
+        
+        const rows = tags.map((tag, index) => {
+            console.log(`Processing tag ${index}:`, tag);
+            const tagName = tag;
+            const tagEscaped = escapeHtml(tagName);
+            const isSelected = selectedTag === tagName;
+            const rowClass = isSelected ? 'selected' : '';
+            
+            // Encode for query parameter
+            const tagEncoded = encodeURIComponent(tagName);
+            const imageNameEncoded = encodeURIComponent(imageName);
+            const registryUrlEncoded = encodeURIComponent(registryUrl || '');
+            
+            let actionCell = '';
+            if (is_admin) {
+                actionCell = `
+                    <button type="button" class="btn btn-danger btn-just-icon btn-sm" onclick="window.deleteTag('${tagName.replace(/'/g, "\\'")}')">
+                        <i class="material-icons">delete</i>
+                    </button>
+                `;
+            } else {
+                actionCell = '-';
+            }
+            
+            return `
+                <tr class="${rowClass}">
+                    <td>
+                        <a href="javascript:;" onclick="sessionStorage.setItem('tag_name', '${tagEscaped.replace(/'/g, "\\'")}'); window.location.href='/plugins/registry/image/data?registry_server_url=${registryUrlEncoded}&image_name=${imageNameEncoded}&tag_name=${tagEncoded}';">${tagEscaped}</a>
+                    </td>
+                    <td>${actionCell}</td>
+                </tr>
+            `;
+        }).join('');
+        
+        console.log('Generated rows HTML:', rows);
+        console.log('Rows length:', rows.length);
+        console.log('Tbody element:', tbody);
+        
+        if (tbody) {
+            tbody.innerHTML = rows;
+            const rowCount = tbody.querySelectorAll('tr').length;
+            console.log('Tbody innerHTML set, row count:', rowCount);
+            
+            // Verify rows are actually in the DOM
+            if (rowCount === 0) {
+                console.error('Rows were not inserted into tbody!');
+                console.log('Tbody HTML:', tbody.innerHTML);
+            }
+        } else {
+            console.error('Tbody element not found!');
+        }
+        
+        // Initialize DataTables after ensuring rows are in DOM
+        setTimeout(function() {
+            const finalTable = document.getElementById('dataTable');
+            if (finalTable && typeof $ !== 'undefined' && $.fn.DataTable) {
+                try {
+                    const $table = $('#dataTable');
+                    
+                    // Check if already initialized and destroy
+                    if (typeof $.fn.DataTable.isDataTable === 'function' && $.fn.DataTable.isDataTable('#dataTable')) {
+                        const dt = $table.DataTable();
+                        if (dt && typeof dt.destroy === 'function') {
+                            dt.destroy();
+                            // Re-insert rows after destroy (DataTables destroy removes them)
+                            if (tbody) {
+                                tbody.innerHTML = rows;
+                                console.log('Rows re-inserted after DataTable destroy');
+                            }
+                        }
+                    }
+                    
+                    const tbodyCheck = finalTable.querySelector('tbody');
+                    if (tbodyCheck) {
+                        const rowsCheck = tbodyCheck.querySelectorAll('tr');
+                        console.log('Rows in tbody before DataTable init:', rowsCheck.length);
+                        
+                        let hasValidRows = false;
+                        for (const row of rowsCheck) {
+                            const cells = row.querySelectorAll('td');
+                            if (cells.length === 2) {
+                                hasValidRows = true;
+                                break;
+                            }
+                        }
+                        
+                        if (hasValidRows) {
+                            const validRowCount = Array.from(rowsCheck).filter(row => {
+                                const cells = row.querySelectorAll('td');
+                                return cells.length === 2;
+                            }).length;
+                            
+                            console.log('Valid rows for DataTable:', validRowCount);
+                            
+                            if (validRowCount > 0) {
+                                $('#dataTable').DataTable({
+                                    responsive: true,
+                                    pageLength: 25,
+                                    destroy: true
+                                });
+                                console.log('DataTable initialized');
+                                
+                                // Verify rows still exist after initialization
+                                setTimeout(() => {
+                                    const rowsAfter = finalTable.querySelector('tbody').querySelectorAll('tr');
+                                    console.log('Rows in tbody after DataTable init:', rowsAfter.length);
+                                }, 50);
+                            }
+                        } else {
+                            console.warn('No valid rows found for DataTable initialization');
+                        }
+                    }
+                } catch (e) {
+                    console.error('Error initializing DataTable:', e);
+                }
+            }
+        }, 150);
+    }
+    
+    // Delete tag (make it global)
+    window.deleteTag = async function(tagName) {
+        const { registryUrl, imageName } = getRegistryParams();
+        
+        if (!registryUrl || !imageName) {
+            alert('Registry URL or image name not found');
+            return;
+        }
+        
+        if (!confirm(`Are you sure you want to delete tag "${tagName}" from image "${imageName}"?`)) {
+            return;
+        }
+        
+        try {
+            // Note: This would need a DELETE API endpoint
+            // For now, we'll use the existing POST endpoint
+            const form = document.createElement('form');
+            form.method = 'POST';
+            form.action = '/plugins/registry/image/tag/delete';
+            
+            const csrfToken = document.querySelector('input[name="csrf_token"]');
+            if (csrfToken) {
+                const csrfInput = document.createElement('input');
+                csrfInput.type = 'hidden';
+                csrfInput.name = 'csrf_token';
+                csrfInput.value = csrfToken.value;
+                form.appendChild(csrfInput);
+            }
+            
+            const imageInput = document.createElement('input');
+            imageInput.type = 'hidden';
+            imageInput.name = 'image_name';
+            imageInput.value = imageName;
+            form.appendChild(imageInput);
+            
+            const tagInput = document.createElement('input');
+            tagInput.type = 'hidden';
+            tagInput.name = 'tag_name';
+            tagInput.value = tagName;
+            form.appendChild(tagInput);
+            
+            document.body.appendChild(form);
+            form.submit();
+            
+        } catch (error) {
+            console.error('Error deleting tag:', error);
+            alert('Error deleting tag: ' + error.message);
+        }
+    };
+    
+    // Load tags from API
+    async function loadTags() {
+        try {
+            const { registryUrl, imageName } = getRegistryParams();
+            
+            if (!registryUrl || !imageName) {
+                throw new Error('Registry server URL or image name not found. Please select a registry server and image first.');
+            }
+            
+            // Encode for API path
+            const encodedUrl = encodeURIComponent(registryUrl);
+            const encodedImage = encodeURIComponent(imageName);
+            const apiUrl = `/api/v1/plugins/registry/${encodedUrl}/images/${encodedImage}/tags`;
+            console.log('Fetching tags from:', apiUrl);
+            
+            const response = await fetch(apiUrl);
+            if (!response.ok) {
+                throw new Error(`HTTP error! status: ${response.status}`);
+            }
+            
+            const result = await response.json();
+            console.log('Tags API response:', result);
+            
+            if (result.error) {
+                throw new Error(result.message || 'Failed to load tags');
+            }
+            
+            const tagData = result.data || {};
+            const tags = tagData.tags || [];
+            console.log('Tags array:', tags, 'Length:', tags.length);
+            const selectedTag = new URLSearchParams(window.location.search).get('selected');
+            
+            populateTagsTable(tags, imageName, selectedTag);
+            
+        } catch (error) {
+            console.error('Error loading tags:', error);
+            const loading = document.getElementById('tags-loading');
+            const content = document.getElementById('tags-content');
+            const empty = document.getElementById('tags-empty');
+            
+            loading.style.display = 'none';
+            content.style.display = 'none';
+            empty.innerHTML = `
+                <div class="alert alert-danger text-center">
+                    <h4>Error loading tags</h4>
+                    <p>${escapeHtml(error.message)}</p>
+                </div>
+            `;
+            empty.style.display = 'block';
+        }
+    }
+    
+    // Load data on page load
+    document.addEventListener('DOMContentLoaded', function() {
+        // Destroy any auto-initialized DataTable instance
+        const table = document.getElementById('dataTable');
+        if (table && typeof $ !== 'undefined' && $.fn.DataTable) {
+            if ($.fn.DataTable.isDataTable && $.fn.DataTable.isDataTable(table)) {
+                const tbody = table.querySelector('tbody');
+                if (tbody) {
+                    const rows = tbody.querySelectorAll('tr');
+                    const hasColspanRow = Array.from(rows).some(row => {
+                        const cells = row.querySelectorAll('td');
+                        return Array.from(cells).some(cell => cell.hasAttribute('colspan'));
+                    });
+                    if (hasColspanRow) {
+                        console.log('Destroying auto-initialized DataTable instance on loading row');
+                        $(table).DataTable().destroy();
+                    }
+                }
+            }
+        }
+        
+        loadTags();
+    });
+</script>
 {% endblock %}

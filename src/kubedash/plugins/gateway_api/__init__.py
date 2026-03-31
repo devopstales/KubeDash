@@ -55,7 +55,12 @@ logger = get_logger()
 @gateway_api_bp.route("/gateway-api", methods=['GET', 'POST'])
 @login_required
 def gateway_api():
-    """Main Gateway API view with tabs for all resource types."""
+    """
+    Main Gateway API view with tabs for all resource types.
+    
+    Data is now loaded client-side via JavaScript API calls.
+    This route only renders the template structure and provides namespaces.
+    """
     user_token = get_user_token(session)
     active_tab = request.args.get('tab', 'gatewayclasses')
     
@@ -67,58 +72,11 @@ def gateway_api():
     
     # Get namespace list
     namespace_list, error = k8sNamespaceListGet(session['user_role'], user_token)
-    if error:
-        namespace_list = []
-    
-    # Check if Gateway API is installed
-    gateway_api_status = check_gateway_api_installed(session['user_role'], user_token)
-    
-    # Fetch all resource types
-    gateway_classes = []
-    gateways = []
-    httproutes = []
-    grpcroutes = []
-    tcproutes = []
-    tlsroutes = []
-    referencegrants = []
-    backendtlspolicies = []
-    
-    if gateway_api_status.get('installed', False):
-        # Always fetch GatewayClasses (cluster-scoped)
-        gateway_classes = GatewayApiGetGatewayClasses(session['user_role'], user_token)
-        
-        # Fetch namespaced resources based on selected namespace
-        ns = session.get('ns_select', 'default')
-        
-        gateways = GatewayApiGetGateways(session['user_role'], user_token, ns)
-        httproutes = GatewayApiGetHTTPRoutes(session['user_role'], user_token, ns)
-        
-        # Fetch experimental resources if available
-        if 'grpcroutes' in gateway_api_status.get('experimental', []):
-            grpcroutes = GatewayApiGetGRPCRoutes(session['user_role'], user_token, ns)
-        if 'tcproutes' in gateway_api_status.get('experimental', []):
-            tcproutes = GatewayApiGetTCPRoutes(session['user_role'], user_token, ns)
-        if 'tlsroutes' in gateway_api_status.get('experimental', []):
-            tlsroutes = GatewayApiGetTLSRoutes(session['user_role'], user_token, ns)
-        if 'backendtlspolicies' in gateway_api_status.get('experimental', []):
-            backendtlspolicies = GatewayApiGetBackendTLSPolicies(session['user_role'], user_token, ns)
-        
-        # ReferenceGrants (standard v1)
-        if 'referencegrants' in gateway_api_status.get('standard', []):
-            referencegrants = GatewayApiGetReferenceGrants(session['user_role'], user_token, ns)
+    namespaces = namespace_list if not error else []
     
     return render_template(
         'gateway-api.html.j2',
-        namespaces=namespace_list,
-        gateway_api_status=gateway_api_status,
-        gateway_classes=gateway_classes,
-        gateways=gateways,
-        httproutes=httproutes,
-        grpcroutes=grpcroutes,
-        tcproutes=tcproutes,
-        tlsroutes=tlsroutes,
-        referencegrants=referencegrants,
-        backendtlspolicies=backendtlspolicies,
+        namespaces=namespaces,
         active_tab=active_tab,
     )
 
@@ -217,29 +175,5 @@ def httproute_detail(namespace, name):
     )
 
 
-##############################################################
-# API Endpoints for AJAX calls (optional)
-##############################################################
-
-@gateway_api_bp.route("/gateway-api/api/gateways", methods=['GET'])
-@login_required
-def api_gateways():
-    """API endpoint to get gateways for a specific namespace."""
-    user_token = get_user_token(session)
-    namespace = request.args.get('namespace', session.get('ns_select', 'default'))
-    
-    gateways = GatewayApiGetGateways(session['user_role'], user_token, namespace)
-    
-    return {"gateways": gateways}
-
-
-@gateway_api_bp.route("/gateway-api/api/httproutes", methods=['GET'])
-@login_required
-def api_httproutes():
-    """API endpoint to get HTTPRoutes for a specific namespace."""
-    user_token = get_user_token(session)
-    namespace = request.args.get('namespace', session.get('ns_select', 'default'))
-    
-    httproutes = GatewayApiGetHTTPRoutes(session['user_role'], user_token, namespace)
-    
-    return {"httproutes": httproutes}
+# Note: API endpoints have been moved to plugins/gateway_api/api.py
+# and are registered under /api/v1/gateway-api/

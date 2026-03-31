@@ -4,6 +4,8 @@ Revision ID: ea51eddbcfb6
 Revises: 22fb365284ec
 Create Date: 2025-07-21 20:45:31.546592
 
+Related Issue: Application catalog plugin
+Related PR: Plugin implementation
 """
 from alembic import op
 import sqlalchemy as sa
@@ -24,6 +26,7 @@ def upgrade():
     sa.Column('application_enabled', sa.Boolean(), nullable=False),
     sa.Column('application_url', sa.String(length=200), nullable=False),
     sa.Column('application_icon', sa.String(length=200), nullable=True),
+    sa.Column('application_embedded', sa.Boolean(), nullable=False, server_default='0'),
     sa.PrimaryKeyConstraint('id'),
     sa.UniqueConstraint('application_name'),
     sa.UniqueConstraint('application_url')

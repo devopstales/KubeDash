@@ -6,7 +6,7 @@
         <nav aria-label="breadcrumb">
             <ol class="breadcrumb my-0">
                 <li class="breadcrumb-item"><span>Plugins</span></li>
-                <li class="breadcrumb-item"><a href="/plugins/trivy-operator/cluster">Trivy Operator</a></li>
+                <li class="breadcrumb-item"><a href="/plugins/trivy-operator/namespace">Trivy Operator</a></li>
                 <li class="breadcrumb-item active"><span>Cluster Reports</span></li>
             </ol>
         </nav>
@@ -14,7 +14,7 @@
 </ul>
 <ul class="header-nav ms-auto"></ul>
 <ul class="header-nav d-lg-flex">
-{% include "segments/topmenu.html.j2" %}
+{% include "segments/partials/topmenu.html.j2" %}
 {% endblock %}
 
 {% block content %}
@@ -48,35 +48,35 @@
                 <a class="nav-link {% if active_tab == 'clustercompliancereports' %}active{% endif %}" 
                    id="nav-clustercompliancereports-tab" data-bs-toggle="tab" href="#nav-clustercompliancereports" 
                    role="tab" aria-controls="nav-clustercompliancereports" aria-selected="{% if active_tab == 'clustercompliancereports' %}true{% else %}false{% endif %}">
-                    Compliance Reports <span class="badge bg-secondary">{{ clustercompliance_reports|length }}</span>
+                    Compliance Reports <span class="badge bg-secondary" id="clustercompliancereports-count">-</span>
                 </a>
             </li>
             <li class="nav-item">
                 <a class="nav-link {% if active_tab == 'clustervulnerabilityreports' %}active{% endif %}" 
                    id="nav-clustervulnerabilityreports-tab" data-bs-toggle="tab" href="#nav-clustervulnerabilityreports" 
                    role="tab" aria-controls="nav-clustervulnerabilityreports" aria-selected="{% if active_tab == 'clustervulnerabilityreports' %}true{% else %}false{% endif %}">
-                    Vulnerability Reports <span class="badge bg-secondary">{{ clustervulnerability_reports|length }}</span>
+                    Vulnerability Reports <span class="badge bg-secondary" id="clustervulnerabilityreports-count">-</span>
                 </a>
             </li>
             <li class="nav-item">
                 <a class="nav-link {% if active_tab == 'clusterconfigauditreports' %}active{% endif %}" 
                    id="nav-clusterconfigauditreports-tab" data-bs-toggle="tab" href="#nav-clusterconfigauditreports" 
                    role="tab" aria-controls="nav-clusterconfigauditreports" aria-selected="{% if active_tab == 'clusterconfigauditreports' %}true{% else %}false{% endif %}">
-                    Config Audit Reports <span class="badge bg-secondary">{{ clusterconfigaudit_reports|length }}</span>
+                    Config Audit Reports <span class="badge bg-secondary" id="clusterconfigauditreports-count">-</span>
                 </a>
             </li>
             <li class="nav-item">
                 <a class="nav-link {% if active_tab == 'clusterinfraassessmentreports' %}active{% endif %}" 
                    id="nav-clusterinfraassessmentreports-tab" data-bs-toggle="tab" href="#nav-clusterinfraassessmentreports" 
                    role="tab" aria-controls="nav-clusterinfraassessmentreports" aria-selected="{% if active_tab == 'clusterinfraassessmentreports' %}true{% else %}false{% endif %}">
-                    Infra Assessment Reports <span class="badge bg-secondary">{{ clusterinfraassessment_reports|length }}</span>
+                    Infra Assessment Reports <span class="badge bg-secondary" id="clusterinfraassessmentreports-count">-</span>
                 </a>
             </li>
             <li class="nav-item">
                 <a class="nav-link {% if active_tab == 'clusterrbacassessmentreports' %}active{% endif %}" 
                    id="nav-clusterrbacassessmentreports-tab" data-bs-toggle="tab" href="#nav-clusterrbacassessmentreports" 
                    role="tab" aria-controls="nav-clusterrbacassessmentreports" aria-selected="{% if active_tab == 'clusterrbacassessmentreports' %}true{% else %}false{% endif %}">
-                    RBAC Assessment Reports <span class="badge bg-secondary">{{ clusterrbacassessment_reports|length }}</span>
+                    RBAC Assessment Reports <span class="badge bg-secondary" id="clusterrbacassessmentreports-count">-</span>
                 </a>
             </li>
         </ul>
@@ -102,50 +102,15 @@
                                         <th>Age</th>
                                     </tr>
                                 </thead>
-                                <tbody>
-                                    {% for report in clustercompliance_reports %}
+                                <tbody id="clustercompliance-tbody">
                                     <tr>
-                                        <td>
-                                            <a href="/plugins/trivy-operator/cluster/compliance/{{ report.name }}">
-                                                {{ report.name }}
-                                            </a>
+                                        <td colspan="7" class="text-center">
+                                            <div class="spinner-border spinner-border-sm text-primary" role="status">
+                                                <span class="visually-hidden">Loading...</span>
+                                            </div>
+                                            <span class="ms-2">Loading cluster compliance reports...</span>
                                         </td>
-                                        <td>
-                                            {% if report.critical > 0 %}
-                                            <span class="badge bg-danger">{{ report.critical }}</span>
-                                            {% else %}
-                                            <span class="badge bg-secondary">0</span>
-                                            {% endif %}
-                                        </td>
-                                        <td>
-                                            {% if report.high > 0 %}
-                                            <span class="badge bg-warning text-dark">{{ report.high }}</span>
-                                            {% else %}
-                                            <span class="badge bg-secondary">0</span>
-                                            {% endif %}
-                                        </td>
-                                        <td>
-                                            {% if report.medium > 0 %}
-                                            <span class="badge bg-info">{{ report.medium }}</span>
-                                            {% else %}
-                                            <span class="badge bg-secondary">0</span>
-                                            {% endif %}
-                                        </td>
-                                        <td>
-                                            {% if report.low > 0 %}
-                                            <span class="badge bg-secondary">{{ report.low }}</span>
-                                            {% else %}
-                                            <span class="badge bg-secondary">0</span>
-                                            {% endif %}
-                                        </td>
-                                        <td><strong>{{ report.total }}</strong></td>
-                                        <td>{{ report.age }}</td>
                                     </tr>
-                                    {% else %}
-                                    <tr>
-                                        <td class="text-center text-muted" colspan="7">No Cluster Compliance Reports found</td>
-                                    </tr>
-                                    {% endfor %}
                                 </tbody>
                             </table>
                         </div>
@@ -172,57 +137,15 @@
                                         <th>Age</th>
                                     </tr>
                                 </thead>
-                                <tbody>
-                                    {% for report in clustervulnerability_reports %}
+                                <tbody id="clustervulnerability-tbody">
                                     <tr>
-                                        <td>
-                                            <a href="/plugins/trivy-operator/cluster/vulnerability/{{ report.name }}">
-                                                {{ report.name }}
-                                            </a>
+                                        <td colspan="8" class="text-center">
+                                            <div class="spinner-border spinner-border-sm text-primary" role="status">
+                                                <span class="visually-hidden">Loading...</span>
+                                            </div>
+                                            <span class="ms-2">Loading cluster vulnerability reports...</span>
                                         </td>
-                                        <td>
-                                            {% if report.critical > 0 %}
-                                            <span class="badge bg-danger">{{ report.critical }}</span>
-                                            {% else %}
-                                            <span class="badge bg-secondary">0</span>
-                                            {% endif %}
-                                        </td>
-                                        <td>
-                                            {% if report.high > 0 %}
-                                            <span class="badge bg-warning text-dark">{{ report.high }}</span>
-                                            {% else %}
-                                            <span class="badge bg-secondary">0</span>
-                                            {% endif %}
-                                        </td>
-                                        <td>
-                                            {% if report.medium > 0 %}
-                                            <span class="badge bg-info">{{ report.medium }}</span>
-                                            {% else %}
-                                            <span class="badge bg-secondary">0</span>
-                                            {% endif %}
-                                        </td>
-                                        <td>
-                                            {% if report.low > 0 %}
-                                            <span class="badge bg-primary">{{ report.low }}</span>
-                                            {% else %}
-                                            <span class="badge bg-secondary">0</span>
-                                            {% endif %}
-                                        </td>
-                                        <td>
-                                            {% if report.unknown > 0 %}
-                                            <span class="badge bg-secondary">{{ report.unknown }}</span>
-                                            {% else %}
-                                            <span class="badge bg-secondary">0</span>
-                                            {% endif %}
-                                        </td>
-                                        <td><strong>{{ report.total }}</strong></td>
-                                        <td>{{ report.age }}</td>
                                     </tr>
-                                    {% else %}
-                                    <tr>
-                                        <td class="text-center text-muted" colspan="8">No Cluster Vulnerability Reports found</td>
-                                    </tr>
-                                    {% endfor %}
                                 </tbody>
                             </table>
                         </div>
@@ -248,50 +171,15 @@
                                         <th>Age</th>
                                     </tr>
                                 </thead>
-                                <tbody>
-                                    {% for report in clusterconfigaudit_reports %}
+                                <tbody id="clusterconfigaudit-tbody">
                                     <tr>
-                                        <td>
-                                            <a href="/plugins/trivy-operator/cluster/configaudit/{{ report.name }}">
-                                                {{ report.resource_kind }}/{{ report.resource_name }}
-                                            </a>
+                                        <td colspan="7" class="text-center">
+                                            <div class="spinner-border spinner-border-sm text-primary" role="status">
+                                                <span class="visually-hidden">Loading...</span>
+                                            </div>
+                                            <span class="ms-2">Loading cluster config audit reports...</span>
                                         </td>
-                                        <td>
-                                            {% if report.critical > 0 %}
-                                            <span class="badge bg-danger">{{ report.critical }}</span>
-                                            {% else %}
-                                            <span class="badge bg-secondary">0</span>
-                                            {% endif %}
-                                        </td>
-                                        <td>
-                                            {% if report.high > 0 %}
-                                            <span class="badge bg-warning text-dark">{{ report.high }}</span>
-                                            {% else %}
-                                            <span class="badge bg-secondary">0</span>
-                                            {% endif %}
-                                        </td>
-                                        <td>
-                                            {% if report.medium > 0 %}
-                                            <span class="badge bg-info">{{ report.medium }}</span>
-                                            {% else %}
-                                            <span class="badge bg-secondary">0</span>
-                                            {% endif %}
-                                        </td>
-                                        <td>
-                                            {% if report.low > 0 %}
-                                            <span class="badge bg-secondary">{{ report.low }}</span>
-                                            {% else %}
-                                            <span class="badge bg-secondary">0</span>
-                                            {% endif %}
-                                        </td>
-                                        <td><strong>{{ report.total }}</strong></td>
-                                        <td>{{ report.age }}</td>
                                     </tr>
-                                    {% else %}
-                                    <tr>
-                                        <td class="text-center text-muted" colspan="7">No Cluster Config Audit Reports found</td>
-                                    </tr>
-                                    {% endfor %}
                                 </tbody>
                             </table>
                         </div>
@@ -317,50 +205,15 @@
                                         <th>Age</th>
                                     </tr>
                                 </thead>
-                                <tbody>
-                                    {% for report in clusterinfraassessment_reports %}
+                                <tbody id="clusterinfraassessment-tbody">
                                     <tr>
-                                        <td>
-                                            <a href="/plugins/trivy-operator/cluster/infraassessment/{{ report.name }}">
-                                                {{ report.resource_kind }}/{{ report.resource_name }}
-                                            </a>
+                                        <td colspan="7" class="text-center">
+                                            <div class="spinner-border spinner-border-sm text-primary" role="status">
+                                                <span class="visually-hidden">Loading...</span>
+                                            </div>
+                                            <span class="ms-2">Loading cluster infra assessment reports...</span>
                                         </td>
-                                        <td>
-                                            {% if report.critical > 0 %}
-                                            <span class="badge bg-danger">{{ report.critical }}</span>
-                                            {% else %}
-                                            <span class="badge bg-secondary">0</span>
-                                            {% endif %}
-                                        </td>
-                                        <td>
-                                            {% if report.high > 0 %}
-                                            <span class="badge bg-warning text-dark">{{ report.high }}</span>
-                                            {% else %}
-                                            <span class="badge bg-secondary">0</span>
-                                            {% endif %}
-                                        </td>
-                                        <td>
-                                            {% if report.medium > 0 %}
-                                            <span class="badge bg-info">{{ report.medium }}</span>
-                                            {% else %}
-                                            <span class="badge bg-secondary">0</span>
-                                            {% endif %}
-                                        </td>
-                                        <td>
-                                            {% if report.low > 0 %}
-                                            <span class="badge bg-secondary">{{ report.low }}</span>
-                                            {% else %}
-                                            <span class="badge bg-secondary">0</span>
-                                            {% endif %}
-                                        </td>
-                                        <td><strong>{{ report.total }}</strong></td>
-                                        <td>{{ report.age }}</td>
                                     </tr>
-                                    {% else %}
-                                    <tr>
-                                        <td class="text-center text-muted" colspan="7">No Cluster Infra Assessment Reports found</td>
-                                    </tr>
-                                    {% endfor %}
                                 </tbody>
                             </table>
                         </div>
@@ -385,43 +238,15 @@
                                         <th>Age</th>
                                     </tr>
                                 </thead>
-                                <tbody>
-                                    {% for report in clusterrbacassessment_reports %}
+                                <tbody id="clusterrbacassessment-tbody">
                                     <tr>
-                                        <td>
-                                            <a href="/plugins/trivy-operator/cluster/rbacassessment/{{ report.name }}">
-                                                {{ report.resource_kind }}/{{ report.resource_name }}
-                                            </a>
+                                        <td colspan="6" class="text-center">
+                                            <div class="spinner-border spinner-border-sm text-primary" role="status">
+                                                <span class="visually-hidden">Loading...</span>
+                                            </div>
+                                            <span class="ms-2">Loading cluster RBAC assessment reports...</span>
                                         </td>
-                                        <td>
-                                            {% if report.danger > 0 %}
-                                            <span class="badge bg-danger">{{ report.danger }}</span>
-                                            {% else %}
-                                            <span class="badge bg-secondary">0</span>
-                                            {% endif %}
-                                        </td>
-                                        <td>
-                                            {% if report.warning > 0 %}
-                                            <span class="badge bg-warning text-dark">{{ report.warning }}</span>
-                                            {% else %}
-                                            <span class="badge bg-secondary">0</span>
-                                            {% endif %}
-                                        </td>
-                                        <td>
-                                            {% if report.pass > 0 %}
-                                            <span class="badge bg-success">{{ report.pass }}</span>
-                                            {% else %}
-                                            <span class="badge bg-secondary">0</span>
-                                            {% endif %}
-                                        </td>
-                                        <td><strong>{{ report.total }}</strong></td>
-                                        <td>{{ report.age }}</td>
                                     </tr>
-                                    {% else %}
-                                    <tr>
-                                        <td class="text-center text-muted" colspan="6">No Cluster RBAC Assessment Reports found</td>
-                                    </tr>
-                                    {% endfor %}
                                 </tbody>
                             </table>
                         </div>
@@ -433,28 +258,294 @@
 </div>
 
 <script>
-// Initialize DataTables for all tables
-$(document).ready(function() {
-    $('#clustercomplianceTable').DataTable({
-        "order": [[5, "desc"]], // Sort by total descending
-        "pageLength": 25
-    });
-    $('#clustervulnerabilityTable').DataTable({
-        "order": [[6, "desc"]], // Sort by total descending
-        "pageLength": 25
-    });
-    $('#clusterconfigauditTable').DataTable({
-        "order": [[5, "desc"]], // Sort by total descending
-        "pageLength": 25
-    });
-    $('#clusterinfraassessmentTable').DataTable({
-        "order": [[5, "desc"]], // Sort by total descending
-        "pageLength": 25
-    });
-    $('#clusterrbacassessmentTable').DataTable({
-        "order": [[4, "desc"]], // Sort by total descending
-        "pageLength": 25
-    });
-});
+(function() {
+    'use strict';
+    
+    const escapeHtml = (text) => {
+        if (text === null || text === undefined) return '';
+        const map = {
+            '&': '&amp;',
+            '<': '&lt;',
+            '>': '&gt;',
+            '"': '&quot;',
+            "'": '&#039;'
+        };
+        return String(text).replace(/[&<>"']/g, m => map[m]);
+    };
+    
+    function updateBadgeCount(reportType, count) {
+        const badge = document.getElementById(reportType + '-count');
+        if (badge) {
+            badge.textContent = count;
+        }
+    }
+    
+    function populateClusterComplianceTable(reports) {
+        const tbody = document.getElementById('clustercompliance-tbody');
+        if (!reports || reports.length === 0) {
+            tbody.innerHTML = '<tr><td class="text-center text-muted" colspan="7">No Cluster Compliance Reports found</td></tr>';
+            updateBadgeCount('clustercompliancereports', 0);
+            return;
+        }
+        
+        updateBadgeCount('clustercompliancereports', reports.length);
+        
+        const rows = reports.map(report => {
+            const resourceLink = `/plugins/trivy-operator/cluster/compliance/${escapeHtml(report.name)}`;
+            return `
+                <tr>
+                    <td><a href="${resourceLink}">${escapeHtml(report.name)}</a></td>
+                    <td>${report.critical > 0 ? `<span class="badge bg-danger">${report.critical}</span>` : '<span class="badge bg-secondary">0</span>'}</td>
+                    <td>${report.high > 0 ? `<span class="badge bg-warning text-dark">${report.high}</span>` : '<span class="badge bg-secondary">0</span>'}</td>
+                    <td>${report.medium > 0 ? `<span class="badge bg-info">${report.medium}</span>` : '<span class="badge bg-secondary">0</span>'}</td>
+                    <td>${report.low > 0 ? `<span class="badge bg-secondary">${report.low}</span>` : '<span class="badge bg-secondary">0</span>'}</td>
+                    <td><strong>${report.total}</strong></td>
+                    <td>${escapeHtml(report.age)}</td>
+                </tr>
+            `;
+        }).join('');
+        
+        tbody.innerHTML = rows;
+        
+        setTimeout(() => {
+            if ($.fn.DataTable && !$.fn.DataTable.isDataTable('#clustercomplianceTable')) {
+                $('#clustercomplianceTable').DataTable({
+                    "order": [[5, "desc"]],
+                    "pageLength": 25
+                });
+            }
+        }, 50);
+    }
+    
+    function populateClusterVulnerabilityTable(reports) {
+        const tbody = document.getElementById('clustervulnerability-tbody');
+        if (!reports || reports.length === 0) {
+            tbody.innerHTML = '<tr><td class="text-center text-muted" colspan="8">No Cluster Vulnerability Reports found</td></tr>';
+            updateBadgeCount('clustervulnerabilityreports', 0);
+            return;
+        }
+        
+        updateBadgeCount('clustervulnerabilityreports', reports.length);
+        
+        const rows = reports.map(report => {
+            const resourceLink = `/plugins/trivy-operator/cluster/vulnerability/${escapeHtml(report.name)}`;
+            return `
+                <tr>
+                    <td><a href="${resourceLink}">${escapeHtml(report.name)}</a></td>
+                    <td>${report.critical > 0 ? `<span class="badge bg-danger">${report.critical}</span>` : '<span class="badge bg-secondary">0</span>'}</td>
+                    <td>${report.high > 0 ? `<span class="badge bg-warning text-dark">${report.high}</span>` : '<span class="badge bg-secondary">0</span>'}</td>
+                    <td>${report.medium > 0 ? `<span class="badge bg-info">${report.medium}</span>` : '<span class="badge bg-secondary">0</span>'}</td>
+                    <td>${report.low > 0 ? `<span class="badge bg-primary">${report.low}</span>` : '<span class="badge bg-secondary">0</span>'}</td>
+                    <td>${report.unknown > 0 ? `<span class="badge bg-secondary">${report.unknown}</span>` : '<span class="badge bg-secondary">0</span>'}</td>
+                    <td><strong>${report.total}</strong></td>
+                    <td>${escapeHtml(report.age)}</td>
+                </tr>
+            `;
+        }).join('');
+        
+        tbody.innerHTML = rows;
+        
+        setTimeout(() => {
+            if ($.fn.DataTable && !$.fn.DataTable.isDataTable('#clustervulnerabilityTable')) {
+                $('#clustervulnerabilityTable').DataTable({
+                    "order": [[6, "desc"]],
+                    "pageLength": 25
+                });
+            }
+        }, 50);
+    }
+    
+    function populateClusterConfigAuditTable(reports) {
+        const tbody = document.getElementById('clusterconfigaudit-tbody');
+        if (!reports || reports.length === 0) {
+            tbody.innerHTML = '<tr><td class="text-center text-muted" colspan="7">No Cluster Config Audit Reports found</td></tr>';
+            updateBadgeCount('clusterconfigauditreports', 0);
+            return;
+        }
+        
+        updateBadgeCount('clusterconfigauditreports', reports.length);
+        
+        const rows = reports.map(report => {
+            const resourceLink = `/plugins/trivy-operator/cluster/configaudit/${escapeHtml(report.name)}`;
+            const resourceDisplay = report.resource_kind && report.resource_name 
+                ? `${escapeHtml(report.resource_kind)}/${escapeHtml(report.resource_name)}`
+                : escapeHtml(report.name);
+            return `
+                <tr>
+                    <td><a href="${resourceLink}">${resourceDisplay}</a></td>
+                    <td>${report.critical > 0 ? `<span class="badge bg-danger">${report.critical}</span>` : '<span class="badge bg-secondary">0</span>'}</td>
+                    <td>${report.high > 0 ? `<span class="badge bg-warning text-dark">${report.high}</span>` : '<span class="badge bg-secondary">0</span>'}</td>
+                    <td>${report.medium > 0 ? `<span class="badge bg-info">${report.medium}</span>` : '<span class="badge bg-secondary">0</span>'}</td>
+                    <td>${report.low > 0 ? `<span class="badge bg-secondary">${report.low}</span>` : '<span class="badge bg-secondary">0</span>'}</td>
+                    <td><strong>${report.total}</strong></td>
+                    <td>${escapeHtml(report.age)}</td>
+                </tr>
+            `;
+        }).join('');
+        
+        tbody.innerHTML = rows;
+        
+        setTimeout(() => {
+            if ($.fn.DataTable && !$.fn.DataTable.isDataTable('#clusterconfigauditTable')) {
+                $('#clusterconfigauditTable').DataTable({
+                    "order": [[5, "desc"]],
+                    "pageLength": 25
+                });
+            }
+        }, 50);
+    }
+    
+    function populateClusterInfraAssessmentTable(reports) {
+        const tbody = document.getElementById('clusterinfraassessment-tbody');
+        if (!reports || reports.length === 0) {
+            tbody.innerHTML = '<tr><td class="text-center text-muted" colspan="7">No Cluster Infra Assessment Reports found</td></tr>';
+            updateBadgeCount('clusterinfraassessmentreports', 0);
+            return;
+        }
+        
+        updateBadgeCount('clusterinfraassessmentreports', reports.length);
+        
+        const rows = reports.map(report => {
+            const resourceLink = `/plugins/trivy-operator/cluster/infraassessment/${escapeHtml(report.name)}`;
+            const resourceDisplay = report.resource_kind && report.resource_name 
+                ? `${escapeHtml(report.resource_kind)}/${escapeHtml(report.resource_name)}`
+                : escapeHtml(report.name);
+            return `
+                <tr>
+                    <td><a href="${resourceLink}">${resourceDisplay}</a></td>
+                    <td>${report.critical > 0 ? `<span class="badge bg-danger">${report.critical}</span>` : '<span class="badge bg-secondary">0</span>'}</td>
+                    <td>${report.high > 0 ? `<span class="badge bg-warning text-dark">${report.high}</span>` : '<span class="badge bg-secondary">0</span>'}</td>
+                    <td>${report.medium > 0 ? `<span class="badge bg-info">${report.medium}</span>` : '<span class="badge bg-secondary">0</span>'}</td>
+                    <td>${report.low > 0 ? `<span class="badge bg-secondary">${report.low}</span>` : '<span class="badge bg-secondary">0</span>'}</td>
+                    <td><strong>${report.total}</strong></td>
+                    <td>${escapeHtml(report.age)}</td>
+                </tr>
+            `;
+        }).join('');
+        
+        tbody.innerHTML = rows;
+        
+        setTimeout(() => {
+            if ($.fn.DataTable && !$.fn.DataTable.isDataTable('#clusterinfraassessmentTable')) {
+                $('#clusterinfraassessmentTable').DataTable({
+                    "order": [[5, "desc"]],
+                    "pageLength": 25
+                });
+            }
+        }, 50);
+    }
+    
+    function populateClusterRbacAssessmentTable(reports) {
+        const tbody = document.getElementById('clusterrbacassessment-tbody');
+        if (!reports || reports.length === 0) {
+            tbody.innerHTML = '<tr><td class="text-center text-muted" colspan="6">No Cluster RBAC Assessment Reports found</td></tr>';
+            updateBadgeCount('clusterrbacassessmentreports', 0);
+            return;
+        }
+        
+        updateBadgeCount('clusterrbacassessmentreports', reports.length);
+        
+        const rows = reports.map(report => {
+            const resourceLink = `/plugins/trivy-operator/cluster/rbacassessment/${escapeHtml(report.name)}`;
+            const resourceDisplay = report.resource_kind && report.resource_name 
+                ? `${escapeHtml(report.resource_kind)}/${escapeHtml(report.resource_name)}`
+                : escapeHtml(report.name);
+            return `
+                <tr>
+                    <td><a href="${resourceLink}">${resourceDisplay}</a></td>
+                    <td>${report.danger > 0 ? `<span class="badge bg-danger">${report.danger}</span>` : '<span class="badge bg-secondary">0</span>'}</td>
+                    <td>${report.warning > 0 ? `<span class="badge bg-warning text-dark">${report.warning}</span>` : '<span class="badge bg-secondary">0</span>'}</td>
+                    <td>${report.pass > 0 ? `<span class="badge bg-success">${report.pass}</span>` : '<span class="badge bg-secondary">0</span>'}</td>
+                    <td><strong>${report.total}</strong></td>
+                    <td>${escapeHtml(report.age)}</td>
+                </tr>
+            `;
+        }).join('');
+        
+        tbody.innerHTML = rows;
+        
+        setTimeout(() => {
+            if ($.fn.DataTable && !$.fn.DataTable.isDataTable('#clusterrbacassessmentTable')) {
+                $('#clusterrbacassessmentTable').DataTable({
+                    "order": [[4, "desc"]],
+                    "pageLength": 25
+                });
+            }
+        }, 50);
+    }
+    
+    async function loadClusterReports(reportType) {
+        try {
+            const apiUrl = `/api/v1/plugins/trivy-operator/cluster/${reportType}`;
+            console.log(`Loading ${reportType} from:`, apiUrl);
+            
+            const response = await fetch(apiUrl, {
+                method: 'GET',
+                headers: {
+                    'Accept': 'application/json',
+                },
+                credentials: 'same-origin'
+            });
+            
+            if (!response.ok) {
+                const errorText = await response.text();
+                console.error(`HTTP error for ${reportType}:`, response.status, errorText);
+                throw new Error(`HTTP error! status: ${response.status}`);
+            }
+            
+            const data = await response.json();
+            console.log(`${reportType} data received:`, data);
+            
+            if (data.error) {
+                throw new Error(data.message || `Failed to load ${reportType}`);
+            }
+            
+            const reports = data.data || [];
+            
+            switch(reportType) {
+                case 'compliance-reports':
+                    populateClusterComplianceTable(reports);
+                    break;
+                case 'vulnerability-reports':
+                    populateClusterVulnerabilityTable(reports);
+                    break;
+                case 'config-audit-reports':
+                    populateClusterConfigAuditTable(reports);
+                    break;
+                case 'infra-assessment-reports':
+                    populateClusterInfraAssessmentTable(reports);
+                    break;
+                case 'rbac-assessment-reports':
+                    populateClusterRbacAssessmentTable(reports);
+                    break;
+            }
+        } catch (error) {
+            console.error(`Error loading ${reportType}:`, error);
+            const tbodyId = reportType.replace(/-reports$/, '').replace(/-/g, '') + '-tbody';
+            const tbody = document.getElementById(tbodyId);
+            if (tbody) {
+                tbody.innerHTML = `<tr><td class="text-center text-danger" colspan="10">Error loading ${reportType}: ${escapeHtml(error.message)}</td></tr>`;
+            }
+        }
+    }
+    
+    function initializePage() {
+        console.log('Trivy Operator cluster page initializing...');
+        
+        // Load all cluster reports in parallel
+        loadClusterReports('compliance-reports');
+        loadClusterReports('vulnerability-reports');
+        loadClusterReports('config-audit-reports');
+        loadClusterReports('infra-assessment-reports');
+        loadClusterReports('rbac-assessment-reports');
+    }
+    
+    // Initialize when DOM is ready
+    if (document.readyState === 'loading') {
+        document.addEventListener('DOMContentLoaded', initializePage);
+    } else {
+        setTimeout(initializePage, 100);
+    }
+})();
 </script>
 {% endblock %}

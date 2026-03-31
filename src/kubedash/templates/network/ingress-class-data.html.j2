@@ -6,16 +6,15 @@
       <nav aria-label="breadcrumb">
         <ol class="breadcrumb my-0">
           <li class="breadcrumb-item"><span>Network</span></li>
-          <li class="breadcrumb-item"><a href="/network/ingress-class">Ingress Class</a></li>
-          <li class="breadcrumb-item active"><span>{{ ic_data.name }}</span></li>
-
+          <li class="breadcrumb-item"><a href="/network/ingress">Ingress Class</a></li>
+          <li class="breadcrumb-item active"><span id="ingress-class-name-breadcrumb">Loading...</span></li>
         </ol>
       </nav>
     </div>
 </ul>
 <ul class="header-nav ms-auto"></ul>
 <ul class="header-nav d-lg-flex">
-{% include "segments/topmenu.html.j2" %}
+{% include "segments/partials/topmenu.html.j2" %}
 {% endblock %}
 
 {% block content %}
@@ -30,90 +29,363 @@
                 <table class="table table-bordered" id="podInfoTable" width="100%" cellspacing="0">
                     <tr>
                         <th>Name:</th>
-                        <td>{{ ic_data.name }}</td>
+                        <td id="ingress-class-name">Loading...</td>
                     </tr>
                     <tr>
                         <th>Created:</th>
-                        <td>{{ ic_data.created }}</td>
+                        <td id="ingress-class-created">Loading...</td>
                     </tr>
                     <tr>
                         <th>Annotations:</th>
-                        <td>
-                            {% if ic_data.annotations %}
-                            <table class="table table-bordered" id="annotationTable" width="100%" cellspacing="0">
-                                <thead>
-                                    <tr>
-                                        <th width="50%">Key</th>
-                                        <th width="50%">Value</th>
-                                    </tr>
-                                </thead>
-                                <tbody>
-                                {% for key, value in ic_data.annotations.items() %}
-                                    <tr>
-                                    {% if key != "kubectl.kubernetes.io/last-applied-configuration" %}
-                                        <td width="50%">{{ key }}</td>
-                                        <td width="50%">{{ value }}</td>
-                                    {% endif %}
-                                    </tr>
-                                {% endfor %}
-                                </tbody>
-                            </table>
-                            {% endif %}
+                        <td id="ingress-class-annotations-container">
+                            <div class="spinner-border spinner-border-sm text-primary" role="status">
+                                <span class="visually-hidden">Loading...</span>
+                            </div>
                         </td>
                     </tr>
                     <tr>
-                        <th>Lables:</th>
-                        <td>
-                            {% if ic_data.labels %}
-                            <table class="table table-bordered" id="labelsTable" width="100%" cellspacing="0">
-                                <thead>
-                                    <tr>
-                                        <th width="50%">Key</th>
-                                        <th width="50%">Value</th>
-                                    </tr>
-                                </thead>
-                                <tbody>
-                                {% for key, value in ic_data.labels.items() %}
-                                    <tr>
-                                        <td width="50%">{{ key }}</td>
-                                        <td width="50%">{{ value }}</td>
-                                    </tr>
-                                {% endfor %}
-                                </tbody>
-                            </table>
-                            {% endif %}
+                        <th>Labels:</th>
+                        <td id="ingress-class-labels-container">
+                            <div class="spinner-border spinner-border-sm text-primary" role="status">
+                                <span class="visually-hidden">Loading...</span>
+                            </div>
                         </td>
                     </tr>
                     <tr>
                         <th>Controller:</th>
-                        <td>{{ ic_data.controller }}</td>
+                        <td id="ingress-class-controller">Loading...</td>
                     </tr>
                 </table>
             </div>
         </div>
     </div>
-    {% if ic_data.parameters %}
-        <div class="card-body">
-            <div class="card shadow mb-4">
-                <div class="card-body">
-                    <div class="table-responsive">
-                        <table class="table table-bordered" id="podInfoTable" width="100%" cellspacing="0">
-                            {% for da_key, da_value in ic_data.parameters.items() %}
+    <div class="card-body" id="ingress-class-parameters-container" style="display: none;">
+        <div class="card shadow mb-4">
+            <div class="card-body">
+                <div class="table-responsive">
+                    <table class="table table-bordered" id="parametersTable" width="100%" cellspacing="0">
+                        <tbody id="parameters-tbody">
                             <tr>
-                                <th>{{ da_key }}:</th>
-                                <td>{{ da_value }}</td>
+                                <td colspan="2" class="text-center">
+                                    <div class="spinner-border spinner-border-sm text-primary" role="status">
+                                        <span class="visually-hidden">Loading...</span>
+                                    </div>
+                                </td>
                             </tr>
-                            {% endfor %}
-                        </table>
-                    </div>
+                        </tbody>
+                    </table>
                 </div>
             </div>
         </div>
-        {% endif %}
+    </div>
     </div>
 </div>
 {% endblock %}
 
 {% block add_head_css %}
-{% include "segments/datatable_snippet.html.j2" %}
+{% include "segments/components/datatable_snippet.html.j2" %}
+{% endblock %}
+
+{% block add_tail_js %}
+<script nonce="{{ csp_nonce }}">
+    const escapeHtml = (text) => {
+        if (text === null || text === undefined) return '';
+        const map = {
+            '&': '&amp;',
+            '<': '&lt;',
+            '>': '&gt;',
+            '"': '&quot;',
+            "'": '&#039;'
+        };
+        return String(text).replace(/[&<>"']/g, m => map[m]);
+    };
+    
+    // DataTables protection - prevent auto-initialization on loading rows
+    (function() {
+        // Wait for jQuery and DataTables to be available
+        function setupDataTablesProtection() {
+            if (typeof $ === 'undefined' || typeof $.fn.DataTable === 'undefined') {
+                setTimeout(setupDataTablesProtection, 100);
+                return;
+            }
+            
+            // Override DataTable initialization to prevent on colspan rows and prevent reinitialization
+            const originalDataTable = $.fn.DataTable;
+            $.fn.DataTable = function(opts) {
+                const $this = $(this);
+                const tableId = $this.attr('id');
+                
+                // Check if this is a loading row with colspan
+                if ($this.find('tbody tr td[colspan]').length > 0) {
+                    console.log('Blocked DataTable initialization on loading row for table:', tableId);
+                    return $this;
+                }
+                
+                // Check if DataTable is already initialized
+                if (typeof $.fn.DataTable.isDataTable === 'function' && $.fn.DataTable.isDataTable($this)) {
+                    console.log('DataTable already initialized for:', tableId, '- returning existing instance');
+                    return $this.data('DataTable');
+                }
+                
+                return originalDataTable.apply(this, arguments);
+            };
+        }
+        setupDataTablesProtection();
+    })();
+    
+    // Track which tables have been initialized
+    const initializedTables = new Set();
+    
+    function safeInitDataTable(selector, orderCol) {
+        const $table = $(selector);
+        if (!$table.length) return;
+        
+        // Check if we've already initialized this table
+        if (initializedTables.has(selector)) {
+            if (typeof $.fn.DataTable.isDataTable === 'function' && $.fn.DataTable.isDataTable(selector)) {
+                return;
+            } else {
+                initializedTables.delete(selector);
+            }
+        }
+        
+        try {
+            // Check if DataTable is already initialized
+            let isInitialized = false;
+            if (typeof $.fn.DataTable.isDataTable === 'function' && $.fn.DataTable.isDataTable(selector)) {
+                isInitialized = true;
+            } else if ($table.data('DataTable')) {
+                isInitialized = true;
+            }
+            
+            // Destroy existing DataTable if it exists
+            if (isInitialized) {
+                try {
+                    $table.DataTable().destroy();
+                    $table.removeData('DataTable');
+                    initializedTables.delete(selector);
+                } catch (destroyError) {
+                    console.warn('Error destroying DataTable:', destroyError);
+                    initializedTables.delete(selector);
+                }
+            }
+            
+            // Initialize DataTables
+            setTimeout(function() {
+                try {
+                    if (typeof $.fn.DataTable.isDataTable === 'function' && $.fn.DataTable.isDataTable(selector)) {
+                        initializedTables.add(selector);
+                        return;
+                    }
+                    
+                    const hasDataRows = $table.find('tbody tr').filter(function() {
+                        return !$(this).find('td[colspan]').length;
+                    }).length > 0;
+                    
+                    if (!hasDataRows) {
+                        return;
+                    }
+                    
+                    $table.DataTable({
+                        "order": [orderCol],
+                        "pageLength": 25,
+                        "responsive": true
+                    });
+                    
+                    initializedTables.add(selector);
+                } catch (initError) {
+                    console.warn('Error initializing DataTable:', initError);
+                    initializedTables.delete(selector);
+                }
+            }, 10);
+        } catch (e) {
+            console.warn('Error in safeInitDataTable:', e);
+            initializedTables.delete(selector);
+        }
+    }
+    
+    // Get ingress class name from URL, sessionStorage, or form data
+    function getIngressClassName() {
+        const urlParams = new URLSearchParams(window.location.search);
+        let ingressClassName = urlParams.get('ic_name');
+        
+        // Fallback to sessionStorage
+        if (!ingressClassName) {
+            ingressClassName = sessionStorage.getItem('ingress_class_data_name');
+        }
+        
+        // Fallback to form data (if page was loaded via POST)
+        if (!ingressClassName) {
+            const form = document.querySelector('form input[name="ic_name"]');
+            if (form) {
+                ingressClassName = form.value;
+            }
+        }
+        
+        return ingressClassName;
+    }
+    
+    function populateIngressClassInfo(ingressClass) {
+        if (!ingressClass) {
+            document.getElementById('ingress-class-name').textContent = 'N/A';
+            document.getElementById('ingress-class-created').textContent = 'N/A';
+            document.getElementById('ingress-class-controller').textContent = 'N/A';
+            return;
+        }
+        
+        document.getElementById('ingress-class-name').textContent = escapeHtml(ingressClass.name || 'N/A');
+        document.getElementById('ingress-class-created').textContent = escapeHtml(ingressClass.created || 'N/A');
+        document.getElementById('ingress-class-controller').textContent = escapeHtml(ingressClass.controller || 'N/A');
+        
+        // Populate annotations
+        const annotationsContainer = document.getElementById('ingress-class-annotations-container');
+        if (ingressClass.annotations && Object.keys(ingressClass.annotations).length > 0) {
+            // Destroy existing DataTable if it exists
+            const existingAnnotationTable = $('#annotationTable');
+            if (existingAnnotationTable.length && typeof $.fn.DataTable !== 'undefined' && $.fn.DataTable.isDataTable('#annotationTable')) {
+                try {
+                    existingAnnotationTable.DataTable().destroy();
+                    initializedTables.delete('#annotationTable');
+                } catch (e) {
+                    console.warn('Error destroying annotation table:', e);
+                }
+            }
+            
+            let annotationsHtml = '<table class="table table-bordered" id="annotationTable" width="100%" cellspacing="0"><thead><tr><th width="50%">Key</th><th width="50%">Value</th></tr></thead><tbody>';
+            for (const [key, value] of Object.entries(ingressClass.annotations)) {
+                if (key !== "kubectl.kubernetes.io/last-applied-configuration") {
+                    annotationsHtml += `<tr><td width="50%">${escapeHtml(key)}</td><td width="50%">${escapeHtml(value)}</td></tr>`;
+                }
+            }
+            annotationsHtml += '</tbody></table>';
+            annotationsContainer.innerHTML = annotationsHtml;
+            
+            // Initialize DataTable for annotations if there are rows
+            setTimeout(function() {
+                if ($('#annotationTable tbody tr').length > 0) {
+                    safeInitDataTable('#annotationTable', [0, "asc"]);
+                }
+            }, 100);
+        } else {
+            annotationsContainer.innerHTML = '<span class="text-muted">No annotations</span>';
+        }
+        
+        // Populate labels
+        const labelsContainer = document.getElementById('ingress-class-labels-container');
+        if (ingressClass.labels && Object.keys(ingressClass.labels).length > 0) {
+            // Destroy existing DataTable if it exists
+            const existingLabelsTable = $('#labelsTable');
+            if (existingLabelsTable.length && typeof $.fn.DataTable !== 'undefined' && $.fn.DataTable.isDataTable('#labelsTable')) {
+                try {
+                    existingLabelsTable.DataTable().destroy();
+                    initializedTables.delete('#labelsTable');
+                } catch (e) {
+                    console.warn('Error destroying labels table:', e);
+                }
+            }
+            
+            let labelsHtml = '<table class="table table-bordered" id="labelsTable" width="100%" cellspacing="0"><thead><tr><th width="50%">Key</th><th width="50%">Value</th></tr></thead><tbody>';
+            for (const [key, value] of Object.entries(ingressClass.labels)) {
+                labelsHtml += `<tr><td width="50%">${escapeHtml(key)}</td><td width="50%">${escapeHtml(value)}</td></tr>`;
+            }
+            labelsHtml += '</tbody></table>';
+            labelsContainer.innerHTML = labelsHtml;
+            
+            // Initialize DataTable for labels if there are rows
+            setTimeout(function() {
+                if ($('#labelsTable tbody tr').length > 0) {
+                    safeInitDataTable('#labelsTable', [0, "asc"]);
+                }
+            }, 100);
+        } else {
+            labelsContainer.innerHTML = '<span class="text-muted">No labels</span>';
+        }
+        
+        // Populate parameters if available
+        const parametersContainer = document.getElementById('ingress-class-parameters-container');
+        const parametersTbody = document.getElementById('parameters-tbody');
+        
+        if (ingressClass.parameters && Object.keys(ingressClass.parameters).length > 0) {
+            // Destroy existing DataTable if it exists
+            const existingParametersTable = $('#parametersTable');
+            if (existingParametersTable.length && typeof $.fn.DataTable !== 'undefined' && $.fn.DataTable.isDataTable('#parametersTable')) {
+                try {
+                    existingParametersTable.DataTable().destroy();
+                    initializedTables.delete('#parametersTable');
+                } catch (e) {
+                    console.warn('Error destroying parameters table:', e);
+                }
+            }
+            
+            parametersContainer.style.display = 'block';
+            let parametersHtml = '';
+            for (const [key, value] of Object.entries(ingressClass.parameters)) {
+                // Handle nested objects/arrays in parameters
+                let valueStr = '';
+                if (typeof value === 'object' && value !== null) {
+                    valueStr = JSON.stringify(value, null, 2);
+                } else {
+                    valueStr = String(value);
+                }
+                parametersHtml += `<tr><th>${escapeHtml(key)}:</th><td><pre>${escapeHtml(valueStr)}</pre></td></tr>`;
+            }
+            parametersTbody.innerHTML = parametersHtml;
+            
+            // Note: parametersTable doesn't need DataTables as it's a simple key-value table
+        } else {
+            parametersContainer.style.display = 'none';
+            parametersTbody.innerHTML = '<tr><td colspan="2" class="text-center text-muted">No parameters</td></tr>';
+        }
+    }
+    
+    async function loadIngressClassData() {
+        const ingressClassName = getIngressClassName();
+        
+        if (!ingressClassName) {
+            console.error('Ingress class name not found in URL, sessionStorage, or form.');
+            document.getElementById('ingress-class-name-breadcrumb').textContent = 'Error';
+            document.getElementById('ingress-class-name').textContent = 'Error: Ingress class name not provided.';
+            return;
+        }
+        
+        // Update breadcrumb
+        const breadcrumb = document.getElementById('ingress-class-name-breadcrumb');
+        if (breadcrumb) {
+            breadcrumb.textContent = ingressClassName;
+        }
+        
+        try {
+            const apiUrl = `/api/v1/network/ingress-classes/${encodeURIComponent(ingressClassName)}`;
+            console.log('Fetching ingress class data from:', apiUrl);
+            
+            const response = await fetch(apiUrl);
+            if (!response.ok) {
+                if (response.status === 404) {
+                    throw new Error(`IngressClass '${ingressClassName}' not found`);
+                }
+                throw new Error(`HTTP error! status: ${response.status}`);
+            }
+            
+            const data = await response.json();
+            console.log('Ingress class data API response:', data);
+            
+            if (data.error) {
+                throw new Error(data.message || 'Failed to load ingress class data');
+            }
+            
+            const ingressClass = data.data;
+            populateIngressClassInfo(ingressClass);
+            
+        } catch (error) {
+            console.error('Error loading ingress class data:', error);
+            document.getElementById('ingress-class-name-breadcrumb').textContent = 'Error';
+            document.getElementById('ingress-class-name').textContent = 'Error: ' + escapeHtml(error.message);
+        }
+    }
+    
+    // Load data when page loads
+    document.addEventListener('DOMContentLoaded', function() {
+        loadIngressClassData();
+    });
+</script>
 {% endblock %}

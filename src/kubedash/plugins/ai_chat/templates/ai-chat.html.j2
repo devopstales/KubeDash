@@ -1,0 +1,446 @@
+{% extends "base2.html.j2" %}
+
+{% block topmenu %}
+<ul class="header-nav d-lg-flex m-3">
+    <div class="container-fluid px-4">
+      <nav aria-label="breadcrumb">
+        <ol class="breadcrumb my-0">
+          <li class="breadcrumb-item"><span>Plugins</span></li>
+          <li class="breadcrumb-item active"><span>AI Chat</span></li>
+        </ol>
+      </nav>
+    </div>
+</ul>
+<ul class="header-nav ms-auto"></ul>
+<ul class="header-nav d-lg-flex">
+{% include "segments/partials/topmenu.html.j2" %}
+{% endblock %}
+
+{% block content %}
+<div class="card shadow mb-4">
+    <div class="card-header py-3">
+        <div class="d-flex justify-content-between align-items-center">
+            <h6 class="m-0 font-weight-bold text-primary">
+                <i class="cil-comment"></i> AI Chat
+                <span id="provider-badge" class="badge bg-warning text-dark ms-2 d-none">Local</span>
+            </h6>
+            <div>
+                <button id="new-conversation-btn" class="btn btn-sm btn-outline-primary me-2">
+                    <i class="cil-plus"></i> New Chat
+                </button>
+                <button id="provider-info-btn" class="btn btn-sm btn-outline-info">
+                    <i class="cil-info"></i> Provider Info
+                </button>
+            </div>
+        </div>
+    </div>
+    <div class="card-body p-0">
+        <div class="d-flex flex-column flex-md-row chat-layout">
+            <div class="chat-sidebar flex-shrink-0 border-end bg-body-tertiary d-flex flex-column">
+                <div class="p-3 border-bottom">
+                    <h6 class="mb-0">Conversations</h6>
+                </div>
+                <div id="conversations-list" class="list-group list-group-flush overflow-auto flex-grow-1 rounded-0">
+                    <div class="list-group-item text-center text-body-secondary py-3">
+                        <small>Loading...</small>
+                    </div>
+                </div>
+            </div>
+            <div class="chat-main flex-grow-1 d-flex flex-column min-h-0">
+                <div id="messages-container" class="overflow-auto flex-grow-1 p-3 bg-body-tertiary">
+                    <div class="text-center py-5 welcome-message">
+                        <i class="cil-comment display-1 text-primary"></i>
+                        <h3 class="mt-3">Welcome to AI Chat!</h3>
+                        <p class="text-body-secondary">Ask me anything about your Kubernetes cluster:</p>
+                        <div class="row justify-content-center mt-4">
+                            <div class="col-md-8">
+                                <div class="list-group">
+                                    <button type="button" class="list-group-item list-group-item-action example-query text-start" data-query="list namespaces">
+                                        <i class="cil-list"></i> List namespaces
+                                    </button>
+                                    <button type="button" class="list-group-item list-group-item-action example-query text-start" data-query="list pods in default">
+                                        <i class="cil-cloud"></i> List pods in default namespace
+                                    </button>
+                                    <button type="button" class="list-group-item list-group-item-action example-query text-start" data-query="list deployments in kube-system">
+                                        <i class="cil-settings"></i> List deployments in kube-system
+                                    </button>
+                                    <button type="button" class="list-group-item list-group-item-action example-query text-start" data-query="helm list">
+                                        <i class="cil-helm"></i> Show Helm releases
+                                    </button>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+                <div class="border-top p-3 bg-body">
+                    <form id="chat-form">
+                        <div class="input-group">
+                            <textarea id="message-input" class="form-control" placeholder="Type your message... (Press Enter to send, Shift+Enter for new line)" rows="2"></textarea>
+                            <button type="submit" class="btn btn-primary" id="send-btn">
+                                <i class="cil-paper-plane"></i> Send
+                            </button>
+                        </div>
+                    </form>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<div class="modal fade" id="providerInfoModal" tabindex="-1" aria-labelledby="providerInfoModalLabel" aria-hidden="true">
+    <div class="modal-dialog">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h5 class="modal-title" id="providerInfoModalLabel">AI Chat Provider Info</h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+            </div>
+            <div class="modal-body">
+                <div id="provider-info-content">Loading...</div>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}
+
+{% block add_head_css %}
+<link rel="stylesheet" href="{{ url_for('static', filename='/vendor/highlightjs@11.4.0/an-old-hope.min.css') }}">
+<style>
+.chat-layout { min-height: 500px; height: calc(100vh - 250px); }
+.chat-sidebar { width: 280px; }
+@media (max-width: 767.98px) {
+    .chat-layout { flex-direction: column; }
+    .chat-sidebar { width: 100%; max-height: 200px; border-end: 0; border-bottom: 1px solid var(--cui-border-color); }
+}
+.typing-dots span { width: 6px; height: 6px; background: currentColor; border-radius: 50%; margin: 0 2px; animation: typing-bounce 1.4s ease-in-out infinite; }
+.typing-dots span:nth-child(1) { animation-delay: -0.32s; }
+.typing-dots span:nth-child(2) { animation-delay: -0.16s; }
+@keyframes typing-bounce { 0%, 80%, 100% { transform: scale(0); } 40% { transform: scale(1); } }
+.chat-message-content { white-space: pre-wrap; line-height: 1.6; }
+.chat-message-content pre { white-space: pre; }
+.chat-message-content .chat-response-table { overflow-x: auto; border-radius: 0.375rem; margin-bottom: 0.75rem; }
+.chat-message-content .chat-response-table table { margin-bottom: 0; }
+#message-input { resize: none; max-height: 150px; }
+#send-btn { min-width: 6rem; }
+</style>
+{% endblock %}
+
+{% block add_tail_js %}
+<script src="{{ url_for('static', filename='/vendor/highlightjs@11.4.0/highlight.min.js') }}"></script>
+<script nonce="{{ csp_nonce }}">
+// Global error handler to catch any JavaScript errors
+window.addEventListener('error', function(e) {
+    console.error('Global error:', e.error);
+    var messagesEl = document.getElementById('messages-container');
+    if (messagesEl) {
+        messagesEl.innerHTML = '<div class="alert alert-danger m-3"><h5>JavaScript Error</h5><p>' + e.message + '</p><pre>' + (e.error ? e.error.stack : '') + '</pre></div>';
+    }
+});
+
+document.addEventListener('DOMContentLoaded', function() {
+    'use strict';
+
+    var API = '/api/v1/plugins/ai-chat';
+    var listEl = document.getElementById('conversations-list');
+    var messagesEl = document.getElementById('messages-container');
+    var messageInput = document.getElementById('message-input');
+    var chatForm = document.getElementById('chat-form');
+    var newBtn = document.getElementById('new-conversation-btn');
+    var providerInfoBtn = document.getElementById('provider-info-btn');
+    var providerBadge = document.getElementById('provider-badge');
+    var providerModal = null;
+    
+    console.log('AI Chat: DOMContentLoaded, API=', API);
+    console.log('AI Chat: Elements:', { listEl: !!listEl, messagesEl: !!messagesEl, chatForm: !!chatForm });
+    
+    // Initialize modal only if bootstrap is available
+    try {
+        var modalEl = document.getElementById('providerInfoModal');
+        if (modalEl && typeof bootstrap !== 'undefined') {
+            providerModal = new bootstrap.Modal(modalEl);
+            console.log('AI Chat: Modal initialized');
+        } else {
+            console.warn('AI Chat: Modal element or bootstrap not found');
+        }
+    } catch (e) {
+        console.error('Failed to initialize provider modal:', e);
+    }
+
+    var currentConversationId = null;
+    var conversations = [];
+
+    function esc(s) {
+        var d = document.createElement('div');
+        d.textContent = s == null ? '' : s;
+        return d.innerHTML;
+    }
+
+    function setList(html) {
+        if (listEl) listEl.innerHTML = html;
+    }
+
+    function loadConversations() {
+        if (!listEl) {
+            console.error('Conversations list element not found');
+            return;
+        }
+        setList('<div class="list-group-item text-center text-body-secondary py-3"><small>Loading...</small></div>');
+
+        fetch(API + '/chat/conversations', { credentials: 'same-origin' })
+            .then(function(res) {
+                console.log('loadConversations response status:', res.status);
+                console.log('loadConversations response headers:', res.headers.get('content-type'));
+                if (!res.ok) {
+                    return res.text().then(function(text) {
+                        console.error('loadConversations error response:', text.substring(0, 500));
+                        throw new Error('HTTP ' + res.status + ': ' + text.substring(0, 100));
+                    });
+                }
+                return res.text();
+            })
+            .then(function(text) {
+                console.log('loadConversations response:', text.substring(0, 200));
+                var data;
+                try {
+                    data = JSON.parse(text);
+                } catch (e) {
+                    console.error('Failed to parse JSON:', e, 'Text:', text.substring(0, 500));
+                    throw new Error('Invalid response (not JSON): ' + text.substring(0, 100));
+                }
+                conversations = Array.isArray(data) ? data : (data.conversations || []);
+                renderConversations();
+            })
+            .catch(function(err) {
+                console.error('loadConversations error:', err);
+                setList('<div class="list-group-item text-center text-body-secondary py-3"><small>Error: ' + esc(err.message) + '</small></div>');
+            });
+    }
+
+    function renderConversations() {
+        if (!listEl) return;
+        if (conversations.length === 0) {
+            setList('<div class="list-group-item text-center text-body-secondary py-3"><small>No conversations yet</small></div>');
+            return;
+        }
+        var html = conversations.map(function(c) {
+            var active = c.id === currentConversationId ? ' list-group-item-primary' : '';
+            return '<div class="list-group-item list-group-item-action text-start d-flex align-items-center gap-1 py-2' + active + '" data-id="' + c.id + '">' +
+                '<div class="flex-grow-1 min-w-0" data-select><div class="fw-semibold text-truncate">' + esc(c.title || 'New Conversation') + '</div>' +
+                '<small class="text-body-secondary">' + (c.message_count || 0) + ' messages</small></div>' +
+                '<button type="button" rel="tooltip" class="btn btn-danger btn-just-icon btn-sm flex-shrink-0" data-delete title="Delete"><i class="material-icons">delete</i></button></div>';
+        }).join('');
+        setList(html);
+        listEl.querySelectorAll('[data-id]').forEach(function(row) {
+            var id = parseInt(row.getAttribute('data-id'), 10);
+            row.querySelector('[data-select]').addEventListener('click', function() { selectConversation(id); });
+            row.querySelector('[data-delete]').addEventListener('click', function(e) { e.stopPropagation(); deleteConversation(id); });
+        });
+    }
+
+    function deleteConversation(id) {
+        if (!confirm('Delete this conversation?')) return;
+        fetch(API + '/chat/conversations/' + id, { method: 'DELETE', credentials: 'same-origin' })
+            .then(function(res) {
+                if (!res.ok) throw new Error(res.statusText);
+                return loadConversations();
+            })
+            .then(function() {
+                if (currentConversationId === id) newConversation();
+            })
+            .catch(function(err) {
+                alert('Delete failed: ' + err.message);
+            });
+    }
+
+    function selectConversation(id) {
+        currentConversationId = id;
+        renderConversations();
+        fetch(API + '/chat/conversations/' + id, { credentials: 'same-origin' })
+            .then(function(res) {
+                if (!res.ok) throw new Error('HTTP ' + res.status);
+                return res.json();
+            })
+            .then(function(data) {
+                var msgs = data.messages || (data.conversation && data.conversation.messages) || [];
+                renderMessages(Array.isArray(msgs) ? msgs : []);
+            })
+            .catch(function(err) {
+                console.error('loadConversationMessages', err);
+                appendMessage('assistant', 'Error loading: ' + err.message);
+            });
+    }
+
+    function renderMessages(messages) {
+        if (!messagesEl) return;
+        messagesEl.innerHTML = '';
+        messages.forEach(function(m) {
+            appendMessage(m.role, m.content, false);
+        });
+        scrollBottom();
+    }
+
+    function appendMessage(role, content, doScroll) {
+        if (doScroll === undefined) doScroll = true;
+        if (!messagesEl) return;
+        var div = document.createElement('div');
+        div.className = role === 'user' ? 'rounded-3 p-3 mb-3 bg-primary text-white ms-auto w-75' : 'rounded-3 p-3 mb-3 border bg-body w-75';
+        var contentDiv = document.createElement('div');
+        contentDiv.className = 'chat-message-content';
+        contentDiv.innerHTML = formatMessage(content);
+        if (typeof hljs !== 'undefined') {
+            contentDiv.querySelectorAll('pre code').forEach(function(block) { hljs.highlightElement(block); });
+        }
+        var timeDiv = document.createElement('div');
+        timeDiv.className = 'small mt-1 ' + (role === 'user' ? 'text-white text-opacity-75 text-end' : 'text-body-secondary');
+        timeDiv.textContent = new Date().toLocaleTimeString();
+        div.appendChild(contentDiv);
+        div.appendChild(timeDiv);
+        messagesEl.appendChild(div);
+        if (doScroll) scrollBottom();
+    }
+
+    function formatMessage(text) {
+        if (!text) return '';
+        var html = esc(text);
+        html = html.replace(/```(\w*)\n([\s\S]*?)```/g, function(_, lang, code) {
+            return '<pre class="pre-scrollable p-3 border rounded mb-2"><code class="d-block' + (lang ? ' language-' + lang : '') + '">' + code + '</code></pre>';
+        });
+        html = html.replace(/(?:^|\n)\n*((\|[^\n]+\|)\r?\n(\|[-\s|:]+\|)\r?\n((?:\|[^\n]+\|\r?\n?)+))/g, function(match, full, headerRow, sepRow, bodyRows) {
+            var rows = [headerRow].concat(bodyRows.trim().split(/\r?\n/));
+            var thead = '<tr>' + rowCells(rows[0]).map(function(c) { return '<th>' + c + '</th>'; }).join('') + '</tr>';
+            var tbody = '';
+            for (var i = 1; i < rows.length; i++) {
+                tbody += '<tr>' + rowCells(rows[i]).map(function(c) { return '<td>' + c + '</td>'; }).join('') + '</tr>';
+            }
+            return (match.indexOf('\n') === 0 ? '<br>' : '') + '<div class="chat-response-table"><table class="table table-bordered table-sm table-striped mb-2"><thead>' + thead + '</thead><tbody>' + tbody + '</tbody></table></div>';
+        });
+        html = html.replace(/`([^`]+)`/g, '<code class="p-1 rounded bg-body-tertiary">$1</code>');
+        html = html.replace(/\*\*([^*]+)\*\*/g, '<strong>$1</strong>');
+        html = html.replace(/\*([^*]+)\*/g, '<em>$1</em>');
+        html = html.replace(/\n/g, '<br>');
+        html = html.replace(/<table/g, '<div class="chat-response-table"><table class="table table-bordered table-sm table-striped mb-2"');
+        html = html.replace(/<\/table>/g, '</table></div>');
+        return html;
+    }
+
+    function rowCells(line) {
+        return line.split('|').map(function(s) { return s.trim(); }).filter(function(s) { return s.length > 0; });
+    }
+
+    function scrollBottom() {
+        if (messagesEl) messagesEl.scrollTop = messagesEl.scrollHeight;
+    }
+
+    function sendMessage(content) {
+        content = (content || '').trim();
+        if (!content) return;
+        if (messageInput) {
+            messageInput.value = '';
+            messageInput.style.height = 'auto';
+        }
+        appendMessage('user', content);
+        var loadingId = 'loading-' + Date.now();
+        var loadingDiv = document.createElement('div');
+        loadingDiv.id = loadingId;
+        loadingDiv.className = 'rounded-3 p-3 mb-3 border bg-body w-75';
+        loadingDiv.innerHTML = '<div class="typing-dots d-inline-flex align-items-center text-body-secondary"><span></span><span></span><span></span></div>';
+        messagesEl.appendChild(loadingDiv);
+        scrollBottom();
+
+        fetch(API + '/chat/message', {
+            method: 'POST',
+            credentials: 'same-origin',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ content: content, conversation_id: currentConversationId })
+        })
+        .then(function(res) {
+            var el = document.getElementById(loadingId);
+            if (el) el.remove();
+            if (!res.ok) throw new Error('HTTP ' + res.status);
+            return res.json();
+        })
+        .then(function(data) {
+            appendMessage('assistant', data.message && data.message.content ? data.message.content : 'No response');
+            if (!currentConversationId && data.conversation_id) {
+                currentConversationId = parseInt(data.conversation_id, 10);
+                loadConversations();
+            }
+        })
+        .catch(function(err) {
+            var el = document.getElementById(loadingId);
+            if (el) el.remove();
+            appendMessage('assistant', 'Error: ' + err.message);
+        });
+    }
+
+    chatForm.addEventListener('submit', function(e) {
+        e.preventDefault();
+        sendMessage(messageInput ? messageInput.value : '');
+    });
+
+    function attachExampleQueryListeners() {
+        document.querySelectorAll('.example-query').forEach(function(btn) {
+            btn.addEventListener('click', function() {
+                sendMessage(this.getAttribute('data-query'));
+            });
+        });
+    }
+
+    newBtn.addEventListener('click', function() {
+        currentConversationId = null;
+        if (!messagesEl) return;
+        messagesEl.innerHTML = '<div class="text-center py-5 welcome-message">' +
+            '<i class="cil-comment display-1 text-primary"></i><h3 class="mt-3">Welcome to AI Chat!</h3>' +
+            '<p class="text-body-secondary">Ask me anything about your Kubernetes cluster:</p>' +
+            '<div class="row justify-content-center mt-4"><div class="col-md-8"><div class="list-group">' +
+            '<button type="button" class="list-group-item list-group-item-action example-query text-start" data-query="list namespaces"><i class="cil-list"></i> List namespaces</button>' +
+            '<button type="button" class="list-group-item list-group-item-action example-query text-start" data-query="list pods in default"><i class="cil-cloud"></i> List pods in default namespace</button>' +
+            '<button type="button" class="list-group-item list-group-item-action example-query text-start" data-query="list deployments in kube-system"><i class="cil-settings"></i> List deployments in kube-system</button>' +
+            '<button type="button" class="list-group-item list-group-item-action example-query text-start" data-query="helm list"><i class="cil-helm"></i> Show Helm releases</button>' +
+            '</div></div></div></div>';
+        attachExampleQueryListeners();
+        renderConversations();
+        messageInput.focus();
+    });
+
+    attachExampleQueryListeners();
+
+    messageInput.addEventListener('input', function() {
+        this.style.height = 'auto';
+        this.style.height = Math.min(this.scrollHeight, 150) + 'px';
+    });
+
+    fetch(API + '/provider/info', { credentials: 'same-origin' })
+        .then(function(res) { return res.ok ? res.json() : {}; })
+        .then(function(info) {
+            if (providerBadge && info.local) providerBadge.classList.remove('d-none');
+        })
+        .catch(function() {});
+
+    providerInfoBtn.addEventListener('click', function() {
+        var contentEl = document.getElementById('provider-info-content');
+        if (!contentEl) return;
+        contentEl.textContent = 'Loading...';
+        fetch(API + '/provider/health', { credentials: 'same-origin' })
+            .then(function(res) { return res.json(); })
+            .then(function(data) {
+                var p = data.provider || {};
+                contentEl.innerHTML = '<table class="table table-sm">' +
+                    '<tr><th>Mode</th><td>' + (p.local ? '<span class="badge bg-warning">Local</span>' : '<span class="badge bg-success">LLM</span>') + '</td></tr>' +
+                    '<tr><th>Provider</th><td>' + esc(p.provider_type) + '</td></tr>' +
+                    '<tr><th>Model</th><td>' + esc(p.model) + '</td></tr>' +
+                    '<tr><th>Base URL</th><td>' + esc(p.base_url) + '</td></tr>' +
+                    '<tr><th>Cluster (lib/k8s)</th><td>' + (p.cluster_operations ? 'Yes' : 'No') + '</td></tr>' +
+                    '<tr><th>Health</th><td>' + (data.healthy ? '<span class="badge bg-success">Healthy</span>' : '<span class="badge bg-danger">Unhealthy</span>') + '</td></tr>' +
+                    '</table>';
+                if (providerModal) providerModal.show();
+            })
+            .catch(function(err) {
+                contentEl.innerHTML = '<div class="alert alert-danger">' + esc(err.message) + '</div>';
+                if (providerModal) providerModal.show();
+            });
+    });
+
+    loadConversations();
+});
+</script>
+{% endblock %}

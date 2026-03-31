@@ -1,10 +1,12 @@
+from typing import Dict, List, Optional, Tuple, Any
+
 from flask import flash
 from kubernetes import client as k8s_client
 from kubernetes import watch
 from kubernetes.client.rest import ApiException
 from kubernetes.stream import stream
 
-from lib.components import socketio
+from lib.components import socketio, get_flask_app
 from lib.helper_functions import (
     ErrorHandler, trimAnnotations
 )
@@ -169,8 +171,8 @@ def k8sDeploymentsGet(username_role, user_token, ns):
                 "environment_variables": [],
                 # Security
                 "security_context": d.spec.template.spec.security_context.to_dict(),
-                # Conditions
-                "conditions": d.status.conditions,
+                # Conditions (will be serialized later)
+                "conditions": [],
                 # Containers
                 "containers": list(),
                 "init_containers": list(),
@@ -201,6 +203,29 @@ def k8sDeploymentsGet(username_role, user_token, ns):
                 DEPLOYMENT_DATA["annotations"] = trimAnnotations(d.metadata.annotations)
             selectors = d.spec.selector.to_dict()
             DEPLOYMENT_DATA['selectors'] = selectors['match_labels']
+            # Serialize V1DeploymentCondition objects to dictionaries
+            if d.status.conditions:
+                DEPLOYMENT_DATA['conditions'] = []
+                for condition in d.status.conditions:
+                    if hasattr(condition, 'to_dict'):
+                        # Use to_dict() if available (Kubernetes client library method)
+                        condition_dict = condition.to_dict()
+                        # Convert snake_case to camelCase for consistency
+                        if 'last_transition_time' in condition_dict:
+                            condition_dict['lastTransitionTime'] = condition_dict.pop('last_transition_time')
+                        DEPLOYMENT_DATA['conditions'].append(condition_dict)
+                    else:
+                        # Manual conversion
+                        condition_dict = {
+                            'type': condition.type if hasattr(condition, 'type') else '',
+                            'status': condition.status if hasattr(condition, 'status') else '',
+                            'reason': condition.reason if hasattr(condition, 'reason') else '',
+                            'message': condition.message if hasattr(condition, 'message') else '',
+                            'lastTransitionTime': condition.last_transition_time.strftime('%Y-%m-%d %H:%M:%S') if hasattr(condition, 'last_transition_time') and condition.last_transition_time else ''
+                        }
+                        # Remove empty values
+                        condition_dict = {k: v for k, v in condition_dict.items() if v}
+                        DEPLOYMENT_DATA['conditions'].append(condition_dict)
             if d.spec.template.spec.image_pull_secrets:
                 for ips in d.spec.template.spec.image_pull_secrets:
                     DEPLOYMENT_DATA['image_pull_secrets'].append(ips.to_dict())
@@ -544,32 +569,56 @@ def k8sPodDelete(username_role, user_token, ns, po):
 ## Pod Logs
 ##############################################################
 
-def k8sPodLogsStream(username_role, user_token, namespace, pod_name, container):
-    k8sClientConfigGet(username_role, user_token)
-    try:
-        w = watch.Watch()
-        for line in w.stream(
-                k8s_client.CoreV1Api().read_namespaced_pod_log, 
-                name=pod_name, 
-                namespace=namespace,
-                container=container,
-                tail_lines=100,
-                _request_timeout=300
-            ):
-            socketio.emit('response',
-                                {'data': str(line)}, namespace="/log")
-    except ApiException as error:
+def k8sPodLogsStream(username_role, user_token, namespace, pod_name, container, sid, cancel_event):
+    # Push application context for background thread
+    app = get_flask_app()
+    with app.app_context():
+        k8sClientConfigGet(username_role, user_token)
+        try:
+            w = watch.Watch()
+            for line in w.stream(
+                    k8s_client.CoreV1Api().read_namespaced_pod_log,
+                    name=pod_name,
+                    namespace=namespace,
+                    container=container,
+                    tail_lines=100,
+                    _request_timeout=300
+                ):
+                if cancel_event and cancel_event.is_set():
+                    break
+                try:
+                    socketio.emit("response", {"data": str(line)}, room=sid, namespace="/log")
+                except (OSError, BrokenPipeError, ConnectionError) as emit_error:
+                    logger.debug(f"Socket emit error (client likely disconnected): {emit_error}")
+                    break
+                except Exception as emit_error:
+                    logger.warning(f"Unexpected error emitting socket message: {emit_error}")
+        except ApiException as error:
             ErrorHandler(logger, error, "get logStream - %s" % error.status)
-    except Exception as error:
-        ERROR = "k8sPodLogsStream: %s" % error
-        ErrorHandler(logger, "error", ERROR)
+        except (OSError, BrokenPipeError, ConnectionError) as error:
+            logger.debug(f"Connection error in log stream (client likely disconnected): {error}")
+        except Exception as error:
+            ERROR = "k8sPodLogsStream: %s" % error
+            ErrorHandler(logger, "error", ERROR)
+        finally:
+            if cancel_event:
+                cancel_event.set()
 
 ##############################################################
 ## Pod Exec
 ##############################################################
 
 def k8sPodExecSocket(username_role, user_token, namespace, pod_name, container):
-    k8sClientConfigGet(username_role, user_token)
+    # This is called from socketio handler which should have app context
+    # But to be safe, ensure we have app context
+    from flask import has_app_context
+    if not has_app_context():
+        # Get app and push context
+        app = get_flask_app()
+        with app.app_context():
+            k8sClientConfigGet(username_role, user_token)
+    else:
+        k8sClientConfigGet(username_role, user_token)
     try:
         wsclient = stream(k8s_client.CoreV1Api().connect_get_namespaced_pod_exec,
                 pod_name,
@@ -586,62 +635,33 @@ def k8sPodExecSocket(username_role, user_token, namespace, pod_name, container):
         ERROR = "k8sPodExecSocket: %s" % error
         ErrorHandler(logger, "error", ERROR)
         return None
-    
-"""
-    def terminal_start(self, namespace, pod_name, container):
-        command = [
-            "/bin/sh",
-            "-c",
-            'TERM=xterm-256color; export TERM; [ -x /bin/bash ] '
-            '&& ([ -x /usr/bin/script ] '
-            '&& /usr/bin/script -q -c "/bin/bash" /dev/null || exec /bin/bash) '
-            '|| exec /bin/sh']
-        client_v1 = self.get_client()
-        container_stream = stream(
-            client_v1.connect_get_namespaced_pod_exec,
-            name=pod_name,
-            namespace=namespace,
-            container=container,
-            command=command,
-            stderr=True, stdin=True,
-            stdout=True, tty=True,
-            _preload_content=False
-        )
 
-        return container_stream
-"""
-
-def k8sPodExecStream(wsclient, username_role, user_token, namespace, pod_name, container):
-    while True:
-        socketio.sleep(0.01)
+def k8sPodExecStream(wsclient, username_role, user_token, namespace, pod_name, container, sid, exec_streams, cancel_ev):
+    try:
+        while True:
+            if cancel_ev.is_set():
+                break
+            socketio.sleep(0.01)
+            try:
+                wsclient.update(timeout=5)
+                output = wsclient.read_all()
+                if output:
+                    try:
+                        socketio.emit("response", {"output": output}, room=sid, namespace="/exec")
+                    except (OSError, BrokenPipeError, ConnectionError) as emit_error:
+                        logger.debug(f"Socket emit error in exec stream (client likely disconnected): {emit_error}")
+                        break
+                    except Exception as emit_error:
+                        logger.warning(f"Unexpected error emitting socket message in exec stream: {emit_error}")
+            except Exception as error:
+                logger.error("k8sPodExecStream: %s" % error)
+                break
+    finally:
+        exec_streams.pop(sid, None)
         try:
-            wsclient.update(timeout=5)
-
-            """Read from wsclient"""
-            output = wsclient.read_all()
-            if output:
-                """write back to socket"""
-                socketio.emit(
-                    "response", {"output": output}, namespace="/exec")
-        #except:
-        #    try:
-        #        print("Failed to read")
-        #        wsclient = k8sPodExecSocket(username_role, user_token, namespace, pod_name, container)
-        #
-        #        """Read from wsclient"""
-        #        output = wsclient.read_all()
-        #        if output:
-        #            """write back to socket"""
-        #            socketio.emit(
-        #                "response", {"output": output}, namespace="/exec")
-        #            
-        #    except Exception as error:
-        #        # Show disconnected status on the UI
-        #        logger.error("k8sPodExecStream: %s" % error)
-
-        except Exception as error:
-            # Show disconnected status on the UI
-            logger.error("k8sPodExecStream: %s" % error)
+            socketio.emit("closed", {"message": "Stream ended"}, room=sid, namespace="/exec")
+        except Exception:
+            pass
 
 ##############################################################
 ## ReplicaSets
@@ -897,3 +917,121 @@ def k8sWorkloadList(username_role, user_token, namespace):
         WORKLOAD_LIST.append(WORKLOAD)
 
     return WORKLOAD_LIST
+
+
+##############################################################
+## Pod Events
+##############################################################
+
+def k8sPodGetEvents(
+    username_role: str,
+    user_token: str,
+    namespace: str,
+    pod_name: str,
+    limit: int = 50
+) -> Tuple[List[Dict[str, Any]], Optional[str]]:
+    """
+    Fetch Kubernetes events related to a pod.
+    
+    Args:
+        username_role: User role for authorization
+        user_token: User token for authentication
+        namespace: The namespace of the pod
+        pod_name: The name of the pod
+        limit: Maximum number of events to return (default: 50)
+        
+    Returns:
+        Tuple of (events_list, error_message)
+        - On success: (events_list, None)
+        - On error: ([], error_message)
+    """
+    k8sClientConfigGet(username_role, user_token)
+    core_api = k8s_client.CoreV1Api()
+    
+    try:
+        # First, try to get the pod to get its UID for more precise matching
+        pod_uid = None
+        try:
+            pod = core_api.read_namespaced_pod(pod_name, namespace, _request_timeout=2)
+            pod_uid = pod.metadata.uid
+        except ApiException:
+            # If we can't get the pod, continue with name-based matching
+            pass
+        except Exception:
+            # If we can't get the pod, continue with name-based matching
+            pass
+        
+        # Field selector to filter events by involved object
+        # Use UID if available (more precise), otherwise use name+kind
+        if pod_uid:
+            field_selector = f"involvedObject.uid={pod_uid}"
+        else:
+            field_selector = f"involvedObject.name={pod_name},involvedObject.kind=Pod"
+        
+        try:
+            events = core_api.list_namespaced_event(
+                namespace=namespace,
+                field_selector=field_selector,
+                limit=limit,
+                _request_timeout=5
+            )
+        except ApiException as e:
+            # If field selector fails, try without it and filter manually
+            logger.warning(f"Field selector failed for pod {pod_name}, trying without selector: {e}")
+            events = core_api.list_namespaced_event(
+                namespace=namespace,
+                limit=limit * 2,  # Get more events to filter from
+                _request_timeout=5
+            )
+        
+        # Convert to list of dicts and sort by last timestamp (newest first)
+        event_list = []
+        for event in events.items:
+            # Additional filter: ensure the event actually matches our pod
+            # This is important because field selectors might match multiple objects
+            if event.involved_object.kind == "Pod":
+                if pod_uid:
+                    # If we have UID, match by UID
+                    if event.involved_object.uid == pod_uid:
+                        event_dict = {
+                            "type": event.type,
+                            "reason": event.reason,
+                            "message": event.message,
+                            "count": event.count or 1,
+                            "first_timestamp": event.first_timestamp.isoformat() if event.first_timestamp else None,
+                            "last_timestamp": event.last_timestamp.isoformat() if event.last_timestamp else None,
+                            "source": event.source.component if event.source else None,
+                            "reporting_controller": getattr(event, 'reporting_controller', None),
+                        }
+                        event_list.append(event_dict)
+                else:
+                    # Match by name and namespace
+                    if (event.involved_object.name == pod_name and 
+                        event.involved_object.namespace == namespace):
+                        event_dict = {
+                            "type": event.type,
+                            "reason": event.reason,
+                            "message": event.message,
+                            "count": event.count or 1,
+                            "first_timestamp": event.first_timestamp.isoformat() if event.first_timestamp else None,
+                            "last_timestamp": event.last_timestamp.isoformat() if event.last_timestamp else None,
+                            "source": event.source.component if event.source else None,
+                            "reporting_controller": getattr(event, 'reporting_controller', None),
+                        }
+                        event_list.append(event_dict)
+        
+        # Sort by last_timestamp descending (newest first)
+        event_list.sort(
+            key=lambda x: x.get("last_timestamp") or x.get("first_timestamp") or "",
+            reverse=True
+        )
+        
+        return event_list, None
+        
+    except ApiException as error:
+        if error.status != 404:
+            ErrorHandler(logger, error, f"get events for Pod {pod_name} in namespace {namespace}")
+        return [], None  # Return empty list instead of error for 404
+    except Exception as error:
+        ErrorHandler(logger, error, f"get events for Pod {pod_name} in namespace {namespace}")
+        return [], f"Failed to connect to Kubernetes: {str(error)}"

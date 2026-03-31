@@ -27,6 +27,54 @@ spec:
       serviceAccountName: {{ include "kubedash.serviceAccountName" . }}
       securityContext:
         {{- toYaml .Values.podSecurityContext | nindent 8 }}
+      initContainers:
+{{- if .Values.redis.enabled }}
+      - name: wait-for-redis
+        image: redis:7-alpine
+        command:
+          - sh
+          - -c
+          - |
+            until redis-cli -h {{ .Release.Name }}-redis -p 6379 ping; do
+              echo "Waiting for Redis to be ready..."
+              sleep 2
+            done
+            echo "Redis is ready!"
+{{- end }}
+{{- if or .Values.postgresql.enabled .Values.externalDatabase.enabled }}
+      - name: wait-for-postgresql
+        image: postgres:15-alpine
+        command:
+          - sh
+          - -c
+          - |
+            {{- if .Values.postgresql.enabled }}
+            until pg_isready -h {{ .Release.Name }}-postgresql -p 5432 -U {{ .Values.postgresql.auth.username }}; do
+              echo "Waiting for PostgreSQL to be ready..."
+              sleep 2
+            done
+            echo "PostgreSQL is ready!"
+            {{- else if .Values.externalDatabase.enabled }}
+            until pg_isready -h {{ .Values.externalDatabase.host }} -p {{ .Values.externalDatabase.port }} -U {{ .Values.externalDatabase.username }}; do
+              echo "Waiting for PostgreSQL to be ready..."
+              sleep 2
+            done
+            echo "PostgreSQL is ready!"
+            {{- end }}
+{{- end }}
+{{- if .Values.jaeger.enabled }}
+      - name: wait-for-jaeger
+        image: curlimages/curl:latest
+        command:
+          - sh
+          - -c
+          - |
+            until curl -f http://{{ include "kubedash.fullname" . }}-jaeger:16686/api/services; do
+              echo "Waiting for Jaeger to be ready..."
+              sleep 2
+            done
+            echo "Jaeger is ready!"
+{{- end }}
       containers:
       - name: {{ .Chart.Name }}
         image: "{{ .Values.image.repository }}:{{ .Values.image.tag | default .Chart.AppVersion }}"
@@ -45,17 +93,22 @@ spec:
         livenessProbe:
           httpGet:
             path: /api/health/live
-            port: 8000
+            port: {{ .Values.service.port }}
+            scheme: HTTPS
           initialDelaySeconds: 5
           timeoutSeconds: 1
+          # Skip TLS verification for self-signed certificates
+          # Kubernetes health probes don't verify certificates by default, but explicit is better
         readinessProbe:
           httpGet:
             path: /api/health/ready
-            port: 8000
+            port: {{ .Values.service.port }}
+            scheme: HTTPS
           initialDelaySeconds: 5
           timeoutSeconds: 1
+          # Skip TLS verification for self-signed certificates
         ports:
-        - containerPort: 8000
+        - containerPort: {{ .Values.service.port }}
           protocol: TCP
           name: http
         volumeMounts:
@@ -114,6 +167,11 @@ spec:
 {{- with .Values.tolerations }}
       tolerations:
         {{- . | toYaml | nindent 8 }}
+{{- end }}
+{{- if .Values.dnsConfig.enabled }}
+      dnsConfig:
+        options:
+          {{- toYaml .Values.dnsConfig.options | nindent 10 }}
 {{- end }}
   volumeClaimTemplates:
 {{- if and .Values.persistence.enabled (not .Values.externalDatabase.enabled) (not .Values.postgresql.enabled) }}

@@ -13,7 +13,7 @@
 </ul>
 <ul class="header-nav ms-auto"></ul>
 <ul class="header-nav d-lg-flex">
-{% include "segments/topmenu.html.j2" %}
+{% include "segments/partials/topmenu.html.j2" %}
 {% endblock %}
 
 
@@ -70,12 +70,12 @@
 {% endblock %}
 
 {% block add_head_css %}
-{% include "segments/pyvis_snippet.html.j2" %}
+{% include "segments/components/pyvis_snippet.html.j2" %}
 {% endblock %}
 
 
 {% block add_tail_js %}
-    <script>
+    <script nonce="{{ csp_nonce }}">
         function getThemeColor() {
             return document.documentElement.getAttribute('data-coreui-theme') === 'dark' ? '#181a1b' : '#ffffff';
         }
@@ -209,7 +209,7 @@
         window.onload = updateNetworkTheme;
     </script>
 
-    <script type="text/javascript">
+    <script type="text/javascript" nonce="{{ csp_nonce }}">
         // initialize global variables.
         var edges;
         var nodes;
@@ -352,12 +352,14 @@
         }
 
         // This method is responsible for drawing the graph, returns the drawn network
-        function drawGraph() {
+        function drawGraph(nodesData, edgesData) {
             var container = document.getElementById('mynetwork');
-            let node = JSON.parse('{{ nodes | tojson }}');
-            let edge = JSON.parse('{{ edges | tojson }}');
+            
+            // Use provided data or empty arrays
+            let node = nodesData || [];
+            let edge = edgesData || [];
 
-            // parsing and collecting nodes and edges from the python
+            // parsing and collecting nodes and edges from the API data
             nodes = new vis.DataSet(node);
             edges = new vis.DataSet(edge);
 
@@ -650,6 +652,74 @@
             }
         }
 
-        drawGraph();
+        // Load workload map data using fetch() - following Flask fetch pattern
+        async function loadWorkloadMap(namespace) {
+            const workload_map_url = '/api/v1/cluster/workload-map';
+            const url = namespace ? `${workload_map_url}?namespace=${encodeURIComponent(namespace)}` : workload_map_url;
+            
+            try {
+                console.log('Fetching workload map from:', url);
+                const response = await fetch(url);
+                
+                if (!response.ok) {
+                    throw new Error(`HTTP error! status: ${response.status}`);
+                }
+                
+                const data = await response.json();
+                console.log('Workload map API response:', data);
+                
+                if (data.error) {
+                    throw new Error(data.message || 'Failed to load workload map');
+                }
+                
+                // Extract nodes and edges from API response
+                const nodesData = data.data?.nodes || [];
+                const edgesData = data.data?.edges || [];
+                
+                console.log('Loaded', nodesData.length, 'nodes and', edgesData.length, 'edges');
+                
+                // Draw graph with fetched data
+                drawGraph(nodesData, edgesData);
+                
+            } catch (error) {
+                console.error('Error loading workload map:', error);
+                // Show error in the network container
+                const container = document.getElementById('mynetwork');
+                if (container) {
+                    container.innerHTML = `
+                        <div style="display: flex; align-items: center; justify-content: center; height: 100%; color: #dc3545;">
+                            <div style="text-align: center;">
+                                <h5>Error loading workload map</h5>
+                                <p>${error.message}</p>
+                            </div>
+                        </div>
+                    `;
+                }
+            }
+        }
+
+        // Get namespace from topbar selector or use default
+        function getSelectedNamespace() {
+            const namespaceSelect = document.getElementById('topbar-namespace-select');
+            return namespaceSelect ? namespaceSelect.value : '';
+        }
+
+        // Load data when page loads
+        document.addEventListener('DOMContentLoaded', function() {
+            const namespace = getSelectedNamespace();
+            loadWorkloadMap(namespace);
+        });
+
+        // Reload data when namespace changes (if namespace selector exists)
+        document.addEventListener('DOMContentLoaded', function() {
+            const namespaceSelect = document.getElementById('topbar-namespace-select');
+            if (namespaceSelect) {
+                namespaceSelect.addEventListener('change', function() {
+                    const namespace = this.value;
+                    console.log('Namespace changed to:', namespace);
+                    loadWorkloadMap(namespace);
+                });
+            }
+        });
     </script>
 {% endblock %}

@@ -21,7 +21,7 @@
     </button>
   </div>
   {% endif %}
-{% include "segments/topmenu.html.j2" %}
+{% include "segments/partials/topmenu.html.j2" %}
 {% endblock %}
 
 {% block content %}
@@ -43,64 +43,15 @@
                         <th>Action</th>
                     </tr>
                 </thead>
-                <tbody>
-                    {% for ns in namespace_list %}
-                    {% if selected == ns.name %}
-                      <tr class="selected" >
-                    {% else %}
-                      <tr>
-                    {% endif %}
-                      <td>
-                      {% if ns.status == "Active" %}
-                        <span class="badge text-bg-success">{{ ns.status }}</span>
-                      {% else %}
-                        <span class="badge text-bg-danger">{{ ns.status }}</span>
-                      {% endif %}
-                      </td>
-                      <td>
-                          <form action="/cluster/namespace/data" method="POST">
-                            <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
-                            <input type="hidden" name="ns_data" value="{{ ns }}" />
-                            <input type="hidden" name="ns_select" value="{{ ns.name }}" />
-                            <a href="javascript:;" onclick="parentNode.submit();">{{ ns.name }}</a>
-                          </form>
-                        
-                      </td>
-                      <td>
-                        {% if ns.app_service.repository and ns.app_service.repository.startswith(('http://', 'https://')) %}
-                          <a  width="24" height="24" href="{{ ns.app_service.repository }}" target="_blank" rel="noopener noreferrer">
-                            <i class="fa-solid fa-code-branch fa-lg" style="font-size: 24px;"></i>
-                          </a>
-                        {% else %}
-                          -
-                        {% endif %}
-                      </td>
-                      <td>
-                        {% if ns.app_service.pipeline and ns.app_service.pipeline.startswith(('http://', 'https://')) %}
-                          <a href="{{ ns.app_service.pipeline }}" target="_blank" rel="noopener noreferrer">
-                            <i class="fa-solid fa-diagram-project fa-lg" style="font-size: 24px;"></i>
-                          </a>
-                        {% else %}
-                          -
-                        {% endif %}
-                      </td>
-                      <td>{{ ns.created }}</td>
-                      <td>
-                        <div class="d-flex flex-row">
-                          {% if session['user_role'] == "Admin" %}
-                          <!-- Button trigger modal -->
-                          <form action="/cluster/namespace/delete" method="post">
-                            <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
-                            <input type="hidden"  name="namespace" value="{{ ns.name }}"/>
-                            <button type="submit" rel="tooltip" class="btn btn-danger btn-just-icon btn-sm" value="upvote">
-                                <i class="material-icons">delete</i>
-                            </button>
-                          </form>  
-                          {% endif %}
-                        </div>
-                      </td>
+                <tbody id="namespaces-tbody">
+                    <tr>
+                        <td colspan="6" class="text-center">
+                            <div class="spinner-border spinner-border-sm text-primary" role="status">
+                                <span class="visually-hidden">Loading...</span>
+                            </div>
+                            <span class="ms-2">Loading namespaces...</span>
+                        </td>
                     </tr>
-                  {% endfor %}
                 </tbody>
             </table>
 
@@ -138,5 +89,288 @@
 {% endblock %}
 
 {% block add_head_css %}
-{% include "segments/datatable_snippet.html.j2" %}
+{% include "segments/components/datatable_snippet.html.j2" %}
+{% endblock %}
+
+{% block add_tail_js %}
+<script nonce="{{ csp_nonce }}">
+    // IMMEDIATE: Prevent datatables-demo.js from initializing on loading row
+    (function() {
+        function setupOverride() {
+            if (typeof $ !== 'undefined' && $.fn && !window._datatableOverrideSetup) {
+                window._datatableOverrideSetup = true;
+                const originalDataTable = $.fn.DataTable;
+                $.fn.DataTable = function(options) {
+                    const table = this[0];
+                    if (table && table.id === 'dataTable') {
+                        const tbody = table.querySelector('tbody');
+                        if (tbody) {
+                            const rows = tbody.querySelectorAll('tr');
+                            const hasColspanRow = Array.from(rows).some(row => {
+                                const cells = row.querySelectorAll('td');
+                                return Array.from(cells).some(cell => cell.hasAttribute('colspan'));
+                            });
+                            if (hasColspanRow) {
+                                console.log('Blocked DataTable initialization on loading row');
+                                return this;
+                            }
+                        }
+                    }
+                    return originalDataTable.apply(this, arguments);
+                };
+                Object.setPrototypeOf($.fn.DataTable, originalDataTable);
+                Object.keys(originalDataTable).forEach(key => {
+                    $.fn.DataTable[key] = originalDataTable[key];
+                });
+            }
+        }
+        setupOverride();
+        setTimeout(setupOverride, 0);
+        setTimeout(setupOverride, 50);
+        setTimeout(setupOverride, 100);
+    })();
+    
+    (function() {
+        function checkAndDestroyAutoInit() {
+            if (typeof $ !== 'undefined' && $.fn.DataTable) {
+                const table = document.getElementById('dataTable');
+                if (table && $.fn.DataTable.isDataTable(table)) {
+                    const tbody = table.querySelector('tbody');
+                    if (tbody) {
+                        const rows = tbody.querySelectorAll('tr');
+                        const hasColspanRow = Array.from(rows).some(row => {
+                            const cells = row.querySelectorAll('td');
+                            return Array.from(cells).some(cell => cell.hasAttribute('colspan'));
+                        });
+                        if (hasColspanRow) {
+                            console.log('Destroying auto-initialized DataTable on loading row');
+                            try {
+                                $(table).DataTable().destroy();
+                            } catch(e) {
+                                console.error('Error destroying DataTable:', e);
+                            }
+                        }
+                    }
+                }
+            }
+        }
+        if (typeof $ !== 'undefined') {
+            checkAndDestroyAutoInit();
+        }
+        setTimeout(checkAndDestroyAutoInit, 50);
+        setTimeout(checkAndDestroyAutoInit, 100);
+        setTimeout(checkAndDestroyAutoInit, 200);
+        setTimeout(checkAndDestroyAutoInit, 500);
+        setTimeout(checkAndDestroyAutoInit, 1000);
+    })();
+    
+    const csrf_token = {{ csrf_token()|tojson }};
+    const selected_namespace = {{ (request.args.get('selected') or '')|tojson }};
+    const user_role = {{ session.get('user_role', '')|tojson }};
+    const is_admin = user_role === 'Admin';
+    const namespaces_api_url = '/api/v1/namespaces';
+    
+    const escapeHtml = (text) => {
+        if (text === null || text === undefined) return '';
+        const map = {
+            '&': '&amp;',
+            '<': '&lt;',
+            '>': '&gt;',
+            '"': '&quot;',
+            "'": '&#039;'
+        };
+        return String(text).replace(/[&<>"']/g, m => map[m]);
+    };
+    
+    function populateNamespacesTable(namespaces) {
+        const tbody = document.getElementById('namespaces-tbody');
+        const table = document.getElementById('dataTable');
+        
+        if (table && typeof $ !== 'undefined' && $.fn.DataTable && $.fn.DataTable.isDataTable(table)) {
+            $(table).DataTable().destroy();
+        }
+        
+        tbody.innerHTML = `
+            <tr>
+                <td colspan="6" class="text-center">
+                    <div class="spinner-border spinner-border-sm text-primary" role="status">
+                        <span class="visually-hidden">Loading...</span>
+                    </div>
+                    <span class="ms-2">Processing namespaces...</span>
+                </td>
+            </tr>
+        `;
+        
+        if (!namespaces || namespaces.length === 0) {
+            tbody.innerHTML = '<tr><td colspan="6" class="text-center text-muted">No namespaces found</td></tr>';
+            return;
+        }
+        
+        // Filter out null/undefined namespaces
+        const validNamespaces = namespaces.filter(ns => ns && ns !== null && typeof ns === 'object');
+        
+        if (validNamespaces.length === 0) {
+            tbody.innerHTML = '<tr><td colspan="6" class="text-center text-muted">No valid namespaces found</td></tr>';
+            return;
+        }
+        
+        const rowsHtml = validNamespaces.map(ns => {
+            const name = escapeHtml(ns.name || '');
+            const status = ns.status || 'Unknown';
+            const isSelected = selected_namespace === ns.name;
+            const rowClass = isSelected ? 'class="selected"' : '';
+            const created = escapeHtml(ns.created || '');
+            
+            // Status badge
+            const statusBadge = status === 'Active' 
+                ? '<span class="badge text-bg-success">Active</span>'
+                : '<span class="badge text-bg-danger">' + escapeHtml(status) + '</span>';
+            
+            // Repository link
+            let repositoryCell = '-';
+            if (ns.app_service && ns.app_service.repository) {
+                const repo = ns.app_service.repository;
+                if (repo && (repo.startsWith('http://') || repo.startsWith('https://'))) {
+                    repositoryCell = `<a width="24" height="24" href="${escapeHtml(repo)}" target="_blank" rel="noopener noreferrer">
+                        <i class="fa-solid fa-code-branch fa-lg" style="font-size: 24px;"></i>
+                    </a>`;
+                }
+            }
+            
+            // Pipeline link
+            let pipelineCell = '-';
+            if (ns.app_service && ns.app_service.pipeline) {
+                const pipeline = ns.app_service.pipeline;
+                if (pipeline && (pipeline.startsWith('http://') || pipeline.startsWith('https://'))) {
+                    pipelineCell = `<a href="${escapeHtml(pipeline)}" target="_blank" rel="noopener noreferrer">
+                        <i class="fa-solid fa-diagram-project fa-lg" style="font-size: 24px;"></i>
+                    </a>`;
+                }
+            }
+            
+            // Delete button (Admin only)
+            let actionCell = '';
+            if (is_admin) {
+                actionCell = `
+                    <div class="d-flex flex-row">
+                        <form action="/cluster/namespace/delete" method="post">
+                            <input type="hidden" name="csrf_token" value="${csrf_token}">
+                            <input type="hidden" name="namespace" value="${escapeHtml(name)}"/>
+                            <button type="submit" rel="tooltip" class="btn btn-danger btn-just-icon btn-sm" value="upvote">
+                                <i class="material-icons">delete</i>
+                            </button>
+                        </form>
+                    </div>
+                `;
+            }
+            
+            return `
+                <tr ${rowClass}>
+                    <td>${statusBadge}</td>
+                    <td>
+                        <form action="/cluster/namespace/data" method="POST" onsubmit="sessionStorage.setItem('namespace_data_name', '${name}'); return true;">
+                            <input type="hidden" name="csrf_token" value="${csrf_token}">
+                            <input type="hidden" name="ns_select" value="${escapeHtml(name)}" />
+                            <a href="javascript:;" onclick="sessionStorage.setItem('namespace_data_name', '${name}'); parentNode.submit();">${name}</a>
+                        </form>
+                    </td>
+                    <td>${repositoryCell}</td>
+                    <td>${pipelineCell}</td>
+                    <td>${created}</td>
+                    <td>${actionCell}</td>
+                </tr>
+            `;
+        }).join('');
+        
+        tbody.innerHTML = rowsHtml;
+        
+        setTimeout(() => {
+            const rows = tbody.querySelectorAll('tr');
+            let hasDataRows = false;
+            rows.forEach(row => {
+                const cells = row.querySelectorAll('td');
+                const hasColspan = Array.from(cells).some(cell => cell.hasAttribute('colspan'));
+                if (!hasColspan && cells.length === 6) {
+                    hasDataRows = true;
+                }
+            });
+            
+            if (!hasDataRows) return;
+            
+            if ($.fn.DataTable && $(table).length) {
+                if ($.fn.DataTable.isDataTable(table)) {
+                    const savedRows = tbody.innerHTML;
+                    $(table).DataTable().destroy();
+                    tbody.innerHTML = savedRows;
+                }
+                
+                const dataRows = Array.from(tbody.querySelectorAll('tr')).filter(row => {
+                    const cells = row.querySelectorAll('td');
+                    return !Array.from(cells).some(cell => cell.hasAttribute('colspan')) && cells.length === 6;
+                });
+                
+                if (dataRows.length > 0) {
+                    $(table).DataTable({
+                        responsive: true,
+                        pageLength: 25
+                    });
+                }
+            }
+        }, 50);
+    }
+    
+    document.addEventListener('DOMContentLoaded', async function() {
+        let retries = 0;
+        while ((typeof $ === 'undefined' || typeof $.fn.DataTable === 'undefined') && retries < 10) {
+            await new Promise(resolve => setTimeout(resolve, 100));
+            retries++;
+        }
+        
+        if (typeof $ === 'undefined' || typeof $.fn.DataTable === 'undefined') {
+            console.error('jQuery or DataTables not loaded');
+            return;
+        }
+        
+        const table = document.getElementById('dataTable');
+        if (table && $.fn.DataTable && $.fn.DataTable.isDataTable(table)) {
+            const tbody = table.querySelector('tbody');
+            if (tbody) {
+                const rows = tbody.querySelectorAll('tr');
+                const hasColspanRow = Array.from(rows).some(row => {
+                    const cells = row.querySelectorAll('td');
+                    return Array.from(cells).some(cell => cell.hasAttribute('colspan'));
+                });
+                if (hasColspanRow) {
+                    $(table).DataTable().destroy();
+                }
+            }
+        }
+        
+        try {
+            console.log('Fetching namespaces from:', namespaces_api_url);
+            
+            const response = await fetch(namespaces_api_url);
+            if (!response.ok) {
+                throw new Error(`HTTP error! status: ${response.status}`);
+            }
+            
+            const data = await response.json();
+            console.log('Namespaces API response:', data);
+            
+            if (data.error) {
+                throw new Error(data.message || 'Failed to load namespaces');
+            }
+            
+            const namespaces = data.data || [];
+            populateNamespacesTable(namespaces);
+            
+        } catch (error) {
+            console.error('Error loading namespaces:', error);
+            const tbody = document.getElementById('namespaces-tbody');
+            if (tbody) {
+                tbody.innerHTML = '<tr><td colspan="6" class="text-center text-danger">Error loading namespaces: ' + escapeHtml(error.message) + '</td></tr>';
+            }
+        }
+    });
+</script>
 {% endblock %}

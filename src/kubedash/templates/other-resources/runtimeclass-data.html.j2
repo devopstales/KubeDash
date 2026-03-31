@@ -1,0 +1,270 @@
+{% extends "base2.html.j2" %}
+
+{% block topmenu %}
+<ul class="header-nav d-lg-flex m-3">
+    <div class="container-fluid px-4">
+      <nav aria-label="breadcrumb">
+        <ol class="breadcrumb my-0">
+          <li class="breadcrumb-item"><span>Other Resources</span></li>
+          <li class="breadcrumb-item"><a href="/other-resource/runtimeclass">Runtime Classes</a></li>
+          <li class="breadcrumb-item active"><span id="runtime-class-name-breadcrumb">Loading...</span></li>
+        </ol>
+      </nav>
+    </div>
+</ul>
+<ul class="header-nav ms-auto"></ul>
+<ul class="header-nav d-lg-flex">
+{% include "segments/partials/topmenu.html.j2" %}
+{% endblock %}
+
+{% block content %}
+<div class="card shadow mb-4">
+    <div class="card-header">
+        <h6 class="m-0 font-weight-bold text-primary">Runtime Class Data</h6>
+    </div>
+    <div class="card-body">
+        <div class="tab-content" id="nav-tabContent">
+            <!-- policy -->
+                <div class="card shadow mb-4">
+                    <div class="card-body">
+                        <div class="table-responsive">
+                            <table class="table table-bordered" id="policyInfoTable" width="100%" cellspacing="0">
+                                <tr>
+                                    <th>Name:</th>
+                                    <td id="runtime-class-name">Loading...</td>
+                                </tr>
+                                <tr>
+                                    <th>Handler:</th>
+                                    <td id="runtime-class-handler">Loading...</td>
+                                </tr>
+                                <tr>
+                                    <th>Creation:</th>
+                                    <td id="runtime-class-created">Loading...</td>
+                                </tr>
+                                <tr>
+                                    <th>Overhead:</th>
+                                    <td id="runtime-class-overhead-container">
+                                        <div class="spinner-border spinner-border-sm text-primary" role="status">
+                                            <span class="visually-hidden">Loading...</span>
+                                        </div>
+                                    </td>
+                                </tr>
+                                <tr>
+                                    <th>Scheduling:</th>
+                                    <td id="runtime-class-scheduling-container">
+                                        <div class="spinner-border spinner-border-sm text-primary" role="status">
+                                            <span class="visually-hidden">Loading...</span>
+                                        </div>
+                                    </td>
+                                </tr>
+                                <tr>
+                                    <th>Annotations:</th>
+                                    <td id="runtime-class-annotations-container">
+                                        <div class="spinner-border spinner-border-sm text-primary" role="status">
+                                            <span class="visually-hidden">Loading...</span>
+                                        </div>
+                                    </td>
+                                </tr>
+                               <tr>
+                                    <th>Labels:</th>
+                                    <td id="runtime-class-labels-container">
+                                        <div class="spinner-border spinner-border-sm text-primary" role="status">
+                                            <span class="visually-hidden">Loading...</span>
+                                        </div>
+                                    </td>
+                                </tr>
+                            </table>
+                        </div>
+                    </div>
+                </div>
+        </div>
+    </div>
+</div>
+{% endblock %}
+
+{% block add_head_css %}
+{% include "segments/components/datatable_snippet.html.j2" %}
+{% endblock %}
+
+{% block add_tail_js %}
+<script nonce="{{ csp_nonce }}">
+    const escapeHtml = (text) => {
+        if (text === null || text === undefined) return '';
+        const map = {
+            '&': '&amp;',
+            '<': '&lt;',
+            '>': '&gt;',
+            '"': '&quot;',
+            "'": '&#039;'
+        };
+        return String(text).replace(/[&<>"']/g, m => map[m]);
+    };
+    
+    const csrf_token = {{ csrf_token()|tojson }};
+    
+    // Get Runtime Class name from URL or sessionStorage
+    function getRuntimeClassInfo() {
+        const urlParams = new URLSearchParams(window.location.search);
+        let rcName = urlParams.get('rc_name');
+        
+        // Fallback to sessionStorage
+        if (!rcName) {
+            rcName = sessionStorage.getItem('runtime_class_data_name');
+        }
+        
+        return { rcName };
+    }
+    
+    function populateRuntimeClassInfo(rc) {
+        if (!rc) {
+            document.getElementById('runtime-class-name').textContent = 'N/A';
+            document.getElementById('runtime-class-handler').textContent = 'N/A';
+            document.getElementById('runtime-class-created').textContent = 'N/A';
+            return;
+        }
+        
+        // Update breadcrumb
+        const breadcrumb = document.getElementById('runtime-class-name-breadcrumb');
+        if (breadcrumb) {
+            breadcrumb.textContent = rc.name || 'N/A';
+        }
+        
+        // Basic info
+        document.getElementById('runtime-class-name').textContent = escapeHtml(rc.name || 'N/A');
+        document.getElementById('runtime-class-handler').textContent = escapeHtml(rc.handler || 'N/A');
+        document.getElementById('runtime-class-created').textContent = escapeHtml(rc.created || 'N/A');
+        
+        // Overhead
+        const overheadContainer = document.getElementById('runtime-class-overhead-container');
+        if (rc.overhead && rc.overhead.podFixed && Object.keys(rc.overhead.podFixed).length > 0) {
+            let overheadHtml = '<table class="table table-bordered" id="overheadTable" width="100%" cellspacing="0">';
+            overheadHtml += '<thead><tr><th width="50%">Resource</th><th width="50%">Value</th></tr></thead><tbody>';
+            for (const [key, value] of Object.entries(rc.overhead.podFixed)) {
+                overheadHtml += `<tr><td width="50%">${escapeHtml(key)}</td><td width="50%">${escapeHtml(String(value))}</td></tr>`;
+            }
+            overheadHtml += '</tbody></table>';
+            overheadContainer.innerHTML = overheadHtml;
+        } else {
+            overheadContainer.innerHTML = '<span class="text-muted">None</span>';
+        }
+        
+        // Scheduling
+        const schedulingContainer = document.getElementById('runtime-class-scheduling-container');
+        if (rc.scheduling) {
+            let schedulingHtml = '<table class="table table-bordered" id="schedulingTable" width="100%" cellspacing="0">';
+            schedulingHtml += '<thead><tr><th width="50%">Key</th><th width="50%">Value</th></tr></thead><tbody>';
+            
+            // Node Selector
+            if (rc.scheduling.nodeSelector && Object.keys(rc.scheduling.nodeSelector).length > 0) {
+                for (const [key, value] of Object.entries(rc.scheduling.nodeSelector)) {
+                    schedulingHtml += `<tr><td width="50%">${escapeHtml(key)}</td><td width="50%">${escapeHtml(String(value))}</td></tr>`;
+                }
+            }
+            
+            // Tolerations
+            if (rc.scheduling.tolerations && Array.isArray(rc.scheduling.tolerations)) {
+                for (const tol of rc.scheduling.tolerations) {
+                    const key = tol.key || tol.Key || 'N/A';
+                    const operator = tol.operator || tol.Operator || 'N/A';
+                    const value = tol.value || tol.Value || 'N/A';
+                    const effect = tol.effect || tol.Effect || 'N/A';
+                    schedulingHtml += `<tr><td width="50%">Toleration</td><td width="50%">Key: ${escapeHtml(String(key))}, Operator: ${escapeHtml(String(operator))}, Value: ${escapeHtml(String(value))}, Effect: ${escapeHtml(String(effect))}</td></tr>`;
+                }
+            }
+            
+            schedulingHtml += '</tbody></table>';
+            schedulingContainer.innerHTML = schedulingHtml;
+        } else {
+            schedulingContainer.innerHTML = '<span class="text-muted">None</span>';
+        }
+        
+        // Annotations
+        const annotationsContainer = document.getElementById('runtime-class-annotations-container');
+        if (rc.annotations && Object.keys(rc.annotations).length > 0) {
+            let annotationsHtml = '<table class="table table-bordered" id="annotationTable" width="100%" cellspacing="0">';
+            annotationsHtml += '<thead><tr><th width="50%">Key</th><th width="50%">Value</th></tr></thead><tbody>';
+            for (const [key, value] of Object.entries(rc.annotations)) {
+                annotationsHtml += `<tr><td width="50%">${escapeHtml(key)}</td><td width="50%">${escapeHtml(String(value))}</td></tr>`;
+            }
+            annotationsHtml += '</tbody></table>';
+            annotationsContainer.innerHTML = annotationsHtml;
+        } else {
+            annotationsContainer.innerHTML = '<span class="text-muted">None</span>';
+        }
+        
+        // Labels
+        const labelsContainer = document.getElementById('runtime-class-labels-container');
+        if (rc.labels && Object.keys(rc.labels).length > 0) {
+            let labelsHtml = '<table class="table table-bordered" id="labelsTable" width="100%" cellspacing="0">';
+            labelsHtml += '<thead><tr><th width="50%">Key</th><th width="50%">Value</th></tr></thead><tbody>';
+            for (const [key, value] of Object.entries(rc.labels)) {
+                labelsHtml += `<tr><td width="50%">${escapeHtml(key)}</td><td width="50%">${escapeHtml(String(value))}</td></tr>`;
+            }
+            labelsHtml += '</tbody></table>';
+            labelsContainer.innerHTML = labelsHtml;
+        } else {
+            labelsContainer.innerHTML = '<span class="text-muted">None</span>';
+        }
+    }
+    
+    async function loadRuntimeClassData() {
+        const { rcName } = getRuntimeClassInfo();
+        
+        if (!rcName) {
+            console.error('No Runtime Class name provided');
+            document.getElementById('runtime-class-name-breadcrumb').textContent = 'Error';
+            document.getElementById('runtime-class-name').textContent = 'Error: Runtime Class name not provided';
+            return;
+        }
+        
+        // Update breadcrumb
+        document.getElementById('runtime-class-name-breadcrumb').textContent = rcName;
+        
+        try {
+            // RuntimeClass is cluster-scoped, so no namespace parameter needed
+            const apiUrl = `/api/v1/other-resources/runtime-classes/${encodeURIComponent(rcName)}`;
+            console.log('Fetching Runtime Class from:', apiUrl);
+            
+            const response = await fetch(apiUrl);
+            if (!response.ok) {
+                if (response.status === 404) {
+                    throw new Error(`Runtime Class '${rcName}' not found`);
+                }
+                throw new Error(`HTTP error! status: ${response.status}`);
+            }
+            
+            const data = await response.json();
+            console.log('Runtime Class API response:', data);
+            
+            if (data.error) {
+                throw new Error(data.message || 'Failed to load Runtime Class');
+            }
+            
+            const rc = data.data || {};
+            populateRuntimeClassInfo(rc);
+            
+        } catch (error) {
+            console.error('Error loading Runtime Class:', error);
+            document.getElementById('runtime-class-name').textContent = 'Error: ' + escapeHtml(error.message);
+            document.getElementById('runtime-class-handler').textContent = 'N/A';
+            document.getElementById('runtime-class-created').textContent = 'N/A';
+        }
+    }
+    
+    // Initialize namespace selector with sessionStorage value on page load
+    document.addEventListener('DOMContentLoaded', function() {
+        const namespaceSelect = document.getElementById('inputGroupSelect04');
+        if (namespaceSelect) {
+            const savedNamespace = sessionStorage.getItem('ns_select');
+            if (savedNamespace && namespaceSelect.querySelector(`option[value="${savedNamespace}"]`)) {
+                namespaceSelect.value = savedNamespace;
+            }
+        }
+    });
+    
+    // Load data when page loads
+    document.addEventListener('DOMContentLoaded', function() {
+        loadRuntimeClassData();
+    });
+</script>
+{% endblock %}

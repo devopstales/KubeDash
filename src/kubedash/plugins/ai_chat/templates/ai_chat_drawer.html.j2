@@ -1,0 +1,248 @@
+{# Sliding AI Chat drawer: bubble + panel. Chat only (no history, no provider info). #}
+<link rel="stylesheet" href="{{ url_for('static', filename='/vendor/highlightjs@11.4.0/an-old-hope.min.css') }}">
+<style nonce="{{ csp_nonce }}">
+.ai-chat-bubble {
+  position: fixed;
+  bottom: 24px;
+  right: 24px;
+  width: 56px;
+  height: 56px;
+  border-radius: 50%;
+  background: var(--cui-primary, #321fdb);
+  color: #fff;
+  border: none;
+  box-shadow: 0 4px 12px rgba(0,0,0,0.2);
+  cursor: pointer;
+  z-index: 1040;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  transition: transform 0.2s, box-shadow 0.2s;
+}
+.ai-chat-bubble:hover { transform: scale(1.05); box-shadow: 0 6px 16px rgba(0,0,0,0.25); }
+.ai-chat-bubble svg { width: 28px; height: 28px; }
+.ai-chat-drawer-overlay {
+  position: fixed;
+  inset: 0;
+  background: rgba(0,0,0,0.35);
+  z-index: 1045;
+  opacity: 0;
+  visibility: hidden;
+  transition: opacity 0.25s, visibility 0.25s;
+}
+.ai-chat-drawer-overlay.open { opacity: 1; visibility: visible; }
+.ai-chat-drawer-panel {
+  position: fixed;
+  top: 0;
+  right: 0;
+  width: 100%;
+  max-width: 420px;
+  height: 100vh;
+  background: var(--cui-body-bg, #fff);
+  box-shadow: -4px 0 20px rgba(0,0,0,0.15);
+  z-index: 1050;
+  display: flex;
+  flex-direction: column;
+  transform: translateX(100%);
+  transition: transform 0.3s ease;
+}
+.ai-chat-drawer-panel.open { transform: translateX(0); }
+.ai-chat-drawer-panel .typing-dots span { width: 6px; height: 6px; background: currentColor; border-radius: 50%; margin: 0 2px; animation: ai-chat-typing 1.4s ease-in-out infinite; }
+.ai-chat-drawer-panel .typing-dots span:nth-child(1) { animation-delay: -0.32s; }
+.ai-chat-drawer-panel .typing-dots span:nth-child(2) { animation-delay: -0.16s; }
+@keyframes ai-chat-typing { 0%, 80%, 100% { transform: scale(0); } 40% { transform: scale(1); } }
+.ai-chat-drawer-panel .chat-message-content { white-space: pre-wrap; line-height: 1.5; font-size: 0.9rem; }
+.ai-chat-drawer-panel .chat-message-content pre { white-space: pre; overflow-x: auto; }
+.ai-chat-drawer-panel .ai-chat-message-input { resize: none; max-height: 120px; }
+/* Button visibility in drawer */
+.ai-chat-drawer-panel .ai-chat-drawer-close {
+  min-width: 2rem;
+  padding: 0.25rem 0.5rem;
+  color: var(--cui-body-color);
+  border: 1px solid var(--cui-border-color);
+  background: var(--cui-body-bg);
+}
+.ai-chat-drawer-panel .ai-chat-drawer-close:hover {
+  color: var(--cui-body-color);
+  background: var(--cui-tertiary-bg);
+  border-color: var(--cui-border-color);
+}
+.ai-chat-drawer-panel .example-query {
+  color: var(--cui-body-color);
+  background: var(--cui-body-bg);
+  border: 1px solid var(--cui-border-color);
+  border-radius: 0.375rem;
+  margin-bottom: 0.25rem;
+}
+.ai-chat-drawer-panel .example-query:hover {
+  background: var(--cui-tertiary-bg);
+  border-color: var(--cui-primary);
+  color: var(--cui-primary);
+}
+.ai-chat-drawer-panel .ai-chat-form .btn-primary {
+  min-width: 5rem;
+  padding-left: 1rem;
+  padding-right: 1rem;
+  color: #fff;
+  background: var(--cui-primary);
+  border: 1px solid var(--cui-primary);
+}
+.ai-chat-drawer-panel .ai-chat-form .btn-primary:hover {
+  filter: brightness(1.1);
+  color: #fff;
+}
+.ai-chat-drawer-panel .ai-chat-form .btn-primary .cil-paper-plane {
+  margin-right: 0.35rem;
+}
+</style>
+
+<button type="button" class="ai-chat-bubble" id="ai-chat-bubble-btn" aria-label="Open AI Chat" title="AI Chat">
+  <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="currentColor"><path d="M20 2H4c-1.1 0-2 .9-2 2v18l4-4h14c1.1 0 2-.9 2-2V4c0-1.1-.9-2-2-2z"/></svg>
+</button>
+<div class="ai-chat-drawer-overlay" id="ai-chat-drawer-overlay" aria-hidden="true"></div>
+<div class="ai-chat-drawer-panel" id="ai-chat-drawer-panel" role="dialog" aria-label="AI Chat" aria-hidden="true">
+  <div class="border-bottom bg-body-tertiary px-3 py-2 d-flex align-items-center justify-content-between flex-shrink-0">
+    <h6 class="mb-0 fw-bold text-body"><i class="cil-comment"></i> AI Chat</h6>
+    <button type="button" class="btn btn-sm ai-chat-drawer-close" aria-label="Close" title="Close"><i class="cil-x"></i></button>
+  </div>
+  <div class="flex-grow-1 d-flex flex-column min-h-0">
+    <div class="ai-chat-messages-container overflow-auto flex-grow-1 p-3 bg-body-tertiary" style="min-height: 200px;">
+      <div class="text-center py-4 welcome-message">
+        <i class="cil-comment display-6 text-primary"></i>
+        <p class="mt-2 mb-1 fw-semibold">AI Chat</p>
+        <p class="small text-body-secondary">Ask about your cluster:</p>
+        <div class="d-flex flex-column gap-2 small">
+          <button type="button" class="btn example-query text-start py-2" data-query="list namespaces">List namespaces</button>
+          <button type="button" class="btn example-query text-start py-2" data-query="list pods in default">List pods in default</button>
+          <button type="button" class="btn example-query text-start py-2" data-query="helm list">Helm list</button>
+        </div>
+      </div>
+    </div>
+    <div class="border-top p-2 bg-body flex-shrink-0">
+      <form class="ai-chat-form">
+        <div class="input-group">
+          <textarea class="form-control ai-chat-message-input" id="ai-chat-drawer-message-input" placeholder="Type a message..." rows="2"></textarea>
+          <button type="submit" class="btn btn-primary" title="Send"><i class="cil-paper-plane"></i> Send</button>
+        </div>
+      </form>
+    </div>
+  </div>
+</div>
+
+<script src="{{ url_for('static', filename='/vendor/highlightjs@11.4.0/highlight.min.js') }}"></script>
+<script nonce="{{ csp_nonce }}">
+(function() {
+  var API = '/api/v1/plugins/ai-chat';
+  var bubble = document.getElementById('ai-chat-bubble-btn');
+  var overlay = document.getElementById('ai-chat-drawer-overlay');
+  var panel = document.getElementById('ai-chat-drawer-panel');
+  if (!bubble || !overlay || !panel) return;
+
+  var drawer = panel;
+  var messagesEl = drawer.querySelector('.ai-chat-messages-container');
+  var messageInput = drawer.querySelector('.ai-chat-message-input');
+  var chatForm = drawer.querySelector('.ai-chat-form');
+  var currentConversationId = null;
+
+  function openDrawer() {
+    overlay.classList.add('open');
+    panel.classList.add('open');
+    panel.setAttribute('aria-hidden', 'false');
+    overlay.setAttribute('aria-hidden', 'false');
+    if (messageInput) messageInput.focus();
+  }
+  function closeDrawer() {
+    overlay.classList.remove('open');
+    panel.classList.remove('open');
+    panel.setAttribute('aria-hidden', 'true');
+    overlay.setAttribute('aria-hidden', 'true');
+  }
+  function toggleDrawer() {
+    if (panel.classList.contains('open')) closeDrawer(); else openDrawer();
+  }
+
+  bubble.addEventListener('click', toggleDrawer);
+  overlay.addEventListener('click', closeDrawer);
+  drawer.querySelectorAll('.ai-chat-drawer-close').forEach(function(btn) { btn.addEventListener('click', closeDrawer); });
+
+  function esc(s) {
+    var d = document.createElement('div');
+    d.textContent = s == null ? '' : s;
+    return d.innerHTML;
+  }
+  function formatMessage(text) {
+    if (!text) return '';
+    var html = esc(text);
+    html = html.replace(/```(\w*)\n([\s\S]*?)```/g, function(_, lang, code) {
+      return '<pre class="p-2 border rounded small"><code class="d-block' + (lang ? ' language-' + lang : '') + '">' + code + '</code></pre>';
+    });
+    html = html.replace(/(?:^|\n)\n*((\|[^\n]+\|)\r?\n(\|[-\s|:]+\|)\r?\n((?:\|[^\n]+\|\r?\n?)+))/g, function(match, full, headerRow, sepRow, bodyRows) {
+      var rows = [headerRow].concat(bodyRows.trim().split(/\r?\n/));
+      function rowCells(line) { return line.split('|').map(function(s) { return s.trim(); }).filter(function(s) { return s.length > 0; }); }
+      var thead = '<tr>' + rowCells(rows[0]).map(function(c) { return '<th>' + c + '</th>'; }).join('') + '</tr>';
+      var tbody = '';
+      for (var i = 1; i < rows.length; i++) tbody += '<tr>' + rowCells(rows[i]).map(function(c) { return '<td>' + c + '</td>'; }).join('') + '</tr>';
+      return (match.indexOf('\n') === 0 ? '<br>' : '') + '<div class="table-responsive"><table class="table table-bordered table-sm small mb-2"><thead>' + thead + '</thead><tbody>' + tbody + '</tbody></table></div>';
+    });
+    html = html.replace(/`([^`]+)`/g, '<code class="p-1 rounded bg-body-tertiary">$1</code>');
+    html = html.replace(/\*\*([^*]+)\*\*/g, '<strong>$1</strong>');
+    html = html.replace(/\n/g, '<br>');
+    return html;
+  }
+  function appendMessage(role, content, doScroll) {
+    if (doScroll === undefined) doScroll = true;
+    if (!messagesEl) return;
+    var div = document.createElement('div');
+    div.className = role === 'user' ? 'rounded-3 p-2 mb-2 bg-primary text-white ms-auto' : 'rounded-3 p-2 mb-2 border bg-body';
+    div.style.maxWidth = '95%';
+    var contentDiv = document.createElement('div');
+    contentDiv.className = 'chat-message-content small';
+    contentDiv.innerHTML = formatMessage(content);
+    if (typeof hljs !== 'undefined') contentDiv.querySelectorAll('pre code').forEach(function(block) { hljs.highlightElement(block); });
+    div.appendChild(contentDiv);
+    messagesEl.appendChild(div);
+    if (doScroll) scrollBottom();
+  }
+  function scrollBottom() { if (messagesEl) messagesEl.scrollTop = messagesEl.scrollHeight; }
+  function sendMessage(content) {
+    content = (content || '').trim();
+    if (!content) return;
+    if (messageInput) { messageInput.value = ''; messageInput.style.height = 'auto'; }
+    appendMessage('user', content);
+    var loadingId = 'loading-' + Date.now();
+    var loadingDiv = document.createElement('div');
+    loadingDiv.id = loadingId;
+    loadingDiv.className = 'rounded-3 p-2 mb-2 border bg-body';
+    loadingDiv.innerHTML = '<div class="typing-dots d-inline-flex"><span></span><span></span><span></span></div>';
+    messagesEl.appendChild(loadingDiv);
+    scrollBottom();
+    fetch(API + '/chat/message', {
+      method: 'POST',
+      credentials: 'same-origin',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ content: content, conversation_id: currentConversationId })
+    })
+    .then(function(r) {
+      var el = document.getElementById(loadingId);
+      if (el) el.remove();
+      if (!r.ok) throw new Error('HTTP ' + r.status);
+      return r.json();
+    })
+    .then(function(data) {
+      appendMessage('assistant', data.message && data.message.content ? data.message.content : 'No response');
+      if (data.conversation_id) currentConversationId = parseInt(data.conversation_id, 10);
+    })
+    .catch(function(err) {
+      var el = document.getElementById(loadingId);
+      if (el) el.remove();
+      appendMessage('assistant', 'Error: ' + err.message);
+    });
+  }
+
+  if (chatForm) chatForm.addEventListener('submit', function(e) { e.preventDefault(); sendMessage(messageInput ? messageInput.value : ''); });
+  drawer.querySelectorAll('.example-query').forEach(function(btn) {
+    btn.addEventListener('click', function() { sendMessage(this.getAttribute('data-query')); });
+  });
+  if (messageInput) messageInput.addEventListener('input', function() { this.style.height = 'auto'; this.style.height = Math.min(this.scrollHeight, 120) + 'px'; });
+})();
+</script>

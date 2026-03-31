@@ -466,6 +466,7 @@ def k8sPVCMetric(namespace):
                             if namespace == volme['pvcRef']['namespace']:
                                 DAT = {
                                     "name": volme['pvcRef']['name'],
+                                    "namespace": volme['pvcRef']['namespace'],
                                     "capacityBytes": int(volme['capacityBytes'])/1024,
                                     "usedBytes": int(volme['usedBytes'])/1024,
                                     "availableBytes": int(volme['availableBytes'])/1024,
@@ -479,6 +480,52 @@ def k8sPVCMetric(namespace):
         return PVC_LIST
     except Exception as error:
         return PVC_LIST
+
+@cache.memoize(timeout=long_cache_time)
+def k8sPVMetric(namespace):
+    """Get the Persistent Volume metrics for a given namespace by matching PVs to PVCs
+    
+    Args:
+        namespace (str): The name of the namespace to filter PVs by their bound PVC namespace
+        
+    Returns:
+        PV_METRICS (dict): Dictionary mapping PV names to their usage metrics
+    """
+    from .storage import k8sPersistentVolumeListGet
+    
+    k8sClientConfigGet('Admin', None)
+    PV_METRICS = {}
+    
+    try:
+        # Get all PVs for the namespace (filtered by claim namespace)
+        pvs = k8sPersistentVolumeListGet("Admin", None, namespace)
+        
+        # Get PVC metrics for the namespace
+        pvc_metrics = k8sPVCMetric(namespace)
+        
+        # Create a lookup map for PVC metrics by name
+        pvc_metrics_map = {}
+        for pvc_metric in pvc_metrics:
+            pvc_metrics_map[pvc_metric['name']] = pvc_metric
+        
+        # Match PVs to their PVC metrics
+        for pv in pvs:
+            pv_name = pv.get('name')
+            pvc_name = pv.get('volume_claim_name')
+            
+            if pv_name and pvc_name and pvc_name in pvc_metrics_map:
+                pvc_metric = pvc_metrics_map[pvc_name]
+                PV_METRICS[pv_name] = {
+                    "capacityBytes": pvc_metric.get('capacityBytes', 0),
+                    "usedBytes": pvc_metric.get('usedBytes', 0),
+                    "availableBytes": pvc_metric.get('availableBytes', 0),
+                    "percentageUsed": pvc_metric.get('percentageUsed', 0),
+                }
+        
+        return PV_METRICS
+    except Exception as error:
+        ErrorHandler(logger, "error", f"k8sPVMetric: {error}")
+        return PV_METRICS
 
 @cache.memoize(timeout=long_cache_time)
 def k8sGetClusterEvents(username_role, user_token, limit=100):

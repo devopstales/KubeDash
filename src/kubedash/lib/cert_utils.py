@@ -9,20 +9,27 @@ from cryptography.hazmat.backends import default_backend
 
 from lib.paths import PROJECT_ROOT
 
+
+class _CanonicalFormatter(logging.Formatter):
+    """Same timestamp format as app logs: YYYY-MM-DD HH:MM:SS,mmm."""
+
+    def formatTime(self, record, datefmt=None):
+        ct = datetime.fromtimestamp(record.created)
+        s = ct.strftime("%Y-%m-%d %H:%M:%S")
+        return "%s,%03d" % (s, record.msecs)
+
+
 def configure_logging():
-    """Configure logging with custom format and correlation ID"""
-    formatter = logging.Formatter(
-        '[%(asctime)s] [%(name)s] [%(levelname)s] %(message)s'
+    """Configure logging with canonical format (same as kubedash app logs)."""
+    formatter = _CanonicalFormatter(
+        "[%(asctime)s] [no-id] [%(name)s] [%(levelname)s] %(message)s"
     )
-    
     handler = logging.StreamHandler()
     handler.setFormatter(formatter)
-    
     logger = logging.getLogger()
     if not logger.hasHandlers():
         logger.addHandler(handler)
     logger.setLevel(logging.INFO)
-    
     return logger
 
 logger = configure_logging()

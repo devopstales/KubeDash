@@ -658,19 +658,60 @@ def TrivyGetRbacAssessmentReport(username_role, user_token, namespace: str, name
         summary = report.get('summary', {})
         checks = report.get('checks', [])
         
-        # Process checks
+        # Calculate counts from checks
+        danger = 0
+        warning = 0
+        pass_count = 0
+        
+        # Process checks and calculate counts
         processed_checks = []
         for check in checks:
+            success = check.get('success', False)
+            severity = (check.get('severity', '') or '').upper()
+            
+            if success:
+                pass_count += 1
+            elif severity == 'DANGER':
+                danger += 1
+            elif severity == 'WARNING':
+                warning += 1
+            # Also handle CRITICAL/HIGH/MEDIUM/LOW if present
+            elif severity == 'CRITICAL':
+                danger += 1
+            elif severity == 'HIGH':
+                danger += 1
+            elif severity == 'MEDIUM':
+                warning += 1
+            elif severity == 'LOW':
+                warning += 1
+            
             processed_checks.append({
                 "checkID": check.get('checkID', ''),
                 "title": check.get('title', ''),
-                "severity": check.get('severity', ''),
+                "severity": severity,
                 "category": check.get('category', ''),
                 "description": check.get('description', ''),
                 "messages": check.get('messages', []),
                 "remediation": check.get('remediation', ''),
-                "success": check.get('success', False),
+                "success": success,
             })
+        
+        # Use summary counts if they exist and are non-zero (override calculated values)
+        if summary.get('dangerCount') is not None and summary.get('dangerCount', 0) > 0:
+            danger = summary.get('dangerCount', 0)
+        if summary.get('warningCount') is not None and summary.get('warningCount', 0) > 0:
+            warning = summary.get('warningCount', 0)
+        if summary.get('passCount') is not None and summary.get('passCount', 0) > 0:
+            pass_count = summary.get('passCount', 0)
+        
+        # Ensure summary has the required keys
+        summary_counts = {
+            'dangerCount': danger,
+            'warningCount': warning,
+            'passCount': pass_count,
+        }
+        # Merge with existing summary
+        summary.update(summary_counts)
         
         # Get resource info from labels
         labels = metadata.get('labels', {})

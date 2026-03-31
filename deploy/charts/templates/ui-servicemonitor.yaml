@@ -68,6 +68,10 @@ spec:
       {{- include "kubedash.labels" . | nindent 6 }}
   endpoints:
     - port: http
+      scheme: HTTPS
+      path: /metrics
+      tlsConfig:
+        insecureSkipVerify: true
       {{- if .Values.metrics.serviceMonitor.interval }}
       interval: {{ .Values.metrics.serviceMonitor.interval }}
       {{- end }}

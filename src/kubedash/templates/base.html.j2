@@ -11,7 +11,7 @@
 <html lang="en">
   <head>
     <!-- Critical Theme Loader (MUST be first) -->
-    <script>
+    <script nonce="{{ csp_nonce }}">
       (function(){
         // 1. Immediately set theme from localStorage (fallback to light)
         const savedTheme = localStorage.getItem('coreui-theme') || 'light';
@@ -22,7 +22,7 @@
 
         // 3. Hide body until fully loaded (prevents flash)
         document.write(`
-          <style id="temp-hide">
+          <style id="temp-hide" nonce="{{ csp_nonce }}">
             body { opacity: 0 !important; }
             .light { color-scheme: light; }
             .dark { color-scheme: dark; }
@@ -36,6 +36,33 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0, shrink-to-fit=no">
     <meta name="description" content="KubeDash - Open Source Kubernetes Admin Dashboard">
     <meta name="author" content="Páldi Balázs">
+    {% if traceparent is defined and traceparent %}
+    <meta name="traceparent" content="{{ traceparent }}">
+    <script nonce="{{ csp_nonce }}">
+      (function() {
+        var tp = document.querySelector('meta[name="traceparent"]');
+        if (tp && tp.content) {
+          window.__TRACEPARENT__ = tp.content;
+          var origFetch = window.fetch;
+          window.fetch = function(input, init) {
+            if (!window.__TRACEPARENT__) return origFetch.apply(this, arguments);
+            init = init || {};
+            var headers = init.headers;
+            if (headers instanceof Headers) {
+              headers = new Headers(headers);
+              headers.append('traceparent', window.__TRACEPARENT__);
+              init = Object.assign({}, init, { headers: headers });
+            } else if (headers && typeof headers === 'object' && !Array.isArray(headers)) {
+              init = Object.assign({}, init, { headers: Object.assign({}, headers, { traceparent: window.__TRACEPARENT__ }) });
+            } else {
+              init = Object.assign({}, init, { headers: Object.assign({}, headers || {}, { traceparent: window.__TRACEPARENT__ }) });
+            }
+            return origFetch.call(this, input, init);
+          };
+        }
+      })();
+    </script>
+    {% endif %}
     <title>KubeDash</title>
 
     <!-- favicon -->
@@ -59,7 +86,7 @@
     {% endblock %}
 
     <!-- Add this right before </head> -->
-    <script>
+    <script nonce="{{ csp_nonce }}">
       document.addEventListener('DOMContentLoaded', function() {
         // Remove the temporary hide style
         const tempStyle = document.getElementById('temp-hide');
@@ -100,7 +127,7 @@
     <script src="{{ url_for('static',filename='/js/config.js') }}"></script>
     <script src="{{ url_for('static',filename='/js/color-modes.js') }}"></script>
 
-    <script>
+    <script nonce="{{ csp_nonce }}">
       const header = document.querySelector('header.header');
 
       document.addEventListener('scroll', () => {
@@ -111,7 +138,7 @@
     </script>
 
     <!-- Toast notification script -->
-    <script>
+    <script nonce="{{ csp_nonce }}">
       function showToast(type, message, title = 'Notification') {
         const container = document.getElementById('toastStack');
         const template = document.getElementById('toastTemplate');
@@ -143,6 +170,49 @@
       // showToast('error', 'Failed to save item', 'Error');
     </script>
 
+    <!-- Global Namespace Selector Handler -->
+    <script nonce="{{ csp_nonce }}">
+      // Global handler for namespace selector persistence across all pages
+      document.addEventListener('DOMContentLoaded', function() {
+        const namespaceSelect = document.getElementById('inputGroupSelect04');
+        if (namespaceSelect) {
+          // Initialize dropdown from sessionStorage on page load
+          const savedNamespace = sessionStorage.getItem('ns_select');
+          if (savedNamespace) {
+            // Check if the saved namespace exists in the options
+            const optionExists = Array.from(namespaceSelect.options).some(
+              option => option.value === savedNamespace || option.text === savedNamespace
+            );
+            if (optionExists) {
+              namespaceSelect.value = savedNamespace;
+            }
+          }
+          
+          // Save to sessionStorage when dropdown changes
+          namespaceSelect.addEventListener('change', function() {
+            const selectedNamespace = this.value;
+            console.log('Namespace changed to:', selectedNamespace);
+            sessionStorage.setItem('ns_select', selectedNamespace);
+            
+            // Dispatch a custom event so pages can listen for namespace changes
+            const event = new CustomEvent('namespaceChanged', {
+              detail: { namespace: selectedNamespace }
+            });
+            window.dispatchEvent(event);
+          });
+          
+          // Also save to sessionStorage when form is submitted
+          const namespaceForm = namespaceSelect.closest('form');
+          if (namespaceForm) {
+            namespaceForm.addEventListener('submit', function() {
+              const selectedNamespace = namespaceSelect.value;
+              sessionStorage.setItem('ns_select', selectedNamespace);
+              console.log('Namespace saved to sessionStorage on form submit:', selectedNamespace);
+            });
+          }
+        }
+      });
+    </script>
 
     <!-- Page tail_js -->
     {% block add_tail_js %}

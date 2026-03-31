@@ -7,14 +7,14 @@
         <ol class="breadcrumb my-0">
           <li class="breadcrumb-item"><span>Workloads</span></li>
           <li class="breadcrumb-item"><a href="/workload/deployments">Deployments</a></li>
-          <li class="breadcrumb-item active"><span>{{ deployment_data.name }}</span></li>
+          <li class="breadcrumb-item active"><span id="deployment-name-breadcrumb">Loading...</span></li>
         </ol>
       </nav>
     </div>
 </ul>
 <ul class="header-nav ms-auto"></ul>
 <ul class="header-nav d-lg-flex">
-{% include "segments/topmenu.html.j2" %}
+{% include "segments/partials/topmenu.html.j2" %}
 {% endblock %}
 
 {% block content %}
@@ -52,108 +52,42 @@
                             <table class="table table-bordered" id="deployInfoTable" width="100%" cellspacing="0">
                                 <tr>
                                     <th>Namespace:</th>
-                                    <td>{{ deployment_data.namespace }}</td>
+                                    <td id="deployment-namespace">Loading...</td>
                                 </tr>
                                 <tr>
                                     <th>Name:</th>
-                                    <td>{{ deployment_data.name }}</td>
+                                    <td id="deployment-name">Loading...</td>
                                 </tr>
                                 <tr>
                                     <th>Created:</th>
-                                    <td>{{ deployment_data.created }}</td>
+                                    <td id="deployment-created">Loading...</td>
                                 </tr>
                                 <tr>
                                     <th>Replicas:</th>
-                                {% if session['user_role'] == "Admin" %}
-                                    <td>
-                                        <div class="input-group">
-                                            <!-- Disbale Dcale
-                                            <div class="input-group-prepend">
-                                              <button id="ctrl__button--decrement" class="btn btn-outline-danger" type="button">-</button>
-                                            </div>
-                                            --->
-                                            <input type="text" class="spinner" id="spinner" readonly="readonly" 
-                                                value="{{ deployment_data.replicas }}"  k8s_type="deployments" 
-                                                csrf_token="{{ csrf_token() }}" selected="{{ deployment_data.name }}"
-                                                namespace="{{ deployment_data.namespace }}">
-                                            <!-- Disbale Dcale
-                                            <div class="input-group-append">
-                                                <button id="ctrl__button--increment" class="btn btn-outline-success" type="button">+</button>
-                                            </div>
-                                            -->
-                                          </div>
-                                    </td>
-                                {% else %}
-                                    <td>{{ deployment_data.replicas }}</td>
-                                {% endif %}
+                                    <td id="deployment-replicas">Loading...</td>
                                 </tr>
                                 <tr>
                                     <th>Annotations:</th>
-                                    <td>
-                                        {% if deployment_data.annotations %}
-                                        <table class="table table-bordered" id="annotationTable" width="100%" cellspacing="0">
-                                            <thead>
-                                                <tr>
-                                                    <th width="50%">Key</th>
-                                                    <th width="50%">Value</th>
-                                                </tr>
-                                            </thead>
-                                            <tbody>
-                                            {% for key, value in deployment_data.annotations.items() %}
-                                                <tr>
-                                                    <td width="50%">{{ key }}</td>
-                                                    <td width="50%">{{ value }}</td>
-                                                </tr>
-                                            {% endfor %}
-                                            </tbody>
-                                        </table>
-                                        {% endif %}
+                                    <td id="deployment-annotations-container">
+                                        <div class="spinner-border spinner-border-sm text-primary" role="status">
+                                            <span class="visually-hidden">Loading...</span>
+                                        </div>
                                     </td>
                                 </tr>
                                 <tr>
-                                    <th>Lables:</th>
-                                    <td>
-                                        {% if deployment_data.labels %}
-                                        <table class="table table-bordered" id="labelsTable" width="100%" cellspacing="0">
-                                            <thead>
-                                                <tr>
-                                                    <th width="50%">Key</th>
-                                                    <th width="50%">Value</th>
-                                                </tr>
-                                            </thead>
-                                            <tbody>
-                                            {% for key, value in deployment_data.labels.items() %}
-                                                <tr>
-                                                    <td  width="50%">{{ key }}</td>
-                                                    <td  width="50%">{{ value }}</td>
-                                                </tr>
-                                            {% endfor %}
-                                            </tbody>
-                                        </table>
-                                        {% endif %}
+                                    <th>Labels:</th>
+                                    <td id="deployment-labels-container">
+                                        <div class="spinner-border spinner-border-sm text-primary" role="status">
+                                            <span class="visually-hidden">Loading...</span>
+                                        </div>
                                     </td>
                                 </tr>
                                 <tr>
                                     <th>Selectors:</th>
-                                    <td>
-                                        {% if deployment_data.selectors %}
-                                        <table class="table table-bordered" id="selectorsTable" width="100%" cellspacing="0">
-                                            <thead>
-                                                <tr>
-                                                    <th width="50%">Key</th>
-                                                    <th width="50%">Value</th>
-                                                </tr>
-                                            </thead>
-                                            <tbody>
-                                            {% for key, value in deployment_data.selectors.items() %}
-                                                <tr>
-                                                    <td width="50%">{{ key }}</td>
-                                                    <td width="50%">{{ value }}</td>
-                                                </tr>
-                                            {% endfor %}
-                                            </tbody>
-                                        </table>
-                                        {% endif %}
+                                    <td id="deployment-selectors-container">
+                                        <div class="spinner-border spinner-border-sm text-primary" role="status">
+                                            <span class="visually-hidden">Loading...</span>
+                                        </div>
                                     </td>
                                 </tr>
                             </table>
@@ -166,9 +100,8 @@
                 <div id="accordion">
                     <div class="card shadow mb-4">
                         <div class="card-body">
-                            {% if deployment_data.init_containers %}
+                            <div id="init-containers-section" style="display: none;">
                             <h3>Init Containers</h3>
-                            
                             <div class="table-responsive">
                                 <table class="table table-bordered" id="initContainersTable" width="100%" cellspacing="0">
                                     <thead>
@@ -177,17 +110,18 @@
                                             <th>Image</th>
                                         </tr>
                                     </thead>
-                                    <tbody>
-                                        {% for ic in deployment_data.init_containers %}
-                                        <tr>
-                                            <td>{{ ic.name }}</td>
-                                            <td>{{ ic.image }}</td>
+                                        <tbody id="init-containers-tbody">
+                                            <tr>
+                                                <td colspan="2" class="text-center">
+                                                    <div class="spinner-border spinner-border-sm text-primary" role="status">
+                                                        <span class="visually-hidden">Loading...</span>
+                                                    </div>
+                                                </td>
                                         </tr>
-                                        {% endfor %}
                                     </tbody>
                                 </table>
+                                </div>
                             </div>
-                            {% endif %}
                             <h3>Containers</h3>
                             <div class="table-responsive">
                                 <table class="table table-bordered" id="containersTable" width="100%" cellspacing="0">
@@ -197,13 +131,14 @@
                                             <th>Image</th>
                                         </tr>
                                     </thead>
-                                    <tbody>
-                                        {% for c in deployment_data.containers %}
+                                    <tbody id="containers-tbody">
                                         <tr>
-                                            <td>{{ c.name }}</td>
-                                            <td>{{ c.image }}</td>
+                                            <td colspan="2" class="text-center">
+                                                <div class="spinner-border spinner-border-sm text-primary" role="status">
+                                                    <span class="visually-hidden">Loading...</span>
+                                                </div>
+                                            </td>
                                         </tr>
-                                        {% endfor %}
                                     </tbody>
                                 </table>
                             </div>
@@ -223,17 +158,14 @@
                                         <th>Value</th>
                                     </tr>
                                 </thead>
-                                <tbody>
-                                    {% for variables in deployment_data.environment_variables %}
+                                <tbody id="variables-tbody">
                                     <tr>
-                                        {% if variables %}
-                                        {% for key, var in variables.items() %}
-                                            <td>{{ key }}</td>
-                                            <td>{{ var }}</td>
-                                        {% endfor %}
-                                        {% endif %}
+                                        <td colspan="2" class="text-center">
+                                            <div class="spinner-border spinner-border-sm text-primary" role="status">
+                                                <span class="visually-hidden">Loading...</span>
+                                            </div>
+                                        </td>
                                     </tr>
-                                    {% endfor %}
                                 </tbody>
                             </table>
                         </div>
@@ -254,15 +186,14 @@
                                         <th>Time</th>
                                     </tr>
                                 </thead>
-                                <tbody>
-                                        {% for dict_item in deployment_data.conditions %}
-                                            <tr>
-                                                <td>{{ dict_item["type"] }}</td>
-                                                <td>{{ dict_item["reason"] }}</td>
-                                                <td>{{ dict_item["message"] }}</td>
-                                                <td>{{ dict_item["last_transition_time"] }}</td>
+                                <tbody id="conditions-tbody">
+                                    <tr>
+                                        <td colspan="4" class="text-center">
+                                            <div class="spinner-border spinner-border-sm text-primary" role="status">
+                                                <span class="visually-hidden">Loading...</span>
+                                            </div>
+                                        </td>
                                             </tr>
-                                        {% endfor %}
                                 </tbody>
                             </table>
                         </div>
@@ -281,15 +212,14 @@
                                     <th>State</th>
                                     </tr>
                                 </thead>
-                                <tbody>
-                                {% if deployment_data.security_context %}
-                                {% for item in deployment_data.security_context.items() %}
+                                <tbody id="security-tbody">
                                     <tr>
-                                        <td>{{ item[0] }}</td>
-                                        <td>{{ item[1] }}</td>
+                                        <td colspan="2" class="text-center">
+                                            <div class="spinner-border spinner-border-sm text-primary" role="status">
+                                                <span class="visually-hidden">Loading...</span>
+                                            </div>
+                                        </td>
                                     </tr>
-                                {% endfor%}
-                                {% endif %}
                                 </tbody>
                             </table>
                         </div>
@@ -303,93 +233,21 @@
                         <h3>Refers To</h3>
                         <div class="table-responsive">
                             <table class="table table-bordered" id="refersTable" width="100%" cellspacing="0">
-                                <!-- service account, secret, configmap, volume-->
                                 <thead>
+                                    <tr>
                                     <th>Type</th>
                                     <th>Name</th>
                                     <th>Namespace</th>
+                                    </tr>
                                 </thead>
-                                <tbody>
-                                {% if deployment_data.image_pull_secrets %}
-                                    {% for dict_item in deployment_data.image_pull_secrets %}
-                                    {% for key, value in dict_item.items() %}
+                                <tbody id="refers-to-tbody">
                                     <tr>
-                                        <td>ImagePullSecret</td>
-                                        <td>
-                                            <form action="/security/secret" method="POST">
-                                                <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
-                                                <input type="hidden" name="ns_select" value="{{ deployment_data.namespace }}" />
-                                                <input type="hidden" name="selected" value="{{ value }}" />
-                                                <a href="javascript:;" onclick="parentNode.submit();">{{ value }}</a>
-                                            </form>
+                                        <td colspan="3" class="text-center">
+                                            <div class="spinner-border spinner-border-sm text-primary" role="status">
+                                                <span class="visually-hidden">Loading...</span>
+                                            </div>
                                         </td>
-                                        <td>{{ deployment_data.namespace }}</td>
                                     </tr>
-                                    {% endfor %}
-                                    {% endfor %}
-                                {% endif %}
-                                {% if deployment_data.service_account %}
-                                    <tr>
-                                        <td>ServiceAccount</td>
-                                        <td>
-                                            <form action="/cluster-permission/service-account" method="POST">
-                                                <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
-                                                <input type="hidden" name="ns_select" value="{{ deployment_data.namespace }}" />
-                                                <input type="hidden" name="selected" value="{{ deployment_data.service_account }}" />
-                                                <a href="javascript:;" onclick="parentNode.submit();">{{ deployment_data.service_account }}</a>
-                                            </form>
-                                        </td>
-                                        <td>{{ deployment_data.namespace }}</td>
-                                    </tr>
-                                {% endif %}
-                                {% if deployment_data.secrets %}
-                                    {% for secret in deployment_data.secrets %}
-                                    <tr>
-                                        <td>Secret</td>
-                                        <td>
-                                            <form action="/security/secret" method="POST">
-                                                <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
-                                                <input type="hidden" name="ns_select" value="{{ deployment_data.namespace }}" />
-                                                <input type="hidden" name="selected" value="{{ secret }}" />
-                                                <a href="javascript:;" onclick="parentNode.submit();">{{ secret }}</a>
-                                            </form>
-                                        </td>
-                                        <td>{{ deployment_data.namespace }}</td>
-                                    </tr>
-                                    {% endfor %}
-                                {% endif %}
-                                {% if deployment_data.cm %}
-                                    {% for cm in deployment_data.cm %}
-                                    <tr>
-                                        <td>Configmap</td>
-                                        <td>
-                                            <form action="/storage/configmap" method="POST">
-                                                <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
-                                                <input type="hidden" name="ns_select" value="{{ deployment_data.namespace }}" />
-                                                <input type="hidden" name="selected" value="{{ cm }}" />
-                                                <a href="javascript:;" onclick="parentNode.submit();">{{ cm }}</a>
-                                            </form>
-                                        </td>
-                                        <td>{{ deployment_data.namespace }}</td>
-                                    </tr>
-                                    {% endfor %}
-                                {% endif %}
-                                {% if deployment_data.pvc %}
-                                    {% for pvc in deployment_data.pvc %}
-                                    <tr>
-                                        <td>PeristentVolumeClame</td>
-                                        <td>
-                                            <form action="/storage/pvc" method="POST">
-                                                <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
-                                                <input type="hidden" name="ns_select" value="{{ deployment_data.namespace }}" />
-                                                <input type="hidden" name="selected" value="{{ pvc }}" />
-                                                <a href="javascript:;" onclick="parentNode.submit();">{{ pvc }}</a>
-                                            </form>
-                                        </td>
-                                        <td>{{ deployment_data.namespace }}</td>
-                                    </tr>
-                                    {% endfor %}
-                                {% endif %}
                                 </tbody>
                             </table>
                         </div>
@@ -403,31 +261,529 @@
 {% endblock %}
 
 {% block add_head_css %}
-{% include "segments/datatable_snippet.html.j2" %}
+{% include "segments/components/datatable_snippet.html.j2" %}
 {% endblock %}
 
 {% block add_tail_js %}
-    {% for c in deployment_data.containers %}
-    <script>
-        $(document).ready(function () {
-            $('#vulnTable{{ c.name }}').DataTable({
-               responsive: true,
-               order: [[1, 'asc']],
+    <script nonce="{{ csp_nonce }}">
+    const escapeHtml = (text) => {
+        if (text === null || text === undefined) return '';
+        const map = {
+            '&': '&amp;',
+            '<': '&lt;',
+            '>': '&gt;',
+            '"': '&quot;',
+            "'": '&#039;'
+        };
+        return String(text).replace(/[&<>"']/g, m => map[m]);
+    };
+    
+    const csrf_token = {{ csrf_token()|tojson }};
+    const is_admin = {{ (session.get('user_role') == 'Admin')|tojson }};
+    
+    // Get deployment name and namespace from URL, sessionStorage, or form
+    function getDeploymentInfo() {
+        const urlParams = new URLSearchParams(window.location.search);
+        let deploymentName = urlParams.get('deployment_name');
+        let namespace = urlParams.get('namespace');
+        
+        if (!deploymentName) {
+            deploymentName = sessionStorage.getItem('deployment_data_name');
+        }
+        if (!namespace) {
+            namespace = sessionStorage.getItem('deployment_data_namespace');
+        }
+        
+        // Fallback to topbar selector
+        if (!namespace) {
+            const topbarSelect = document.getElementById('inputGroupSelect04');
+            if (topbarSelect) {
+                namespace = topbarSelect.value;
+            }
+        }
+        
+        // Final fallback
+        if (!namespace) {
+            namespace = sessionStorage.getItem('ns_select') || 'default';
+        }
+        
+        return { deploymentName, namespace };
+    }
+    
+    function populateDeploymentData(deploymentData) {
+        const { deploymentName, namespace } = getDeploymentInfo();
+        
+        // Update breadcrumb
+        const breadcrumb = document.getElementById('deployment-name-breadcrumb');
+        if (breadcrumb) {
+            breadcrumb.textContent = deploymentData.name || deploymentName || 'Deployment';
+        }
+        
+        // Update deployment info table
+        document.getElementById('deployment-namespace').textContent = escapeHtml(deploymentData.namespace || namespace || '');
+        document.getElementById('deployment-name').textContent = escapeHtml(deploymentData.name || '');
+        document.getElementById('deployment-created').textContent = escapeHtml(deploymentData.created || '');
+        
+        // Replicas (with spinner for admin)
+        const replicasContainer = document.getElementById('deployment-replicas');
+        if (is_admin) {
+            replicasContainer.innerHTML = `
+                <div class="input-group">
+                    <input type="text" class="spinner" id="spinner" readonly="readonly" 
+                        value="${deploymentData.replicas || 0}" k8s_type="deployments" 
+                        csrf_token="${escapeHtml(csrf_token)}" selected="${escapeHtml(deploymentData.name || deploymentName || '')}"
+                        namespace="${escapeHtml(deploymentData.namespace || namespace || '')}">
+                </div>
+            `;
+            // Load spinner script if not already loaded
+            if (!document.getElementById('spinner-script')) {
+                const script = document.createElement('script');
+                script.id = 'spinner-script';
+                script.src = "{{ url_for('static',filename='/vendor/custom-input-spinner/inputt-spinner.js') }}";
+                document.body.appendChild(script);
+            }
+        } else {
+            replicasContainer.textContent = deploymentData.replicas || 0;
+        }
+        
+        // Annotations
+        const annotationsContainer = document.getElementById('deployment-annotations-container');
+        if (deploymentData.annotations && Array.isArray(deploymentData.annotations) && deploymentData.annotations.length > 0) {
+            // Handle array format (from k8sDeploymentsGet)
+            const annotations = {};
+            deploymentData.annotations.forEach(ann => {
+                if (typeof ann === 'object' && ann !== null) {
+                    Object.assign(annotations, ann);
+                }
             });
+            if (Object.keys(annotations).length > 0) {
+                annotationsContainer.innerHTML = `
+                    <table class="table table-bordered" id="annotationTable" width="100%" cellspacing="0">
+                        <thead>
+                            <tr>
+                                <th width="50%">Key</th>
+                                <th width="50%">Value</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            ${Object.entries(annotations).map(([key, value]) => `
+                                <tr>
+                                    <td width="50%">${escapeHtml(key)}</td>
+                                    <td width="50%">${escapeHtml(value)}</td>
+                                </tr>
+                            `).join('')}
+                        </tbody>
+                    </table>
+                `;
+            } else {
+                annotationsContainer.innerHTML = '<span class="text-muted">No annotations</span>';
+            }
+        } else if (deploymentData.annotations && typeof deploymentData.annotations === 'object' && Object.keys(deploymentData.annotations).length > 0) {
+            // Handle object format
+            annotationsContainer.innerHTML = `
+                <table class="table table-bordered" id="annotationTable" width="100%" cellspacing="0">
+                    <thead>
+                        <tr>
+                            <th width="50%">Key</th>
+                            <th width="50%">Value</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        ${Object.entries(deploymentData.annotations).map(([key, value]) => `
+                            <tr>
+                                <td width="50%">${escapeHtml(key)}</td>
+                                <td width="50%">${escapeHtml(value)}</td>
+                            </tr>
+                        `).join('')}
+                    </tbody>
+                </table>
+            `;
+        } else {
+            annotationsContainer.innerHTML = '<span class="text-muted">No annotations</span>';
+        }
+        
+        // Labels
+        const labelsContainer = document.getElementById('deployment-labels-container');
+        if (deploymentData.labels && Array.isArray(deploymentData.labels) && deploymentData.labels.length > 0) {
+            // Handle array format
+            const labels = {};
+            deploymentData.labels.forEach(label => {
+                if (typeof label === 'object' && label !== null) {
+                    Object.assign(labels, label);
+                }
+            });
+            if (Object.keys(labels).length > 0) {
+                labelsContainer.innerHTML = `
+                    <table class="table table-bordered" id="labelsTable" width="100%" cellspacing="0">
+                        <thead>
+                            <tr>
+                                <th width="50%">Key</th>
+                                <th width="50%">Value</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            ${Object.entries(labels).map(([key, value]) => `
+                                <tr>
+                                    <td width="50%">${escapeHtml(key)}</td>
+                                    <td width="50%">${escapeHtml(value)}</td>
+                                </tr>
+                            `).join('')}
+                        </tbody>
+                    </table>
+                `;
+            } else {
+                labelsContainer.innerHTML = '<span class="text-muted">No labels</span>';
+            }
+        } else if (deploymentData.labels && typeof deploymentData.labels === 'object' && Object.keys(deploymentData.labels).length > 0) {
+            // Handle object format
+            labelsContainer.innerHTML = `
+                <table class="table table-bordered" id="labelsTable" width="100%" cellspacing="0">
+                    <thead>
+                        <tr>
+                            <th width="50%">Key</th>
+                            <th width="50%">Value</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        ${Object.entries(deploymentData.labels).map(([key, value]) => `
+                            <tr>
+                                <td width="50%">${escapeHtml(key)}</td>
+                                <td width="50%">${escapeHtml(value)}</td>
+                            </tr>
+                        `).join('')}
+                    </tbody>
+                </table>
+            `;
+        } else {
+            labelsContainer.innerHTML = '<span class="text-muted">No labels</span>';
+        }
+        
+        // Selectors
+        const selectorsContainer = document.getElementById('deployment-selectors-container');
+        if (deploymentData.selectors && Array.isArray(deploymentData.selectors) && deploymentData.selectors.length > 0) {
+            // Handle array format
+            const selectors = {};
+            deploymentData.selectors.forEach(sel => {
+                if (typeof sel === 'object' && sel !== null) {
+                    Object.assign(selectors, sel);
+                }
+            });
+            if (Object.keys(selectors).length > 0) {
+                selectorsContainer.innerHTML = `
+                    <table class="table table-bordered" id="selectorsTable" width="100%" cellspacing="0">
+                        <thead>
+                            <tr>
+                                <th width="50%">Key</th>
+                                <th width="50%">Value</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            ${Object.entries(selectors).map(([key, value]) => `
+                                <tr>
+                                    <td width="50%">${escapeHtml(key)}</td>
+                                    <td width="50%">${escapeHtml(value)}</td>
+                                </tr>
+                            `).join('')}
+                        </tbody>
+                    </table>
+                `;
+            } else {
+                selectorsContainer.innerHTML = '<span class="text-muted">No selectors</span>';
+            }
+        } else if (deploymentData.selectors && typeof deploymentData.selectors === 'object' && Object.keys(deploymentData.selectors).length > 0) {
+            // Handle object format
+            selectorsContainer.innerHTML = `
+                <table class="table table-bordered" id="selectorsTable" width="100%" cellspacing="0">
+                    <thead>
+                        <tr>
+                            <th width="50%">Key</th>
+                            <th width="50%">Value</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        ${Object.entries(deploymentData.selectors).map(([key, value]) => `
+                            <tr>
+                                <td width="50%">${escapeHtml(key)}</td>
+                                <td width="50%">${escapeHtml(value)}</td>
+                            </tr>
+                        `).join('')}
+                    </tbody>
+                </table>
+            `;
+        } else {
+            selectorsContainer.innerHTML = '<span class="text-muted">No selectors</span>';
+        }
+        
+        // Populate containers
+        populateContainers(deploymentData);
+        
+        // Populate variables
+        populateVariables(deploymentData.environment_variables || []);
+        
+        // Populate conditions
+        populateConditions(deploymentData.conditions || []);
+        
+        // Populate security contexts
+        populateSecurityContext(deploymentData.security_context || {});
+        
+        // Populate related resources
+        populateRelatedResources(deploymentData, namespace);
+    }
+    
+    function populateContainers(deploymentData) {
+        // Init containers
+        const initContainersSection = document.getElementById('init-containers-section');
+        const initContainersTbody = document.getElementById('init-containers-tbody');
+        
+        if (deploymentData.init_containers && deploymentData.init_containers.length > 0) {
+            initContainersSection.style.display = 'block';
+            initContainersTbody.innerHTML = deploymentData.init_containers.map(ic => {
+                return `
+                    <tr>
+                        <td>${escapeHtml(ic.name || '')}</td>
+                        <td>${escapeHtml(ic.image || '')}</td>
+                    </tr>
+                `;
+            }).join('');
+        } else {
+            initContainersSection.style.display = 'none';
+            initContainersTbody.innerHTML = '';
+        }
+        
+        // Containers
+        const containersTbody = document.getElementById('containers-tbody');
+        if (deploymentData.containers && deploymentData.containers.length > 0) {
+            containersTbody.innerHTML = deploymentData.containers.map(c => {
+                return `
+                    <tr>
+                        <td>${escapeHtml(c.name || '')}</td>
+                        <td>${escapeHtml(c.image || '')}</td>
+                    </tr>
+                `;
+            }).join('');
+        } else {
+            containersTbody.innerHTML = '<tr><td colspan="2" class="text-center text-muted">No containers found</td></tr>';
+        }
+    }
+    
+    function populateVariables(environmentVariables) {
+        const tbody = document.getElementById('variables-tbody');
+        if (environmentVariables && environmentVariables.length > 0) {
+            tbody.innerHTML = environmentVariables.map(vars => {
+                if (vars && typeof vars === 'object') {
+                    return Object.entries(vars).map(([key, value]) => `
+                        <tr>
+                            <td>${escapeHtml(key)}</td>
+                            <td>${escapeHtml(value)}</td>
+                        </tr>
+                    `).join('');
+                }
+                return '';
+            }).join('');
+        } else {
+            tbody.innerHTML = '<tr><td colspan="2" class="text-center text-muted">No environment variables found</td></tr>';
+        }
+    }
+    
+    function populateConditions(conditions) {
+        const tbody = document.getElementById('conditions-tbody');
+        if (conditions && conditions.length > 0) {
+            tbody.innerHTML = conditions.map(cond => {
+                const type = cond.type || cond['type'] || '';
+                const reason = cond.reason || cond['reason'] || '';
+                const message = cond.message || cond['message'] || '';
+                const lastTransitionTime = cond.last_transition_time || cond['last_transition_time'] || cond.lastTransitionTime || '';
+                return `
+                    <tr>
+                        <td>${escapeHtml(type)}</td>
+                        <td>${escapeHtml(reason)}</td>
+                        <td>${escapeHtml(message)}</td>
+                        <td>${escapeHtml(lastTransitionTime)}</td>
+                    </tr>
+                `;
+            }).join('');
+        } else {
+            tbody.innerHTML = '<tr><td colspan="4" class="text-center text-muted">No conditions found</td></tr>';
+        }
+    }
+    
+    function populateSecurityContext(securityContext) {
+        const tbody = document.getElementById('security-tbody');
+        if (securityContext && Object.keys(securityContext).length > 0) {
+            tbody.innerHTML = Object.entries(securityContext).map(([key, value]) => {
+                const valueStr = typeof value === 'object' ? JSON.stringify(value) : String(value);
+                return `
+                    <tr>
+                        <td>${escapeHtml(key)}</td>
+                        <td>${escapeHtml(valueStr)}</td>
+                    </tr>
+                `;
+            }).join('');
+        } else {
+            tbody.innerHTML = '<tr><td colspan="2" class="text-center text-muted">No security context found</td></tr>';
+        }
+    }
+    
+    function populateRelatedResources(deploymentData, namespace) {
+        const ns = deploymentData.namespace || namespace || '';
+        const tbody = document.getElementById('refers-to-tbody');
+        let rows = [];
+        
+        // Image pull secrets
+        if (deploymentData.image_pull_secrets && deploymentData.image_pull_secrets.length > 0) {
+            deploymentData.image_pull_secrets.forEach(ips => {
+                if (typeof ips === 'object' && ips !== null) {
+                    Object.entries(ips).forEach(([key, value]) => {
+                        if (key === 'name' || value) {
+                            const secretName = escapeHtml(value || '');
+                            rows.push(`
+                                <tr>
+                                    <td>ImagePullSecret</td>
+                                    <td>
+                                        <form action="/security/secret" method="POST" onsubmit="sessionStorage.setItem('ns_select', '${escapeHtml(ns)}'); return true;">
+                                            <input type="hidden" name="csrf_token" value="${escapeHtml(csrf_token)}">
+                                            <input type="hidden" name="ns_select" value="${escapeHtml(ns)}" />
+                                            <input type="hidden" name="selected" value="${secretName}" />
+                                            <a href="javascript:;" onclick="parentNode.submit();">${secretName}</a>
+                                        </form>
+                                    </td>
+                                    <td>${escapeHtml(ns)}</td>
+                                </tr>
+                            `);
+                        }
+                    });
+                }
+            });
+        }
+        
+        // Service account
+        if (deploymentData.service_account) {
+            const saName = Array.isArray(deploymentData.service_account) 
+                ? deploymentData.service_account[0] 
+                : deploymentData.service_account;
+            if (saName) {
+                rows.push(`
+                    <tr>
+                        <td>ServiceAccount</td>
+                        <td>
+                            <form action="/cluster-permission/service-account" method="POST" onsubmit="sessionStorage.setItem('ns_select', '${escapeHtml(ns)}'); return true;">
+                                <input type="hidden" name="csrf_token" value="${escapeHtml(csrf_token)}">
+                                <input type="hidden" name="ns_select" value="${escapeHtml(ns)}" />
+                                <input type="hidden" name="selected" value="${escapeHtml(saName)}" />
+                                <a href="javascript:;" onclick="parentNode.submit();">${escapeHtml(saName)}</a>
+                            </form>
+                        </td>
+                        <td>${escapeHtml(ns)}</td>
+                    </tr>
+                `);
+            }
+        }
+        
+        // Secrets
+        if (deploymentData.secrets && deploymentData.secrets.length > 0) {
+            deploymentData.secrets.forEach(secret => {
+                rows.push(`
+                    <tr>
+                        <td>Secret</td>
+                        <td>
+                            <form action="/security/secret" method="POST" onsubmit="sessionStorage.setItem('ns_select', '${escapeHtml(ns)}'); return true;">
+                                <input type="hidden" name="csrf_token" value="${escapeHtml(csrf_token)}">
+                                <input type="hidden" name="ns_select" value="${escapeHtml(ns)}" />
+                                <input type="hidden" name="selected" value="${escapeHtml(secret)}" />
+                                <a href="javascript:;" onclick="parentNode.submit();">${escapeHtml(secret)}</a>
+                            </form>
+                        </td>
+                        <td>${escapeHtml(ns)}</td>
+                    </tr>
+                `);
+            });
+        }
+        
+        // ConfigMaps
+        if (deploymentData.cm && deploymentData.cm.length > 0) {
+            deploymentData.cm.forEach(cm => {
+                rows.push(`
+                    <tr>
+                        <td>ConfigMap</td>
+                        <td>
+                            <form action="/storage/configmap" method="POST" onsubmit="sessionStorage.setItem('ns_select', '${escapeHtml(ns)}'); return true;">
+                                <input type="hidden" name="csrf_token" value="${escapeHtml(csrf_token)}">
+                                <input type="hidden" name="ns_select" value="${escapeHtml(ns)}" />
+                                <input type="hidden" name="selected" value="${escapeHtml(cm)}" />
+                                <a href="javascript:;" onclick="parentNode.submit();">${escapeHtml(cm)}</a>
+                            </form>
+                        </td>
+                        <td>${escapeHtml(ns)}</td>
+                    </tr>
+                `);
+            });
+        }
+        
+        // PVCs
+        if (deploymentData.pvc && deploymentData.pvc.length > 0) {
+            deploymentData.pvc.forEach(pvc => {
+                rows.push(`
+                    <tr>
+                        <td>PersistentVolumeClaim</td>
+                        <td>
+                            <form action="/storage/pvc" method="POST" onsubmit="sessionStorage.setItem('ns_select', '${escapeHtml(ns)}'); return true;">
+                                <input type="hidden" name="csrf_token" value="${escapeHtml(csrf_token)}">
+                                <input type="hidden" name="ns_select" value="${escapeHtml(ns)}" />
+                                <input type="hidden" name="selected" value="${escapeHtml(pvc)}" />
+                                <a href="javascript:;" onclick="parentNode.submit();">${escapeHtml(pvc)}</a>
+                            </form>
+                        </td>
+                        <td>${escapeHtml(ns)}</td>
+                    </tr>
+                `);
+            });
+        }
+        
+        if (rows.length > 0) {
+            tbody.innerHTML = rows.join('');
+        } else {
+            tbody.innerHTML = '<tr><td colspan="3" class="text-center text-muted">No related resources found</td></tr>';
+        }
+    }
+    
+    async function loadDeploymentData() {
+        const { deploymentName, namespace } = getDeploymentInfo();
+        
+        if (!deploymentName) {
+            console.error('Deployment name not found in URL, sessionStorage, or form.');
+            document.getElementById('deployment-name-breadcrumb').textContent = 'Error';
+            document.getElementById('deployment-name').textContent = 'Error: Deployment name not provided.';
+            return;
+        }
+        
+        try {
+            const apiUrl = `/api/v1/workloads/deployments/${encodeURIComponent(deploymentName)}?namespace=${encodeURIComponent(namespace)}`;
+            console.log('Fetching deployment data from:', apiUrl);
+            
+            const response = await fetch(apiUrl);
+            if (!response.ok) {
+                throw new Error(`HTTP error! status: ${response.status}`);
+            }
+            
+            const data = await response.json();
+            console.log('Deployment data API response:', data);
+            
+            if (data.error) {
+                throw new Error(data.message || 'Failed to load deployment data');
+            }
+            
+            populateDeploymentData(data.data);
+            
+        } catch (error) {
+            console.error('Error loading deployment data:', error);
+            document.getElementById('deployment-name-breadcrumb').textContent = 'Error';
+            document.getElementById('deployment-name').textContent = 'Error: ' + escapeHtml(error.message);
+        }
+    }
+    
+    // Load data when page loads
+    document.addEventListener('DOMContentLoaded', function() {
+        loadDeploymentData();
         });
     </script>
-    {% endfor %}
-    {% for ic in deployment_data.init_containers %}
-    <script>
-        $(document).ready(function () {
-            $('#intVulnTable{{ ic.name }}').DataTable({
-               responsive: true,
-               order: [[1, 'asc']],
-            });
-        });
-    </script>
-    {% endfor %}
-
-    <!-- Custom input spinner -->
-    <script id="spinner" src="{{ url_for('static',filename='/vendor/custom-input-spinner/inputt-spinner.js') }}" ></script>
 {% endblock %}

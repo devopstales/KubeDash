@@ -1,0 +1,61 @@
+{
+  "mcpServers": {
+    "filesystem": {
+      "command": "docker",
+      "args": [
+        "run",
+        "-i",
+        "--rm",
+        "--mount",
+        "type=bind,src=/data/git/kubedash_v4,dst=/projects",
+        "mcp/filesystem",
+        "/projects"
+      ]
+    },
+    "git": {
+      "command": "docker",
+      "args": [
+        "run",
+        "--rm",
+        "-i",
+        "--mount",
+        "type=bind,src=/data/git/kubedash_v4,dst=/workspace",
+        "mcp/git"
+      ]
+    },
+    "postgres": {
+      "command": "docker",
+      "args": [
+        "run",
+        "-i",
+        "--rm",
+        "mcp/postgres",
+        "postgresql://kubedash:kubedash@127.0.0.1:5432"
+      ]
+    },
+    "redis": {
+      "command": "docker",
+      "args": [
+        "run",
+        "-i",
+        "--rm",
+        "mcp/redis",
+        "--url",
+        "redis://127.0.0.1:6379"
+      ]
+    },
+    "sqlite": {
+      "command": "docker",
+      "args": [
+        "run",
+        "--rm",
+        "-i",
+        "-v",
+        "mcp-sqlite:/mcp",
+        "mcp/sqlite",
+        "--db-path",
+        "/data/git/kubedash_v4/src/kubedash/database/development.db"
+      ]
+    }
+  }
+}

@@ -1,0 +1,20 @@
+{{- if .Values.kubeview.enabled }}
+apiVersion: v1
+kind: Service
+metadata:
+  name: {{ include "kubedash.fullname" . }}-kubeview
+  labels:
+    app: "kubeview"
+    {{- include "kubedash.labels" . | nindent 4 }}
+spec:
+  type: ClusterIP
+  ports:
+    - name: http
+      port: {{ .Values.kubeview.port }}
+      targetPort: http
+      protocol: TCP
+  selector:
+    app: "kubeview"
+    {{- include "kubedash.labels" . | nindent 4 }}
+{{- end }}
+

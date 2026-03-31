@@ -119,32 +119,45 @@ def k8sPersistentVolumeListGet(username_role, user_token, namespace):
     try:
         pv_list = k8s_client.CoreV1Api().list_persistent_volume(_request_timeout=1)
         for pv in pv_list.items:
-            if namespace == pv.spec.claim_ref.namespace:
-                PV = {
-                    "status": pv.status.phase,
-                    "name": pv.metadata.name,
-                    "created": pv.metadata.creation_timestamp.strftime('%Y-%m-%d %H:%M:%S'),
-                    "annotations": trimAnnotations(pv.metadata.annotations),
-                    "labels": pv.metadata.labels,
-                    "access_modes": pv.spec.access_modes,
-                    "storage_class_name": pv.spec.storage_class_name,
-                    "volume_claim_name": pv.spec.claim_ref.name,
-                    "volume_claim_namespace": pv.spec.claim_ref.namespace,
-                    "reclaim_policy": pv.spec.persistent_volume_reclaim_policy,
-                    "volume_mode": pv.spec.volume_mode,
-                    "capacity": pv.spec.capacity['storage'],
-                }
-                if pv.metadata.deletion_timestamp:
-                    PV.update({"status": "Terminating"})
-                    PV.update({"deleted": pv.metadata.deletion_timestamp})
-                if pv.spec.csi:
-                    PV.update({"csi_driver": pv.spec.csi.driver})
-                    PV.update({"fs_type": pv.spec.csi.fs_type})
-                    PV.update({"volume_attributes":  pv.spec.csi.volume_attributes})
-                if pv.spec.host_path:
-                    PV.update({"host_path": pv.spec.host_path.path})
+            # Get the namespace of the PVC this PV is bound to
+            claim_namespace = None
+            if pv.spec.claim_ref:
+                claim_namespace = pv.spec.claim_ref.namespace
+            
+            # Filter by namespace: if namespace is 'all', show all PVs
+            # Otherwise, only show PVs bound to PVCs in the specified namespace
+            # Unbound PVs (no claim_ref) are excluded when filtering by namespace
+            if namespace and namespace.lower() != 'all':
+                # Filter by namespace - only include PVs bound to PVCs in this namespace
+                if claim_namespace != namespace:
                     continue
-                PV_LIST.append(PV)
+            
+            PV = {
+                "status": pv.status.phase,
+                "name": pv.metadata.name,
+                "created": pv.metadata.creation_timestamp.strftime('%Y-%m-%d %H:%M:%S'),
+                "annotations": trimAnnotations(pv.metadata.annotations),
+                "labels": pv.metadata.labels,
+                "access_modes": pv.spec.access_modes,
+                "storage_class_name": pv.spec.storage_class_name,
+                "volume_claim_name": pv.spec.claim_ref.name if pv.spec.claim_ref else None,
+                "volume_claim_namespace": claim_namespace,
+                "reclaim_policy": pv.spec.persistent_volume_reclaim_policy,
+                "volume_mode": pv.spec.volume_mode,
+                "capacity": pv.spec.capacity['storage'] if pv.spec.capacity else None,
+            }
+            if pv.metadata.deletion_timestamp:
+                PV.update({"status": "Terminating"})
+                PV.update({"deleted": pv.metadata.deletion_timestamp.strftime('%Y-%m-%d %H:%M:%S')})
+            if pv.spec.csi:
+                PV.update({"csi_driver": pv.spec.csi.driver})
+                if hasattr(pv.spec.csi, 'fs_type') and pv.spec.csi.fs_type:
+                    PV.update({"fs_type": pv.spec.csi.fs_type})
+                if hasattr(pv.spec.csi, 'volume_attributes') and pv.spec.csi.volume_attributes:
+                    PV.update({"volume_attributes":  pv.spec.csi.volume_attributes})
+            if pv.spec.host_path:
+                PV.update({"host_path": pv.spec.host_path.path})
+            PV_LIST.append(PV)
         return PV_LIST
     except ApiException as error:
         if error.status != 404:
@@ -159,7 +172,7 @@ def k8sPersistentVolumeListGet(username_role, user_token, namespace):
 ## Volume Snapshot
 ##############################################################
 
-def k8sPersistentVolumeSnapshotListGet(username_role, user_token):
+def k8sPersistentVolumeSnapshotListGet(username_role, user_token, namespace=None):
     k8sClientConfigGet(username_role, user_token)
     PVS_LIST = list()
     try:
@@ -170,23 +183,32 @@ def k8sPersistentVolumeSnapshotListGet(username_role, user_token):
             _request_timeout=1
         )
         for pvs in snapshot_list["items"]:
+            # Get namespace from metadata
+            snapshot_namespace = pvs["metadata"].get("namespace", "")
+            
+            # Filter by namespace if provided and not 'all'
+            if namespace and namespace.lower() != 'all' and snapshot_namespace != namespace:
+                continue
+            
             PVS = {
-            "name": pvs["metadata"]["name"],
-            "annotations": trimAnnotations(pvs["metadata"]["annotations"]),
-            "created": datetime.strptime(pvs["metadata"]["creationTimestamp"], "%Y-%m-%dT%H:%M:%SZ").strftime('%Y-%m-%d %H:%M:%S'),
-            "pvc": pvs["spec"]["source"]["persistentVolumeClaimName"],
-            "volume_snapshot_class": pvs["spec"]["volumeSnapshotClassName"],
-            "volume_snapshot_content": pvs["status"]["boundVolumeSnapshotContentName"],
-            "snapshot_creation_time": pvs["status"]["creationTime"],
-            "status": pvs["status"]["readyToUse"],
-            "restore_size": pvs["status"]["restoreSize"],
+                "name": pvs["metadata"]["name"],
+                "namespace": snapshot_namespace,
+                "annotations": trimAnnotations(pvs["metadata"].get("annotations")),
+                "created": datetime.strptime(pvs["metadata"]["creationTimestamp"], "%Y-%m-%dT%H:%M:%SZ").strftime('%Y-%m-%d %H:%M:%S'),
+                "pvc": pvs["spec"]["source"]["persistentVolumeClaimName"],
+                "volume_snapshot_class": pvs["spec"]["volumeSnapshotClassName"],
+                "volume_snapshot_content": pvs["status"].get("boundVolumeSnapshotContentName"),
+                "snapshot_creation_time": pvs["status"].get("creationTime"),
+                "status": pvs["status"].get("readyToUse", False),
+                "restore_size": pvs["status"].get("restoreSize"),
             }
             if "labels" in pvs["metadata"]:
                 PVS["labels"] = pvs["metadata"]["labels"]
             PVS_LIST.append(PVS)
         return PVS_LIST
     except ApiException as error:
-        ErrorHandler(logger, error, "get Volume Snapshot list - %s" % error.status)
+        if error.status != 404:
+            ErrorHandler(logger, error, "get Volume Snapshot list - %s" % error.status)
         return PVS_LIST
     except Exception as error:
         ERROR = "k8sPersistentVolumeSnapshotListGet: %s" % error

@@ -1,0 +1,42 @@
+{{- if .Values.kubeview.enabled }}
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: {{ include "kubedash.fullname" . }}-kubeview
+  labels:
+    app: "kubeview"
+    {{- include "kubedash.labels" . | nindent 4 }}
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: "kubeview"
+      {{- include "kubedash.labels" . | nindent 6 }}
+  template:
+    metadata:
+      labels:
+        app: "kubeview"
+        {{- include "kubedash.labels" . | nindent 8 }}
+    spec:
+      serviceAccountName: {{ include "kubedash.serviceAccountName" . }}
+      containers:
+        - name: kubeview
+          image: "{{ .Values.kubeview.image.repository }}:{{ .Values.kubeview.image.tag }}"
+          imagePullPolicy: {{ .Values.kubeview.image.pullPolicy }}
+          ports:
+            - name: http
+              containerPort: {{ .Values.kubeview.port }}
+              protocol: TCP
+          env:
+            - name: TZ
+              value: {{ .Values.TimeZone | quote }}
+            - name: PORT
+              value: {{ .Values.kubeview.port | quote }}
+            - name: NAMESPACE_FILTER
+              value: {{ .Values.kubeview.namespaceFilter | quote }}
+          {{- with .Values.kubeview.resources }}
+          resources:
+            {{- toYaml . | nindent 12 }}
+          {{- end }}
+{{- end }}
+

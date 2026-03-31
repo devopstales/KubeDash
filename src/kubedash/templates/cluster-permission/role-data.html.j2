@@ -7,14 +7,14 @@
         <ol class="breadcrumb my-0">
           <li class="breadcrumb-item"><span>Cluster Permissions</span></li>
           <li class="breadcrumb-item "><a href="/cluster-permission/role">Roles</a></li>
-          <li class="breadcrumb-item active"><span>{{ r_name }}</span></li>
+          <li class="breadcrumb-item active" id="role-name-breadcrumb">Loading...</li>
         </ol>
       </nav>
     </div>
 </ul>
 <ul class="header-nav ms-auto"></ul>
 <ul class="header-nav d-lg-flex">
-{% include "segments/topmenu.html.j2" %}
+{% include "segments/partials/topmenu.html.j2" %}
 {% endblock %}
 
 {% block content %}
@@ -33,65 +33,15 @@
                         <th>Verbs</th>
                     </tr>
                 </thead>
-                <tbody>
-                {% if role %}
-                  {% if role.rules %}
-                    {% for rules in role.rules %}
-                        <tr>
-                            <td>
-                                {% if rules.api_groups %}
-                                {% for ag in rules.api_groups %}
-                                    {{ ag }}{% if not loop.last %}<br>{% endif %}
-                                {% endfor %}
-                                {% else %}
-                                    {{ rules.api_groups }}
-                                {% endif %}
-                            </td>
-                            <td>
-                                {% if rules.resource_names %}
-                                {% for rn in rules.resource_names %}
-                                    {{ rn }}{% if not loop.last %}<br>{% endif %}
-                                {% endfor %}
-                                {% else %}
-                                    {{ rules.resource_names }}
-                                {% endif %}
-                            </td>
-                            <td>
-                                {% if rules.resources %}
-                                {% for r in rules.resources %}
-                                    {{ r }}{% if not loop.last %}<br>{% endif %}
-                                {% endfor %}
-                                {% else %}
-                                    {{ rules.resources }}
-                                {% endif %}
-                            </td>
-                            <td>
-                                {% if rules.verbs %}
-                                {% for v in rules.verbs %}
-                                    {{ v }}{% if not loop.last %}<br>{% endif %}
-                                {% endfor %}
-                                {% else %}
-                                    {{ rules.verbs }}
-                                {% endif %}
-                            </td>
-                        </tr>
-                    {% endfor %}
-                  {% else %}
+                <tbody id="rules-tbody">
                     <tr>
-                        <td></td>
-                        <td class="text-center">No rules found.</td>
-                        <td></td>
-                        <td></td>
+                        <td colspan="4" class="text-center">
+                            <div class="spinner-border spinner-border-sm text-primary" role="status">
+                                <span class="visually-hidden">Loading...</span>
+                            </div>
+                            <span class="ms-2">Loading rules...</span>
+                        </td>
                     </tr>
-                  {% endif %}
-                {% else %}
-                    <tr>
-                        <td></td>
-                        <td class="text-center">No role.</td>
-                        <td></td>
-                        <td></td>
-                    </tr>
-                {% endif %}
                 </tbody>
             </table>
         </div>
@@ -100,5 +50,283 @@
 {% endblock %}
 
 {% block add_head_css %}
-{% include "segments/datatable_snippet.html.j2" %}
+{% include "segments/components/datatable_snippet.html.j2" %}
+{% endblock %}
+
+{% block add_tail_js %}
+<script nonce="{{ csp_nonce }}">
+    // IMMEDIATE: Prevent datatables-demo.js from initializing on loading row
+    (function() {
+        function setupOverride() {
+            if (typeof $ !== 'undefined' && $.fn && !window._datatableOverrideSetup) {
+                window._datatableOverrideSetup = true;
+                const originalDataTable = $.fn.DataTable;
+                $.fn.DataTable = function(options) {
+                    const table = this[0];
+                    if (table && table.id === 'dataTable') {
+                        const tbody = table.querySelector('tbody');
+                        if (tbody) {
+                            const rows = tbody.querySelectorAll('tr');
+                            const hasColspanRow = Array.from(rows).some(row => {
+                                const cells = row.querySelectorAll('td');
+                                return Array.from(cells).some(cell => cell.hasAttribute('colspan'));
+                            });
+                            if (hasColspanRow) {
+                                console.log('Blocked DataTable initialization on loading row');
+                                return this;
+                            }
+                        }
+                    }
+                    return originalDataTable.apply(this, arguments);
+                };
+                Object.setPrototypeOf($.fn.DataTable, originalDataTable);
+                Object.keys(originalDataTable).forEach(key => {
+                    $.fn.DataTable[key] = originalDataTable[key];
+                });
+            }
+        }
+        setupOverride();
+        setTimeout(setupOverride, 0);
+        setTimeout(setupOverride, 50);
+        setTimeout(setupOverride, 100);
+    })();
+    
+    (function() {
+        function checkAndDestroyAutoInit() {
+            if (typeof $ !== 'undefined' && $.fn.DataTable) {
+                const table = document.getElementById('dataTable');
+                if (table && $.fn.DataTable.isDataTable(table)) {
+                    const tbody = table.querySelector('tbody');
+                    if (tbody) {
+                        const rows = tbody.querySelectorAll('tr');
+                        const hasColspanRow = Array.from(rows).some(row => {
+                            const cells = row.querySelectorAll('td');
+                            return Array.from(cells).some(cell => cell.hasAttribute('colspan'));
+                        });
+                        if (hasColspanRow) {
+                            console.log('Destroying auto-initialized DataTable on loading row');
+                            try {
+                                $(table).DataTable().destroy();
+                            } catch(e) {
+                                console.error('Error destroying DataTable:', e);
+                            }
+                        }
+                    }
+                }
+            }
+        }
+        if (typeof $ !== 'undefined') {
+            checkAndDestroyAutoInit();
+        }
+        setTimeout(checkAndDestroyAutoInit, 50);
+        setTimeout(checkAndDestroyAutoInit, 100);
+        setTimeout(checkAndDestroyAutoInit, 200);
+        setTimeout(checkAndDestroyAutoInit, 500);
+        setTimeout(checkAndDestroyAutoInit, 1000);
+    })();
+    
+    const escapeHtml = (text) => {
+        if (text === null || text === undefined) return '';
+        const map = {
+            '&': '&amp;',
+            '<': '&lt;',
+            '>': '&gt;',
+            '"': '&quot;',
+            "'": '&#039;'
+        };
+        return String(text).replace(/[&<>"']/g, m => map[m]);
+    };
+    
+    function formatArrayValue(arr) {
+        if (!arr || !Array.isArray(arr)) return '';
+        return arr.filter(item => item && item.length > 0).map(item => escapeHtml(item)).join('<br>') || ' ';
+    }
+    
+    // Get role name and namespace from URL query parameter, form data, or sessionStorage
+    function getRoleInfo() {
+        const urlParams = new URLSearchParams(window.location.search);
+        let roleName = urlParams.get('r_name');
+        let namespace = urlParams.get('namespace');
+        
+        // If not in query, check sessionStorage
+        if (!roleName) {
+            roleName = sessionStorage.getItem('role_data_name');
+            if (roleName) {
+                sessionStorage.removeItem('role_data_name');
+            }
+        }
+        if (!namespace) {
+            namespace = sessionStorage.getItem('role_data_namespace');
+            if (namespace) {
+                sessionStorage.removeItem('role_data_namespace');
+            }
+        }
+        
+        // If still not found, check form data
+        if (!roleName) {
+            const form = document.querySelector('form[action="/cluster-permission/role/data"]');
+            if (form) {
+                const roleNameInput = form.querySelector('input[name="r_name"]');
+                if (roleNameInput) {
+                    roleName = roleNameInput.value;
+                }
+                const nsInput = form.querySelector('input[name="ns_select"]');
+                if (nsInput) {
+                    namespace = nsInput.value;
+                }
+            }
+        }
+        
+        return { roleName, namespace: namespace || 'default' };
+    }
+    
+    function populateRulesTable(role) {
+        const tbody = document.getElementById('rules-tbody');
+        const table = document.getElementById('dataTable');
+        
+        if (table && typeof $ !== 'undefined' && $.fn.DataTable && $.fn.DataTable.isDataTable(table)) {
+            $(table).DataTable().destroy();
+        }
+        
+        tbody.innerHTML = `
+            <tr>
+                <td colspan="4" class="text-center">
+                    <div class="spinner-border spinner-border-sm text-primary" role="status">
+                        <span class="visually-hidden">Loading...</span>
+                    </div>
+                    <span class="ms-2">Processing rules...</span>
+                </td>
+            </tr>
+        `;
+        
+        if (!role || !role.rules || role.rules.length === 0) {
+            tbody.innerHTML = '<tr><td colspan="4" class="text-center text-muted">No rules found</td></tr>';
+            return;
+        }
+        
+        const rowsHtml = role.rules.map(rule => {
+            const apiGroups = formatArrayValue(rule.apiGroups || rule.api_groups);
+            const resourceNames = formatArrayValue(rule.resourceNames || rule.resource_names);
+            const resources = formatArrayValue(rule.resources);
+            const verbs = formatArrayValue(rule.verbs);
+            
+            return `
+                <tr>
+                    <td>${apiGroups || ' '}</td>
+                    <td>${resourceNames || ' '}</td>
+                    <td>${resources || ' '}</td>
+                    <td>${verbs || ' '}</td>
+                </tr>
+            `;
+        }).join('');
+        
+        tbody.innerHTML = rowsHtml;
+        
+        setTimeout(() => {
+            const rows = tbody.querySelectorAll('tr');
+            let hasDataRows = false;
+            rows.forEach(row => {
+                const cells = row.querySelectorAll('td');
+                const hasColspan = Array.from(cells).some(cell => cell.hasAttribute('colspan'));
+                if (!hasColspan && cells.length === 4) {
+                    hasDataRows = true;
+                }
+            });
+            
+            if (!hasDataRows) return;
+            
+            if ($.fn.DataTable && $(table).length) {
+                if ($.fn.DataTable.isDataTable(table)) {
+                    const savedRows = tbody.innerHTML;
+                    $(table).DataTable().destroy();
+                    tbody.innerHTML = savedRows;
+                }
+                
+                const dataRows = Array.from(tbody.querySelectorAll('tr')).filter(row => {
+                    const cells = row.querySelectorAll('td');
+                    return !Array.from(cells).some(cell => cell.hasAttribute('colspan')) && cells.length === 4;
+                });
+                
+                if (dataRows.length > 0) {
+                    $(table).DataTable({
+                        responsive: true,
+                        pageLength: 25
+                    });
+                }
+            }
+        }, 50);
+    }
+    
+    document.addEventListener('DOMContentLoaded', async function() {
+        let retries = 0;
+        while ((typeof $ === 'undefined' || typeof $.fn.DataTable === 'undefined') && retries < 10) {
+            await new Promise(resolve => setTimeout(resolve, 100));
+            retries++;
+        }
+        
+        if (typeof $ === 'undefined' || typeof $.fn.DataTable === 'undefined') {
+            console.error('jQuery or DataTables not loaded');
+            return;
+        }
+        
+        const table = document.getElementById('dataTable');
+        if (table && $.fn.DataTable && $.fn.DataTable.isDataTable(table)) {
+            const tbody = table.querySelector('tbody');
+            if (tbody) {
+                const rows = tbody.querySelectorAll('tr');
+                const hasColspanRow = Array.from(rows).some(row => {
+                    const cells = row.querySelectorAll('td');
+                    return Array.from(cells).some(cell => cell.hasAttribute('colspan'));
+                });
+                if (hasColspanRow) {
+                    $(table).DataTable().destroy();
+                }
+            }
+        }
+        
+        const { roleName, namespace } = getRoleInfo();
+        
+        if (!roleName) {
+            console.error('No role name provided');
+            const breadcrumb = document.getElementById('role-name-breadcrumb');
+            const tbody = document.getElementById('rules-tbody');
+            if (breadcrumb) breadcrumb.textContent = 'Error';
+            if (tbody) tbody.innerHTML = '<tr><td colspan="4" class="text-center text-danger">Error: Role name not provided</td></tr>';
+            return;
+        }
+        
+        // Update breadcrumb
+        const breadcrumb = document.getElementById('role-name-breadcrumb');
+        if (breadcrumb) {
+            breadcrumb.textContent = roleName;
+        }
+        
+        try {
+            const apiUrl = `/api/v1/rbac/roles/${encodeURIComponent(roleName)}?namespace=${encodeURIComponent(namespace)}`;
+            console.log('Fetching role from:', apiUrl);
+            
+            const response = await fetch(apiUrl);
+            if (!response.ok) {
+                throw new Error(`HTTP error! status: ${response.status}`);
+            }
+            
+            const data = await response.json();
+            console.log('Role API response:', data);
+            
+            if (data.error) {
+                throw new Error(data.message || 'Failed to load role');
+            }
+            
+            const role = data.data || {};
+            populateRulesTable(role);
+            
+        } catch (error) {
+            console.error('Error loading role:', error);
+            const tbody = document.getElementById('rules-tbody');
+            if (tbody) {
+                tbody.innerHTML = '<tr><td colspan="4" class="text-center text-danger">Error loading role: ' + escapeHtml(error.message) + '</td></tr>';
+            }
+        }
+    });
+</script>
 {% endblock %}

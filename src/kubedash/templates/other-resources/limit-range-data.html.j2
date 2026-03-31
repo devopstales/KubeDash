@@ -7,15 +7,14 @@
         <ol class="breadcrumb my-0">
           <li class="breadcrumb-item"><span>Other Resources</span></li>
           <li class="breadcrumb-item"><a href="/other-resource/limit-range">Limit Range</a></li>
-          <li class="breadcrumb-item active"><span>VPAs</span></li>
-
+          <li class="breadcrumb-item active"><span id="limit-range-name-breadcrumb">Loading...</span></li>
         </ol>
       </nav>
     </div>
 </ul>
 <ul class="header-nav ms-auto"></ul>
 <ul class="header-nav d-lg-flex">
-{% include "segments/topmenu.html.j2" %}
+{% include "segments/partials/topmenu.html.j2" %}
 {% endblock %}
 
 {% block content %}
@@ -32,60 +31,30 @@
                             <table class="table table-bordered" id="policyInfoTable" width="100%" cellspacing="0">
                                 <tr>
                                     <th>Name:</th>
-                                    <td>{{ limit_data.name }}</td>
+                                    <td id="limit-range-name">Loading...</td>
                                 </tr>
                                 <tr>
                                     <th>Created:</th>
-                                    <td>{{ limit_data.created }}</td>
+                                    <td id="limit-range-created">Loading...</td>
                                 </tr>
                                 <tr>
                                     <th>Namespace:</th>
-                                    <td>{{ limit_data.namespace }}</td>
+                                    <td id="limit-range-namespace">Loading...</td>
                                 </tr>
                                 <tr>
                                     <th>Annotations:</th>
-                                    <td>
-                                        {% if limit_data.annotations %}
-                                        <table class="table table-bordered" id="annotationTable" width="100%" cellspacing="0">
-                                            <thead>
-                                                <tr>
-                                                    <th width="50%">Key</th>
-                                                    <th width="50%">Value</th>
-                                                </tr>
-                                            </thead>
-                                            <tbody>
-                                            {% for key, value in limit_data.annotations.items() %}
-                                                <tr>
-                                                    <td width="50%">{{ key }}</td>
-                                                    <td width="50%">{{ value }}</td>
-                                                </tr>
-                                            {% endfor %}
-                                            </tbody>
-                                        </table>
-                                        {% endif %}
+                                    <td id="limit-range-annotations-container">
+                                        <div class="spinner-border spinner-border-sm text-primary" role="status">
+                                            <span class="visually-hidden">Loading...</span>
+                                        </div>
                                     </td>
                                 </tr>
                                <tr>
-                                    <th>Lables:</th>
-                                    <td>
-                                        {% if limit_data.labels %}
-                                        <table class="table table-bordered" id="labelsTable" width="100%" cellspacing="0">
-                                            <thead>
-                                                <tr>
-                                                    <th width="50%">Key</th>
-                                                    <th width="50%">Value</th>
-                                                </tr>
-                                            </thead>
-                                            <tbody>
-                                            {% for key, value in limit_data.labels.items() %}
-                                                <tr>
-                                                    <td width="50%">{{ key }}</td>
-                                                    <td width="50%">{{ value }}</td>
-                                                </tr>
-                                            {% endfor %}
-                                            </tbody>
-                                        </table>
-                                        {% endif %}
+                                    <th>Labels:</th>
+                                    <td id="limit-range-labels-container">
+                                        <div class="spinner-border spinner-border-sm text-primary" role="status">
+                                            <span class="visually-hidden">Loading...</span>
+                                        </div>
                                     </td>
                                 </tr>
                             </table>
@@ -106,7 +75,7 @@
                 <div class="card shadow mb-4">
                     <div class="card-body">
                         <div class="table-responsive">
-                            <table class="table table-bordered" id="policyInfoTable" width="100%" cellspacing="0">
+                            <table class="table table-bordered" id="limitsTable" width="100%" cellspacing="0">
                                 <thead>
                                     <tr>
                                         <th>Resource</th>
@@ -117,33 +86,14 @@
                                         <th>Minimum Limit Request Ratio</th>
                                     </tr>
                                 </thead>
-                                <tbody>
-                                    {% if limit_data.limits %}
-                                    {% for item in limit_data.limits %}
+                                <tbody id="limits-tbody">
                                     <tr>
-                                        <td>cpu</td>
-                                        <td>{% if item.min.cpu %}{{ item.min.cpu }}{% else %}None{% endif %}</td>
-                                        <td>{% if item.max.cpu %}{{ item.max.cpu }}{% else %}None{% endif %}</td>
-                                        <td>{% if item.default.cpu %}{{ item.default.cpu }}{% else %}None{% endif %}</td>
-                                        <td>{% if item.default_request.cpu %}{{ item.default_request.cpu }}{% else %}None{% endif %}</td>
-                                        <td>{% if item.max_limit_request_ratio.cpu %}{{ item.max_limit_request_ratio.cpu }}{% else %}None{% endif %}</td>
+                                        <td colspan="6" class="text-center">
+                                            <div class="spinner-border spinner-border-sm text-primary" role="status">
+                                                <span class="visually-hidden">Loading...</span>
+                                            </div>
+                                        </td>
                                     </tr>
-                                    <tr>
-                                        <td>memory</td>
-                                        <td>{% if item.min.memory %}{{ item.min.memory }}{% else %}None{% endif %}</td>
-                                        <td>{% if item.max.memory %}{{ item.max.memory }}{% else %}None{% endif %}</td>
-                                        <td>{% if item.default.memory %}{{ item.default.memory }}{% else %}None{% endif %}</td>
-                                        <td>{% if item.default_request.memory %}{{ item.default_request.memory }}{% else %}None{% endif %}</td>
-                                        <td>{% if item.max_limit_request_ratio.memory %}{{ item.max_limit_request_ratio.memory }}{% else %}None{% endif %}</td>
-                                    </tr>
-                                    {% endfor %}
-                                    {% else %}
-                                    <tr>
-                                        <td></td>
-                                        <td></td>
-                                        <td></td>
-                                    </tr>
-                                    {% endif %}
                                 </tbody>
                             </table>
                         </div>
@@ -155,5 +105,223 @@
 {% endblock %}
 
 {% block add_head_css %}
-{% include "segments/datatable_snippet.html.j2" %}
+{% include "segments/components/datatable_snippet.html.j2" %}
+{% endblock %}
+
+{% block add_tail_js %}
+<script nonce="{{ csp_nonce }}">
+    const escapeHtml = (text) => {
+        if (text === null || text === undefined) return '';
+        const map = {
+            '&': '&amp;',
+            '<': '&lt;',
+            '>': '&gt;',
+            '"': '&quot;',
+            "'": '&#039;'
+        };
+        return String(text).replace(/[&<>"']/g, m => map[m]);
+    };
+    
+    const csrf_token = {{ csrf_token()|tojson }};
+    
+    // Get Limit Range name and namespace from URL, sessionStorage, or topbar selector
+    function getLimitRangeInfo() {
+        const urlParams = new URLSearchParams(window.location.search);
+        let limitRangeName = urlParams.get('limit_name');
+        let namespace = urlParams.get('namespace');
+        
+        // Fallback to sessionStorage
+        if (!limitRangeName) {
+            limitRangeName = sessionStorage.getItem('limit_range_data_name');
+        }
+        if (!namespace) {
+            namespace = sessionStorage.getItem('ns_select');
+        }
+        
+        // Fallback to topbar selector
+        if (!namespace) {
+            const topbarSelect = document.getElementById('inputGroupSelect04');
+            if (topbarSelect && topbarSelect.value) {
+                namespace = topbarSelect.value;
+                // Store it in sessionStorage for consistency
+                sessionStorage.setItem('ns_select', namespace);
+            }
+        }
+        
+        // Final fallback
+        if (!namespace) {
+            namespace = 'default';
+        }
+        
+        return { limitRangeName, namespace };
+    }
+    
+    function populateLimitRangeInfo(limitRange) {
+        if (!limitRange) {
+            document.getElementById('limit-range-name').textContent = 'N/A';
+            document.getElementById('limit-range-created').textContent = 'N/A';
+            document.getElementById('limit-range-namespace').textContent = 'N/A';
+            return;
+        }
+        
+        // Update breadcrumb
+        const breadcrumb = document.getElementById('limit-range-name-breadcrumb');
+        if (breadcrumb) {
+            breadcrumb.textContent = limitRange.name || 'N/A';
+        }
+        
+        // Basic info
+        document.getElementById('limit-range-name').textContent = escapeHtml(limitRange.name || 'N/A');
+        document.getElementById('limit-range-created').textContent = escapeHtml(limitRange.created || 'N/A');
+        document.getElementById('limit-range-namespace').textContent = escapeHtml(limitRange.namespace || 'N/A');
+        
+        // Annotations
+        const annotationsContainer = document.getElementById('limit-range-annotations-container');
+        if (limitRange.annotations && Object.keys(limitRange.annotations).length > 0) {
+            let annotationsHtml = '<table class="table table-bordered" id="annotationTable" width="100%" cellspacing="0">';
+            annotationsHtml += '<thead><tr><th width="50%">Key</th><th width="50%">Value</th></tr></thead><tbody>';
+            for (const [key, value] of Object.entries(limitRange.annotations)) {
+                annotationsHtml += `<tr><td width="50%">${escapeHtml(key)}</td><td width="50%">${escapeHtml(String(value))}</td></tr>`;
+            }
+            annotationsHtml += '</tbody></table>';
+            annotationsContainer.innerHTML = annotationsHtml;
+        } else {
+            annotationsContainer.innerHTML = '<span class="text-muted">None</span>';
+        }
+        
+        // Labels
+        const labelsContainer = document.getElementById('limit-range-labels-container');
+        if (limitRange.labels && Object.keys(limitRange.labels).length > 0) {
+            let labelsHtml = '<table class="table table-bordered" id="labelsTable" width="100%" cellspacing="0">';
+            labelsHtml += '<thead><tr><th width="50%">Key</th><th width="50%">Value</th></tr></thead><tbody>';
+            for (const [key, value] of Object.entries(limitRange.labels)) {
+                labelsHtml += `<tr><td width="50%">${escapeHtml(key)}</td><td width="50%">${escapeHtml(String(value))}</td></tr>`;
+            }
+            labelsHtml += '</tbody></table>';
+            labelsContainer.innerHTML = labelsHtml;
+        } else {
+            labelsContainer.innerHTML = '<span class="text-muted">None</span>';
+        }
+        
+        // Limits
+        populateLimits(limitRange.limits || []);
+    }
+    
+    function populateLimits(limits) {
+        const tbody = document.getElementById('limits-tbody');
+        
+        if (!limits || limits.length === 0) {
+            tbody.innerHTML = '<tr><td colspan="6" class="text-center text-muted">No limits defined</td></tr>';
+            return;
+        }
+        
+        let rowsHtml = '';
+        
+        for (const limit of limits) {
+            // Handle both snake_case and camelCase
+            const min = limit.min || {};
+            const max = limit.max || {};
+            const defaultLimit = limit.default || limit.defaultLimit || {};
+            const defaultRequest = limit.default_request || limit.defaultRequest || {};
+            const maxLimitRequestRatio = limit.max_limit_request_ratio || limit.maxLimitRequestRatio || {};
+            
+            // CPU row
+            const cpuMin = min.cpu || 'None';
+            const cpuMax = max.cpu || 'None';
+            const cpuDefaultLimit = defaultLimit.cpu || 'None';
+            const cpuDefaultRequest = defaultRequest.cpu || 'None';
+            const cpuMaxRatio = maxLimitRequestRatio.cpu || 'None';
+            
+            rowsHtml += `
+                <tr>
+                    <td>cpu</td>
+                    <td>${escapeHtml(String(cpuMin))}</td>
+                    <td>${escapeHtml(String(cpuMax))}</td>
+                    <td>${escapeHtml(String(cpuDefaultLimit))}</td>
+                    <td>${escapeHtml(String(cpuDefaultRequest))}</td>
+                    <td>${escapeHtml(String(cpuMaxRatio))}</td>
+                </tr>
+            `;
+            
+            // Memory row
+            const memMin = min.memory || 'None';
+            const memMax = max.memory || 'None';
+            const memDefaultLimit = defaultLimit.memory || 'None';
+            const memDefaultRequest = defaultRequest.memory || 'None';
+            const memMaxRatio = maxLimitRequestRatio.memory || 'None';
+            
+            rowsHtml += `
+                <tr>
+                    <td>memory</td>
+                    <td>${escapeHtml(String(memMin))}</td>
+                    <td>${escapeHtml(String(memMax))}</td>
+                    <td>${escapeHtml(String(memDefaultLimit))}</td>
+                    <td>${escapeHtml(String(memDefaultRequest))}</td>
+                    <td>${escapeHtml(String(memMaxRatio))}</td>
+                </tr>
+            `;
+        }
+        
+        tbody.innerHTML = rowsHtml;
+    }
+    
+    async function loadLimitRangeData() {
+        const { limitRangeName, namespace } = getLimitRangeInfo();
+        
+        if (!limitRangeName) {
+            console.error('No Limit Range name provided');
+            document.getElementById('limit-range-name-breadcrumb').textContent = 'Error';
+            document.getElementById('limit-range-name').textContent = 'Error: Limit Range name not provided';
+            return;
+        }
+        
+        // Update breadcrumb
+        document.getElementById('limit-range-name-breadcrumb').textContent = limitRangeName;
+        
+        try {
+            const apiUrl = `/api/v1/other-resources/limit-ranges/${encodeURIComponent(limitRangeName)}?namespace=${encodeURIComponent(namespace)}`;
+            console.log('Fetching Limit Range from:', apiUrl);
+            
+            const response = await fetch(apiUrl);
+            if (!response.ok) {
+                if (response.status === 404) {
+                    throw new Error(`Limit Range '${limitRangeName}' not found in namespace '${namespace}'`);
+                }
+                throw new Error(`HTTP error! status: ${response.status}`);
+            }
+            
+            const data = await response.json();
+            console.log('Limit Range API response:', data);
+            
+            if (data.error) {
+                throw new Error(data.message || 'Failed to load Limit Range');
+            }
+            
+            const limitRange = data.data || {};
+            populateLimitRangeInfo(limitRange);
+            
+        } catch (error) {
+            console.error('Error loading Limit Range:', error);
+            document.getElementById('limit-range-name').textContent = 'Error: ' + escapeHtml(error.message);
+            document.getElementById('limit-range-created').textContent = 'N/A';
+            document.getElementById('limit-range-namespace').textContent = 'N/A';
+        }
+    }
+    
+    // Initialize namespace selector with sessionStorage value on page load
+    document.addEventListener('DOMContentLoaded', function() {
+        const namespaceSelect = document.getElementById('inputGroupSelect04');
+        if (namespaceSelect) {
+            const savedNamespace = sessionStorage.getItem('ns_select');
+            if (savedNamespace && namespaceSelect.querySelector(`option[value="${savedNamespace}"]`)) {
+                namespaceSelect.value = savedNamespace;
+            }
+        }
+    });
+    
+    // Load data when page loads
+    document.addEventListener('DOMContentLoaded', function() {
+        loadLimitRangeData();
+    });
+</script>
 {% endblock %}

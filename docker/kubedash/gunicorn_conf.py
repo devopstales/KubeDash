@@ -2,14 +2,75 @@ import logging
 import os
 import uuid
 import time
+from datetime import datetime as dt
 from statsd import StatsClient
 
-from gunicorn.glogging import Logger as GunicornBaseLogger
+from gunicorn_color import Logger as GunicornColorLogger
+from lib.cert_utils import generate_self_signed_cert
 
+
+def _canonical_timestamp():
+    """Timestamp in canonical format: [YYYY-MM-DD HH:MM:SS,mmm]"""
+    now = time.time()
+    ct = dt.fromtimestamp(now)
+    s = ct.strftime("%Y-%m-%d %H:%M:%S")
+    msecs = int((now % 1) * 1000)
+    return "[%s,%03d]" % (s, msecs)
+
+
+class CanonicalAccessLogger(GunicornColorLogger):
+    """Gunicorn Logger that emits access logs in canonical format: [timestamp] [trace-id] [gunicorn.access] [INFO] ..."""
+
+    def now(self):
+        return _canonical_timestamp()
+
+    def atoms(self, resp, req, environ, request_time):
+        atoms = super().atoms(resp, req, environ, request_time)
+        # Correlation ID: OTEL trace_id first (set by Flask so log ID = Jaeger trace ID), then headers
+        cid = None
+        try:
+            if environ:
+                cid = environ.get("OTEL_TRACE_ID")
+            if not cid:
+                req_headers = getattr(req, "headers", None) if hasattr(req, "headers") else None
+                if req_headers is not None:
+                    if hasattr(req_headers, "get"):
+                        cid = req_headers.get("X-Request-ID") or req_headers.get("X-Trace-ID")
+                    else:
+                        cid = get_header_value(req_headers, "X-Request-ID") or get_header_value(req_headers, "X-Trace-ID")
+                if not cid and environ:
+                    cid = environ.get("HTTP_X_REQUEST_ID") or environ.get("HTTP_X_TRACE_ID")
+        except Exception:
+            pass
+        atoms["correlation_id"] = cid if cid else "no-id"
+        return atoms
+
+
+def get_header_value(headers, key):
+    """Helper to get header value from list of tuples or dict"""
+    if isinstance(headers, dict):
+        return headers.get(key)
+    if isinstance(headers, list):
+        return next((v for k, v in headers if k.lower() == key.lower()), None)
+    return None
+
+
+class _CanonicalFormatter(logging.Formatter):
+    """Same timestamp format as app logs: YYYY-MM-DD HH:MM:SS,mmm."""
+
+    def formatTime(self, record, datefmt=None):
+        ct = dt.fromtimestamp(record.created)
+        s = ct.strftime("%Y-%m-%d %H:%M:%S")
+        return "%s,%03d" % (s, record.msecs)
+
+cert_path, key_path, ca_cert_path = generate_self_signed_cert()
 # ========================
 # 1. Server Configuration
 # ========================
-bind = "0.0.0.0:8000"
+keyfile = key_path
+certfile = cert_path
+ca_certs = ca_cert_path
+bind = "0.0.0.0:5000"
 workers = 1
 threads = 4
 worker_tmp_dir = "/tmp/kubedash"
@@ -20,58 +81,33 @@ keepalive = 5
 # ========================
 # 2. Logging Configuration
 # ========================
-logger_class = "gunicorn_color.Logger"
+logger_class = CanonicalAccessLogger
 loglevel = "info"
 errorlog = "-"  # stderr
 accesslog = "-"  # stdout
-access_log_format = '%(t)s [%(correlation_id)s] %(h)s "%(r)s" %(s)s %(b)s "%(f)s" "%(a)s"'
+# Canonical format: [timestamp] [trace-id] [gunicorn.access] [INFO] method path status size ...
+access_log_format = '%(t)s [%(correlation_id)s] [gunicorn.access] [INFO] %(h)s "%(r)s" %(s)s %(b)s "%(f)s" "%(a)s"'
 
 # ========================
 # 3. Correlation ID Setup
 # ========================
 
-def get_header_value(headers, key):
-    """Helper to get header value from list of tuples or dict"""
-    if isinstance(headers, dict):
-        return headers.get(key)
-    if isinstance(headers, list):
-        return next((v for k, v in headers if k.lower() == key.lower()), None)
-    return None
-
 def pre_request(worker, req):
-    """Executed before each request."""
+    """Executed before each request. Set correlation_id for access/error logs (PRD: trace ID propagation)."""
     try:
-        # Get correlation ID from headers or generate new
-        correlation_id = get_header_value(req.headers, 'X-Correlation-ID') or None #str(uuid.uuid4())
-        
-        if correlation_id:
-            # Store in worker environment
-            worker.correlation_id = correlation_id   
-            # Log the request start
-            #worker.log.info(f"Request started | {correlation_id} | {req.method} {req.path}")
-        
-        # Store start time for duration calculation
+        request_id = get_header_value(req.headers, 'X-Request-ID') or get_header_value(req.headers, 'X-Trace-ID')
+        worker.correlation_id = request_id if request_id else 'no-id'
         worker.start_time = time.time()
-        
-        return correlation_id
+        return worker.correlation_id
     except Exception as e:
-        worker.log.error(f"Error in pre_request: {str(e)}")
-        return str(uuid.uuid4())  # Fallback ID
+        worker.correlation_id = str(uuid.uuid4())
+        worker.log.error("Error in pre_request: %s", e)
+        return worker.correlation_id
 
 def post_request(worker, req, environ, resp):
     """Executed after each request."""
     try:
-        # Get correlation ID from worker (set in pre_request)
-        #correlation_id = getattr(worker, 'correlation_id', 'no-id')
-        
-        # Get status safely (resp might be None)
         status = getattr(resp, 'status', '500')
-        
-        #if correlation_id:
-            # Log request completion
-            #worker.log.info(f"Request completed | {correlation_id} | {req.method} {req.path} {status}")
-        
-        # Send metrics to StatsD
         statsd = StatsClient(
             host=os.getenv("STATSD_HOST", "localhost"),
             port=int(os.getenv("STATSD_PORT", "9125")),
@@ -79,53 +115,58 @@ def post_request(worker, req, environ, resp):
         )
         statsd.incr("gunicorn.requests")
         statsd.incr(f"gunicorn.request.status.{status}")
-        
         if hasattr(worker, 'start_time'):
-            duration = (time.time() - worker.start_time) * 1000  # Convert to ms
+            duration = (time.time() - worker.start_time) * 1000
             statsd.timing("gunicorn.request.duration", duration)
-        
         statsd.gauge("gunicorn.workers", worker.cfg.workers)
     except Exception as e:
-        worker.log.error(f"Error in post_request: {str(e)}")
+        worker.log.error("Error in post_request: %s", e)
 
 """Exclude requests logging"""
 class NoPing(logging.Filter):
     def filter(self, record):
-        """Filter requests for /api/ping endpoint"""
         return record.getMessage().find('/api/ping') == -1
 
 class NoHealth(logging.Filter):
     def filter(self, record):
-        """Filter requests for /api/health endpoint"""
         return record.getMessage().find('/api/health') == -1
 
 class NoMetrics(logging.Filter):
     def filter(self, record):
-        """Filter requests for /api/metrics endpoint"""
         return record.getMessage().find('/metrics') == -1
 
 class NoSocketIo(logging.Filter):
     def filter(self, record):
-        """Filter requests for /socket.io endpoint"""
         return record.getMessage().find('/socket.io') == -1
+
+class ExtensionAPIFilter(logging.Filter):
+    def filter(self, record):
+        msg = record.getMessage()
+        if '/openapi' in msg or '"/apis' in msg or ' /apis' in msg:
+            return ' 200 ' not in msg
+        return True
 
 def on_starting(server):
     """Executed when Gunicorn starts."""
+    canonical = _CanonicalFormatter(
+        "[%(asctime)s] [%(process)d] [%(levelname)s] %(message)s"
+    )
+    try:
+        for handler in getattr(server.log.error_log, "handlers", []):
+            handler.setFormatter(canonical)
+    except Exception:
+        pass
     server.log.access_log.addFilter(NoPing())
     server.log.access_log.addFilter(NoHealth())
     server.log.access_log.addFilter(NoMetrics())
     server.log.access_log.addFilter(NoSocketIo())
-    
-    # Initialize StatsD client
+    server.log.access_log.addFilter(ExtensionAPIFilter())
     server.statsd = StatsClient(
         host=os.getenv("STATSD_HOST", "localhost"),
         port=int(os.getenv("STATSD_PORT", "9125")),
         prefix=os.getenv("STATSD_PREFIX", "kubedash")
     )
 
-# ========================
-# 4. Register Hooks
-# ========================
 pre_request = pre_request
 post_request = post_request
 on_starting = on_starting

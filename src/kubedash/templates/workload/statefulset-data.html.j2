@@ -7,25 +7,25 @@
         <ol class="breadcrumb my-0">
           <li class="breadcrumb-item"><span>Workloads</span></li>
           <li class="breadcrumb-item"><a href="/workload/statefulsets">StatefulSets</a></li>
-          <li class="breadcrumb-item active"><span>{{ statefulset_data.name }}</span></li>
+          <li class="breadcrumb-item active"><span id="statefulset-name-breadcrumb">Loading...</span></li>
         </ol>
       </nav>
     </div>
 </ul>
 <ul class="header-nav ms-auto"></ul>
 <ul class="header-nav d-lg-flex">
-{% include "segments/topmenu.html.j2" %}
+{% include "segments/partials/topmenu.html.j2" %}
 {% endblock %}
 
 {% block content %}
 <div class="card shadow mb-4">
     <div class="card-header">
-        <h6 class="m-0 font-weight-bold text-primary">Deployment Data</h6>
+        <h6 class="m-0 font-weight-bold text-primary">StatefulSet Data</h6>
     </div>
     <div class="card-body">
         <ul class="nav nav-tabs" id="nav-tab" role="tablist">
             <li class="nav-item">
-                <a class="nav-link active" id="nav-deploy-tab" data-bs-toggle="tab" href="#nav-deploy" role="tab" aria-controls="nav-deploy" aria-selected="true" data-bs-toggle="tab">Deployment</a>
+                <a class="nav-link active" id="nav-deploy-tab" data-bs-toggle="tab" href="#nav-deploy" role="tab" aria-controls="nav-deploy" aria-selected="true" data-bs-toggle="tab">StatefulSet</a>
             </li>
             <li class="nav-item">
                 <a class="nav-link" id="nav-containers-tab" data-bs-toggle="tab" href="#nav-containers" role="tab" aria-controls="nav-containers" aria-selected="false" data-bs-toggle="tab">Containers</a>
@@ -49,110 +49,42 @@
                             <table class="table table-bordered" id="deployInfoTable" width="100%" cellspacing="0">
                                 <tr>
                                     <th>Namespace:</th>
-                                    <td>{{ statefulset_data.namespace }}</td>
+                                    <td id="statefulset-namespace">Loading...</td>
                                 </tr>
                                 <tr>
                                     <th>Name:</th>
-                                    <td>{{ statefulset_data.name }}</td>
+                                    <td id="statefulset-name">Loading...</td>
                                 </tr>
                                 <tr>
                                     <th>Created:</th>
-                                    <td>{{ statefulset_data.created }}</td>
+                                    <td id="statefulset-created">Loading...</td>
                                 </tr>
                                 <tr>
                                     <th>Replicas:</th>
-                                {% if session['user_role'] == "Admin" %}
-                                    <td>
-                                        <div class="input-group">
-                                            <!-- Disbale Dcale
-                                            <div class="input-group-prepend">
-                                              <button id="ctrl__button--decrement" class="btn btn-outline-danger" type="button">-</button>
-                                            </div>
-                                            -->
-                                            <input type="text" class="spinner" id="spinner" readonly="readonly"
-                                                value="{{ statefulset_data.replicas }}"  k8s_type="statefulsets" 
-                                                csrf_token="{{ csrf_token() }}" selected="{{ statefulset_data.name }}"
-                                                namespace="{{ statefulset_data.namespace }}">
-                                            <!-- Disbale Dcale
-                                            <div class="input-group-append">
-                                                <button id="ctrl__button--increment" class="btn btn-outline-success" type="button">+</button>
-                                            </div>
-                                            -->
-                                          </div>
-                                    </td>
-                                {% else %}
-                                    <td>{{ statefulset_data.replicas }}</td>
-                                {% endif %}
+                                    <td id="statefulset-replicas">Loading...</td>
                                 </tr>
                                 <tr>
                                     <th>Annotations:</th>
-                                    <td>
-                                        {% if statefulset_data.annotations %}
-                                        <table class="table table-bordered" id="annotationTable" width="100%" cellspacing="0">
-                                            <thead>
-                                                <tr>
-                                                    <th width="50%">Key</th>
-                                                    <th width="50%">Value</th>
-                                                </tr>
-                                            </thead>
-                                            <tbody>
-                                            {% for key, value in statefulset_data.annotations.items() %}
-                                                <tr>
-                                                {% if key != "kubectl.kubernetes.io/last-applied-configuration" %}
-                                                    <td width="50%">{{ key }}</td>
-                                                    <td width="50%">{{ value }}</td>
-                                                {% endif %}
-                                                </tr>
-                                            {% endfor %}
-                                            </tbody>
-                                        </table>
-                                        {% endif %}
+                                    <td id="statefulset-annotations-container">
+                                        <div class="spinner-border spinner-border-sm text-primary" role="status">
+                                            <span class="visually-hidden">Loading...</span>
+                                        </div>
                                     </td>
                                 </tr>
-                               <tr>
-                                    <th>Lables:</th>
-                                    <td>
-                                        {% if statefulset_data.labels %}
-                                        <table class="table table-bordered" id="labelsTable" width="100%" cellspacing="0">
-                                            <thead>
-                                                <tr>
-                                                    <th width="50%">Key</th>
-                                                    <th width="50%">Value</th>
-                                                </tr>
-                                            </thead>
-                                            <tbody>
-                                            {% for key, value in statefulset_data.labels.items() %}
-                                                <tr>
-                                                    <td width="50%">{{ key }}</td>
-                                                    <td width="50%">{{ value }}</td>
-                                                </tr>
-                                            {% endfor %}
-                                            </tbody>
-                                        </table>
-                                        {% endif %}
+                                <tr>
+                                    <th>Labels:</th>
+                                    <td id="statefulset-labels-container">
+                                        <div class="spinner-border spinner-border-sm text-primary" role="status">
+                                            <span class="visually-hidden">Loading...</span>
+                                        </div>
                                     </td>
                                 </tr>
                                 <tr>
                                     <th>Selectors:</th>
-                                    <td>
-                                        {% if statefulset_data.selectors %}
-                                        <table class="table table-bordered" id="selectorsTable" width="100%" cellspacing="0">
-                                            <thead>
-                                                <tr>
-                                                    <th width="50%">Key</th>
-                                                    <th width="50%">Value</th>
-                                                </tr>
-                                            </thead>
-                                            <tbody>
-                                            {% for key, value in statefulset_data.selectors.items() %}
-                                                <tr>
-                                                    <td width="50%">{{ key }}</td>
-                                                    <td width="50%">{{ value }}</td>
-                                                </tr>
-                                            {% endfor %}
-                                            </tbody>
-                                        </table>
-                                        {% endif %}
+                                    <td id="statefulset-selectors-container">
+                                        <div class="spinner-border spinner-border-sm text-primary" role="status">
+                                            <span class="visually-hidden">Loading...</span>
+                                        </div>
                                     </td>
                                 </tr>
                             </table>
@@ -165,28 +97,28 @@
                 <div id="accordion">
                     <div class="card shadow mb-4">
                         <div class="card-body">
-                            {% if statefulset_data.init_containers %}
-                            <h3>Init Containers</h3>
-                            
-                            <div class="table-responsive">
-                                <table class="table table-bordered" id="initContainersTable" width="100%" cellspacing="0">
-                                    <thead>
-                                        <tr>
-                                            <th>Name</th>
-                                            <th>Image</th>
-                                        </tr>
-                                    </thead>
-                                    <tbody>
-                                        {% for ic in statefulset_data.init_containers %}
-                                        <tr>
-                                            <td>{{ ic.name }}</td>
-                                            <td>{{ ic.image }}</td>
-                                        </tr>
-                                        {% endfor %}
-                                    </tbody>
-                                </table>
+                            <div id="init-containers-section" style="display: none;">
+                                <h3>Init Containers</h3>
+                                <div class="table-responsive">
+                                    <table class="table table-bordered" id="initContainersTable" width="100%" cellspacing="0">
+                                        <thead>
+                                            <tr>
+                                                <th>Name</th>
+                                                <th>Image</th>
+                                            </tr>
+                                        </thead>
+                                        <tbody id="init-containers-tbody">
+                                            <tr>
+                                                <td colspan="2" class="text-center">
+                                                    <div class="spinner-border spinner-border-sm text-primary" role="status">
+                                                        <span class="visually-hidden">Loading...</span>
+                                                    </div>
+                                                </td>
+                                            </tr>
+                                        </tbody>
+                                    </table>
+                                </div>
                             </div>
-                            {% endif %}
                             <h3>Containers</h3>
                             <div class="table-responsive">
                                 <table class="table table-bordered" id="containersTable" width="100%" cellspacing="0">
@@ -196,13 +128,14 @@
                                             <th>Image</th>
                                         </tr>
                                     </thead>
-                                    <tbody>
-                                        {% for c in statefulset_data.containers %}
+                                    <tbody id="containers-tbody">
                                         <tr>
-                                            <td>{{ c.name }}</td>
-                                            <td>{{ c.image }}</td>
+                                            <td colspan="2" class="text-center">
+                                                <div class="spinner-border spinner-border-sm text-primary" role="status">
+                                                    <span class="visually-hidden">Loading...</span>
+                                                </div>
+                                            </td>
                                         </tr>
-                                        {% endfor %}
                                     </tbody>
                                 </table>
                             </div>
@@ -222,15 +155,14 @@
                                         <th>Value</th>
                                     </tr>
                                 </thead>
-                                <tbody>
-                                    {% for variables in statefulset_data.environment_variables %}
+                                <tbody id="variables-tbody">
                                     <tr>
-                                        {% for key, var in variables.items() %}
-                                            <td>{{ key }}</td>
-                                            <td>{{ var }}</td>
-                                        {% endfor %}
+                                        <td colspan="2" class="text-center">
+                                            <div class="spinner-border spinner-border-sm text-primary" role="status">
+                                                <span class="visually-hidden">Loading...</span>
+                                            </div>
+                                        </td>
                                     </tr>
-                                    {% endfor %}
                                 </tbody>
                             </table>
                         </div>
@@ -245,17 +177,18 @@
                             <table class="table table-bordered" id="securityTable" width="100%" cellspacing="0">
                                 <thead>
                                     <tr>
-                                    <th>Context</th>
-                                    <th>State</th>
+                                        <th>Context</th>
+                                        <th>State</th>
                                     </tr>
                                 </thead>
-                                <tbody>
-                                {% for item in statefulset_data.security_context.items() %}
+                                <tbody id="security-tbody">
                                     <tr>
-                                        <td>{{ item[0] }}</td>
-                                        <td>{{ item[1] }}</td>
+                                        <td colspan="2" class="text-center">
+                                            <div class="spinner-border spinner-border-sm text-primary" role="status">
+                                                <span class="visually-hidden">Loading...</span>
+                                            </div>
+                                        </td>
                                     </tr>
-                                {% endfor%}
                                 </tbody>
                             </table>
                         </div>
@@ -269,93 +202,21 @@
                         <h3>Refers To</h3>
                         <div class="table-responsive">
                             <table class="table table-bordered" id="refersTable" width="100%" cellspacing="0">
-                                <!-- service account, secret, configmap, volume-->
                                 <thead>
-                                    <th>Type</th>
-                                    <th>Name</th>
-                                    <th>Namespace</th>
+                                    <tr>
+                                        <th>Type</th>
+                                        <th>Name</th>
+                                        <th>Namespace</th>
+                                    </tr>
                                 </thead>
-                                <tbody>
-                                {% if statefulset_data.image_pull_secrets %}
-                                    {% for dict_item in statefulset_data.image_pull_secrets %}
-                                    {% for key, value in dict_item.items() %}
+                                <tbody id="refers-to-tbody">
                                     <tr>
-                                        <td>ImagePullSecret</td>
-                                        <td>
-                                            <form action="/security/secret" method="POST">
-                                                <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
-                                                <input type="hidden" name="ns_select" value="{{ statefulset_data.namespace }}" />
-                                                <input type="hidden" name="selected" value="{{ value }}" />
-                                                <a href="javascript:;" onclick="parentNode.submit();">{{ value }}</a>
-                                            </form>
+                                        <td colspan="3" class="text-center">
+                                            <div class="spinner-border spinner-border-sm text-primary" role="status">
+                                                <span class="visually-hidden">Loading...</span>
+                                            </div>
                                         </td>
-                                        <td>{{ statefulset_data.namespace }}</td>
                                     </tr>
-                                    {% endfor %}
-                                    {% endfor %}
-                                {% endif %}
-                                {% if statefulset_data.service_account %}
-                                    <tr>
-                                        <td>ServiceAccount</td>
-                                        <td>
-                                            <form action="/cluster-permission/service-account" method="POST">
-                                                <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
-                                                <input type="hidden" name="ns_select" value="{{ statefulset_data.namespace }}" />
-                                                <input type="hidden" name="selected" value="{{ statefulset_data.service_account }}" />
-                                                <a href="javascript:;" onclick="parentNode.submit();">{{ statefulset_data.service_account }}</a>
-                                            </form>
-                                        </td>
-                                        <td>{{ statefulset_data.namespace }}</td>
-                                    </tr>
-                                {% endif %}
-                                {% if statefulset_data.secrets %}
-                                    {% for secret in statefulset_data.secrets %}
-                                    <tr>
-                                        <td>Secret</td>
-                                        <td>
-                                            <form action="/security/secret" method="POST">
-                                                <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
-                                                <input type="hidden" name="ns_select" value="{{ statefulset_data.namespace }}" />
-                                                <input type="hidden" name="selected" value="{{ secret }}" />
-                                                <a href="javascript:;" onclick="parentNode.submit();">{{ secret }}</a>
-                                            </form>
-                                        </td>
-                                        <td>{{ statefulset_data.namespace }}</td>
-                                    </tr>
-                                    {% endfor %}
-                                {% endif %}
-                                {% if statefulset_data.cm %}
-                                    {% for cm in statefulset_data.cm %}
-                                    <tr>
-                                        <td>Configmap</td>
-                                        <td>
-                                            <form action="/storage/configmap" method="POST">
-                                                <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
-                                                <input type="hidden" name="ns_select" value="{{ statefulset_data.namespace }}" />
-                                                <input type="hidden" name="selected" value="{{ cm }}" />
-                                                <a href="javascript:;" onclick="parentNode.submit();">{{ cm }}</a>
-                                            </form>
-                                        </td>
-                                        <td>{{ statefulset_data.namespace }}</td>
-                                    </tr>
-                                    {% endfor %}
-                                {% endif %}
-                                {% if statefulset_data.pvc %}
-                                    {% for pvc in statefulset_data.pvc %}
-                                    <tr>
-                                        <td>PeristentVolumeClame</td>
-                                        <td>
-                                            <form action="/storage/pvc" method="POST">
-                                                <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
-                                                <input type="hidden" name="ns_select" value="{{ statefulset_data.namespace }}" />
-                                                <input type="hidden" name="selected" value="{{ pvc }}" />
-                                                <a href="javascript:;" onclick="parentNode.submit();">{{ pvc }}</a>
-                                            </form>
-                                        </td>
-                                        <td>{{ statefulset_data.namespace }}</td>
-                                    </tr>
-                                    {% endfor %}
-                                {% endif %}
                                 </tbody>
                             </table>
                         </div>
@@ -369,31 +230,511 @@
 {% endblock %}
 
 {% block add_head_css %}
-{% include "segments/datatable_snippet.html.j2" %}
+{% include "segments/components/datatable_snippet.html.j2" %}
 {% endblock %}
 
 {% block add_tail_js %}
-    {% for c in statefulset_data.containers %}
-    <script>
-        $(document).ready(function () {
-            $('#vulnTable{{ c.name }}').DataTable({
-               responsive: true,
-               order: [[1, 'asc']],
+<script nonce="{{ csp_nonce }}">
+    const escapeHtml = (text) => {
+        if (text === null || text === undefined) return '';
+        const map = {
+            '&': '&amp;',
+            '<': '&lt;',
+            '>': '&gt;',
+            '"': '&quot;',
+            "'": '&#039;'
+        };
+        return String(text).replace(/[&<>"']/g, m => map[m]);
+    };
+    
+    const csrf_token = {{ csrf_token()|tojson }};
+    const is_admin = {{ (session.get('user_role') == 'Admin')|tojson }};
+    
+    // Get statefulset name and namespace from URL, sessionStorage, or form
+    function getStatefulSetInfo() {
+        const urlParams = new URLSearchParams(window.location.search);
+        let statefulsetName = urlParams.get('statefulset_name');
+        let namespace = urlParams.get('namespace');
+        
+        if (!statefulsetName) {
+            statefulsetName = sessionStorage.getItem('statefulset_data_name');
+        }
+        if (!namespace) {
+            namespace = sessionStorage.getItem('statefulset_data_namespace');
+        }
+        
+        // Fallback to topbar selector
+        if (!namespace) {
+            const topbarSelect = document.getElementById('inputGroupSelect04');
+            if (topbarSelect) {
+                namespace = topbarSelect.value;
+            }
+        }
+        
+        // Final fallback
+        if (!namespace) {
+            namespace = sessionStorage.getItem('ns_select') || 'default';
+        }
+        
+        return { statefulsetName, namespace };
+    }
+    
+    function populateStatefulSetData(statefulsetData) {
+        const { statefulsetName, namespace } = getStatefulSetInfo();
+        
+        // Update breadcrumb
+        const breadcrumb = document.getElementById('statefulset-name-breadcrumb');
+        if (breadcrumb) {
+            breadcrumb.textContent = statefulsetData.name || statefulsetName || 'StatefulSet';
+        }
+        
+        // Update statefulset info table
+        document.getElementById('statefulset-namespace').textContent = escapeHtml(statefulsetData.namespace || namespace || '');
+        document.getElementById('statefulset-name').textContent = escapeHtml(statefulsetData.name || '');
+        document.getElementById('statefulset-created').textContent = escapeHtml(statefulsetData.created || '');
+        
+        // Replicas (with spinner for admin)
+        const replicasContainer = document.getElementById('statefulset-replicas');
+        if (is_admin) {
+            replicasContainer.innerHTML = `
+                <div class="input-group">
+                    <input type="text" class="spinner" id="spinner" readonly="readonly" 
+                        value="${statefulsetData.replicas || 0}" k8s_type="statefulsets" 
+                        csrf_token="${escapeHtml(csrf_token)}" selected="${escapeHtml(statefulsetData.name || statefulsetName || '')}"
+                        namespace="${escapeHtml(statefulsetData.namespace || namespace || '')}">
+                </div>
+            `;
+            // Load spinner script if not already loaded
+            if (!document.getElementById('spinner-script')) {
+                const script = document.createElement('script');
+                script.id = 'spinner-script';
+                script.src = "{{ url_for('static',filename='/vendor/custom-input-spinner/inputt-spinner.js') }}";
+                document.body.appendChild(script);
+            }
+        } else {
+            replicasContainer.textContent = statefulsetData.replicas || 0;
+        }
+        
+        // Annotations
+        const annotationsContainer = document.getElementById('statefulset-annotations-container');
+        if (statefulsetData.annotations && Array.isArray(statefulsetData.annotations) && statefulsetData.annotations.length > 0) {
+            // Handle array format
+            const annotations = {};
+            statefulsetData.annotations.forEach(ann => {
+                if (typeof ann === 'object' && ann !== null) {
+                    Object.assign(annotations, ann);
+                }
             });
-        });
-    </script>
-    {% endfor %}
-    {% for ic in statefulset_data.init_containers %}
-    <script>
-        $(document).ready(function () {
-            $('#intVulnTable{{ ic.name }}').DataTable({
-               responsive: true,
-               order: [[1, 'asc']],
+            // Filter out kubectl.kubernetes.io/last-applied-configuration
+            const filteredAnnotations = Object.fromEntries(
+                Object.entries(annotations).filter(([key]) => key !== 'kubectl.kubernetes.io/last-applied-configuration')
+            );
+            if (Object.keys(filteredAnnotations).length > 0) {
+                annotationsContainer.innerHTML = `
+                    <table class="table table-bordered" id="annotationTable" width="100%" cellspacing="0">
+                        <thead>
+                            <tr>
+                                <th width="50%">Key</th>
+                                <th width="50%">Value</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            ${Object.entries(filteredAnnotations).map(([key, value]) => `
+                                <tr>
+                                    <td width="50%">${escapeHtml(key)}</td>
+                                    <td width="50%">${escapeHtml(value)}</td>
+                                </tr>
+                            `).join('')}
+                        </tbody>
+                    </table>
+                `;
+            } else {
+                annotationsContainer.innerHTML = '<span class="text-muted">No annotations</span>';
+            }
+        } else if (statefulsetData.annotations && typeof statefulsetData.annotations === 'object' && Object.keys(statefulsetData.annotations).length > 0) {
+            // Handle object format
+            const filteredAnnotations = Object.fromEntries(
+                Object.entries(statefulsetData.annotations).filter(([key]) => key !== 'kubectl.kubernetes.io/last-applied-configuration')
+            );
+            if (Object.keys(filteredAnnotations).length > 0) {
+                annotationsContainer.innerHTML = `
+                    <table class="table table-bordered" id="annotationTable" width="100%" cellspacing="0">
+                        <thead>
+                            <tr>
+                                <th width="50%">Key</th>
+                                <th width="50%">Value</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            ${Object.entries(filteredAnnotations).map(([key, value]) => `
+                                <tr>
+                                    <td width="50%">${escapeHtml(key)}</td>
+                                    <td width="50%">${escapeHtml(value)}</td>
+                                </tr>
+                            `).join('')}
+                        </tbody>
+                    </table>
+                `;
+            } else {
+                annotationsContainer.innerHTML = '<span class="text-muted">No annotations</span>';
+            }
+        } else {
+            annotationsContainer.innerHTML = '<span class="text-muted">No annotations</span>';
+        }
+        
+        // Labels
+        const labelsContainer = document.getElementById('statefulset-labels-container');
+        if (statefulsetData.labels && Array.isArray(statefulsetData.labels) && statefulsetData.labels.length > 0) {
+            // Handle array format
+            const labels = {};
+            statefulsetData.labels.forEach(label => {
+                if (typeof label === 'object' && label !== null) {
+                    Object.assign(labels, label);
+                }
             });
-        });
-    </script>
-    {% endfor %}
-
-    <!-- Custom input spinner -->
-    <script id="spinner" src="{{ url_for('static',filename='/vendor/custom-input-spinner/inputt-spinner.js') }}" ></script>
+            if (Object.keys(labels).length > 0) {
+                labelsContainer.innerHTML = `
+                    <table class="table table-bordered" id="labelsTable" width="100%" cellspacing="0">
+                        <thead>
+                            <tr>
+                                <th width="50%">Key</th>
+                                <th width="50%">Value</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            ${Object.entries(labels).map(([key, value]) => `
+                                <tr>
+                                    <td width="50%">${escapeHtml(key)}</td>
+                                    <td width="50%">${escapeHtml(value)}</td>
+                                </tr>
+                            `).join('')}
+                        </tbody>
+                    </table>
+                `;
+            } else {
+                labelsContainer.innerHTML = '<span class="text-muted">No labels</span>';
+            }
+        } else if (statefulsetData.labels && typeof statefulsetData.labels === 'object' && Object.keys(statefulsetData.labels).length > 0) {
+            // Handle object format
+            labelsContainer.innerHTML = `
+                <table class="table table-bordered" id="labelsTable" width="100%" cellspacing="0">
+                    <thead>
+                        <tr>
+                            <th width="50%">Key</th>
+                            <th width="50%">Value</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        ${Object.entries(statefulsetData.labels).map(([key, value]) => `
+                            <tr>
+                                <td width="50%">${escapeHtml(key)}</td>
+                                <td width="50%">${escapeHtml(value)}</td>
+                            </tr>
+                        `).join('')}
+                    </tbody>
+                </table>
+            `;
+        } else {
+            labelsContainer.innerHTML = '<span class="text-muted">No labels</span>';
+        }
+        
+        // Selectors
+        const selectorsContainer = document.getElementById('statefulset-selectors-container');
+        if (statefulsetData.selectors && Array.isArray(statefulsetData.selectors) && statefulsetData.selectors.length > 0) {
+            // Handle array format
+            const selectors = {};
+            statefulsetData.selectors.forEach(sel => {
+                if (typeof sel === 'object' && sel !== null) {
+                    Object.assign(selectors, sel);
+                }
+            });
+            if (Object.keys(selectors).length > 0) {
+                selectorsContainer.innerHTML = `
+                    <table class="table table-bordered" id="selectorsTable" width="100%" cellspacing="0">
+                        <thead>
+                            <tr>
+                                <th width="50%">Key</th>
+                                <th width="50%">Value</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            ${Object.entries(selectors).map(([key, value]) => `
+                                <tr>
+                                    <td width="50%">${escapeHtml(key)}</td>
+                                    <td width="50%">${escapeHtml(value)}</td>
+                                </tr>
+                            `).join('')}
+                        </tbody>
+                    </table>
+                `;
+            } else {
+                selectorsContainer.innerHTML = '<span class="text-muted">No selectors</span>';
+            }
+        } else if (statefulsetData.selectors && typeof statefulsetData.selectors === 'object' && Object.keys(statefulsetData.selectors).length > 0) {
+            // Handle object format
+            selectorsContainer.innerHTML = `
+                <table class="table table-bordered" id="selectorsTable" width="100%" cellspacing="0">
+                    <thead>
+                        <tr>
+                            <th width="50%">Key</th>
+                            <th width="50%">Value</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        ${Object.entries(statefulsetData.selectors).map(([key, value]) => `
+                            <tr>
+                                <td width="50%">${escapeHtml(key)}</td>
+                                <td width="50%">${escapeHtml(value)}</td>
+                            </tr>
+                        `).join('')}
+                    </tbody>
+                </table>
+            `;
+        } else {
+            selectorsContainer.innerHTML = '<span class="text-muted">No selectors</span>';
+        }
+        
+        // Populate containers
+        populateContainers(statefulsetData);
+        
+        // Populate variables
+        populateVariables(statefulsetData.environment_variables || []);
+        
+        // Populate security contexts
+        populateSecurityContext(statefulsetData.security_context || {});
+        
+        // Populate related resources
+        populateRelatedResources(statefulsetData, namespace);
+    }
+    
+    function populateContainers(statefulsetData) {
+        // Init containers
+        const initContainersSection = document.getElementById('init-containers-section');
+        const initContainersTbody = document.getElementById('init-containers-tbody');
+        
+        if (statefulsetData.init_containers && statefulsetData.init_containers.length > 0) {
+            initContainersSection.style.display = 'block';
+            initContainersTbody.innerHTML = statefulsetData.init_containers.map(ic => {
+                return `
+                    <tr>
+                        <td>${escapeHtml(ic.name || '')}</td>
+                        <td>${escapeHtml(ic.image || '')}</td>
+                    </tr>
+                `;
+            }).join('');
+        } else {
+            initContainersSection.style.display = 'none';
+            initContainersTbody.innerHTML = '';
+        }
+        
+        // Containers
+        const containersTbody = document.getElementById('containers-tbody');
+        if (statefulsetData.containers && statefulsetData.containers.length > 0) {
+            containersTbody.innerHTML = statefulsetData.containers.map(c => {
+                return `
+                    <tr>
+                        <td>${escapeHtml(c.name || '')}</td>
+                        <td>${escapeHtml(c.image || '')}</td>
+                    </tr>
+                `;
+            }).join('');
+        } else {
+            containersTbody.innerHTML = '<tr><td colspan="2" class="text-center text-muted">No containers found</td></tr>';
+        }
+    }
+    
+    function populateVariables(environmentVariables) {
+        const tbody = document.getElementById('variables-tbody');
+        if (environmentVariables && environmentVariables.length > 0) {
+            tbody.innerHTML = environmentVariables.map(vars => {
+                if (vars && typeof vars === 'object') {
+                    return Object.entries(vars).map(([key, value]) => `
+                        <tr>
+                            <td>${escapeHtml(key)}</td>
+                            <td>${escapeHtml(value)}</td>
+                        </tr>
+                    `).join('');
+                }
+                return '';
+            }).join('');
+        } else {
+            tbody.innerHTML = '<tr><td colspan="2" class="text-center text-muted">No environment variables found</td></tr>';
+        }
+    }
+    
+    function populateSecurityContext(securityContext) {
+        const tbody = document.getElementById('security-tbody');
+        if (securityContext && Object.keys(securityContext).length > 0) {
+            tbody.innerHTML = Object.entries(securityContext).map(([key, value]) => {
+                const valueStr = typeof value === 'object' ? JSON.stringify(value) : String(value);
+                return `
+                    <tr>
+                        <td>${escapeHtml(key)}</td>
+                        <td>${escapeHtml(valueStr)}</td>
+                    </tr>
+                `;
+            }).join('');
+        } else {
+            tbody.innerHTML = '<tr><td colspan="2" class="text-center text-muted">No security context found</td></tr>';
+        }
+    }
+    
+    function populateRelatedResources(statefulsetData, namespace) {
+        const ns = statefulsetData.namespace || namespace || '';
+        const tbody = document.getElementById('refers-to-tbody');
+        let rows = [];
+        
+        // Image pull secrets
+        if (statefulsetData.image_pull_secrets && statefulsetData.image_pull_secrets.length > 0) {
+            statefulsetData.image_pull_secrets.forEach(ips => {
+                if (typeof ips === 'object' && ips !== null) {
+                    Object.entries(ips).forEach(([key, value]) => {
+                        if (key === 'name' || value) {
+                            const secretName = escapeHtml(value || '');
+                            rows.push(`
+                                <tr>
+                                    <td>ImagePullSecret</td>
+                                    <td>
+                                        <form action="/security/secret" method="POST" onsubmit="sessionStorage.setItem('ns_select', '${escapeHtml(ns)}'); return true;">
+                                            <input type="hidden" name="csrf_token" value="${escapeHtml(csrf_token)}">
+                                            <input type="hidden" name="ns_select" value="${escapeHtml(ns)}" />
+                                            <input type="hidden" name="selected" value="${secretName}" />
+                                            <a href="javascript:;" onclick="parentNode.submit();">${secretName}</a>
+                                        </form>
+                                    </td>
+                                    <td>${escapeHtml(ns)}</td>
+                                </tr>
+                            `);
+                        }
+                    });
+                }
+            });
+        }
+        
+        // Service account
+        if (statefulsetData.service_account) {
+            const saName = escapeHtml(statefulsetData.service_account);
+            rows.push(`
+                <tr>
+                    <td>ServiceAccount</td>
+                    <td>
+                        <form action="/cluster-permission/service-account" method="POST" onsubmit="sessionStorage.setItem('ns_select', '${escapeHtml(ns)}'); return true;">
+                            <input type="hidden" name="csrf_token" value="${escapeHtml(csrf_token)}">
+                            <input type="hidden" name="ns_select" value="${escapeHtml(ns)}" />
+                            <input type="hidden" name="selected" value="${saName}" />
+                            <a href="javascript:;" onclick="parentNode.submit();">${saName}</a>
+                        </form>
+                    </td>
+                    <td>${escapeHtml(ns)}</td>
+                </tr>
+            `);
+        }
+        
+        // Secrets
+        if (statefulsetData.secrets && statefulsetData.secrets.length > 0) {
+            statefulsetData.secrets.forEach(secret => {
+                rows.push(`
+                    <tr>
+                        <td>Secret</td>
+                        <td>
+                            <form action="/security/secret" method="POST" onsubmit="sessionStorage.setItem('ns_select', '${escapeHtml(ns)}'); return true;">
+                                <input type="hidden" name="csrf_token" value="${escapeHtml(csrf_token)}">
+                                <input type="hidden" name="ns_select" value="${escapeHtml(ns)}" />
+                                <input type="hidden" name="selected" value="${escapeHtml(secret)}" />
+                                <a href="javascript:;" onclick="parentNode.submit();">${escapeHtml(secret)}</a>
+                            </form>
+                        </td>
+                        <td>${escapeHtml(ns)}</td>
+                    </tr>
+                `);
+            });
+        }
+        
+        // ConfigMaps
+        if (statefulsetData.cm && statefulsetData.cm.length > 0) {
+            statefulsetData.cm.forEach(cm => {
+                rows.push(`
+                    <tr>
+                        <td>ConfigMap</td>
+                        <td>
+                            <form action="/storage/configmap" method="POST" onsubmit="sessionStorage.setItem('ns_select', '${escapeHtml(ns)}'); return true;">
+                                <input type="hidden" name="csrf_token" value="${escapeHtml(csrf_token)}">
+                                <input type="hidden" name="ns_select" value="${escapeHtml(ns)}" />
+                                <input type="hidden" name="selected" value="${escapeHtml(cm)}" />
+                                <a href="javascript:;" onclick="parentNode.submit();">${escapeHtml(cm)}</a>
+                            </form>
+                        </td>
+                        <td>${escapeHtml(ns)}</td>
+                    </tr>
+                `);
+            });
+        }
+        
+        // PVCs
+        if (statefulsetData.pvc && statefulsetData.pvc.length > 0) {
+            statefulsetData.pvc.forEach(pvc => {
+                rows.push(`
+                    <tr>
+                        <td>PersistentVolumeClaim</td>
+                        <td>
+                            <form action="/storage/pvc" method="POST" onsubmit="sessionStorage.setItem('ns_select', '${escapeHtml(ns)}'); return true;">
+                                <input type="hidden" name="csrf_token" value="${escapeHtml(csrf_token)}">
+                                <input type="hidden" name="ns_select" value="${escapeHtml(ns)}" />
+                                <input type="hidden" name="selected" value="${escapeHtml(pvc)}" />
+                                <a href="javascript:;" onclick="parentNode.submit();">${escapeHtml(pvc)}</a>
+                            </form>
+                        </td>
+                        <td>${escapeHtml(ns)}</td>
+                    </tr>
+                `);
+            });
+        }
+        
+        if (rows.length > 0) {
+            tbody.innerHTML = rows.join('');
+        } else {
+            tbody.innerHTML = '<tr><td colspan="3" class="text-center text-muted">No related resources found</td></tr>';
+        }
+    }
+    
+    async function loadStatefulSetData() {
+        const { statefulsetName, namespace } = getStatefulSetInfo();
+        
+        if (!statefulsetName) {
+            console.error('StatefulSet name not found in URL, sessionStorage, or form.');
+            document.getElementById('statefulset-name-breadcrumb').textContent = 'Error';
+            document.getElementById('statefulset-name').textContent = 'Error: StatefulSet name not provided.';
+            return;
+        }
+        
+        try {
+            const apiUrl = `/api/v1/workloads/statefulsets/${encodeURIComponent(statefulsetName)}?namespace=${encodeURIComponent(namespace)}`;
+            console.log('Fetching statefulset data from:', apiUrl);
+            
+            const response = await fetch(apiUrl);
+            if (!response.ok) {
+                throw new Error(`HTTP error! status: ${response.status}`);
+            }
+            
+            const data = await response.json();
+            console.log('StatefulSet data API response:', data);
+            
+            if (data.error) {
+                throw new Error(data.message || 'Failed to load statefulset data');
+            }
+            
+            populateStatefulSetData(data.data);
+            
+        } catch (error) {
+            console.error('Error loading statefulset data:', error);
+            document.getElementById('statefulset-name-breadcrumb').textContent = 'Error';
+            document.getElementById('statefulset-name').textContent = 'Error: ' + escapeHtml(error.message);
+        }
+    }
+    
+    // Load data when page loads
+    document.addEventListener('DOMContentLoaded', function() {
+        loadStatefulSetData();
+    });
+</script>
 {% endblock %}

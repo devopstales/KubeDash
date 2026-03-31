@@ -1,0 +1,11 @@
+services:
+  kubernetes-mcp-server:
+    container_name: kubedash-kubernetes-mcp-server
+    image: ghcr.io/containers/kubernetes-mcp-server:latest
+    restart: always
+    environment:
+      - KUBECONFIG=/kube/config
+    volumes:
+      - ${KUBECONFIG:-$HOME/.kube/config}:/kube/config:ro
+    ports:
+      - "8000:8000"

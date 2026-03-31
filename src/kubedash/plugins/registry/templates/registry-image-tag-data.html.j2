@@ -8,15 +8,15 @@
           <li class="breadcrumb-item"><span>Plugins</span></li>
           <li class="breadcrumb-item"><a href="/plugins/registry">Registry</a></li>
           <li class="breadcrumb-item"><a href="/plugins/registry/image/list">Images</a></li>
-          <li class="breadcrumb-item"><a href="/plugins/registry/image/tags">{{ image_name }}</a></li>
-          <li class="breadcrumb-item active"><span>{{ tag_name }}</span></li>
+          <li class="breadcrumb-item"><a href="/plugins/registry/image/tags" id="breadcrumb-image-link">Images</a></li>
+          <li class="breadcrumb-item active"><span id="breadcrumb-tag-name">Tag</span></li>
         </ol>
       </nav>
     </div>
 </ul>
 <ul class="header-nav ms-auto"></ul>
 <ul class="header-nav d-lg-flex">
-{% include "segments/topmenu.html.j2" %}
+{% include "segments/partials/topmenu.html.j2" %}
 {% endblock %}
 
 {% block content %}
@@ -25,90 +25,40 @@
         <h6 class="m-0 font-weight-bold text-primary">Tag Data</h6>
     </div>
     <div class="card-body">
-        <ul class="nav nav-tabs" id="nav-tab" role="tablist">
-            <li class="nav-item">
-                <a class="nav-link active" id="nav-info-tab" data-bs-toggle="tab" href="#nav-info" role="tab" aria-controls="nav-info" aria-selected="true" data-bs-toggle="tab">Info</a>
-            </li>
-            <li class="nav-item">
-                <a class="nav-link" id="nav-configuration-tab" data-bs-toggle="tab" href="#nav-configuration" role="tab" aria-controls="nav-configuration" aria-selected="false" data-bs-toggle="tab">Configuration</a>
-            </li>
-            {% if tag_data.format == "Docker" or tag_data.media_type == "application/vnd.cncf.helm.config.v1+json" %}
-            <li class="nav-item">
-                <a class="nav-link" id="nav-metadata-tab" data-bs-toggle="tab" href="#nav-metadata" role="tab" aria-controls="nav-metadata" aria-selected="false" data-bs-toggle="tab">Metadata</a>
-            </li>
-            {% endif %}
-            {% if tag_data.vulnerabilities %}
-            <li class="nav-item">
-                <a class="nav-link" id="nav-vuln-tab" data-bs-toggle="tab" href="#nav-vuln" role="tab" aria-controls="nav-vuln" aria-selected="false" data-bs-toggle="tab">Vulnerabilities</a>
-            </li>
-            {% endif %}
-            {% if tag_events %}
-            <li class="nav-item">
-                <a class="nav-link" id="nav-events-tab" data-bs-toggle="tab" href="#nav-events" role="tab" aria-controls="nav-events" aria-selected="false" data-bs-toggle="tab">Events</a>
-            </li>
-            {% endif %}
-        </ul>
+        <div id="tag-data-loading" class="text-center py-5">
+            <div class="spinner-border spinner-border-sm text-primary" role="status">
+                <span class="visually-hidden">Loading...</span>
+            </div>
+            <span class="ms-2">Loading tag data...</span>
+        </div>
+        
+        <div id="tag-data-content" style="display: none;">
+            <ul class="nav nav-tabs" id="nav-tab" role="tablist">
+                <li class="nav-item">
+                    <a class="nav-link active" id="nav-info-tab" data-bs-toggle="tab" href="#nav-info" role="tab" aria-controls="nav-info" aria-selected="true">Info</a>
+                </li>
+                <li class="nav-item">
+                    <a class="nav-link" id="nav-configuration-tab" data-bs-toggle="tab" href="#nav-configuration" role="tab" aria-controls="nav-configuration" aria-selected="false">Configuration</a>
+                </li>
+                <li class="nav-item" id="nav-metadata-tab-item" style="display: none;">
+                    <a class="nav-link" id="nav-metadata-tab" data-bs-toggle="tab" href="#nav-metadata" role="tab" aria-controls="nav-metadata" aria-selected="false">Metadata</a>
+                </li>
+                <li class="nav-item" id="nav-vuln-tab-item" style="display: none;">
+                    <a class="nav-link" id="nav-vuln-tab" data-bs-toggle="tab" href="#nav-vuln" role="tab" aria-controls="nav-vuln" aria-selected="false">Vulnerabilities</a>
+                </li>
+                <li class="nav-item" id="nav-events-tab-item" style="display: none;">
+                    <a class="nav-link" id="nav-events-tab" data-bs-toggle="tab" href="#nav-events" role="tab" aria-controls="nav-events" aria-selected="false">Events</a>
+                </li>
+            </ul>
         <div class="tab-content" id="nav-tabContent">
             <div class="tab-pane fade show active" id="nav-info" role="tabpanel" aria-labelledby="nav-info-tab">
                 <div class="card shadow mb-4">
                     <div class="card-body">
                         <div class="table-responsive">
                             <table class="table table-bordered" id="infoInfoTable" width="100%" cellspacing="0">
-                                <tr>
-                                    <th>Image:</th>
-                                    {% if tag_data.format == "Docker" %}
-                                    <td>{{ tag_data.registry | replace("https://","") | replace("http://","") | replace("www.","") }}/{{ image_name }}:{{ tag_name }}</td>
-                                    {% elif tag_data.format == "OCI" %}
-                                    <td>{{ tag_data.registry | replace("https://","oci://") | replace("http://","oci://") | replace("www.","oci://") }}/{{ image_name }}:{{ tag_name }}</td>
-                                    {% endif %}
-                                </tr>
-                                <tr>
-                                    <th>Digest:</th>
-                                    <td>{{ tag_data.digest }}</td>
-                                </tr>
-                                <tr>
-                                    <th>Signed</th>
-                                    <td>
-                                        {% if tag_data.signed %}
-                                            <span class="material-icons text-success">check_circle</span>
-
-                                        {% else %}
-                                            <span class="material-icons text-danger">cancel</span>
-                                        {% endif %}
-                                    </td>
-                                </tr>
-                                <tr>
-                                    <th>Format:</th>
-                                    <td>{{ tag_data.format }}</td>
-                                </tr>
-                                {% if tag_data.created %}
-                                <tr>
-                                    <th>Created:</th>
-                                    <td>{{ tag_data.created }}</td>
-                                </tr>
-                                {% endif %}
-                                {% if tag_data.architecture %}
-                                <tr>
-                                    <th>Architecture:</th>
-                                    <td>{{ tag_data.architecture }}</td>
-                                </tr>
-                                {% endif %}
-                                {% if tag_data.os %}
-                                <tr>
-                                    <th>Operation System:</th>
-                                    <td>{{ tag_data.os }}</td>
-                                </tr>
-                                {% endif %}
-                                {% if tag_data.docker_version %}
-                                <tr>
-                                    <th>Docker Version:</th>
-                                    <td>{{ tag_data.docker_version }}</td>
-                                </tr>
-                                {% endif %}
-                                <tr>
-                                    <th>Number of Layers:</th>
-                                    <td>{{ tag_data.layers }}</td>
-                                </tr>
+                                <tbody id="info-tbody">
+                                    <!-- Populated by JavaScript -->
+                                </tbody>
                             </table>
                         </div>
                     </div>
@@ -121,121 +71,10 @@
                         <div class="card-body">
                             <h3>Image Configuration</h3>
                             <div class="table-responsive">
-                                <table class="table table-bordered" id="infoInfoTable" width="100%" cellspacing="0">
-                                {% if tag_data.format == "OCI" %}
-                                    <tr>
-                                        <th>Media Type:</th>
-                                        <td>{{ tag_data.media_type }}</td>
-                                    </tr>
-                                    {% if tag_data.media_type == "application/vnd.aquasec.trivy.config.v1+json" %}
-                                    <tr>
-                                        <th>Trivy DB:</th>
-                                        <td>{{ tag_data.trivy_db }}</td>
-                                    </tr>
-                                    {% elif tag_data.media_type == "application/vnd.oci.image.config.v1+json" %}
-                                    <tr>
-                                        <th>Cosign Signature:</th>
-                                        <td>
-                                            <pre><code>{{ tag_data.cosign_signature }}</code></pre>
-                                        </td>
-
-                                    </tr>
-                                    <tr>
-                                        <th>Cosign Bundle:</th>
-                                        <td>
-                                            <pre><code>{{tag_data.cosign_bundle }}</code></pre>
-                                        </td>
-                                    </tr>
-                                    <tr>
-                                        <th>Cosign Certificate:</th>
-                                        <td>
-                                            <pre><code>{{ tag_data.cosign_certificate }}</code></pre>
-                                        </td>
-                                    </tr>
-                                    <tr>
-                                        <th>Cosign Chain:</th>
-                                        <td>
-                                            <pre><code>{{ tag_data.cosign_chain }}</code></pre>
-                                        </td>
-                                    </tr>
-                                    {% endif %}
-                                {% endif %}
-                                {% if tag_data.build_date %}
-                                    <tr>
-                                        <th>Build Date:</th>
-                                        <td>{{ tag_data.build_date }}</td>
-                                    </tr>
-                                {% endif %}
-                                {% if tag_data.vcs_url %}
-                                    <tr>
-                                        <th>VCS URL:</th>
-                                        <td><a href="{{ tag_data.vcs_url }}">{{ tag_data.vcs_url }}</a></td>
-                                    </tr>
-                                {% endif %}
-                                {% if tag_data.documentation %}
-                                    <tr>
-                                        <th>Documentation:</th>
-                                        <td><a href="{{ tag_data.documentation }}">{{ tag_data.documentation }}</a></td>
-                                    </tr>
-                                {% endif %}
-                                    <tr>
-                                        <th>Entrypoint</th>
-                                        <td>
-                                        {% if tag_data.entrypoint %}
-                                            {% for item in tag_data.entrypoint %}
-                                                {{ item }}{% if not loop.last %} {% endif %}
-                                            {% endfor %}
-                                        {% endif %}
-                                        </td>
-                                    </tr>
-                                    <tr>
-                                        <th>CMD</th>
-                                        <td>
-                                            {% for item in tag_data.cmd %}
-                                               {{ item }}{% if not loop.last %} {% endif %}
-                                            {% endfor %}
-                                        </td>
-                                    </tr>
-                                    <tr>
-                                        <th>ENV</th>
-                                        <td>
-                                            {% for item in tag_data.env %}
-                                                {{ item }}{% if not loop.last %}<br>{% endif %}
-                                            {% endfor %}
-                                        </td>
-                                    </tr>
-                                    {% if tag_data.labels %}
-                                    <tr>
-                                        <th>Labels</th>
-                                        <td>
-                                            {% for key, value in tag_data.labels.items() %}
-                                                {{ key }}={{ value }}{% if not loop.last %}<br>{% endif %}
-                                            {% endfor %}
-                                        </td>
-                                    </tr>
-                                    {% endif %}
-                                    <tr>
-                                        <th>WorkDir</th>
-                                        <td>{{ tag_data.working_dir }}</td>
-                                    </tr>
-                                    <tr>
-                                        <th>Volumes</th>
-                                        <td>
-                                        {% if tag_data.volumes %}
-                                            {% for item in tag_data.volumes %}
-                                                {{ item }}{% if not loop.last %}<br>{% endif %}
-                                            {% endfor %}
-                                        {% endif %}
-                                        </td>
-                                    </tr>
-                                    <tr>
-                                        <th>ExposedPorts</th>
-                                        <td>
-                                            {% for item in tag_data.exposed_ports %}
-                                                {{ item }}{% if not loop.last %}<br>{% endif %}
-                                            {% endfor %}
-                                        </td>
-                                    </tr>
+                                <table class="table table-bordered" id="configInfoTable" width="100%" cellspacing="0">
+                                    <tbody id="config-tbody">
+                                        <!-- Populated by JavaScript -->
+                                    </tbody>
                                 </table>
                             </div>
                         </div>
@@ -249,88 +88,10 @@
                         <div class="card-body">
                             <h3>Image Metadata</h3>
                             <div class="table-responsive">
-                                <table class="table table-bordered" id="infoInfoTable" width="100%" cellspacing="0">
-                                {% if tag_data.format == "Docker" %}
-                                    <tr>
-                                        <th>Maintainer</th>
-                                        <td>{{ tag_data.maintainer }}</td>
-                                    </tr>
-                                    {% if tag_data.authors %}
-                                    <tr>
-                                        <th>Authors</th>
-                                        <td>{{ tag_data.authors }}</td>
-                                    </tr>
-                                    {% endif %}
-                                    <tr>
-                                        <th>Licence</th>
-                                        <td>{{ tag_data.licenses }}</td>
-                                    </tr>
-                                    <tr>
-                                        <th>URL</th>
-                                        <td><a href="{{ tag_data.url }}">{{ tag_data.url }}</a></td>
-                                    </tr>
-                                    <tr>
-                                        <th>Documentation</th>
-                                        <td><a href="{{ tag_data.documentation }}">{{ tag_data.documentation }}</a></td>
-                                    </tr>
-                                    <tr>
-                                        <th>Source Code</th>
-                                        <td><a href="{{ tag_data.source_code }}">{{ tag_data.source_code }}</a></td>
-                                    </tr>
-                                    <tr>
-                                        <th>Commit Hash</th>
-                                        <td>{{ tag_data.source_code_version }}</td>
-                                    </tr>
-                                {% elif tag_data.media_type == "application/vnd.cncf.helm.config.v1+json" %}
-                                    {% if tag_data.maintainer %}
-                                    <tr>
-                                        <th>Maintainer</th>
-                                        <td>{{ tag_data.maintainer }}</td>
-                                    </tr>
-                                    {% endif %}
-                                    {% if tag_data.licenses %}
-                                    <tr>
-                                        <th>Licence</th>
-                                        <td>{{ tag_data.licenses }}</td>
-                                    </tr>
-                                    {% endif %}
-                                    {% if tag_data.url %}
-                                    <tr>
-                                        <th>URL</th>
-                                        <td><a href="{{ tag_data.url }}">{{ tag_data.url }}</a></td>
-                                    </tr>
-                                    {% endif %}
-                                    {% if tag_data.helm_name %}
-                                    <tr>
-                                        <th>Chart Name</th>
-                                        <td>{{ tag_data.helm_name }}</td>
-                                    </tr>
-                                    {% endif %}
-                                    {% if tag_data.helm_description %}
-                                    <tr>
-                                        <th>Chart Description</th>
-                                        <td>{{ tag_data.helm_description }}</td>
-                                    </tr>
-                                    {% endif %}
-                                    {% if tag_data.helm_version %}
-                                    <tr>
-                                        <th>Chart Version</th>
-                                        <td>{{ tag_data.helm_version }}</td>
-                                    </tr>
-                                    {% endif %}
-                                    {% if tag_data.helm_app_version %}
-                                    <tr>
-                                        <th>Chart App Version</th>
-                                        <td>{{ tag_data.helm_app_version }}</td>
-                                    </tr>
-                                    {% endif %}
-                                    {% if tag_data.helm_api_version %}
-                                    <tr>
-                                        <th>Chart API Version</th>
-                                        <td>{{ tag_data.helm_api_version }}</td>
-                                    </tr>
-                                    {% endif %}
-                                {% endif %}
+                                <table class="table table-bordered" id="metadataInfoTable" width="100%" cellspacing="0">
+                                    <tbody id="metadata-tbody">
+                                        <!-- Populated by JavaScript -->
+                                    </tbody>
                                 </table>
                             </div>
                         </div>
@@ -344,7 +105,7 @@
                         <div class="card-body">
                             <h3>Image Vulnerabilities</h3>
                             <div class="table-responsive">
-                                <table class="table table-bordered" id="infoInfoTable" width="100%" cellspacing="0">
+                                <table class="table table-bordered" id="vulnInfoTable" width="100%" cellspacing="0">
                                     <thead>
                                         <tr>
                                             <th>ID</th>
@@ -355,29 +116,8 @@
                                             <th>Fixed Version</th>
                                         </tr>
                                     </thead>
-                                    <tbody>
-                                    {% for v in tag_data.vulnerabilities %}
-                                        <tr>
-                                            <td>
-                                                <a href="https://avd.aquasec.com/nvd/{{ v.vulnerabilityID | lower }}" rel="noopener noreferrer" target="_blank">{{ v.vulnerabilityID }}</a>
-                                            </td>
-                                            {% if v.severity == "CRITICAL" %}
-                                            <td><span class="badge text-bg-danger">{{ v.severity }}</span></td>
-                                            {% elif v.severity == "HIGH" %}
-                                            <td><span class="badge text-bg-warning">{{ v.severity }}</span></td>
-                                            {% elif v.severity == "MEDIUM" %}
-                                            <td><span class="badge text-bg-primary">{{ v.severity }}</span></td>
-                                            {% elif v.severity == "LOW" %}
-                                            <td><span class="badge text-bg-info">{{ v.severity }}</span></td>
-                                            {% else %}
-                                            <td><span class="badge text-bg-secondary">{{ v.severity }}</span></td>
-                                            {% endif %}
-                                            <td>{{ v.score }}</td>
-                                            <td>{{ v.resource }}</td>
-                                            <td>{{ v.installedVersion }}</td>
-                                            <td>{{ v.fixedVersion }}</td>
-                                        </tr>
-                                    {% endfor %}
+                                    <tbody id="vuln-tbody">
+                                        <!-- Populated by JavaScript -->
                                     </tbody>
                                 </table>
                             </div>
@@ -392,7 +132,7 @@
                         <div class="card-body">
                             <h3>Event Log</h3>
                             <div class="table-responsive">
-                                <table class="table table-bordered" id="infoInfoTable" width="100%" cellspacing="0">
+                                <table class="table table-bordered" id="eventsInfoTable" width="100%" cellspacing="0">
                                     <thead>
                                         <tr>
                                             <th>Action</th>
@@ -401,15 +141,8 @@
                                             <th>Time</th>
                                         </tr>
                                     </thead>
-                                    <tbody>
-                                        {% for e in tag_events %}
-                                        <tr>
-                                            <td>{{ e.action }}</td>
-                                            <td>{{ e.ip }}</td>
-                                            <td>{{ e.user }}</td>
-                                            <td>{{ e.created }}</td>
-                                        </tr>
-                                        {% endfor %}
+                                    <tbody id="events-tbody">
+                                        <!-- Populated by JavaScript -->
                                     </tbody>
                                 </table>
                             </div>
@@ -418,10 +151,541 @@
                 </div>
             </div>
         </div>
+        </div>
     </div>
 </div>
 {% endblock %}
 
 {% block add_head_css %}
-{% include "segments/datatable_snippet.html.j2" %}
+{% include "segments/components/datatable_snippet.html.j2" %}
+{% endblock %}
+
+{% block add_tail_js %}
+<script>
+    // Escape HTML helper
+    function escapeHtml(text) {
+        if (!text) return '';
+        const map = {
+            '&': '&amp;',
+            '<': '&lt;',
+            '>': '&gt;',
+            '"': '&quot;',
+            "'": '&#039;'
+        };
+        return text.toString().replace(/[&<>"']/g, m => map[m]);
+    }
+    
+    // Get registry server URL, image name, and tag name from query params or sessionStorage
+    function getRegistryParams() {
+        const urlParams = new URLSearchParams(window.location.search);
+        const registryUrl = urlParams.get('registry_server_url') || sessionStorage.getItem('registry_server_url');
+        const imageName = urlParams.get('image_name') || sessionStorage.getItem('image_name');
+        const tagName = urlParams.get('tag_name') || sessionStorage.getItem('tag_name');
+        
+        if (registryUrl) sessionStorage.setItem('registry_server_url', registryUrl);
+        if (imageName) sessionStorage.setItem('image_name', imageName);
+        if (tagName) sessionStorage.setItem('tag_name', tagName);
+        
+        return { registryUrl, imageName, tagName };
+    }
+    
+    // Populate Info tab
+    function populateInfoTab(tagData, imageName, tagName) {
+        const tbody = document.getElementById('info-tbody');
+        if (!tbody) return;
+        
+        const format = tagData.format || '';
+        const registry = tagData.registry || '';
+        let registryDisplay = registry.replace(/^https?:\/\//, '').replace(/^www\./, '');
+        
+        let imageDisplay = '';
+        if (format === 'Docker') {
+            imageDisplay = `${registryDisplay}/${imageName}:${tagName}`;
+        } else if (format === 'OCI') {
+            imageDisplay = `oci://${registryDisplay}/${imageName}:${tagName}`;
+        } else {
+            imageDisplay = `${registryDisplay}/${imageName}:${tagName}`;
+        }
+        
+        let html = `
+            <tr>
+                <th>Image:</th>
+                <td>${escapeHtml(imageDisplay)}</td>
+            </tr>
+            <tr>
+                <th>Digest:</th>
+                <td>${escapeHtml(tagData.digest || '')}</td>
+            </tr>
+            <tr>
+                <th>Signed</th>
+                <td>
+                    ${tagData.signed ? '<span class="material-icons text-success">check_circle</span>' : '<span class="material-icons text-danger">cancel</span>'}
+                </td>
+            </tr>
+            <tr>
+                <th>Format:</th>
+                <td>${escapeHtml(format)}</td>
+            </tr>
+        `;
+        
+        if (tagData.created) {
+            html += `
+                <tr>
+                    <th>Created:</th>
+                    <td>${escapeHtml(tagData.created)}</td>
+                </tr>
+            `;
+        }
+        
+        if (tagData.architecture) {
+            html += `
+                <tr>
+                    <th>Architecture:</th>
+                    <td>${escapeHtml(tagData.architecture)}</td>
+                </tr>
+            `;
+        }
+        
+        if (tagData.os) {
+            html += `
+                <tr>
+                    <th>Operation System:</th>
+                    <td>${escapeHtml(tagData.os)}</td>
+                </tr>
+            `;
+        }
+        
+        if (tagData.docker_version) {
+            html += `
+                <tr>
+                    <th>Docker Version:</th>
+                    <td>${escapeHtml(tagData.docker_version)}</td>
+                </tr>
+            `;
+        }
+        
+        html += `
+            <tr>
+                <th>Number of Layers:</th>
+                <td>${escapeHtml(tagData.layers || '')}</td>
+            </tr>
+        `;
+        
+        tbody.innerHTML = html;
+    }
+    
+    // Populate Configuration tab
+    function populateConfigurationTab(tagData) {
+        const tbody = document.getElementById('config-tbody');
+        if (!tbody) return;
+        
+        let html = '';
+        
+        if (tagData.format === 'OCI') {
+            html += `
+                <tr>
+                    <th>Media Type:</th>
+                    <td>${escapeHtml(tagData.media_type || '')}</td>
+                </tr>
+            `;
+            
+            if (tagData.media_type === 'application/vnd.aquasec.trivy.config.v1+json') {
+                html += `
+                    <tr>
+                        <th>Trivy DB:</th>
+                        <td>${escapeHtml(tagData.trivy_db || '')}</td>
+                    </tr>
+                `;
+            } else if (tagData.media_type === 'application/vnd.oci.image.config.v1+json') {
+                if (tagData.cosign_signature) {
+                    html += `
+                        <tr>
+                            <th>Cosign Signature:</th>
+                            <td><pre><code>${escapeHtml(tagData.cosign_signature)}</code></pre></td>
+                        </tr>
+                    `;
+                }
+                if (tagData.cosign_bundle) {
+                    html += `
+                        <tr>
+                            <th>Cosign Bundle:</th>
+                            <td><pre><code>${escapeHtml(tagData.cosign_bundle)}</code></pre></td>
+                        </tr>
+                    `;
+                }
+                if (tagData.cosign_certificate) {
+                    html += `
+                        <tr>
+                            <th>Cosign Certificate:</th>
+                            <td><pre><code>${escapeHtml(tagData.cosign_certificate)}</code></pre></td>
+                        </tr>
+                    `;
+                }
+                if (tagData.cosign_chain) {
+                    html += `
+                        <tr>
+                            <th>Cosign Chain:</th>
+                            <td><pre><code>${escapeHtml(tagData.cosign_chain)}</code></pre></td>
+                        </tr>
+                    `;
+                }
+            }
+        }
+        
+        if (tagData.build_date) {
+            html += `
+                <tr>
+                    <th>Build Date:</th>
+                    <td>${escapeHtml(tagData.build_date)}</td>
+                </tr>
+            `;
+        }
+        
+        if (tagData.vcs_url) {
+            html += `
+                <tr>
+                    <th>VCS URL:</th>
+                    <td><a href="${escapeHtml(tagData.vcs_url)}">${escapeHtml(tagData.vcs_url)}</a></td>
+                </tr>
+            `;
+        }
+        
+        if (tagData.documentation) {
+            html += `
+                <tr>
+                    <th>Documentation:</th>
+                    <td><a href="${escapeHtml(tagData.documentation)}">${escapeHtml(tagData.documentation)}</a></td>
+                </tr>
+            `;
+        }
+        
+        // Helper function to safely convert to array
+        function toArray(value) {
+            if (!value) return [];
+            if (Array.isArray(value)) return value;
+            if (typeof value === 'string') return [value];
+            if (typeof value === 'object') return Object.values(value);
+            return [];
+        }
+        
+        html += `
+            <tr>
+                <th>Entrypoint</th>
+                <td>${tagData.entrypoint ? toArray(tagData.entrypoint).map(e => escapeHtml(String(e))).join(' ') : ''}</td>
+            </tr>
+            <tr>
+                <th>CMD</th>
+                <td>${tagData.cmd ? toArray(tagData.cmd).map(c => escapeHtml(String(c))).join(' ') : ''}</td>
+            </tr>
+            <tr>
+                <th>ENV</th>
+                <td>${tagData.env ? toArray(tagData.env).map(e => escapeHtml(String(e))).join('<br>') : ''}</td>
+            </tr>
+        `;
+        
+        if (tagData.labels) {
+            let labelsHtml = '';
+            if (typeof tagData.labels === 'object' && tagData.labels !== null) {
+                labelsHtml = Object.entries(tagData.labels).map(([key, value]) => 
+                    `${escapeHtml(String(key))}=${escapeHtml(String(value))}`
+                ).join('<br>');
+            }
+            html += `
+                <tr>
+                    <th>Labels</th>
+                    <td>${labelsHtml}</td>
+                </tr>
+            `;
+        }
+        
+        html += `
+            <tr>
+                <th>WorkDir</th>
+                <td>${escapeHtml(tagData.working_dir || '')}</td>
+            </tr>
+            <tr>
+                <th>Volumes</th>
+                <td>${tagData.volumes ? toArray(tagData.volumes).map(v => escapeHtml(String(v))).join('<br>') : ''}</td>
+            </tr>
+            <tr>
+                <th>ExposedPorts</th>
+                <td>${(() => {
+                    if (!tagData.exposed_ports) return '';
+                    // ExposedPorts can be an object (keys are port strings) or an array
+                    if (Array.isArray(tagData.exposed_ports)) {
+                        return tagData.exposed_ports.map(p => escapeHtml(String(p))).join('<br>');
+                    } else if (typeof tagData.exposed_ports === 'object') {
+                        return Object.keys(tagData.exposed_ports).map(p => escapeHtml(String(p))).join('<br>');
+                    }
+                    return escapeHtml(String(tagData.exposed_ports));
+                })()}</td>
+            </tr>
+        `;
+        
+        tbody.innerHTML = html;
+    }
+    
+    // Populate Metadata tab
+    function populateMetadataTab(tagData) {
+        const tbody = document.getElementById('metadata-tbody');
+        if (!tbody) return;
+        
+        let html = '';
+        
+        if (tagData.format === 'Docker') {
+            if (tagData.maintainer) {
+                html += `<tr><th>Maintainer</th><td>${escapeHtml(tagData.maintainer)}</td></tr>`;
+            }
+            if (tagData.authors) {
+                html += `<tr><th>Authors</th><td>${escapeHtml(tagData.authors)}</td></tr>`;
+            }
+            if (tagData.licenses) {
+                html += `<tr><th>Licence</th><td>${escapeHtml(tagData.licenses)}</td></tr>`;
+            }
+            if (tagData.url) {
+                html += `<tr><th>URL</th><td><a href="${escapeHtml(tagData.url)}">${escapeHtml(tagData.url)}</a></td></tr>`;
+            }
+            if (tagData.documentation) {
+                html += `<tr><th>Documentation</th><td><a href="${escapeHtml(tagData.documentation)}">${escapeHtml(tagData.documentation)}</a></td></tr>`;
+            }
+            if (tagData.source_code) {
+                html += `<tr><th>Source Code</th><td><a href="${escapeHtml(tagData.source_code)}">${escapeHtml(tagData.source_code)}</a></td></tr>`;
+            }
+            if (tagData.source_code_version) {
+                html += `<tr><th>Commit Hash</th><td>${escapeHtml(tagData.source_code_version)}</td></tr>`;
+            }
+        } else if (tagData.media_type === 'application/vnd.cncf.helm.config.v1+json') {
+            if (tagData.maintainer) {
+                html += `<tr><th>Maintainer</th><td>${escapeHtml(tagData.maintainer)}</td></tr>`;
+            }
+            if (tagData.licenses) {
+                html += `<tr><th>Licence</th><td>${escapeHtml(tagData.licenses)}</td></tr>`;
+            }
+            if (tagData.url) {
+                html += `<tr><th>URL</th><td><a href="${escapeHtml(tagData.url)}">${escapeHtml(tagData.url)}</a></td></tr>`;
+            }
+            if (tagData.helm_name) {
+                html += `<tr><th>Chart Name</th><td>${escapeHtml(tagData.helm_name)}</td></tr>`;
+            }
+            if (tagData.helm_description) {
+                html += `<tr><th>Chart Description</th><td>${escapeHtml(tagData.helm_description)}</td></tr>`;
+            }
+            if (tagData.helm_version) {
+                html += `<tr><th>Chart Version</th><td>${escapeHtml(tagData.helm_version)}</td></tr>`;
+            }
+            if (tagData.helm_app_version) {
+                html += `<tr><th>Chart App Version</th><td>${escapeHtml(tagData.helm_app_version)}</td></tr>`;
+            }
+            if (tagData.helm_api_version) {
+                html += `<tr><th>Chart API Version</th><td>${escapeHtml(tagData.helm_api_version)}</td></tr>`;
+            }
+        }
+        
+        tbody.innerHTML = html;
+    }
+    
+    // Populate Vulnerabilities tab
+    function populateVulnerabilitiesTab(vulnerabilities) {
+        const tbody = document.getElementById('vuln-tbody');
+        if (!tbody) return;
+        
+        if (!vulnerabilities || vulnerabilities.length === 0) {
+            tbody.innerHTML = '<tr><td colspan="6" class="text-center">No vulnerabilities found</td></tr>';
+            return;
+        }
+        
+        const rows = vulnerabilities.map(v => {
+            const severity = v.severity || '';
+            let badgeClass = 'text-bg-secondary';
+            if (severity === 'CRITICAL') badgeClass = 'text-bg-danger';
+            else if (severity === 'HIGH') badgeClass = 'text-bg-warning';
+            else if (severity === 'MEDIUM') badgeClass = 'text-bg-primary';
+            else if (severity === 'LOW') badgeClass = 'text-bg-info';
+            
+            return `
+                <tr>
+                    <td>
+                        <a href="https://avd.aquasec.com/nvd/${escapeHtml(v.vulnerabilityID || '').toLowerCase()}" rel="noopener noreferrer" target="_blank">${escapeHtml(v.vulnerabilityID || '')}</a>
+                    </td>
+                    <td><span class="badge ${badgeClass}">${escapeHtml(severity)}</span></td>
+                    <td>${escapeHtml(v.score || '')}</td>
+                    <td>${escapeHtml(v.resource || '')}</td>
+                    <td>${escapeHtml(v.installedVersion || '')}</td>
+                    <td>${escapeHtml(v.fixedVersion || '')}</td>
+                </tr>
+            `;
+        }).join('');
+        
+        tbody.innerHTML = rows;
+        
+        // Initialize DataTables for vulnerabilities
+        setTimeout(() => {
+            if (typeof $ !== 'undefined' && $.fn.DataTable) {
+                try {
+                    if ($.fn.DataTable.isDataTable && $.fn.DataTable.isDataTable('#vulnInfoTable')) {
+                        $('#vulnInfoTable').DataTable().destroy();
+                    }
+                    $('#vulnInfoTable').DataTable({
+                        responsive: true,
+                        pageLength: 25,
+                        destroy: true
+                    });
+                } catch (e) {
+                    console.warn('Error initializing vulnerabilities DataTable:', e);
+                }
+            }
+        }, 100);
+    }
+    
+    // Populate Events tab
+    function populateEventsTab(events) {
+        const tbody = document.getElementById('events-tbody');
+        if (!tbody) return;
+        
+        if (!events || events.length === 0) {
+            tbody.innerHTML = '<tr><td colspan="4" class="text-center">No events found</td></tr>';
+            return;
+        }
+        
+        const rows = events.map(e => {
+            return `
+                <tr>
+                    <td>${escapeHtml(e.action || '')}</td>
+                    <td>${escapeHtml(e.ip || '')}</td>
+                    <td>${escapeHtml(e.user || '')}</td>
+                    <td>${escapeHtml(e.created || '')}</td>
+                </tr>
+            `;
+        }).join('');
+        
+        tbody.innerHTML = rows;
+        
+        // Initialize DataTables for events
+        setTimeout(() => {
+            if (typeof $ !== 'undefined' && $.fn.DataTable) {
+                try {
+                    if ($.fn.DataTable.isDataTable && $.fn.DataTable.isDataTable('#eventsInfoTable')) {
+                        $('#eventsInfoTable').DataTable().destroy();
+                    }
+                    $('#eventsInfoTable').DataTable({
+                        responsive: true,
+                        pageLength: 25,
+                        destroy: true
+                    });
+                } catch (e) {
+                    console.warn('Error initializing events DataTable:', e);
+                }
+            }
+        }, 100);
+    }
+    
+    // Populate all tabs with data
+    function populateAllTabs(data) {
+        const tagData = data.tag_data || {};
+        const tagEvents = data.tag_events || [];
+        const imageName = data.image_name || '';
+        const tagName = data.tag_name || '';
+        
+        // Update breadcrumbs
+        const imageLink = document.getElementById('breadcrumb-image-link');
+        if (imageLink && imageName) {
+            const registryUrl = getRegistryParams().registryUrl;
+            const encodedUrl = encodeURIComponent(registryUrl);
+            const encodedImage = encodeURIComponent(imageName);
+            imageLink.href = `/plugins/registry/image/tags?registry_server_url=${encodedUrl}&image_name=${encodedImage}`;
+            imageLink.textContent = imageName;
+        }
+        
+        const tagNameSpan = document.getElementById('breadcrumb-tag-name');
+        if (tagNameSpan) {
+            tagNameSpan.textContent = tagName;
+        }
+        
+        // Populate tabs
+        populateInfoTab(tagData, imageName, tagName);
+        populateConfigurationTab(tagData);
+        populateMetadataTab(tagData);
+        
+        // Show/hide tabs based on data
+        const metadataTab = document.getElementById('nav-metadata-tab-item');
+        const vulnTab = document.getElementById('nav-vuln-tab-item');
+        const eventsTab = document.getElementById('nav-events-tab-item');
+        
+        if (tagData.format === 'Docker' || tagData.media_type === 'application/vnd.cncf.helm.config.v1+json') {
+            if (metadataTab) metadataTab.style.display = '';
+        }
+        
+        if (tagData.vulnerabilities && tagData.vulnerabilities.length > 0) {
+            if (vulnTab) vulnTab.style.display = '';
+            populateVulnerabilitiesTab(tagData.vulnerabilities);
+        }
+        
+        if (tagEvents && tagEvents.length > 0) {
+            if (eventsTab) eventsTab.style.display = '';
+            populateEventsTab(tagEvents);
+        }
+    }
+    
+    // Load tag data from API
+    async function loadTagData() {
+        try {
+            const { registryUrl, imageName, tagName } = getRegistryParams();
+            
+            if (!registryUrl || !imageName || !tagName) {
+                throw new Error('Registry server URL, image name, or tag name not found. Please select a registry server, image, and tag first.');
+            }
+            
+            // Encode for API path
+            const encodedUrl = encodeURIComponent(registryUrl);
+            const encodedImage = encodeURIComponent(imageName);
+            const encodedTag = encodeURIComponent(tagName);
+            const apiUrl = `/api/v1/plugins/registry/${encodedUrl}/images/${encodedImage}/tags/${encodedTag}/data`;
+            console.log('Fetching tag data from:', apiUrl);
+            
+            const response = await fetch(apiUrl);
+            if (!response.ok) {
+                throw new Error(`HTTP error! status: ${response.status}`);
+            }
+            
+            const result = await response.json();
+            console.log('Tag data API response:', result);
+            
+            if (result.error) {
+                throw new Error(result.message || 'Failed to load tag data');
+            }
+            
+            const data = result.data || {};
+            
+            // Hide loading, show content
+            const loading = document.getElementById('tag-data-loading');
+            const content = document.getElementById('tag-data-content');
+            
+            if (loading) loading.style.display = 'none';
+            if (content) {
+                content.style.display = 'block';
+                populateAllTabs(data);
+            }
+            
+        } catch (error) {
+            console.error('Error loading tag data:', error);
+            const loading = document.getElementById('tag-data-loading');
+            const content = document.getElementById('tag-data-content');
+            
+            if (loading) {
+                loading.innerHTML = `
+                    <div class="alert alert-danger text-center">
+                        <h4>Error loading tag data</h4>
+                        <p>${escapeHtml(error.message)}</p>
+                    </div>
+                `;
+            }
+            if (content) content.style.display = 'none';
+        }
+    }
+    
+    // Load data on page load
+    document.addEventListener('DOMContentLoaded', function() {
+        loadTagData();
+    });
+</script>
 {% endblock %}

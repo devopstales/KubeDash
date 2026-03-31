@@ -8,14 +8,14 @@
           <li class="breadcrumb-item">User Management</li>
           <li class="breadcrumb-item"><a href="/user/list">Users</a></li>
           <li class="breadcrumb-item">Privileges</li>
-          <li class="breadcrumb-item active" aria-current="page">{{ username }}</li>
+          <li class="breadcrumb-item active" aria-current="page" id="username-breadcrumb">Loading...</li>
         </ol>
       </nav>
     </div>
 </ul>
 <ul class="header-nav ms-auto"></ul>
 <ul class="header-nav d-lg-flex">
-{% include "segments/topmenu.html.j2" %}
+{% include "segments/partials/topmenu.html.j2" %}
 {% endblock %}
 
 {% block content %}
@@ -28,6 +28,7 @@
             <table class="table table-bordered" id="dataTable" width="100%" cellspacing="0">
                 <thead>
                     <tr>
+                        <th>Source</th>
                         <th>Namespace</th>
                         <th>API Groups</th>
                         <th>Non Resources</th>
@@ -35,99 +36,15 @@
                         <th>Verbs</th>
                     </tr>
                   </thead>
-                  <tbody>
-                    {% for ucr in user_cluster_roles %}
+                  <tbody id="privileges-tbody">
                     <tr>
-                        <td>All</td>
-                        <td>
-                            {% if ucr.api_groups %}
-                            {% for ag in ucr.api_groups %}
-                                {% if arg|length %}
-                                    {{ ag }}{% if not loop.last %}<br>{% endif %}
-                                {% else %}
-                                    " "{% if not loop.last %}<br>{% endif %}
-                                {% endif %}
-                            {% endfor %}
-                            {% else %}
-                                {{ ucr.api_groups }}
-                            {% endif %}
-                        </td>
-                        <td>
-                            {% if ucr.resource_names %}
-                            {% for rn in ucr.resource_names %}
-                                {{ rn }}{% if not loop.last %}<br>{% endif %}
-                            {% endfor %}
-                            {% else %}
-                                {{ ucr.resource_names }}
-                            {% endif %}
-                        </td>
-                        <td>
-                            {% if ucr.resources %}
-                            {% for r in ucr.resources %}
-                                {{ r }}{% if not loop.last %}<br>{% endif %}
-                            {% endfor %}
-                            {% else %}
-                                {{ ucr.resources }}
-                            {% endif %}
-                        </td>
-                        <td>
-                            {% if ucr.verbs %}
-                            {% for v in ucr.verbs %}
-                                {{ v }}{% if not loop.last %}<br>{% endif %}
-                            {% endfor %}
-                            {% else %}
-                                {{ ucr.verbs }}
-                            {% endif %}
-                        </td>
-                    </tr>    
-                    {% endfor%}
-                    {% for ur in user_roles %}
-                    {% for ns, priv in ur.items() %}
-                    <tr>
-                        <td>{{ ns }}</td>
-                        <td>
-                            {% if priv.api_groups %}
-                            {% for ag in priv.api_groups %}
-                                {% if arg|length %}
-                                    {{ ag }}{% if not loop.last %}<br>{% endif %}
-                                {% else %}
-                                    " "{% if not loop.last %}<br>{% endif %}
-                                {% endif %}
-                            {% endfor %}
-                            {% else %}
-                                {{ priv.api_groups }}
-                            {% endif %}
-                        </td>
-                        <td>
-                            {% if priv.resource_names %}
-                            {% for rn in priv.resource_names %}
-                                {{ rn }}{% if not loop.last %}<br>{% endif %}
-                            {% endfor %}
-                            {% else %}
-                                {{ priv.resource_names }}
-                            {% endif %}
-                        </td>
-                        <td>
-                            {% if priv.resources %}
-                            {% for r in priv.resources %}
-                                {{ r }}{% if not loop.last %}<br>{% endif %}
-                            {% endfor %}
-                            {% else %}
-                                {{ priv.resources }}
-                            {% endif %}
-                        </td>
-                        <td>
-                            {% if priv.verbs %}
-                            {% for v in priv.verbs %}
-                                {{ v }}{% if not loop.last %}<br>{% endif %}
-                            {% endfor %}
-                            {% else %}
-                                {{ priv.verbs }}
-                            {% endif %}
+                        <td colspan="6" class="text-center">
+                            <div class="spinner-border spinner-border-sm text-primary" role="status">
+                                <span class="visually-hidden">Loading...</span>
+                            </div>
+                            <span class="ms-2">Loading privileges...</span>
                         </td>
                     </tr>
-                    {% endfor%}
-                    {% endfor%}
                   </tbody>
             </table>
         </div>
@@ -137,5 +54,671 @@
 
 
 {% block add_head_css %}
-{% include "segments/datatable_snippet.html.j2" %}
+{% include "segments/components/datatable_snippet.html.j2" %}
+{% endblock %}
+
+{% block add_tail_js %}
+<script nonce="{{ csp_nonce }}">
+    // IMMEDIATE: Prevent datatables-demo.js from initializing on loading row
+    // Override jQuery ready to intercept datatables-demo.js initialization
+    (function() {
+        // Store original jQuery ready
+        const originalReady = typeof $ !== 'undefined' ? $.fn.ready : null;
+        
+        // Override when jQuery loads
+        function setupOverride() {
+            if (typeof $ !== 'undefined' && $.fn && !window._datatableOverrideSetup) {
+                window._datatableOverrideSetup = true;
+                
+                // Intercept DataTable calls on #dataTable
+                const originalDataTable = $.fn.DataTable;
+                $.fn.DataTable = function(options) {
+                    const table = this[0];
+                    if (table && table.id === 'dataTable') {
+                        const tbody = table.querySelector('tbody');
+                        if (tbody) {
+                            const rows = tbody.querySelectorAll('tr');
+                            const hasColspanRow = Array.from(rows).some(row => {
+                                const cells = row.querySelectorAll('td');
+                                return Array.from(cells).some(cell => cell.hasAttribute('colspan'));
+                            });
+                            if (hasColspanRow) {
+                                console.log('Blocked DataTable initialization on loading row');
+                                return this; // Return jQuery object, don't initialize
+                            }
+                        }
+                    }
+                    return originalDataTable.apply(this, arguments);
+                };
+                
+                // Copy static methods
+                Object.setPrototypeOf($.fn.DataTable, originalDataTable);
+                Object.keys(originalDataTable).forEach(key => {
+                    $.fn.DataTable[key] = originalDataTable[key];
+                });
+            }
+        }
+        
+        // Try immediately and on intervals
+        setupOverride();
+        setTimeout(setupOverride, 0);
+        setTimeout(setupOverride, 50);
+        setTimeout(setupOverride, 100);
+    })();
+    
+    // Also destroy any auto-initialized DataTable instances as backup
+    (function() {
+        function checkAndDestroyAutoInit() {
+            if (typeof $ !== 'undefined' && $.fn.DataTable) {
+                const table = document.getElementById('dataTable');
+                if (table && $.fn.DataTable.isDataTable(table)) {
+                    const tbody = table.querySelector('tbody');
+                    if (tbody) {
+                        const rows = tbody.querySelectorAll('tr');
+                        const hasColspanRow = Array.from(rows).some(row => {
+                            const cells = row.querySelectorAll('td');
+                            return Array.from(cells).some(cell => cell.hasAttribute('colspan'));
+                        });
+                        if (hasColspanRow) {
+                            console.log('Destroying auto-initialized DataTable on loading row');
+                            try {
+                                $(table).DataTable().destroy();
+                            } catch(e) {
+                                console.error('Error destroying DataTable:', e);
+                            }
+                        }
+                    }
+                }
+            }
+        }
+        
+        if (typeof $ !== 'undefined') {
+            checkAndDestroyAutoInit();
+        }
+        setTimeout(checkAndDestroyAutoInit, 50);
+        setTimeout(checkAndDestroyAutoInit, 100);
+        setTimeout(checkAndDestroyAutoInit, 200);
+        setTimeout(checkAndDestroyAutoInit, 500);
+        setTimeout(checkAndDestroyAutoInit, 1000);
+    })();
+    
+    // Helper function to escape HTML
+    const escapeHtml = (text) => {
+        if (text === null || text === undefined) return '';
+        const map = {
+            '&': '&amp;',
+            '<': '&lt;',
+            '>': '&gt;',
+            '"': '&quot;',
+            "'": '&#039;'
+        };
+        return String(text).replace(/[&<>"']/g, m => map[m]);
+    };
+    
+    // Helper function to format array values
+    function formatArrayValue(arr) {
+        if (!arr) return '';
+        if (Array.isArray(arr)) {
+            return arr.filter(item => item && item.length > 0).join('<br>') || ' ';
+        }
+        return String(arr);
+    }
+    
+    // Get username from URL query parameter or form data
+    function getUsername() {
+        // Try URL query parameter first
+        const urlParams = new URLSearchParams(window.location.search);
+        let username = urlParams.get('username');
+        
+        // If not in query, check if we're coming from a POST (check sessionStorage or localStorage)
+        if (!username) {
+            // Check if username was stored from form submission
+            username = sessionStorage.getItem('privilege_username');
+            if (username) {
+                sessionStorage.removeItem('privilege_username');
+            }
+        }
+        
+        // If still no username, try to get from form data in the page
+        if (!username) {
+            const form = document.querySelector('form[action="/user/privilege"]');
+            if (form) {
+                const usernameInput = form.querySelector('input[name="username"]');
+                if (usernameInput) {
+                    username = usernameInput.value;
+                }
+            }
+        }
+        
+        return username;
+    }
+    
+    // Cache for role rules to avoid duplicate fetches
+    const roleRulesCache = new Map();
+    
+    // Fetch role rules from role name (with caching)
+    async function fetchRoleRules(roleName, namespace = null) {
+        const cacheKey = namespace ? `${namespace}:${roleName}` : `cluster:${roleName}`;
+        
+        // Check cache first
+        if (roleRulesCache.has(cacheKey)) {
+            return roleRulesCache.get(cacheKey);
+        }
+        
+        try {
+            let url;
+            if (namespace) {
+                url = `/api/v1/rbac/roles/${encodeURIComponent(roleName)}?namespace=${encodeURIComponent(namespace)}`;
+            } else {
+                url = `/api/v1/rbac/cluster-roles/${encodeURIComponent(roleName)}`;
+            }
+            
+            const response = await fetch(url);
+            if (!response.ok) {
+                console.warn(`Failed to fetch role ${roleName}: HTTP ${response.status}`);
+                return null;
+            }
+            
+            const data = await response.json();
+            const rules = data.data?.rules || [];
+            
+            // Cache the result
+            roleRulesCache.set(cacheKey, rules);
+            return rules;
+        } catch (error) {
+            console.warn(`Error fetching rules for role ${roleName}:`, error);
+            return null;
+        }
+    }
+    
+    // Extract role name from binding role field
+    function extractRoleName(roleField, kind = 'ClusterRole') {
+        if (!roleField) return null;
+        
+        if (Array.isArray(roleField) && roleField.length > 0) {
+            const roleObj = roleField[0];
+            if (typeof roleObj === 'object') {
+                return roleObj[kind] || roleObj.Role || roleObj.ClusterRole || roleObj.name;
+            }
+        } else if (typeof roleField === 'object') {
+            return roleField[kind] || roleField.Role || roleField.ClusterRole || roleField.name;
+        } else if (typeof roleField === 'string') {
+            return roleField;
+        }
+        
+        return null;
+    }
+    
+    // Process group privileges and combine with user privileges
+    async function processGroupPrivileges(groupPrivileges) {
+        const processed = {
+            cluster_roles: [],
+            roles: []
+        };
+        
+        if (!groupPrivileges || !Array.isArray(groupPrivileges)) {
+            return processed;
+        }
+        
+        console.log('Processing group privileges:', groupPrivileges);
+        
+        // Map to store group names for each privilege
+        const groupNameMap = new Map();
+        
+        // Collect all unique role names first to batch fetch
+        const rolesToFetch = {
+            cluster: new Set(),
+            namespaced: new Map() // namespace -> Set of role names
+        };
+        
+        // First pass: collect all role names
+        for (const groupData of groupPrivileges) {
+            if (!groupData || !groupData.data) continue;
+            
+            // Collect cluster role names
+            const clusterRoleBindings = groupData.data.cluster_role_bindings || [];
+            for (const crb of clusterRoleBindings) {
+                if (!crb || !crb.role) continue;
+                const roleName = extractRoleName(crb.role, 'ClusterRole');
+                if (roleName) {
+                    rolesToFetch.cluster.add(roleName);
+                }
+            }
+            
+            // Collect namespaced role names
+            const roleBindings = groupData.data.role_bindings || [];
+            for (const rb of roleBindings) {
+                if (!rb || !rb.role || !rb.namespace) continue;
+                const roleName = extractRoleName(rb.role, 'Role');
+                if (roleName) {
+                    if (!rolesToFetch.namespaced.has(rb.namespace)) {
+                        rolesToFetch.namespaced.set(rb.namespace, new Set());
+                    }
+                    rolesToFetch.namespaced.get(rb.namespace).add(roleName);
+                }
+            }
+        }
+        
+        // Batch fetch all cluster roles in parallel
+        const clusterRolePromises = Array.from(rolesToFetch.cluster).map(roleName => 
+            fetchRoleRules(roleName).then(rules => ({ roleName, rules }))
+        );
+        const clusterRoleResults = await Promise.all(clusterRolePromises);
+        const clusterRoleMap = new Map();
+        clusterRoleResults.forEach(({ roleName, rules }) => {
+            if (rules) clusterRoleMap.set(roleName, rules);
+        });
+        
+        // Batch fetch all namespaced roles in parallel
+        const namespacedRolePromises = [];
+        for (const [namespace, roleNames] of rolesToFetch.namespaced.entries()) {
+            for (const roleName of roleNames) {
+                namespacedRolePromises.push(
+                    fetchRoleRules(roleName, namespace).then(rules => ({ namespace, roleName, rules }))
+                );
+            }
+        }
+        const namespacedRoleResults = await Promise.all(namespacedRolePromises);
+        const namespacedRoleMap = new Map();
+        namespacedRoleResults.forEach(({ namespace, roleName, rules }) => {
+            const key = `${namespace}:${roleName}`;
+            if (rules) namespacedRoleMap.set(key, rules);
+        });
+        
+        // Second pass: process bindings using cached rules
+        for (const groupData of groupPrivileges) {
+            if (!groupData || !groupData.data) continue;
+            
+            const groupName = groupData.data.group_name || 'Unknown Group';
+            
+            // Process cluster role bindings
+            const clusterRoleBindings = groupData.data.cluster_role_bindings || [];
+            for (const crb of clusterRoleBindings) {
+                if (!crb || !crb.role) continue;
+                const roleName = extractRoleName(crb.role, 'ClusterRole');
+                if (roleName) {
+                    const rules = clusterRoleMap.get(roleName);
+                    if (rules && Array.isArray(rules)) {
+                        rules.forEach(rule => {
+                            const ruleWithSource = { ...rule, _source: groupName, _sourceType: 'group' };
+                            processed.cluster_roles.push(ruleWithSource);
+                        });
+                    }
+                }
+            }
+            
+            // Process role bindings (namespaced)
+            const roleBindings = groupData.data.role_bindings || [];
+            for (const rb of roleBindings) {
+                if (!rb || !rb.role || !rb.namespace) continue;
+                const roleName = extractRoleName(rb.role, 'Role');
+                if (roleName) {
+                    const key = `${rb.namespace}:${roleName}`;
+                    const rules = namespacedRoleMap.get(key);
+                    if (rules && Array.isArray(rules)) {
+                        rules.forEach(rule => {
+                            const ruleWithSource = { ...rule, _source: groupName, _sourceType: 'group' };
+                            processed.roles.push({
+                                [rb.namespace]: ruleWithSource
+                            });
+                        });
+                    }
+                }
+            }
+        }
+        
+        console.log('Processed group privileges:', processed);
+        return processed;
+    }
+    
+    // Populate privileges table
+    async function populatePrivilegesTable(privilegesData, groupPrivileges = []) {
+        const tbody = document.getElementById('privileges-tbody');
+        const table = document.getElementById('dataTable');
+        
+        // Destroy any existing DataTable instance first (in case it was auto-initialized)
+        if (table && typeof $ !== 'undefined' && $.fn.DataTable && $.fn.DataTable.isDataTable(table)) {
+            console.log('Destroying existing DataTable before populating');
+            $(table).DataTable().destroy();
+        }
+        
+        // Show loading state while processing
+        tbody.innerHTML = `
+            <tr>
+                <td colspan="6" class="text-center">
+                    <div class="spinner-border spinner-border-sm text-primary" role="status">
+                        <span class="visually-hidden">Loading...</span>
+                    </div>
+                    <span class="ms-2">Processing privileges...</span>
+                </td>
+            </tr>
+        `;
+        
+        if (!privilegesData) {
+            tbody.innerHTML = '<tr><td colspan="6" class="text-center text-danger">Error: No privileges data</td></tr>';
+            return;
+        }
+        
+        // Mark user privileges with source information
+        let userClusterRoles = (privilegesData.user_cluster_roles || []).map(ucr => ({
+            ...ucr,
+            _source: 'User',
+            _sourceType: 'user'
+        }));
+        let userRoles = (privilegesData.user_roles || []).map(ur => {
+            if (typeof ur === 'object' && ur !== null) {
+                const result = {};
+                Object.entries(ur).forEach(([namespace, priv]) => {
+                    if (priv && typeof priv === 'object') {
+                        result[namespace] = {
+                            ...priv,
+                            _source: 'User',
+                            _sourceType: 'user'
+                        };
+                    }
+                });
+                return result;
+            }
+            return ur;
+        });
+        
+        // Process and merge group-based privileges
+        const groupPrivs = await processGroupPrivileges(groupPrivileges);
+        if (groupPrivs.cluster_roles.length > 0 || groupPrivs.roles.length > 0) {
+            console.log('Found group-based privileges:', {
+                cluster_roles: groupPrivs.cluster_roles.length,
+                roles: groupPrivs.roles.length
+            });
+            // Merge group privileges with user privileges
+            userClusterRoles = [...userClusterRoles, ...groupPrivs.cluster_roles];
+            userRoles = [...userRoles, ...groupPrivs.roles];
+        }
+        
+        console.log('Total cluster roles count:', userClusterRoles.length);
+        console.log('Total namespaced roles count:', userRoles.length);
+        console.log('Cluster roles:', userClusterRoles);
+        console.log('Namespaced roles:', userRoles);
+        
+        if (userClusterRoles.length === 0 && userRoles.length === 0) {
+            tbody.innerHTML = '<tr><td colspan="6" class="text-center text-muted">No privileges found. This user has no assigned cluster roles, namespaced roles, or group-based privileges.</td></tr>';
+            if ($.fn.DataTable && $(table).length) {
+                if ($.fn.DataTable.isDataTable(table)) {
+                    const savedRows = tbody.innerHTML;
+                    $(table).DataTable().destroy();
+                    tbody.innerHTML = savedRows;
+                }
+                $(table).DataTable({
+                    responsive: true,
+                    pageLength: 25,
+                    language: {
+                        emptyTable: "No privileges found. This user has no assigned cluster roles, namespaced roles, or group-based privileges."
+                    }
+                });
+            }
+            return;
+        }
+        
+        let rowsHtml = '';
+        
+        // Add cluster roles (namespace is "All")
+        userClusterRoles.forEach(ucr => {
+            // Handle both dict format (from API) and object format
+            const apiGroups = ucr.apiGroups || ucr.api_groups || [];
+            const resourceNames = ucr.resourceNames || ucr.resource_names || [];
+            const resources = ucr.resources || [];
+            const verbs = ucr.verbs || [];
+            
+            // Get source information
+            const source = ucr._source || 'User';
+            const sourceType = ucr._sourceType || 'user';
+            const sourceBadge = sourceType === 'group' 
+                ? `<span class="badge text-bg-info" title="From group: ${escapeHtml(source)}">Group: ${escapeHtml(source)}</span>`
+                : `<span class="badge text-bg-primary">User</span>`;
+            
+            rowsHtml += `
+                <tr>
+                    <td>${sourceBadge}</td>
+                    <td>All</td>
+                    <td>${formatArrayValue(apiGroups)}</td>
+                    <td>${formatArrayValue(resourceNames)}</td>
+                    <td>${formatArrayValue(resources)}</td>
+                    <td>${formatArrayValue(verbs)}</td>
+                </tr>
+            `;
+        });
+        
+        // Add namespaced roles
+        // user_roles can be an array of objects or an array of arrays
+        userRoles.forEach(ur => {
+            if (typeof ur === 'object' && ur !== null) {
+                // If it's an object with namespace keys
+                Object.entries(ur).forEach(([namespace, priv]) => {
+                    if (priv && typeof priv === 'object') {
+                        // Handle both dict format (from API) and object format
+                        const apiGroups = priv.apiGroups || priv.api_groups || [];
+                        const resourceNames = priv.resourceNames || priv.resource_names || [];
+                        const resources = priv.resources || [];
+                        const verbs = priv.verbs || [];
+                        
+                        // Get source information
+                        const source = priv._source || 'User';
+                        const sourceType = priv._sourceType || 'user';
+                        const sourceBadge = sourceType === 'group' 
+                            ? `<span class="badge text-bg-info" title="From group: ${escapeHtml(source)}">Group: ${escapeHtml(source)}</span>`
+                            : `<span class="badge text-bg-primary">User</span>`;
+                        
+                        rowsHtml += `
+                            <tr>
+                                <td>${sourceBadge}</td>
+                                <td>${escapeHtml(namespace)}</td>
+                                <td>${formatArrayValue(apiGroups)}</td>
+                                <td>${formatArrayValue(resourceNames)}</td>
+                                <td>${formatArrayValue(resources)}</td>
+                                <td>${formatArrayValue(verbs)}</td>
+                            </tr>
+                        `;
+                    }
+                });
+            }
+        });
+        
+        // Set innerHTML
+        tbody.innerHTML = rowsHtml;
+        
+        // Verify rows were added
+        const rowCount = tbody.querySelectorAll('tr').length;
+        console.log('Rows added to tbody:', rowCount);
+        
+        // Initialize or reinitialize DataTable
+        if ($.fn.DataTable && $(table).length) {
+            if ($.fn.DataTable.isDataTable(table)) {
+                // Save rows before destroying
+                const savedRows = tbody.innerHTML;
+                $(table).DataTable().destroy();
+                // Restore rows after destroying
+                tbody.innerHTML = savedRows;
+            }
+            
+            // Verify rows exist before initializing
+            const currentRowCount = tbody.querySelectorAll('tr').length;
+            console.log('Initializing DataTable with', currentRowCount, 'rows');
+            
+            if (currentRowCount === 0) {
+                console.warn('No rows found in tbody, skipping DataTable initialization');
+                return;
+            }
+            
+            // Small delay to ensure DOM is updated
+            setTimeout(() => {
+                const finalRowCount = tbody.querySelectorAll('tr').length;
+                if (finalRowCount > 0) {
+                    $(table).DataTable({
+                        responsive: true,
+                        pageLength: 25,
+                        language: {
+                            emptyTable: "No privileges found"
+                        }
+                    });
+                    console.log('DataTable initialized successfully');
+                } else {
+                    console.warn('Rows disappeared, DataTable not initialized');
+                }
+            }, 50);
+        }
+    }
+    
+    // Load user privileges using fetch() - following Flask fetch pattern
+    document.addEventListener('DOMContentLoaded', async function() {
+        // Wait for jQuery and DataTables
+        let retries = 0;
+        while ((typeof $ === 'undefined' || typeof $.fn.DataTable === 'undefined') && retries < 10) {
+            await new Promise(resolve => setTimeout(resolve, 100));
+            retries++;
+        }
+        
+        if (typeof $ === 'undefined' || typeof $.fn.DataTable === 'undefined') {
+            console.error('jQuery or DataTables not loaded');
+            return;
+        }
+        
+        // CRITICAL: Destroy any auto-initialized DataTable instance from datatables-demo.js
+        // This prevents initialization on the loading row with colspan
+        const table = document.getElementById('dataTable');
+        if (table) {
+            // Check if DataTable was auto-initialized on a loading row
+            if ($.fn.DataTable && $.fn.DataTable.isDataTable(table)) {
+                const tbody = table.querySelector('tbody');
+                if (tbody) {
+                    const rows = tbody.querySelectorAll('tr');
+                    const hasColspanRow = Array.from(rows).some(row => {
+                        const cells = row.querySelectorAll('td');
+                        return Array.from(cells).some(cell => cell.hasAttribute('colspan'));
+                    });
+                    if (hasColspanRow) {
+                        console.log('Destroying auto-initialized DataTable instance on loading row');
+                        $(table).DataTable().destroy();
+                    }
+                } else {
+                    // No tbody or empty, destroy anyway
+                    console.log('Destroying auto-initialized DataTable instance (no valid tbody)');
+                    $(table).DataTable().destroy();
+                }
+            }
+        }
+        
+        // Get username
+        const username = getUsername();
+        
+        if (!username) {
+            console.error('No username provided');
+            const tbody = document.getElementById('privileges-tbody');
+            const breadcrumb = document.getElementById('username-breadcrumb');
+            if (tbody) {
+                tbody.innerHTML = '<tr><td colspan="6" class="text-center text-danger">Error: Username not provided</td></tr>';
+            }
+            if (breadcrumb) {
+                breadcrumb.textContent = 'Error';
+            }
+            return;
+        }
+        
+        // Update breadcrumb
+        const breadcrumb = document.getElementById('username-breadcrumb');
+        if (breadcrumb) {
+            breadcrumb.textContent = username;
+        }
+        
+        try {
+            // Fetch user privileges (direct bindings)
+            const privileges_url = `/api/v1/users/${encodeURIComponent(username)}/privileges`;
+            console.log('Fetching user privileges from:', privileges_url);
+            
+            const response = await fetch(privileges_url);
+            
+            if (!response.ok) {
+                throw new Error(`HTTP error! status: ${response.status}`);
+            }
+            
+            const data = await response.json();
+            console.log('User privileges API response:', data);
+            
+            if (data.error) {
+                throw new Error(data.message || 'Failed to load privileges');
+            }
+            
+            // Fetch user details to get groups
+            const user_url = `/api/v1/users/${encodeURIComponent(username)}`;
+            console.log('Fetching user details from:', user_url);
+            
+            let userGroups = [];
+            try {
+                const userResponse = await fetch(user_url);
+                if (userResponse.ok) {
+                    const userData = await userResponse.json();
+                    // Check if user has groups in the response
+                    if (userData.data && userData.data.sso_groups) {
+                        userGroups = userData.data.sso_groups;
+                    }
+                }
+            } catch (err) {
+                console.warn('Could not fetch user details for groups:', err);
+            }
+            
+            // If no groups from user details, try to get from SSO groups endpoint
+            if (userGroups.length === 0) {
+                try {
+                    const groupsResponse = await fetch('/api/v1/users/sso/groups?include_members=true');
+                    if (groupsResponse.ok) {
+                        const groupsData = await groupsResponse.json();
+                        // Find groups that include this user
+                        if (groupsData.data) {
+                            userGroups = groupsData.data
+                                .filter(group => group.members && group.members.includes(username))
+                                .map(group => group.name);
+                        }
+                    }
+                } catch (err) {
+                    console.warn('Could not fetch SSO groups:', err);
+                }
+            }
+            
+            console.log('User groups:', userGroups);
+            
+            // Fetch group-based privileges
+            const groupPrivilegesPromises = userGroups.map(groupName => {
+                const groupPrivUrl = `/api/v1/users/groups/${encodeURIComponent(groupName)}/privileges`;
+                console.log('Fetching group privileges from:', groupPrivUrl);
+                return fetch(groupPrivUrl)
+                    .then(res => res.ok ? res.json() : null)
+                    .catch(err => {
+                        console.warn(`Error fetching privileges for group ${groupName}:`, err);
+                        return null;
+                    });
+            });
+            
+            const groupPrivileges = await Promise.all(groupPrivilegesPromises);
+            const validGroupPrivileges = groupPrivileges.filter(p => p !== null);
+            console.log('Group privileges:', validGroupPrivileges);
+            
+            // Populate table with combined privileges
+            await populatePrivilegesTable(data.data, validGroupPrivileges);
+            
+        } catch (error) {
+            console.error('Error loading user privileges:', error);
+            const tbody = document.getElementById('privileges-tbody');
+            if (tbody) {
+                tbody.innerHTML = '<tr><td colspan="6" class="text-center text-danger">Error loading privileges: ' + escapeHtml(error.message) + '</td></tr>';
+                
+                // Initialize DataTable even with error
+                const table = document.getElementById('dataTable');
+                if ($.fn.DataTable && $(table).length && !$.fn.DataTable.isDataTable(table)) {
+                    $(table).DataTable({
+                        responsive: true,
+                        pageLength: 25
+                    });
+                }
+            }
+        }
+    });
+</script>
 {% endblock %}

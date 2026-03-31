@@ -7,36 +7,32 @@
         <ol class="breadcrumb my-0">
           <li class="breadcrumb-item"><span>Workloads</span></li>
           <li class="breadcrumb-item"><a href="/workload/pods">Pod</a></li>
-          <li class="breadcrumb-item active"><span>{{ pod_data.name }}</span></li>
+          <li class="breadcrumb-item active"><span id="pod-name-breadcrumb">Loading...</span></li>
         </ol>
       </nav>
     </div>
 </ul>
 <ul class="header-nav ms-auto"></ul>
 <ul class="header-nav d-lg-flex">
-{% if pod_data.init_containers or pod_data.containers %}
-    <div class="container-fluid d-flex justify-content-end py-2 px-2">
-        <form action="/workload/pods/exec" method="POST" class="form-post">
+    <div id="pod-actions-container" class="container-fluid d-flex justify-content-end py-2 px-2" style="display: none;">
+        <form id="pod-exec-form" action="/workload/pods/exec" method="POST" class="form-post me-2">
             <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
-            <input type="hidden" name="ns_select" value="{{ session['ns_select'] }}" />
-            <input type="hidden" name="po_name" value="{{ po_name }}" />
-            <a class="card-link float-right pr-1" data-bs-toggle="collapse" href="javascript:;" onclick="parentNode.submit();">
+            <input type="hidden" name="ns_select" id="pod-exec-namespace" />
+            <input type="hidden" name="po_name" id="pod-exec-name" />
+            <a class="card-link" data-bs-toggle="collapse" href="javascript:;" onclick="document.getElementById('pod-exec-form').submit();">
                 <i class="material-icons">input</i>
             </a>
         </form>
-    </div>
-    <div class="container-fluid d-flex justify-content-end py-2 px-2">
-        <form action="/workload/pods/logs" method="POST" class="form-post">
+        <form id="pod-logs-form" action="/workload/pods/logs" method="POST" class="form-post">
             <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
-            <input type="hidden" name="ns_select" value="{{ session['ns_select'] }}" />
-            <input type="hidden" name="po_name" value="{{ po_name }}" />
-            <a class="card-link float-right pr-1" data-bs-toggle="collapse" href="javascript:;" onclick="parentNode.submit();">
+            <input type="hidden" name="ns_select" id="pod-logs-namespace" />
+            <input type="hidden" name="po_name" id="pod-logs-name" />
+            <a class="card-link" data-bs-toggle="collapse" href="javascript:;" onclick="document.getElementById('pod-logs-form').submit();">
                 <i class="material-icons">list</i>
             </a>
         </form>
     </div>
-{% endif %}
-{% include "segments/topmenu.html.j2" %}
+{% include "segments/partials/topmenu.html.j2" %}
 {% endblock %}
 
 {% block content %}
@@ -61,6 +57,9 @@
             <li class="nav-item">
                 <a class="nav-link" id="nav-resources-tab" data-bs-toggle="tab" href="#nav-resources" role="tab" aria-controls="nav-resources" aria-selected="false" data-bs-toggle="tab">Related Resources</a>
             </li>
+            <li class="nav-item">
+                <a class="nav-link" id="nav-events-tab" data-bs-toggle="tab" href="#nav-events" role="tab" aria-controls="nav-events" aria-selected="false" data-bs-toggle="tab">Events</a>
+            </li>
         </ul>
         <div class="tab-content" id="nav-tabContent">
             <!-- pod -->
@@ -71,114 +70,58 @@
                             <table class="table table-bordered" id="podInfoTable" width="100%" cellspacing="0">
                                 <tr>
                                     <th>Namespace:</th>
-                                    <td>{{ pod_data.namespace }}</td>
+                                    <td id="pod-namespace">Loading...</td>
                                 </tr>
                                 <tr>
                                     <th>Name:</th>
-                                    <td>{{ pod_data.name }}</td>
+                                    <td id="pod-name">Loading...</td>
                                 </tr>
                                 <tr>
                                     <th>Status:</th>
-                                    <td>
-                                    {% if pod_data.status == "Running" %} 
-                                    <span class="badge text-bg-success">{{ pod_data.status }}</span>
-                                    {% elif pod_data.status == "Pending" %}
-                                    <span class="badge text-bg-warning">{{ pod_data.status }}</span>
-                                    {% elif pod_data.status == "Succeeded" %}
-                                    <span class="badge text-bg-secondary">{{ pod_data.status }}</span>
-                                    {% elif pod_data.status == "Terminated" or pod_data.status == "CrashLoopBackOff" %}
-                                    <span class="badge text-bg-danger">{{ pod_data.status }}</span>
-                                    {% else %}
-                                    <span class="badge text-bg-secondary">{{ pod_data.status }}</span>
-                                    {% endif %}
-                                    </td>
+                                    <td id="pod-status">Loading...</td>
                                 </tr>
                                 <tr>
                                     <th>Restarts:</th>
-                                    <td>{{ pod_data.restarts }}</td>
+                                    <td id="pod-restarts">Loading...</td>
                                 </tr>
                                 <tr>
                                     <th>Created:</th>
-                                    <td>{{ pod_data.created }}</td>
+                                    <td id="pod-created">Loading...</td>
                                 </tr>
                                 <tr>
                                     <th>Node:</th>
-                                    <td>
-                                        <form action="/cluster/node" method="POST">
-                                            <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
-                                            <input type="hidden" name="ns_select" value="{{ pod_data.namespace }}" />
-                                            <input type="hidden" name="selected" value="{{ pod_data.node }}" />
-                                            <a href="javascript:;" onclick="parentNode.submit();">{{ pod_data.node }}</a>
-                                        </form>
-                                    </td>
+                                    <td id="pod-node">Loading...</td>
                                 </tr>
                                 <tr>
                                     <th>Owner:</th>
-                                    <td>
-                                        <form action="/workload/{{ pod_data.owner.split('/')[0] }}" method="POST">
-                                            <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
-                                            <input type="hidden" name="ns_select" value="{{ pod_data.namespace }}" />
-                                            <input type="hidden" name="selected" value="{{ pod_data.owner.split('/')[1] }}" />
-                                            <a href="javascript:;" onclick="parentNode.submit();">{{ pod_data.owner }}</a>
-                                        </form>
-                                    </td>
+                                    <td id="pod-owner">Loading...</td>
                                 </tr>
                                 <tr>
                                     <th>Priority:</th>
-                                    <td>{{ pod_data.priority }}</td>
+                                    <td id="pod-priority">Loading...</td>
                                 </tr>
                                 <tr>
                                     <th>Priority Class:</th>
-                                    <td>{{ pod_data.priority_class_name }}</td>
+                                    <td id="pod-priority-class">Loading...</td>
                                 </tr>
                                 <tr>
-                                    <th>Runetime Class:</th>
-                                    <td>{{ pod_data.runtime_class_name }}</td>
+                                    <th>Runtime Class:</th>
+                                    <td id="pod-runtime-class">Loading...</td>
                                 </tr>
                                 <tr>
                                     <th>Annotations:</th>
-                                    <td>
-                                        {% if pod_data.annotations %}
-                                        <table class="table table-bordered" id="annotationTable" width="100%" cellspacing="0">
-                                            <thead>
-                                                <tr>
-                                                    <th width="50%">Key</th>
-                                                    <th width="50%">Value</th>
-                                                </tr>
-                                            </thead>
-                                            <tbody>
-                                            {% for key, value in pod_data.annotations.items() %}
-                                                <tr>
-                                                    <td width="50%">{{ key }}</td>
-                                                    <td width="50%">{{ value }}</td>
-                                                </tr>
-                                            {% endfor %}
-                                            </tbody>
-                                        </table>
-                                        {% endif %}
+                                    <td id="pod-annotations-container">
+                                        <div class="spinner-border spinner-border-sm text-primary" role="status">
+                                            <span class="visually-hidden">Loading...</span>
+                                        </div>
                                     </td>
                                 </tr>
                                <tr>
-                                    <th>Lables:</th>
-                                    <td>
-                                        {% if pod_data.labels %}
-                                        <table class="table table-bordered" id="labelsTable" width="100%" cellspacing="0">
-                                            <thead>
-                                                <tr>
-                                                    <th width="50%">Key</th>
-                                                    <th width="50%">Value</th>
-                                                </tr>
-                                            </thead>
-                                            <tbody>
-                                            {% for key, value in pod_data.labels.items() %}
-                                                <tr>
-                                                    <td width="50%">{{ key }}</td>
-                                                    <td width="50%">{{ value }}</td>
-                                                </tr>
-                                            {% endfor %}
-                                            </tbody>
-                                        </table>
-                                        {% endif %}
+                                    <th>Labels:</th>
+                                    <td id="pod-labels-container">
+                                        <div class="spinner-border spinner-border-sm text-primary" role="status">
+                                            <span class="visually-hidden">Loading...</span>
+                                        </div>
                                     </td>
                                 </tr>
                             </table>
@@ -191,72 +134,49 @@
                 <div id="accordion">
                     <div class="card shadow mb-4">
                         <div class="card-body">
-                            {% if pod_data.init_containers %}
+                            <div id="init-containers-section" style="display: none;">
                             <h3>Init Containers</h3>
-                            
                             <div class="table-responsive">
                                 <table class="table table-bordered" id="initContainersTable" width="100%" cellspacing="0">
                                     <thead>
                                         <tr>
-                                            {% if has_report %}
-                                            <th style="width:5%"></th>
-                                            {% endif %}
                                             <th>State</th>
                                             <th>Name</th>
                                             <th>Image</th>
                                             <th>Restarts</th>
                                         </tr>
                                     </thead>
-                                    <tbody>
-                                        {% for ic in pod_data.init_containers %}
-                                        <tr>
-                                            {% if ic.ready == "Completed" %}
-                                            <td><span class="badge text-bg-secondary">{{ ic.ready }}</span></td>
-                                            {% elif ic.ready == "ImagePullBackOff" or ic.ready == "ErrImagePull" or ic.ready == "Error" or ic.ready == "CrashLoopBackOff" %}
-                                            <td><span class="badge text-bg-danger">{{ ic.ready }}</span></td>
-                                            {% else %}
-                                            <td><span class="badge text-bg-secondary">{{ ic.ready }}</span></td>
-                                            {% endif %}
-                                            <td>{{ ic.name }}</td>
-                                            <td>{{ ic.image }}</td>
-                                            <td>{{ ic.restarts }}</td>
+                                        <tbody id="init-containers-tbody">
+                                            <tr>
+                                                <td colspan="4" class="text-center">
+                                                    <div class="spinner-border spinner-border-sm text-primary" role="status">
+                                                        <span class="visually-hidden">Loading...</span>
+                                                    </div>
+                                                </td>
                                         </tr>
-                                        {% endfor %}
                                     </tbody>
                                 </table>
+                                </div>
                             </div>
-                            {% endif %}
                             <h3>Containers</h3>
                             <div class="table-responsive">
                                 <table class="table table-bordered" id="containersTable" width="100%" cellspacing="0">
                                     <thead>
                                         <tr>
-                                            {% if has_report %}
-                                            <th style="width:5%"></th>
-                                            {% endif %}
                                             <th>State</th>
                                             <th>Name</th>
                                             <th>Image</th>
                                             <th>Restarts</th>
                                         </tr>
                                     </thead>
-                                    <tbody>
-                                        {% for c in pod_data.containers %}
+                                    <tbody id="containers-tbody">
                                         <tr>
-                                            {% if c.ready == "Running"%}
-                                            <td><span class="badge text-bg-success">{{ c.ready }}</span></td>
-                                            {% elif c.ready == "ImagePullBackOff" or c.ready == "ErrImagePull" or c.ready == "Error" or c.ready == "CrashLoopBackOff" %}
-                                            <td><span class="badge text-bg-danger">{{ c.ready }}</span></td>
-                                            {% elif c.ready == "PodInitializing"%}
-                                            <td><span class="badge text-bg-info">{{ c.ready }}</span></td>
-                                            {% else %}
-                                            <td><span class="badge text-bg-secondary">{{ c.ready }}</span></td>
-                                            {% endif %}
-                                            <td>{{ c.name }}</td>
-                                            <td>{{ c.image }}</td>
-                                            <td>{{ c.restarts }}</td>
+                                            <td colspan="4" class="text-center">
+                                                <div class="spinner-border spinner-border-sm text-primary" role="status">
+                                                    <span class="visually-hidden">Loading...</span>
+                                                </div>
+                                            </td>
                                         </tr>
-                                        {% endfor %}
                                     </tbody>
                                 </table>
                             </div>
@@ -381,16 +301,15 @@
                                         <th>State</th>
                                     </tr>
                                 </thead>
-                            {% for dict_item in pod_data.conditions %}
-                            <tbody>
-                                    {% for key, value in dict_item.items() %}
+                                <tbody id="conditions-tbody">
                                     <tr>
-                                        <td>{{ key }}</td>
-                                        <td>{{ value }}</td>
+                                        <td colspan="2" class="text-center">
+                                            <div class="spinner-border spinner-border-sm text-primary" role="status">
+                                                <span class="visually-hidden">Loading...</span>
+                                            </div>
+                                        </td>
                                     </tr>
-                                    {% endfor%}
                                 </tbody>
-                                {% endfor %}
                             </table>
                         </div>
                     </div>
@@ -402,20 +321,20 @@
                     <div class="card-body">
                         <div class="table-responsive">
                             <table class="table table-bordered" id="securityTable" width="100%" cellspacing="0">
-                                <!-- {{ pod_data.security_context }} -->
                                 <thead>
                                     <tr>
                                     <th>Context</th>
                                     <th>State</th>
                                     </tr>
                                 </thead>
-                                <tbody>
-                                {% for item in pod_data.security_context.items() %}
+                                <tbody id="security-tbody">
                                     <tr>
-                                        <td>{{ item[0] }}</td>
-                                        <td>{{ item[1] }}</td>
+                                        <td colspan="2" class="text-center">
+                                            <div class="spinner-border spinner-border-sm text-primary" role="status">
+                                                <span class="visually-hidden">Loading...</span>
+                                            </div>
+                                        </td>
                                     </tr>
-                                {% endfor%}
                                 </tbody>
                             </table>
                         </div>
@@ -426,26 +345,23 @@
             <div class="tab-pane fade" id="nav-resources" role="tabpanel" aria-labelledby="nav-resources-tab">
                 <div class="card shadow mb-4">
                     <div class="card-body">
-                        <h3>Refered By</h3>
+                        <h3>Referred By</h3>
                         <div class="table-responsive">
                             <table class="table table-bordered" id="resourcesTable" width="100%" cellspacing="0">
                                 <thead>
+                                    <tr>
                                     <th>Type</th>
                                     <th>Name</th>
                                     <th>Namespace</th>
+                                    </tr>
                                 </thead>
-                                <tbody>
+                                <tbody id="referred-by-tbody">
                                     <tr>
-                                        <td>{{ pod_data.owner.split("/")[0] }}</td>
-                                        <td>
-                                            <form action="/workload/{{ pod_data.owner.split('/')[0] }}" method="POST">
-                                                <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
-                                                <input type="hidden" name="ns_select" value="{{ pod_data.namespace }}" />
-                                                <input type="hidden" name="selected" value="{{ pod_data.owner.split('/')[-1] }}" />
-                                                <a href="javascript:;" onclick="parentNode.submit();">{{ pod_data.owner.split("/")[-1] }}</a>
-                                            </form>
+                                        <td colspan="3" class="text-center">
+                                            <div class="spinner-border spinner-border-sm text-primary" role="status">
+                                                <span class="visually-hidden">Loading...</span>
+                                            </div>
                                         </td>
-                                        <td>{{ pod_data.namespace }}</td>
                                     </tr>
                                 </tbody>
                             </table>
@@ -453,93 +369,52 @@
                         <h3>Refers To</h3>
                         <div class="table-responsive">
                             <table class="table table-bordered" id="refersTable" width="100%" cellspacing="0">
-                                <!-- service account, secret, configmap, volume-->
                                 <thead>
+                                    <tr>
                                     <th>Type</th>
                                     <th>Name</th>
                                     <th>Namespace</th>
+                                    </tr>
                                 </thead>
-                                <tbody>
-                                {% if pod_data.image_pull_secrets %}
-                                    {% for dict_item in pod_data.image_pull_secrets %}
-                                    {% for key, value in dict_item.items() %}
+                                <tbody id="refers-to-tbody">
                                     <tr>
-                                        <td>ImagePullSecret</td>
-                                        <td>
-                                            <form action="/security/secret" method="POST">
-                                                <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
-                                                <input type="hidden" name="ns_select" value="{{ pod_data.namespace }}" />
-                                                <input type="hidden" name="selected" value="{{ value }}" />
-                                                <a href="javascript:;" onclick="parentNode.submit();">{{ value }}</a>
-                                            </form>
+                                        <td colspan="3" class="text-center">
+                                            <div class="spinner-border spinner-border-sm text-primary" role="status">
+                                                <span class="visually-hidden">Loading...</span>
+                                            </div>
                                         </td>
-                                        <td>{{ pod_data.namespace }}</td>
                                     </tr>
-                                    {% endfor %}
-                                    {% endfor %}
-                                {% endif %}
-                                {% if pod_data.service_account %}
+                                </tbody>
+                            </table>
+                        </div>
+                    </div>
+                </div>
+            </div>
+            <!-- events -->
+            <div class="tab-pane fade" id="nav-events" role="tabpanel" aria-labelledby="nav-events-tab">
+                <div class="card shadow mb-4">
+                    <div class="card-body">
+                        <div class="table-responsive">
+                            <table class="table table-bordered" id="eventsTable" width="100%" cellspacing="0">
+                                <thead>
                                     <tr>
-                                        <td>ServiceAccount</td>
-                                        <td>
-                                            <form action="/cluster-permission/service-account" method="POST">
-                                                <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
-                                                <input type="hidden" name="ns_select" value="{{ pod_data.namespace }}" />
-                                                <input type="hidden" name="selected" value="{{ pod_data.service_account }}" />
-                                                <a href="javascript:;" onclick="parentNode.submit();">{{ pod_data.service_account }}</a>
-                                            </form>
-                                        </td>
-                                        <td>{{ pod_data.namespace }}</td>
+                                        <th>Type</th>
+                                        <th>Reason</th>
+                                        <th>Message</th>
+                                        <th>Count</th>
+                                        <th>First Seen</th>
+                                        <th>Last Seen</th>
+                                        <th>Source</th>
                                     </tr>
-                                {% endif %}
-                                {% if pod_data.secrets %}
-                                    {% for secret in pod_data.secrets %}
+                                </thead>
+                                <tbody id="events-tbody">
                                     <tr>
-                                        <td>Secret</td>
-                                        <td>
-                                            <form action="/security/secret" method="POST">
-                                                <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
-                                                <input type="hidden" name="ns_select" value="{{ pod_data.namespace }}" />
-                                                <input type="hidden" name="selected" value="{{ secret }}" />
-                                                <a href="javascript:;" onclick="parentNode.submit();">{{ secret }}</a>
-                                            </form>
+                                        <td colspan="7" class="text-center">
+                                            <div class="spinner-border spinner-border-sm text-primary" role="status">
+                                                <span class="visually-hidden">Loading...</span>
+                                            </div>
                                         </td>
-                                        <td>{{ pod_data.namespace }}</td>
                                     </tr>
-                                    {% endfor %}
-                                {% endif %}
-                                {% if pod_data.cm %}
-                                    {% for cm in pod_data.cm %}
-                                    <tr>
-                                        <td>Configmap</td>
-                                        <td>
-                                            <form action="/storage/configmap" method="POST">
-                                                <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
-                                                <input type="hidden" name="ns_select" value="{{ pod_data.namespace }}" />
-                                                <input type="hidden" name="selected" value="{{ cm }}" />
-                                                <a href="javascript:;" onclick="parentNode.submit();">{{ cm }}</a>
-                                            </form>
-                                        </td>
-                                        <td>{{ pod_data.namespace }}</td>
-                                    </tr>
-                                    {% endfor %}
-                                {% endif %}
-                                {% if pod_data.pvc %}
-                                    {% for pvc in pod_data.pvc %}
-                                    <tr>
-                                        <td>PeristentVolumeClame</td>
-                                        <td>
-                                            <form action="/storage/pvc" method="POST">
-                                                <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
-                                                <input type="hidden" name="ns_select" value="{{ pod_data.namespace }}" />
-                                                <input type="hidden" name="selected" value="{{ pvc }}" />
-                                                <a href="javascript:;" onclick="parentNode.submit();">{{ pvc }}</a>
-                                            </form>
-                                        </td>
-                                        <td>{{ pod_data.namespace }}</td>
-                                    </tr>
-                                    {% endfor %}
-                                {% endif %}
                                 </tbody>
                             </table>
                         </div>
@@ -553,28 +428,565 @@
 {% endblock %}
 
 {% block add_head_css %}
-{% include "segments/datatable_snippet.html.j2" %}
+{% include "segments/components/datatable_snippet.html.j2" %}
 {% endblock %}
 
 {% block add_tail_js %}
-    {% for c in pod_data.containers %}
-    <script>
-        $(document).ready(function () {
-            $('#vulnTable{{ c.name }}').DataTable({
-               responsive: true,
-               order: [[1, 'asc']],
+    <script nonce="{{ csp_nonce }}">
+    const escapeHtml = (text) => {
+        if (text === null || text === undefined) return '';
+        const map = {
+            '&': '&amp;',
+            '<': '&lt;',
+            '>': '&gt;',
+            '"': '&quot;',
+            "'": '&#039;'
+        };
+        return String(text).replace(/[&<>"']/g, m => map[m]);
+    };
+    
+    const csrf_token = {{ csrf_token()|tojson }};
+    
+    // Get pod name and namespace from URL, sessionStorage, or form
+    function getPodInfo() {
+        const urlParams = new URLSearchParams(window.location.search);
+        let podName = urlParams.get('po_name');
+        let namespace = urlParams.get('namespace');
+        
+        if (!podName) {
+            podName = sessionStorage.getItem('pod_data_name');
+        }
+        if (!namespace) {
+            namespace = sessionStorage.getItem('pod_data_namespace');
+        }
+        
+        // Fallback to topbar selector
+        if (!namespace) {
+            const topbarSelect = document.getElementById('inputGroupSelect04');
+            if (topbarSelect) {
+                namespace = topbarSelect.value;
+            }
+        }
+        
+        // Final fallback
+        if (!namespace) {
+            namespace = sessionStorage.getItem('ns_select') || 'default';
+        }
+        
+        return { podName, namespace };
+    }
+    
+    function populatePodData(podData) {
+        const { podName, namespace } = getPodInfo();
+        
+        // Update breadcrumb
+        const breadcrumb = document.getElementById('pod-name-breadcrumb');
+        if (breadcrumb) {
+            breadcrumb.textContent = podData.name || podName || 'Pod';
+        }
+        
+        // Update pod info table
+        document.getElementById('pod-namespace').textContent = escapeHtml(podData.namespace || namespace || '');
+        document.getElementById('pod-name').textContent = escapeHtml(podData.name || '');
+        
+        // Status badge
+        const status = podData.status || 'Unknown';
+        let statusBadge = '';
+        if (status === 'Running') {
+            statusBadge = '<span class="badge text-bg-success">' + escapeHtml(status) + '</span>';
+        } else if (status === 'Pending') {
+            statusBadge = '<span class="badge text-bg-warning">' + escapeHtml(status) + '</span>';
+        } else if (status === 'Succeeded') {
+            statusBadge = '<span class="badge text-bg-secondary">' + escapeHtml(status) + '</span>';
+        } else if (status === 'Terminated' || status === 'CrashLoopBackOff') {
+            statusBadge = '<span class="badge text-bg-danger">' + escapeHtml(status) + '</span>';
+        } else {
+            statusBadge = '<span class="badge text-bg-secondary">' + escapeHtml(status) + '</span>';
+        }
+        document.getElementById('pod-status').innerHTML = statusBadge;
+        
+        document.getElementById('pod-restarts').textContent = podData.restarts || '0';
+        document.getElementById('pod-created').textContent = escapeHtml(podData.created || '');
+        
+        // Node link - Use data attributes to prevent XSS
+        const node = podData.node || '';
+        if (node) {
+            const safeNode = escapeHtml(node);
+            document.getElementById('pod-node').innerHTML = `
+                <form action="/cluster/node" method="POST" data-node-name="${safeNode}" onsubmit="sessionStorage.setItem('node_data_name', this.dataset.nodeName); return true;">
+                    <input type="hidden" name="csrf_token" value="${escapeHtml(csrf_token)}">
+                    <input type="hidden" name="selected" value="${safeNode}" />
+                    <a href="javascript:;" onclick="parentNode.submit();">${safeNode}</a>
+                </form>
+            `;
+        } else {
+            document.getElementById('pod-node').textContent = '-';
+        }
+        
+        // Owner link - Use data attributes to prevent XSS
+        const owner = podData.owner || '';
+        if (owner) {
+            const ownerParts = owner.split('/');
+            if (ownerParts.length >= 2) {
+                const ownerKind = escapeHtml(ownerParts[0].toLowerCase());
+                const ownerName = escapeHtml(ownerParts[1]);
+                const safeNamespace = escapeHtml(podData.namespace || namespace || '');
+                document.getElementById('pod-owner').innerHTML = `
+                    <form action="/workload/${ownerKind}" method="POST" data-namespace="${safeNamespace}" onsubmit="sessionStorage.setItem('ns_select', this.dataset.namespace); return true;">
+                        <input type="hidden" name="csrf_token" value="${escapeHtml(csrf_token)}">
+                        <input type="hidden" name="ns_select" value="${safeNamespace}" />
+                        <input type="hidden" name="selected" value="${ownerName}" />
+                        <a href="javascript:;" onclick="parentNode.submit();">${escapeHtml(owner)}</a>
+                    </form>
+                `;
+            } else {
+                document.getElementById('pod-owner').textContent = escapeHtml(owner);
+            }
+        } else {
+            document.getElementById('pod-owner').textContent = '-';
+        }
+        
+        document.getElementById('pod-priority').textContent = escapeHtml(podData.priority || '-');
+        document.getElementById('pod-priority-class').textContent = escapeHtml(podData.priority_class_name || '-');
+        document.getElementById('pod-runtime-class').textContent = escapeHtml(podData.runtime_class_name || '-');
+        
+        // Annotations
+        const annotationsContainer = document.getElementById('pod-annotations-container');
+        if (podData.annotations && Object.keys(podData.annotations).length > 0) {
+            annotationsContainer.innerHTML = `
+                <table class="table table-bordered" id="annotationTable" width="100%" cellspacing="0">
+                    <thead>
+                        <tr>
+                            <th width="50%">Key</th>
+                            <th width="50%">Value</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        ${Object.entries(podData.annotations).map(([key, value]) => `
+                            <tr>
+                                <td width="50%">${escapeHtml(key)}</td>
+                                <td width="50%">${escapeHtml(value)}</td>
+                            </tr>
+                        `).join('')}
+                    </tbody>
+                </table>
+            `;
+        } else {
+            annotationsContainer.innerHTML = '<span class="text-muted">No annotations</span>';
+        }
+        
+        // Labels
+        const labelsContainer = document.getElementById('pod-labels-container');
+        if (podData.labels && Object.keys(podData.labels).length > 0) {
+            labelsContainer.innerHTML = `
+                <table class="table table-bordered" id="labelsTable" width="100%" cellspacing="0">
+                    <thead>
+                        <tr>
+                            <th width="50%">Key</th>
+                            <th width="50%">Value</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        ${Object.entries(podData.labels).map(([key, value]) => `
+                            <tr>
+                                <td width="50%">${escapeHtml(key)}</td>
+                                <td width="50%">${escapeHtml(value)}</td>
+                            </tr>
+                        `).join('')}
+                    </tbody>
+                </table>
+            `;
+        } else {
+            labelsContainer.innerHTML = '<span class="text-muted">No labels</span>';
+        }
+        
+        // Show/hide actions based on containers
+        const actionsContainer = document.getElementById('pod-actions-container');
+        if (podData.init_containers && podData.init_containers.length > 0 || podData.containers && podData.containers.length > 0) {
+            if (actionsContainer) {
+                actionsContainer.style.display = 'block';
+                document.getElementById('pod-exec-name').value = podData.name || podName || '';
+                document.getElementById('pod-exec-namespace').value = podData.namespace || namespace || '';
+                document.getElementById('pod-logs-name').value = podData.name || podName || '';
+                document.getElementById('pod-logs-namespace').value = podData.namespace || namespace || '';
+            }
+        }
+        
+        // Populate containers
+        populateContainers(podData);
+        
+        // Populate conditions
+        populateConditions(podData.conditions || []);
+        
+        // Populate security contexts
+        populateSecurityContext(podData.security_context || {});
+        
+        // Populate related resources
+        populateRelatedResources(podData, namespace);
+        
+        // Load events
+        loadPodEvents(podData.name || podName, podData.namespace || namespace);
+    }
+    
+    function populateContainers(podData) {
+        // Init containers
+        const initContainersSection = document.getElementById('init-containers-section');
+        const initContainersTbody = document.getElementById('init-containers-tbody');
+        
+        if (podData.init_containers && podData.init_containers.length > 0) {
+            initContainersSection.style.display = 'block';
+            initContainersTbody.innerHTML = podData.init_containers.map(ic => {
+                const ready = ic.ready || 'Unknown';
+                let statusBadge = '';
+                if (ready === 'Completed') {
+                    statusBadge = '<span class="badge text-bg-secondary">' + escapeHtml(ready) + '</span>';
+                } else if (ready === 'ImagePullBackOff' || ready === 'ErrImagePull' || ready === 'Error' || ready === 'CrashLoopBackOff') {
+                    statusBadge = '<span class="badge text-bg-danger">' + escapeHtml(ready) + '</span>';
+                } else {
+                    statusBadge = '<span class="badge text-bg-secondary">' + escapeHtml(ready) + '</span>';
+                }
+                return `
+                    <tr>
+                        <td>${statusBadge}</td>
+                        <td>${escapeHtml(ic.name || '')}</td>
+                        <td>${escapeHtml(ic.image || '')}</td>
+                        <td>${escapeHtml(ic.restarts || '0')}</td>
+                    </tr>
+                `;
+            }).join('');
+        } else {
+            initContainersSection.style.display = 'none';
+            initContainersTbody.innerHTML = '';
+        }
+        
+        // Containers
+        const containersTbody = document.getElementById('containers-tbody');
+        if (podData.containers && podData.containers.length > 0) {
+            containersTbody.innerHTML = podData.containers.map(c => {
+                const ready = c.ready || 'Unknown';
+                let statusBadge = '';
+                if (ready === 'Running') {
+                    statusBadge = '<span class="badge text-bg-success">' + escapeHtml(ready) + '</span>';
+                } else if (ready === 'ImagePullBackOff' || ready === 'ErrImagePull' || ready === 'Error' || ready === 'CrashLoopBackOff') {
+                    statusBadge = '<span class="badge text-bg-danger">' + escapeHtml(ready) + '</span>';
+                } else if (ready === 'PodInitializing') {
+                    statusBadge = '<span class="badge text-bg-info">' + escapeHtml(ready) + '</span>';
+                } else {
+                    statusBadge = '<span class="badge text-bg-secondary">' + escapeHtml(ready) + '</span>';
+                }
+                return `
+                    <tr>
+                        <td>${statusBadge}</td>
+                        <td>${escapeHtml(c.name || '')}</td>
+                        <td>${escapeHtml(c.image || '')}</td>
+                        <td>${escapeHtml(c.restarts || '0')}</td>
+                    </tr>
+                `;
+            }).join('');
+        } else {
+            containersTbody.innerHTML = '<tr><td colspan="4" class="text-center text-muted">No containers found</td></tr>';
+        }
+    }
+    
+    function populateConditions(conditions) {
+        const tbody = document.getElementById('conditions-tbody');
+        if (conditions && conditions.length > 0) {
+            tbody.innerHTML = conditions.map(cond => {
+                return Object.entries(cond).map(([key, value]) => `
+                    <tr>
+                        <td>${escapeHtml(key)}</td>
+                        <td>${escapeHtml(value)}</td>
+                    </tr>
+                `).join('');
+            }).join('');
+        } else {
+            tbody.innerHTML = '<tr><td colspan="2" class="text-center text-muted">No conditions found</td></tr>';
+        }
+    }
+    
+    function populateSecurityContext(securityContext) {
+        const tbody = document.getElementById('security-tbody');
+        if (securityContext && Object.keys(securityContext).length > 0) {
+            tbody.innerHTML = Object.entries(securityContext).map(([key, value]) => {
+                const valueStr = typeof value === 'object' ? JSON.stringify(value) : String(value);
+                return `
+                    <tr>
+                        <td>${escapeHtml(key)}</td>
+                        <td>${escapeHtml(valueStr)}</td>
+                    </tr>
+                `;
+            }).join('');
+        } else {
+            tbody.innerHTML = '<tr><td colspan="2" class="text-center text-muted">No security context found</td></tr>';
+        }
+    }
+    
+    function populateRelatedResources(podData, namespace) {
+        const ns = podData.namespace || namespace || '';
+        
+        // Referred By (owner)
+        const referredByTbody = document.getElementById('referred-by-tbody');
+        if (podData.owner) {
+            const ownerParts = podData.owner.split('/');
+            if (ownerParts.length >= 2) {
+                const ownerKind = ownerParts[0].toLowerCase();
+                const ownerName = escapeHtml(ownerParts[1]);
+                const safeNs = escapeHtml(ns);
+                referredByTbody.innerHTML = `
+                    <tr>
+                        <td>${escapeHtml(ownerParts[0])}</td>
+                        <td>
+                            <form action="/workload/${ownerKind}" method="POST" data-namespace="${safeNs}" onsubmit="sessionStorage.setItem('ns_select', this.dataset.namespace); return true;">
+                                <input type="hidden" name="csrf_token" value="${escapeHtml(csrf_token)}">
+                                <input type="hidden" name="ns_select" value="${safeNs}" />
+                                <input type="hidden" name="selected" value="${ownerName}" />
+                                <a href="javascript:;" onclick="parentNode.submit();">${ownerName}</a>
+                            </form>
+                        </td>
+                        <td>${safeNs}</td>
+                    </tr>
+                `;
+            } else {
+                referredByTbody.innerHTML = '<tr><td colspan="3" class="text-center text-muted">No owner found</td></tr>';
+            }
+        } else {
+            referredByTbody.innerHTML = '<tr><td colspan="3" class="text-center text-muted">No owner found</td></tr>';
+        }
+        
+        // Refers To
+        const refersToTbody = document.getElementById('refers-to-tbody');
+        let refersToRows = [];
+        
+        // Image pull secrets
+        if (podData.image_pull_secrets && podData.image_pull_secrets.length > 0) {
+            podData.image_pull_secrets.forEach(ips => {
+                if (typeof ips === 'object') {
+                    Object.entries(ips).forEach(([key, value]) => {
+                        if (key === 'name' || value) {
+                            const secretName = escapeHtml(value || '');
+                            const safeNs = escapeHtml(ns);
+                            refersToRows.push(`
+                                <tr>
+                                    <td>ImagePullSecret</td>
+                                    <td>
+                                        <form action="/security/secret" method="POST" data-namespace="${safeNs}" onsubmit="sessionStorage.setItem('ns_select', this.dataset.namespace); return true;">
+                                            <input type="hidden" name="csrf_token" value="${escapeHtml(csrf_token)}">
+                                            <input type="hidden" name="ns_select" value="${safeNs}" />
+                                            <input type="hidden" name="selected" value="${secretName}" />
+                                            <a href="javascript:;" onclick="parentNode.submit();">${secretName}</a>
+                                        </form>
+                                    </td>
+                                    <td>${safeNs}</td>
+                                </tr>
+                            `);
+                        }
+                    });
+                }
             });
+        }
+        
+        // Service account - Use data attributes to prevent XSS
+        if (podData.service_account) {
+            const safeNs = escapeHtml(ns);
+            const safeServiceAccount = escapeHtml(podData.service_account);
+            refersToRows.push(`
+                <tr>
+                    <td>ServiceAccount</td>
+                    <td>
+                        <form action="/cluster-permission/service-account" method="POST" data-namespace="${safeNs}" onsubmit="sessionStorage.setItem('ns_select', this.dataset.namespace); return true;">
+                            <input type="hidden" name="csrf_token" value="${escapeHtml(csrf_token)}">
+                            <input type="hidden" name="ns_select" value="${safeNs}" />
+                            <input type="hidden" name="selected" value="${safeServiceAccount}" />
+                            <a href="javascript:;" onclick="parentNode.submit();">${safeServiceAccount}</a>
+                        </form>
+                    </td>
+                    <td>${safeNs}</td>
+                </tr>
+            `);
+        }
+        
+        // Secrets - Use data attributes to prevent XSS
+        if (podData.secrets && podData.secrets.length > 0) {
+            const safeNs = escapeHtml(ns);
+            podData.secrets.forEach(secret => {
+                const safeSecret = escapeHtml(secret);
+                refersToRows.push(`
+                    <tr>
+                        <td>Secret</td>
+                        <td>
+                            <form action="/security/secret" method="POST" data-namespace="${safeNs}" onsubmit="sessionStorage.setItem('ns_select', this.dataset.namespace); return true;">
+                                <input type="hidden" name="csrf_token" value="${escapeHtml(csrf_token)}">
+                                <input type="hidden" name="ns_select" value="${safeNs}" />
+                                <input type="hidden" name="selected" value="${safeSecret}" />
+                                <a href="javascript:;" onclick="parentNode.submit();">${safeSecret}</a>
+                            </form>
+                        </td>
+                        <td>${safeNs}</td>
+                    </tr>
+                `);
+            });
+        }
+        
+        // ConfigMaps - Use data attributes to prevent XSS
+        if (podData.cm && podData.cm.length > 0) {
+            const safeNs = escapeHtml(ns);
+            podData.cm.forEach(cm => {
+                const safeCm = escapeHtml(cm);
+                refersToRows.push(`
+                    <tr>
+                        <td>ConfigMap</td>
+                        <td>
+                            <form action="/storage/configmap" method="POST" data-namespace="${safeNs}" onsubmit="sessionStorage.setItem('ns_select', this.dataset.namespace); return true;">
+                                <input type="hidden" name="csrf_token" value="${escapeHtml(csrf_token)}">
+                                <input type="hidden" name="ns_select" value="${safeNs}" />
+                                <input type="hidden" name="selected" value="${safeCm}" />
+                                <a href="javascript:;" onclick="parentNode.submit();">${safeCm}</a>
+                            </form>
+                        </td>
+                        <td>${safeNs}</td>
+                    </tr>
+                `);
+            });
+        }
+        
+        // PVCs - Use data attributes to prevent XSS
+        if (podData.pvc && podData.pvc.length > 0) {
+            const safeNs = escapeHtml(ns);
+            podData.pvc.forEach(pvc => {
+                const safePvc = escapeHtml(pvc);
+                refersToRows.push(`
+                    <tr>
+                        <td>PersistentVolumeClaim</td>
+                        <td>
+                            <form action="/storage/pvc" method="POST" data-namespace="${safeNs}" onsubmit="sessionStorage.setItem('ns_select', this.dataset.namespace); return true;">
+                                <input type="hidden" name="csrf_token" value="${escapeHtml(csrf_token)}">
+                                <input type="hidden" name="ns_select" value="${safeNs}" />
+                                <input type="hidden" name="selected" value="${safePvc}" />
+                                <a href="javascript:;" onclick="parentNode.submit();">${safePvc}</a>
+                            </form>
+                        </td>
+                        <td>${safeNs}</td>
+                    </tr>
+                `);
+            });
+        }
+        
+        if (refersToRows.length > 0) {
+            refersToTbody.innerHTML = refersToRows.join('');
+        } else {
+            refersToTbody.innerHTML = '<tr><td colspan="3" class="text-center text-muted">No related resources found</td></tr>';
+        }
+    }
+    
+    function populateEvents(events) {
+        const tbody = document.getElementById('events-tbody');
+        if (events && events.length > 0) {
+            tbody.innerHTML = events.map(event => {
+                // Type badge
+                let typeBadge = '';
+                if (event.type === 'Normal') {
+                    typeBadge = '<span class="badge text-bg-success">' + escapeHtml(event.type) + '</span>';
+                } else if (event.type === 'Warning') {
+                    typeBadge = '<span class="badge text-bg-warning">' + escapeHtml(event.type) + '</span>';
+                } else {
+                    typeBadge = '<span class="badge text-bg-secondary">' + escapeHtml(event.type || 'Unknown') + '</span>';
+                }
+                
+                // Format timestamps
+                const firstTimestamp = event.first_timestamp ? new Date(event.first_timestamp).toLocaleString() : '-';
+                const lastTimestamp = event.last_timestamp ? new Date(event.last_timestamp).toLocaleString() : '-';
+                
+                return `
+                    <tr>
+                        <td>${typeBadge}</td>
+                        <td>${escapeHtml(event.reason || '-')}</td>
+                        <td>${escapeHtml(event.message || '-')}</td>
+                        <td>${escapeHtml(event.count || '1')}</td>
+                        <td>${escapeHtml(firstTimestamp)}</td>
+                        <td>${escapeHtml(lastTimestamp)}</td>
+                        <td>${escapeHtml(event.source || event.reporting_controller || '-')}</td>
+                    </tr>
+                `;
+            }).join('');
+        } else {
+            tbody.innerHTML = '<tr><td colspan="7" class="text-center text-muted">No events found</td></tr>';
+        }
+    }
+    
+    async function loadPodEvents(podName, namespace) {
+        if (!podName || !namespace) {
+            const tbody = document.getElementById('events-tbody');
+            tbody.innerHTML = '<tr><td colspan="7" class="text-center text-muted">Pod information not available</td></tr>';
+            return;
+        }
+        
+        try {
+            const apiUrl = `/api/v1/workloads/pods/${encodeURIComponent(podName)}/events?namespace=${encodeURIComponent(namespace)}&limit=100`;
+            console.log('Fetching pod events from:', apiUrl);
+            console.log('Pod name:', podName, 'Namespace:', namespace);
+            
+            const response = await fetch(apiUrl);
+            if (!response.ok) {
+                const errorText = await response.text();
+                console.error('API error response:', response.status, errorText);
+                throw new Error(`HTTP error! status: ${response.status}`);
+            }
+            
+            const data = await response.json();
+            console.log('Pod events API response:', data);
+            console.log('Number of events found:', data.data ? data.data.length : 0);
+            
+            if (data.error) {
+                throw new Error(data.message || 'Failed to load pod events');
+            }
+            
+            populateEvents(data.data || []);
+            
+        } catch (error) {
+            console.error('Error loading pod events:', error);
+            const tbody = document.getElementById('events-tbody');
+            tbody.innerHTML = '<tr><td colspan="7" class="text-center text-danger">Error: ' + escapeHtml(error.message) + '</td></tr>';
+        }
+    }
+    
+    async function loadPodData() {
+        const { podName, namespace } = getPodInfo();
+        
+        if (!podName) {
+            console.error('Pod name not found in URL, sessionStorage, or form.');
+            document.getElementById('pod-name-breadcrumb').textContent = 'Error';
+            document.getElementById('pod-name').textContent = 'Error: Pod name not provided.';
+            return;
+        }
+        
+        try {
+            const apiUrl = `/api/v1/workloads/pods/${encodeURIComponent(podName)}?namespace=${encodeURIComponent(namespace)}`;
+            console.log('Fetching pod data from:', apiUrl);
+            
+            const response = await fetch(apiUrl);
+            if (!response.ok) {
+                throw new Error(`HTTP error! status: ${response.status}`);
+            }
+            
+            const data = await response.json();
+            console.log('Pod data API response:', data);
+            
+            if (data.error) {
+                throw new Error(data.message || 'Failed to load pod data');
+            }
+            
+            populatePodData(data.data);
+            
+        } catch (error) {
+            console.error('Error loading pod data:', error);
+            document.getElementById('pod-name-breadcrumb').textContent = 'Error';
+            document.getElementById('pod-name').textContent = 'Error: ' + escapeHtml(error.message);
+        }
+    }
+    
+    // Load data when page loads
+    document.addEventListener('DOMContentLoaded', function() {
+        loadPodData();
         });
     </script>
-    {% endfor %}
-    {% for ic in pod_data.init_containers %}
-    <script>
-        $(document).ready(function () {
-            $('#intVulnTable{{ ic.name }}').DataTable({
-               responsive: true,
-               order: [[1, 'asc']],
-            });
-        });
-    </script>
-    {% endfor %}
 {% endblock%}

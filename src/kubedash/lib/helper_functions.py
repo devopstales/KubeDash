@@ -1,7 +1,9 @@
 import json
 import logging
+import os
 import re
 import sys
+from datetime import datetime as dt, timezone
 import colorlog
 import validators
 from colorlog.escape_codes import escape_codes
@@ -12,7 +14,7 @@ from urllib.parse import urlparse, urljoin
 import six
 import yaml
 from flask import g, flash, has_request_context, Request
-from typing import Optional, Union
+from typing import Optional, Union, Tuple
 
 ##############################################################
 ## Helpers
@@ -50,9 +52,15 @@ class ThreadedTicker:
         ch = logging.StreamHandler()
         ch.setLevel(logging.DEBUG)
 
-        # Create formatter and add to handler
-        formatter = logging.Formatter(
-            '[%(asctime)s] [%(name)s] [%(levelname)s] %(message)s'
+        # Canonical format (same as get_logger): [timestamp] [no-id] [logger] [LEVEL] message
+        class CanonicalFormatter(logging.Formatter):
+            def formatTime(self, record, datefmt=None):
+                ct = dt.fromtimestamp(record.created)
+                s = ct.strftime("%Y-%m-%d %H:%M:%S")
+                return "%s,%03d" % (s, record.msecs)
+
+        formatter = CanonicalFormatter(
+            '[%(asctime)s] [no-id] [%(name)s] [%(levelname)s] %(message)s'
         )
         ch.setFormatter(formatter)
 
@@ -86,9 +94,65 @@ class ThreadedTicker:
                 continue
         self.logger.debug("Ticker loop has exited.")
 
+
+# Cached logging config from kubedash.ini so we don't re-read on every get_logger() call
+_log_config_cache = None
+
+
+def _get_logging_config(ini_config=None):
+    """Read [logging] from kubedash.ini or from provided ConfigParser. Returns dict with 'format' and 'level'."""
+    global _log_config_cache
+    if ini_config is not None and ini_config.has_section('logging'):
+        format_val = ini_config.get('logging', 'format', fallback='text').strip().lower()
+        if format_val not in ('text', 'json'):
+            format_val = 'text'
+        level_val = ini_config.get('logging', 'level', fallback='INFO').strip().upper()
+        return {'format': format_val, 'level': level_val}
+    if _log_config_cache is not None:
+        return _log_config_cache
+    import configparser
+    config = configparser.ConfigParser()
+    ini_path = os.environ.get('KUBEDASH_INI_PATH', 'kubedash.ini')
+    if os.path.isfile(ini_path):
+        config.read(ini_path)
+    format_val = 'text'
+    level_val = 'INFO'
+    if config.has_section('logging'):
+        format_val = config.get('logging', 'format', fallback='text').strip().lower()
+        if format_val not in ('text', 'json'):
+            format_val = 'text'
+        level_val = config.get('logging', 'level', fallback='INFO').strip().upper()
+    _log_config_cache = {'format': format_val, 'level': level_val}
+    return _log_config_cache
+
+
+class JsonFormatter(logging.Formatter):
+    """Emit one JSON object per log line for ELK/Loki. Same trace_id and logger names as text mode."""
+
+    def format(self, record):
+        if not hasattr(record, 'correlation_id'):
+            record.correlation_id = 'no-id'
+        if not record.correlation_id:
+            record.correlation_id = 'no-id'
+        # ISO timestamp with Z (UTC)
+        ct = dt.fromtimestamp(record.created, tz=timezone.utc)
+        ts = ct.strftime('%Y-%m-%dT%H:%M:%S') + '.%03dZ' % (record.msecs,)
+        obj = {
+            'timestamp': ts,
+            'trace_id': record.correlation_id,
+            'logger': record.name,
+            'level': record.levelname,
+            'message': record.getMessage(),
+        }
+        if record.exc_info:
+            obj['error_type'] = record.exc_info[0].__name__ if record.exc_info[0] else None
+            obj['stack_trace'] = self.formatException(record.exc_info) if record.exc_info else None
+        return json.dumps(obj, default=str)
+
+
 @tracer.start_as_current_span("get_logger")
-def get_logger() -> Logger:
-    """Generate a Logger for the given module name with correlation ID support"""
+def get_logger(ini_config=None) -> Logger:
+    """Generate a Logger with correlation ID support. Uses [logging] from kubedash.ini or ini_config if provided."""
     span = trace.get_current_span()
 
     # Remove existing handlers (avoid duplicate logs if reconfigured)
@@ -103,6 +167,14 @@ def get_logger() -> Logger:
     RED = '\033[31m'
 
     class BooleanColorFormatter(colorlog.ColoredFormatter):
+        """Canonical log format: [YYYY-MM-DD HH:MM:SS,mmm] [trace-id] [logger] [LEVEL] message."""
+
+        def formatTime(self, record, datefmt=None):
+            """Produce timestamp in canonical form with milliseconds."""
+            ct = dt.fromtimestamp(record.created)
+            s = ct.strftime("%Y-%m-%d %H:%M:%S")
+            return "%s,%03d" % (s, record.msecs)
+
         def format(self, record):
             # Ensure correlation_id exists on the record
             if not hasattr(record, 'correlation_id'):
@@ -128,12 +200,17 @@ def get_logger() -> Logger:
         }
     )
 
-    # Set up stream handler with color
+    log_config = _get_logging_config(ini_config)
+    if log_config['format'] == 'json':
+        formatter = JsonFormatter()
+
     handler = logging.StreamHandler()
     handler.setFormatter(formatter)
 
     logger = logging.getLogger()
-    logger.setLevel(logging.INFO)
+    level_name = log_config.get('level', 'INFO')
+    level = getattr(logging, level_name, logging.INFO)
+    logger.setLevel(level)
     logger.addHandler(handler)
     logger.propagate = False
 
@@ -143,18 +220,18 @@ def get_logger() -> Logger:
             if not hasattr(record, 'correlation_id'):
                 corr_id = 'no-id'
                 try:
-                    # Only try to get from Flask's g context if we're in an app context
                     from flask import has_app_context, g
                     if has_app_context():
                         corr_id = getattr(g, 'correlation_id', 'no-id')
                     else:
-                        # Try to get from active span if not in app context
                         current_span = tracer.get_current_span()
                         if current_span.is_recording():
-                            corr_id = current_span.get_span_context().trace_id
+                            ctx = current_span.get_span_context()
+                            if ctx.is_valid:
+                                corr_id = f"{ctx.trace_id:032x}"
                 except Exception:
+                    # Intentionally swallow so logging never fails; record keeps no-id
                     pass
-                
                 record.correlation_id = corr_id
             return True
 
@@ -417,15 +494,17 @@ def calcPercent(x, y, integer = False):
 ##############################################################
 
 def ErrorHandler(logger, error, action):
-    """Handle errors and flash messages
-    
+    """Log and optionally flash errors. Use for API and critical paths so format and level are consistent.
+    When error is an Exception, logs with exc_info=True so stack traces appear in logs.
+
     Args:
-        logger (Logger): The Logger for the module.
-        error (str): The error to handle.
-        action (str): The action being performed.
+        logger: The Logger for the module.
+        error: The error (Exception instance, or object with .status for API errors).
+        action: Description of the action being performed.
     """
+    exc_info = isinstance(error, BaseException)
     if hasattr(error, '__iter__'):
-        if 'status' in error:
+        if hasattr(error, 'status'):
             if error.status == 401:
                 if has_request_context():
                     flash("401 - Unauthorized: User cannot connect to Kubernetes", "danger")
@@ -434,14 +513,18 @@ def ErrorHandler(logger, error, action):
                 if has_request_context():
                     flash("403 - Forbidden: User cannot %s" % action, "danger")
                 logger.error("403 - Forbidden: User cannot %s" % action)
+            else:
+                if has_request_context():
+                    flash("Exception: %s" % action, "danger")
+                logger.error("Exception: %s %s", action, error, exc_info=exc_info)
         else:
             if has_request_context():
                 flash("Exception: %s" % action, "danger")
-            logger.error("Exception: %s %s \n" % (action, error))
+            logger.error("Exception: %s %s", action, error, exc_info=exc_info)
     else:
         if has_request_context():
             flash("Exception: %s" % action, "danger")
-        logger.error("Exception: %s %s \n" % (action, error))
+        logger.error("Exception: %s %s", action, error, exc_info=exc_info)
         
 def WarningHandler(logger, warning, action):
     """Handle warnings and flash messages
@@ -475,3 +558,167 @@ def ResponseHandler(message, status):
         status (str): The status of the message (e.g., "success", "danger", etc.)
     """
     flash(message, status)
+
+##############################################################
+## Security Validation Functions
+##############################################################
+
+def validate_k8s_resource_name(name: str, resource_type: str = "resource") -> Tuple[bool, Optional[str]]:
+    """
+    Validate Kubernetes resource name according to RFC 1123 subdomain format.
+    
+    Kubernetes resource names must:
+    - Be lowercase alphanumeric characters or '-'
+    - Start and end with an alphanumeric character
+    - Be at most 253 characters
+    - Not contain '..' or path separators
+    
+    Args:
+        name: The resource name to validate
+        resource_type: Type of resource for error messages (e.g., "pod", "namespace")
+    
+    Returns:
+        tuple: (is_valid, error_message)
+    """
+    if not name or not isinstance(name, str):
+        return False, f"Invalid {resource_type} name: must be a non-empty string"
+    
+    # Check for path traversal attempts
+    if '..' in name or '/' in name or '\\' in name:
+        return False, f"Invalid {resource_type} name: contains path traversal characters"
+    
+    # Check length
+    if len(name) > 253:
+        return False, f"Invalid {resource_type} name: exceeds maximum length of 253 characters"
+    
+    # Kubernetes DNS-1123 subdomain format: [a-z0-9]([-a-z0-9]*[a-z0-9])?
+    # Must start and end with alphanumeric, can contain hyphens in between
+    if not re.match(r'^[a-z0-9]([-a-z0-9]*[a-z0-9])?$', name):
+        return False, f"Invalid {resource_type} name: must match DNS-1123 subdomain format (lowercase alphanumeric and hyphens)"
+    
+    return True, None
+
+def validate_namespace(name: str) -> Tuple[bool, Optional[str]]:
+    """
+    Validate Kubernetes namespace name.
+    
+    Args:
+        name: The namespace name to validate
+    
+    Returns:
+        tuple: (is_valid, error_message)
+    """
+    return validate_k8s_resource_name(name, "namespace")
+
+def validate_pod_name(name: str) -> Tuple[bool, Optional[str]]:
+    """
+    Validate Kubernetes pod name.
+    
+    Args:
+        name: The pod name to validate
+    
+    Returns:
+        tuple: (is_valid, error_message)
+    """
+    return validate_k8s_resource_name(name, "pod")
+
+def sanitize_html(text: str) -> str:
+    """
+    Sanitize HTML to prevent XSS attacks.
+    Escapes HTML special characters.
+    
+    Args:
+        text: The text to sanitize
+    
+    Returns:
+        str: Sanitized text safe for HTML output
+    """
+    if not text or not isinstance(text, str):
+        return ""
+    
+    # Escape HTML special characters
+    html_escape_map = {
+        '&': '&amp;',
+        '<': '&lt;',
+        '>': '&gt;',
+        '"': '&quot;',
+        "'": '&#x27;',
+        '/': '&#x2F;'
+    }
+    
+    # Replace each character
+    sanitized = ""
+    for char in text:
+        sanitized += html_escape_map.get(char, char)
+    
+    return sanitized
+
+def validate_no_path_traversal(path: str) -> Tuple[bool, Optional[str]]:
+    """
+    Validate that a path does not contain path traversal sequences.
+    
+    Args:
+        path: The path to validate
+    
+    Returns:
+        tuple: (is_valid, error_message)
+    """
+    if not path or not isinstance(path, str):
+        return False, "Invalid path: must be a non-empty string"
+    
+    # Check for path traversal patterns
+    dangerous_patterns = [
+        '..',
+        '../',
+        '..\\',
+        '/etc/',
+        'c:/',
+        'c:\\',
+        '//',
+        '\\\\'
+    ]
+    
+    path_lower = path.lower()
+    for pattern in dangerous_patterns:
+        if pattern in path_lower:
+            return False, f"Invalid path: contains path traversal pattern '{pattern}'"
+    
+    return True, None
+
+def sanitize_input(value: str, input_type: str = "text") -> str:
+    """
+    Sanitize user input based on expected type.
+    
+    Args:
+        value: The input value to sanitize
+        input_type: Type of input ("text", "pod_name", "namespace", "url")
+    
+    Returns:
+        str: Sanitized value
+    """
+    if not value or not isinstance(value, str):
+        return ""
+    
+    if input_type in ("pod_name", "namespace"):
+        # For K8s resource names, validate and return cleaned version
+        is_valid, _ = validate_k8s_resource_name(value, input_type)
+        if not is_valid:
+            # Return empty string if invalid
+            return ""
+        return value.strip().lower()
+    
+    elif input_type == "url":
+        # For URLs, validate and sanitize
+        value = value.strip()
+        # Basic URL validation - should start with http:// or https://
+        if not value.startswith(('http://', 'https://')):
+            return ""
+        return value
+    
+    else:
+        # For general text, strip whitespace and limit length
+        value = value.strip()
+        # Limit to reasonable length to prevent DoS
+        if len(value) > 10000:
+            value = value[:10000]
+        return value

@@ -13,7 +13,7 @@
 </ul>
 <ul class="header-nav ms-auto"></ul>
 <ul class="header-nav d-lg-flex">
-{% include "segments/topmenu.html.j2" %}
+{% include "segments/partials/topmenu.html.j2" %}
 {% endblock %}
 
 {% block content %}
@@ -33,62 +33,15 @@
                       <th>ServiceAccount</th>
                     </tr>
                   </thead>
-                  <tbody>
-                    {% for rb in role_bindings %}
-                    {% if rb_name == rb.name %}
-                      <tr class="selected" >
-                    {% else %}
-                      <tr>
-                    {% endif %}
-                        <td>{{ rb.name }}</td>
-                        <td>
-                            {% for rbr in rb.role %}
-                              {% for rbr_type, rbr_name in rbr.items() %}
-                                {% if rbr_type == "Role" %}
-                                  <form action="/cluster-permission/role/data" method="POST">
-                                      <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
-                                      <input type="hidden" name="ns_select" value="{{ session['ns_select'] }}" />
-                                      <input type="hidden" name="r_name" value="{{ rbr_name }}" />
-                                      <a href="javascript:;" onclick="parentNode.submit();">{{ rbr_name }}</a>
-                                  </form>
-                                {% elif rbr_type == "ClusterRole" %}
-                                  <form action="/cluster-permission/cluster-role/data" method="POST">
-                                    <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
-                                    <input type="hidden" name="cr_name" value="{{ rbr_name }}" />
-                                    <a href="javascript:;" onclick="parentNode.submit();">{{ rbr_name }}</a>
-                                  </form>
-                                {% else %}
-                                  {{ rbr_name }}
-                                {% endif %}
-                                {% if not loop.last %}<br>{% endif %}
-                                {% endfor %}
-                            {% endfor %}
+                  <tbody id="role-bindings-tbody">
+                    <tr>
+                        <td colspan="5" class="text-center">
+                            <div class="spinner-border spinner-border-sm text-primary" role="status">
+                                <span class="visually-hidden">Loading...</span>
+                            </div>
+                            <span class="ms-2">Loading role bindings...</span>
                         </td>
-                        <td>
-                          {% for rbu in rb.user %}
-                              {{ rbu }}{% if not loop.last %}<br>{% endif %}
-                          {% endfor %}
-                        </td>
-                        <td>
-                          {% for rbg in rb.group %}
-                            {{ rbg }}{% if not loop.last %}<br>{% endif %}
-                          {% endfor %}
-                        </td>
-                        <td>
-                          {% for rbsa in rb.ServiceAccount %}
-                            {% for rbsa_name, rbsa_ns in rbsa.items()  %}
-                              <form action="/cluster-permission/service-account" method="POST">
-                                  <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
-                                  <input type="hidden" name="ns_select" value="{{ rbsa_ns }}" />
-                                  <input type="hidden" name="selected" value="{{ rbsa_name }}" />
-                                  <a href="javascript:;" onclick="parentNode.submit();">{{ rbsa_name }}</a>
-                              </form>
-                              {% if not loop.last %}<br>{% endif %}
-                            {% endfor %}
-                          {% endfor %}
-                        </td>
-                      </tr>
-                    {% endfor %}
+                    </tr>
                   </tbody>
             </table>
         </div>
@@ -98,5 +51,290 @@
 
 
 {% block add_head_css %}
-{% include "segments/datatable_snippet.html.j2" %}
+{% include "segments/components/datatable_snippet.html.j2" %}
+{% endblock %}
+
+{% block add_tail_js %}
+<script nonce="{{ csp_nonce }}">
+    // IMMEDIATE: Prevent datatables-demo.js from initializing on loading row
+    (function() {
+        function setupOverride() {
+            if (typeof $ !== 'undefined' && $.fn && !window._datatableOverrideSetup) {
+                window._datatableOverrideSetup = true;
+                const originalDataTable = $.fn.DataTable;
+                $.fn.DataTable = function(options) {
+                    const table = this[0];
+                    if (table && table.id === 'dataTable') {
+                        const tbody = table.querySelector('tbody');
+                        if (tbody) {
+                            const rows = tbody.querySelectorAll('tr');
+                            const hasColspanRow = Array.from(rows).some(row => {
+                                const cells = row.querySelectorAll('td');
+                                return Array.from(cells).some(cell => cell.hasAttribute('colspan'));
+                            });
+                            if (hasColspanRow) {
+                                console.log('Blocked DataTable initialization on loading row');
+                                return this;
+                            }
+                        }
+                    }
+                    return originalDataTable.apply(this, arguments);
+                };
+                Object.setPrototypeOf($.fn.DataTable, originalDataTable);
+                Object.keys(originalDataTable).forEach(key => {
+                    $.fn.DataTable[key] = originalDataTable[key];
+                });
+            }
+        }
+        setupOverride();
+        setTimeout(setupOverride, 0);
+        setTimeout(setupOverride, 50);
+        setTimeout(setupOverride, 100);
+    })();
+    
+    (function() {
+        function checkAndDestroyAutoInit() {
+            if (typeof $ !== 'undefined' && $.fn.DataTable) {
+                const table = document.getElementById('dataTable');
+                if (table && $.fn.DataTable.isDataTable(table)) {
+                    const tbody = table.querySelector('tbody');
+                    if (tbody) {
+                        const rows = tbody.querySelectorAll('tr');
+                        const hasColspanRow = Array.from(rows).some(row => {
+                            const cells = row.querySelectorAll('td');
+                            return Array.from(cells).some(cell => cell.hasAttribute('colspan'));
+                        });
+                        if (hasColspanRow) {
+                            console.log('Destroying auto-initialized DataTable on loading row');
+                            try {
+                                $(table).DataTable().destroy();
+                            } catch(e) {
+                                console.error('Error destroying DataTable:', e);
+                            }
+                        }
+                    }
+                }
+            }
+        }
+        if (typeof $ !== 'undefined') {
+            checkAndDestroyAutoInit();
+        }
+        setTimeout(checkAndDestroyAutoInit, 50);
+        setTimeout(checkAndDestroyAutoInit, 100);
+        setTimeout(checkAndDestroyAutoInit, 200);
+        setTimeout(checkAndDestroyAutoInit, 500);
+        setTimeout(checkAndDestroyAutoInit, 1000);
+    })();
+    
+    const csrf_token = {{ csrf_token()|tojson }};
+    const selected_rb_name = {{ (request.args.get('rb_name') or '')|tojson }};
+    const current_namespace = {{ session.get('ns_select', 'default')|tojson }};
+    const role_bindings_api_url = '/api/v1/rbac/role-bindings';
+    
+    const escapeHtml = (text) => {
+        if (text === null || text === undefined) return '';
+        const map = {
+            '&': '&amp;',
+            '<': '&lt;',
+            '>': '&gt;',
+            '"': '&quot;',
+            "'": '&#039;'
+        };
+        return String(text).replace(/[&<>"']/g, m => map[m]);
+    };
+    
+    function formatArrayValue(arr) {
+        if (!arr || !Array.isArray(arr)) return '';
+        return arr.filter(item => item && item.length > 0).map(item => escapeHtml(item)).join('<br>') || ' ';
+    }
+    
+    function formatRole(role) {
+        if (!role || !Array.isArray(role)) return '';
+        return role.map(rbr => {
+            if (typeof rbr === 'object' && rbr !== null) {
+                return Object.entries(rbr).map(([rbr_type, rbr_name]) => {
+                    if (rbr_type === 'Role') {
+                        return `<form action="/cluster-permission/role/data" method="POST" onsubmit="sessionStorage.setItem('role_data_name', '${escapeHtml(rbr_name)}'); sessionStorage.setItem('role_data_namespace', '${escapeHtml(current_namespace)}'); return true;">
+                            <input type="hidden" name="csrf_token" value="${csrf_token}">
+                            <input type="hidden" name="ns_select" value="${escapeHtml(current_namespace)}" />
+                            <input type="hidden" name="r_name" value="${escapeHtml(rbr_name)}" />
+                            <a href="javascript:;" onclick="sessionStorage.setItem('role_data_name', '${escapeHtml(rbr_name)}'); sessionStorage.setItem('role_data_namespace', '${escapeHtml(current_namespace)}'); parentNode.submit();">${escapeHtml(rbr_name)}</a>
+                        </form>`;
+                    } else if (rbr_type === 'ClusterRole') {
+                        return `<form action="/cluster-permission/cluster-role/data" method="POST" onsubmit="sessionStorage.setItem('cluster_role_data_name', '${escapeHtml(rbr_name)}'); return true;">
+                            <input type="hidden" name="csrf_token" value="${csrf_token}">
+                            <input type="hidden" name="cr_name" value="${escapeHtml(rbr_name)}" />
+                            <a href="javascript:;" onclick="sessionStorage.setItem('cluster_role_data_name', '${escapeHtml(rbr_name)}'); parentNode.submit();">${escapeHtml(rbr_name)}</a>
+                        </form>`;
+                    } else {
+                        return escapeHtml(rbr_name);
+                    }
+                }).join('');
+            }
+            return '';
+        }).join('<br>');
+    }
+    
+    function formatServiceAccounts(serviceAccounts) {
+        if (!serviceAccounts || !Array.isArray(serviceAccounts)) return '';
+        return serviceAccounts.map(sa => {
+            if (typeof sa === 'object' && sa !== null) {
+                return Object.entries(sa).map(([sa_name, sa_ns]) => {
+                    return `<form action="/cluster-permission/service-account" method="POST">
+                        <input type="hidden" name="csrf_token" value="${csrf_token}">
+                        <input type="hidden" name="ns_select" value="${escapeHtml(sa_ns)}" />
+                        <input type="hidden" name="selected" value="${escapeHtml(sa_name)}" />
+                        <a href="javascript:;" onclick="parentNode.submit();">${escapeHtml(sa_name)}</a>
+                    </form>`;
+                }).join('');
+            }
+            return '';
+        }).join('<br>');
+    }
+    
+    function populateRoleBindingsTable(roleBindings) {
+        const tbody = document.getElementById('role-bindings-tbody');
+        const table = document.getElementById('dataTable');
+        
+        if (table && typeof $ !== 'undefined' && $.fn.DataTable && $.fn.DataTable.isDataTable(table)) {
+            $(table).DataTable().destroy();
+        }
+        
+        tbody.innerHTML = `
+            <tr>
+                <td colspan="5" class="text-center">
+                    <div class="spinner-border spinner-border-sm text-primary" role="status">
+                        <span class="visually-hidden">Loading...</span>
+                    </div>
+                    <span class="ms-2">Processing role bindings...</span>
+                </td>
+            </tr>
+        `;
+        
+        if (!roleBindings || roleBindings.length === 0) {
+            tbody.innerHTML = '<tr><td colspan="5" class="text-center text-muted">No role bindings found</td></tr>';
+            return;
+        }
+        
+        // Filter out null/undefined role bindings
+        const validRoleBindings = roleBindings.filter(rb => rb && rb !== null && typeof rb === 'object');
+        
+        if (validRoleBindings.length === 0) {
+            tbody.innerHTML = '<tr><td colspan="5" class="text-center text-muted">No valid role bindings found</td></tr>';
+            return;
+        }
+        
+        const rowsHtml = validRoleBindings.map(rb => {
+            const name = escapeHtml(rb.name || '');
+            const isSelected = selected_rb_name === rb.name;
+            const rowClass = isSelected ? 'class="selected"' : '';
+            const role = formatRole(rb.role);
+            const users = formatArrayValue(rb.user);
+            const groups = formatArrayValue(rb.group);
+            const serviceAccounts = formatServiceAccounts(rb.ServiceAccount);
+            
+            return `
+                <tr ${rowClass}>
+                    <td>${name}</td>
+                    <td>${role || ' '}</td>
+                    <td>${users || ' '}</td>
+                    <td>${groups || ' '}</td>
+                    <td>${serviceAccounts || ' '}</td>
+                </tr>
+            `;
+        }).join('');
+        
+        tbody.innerHTML = rowsHtml;
+        
+        setTimeout(() => {
+            const rows = tbody.querySelectorAll('tr');
+            let hasDataRows = false;
+            rows.forEach(row => {
+                const cells = row.querySelectorAll('td');
+                const hasColspan = Array.from(cells).some(cell => cell.hasAttribute('colspan'));
+                if (!hasColspan && cells.length === 5) {
+                    hasDataRows = true;
+                }
+            });
+            
+            if (!hasDataRows) return;
+            
+            if ($.fn.DataTable && $(table).length) {
+                if ($.fn.DataTable.isDataTable(table)) {
+                    const savedRows = tbody.innerHTML;
+                    $(table).DataTable().destroy();
+                    tbody.innerHTML = savedRows;
+                }
+                
+                const dataRows = Array.from(tbody.querySelectorAll('tr')).filter(row => {
+                    const cells = row.querySelectorAll('td');
+                    return !Array.from(cells).some(cell => cell.hasAttribute('colspan')) && cells.length === 5;
+                });
+                
+                if (dataRows.length > 0) {
+                    $(table).DataTable({
+                        responsive: true,
+                        pageLength: 25
+                    });
+                }
+            }
+        }, 50);
+    }
+    
+    document.addEventListener('DOMContentLoaded', async function() {
+        let retries = 0;
+        while ((typeof $ === 'undefined' || typeof $.fn.DataTable === 'undefined') && retries < 10) {
+            await new Promise(resolve => setTimeout(resolve, 100));
+            retries++;
+        }
+        
+        if (typeof $ === 'undefined' || typeof $.fn.DataTable === 'undefined') {
+            console.error('jQuery or DataTables not loaded');
+            return;
+        }
+        
+        const table = document.getElementById('dataTable');
+        if (table && $.fn.DataTable && $.fn.DataTable.isDataTable(table)) {
+            const tbody = table.querySelector('tbody');
+            if (tbody) {
+                const rows = tbody.querySelectorAll('tr');
+                const hasColspanRow = Array.from(rows).some(row => {
+                    const cells = row.querySelectorAll('td');
+                    return Array.from(cells).some(cell => cell.hasAttribute('colspan'));
+                });
+                if (hasColspanRow) {
+                    $(table).DataTable().destroy();
+                }
+            }
+        }
+        
+        try {
+            const namespace = current_namespace || 'default';
+            const apiUrl = `${role_bindings_api_url}?namespace=${encodeURIComponent(namespace)}`;
+            console.log('Fetching role bindings from:', apiUrl);
+            
+            const response = await fetch(apiUrl);
+            if (!response.ok) {
+                throw new Error(`HTTP error! status: ${response.status}`);
+            }
+            
+            const data = await response.json();
+            console.log('Role bindings API response:', data);
+            
+            if (data.error) {
+                throw new Error(data.message || 'Failed to load role bindings');
+            }
+            
+            const roleBindings = data.data || [];
+            populateRoleBindingsTable(roleBindings);
+            
+        } catch (error) {
+            console.error('Error loading role bindings:', error);
+            const tbody = document.getElementById('role-bindings-tbody');
+            if (tbody) {
+                tbody.innerHTML = '<tr><td colspan="5" class="text-center text-danger">Error loading role bindings: ' + escapeHtml(error.message) + '</td></tr>';
+            }
+        }
+    });
+</script>
 {% endblock %}

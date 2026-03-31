@@ -1,0 +1,28 @@
+{{- if .Values.extensionApi.enabled }}
+apiVersion: apiregistration.k8s.io/v1
+kind: APIService
+metadata:
+  name: {{ .Values.extensionApi.version }}.{{ .Values.extensionApi.group }}
+  labels:
+    app: kubedash
+    app.kubernetes.io/component: extension-api
+    {{- include "kubedash.labels" . | nindent 4 }}
+  annotations:
+    "meta.helm.sh/release-name": {{ .Release.Name | quote }}
+    "meta.helm.sh/release-namespace": {{ .Release.Namespace | quote }}
+spec:
+  group: {{ .Values.extensionApi.group }}
+  version: {{ .Values.extensionApi.version }}
+  service:
+    name: {{ include "kubedash.fullname" . }}-extension-api
+    namespace: {{ .Release.Namespace }}
+    port: {{ .Values.extensionApi.servicePort }}
+  {{- if .Values.extensionApi.caBundle }}
+  caBundle: {{ .Values.extensionApi.caBundle }}
+  {{- else if .Values.extensionApi.insecureSkipTLSVerify }}
+  insecureSkipTLSVerify: true
+  {{- end }}
+  groupPriorityMinimum: {{ .Values.extensionApi.groupPriorityMinimum }}
+  versionPriority: {{ .Values.extensionApi.versionPriority }}
+{{- end }}
+

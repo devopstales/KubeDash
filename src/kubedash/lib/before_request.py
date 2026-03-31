@@ -5,6 +5,7 @@ from flask import g, Flask, request
 from lib.cache import cached_base, cached_base2
 from lib.helper_functions import get_logger
 from lib.prometheus import REQUEST_COUNT, REQUEST_LATENCY
+from lib.components import db
 
 ##############################################################
 ## Helpers
@@ -30,17 +31,30 @@ def init_before_request(app: Flask):
     @app.before_request
     def before_request():
         path = request.path
+
+        # Set correlation ID for all requests so logs (and Gunicorn access log) match Jaeger trace ID
+        try:
+            from opentelemetry import trace
+            span = trace.get_current_span()
+            if span.is_recording():
+                ctx = span.get_span_context()
+                if ctx.is_valid:
+                    otel_trace_id = f"{ctx.trace_id:032x}"
+                    g.correlation_id = otel_trace_id
+                    request.environ["OTEL_TRACE_ID"] = otel_trace_id
+        except Exception:
+            pass
+        if not getattr(g, 'correlation_id', None):
+            request_id = request.headers.get('X-Request-ID') or request.headers.get('X-Trace-ID')
+            g.correlation_id = request_id if request_id else 'no-id'
+            request.environ["OTEL_TRACE_ID"] = g.correlation_id
+
         if any(path.startswith(p) for p in SKIP_PATH) or request.endpoint is None:
             return
 
         # Start timer
         g._start_time = time.time()
-        
-        # Get correlation ID from headers or generate new
-        correlation_id = request.headers.get('X-Correlation-ID', None) #str(uuid.uuid4()))
-        if correlation_id:
-            g.correlation_id = correlation_id
-        
+
         # Skip page cache for API paths (they don't use HTML templates)
         if not any(path.startswith(p) for p in SKIP_PAGE_CACHE_PATH):
             cached_base(app)
@@ -63,8 +77,13 @@ def init_before_request(app: Flask):
                 REQUEST_LATENCY.labels(endpoint=request.endpoint).observe(latency)
                 REQUEST_COUNT.labels(method=request.method, endpoint=request.endpoint).inc()
             
-        # Ensure correlation ID is in response headers
+        # Ensure request ID is in response headers
         if hasattr(g, 'correlation_id'):
-            response.headers['X-Correlation-ID'] = g.correlation_id
+            response.headers['X-Request-ID'] = g.correlation_id
 
         return response
+    
+    @app.teardown_appcontext
+    def shutdown_session(exception=None):
+        """Remove database session after each request to prevent connection leaks"""
+        db.session.remove()

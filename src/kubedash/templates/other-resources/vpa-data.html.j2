@@ -7,14 +7,14 @@
         <ol class="breadcrumb my-0">
           <li class="breadcrumb-item"><span>Other Resources</span></li>
           <li class="breadcrumb-item"><a href="/other-resource/vertical-pod-autoscaler">VPAs</a></li>
-          <li class="breadcrumb-item active"><span>{{ vpa_data.name }}</span></li>
+          <li class="breadcrumb-item active"><span id="vpa-name-breadcrumb">Loading...</span></li>
         </ol>
       </nav>
     </div>
 </ul>
 <ul class="header-nav ms-auto"></ul>
 <ul class="header-nav d-lg-flex">
-{% include "segments/topmenu.html.j2" %}
+{% include "segments/partials/topmenu.html.j2" %}
 {% endblock %}
 
 {% block content %}
@@ -27,159 +27,54 @@
             <table class="table table-bordered" width="100%" cellspacing="0">
                 <tr>
                     <th>Name:</th>
-                    <td>{{ vpa_data.name }}</td>
+                    <td id="vpa-name">Loading...</td>
                 </tr>
                 <tr>
                     <th>Created:</th>
-                    <td>{{ vpa_data.created }}</td>
+                    <td id="vpa-created">Loading...</td>
                 </tr>
                 <tr>
                     <th>Namespace:</th>
-                    <td>{{ vpa_data.namespace }}</td>
+                    <td id="vpa-namespace">Loading...</td>
                 </tr>
                 <tr>
                     <th>Annotations:</th>
-                    <td>
-                        {% if vpa_data.annotations %}
-                        <table class="table table-bordered" width="100%" cellspacing="0">
-                            <thead>
-                                <tr><th width="50%">Key</th><th width="50%">Value</th></tr>
-                            </thead>
-                            <tbody>
-                            {% for key, value in vpa_data.annotations.items() %}
-                                <tr>
-                                    <td>{{ key }}</td>
-                                    <td>{{ value }}</td>
-                                </tr>
-                            {% endfor %}
-                            </tbody>
-                        </table>
-                        {% else %}
-                        None
-                        {% endif %}
+                    <td id="vpa-annotations-container">
+                        <div class="spinner-border spinner-border-sm text-primary" role="status">
+                            <span class="visually-hidden">Loading...</span>
+                        </div>
                     </td>
                 </tr>
                 <tr>
                     <th>Labels:</th>
-                    <td>
-                        {% if vpa_data.labels %}
-                        <table class="table table-bordered" width="100%" cellspacing="0">
-                            <thead>
-                                <tr><th width="50%">Key</th><th width="50%">Value</th></tr>
-                            </thead>
-                            <tbody>
-                            {% for key, value in vpa_data.labels.items() %}
-                                <tr>
-                                    <td>{{ key }}</td>
-                                    <td>{{ value }}</td>
-                                </tr>
-                            {% endfor %}
-                            </tbody>
-                        </table>
-                        {% else %}
-                        None
-                        {% endif %}
+                    <td id="vpa-labels-container">
+                        <div class="spinner-border spinner-border-sm text-primary" role="status">
+                            <span class="visually-hidden">Loading...</span>
+                        </div>
                     </td>
                 </tr>
                 <tr>
                     <th>Target (Owner):</th>
-                    <td>
-                        <form action="/workload/{{ vpa_data.spec.targetRef.kind | lower }}s" method="POST">
-                            <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
-                            <input type="hidden" name="ns_select" value="{{ vpa_data.namespace }}" />
-                            <input type="hidden" name="selected" value="{{ vpa_data.spec.targetRef.name }}" />
-                            <a href="javascript:;" onclick="parentNode.submit();">{{ vpa_data.spec.targetRef.name }}</a>
-                        </form>
-                    </td>
+                    <td id="vpa-target-container">Loading...</td>
                 </tr>
                 <tr>
                     <th>Update Mode:</th>
-                    <td>{{ vpa_data.spec.updatePolicy.updateMode if vpa_data.spec.updatePolicy is defined else "N/A" }}</td>
+                    <td id="vpa-update-mode">Loading...</td>
                 </tr>
                 <tr>
                     <th>Container Policies:</th>
-                    <td>
-                        {% if vpa_data.spec.resourcePolicy is defined and vpa_data.spec.resourcePolicy.containerPolicies is defined %}
-                        <table class="table table-bordered" width="100%" cellspacing="0">
-                            <thead>
-                                <tr>
-                                    <th>Container Name</th>
-                                    <th>Controlled Values</th>
-                                    <th>Mode</th>
-                                    <th>Min Allowed</th>
-                                    <th>Max Allowed</th>
-                                    <th>Controlled Resources</th>
-                                </tr>
-                            </thead>
-                            <tbody>
-                            {% for cp in vpa_data.spec.resourcePolicy.containerPolicies %}
-                                <tr>
-                                    <td>{{ cp.containerName }}</td>
-                                    <td>{{ cp.controlledValues }}</td>
-                                    <td>{{ cp.mode }}</td>
-                                    <td>
-                                        {% if cp.minAllowed %}
-                                            {% for res, val in cp.minAllowed.items() %}
-                                                {{ res }}: {{ val }}<br>
-                                            {% endfor %}
-                                        {% else %}
-                                            N/A
-                                        {% endif %}
-                                    </td>
-                                    <td>
-                                        {% if cp.maxAllowed %}
-                                            {% for res, val in cp.maxAllowed.items() %}
-                                                {{ res }}: {{ val }}<br>
-                                            {% endfor %}
-                                        {% else %}
-                                            N/A
-                                        {% endif %}
-                                    </td>
-                                    <td>
-                                        {% if cp.controlledResources %}
-                                            {{ cp.controlledResources | join(", ") }}
-                                        {% else %}
-                                            N/A
-                                        {% endif %}
-                                    </td>
-                                </tr>
-                            {% endfor %}
-                            </tbody>
-                        </table>
-                        {% else %}
-                        None
-                        {% endif %}
+                    <td id="vpa-container-policies-container">
+                        <div class="spinner-border spinner-border-sm text-primary" role="status">
+                            <span class="visually-hidden">Loading...</span>
+                        </div>
                     </td>
                 </tr>
                 <tr>
                     <th>Conditions:</th>
-                    <td>
-                        {% if vpa_data.conditions %}
-                        <table class="table table-bordered" width="100%" cellspacing="0">
-                            <thead>
-                                <tr>
-                                    <th>Type</th>
-                                    <th>Status</th>
-                                    <th>Last Transition Time</th>
-                                    <th>Reason</th>
-                                    <th>Message</th>
-                                </tr>
-                            </thead>
-                            <tbody>
-                                {% for cond in vpa_data.conditions %}
-                                <tr>
-                                    <td>{{ cond.type }}</td>
-                                    <td>{{ cond.status }}</td>
-                                    <td>{{ cond.lastTransitionTime }}</td>
-                                    <td>{{ cond.reason }}</td>
-                                    <td>{{ cond.message }}</td>
-                                </tr>
-                                {% endfor %}
-                            </tbody>
-                        </table>
-                        {% else %}
-                        None
-                        {% endif %}
+                    <td id="vpa-conditions-container">
+                        <div class="spinner-border spinner-border-sm text-primary" role="status">
+                            <span class="visually-hidden">Loading...</span>
+                        </div>
                     </td>
                 </tr>
             </table>
@@ -189,5 +84,278 @@
 {% endblock %}
 
 {% block add_head_css %}
-{% include "segments/datatable_snippet.html.j2" %}
+{% include "segments/components/datatable_snippet.html.j2" %}
+{% endblock %}
+
+{% block add_tail_js %}
+<script nonce="{{ csp_nonce }}">
+    const escapeHtml = (text) => {
+        if (text === null || text === undefined) return '';
+        const map = {
+            '&': '&amp;',
+            '<': '&lt;',
+            '>': '&gt;',
+            '"': '&quot;',
+            "'": '&#039;'
+        };
+        return String(text).replace(/[&<>"']/g, m => map[m]);
+    };
+    
+    const csrf_token = {{ csrf_token()|tojson }};
+    
+    // Get VPA name and namespace from URL, sessionStorage, or topbar selector
+    function getVPAInfo() {
+        const urlParams = new URLSearchParams(window.location.search);
+        let vpaName = urlParams.get('vpa_name');
+        let namespace = urlParams.get('namespace');
+        
+        // Fallback to sessionStorage
+        if (!vpaName) {
+            vpaName = sessionStorage.getItem('vpa_data_name');
+        }
+        if (!namespace) {
+            namespace = sessionStorage.getItem('ns_select');
+        }
+        
+        // Fallback to topbar selector
+        if (!namespace) {
+            const topbarSelect = document.getElementById('inputGroupSelect04');
+            if (topbarSelect && topbarSelect.value) {
+                namespace = topbarSelect.value;
+                // Store it in sessionStorage for consistency
+                sessionStorage.setItem('ns_select', namespace);
+            }
+        }
+        
+        // Final fallback
+        if (!namespace) {
+            namespace = 'default';
+        }
+        
+        return { vpaName, namespace };
+    }
+    
+    // Initialize namespace selector with sessionStorage value on page load
+    document.addEventListener('DOMContentLoaded', function() {
+        const namespaceSelect = document.getElementById('inputGroupSelect04');
+        if (namespaceSelect) {
+            const savedNamespace = sessionStorage.getItem('ns_select');
+            if (savedNamespace && namespaceSelect.querySelector(`option[value="${savedNamespace}"]`)) {
+                namespaceSelect.value = savedNamespace;
+            }
+        }
+    });
+    
+    function populateVPAInfo(vpa) {
+        if (!vpa) {
+            document.getElementById('vpa-name').textContent = 'N/A';
+            document.getElementById('vpa-created').textContent = 'N/A';
+            document.getElementById('vpa-namespace').textContent = 'N/A';
+            return;
+        }
+        
+        // Update breadcrumb
+        const breadcrumb = document.getElementById('vpa-name-breadcrumb');
+        if (breadcrumb) {
+            breadcrumb.textContent = vpa.name || 'N/A';
+        }
+        
+        // Basic info
+        document.getElementById('vpa-name').textContent = escapeHtml(vpa.name || 'N/A');
+        document.getElementById('vpa-created').textContent = escapeHtml(vpa.created || 'N/A');
+        document.getElementById('vpa-namespace').textContent = escapeHtml(vpa.namespace || 'N/A');
+        
+        // Annotations
+        const annotationsContainer = document.getElementById('vpa-annotations-container');
+        if (vpa.annotations && Object.keys(vpa.annotations).length > 0) {
+            let annotationsHtml = '<table class="table table-bordered" width="100%" cellspacing="0">';
+            annotationsHtml += '<thead><tr><th width="50%">Key</th><th width="50%">Value</th></tr></thead><tbody>';
+            for (const [key, value] of Object.entries(vpa.annotations)) {
+                annotationsHtml += `<tr><td width="50%">${escapeHtml(key)}</td><td width="50%">${escapeHtml(String(value))}</td></tr>`;
+            }
+            annotationsHtml += '</tbody></table>';
+            annotationsContainer.innerHTML = annotationsHtml;
+        } else {
+            annotationsContainer.innerHTML = '<span class="text-muted">None</span>';
+        }
+        
+        // Labels
+        const labelsContainer = document.getElementById('vpa-labels-container');
+        if (vpa.labels && Object.keys(vpa.labels).length > 0) {
+            let labelsHtml = '<table class="table table-bordered" width="100%" cellspacing="0">';
+            labelsHtml += '<thead><tr><th width="50%">Key</th><th width="50%">Value</th></tr></thead><tbody>';
+            for (const [key, value] of Object.entries(vpa.labels)) {
+                labelsHtml += `<tr><td width="50%">${escapeHtml(key)}</td><td width="50%">${escapeHtml(String(value))}</td></tr>`;
+            }
+            labelsHtml += '</tbody></table>';
+            labelsContainer.innerHTML = labelsHtml;
+        } else {
+            labelsContainer.innerHTML = '<span class="text-muted">None</span>';
+        }
+        
+        // Target (Owner)
+        const targetContainer = document.getElementById('vpa-target-container');
+        const spec = vpa.spec || {};
+        const targetRef = spec.target_ref || spec.targetRef || {};
+        const targetKind = targetRef.kind || '';
+        const targetName = targetRef.name || '';
+        const ns = vpa.namespace || '';
+        
+        if (targetName && targetKind) {
+            targetContainer.innerHTML = `
+                <form action="/workload/${targetKind.toLowerCase()}s" method="POST" onsubmit="sessionStorage.setItem('ns_select', '${escapeHtml(ns)}'); return true;">
+                    <input type="hidden" name="csrf_token" value="${escapeHtml(csrf_token)}">
+                    <input type="hidden" name="ns_select" value="${escapeHtml(ns)}" />
+                    <input type="hidden" name="selected" value="${escapeHtml(targetName)}" />
+                    <a href="javascript:;" onclick="parentNode.submit();">${escapeHtml(targetName)}</a>
+                </form>
+            `;
+        } else {
+            targetContainer.innerHTML = '<span class="text-muted">N/A</span>';
+        }
+        
+        // Update Mode
+        const updateModeContainer = document.getElementById('vpa-update-mode');
+        const updatePolicy = spec.update_policy || spec.updatePolicy || {};
+        const updateMode = updatePolicy.update_mode || updatePolicy.updateMode || 'N/A';
+        updateModeContainer.textContent = escapeHtml(String(updateMode));
+        
+        // Container Policies
+        const containerPoliciesContainer = document.getElementById('vpa-container-policies-container');
+        const resourcePolicy = spec.resource_policy || spec.resourcePolicy || {};
+        const containerPolicies = resourcePolicy.container_policies || resourcePolicy.containerPolicies || [];
+        
+        if (containerPolicies.length > 0) {
+            let policiesHtml = '<table class="table table-bordered" width="100%" cellspacing="0">';
+            policiesHtml += '<thead><tr><th>Container Name</th><th>Controlled Values</th><th>Mode</th><th>Min Allowed</th><th>Max Allowed</th><th>Controlled Resources</th></tr></thead><tbody>';
+            
+            for (const cp of containerPolicies) {
+                const containerName = escapeHtml(cp.container_name || cp.containerName || 'N/A');
+                const controlledValues = escapeHtml(cp.controlled_values || cp.controlledValues || 'N/A');
+                const mode = escapeHtml(cp.mode || 'N/A');
+                
+                const minAllowed = cp.min_allowed || cp.minAllowed || {};
+                let minAllowedHtml = '';
+                if (Object.keys(minAllowed).length > 0) {
+                    for (const [res, val] of Object.entries(minAllowed)) {
+                        minAllowedHtml += `${escapeHtml(res)}: ${escapeHtml(String(val))}<br>`;
+                    }
+                } else {
+                    minAllowedHtml = 'N/A';
+                }
+                
+                const maxAllowed = cp.max_allowed || cp.maxAllowed || {};
+                let maxAllowedHtml = '';
+                if (Object.keys(maxAllowed).length > 0) {
+                    for (const [res, val] of Object.entries(maxAllowed)) {
+                        maxAllowedHtml += `${escapeHtml(res)}: ${escapeHtml(String(val))}<br>`;
+                    }
+                } else {
+                    maxAllowedHtml = 'N/A';
+                }
+                
+                const controlledResources = cp.controlled_resources || cp.controlledResources || [];
+                const controlledResourcesHtml = controlledResources.length > 0 
+                    ? escapeHtml(controlledResources.join(', '))
+                    : 'N/A';
+                
+                policiesHtml += `
+                    <tr>
+                        <td>${containerName}</td>
+                        <td>${controlledValues}</td>
+                        <td>${mode}</td>
+                        <td>${minAllowedHtml}</td>
+                        <td>${maxAllowedHtml}</td>
+                        <td>${controlledResourcesHtml}</td>
+                    </tr>
+                `;
+            }
+            
+            policiesHtml += '</tbody></table>';
+            containerPoliciesContainer.innerHTML = policiesHtml;
+        } else {
+            containerPoliciesContainer.innerHTML = '<span class="text-muted">None</span>';
+        }
+        
+        // Conditions
+        const conditionsContainer = document.getElementById('vpa-conditions-container');
+        const conditions = vpa.conditions || [];
+        
+        if (conditions.length > 0) {
+            let conditionsHtml = '<table class="table table-bordered" width="100%" cellspacing="0">';
+            conditionsHtml += '<thead><tr><th>Type</th><th>Status</th><th>Last Transition Time</th><th>Reason</th><th>Message</th></tr></thead><tbody>';
+            
+            for (const cond of conditions) {
+                const type = escapeHtml(cond.type || cond.Type || 'N/A');
+                const status = escapeHtml(cond.status || cond.Status || 'N/A');
+                const lastTransitionTime = escapeHtml(cond.last_transition_time || cond.lastTransitionTime || cond.LastTransitionTime || 'N/A');
+                const reason = escapeHtml(cond.reason || cond.Reason || 'N/A');
+                const message = escapeHtml(cond.message || cond.Message || 'N/A');
+                
+                conditionsHtml += `
+                    <tr>
+                        <td>${type}</td>
+                        <td>${status}</td>
+                        <td>${lastTransitionTime}</td>
+                        <td>${reason}</td>
+                        <td>${message}</td>
+                    </tr>
+                `;
+            }
+            
+            conditionsHtml += '</tbody></table>';
+            conditionsContainer.innerHTML = conditionsHtml;
+        } else {
+            conditionsContainer.innerHTML = '<span class="text-muted">None</span>';
+        }
+    }
+    
+    async function loadVPAData() {
+        const { vpaName, namespace } = getVPAInfo();
+        
+        if (!vpaName) {
+            console.error('No VPA name provided');
+            document.getElementById('vpa-name-breadcrumb').textContent = 'Error';
+            document.getElementById('vpa-name').textContent = 'Error: VPA name not provided';
+            return;
+        }
+        
+        // Update breadcrumb
+        document.getElementById('vpa-name-breadcrumb').textContent = vpaName;
+        
+        try {
+            const apiUrl = `/api/v1/other-resources/vpa/${encodeURIComponent(vpaName)}?namespace=${encodeURIComponent(namespace)}`;
+            console.log('Fetching VPA from:', apiUrl);
+            
+            const response = await fetch(apiUrl);
+            if (!response.ok) {
+                if (response.status === 404) {
+                    throw new Error(`VPA '${vpaName}' not found in namespace '${namespace}'`);
+                }
+                throw new Error(`HTTP error! status: ${response.status}`);
+            }
+            
+            const data = await response.json();
+            console.log('VPA API response:', data);
+            
+            if (data.error) {
+                throw new Error(data.message || 'Failed to load VPA');
+            }
+            
+            const vpa = data.data || {};
+            populateVPAInfo(vpa);
+            
+        } catch (error) {
+            console.error('Error loading VPA:', error);
+            document.getElementById('vpa-name').textContent = 'Error: ' + escapeHtml(error.message);
+            document.getElementById('vpa-created').textContent = 'N/A';
+            document.getElementById('vpa-namespace').textContent = 'N/A';
+        }
+    }
+    
+    // Load data when page loads
+    document.addEventListener('DOMContentLoaded', function() {
+        loadVPAData();
+    });
+</script>
 {% endblock %}

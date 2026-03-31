@@ -7,14 +7,14 @@
         <ol class="breadcrumb my-0">
           <li class="breadcrumb-item"><span>Network</span></li>
           <li class="breadcrumb-item"><a href="/network/service">Services</a></li>
-          <li class="breadcrumb-item active"><span>Services</span></li>
+          <li class="breadcrumb-item active"><span id="service-name-breadcrumb">Loading...</span></li>
         </ol>
       </nav>
     </div>
 </ul>
 <ul class="header-nav ms-auto"></ul>
 <ul class="header-nav d-lg-flex">
-{% include "segments/topmenu.html.j2" %}
+{% include "segments/partials/topmenu.html.j2" %}
 {% endblock %}
 
 {% block content %}
@@ -33,11 +33,6 @@
             <li class="nav-item">
                 <a class="nav-link" id="nav-conditions-pod" data-bs-toggle="tab" href="#nav-pod" role="tab" aria-controls="nav-pod" aria-selected="false" data-bs-toggle="tab">Pods</a>
             </li>
-            {#
-            <li class="nav-item">
-                <a class="nav-link" id="nav-ingress-tab" data-bs-toggle="tab" href="#nav-ingress" role="tab" aria-controls="nav-ingress" aria-selected="false" data-bs-toggle="tab">Ingresses</a>
-            </li>
-            #}
         </ul>
         <div class="tab-content" id="nav-tabContent">
             <div class="tab-pane fade show active" id="nav-service" role="tabpanel" aria-labelledby="nav-service-tab">
@@ -47,71 +42,39 @@
                             <table class="table table-bordered" id="podInfoTable" width="100%" cellspacing="0">
                                 <tr>
                                     <th>Name:</th>
-                                    <td>{{ service_data.name }}</td>
+                                    <td id="service-name">Loading...</td>
                                 </tr>
                                 <tr>
                                     <th>Type:</th>
-                                    <td>{{ service_data.type }}</td>
+                                    <td id="service-type">Loading...</td>
                                 </tr>
                                 <tr>
                                     <th>Created:</th>
-                                    <td>{{ service_data.created }}</td>
+                                    <td id="service-created">Loading...</td>
                                 </tr>
                                 <tr>
                                     <th>Annotations:</th>
-                                    <td>
-                                        {% if service_data.annotations %}
-                                        <table class="table table-bordered" id="annotationTable" width="100%" cellspacing="0">
-                                            <thead>
-                                                <tr>
-                                                    <th width="50%">Key</th>
-                                                    <th width="50%">Value</th>
-                                                </tr>
-                                            </thead>
-                                            <tbody>
-                                            {% for key, value in service_data.annotations.items() %}
-                                                <tr>
-                                                {% if key != "kubectl.kubernetes.io/last-applied-configuration" %}
-                                                    <td width="50%">{{ key }}</td>
-                                                    <td width="50%">{{ value }}</td>
-                                                {% endif %}
-                                                </tr>
-                                            {% endfor %}
-                                            </tbody>
-                                        </table>
-                                        {% endif %}
+                                    <td id="service-annotations-container">
+                                        <div class="spinner-border spinner-border-sm text-primary" role="status">
+                                            <span class="visually-hidden">Loading...</span>
+                                        </div>
                                     </td>
                                 </tr>
                                <tr>
-                                    <th>Lables:</th>
-                                    <td>
-                                        {% if service_data.labels %}
-                                        <table class="table table-bordered" id="labelsTable" width="100%" cellspacing="0">
-                                            <thead>
-                                                <tr>
-                                                    <th width="50%">Key</th>
-                                                    <th width="50%">Value</th>
-                                                </tr>
-                                            </thead>
-                                            <tbody>
-                                            {% for key, value in service_data.labels.items() %}
-                                                <tr>
-                                                    <td width="50%">{{ key }}</td>
-                                                    <td width="50%">{{ value }}</td>
-                                                </tr>
-                                            {% endfor %}
-                                            </tbody>
-                                        </table>
-                                        {% endif %}
+                                    <th>Labels:</th>
+                                    <td id="service-labels-container">
+                                        <div class="spinner-border spinner-border-sm text-primary" role="status">
+                                            <span class="visually-hidden">Loading...</span>
+                                        </div>
                                     </td>
                                 </tr>
                                 <tr>
                                     <th>Cluster IP:</th>
-                                    <td>{{ service_data.cluster_ip }}</td>
+                                    <td id="service-cluster-ip">Loading...</td>
                                 </tr>
                                 <tr>
                                     <th>External IP:</th>
-                                    <td>{{ service_data.external_ip }}</td>
+                                    <td id="service-external-ip">Loading...</td>
                                 </tr>
                             </table>
                         </div>
@@ -134,16 +97,15 @@
                                             <th>Node Port</th>
                                         </tr>
                                     </thead>
-                                    <tbody>
-                                        {% for port in service_data.ports %}
-                                            <tr>
-                                                <td>{{ port.name }}</td>
-                                                <td>{{ port.port }}</td>
-                                                <td>{{ port.protocol }}</td>
-                                                <td>{{ port.target_port }}</td>
-                                                <td>{{ port.node_port }}</td>
-                                            </tr>
-                                        {% endfor %}
+                                    <tbody id="ports-tbody">
+                                        <tr>
+                                            <td colspan="5" class="text-center">
+                                                <div class="spinner-border spinner-border-sm text-primary" role="status">
+                                                    <span class="visually-hidden">Loading...</span>
+                                                </div>
+                                                <span class="ms-2">Loading ports...</span>
+                                            </td>
+                                        </tr>
                                     </tbody>
                                 </table>
                             </div>
@@ -151,7 +113,6 @@
                     </div>
                 </div>
             </div>
-            <!-- END CONTENT -->
             <!-- END CONTENT -->
             <div class="tab-pane fade" id="nav-pod" role="tabpanel" aria-labelledby="nav-pod-tab">
                 <div id="accordion">
@@ -168,47 +129,15 @@
                                             <th>Owner</th>
                                         </tr>
                                     </thead>
-                                    <tbody>
-                                        {% for pod in pod_list %}
-                                            <tr>
-                                                <td>
-                                                    {% if pod.status == "Running" %}
-                                                    <span class="badge text-bg-success">{{ pod.status }}</span>
-                                                    {% elif pod.status == "Pending" %}
-                                                    <span class="badge text-bg-warning">{{ pod.status }}</span>
-                                                    {% elif pod.status == "Succeeded" %}
-                                                    <span class="badge text-bg-secondary">{{ pod.status }}</span>
-                                                    {% else %}
-                                                    <span class="badge text-bg-info">{{ pod.status }}</span>
-                                                    {% endif %}
-                                                </td>
-                                                <td>
-                                                    <form action="/workload/pod/data" method="POST">
-                                                        <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
-                                                        <input type="hidden" name="ns_select" value="{{ session['ns_select'] }}" />
-                                                        <input type="hidden" name="po_name" value="{{ pod.name }}" />
-                                                        <a href="javascript:;" onclick="parentNode.submit();">{{ pod.name }}</a>
-                                                    </form>
-                                                </td>
-                                                <td>{{ pod.pod_ip }}</td>
-                                                <td>
-                                                    <form action="/cluster/node" method="POST">
-                                                        <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
-                                                        <input type="hidden" name="ns_select" value="{{ session['ns_select'] }}" />
-                                                        <input type="hidden" name="selected" value="{{ pod.node_name }}" />
-                                                        <a href="javascript:;" onclick="parentNode.submit();">{{ pod.node_name }}</a>
-                                                    </form>
-                                                </td>
-                                                <td>
-                                                    <form action="/workload/{{ pod.owner.split('/')[0] }}" method="POST">
-                                                        <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
-                                                        <input type="hidden" name="ns_select" value="{{ session['ns_select'] }}" />
-                                                        <input type="hidden" name="selected" value="{{ pod.owner.split('/')[1] }}" />
-                                                        <a href="javascript:;" onclick="parentNode.submit();">{{ pod.owner }}</a>
-                                                    </form>
-                                                </td>
-                                            </tr>
-                                        {% endfor %}
+                                    <tbody id="pods-tbody">
+                                        <tr>
+                                            <td colspan="5" class="text-center">
+                                                <div class="spinner-border spinner-border-sm text-primary" role="status">
+                                                    <span class="visually-hidden">Loading...</span>
+                                                </div>
+                                                <span class="ms-2">Loading pods...</span>
+                                            </td>
+                                        </tr>
                                     </tbody>
                                 </table>
                             </div>
@@ -223,5 +152,264 @@
 {% endblock %}
 
 {% block add_head_css %}
-{% include "segments/datatable_snippet.html.j2" %}
+{% include "segments/components/datatable_snippet.html.j2" %}
+{% endblock %}
+
+{% block add_tail_js %}
+<script nonce="{{ csp_nonce }}">
+    const escapeHtml = (text) => {
+        if (text === null || text === undefined) return '';
+        const map = {
+            '&': '&amp;',
+            '<': '&lt;',
+            '>': '&gt;',
+            '"': '&quot;',
+            "'": '&#039;'
+        };
+        return String(text).replace(/[&<>"']/g, m => map[m]);
+    };
+    
+    const csrf_token = {{ csrf_token()|tojson }};
+    
+    // Get service name and namespace from URL, sessionStorage, or topbar selector
+    function getServiceInfo() {
+        const urlParams = new URLSearchParams(window.location.search);
+        let serviceName = urlParams.get('service_name');
+        let namespace = urlParams.get('namespace');
+        
+        // Fallback to sessionStorage
+        if (!serviceName) {
+            serviceName = sessionStorage.getItem('service_data_name');
+        }
+        if (!namespace) {
+            namespace = sessionStorage.getItem('ns_select');
+        }
+        
+        // Fallback to topbar selector
+        if (!namespace) {
+            const topbarSelect = document.getElementById('inputGroupSelect04');
+            if (topbarSelect) {
+                namespace = topbarSelect.value;
+            }
+        }
+        
+        // Final fallback
+        if (!namespace) {
+            namespace = 'default';
+        }
+        
+        return { serviceName, namespace };
+    }
+    
+    function populateServiceInfo(service) {
+        if (!service) {
+            document.getElementById('service-name').textContent = 'N/A';
+            document.getElementById('service-type').textContent = 'N/A';
+            document.getElementById('service-created').textContent = 'N/A';
+            document.getElementById('service-cluster-ip').textContent = 'N/A';
+            document.getElementById('service-external-ip').textContent = 'N/A';
+            return;
+        }
+        
+        document.getElementById('service-name').textContent = escapeHtml(service.name || 'N/A');
+        document.getElementById('service-type').textContent = escapeHtml(service.type || 'N/A');
+        document.getElementById('service-created').textContent = escapeHtml(service.created || 'N/A');
+        document.getElementById('service-cluster-ip').textContent = escapeHtml(service.cluster_ip || '-');
+        document.getElementById('service-external-ip').textContent = service.external_ip ? escapeHtml(service.external_ip) : '-';
+        
+        // Populate annotations
+        const annotationsContainer = document.getElementById('service-annotations-container');
+        if (service.annotations && Object.keys(service.annotations).length > 0) {
+            let annotationsHtml = '<table class="table table-bordered" id="annotationTable" width="100%" cellspacing="0"><thead><tr><th width="50%">Key</th><th width="50%">Value</th></tr></thead><tbody>';
+            for (const [key, value] of Object.entries(service.annotations)) {
+                if (key !== "kubectl.kubernetes.io/last-applied-configuration") {
+                    annotationsHtml += `<tr><td width="50%">${escapeHtml(key)}</td><td width="50%">${escapeHtml(value)}</td></tr>`;
+                }
+            }
+            annotationsHtml += '</tbody></table>';
+            annotationsContainer.innerHTML = annotationsHtml;
+        } else {
+            annotationsContainer.innerHTML = '<span class="text-muted">No annotations</span>';
+        }
+        
+        // Populate labels
+        const labelsContainer = document.getElementById('service-labels-container');
+        if (service.labels && Object.keys(service.labels).length > 0) {
+            let labelsHtml = '<table class="table table-bordered" id="labelsTable" width="100%" cellspacing="0"><thead><tr><th width="50%">Key</th><th width="50%">Value</th></tr></thead><tbody>';
+            for (const [key, value] of Object.entries(service.labels)) {
+                labelsHtml += `<tr><td width="50%">${escapeHtml(key)}</td><td width="50%">${escapeHtml(value)}</td></tr>`;
+            }
+            labelsHtml += '</tbody></table>';
+            labelsContainer.innerHTML = labelsHtml;
+        } else {
+            labelsContainer.innerHTML = '<span class="text-muted">No labels</span>';
+        }
+    }
+    
+    function populatePorts(ports) {
+        const tbody = document.getElementById('ports-tbody');
+        
+        if (!ports || ports.length === 0) {
+            tbody.innerHTML = '<tr><td colspan="5" class="text-center text-muted">No ports found</td></tr>';
+            return;
+        }
+        
+        const rows = ports.map(port => {
+            // Handle both snake_case and camelCase field names
+            const name = port.name ? escapeHtml(port.name) : '-';
+            const portNum = port.port ? escapeHtml(String(port.port)) : '-';
+            const protocol = port.protocol ? escapeHtml(port.protocol) : '-';
+            const targetPort = (port.target_port || port.targetPort) ? escapeHtml(String(port.target_port || port.targetPort)) : '-';
+            const nodePort = (port.node_port || port.nodePort) ? escapeHtml(String(port.node_port || port.nodePort)) : '-';
+            
+            return `
+                <tr>
+                    <td>${name}</td>
+                    <td>${portNum}</td>
+                    <td>${protocol}</td>
+                    <td>${targetPort}</td>
+                    <td>${nodePort}</td>
+                </tr>
+            `;
+        }).join('');
+        
+        tbody.innerHTML = rows;
+    }
+    
+    function populatePods(pods, namespace) {
+        const tbody = document.getElementById('pods-tbody');
+        
+        if (!pods || pods.length === 0) {
+            tbody.innerHTML = '<tr><td colspan="5" class="text-center text-muted">No pods found</td></tr>';
+            return;
+        }
+        
+        const rows = pods.map(pod => {
+            const status = pod.status || 'Unknown';
+            const name = escapeHtml(pod.name || '');
+            const podIp = escapeHtml(pod.pod_ip || '-');
+            const nodeName = escapeHtml(pod.node_name || '-');
+            const owner = pod.owner || '';
+            
+            let statusBadge = '';
+            if (status === "Running") {
+                statusBadge = '<span class="badge text-bg-success">' + escapeHtml(status) + '</span>';
+            } else if (status === "Pending") {
+                statusBadge = '<span class="badge text-bg-warning">' + escapeHtml(status) + '</span>';
+            } else if (status === "Succeeded") {
+                statusBadge = '<span class="badge text-bg-secondary">' + escapeHtml(status) + '</span>';
+            } else {
+                statusBadge = '<span class="badge text-bg-info">' + escapeHtml(status) + '</span>';
+            }
+            
+            let ownerCell = '<td>-</td>';
+            if (owner) {
+                const ownerParts = owner.split('/');
+                if (ownerParts.length >= 2) {
+                    const ownerKind = ownerParts[0].toLowerCase();
+                    const ownerName = escapeHtml(ownerParts[1]);
+                    ownerCell = `
+                        <td>
+                            <form action="/workload/${ownerKind}" method="POST" onsubmit="sessionStorage.setItem('ns_select', '${escapeHtml(namespace)}'); return true;">
+                                <input type="hidden" name="csrf_token" value="${escapeHtml(csrf_token)}">
+                                <input type="hidden" name="ns_select" value="${escapeHtml(namespace)}" />
+                                <input type="hidden" name="selected" value="${ownerName}" />
+                                <a href="javascript:;" onclick="parentNode.submit();">${escapeHtml(owner)}</a>
+                            </form>
+                        </td>
+                    `;
+                } else {
+                    ownerCell = '<td>' + escapeHtml(owner) + '</td>';
+                }
+            }
+            
+            let nodeCell = '<td>-</td>';
+            if (nodeName && nodeName !== '-') {
+                nodeCell = `
+                    <td>
+                        <form action="/cluster/node" method="POST" onsubmit="sessionStorage.setItem('ns_select', '${escapeHtml(namespace)}'); return true;">
+                            <input type="hidden" name="csrf_token" value="${escapeHtml(csrf_token)}">
+                            <input type="hidden" name="ns_select" value="${escapeHtml(namespace)}" />
+                            <input type="hidden" name="selected" value="${nodeName}" />
+                            <a href="javascript:;" onclick="parentNode.submit();">${nodeName}</a>
+                        </form>
+                    </td>
+                `;
+            }
+            
+            return `
+                <tr>
+                    <td>${statusBadge}</td>
+                    <td>
+                        <form action="/workload/pods/data" method="POST" onsubmit="sessionStorage.setItem('ns_select', '${escapeHtml(namespace)}'); sessionStorage.setItem('pod_data_name', '${name}'); return true;">
+                            <input type="hidden" name="csrf_token" value="${escapeHtml(csrf_token)}">
+                            <input type="hidden" name="ns_select" value="${escapeHtml(namespace)}" />
+                            <input type="hidden" name="po_name" value="${name}" />
+                            <a href="javascript:;" onclick="parentNode.submit();">${name}</a>
+                        </form>
+                    </td>
+                    <td>${podIp}</td>
+                    ${nodeCell}
+                    ${ownerCell}
+                </tr>
+            `;
+        }).join('');
+        
+        tbody.innerHTML = rows;
+    }
+    
+    async function loadServiceData() {
+        const { serviceName, namespace } = getServiceInfo();
+        
+        if (!serviceName) {
+            console.error('Service name not found in URL, sessionStorage, or form.');
+            document.getElementById('service-name-breadcrumb').textContent = 'Error';
+            document.getElementById('service-name').textContent = 'Error: Service name not provided.';
+            return;
+        }
+        
+        // Update breadcrumb
+        const breadcrumb = document.getElementById('service-name-breadcrumb');
+        if (breadcrumb) {
+            breadcrumb.textContent = serviceName;
+        }
+        
+        try {
+            const apiUrl = `/api/v1/network/services/${encodeURIComponent(serviceName)}?namespace=${encodeURIComponent(namespace)}`;
+            console.log('Fetching service data from:', apiUrl);
+            
+            const response = await fetch(apiUrl);
+            if (!response.ok) {
+                if (response.status === 404) {
+                    throw new Error(`Service '${serviceName}' not found in namespace '${namespace}'`);
+                }
+                throw new Error(`HTTP error! status: ${response.status}`);
+            }
+            
+            const data = await response.json();
+            console.log('Service data API response:', data);
+            
+            if (data.error) {
+                throw new Error(data.message || 'Failed to load service data');
+            }
+            
+            const service = data.data.service;
+            const pods = data.data.pods || [];
+            
+            populateServiceInfo(service);
+            populatePorts(service.ports || []);
+            populatePods(pods, namespace);
+            
+        } catch (error) {
+            console.error('Error loading service data:', error);
+            document.getElementById('service-name-breadcrumb').textContent = 'Error';
+            document.getElementById('service-name').textContent = 'Error: ' + escapeHtml(error.message);
+        }
+    }
+    
+    // Load data when page loads
+    document.addEventListener('DOMContentLoaded', function() {
+        loadServiceData();
+    });
+</script>
 {% endblock %}

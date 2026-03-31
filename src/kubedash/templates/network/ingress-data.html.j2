@@ -7,14 +7,14 @@
         <ol class="breadcrumb my-0">
           <li class="breadcrumb-item"><span>Network</span></li>
           <li class="breadcrumb-item"><a href="/network/ingress">Ingress</a></li>
-          <li class="breadcrumb-item active"><span>{{ i_data.name }}</span></li>
+          <li class="breadcrumb-item active"><span id="ingress-name-breadcrumb">Loading...</span></li>
         </ol>
       </nav>
     </div>
 </ul>
 <ul class="header-nav ms-auto"></ul>
 <ul class="header-nav d-lg-flex">
-{% include "segments/topmenu.html.j2" %}
+{% include "segments/partials/topmenu.html.j2" %}
 {% endblock %}
 
 {% block content %}
@@ -27,73 +27,30 @@
             <table class="table table-bordered" id="podInfoTable" width="100%" cellspacing="0">
                 <tr>
                     <th>Name:</th>
-                    <td>{{ i_data.name }}</td>
+                    <td id="ingress-name">Loading...</td>
                 </tr>
                 <tr>
                     <th>ingressClass:</th>
-                    <td>
-                        {% if i_data.ingressClass %}
-                            <form action="/network/ingress-class" method="POST">
-                                <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
-                                <input type="hidden" name="ns_select" value="{{ session['ns_select'] }}" />
-                                <input type="hidden" name="selected" value='{{ i_data.ingressClass }}' />
-                                <a href="javascript:;" onclick="parentNode.submit();">{{ i_data.ingressClass }}</a>
-                            </form>
-                        {% else %}
-                            {{ i_data.ingressClass }}
-                        {% endif %}
-                    </td>
+                    <td id="ingress-class-container">Loading...</td>
                 </tr>
                 <tr>
                     <th>Created:</th>
-                    <td>{{ i_data.created }}</td>
+                    <td id="ingress-created">Loading...</td>
                 </tr>
                 <tr>
                     <th>Annotations:</th>
-                    <td>
-                        {% if i_data.annotations %}
-                        <table class="table table-bordered" id="annotationTable" width="100%" cellspacing="0">
-                            <thead>
-                                <tr>
-                                    <th width="50%">Key</th>
-                                    <th width="50%">Value</th>
-                                </tr>
-                            </thead>
-                            <tbody>
-                            {% for key, value in i_data.annotations.items() %}
-                                <tr>
-                                {% if key != "kubectl.kubernetes.io/last-applied-configuration" %}
-                                    <td width="50%">{{ key }}</td>
-                                    <td width="50%">{{ value }}</td>
-                                {% endif %}
-                                </tr>
-                            {% endfor %}
-                            </tbody>
-                        </table>
-                        {% endif %}
+                    <td id="ingress-annotations-container">
+                        <div class="spinner-border spinner-border-sm text-primary" role="status">
+                            <span class="visually-hidden">Loading...</span>
+                        </div>
                     </td>
                 </tr>
                 <tr>
-                    <th>Lables:</th>
-                    <td>
-                        {% if i_data.labels %}
-                        <table class="table table-bordered" id="labelsTable" width="100%" cellspacing="0">
-                            <thead>
-                                <tr>
-                                    <th width="50%">Key</th>
-                                    <th width="50%">Value</th>
-                                </tr>
-                            </thead>
-                            <tbody>
-                            {% for key, value in i_data.labels.items() %}
-                                <tr>
-                                    <td width="50%">{{ key }}</td>
-                                    <td width="50%">{{ value }}</td>
-                                </tr>
-                            {% endfor %}
-                            </tbody>
-                        </table>
-                        {% endif %}
+                    <th>Labels:</th>
+                    <td id="ingress-labels-container">
+                        <div class="spinner-border spinner-border-sm text-primary" role="status">
+                            <span class="visually-hidden">Loading...</span>
+                        </div>
                     </td>
                 </tr>
             </table>
@@ -101,14 +58,13 @@
     </div>
 </div>
 
-{% if i_data.rules %}
-<div class="card shadow mb-4">
+<div class="card shadow mb-4" id="ingress-routes-card" style="display: none;">
     <div class="card-header">
-        <h6 class="m-0 font-weight-bold text-primary">Routs</h6>
+        <h6 class="m-0 font-weight-bold text-primary">Routes</h6>
     </div>
     <div class="card-body">
         <div class="table-responsive">
-            <table class="table table-bordered" id="podInfoTable" width="100%" cellspacing="0">
+            <table class="table table-bordered" id="routesTable" width="100%" cellspacing="0">
                 <thead>
                     <tr>
                         <th>Host</th>
@@ -119,58 +75,307 @@
                         <th>TLS</th>
                     </tr>
                 </thead>
-                <tbody>
-                {% for rule in i_data.rules %}
+                <tbody id="routes-tbody">
                     <tr>
-                        <td>
-                            {% if i_data.tls[0] %}
-                            <a href="https://{{ i_data.hosts[0] }}" target="_blank">{{ i_data.hosts[0] }}</a>
-                            {% else %}
-                            <a href="http://{{ i_data.hosts[0] }}" target="_blank">{{ i_data.hosts[0] }}</a>
-                            {% endif %}
+                        <td colspan="6" class="text-center">
+                            <div class="spinner-border spinner-border-sm text-primary" role="status">
+                                <span class="visually-hidden">Loading...</span>
+                            </div>
+                            <span class="ms-2">Loading routes...</span>
                         </td>
-                        <td>{{ rule.path }}</td>
-                        <td>{{ rule.path_type }}</td>
-                        <td>
-                            <form action="/network/service" method="POST">
-                                <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
-                                <input type="hidden" name="ns_select" value="{{ session['ns_select'] }}" />
-                                <input type="hidden" name="selected" value='{{ rule.backend.service.name }}' />
-                                <a href="javascript:;" onclick="parentNode.submit();">{{ rule.backend.service.name }}</a>
-                            </form>
-                        </td>
-                        <td>
-                            {% if rule.backend.service.port.number %}
-                              {{ rule.backend.service.port.number }}
-                            {% elif rule.backend.service.port.name %}
-                              {{ rule.backend.service.port.name }}
-                            {% else %}
-                              None
-                            {% endif %}
-                        </td>
-                        {% if i_data.tls[0] %}
-                        <td>
-                            <form action="/security/secret" method="POST">
-                                <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
-                                <input type="hidden" name="ns_select" value="{{ session['ns_select'] }}" />
-                                <input type="hidden" name="selected" value='{{ i_data.tls[0]["secret_name"] }}' />
-                                <a href="javascript:;" onclick="parentNode.submit();">{{ i_data.tls[0]["secret_name"] }}</a>
-                            </form>
-                        </td>
-                        {% else %}
-                        <td></td>
-                        {% endif %}
                     </tr>
-                {% endfor %}
                 </tbody>
             </table>
         </div>
     </div>
 </div>
-{% endif %}
 
 {% endblock %}
 
 {% block add_head_css %}
-{% include "segments/datatable_snippet.html.j2" %}
+{% include "segments/components/datatable_snippet.html.j2" %}
+{% endblock %}
+
+{% block add_tail_js %}
+<script nonce="{{ csp_nonce }}">
+    const escapeHtml = (text) => {
+        if (text === null || text === undefined) return '';
+        const map = {
+            '&': '&amp;',
+            '<': '&lt;',
+            '>': '&gt;',
+            '"': '&quot;',
+            "'": '&#039;'
+        };
+        return String(text).replace(/[&<>"']/g, m => map[m]);
+    };
+    
+    const csrf_token = {{ csrf_token()|tojson }};
+    
+    // Get ingress name and namespace from URL, sessionStorage, or topbar selector
+    function getIngressInfo() {
+        const urlParams = new URLSearchParams(window.location.search);
+        let ingressName = urlParams.get('i_name');
+        let namespace = urlParams.get('namespace');
+        
+        // Fallback to sessionStorage
+        if (!ingressName) {
+            ingressName = sessionStorage.getItem('ingress_data_name');
+        }
+        if (!namespace) {
+            namespace = sessionStorage.getItem('ns_select');
+        }
+        
+        // Fallback to topbar selector
+        if (!namespace) {
+            const topbarSelect = document.getElementById('inputGroupSelect04');
+            if (topbarSelect) {
+                namespace = topbarSelect.value;
+            }
+        }
+        
+        // Final fallback
+        if (!namespace) {
+            namespace = 'default';
+        }
+        
+        return { ingressName, namespace };
+    }
+    
+    function populateIngressInfo(ingress) {
+        if (!ingress) {
+            document.getElementById('ingress-name').textContent = 'N/A';
+            document.getElementById('ingress-created').textContent = 'N/A';
+            return;
+        }
+        
+        document.getElementById('ingress-name').textContent = escapeHtml(ingress.name || 'N/A');
+        document.getElementById('ingress-created').textContent = escapeHtml(ingress.created || 'N/A');
+        
+        // Populate ingress class
+        const ingressClassContainer = document.getElementById('ingress-class-container');
+        const ingressClass = ingress.ingressClass || '';
+        if (ingressClass) {
+            const namespace = getIngressInfo().namespace;
+            ingressClassContainer.innerHTML = `
+                <form action="/network/ingress-class/data" method="POST" onsubmit="sessionStorage.setItem('ns_select', '${escapeHtml(namespace)}'); return true;">
+                    <input type="hidden" name="csrf_token" value="${escapeHtml(csrf_token)}">
+                    <input type="hidden" name="ic_name" value="${escapeHtml(ingressClass)}" />
+                    <a href="javascript:;" onclick="parentNode.submit();">${escapeHtml(ingressClass)}</a>
+                </form>
+            `;
+        } else {
+            ingressClassContainer.textContent = '-';
+        }
+        
+        // Populate annotations
+        const annotationsContainer = document.getElementById('ingress-annotations-container');
+        if (ingress.annotations && Object.keys(ingress.annotations).length > 0) {
+            let annotationsHtml = '<table class="table table-bordered" id="annotationTable" width="100%" cellspacing="0"><thead><tr><th width="50%">Key</th><th width="50%">Value</th></tr></thead><tbody>';
+            for (const [key, value] of Object.entries(ingress.annotations)) {
+                if (key !== "kubectl.kubernetes.io/last-applied-configuration") {
+                    annotationsHtml += `<tr><td width="50%">${escapeHtml(key)}</td><td width="50%">${escapeHtml(value)}</td></tr>`;
+                }
+            }
+            annotationsHtml += '</tbody></table>';
+            annotationsContainer.innerHTML = annotationsHtml;
+        } else {
+            annotationsContainer.innerHTML = '<span class="text-muted">No annotations</span>';
+        }
+        
+        // Populate labels
+        const labelsContainer = document.getElementById('ingress-labels-container');
+        if (ingress.labels && Object.keys(ingress.labels).length > 0) {
+            let labelsHtml = '<table class="table table-bordered" id="labelsTable" width="100%" cellspacing="0"><thead><tr><th width="50%">Key</th><th width="50%">Value</th></tr></thead><tbody>';
+            for (const [key, value] of Object.entries(ingress.labels)) {
+                labelsHtml += `<tr><td width="50%">${escapeHtml(key)}</td><td width="50%">${escapeHtml(value)}</td></tr>`;
+            }
+            labelsHtml += '</tbody></table>';
+            labelsContainer.innerHTML = labelsHtml;
+        } else {
+            labelsContainer.innerHTML = '<span class="text-muted">No labels</span>';
+        }
+    }
+    
+    function populateRoutes(rules, hosts, tls, namespace) {
+        const tbody = document.getElementById('routes-tbody');
+        const routesCard = document.getElementById('ingress-routes-card');
+        
+        if (!rules || rules.length === 0) {
+            tbody.innerHTML = '<tr><td colspan="6" class="text-center text-muted">No routes found</td></tr>';
+            routesCard.style.display = 'none';
+            return;
+        }
+        
+        routesCard.style.display = 'block';
+        
+        const rows = rules.map((rule, index) => {
+            // Extract rule data - handle both dict and object formats
+            const path = rule.path || '/';
+            const pathType = rule.path_type || rule.pathType || 'Prefix';
+            const backend = rule.backend || {};
+            const service = backend.service || {};
+            const serviceName = service.name || '';
+            const servicePort = service.port || {};
+            const portNumber = servicePort.number || servicePort.port;
+            const portName = servicePort.name;
+            
+            // Get host for this rule (use first host or rule-specific host)
+            const host = (hosts && hosts.length > 0) ? hosts[0] : '-';
+            
+            // Determine if TLS is enabled
+            const hasTls = tls && tls.length > 0;
+            const tlsSecret = hasTls ? (tls[0].secret_name || tls[0].secretName || '') : '';
+            
+            // Build host cell with link
+            let hostCell = '<td>-</td>';
+            if (host && host !== '-') {
+                const protocol = hasTls ? 'https' : 'http';
+                hostCell = `<td><a href="${protocol}://${escapeHtml(host)}" target="_blank">${escapeHtml(host)}</a></td>`;
+            }
+            
+            // Build service cell with link
+            let serviceCell = '<td>-</td>';
+            if (serviceName) {
+                serviceCell = `
+                    <td>
+                        <form action="/network/service/data" method="POST" onsubmit="sessionStorage.setItem('ns_select', '${escapeHtml(namespace)}'); return true;">
+                            <input type="hidden" name="csrf_token" value="${escapeHtml(csrf_token)}">
+                            <input type="hidden" name="ns_select" value="${escapeHtml(namespace)}" />
+                            <input type="hidden" name="service_name" value="${escapeHtml(serviceName)}" />
+                            <a href="javascript:;" onclick="parentNode.submit();">${escapeHtml(serviceName)}</a>
+                        </form>
+                    </td>
+                `;
+            }
+            
+            // Build port cell
+            let portCell = '<td>-</td>';
+            if (portNumber) {
+                portCell = `<td>${escapeHtml(String(portNumber))}</td>`;
+            } else if (portName) {
+                portCell = `<td>${escapeHtml(portName)}</td>`;
+            }
+            
+            // Build TLS cell
+            let tlsCell = '<td>-</td>';
+            if (hasTls && tlsSecret) {
+                tlsCell = `
+                    <td>
+                        <form action="/security/secret/data" method="POST" onsubmit="sessionStorage.setItem('ns_select', '${escapeHtml(namespace)}'); return true;">
+                            <input type="hidden" name="csrf_token" value="${escapeHtml(csrf_token)}">
+                            <input type="hidden" name="ns_select" value="${escapeHtml(namespace)}" />
+                            <input type="hidden" name="selected" value="${escapeHtml(tlsSecret)}" />
+                            <a href="javascript:;" onclick="parentNode.submit();">${escapeHtml(tlsSecret)}</a>
+                        </form>
+                    </td>
+                `;
+            }
+            
+            return `
+                <tr>
+                    ${hostCell}
+                    <td>${escapeHtml(path)}</td>
+                    <td>${escapeHtml(pathType)}</td>
+                    ${serviceCell}
+                    ${portCell}
+                    ${tlsCell}
+                </tr>
+            `;
+        }).join('');
+        
+        tbody.innerHTML = rows;
+        
+        // Initialize DataTables after a short delay
+        setTimeout(function() {
+            const $table = $('#routesTable');
+            if ($table.length && typeof $ !== 'undefined' && $.fn.DataTable) {
+                try {
+                    // Check if DataTable is already initialized
+                    let isInitialized = false;
+                    if (typeof $.fn.DataTable.isDataTable === 'function' && $.fn.DataTable.isDataTable('#routesTable')) {
+                        isInitialized = true;
+                    } else if ($table.data('DataTable')) {
+                        isInitialized = true;
+                    }
+                    
+                    // Destroy existing DataTable if it exists
+                    if (isInitialized) {
+                        try {
+                            $table.DataTable().destroy();
+                        } catch (destroyError) {
+                            console.warn('Error destroying DataTable:', destroyError);
+                        }
+                    }
+                    
+                    // Initialize DataTables only if not already initialized
+                    if (!isInitialized) {
+                        $('#routesTable').DataTable({
+                            responsive: true,
+                            order: [[0, 'asc']],
+                            pageLength: 25
+                        });
+                    }
+                } catch (e) {
+                    console.warn('Error initializing DataTable:', e);
+                }
+            }
+        }, 50);
+    }
+    
+    async function loadIngressData() {
+        const { ingressName, namespace } = getIngressInfo();
+        
+        if (!ingressName) {
+            console.error('Ingress name not found in URL, sessionStorage, or form.');
+            document.getElementById('ingress-name-breadcrumb').textContent = 'Error';
+            document.getElementById('ingress-name').textContent = 'Error: Ingress name not provided.';
+            return;
+        }
+        
+        // Update breadcrumb
+        const breadcrumb = document.getElementById('ingress-name-breadcrumb');
+        if (breadcrumb) {
+            breadcrumb.textContent = ingressName;
+        }
+        
+        try {
+            const apiUrl = `/api/v1/network/ingress/${encodeURIComponent(ingressName)}?namespace=${encodeURIComponent(namespace)}`;
+            console.log('Fetching ingress data from:', apiUrl);
+            
+            const response = await fetch(apiUrl);
+            if (!response.ok) {
+                if (response.status === 404) {
+                    throw new Error(`Ingress '${ingressName}' not found in namespace '${namespace}'`);
+                }
+                throw new Error(`HTTP error! status: ${response.status}`);
+            }
+            
+            const data = await response.json();
+            console.log('Ingress data API response:', data);
+            
+            if (data.error) {
+                throw new Error(data.message || 'Failed to load ingress data');
+            }
+            
+            const ingress = data.data;
+            populateIngressInfo(ingress);
+            
+            // Populate routes if available
+            if (ingress.rules) {
+                populateRoutes(ingress.rules, ingress.hosts, ingress.tls, namespace);
+            }
+            
+        } catch (error) {
+            console.error('Error loading ingress data:', error);
+            document.getElementById('ingress-name-breadcrumb').textContent = 'Error';
+            document.getElementById('ingress-name').textContent = 'Error: ' + escapeHtml(error.message);
+        }
+    }
+    
+    // Load data when page loads
+    document.addEventListener('DOMContentLoaded', function() {
+        loadIngressData();
+    });
+</script>
 {% endblock %}

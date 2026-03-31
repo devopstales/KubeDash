@@ -24,7 +24,7 @@
 </ul>
 <ul class="header-nav ms-auto"></ul>
 <ul class="header-nav d-lg-flex">
-{% include "segments/topmenu.html.j2" %}
+{% include "segments/partials/topmenu.html.j2" %}
 {% endblock %}
 
 {% block content %}
@@ -38,16 +38,11 @@
           <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
           <input type="hidden" name="po_name" value="{{ po_name }}">
           <div class="input-group">
-              <select name= "container_select" class="form-select" id="containers" aria-label="Select Container">
-                {% for container in pod_containers %}
-                {% if container == container_select %}
-                <option value="{{ container }}" selected>{{ container }}</option>
-                {% else %}
-                <option value="{{ container }}">{{ container }}</option>
-                {% endif %}
-                {% endfor %}
+              <select name="container_select" class="form-select" id="containers" aria-label="Select Container">
+                <option value="" selected disabled>Loading containers...</option>
               </select>
               <button type="submit" class="btn btn-primary" type="button">Submit</button>
+              <button type="button" class="btn btn-outline-secondary" id="disconnectBtn" title="Disconnect from shell">Disconnect</button>
           </div>
         </form>
       </div>
@@ -57,12 +52,12 @@
 {% endblock %}
 
 {% block add_head_css %}
-{% include "segments/datatable_snippet.html.j2" %}
-{% include "segments/socket_snippet.html.j2" %}
+{% include "segments/components/datatable_snippet.html.j2" %}
+{% include "segments/components/socket_snippet.html.j2" %}
 {% endblock %}
 
 {% block add_tail_js %}
-    <script>
+    <script nonce="{{ csp_nonce }}">
         const term = new Terminal({
           cursorBlink: true,
           macOptionIsMeta: true,
@@ -83,17 +78,124 @@
             socket.emit("exec-input", {"input": e.key})
         });
 
+        // Paste: use paste event so it works on Windows (Ctrl+V), Linux (Ctrl+Shift+V), macOS (Cmd+V), and context menu.
+        // Only send to server; do not term.write() — the server echoes input back, so we'd get double output.
+        term.element.addEventListener("paste", function(e) {
+          const text = (e.clipboardData || window.clipboardData).getData("text/plain");
+          if (text && socket && socket.connected) {
+            socket.emit("exec-input", { input: text });
+          }
+          e.preventDefault();
+        });
+
         const socket = io.connect('/exec');
         const status = document.getElementById("status");
+        const containersSelect = document.getElementById("containers");
+        const podName = "{{ po_name | e }}";
+        const namespace = "{{ session['ns_select'] | e }}";
+        const initialContainer = "{{ container_select | default('', true) | e }}";
+
+        let socketConnected = false;
+        let selectedContainer = "";
+
+        function sendExecRequest(containerName) {
+          if (!containerName) {
+            return;
+          }
+          selectedContainer = containerName;
+          if (socketConnected) {
+            socket.send(podName, containerName);
+            term.reset();
+          }
+        }
+
+        function buildContainerOptions(containers, initContainers) {
+          containersSelect.innerHTML = "";
+
+          if ((!containers || containers.length === 0) && (!initContainers || initContainers.length === 0)) {
+            const option = document.createElement("option");
+            option.value = "";
+            option.textContent = "No containers found";
+            option.disabled = true;
+            option.selected = true;
+            containersSelect.appendChild(option);
+            return;
+          }
+
+          if (initContainers && initContainers.length > 0) {
+            const initGroup = document.createElement("optgroup");
+            initGroup.label = "Init containers";
+            initContainers.forEach((name) => {
+              const option = document.createElement("option");
+              option.value = name;
+              option.textContent = name;
+              initGroup.appendChild(option);
+            });
+            containersSelect.appendChild(initGroup);
+          }
+
+          if (containers && containers.length > 0) {
+            const mainGroup = document.createElement("optgroup");
+            mainGroup.label = "Containers";
+            containers.forEach((name) => {
+              const option = document.createElement("option");
+              option.value = name;
+              option.textContent = name;
+              mainGroup.appendChild(option);
+            });
+            containersSelect.appendChild(mainGroup);
+          }
+        }
+
+        async function loadContainers() {
+          try {
+            const url = `/api/v1/workloads/pods/${encodeURIComponent(podName)}/containers?namespace=${encodeURIComponent(namespace)}`;
+            const response = await fetch(url, { headers: { "Accept": "application/json" } });
+            if (!response.ok) {
+              throw new Error(`Container fetch failed: ${response.status}`);
+            }
+            const payload = await response.json();
+            const containers = (payload.data && payload.data.containers) || [];
+            const initContainers = (payload.data && payload.data.init_containers) || [];
+
+            buildContainerOptions(containers, initContainers);
+
+            const desired = initialContainer || (containers[0] || initContainers[0] || "");
+            if (desired) {
+              containersSelect.value = desired;
+              sendExecRequest(desired);
+            }
+          } catch (error) {
+            containersSelect.innerHTML = "";
+            const option = document.createElement("option");
+            option.value = "";
+            option.textContent = "Failed to load containers";
+            option.disabled = true;
+            option.selected = true;
+            containersSelect.appendChild(option);
+            console.error(error);
+          }
+        }
 
         socket.on("connect", () => {
-          socket.send("{{ po_name }}", "{{ container_select }}");
-          term.reset();
+          socketConnected = true;
           status.innerHTML = '<span class="connected">connected</span>';
+          if (selectedContainer) {
+            socket.send(podName, selectedContainer);
+            term.reset();
+          }
         });
 
         socket.on("response", function(msg){
             term.write(msg.output)
+        });
+
+        socket.on("closed", function(msg){
+          status.innerHTML =
+            '<span class="disconnected">disconnected</span>';
+          if (msg && msg.message) {
+            term.writeln("\r\n" + (msg.message || "Stream ended."));
+          }
         });
 
         socket.on("disconnect", () => {
@@ -101,32 +203,67 @@
             '<span class="disconnected">disconnected</span>';
         });
 
+        containersSelect.addEventListener("change", (event) => {
+          sendExecRequest(event.target.value);
+        });
+
+        document.getElementById("disconnectBtn").addEventListener("click", () => {
+          if (socket && socket.connected) {
+            socket.emit("stop");
+          }
+        });
+
+        loadContainers();
+
         /**
-        * Handle copy and paste events
-        */
+         * Handle copy and paste key shortcuts. We must do paste here for Cmd+V/Ctrl+V
+         * because preventing default stops the browser from firing the paste event.
+         * Context-menu paste still uses the "paste" event listener.
+         */
         function customKeyEventHandler(e) {
           if (e.type !== "keydown") {
             return true;
           }
-          if (e.ctrlKey && e.shiftKey) {
-            const key = e.key.toLowerCase();
-            if (key === "v") {
-              // ctrl+shift+v: paste whatever is in the clipboard
-              navigator.clipboard.readText().then((toPaste) => {
-                term.writeText(toPaste);
-              });
-              return false;
-            } else if (key === "c" || key === "x") {
-              // ctrl+shift+x: copy whatever is highlighted to clipboard
-
-              // 'x' is used as an alternate to 'c' because ctrl+c is taken
-              // by the terminal (SIGINT) and ctrl+shift+c is taken by the browser
-              // (open devtools).
-              // I'm not aware of ctrl+shift+x being used by anything in the terminal
-              // or browser
-              const toCopy = term.getSelection();
-              navigator.clipboard.writeText(toCopy);
+          const key = e.key.toLowerCase();
+          // Paste: Ctrl+V (Windows/Linux), Cmd+V (macOS), Ctrl+Shift+V — do it here so it works when we preventDefault
+          if (key === "v" && (e.ctrlKey || e.metaKey)) {
+            e.preventDefault();
+            if (navigator.clipboard && navigator.clipboard.readText) {
+              navigator.clipboard.readText().then(function(toPaste) {
+                if (toPaste && socket && socket.connected) {
+                  socket.emit("exec-input", { input: toPaste });
+                }
+              }).catch(function() {});
+            }
+            return false;
+          }
+          // Copy: Ctrl+C / Cmd+C when there is selection
+          if ((e.ctrlKey || e.metaKey) && !e.shiftKey && (key === "c" || key === "x")) {
+            const toCopy = term.getSelection();
+            if (toCopy) {
+              const clip = (navigator.clipboard && navigator.clipboard.writeText) ? navigator.clipboard : null;
+              if (clip) {
+                clip.writeText(toCopy).catch(function() {});
+              } else if (window.clipboardData) {
+                window.clipboardData.setData("Text", toCopy);
+              }
               term.focus();
+              e.preventDefault();
+              return false;
+            }
+          }
+          // Ctrl+Shift+C / Ctrl+Shift+X: copy selection (alternate when Ctrl+C is SIGINT)
+          if (e.ctrlKey && e.shiftKey && (key === "c" || key === "x")) {
+            const toCopy = term.getSelection();
+            if (toCopy) {
+              const clip = (navigator.clipboard && navigator.clipboard.writeText) ? navigator.clipboard : null;
+              if (clip) {
+                clip.writeText(toCopy).catch(function() {});
+              } else if (window.clipboardData) {
+                window.clipboardData.setData("Text", toCopy);
+              }
+              term.focus();
+              e.preventDefault();
               return false;
             }
           }
