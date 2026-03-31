@@ -43,6 +43,8 @@
   z-index: 1050;
   display: flex;
   flex-direction: column;
+  min-height: 0;
+  overflow: hidden;
   transform: translateX(100%);
   transition: transform 0.3s ease;
 }
@@ -54,6 +56,17 @@
 .ai-chat-drawer-panel .chat-message-content { white-space: pre-wrap; line-height: 1.5; font-size: 0.9rem; }
 .ai-chat-drawer-panel .chat-message-content pre { white-space: pre; overflow-x: auto; }
 .ai-chat-drawer-panel .ai-chat-message-input { resize: none; max-height: 120px; }
+.ai-chat-drawer-panel .ai-chat-content {
+  flex: 1 1 auto;
+  min-height: 0;
+  display: flex;
+  flex-direction: column;
+}
+.ai-chat-drawer-panel .ai-chat-messages-container {
+  overflow-y: auto;
+  flex: 1 1 auto;
+  min-height: 0;
+}
 /* Button visibility in drawer */
 .ai-chat-drawer-panel .ai-chat-drawer-close {
   min-width: 2rem;
@@ -103,9 +116,13 @@
 <div class="ai-chat-drawer-panel" id="ai-chat-drawer-panel" role="dialog" aria-label="AI Chat" aria-hidden="true">
   <div class="border-bottom bg-body-tertiary px-3 py-2 d-flex align-items-center justify-content-between flex-shrink-0">
     <h6 class="mb-0 fw-bold text-body"><i class="cil-comment"></i> AI Chat</h6>
-    <button type="button" class="btn btn-sm ai-chat-drawer-close" aria-label="Close" title="Close"><i class="cil-x"></i></button>
+    <button type="button" class="btn btn-sm ai-chat-drawer-close d-inline-flex align-items-center justify-content-center" aria-label="Close" title="Close">
+      <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 16 16" width="14" height="14" aria-hidden="true" focusable="false">
+        <path fill="currentColor" d="M3.22 3.22a.75.75 0 0 1 1.06 0L8 6.94l3.72-3.72a.75.75 0 1 1 1.06 1.06L9.06 8l3.72 3.72a.75.75 0 1 1-1.06 1.06L8 9.06l-3.72 3.72a.75.75 0 1 1-1.06-1.06L6.94 8 3.22 4.28a.75.75 0 0 1 0-1.06z"/>
+      </svg>
+    </button>
   </div>
-  <div class="flex-grow-1 d-flex flex-column min-h-0">
+  <div class="ai-chat-content flex-grow-1 d-flex flex-column min-h-0">
     <div class="ai-chat-messages-container overflow-auto flex-grow-1 p-3 bg-body-tertiary" style="min-height: 200px;">
       <div class="text-center py-4 welcome-message">
         <i class="cil-comment display-6 text-primary"></i>
