@@ -46,7 +46,6 @@ def k8sGetClusterMetric():
         result = None
         k8sClientConfigGet("Admin", None)
         tmpTotalPodCount = float()
-        totalTotalPodAllocatable = float()
         totalPodAllocatable = float()
         tmpTotalCpuCapacity = int()
         tmpTotalMemoryCapacity = int()
@@ -145,6 +144,7 @@ def k8sGetClusterMetric():
                 tmpMemoryRequest = float()
                 node_mem_usage = 0
                 node_cpu_usage = 0
+                node_pod_allocatable = float(node.status.allocatable["pods"])
                 
                 # Process pods for this node (much faster than nested loop)
                 node_pods = pods_by_node.get(node_name, [])
@@ -162,7 +162,7 @@ def k8sGetClusterMetric():
                             if "memory" in container.resources.requests:
                                 tmpMemoryRequest += float(parse_quantity(container.resources.requests["memory"]))
                 
-                totalPodAllocatable += float(node.status.allocatable["pods"])
+                totalPodAllocatable += node_pod_allocatable
                 node_mem_capacity = float(parse_quantity(node.status.capacity["memory"]))
                 node_mem_allocatable = float(parse_quantity(node.status.allocatable["memory"]))
                 # Parse CPU quantities (can be in formats like "2500m", "2.5", etc.)
@@ -199,12 +199,11 @@ def k8sGetClusterMetric():
                             },
                     "pod_count": {
                         "current": tmpPodCount,
-                        "currentPercent": calcPercent(tmpPodCount, totalPodAllocatable, True),
-                        "allocatable": totalPodAllocatable,
+                        "currentPercent": calcPercent(tmpPodCount, node_pod_allocatable, True),
+                        "allocatable": node_pod_allocatable,
                     },
                 })
                 tmpTotalPodCount += tmpPodCount
-                totalTotalPodAllocatable += totalPodAllocatable
                 tmpTotalCpuAllocatable += node_cpu_allocatable
                 tmpTotalMenoryAllocatable += node_mem_allocatable
                 tmpTotalCpuCapacity += node_cpu_capacity
@@ -227,7 +226,7 @@ def k8sGetClusterMetric():
                 span.set_attribute("total.cpu.limits", tmpTotalCpuLimit)
                 span.set_attribute("total.memory.limits", tmpTotalMemoryLimit)
                 span.set_attribute("total.pod.count.current", tmpTotalPodCount)
-                span.set_attribute("total.pod.count.allocatable", totalTotalPodAllocatable)
+                span.set_attribute("total.pod.count.allocatable", totalPodAllocatable)
                 
                 clusterMetric["clusterTotals"] = {
                     "cpu": {
@@ -252,8 +251,8 @@ def k8sGetClusterMetric():
                     },
                     "pod_count": {
                         "current": tmpTotalPodCount,
-                        "currentPercent": calcPercent(tmpTotalPodCount, totalTotalPodAllocatable, True),
-                        "allocatable": totalTotalPodAllocatable,
+                        "currentPercent": calcPercent(tmpTotalPodCount, totalPodAllocatable, True),
+                        "allocatable": totalPodAllocatable,
                     },
                 }
             result = clusterMetric
