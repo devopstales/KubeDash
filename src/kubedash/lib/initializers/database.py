@@ -57,11 +57,13 @@ def initialize_app_database(app: Flask, filename: str):
             test_engine.dispose()
         except Exception as e:
             app.logger.error(f"   Failed to connect to PostgreSQL database: {type(e).__name__}: {e}")
-            app.logger.warning("   Falling back to SQLite database")
-            basedir = os.path.abspath(os.path.dirname(filename))
-            sqlite_url =  "sqlite:///"+basedir+"/database/"+ app.config['ENV'] +".db"
-            app.config['SQLALCHEMY_DATABASE_URI'] = sqlite_url
-            database_type = 'sqlite3'
+            env = app.config.get('ENV', 'development')
+            # Never silently fall back when PostgreSQL is selected; require explicit fix
+            raise RuntimeError(
+                f"Failed to connect to PostgreSQL database in '{env}' environment. "
+                "Fix database configuration or disable PostgreSQL (set database.type to "
+                "'sqlite3' in kubedash.ini) instead of relying on an automatic fallback."
+            ) from e
 
     """Logging Database URL"""
     app.logger.info("   Database Configuration:")

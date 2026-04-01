@@ -66,9 +66,11 @@ def get_database_url(app: Flask, filename: string) -> string:
         
     """Create Database URL"""
     basedir = os.path.abspath(os.path.dirname(filename))
+    env = app.config.get('ENV', 'development')
+
     # Check if PostgreSQL is configured and all credentials are present
     if EXTERNAL_DATABASE_ENABLED and SQLALCHEMY_DATABASE_USER and SQLALCHEMY_DATABASE_PASSWORD and SQLALCHEMY_DATABASE_HOST and SQLALCHEMY_DATABASE_DB:
-        # Use PostgreSQL if configured, even in testing mode
+        # Use PostgreSQL if configured, even in testing or development mode
         # Use urllib.parse.quote_plus to properly encode URL components to prevent injection
         from urllib.parse import quote_plus
         
@@ -88,11 +90,46 @@ def get_database_url(app: Flask, filename: string) -> string:
         
         # Construct PostgreSQL URL with proper host:port format
         SQLALCHEMY_DATABASE_URI = f"postgresql://{encoded_user}:{encoded_password}@{encoded_host}:{port}/{encoded_db}"
-    elif app.config['ENV'] == 'testing':
+    elif database_type == 'postgres':
+        # PostgreSQL was selected but is not fully configured; do not silently fall back
+        missing_parts = []
+        if not SQLALCHEMY_DATABASE_HOST:
+            missing_parts.append("database.host")
+        if not SQLALCHEMY_DATABASE_DB:
+            missing_parts.append("database.name")
+        if not SQLALCHEMY_DATABASE_USER:
+            missing_parts.append("database.user")
+        if not SQLALCHEMY_DATABASE_PASSWORD:
+            missing_parts.append("database.password")
+        missing_str = ", ".join(missing_parts) if missing_parts else "PostgreSQL configuration"
+        raise RuntimeError(
+            f"database.type is set to 'postgres' but configuration is incomplete. "
+            f"Missing settings: {missing_str}. Either fix PostgreSQL config or "
+            f"set database.type to 'sqlite3' for SQLite."
+        )
+    elif env == 'production':
+        # In production, PostgreSQL must be enabled and fully configured
+        missing_parts = []
+        if not EXTERNAL_DATABASE_ENABLED:
+            missing_parts.append("database.type=postgres")
+        if not SQLALCHEMY_DATABASE_HOST:
+            missing_parts.append("database.host")
+        if not SQLALCHEMY_DATABASE_DB:
+            missing_parts.append("database.name")
+        if not SQLALCHEMY_DATABASE_USER:
+            missing_parts.append("database.user")
+        if not SQLALCHEMY_DATABASE_PASSWORD:
+            missing_parts.append("database.password")
+        missing_str = ", ".join(missing_parts) if missing_parts else "PostgreSQL configuration"
+        raise RuntimeError(
+            f"In production environment, PostgreSQL must be configured and used. "
+            f"Missing or invalid settings: {missing_str}"
+        )
+    elif env == 'testing':
         # Fall back to SQLite only if PostgreSQL is not configured
-        SQLALCHEMY_DATABASE_URI = "sqlite:///"+basedir+"/database/"+ app.config['ENV'] +".db"
+        SQLALCHEMY_DATABASE_URI = "sqlite:///"+basedir+"/database/"+ env +".db"
     else:
-        SQLALCHEMY_DATABASE_URI = "sqlite:///"+basedir+"/database/"+ app.config['ENV'] +".db"
+        SQLALCHEMY_DATABASE_URI = "sqlite:///"+basedir+"/database/"+ env +".db"
         
     return SQLALCHEMY_DATABASE_URI
 
