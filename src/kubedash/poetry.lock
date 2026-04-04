@@ -2717,14 +2717,14 @@ xmp = ["defusedxml"]
 
 [[package]]
 name = "pip"
-version = "25.2"
+version = "26.0"
 description = "The PyPA recommended tool for installing Python packages."
 optional = false
 python-versions = ">=3.9"
 groups = ["dev"]
 files = [
-    {file = "pip-25.2-py3-none-any.whl", hash = "sha256:6d67a2b4e7f14d8b31b8b52648866fa717f45a1eb70e83002f4331d07e953717"},
-    {file = "pip-25.2.tar.gz", hash = "sha256:578283f006390f85bb6282dffb876454593d637f5d1be494b5202ce4877e71f2"},
+    {file = "pip-26.0-py3-none-any.whl", hash = "sha256:98436feffb9e31bc9339cf369fd55d3331b1580b6a6f1173bacacddcf9c34754"},
+    {file = "pip-26.0.tar.gz", hash = "sha256:3ce220a0a17915972fbf1ab451baae1521c4539e778b28127efa79b974aff0fa"},
 ]
 
 [[package]]
@@ -4853,4 +4853,4 @@ test = ["pytest"]
 [metadata]
 lock-version = "2.1"
 python-versions = ">=3.11,<3.13"
-content-hash = "8a6ce62263e2a836add5e24eb3d06e9c15d747028d669477d341e1a20659d09f"
+content-hash = "10acc35bbc5aae114c8cf433f0718b3582b61bd4908979f439404b678504943f"
