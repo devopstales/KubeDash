@@ -11,9 +11,9 @@ spec:
     {{- include "kubedash.selectorLabels" . | nindent 4 }}
   ports:
     - name: http
-      port: 8000
+      port: {{ .Values.service.port }}
       protocol: TCP
-      targetPort: 8000
+      targetPort: {{ .Values.service.port }}
   sessionAffinity: None
   type: ClusterIP
 status:
@@ -34,9 +34,9 @@ spec:
     {{- include "kubedash.selectorLabels" . | nindent 4 }}
   ports:
     - name: http
-      port: 8000
+      port: {{ .Values.service.port }}
       protocol: TCP
-      targetPort: 8000
+      targetPort: {{ .Values.service.port }}
   sessionAffinity: None
   type: ClusterIP
 status:
@@ -87,9 +87,9 @@ spec:
     {{- include "kubedash.selectorLabels" . | nindent 4 }}
   ports:
     - name: http
-      port: 8000
+      port: {{ .Values.service.port }}
       protocol: TCP
-      targetPort: 8000
+      targetPort: {{ .Values.service.port }}
     {{- if .Values.metrics.enabled }}
     - name: statsd
       port: 9125
