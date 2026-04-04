@@ -784,7 +784,7 @@ def initialize_app_security(app: Flask):
           app.wsgi_app, x_for=1, x_proto=1, x_host=1, x_prefix=1
         )
         """Config Talisman"""
-        app.talisman.force_https = True
+        app.talisman.force_https = False
         app.talisman.strict_transport_security = hsts
 
     else:

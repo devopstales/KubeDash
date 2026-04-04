@@ -20,6 +20,10 @@ spec:
         {{- include "kubedash.labels" . | nindent 8 }}
         checksum/config: {{ include (print $.Template.BasePath "/ui-configmap.yaml") . | sha256sum | trunc 63 }}
     spec:
+      dnsConfig:
+        options:
+          - name: ndots
+            value: "2"
       {{- with .Values.imagePullSecrets }}
       imagePullSecrets:
         {{- toYaml . | nindent 8 }}
@@ -45,17 +49,17 @@ spec:
         livenessProbe:
           httpGet:
             path: /api/health/live
-            port: 8000
+            port: {{ .Values.service.port }}
           initialDelaySeconds: 5
           timeoutSeconds: 1
         readinessProbe:
           httpGet:
             path: /api/health/ready
-            port: 8000
+            port: {{ .Values.service.port }}
           initialDelaySeconds: 5
           timeoutSeconds: 1
         ports:
-        - containerPort: 8000
+        - containerPort: {{ .Values.service.port }}
           protocol: TCP
           name: http
         volumeMounts:
