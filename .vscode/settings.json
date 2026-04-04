@@ -43,5 +43,7 @@
   },
   "chat.mcp.serverSampling": {
     
-  }
+  },
+  "snyk.advanced.organization": "dc65020b-c39e-469f-b3a5-333bc83d5e75",
+  "snyk.advanced.autoSelectOrganization": true
 }

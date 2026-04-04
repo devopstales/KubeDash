@@ -14,6 +14,8 @@ graph TD
     CORE --> PRD_COST[Cost Optimization Dashboard]
     CORE --> PRD_CLUSTERED[Clustered Replica Mode]
     CORE --> PRD_KYVERNO[Kyverno Policy Plugin]
+    CORE --> PRD_MINIMALCFG[Minimal Config Startup]
+    CORE --> PRD_HNC[HNC Namespace Hierarchy Plugin]
 ```
 
 ### Available PRDs
@@ -42,4 +44,12 @@ graph TD
 - **Kyverno plugin**
   - OpenSpec: `openspec/changes/kyverno-plugin/`
   - PRD: `project/prd/kyverno-plugin.md`
-
+ - **kubelogin interactive OIDC support**
+   - OpenSpec: `openspec/changes/kubelogin-interactive-login/`
+   - PRD: `project/prd/kubelogin-interactive-login.md`
+- **Minimal config startup (no kubedash.ini)**
+  - OpenSpec: `openspec/changes/minimal-config-startup/`
+  - PRD: `project/prd/minimal-config-startup.md`
+- **HNC namespace hierarchy plugin**
+  - OpenSpec: _TBD (future change)_
+  - PRD: `project/prd/hnc-namespace-hierarchy-plugin.md`

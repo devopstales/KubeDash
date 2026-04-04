@@ -95,3 +95,5 @@ cover/
 src/certs
 !kubedash.ini.example
 kubedash.ini*
+# CocoIndex Code (ccc)
+/.cocoindex_code/
