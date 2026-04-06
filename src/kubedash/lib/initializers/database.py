@@ -17,6 +17,7 @@ def initialize_app_database(app: Flask, filename: str):
     """
     from lib.components import db, migrate, sess
     from lib.init_functions import get_database_url
+    from lib.session import configure_session_backend
 
     app.logger.info("Initialize Database:")
 
@@ -133,6 +134,7 @@ def initialize_app_database(app: Flask, filename: str):
             return _original_table(*args, **kwargs)
         try:
             sa.Table = _patched_table
+            configure_session_backend(app)
             sess.init_app(app)
         finally:
             sa.Table = _original_table

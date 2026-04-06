@@ -56,7 +56,15 @@ def initialize_app_configuration(app: Flask, external_config_name: str) -> bool:
             'redis_port': '6379',
             'redis_db': '0',
             'redis_password': '',
+            'redis_ssl': 'false',
             'cluster_enabled': 'false',
+            'replica_mode': 'single',
+            'replica_count': '1',
+            'leader_election_enabled': 'false',
+            'leader_election_lease_name': 'kubedash-leader-election',
+            'leader_election_lease_duration': '30',
+            'leader_election_renew_deadline': '20',
+            'leader_election_retry_period': '5',
             'cluster_startup_nodes': '',
             'short_cache_time': '60',
             'long_cache_time': '900'
@@ -104,7 +112,7 @@ def initialize_app_configuration(app: Flask, external_config_name: str) -> bool:
             validate_config(dict(app.config), ini_dict)
             app.logger.info("Configuration validation passed")
         except Exception as e:
-            app.logger.error(f"❌ Configuration validation failed: {e}")
+            app.logger.error(f"Configuration validation failed: {e}")
             raise
 
     return False

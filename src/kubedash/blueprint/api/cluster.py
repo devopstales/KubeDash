@@ -14,6 +14,9 @@ from lib.k8s.other import k8sRuntimeClassListGet
 from lib.k8s.server import k8sGetClusterStatus
 from lib.opentelemetry import get_tracer
 from lib.sso import get_user_token
+from lib.replica_mode import get_replica_mode, get_pod_identity
+from lib.leader_election import get_leader_elector
+from lib.leader_tasks import get_task_registry
 
 ##############################################################
 ## Blueprint Definition
@@ -278,4 +281,284 @@ class RuntimeClassesListResource(MethodView):
                     "count": len(runtime_classes)
                 }
             })
+
+
+##############################################################
+## Replica Mode and Leader Election
+##############################################################
+
+@cluster_api_bp.route('/mode')
+class ClusterModeResource(MethodView):
+    """
+    Cluster mode endpoint.
+    
+    Returns the current replica mode configuration and feature flags.
+    """
+    
+    @cluster_api_bp.response(200, description="Successfully retrieved cluster mode")
+    @cluster_api_bp.response(401, description="Unauthorized - User not authenticated")
+    @cluster_api_bp.doc(tags=['Cluster'])
+    @login_required
+    def get(self):
+        """
+        Get cluster mode
+        
+        Returns the current replica mode (single/cluster) and associated feature flags.
+        
+        Returns:
+            dict: Cluster mode information with feature flags
+        """
+        from flask import current_app
+        
+        with tracer.start_as_current_span(
+            "cluster-mode",
+            attributes={
+                "http.route": "/api/v1/cluster/mode",
+                "http.method": "GET",
+            }
+        ) if tracer else nullcontext():
+            mode = get_replica_mode()
+            replica_count = current_app.config.get('REPLICA_COUNT', 1)
+            
+            # Feature flags based on mode
+            feature_flags = {
+                'leader_election': mode == 'cluster',
+                'distributed_sessions': mode == 'cluster',
+                'coordinated_tasks': mode == 'cluster',
+                'metrics_cleanup': mode == 'cluster'
+            }
+            
+            return jsonify({
+                "data": {
+                    "mode": mode,
+                    "replica_count": replica_count,
+                    "feature_flags": feature_flags
+                },
+                "metadata": {
+                    "source": "configuration"
+                }
+            })
+
+
+@cluster_api_bp.route('/leader/status')
+class LeaderStatusResource(MethodView):
+    """
+    Leader election status endpoint.
+    
+    Returns the current leader election status and lease information.
+    """
+    
+    @cluster_api_bp.response(200, description="Successfully retrieved leader status")
+    @cluster_api_bp.response(401, description="Unauthorized - User not authenticated")
+    @cluster_api_bp.doc(tags=['Cluster'])
+    @login_required
+    def get(self):
+        """
+        Get leader election status
+        
+        Returns detailed information about the current leader election state,
+        including identity, lease duration, renewal times, and transition history.
+        
+        Returns:
+            dict: Leader election status with lease information
+        """
+        with tracer.start_as_current_span(
+            "leader-status",
+            attributes={
+                "http.route": "/api/v1/cluster/leader/status",
+                "http.method": "GET",
+            }
+        ) if tracer else nullcontext():
+            elector = get_leader_elector()
+            if not elector:
+                return jsonify({
+                    "data": {
+                        "enabled": False,
+                        "message": "Leader election not enabled (single replica mode)"
+                    }
+                })
+            
+            status = elector.get_status()
+            
+            return jsonify({
+                "data": status,
+                "metadata": {
+                    "source": "leader_election"
+                }
+            })
+
+
+@cluster_api_bp.route('/replicas/self')
+class ReplicaSelfResource(MethodView):
+    """
+    Local replica status endpoint.
+    
+    Returns status information for the current replica instance.
+    """
+    
+    @cluster_api_bp.response(200, description="Successfully retrieved replica status")
+    @cluster_api_bp.response(401, description="Unauthorized - User not authenticated")
+    @cluster_api_bp.doc(tags=['Cluster'])
+    @login_required
+    def get(self):
+        """
+        Get local replica status
+        
+        Returns status information for this replica instance, including
+        identity, leadership status, and uptime.
+        
+        Returns:
+            dict: Local replica status information
+        """
+        from datetime import datetime
+        import time
+        
+        with tracer.start_as_current_span(
+            "replica-self",
+            attributes={
+                "http.route": "/api/v1/cluster/replicas/self",
+                "http.method": "GET",
+            }
+        ) if tracer else nullcontext():
+            pod_identity = get_pod_identity()
+            elector = get_leader_elector()
+            
+            # Calculate uptime (simplified - would need to track actual start time)
+            uptime_seconds = time.time() - time.time()  # Placeholder
+            
+            status = {
+                "identity": pod_identity,
+                "is_leader": elector.is_leader() if elector else True,  # Single mode = always leader
+                "uptime_seconds": uptime_seconds,
+                "mode": get_replica_mode()
+            }
+            
+            return jsonify({
+                "data": status,
+                "metadata": {
+                    "timestamp": datetime.utcnow().isoformat(),
+                    "source": "local_instance"
+                }
+            })
+
+
+@cluster_api_bp.route('/tasks')
+class LeaderTasksResource(MethodView):
+    """
+    Leader tasks endpoint.
+    
+    Returns information about registered leader-only tasks and their execution status.
+    """
+    
+    @cluster_api_bp.response(200, description="Successfully retrieved tasks list")
+    @cluster_api_bp.response(401, description="Unauthorized - User not authenticated")
+    @cluster_api_bp.doc(tags=['Cluster'])
+    @login_required
+    def get(self):
+        """
+        Get leader tasks list
+        
+        Returns a list of all registered leader-only tasks with their
+        execution status, last run time, and scope information.
+        
+        Returns:
+            dict: List of leader tasks with execution information
+        """
+        with tracer.start_as_current_span(
+            "leader-tasks",
+            attributes={
+                "http.route": "/api/v1/cluster/tasks",
+                "http.method": "GET",
+            }
+        ) if tracer else nullcontext():
+            registry = get_task_registry()
+            if not registry:
+                return jsonify({
+                    "data": [],
+                    "metadata": {
+                        "message": "Leader tasks not enabled (single replica mode)",
+                        "count": 0
+                    }
+                })
+            
+            tasks = registry.list_tasks()
+            
+            return jsonify({
+                "data": tasks,
+                "metadata": {
+                    "count": len(tasks),
+                    "source": "leader_task_registry"
+                }
+            })
+
+
+@cluster_api_bp.route('/tasks/<task_name>/trigger', methods=['POST'])
+class LeaderTaskTriggerResource(MethodView):
+    """
+    Manual leader task trigger endpoint.
+    
+    Allows manual execution of a registered leader-only task.
+    Only works if this instance is the current leader.
+    """
+    
+    @cluster_api_bp.response(200, description="Task triggered successfully")
+    @cluster_api_bp.response(403, description="Not the current leader")
+    @cluster_api_bp.response(404, description="Task not found")
+    @cluster_api_bp.response(401, description="Unauthorized - User not authenticated")
+    @cluster_api_bp.doc(tags=['Cluster'])
+    @login_required
+    def post(self, task_name):
+        """
+        Trigger leader task manually
+        
+        Manually executes a registered leader-only task. This endpoint will
+        only succeed if the current instance is the elected leader.
+        
+        Path Parameters:
+            task_name (str): Name of the task to trigger
+        
+        Returns:
+            dict: Task execution result
+        """
+        from flask import current_app
+        
+        with tracer.start_as_current_span(
+            "trigger-leader-task",
+            attributes={
+                "http.route": "/api/v1/cluster/tasks/{task_name}/trigger",
+                "http.method": "POST",
+                "task.name": task_name,
+            }
+        ) if tracer else nullcontext():
+            registry = get_task_registry()
+            if not registry:
+                return jsonify({
+                    "error": "Leader tasks not enabled (single replica mode)"
+                }), 403
+            
+            elector = get_leader_elector()
+            if elector and not elector.is_leader():
+                return jsonify({
+                    "error": "Not the current leader",
+                    "leader": elector.get_current_leader()
+                }), 403
+            
+            # Execute the task
+            try:
+                result = registry.execute_task(task_name, current_app, None)  # db parameter not needed for manual trigger
+                return jsonify({
+                    "data": {
+                        "task_name": task_name,
+                        "executed": True,
+                        "result": result
+                    },
+                    "metadata": {
+                        "timestamp": "now",
+                        "source": "manual_trigger"
+                    }
+                })
+            except ValueError as e:
+                return jsonify({
+                    "error": str(e)
+                }), 404
 

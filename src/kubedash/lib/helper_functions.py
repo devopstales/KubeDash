@@ -4,9 +4,7 @@ import os
 import re
 import sys
 from datetime import datetime as dt, timezone
-import colorlog
 import validators
-from colorlog.escape_codes import escape_codes
 from decimal import Decimal, InvalidOperation
 from logging import Logger
 from urllib.parse import urlparse, urljoin
@@ -52,15 +50,25 @@ class ThreadedTicker:
         ch = logging.StreamHandler()
         ch.setLevel(logging.DEBUG)
 
-        # Canonical format (same as get_logger): [timestamp] [no-id] [logger] [LEVEL] message
+        # Canonical format (same as get_logger): [timestamp] [pod_name] [logger] [LEVEL] message
         class CanonicalFormatter(logging.Formatter):
             def formatTime(self, record, datefmt=None):
                 ct = dt.fromtimestamp(record.created)
                 s = ct.strftime("%Y-%m-%d %H:%M:%S")
                 return "%s,%03d" % (s, record.msecs)
+            
+            def format(self, record):
+                if not hasattr(record, 'pod_name'):
+                    record.pod_name = (
+                        os.environ.get('POD_NAME')
+                        or os.environ.get('HOSTNAME')
+                        or os.uname().nodename
+                        or 'unknown'
+                    )
+                return super().format(record)
 
         formatter = CanonicalFormatter(
-            '[%(asctime)s] [no-id] [%(name)s] [%(levelname)s] %(message)s'
+            '[%(asctime)s] [%(pod_name)s] [%(name)s] [%(levelname)s] %(message)s'
         )
         ch.setFormatter(formatter)
 
@@ -134,12 +142,20 @@ class JsonFormatter(logging.Formatter):
             record.correlation_id = 'no-id'
         if not record.correlation_id:
             record.correlation_id = 'no-id'
+        if not hasattr(record, 'pod_name'):
+            record.pod_name = (
+                os.environ.get('POD_NAME')
+                or os.environ.get('HOSTNAME')
+                or os.uname().nodename
+                or 'unknown'
+            )
         # ISO timestamp with Z (UTC)
         ct = dt.fromtimestamp(record.created, tz=timezone.utc)
         ts = ct.strftime('%Y-%m-%dT%H:%M:%S') + '.%03dZ' % (record.msecs,)
         obj = {
             'timestamp': ts,
             'trace_id': record.correlation_id,
+            'pod_name': record.pod_name,
             'logger': record.name,
             'level': record.levelname,
             'message': record.getMessage(),
@@ -159,15 +175,26 @@ def get_logger(ini_config=None) -> Logger:
     for handler in logging.root.handlers[:]:
         logging.root.removeHandler(handler)
 
-    # Define color codes
-    BLACK = escape_codes['black']
-    PURPLE = escape_codes['purple']
-    RESET = escape_codes['reset']
-    GREEN = '\033[32m'
-    RED = '\033[31m'
+    # Force ALL known loggers to propagate to root and strip their handlers
+    for logger_name in list(logging.Logger.manager.loggerDict.keys()):
+        _logger = logging.getLogger(logger_name)
+        if isinstance(_logger, logging.PlaceHolder):
+            continue
+        _logger.handlers.clear()
+        _logger.propagate = True
 
-    class BooleanColorFormatter(colorlog.ColoredFormatter):
-        """Canonical log format: [YYYY-MM-DD HH:MM:SS,mmm] [trace-id] [logger] [LEVEL] message."""
+    class BooleanColorFormatter(logging.Formatter):
+        """Canonical log format: [YYYY-MM-DD HH:MM:SS,mmm] [trace-id] [pod_name] [LEVEL] message."""
+
+        LEVEL_COLORS = {
+            'DEBUG': '\033[1;30m',      # bold_black
+            'INFO': '\033[32m',          # green
+            'WARNING': '\033[33m',       # yellow
+            'ERROR': '\033[31m',         # red
+            'CRITICAL': '\033[1;31m',    # bold_red
+        }
+        RESET = '\033[0m'
+        PURPLE = '\033[35m'
 
         def formatTime(self, record, datefmt=None):
             """Produce timestamp in canonical form with milliseconds."""
@@ -176,29 +203,48 @@ def get_logger(ini_config=None) -> Logger:
             return "%s,%03d" % (s, record.msecs)
 
         def format(self, record):
-            # Ensure correlation_id exists on the record
-            if not hasattr(record, 'correlation_id'):
+            # Always override to ensure pod_name and correlation_id are set
+            record.pod_name = (
+                os.environ.get('POD_NAME')
+                or os.environ.get('HOSTNAME')
+                or os.uname().nodename
+                or 'unknown'
+            )
+            if not hasattr(record, 'correlation_id') or not record.correlation_id:
                 record.correlation_id = 'no-id'
-            if not record.correlation_id:
-                record.correlation_id = 'no-id'
+                try:
+                    from flask import has_app_context, g
+                    if has_app_context():
+                        record.correlation_id = getattr(g, 'correlation_id', 'no-id')
+                    else:
+                        current_span = tracer.get_current_span()
+                        if current_span.is_recording():
+                            ctx = current_span.get_span_context()
+                            if ctx.is_valid:
+                                record.correlation_id = f"{ctx.trace_id:032x}"
+                except Exception:
+                    pass
+
+            level_color = self.LEVEL_COLORS.get(record.levelname, '')
             msg = super().format(record)
-            # Colorize True and False words
-            msg = msg.replace("True", f"{GREEN}True{RESET}")
-            msg = msg.replace("False", f"{RED}False{RESET}")
+            # Colorize level name (first occurrence only)
+            msg = msg.replace(
+                record.levelname,
+                f'{level_color}{record.levelname}{self.RESET}',
+                1
+            )
+            # Colorize True and False
+            msg = msg.replace("True", f"\033[32mTrue{self.RESET}")
+            msg = msg.replace("False", f"\033[31mFalse{self.RESET}")
             return msg
 
-    # Define colorlog formatter with safe correlation_id fallback
-    formatter = BooleanColorFormatter(
-        fmt=f'[{BLACK}%(asctime)s{RESET}] [%(correlation_id)s] [{PURPLE}%(name)s{RESET}] '
-            f'[%(log_color)s%(levelname)s%(reset)s] %(message)s',
-        log_colors={
-            'DEBUG': 'bold_black',
-            'INFO': 'green',
-            'WARNING': 'yellow',
-            'ERROR': 'red',
-            'CRITICAL': 'bold_red',
-        }
+    # Build format with inline ANSI color codes for pod_name
+    fmt_str = (
+        '[%(asctime)s] [%(correlation_id)s] '
+        + BooleanColorFormatter.PURPLE + '[%(pod_name)s]' + BooleanColorFormatter.RESET
+        + ' [%(levelname)s] %(message)s'
     )
+    formatter = BooleanColorFormatter(fmt=fmt_str)
 
     log_config = _get_logging_config(ini_config)
     if log_config['format'] == 'json':
@@ -214,7 +260,7 @@ def get_logger(ini_config=None) -> Logger:
     logger.addHandler(handler)
     logger.propagate = False
 
-    # Add correlation_id filter to ensure it's always available
+    # Add correlation_id and pod_name filter to ensure they're always available
     class CorrelationIDFilter(logging.Filter):
         def filter(self, record):
             if not hasattr(record, 'correlation_id'):
@@ -233,6 +279,18 @@ def get_logger(ini_config=None) -> Logger:
                     # Intentionally swallow so logging never fails; record keeps no-id
                     pass
                 record.correlation_id = corr_id
+            
+            # Inject pod_name into every log record
+            if not hasattr(record, 'pod_name'):
+                try:
+                    record.pod_name = (
+                        os.environ.get('POD_NAME')
+                        or os.environ.get('HOSTNAME')
+                        or os.uname().nodename
+                        or 'unknown'
+                    )
+                except Exception:
+                    record.pod_name = 'unknown'
             return True
 
     logger.addFilter(CorrelationIDFilter())

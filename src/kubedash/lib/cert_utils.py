@@ -17,12 +17,22 @@ class _CanonicalFormatter(logging.Formatter):
         ct = datetime.fromtimestamp(record.created)
         s = ct.strftime("%Y-%m-%d %H:%M:%S")
         return "%s,%03d" % (s, record.msecs)
+    
+    def format(self, record):
+        if not hasattr(record, 'pod_name'):
+            record.pod_name = (
+                os.environ.get('POD_NAME')
+                or os.environ.get('HOSTNAME')
+                or os.uname().nodename
+                or 'unknown'
+            )
+        return super().format(record)
 
 
 def configure_logging():
     """Configure logging with canonical format (same as kubedash app logs)."""
     formatter = _CanonicalFormatter(
-        "[%(asctime)s] [no-id] [%(name)s] [%(levelname)s] %(message)s"
+        "[%(asctime)s] [%(pod_name)s] [%(name)s] [%(levelname)s] %(message)s"
     )
     handler = logging.StreamHandler()
     handler.setFormatter(formatter)

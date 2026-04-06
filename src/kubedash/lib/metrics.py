@@ -136,7 +136,10 @@ def update_metrics(app: Flask, db: SQLAlchemy, window: int):
 
     if nodeMetrics and podMetrics:
         UpdateDatabase(app, db, nodeMetrics, podMetrics)
-        CullDatabase(app, db, window)
+        # CullDatabase is now a leader-only operation
+        from lib.leader_tasks import get_task_registry
+        registry = get_task_registry()
+        registry.execute_task('cull_metrics_database', app, db, window)
         app.logger.info("Scraping metrics...")
         app.logger.info(f"Metrics update took {time.time() - start_time:.2f}s")
 

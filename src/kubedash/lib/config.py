@@ -21,6 +21,19 @@ class Config(object):
     SESSION_COOKIE_HTTPONLY = True
     SESSION_COOKIE_SAMESITE = "Lax"
     SESSION_TYPE = "sqlalchemy"
+    SESSION_REDIS_URL = None
+    SESSION_KEY_PREFIX = "kubedash:session:"
+    SESSION_FILE_DIR = "/tmp/kubedash-sessions"
+    SESSION_PERMANENT = False
+    SESSION_USE_SIGNER = True
+    # replica mode
+    REPLICA_MODE = "single"
+    REPLICA_COUNT = 1
+    LEADER_ELECTION_ENABLED = False
+    LEADER_ELECTION_LEASE_NAME = "kubedash-leader-election"
+    LEADER_ELECTION_LEASE_DURATION = 30
+    LEADER_ELECTION_RENEW_DEADLINE = 20
+    LEADER_ELECTION_RETRY_PERIOD = 5
     # security
     CORS_HEADERS = 'Content-Type'
     SECRET_KEY = "develop"

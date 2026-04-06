@@ -51,6 +51,10 @@ from lib.initializers.security import initialize_app_security
 
 from lib.initializers.workload_cache import initialize_workloadcachers
 
+from lib.replica_mode import initialize_replica_mode
+from lib.leader_election import initialize_leader_election
+from lib.leader_tasks import initialize_leader_tasks
+
 __all__ = [
     # Config
     'initialize_app_configuration',
@@ -87,6 +91,10 @@ __all__ = [
     'initialize_app_socket',
     # Security
     'initialize_app_security',
+    # Leader election
+    'initialize_replica_mode',
+    'initialize_leader_election',
+    'initialize_leader_tasks',
     # Workload Cache
     'initialize_workloadcachers',
 ]

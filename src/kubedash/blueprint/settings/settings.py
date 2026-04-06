@@ -45,6 +45,21 @@ def sso_config():
     """
     # Template now loads data via JavaScript from /api/v1/settings/sso
     return render_template('settings/sso-config.html.j2')
+
+##############################################################
+## Cluster Status
+##############################################################
+
+@settings_bp.route('/cluster-status')
+@login_required
+def cluster_status():
+    """
+    Cluster status page.
+    
+    Displays deployment mode, leader status, and cluster configuration.
+    Data is loaded client-side via JavaScript API calls to /api/cluster/status.
+    """
+    return render_template('settings/cluster-status.html.j2')
         
 @sso_bp.route("/callback", methods=["GET"])
 def callback():
@@ -193,12 +208,12 @@ def callback():
 ## Kubectl config
 ##############################################################
 
-@settings_bp.route('/cluster-config', methods=['GET', 'POST'])
+@settings_bp.route('/k8s-config', methods=['GET', 'POST'])
 @login_required
 def k8s_config():
     """
     Kubernetes cluster configuration page.
-    
+
     Data is now loaded client-side via JavaScript API calls.
     This route only renders the template structure.
     """
