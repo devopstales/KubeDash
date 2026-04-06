@@ -1,0 +1,51 @@
+{
+  "mcpServers": {
+    "cocoindex-code": {
+      "command": "ccc",
+      "args": [
+        "mcp"
+      ]
+    },
+    "engram": {
+      "command": "docker",
+      "args": [
+        "run",
+        "-i",
+        "--rm",
+        "--name",
+        "ai-mcp-engram-memory",
+        "-v",
+        "mcp-engram-memory:/knowledge",
+        "cylian/engram"
+      ]
+    },
+    "deepwiki": {
+      "httpUrl": "https://mcp.deepwiki.com/mcp"
+    },
+    "exa-http": {
+      "httpUrl": "https://mcp.exa.ai/mcp"
+    }
+  },
+  "$version": 3,
+  "hooks": {
+    "Notification": [
+      {
+        "matcher": "",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "notify-send 'Qwen Code' 'Awaiting your input'"
+          }
+        ]
+      }
+    ]
+  },
+  "permissions": {
+    "allow": [
+      "Bash(jq *)",
+      "Bash(sort)",
+      "Bash(comm *)",
+      "Bash(find *)"
+    ]
+  }
+}

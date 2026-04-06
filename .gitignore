@@ -97,3 +97,4 @@ src/certs
 kubedash.ini*
 # CocoIndex Code (ccc)
 /.cocoindex_code/
+.codemap/

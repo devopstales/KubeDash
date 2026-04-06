@@ -30,14 +30,11 @@
       "connectionTimeout": 30
     }
   ],    
-  "kiroAgent.configureMCP": "Disabled",
-  "kilo-code.debug": false,
   "kilo-code.allowedCommands": [
     "git log",
     "git diff",
     "git show"
   ],
-  "kilo-code.deniedCommands": [],
   "chat.mcp.discovery.enabled": {
     "cursor-workspace": true
   },
