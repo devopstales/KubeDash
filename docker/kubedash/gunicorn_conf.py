@@ -19,7 +19,7 @@ def _canonical_timestamp():
 
 
 class CanonicalAccessLogger(GunicornColorLogger):
-    """Gunicorn Logger that emits access logs in canonical format: [timestamp] [trace-id] [gunicorn.access] [INFO] ..."""
+    """Gunicorn Logger that emits access logs in canonical format: [timestamp] [trace-id] [pod_name] [gunicorn.access] [INFO] ..."""
 
     def now(self):
         return _canonical_timestamp()
@@ -43,6 +43,14 @@ class CanonicalAccessLogger(GunicornColorLogger):
         except Exception:
             pass
         atoms["correlation_id"] = cid if cid else "no-id"
+        
+        # Pod name: from environment variables (Kubernetes downward API)
+        atoms["pod_name"] = (
+            os.environ.get('POD_NAME')
+            or os.environ.get('HOSTNAME')
+            or os.uname().nodename
+            or 'unknown'
+        )
         return atoms
 
 
@@ -85,8 +93,8 @@ logger_class = CanonicalAccessLogger
 loglevel = "info"
 errorlog = "-"  # stderr
 accesslog = "-"  # stdout
-# Canonical format: [timestamp] [trace-id] [gunicorn.access] [INFO] method path status size ...
-access_log_format = '%(t)s [%(correlation_id)s] [gunicorn.access] [INFO] %(h)s "%(r)s" %(s)s %(b)s "%(f)s" "%(a)s"'
+# Canonical format: [timestamp] [trace-id] [pod_name] [gunicorn.access] [INFO] method path status size ...
+access_log_format = '%(t)s [%(correlation_id)s] [%(pod_name)s] [gunicorn.access] [INFO] %(h)s "%(r)s" %(s)s %(b)s "%(f)s" "%(a)s"'
 
 # ========================
 # 3. Correlation ID Setup
@@ -148,8 +156,14 @@ class ExtensionAPIFilter(logging.Filter):
 
 def on_starting(server):
     """Executed when Gunicorn starts."""
+    pod_name = (
+        os.environ.get('POD_NAME')
+        or os.environ.get('HOSTNAME')
+        or os.uname().nodename
+        or 'unknown'
+    )
     canonical = _CanonicalFormatter(
-        "[%(asctime)s] [%(process)d] [%(levelname)s] %(message)s"
+        f"[%(asctime)s] [{pod_name}] [%(process)d] [%(levelname)s] %(message)s"
     )
     try:
         for handler in getattr(server.log.error_log, "handlers", []):

@@ -5,6 +5,165 @@ hide:
 
 # Configuration
 
+## Replica Mode Configuration
+
+KubeDash supports both single-replica and multi-replica (clustered) deployments for scalability and high availability.
+
+### Single-Replica Mode (Default)
+
+Single-replica mode is the default configuration for KubeDash. In this mode:
+- KubeDash runs as a single instance
+- No leader election or replica coordination
+- Best for development, testing, or non-critical production environments
+- SQLite database is supported (recommended for single-replica only)
+- Session state is stored locally in the database (in-memory or SQLite)
+
+**Environment Variables:**
+```bash
+REPLICA_MODE=single  # Default
+```
+
+**Example values.yaml:**
+```yaml
+replicas: 1
+REPLICA_MODE: "single"
+externalDatabase:
+  enabled: false  # SQLite is fine for single-replica
+externalRedis:
+  enabled: false  # Not required for single-replica
+```
+
+### Multi-Replica (Cluster) Mode
+
+Multi-replica mode enables horizontal scaling and high availability:
+- Multiple KubeDash instances run concurrently
+- Kubernetes Leases API manages leader election
+- Only the leader pod executes background tasks (metrics cleanup, etc.)
+- Session state is shared via Redis across all replicas
+- PostgreSQL is **required** for multi-replica deployments
+- Redis is **required** for multi-replica deployments
+
+**Environment Variables:**
+```bash
+REPLICA_MODE=cluster                          # Enable cluster mode
+LEADER_ELECTION_ENABLED=true                  # Enable leader election (default: true)
+LEADER_ELECTION_LEASE_TTL=30                  # Lease duration in seconds (default: 30)
+LEADER_ELECTION_ELECTION_INTERVAL=5           # Re-election check interval in seconds (default: 5)
+KUBERNETES_POD_NAME=kubedash-0                # Pod name (auto-detected from downward API)
+KUBERNETES_POD_NAMESPACE=default              # Pod namespace (auto-detected from downward API)
+```
+
+**Example multi-replica values.yaml:**
+```yaml
+# Replica Configuration
+replicas: 3  # Deploy 3 replicas for HA
+
+# Use external PostgreSQL (required for multi-replica)
+externalDatabase:
+  enabled: true
+  host: "postgres.database.svc.cluster.local"
+  port: 5432
+  database: "kubedash"
+  username: "kubedash"
+  password: "secure-password"  # Use Kubernetes Secret in production
+
+# Use external Redis (required for multi-replica)
+externalRedis:
+  enabled: true
+  host: "redis.data.svc.cluster.local"
+  port: 6379
+  database: 0
+  password: ""  # Set if Redis has authentication
+
+# Pod environment setup for leader election
+env:
+  - name: REPLICA_MODE
+    value: "cluster"
+  - name: KUBERNETES_POD_NAME
+    valueFrom:
+      fieldRef:
+        fieldPath: metadata.name
+  - name: KUBERNETES_POD_NAMESPACE
+    valueFrom:
+      fieldRef:
+        fieldPath: metadata.namespace
+  - name: LEADER_ELECTION_ENABLED
+    value: "true"
+  - name: LEADER_ELECTION_LEASE_TTL
+    value: "30"
+  - name: LEADER_ELECTION_ELECTION_INTERVAL
+    value: "5"
+
+# RBAC required for leader election
+serviceAccount:
+  create: true
+  name: "kubedash-admin"
+
+# Horizontal Pod Autoscaler (optional)
+autoscaling:
+  enabled: true
+  minReplicas: 2
+  maxReplicas: 10
+  targetCPUUtilizationPercentage: 70
+
+# Pod Disruption Budget for high availability
+podDisruptionBudget:
+  enabled: true
+  minAvailable: 1
+```
+
+### Automatic Pod Identity Setup
+
+When using cluster mode, KubeDash automatically detects pod identity from:
+1. **KUBERNETES_POD_NAME** environment variable (from downward API)
+2. **KUBERNETES_POD_NAMESPACE** environment variable (from downward API)
+
+The Helm chart automatically sets these via the downward API in the deployment template.
+
+### Leader Election and Background Tasks
+
+In multi-replica mode:
+- **Only the leader pod** executes background tasks such as:
+  - Metrics database cleanup / culling old records
+  - Session cleanup
+  - Internal maintenance tasks
+- **All replicas** perform:
+  - API request handling
+  - User authentication
+  - Resource queries and visualization
+  - Session management (via shared Redis state)
+
+This prevents duplicate task execution and ensures cluster-wide consistency.
+
+### Redis Session Backend
+
+For multi-replica deployments, KubeDash requires Redis for shared session state:
+
+**Configuration via environment variables:**
+```bash
+SESSION_REDIS_URL=redis://redis.data.svc.cluster.local:6379/0
+SESSION_KEY_PREFIX=kubedash:session:
+```
+
+**Configuration via kubedash.ini:**
+```ini
+[remote_cache]
+redis_url = redis://redis.data.svc.cluster.local:6379/0
+key_prefix = kubedash:session:
+```
+
+### Database Requirements
+
+- **Single-replica mode (REPLICA_MODE=single)**: SQLite or PostgreSQL
+- **Multi-replica mode (REPLICA_MODE=cluster)**:
+  - PostgreSQL **required** (no SQLite support)
+  - Minimum connection pool size: `worker_count * 2` (e.g., 6+ for 3 replicas with 2 connections each)
+  - Recommended: PostgreSQL HA setup with connection pooling (PgBouncer or built-in pooling)
+
+---
+
+## Standard Configuration
+
 Create a values file for your helm deploy:
 
 ```yaml
