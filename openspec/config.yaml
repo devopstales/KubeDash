@@ -1,1 +1,95 @@
-../.ai-config/openspec-config.yaml
+# OpenSpec-oriented project config. Copy or merge into `openspec/config.yaml` at the repo root
+# if your OpenSpec CLI/version expects the canonical path (see skills referencing `openspec/config.yaml`).
+#
+# MCP server keys match the snippets under `configs/mcp/` in this repo:
+# - `mcp/docker/github.json` → github-docker
+# - `mcp/http/gitlab.json` → GitLab-http
+# - `mcp/http/atlassian-http.json` → atlassian-http (Jira / Atlassian)
+#
+# Optional background:
+# - RFC: GitHub Issues integration (hooks & adapters): https://github.com/Fission-AI/OpenSpec/discussions/657
+
+schema: spec-driven
+
+context: |
+  Separation of concerns (SDD):
+    - The "what": business use cases, acceptance criteria, and backlog state — live in your issue tracker
+      (GitHub Issues, GitLab Issues, or Jira — pick one primary backlog for the team).
+    - The "how": technical design, spec deltas, and task breakdown — live under `openspec/` in git.
+
+  MCP alignment (this repo):
+    - GitHub: MCP server key `github-docker` (see `configs/mcp/docker/github.json`; token via GITHUB_PERSONAL_ACCESS_TOKEN).
+    - GitLab: MCP server key `GitLab-http` (set `url` to your GitLab instance API MCP endpoint in that JSON).
+    - Jira: MCP server key `atlassian-http` (Atlassian remote MCP; see `configs/mcp/http/atlassian-http.json`).
+
+  Pick a primary tracker:
+    - Set `integrations.primary` below to `github`, `gitlab`, or `jira` so agents know which tools to prefer.
+    - You may still have multiple MCPs enabled for cross-links or migration; only one should own "what's next" status.
+
+  Stage ↔ status hygiene (adjust state names to your workflow):
+    - Proposing: work item exists and is ready for spec work (e.g. Open / To Do / Backlog).
+    - Applying: item reflects active implementation (e.g. In Progress).
+    - After verify + archive: item reflects completion (e.g. Closed / Done).
+
+  Optional automation (RFC #657 — when supported by your toolchain):
+    - Use `hooks` for lifecycle scripts; use `integrations.github.export` to mirror proposal/tasks into GitHub Issues.
+
+integrations:
+  primary: github # github | gitlab | jira — set to your team's backlog
+
+  github:
+    enabled: true
+    mcp_server: github-docker
+    paths:
+      defaults_file: openspec/github.yaml
+      change_file: openspec/changes/<change>/github.yaml
+    # Optional one-way export (RFC #657 — when OpenSpec/tooling supports it)
+    export:
+      enabled: false
+      repo: "" # e.g. owner/repo or rely on git remote detection when supported
+      epic_from: proposal
+      issues_from: tasks
+      labels:
+        defaults: ["status:ready"]
+      create_branch: true
+
+  gitlab:
+    enabled: true
+    mcp_server: GitLab-http
+    paths:
+      defaults_file: openspec/gitlab.yaml
+      change_file: openspec/changes/<change>/gitlab.yaml
+
+  jira:
+    enabled: true
+    mcp_server: atlassian-http
+    paths:
+      defaults_file: openspec/jira.yaml
+      change_file: openspec/changes/<change>/jira.yaml
+
+hooks:
+  # RFC #657 examples — wire to repo scripts when your OpenSpec build supports hook execution.
+  onCreate: ""
+  onArchive: ""
+  # onArchive: "./scripts/hooks.ts#onArchive"
+
+rules:
+  proposal:
+    - Before drafting `proposal.md`, if the primary tracker's MCP is configured and available, select or create
+      the corresponding issue (GitHub/GitLab) or Jira issue/story, move it to the team's agreed state for spec work,
+      and record identifiers in the per-change sidecar for that tracker (`openspec/changes/<change>/github.yaml`,
+      `.../gitlab.yaml`, or `.../jira.yaml`) and reference them in `proposal.md`.
+    - If no tracker MCP is available for the primary integration, state explicitly in `proposal.md` that no
+      issue was linked.
+
+  specs:
+    - When a tracker item is linked for the change, keep the sidecar file next to the change (under
+      `openspec/changes/<change>/`) consistent with spec deltas under `openspec/changes/<change>/specs/<capability>/spec.md`.
+
+  apply:
+    - Keep the linked issue's status in sync with implementation progress (e.g. In Progress while `tasks.md` rows
+      are executed), using the appropriate MCP (`github-docker`, `GitLab-http`, or `atlassian-http`) when available.
+
+  archive:
+    - After archive, reconcile the linked issue to the completed state and ensure `openspec/specs/` reflects
+      shipped behavior per team process.

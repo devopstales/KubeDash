@@ -182,9 +182,9 @@ def cleanup_expired_sessions():
 
 **Configuration:**
 ```ini
-[replicas]
-mode = cluster  # or 'single'
-count = 3       # informational, not enforced
+[cluster]
+replicas_mode = cluster  # or 'single'
+replicas_count = 3       # informational, not enforced
 ```
 
 **Validation:**
