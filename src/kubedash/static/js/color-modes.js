@@ -37,6 +37,9 @@
     const btnToActive = document.querySelector(
       `[data-coreui-theme-value="${theme}"]`,
     );
+    if (!btnToActive) {
+      return;
+    }
     const svgOfActiveBtn = btnToActive
       .querySelector("svg use")
       .getAttribute("xlink:href");

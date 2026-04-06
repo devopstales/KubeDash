@@ -164,7 +164,7 @@
 {% endblock %}
 
 {% block add_tail_js %}
-<script>
+<script nonce="{{ csp_nonce }}">
     const escapeHtml = (text) => {
         if (text === null || text === undefined) return '';
         const map = {
@@ -407,11 +407,11 @@
                 <tr class="${rowClass}">
                     <td>${status}</td>
                     <td id="${name}">
-                        <form action="/plugins/cert-manager/data" method="POST" onsubmit="sessionStorage.setItem('cert_manager_object_type', 'cluster_issuer'); sessionStorage.setItem('cert_manager_selected', '${name}'); return true;">
+                        <form action="/plugins/cert-manager/data" method="POST" class="inline-form" data-object-type="cluster_issuer" data-object-name="${name}">
                             <input type="hidden" name="csrf_token" value="${escapeHtml(csrf_token)}">
                             <input type="hidden" name="object_type" value="cluster_issuer" />
                             <input type="hidden" name="selected" value="${name}" />
-                            <a href="javascript:;" onclick="parentNode.submit();">${name}</a>
+                            <a href="#" class="form-submit-link">${name}</a>
                         </form>
                     </td>
                     <td>${type}</td>
@@ -445,12 +445,12 @@
                 <tr class="${rowClass}">
                     <td>${status}</td>
                     <td id="${name}">
-                        <form action="/plugins/cert-manager/data" method="POST" onsubmit="sessionStorage.setItem('cert_manager_object_type', 'issuer'); sessionStorage.setItem('cert_manager_selected', '${name}'); return true;">
+                        <form action="/plugins/cert-manager/data" method="POST" class="inline-form" data-object-type="issuer" data-object-name="${name}" data-namespace="${escapeHtml(namespace)}">
                             <input type="hidden" name="csrf_token" value="${escapeHtml(csrf_token)}">
                             <input type="hidden" name="object_type" value="issuer" />
                             <input type="hidden" name="selected" value="${name}" />
                             <input type="hidden" name="ns_select" value="${escapeHtml(namespace)}" />
-                            <a href="javascript:;" onclick="parentNode.submit();">${name}</a>
+                            <a href="#" class="form-submit-link">${name}</a>
                         </form>
                     </td>
                     <td>${type}</td>
@@ -484,16 +484,16 @@
                 <tr>
                     <td>${status}</td>
                     <td>
-                        <form action="/plugins/cert-manager/data" method="POST" onsubmit="sessionStorage.setItem('cert_manager_object_type', 'certificate_request'); sessionStorage.setItem('cert_manager_selected', '${name}'); return true;">
+                        <form action="/plugins/cert-manager/data" method="POST" class="inline-form" data-object-type="certificate_request" data-object-name="${name}" data-namespace="${escapeHtml(namespace)}">
                             <input type="hidden" name="csrf_token" value="${escapeHtml(csrf_token)}">
                             <input type="hidden" name="object_type" value="certificate_request" />
                             <input type="hidden" name="selected" value="${name}" />
                             <input type="hidden" name="ns_select" value="${escapeHtml(namespace)}" />
-                            <a href="javascript:;" onclick="parentNode.submit();">${name}</a>
+                            <a href="#" class="form-submit-link">${name}</a>
                         </form>
                     </td>
                     <td>
-                        <a href="#" onclick="goToTab('${issuerType}', '${issuer}'); return false;">${issuer}</a>
+                        <a href="#" class="go-to-tab-link" data-issuer-type="${issuerType}" data-issuer="${issuer}">${issuer}</a>
                     </td>
                     <td>${owner}</td>
                 </tr>
@@ -524,11 +524,11 @@
                 if (cert.owner_type === 'Ingress') {
                     ownerHtml = `
                         <td>
-                            <form action="/network/ingress" method="POST">
+                            <form action="/network/ingress" method="POST" class="inline-form" data-namespace="${escapeHtml(namespace)}" data-value="${escapeHtml(cert.owner)}">
                                 <input type="hidden" name="csrf_token" value="${escapeHtml(csrf_token)}">
                                 <input type="hidden" name="ns_select" value="${escapeHtml(namespace)}" />
                                 <input type="hidden" name="selected" value="${escapeHtml(cert.owner)}" />
-                                <a href="#" onclick="this.closest('form').submit(); return false;">${escapeHtml(cert.owner)}</a>
+                                <a href="#" class="form-submit-link">${escapeHtml(cert.owner)}</a>
                             </form>
                         </td>
                     `;
@@ -541,20 +541,20 @@
                 <tr>
                     <td>${status}</td>
                     <td>
-                        <form action="/plugins/cert-manager/data" method="POST" onsubmit="sessionStorage.setItem('cert_manager_object_type', 'certificate'); sessionStorage.setItem('cert_manager_selected', '${name}'); return true;">
+                        <form action="/plugins/cert-manager/data" method="POST" class="inline-form" data-object-type="certificate" data-object-name="${name}" data-namespace="${escapeHtml(namespace)}">
                             <input type="hidden" name="csrf_token" value="${escapeHtml(csrf_token)}">
                             <input type="hidden" name="object_type" value="certificate" />
                             <input type="hidden" name="selected" value="${name}" />
                             <input type="hidden" name="ns_select" value="${escapeHtml(namespace)}" />
-                            <a href="javascript:;" onclick="parentNode.submit();">${name}</a>
+                            <a href="#" class="form-submit-link">${name}</a>
                         </form>
                     </td>
                     <td>
-                        <form action="/security/secrets" method="POST">
+                        <form action="/security/secrets" method="POST" class="inline-form" data-namespace="${escapeHtml(namespace)}" data-value="${secretName}">
                             <input type="hidden" name="csrf_token" value="${escapeHtml(csrf_token)}">
                             <input type="hidden" name="ns_select" value="${escapeHtml(namespace)}" />
                             <input type="hidden" name="selected" value="${secretName}" />
-                            <a href="#" onclick="this.closest('form').submit(); return false;">${secretName}</a>
+                            <a href="#" class="form-submit-link">${secretName}</a>
                         </form>
                     </td>
                     ${ownerHtml}
@@ -639,6 +639,48 @@
                 }
             }, 50);
         });
+    });
+
+    // Event delegation for inline forms (CSP-compliant)
+    document.addEventListener('click', function(e) {
+        if (e.target.classList.contains('form-submit-link')) {
+            e.preventDefault();
+            const form = e.target.closest('form');
+            if (form) {
+                form.submit();
+            }
+        }
+        if (e.target.classList.contains('go-to-tab-link')) {
+            e.preventDefault();
+            const issuerType = e.target.dataset.issuerType;
+            const issuer = e.target.dataset.issuer;
+            if (typeof goToTab === 'function') {
+                goToTab(issuerType, issuer);
+            }
+        }
+    });
+
+    document.addEventListener('submit', function(e) {
+        if (e.target.classList.contains('inline-form')) {
+            const form = e.target;
+            const objectType = form.dataset.objectType;
+            const objectName = form.dataset.objectName;
+            const namespace = form.dataset.namespace;
+            const value = form.dataset.value;
+
+            if (objectType) {
+                sessionStorage.setItem('cert_manager_object_type', objectType);
+            }
+            if (objectName) {
+                sessionStorage.setItem('cert_manager_selected', objectName);
+            }
+            if (namespace) {
+                sessionStorage.setItem('ns_select', namespace);
+            }
+            if (value) {
+                sessionStorage.setItem('selected', value);
+            }
+        }
     });
 </script>
 {% endblock %}

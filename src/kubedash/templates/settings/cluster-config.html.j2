@@ -109,6 +109,42 @@
 {% include "segments/components/datatable_snippet.html.j2" %}
 {% include "segments/components/functions_snippet.j2"%}
     <script nonce="{{ csp_nonce }}">
+        // IMMEDIATE: Prevent datatables-demo.js from initializing on loading row
+        (function() {
+            function setupOverride() {
+                if (typeof $ !== 'undefined' && $.fn && !window._k8sConfigDtOverride) {
+                    window._k8sConfigDtOverride = true;
+                    const originalDataTable = $.fn.DataTable;
+                    $.fn.DataTable = function(options) {
+                        const table = this[0];
+                        if (table && table.id === 'dataTable') {
+                            const tbody = table.querySelector('tbody');
+                            if (tbody) {
+                                const rows = tbody.querySelectorAll('tr');
+                                const hasColspanRow = Array.from(rows).some(row => {
+                                    const cells = row.querySelectorAll('td');
+                                    return Array.from(cells).some(cell => cell.hasAttribute('colspan'));
+                                });
+                                if (hasColspanRow) {
+                                    console.log('Blocked DataTable auto-init on loading row (k8s-config)');
+                                    return this;
+                                }
+                            }
+                        }
+                        return originalDataTable.apply(this, arguments);
+                    };
+                    Object.setPrototypeOf($.fn.DataTable, originalDataTable);
+                    Object.keys(originalDataTable).forEach(key => {
+                        $.fn.DataTable[key] = originalDataTable[key];
+                    });
+                }
+            }
+            setupOverride();
+            setTimeout(setupOverride, 0);
+            setTimeout(setupOverride, 50);
+            setTimeout(setupOverride, 100);
+        })();
+
         const escapeHtml = (text) => {
             if (text === null || text === undefined) return '';
             const map = {
@@ -233,7 +269,7 @@
                         <button type="button" class="btn btn-success btn-just-icon btn-xs" data-bs-toggle="modal" data-bs-target="#modaledit${safeId}">
                             <i class="material-icons">edit</i>
                         </button>
-                        <button type="button" class="btn btn-danger btn-just-icon btn-sm" onclick="window.deleteConfig('${contextForJS}')">
+                        <button type="button" class="btn btn-danger btn-just-icon btn-sm delete-config-btn" data-context="${contextForJS}">
                             <i class="material-icons">delete</i>
                         </button>
                     `;
@@ -604,6 +640,15 @@
                     }
                 }
             });
+        });
+
+        // Event delegation for delete config buttons
+        document.addEventListener('click', function(e) {
+            const btn = e.target.closest('.delete-config-btn');
+            if (btn) {
+                const context = btn.dataset.context;
+                if (context) window.deleteConfig(context);
+            }
         });
     </script>
 {% endblock %}

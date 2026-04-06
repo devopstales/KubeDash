@@ -2,10 +2,10 @@
     <div class="card-header py-3 d-flex justify-content-between align-items-center">
         <h6 class="m-0 font-weight-bold text-primary">Flux Object Dependencies</h6>
         <div>
-            <button type="button" class="btn btn-sm btn-secondary" onclick="fitGraph()" title="Fit to view">
+            <button type="button" class="btn btn-sm btn-secondary" id="fit-graph-btn" title="Fit to view">
                 <i class="fa fa-expand"></i>
             </button>
-            <button type="button" class="btn btn-sm btn-secondary" onclick="resetLayout()" title="Reset layout">
+            <button type="button" class="btn btn-sm btn-secondary" id="reset-layout-btn" title="Reset layout">
                 <i class="fa fa-redo"></i>
             </button>
         </div>
@@ -48,7 +48,7 @@
 <script src="{{ url_for('static', filename='/vendor/dagre@0.8.5/dist/dagre.min.js') }}"></script>
 <script src="{{ url_for('static', filename='/vendor/cytoscape-dagre@2.5.0/cytoscape-dagre.js') }}"></script>
 
-<script>
+<script nonce="{{ csp_nonce }}">
 var cy = null;
 var graphData = {{ graph_data | safe }};
 var tooltip = null;
@@ -366,4 +366,13 @@ function resetLayout() {
         cy.fit(30);
     }
 }
+
+// CSP-compliant event delegation
+document.addEventListener('click', function(e) {
+    if (e.target.closest('#fit-graph-btn')) {
+        fitGraph();
+    } else if (e.target.closest('#reset-layout-btn')) {
+        resetLayout();
+    }
+});
 </script>

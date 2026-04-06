@@ -265,7 +265,7 @@
                 const nameForJs = String(app.application_name || '').replace(/'/g, "\\'").replace(/"/g, '\\"');
                 const actionHtml = is_admin
                     ? `<button class="btn btn-sm btn-primary me-2" data-bs-toggle="modal" data-bs-target="#modaledit${safeId}">Edit</button>
-                       <button class="btn btn-sm btn-danger" onclick="deleteApplication('${nameForJs}')">Delete</button>`
+                       <button class="btn btn-sm btn-danger delete-app-btn" data-app-name="${nameForJs}">Delete</button>`
                     : '-';
                 
                 const linkTarget = app.application_enabled
@@ -460,6 +460,15 @@
                     }
                 }
             });
+        });
+
+        // Event delegation for delete app buttons
+        document.addEventListener('click', function(e) {
+            const btn = e.target.closest('.delete-app-btn');
+            if (btn) {
+                const appName = btn.dataset.appName;
+                if (appName) deleteApplication(appName);
+            }
         });
     </script>
 {% endblock %}

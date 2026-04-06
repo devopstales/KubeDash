@@ -529,7 +529,7 @@
 {% endblock %}
 
 {% block add_tail_js %}
-<script>
+<script nonce="{{ csp_nonce }}">
 $(document).ready(function() {
     // Only initialize events table if there are events
     if ($('#eventsTable tbody tr').filter(function() { return !$(this).find('td[colspan]').length; }).length > 0) {

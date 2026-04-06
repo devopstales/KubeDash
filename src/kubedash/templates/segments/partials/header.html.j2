@@ -1,5 +1,5 @@
     <div class="container-fluid border-bottom px-4">
-        <button class="header-toggler" type="button" onclick="coreui.Sidebar.getInstance(document.querySelector('#sidebar')).toggle()" style="margin-inline-start: -14px;">
+        <button class="header-toggler" type="button" id="header-toggler-btn" style="margin-inline-start: -14px;">
         <svg class="icon icon-lg">
             <use xlink:href="{{ url_for('static',filename='/vendor/@coreui/icons/svg/free.svg') }}#cil-menu"></use>
         </svg>
@@ -84,7 +84,7 @@
                     aria-labelledby="notificationDropdown">
                     <li class="dropdown-header d-flex justify-content-between align-items-center px-3 pt-2 pb-1">
                         <span class="fw-semibold">Notifications</span>
-                        <button class="btn btn-sm btn-outline-secondary" onclick="clearAllNotifications()">
+                        <button class="btn btn-sm btn-outline-secondary" id="clear-notifications-btn">
                             Clear All
                         </button>
                     </li>
@@ -109,8 +109,8 @@
                                                 Just now
                                             </span>
                                         </div>
-                                        <i class="fas fa-times notification-close" 
-                                        onclick="removeNotification('notif-{{ loop.index }}')"></i>
+                                        <i class="fas fa-times notification-close"
+                                        data-notification-id="notif-{{ loop.index }}"></i>
                                     </div>
                                     <div class="mt-1 small">{{ message }}</div>
                                 </li>
@@ -193,3 +193,27 @@
             </li>
         </ul>
     </div>
+    <script nonce="{{ csp_nonce }}">
+        document.getElementById('clear-notifications-btn')?.addEventListener('click', function() {
+            if (typeof clearAllNotifications === 'function') {
+                clearAllNotifications();
+            }
+        });
+
+        // Header toggler
+        document.getElementById('header-toggler-btn')?.addEventListener('click', function() {
+            if (typeof coreui !== 'undefined' && coreui.Sidebar) {
+                coreui.Sidebar.getInstance(document.querySelector('#sidebar'))?.toggle();
+            }
+        });
+
+        // Notification close buttons
+        document.querySelectorAll('.notification-close').forEach(function(closeBtn) {
+            closeBtn.addEventListener('click', function() {
+                var notificationId = this.getAttribute('data-notification-id');
+                if (notificationId && typeof removeNotification === 'function') {
+                    removeNotification(notificationId);
+                }
+            });
+        });
+    </script>

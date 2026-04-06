@@ -71,19 +71,19 @@
                   <input type="password" class="form-control" id="registry_server_auth_pass" name="registry_server_auth_pass" placeholder="Password">
               </div>
               <div class="custom-control custom-switch">
-                  <input type="checkbox" class="custom-control-input" id="registry_server_tls_register" onclick="checkbox('registry_server_tls_register')" checked>
+                  <input type="checkbox" class="custom-control-input" id="registry_server_tls_register" data-checkbox-id="registry_server_tls_register" checked>
                   <label class="custom-control-label" for="registry_server_tls_register">TLS</label>
                   <input type="hidden" name="registry_server_tls_register_value" id="registry_server_tls_register_value" value="True">
               </div>
               <div class="custom-control custom-switch">
-                  <input type="checkbox" class="custom-control-input" id="insecure_tls_register" onclick="checkbox('insecure_tls_register')">
+                  <input type="checkbox" class="custom-control-input" id="insecure_tls_register" data-checkbox-id="insecure_tls_register">
                   <label class="custom-control-label" for="insecure_tls_register">Insecure TLS</label>
                   <input type="hidden" name="insecure_tls_register_value" id="insecure_tls_register_value" value="False">
               </div>
               <div class="modal-footer">
                   <div class="form-group mt-2">
                       <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Close</button>
-                      <button type="submit" class="btn btn-primary" onClick="save();" value="Add" id="add">Add</button>
+                      <button type="submit" class="btn btn-primary" id="save-btn" value="Add">Add</button>
                   </div>
               </div>
           </form>
@@ -136,7 +136,7 @@
 {% endblock %}
 
 {% block add_tail_js %}
-<script>
+<script nonce="{{ csp_nonce }}">
     // IMMEDIATE: Prevent datatables-demo.js from initializing on loading row
     // Override jQuery ready to intercept datatables-demo.js initialization
     (function() {
@@ -258,21 +258,21 @@
                     <button type="button" class="btn btn-success btn-just-icon btn-xs" data-bs-toggle="modal" data-bs-target="#modaledit-${safeId}">
                         <i class="material-icons">edit</i>
                     </button>
-                    <button type="button" class="btn btn-danger btn-just-icon btn-sm" onclick="window.deleteRegistry('${urlForJS}')">
+                    <button type="button" class="btn btn-danger btn-just-icon btn-sm delete-btn" data-url="${urlForJS}">
                         <i class="material-icons">delete</i>
                     </button>
                 `;
             } else {
                 actionCell = '-';
             }
-            
+
             // Encode URL for use in query parameter
             const urlEncoded = encodeURIComponent(url);
-            
+
             return `
                 <tr>
                     <td>
-                        <a href="javascript:;" onclick="sessionStorage.setItem('registry_server_url', '${urlEscaped.replace(/'/g, "\\'")}'); window.location.href='/plugins/registry/image/list?registry_server_url=${urlEncoded}';">${urlEscaped}</a>
+                        <a href="#" class="nav-link" data-registry-url="${urlEscaped}" data-registry-url-encoded="${urlEncoded}">${urlEscaped}</a>
                     </td>
                     <td>${portEscaped}</td>
                     <td>${auth}</td>
@@ -386,12 +386,12 @@
                         <input type="password" class="form-control" id="registry_server_auth_pass_${safeId}" name="registry_server_auth_pass" placeholder="Leave empty to keep existing">
                     </div>
                     <div class="custom-control custom-switch">
-                        <input type="checkbox" class="custom-control-input" id="registry_server_tls_edit_${safeId}" onclick="checkbox('registry_server_tls_edit_${safeId}')" ${tls ? 'checked' : ''}>
+                        <input type="checkbox" class="custom-control-input" id="registry_server_tls_edit_${safeId}" data-checkbox-id="registry_server_tls_edit_${safeId}" ${tls ? 'checked' : ''}>
                         <label class="custom-control-label" for="registry_server_tls_edit_${safeId}">TLS</label>
                         <input type="hidden" name="registry_server_tls_edit_value" id="registry_server_tls_edit_value_${safeId}" value="${tls ? 'True' : 'False'}">
                     </div>
                     <div class="custom-control custom-switch">
-                        <input type="checkbox" class="custom-control-input" id="insecure_tls_edit_${safeId}" onclick="checkbox('insecure_tls_edit_${safeId}')" ${insecure ? 'checked' : ''}>
+                        <input type="checkbox" class="custom-control-input" id="insecure_tls_edit_${safeId}" data-checkbox-id="insecure_tls_edit_${safeId}" ${insecure ? 'checked' : ''}>
                         <label class="custom-control-label" for="insecure_tls_edit_${safeId}">Insecure TLS</label>
                         <input type="hidden" name="insecure_tls_edit_value" id="insecure_tls_edit_value_${safeId}" value="${insecure ? 'True' : 'False'}">
                     </div>
@@ -628,6 +628,43 @@
                 } catch (error) {
                     console.error('Error updating registry:', error);
                     messagesDiv.innerHTML = '<div class="alert alert-danger">Error: ' + escapeHtml(error.message) + '</div>';
+                }
+            }
+        });
+
+        // Event delegation for dynamically created elements
+        // Checkbox change handlers
+        document.addEventListener('change', function(e) {
+            if (e.target.hasAttribute('data-checkbox-id')) {
+                const checkboxId = e.target.getAttribute('data-checkbox-id');
+                const hiddenInput = document.getElementById(checkboxId + '_value');
+                if (hiddenInput) {
+                    hiddenInput.value = e.target.checked ? 'True' : 'False';
+                }
+            }
+        });
+
+        // Delete button click handler
+        document.addEventListener('click', function(e) {
+            const deleteBtn = e.target.closest('.delete-btn');
+            if (deleteBtn) {
+                const url = deleteBtn.getAttribute('data-url');
+                if (url && typeof window.deleteRegistry === 'function') {
+                    window.deleteRegistry(url);
+                }
+            }
+        });
+
+        // Navigation link click handler
+        document.addEventListener('click', function(e) {
+            const navLink = e.target.closest('.nav-link');
+            if (navLink) {
+                e.preventDefault();
+                const registryUrl = navLink.getAttribute('data-registry-url');
+                const registryUrlEncoded = navLink.getAttribute('data-registry-url-encoded');
+                if (registryUrl) {
+                    sessionStorage.setItem('registry_server_url', registryUrl);
+                    window.location.href = '/plugins/registry/image/list?registry_server_url=' + registryUrlEncoded;
                 }
             }
         });

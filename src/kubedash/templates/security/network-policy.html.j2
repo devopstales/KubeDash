@@ -206,8 +206,8 @@
             rows.push(`
                 <tr class="${rowClass}">
                     <td>
-                        <a href="/security/network-policy/data?policy_name=${encodeURIComponent(policy.name)}&namespace=${encodeURIComponent(policyNamespace)}&kind=${encodeURIComponent(policy.kind || 'NetworkPolicy')}" 
-                           onclick="sessionStorage.setItem('ns_select', '${escapeHtml(policyNamespace)}'); sessionStorage.setItem('policy_data_name', '${escapeHtml(policy.name)}'); sessionStorage.setItem('policy_kind', '${escapeHtml(policy.kind || 'NetworkPolicy')}'); return true;">
+                        <a href="/security/network-policy/data?policy_name=${encodeURIComponent(policy.name)}&namespace=${encodeURIComponent(policyNamespace)}&kind=${encodeURIComponent(policy.kind || 'NetworkPolicy')}"
+                           class="data-link" data-ns="${escapeHtml(policyNamespace)}" data-name="${escapeHtml(policy.name)}" data-storage-key="policy_data_name" data-kind="${escapeHtml(policy.kind || 'NetworkPolicy')}">
                             ${escapeHtml(policy.name)}
                         </a>
                     </td>
@@ -269,6 +269,22 @@
         loadPolicies(namespace);
     });
     
+    // Event delegation for data links
+    document.addEventListener('click', function(e) {
+        const link = e.target.closest('.data-link');
+        if (link) {
+            e.preventDefault();
+            const ns = link.dataset.ns || '';
+            const name = link.dataset.name || '';
+            const storageKey = link.dataset.storageKey || '';
+            const kind = link.dataset.kind || '';
+            if (ns) sessionStorage.setItem('ns_select', ns);
+            if (name && storageKey) sessionStorage.setItem(storageKey, name);
+            if (kind) sessionStorage.setItem('policy_kind', kind);
+            window.location.href = link.href;
+        }
+    });
+
     // Reload data when namespace changes (if namespace selector exists)
     document.addEventListener('DOMContentLoaded', function() {
         const namespaceSelect = document.getElementById('inputGroupSelect04');

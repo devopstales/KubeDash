@@ -179,26 +179,26 @@
             if (snapshotClass && snapshotClass !== '-') {
                 snapshotClassCell = `
                     <td>
-                        <form action="/storage/snapshot-class" method="POST" onsubmit="sessionStorage.setItem('ns_select', '${escapeHtml(namespace)}'); return true;">
+                        <form action="/storage/snapshot-class" method="POST" class="data-form" data-ns="${escapeHtml(namespace)}" data-name="${snapshotClass}" data-storage-key="snapshotclass_data_name">
                             <input type="hidden" name="csrf_token" value="${escapeHtml(csrf_token)}">
                             <input type="hidden" name="ns_select" value="${escapeHtml(namespace)}" />
                             <input type="hidden" name="selected" value="${snapshotClass}" />
-                            <a href="javascript:;" onclick="parentNode.submit();">${snapshotClass}</a>
+                            <a href="#" class="form-submit-link">${snapshotClass}</a>
                         </form>
                     </td>
                 `;
             }
-            
+
             // PVC link
             let pvcCell = '<td>-</td>';
             if (pvc && pvc !== '-') {
                 pvcCell = `
                     <td>
-                        <form action="/storage/pvc" method="POST" onsubmit="sessionStorage.setItem('ns_select', '${escapeHtml(snapshotNamespace)}'); return true;">
+                        <form action="/storage/pvc" method="POST" class="data-form" data-ns="${escapeHtml(snapshotNamespace)}" data-name="${pvc}" data-storage-key="pvc_data_name">
                             <input type="hidden" name="csrf_token" value="${escapeHtml(csrf_token)}">
                             <input type="hidden" name="ns_select" value="${escapeHtml(snapshotNamespace)}" />
                             <input type="hidden" name="selected" value="${pvc}" />
-                            <a href="javascript:;" onclick="parentNode.submit();">${pvc}</a>
+                            <a href="#" class="form-submit-link">${pvc}</a>
                         </form>
                     </td>
                 `;
@@ -208,11 +208,11 @@
                 <tr class="${rowClass}">
                     <td>${statusBadge}</td>
                     <td>
-                        <form action="/storage/volumesnapshot/data" method="POST" onsubmit="sessionStorage.setItem('volumesnapshot_data_name', '${name}'); sessionStorage.setItem('ns_select', '${escapeHtml(snapshotNamespace)}'); return true;">
+                        <form action="/storage/volumesnapshot/data" method="POST" class="data-form" data-ns="${escapeHtml(snapshotNamespace)}" data-name="${name}" data-storage-key="volumesnapshot_data_name">
                             <input type="hidden" name="csrf_token" value="${escapeHtml(csrf_token)}">
                             <input type="hidden" name="ns_select" value="${escapeHtml(snapshotNamespace)}" />
                             <input type="hidden" name="selected" value="${name}" />
-                            <a href="javascript:;" onclick="parentNode.submit();">${name}</a>
+                            <a href="#" class="form-submit-link">${name}</a>
                         </form>
                     </td>
                     ${snapshotClassCell}
@@ -283,6 +283,23 @@
         loadVolumeSnapshots(namespace);
     });
     
+    // Event delegation for form submissions
+    document.addEventListener('click', function(e) {
+        const link = e.target.closest('.form-submit-link');
+        if (link) {
+            e.preventDefault();
+            const form = link.closest('form');
+            if (form) {
+                const ns = form.dataset.ns || '';
+                const name = form.dataset.name || '';
+                const storageKey = form.dataset.storageKey || '';
+                if (ns) sessionStorage.setItem('ns_select', ns);
+                if (name && storageKey) sessionStorage.setItem(storageKey, name);
+                form.submit();
+            }
+        }
+    });
+
     // Reload data when namespace changes (if namespace selector exists)
     document.addEventListener('DOMContentLoaded', function() {
         const namespaceSelect = document.getElementById('inputGroupSelect04');
@@ -292,6 +309,29 @@
                 console.log('Namespace changed to:', namespace);
                 sessionStorage.setItem('ns_select', namespace);
                 loadVolumeSnapshots(namespace);
+            });
+        }
+    });
+
+    // Event delegation for form submission links (CSP-compliant)
+    document.addEventListener('click', function(e) {
+        if (e.target.classList.contains('form-submit-link')) {
+            e.preventDefault();
+            const form = e.target.closest('form');
+            if (form) {
+                form.submit();
+            }
+        }
+    });
+
+    document.addEventListener('submit', function(e) {
+        if (e.target.classList.contains('inline-form')) {
+            const form = e.target;
+            const inputs = form.querySelectorAll('input[type="hidden"]');
+            inputs.forEach(input => {
+                if (input.name && input.value) {
+                    sessionStorage.setItem(input.name, input.value);
+                }
             });
         }
     });

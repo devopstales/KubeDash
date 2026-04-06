@@ -1,4 +1,4 @@
-     <li class="nav-item py-1">
+<li class="nav-item py-1">
         <div class="vr h-100 mx-2 text-body text-opacity-75"></div>
     </li>
   </ul>
@@ -7,8 +7,13 @@
           <a class="card-link float-right me-3" href="{{ url_for('history.back') }}">
               <i class="material-icons">arrow_back</i>
           </a>
-          <a class="card-link float-right" data-bs-toggle="collapse" href="#" onclick="reload()">
-              <i class="material-icons">refresh</i> 
-          </a>
+          <button class="btn btn-link card-link p-0" id="topmenu-reload-btn" type="button" title="Reload page" style="color: #6261cc;">
+              <i class="material-icons">refresh</i>
+          </button>
     </div>
   </ul>
+  <script nonce="{{ csp_nonce }}">
+    document.getElementById('topmenu-reload-btn')?.addEventListener('click', function() {
+      window.location.reload();
+    });
+  </script>

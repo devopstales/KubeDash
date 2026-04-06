@@ -17,7 +17,7 @@
 {% endblock %}
 
 {% block content %}
-<script>
+<script nonce="{{ csp_nonce }}">
     // Immediate test - should execute as soon as script tag is parsed
     console.log('=== INLINE SCRIPT TEST - External LoadBalancer ===');
     if (typeof window !== 'undefined') {
@@ -170,7 +170,7 @@
 {% endblock %}
 
 {% block add_tail_js %}
-<script>
+<script nonce="{{ csp_nonce }}">
 (function() {
     'use strict';
     try {
@@ -339,11 +339,11 @@
         }
         
         try {
-            // Store pools data in a global object for access in onclick handlers
+            // Store pools data in a global object for access in event delegation
             if (!window.loadbalancerPoolsData) {
                 window.loadbalancerPoolsData = {};
             }
-            
+
             const rows = pools.map((pool, index) => {
                 if (!pool || typeof pool !== 'object') {
                     return '';
@@ -353,7 +353,7 @@
                 const addresses = formatAddresses(pool);
                 const isSelected = selected === pool.name;
                 const rowClass = isSelected ? 'selected' : '';
-                
+
                 // Store pool data in global object
                 const poolKey = `ipaddresspool_${index}_${name}`;
                 try {
@@ -361,16 +361,16 @@
                 } catch (e) {
                     console.warn('Error storing pool data:', e);
                 }
-                
+
                 return `
                     <tr id="${name}" class="${rowClass}">
                         <td>${type}</td>
                         <td>
-                            <form action="/plugins/external-loadbalancer/data" method="POST" data-pool-key="${poolKey}" onsubmit="const form = this; const poolKey = form.getAttribute('data-pool-key'); if (poolKey && window.loadbalancerPoolsData && window.loadbalancerPoolsData[poolKey]) { sessionStorage.setItem('loadbalancer_object_data', JSON.stringify(window.loadbalancerPoolsData[poolKey])); } sessionStorage.setItem('loadbalancer_object_type', 'ipaddresspool'); return true;">
+                            <form class="inline-form" action="/plugins/external-loadbalancer/data" method="POST" data-pool-key="${poolKey}" data-object-type="ipaddresspool">
                                 <input type="hidden" name="csrf_token" value="${escapeHtml(csrf_token)}">
                                 <input type="hidden" name="object_type" value="ipaddresspool" />
                                 <input type="hidden" name="ns_select" value="${escapeHtml(namespace || 'default')}" />
-                                <a href="javascript:;" onclick="parentNode.submit();">${name}</a>
+                                <a href="#" class="form-submit-link">${name}</a>
                             </form>
                         </td>
                         <td>${addresses}</td>
@@ -392,31 +392,32 @@
     
     function populateL2AdvertisementsTable(advertisements, namespace) {
         const tbody = document.getElementById('l2advertisement-tbody');
-        
+
         if (!advertisements || advertisements.length === 0) {
             tbody.innerHTML = '<tr><td colspan="3" class="text-center text-muted">No L2 advertisements found</td></tr>';
             return;
         }
-        
+
         const rows = advertisements.map(adv => {
             const name = escapeHtml(adv.name || '');
             const type = escapeHtml(adv.type || '');
             let poolsHtml = '-';
             if (adv.ipAddressPools && Array.isArray(adv.ipAddressPools)) {
-                poolsHtml = adv.ipAddressPools.map(pool => 
-                    `<a href="javascript:;" onclick="goToTab('l2advertisement', '${escapeHtml(pool)}')">${escapeHtml(pool)}</a>`
+                poolsHtml = adv.ipAddressPools.map(pool =>
+                    `<a href="#" class="go-to-tab-link" data-tab-type="l2advertisement" data-tab-name="${escapeHtml(pool)}">${escapeHtml(pool)}</a>`
                 ).join('<br>');
             }
-            
+
+            const advDataAttr = escapeHtml(JSON.stringify(adv));
             return `
                 <tr>
                     <td>${type}</td>
                     <td>
-                        <form action="/plugins/external-loadbalancer/data" method="POST" onsubmit="sessionStorage.setItem('loadbalancer_object_data', JSON.stringify(${JSON.stringify(adv)})); sessionStorage.setItem('loadbalancer_object_type', 'l2advertisement'); return true;">
+                        <form class="inline-form" action="/plugins/external-loadbalancer/data" method="POST" data-object-type="l2advertisement" data-object-data='${advDataAttr}'>
                             <input type="hidden" name="csrf_token" value="${escapeHtml(csrf_token)}">
                             <input type="hidden" name="object_type" value="l2advertisement" />
                             <input type="hidden" name="ns_select" value="${escapeHtml(namespace)}" />
-                            <a href="javascript:;" onclick="parentNode.submit();">${name}</a>
+                            <a href="#" class="form-submit-link">${name}</a>
                         </form>
                     </td>
                     <td>${poolsHtml}</td>
@@ -448,16 +449,17 @@
             const name = escapeHtml(peer.name || '');
             const type = escapeHtml(peer.type || '');
             const peerAddress = formatPeerAddress(peer);
-            
+
+            const peerDataAttr = escapeHtml(JSON.stringify(peer));
             return `
                 <tr>
                     <td>${type}</td>
                     <td>
-                        <form action="/plugins/external-loadbalancer/data" method="POST" onsubmit="sessionStorage.setItem('loadbalancer_object_data', JSON.stringify(${JSON.stringify(peer)})); sessionStorage.setItem('loadbalancer_object_type', 'bgppeers'); return true;">
+                        <form class="inline-form" action="/plugins/external-loadbalancer/data" method="POST" data-object-type="bgppeers" data-object-data='${peerDataAttr}'>
                             <input type="hidden" name="csrf_token" value="${escapeHtml(csrf_token)}">
                             <input type="hidden" name="object_type" value="bgppeers" />
                             <input type="hidden" name="ns_select" value="${escapeHtml(namespace)}" />
-                            <a href="javascript:;" onclick="parentNode.submit();">${name}</a>
+                            <a href="#" class="form-submit-link">${name}</a>
                         </form>
                     </td>
                     <td>${peerAddress}</td>
@@ -486,11 +488,11 @@
             const type = escapeHtml(adv.type || '');
             let poolsHtml = '-';
             if (adv.ipAddressPools && Array.isArray(adv.ipAddressPools)) {
-                poolsHtml = adv.ipAddressPools.map(pool => 
-                    `<a href="javascript:;" onclick="goToTab('bgpadvertisement', '${escapeHtml(pool)}')">${escapeHtml(pool)}</a>`
+                poolsHtml = adv.ipAddressPools.map(pool =>
+                    `<a href="#" class="go-to-tab-link" data-tab-type="bgpadvertisement" data-tab-name="${escapeHtml(pool)}">${escapeHtml(pool)}</a>`
                 ).join('<br>');
             }
-            
+
             return `
                 <tr>
                     <td>${type}</td>
@@ -749,6 +751,50 @@
             console.error('Error in initializePage:', error);
         }
     }
+
+    // CSP-compliant event delegation for inline handlers
+    document.addEventListener('click', function(e) {
+        const link = e.target.closest('.form-submit-link');
+        if (link) {
+            e.preventDefault();
+            const form = link.closest('form');
+            if (form) form.submit();
+            return;
+        }
+
+        const goTabLink = e.target.closest('.go-to-tab-link');
+        if (goTabLink) {
+            e.preventDefault();
+            const tabType = goTabLink.getAttribute('data-tab-type');
+            const tabName = goTabLink.getAttribute('data-tab-name');
+            if (tabType && tabName) {
+                goToTab(tabType, tabName);
+            }
+        }
+    });
+
+    document.addEventListener('submit', function(e) {
+        const form = e.target.closest('.inline-form');
+        if (form) {
+            const objectType = form.getAttribute('data-object-type');
+            const objectData = form.getAttribute('data-object-data');
+            const poolKey = form.getAttribute('data-pool-key');
+
+            if (poolKey && window.loadbalancerPoolsData && window.loadbalancerPoolsData[poolKey]) {
+                sessionStorage.setItem('loadbalancer_object_data', JSON.stringify(window.loadbalancerPoolsData[poolKey]));
+            } else if (objectData) {
+                try {
+                    sessionStorage.setItem('loadbalancer_object_data', objectData);
+                } catch (parseError) {
+                    console.warn('Error storing object data in sessionStorage:', parseError);
+                }
+            }
+
+            if (objectType) {
+                sessionStorage.setItem('loadbalancer_object_type', objectType);
+            }
+        }
+    });
     } catch (error) {
         console.error('Error in External LoadBalancer script:', error);
         // Show error in UI
@@ -758,5 +804,29 @@
         document.body.insertBefore(errorDiv, document.body.firstChild);
     }
 })();
+
+    // Event delegation for form submission links (CSP-compliant)
+    document.addEventListener('click', function(e) {
+        if (e.target.classList.contains('form-submit-link')) {
+            e.preventDefault();
+            const form = e.target.closest('form');
+            if (form) {
+                form.submit();
+            }
+        }
+    });
+
+    document.addEventListener('submit', function(e) {
+        if (e.target.classList.contains('inline-form')) {
+            const form = e.target;
+            const inputs = form.querySelectorAll('input[type="hidden"]');
+            inputs.forEach(input => {
+                if (input.name && input.value) {
+                    sessionStorage.setItem(input.name, input.value);
+                }
+            });
+        }
+    });
 </script>
 {% endblock %}
+

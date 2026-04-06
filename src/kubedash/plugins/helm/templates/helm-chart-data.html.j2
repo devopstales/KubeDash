@@ -132,7 +132,7 @@
 {% endblock %}
 
 {% block add_tail_js %}
-<script>
+<script nonce="{{ csp_nonce }}">
     // Helper function to escape HTML
     function escapeHtml(text) {
         if (text == null) return '';

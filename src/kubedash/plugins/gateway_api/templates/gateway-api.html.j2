@@ -383,7 +383,7 @@
 {% endblock %}
 
 {% block add_tail_js %}
-<script>
+<script nonce="{{ csp_nonce }}">
     const escapeHtml = (text) => {
         if (text === null || text === undefined) return '';
         const map = {

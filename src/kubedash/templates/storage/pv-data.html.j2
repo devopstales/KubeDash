@@ -86,6 +86,10 @@
                     <th>Capacity:</th>
                     <td id="pv-capacity">Loading...</td>
                 </tr>
+                <tr>
+                    <th>Usage:</th>
+                    <td id="pv-usage">Loading...</td>
+                </tr>
                 <tr id="pv-host-path-row" style="display: none;">
                     <th>Local Path:</th>
                     <td id="pv-host-path">-</td>
@@ -220,7 +224,7 @@
         return { pvName, namespace };
     }
     
-    function populatePVInfo(pv) {
+    function populatePVInfo(pv, metrics) {
         if (!pv) {
             document.getElementById('pv-name').textContent = 'N/A';
             document.getElementById('pv-status').textContent = 'N/A';
@@ -290,26 +294,26 @@
         const namespace = sessionStorage.getItem('ns_select') || 'default';
         if (pv.storage_class_name) {
             document.getElementById('pv-storageclass').innerHTML = `
-                <form action="/storage/storage-class" method="POST" onsubmit="sessionStorage.setItem('ns_select', '${escapeHtml(namespace)}'); return true;">
+                <form action="/storage/storage-class" method="POST" class="data-form" data-ns="${escapeHtml(namespace)}" data-name="${escapeHtml(pv.storage_class_name)}" data-storage-key="storageclass_data_name">
                     <input type="hidden" name="csrf_token" value="${escapeHtml(csrf_token)}">
                     <input type="hidden" name="ns_select" value="${escapeHtml(namespace)}" />
                     <input type="hidden" name="selected" value="${escapeHtml(pv.storage_class_name)}" />
-                    <a href="javascript:;" onclick="parentNode.submit();">${escapeHtml(pv.storage_class_name)}</a>
+                    <a href="#" class="form-submit-link">${escapeHtml(pv.storage_class_name)}</a>
                 </form>
             `;
         } else {
             document.getElementById('pv-storageclass').textContent = '-';
         }
-        
+
         // VolumeClaim
         if (pv.volume_claim_name) {
             const pvcNamespace = pv.volume_claim_namespace || namespace;
             document.getElementById('pv-volumeclaim').innerHTML = `
-                <form action="/storage/pvc" method="POST" onsubmit="sessionStorage.setItem('ns_select', '${escapeHtml(pvcNamespace)}'); return true;">
+                <form action="/storage/pvc" method="POST" class="data-form" data-ns="${escapeHtml(pvcNamespace)}" data-name="${escapeHtml(pv.volume_claim_name)}" data-storage-key="pvc_data_name">
                     <input type="hidden" name="csrf_token" value="${escapeHtml(csrf_token)}">
                     <input type="hidden" name="ns_select" value="${escapeHtml(pvcNamespace)}" />
                     <input type="hidden" name="selected" value="${escapeHtml(pv.volume_claim_name)}" />
-                    <a href="javascript:;" onclick="parentNode.submit();">${escapeHtml(pv.volume_claim_name)}</a>
+                    <a href="#" class="form-submit-link">${escapeHtml(pv.volume_claim_name)}</a>
                 </form>
             `;
         } else {
@@ -321,7 +325,30 @@
         document.getElementById('pv-volume-mode').textContent = escapeHtml(pv.volume_mode || '-');
         document.getElementById('pv-reclaim-policy').textContent = escapeHtml(pv.reclaim_policy || '-');
         document.getElementById('pv-capacity').textContent = escapeHtml(pv.capacity || '-');
-        
+
+        // Usage metrics
+        const usageContainer = document.getElementById('pv-usage');
+        if (metrics && metrics.percentageUsed !== undefined) {
+            const usagePercent = Math.round(metrics.percentageUsed || 0);
+            let progressBarClass = 'bg-success';
+            if (usagePercent >= 90) {
+                progressBarClass = 'bg-danger';
+            } else if (usagePercent >= 75) {
+                progressBarClass = 'bg-warning';
+            }
+            usageContainer.innerHTML = `
+                <div class="progress position-relative" style="height: 20px;">
+                    <div class="progress-bar ${progressBarClass}" role="progressbar" style="width: ${usagePercent}%" aria-valuenow="${usagePercent}" aria-valuemin="0" aria-valuemax="100"></div>
+                    <small class="justify-content-center d-flex position-absolute w-100">${usagePercent}%</small>
+                </div>
+                <div class="mt-2 small text-muted">
+                    Used: ${(metrics.usedBytes || 0).toFixed(2)} KB / Capacity: ${(metrics.capacityBytes || 0).toFixed(2)} KB
+                </div>
+            `;
+        } else {
+            usageContainer.textContent = '-';
+        }
+
         // Host path
         if (pv.host_path) {
             document.getElementById('pv-host-path').textContent = escapeHtml(pv.host_path);
@@ -381,52 +408,111 @@
     async function loadPVData() {
         try {
             const { pvName, namespace } = getPVInfo();
-            
+
             console.log('PV info:', { pvName, namespace });
-            
+
             if (!pvName) {
                 throw new Error('PV name not found. Please select a PV from the list page.');
             }
-            
-            const apiUrl = `/api/v1/storage/pvs/${encodeURIComponent(pvName)}`;
-            console.log('Fetching PV data from:', apiUrl);
-            
-            const response = await fetch(apiUrl);
-            if (!response.ok) {
-                if (response.status === 404) {
+
+            // Fetch PV data and metrics in parallel
+            const [pvResponse, metricsResponse] = await Promise.all([
+                fetch(`/api/v1/storage/pvs/${encodeURIComponent(pvName)}`),
+                fetch(`/api/v1/storage/pvs/metrics`)
+            ]);
+
+            if (!pvResponse.ok) {
+                if (pvResponse.status === 404) {
                     throw new Error(`PV '${pvName}' not found`);
                 }
-                throw new Error(`HTTP error! status: ${response.status}`);
+                throw new Error(`HTTP error! status: ${pvResponse.status}`);
             }
-            
-            const result = await response.json();
+
+            const result = await pvResponse.json();
             console.log('PV API response:', result);
-            
+
             if (result.error) {
                 throw new Error(result.message || 'Failed to load PV');
             }
-            
+
             const pv = result.data;
             if (!pv) {
                 throw new Error('No PV data received');
             }
-            
-            populatePVInfo(pv);
+
+            // Get metrics for this PV
+            let metrics = null;
+            if (metricsResponse.ok) {
+                try {
+                    const metricsData = await metricsResponse.json();
+                    console.log('PV Metrics API response:', metricsData);
+                    const allMetrics = metricsData.data || {};
+                    // k8sPVMetric returns a dict { pvName: { metrics } }, not an array
+                    if (pvName && allMetrics[pvName]) {
+                        metrics = allMetrics[pvName];
+                    }
+                } catch (e) {
+                    console.warn('Failed to parse PV metrics:', e);
+                }
+            }
+
+            populatePVInfo(pv, metrics);
             
         } catch (error) {
             console.error('Error loading PV data:', error);
             document.getElementById('pv-name').textContent = 'Error';
             document.getElementById('pv-status').textContent = 'Error';
             document.getElementById('pv-created').textContent = 'Error';
-            document.getElementById('pv-annotations-container').innerHTML = 
+            document.getElementById('pv-annotations-container').innerHTML =
                 '<span class="text-danger">Error loading PV: ' + escapeHtml(error.message) + '</span>';
             document.getElementById('pv-labels-container').innerHTML = '';
+            document.getElementById('pv-usage').textContent = '-';
         }
     }
     
+    // Event delegation for form submissions
+    document.addEventListener('click', function(e) {
+        const link = e.target.closest('.form-submit-link');
+        if (link) {
+            e.preventDefault();
+            const form = link.closest('form');
+            if (form) {
+                const ns = form.dataset.ns || '';
+                const name = form.dataset.name || '';
+                const storageKey = form.dataset.storageKey || '';
+                if (ns) sessionStorage.setItem('ns_select', ns);
+                if (name && storageKey) sessionStorage.setItem(storageKey, name);
+                form.submit();
+            }
+        }
+    });
+
     // Load data when page loads
     document.addEventListener('DOMContentLoaded', function() {
         loadPVData();
+    });
+
+    // Event delegation for form submission links (CSP-compliant)
+    document.addEventListener('click', function(e) {
+        if (e.target.classList.contains('form-submit-link')) {
+            e.preventDefault();
+            const form = e.target.closest('form');
+            if (form) {
+                form.submit();
+            }
+        }
+    });
+
+    document.addEventListener('submit', function(e) {
+        if (e.target.classList.contains('inline-form')) {
+            const form = e.target;
+            const inputs = form.querySelectorAll('input[type="hidden"]');
+            inputs.forEach(input => {
+                if (input.name && input.value) {
+                    sessionStorage.setItem(input.name, input.value);
+                }
+            });
+        }
     });
 </script>
 {% endblock %}

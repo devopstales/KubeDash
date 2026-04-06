@@ -259,7 +259,7 @@
 {% endblock %}
 
 {% block add_tail_js %}
-<script>
+<script nonce="{{ csp_nonce }}">
 $(document).ready(function() {
     {% if report.controlChecks and report.controlChecks|length > 0 %}
     $('#controlsTable').DataTable({

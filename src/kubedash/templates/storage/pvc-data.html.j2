@@ -202,25 +202,25 @@
         const namespace = pvc.namespace || sessionStorage.getItem('ns_select') || 'default';
         if (pvc.storage_class_name) {
             document.getElementById('pvc-storageclass').innerHTML = `
-                <form action="/storage/storage-class" method="POST" onsubmit="sessionStorage.setItem('ns_select', '${escapeHtml(namespace)}'); return true;">
+                <form action="/storage/storage-class" method="POST" class="data-form" data-ns="${escapeHtml(namespace)}" data-name="${escapeHtml(pvc.storage_class_name)}" data-storage-key="storageclass_data_name">
                     <input type="hidden" name="csrf_token" value="${escapeHtml(csrf_token)}">
                     <input type="hidden" name="ns_select" value="${escapeHtml(namespace)}" />
                     <input type="hidden" name="selected" value="${escapeHtml(pvc.storage_class_name)}" />
-                    <a href="javascript:;" onclick="parentNode.submit();">${escapeHtml(pvc.storage_class_name)}</a>
+                    <a href="#" class="form-submit-link">${escapeHtml(pvc.storage_class_name)}</a>
                 </form>
             `;
         } else {
             document.getElementById('pvc-storageclass').textContent = '-';
         }
-        
+
         // Persistent Volume
         if (pvc.volume_name) {
             document.getElementById('pvc-volume').innerHTML = `
-                <form action="/storage/pv" method="POST" onsubmit="sessionStorage.setItem('ns_select', '${escapeHtml(namespace)}'); return true;">
+                <form action="/storage/pv" method="POST" class="data-form" data-ns="${escapeHtml(namespace)}" data-name="${escapeHtml(pvc.volume_name)}" data-storage-key="pv_data_name">
                     <input type="hidden" name="csrf_token" value="${escapeHtml(csrf_token)}">
                     <input type="hidden" name="ns_select" value="${escapeHtml(namespace)}" />
                     <input type="hidden" name="selected" value="${escapeHtml(pvc.volume_name)}" />
-                    <a href="javascript:;" onclick="parentNode.submit();">${escapeHtml(pvc.volume_name)}</a>
+                    <a href="#" class="form-submit-link">${escapeHtml(pvc.volume_name)}</a>
                 </form>
             `;
         } else {
@@ -318,9 +318,49 @@
         }
     }
     
+    // Event delegation for form submissions
+    document.addEventListener('click', function(e) {
+        const link = e.target.closest('.form-submit-link');
+        if (link) {
+            e.preventDefault();
+            const form = link.closest('form');
+            if (form) {
+                const ns = form.dataset.ns || '';
+                const name = form.dataset.name || '';
+                const storageKey = form.dataset.storageKey || '';
+                if (ns) sessionStorage.setItem('ns_select', ns);
+                if (name && storageKey) sessionStorage.setItem(storageKey, name);
+                form.submit();
+            }
+        }
+    });
+
     // Load data when page loads
     document.addEventListener('DOMContentLoaded', function() {
         loadPVCData();
+    });
+
+    // Event delegation for form submission links (CSP-compliant)
+    document.addEventListener('click', function(e) {
+        if (e.target.classList.contains('form-submit-link')) {
+            e.preventDefault();
+            const form = e.target.closest('form');
+            if (form) {
+                form.submit();
+            }
+        }
+    });
+
+    document.addEventListener('submit', function(e) {
+        if (e.target.classList.contains('inline-form')) {
+            const form = e.target;
+            const inputs = form.querySelectorAll('input[type="hidden"]');
+            inputs.forEach(input => {
+                if (input.name && input.value) {
+                    sessionStorage.setItem(input.name, input.value);
+                }
+            });
+        }
     });
 </script>
 {% endblock %}

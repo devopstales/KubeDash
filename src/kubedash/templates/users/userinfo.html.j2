@@ -19,7 +19,7 @@
 <ul class="header-nav ms-auto"></ul>
 <ul class="header-nav d-lg-flex">
     <div class="col">
-      <a class="card-link float-right" data-bs-toggle="collapse" href="#" onclick="unhideElementsById(['hiddenDIV','hiddenHR','hiddenFOOTER'])" id="addBTN">
+      <a class="card-link float-right" data-bs-toggle="collapse" href="#" id="addBTN">
         <i class="material-icons">edit</i></a>
     </div>
 {% include "segments/partials/topmenu.html.j2" %}
@@ -85,8 +85,8 @@
                                     <input class="form-control user" id="old_password" name="old_password" type="password" placeholder="Current Password" required>
                                 </div>
                                 <div class="p-2">
-                                        <button type="button" class="btn btn-just-icon btn-xs" onclick="showPasswords('old_password')">
-                                            <i id="old_password_icon" class="material-icons">visibility_off</i> 
+                                        <button type="button" class="btn btn-just-icon btn-xs show-password-btn" data-field="old_password">
+                                            <i id="old_password_icon" class="material-icons">visibility_off</i>
                                         </button>
                                 </div>
                             </div>
@@ -101,8 +101,8 @@
                                     <input class="form-control user" id="new_password" name="new_password" type="password" placeholder="New Password" required>
                                 </div>
                                 <div class="p-2">
-                                        <button type="button" class="btn btn-just-icon btn-xs" onclick="showPasswords('new_password')">
-                                            <i id="new_password_icon" class="material-icons">visibility_off</i> 
+                                        <button type="button" class="btn btn-just-icon btn-xs show-password-btn" data-field="new_password">
+                                            <i id="new_password_icon" class="material-icons">visibility_off</i>
                                         </button>
                                 </div>
                             </div>
@@ -130,8 +130,8 @@
                                         <input class="form-control user" id="confirm_new_password" name="confirm_new_password" type="password" placeholder="Confirm New Password" required>
                                     </div>
                                     <div class="m-2">
-                                        <button type="button" class="btn btn-just-icon btn-xs" onclick="showPasswords('confirm_new_password')">
-                                            <i id="confirm_new_password_icon" class="material-icons">visibility_off</i> 
+                                        <button type="button" class="btn btn-just-icon btn-xs show-password-btn" data-field="confirm_new_password">
+                                            <i id="confirm_new_password_icon" class="material-icons">visibility_off</i>
                                         </button>
                                     </div>
                                 </div>
@@ -143,7 +143,7 @@
         <div id="hiddenFOOTER" class="modal-footer m-3" hidden=true>
             <div class="form-group">
                 <div id="password-form-messages"></div>
-                <button type="button" class="btn btn-secondary m-1" onclick="unhideElementsById(['hiddenDIV','hiddenHR','hiddenFOOTER'])">Close</button>
+                <button type="button" class="btn btn-secondary m-1" id="close-modal-btn">Close</button>
                 <button type="submit" class="btn btn-primary m-1" >Update Profile</button>
             </div>
         </div>
@@ -304,6 +304,27 @@
                     checkPasswordConformation(new_password, confirm_new_password);
                 }
             });
+        });
+
+        // Event delegation for CSP-compliant handlers
+        document.addEventListener('click', function(e) {
+            if (e.target.id === 'addBTN' || e.target.closest('#addBTN')) {
+                e.preventDefault();
+                if (typeof unhideElementsById === 'function') {
+                    unhideElementsById(['hiddenDIV', 'hiddenHR', 'hiddenFOOTER']);
+                }
+            }
+            if (e.target.id === 'close-modal-btn') {
+                if (typeof unhideElementsById === 'function') {
+                    unhideElementsById(['hiddenDIV', 'hiddenHR', 'hiddenFOOTER']);
+                }
+            }
+            if (e.target.classList.contains('show-password-btn')) {
+                const field = e.target.dataset.field;
+                if (typeof showPasswords === 'function') {
+                    showPasswords(field);
+                }
+            }
         });
     </script>
 {% endblock %}

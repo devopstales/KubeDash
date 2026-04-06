@@ -52,7 +52,7 @@
 {% endblock %}
 
 {% block add_tail_js %}
-<script>
+<script nonce="{{ csp_nonce }}">
     // IMMEDIATE: Prevent datatables-demo.js from initializing on loading row
     (function() {
         function setupOverride() {
@@ -167,7 +167,7 @@
             return `
                 <tr class="${rowClass}">
                     <td>
-                        <a href="javascript:;" onclick="sessionStorage.setItem('image_name', '${imageNameEscaped.replace(/'/g, "\\'")}'); sessionStorage.setItem('registry_server_url', '${registryServerUrl.replace(/'/g, "\\'")}'); window.location.href='/plugins/registry/image/tags?registry_server_url=${registryUrlEncoded}&image_name=${imageNameEncoded}';">${imageNameEscaped}</a>
+                        <a href="#" class="nav-link" data-image-name="${imageNameEscaped}" data-registry-url="${registryServerUrl}" data-image-name-encoded="${imageNameEncoded}" data-registry-url-encoded="${registryUrlEncoded}">${imageNameEscaped}</a>
                     </td>
                 </tr>
             `;
@@ -289,6 +289,23 @@
         }
         
         loadImages();
+
+        // Event delegation for navigation links
+        document.addEventListener('click', function(e) {
+            const navLink = e.target.closest('.nav-link');
+            if (navLink) {
+                e.preventDefault();
+                const imageName = navLink.getAttribute('data-image-name');
+                const registryUrl = navLink.getAttribute('data-registry-url');
+                const imageNameEncoded = navLink.getAttribute('data-image-name-encoded');
+                const registryUrlEncoded = navLink.getAttribute('data-registry-url-encoded');
+                if (imageName && registryUrl) {
+                    sessionStorage.setItem('image_name', imageName);
+                    sessionStorage.setItem('registry_server_url', registryUrl);
+                    window.location.href = '/plugins/registry/image/tags?registry_server_url=' + registryUrlEncoded + '&image_name=' + imageNameEncoded;
+                }
+            }
+        });
     });
 </script>
 {% endblock %}

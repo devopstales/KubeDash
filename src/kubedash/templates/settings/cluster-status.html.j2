@@ -1,0 +1,230 @@
+{% extends "base2.html.j2" %}
+
+{% block topmenu %}
+<ul class="header-nav d-lg-flex m-3">
+    <div class="container-fluid px-4">
+      <nav aria-label="breadcrumb">
+        <ol class="breadcrumb my-0">
+          <li class="breadcrumb-item">Settings</li>
+          <li class="breadcrumb-item active"><span>Cluster Status</span></li>
+        </ol>
+      </nav>
+    </div>
+</ul>
+<ul class="header-nav ms-auto"></ul>
+<ul class="header-nav d-lg-flex">
+{% include "segments/partials/topmenu.html.j2" %}
+{% endblock %}
+
+{% block content %}
+<div class="row">
+  <!-- Deployment Mode Card -->
+  <div class="col-md-6 col-lg-3 mb-4">
+    <div class="card shadow h-100" id="replica-mode-card">
+      <div class="card-header py-3">
+        <h6 class="m-0 font-weight-bold text-primary">Deployment Mode</h6>
+      </div>
+      <div class="card-body">
+        <div id="replica-mode-content" class="text-center">
+          <div class="spinner-border text-primary" role="status">
+            <span class="visually-hidden">Loading...</span>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Local Pod Status Card -->
+  <div class="col-md-6 col-lg-3 mb-4">
+    <div class="card shadow h-100" id="pod-status-card">
+      <div class="card-header py-3">
+        <h6 class="m-0 font-weight-bold text-primary">Local Pod Status</h6>
+      </div>
+      <div class="card-body">
+        <div id="pod-status-content" class="text-center">
+          <div class="spinner-border text-primary" role="status">
+            <span class="visually-hidden">Loading...</span>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Leader Status Card -->
+  <div class="col-md-6 col-lg-3 mb-4">
+    <div class="card shadow h-100" id="leader-status-card">
+      <div class="card-header py-3">
+        <h6 class="m-0 font-weight-bold text-primary">Leader Status</h6>
+      </div>
+      <div class="card-body">
+        <div id="leader-status-content" class="text-center">
+          <div class="spinner-border text-primary" role="status">
+            <span class="visually-hidden">Loading...</span>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Cluster Configuration Card -->
+  <div class="col-md-6 col-lg-3 mb-4">
+    <div class="card shadow h-100" id="cluster-config-card">
+      <div class="card-header py-3">
+        <h6 class="m-0 font-weight-bold text-primary">Cluster Size</h6>
+      </div>
+      <div class="card-body">
+        <div id="cluster-config-content" class="text-center">
+          <div class="spinner-border text-primary" role="status">
+            <span class="visually-hidden">Loading...</span>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- Detailed Information Section -->
+<div class="card shadow mb-4">
+  <div class="card-header py-3">
+    <h6 class="m-0 font-weight-bold text-primary">Detailed Information</h6>
+  </div>
+  <div class="card-body">
+    <div class="table-responsive">
+      <table class="table table-hover table-sm">
+        <tbody>
+          <tr>
+            <td class="fw-bold">Deployment Mode</td>
+            <td id="detail-replica-mode">—</td>
+          </tr>
+          <tr>
+            <td class="fw-bold">Pod Name</td>
+            <td id="detail-pod-name">—</td>
+          </tr>
+          <tr>
+            <td class="fw-bold">Pod Namespace</td>
+            <td id="detail-pod-namespace">—</td>
+          </tr>
+          <tr>
+            <td class="fw-bold">Is Leader</td>
+            <td id="detail-is-leader">—</td>
+          </tr>
+          <tr>
+            <td class="fw-bold">Current Leader Pod</td>
+            <td id="detail-leader-pod">—</td>
+          </tr>
+          <tr>
+            <td class="fw-bold">Total Replicas</td>
+            <td id="detail-replica-count">—</td>
+          </tr>
+          <tr>
+            <td class="fw-bold">Last Updated</td>
+            <td id="detail-last-updated">—</td>
+          </tr>
+        </tbody>
+      </table>
+    </div>
+  </div>
+</div>
+
+<!-- Status Code Reference -->
+<div class="card shadow">
+  <div class="card-header py-3">
+    <h6 class="m-0 font-weight-bold text-primary">Status Guide</h6>
+  </div>
+  <div class="card-body">
+    <div class="row">
+      <div class="col-md-6">
+        <h6 class="font-weight-bold">Deployment Modes</h6>
+        <ul class="list-unstyled ps-3">
+          <li><strong>Single:</strong> Single-replica deployment, no leader election needed</li>
+          <li><strong>Cluster:</strong> Multi-replica deployment with Kubernetes-based leader election</li>
+        </ul>
+      </div>
+      <div class="col-md-6">
+        <h6 class="font-weight-bold">Pod Roles</h6>
+        <ul class="list-unstyled ps-3">
+          <li><strong>Leader:</strong> This pod executes background tasks and cluster coordination</li>
+          <li><strong>Follower:</strong> This pod handles API requests but skips background tasks</li>
+        </ul>
+      </div>
+    </div>
+  </div>
+</div>
+
+<script nonce="{{ csp_nonce }}">
+document.addEventListener('DOMContentLoaded', function() {
+  // Load initial status
+  loadClusterStatus();
+
+  // Auto-refresh every 10 seconds
+  setInterval(loadClusterStatus, 10000);
+});
+
+function loadClusterStatus() {
+  fetch('/api/cluster/status')
+    .then(response => response.json())
+    .then(data => updateClusterStatusUI(data))
+    .catch(error => {
+      console.error('Error fetching cluster status:', error);
+      updateErrorUI();
+    });
+}
+
+function updateClusterStatusUI(data) {
+  const now = new Date().toLocaleTimeString();
+
+  // Deployment Mode Card
+  const modeDisplay = data.replica_mode === 'cluster' ? '🔗 Cluster' : '⚙️ Single';
+  document.getElementById('replica-mode-content').innerHTML = `
+    <div style="font-size: 2rem; margin: 10px 0;">${modeDisplay}</div>
+    <small class="text-muted">${data.replica_mode.toUpperCase()}</small>
+  `;
+
+  // Local Pod Status Card
+  const leaderBadge = data.is_leader ? '<span class="badge bg-success">Leader</span>' : '<span class="badge bg-info">Follower</span>';
+  document.getElementById('pod-status-content').innerHTML = `
+    <div style="font-size: 1.5rem; margin: 10px 0;">${leaderBadge}</div>
+    <small class="text-muted">${data.pod_name}</small>
+  `;
+
+  // Leader Status Card
+  if (data.replica_mode === 'cluster' && data.leader_pod) {
+    const leaderDisplay = data.is_leader ? 'This Pod ✓' : data.leader_pod;
+    document.getElementById('leader-status-content').innerHTML = `
+      <div style="font-size: 1.2rem; margin: 10px 0;">${leaderDisplay}</div>
+      <small class="text-muted">Leader Holder</small>
+    `;
+  } else {
+    document.getElementById('leader-status-content').innerHTML = `
+      <div style="font-size: 1rem; margin: 10px 0;">N/A</div>
+      <small class="text-muted">Not applicable in single mode</small>
+    `;
+  }
+
+  // Cluster Configuration Card
+  document.getElementById('cluster-config-content').innerHTML = `
+    <div style="font-size: 2rem; margin: 10px 0;">${data.replica_count}</div>
+    <small class="text-muted">Replica${data.replica_count !== 1 ? 's' : ''}</small>
+  `;
+
+  // Detailed Information Table
+  document.getElementById('detail-replica-mode').textContent = data.replica_mode.toUpperCase();
+  document.getElementById('detail-pod-name').textContent = data.pod_name;
+  document.getElementById('detail-pod-namespace').textContent = data.pod_namespace;
+  document.getElementById('detail-is-leader').innerHTML = data.is_leader ?
+    '<span class="badge bg-success">Yes</span>' :
+    '<span class="badge bg-info">No</span>';
+  document.getElementById('detail-leader-pod').textContent = data.leader_pod || 'N/A';
+  document.getElementById('detail-replica-count').textContent = data.replica_count;
+  document.getElementById('detail-last-updated').textContent = now;
+}
+
+function updateErrorUI() {
+  const errorMsg = '<div class="alert alert-danger">Failed to load cluster status</div>';
+  document.getElementById('replica-mode-content').innerHTML = errorMsg;
+  document.getElementById('pod-status-content').innerHTML = errorMsg;
+  document.getElementById('leader-status-content').innerHTML = errorMsg;
+  document.getElementById('cluster-config-content').innerHTML = errorMsg;
+}
+</script>
+{% endblock %}

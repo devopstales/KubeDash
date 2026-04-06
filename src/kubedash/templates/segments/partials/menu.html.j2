@@ -12,7 +12,7 @@
             </svg>
             </a>
         </div>
-        <button class="btn-close d-lg-none" type="button" data-coreui-dismiss="offcanvas" data-coreui-theme="dark" aria-label="Close" onclick="coreui.Sidebar.getInstance(document.querySelector(&quot;#sidebar&quot;)).toggle()"></button>
+        <button class="btn-close d-lg-none" type="button" data-coreui-dismiss="offcanvas" data-coreui-theme="dark" aria-label="Close" id="sidebar-close-btn"></button>
         </div>
         <ul class="sidebar-nav" data-coreui="navigation" data-simplebar="">
 
@@ -94,10 +94,10 @@
                     <li class="nav-item"><a class="nav-link" href="/network/service"> Services </a></li>
                     <!-- endpoints -->
                 {% if config.plugins["cert_manager"] %}
-                    <li class="nav-item"><a class="nav-link" href="/plugins/cert-manager"> Cert-Manager <span class="badge text-bg-sm bg-warning ms-auto">Beta</span></a></li>
+                    <li class="nav-item"><a class="nav-link" href="/plugins/cert-manager"> Cert-Manager </a></li>
                 {% endif %}
                 {% if config.plugins["external_loadbalancer"] %}
-                    <li class="nav-item"><a class="nav-link" href="/plugins/external-loadbalancer"> LoadBalancers <span class="badge text-bg-sm bg-warning ms-auto">Beta</span></a></li>
+                    <li class="nav-item"><a class="nav-link" href="/plugins/external-loadbalancer"> LoadBalancers </a></li>
                 {% endif %}
                     <li class="nav-item"><a class="nav-link" href="/network/ingress"> Ingress </a></li>
                     <!-- Gateways -->
@@ -164,7 +164,8 @@
                 </svg> Settings </a>
                 <ul class="nav-group-items compact">
                     <li class="nav-item"><a class="nav-link" href="/settings/sso-config"> Auth Provider </a></li>
-                    <li class="nav-item"><a class="nav-link" href="/settings/cluster-config"> Cluster Configuration </a></li>
+                    <li class="nav-item"><a class="nav-link" href="/settings/k8s-config"> Kubernetes Cluster </a></li>
+                    <li class="nav-item"><a class="nav-link" href="/settings/cluster-status"> HA Status </a></li>
                     <li class="nav-item"><a class="nav-link" href="/settings/audit-log"> Audit Log </a></li>
                     {% if config.plugins["application_catalog"] %}
                     <li class="nav-item"><a class="nav-link" href="/plugins/app-catalog/settings"> Applications </a></li>
@@ -208,3 +209,10 @@
             <button class="sidebar-toggler" type="button" data-coreui-toggle="unfoldable"></button>
     </div>
     </div>
+    <script nonce="{{ csp_nonce }}">
+        document.getElementById('sidebar-close-btn')?.addEventListener('click', function() {
+            if (typeof coreui !== 'undefined' && coreui.Sidebar) {
+                coreui.Sidebar.getInstance(document.querySelector("#sidebar"))?.toggle();
+            }
+        });
+    </script>

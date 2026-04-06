@@ -266,7 +266,7 @@
 {% endblock %}
 
 {% block add_tail_js %}
-<script>
+<script nonce="{{ csp_nonce }}">
 $(document).ready(function() {
     $('#checksTable').DataTable({
         "order": [[0, "asc"]], // Sort by status

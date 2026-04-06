@@ -158,10 +158,10 @@
         if (ingressClass) {
             const namespace = getIngressInfo().namespace;
             ingressClassContainer.innerHTML = `
-                <form action="/network/ingress-class/data" method="POST" onsubmit="sessionStorage.setItem('ns_select', '${escapeHtml(namespace)}'); return true;">
+                <form action="/network/ingress-class/data" method="POST" >
                     <input type="hidden" name="csrf_token" value="${escapeHtml(csrf_token)}">
                     <input type="hidden" name="ic_name" value="${escapeHtml(ingressClass)}" />
-                    <a href="javascript:;" onclick="parentNode.submit();">${escapeHtml(ingressClass)}</a>
+                    <a href="#" class="form-submit-link">${escapeHtml(ingressClass)}</a>
                 </form>
             `;
         } else {
@@ -239,11 +239,11 @@
             if (serviceName) {
                 serviceCell = `
                     <td>
-                        <form action="/network/service/data" method="POST" onsubmit="sessionStorage.setItem('ns_select', '${escapeHtml(namespace)}'); return true;">
+                        <form action="/network/service/data" method="POST" >
                             <input type="hidden" name="csrf_token" value="${escapeHtml(csrf_token)}">
                             <input type="hidden" name="ns_select" value="${escapeHtml(namespace)}" />
                             <input type="hidden" name="service_name" value="${escapeHtml(serviceName)}" />
-                            <a href="javascript:;" onclick="parentNode.submit();">${escapeHtml(serviceName)}</a>
+                            <a href="#" class="form-submit-link">${escapeHtml(serviceName)}</a>
                         </form>
                     </td>
                 `;
@@ -262,11 +262,11 @@
             if (hasTls && tlsSecret) {
                 tlsCell = `
                     <td>
-                        <form action="/security/secret/data" method="POST" onsubmit="sessionStorage.setItem('ns_select', '${escapeHtml(namespace)}'); return true;">
+                        <form action="/security/secret/data" method="POST" >
                             <input type="hidden" name="csrf_token" value="${escapeHtml(csrf_token)}">
                             <input type="hidden" name="ns_select" value="${escapeHtml(namespace)}" />
                             <input type="hidden" name="selected" value="${escapeHtml(tlsSecret)}" />
-                            <a href="javascript:;" onclick="parentNode.submit();">${escapeHtml(tlsSecret)}</a>
+                            <a href="#" class="form-submit-link">${escapeHtml(tlsSecret)}</a>
                         </form>
                     </td>
                 `;
@@ -377,5 +377,30 @@
     document.addEventListener('DOMContentLoaded', function() {
         loadIngressData();
     });
+
+    // Event delegation for form submission links (CSP-compliant)
+    document.addEventListener('click', function(e) {
+        if (e.target.classList.contains('form-submit-link')) {
+            e.preventDefault();
+            const form = e.target.closest('form');
+            if (form) {
+                form.submit();
+            }
+        }
+    });
+
+    document.addEventListener('submit', function(e) {
+        if (e.target.classList.contains('inline-form')) {
+            const form = e.target;
+            // Set sessionStorage based on form inputs
+            const inputs = form.querySelectorAll('input[type="hidden"]');
+            inputs.forEach(input => {
+                if (input.name && input.value) {
+                    sessionStorage.setItem(input.name, input.value);
+                }
+            });
+        }
+    });
 </script>
 {% endblock %}
+

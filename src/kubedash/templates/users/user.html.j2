@@ -89,7 +89,15 @@
                 </div>
                 <div class="form-group">
                   <label>Password:</label>
-                  <input type="password" name="password" id="PassEntry" class="form-control user" placeholder="Type your password">
+                  <input type="password" name="password" id="PassEntry" class="form-control user" placeholder="Type your password" readonly>
+                  <div id="password-strength-status"></div>
+                  <ul id="passwordCriterion" class="pswd_info">
+                    <li data-criterion="length" class="invalid">6-15 characters</li>
+                    <li data-criterion="capital" class="invalid">Uppercase letter (A-Z)</li>
+                    <li data-criterion="small" class="invalid">Lowercase letter (a-z)</li>
+                    <li data-criterion="number" class="invalid">Number (0-9)</li>
+                    <li data-criterion="special" class="invalid">Special character</li>
+                  </ul>
                 </div>
                 <div class="form-group">
                   <label>Permission:</label>
@@ -108,7 +116,7 @@
                 <div class="modal-footer">
                   <div class="form-group mt-2">
                     <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Close</button>
-                    <button type="submit" class="btn btn-primary" >Add User</button>
+                    <button type="submit" class="btn btn-primary" id="btnAddUser" disabled>Add User</button>
                   </div>
                 </div>
               </form>
@@ -165,6 +173,7 @@
 
 {% block add_head_css %}
 {% include "segments/components/datatable_snippet.html.j2" %}
+<link rel="stylesheet" href="{{ url_for('static',filename='/vendor/check-strength-password/password-strength.css') }}">
 {% endblock %}
 
 {% block add_tail_js %}
@@ -346,13 +355,13 @@
             if (canEdit || canViewSelf) {
                 // Use data attribute instead of inline JavaScript to prevent XSS
                 const safeUsername = escapeHtml(user.username);
-                usernameCell = `<form action="/user/privilege" method="POST" data-username="${safeUsername}" onsubmit="sessionStorage.setItem('privilege_username', this.dataset.username); return true;">
+                usernameCell = `<form action="/user/privilege" method="POST" class="inline-form" data-username="${safeUsername}">
                     <input type="hidden" name="csrf_token" value="${escapeHtml(csrf_token)}">
                     <input type="hidden" name="username" value="${safeUsername}"/>
-                    <a href="javascript:;" onclick="const form = this.closest('form'); sessionStorage.setItem('privilege_username', form.dataset.username); form.submit();">${safeUsername}</a>
+                    <a href="#" class="form-submit-link">${safeUsername}</a>
                 </form>`;
             }
-            
+
             let actionCell = '';
             if (canEdit) {
                 // Use data attributes to prevent XSS in onclick handlers
@@ -361,18 +370,18 @@
                 const safeUserType = escapeHtml(user.user_type || '');
                 actionCell = `<div class="d-flex flex-row">
                     <form action="/user/delete" method="POST">
-                        <input type="hidden" name="csrf_token" value="${escapeHtml(csrf_token)}">
-                        <button type="button" class="btn btn-success btn-just-icon btn-xs" data-username="${safeUsername}" data-role="${safeRole}" data-user-type="${safeUserType}" onclick="openEditModal(this.dataset.username, this.dataset.role, this.dataset.userType)">
+                        <button type="button" class="btn btn-success btn-just-icon btn-xs edit-btn" data-username="${safeUsername}" data-role="${safeRole}" data-user-type="${safeUserType}">
                             <i class="material-icons">edit</i>
                         </button>
                         ${user.username !== current_username ? `
+                        <input type="hidden" name="csrf_token" value="${escapeHtml(csrf_token)}">
                         <input type="hidden" name="username" value="${safeUsername}"/>
                         <button type="submit" rel="tooltip" class="btn btn-danger btn-just-icon btn-sm" value="upvote">
                             <i class="material-icons">delete</i>
                         </button>
                         ` : ''}
                     </form>
-                    <form action="/user/privilege/edit" method="POST" data-username="${safeUsername}" onsubmit="sessionStorage.setItem('privilege_edit_username', this.dataset.username); return true;">
+                    <form action="/user/privilege/edit" method="POST" class="inline-form" data-username="${safeUsername}">
                         <input type="hidden" name="csrf_token" value="${csrf_token}">
                         <input type="hidden" name="username" value="${escapeHtml(user.username)}"/>
                         <button type="submit" rel="tooltip" class="btn btn-secondary btn-just-icon btn-sm" value="upvote">
@@ -559,10 +568,10 @@
             
             // Populate K8s contexts in select elements
             populateK8sContexts(k8sContexts);
-            
+
             // Populate users table
             populateUsersTable(users);
-            
+
         } catch (error) {
             console.error('Error loading users:', error);
             const tbody = document.getElementById('users-tbody');
@@ -571,5 +580,101 @@
             }
         }
     });
+
+    // Event delegation for inline forms and buttons (CSP-compliant)
+    document.addEventListener('click', function(e) {
+        if (e.target.classList.contains('form-submit-link')) {
+            e.preventDefault();
+            const form = e.target.closest('form');
+            if (form) {
+                const username = form.dataset.username;
+                if (username) sessionStorage.setItem('privilege_username', username);
+                form.submit();
+            }
+        }
+        if (e.target.classList.contains('edit-btn')) {
+            const username = e.target.dataset.username;
+            const role = e.target.dataset.role;
+            const userType = e.target.dataset.userType;
+            if (typeof openEditModal === 'function') {
+                openEditModal(username, role, userType);
+            }
+        }
+    });
+
+    document.addEventListener('submit', function(e) {
+        if (e.target.classList.contains('inline-form')) {
+            const form = e.target;
+            const username = form.dataset.username;
+            if (username) {
+                // Determine which key to use based on form action
+                if (form.action.includes('/privilege/edit')) {
+                    sessionStorage.setItem('privilege_edit_username', username);
+                } else {
+                    sessionStorage.setItem('privilege_username', username);
+                }
+            }
+        }
+    });
+</script>
+<script nonce="{{ csp_nonce }}" src="{{ url_for('static',filename='/vendor/check-strength-password/password-strength.js') }}"></script>
+<script nonce="{{ csp_nonce }}">
+(function() {
+    const passEntry = document.getElementById('PassEntry');
+    const btnAddUser = document.getElementById('btnAddUser');
+    const statusEl = document.getElementById('password-strength-status');
+
+    if (!passEntry || !btnAddUser) return;
+
+    let isPasswordUnlocked = false;
+
+    // Click to unlock password field
+    passEntry.addEventListener('click', function() {
+        if (!isPasswordUnlocked) {
+            passEntry.removeAttribute('readonly');
+            passEntry.focus();
+            isPasswordUnlocked = true;
+        }
+    });
+
+    passEntry.addEventListener('input', function() {
+        const pwd = passEntry.value;
+
+        // Run strength check using existing library
+        let total = 0;
+        if (typeof checkPasswordStrength === 'function') {
+            total = checkPasswordStrength('', pwd);
+        }
+
+        // Strong = all 5 criteria met (length, capital, small, number, special)
+        const isStrong = total >= 5;
+
+        btnAddUser.disabled = !isStrong;
+
+        // Update status text for button
+        if (isStrong) {
+            statusEl.textContent = 'Password is strong — you can add the user.';
+            statusEl.style.color = '#229954';
+        } else if (pwd.length > 0) {
+            statusEl.textContent = 'Password not strong enough yet.';
+            statusEl.style.color = '#ec3f41';
+        } else {
+            statusEl.textContent = '';
+        }
+    });
+
+    // Reset on modal close
+    document.getElementById('modaladd')?.addEventListener('hidden.bs.modal', function() {
+        passEntry.setAttribute('readonly', '');
+        passEntry.value = '';
+        isPasswordUnlocked = false;
+        btnAddUser.disabled = true;
+        statusEl.textContent = '';
+        document.querySelectorAll('#passwordCriterion li').forEach(li => {
+            li.classList.remove('valid');
+            li.classList.add('invalid');
+        });
+    });
+})();
 </script>
 {% endblock %}

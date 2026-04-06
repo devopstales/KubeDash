@@ -312,19 +312,19 @@
                         <td>${namespace}</td>
                         <td>RoleBinding</td>
                         <td>
-                            <form action="/cluster-permission/role-binding" method="POST">
+                            <form action="/cluster-permission/role-binding" method="POST" class="role-binding-form">
                                 <input type="hidden" name="csrf_token" value="${csrf_token}">
                                 <input type="hidden" name="ns_select" value="${namespace}" />
                                 <input type="hidden" name="rb_name" value="${name}" />
-                                <a href="javascript:;" onclick="parentNode.submit();">${name}</a>
+                                <a href="#" class="form-submit-link" data-form-class="role-binding-form">${name}</a>
                             </form>
                         </td>
                         <td>
                             ${clusterRole ? `
-                            <form action="/cluster-permission/cluster-role/data" method="POST">
+                            <form action="/cluster-permission/cluster-role/data" method="POST" class="cluster-role-data-form">
                                 <input type="hidden" name="csrf_token" value="${csrf_token}">
                                 <input type="hidden" name="cr_name" value="${clusterRole}" />
-                                <a href="javascript:;" onclick="parentNode.submit();">${clusterRole}</a>
+                                <a href="#" class="form-submit-link" data-form-class="cluster-role-data-form">${clusterRole}</a>
                             </form>
                             ` : ''}
                         </td>
@@ -332,30 +332,30 @@
                 `;
             });
         }
-        
+
         // Add cluster role bindings
         if (clusterRoleBindings && Array.isArray(clusterRoleBindings)) {
             clusterRoleBindings.forEach(crb => {
                 const name = escapeHtml(crb.name || '');
                 const clusterRole = crb.role && crb.role[0] ? escapeHtml(crb.role[0].ClusterRole || '') : '';
-                
+
                 rowsHtml += `
                     <tr>
                         <td></td>
                         <td>ClusterRoleBinding</td>
                         <td>
-                            <form action="/cluster-permission/cluster-role-binding" method="POST">
+                            <form action="/cluster-permission/cluster-role-binding" method="POST" class="cluster-role-binding-form">
                                 <input type="hidden" name="csrf_token" value="${csrf_token}">
                                 <input type="hidden" name="crb_name" value="${name}" />
-                                <a href="javascript:;" onclick="parentNode.submit();">${name}</a>
+                                <a href="#" class="form-submit-link" data-form-class="cluster-role-binding-form">${name}</a>
                             </form>
                         </td>
                         <td>
                             ${clusterRole ? `
-                            <form action="/cluster-permission/cluster-role/data" method="POST">
+                            <form action="/cluster-permission/cluster-role/data" method="POST" class="cluster-role-data-form">
                                 <input type="hidden" name="csrf_token" value="${csrf_token}">
                                 <input type="hidden" name="cr_name" value="${clusterRole}" />
-                                <a href="javascript:;" onclick="parentNode.submit();">${clusterRole}</a>
+                                <a href="#" class="form-submit-link" data-form-class="cluster-role-data-form">${clusterRole}</a>
                             </form>
                             ` : ''}
                         </td>
@@ -465,6 +465,20 @@
             }
             if (rolesTbody) {
                 rolesTbody.innerHTML = '<tr><td colspan="4" class="text-center text-danger">Error loading role bindings: ' + escapeHtml(error.message) + '</td></tr>';
+            }
+        }
+    });
+
+    // Event delegation for form-submit-link clicks
+    document.addEventListener('click', function(e) {
+        if (e.target.classList.contains('form-submit-link')) {
+            e.preventDefault();
+            const formClass = e.target.getAttribute('data-form-class');
+            if (formClass) {
+                const form = document.querySelector('.' + formClass);
+                if (form) {
+                    form.submit();
+                }
             }
         }
     });
