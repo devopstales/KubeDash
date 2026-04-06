@@ -27,6 +27,8 @@ spec:
       serviceAccountName: {{ include "kubedash.serviceAccountName" . }}
       securityContext:
         {{- toYaml .Values.podSecurityContext | nindent 8 }}
+      # Graceful shutdown: time to wait for pod to terminate cleanly
+      terminationGracePeriodSeconds: {{ .Values.terminationGracePeriodSeconds | default 30 }}
       initContainers:
 {{- if .Values.redis.enabled }}
       - name: wait-for-redis
@@ -86,6 +88,15 @@ spec:
             value: {{ .Values.TimeZone }}
           - name: FLASK_CONFIG
             value: "{{ .Values.flaskConfig }}"
+          # Pod identity for leader election (graceful shutdown)
+          - name: POD_NAME
+            valueFrom:
+              fieldRef:
+                fieldPath: metadata.name
+          - name: POD_NAMESPACE
+            valueFrom:
+              fieldRef:
+                fieldPath: metadata.namespace
           {{- if or (eq .Values.logLevel "DEBUG") (eq .Values.logLevel "HIGH") }}
           - name: VERBOSE_LOG
             value: "True"
@@ -107,6 +118,24 @@ spec:
           initialDelaySeconds: 5
           timeoutSeconds: 1
           # Skip TLS verification for self-signed certificates
+        # Graceful shutdown: preStop hook for graceful leadership release (10.6)
+        lifecycle:
+          preStop:
+            exec:
+              command:
+              - /bin/sh
+              - -c
+              - |
+                echo "Initiating graceful shutdown..."
+                # Allow signal handlers to catch SIGTERM
+                sleep 1
+                # Call graceful shutdown endpoint (runs in background, returns immediately)
+                curl -s -X POST https://localhost:{{ .Values.service.port }}/api/shutdown \
+                  -H "Content-Type: application/json" \
+                  --insecure --max-time 28 || true
+                echo "Shutdown endpoint called, waiting for termination..."
+                # Wait remaining time for final shutdown (total 30s - ~2 for hook exec)
+                sleep 28
         ports:
         - containerPort: {{ .Values.service.port }}
           protocol: TCP

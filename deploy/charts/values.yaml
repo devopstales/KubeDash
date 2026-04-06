@@ -50,6 +50,10 @@ imagePullSecrets: []
 # -- replica number - for multiple replicas you need to enable externalDatabase support
 replicas: 1
 
+# -- terminationGracePeriodSeconds: time (seconds) to allow graceful shutdown
+# Should match or exceed the preStop hook timeout (28s) + some buffer
+terminationGracePeriodSeconds: 30
+
 # -- enable external postgresql support
 externalDatabase:
   # -- Enable external postgresql

@@ -21,7 +21,7 @@ services:
     container_name: kubedash-dbui
     restart: always
     ports:
-      - "8001:8081"
+      - "8082:8081"
     environment:
       DATABASE_URL: postgres://kubedash:kubedash@postgresql:5432/kubedash?sslmode=disable
     volumes:
