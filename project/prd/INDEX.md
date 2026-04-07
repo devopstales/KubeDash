@@ -16,6 +16,8 @@ graph TD
     CORE --> PRD_KYVERNO[Kyverno Policy Plugin]
     CORE --> PRD_MINIMALCFG[Minimal Config Startup]
     CORE --> PRD_HNC[HNC Namespace Hierarchy Plugin]
+    CORE --> PRD_LOGVIEWER[Enhanced Log Viewer]
+    CORE --> PRD_TERMINAL[Interactive Terminal]
 ```
 
 ### Available PRDs
@@ -53,3 +55,9 @@ graph TD
 - **HNC namespace hierarchy plugin**
   - OpenSpec: _TBD (future change)_
   - PRD: `project/prd/hnc-namespace-hierarchy-plugin.md`
+- **Enhanced log viewer**
+  - OpenSpec: `openspec/changes/enhanced-log-viewer/`
+  - PRD: `project/prd/enhanced-log-viewer.md`
+- **Interactive terminal (xterm.js pod exec)**
+  - OpenSpec: `openspec/changes/interactive-terminal/`
+  - PRD: `project/prd/interactive-terminal.md`
