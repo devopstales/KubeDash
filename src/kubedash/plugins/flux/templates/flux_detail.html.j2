@@ -365,7 +365,7 @@
 {% endblock %}
 
 {% block add_tail_js %}
-<script>
+<script nonce="{{ csp_nonce }}">
 $(document).ready(function() {
     $('#eventsTable').DataTable({
         order: [[0, 'desc']]

@@ -39,11 +39,11 @@
                       <tr>
                     {% endif %}
                         <td>
-                          <form action="/network/ingress-class/data" method="POST">
+                          <form action="/network/ingress-class/data" method="POST" class="data-form" data-name="{{ ic.name }}" data-storage-key="ingress_class_data_name">
                             <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
                             <input type="hidden" name="ns_select" value="{{ session['ns_select'] }}" />
                             <input type="hidden" name="ic_name" value="{{ ic.name }}" />
-                            <a href="javascript:;" onclick="parentNode.submit();">{{ ic.name }}</a>
+                            <a href="#" class="form-submit-link">{{ ic.name }}</a>
                           </form>
                         </td>
                         <td>
@@ -63,4 +63,46 @@
 
 {% block add_head_css %}
 {% include "segments/components/datatable_snippet.html.j2" %}
+{% endblock %}
+
+{% block add_tail_js %}
+<script nonce="{{ csp_nonce }}">
+    // Event delegation for form submissions
+    document.addEventListener('click', function(e) {
+        const link = e.target.closest('.form-submit-link');
+        if (link) {
+            e.preventDefault();
+            const form = link.closest('form');
+            if (form) {
+                const name = form.dataset.name || '';
+                const storageKey = form.dataset.storageKey || '';
+                if (name && storageKey) sessionStorage.setItem(storageKey, name);
+                form.submit();
+            }
+        }
+    });
+
+    // Event delegation for form submission links (CSP-compliant)
+    document.addEventListener('click', function(e) {
+        if (e.target.classList.contains('form-submit-link')) {
+            e.preventDefault();
+            const form = e.target.closest('form');
+            if (form) {
+                form.submit();
+            }
+        }
+    });
+
+    document.addEventListener('submit', function(e) {
+        if (e.target.classList.contains('inline-form')) {
+            const form = e.target;
+            const inputs = form.querySelectorAll('input[type="hidden"]');
+            inputs.forEach(input => {
+                if (input.name && input.value) {
+                    sessionStorage.setItem(input.name, input.value);
+                }
+            });
+        }
+    });
+</script>
 {% endblock %}

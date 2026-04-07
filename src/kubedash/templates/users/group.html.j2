@@ -194,7 +194,7 @@
             if (current_user_role === 'Admin') {
                 actionCell = `
                     <div class="d-flex flex-row">
-                        <form action="/user/group/privilege/edit" method="POST" onsubmit="sessionStorage.setItem('group_privilege_edit_name', '${escapeHtml(groupName)}'); return true;">
+                        <form action="/user/group/privilege/edit" method="POST" class="inline-form" data-action="privilege-edit" data-group-name="${escapeHtml(groupName)}">
                             <input type="hidden" name="csrf_token" value="${csrf_token}">
                             <input type="hidden" name="group_name" value="${escapeHtml(groupName)}"/>
                             <button type="submit" rel="tooltip" class="btn btn-secondary btn-just-icon btn-sm" value="upvote">
@@ -204,14 +204,14 @@
                     </div>
                 `;
             }
-            
+
             return `
                 <tr ${rowClass}>
                     <td>
-                        <form action="/user/group/privilege" method="POST" onsubmit="sessionStorage.setItem('group_privilege_name', '${escapeHtml(groupName)}'); return true;">
+                        <form action="/user/group/privilege" method="POST" class="inline-form" data-action="group-privilege" data-group-name="${escapeHtml(groupName)}">
                             <input type="hidden" name="csrf_token" value="${csrf_token}">
                             <input type="hidden" name="group_name" value="${escapeHtml(groupName)}" />
-                            <a href="javascript:;" onclick="sessionStorage.setItem('group_privilege_name', '${escapeHtml(groupName)}'); parentNode.submit();">${groupName}</a>
+                            <a href="#" class="form-submit-link" data-group-name="${escapeHtml(groupName)}">${groupName}</a>
                         </form>
                     </td>
                     <td>${created}</td>
@@ -374,6 +374,35 @@
                         pageLength: 25
                     });
                 }
+            }
+        }
+    });
+
+    // Event delegation for inline-form submissions
+    document.addEventListener('submit', function(e) {
+        const form = e.target;
+        if (form.classList.contains('inline-form')) {
+            const action = form.getAttribute('data-action');
+            const groupName = form.getAttribute('data-group-name');
+            if (action === 'group-privilege') {
+                sessionStorage.setItem('group_privilege_name', groupName);
+            } else if (action === 'privilege-edit') {
+                sessionStorage.setItem('group_privilege_edit_name', groupName);
+            }
+        }
+    });
+
+    // Event delegation for form-submit-link clicks
+    document.addEventListener('click', function(e) {
+        if (e.target.classList.contains('form-submit-link')) {
+            e.preventDefault();
+            const groupName = e.target.getAttribute('data-group-name');
+            if (groupName) {
+                sessionStorage.setItem('group_privilege_name', groupName);
+            }
+            const form = e.target.closest('form');
+            if (form) {
+                form.submit();
             }
         }
     });

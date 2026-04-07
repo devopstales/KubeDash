@@ -152,8 +152,8 @@
             rows.push(`
                 <tr class="${rowClass}">
                     <td>
-                        <a href="/security/priorityclass/data?pc_name=${encodeURIComponent(pc.name)}" 
-                           onclick="sessionStorage.setItem('priority_class_data_name', '${escapeHtml(pc.name)}'); return true;">
+                        <a href="/security/priorityclass/data?pc_name=${encodeURIComponent(pc.name)}"
+                           class="data-link" data-name="${escapeHtml(pc.name)}" data-storage-key="priority_class_data_name">
                             ${escapeHtml(pc.name)}
                         </a>
                     </td>
@@ -211,6 +211,18 @@
         }
     }
     
+    // Event delegation for data links
+    document.addEventListener('click', function(e) {
+        const link = e.target.closest('.data-link');
+        if (link) {
+            e.preventDefault();
+            const name = link.dataset.name || '';
+            const storageKey = link.dataset.storageKey || '';
+            if (name && storageKey) sessionStorage.setItem(storageKey, name);
+            window.location.href = link.href;
+        }
+    });
+
     // Load data when page loads
     document.addEventListener('DOMContentLoaded', function() {
         loadPriorityClasses();

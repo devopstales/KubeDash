@@ -60,7 +60,7 @@
 {% endblock %}
 
 {% block add_tail_js %}
-<script>
+<script nonce="{{ csp_nonce }}">
     // IMMEDIATE: Prevent datatables-demo.js from initializing on loading row
     (function() {
         function setupOverride() {
@@ -212,18 +212,18 @@
             let actionCell = '';
             if (is_admin) {
                 actionCell = `
-                    <button type="button" class="btn btn-danger btn-just-icon btn-sm" onclick="window.deleteTag('${tagName.replace(/'/g, "\\'")}')">
+                    <button type="button" class="btn btn-danger btn-just-icon btn-sm delete-btn" data-tag="${tagEscaped}">
                         <i class="material-icons">delete</i>
                     </button>
                 `;
             } else {
                 actionCell = '-';
             }
-            
+
             return `
                 <tr class="${rowClass}">
                     <td>
-                        <a href="javascript:;" onclick="sessionStorage.setItem('tag_name', '${tagEscaped.replace(/'/g, "\\'")}'); window.location.href='/plugins/registry/image/data?registry_server_url=${registryUrlEncoded}&image_name=${imageNameEncoded}&tag_name=${tagEncoded}';">${tagEscaped}</a>
+                        <a href="#" class="nav-link" data-tag-name="${tagEscaped}" data-registry-url="${registryUrl}" data-image-name="${imageName}" data-tag-name-encoded="${tagEncoded}" data-image-name-encoded="${imageNameEncoded}" data-registry-url-encoded="${registryUrlEncoded}">${tagEscaped}</a>
                     </td>
                     <td>${actionCell}</td>
                 </tr>
@@ -439,6 +439,36 @@
         }
         
         loadTags();
+
+        // Event delegation for dynamically created elements
+        // Delete button click handler
+        document.addEventListener('click', function(e) {
+            const deleteBtn = e.target.closest('.delete-btn');
+            if (deleteBtn) {
+                const tag = deleteBtn.getAttribute('data-tag');
+                if (tag && typeof window.deleteTag === 'function') {
+                    window.deleteTag(tag);
+                }
+            }
+        });
+
+        // Navigation link click handler
+        document.addEventListener('click', function(e) {
+            const navLink = e.target.closest('.nav-link');
+            if (navLink) {
+                e.preventDefault();
+                const tagName = navLink.getAttribute('data-tag-name');
+                const registryUrl = navLink.getAttribute('data-registry-url');
+                const imageName = navLink.getAttribute('data-image-name');
+                const tagNameEncoded = navLink.getAttribute('data-tag-name-encoded');
+                const imageNameEncoded = navLink.getAttribute('data-image-name-encoded');
+                const registryUrlEncoded = navLink.getAttribute('data-registry-url-encoded');
+                if (tagName && registryUrl && imageName) {
+                    sessionStorage.setItem('tag_name', tagName);
+                    window.location.href = '/plugins/registry/image/data?registry_server_url=' + registryUrlEncoded + '&image_name=' + imageNameEncoded + '&tag_name=' + tagNameEncoded;
+                }
+            }
+        });
     });
 </script>
 {% endblock %}

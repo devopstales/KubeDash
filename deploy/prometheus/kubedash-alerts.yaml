@@ -1,0 +1,274 @@
+apiVersion: monitoring.coreos.com/v1
+kind: PrometheusRule
+metadata:
+  name: kubedash-multi-replica-alerts
+  namespace: default
+spec:
+  groups:
+  - name: kubedash-leader-election
+    interval: 30s
+    rules:
+    
+    # Alert: No leader elected
+    - alert: KubeDashNoLeaderElected
+      expr: |
+        sum(kubedash_leader_election_is_leader) == 0 and on() kubedash_replica_mode_info{replica_mode="cluster"} == 1
+      for: 2m
+      labels:
+        severity: critical
+        component: leader-election
+      annotations:
+        summary: "KubeDash: No leader elected in cluster mode"
+        description: "Cluster has no leader for {{ $value | humanize }} seconds. Check leader election logs."
+        runbook_url: "https://docs.example.com/runbooks/kubedash-no-leader"
+
+    # Alert: Frequent leader transitions
+    - alert: KubeDashFrequentLeaderTransitions
+      expr: |
+        rate(kubedash_leader_election_transitions_total[5m]) > 0.1
+      for: 5m
+      labels:
+        severity: warning
+        component: leader-election
+      annotations:
+        summary: "KubeDash: Frequent leader election transitions"
+        description: "Leader transitions > 0.1/min over last 5m. Cluster may be unstable."
+        runbook_url: "https://docs.example.com/runbooks/kubedash-frequent-transitions"
+
+    # Alert: Leader lease renewal failures
+    - alert: KubeDashLeaderRenewalFailures
+      expr: |
+        rate(kubedash_leader_election_renewals_total{status="failed"}[5m]) > 0.05
+      for: 5m
+      labels:
+        severity: warning
+        component: leader-election
+      annotations:
+        summary: "KubeDash: Leader lease renewal failures"
+        description: "Leader renewal failures detected. API server connectivity issue?"
+
+    # Alert: Multiple pods claiming leadership
+    - alert: KubeDashMultipleLeaders
+      expr: |
+        sum(kubedash_leader_election_is_leader) > 1
+      for: 1m
+      labels:
+        severity: critical
+        component: leader-election
+      annotations:
+        summary: "KubeDash: Multiple leaders detected (possible split-brain)"
+        description: "{{ $value | humanize }} pods claiming leadership. This should never happen."
+        runbook_url: "https://docs.example.com/runbooks/kubedash-split-brain"
+
+  - name: kubedash-tasks
+    interval: 30s
+    rules:
+    
+    # Alert: Leader tasks failing
+    - alert: KubeDashLeaderTasksFailures
+      expr: |
+        rate(kubedash_leader_tasks_executed_total{status="failed"}[5m]) > 0
+      for: 5m
+      labels:
+        severity: warning
+        component: tasks
+      annotations:
+        summary: "KubeDash: Leader tasks failing: {{ $labels.task_name }}"
+        description: "Task {{ $labels.task_name }} failed {{ $value | humanize }} times in 5min."
+
+    # Alert: High task execution duration
+    - alert: KubeDashHighTaskDuration
+      expr: |
+        histogram_quantile(0.95, rate(kubedash_leader_task_duration_seconds_bucket[5m])) > 30
+      for: 5m
+      labels:
+        severity: warning
+        component: tasks
+      annotations:
+        summary: "KubeDash: High task execution duration"
+        description: "p95 task duration > 30s. Tasks may be slow or system overloaded."
+
+    # Alert: Task registry unavailable
+    - alert: KubeDashTaskRegistryMissing
+      expr: |
+        absent(kubedash_leader_task_registry_info) == 1 and on() kubedash_replica_mode_info{replica_mode="cluster"} == 1
+      for: 2m
+      labels:
+        severity: critical
+        component: tasks
+      annotations:
+        summary: "KubeDash: Task registry unavailable"
+        description: "Leader task registry not available. Check pod logs."
+
+  - name: kubedash-sessions
+    interval: 30s
+    rules:
+    
+    # Alert: Session Redis errors
+    - alert: KubeDashSessionRedisErrors
+      expr: |
+        rate(kubedash_session_redis_errors_total[5m]) > 0.1
+      for: 3m
+      labels:
+        severity: warning
+        component: sessions
+      annotations:
+        summary: "KubeDash: Session Redis errors"
+        description: "Redis session errors rate > 0.1/sec. Redis connectivity issue?"
+        runbook_url: "https://docs.example.com/runbooks/kubedash-redis-errors"
+
+    # Alert: Session operation latency high
+    - alert: KubeDashHighSessionLatency
+      expr: |
+        histogram_quantile(0.99, rate(kubedash_session_operation_duration_seconds_bucket[5m])) > 1
+      for: 5m
+      labels:
+        severity: warning
+        component: sessions
+      annotations:
+        summary: "KubeDash: High session operation latency"
+        description: "p99 session latency > 1s. Redis or network slow?"
+
+    # Alert: Session backend unavailable
+    - alert: KubeDashSessionBackendUnavailable
+      expr: |
+        absent(kubedash_session_operations_total) == 1 and on() kubedash_replica_mode_info{replica_mode="cluster"} == 1
+      for: 2m
+      labels:
+        severity: critical
+        component: sessions
+      annotations:
+        summary: "KubeDash: Session backend unavailable"
+        description: "Session operations not being recorded. Check pod logs."
+
+  - name: kubedash-replication
+    interval: 30s
+    rules:
+    
+    # Alert: Replica count mismatch
+    - alert: KubeDashReplicaCountMismatch
+      expr: |
+        kubedash_replica_count != on() kubedash_replica_desired
+      for: 5m
+      labels:
+        severity: warning
+        component: replication
+      annotations:
+        summary: "KubeDash: Replica count mismatch"
+        description: "Expected {{ $value | humanize }} replicas but cluster has {{ .Labels.replica_count }}."
+
+    # Alert: Not enough replicas for HA
+    - alert: KubeDashInsufficientReplicas
+      expr: |
+        kubedash_replica_count < 2 and on() kubedash_replica_mode_info{replica_mode="cluster"} == 1
+      for: 3m
+      labels:
+        severity: critical
+        component: replication
+      annotations:
+        summary: "KubeDash: Insufficient replicas for HA"
+        description: "Cluster has {{ $value | humanize }} replicas. Minimum 2 required for HA."
+
+    # Alert: Pod startup failures
+    - alert: KubeDashPodStartupFailures
+      expr: |
+        rate(kubedash_pod_startup_failures_total[5m]) > 0
+      for: 3m
+      labels:
+        severity: warning
+        component: replication
+      annotations:
+        summary: "KubeDash: Pod startup failures"
+        description: "{{ $value | humanize }} pods failed to start in 5min."
+
+  - name: kubedash-database
+    interval: 30s
+    rules:
+    
+    # Alert: Database connection pool exhausted
+    - alert: KubeDashDBConnectionPoolExhausted
+      expr: |
+        kubedash_db_connection_pool_used / kubedash_db_connection_pool_size > 0.9
+      for: 5m
+      labels:
+        severity: warning
+        component: database
+      annotations:
+        summary: "KubeDash: Database connection pool 90% utilized"
+        description: "Connection pool utilization > 90%. May need to increase pool size."
+
+    # Alert: Database replication lag
+    - alert: KubeDashDBReplicationLag
+      expr: |
+        kubedash_db_replication_lag_bytes > 100000000
+      for: 5m
+      labels:
+        severity: warning
+        component: database
+      annotations:
+        summary: "KubeDash: High database replication lag"
+        description: "Replication lag > 100MB. Streaming may be behind."
+
+    # Alert: PostgreSQL not available
+    - alert: KubeDashPostgresUnavailable
+      expr: |
+        up{job="kubedash-postgres"} == 0
+      for: 2m
+      labels:
+        severity: critical
+        component: database
+      annotations:
+        summary: "KubeDash: PostgreSQL unavailable"
+        description: "Cannot connect to PostgreSQL. Check database pod status."
+
+  - name: kubedash-infrastructure
+    interval: 30s
+    rules:
+    
+    # Alert: Redis unavailable
+    - alert: KubeDashRedisUnavailable
+      expr: |
+        up{job="redis"} == 0
+      for: 2m
+      labels:
+        severity: critical
+        component: redis
+      annotations:
+        summary: "KubeDash: Redis unavailable"
+        description: "Cannot connect to Redis. Check Redis pod status."
+
+    # Alert: Pod memory usage high
+    - alert: KubeDashHighMemoryUsage
+      expr: |
+        container_memory_usage_bytes{pod=~"kubedash.*"} / container_spec_memory_limit_bytes > 0.85
+      for: 5m
+      labels:
+        severity: warning
+        component: infrastructure
+      annotations:
+        summary: "KubeDash Pod {{ $labels.pod }}: Memory usage > 85%"
+        description: "Memory usage {{ $value | humanizePercentage }}. May need to increase memory limit."
+
+    # Alert: Pod CPU throttling
+    - alert: KubeDashCPUThrottling
+      expr: |
+        rate(container_cpu_cfs_throttled_seconds_total{pod=~"kubedash.*"}[5m]) > 0.1
+      for: 5m
+      labels:
+        severity: warning
+        component: infrastructure
+      annotations:
+        summary: "KubeDash Pod {{ $labels.pod }}: CPU throttling detected"
+        description: "Pod is being CPU throttled. May need to increase CPU request/limit."
+
+    # Alert: Pod restarts
+    - alert: KubeDashPodRestarts
+      expr: |
+        rate(kube_pod_container_status_restarts_total{pod=~"kubedash.*"}[15m]) > 0
+      for: 5m
+      labels:
+        severity: warning
+        component: infrastructure
+      annotations:
+        summary: "KubeDash Pod {{ $labels.pod }}: Restarting"
+        description: "Pod restarted {{ $value | humanize }} times in 15 minutes. Check logs for crash reason."

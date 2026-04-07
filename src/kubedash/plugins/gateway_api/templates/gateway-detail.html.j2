@@ -503,7 +503,7 @@
 {% endblock %}
 
 {% block add_tail_js %}
-<script>
+<script nonce="{{ csp_nonce }}">
 $(document).ready(function() {
     $('#routesTable').DataTable({
         order: [[1, 'asc']],

@@ -82,7 +82,7 @@
 {% endblock %}
 
 {% block add_tail_js %}
-<script>
+<script nonce="{{ csp_nonce }}">
     // Helper function to escape HTML
     function escapeHtml(text) {
         if (text == null) return '';
@@ -377,15 +377,14 @@
             const row = document.createElement('tr');
             row.innerHTML = `
                 <td>
-                    <img src="${escapeHtml(iconUrl)}" 
+                    <img src="${escapeHtml(iconUrl)}"
                          class="helm-chart-icon"
-                         width="50" 
-                         height="50" 
-                         alt="Chart icon"
-                         onerror="this.src='/img/helm-icon-color.svg'; this.onerror=null;">
+                         width="50"
+                         height="50"
+                         alt="Chart icon">
                 </td>
                 <td>
-                    <a href="javascript:;" onclick="navigateToChartData('${escapeHtml(chart.release_name)}', ${chart.release_version}, '${escapeHtml(namespace)}')">
+                    <a href="#" class="nav-link" data-release-name="${escapeHtml(chart.release_name)}" data-release-version="${chart.release_version}" data-namespace="${escapeHtml(namespace)}">
                         ${escapeHtml(chart.release_name)}
                     </a>
                 </td>
@@ -397,6 +396,10 @@
                 <td>${chart.release_version || ''}</td>
                 <td>${escapeHtml(chart.updated || '')}</td>
             `;
+            const img = row.querySelector('img');
+            img.addEventListener('error', function() {
+                this.src = '/img/helm-icon-color.svg';
+            }, { once: true });
             tbody.appendChild(row);
         });
         
@@ -426,13 +429,21 @@
         }
     }
     
+    // Event delegation for navigation links (CSP-compliant)
+    document.addEventListener('click', function(e) {
+        if (e.target.classList.contains('nav-link') && e.target.dataset.releaseName) {
+            e.preventDefault();
+            navigateToChartData(e.target.dataset.releaseName, e.target.dataset.releaseVersion, e.target.dataset.namespace);
+        }
+    });
+
     // Navigate to chart data page
     function navigateToChartData(releaseName, releaseVersion, namespace) {
         // Store in sessionStorage for the data page
         sessionStorage.setItem('ns_select', namespace);
         sessionStorage.setItem('helm_release_name', releaseName);
         sessionStorage.setItem('helm_release_version', releaseVersion);
-        
+
         // Navigate to chart data page
         window.location.href = `/plugins/helm-charts/data?release_name=${encodeURIComponent(releaseName)}&release_version=${releaseVersion}&namespace=${encodeURIComponent(namespace)}`;
     }

@@ -1,0 +1,44 @@
+#!/usr/bin/env python3
+
+from flask import Blueprint, render_template, request, session
+from flask_login import login_required
+
+from kubedash.lib.helper_functions import get_logger
+from kubedash.lib.sso import get_user_token
+
+from .functions import GatewayApiGetGatewayClass
+
+##############################################################
+## variables
+##############################################################
+
+gateway_api_bp = Blueprint("gateway_api", __name__, url_prefix="/plugins", \
+    template_folder="templates")
+logger = get_logger()
+
+##############################################################
+# Get Gateway API 1.0 Routes
+##############################################################
+
+@gateway_api_bp.route("/gateway-class", methods=['GET', 'POST'])
+@login_required
+def gateway_class():
+    selected = None
+    user_token = get_user_token(session)
+
+    if request.method == 'POST':
+        if request.form.get('ns_select', None):
+            if 'ns_select' in request.form:
+          session['ns_select'] = request.form['ns_select']
+        selected = request.form.get('selected')
+
+    gateway_classes = GatewayApiGetGatewayClass(session['user_role'], user_token)
+    print(gateway_classes)
+
+    return render_template(
+        'gateway-classes.html.j2',
+        gateway_classes = gateway_classes,
+        selected = selected,
+    )
+
+    

@@ -12,15 +12,16 @@ function checkPasswordStrength(old_password, password) {
 	var special        = specialCharacters.test(password) ? 1 : 0;
     var difference     = (old_password != password);
 
-	this.update_info('length', password.length >= 6 && password.length <= 15);
-    this.update_info('capital', capitalletters);
-    this.update_info('small', loweletters);
-    this.update_info('number', numbers);
-    this.update_info('special', special);
-    this.update_info('difference', difference);
+	update_info('length', password.length >= 6 && password.length <= 15);
+    update_info('capital', capitalletters);
+    update_info('small', loweletters);
+    update_info('number', numbers);
+    update_info('special', special);
+    update_info('difference', difference);
 
 	var total = characters + capitalletters + loweletters + numbers + special;
-	this.password_meter(total);
+	password_meter(total);
+	return total;
 }
 
 function update_info(criterion, isValid) {

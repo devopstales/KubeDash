@@ -168,11 +168,11 @@
             return `
                 <tr class="${rowClass}">
                     <td>
-                        <form action="/workload/daemonsets/data" method="POST" onsubmit="sessionStorage.setItem('daemonset_data_name', '${name}'); sessionStorage.setItem('daemonset_data_namespace', '${escapeHtml(namespace)}'); return true;">
+                        <form action="/workload/daemonsets/data" method="POST" class="inline-form" data-session-key="daemonset_data_name" data-session-value="${name}" data-namespace-session-key="daemonset_data_namespace" data-namespace-value="${escapeHtml(namespace)}">
                             <input type="hidden" name="csrf_token" value="${escapeHtml(csrf_token)}">
                             <input type="hidden" name="ns_select" value="${escapeHtml(namespace)}" />
                             <input type="hidden" name="selected" value="${name}" />
-                            <a href="javascript:;" onclick="parentNode.submit();">${name}</a>
+                            <a href="#" class="form-submit-link">${name}</a>
                         </form>
                     </td>
                     <td>${desired}</td>
@@ -274,6 +274,34 @@
                 sessionStorage.setItem('ns_select', namespace);
                 loadDaemonSets(namespace);
             });
+        }
+    });
+
+    // Event delegation for inline forms (CSP-compliant)
+    document.addEventListener('click', function(e) {
+        if (e.target.classList.contains('form-submit-link')) {
+            e.preventDefault();
+            const formId = e.target.dataset.formId;
+            if (formId) {
+                document.getElementById(formId)?.submit();
+            } else {
+                const form = e.target.closest('form');
+                if (form) form.submit();
+            }
+        }
+    });
+
+    document.addEventListener('submit', function(e) {
+        if (e.target.classList.contains('inline-form')) {
+            e.preventDefault();
+            const form = e.target;
+            const sessionKey = form.dataset.sessionKey;
+            const sessionValue = form.dataset.sessionValue;
+            const nsSessionKey = form.dataset.namespaceSessionKey;
+            const nsSessionValue = form.dataset.namespaceValue;
+            if (sessionKey && sessionValue) sessionStorage.setItem(sessionKey, sessionValue);
+            if (nsSessionKey && nsSessionValue) sessionStorage.setItem(nsSessionKey, nsSessionValue);
+            form.submit();
         }
     });
 </script>

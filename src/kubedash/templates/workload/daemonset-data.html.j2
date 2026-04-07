@@ -584,11 +584,11 @@
                                 <tr>
                                     <td>ImagePullSecret</td>
                                     <td>
-                                        <form action="/security/secret" method="POST" onsubmit="sessionStorage.setItem('ns_select', '${escapeHtml(ns)}'); return true;">
+                                        <form action="/security/secret" method="POST" class="inline-form" data-namespace-session-key="ns_select" data-namespace-value="${escapeHtml(ns)}">
                                             <input type="hidden" name="csrf_token" value="${escapeHtml(csrf_token)}">
                                             <input type="hidden" name="ns_select" value="${escapeHtml(ns)}" />
                                             <input type="hidden" name="selected" value="${secretName}" />
-                                            <a href="javascript:;" onclick="parentNode.submit();">${secretName}</a>
+                                            <a href="#" class="form-submit-link">${secretName}</a>
                                         </form>
                                     </td>
                                     <td>${escapeHtml(ns)}</td>
@@ -610,11 +610,11 @@
                     <tr>
                         <td>ServiceAccount</td>
                         <td>
-                            <form action="/cluster-permission/service-account" method="POST" onsubmit="sessionStorage.setItem('ns_select', '${escapeHtml(ns)}'); return true;">
+                            <form action="/cluster-permission/service-account" method="POST" class="inline-form" data-namespace-session-key="ns_select" data-namespace-value="${escapeHtml(ns)}">
                                 <input type="hidden" name="csrf_token" value="${escapeHtml(csrf_token)}">
                                 <input type="hidden" name="ns_select" value="${escapeHtml(ns)}" />
                                 <input type="hidden" name="selected" value="${escapeHtml(saName)}" />
-                                <a href="javascript:;" onclick="parentNode.submit();">${escapeHtml(saName)}</a>
+                                <a href="#" class="form-submit-link">${escapeHtml(saName)}</a>
                             </form>
                         </td>
                         <td>${escapeHtml(ns)}</td>
@@ -630,11 +630,11 @@
                     <tr>
                         <td>Secret</td>
                         <td>
-                            <form action="/security/secret" method="POST" onsubmit="sessionStorage.setItem('ns_select', '${escapeHtml(ns)}'); return true;">
+                            <form action="/security/secret" method="POST" class="inline-form" data-namespace-session-key="ns_select" data-namespace-value="${escapeHtml(ns)}">
                                 <input type="hidden" name="csrf_token" value="${escapeHtml(csrf_token)}">
                                 <input type="hidden" name="ns_select" value="${escapeHtml(ns)}" />
                                 <input type="hidden" name="selected" value="${escapeHtml(secret)}" />
-                                <a href="javascript:;" onclick="parentNode.submit();">${escapeHtml(secret)}</a>
+                                <a href="#" class="form-submit-link">${escapeHtml(secret)}</a>
                             </form>
                         </td>
                         <td>${escapeHtml(ns)}</td>
@@ -650,11 +650,11 @@
                     <tr>
                         <td>ConfigMap</td>
                         <td>
-                            <form action="/storage/configmap" method="POST" onsubmit="sessionStorage.setItem('ns_select', '${escapeHtml(ns)}'); return true;">
+                            <form action="/storage/configmap" method="POST" class="inline-form" data-namespace-session-key="ns_select" data-namespace-value="${escapeHtml(ns)}">
                                 <input type="hidden" name="csrf_token" value="${escapeHtml(csrf_token)}">
                                 <input type="hidden" name="ns_select" value="${escapeHtml(ns)}" />
                                 <input type="hidden" name="selected" value="${escapeHtml(cm)}" />
-                                <a href="javascript:;" onclick="parentNode.submit();">${escapeHtml(cm)}</a>
+                                <a href="#" class="form-submit-link">${escapeHtml(cm)}</a>
                             </form>
                         </td>
                         <td>${escapeHtml(ns)}</td>
@@ -670,11 +670,11 @@
                     <tr>
                         <td>PersistentVolumeClaim</td>
                         <td>
-                            <form action="/storage/pvc" method="POST" onsubmit="sessionStorage.setItem('ns_select', '${escapeHtml(ns)}'); return true;">
+                            <form action="/storage/pvc" method="POST" class="inline-form" data-namespace-session-key="ns_select" data-namespace-value="${escapeHtml(ns)}">
                                 <input type="hidden" name="csrf_token" value="${escapeHtml(csrf_token)}">
                                 <input type="hidden" name="ns_select" value="${escapeHtml(ns)}" />
                                 <input type="hidden" name="selected" value="${escapeHtml(pvc)}" />
-                                <a href="javascript:;" onclick="parentNode.submit();">${escapeHtml(pvc)}</a>
+                                <a href="#" class="form-submit-link">${escapeHtml(pvc)}</a>
                             </form>
                         </td>
                         <td>${escapeHtml(ns)}</td>
@@ -728,6 +728,31 @@
     // Load data when page loads
     document.addEventListener('DOMContentLoaded', function() {
         loadDaemonSetData();
+    });
+
+    // Event delegation for inline forms (CSP-compliant)
+    document.addEventListener('click', function(e) {
+        if (e.target.classList.contains('form-submit-link')) {
+            e.preventDefault();
+            const formId = e.target.dataset.formId;
+            if (formId) {
+                document.getElementById(formId)?.submit();
+            } else {
+                const form = e.target.closest('form');
+                if (form) form.submit();
+            }
+        }
+    });
+
+    document.addEventListener('submit', function(e) {
+        if (e.target.classList.contains('inline-form')) {
+            e.preventDefault();
+            const form = e.target;
+            const nsSessionKey = form.dataset.namespaceSessionKey;
+            const nsSessionValue = form.dataset.namespaceValue;
+            if (nsSessionKey && nsSessionValue) sessionStorage.setItem(nsSessionKey, nsSessionValue);
+            form.submit();
+        }
     });
 </script>
 {% endblock %}

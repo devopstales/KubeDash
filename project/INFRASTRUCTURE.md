@@ -14,7 +14,7 @@ It intentionally **excludes CI/CD pipelines** and focuses on runtime topology, c
 graph TB
     subgraph "User Side"
         USER[User]
-        KDL[kdlogin (local)]
+        KDL["kdlogin (local)"]
     end
 
     subgraph "Edge"
@@ -39,7 +39,7 @@ graph TB
     KD --> DB
     KD --> REDIS
     KD --> API
-    MS --> KD
+    KD --> MS
 
     KDL -->|writes kubeconfig| USER
     KDL -->|uses kubeconfig| API

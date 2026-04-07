@@ -107,7 +107,7 @@
 {% block add_tail_js %}
 {% include "segments/components/datatable_snippet.html.j2" %}
 {% include "segments/components/functions_snippet.j2"%}
-    <script>
+    <script nonce="{{ csp_nonce }}">
         const escapeHtml = (text) => {
             if (text === null || text === undefined) return '';
             const map = {
@@ -251,8 +251,14 @@
                 const safeId = String(app.application_name || '').replace(/[^a-zA-Z0-9]/g, '_');
                 const nameForJs = String(app.application_name || '').replace(/'/g, "\\'").replace(/"/g, '\\"');
                 const actionHtml = is_admin
-                    ? `<button class="btn btn-sm btn-primary me-2" data-bs-toggle="modal" data-bs-target="#modaledit${safeId}">Edit</button>
-                       <button class="btn btn-sm btn-danger" onclick="deleteApplication('${nameForJs}')">Delete</button>`
+                    ? `<div class="d-flex flex-row">
+                       <button type="button" class="btn btn-success btn-just-icon btn-xs" data-bs-toggle="modal" data-bs-target="#modaledit${safeId}">
+                           <i class="material-icons">edit</i>
+                       </button>
+                       <button type="button" class="btn btn-danger btn-just-icon btn-sm delete-btn" data-app-name="${escapeHtml(app.application_name)}">
+                           <i class="material-icons">delete</i>
+                       </button>
+                       </div>`
                     : '-';
                 
                 // If embedded, use catalog route; if not embedded, use direct URL in new tab
@@ -555,6 +561,17 @@
             }
             
             loadApplications();
+        });
+
+        // CSP-compliant event delegation for delete buttons
+        document.addEventListener('click', function(e) {
+            const deleteBtn = e.target.closest('.delete-btn');
+            if (deleteBtn) {
+                const appName = deleteBtn.getAttribute('data-app-name');
+                if (appName) {
+                    window.deleteApplication(appName);
+                }
+            }
         });
     </script>
 {% endblock %}

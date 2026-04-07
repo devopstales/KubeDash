@@ -380,7 +380,7 @@
 {% endblock %}
 
 {% block add_tail_js %}
-<script>
+<script nonce="{{ csp_nonce }}">
 $(document).ready(function() {
     $('#gatewaysTable').DataTable({
         order: [[1, 'asc']],

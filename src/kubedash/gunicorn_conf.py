@@ -19,7 +19,7 @@ def _canonical_timestamp():
 
 
 class CanonicalAccessLogger(GunicornColorLogger):
-    """Gunicorn Logger that emits access logs in canonical format: [timestamp] [trace-id] [gunicorn.access] [INFO] ..."""
+    """Gunicorn Logger that emits access logs in canonical format: [timestamp] [trace-id] [pod_name] [gunicorn.access] [INFO] ..."""
 
     def now(self):
         return _canonical_timestamp()
@@ -43,6 +43,14 @@ class CanonicalAccessLogger(GunicornColorLogger):
         except Exception:
             pass
         atoms["correlation_id"] = cid if cid else "no-id"
+        
+        # Pod name: from environment variables (Kubernetes downward API)
+        atoms["pod_name"] = (
+            os.environ.get('POD_NAME')
+            or os.environ.get('HOSTNAME')
+            or os.uname().nodename
+            or 'unknown'
+        )
         return atoms
 
 
@@ -70,7 +78,7 @@ cert_path, key_path, ca_cert_path = generate_self_signed_cert()
 keyfile = key_path
 certfile = cert_path
 ca_certs = ca_cert_path
-bind = "0.0.0.0:5000"
+bind = "0.0.0.0:8000"
 workers = 1
 threads = 4
 worker_tmp_dir = "/tmp/kubedash"
@@ -85,8 +93,8 @@ logger_class = CanonicalAccessLogger
 loglevel = "info"
 errorlog = "-"  # stderr
 accesslog = "-"  # stdout
-# Canonical format: [timestamp] [trace-id] [gunicorn.access] [INFO] method path status size ...
-access_log_format = '%(t)s [%(correlation_id)s] [gunicorn.access] [INFO] %(h)s "%(r)s" %(s)s %(b)s "%(f)s" "%(a)s"'
+# Canonical format: [timestamp] [trace-id] [pod_name] [gunicorn.access] [INFO] method path status size ...
+access_log_format = '%(t)s [%(correlation_id)s] [%(pod_name)s] [gunicorn.access] [INFO] %(h)s "%(r)s" %(s)s %(b)s "%(f)s" "%(a)s"'
 
 # ========================
 # 3. Correlation ID Setup
@@ -168,16 +176,65 @@ class ExtensionAPIFilter(logging.Filter):
         return True
 
 def on_starting(server):
-    """Executed when Gunicorn starts."""
-    # Use canonical timestamp format (YYYY-MM-DD HH:MM:SS,mmm) for error log
-    canonical = _CanonicalFormatter(
-        "[%(asctime)s] [%(process)d] [%(levelname)s] %(message)s"
+    """Executed when Gunicorn starts — configure ALL logging before any worker logs."""
+    import logging as _logging
+    pod_name = (
+        os.environ.get('POD_NAME')
+        or os.environ.get('HOSTNAME')
+        or os.uname().nodename
+        or 'unknown'
     )
-    try:
-        for handler in getattr(server.log.error_log, "handlers", []):
-            handler.setFormatter(canonical)
-    except Exception:
-        pass
+    PURPLE = '\033[35m'
+    RESET = '\033[0m'
+    GREEN = '\033[32m'
+    YELLOW = '\033[33m'
+    RED = '\033[31m'
+
+    LEVEL_COLORS = {
+        'INFO': GREEN,
+        'WARNING': YELLOW,
+        'ERROR': RED,
+        'CRITICAL': '\033[1;31m',
+        'DEBUG': '\033[1;30m',
+    }
+
+    class CanonicalFormatter(_logging.Formatter):
+        """Single formatter for ALL Python/gunicorn logs."""
+        def formatTime(self, record, datefmt=None):
+            ct = dt.fromtimestamp(record.created)
+            s = ct.strftime("%Y-%m-%d %H:%M:%S")
+            return "%s,%03d" % (s, record.msecs)
+
+        def format(self, record):
+            record.pod_name = pod_name
+            if not getattr(record, 'correlation_id', None):
+                record.correlation_id = 'no-id'
+            level_color = LEVEL_COLORS.get(record.levelname, '')
+            msg = super().format(record)
+            msg = msg.replace(record.levelname, f'{level_color}{record.levelname}{RESET}', 1)
+            return msg
+
+    fmt = CanonicalFormatter(
+        f'[%(asctime)s] [%(correlation_id)s] [{PURPLE}%(pod_name)s{RESET}] '
+        f'[%(levelname)s] %(message)s'
+    )
+
+    # Strip ALL existing handlers from root and every known logger
+    root = _logging.getLogger()
+    for h in root.handlers[:]:
+        root.removeHandler(h)
+    for name in list(_logging.Logger.manager.loggerDict.keys()):
+        lg = _logging.getLogger(name)
+        if not isinstance(lg, _logging.PlaceHolder):
+            lg.handlers.clear()
+            lg.propagate = True
+
+    # Single root handler — every log goes through it
+    handler = _logging.StreamHandler()
+    handler.setFormatter(fmt)
+    root.addHandler(handler)
+    root.setLevel(_logging.INFO)
+    root.propagate = False
 
     server.log.access_log.addFilter(NoPing())
     server.log.access_log.addFilter(NoHealth())

@@ -8015,6 +8015,10 @@ fieldset:disabled .btn {
   cursor: pointer;
 }
 
+.header-toggler .material-icons {
+  color: #605fc9;
+}
+
 .header-toggler-icon {
   display: block;
   height: 1.5625rem;

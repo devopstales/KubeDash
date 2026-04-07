@@ -179,26 +179,27 @@
             if (storageClass && storageClass !== '-') {
                 storageClassCell = `
                     <td>
-                        <form action="/storage/storage-class" method="POST" onsubmit="sessionStorage.setItem('ns_select', '${escapeHtml(namespace)}'); return true;">
+                        <form action="/storage/storage-class" method="POST" class="data-form" data-ns="${escapeHtml(namespace)}" data-name="${storageClass}" data-storage-key="storageclass_data_name">
                             <input type="hidden" name="csrf_token" value="${escapeHtml(csrf_token)}">
                             <input type="hidden" name="ns_select" value="${escapeHtml(namespace)}" />
                             <input type="hidden" name="selected" value="${storageClass}" />
-                            <a href="javascript:;" onclick="parentNode.submit();">${storageClass}</a>
+                            <a href="#" class="form-submit-link">${storageClass}</a>
                         </form>
                     </td>
                 `;
             }
-            
+
             // VolumeClaim link
             let volumeClaimCell = '<td>-</td>';
             if (volumeClaim && volumeClaim !== '-') {
+                const claimNs = pv.volume_claim_namespace || namespace;
                 volumeClaimCell = `
                     <td>
-                        <form action="/storage/pvc" method="POST" onsubmit="sessionStorage.setItem('ns_select', '${escapeHtml(pv.volume_claim_namespace || namespace)}'); return true;">
+                        <form action="/storage/pvc" method="POST" class="data-form" data-ns="${escapeHtml(claimNs)}" data-name="${volumeClaim}" data-storage-key="pvc_data_name">
                             <input type="hidden" name="csrf_token" value="${escapeHtml(csrf_token)}">
-                            <input type="hidden" name="ns_select" value="${escapeHtml(pv.volume_claim_namespace || namespace)}" />
+                            <input type="hidden" name="ns_select" value="${escapeHtml(claimNs)}" />
                             <input type="hidden" name="selected" value="${volumeClaim}" />
-                            <a href="javascript:;" onclick="parentNode.submit();">${volumeClaim}</a>
+                            <a href="#" class="form-submit-link">${volumeClaim}</a>
                         </form>
                     </td>
                 `;
@@ -231,11 +232,11 @@
                 <tr class="${rowClass}">
                     <td>${statusBadge}</td>
                     <td>
-                        <form action="/storage/pv/data" method="POST" onsubmit="sessionStorage.setItem('pv_data_name', '${name}'); return true;">
+                        <form action="/storage/pv/data" method="POST" class="data-form" data-ns="${escapeHtml(namespace)}" data-name="${name}" data-storage-key="pv_data_name">
                             <input type="hidden" name="csrf_token" value="${escapeHtml(csrf_token)}">
                             <input type="hidden" name="ns_select" value="${escapeHtml(namespace)}" />
                             <input type="hidden" name="selected" value="${name}" />
-                            <a href="javascript:;" onclick="parentNode.submit();">${name}</a>
+                            <a href="#" class="form-submit-link">${name}</a>
                         </form>
                     </td>
                     ${storageClassCell}
@@ -350,6 +351,23 @@
         loadPVs(namespace);
     });
     
+    // Event delegation for form submissions
+    document.addEventListener('click', function(e) {
+        const link = e.target.closest('.form-submit-link');
+        if (link) {
+            e.preventDefault();
+            const form = link.closest('form');
+            if (form) {
+                const ns = form.dataset.ns || '';
+                const name = form.dataset.name || '';
+                const storageKey = form.dataset.storageKey || '';
+                if (ns) sessionStorage.setItem('ns_select', ns);
+                if (name && storageKey) sessionStorage.setItem(storageKey, name);
+                form.submit();
+            }
+        }
+    });
+
     // Reload data when namespace changes (if namespace selector exists)
     document.addEventListener('DOMContentLoaded', function() {
         const namespaceSelect = document.getElementById('inputGroupSelect04');
@@ -359,6 +377,29 @@
                 console.log('Namespace changed to:', namespace);
                 sessionStorage.setItem('ns_select', namespace);
                 loadPVs(namespace);
+            });
+        }
+    });
+
+    // Event delegation for form submission links (CSP-compliant)
+    document.addEventListener('click', function(e) {
+        if (e.target.classList.contains('form-submit-link')) {
+            e.preventDefault();
+            const form = e.target.closest('form');
+            if (form) {
+                form.submit();
+            }
+        }
+    });
+
+    document.addEventListener('submit', function(e) {
+        if (e.target.classList.contains('inline-form')) {
+            const form = e.target;
+            const inputs = form.querySelectorAll('input[type="hidden"]');
+            inputs.forEach(input => {
+                if (input.name && input.value) {
+                    sessionStorage.setItem(input.name, input.value);
+                }
             });
         }
     });

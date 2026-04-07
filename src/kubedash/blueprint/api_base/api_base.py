@@ -195,11 +195,126 @@ class ReadinessResource(MethodView):
         #elif not oidc_test:
         #    code = 503
 
+        # Import replica mode function
+        from lib.replica_mode import get_replica_mode
+        from flask import current_app
+
+        # Determine config mode
+        config_mode = 'minimal' if current_app.config.get('MINIMAL_CONFIG') else 'full'
+
         return {
             'database': database_status,
             'oidc': oidc_test,
             'kubernetes': k8s_status,
+            'replica_mode': get_replica_mode(current_app),
+            'config_mode': config_mode
         }, code
+
+##############################################################
+## Cluster Status
+##############################################################
+
+@api_bp.route('/cluster/status')
+class ClusterStatusResource(MethodView):
+    """
+    Cluster status endpoint.
+    
+    Returns information about the current cluster configuration and leader status.
+    This endpoint does not require authentication.
+    """
+    
+    @api_bp.response(200, description="Cluster status",
+                     example={
+                         'replica_mode': 'cluster',
+                         'is_leader': True,
+                         'pod_name': 'kubedash-0',
+                         'pod_namespace': 'default',
+                         'replica_count': 3
+                     })
+    @api_bp.doc(tags=['Health'])
+    def get(self):
+        """
+        Get cluster status
+        
+        Returns information about the current deployment mode and leader election status.
+        
+        In single-replica mode:
+            - is_leader: always true
+            - leader_pod: None (N/A)
+        
+        In cluster mode:
+            - is_leader: true if this pod is the current leader
+            - leader_pod: name of the pod holding the lease
+            - pod_name: this pod's name
+            - pod_namespace: this pod's namespace
+        
+        Returns:
+            dict: Cluster status information:
+                {
+                    "replica_mode": str (single or cluster),
+                    "is_leader": bool,
+                    "leader_pod": str or None,
+                    "pod_name": str,
+                    "pod_namespace": str,
+                    "replica_count": int
+                }
+        
+        Example Response (Cluster - Leader):
+            {
+                "replica_mode": "cluster",
+                "is_leader": true,
+                "leader_pod": "kubedash-0",
+                "pod_name": "kubedash-0",
+                "pod_namespace": "default",
+                "replica_count": 3
+            }
+        
+        Example Response (Cluster - Follower):
+            {
+                "replica_mode": "cluster",
+                "is_leader": false,
+                "leader_pod": "kubedash-0",
+                "pod_name": "kubedash-1",
+                "pod_namespace": "default",
+                "replica_count": 3
+            }
+        
+        Example Response (Single Replica):
+            {
+                "replica_mode": "single",
+                "is_leader": true,
+                "leader_pod": null,
+                "pod_name": "kubedash",
+                "pod_namespace": "default",
+                "replica_count": 1
+            }
+        """
+        from flask import current_app
+        from lib.replica_mode import get_replica_mode, get_pod_identity, get_pod_namespace, get_replica_count
+        from lib.leader_election import get_leader_elector
+
+        replica_mode = get_replica_mode(current_app)
+        is_leader = False
+        leader_pod = None
+
+        if replica_mode == 'cluster':
+            # Get leader elector from app extensions
+            leader_elector = get_leader_elector()
+            if leader_elector:
+                is_leader = leader_elector.is_leader
+                leader_pod = leader_elector.leader_holder_name
+        else:
+            # Single replica is always a leader
+            is_leader = True
+
+        return {
+            'replica_mode': replica_mode,
+            'is_leader': is_leader,
+            'leader_pod': leader_pod,
+            'pod_name': get_pod_identity(current_app),
+            'pod_namespace': get_pod_namespace(current_app),
+            'replica_count': get_replica_count(current_app)
+        }, 200
         
 ##############################################################
 # Debug Trace endpoint

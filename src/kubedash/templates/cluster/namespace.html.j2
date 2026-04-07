@@ -268,10 +268,10 @@
                 <tr ${rowClass}>
                     <td>${statusBadge}</td>
                     <td>
-                        <form action="/cluster/namespace/data" method="POST" onsubmit="sessionStorage.setItem('namespace_data_name', '${name}'); return true;">
+                        <form action="/cluster/namespace/data" method="POST" class="inline-form" data-namespace="${escapeHtml(name)}">
                             <input type="hidden" name="csrf_token" value="${csrf_token}">
                             <input type="hidden" name="ns_select" value="${escapeHtml(name)}" />
-                            <a href="javascript:;" onclick="sessionStorage.setItem('namespace_data_name', '${name}'); parentNode.submit();">${name}</a>
+                            <a href="#" class="form-submit-link">${name}</a>
                         </form>
                     </td>
                     <td>${repositoryCell}</td>
@@ -360,15 +360,36 @@
             if (data.error) {
                 throw new Error(data.message || 'Failed to load namespaces');
             }
-            
+
             const namespaces = data.data || [];
             populateNamespacesTable(namespaces);
-            
+
         } catch (error) {
             console.error('Error loading namespaces:', error);
             const tbody = document.getElementById('namespaces-tbody');
             if (tbody) {
                 tbody.innerHTML = '<tr><td colspan="6" class="text-center text-danger">Error loading namespaces: ' + escapeHtml(error.message) + '</td></tr>';
+            }
+        }
+    });
+
+    // Event delegation for form submission links (CSP-compliant)
+    document.addEventListener('click', function(e) {
+        if (e.target.classList.contains('form-submit-link')) {
+            e.preventDefault();
+            const form = e.target.closest('form');
+            if (form) {
+                form.submit();
+            }
+        }
+    });
+
+    document.addEventListener('submit', function(e) {
+        if (e.target.classList.contains('inline-form')) {
+            const form = e.target;
+            const namespace = form.dataset.namespace;
+            if (namespace) {
+                sessionStorage.setItem('ns_select', namespace);
             }
         }
     });

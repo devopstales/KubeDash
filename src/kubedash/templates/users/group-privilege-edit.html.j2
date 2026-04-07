@@ -84,7 +84,7 @@
                     </div>
                     <!-- buttons -->
                     <hr>
-                    <button class="py-2 px-6 btn btn-outline-secondary" type="button" onclick="unHide()" id="addBTN">add</button>
+                    <button class="py-2 px-6 btn btn-outline-secondary" type="button" id="addBTN">add</button>
                 </div>
                 <div class="block uppercase font-bold mb-2">access to cluster resources (non-namespaced):</div>
                 <div class="form-group col-md-4">
@@ -425,6 +425,14 @@
         // Initialize Select2 on page load
         $(document).ready(function() {
             initSelect2();
+        });
+
+        // Attach unHide to addBTN via addEventListener
+        document.addEventListener('DOMContentLoaded', function() {
+            const addBtn = document.getElementById('addBTN');
+            if (addBtn) {
+                addBtn.addEventListener('click', unHide);
+            }
         });
     </script>
 {% endblock %}

@@ -18,6 +18,11 @@ def initialize_app_logging(app: Flask):
     if sys.argv[1] != 'cli' and sys.argv[1] != 'db':
         app.logger.info("Initialize logging")
 
+    # Remove Flask's default handler to prevent duplicate/interleaved log output.
+    # The root logger (configured by get_logger) already has the correct handler.
+    app.logger.handlers.clear()
+    app.logger.propagate = True
+
     # Use INFO in all modes (development and production). DEBUG is only for Flask (e.g. tracebacks).
     app.logger.setLevel(logging.INFO)
     logging.getLogger("werkzeug").addFilter(NoMetrics())

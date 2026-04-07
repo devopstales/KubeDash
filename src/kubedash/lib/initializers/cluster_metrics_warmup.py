@@ -24,12 +24,13 @@ def initialize_cluster_metrics_warmup(app: Flask):
     Start a ThreadedTicker that periodically warms the cluster-metrics cache
     by calling k8sGetClusterMetric(), when enabled and interval > 0.
 
-    Config (ini [performance] or env):
-      - cluster_metrics_warm_enabled (default true); env KUBEDASH_CLUSTER_METRICS_WARM_ENABLED
-      - cluster_metrics_warm_interval_sec (default 300); env KUBEDASH_CLUSTER_METRICS_WARM_INTERVAL
-
-    If enabled is false or interval is 0, no ticker is started.
+    Skipped in minimal-config mode (no K8s cluster available).
     """
+    # Skip entirely in minimal-config mode
+    if app.config.get('MINIMAL_CONFIG'):
+        app.logger.info("Cluster-metrics warmup ticker disabled in minimal-config mode")
+        return
+
     ini = app.config.get("kubedash.ini")
     if not ini:
         return

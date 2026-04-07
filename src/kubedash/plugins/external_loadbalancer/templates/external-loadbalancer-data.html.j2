@@ -47,7 +47,7 @@
 {% endblock %}
 
 {% block add_tail_js %}
-<script>
+<script nonce="{{ csp_nonce }}">
 (function() {
     'use strict';
     try {
@@ -241,12 +241,12 @@
                     let poolsHtml = '';
                     objectData.ipAddressPools.forEach(pool => {
                         poolsHtml += `
-                            <form action="/plugins/external-loadbalancer" method="POST" onsubmit="sessionStorage.setItem('ns_select', '${escapeHtml(namespace)}'); return true;">
+                            <form class="inline-form" action="/plugins/external-loadbalancer" method="POST" data-session-key="ns_select" data-session-value="${escapeHtml(namespace)}">
                                 <input type="hidden" name="csrf_token" value="${escapeHtml(csrf_token)}">
                                 <input type="hidden" name="ns_select" value="${escapeHtml(namespace)}" />
                                 <input type="hidden" name="selected" value="${escapeHtml(pool)}" />
                                 <input type="hidden" name="object_type" value="ipaddresspool" />
-                                <a href="javascript:;" onclick="parentNode.submit();" class="text-decoration-none">${escapeHtml(pool)}</a>
+                                <a href="#" class="form-submit-link text-decoration-none">${escapeHtml(pool)}</a>
                             </form><br>
                         `;
                     });
@@ -554,6 +554,27 @@
         console.log('Populating data for:', { objectType, objectName, namespace });
         populateLoadBalancerData(objectData, objectType, namespace);
     });
+
+    // CSP-compliant event delegation for inline handlers
+    document.addEventListener('click', function(e) {
+        const link = e.target.closest('.form-submit-link');
+        if (link) {
+            e.preventDefault();
+            const form = link.closest('form');
+            if (form) form.submit();
+        }
+    });
+
+    document.addEventListener('submit', function(e) {
+        const form = e.target.closest('.inline-form');
+        if (form) {
+            const key = form.getAttribute('data-session-key');
+            const value = form.getAttribute('data-session-value');
+            if (key && value) {
+                sessionStorage.setItem(key, value);
+            }
+        }
+    });
     } catch (error) {
         console.error('Error in External LoadBalancer data script:', error);
         const tbody = document.getElementById('lb-info-tbody');
@@ -563,5 +584,29 @@
         }
     }
 })();
+
+    // Event delegation for form submission links (CSP-compliant)
+    document.addEventListener('click', function(e) {
+        if (e.target.classList.contains('form-submit-link')) {
+            e.preventDefault();
+            const form = e.target.closest('form');
+            if (form) {
+                form.submit();
+            }
+        }
+    });
+
+    document.addEventListener('submit', function(e) {
+        if (e.target.classList.contains('inline-form')) {
+            const form = e.target;
+            const inputs = form.querySelectorAll('input[type="hidden"]');
+            inputs.forEach(input => {
+                if (input.name && input.value) {
+                    sessionStorage.setItem(input.name, input.value);
+                }
+            });
+        }
+    });
 </script>
 {% endblock %}
+

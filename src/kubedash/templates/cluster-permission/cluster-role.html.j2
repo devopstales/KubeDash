@@ -189,10 +189,10 @@
             return `
                 <tr ${rowClass}>
                     <td>
-                        <form action="/cluster-permission/cluster-role/data" method="POST" onsubmit="sessionStorage.setItem('cluster_role_data_name', '${name}'); return true;">
+                        <form action="/cluster-permission/cluster-role/data" method="POST" class="inline-form">
                             <input type="hidden" name="csrf_token" value="${csrf_token}">
                             <input type="hidden" name="cr_name" value="${name}" />
-                            <a href="javascript:;" onclick="sessionStorage.setItem('cluster_role_data_name', '${name}'); parentNode.submit();">${name}</a>
+                            <a href="#" class="form-submit-link">${name}</a>
                         </form>
                     </td>
                     <td>${labels || ' '}</td>
@@ -291,5 +291,43 @@
             }
         }
     });
+
+    // Event delegation for form submission links (CSP-compliant)
+    document.addEventListener('click', function(e) {
+        if (e.target.classList.contains('form-submit-link')) {
+            e.preventDefault();
+            const form = e.target.closest('form');
+            if (form) {
+                form.submit();
+            }
+        }
+    });
+
+    document.addEventListener('submit', function(e) {
+        if (e.target.classList.contains('inline-form')) {
+            const form = e.target;
+            const nsSelect = form.querySelector('input[name="ns_select"]');
+            if (nsSelect) {
+                sessionStorage.setItem('ns_select', nsSelect.value);
+            }
+            const rName = form.querySelector('input[name="r_name"]');
+            if (rName) {
+                sessionStorage.setItem('r_name', rName.value);
+            }
+            const crName = form.querySelector('input[name="cr_name"]');
+            if (crName) {
+                sessionStorage.setItem('cr_name', crName.value);
+            }
+            const crbrName = form.querySelector('input[name="crbr_name"]');
+            if (crbrName) {
+                sessionStorage.setItem('crbr_name', crbrName.value);
+            }
+            const rbrName = form.querySelector('input[name="rbr_name"]');
+            if (rbrName) {
+                sessionStorage.setItem('rbr_name', rbrName.value);
+            }
+        }
+    });
 </script>
 {% endblock %}
+

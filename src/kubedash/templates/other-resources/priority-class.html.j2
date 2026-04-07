@@ -43,7 +43,7 @@
                           <form action="/other-resource/priorityclass/data" method="POST">
                             <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
                             <input type="hidden" name="pc_name" value="{{ pc.name }}" />
-                            <a href="javascript:;" onclick="parentNode.submit();">{{ pc.name }}</a>
+                            <a href="#" class="form-submit-link">{{ pc.name }}</a>
                           </form>
                         </td>
                         <td>
@@ -67,4 +67,19 @@
 
 {% block add_head_css %}
 {% include "segments/components/datatable_snippet.html.j2" %}
+{% endblock %}
+
+{% block add_tail_js %}
+<script nonce="{{ csp_nonce }}">
+    // Event delegation for form submission links (CSP-compliant)
+    document.addEventListener('click', function(e) {
+        if (e.target.classList.contains('form-submit-link')) {
+            e.preventDefault();
+            const form = e.target.closest('form');
+            if (form) {
+                form.submit();
+            }
+        }
+    });
+</script>
 {% endblock %}

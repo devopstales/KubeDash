@@ -35,8 +35,12 @@ def initialize_app_security(app: Flask):
     def set_csp_nonce():
         """Generate CSP nonce for inline scripts to prevent XSS"""
         g.csp_nonce = secrets.token_urlsafe(16)
-        # Make nonce available to templates
-        app.jinja_env.globals['csp_nonce'] = g.csp_nonce
+
+    # Make nonce available to all templates via context processor
+    @app.context_processor
+    def inject_csp_nonce():
+        """Inject CSP nonce into template context for each request"""
+        return {'csp_nonce': getattr(g, 'csp_nonce', '')}
 
     # Build CSP policy - nonce will be added dynamically in after_request
     # Note: 'unsafe-eval' removed for better XSS protection

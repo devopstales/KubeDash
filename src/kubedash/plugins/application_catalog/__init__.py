@@ -65,12 +65,16 @@ def initialize_application_catalog(app):
         try:
             # Sync database with config file
             application_links_init(app_config)
-            
-            # Discover and register ingresses with application-catalog annotation
-            discover_ingress_applications()
-            
-            # Discover and register services with application-catalog annotation
-            discover_service_applications()
+
+            # Skip K8s discovery in minimal-config mode
+            if app.config.get('MINIMAL_CONFIG'):
+                logger.info("Application catalog: K8s discovery disabled in minimal-config mode")
+            else:
+                # Discover and register ingresses with application-catalog annotation
+                discover_ingress_applications()
+
+                # Discover and register services with application-catalog annotation
+                discover_service_applications()
             
             # Build applications list for CSP update from all sources (config + discovered ingresses)
             # Get all enabled applications from database (includes both config and discovered)

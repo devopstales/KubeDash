@@ -1,0 +1,71 @@
+{
+  "servers": {
+    "cocoindex-code": {
+      "command": "ccc",
+      "args": [
+        "mcp"
+      ]
+    },
+    "trivy-command": {
+      "command": "trivy",
+      "args": [
+        "mcp"
+      ]
+    },
+    "engram": {
+      "command": "docker",
+      "args": [
+        "run",
+        "-i",
+        "--rm",
+        "--name",
+        "ai-mcp-engram-memory",
+        "-v",
+        "mcp-engram-memory:/knowledge",
+        "cylian/engram"
+      ]
+    },
+    "fetch-docker": {
+      "command": "docker",
+      "args": [
+        "run",
+        "--rm",
+        "--name",
+        "ai-mcp-fetch",
+        "-i",
+        "mcp/fetch"
+      ]
+    },
+    "playwright-docker": {
+      "command": "docker",
+      "args": [
+        "run",
+        "--rm",
+        "-i",
+        "--name",
+        "ai-mcp-playwright",
+        "--shm-size=1g",
+        "mcp/playwright"
+      ]
+    },
+    "sequentialthinking-docker": {
+      "command": "docker",
+      "args": [
+        "run",
+        "--rm",
+        "--name",
+        "ai-mcp-sequentialthinking",
+        "-i",
+        "mcp/sequentialthinking"
+      ]
+    },
+    "deepwiki": {
+      "type": "streamable-http",
+      "url": "https://mcp.deepwiki.com/mcp"
+    },
+    "exa-http": {
+      "type": "streamable-http",
+      "url": "https://mcp.exa.ai/mcp"
+    }
+  }
+}

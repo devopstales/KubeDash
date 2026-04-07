@@ -209,11 +209,11 @@
                 <tr class="${rowClass}">
                     <td>${statusBadge}</td>
                     <td>
-                        <form action="/cluster/node/data" method="POST" data-node-name="${escapeHtml(nodeName)}" onsubmit="sessionStorage.setItem('node_data_name', this.dataset.nodeName); return true;">
+                        <form action="/cluster/node/data" method="POST" data-node-name="${escapeHtml(nodeName)}" >
                             <input type="hidden" name="csrf_token" value="${escapeHtml(csrf_token)}">
                             <input type="hidden" name="no_name" value="${escapeHtml(nodeName)}" />
                             <input type="hidden" name="selected" value="${escapeHtml(nodeName)}" />
-                            <a href="javascript:;" onclick="parentNode.submit();">${nodeName}</a>
+                            <a href="#" class="form-submit-link">${nodeName}</a>
                         </form>
                     </td>
                     <td>${role}</td>
@@ -305,6 +305,30 @@
             if (tbody) {
                 tbody.innerHTML = '<tr><td colspan="8" class="text-center text-danger">Error loading nodes: ' + escapeHtml(error.message) + '</td></tr>';
             }
+        }
+    });
+
+    // Event delegation for form submission links (CSP-compliant)
+    document.addEventListener('click', function(e) {
+        if (e.target.classList.contains('form-submit-link')) {
+            e.preventDefault();
+            const form = e.target.closest('form');
+            if (form) {
+                form.submit();
+            }
+        }
+    });
+
+    document.addEventListener('submit', function(e) {
+        if (e.target.classList.contains('inline-form')) {
+            const form = e.target;
+            // Set sessionStorage based on form inputs
+            const inputs = form.querySelectorAll('input[type="hidden"]');
+            inputs.forEach(input => {
+                if (input.name && input.value) {
+                    sessionStorage.setItem(input.name, input.value);
+                }
+            });
         }
     });
 </script>

@@ -22,14 +22,14 @@
     <div id="filter-menu" class="card-header">
         <div class="row g-2 align-items-center">
             <div class="col-md-3">
-                <select class="form-select" aria-label="Select network item" onchange="updateFilter(value, 'item')" id="select-item" >
+                <select class="form-select" aria-label="Select network item" id="select-item" >
                     <option value="">Select a network item</option>
                     <option value="edge">edge</option>
                     <option value="node">node</option>
                 </select>
             </div>
             <div class="col-md-3">
-                <select class="form-select" aria-label="Select property" onchange="updateFilter(value, 'property')" id="select-property" >
+                <select class="form-select" aria-label="Select property" id="select-property" >
                     <option value="">Select a property...</option>
                 </select>
             </div>
@@ -39,10 +39,10 @@
                 </select>
             </div>
             <div class="col-md-1">
-              <button type="button" class="btn btn-primary w-100" onclick="highlightFilter(filter);">Filter</button>
+              <button type="button" class="btn btn-primary w-100 filter-btn" data-action="filter">Filter</button>
             </div>
             <div class="col-md-2">
-              <button type="button" class="btn btn-outline-secondary w-100" onclick="clearFilter(true)">Reset</button>
+              <button type="button" class="btn btn-outline-secondary w-100 filter-btn" data-action="reset">Reset</button>
             </div>
         </div>
     </div>
@@ -210,6 +210,28 @@
     </script>
 
     <script type="text/javascript" nonce="{{ csp_nonce }}">
+        // Event listeners for filter selects (CSP-compliant)
+        document.addEventListener('DOMContentLoaded', function() {
+            const selectItem = document.getElementById('select-item');
+            const selectProperty = document.getElementById('select-property');
+            
+            if (selectItem) {
+                selectItem.addEventListener('change', function() {
+                    if (typeof updateFilter === 'function') {
+                        updateFilter(this.value, 'item');
+                    }
+                });
+            }
+            
+            if (selectProperty) {
+                selectProperty.addEventListener('change', function() {
+                    if (typeof updateFilter === 'function') {
+                        updateFilter(this.value, 'property');
+                    }
+                });
+            }
+        });
+
         // initialize global variables.
         var edges;
         var nodes;
@@ -708,6 +730,19 @@
         document.addEventListener('DOMContentLoaded', function() {
             const namespace = getSelectedNamespace();
             loadWorkloadMap(namespace);
+        });
+
+        // Event delegation for filter buttons
+        document.addEventListener('click', function(e) {
+            const btn = e.target.closest('.filter-btn');
+            if (btn) {
+                const action = btn.dataset.action;
+                if (action === 'filter') {
+                    highlightFilter(filter);
+                } else if (action === 'reset') {
+                    clearFilter(true);
+                }
+            }
         });
 
         // Reload data when namespace changes (if namespace selector exists)

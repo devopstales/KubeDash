@@ -143,10 +143,16 @@ def initialize_instrumentors(app: Flask):
             command_args.extend(f"{k}={v}" for k, v in kwargs.items())
 
         # Sanitize and truncate arguments
-        sanitized_args = [
-            arg.decode('utf-8') if isinstance(arg, bytes) else str(arg)
-            for arg in command_args[:3]  # Only show first 3 args
-        ]
+        sanitized_args = []
+        for arg in command_args[:3]:  # Only show first 3 args
+            if isinstance(arg, bytes):
+                try:
+                    sanitized_args.append(arg.decode('utf-8'))
+                except UnicodeDecodeError:
+                    # Binary data (e.g., pickled session data) - show placeholder
+                    sanitized_args.append(f"<binary:{len(arg)} bytes>")
+            else:
+                sanitized_args.append(str(arg))
         span.set_attribute("redis.command", " ".join(sanitized_args))
 
         # Add connection context
@@ -201,8 +207,6 @@ def initialize_instrumentors(app: Flask):
 
     app.logger.info("\tInitializing tracing for Logging")
     LoggingInstrumentor().instrument(
-        set_logging_format=True,
-        log_hook=log_hook,
         tracer_provider=trace.get_tracer_provider()
     )
 
