@@ -2,24 +2,24 @@
 
 ### Requirement: Enhanced Log Viewer UI
 
-The system SHALL provide an enhanced log viewer component for viewing pod logs served by the existing `join_pod_logs` Socket.IO event in the `/log` namespace. The viewer SHALL render log lines in a scrollable terminal-style panel using either xterm.js or a custom DOM-based renderer and SHALL include the following controls:
+The system SHALL provide an enhanced log viewer component for viewing pod logs served by the existing `message` event in the `/log` namespace. The viewer SHALL use the existing xterm.js v4.11.0 instance as the rendering surface for raw output, AND overlay a custom DOM-based rendering layer for enriched features (filtering, search, highlighting). The enhanced viewer SHALL include the following controls:
 
 - Auto-scroll toggle (enabled by default)
 - Timestamp visibility toggle (enabled by default)
-- Search input field (empty by default)
+- Search input field (empty by default) — invokes xterm.js SearchAddon
 - Log level filter multi-select (all levels selected by default)
 - Export button (download current buffer)
 - Buffer usage indicator (shows lines displayed / max buffer)
 
-The viewer SHALL receive log line events from the Socket.IO `response` event scoped to the user's connection (`room=request.sid`) and append each line to the client-side buffer.
+The viewer SHALL receive log line events from the Socket.IO `response` event scoped to the user's connection (`room=request.sid`) and append each line to both the xterm terminal AND the client-side buffer.
 
 #### Scenario: Default log view loads
 - **WHEN** user navigates to the log view for a pod/container
-- **THEN** the system SHALL connect to `/log` via Socket.IO, send `join_pod_logs` with pod/container details, and begin streaming logs into the viewer with auto-scroll and timestamps enabled
+- **THEN** the system SHALL connect to `/log` via Socket.IO, send pod/container details via `socket.send(podName, containerName)` (the `message` event), and begin streaming logs into the viewer with auto-scroll enabled
 
 #### Scenario: User toggles auto-scroll off
 - **WHEN** user is viewing logs and clicks the auto-scroll toggle to disable it
-- **THEN** the system SHALL stop automatically scrolling to the bottom when new log lines arrive
+- **THEN** the system SHALL stop automatically calling `term.scrollToBottom()` when new log lines arrive
 - **AND** a visual indicator SHALL show "Paused — new lines arriving" or equivalent
 
 #### Scenario: User toggles timestamps off
@@ -87,7 +87,7 @@ The multi-pod aggregation SHALL:
 - Maintain separate per-pod level tracking so filtering works globally across all pods
 - Respect the same buffer management limits regardless of pod count
 
-Multi-pod aggregation SHALL use the existing `join_pod_logs` Socket.IO mechanism — one connection instance per pod/stream, all scoped to the same user session.
+The multi-pod aggregation SHALL use the existing `message` event on `/log` namespace — each pod/stream requires its own `socket.send(podName, containerName)` call, all scoped to the same `/log` connection.
 
 #### Scenario: View all pods in a Deployment
 - **WHEN** user is viewing a Deployment detail page and clicks "View All Logs"
@@ -165,17 +165,17 @@ The log viewer SHALL display the connection status to the user. Possible states 
 
 | State | Indicator |
 |-------|-----------|
-| Connecting | "Connecting to log stream..." spinner |
+| Connecting | "Connecting..." spinner |
 | Streaming | Green dot + "Streaming" |
 | Disconnected | Red dot + "Disconnected" with reconnect button |
-| Error | Red banner with error message from server (`error` event) |
-| Completed | Gray indicator + "Log stream ended (pod may have terminated)" |
+| Error | Red banner with error message |
+| Completed | Gray indicator + "Log stream ended" |
 
 When the Socket.IO connection drops, the viewer SHALL attempt automatic reconnection (using Socket.IO's built-in reconnect mechanism) and display a "Reconnecting..." indicator. If reconnection fails after 3 attempts, it SHALL display a manual reconnect button.
 
 #### Scenario: Pod terminates while streaming
 - **WHEN** the user is streaming logs and the pod is deleted or terminates
-- **THEN** the K8s log API SHALL close the stream, the server SHALL emit a `log_stream_ended` event (or Socket.IO `disconnect`), and the viewer SHALL show "Log stream ended — pod may have terminated"
+- **THEN** the K8s watch stream in `k8sPodLogsStream()` SHALL close naturally, the backend SHALL disconnect the Socket.IO room, and the viewer SHALL show "Log stream ended — pod may have terminated"
 
 ### Requirement: Security and Access Control
 

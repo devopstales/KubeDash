@@ -2,7 +2,7 @@ import functools
 import logging
 import threading
 
-from flask import (Blueprint, flash, g, redirect, render_template, request, session,
+from flask import (Blueprint, current_app, flash, g, redirect, render_template, request, session,
                    url_for)
 from flask_login import current_user, login_required
 from flask_socketio import disconnect
@@ -17,7 +17,7 @@ from lib.k8s.workload import (ErrorHandler, k8sDaemonsetPatch,
                               k8sDaemonSetsGet, k8sDeploymentsGet,
                               k8sDeploymentsPatchReplica, k8sPodExecSocket,
                               k8sPodExecStream, k8sPodGet, k8sPodGetContainers,
-                              k8sPodListGet, k8sPodLogsStream, k8sPodDelete,
+                              k8sPodListGet, k8sPodLogsStream, k8sPodLogsStreamWithTail, k8sPodDelete,
                               k8sReplicaSetsGet, k8sStatefulSetPatchReplica,
                               k8sStatefulSetsGet)
 from lib.sso import get_user_token
@@ -182,17 +182,102 @@ def pod_data():
 logging.getLogger('socketio').setLevel(logging.ERROR)
 logging.getLogger('engineio').setLevel(logging.ERROR)
 
+@workload_bp.route('/pods/logs/enhanced', methods=['GET', 'POST'])
+@login_required
+def pod_logs_enhanced():
+    """
+    Enhanced pod logs page with filtering, search, and export.
+
+    Uses the new DOM-based log viewer with toolbar controls.
+    Containers are loaded client-side via JavaScript API calls.
+    WebSocket connection is handled server-side for log streaming.
+    """
+    from lib.helper_functions import validate_pod_name, validate_namespace
+
+    # Get pod name and namespace from query params or form
+    po_name = request.args.get('po_name') or request.form.get('po_name', '')
+    namespace = request.form.get('ns_select', '')
+    container_select = request.args.get('container') or request.form.get('container', '')
+
+    # Validate pod name to prevent XSS and path traversal
+    if po_name:
+        is_valid, error_msg = validate_pod_name(po_name)
+        if not is_valid:
+            flash(f"Invalid pod name: {error_msg}", "danger")
+            po_name = ''
+
+    # Validate namespace
+    if namespace:
+        is_valid_ns, error_msg_ns = validate_namespace(namespace)
+        if not is_valid_ns:
+            flash(f"Invalid namespace: {error_msg_ns}", "danger")
+            namespace = ''
+        else:
+            session['ns_select'] = namespace
+
+    # Check feature flag
+    config = current_app.config.get('kubedash.ini')
+    feature_enabled = 'true'
+    if config:
+        feature_enabled = config.get('features', 'enhanced_log_viewer', fallback='true')
+
+    return render_template(
+        'workload/pod-logs.html.j2',
+        po_name=po_name or '',
+        container_select=container_select or '',
+        feature_enabled=feature_enabled,
+        async_mode=socketio.async_mode
+    )
+
+
+@workload_bp.route('/workloads/logs', methods=['GET', 'POST'])
+@login_required
+def workload_logs():
+    """
+    Multi-pod log viewer for workloads (Deployment, StatefulSet, DaemonSet, ReplicaSet).
+    
+    Shows merged logs from all pods belonging to a workload.
+    """
+    from lib.helper_functions import validate_namespace
+
+    workload_kind = request.args.get('workload_kind', '')
+    workload_name = request.args.get('workload_name', '')
+    namespace = request.form.get('ns_select', '') or request.args.get('namespace', '')
+
+    # Validate namespace
+    if namespace:
+        is_valid_ns, error_msg_ns = validate_namespace(namespace)
+        if not is_valid_ns:
+            flash(f"Invalid namespace: {error_msg_ns}", "danger")
+            namespace = ''
+        else:
+            session['ns_select'] = namespace
+
+    # Check feature flag
+    config = current_app.config.get('kubedash.ini')
+    feature_enabled = 'true'
+    if config:
+        feature_enabled = config.get('features', 'enhanced_log_viewer', fallback='true')
+
+    return render_template(
+        'workload/multipod-logs.html.j2',
+        workload_kind=workload_kind or '',
+        workload_name=workload_name or '',
+        feature_enabled=feature_enabled,
+        async_mode=socketio.async_mode
+    )
+
 @workload_bp.route('/pods/logs', methods=['GET', 'POST'])
 @login_required
 def pod_logs():
     """
     Pod logs page.
-    
+
     Containers are loaded client-side via JavaScript API calls.
     Websocket connection is handled server-side for log streaming.
     """
     from lib.helper_functions import validate_pod_name, validate_namespace
-    
+
     # Get pod name and namespace from query params or form
     po_name = request.args.get('po_name') or request.form.get('po_name', '')
     namespace = request.form.get('ns_select', '')
@@ -278,6 +363,92 @@ def log_message(po_name, container):
         container,
         sid,
         cancel_ev,
+    )
+
+
+@socketio.on("join_pod_logs", namespace="/log")
+@authenticated_only
+def join_pod_logs(data):
+    """
+    Enhanced log join event that supports tail_lines parameter for loading older lines.
+    
+    Expected data format:
+    {
+        podName: string,
+        container: string,
+        namespace: string (optional, defaults to session),
+        tail_lines: int (optional, defaults to 100)
+    }
+    """
+    from lib.helper_functions import validate_pod_name, validate_namespace
+
+    if not data or not isinstance(data, dict):
+        logger.warning("Invalid data format in join_pod_logs")
+        return
+
+    po_name = data.get('podName', '')
+    container = data.get('container', '')
+    namespace = data.get('namespace', session.get('ns_select', 'default'))
+    tail_lines = data.get('tail_lines', 100)
+
+    # Validate inputs
+    if not po_name or not isinstance(po_name, str):
+        logger.warning(f"Invalid pod name in join_pod_logs: {po_name}")
+        return
+
+    is_valid, error_msg = validate_pod_name(po_name)
+    if not is_valid:
+        logger.warning(f"Invalid pod name in join_pod_logs: {error_msg}")
+        return
+
+    if namespace:
+        is_valid_ns, error_msg_ns = validate_namespace(namespace)
+        if not is_valid_ns:
+            logger.warning(f"Invalid namespace in join_pod_logs: {error_msg_ns}")
+            return
+
+    if container and not isinstance(container, str):
+        logger.warning(f"Invalid container name in join_pod_logs: {container}")
+        return
+
+    # Clamp tail_lines to reasonable range
+    tail_lines = max(1, min(tail_lines, 10000))
+
+    sid = request.sid
+    # Cancel previous log stream for this connection
+    old_ev = log_cancel.pop(sid, None)
+    if old_ev:
+        old_ev.set()
+    cancel_ev = threading.Event()
+    log_cancel[sid] = cancel_ev
+
+    user_token = get_user_token(session)
+    
+    # Audit log for log access
+    try:
+        log_audit_event(
+            action='log_access',
+            username=session.get('user_role', 'unknown'),
+            details={
+                'namespace': namespace,
+                'pod': po_name,
+                'container': container,
+                'tail_lines': tail_lines
+            }
+        )
+    except Exception as audit_error:
+        logger.debug(f"Audit logging failed (non-critical): {audit_error}")
+
+    socketio.start_background_task(
+        k8sPodLogsStreamWithTail,
+        session['user_role'],
+        user_token,
+        namespace,
+        po_name,
+        container,
+        sid,
+        cancel_ev,
+        tail_lines
     )
 
 ##############################################################

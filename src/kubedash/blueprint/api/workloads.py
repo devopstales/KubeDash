@@ -793,6 +793,73 @@ class PodEventsResource(MethodView):
 
 
 ##############################################################
+## Workload Pods (Multi-pod log viewing)
+##############################################################
+
+@workloads_api_bp.route('/<kind>/<name>/pods')
+class WorkloadPodsResource(MethodView):
+    """
+    Get pods for a specific workload (Deployment, StatefulSet, DaemonSet, ReplicaSet).
+    
+    Used for multi-pod log viewing to discover all pods belonging to a workload.
+    """
+
+    @workloads_api_bp.response(200, description="Successfully retrieved workload pods")
+    @workloads_api_bp.doc(tags=['Workloads'])
+    @login_required
+    def get(self, kind, name):
+        """
+        Get pods for a workload
+        
+        Path Parameters:
+            kind (str): Workload kind (deployments, statefulsets, daemonsets, replicasets)
+            name (str): Workload name
+
+        Query Parameters:
+            namespace (str): Kubernetes namespace (default: from session)
+
+        Returns:
+            dict: List of pods belonging to the specified workload
+        """
+        from lib.k8s.workload import k8sWorkloadPodsGet
+        
+        user_token = get_user_token(session)
+        namespace = request.args.get('namespace', session.get('ns_select', 'default'))
+
+        with tracer.start_as_current_span(
+            "workload-pods-get",
+            attributes={
+                "http.route": "/api/v1/workloads/{kind}/{name}/pods",
+                "http.method": "GET",
+                "workload.kind": kind,
+                "workload.name": name,
+                "namespace": namespace,
+            }
+        ) if tracer else nullcontext():
+            pods, status_code = k8sWorkloadPodsGet(
+                session['user_role'], user_token, namespace, kind, name
+            )
+            
+            # Check if error was returned
+            if isinstance(pods, dict) and 'error' in pods:
+                return jsonify({
+                    "error": "WorkloadPodsError",
+                    "message": pods['error'],
+                    "data": []
+                }), status_code
+
+            return jsonify({
+                "data": pods,
+                "metadata": {
+                    "kind": kind,
+                    "name": name,
+                    "namespace": namespace,
+                    "pod_count": len(pods)
+                }
+            })
+
+
+##############################################################
 ## ReplicaSets
 ##############################################################
 

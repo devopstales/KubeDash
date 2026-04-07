@@ -20,7 +20,12 @@
 {% block content %}
 <div class="card shadow mb-4">
     <div class="card-header">
-        <h6 class="m-0 font-weight-bold text-primary">Deployment Data</h6>
+        <div class="d-flex justify-content-between align-items-center">
+            <h6 class="m-0 font-weight-bold text-primary">Deployment Data</h6>
+            <a href="#" id="view-all-logs-btn" class="btn btn-sm btn-outline-primary" title="View logs from all pods in this deployment">
+                <i class="cil-description"></i> View All Logs
+            </a>
+        </div>
     </div>
     <div class="card-body">
         <ul class="nav nav-tabs" id="nav-tab" role="tablist">
@@ -784,7 +789,20 @@
     // Load data when page loads
     document.addEventListener('DOMContentLoaded', function() {
         loadDeploymentData();
-        });
+        
+        // Wire up "View All Logs" button
+        const viewAllLogsBtn = document.getElementById('view-all-logs-btn');
+        if (viewAllLogsBtn) {
+            viewAllLogsBtn.addEventListener('click', function(e) {
+                e.preventDefault();
+                const { deploymentName, namespace } = getDeploymentInfo();
+                if (deploymentName) {
+                    const url = `/workload/pods/logs/enhanced?workload_kind=deployment&workload_name=${encodeURIComponent(deploymentName)}&ns_select=${encodeURIComponent(namespace)}`;
+                    window.location.href = url;
+                }
+            });
+        }
+    });
 
     // Event delegation for inline forms (CSP-compliant)
     document.addEventListener('click', function(e) {

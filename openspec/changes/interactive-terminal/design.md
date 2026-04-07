@@ -1,12 +1,51 @@
 ## Context
 
-KubeDash already has a working Socket.IO infrastructure for pod exec:
-- `pod_exec` event in `/exec` namespace
-- Per-connection state management via `request.sid` routing
-- `exec-input` event routing stdin to the correct wsclient
-- `closed` event notification when stream dies
-- `stop` event for user-initiated session termination
-- K8sService `exec_pod()` method using `stream()` wrapper
+KubeDash has a working terminal in `src/kubedash/templates/workload/pod-exec.html.j2` (297 lines)
+with an xterm.js v4.11.0-based terminal already. Current implementation:
+
+**What already exists:**
+- xterm.js v4.11.0 already in `src/kubedash/static/vendor/xterm.js@4.11.0/`
+  - With addons: FitAddon, WebLinksAddon, SearchAddon
+- Socket.IO `/exec` namespace
+- Input loop: `term.onKey(e => socket.emit("exec-input", {"input": e.key}))`
+- Response: `socket.on("response", msg => term.write(msg.output))`
+- Paste handling: Ctrl+V/Cmd+V/Shift+Ctrl+V via customKeyEventHandler AND element paste event
+- Copy handling: Ctrl+C/Cmd+C with selection, Ctrl+Shift+C/X alternate
+- Disconnect button: `socket.emit("stop")`
+- Closed event handler: `socket.on("closed", msg => term.writeln("\r\n" + msg.message))`
+- Backend: `k8sPodExecStream()` in `src/kubedash/lib/k8s/workload.py`
+  - Uses `exec_streams` dict keyed by `request.sid`
+  - `wsclient.update(timeout=5)` loop with `output = wsclient.read_all()`
+  - Cancel via `cancel_ev` threading.Event
+  - Hardcoded command: `['/bin/sh']` in `k8sPodExecSocket()`
+  - Cleanup: `exec_streams.pop(sid, None)` + `socketio.emit("closed", ..., room=sid)`
+- Container selector dropdown with init container support
+- CSP-compliant inline scripts with nonce
+
+**What's missing (gaps this spec addresses):**
+- No multi-tab management (single session only)
+- No session recording for audit compliance
+- No timeout warnings or auto-disconnect countdown
+- No quick commands panel
+- No terminal settings/preferences persistence
+- No fullscreen mode
+- No tab-based pod switching (reselecting requires page reload)
+- No "recent sessions" history
+
+**Key backend details to interface with:**
+- Socket event: `socket.send(podName, containerName)` on `/exec` namespace (the `message` event)
+- Input event: `socket.emit("exec-input", {"input": key})`
+- Response event: `socket.on("response", msg => term.write(msg.output))`
+- Closed event: `socket.on("closed", msg => term.writeln(terminated_message))`
+- Stop event: `socket.emit("stop")` to disconnect
+- Backend function: `k8sPodExecStream(wsclient, username_role, user_token, namespace, pod_name, container, sid, exec_streams, cancel_ev)`
+- Socket factory: `k8sPodExecSocket(username_role, user_token, namespace, pod_name, container)` returns wsclient with `/bin/sh` hardcoded
+
+**Constraints:**
+- Must use xterm.js v4.11.0 already in vendor (NOT v5.x)
+- Must maintain compatibility with existing `/exec` namespace event protocol
+- Must stay CSP-compliant (nonce-based inline scripts)
+- The `customKeyEventHandler` already handles paste/copy — new code must not break it
 - xterm.js referenced in architecture diagrams as the exec rendering target
 - Redis-backed sessions for multi-replica support
 - AuditLog model already available for logging
@@ -518,6 +557,57 @@ kubedash-ui/templates/admin/
       - Session detail view
       - Replay button
 ```
+
+## Data Flows
+
+### Single Pod Exec Session
+
+The actual implementation flow (updated for real backend):
+
+```
+User clicks "Shell" on Pod detail page
+    │
+    ▼
+UI Template: pod-exec.html.j2 renders page with inline JS
+  - Loads xterm.js v4.11.0 + FitAddon + WebLinksAddon + SearchAddon
+  - Creates term = new Terminal({scrollback: 10000})
+  - socket = io.connect('/exec')
+  - term.onKey(e => socket.emit("exec-input", {input: e.key}))
+  - Custom paste handler (element.addEventListener("paste"))
+  - Custom copy handler (customKeyEventHandler Ctrl+V, Ctrl+C)
+    │
+    ▼
+Container selector loads containers via:
+  GET /api/v1/workloads/pods/{pod_name}/containers?namespace={ns}
+    │
+    ▼
+socket.send(podName, containerName)   // sends 'message' event on /exec namespace
+    │
+    ▼
+Backend: message() handler in workload.py
+  - Validates pod_name, namespace, container
+  - Cancels existing exec: exec_streams[sid].get("cancel").set()
+  - wsclient = k8sPodExecSocket(user_token, namespace, pod_name, container)
+    → Returns stream() wrapping connect_get_namespaced_pod_exec
+    → Hardcoded to ['/bin/sh']
+  - exec_streams[sid] = {"wsclient": wsclient, "cancel": cancel_ev}
+  - socketio.start_background_task(k8sPodExecStream, wsclient, ..., sid, exec_streams, cancel_ev)
+    │
+    ▼
+k8sPodExecStream() in lib/k8s/workload.py:
+  - while True:
+    - if cancel_ev.is_set(): break
+    - wsclient.update(timeout=5)
+    - output = wsclient.read_all()
+    - if output: socketio.emit("response", {output: output}, room=sid)
+  - On cancel/break: break loop
+  - finally: exec_streams.pop(sid) + emit("closed", room=sid)
+    │
+    ▼
+Browser: socket.on("response", msg => term.write(msg.output))
+    │
+    ▼
+User types: term.onKey(e => socket.emit("exec-input", {input: e.key}))
 
 ## State Management
 

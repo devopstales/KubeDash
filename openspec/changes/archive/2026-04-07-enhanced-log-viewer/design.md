@@ -1,20 +1,47 @@
 ## Context
 
-KubeDash already has a working Socket.IO infrastructure for pod log streaming:
-- `join_pod_logs` event in `/log` namespace
-- Per-connection state management via `request.sid` routing
-- K8sService `get_pod_logs()` with `follow=true` for streaming
-- xterm.js referenced in architecture diagrams as the rendering target
-- Redis-backed sessions for multi-replica support
-- Per-user K8s token scoping enforced at every layer
+KubeDash has a working log viewer in `src/kubedash/templates/workload/pod-log.html.j2` (214 lines)
+with an xterm.js-based terminal rendering approach. Current implementation:
 
-The gap is UX: users receive raw log lines with no filtering, search, multi-pod support, or export capabilities. This design adds a rich frontend viewer on top of the existing backend streaming without modifying the core Socket.IO protocol.
+**What already exists:**
+- xterm.js v4.11.0 already included in `src/kubedash/static/vendor/xterm.js@4.11.0/`
+  - With addons: FitAddon, WebLinksAddon, SearchAddon
+- Socket.IO `/log` namespace with `message` event (sends podName, containerName)
+- Response format: `socket.on('response', msg => term.write(msg.data + "\r\n"))`
+- Backend log stream: `k8sPodLogsStream()` in `src/kubedash/lib/k8s/workload.py`
+  - Uses `watch.Watch().stream()` on `read_namespaced_pod_log`
+  - `tail_lines=100`, `_request_timeout=300`
+- Per-connection cancel via `log_cancel` dict with threading.Event
+- Disconnect handler sets cancel event
+- Container selector dropdown with init container support
+- Socket snippet include: `segments/components/socket_snippet.html.j2`
+- CSS: CoreUI-based with dark mode support via `[data-coreui-theme="dark"]`
+- CSP-compliant inline scripts with nonce
+
+**What's missing (gaps this spec addresses):**
+- No log level filtering (raw output only)
+- No multi-pod log aggregation
+- No export/download functionality
+- No auto-scroll toggle (xterm auto-scrolls by default always)
+- No timestamp toggle (timestamps come from K8s, no control)
+- No buffer management (scrollback=10000 hardcoded, no eviction indicator)
+- No search UI (SearchAddon loaded but never invoked from template)
+- No connection state feedback beyond "connecting..." / "connected" / "disconnected"
+
+**Key backend details to interface with:**
+- Socket event: `socket.send(podName, containerName)` on `/log` namespace
+- Response event: `{data: "log line text"}` 
+- Disconnect handler: `log_disconnect()` pops and sets cancel event
+- `log_message()` handler: validates pod/namespace, cancels previous stream, starts new one
+- Backend function signature: `k8sPodLogsStream(username_role, user_token, namespace, pod_name, container, sid, cancel_event)`
+- No `join_pod_logs` event name — the current event IS `message` on `/log` namespace
 
 **Constraints:**
-- Must be compatible with existing `join_pod_logs` / `response` / `disconnect` event protocol
-- Must respect per-user K8s token scoping (no new access patterns)
+- Must maintain compatibility with existing backend Socket.IO `/log` namespace
+- Must use xterm.js v4.11.0 already in vendor (NOT v5.x — upgrade would be separate work)
 - Must work within Server-rendered Flask + Jinja2 + AJAX paradigm
-- Must not require new npm build step (use vanilla JS or existing dependencies)
+- Must stay CSP-compliant (nonce-based inline scripts, no eval)
+- The current template uses `socket.send()` which is the Socket.IO `message` event shorthand
 
 ## Architecture
 
@@ -375,33 +402,48 @@ class MultiPodAggregator {
 
 ### Single Pod Log Streaming
 
+The actual implementation flow (updated for real backend):
+
 ```
 User clicks "View Logs" on Pod detail page
     │
     ▼
-UI Template: Jinja2 renders log view page
-with embedded LogViewer.js configuration
+UI Template: pod-log.html.j2 renders page with inline JS
+  - Loads xterm.js v4.11.0 + FitAddon + WebLinksAddon + SearchAddon
+  - Creates term = new Terminal({scrollback: 10000})
+  - socket = io.connect('/log')
     │
     ▼
-LogViewer.connect(pod, container, namespace)
+Container selector loads containers via:
+  GET /api/v1/workloads/pods/{pod_name}/containers?namespace={ns}
+  → Response: {data: {containers: [...], init_containers: [...]}}
     │
     ▼
-Socket.IO emit: join_pod_logs({podName, container, namespace})
+socket.send(podName, containerName)   // sends 'message' event on /log namespace
     │
     ▼
-Flask: Socket.IO handler validates namespace access
-starts get_pod_logs(follow=True) background thread
+Backend: log_message() handler in workload.py
+  - Validates pod_name via validate_pod_name()
+  - Validates namespace via validate_namespace()
+  - Cancels previous stream: log_cancel.pop(sid).set()
+  - Creates new threading.Event, stores in log_cancel[sid]
+  - socketio.start_background_task(k8sPodLogsStream, ..., sid, cancel_ev)
     │
     ▼
-K8s Log API streams lines → Flask buffer → emit("response", {text}) 
-with room=request.sid
+k8sPodLogsStream() in lib/k8s/workload.py:
+  - watch.Watch().stream(read_namespaced_pod_log, ..., tail_lines=100)
+  - For each line: socketio.emit("response", {data: str(line)}, room=sid)
     │
     ▼
-Browser: LogViewer.onLogLine(data) → LogBuffer.add() → applyFilter() → render()
+Browser: socket.on('response', msg => {
+  term.write(msg.data + "\r\n");
+  logBuffer.add(msg.data);
+  applyFilter();
+})
     │
-    ├─► LogFilter.matches() → show/hide based on level
-    ├─► LogSearch.active → highlight matches
-    └─► AutoScroll → scrollToBottom() or leave in place
+    ├─► LogFilter.matches() → show/hide based on level (DOM, not xterm)
+    ├─► LogSearch.active → highlight matches via DOM spans
+    └─► AutoScroll → term.scrollToBottom() or leave in place
 ```
 
 ### Multi-Pod Log Streaming

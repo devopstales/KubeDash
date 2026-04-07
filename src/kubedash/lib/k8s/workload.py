@@ -371,6 +371,87 @@ def k8sPodListGet(username_role, user_token, ns):
             ErrorHandler(logger, error, "get pod list - %s" % error.status)
         return POD_LIST
 
+def k8sWorkloadPodsGet(username_role, user_token, ns, kind, name):
+    """
+    Get pods for a specific workload (Deployment, StatefulSet, DaemonSet, ReplicaSet).
+    Returns pods with their containers info, filtered by owner reference.
+    """
+    k8sClientConfigGet(username_role, user_token)
+    POD_LIST = list()
+    
+    try:
+        # Map kind to API group
+        kind_map = {
+            'deployment': ('apps', 'Deployment'),
+            'deployments': ('apps', 'Deployment'),
+            'statefulset': ('apps', 'StatefulSet'),
+            'statefulsets': ('apps', 'StatefulSet'),
+            'daemonset': ('apps', 'DaemonSet'),
+            'daemonsets': ('apps', 'DaemonSet'),
+            'replicaset': ('apps', 'ReplicaSet'),
+            'replicasets': ('apps', 'ReplicaSet'),
+        }
+        
+        if kind.lower() not in kind_map:
+            return {"error": f"Unsupported kind: {kind}"}, 400
+        
+        # Get all pods in namespace
+        pod_list = k8s_client.CoreV1Api().list_namespaced_pod(ns, _request_timeout=1)
+        
+        # Filter pods by owner reference
+        for pod in pod_list.items:
+            # Check if this pod belongs to the specified workload
+            is_owner = False
+            if pod.metadata.owner_references:
+                for owner in pod.metadata.owner_references:
+                    if owner.kind.lower() in kind.lower() and owner.name == name:
+                        is_owner = True
+                        break
+            
+            if not is_owner:
+                continue
+            
+            # Build pod summary
+            POD_SUM = {
+                "name": pod.metadata.name,
+                "status": pod.status.phase,
+                "namespace": ns,
+                "pod_ip": pod.status.pod_ip,
+                "containers": [],
+                "init_containers": []
+            }
+            
+            if pod.metadata.deletion_timestamp:
+                POD_SUM['status'] = "Terminating"
+            
+            # Update status from container states
+            if pod.status.container_statuses:
+                for cs in pod.status.container_statuses:
+                    if cs.state.waiting:
+                        POD_SUM["status"] = cs.state.waiting.reason
+                    elif cs.state.terminated:
+                        POD_SUM["status"] = cs.state.terminated.reason
+                    break
+            
+            # Add container names
+            if pod.spec.containers:
+                POD_SUM["containers"] = [c.name for c in pod.spec.containers]
+            
+            if pod.spec.init_containers:
+                POD_SUM["init_containers"] = [c.name for c in pod.spec.init_containers]
+            
+            POD_LIST.append(POD_SUM)
+        
+        return POD_LIST, 200
+        
+    except ApiException as error:
+        ErrorHandler(logger, error, f"get workload pods - {error.status}")
+        return {"error": str(error.reason)}, error.status
+    except Exception as error:
+        ErrorHandler(logger, error, "get workload pods")
+        return {"error": str(error)}, 500
+
+
 def k8sPodGet(username_role, user_token, ns, po):
     k8sClientConfigGet(username_role, user_token)
     POD_DATA = {}
@@ -599,6 +680,45 @@ def k8sPodLogsStream(username_role, user_token, namespace, pod_name, container, 
             logger.debug(f"Connection error in log stream (client likely disconnected): {error}")
         except Exception as error:
             ERROR = "k8sPodLogsStream: %s" % error
+            ErrorHandler(logger, "error", ERROR)
+        finally:
+            if cancel_event:
+                cancel_event.set()
+
+
+def k8sPodLogsStreamWithTail(username_role, user_token, namespace, pod_name, container, sid, cancel_event, tail_lines=100):
+    """
+    Stream pod logs with configurable tail_lines parameter.
+    Similar to k8sPodLogsStream but allows customizing how many historical lines to fetch.
+    """
+    app = get_flask_app()
+    with app.app_context():
+        k8sClientConfigGet(username_role, user_token)
+        try:
+            w = watch.Watch()
+            for line in w.stream(
+                    k8s_client.CoreV1Api().read_namespaced_pod_log,
+                    name=pod_name,
+                    namespace=namespace,
+                    container=container,
+                    tail_lines=tail_lines,
+                    _request_timeout=300
+                ):
+                if cancel_event and cancel_event.is_set():
+                    break
+                try:
+                    socketio.emit("response", {"data": str(line)}, room=sid, namespace="/log")
+                except (OSError, BrokenPipeError, ConnectionError) as emit_error:
+                    logger.debug(f"Socket emit error (client likely disconnected): {emit_error}")
+                    break
+                except Exception as emit_error:
+                    logger.warning(f"Unexpected error emitting socket message: {emit_error}")
+        except ApiException as error:
+            ErrorHandler(logger, error, "get logStream - %s" % error.status)
+        except (OSError, BrokenPipeError, ConnectionError) as error:
+            logger.debug(f"Connection error in log stream (client likely disconnected): {error}")
+        except Exception as error:
+            ERROR = "k8sPodLogsStreamWithTail: %s" % error
             ErrorHandler(logger, "error", ERROR)
         finally:
             if cancel_event:

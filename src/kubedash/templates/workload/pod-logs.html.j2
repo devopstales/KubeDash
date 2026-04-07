@@ -1,0 +1,408 @@
+{% extends "base2.html.j2" %}
+
+{% block topmenu %}
+<ul class="header-nav d-lg-flex m-3">
+    <div class="container-fluid px-4">
+      <nav aria-label="breadcrumb">
+        <ol class="breadcrumb my-0">
+          <li class="breadcrumb-item"><span>Workloads</span></li>
+          <li class="breadcrumb-item"><span>Pods</span></li>
+          <li class="breadcrumb-item">
+            <div class="d-flex">
+              <form action="/workload/pods/data" method="POST" class="form-post inline-form" data-namespace-session-key="ns_select" data-namespace-value="{{ session['ns_select'] }}">
+                <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+                <input type="hidden" name="ns_select" value="{{ session['ns_select'] }}" />
+                <input type="hidden" name="po_name" value="{{ po_name }}" />
+                <a href="#" class="form-submit-link">{{ po_name }}</a>
+              </form>
+            </div>
+          </li>
+          <li class="breadcrumb-item active"><span>Logs</span></li>
+        </ol>
+      </nav>
+    </div>
+</ul>
+<ul class="header-nav ms-auto"></ul>
+<ul class="header-nav d-lg-flex">
+{% include "segments/partials/topmenu.html.j2" %}
+{% endblock %}
+
+{% block content %}
+<div class="card log-viewer-card"
+     data-pod-name="{{ po_name | e }}"
+     data-namespace="{{ session['ns_select'] | e }}"
+     data-initial-container="{{ container_select | default('', true) | e }}"
+     data-feature-enabled="{{ feature_enabled | default('true', true) | e }}">
+    <div id="log-toolbar" class="log-toolbar">
+      <div class="toolbar-row">
+        <div class="toolbar-group">
+          <label for="container-select" class="toolbar-label">Container</label>
+          <select id="container-select" class="form-select form-select-sm" aria-label="Select Container">
+            <option value="" selected disabled>Loading...</option>
+          </select>
+        </div>
+
+        <div class="toolbar-group">
+          <label class="toolbar-checkbox">
+            <input type="checkbox" id="auto-scroll-toggle" checked />
+            Auto-scroll
+          </label>
+        </div>
+
+        <div class="toolbar-group">
+          <label class="toolbar-checkbox">
+            <input type="checkbox" id="timestamp-toggle" checked />
+            Timestamps
+          </label>
+        </div>
+
+        <div class="toolbar-group">
+          <label for="level-filter" class="toolbar-label">Level</label>
+          <div id="level-filter" class="level-filter-dropdown">
+            <button type="button" class="btn btn-sm btn-outline-secondary dropdown-toggle" data-coreui-toggle="dropdown" aria-expanded="false">
+              All Levels
+            </button>
+            <ul class="dropdown-menu level-filter-menu">
+              <li><label class="dropdown-item level-checkbox-label"><input type="checkbox" class="level-cb" value="ERROR" checked /> <span class="level-badge level-error">ERROR</span></label></li>
+              <li><label class="dropdown-item level-checkbox-label"><input type="checkbox" class="level-cb" value="WARN" checked /> <span class="level-badge level-warn">WARN</span></label></li>
+              <li><label class="dropdown-item level-checkbox-label"><input type="checkbox" class="level-cb" value="INFO" checked /> <span class="level-badge level-info">INFO</span></label></li>
+              <li><label class="dropdown-item level-checkbox-label"><input type="checkbox" class="level-cb" value="DEBUG" checked /> <span class="level-badge level-debug">DEBUG</span></label></li>
+              <li><label class="dropdown-item level-checkbox-label"><input type="checkbox" class="level-cb" value="FATAL" checked /> <span class="level-badge level-fatal">FATAL</span></label></li>
+              <li class="dropdown-divider"></li>
+              <li><label class="dropdown-item level-checkbox-label"><input type="checkbox" class="level-cb" value="UNKNOWN" checked /> Unknown</label></li>
+            </ul>
+          </div>
+        </div>
+
+        <div class="toolbar-group toolbar-flex-grow">
+          <div class="search-bar">
+            <input type="text" id="search-input" class="form-control form-control-sm" placeholder="Search logs..." />
+            <span id="search-match-count" class="search-match-count"></span>
+            <button type="button" id="search-prev" class="btn btn-sm btn-outline-secondary" title="Previous match" disabled>&#9650;</button>
+            <button type="button" id="search-next" class="btn btn-sm btn-outline-secondary" title="Next match" disabled>&#9660;</button>
+            <button type="button" id="search-clear" class="btn btn-sm btn-outline-secondary" title="Clear search" disabled>&times;</button>
+          </div>
+        </div>
+
+        <div class="toolbar-group">
+          <button type="button" id="export-btn" class="btn btn-sm btn-outline-secondary" title="Export logs">Export</button>
+          <div class="dropdown d-inline">
+            <button type="button" class="btn btn-sm btn-outline-secondary dropdown-toggle" data-coreui-toggle="dropdown" aria-expanded="false" id="export-format-dropdown">
+              Text
+            </button>
+            <ul class="dropdown-menu dropdown-menu-end">
+              <li><a class="dropdown-item export-format-link" href="#" data-format="text">Text (.log)</a></li>
+              <li><a class="dropdown-item export-format-link" href="#" data-format="json">JSON (.jsonl)</a></li>
+            </ul>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <div id="log-content" class="log-content" tabindex="0"></div>
+
+    <div id="log-status-bar" class="log-status-bar">
+      <div class="status-left">
+        <span id="connection-status" class="status-indicator status-connecting">Connecting...</span>
+        <span id="buffer-usage" class="buffer-usage"></span>
+      </div>
+      <div class="status-right">
+        <span id="line-count" class="line-count"></span>
+        <button type="button" id="reconnect-btn" class="btn btn-sm btn-link status-reconnect" style="display: none;">Reconnect</button>
+      </div>
+    </div>
+</div>
+
+<!-- Hidden export form for triggering downloads -->
+<a id="download-link" style="display: none;"></a>
+{% endblock %}
+
+{% block add_head_css %}
+{% include "segments/components/datatable_snippet.html.j2" %}
+{% include "segments/components/socket_snippet.html.j2" %}
+<style nonce="{{ csp_nonce }}">
+.log-viewer-card {
+  display: flex;
+  flex-direction: column;
+  height: calc(100vh - 200px);
+  min-height: 400px;
+}
+
+.log-toolbar {
+  display: flex;
+  gap: 8px;
+  padding: 8px 12px;
+  border-bottom: 1px solid var(--border-color, #303b4a);
+  background: var(--surface-color, #1e2a3a);
+  flex-wrap: wrap;
+  align-items: flex-end;
+}
+
+.toolbar-row {
+  display: flex;
+  gap: 12px;
+  width: 100%;
+  align-items: flex-end;
+  flex-wrap: wrap;
+}
+
+.toolbar-group {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+
+.toolbar-flex-grow {
+  flex: 1;
+  min-width: 200px;
+}
+
+.toolbar-label {
+  font-size: 11px;
+  color: var(--text-muted, #8a96a3);
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+}
+
+.toolbar-checkbox {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  font-size: 13px;
+  cursor: pointer;
+  padding-top: 18px;
+}
+
+.toolbar-checkbox input[type="checkbox"] {
+  margin: 0;
+}
+
+.level-filter-dropdown {
+  position: relative;
+}
+
+.level-filter-menu {
+  min-width: 140px;
+  padding: 4px 0;
+}
+
+.level-checkbox-label {
+  padding: 2px 12px;
+  cursor: pointer;
+}
+
+.level-checkbox-label input {
+  margin-right: 6px;
+}
+
+.level-badge {
+  font-weight: 600;
+  font-size: 11px;
+  padding: 1px 5px;
+  border-radius: 3px;
+}
+
+.level-error { color: #f85149; }
+.level-warn { color: #d29922; }
+.level-info { color: #58a6ff; }
+.level-debug { color: #8b949e; }
+.level-fatal { color: #f47067; }
+
+.search-bar {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+}
+
+.search-match-count {
+  font-size: 12px;
+  color: var(--text-muted, #8a96a3);
+  white-space: nowrap;
+  min-width: 60px;
+}
+
+.log-content {
+  flex: 1;
+  overflow-y: auto;
+  font-family: 'Cascadia Code', 'Fira Code', 'JetBrains Mono', 'Courier New', monospace;
+  font-size: 13px;
+  line-height: 1.5;
+  background: #0d1117;
+  color: #c9d1d9;
+  padding: 8px;
+  scroll-behavior: smooth;
+}
+
+.log-line {
+  display: flex;
+  gap: 8px;
+  padding: 1px 4px;
+  border-radius: 2px;
+  white-space: pre-wrap;
+  word-break: break-word;
+}
+
+.log-line:hover {
+  background: rgba(255, 255, 255, 0.05);
+}
+
+.log-line.hidden-by-filter {
+  display: none;
+}
+
+.log-timestamp {
+  color: #8b949e;
+  user-select: none;
+  white-space: nowrap;
+  flex-shrink: 0;
+}
+
+.log-timestamp.hidden {
+  display: none;
+}
+
+.log-pod-name {
+  font-weight: 600;
+  white-space: nowrap;
+  flex-shrink: 0;
+}
+
+.log-message {
+  flex: 1;
+}
+
+.log-level-error .log-message { color: #f85149; }
+.log-level-warn .log-message  { color: #d29922; }
+.log-level-fatal .log-message { color: #f47067; }
+.log-level-info .log-message  { color: #58a6ff; }
+.log-level-debug .log-message { color: #8b949e; }
+
+.search-match {
+  background: rgba(187, 128, 9, 0.4);
+  border-radius: 2px;
+}
+
+.search-match-current {
+  background: rgba(187, 128, 9, 0.7);
+  outline: 2px solid #d29922;
+}
+
+.log-status-bar {
+  display: flex;
+  justify-content: space-between;
+  padding: 4px 12px;
+  font-size: 12px;
+  color: var(--text-muted, #8a96a3);
+  border-top: 1px solid var(--border-color, #303b4a);
+  background: var(--surface-color, #1e2a3a);
+}
+
+.status-left, .status-right {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
+
+.status-indicator {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+}
+
+.status-indicator::before {
+  content: '';
+  display: inline-block;
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+}
+
+.status-connecting::before { background: #d29922; animation: pulse 1s infinite; }
+.status-streaming::before { background: #3fb950; }
+.status-disconnected::before { background: #8b949e; }
+.status-error::before { background: #f85149; }
+.status-completed::before { background: #58a6ff; }
+
+@keyframes pulse {
+  0%, 100% { opacity: 1; }
+  50% { opacity: 0.4; }
+}
+
+.buffer-usage.warning {
+  color: #d29922;
+  font-weight: 600;
+}
+
+.buffer-usage.critical {
+  color: #f85149;
+  font-weight: 600;
+}
+
+.line-count {
+  white-space: nowrap;
+}
+
+/* Dark mode compatibility */
+[data-coreui-theme="dark"] .log-toolbar {
+  background: var(--surface-color, #1e2a3a);
+  border-color: #303b4a;
+}
+
+[data-coreui-theme="dark"] .log-content {
+  background: #0d1117;
+  color: #c9d1d9;
+}
+
+[data-coreui-theme="light"] .log-content {
+  background: #ffffff;
+  color: #24292f;
+}
+
+[data-coreui-theme="light"] .log-timestamp {
+  color: #57606a;
+}
+
+[data-coreui-theme="light"] .log-line:hover {
+  background: rgba(0, 0, 0, 0.05);
+}
+
+/* Responsive layout for tablets */
+@media (max-width: 992px) {
+  .log-toolbar {
+    padding: 6px 8px;
+  }
+
+  .toolbar-row {
+    gap: 8px;
+  }
+
+  .toolbar-group {
+    min-width: auto;
+  }
+
+  .toolbar-flex-grow {
+    width: 100%;
+    order: -1;
+  }
+
+  .search-bar {
+    width: 100%;
+  }
+
+  #search-input {
+    flex: 1;
+  }
+}
+</style>
+{% endblock %}
+
+{% block add_tail_js %}
+    <script src="{{ url_for('static', filename='js/log_viewer/log_level_detector.js') }}"></script>
+    <script src="{{ url_for('static', filename='js/log_viewer/log_buffer.js') }}"></script>
+    <script src="{{ url_for('static', filename='js/log_viewer/log_filter.js') }}"></script>
+    <script src="{{ url_for('static', filename='js/log_viewer/log_renderer.js') }}"></script>
+    <script src="{{ url_for('static', filename='js/log_viewer/log_search.js') }}"></script>
+    <script src="{{ url_for('static', filename='js/log_viewer/log_exporter.js') }}"></script>
+    <script src="{{ url_for('static', filename='js/log_viewer/log_viewer.js') }}"></script>
+    <script src="{{ url_for('static', filename='js/log_viewer/log_init.js') }}"></script>
+{% endblock %}

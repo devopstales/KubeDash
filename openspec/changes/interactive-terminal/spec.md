@@ -2,16 +2,17 @@
 
 ### Requirement: xterm.js Terminal Integration
 
-The system SHALL embed an interactive terminal using xterm.js (v5.x) for pod exec sessions. The terminal SHALL provide:
+The system SHALL embed an interactive terminal using xterm.js (v4.11.0 — already in vendor) for pod exec sessions. The terminal SHALL provide:
 
 - Full TTY emulation with proper cursor control, colors, and keyboard handling
-- WebLinks addon for clickable URLs in terminal output
-- FitAddon for responsive terminal sizing (terminal fills container)
+- WebLinks addon for clickable URLs in terminal output (already loaded, not invoked from template)
+- FitAddon for responsive terminal sizing (terminal fills container — already working)
+- SearchAddon for text search within terminal output (already loaded, not invoked from template)
 - Custom shell theme matching KubeDash's visual design (dark background, readable colors)
 - Configurable font size with Ctrl+Plus/Minus zoom
 - Configurable font family (monospace default, with fallbacks)
 
-The terminal SHALL connect to the existing Socket.IO `/exec` namespace using the established `pod_exec` / `response` / `exec-input` / `closed` / `stop` event protocol.
+The terminal SHALL connect to the existing Socket.IO `/exec` namespace using the established `message` (for exec start) / `response` / `exec-input` / `closed` / `stop` event protocol. The current implementation already uses `socket.send(podName, containerName)` for the message event — this SHALL continue unchanged.
 
 #### Scenario: Open terminal session
 - **WHEN** user opens a terminal for a pod/container
