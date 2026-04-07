@@ -34,13 +34,20 @@ def initialize_app_configuration(app: Flask, external_config_name: str) -> bool:
     app.logger.info("Initializing app configuration")
 
     config_ini = configparser.ConfigParser()
+    minimal_config_mode = False
 
     if os.path.isfile("kubedash.ini"):
         app.logger.info("Reading Config file")
         config_ini.read('kubedash.ini')
     else:
-        app.logger.warning("Config file kubedash.ini not found, using defaults")
-        # Set default configuration
+        minimal_config_mode = True
+        app.logger.warning(
+            "Config file kubedash.ini not found — entering minimal-config mode.\n"
+            "KubeDash is starting with built-in defaults (SQLite, no Redis, no OIDC).\n"
+            "This is safe for local development but NOT recommended for production.\n"
+            "To use full configuration, create a kubedash.ini file."
+        )
+        # Set default configuration for minimal-config mode
         config_ini['DEFAULT'] = {'app_mode': 'development'}
         config_ini['logging'] = {'format': 'text', 'level': 'INFO'}
         config_ini['audit'] = {'enabled': 'true'}
@@ -80,6 +87,30 @@ def initialize_app_configuration(app: Flask, external_config_name: str) -> bool:
             'cert_manager': 'false',
             'ai_chat': 'false'
         }
+        # Disable OIDC and external auth in minimal mode
+        config_ini['oidc'] = {
+            'enabled': 'false',
+            'issuer': '',
+            'client_id': '',
+            'client_secret': '',
+            'redirect_uri': '',
+            'scope': 'openid email profile'
+        }
+        config_ini['kubernetes'] = {
+            'auth_mode': 'kubeconfig',
+            'in_cluster': 'false'
+        }
+
+    # Set MINIMAL_CONFIG flag for use by other modules
+    app.config['MINIMAL_CONFIG'] = minimal_config_mode
+
+    if minimal_config_mode:
+        # Clear stale K8s config from database (left over from previous kubedash.ini run)
+        try:
+            from lib.k8s.server import k8sServerConfigDelete
+            k8sServerConfigDelete()
+        except Exception:
+            pass  # No existing config to delete, or DB not ready yet
 
     app.config['kubedash.ini'] = config_ini
 
@@ -97,6 +128,22 @@ def initialize_app_configuration(app: Flask, external_config_name: str) -> bool:
     app.logger.info("Integrations:")
     app.logger.info("	Redis:	%s" % bool_var_test(app.config['kubedash.ini'].get('remote_cache', 'redis_enabled')))
     app.logger.info("	Jaeger:	%s" % bool_var_test(app.config['kubedash.ini'].get('monitoring', 'jaeger_enabled')))
+
+    if minimal_config_mode:
+        from lib.minimal_config import get_minimal_db_path
+        from lib.prometheus import METRIC_CONFIG_MODE
+        db_path = get_minimal_db_path()
+        app.logger.info("Minimal-config mode summary:")
+        app.logger.info("  Database: SQLite at %s", db_path)
+        app.logger.info("  Redis: disabled")
+        app.logger.info("  OIDC: disabled")
+        app.logger.info("  Leader election: disabled")
+        app.logger.info("  Replica mode: single (forced)")
+        app.logger.info("To use full configuration, create a kubedash.ini file.")
+        METRIC_CONFIG_MODE.labels(mode='minimal').set(2)
+    else:
+        from lib.prometheus import METRIC_CONFIG_MODE
+        METRIC_CONFIG_MODE.labels(mode='full').set(1)
 
     app.logger.info(separator_short)
 
@@ -160,5 +207,12 @@ def initialize_app_version(app: Flask):
     version: {RED}{kubedash_version}{RESET}
 """
 
-    app.logger.info("Initializing app Logo\n" + separator_long + "\n" + LOGO + "\n" + separator_long)
+    # Use sys.stderr.write() to guarantee the logo appears regardless of logging state
+    import sys
+    sys.stderr.write(f"\n{separator_long}\n")
+    sys.stderr.write(LOGO)
+    sys.stderr.write(f"{separator_long}\n\n")
+    sys.stderr.flush()
+
+    app.logger.info("Initializing app Logo")
     app.logger.info("Running in %s mode" % app.config['ENV'])

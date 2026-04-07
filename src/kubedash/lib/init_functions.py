@@ -236,10 +236,16 @@ def init_db_test(app) -> bool:
     
 def oidc_init(config: configparser.ConfigParser):
     """Store OIDC configuration in database. Test the OIDC connection and add resoults to prometheus endpoint.
-    
+
     Args:
         config (configparser.ConfigParser): Configuration
     """
+    # Skip OIDC in minimal-config mode
+    from flask import has_app_context, current_app
+    if has_app_context() and current_app.config.get('MINIMAL_CONFIG'):
+        logger.info("OIDC disabled in minimal-config mode")
+        return
+
     # https://github.com/requests/requests-oauthlib/issues/387
     os.environ['OAUTHLIB_RELAX_TOKEN_SCOPE'] = "1"
     OIDC_ISSUER_URL   = config.get('sso_settings', 'issuer_url', fallback=None)
@@ -319,10 +325,16 @@ def oidc_init(config: configparser.ConfigParser):
 
 def k8s_config_int(config: configparser.ConfigParser):
     """Store K8S Api connection configuration in database. Test the K8S API Connection and add resoults to prometheus endpoint.
-    
+
     Args:
         config (configparser.ConfigParser): Configuration
     """
+    # Skip K8s config in minimal-config mode
+    from flask import has_app_context, current_app
+    if has_app_context() and current_app.config.get('MINIMAL_CONFIG'):
+        logger.info("Kubernetes config disabled in minimal-config mode")
+        return
+
     K8S_CLUSTER_NAME = config.get('k8s', 'cluster_name', fallback="k8s-main")
     K8S_API_SERVER   = config.get('k8s', 'api_server', fallback=None)
 

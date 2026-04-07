@@ -198,12 +198,16 @@ class ReadinessResource(MethodView):
         # Import replica mode function
         from lib.replica_mode import get_replica_mode
         from flask import current_app
-        
+
+        # Determine config mode
+        config_mode = 'minimal' if current_app.config.get('MINIMAL_CONFIG') else 'full'
+
         return {
             'database': database_status,
             'oidc': oidc_test,
             'kubernetes': k8s_status,
-            'replica_mode': get_replica_mode(current_app)
+            'replica_mode': get_replica_mode(current_app),
+            'config_mode': config_mode
         }, code
 
 ##############################################################

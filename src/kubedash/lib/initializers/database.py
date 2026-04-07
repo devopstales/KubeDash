@@ -8,6 +8,21 @@ from sqlalchemy import create_engine, text
 from opentelemetry.instrumentation.sqlalchemy import SQLAlchemyInstrumentor
 
 
+def _setup_minimal_database(app: Flask) -> str:
+    """Set up SQLite database for minimal-config mode.
+
+    Returns:
+        str: The SQLite database URI that was configured.
+    """
+    from lib.minimal_config import get_minimal_db_path
+
+    db_path = get_minimal_db_path()
+    db_uri = f"sqlite:///{db_path}"
+    app.config['SQLALCHEMY_DATABASE_URI'] = db_uri
+    app.logger.info("   Minimal-config mode: using SQLite at %s", db_path)
+    return db_uri
+
+
 def initialize_app_database(app: Flask, filename: str):
     """Initialize the database
 
@@ -25,15 +40,20 @@ def initialize_app_database(app: Flask, filename: str):
     app.logger.info("   Get Database Configuration")
     app.config['SESSION_SQLALCHEMY'] = db
 
-    # Get database URL - this will use PostgreSQL if configured, even in testing mode
-    app.config['SQLALCHEMY_DATABASE_URI'] = get_database_url(app, filename)
-    database_uri = app.config['SQLALCHEMY_DATABASE_URI']
-
-    # Determine actual database type from the URI
-    if database_uri.startswith('postgresql://') or database_uri.startswith('postgresql+'):
-        database_type = 'postgres'
-    else:
+    # Check if we're in minimal-config mode (no kubedash.ini)
+    if app.config.get('MINIMAL_CONFIG'):
+        database_uri = _setup_minimal_database(app)
         database_type = 'sqlite3'
+    else:
+        # Get database URL - this will use PostgreSQL if configured, even in testing mode
+        app.config['SQLALCHEMY_DATABASE_URI'] = get_database_url(app, filename)
+        database_uri = app.config['SQLALCHEMY_DATABASE_URI']
+
+        # Determine actual database type from the URI
+        if database_uri.startswith('postgresql://') or database_uri.startswith('postgresql+'):
+            database_type = 'postgres'
+        else:
+            database_type = 'sqlite3'
 
     """Test Database Connection"""
     app.logger.info("   Test Database Connection")

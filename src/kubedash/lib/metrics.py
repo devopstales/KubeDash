@@ -129,7 +129,10 @@ def update_metrics(app: Flask, db: SQLAlchemy, window: int):
         db (SQLAlchemy): SQLAlchemy object
         window (int): Duration in hours to keep metrics in the DB
     """
-    
+    # Skip metrics collection in minimal-config mode (no K8s cluster)
+    if app.config.get('MINIMAL_CONFIG'):
+        return
+
     start_time = time.time()
     nodeMetrics = getNodeMetrics()
     podMetrics  = getPodMetrics()
@@ -149,13 +152,15 @@ def update_metrics(app: Flask, db: SQLAlchemy, window: int):
 from functools import partial
 
 def initialize_metrics_scraper(app: Flask):
-    """Initialize the metrics scraper with a 300-second interval
-    
-    Args:
-        app (Flask): Flask app object
+    """Initialize the metrics scraper with a 300-second interval.
+    Skipped in minimal-config mode (no K8s cluster available).
     """
+    if app.config.get('MINIMAL_CONFIG'):
+        app.logger.info("Metrics scraper disabled in minimal-config mode")
+        return
+
     ticker = ThreadedTicker(
-        interval_sec=300, 
+        interval_sec=300,
         func=partial(update_metrics, app, db, 30)
         )
     ticker.start()

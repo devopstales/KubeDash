@@ -1,11 +1,17 @@
 import os
 
 basedir = os.path.abspath(os.path.dirname(__file__))
+
 class Config(object):
     """
     Common configurations
+
+    Configuration precedence (highest to lowest):
+    1. Environment variables (e.g. DATABASE_URL, SESSION_REDIS_URL)
+    2. kubedash.ini file (if present)
+    3. Built-in defaults (used in minimal-config mode when kubedash.ini is absent)
     """
-    # sqlAlchemi config   
+    # sqlAlchemi config
     SQLALCHEMY_TRACK_MODIFICATIONS = False
     # apiflask config
     DOCS_FAVICON = "/vendor/wagger-ui@5.0/favicon.svg"
@@ -38,6 +44,25 @@ class Config(object):
     CORS_HEADERS = 'Content-Type'
     SECRET_KEY = "develop"
     WTF_CSRF_ENABLED = True
+
+
+class MinimalConfig(Config):
+    """
+    Minimal configuration for zero-config startup (no kubedash.ini).
+
+    In minimal-config mode:
+    - SQLite is used as the database (default path determined by get_minimal_db_path())
+    - Redis sessions are disabled
+    - OIDC/external auth is disabled
+    - Leader election is disabled
+    - Only single-replica mode is supported
+    """
+    # Force SQLite in minimal mode (URI set dynamically by database initializer)
+    SQLALCHEMY_DATABASE_URI = None
+    SESSION_TYPE = "sqlalchemy"
+    SESSION_REDIS_URL = None
+    REPLICA_MODE = "single"
+    LEADER_ELECTION_ENABLED = False
 
 class DevelopmentConfig(Config):
     """

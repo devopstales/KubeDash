@@ -110,3 +110,13 @@ METRIC_REPLICA_DESIRED = Gauge(
     'kubedash_replica_desired',
     'Desired number of replicas'
 )
+
+##############################################################
+## Config Mode Metric (minimal-config-startup)
+##############################################################
+
+METRIC_CONFIG_MODE = Gauge(
+    'kubedash_config_mode',
+    'Configuration mode (1=full, 2=minimal)',
+    ['mode']
+)
