@@ -27,3 +27,21 @@ $ kubectl kdlogin /
 Configfile created with config for productioncluster to ~/.kube/config
 Happy Kubernetes interaction!
 ```
+
+### When the server cannot reach your machine
+
+If KubeDash cannot push the kubeconfig to the plugin (NAT, firewall, or the local listener is not running), complete browser login and use the **one-time code** shown on the success page:
+
+```bash
+kubectl kdlogin --code YOUR_CODE --base-url https://your-kubedash.example.com
+```
+
+`--base-url` is the same origin you use in the browser (no trailing path required). The code expires after a few minutes and works once.
+
+### Custom local port
+
+If port 8080 is in use, run the plugin on another port and pass it on the kdlogin URL (KubeDash appends `?port=` when opening the browser):
+
+```bash
+kubectl kdlogin --port 9090 https://your-kubedash.example.com/path/to/kdlogin
+```

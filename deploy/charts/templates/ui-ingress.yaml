@@ -17,6 +17,8 @@ metadata:
     nginx.ingress.kubernetes.io/proxy-body-size: "10m"
     nginx.ingress.kubernetes.io/proxy-read-timeout: "3600"
     nginx.ingress.kubernetes.io/proxy-send-timeout: "3600"
+    # Trust X-Forwarded-* from an outer load balancer / host nginx (do not strip the chain).
+    nginx.ingress.kubernetes.io/use-forwarded-headers: "true"
     nginx.ingress.kubernetes.io/server-snippets: |
       proxy_ssl_verify off;
       location / {
@@ -24,7 +26,8 @@ metadata:
         proxy_http_version 1.1;
         proxy_set_header X-Forwarded-Host $http_host;
         proxy_set_header X-Forwarded-Proto $scheme;
-        proxy_set_header X-Forwarded-For $remote_addr;
+        proxy_set_header X-Real-IP $remote_addr;
+        proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
         proxy_set_header Host $host;
         proxy_set_header Connection "upgrade";
         proxy_set_header X-Request-ID $request_id;

@@ -5,7 +5,7 @@ from lib.helper_functions import ErrorHandler
 from lib.components import cache, short_cache_time, long_cache_time
 
 from . import logger, tracer
-from .server import k8sClientConfigGet
+from .server import is_k8s_unreachable_exception, k8sClientConfigGet
 
 ##############################################################
 ## Variables
@@ -58,7 +58,19 @@ def get_custom_resources(username_role, user_token):
                 if error.status != 404:
                     ErrorHandler(logger, error, "get_custom_resources - %s " % error.status)
             except Exception as error:
-                ErrorHandler(logger, "CannotConnect", f"get_custom_resources for {group_name}/{version}: {error}")
+                if is_k8s_unreachable_exception(error):
+                    logger.warning(
+                        "Cannot connect to Kubernetes (get_custom_resources %s/%s): %s",
+                        group_name,
+                        version,
+                        error,
+                    )
+                else:
+                    ErrorHandler(
+                        logger,
+                        error,
+                        f"get_custom_resources for {group_name}/{version}: {error}",
+                    )
     
     return crd_list
 
@@ -151,6 +163,18 @@ def get_custom_resource_data(username_role, user_token, namespace, crd_name, crd
             # Return None to indicate an error (not just empty results)
             return None
     except Exception as error:
-        ErrorHandler(logger, "CannotConnect", f"get_custom_resource_data for {crd_group}/{crd_version}/{crd_name} in namespace {namespace}: {error}")
-        # Return None to indicate an error
+        if is_k8s_unreachable_exception(error):
+            logger.warning(
+                "Cannot connect to Kubernetes (get_custom_resource_data %s/%s/%s): %s",
+                crd_group,
+                crd_version,
+                crd_name,
+                error,
+            )
+        else:
+            ErrorHandler(
+                logger,
+                error,
+                f"get_custom_resource_data for {crd_group}/{crd_version}/{crd_name} in namespace {namespace}: {error}",
+            )
         return None

@@ -8,9 +8,9 @@ metadata:
 spec:
   ports:
   - name: http
-    port: 8000
+    port: 8765
     protocol: TCP
-    targetPort: 8000
+    targetPort: 8765
   selector:
     app: kubedash
   sessionAffinity: None

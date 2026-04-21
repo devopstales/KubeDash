@@ -366,7 +366,7 @@ def initialize_blueprints(app: Flask):
     app.register_blueprint(storage_bp)
     app.register_blueprint(security_bp)
     app.register_blueprint(other_resources_bp)
-    app.register_blueprint(settings_bp)    
+    app.register_blueprint(settings_bp)
 
 def initialize_commands(app: Flask):
     """Initialize commands"""

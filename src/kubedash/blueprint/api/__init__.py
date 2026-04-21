@@ -41,6 +41,7 @@ from blueprint.api.other_resources import other_resources_api_bp
 from blueprint.api.users import users_api_bp
 from blueprint.api.settings import settings_api_bp
 from blueprint.api.audit import audit_api_bp
+from blueprint.api.kdlogin import kdlogin_api_bp
 
 # Register all sub-blueprints
 api_v1_bp.register_blueprint(cluster_api_bp)
@@ -56,6 +57,7 @@ api_v1_bp.register_blueprint(other_resources_api_bp)
 api_v1_bp.register_blueprint(users_api_bp)
 api_v1_bp.register_blueprint(settings_api_bp)
 api_v1_bp.register_blueprint(audit_api_bp)
+api_v1_bp.register_blueprint(kdlogin_api_bp)
 
 # Note: Plugin API blueprints are dynamically loaded in lib/initializers.initialize_plugin_apis()
 

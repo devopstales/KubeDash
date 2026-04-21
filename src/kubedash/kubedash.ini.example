@@ -49,9 +49,26 @@ redis_password =
 short_cache_time = 60
 long_cache_time = 900
 
+#################################### kdlogin (kubectl plugin) #################
+[kdlogin]
+# Timeouts (seconds) for server -> plugin HTTP (GET /info and POST kubeconfig)
+http_info_timeout_sec = 3
+http_post_timeout_sec = 5
+# When set, always use this hostname for server->kubectl-kdlogin push (overrides kdlogin_client and remote_addr).
+# Env KUBEDASH_KDLOGIN_CLIENT_PUSH_HOST overrides this.
+# If unset and the plugin sent ?kdlogin_client=, push uses that host only.
+# client_push_host =
+# Port the plugin listens on when not using ?port= on the kdlogin URL (default 8080)
+client_listen_port = 8080
+# One-time code exchange (when push to the plugin fails)
+exchange_code_ttl_sec = 300
+exchange_rate_limit_per_minute = 60
+
 #################################### SSO Settings ###########################
 [sso_settings]
 # OAuth2/OIDC configuration for SSO
+# TLS to the IdP: default verify with system CAs; if oauth_server_ca is set in the DB it is used as the CA bundle.
+# To disable TLS verification (dev only): environment KUBEDASH_OIDC_TLS_VERIFY=false
 issuer_url = https://auth.example.com/realms/myrealm
 callback_url = https://kubedash.example.com
 scope = roles email openid profile

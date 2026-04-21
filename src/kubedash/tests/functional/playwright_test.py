@@ -41,7 +41,7 @@ def test_login(playwright_browser):
     
     Note: This test requires:
     1. Playwright browsers installed (run `playwright install`)
-    2. The application running on http://127.0.0.1:8000/
+    2. The application running on http://127.0.0.1:8765/
     3. A test user with username/password: pytest/pytest
     
     This test is skipped by default as it requires a running server.
@@ -52,9 +52,9 @@ def test_login(playwright_browser):
     
     try:
         # Navigate to login page
-        # Note: This assumes the app is running on localhost:8000
+        # Note: This assumes the app is running on localhost:8765
         # In CI, this might need to be configured differently
-        page.goto("http://127.0.0.1:8000/", timeout=10000)
+        page.goto("http://127.0.0.1:8765/", timeout=10000)
         
         # Fill in login form
         page.get_by_placeholder("Username").click()

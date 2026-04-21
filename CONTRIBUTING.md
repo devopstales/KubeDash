@@ -74,7 +74,7 @@ cp kubedash.ini.example kubedash.ini
 poetry run python kubedash.py
 
 # Or using gunicorn
-poetry run gunicorn kubedash:app -b 0.0.0.0:8000 --reload
+poetry run gunicorn kubedash:app -b 0.0.0.0:8765 --reload
 ```
 
 ### Running Database Migrations

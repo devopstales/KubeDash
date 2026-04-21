@@ -11,7 +11,7 @@
       {
         "label": "killdebugger",
         "type": "shell",
-        "command": "lsof -t -i tcp:8000 | xargs kill -9"
+        "command": "lsof -t -i tcp:8765 | xargs kill -9"
     }
   ]
 }

@@ -1,9 +1,11 @@
 import json
+import secrets
+from ipaddress import ip_address as _validate_ip
+from urllib.parse import parse_qsl, urlencode, urlparse, urlunparse
 
-import requests
 import yaml
-from flask import (Blueprint, Response, flash, g, redirect, render_template,
-                   request, session, url_for)
+from flask import (Blueprint, Response, current_app, flash, g, redirect,
+                   render_template, request, session, url_for)
 from flask_login import login_required, login_user
 from itsdangerous import base64_decode, base64_encode
 
@@ -12,8 +14,21 @@ from lib.helper_functions import get_logger
 from lib.k8s.server import (k8sServerConfigCreate, k8sServerConfigDelete,
                             k8sServerConfigGet, k8sServerConfigList,
                             k8sServerConfigUpdate)
+from lib.kdlogin_exchange import (
+    SESSION_KDLOGIN_CODE_FROM_HANDOFF,
+    SESSION_KDLOGIN_CODE_SHOW,
+    SESSION_KDLOGIN_HANDOFF_ID,
+    pop_kdlogin_handoff_payload,
+    store_kdlogin_config_payload,
+    store_kdlogin_handoff_payload,
+)
+from lib.kdlogin_push import (KDLOGIN_FLOW_KDLOGIN, SESSION_KDLOGIN_CLIENT_HOST,
+                              SESSION_KDLOGIN_CLIENT_PORT, SESSION_OIDC_CLIENT_FLOW,
+                              client_ip_for_kdlogin_push, http_url_host_for_browser_handoff,
+                              resolve_kdlogin_listen_port, try_push_kubeconfig_to_kdlogin)
+from lib.oauth_pkce import generate_pkce_pair
 from lib.sso import (SSOSererGet, SSOServerCreate, SSOServerUpdate,
-                     get_auth_server_info)
+                     get_auth_server_info, oauth_tls_verify_value)
 from lib.user import (KubectlConfig, Role, SSOGroupCreateFromList,
                       SSOGroupsUpdateFromList, SSOTokenUpdate, SSOUserCreate,
                       User, UsersRoles)
@@ -21,6 +36,17 @@ from lib.user import (KubectlConfig, Role, SSOGroupCreateFromList,
 ##############################################################
 ## Helpers
 ##############################################################
+
+
+def _redact_oauth_callback_url(url: str) -> str:
+    """OAuth callback URL safe for logs (code/state values redacted)."""
+    p = urlparse(url)
+    q = [
+        (k, "<redacted>" if k in ("code", "state") else v)
+        for k, v in parse_qsl(p.query, keep_blank_values=True)
+    ]
+    return urlunparse((p.scheme, p.netloc, p.path, p.params, urlencode(q), p.fragment))
+
 
 settings_bp = Blueprint("settings", __name__, url_prefix="/settings")
 sso_bp = Blueprint("sso", __name__)
@@ -78,17 +104,27 @@ def callback():
             flash('Error encountered.', "danger")
     ssoServer = SSOSererGet()
     if ('code' not in request.args and 'state' not in request.args) or not ssoServer:
-        return redirect(url_for('sso.login'))
+        return redirect(url_for('auth.login'))
     else:
+        if request.args.get("state") != session.get("oauth_state"):
+            logger.warning(
+                "OIDC callback rejected: state mismatch or missing (remote=%s)",
+                request.remote_addr,
+            )
+            session.pop("oauth_code_verifier", None)
+            flash("Sign-in failed. Please try again.", "danger")
+            return redirect(url_for("auth.login"))
+
         auth_server_info, oauth = get_auth_server_info()
-        
+
         if auth_server_info is None:
             flash("Cannot connect to identity provider. Please try again later.", "danger")
             logger.error("Cannot connect to identity provider during callback - auth_server_info is None")
-            return redirect(url_for('login.login'))
-        
+            return redirect(url_for('auth.login'))
+
         token_url = auth_server_info["token_endpoint"]
         userinfo_url = auth_server_info["userinfo_endpoint"]
+        tls_verify = oauth_tls_verify_value(ssoServer)
 
         if (
             request.url.startswith("http://") and
@@ -98,61 +134,55 @@ def callback():
             request_url = request.url.replace("http", "https")
         else:
             request_url = request.url
-        logger.info("Request URL %s" % request_url)
 
+        code_verifier = session.pop("oauth_code_verifier", None)
         token = oauth.fetch_token(
             token_url,
-            authorization_response = request_url,
-            client_secret = ssoServer.client_secret,
-            timeout = 60,
-            verify = False,
+            authorization_response=request_url,
+            client_secret=ssoServer.client_secret,
+            timeout=60,
+            verify=tls_verify,
+            code_verifier=code_verifier,
         )
         user_data = oauth.get(
             userinfo_url,
-            timeout = 60,
-            verify = False,
+            timeout=60,
+            verify=tls_verify,
         ).json()
 
-        if request.environ.get('HTTP_X_FORWARDED_FOR') is None:
-            remote_addr = request.remote_addr
-        else:
-            remote_addr = request.environ['HTTP_X_FORWARDED_FOR']
+        remote_addr = client_ip_for_kdlogin_push(request)
 
-## Kubectl config
+        if session.get(SESSION_OIDC_CLIENT_FLOW) == KDLOGIN_FLOW_KDLOGIN:
+            logger.info(
+                "kdlogin OIDC callback url=%s client_ip_for_push=%s kdlogin_port=%s",
+                _redact_oauth_callback_url(request_url),
+                remote_addr,
+                session.get(SESSION_KDLOGIN_CLIENT_PORT),
+            )
+
+## Kubectl config (kdlogin push + one-time code fallback)
         k8sConfig = k8sServerConfigGet()
+        response_json = None
         if k8sConfig is None:
-            logger.error ("Kubectl Integration is not configured.")
+            logger.error("Kubectl Integration is not configured.")
         else:
             k8s_server_ca = str(base64_decode(k8sConfig.k8s_server_ca), 'UTF-8')
-            try:
-                i = requests.get('http://%s:8080/info' % remote_addr, timeout=1)
-                info = i.json()
-                response_json = {
-                                    "username": user_data["preferred_username"],
-                                    "context": k8sConfig.k8s_context,
-                                    "server": k8sConfig.k8s_server_url,
-                                    "certificate-authority-data": k8s_server_ca,
-                                    "client-id": ssoServer.client_id,
-                                    "id-token": token.get("id_token"),
-                                    "refresh-token": token.get("refresh_token"),
-                                    "idp-issuer-url": ssoServer.oauth_server_uri,
-                                    "client_secret": ssoServer.client_secret,
-                                }
-                if ssoServer.oauth_server_ca:
-                    response_json["idp-certificate-authority-data"] = ssoServer.oauth_server_ca
-                else:
-                    response_json["idp-certificate-authority-data"] = None
-                
-                if info.get("message") == "kdlogin":
-                    x = requests.post('http://%s:8080/' % remote_addr, json=response_json, timeout=5)
-                    logger.info("Config sent to client")
-                    logger.info("Answer from clinet: %s" % x.text)
-                else:
-                    logger.warning("NO config sent to client")
-                    logger.warning("Missing header")
-            except:
-                pass
-## Kubectl config end
+            response_json = {
+                "username": k8sConfig.k8s_context,
+                "context": k8sConfig.k8s_context,
+                "server": k8sConfig.k8s_server_url,
+                "certificate-authority-data": k8s_server_ca,
+                "client-id": ssoServer.client_id,
+                "id-token": token.get("id_token"),
+                "refresh-token": token.get("refresh_token"),
+                "idp-issuer-url": ssoServer.oauth_server_uri,
+                "client_secret": ssoServer.client_secret,
+            }
+            if ssoServer.oauth_server_ca:
+                response_json["idp-certificate-authority-data"] = ssoServer.oauth_server_ca
+            else:
+                response_json["idp-certificate-authority-data"] = None
+## Kubectl config end (push runs after login_user — see below)
 
         email = user_data['email']
         username = user_data["preferred_username"]
@@ -202,6 +232,52 @@ def callback():
             trace_id=getattr(g, "correlation_id", None),
             details={"method": "sso"},
         )
+
+        if (
+            session.get(SESSION_OIDC_CLIENT_FLOW) == KDLOGIN_FLOW_KDLOGIN
+            and response_json
+        ):
+            listen_port = resolve_kdlogin_listen_port(dict(session), current_app)
+            plugin_lan_hint = (session.get(SESSION_KDLOGIN_CLIENT_HOST) or "").strip()
+            logger.info(
+                "kdlogin: server-side push to plugin host %s (from kdlogin_client)",
+                plugin_lan_hint or "none",
+            )
+            push = try_push_kubeconfig_to_kdlogin(
+                current_app, session, remote_addr, response_json
+            )
+            if push.success:
+                logger.info(
+                    "kdlogin kubeconfig delivered to the plugin (server-side push)"
+                )
+                return redirect(url_for("sso.kdlogin_push_delivered"))
+            else:
+                handoff_host = http_url_host_for_browser_handoff(plugin_lan_hint)
+                if push.skipped:
+                    logger.warning(
+                        "kdlogin push skipped unexpectedly; using browser delivery page"
+                    )
+                else:
+                    logger.info(
+                        "kdlogin: server-side push did not complete (that path probes "
+                        "GET /info then POST / from KubeDash); loading browser delivery "
+                        "page that POSTs to http://%s:%s/ from the browser (no /info probe)",
+                        handoff_host,
+                        listen_port,
+                    )
+                hid = store_kdlogin_handoff_payload(current_app, response_json)
+                session[SESSION_KDLOGIN_HANDOFF_ID] = hid
+                return render_template(
+                    "settings/kdlogin-browser-handoff.html.j2",
+                    payload_json=response_json,
+                    listen_port=listen_port,
+                    handoff_host=handoff_host,
+                    next_url=url_for("sso.kdlogin_push_delivered"),
+                    fallback_url=url_for("sso.kdlogin_handoff_fallback"),
+                )
+
+        if session.get(SESSION_KDLOGIN_CODE_SHOW):
+            return redirect(url_for("sso.kdlogin_code"))
         return redirect(url_for('dashboard.cluster_metrics'))
     
 ##############################################################
@@ -241,27 +317,105 @@ def export():
     Data is now loaded client-side via JavaScript API calls.
     This route only renders the template structure.
     """
-    # Template now loads data via JavaScript from /api/v1/settings/export
-    return render_template('settings/export.html.j2')
+    # Same variable name as kdlogin-code.html.j2; value is a fresh example token per page load (not usable for exchange).
+    return render_template(
+        'settings/export.html.j2',
+        exchange_code=secrets.token_urlsafe(18),
+    )
 
 @sso_bp.route('/kdlogin')
 def index():
     auth_server_info, oauth = get_auth_server_info()
-    
+
     if auth_server_info is None:
         flash("Cannot connect to identity provider. Please try again later.", "danger")
         logger.error("Cannot connect to identity provider - auth_server_info is None")
-        return redirect(url_for('login.login'))
-    
+        return redirect(url_for('auth.login'))
+
+    session[SESSION_OIDC_CLIENT_FLOW] = "kdlogin"
+    port = request.args.get("port", type=int)
+    if port is not None and 1 <= port <= 65535:
+        session[SESSION_KDLOGIN_CLIENT_PORT] = port
+    else:
+        session.pop(SESSION_KDLOGIN_CLIENT_PORT, None)
+
+    client_hint = request.args.get("kdlogin_client") or request.args.get("client_ip")
+    if client_hint:
+        try:
+            _validate_ip(client_hint.strip())
+            session[SESSION_KDLOGIN_CLIENT_HOST] = client_hint.strip()
+        except ValueError:
+            session.pop(SESSION_KDLOGIN_CLIENT_HOST, None)
+    else:
+        session.pop(SESSION_KDLOGIN_CLIENT_HOST, None)
+
     auth_url = auth_server_info["authorization_endpoint"]
+    code_verifier, code_challenge = generate_pkce_pair()
+    session["oauth_code_verifier"] = code_verifier
 
     authorization_url, state = oauth.authorization_url(
         auth_url,
-        access_type="offline",  # not sure if it is actually always needed,
-                                # may be a cargo-cult from Google-based example
+        access_type="offline",
+        code_challenge=code_challenge,
+        code_challenge_method="S256",
     )
-    session['oauth_state'] = state
+    session["oauth_state"] = state
     return redirect(authorization_url)
+
+
+@sso_bp.route("/kdlogin/handoff-fallback")
+@login_required
+def kdlogin_handoff_fallback():
+    """Issue one-time code when browser could not POST kubeconfig to localhost kdlogin."""
+    hid = session.pop(SESSION_KDLOGIN_HANDOFF_ID, None)
+    if not hid:
+        return redirect(url_for("dashboard.cluster_metrics"))
+    payload = pop_kdlogin_handoff_payload(current_app, hid)
+    if not payload:
+        flash(
+            "That login handoff expired. Please run kubectl kdlogin again if you still need the config.",
+            "warning",
+        )
+        return redirect(url_for("dashboard.cluster_metrics"))
+    otc = store_kdlogin_config_payload(current_app, payload)
+    session[SESSION_KDLOGIN_CODE_SHOW] = otc
+    session[SESSION_KDLOGIN_CODE_FROM_HANDOFF] = True
+    logger.info(
+        "kdlogin: browser POST to localhost did not complete; issued one-time config code"
+    )
+    return redirect(url_for("sso.kdlogin_code"))
+
+
+@sso_bp.route("/kdlogin/delivered")
+@login_required
+def kdlogin_push_delivered():
+    """After kubeconfig was pushed to kdlogin (server or browser); user can close the tab."""
+    return render_template("settings/kdlogin-delivered.html.j2")
+
+
+@sso_bp.route("/kdlogin/success")
+def kdlogin_success_legacy_redirect():
+    """Old URL for the one-time code page; use /kdlogin/code."""
+    return redirect(url_for("sso.kdlogin_code"), code=301)
+
+
+@sso_bp.route("/kdlogin/code")
+@login_required
+def kdlogin_code():
+    """One-time code for kubectl when kubeconfig push to the local plugin did not complete."""
+    code = session.get(SESSION_KDLOGIN_CODE_SHOW)
+    if not code:
+        return redirect(url_for("dashboard.cluster_metrics"))
+    session.pop(SESSION_KDLOGIN_CODE_SHOW, None)
+    from_handoff_fallback = session.pop(SESSION_KDLOGIN_CODE_FROM_HANDOFF, False)
+    sso = SSOSererGet()
+    base = (sso.base_uri if sso else "").rstrip("/")
+    return render_template(
+        "settings/kdlogin-code.html.j2",
+        exchange_code=code,
+        plugin_base_url=base or request.url_root.rstrip("/"),
+        from_handoff_fallback=from_handoff_fallback,
+    )
 
 @sso_bp.route("/get-file")
 @login_required
@@ -288,7 +442,7 @@ def get_file():
             return Response("Cannot connect to identity provider", status=503, mimetype='text/plain')
         
         token_url = auth_server_info["token_endpoint"]
-        verify = False
+        verify = oauth_tls_verify_value(ssoServer)
 
         try:
             token = oauth.refresh_token(
@@ -319,8 +473,6 @@ def get_file():
             kube_user["auth-provider"]["config"]["idp-certificate-authority-data"] = ssoServer.oauth_server_ca
         if ssoServer.client_secret:
             kube_user["auth-provider"]["config"]["client-secret"] = ssoServer.client_secret
-        if verify:
-            kube_user["auth-provider"]["config"]["idp-certificate-authority"] = verify
 
         config_snippet = {
             "apiVersion": "v1",

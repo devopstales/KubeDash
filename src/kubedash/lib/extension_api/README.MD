@@ -1,11 +1,11 @@
 ```bash
 TOKEN=$(kubectl create token default -n default)
 
-curl -X GET http://localhost:8000/apis/kubedash.devopstales.github.io/v1/projects \
+curl -X GET http://localhost:8765/apis/kubedash.devopstales.github.io/v1/projects \
   -H "Authorization: Bearer $TOKEN" \
   -H "Content-Type: application/json" > /tmp/projects.json
 
-curl -X POST http://localhost:8000/apis/kubedash.devopstales.github.io/v1/projects \
+curl -X POST http://localhost:8765/apis/kubedash.devopstales.github.io/v1/projects \
   -H "Authorization: Bearer $TOKEN" \
   -H "Content-Type: application/json" \
   -d '{
@@ -77,7 +77,7 @@ spec:
   ports:
     - name: https
       port: 443
-      targetPort: 8000
+      targetPort: 8765
       protocol: TCP
   # No selector - traffic routed via Endpoints below
 ---
@@ -92,7 +92,7 @@ subsets:
       - ip: 192.168.0.51 # node IP
     ports:
       - name: https
-        port: 8000
+        port: 8765
         protocol: TCP
 
 ---

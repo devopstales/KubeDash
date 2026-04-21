@@ -514,8 +514,7 @@ tasks:
       - |
         docker run -d \
         --name kubedash \
-        -p 8080:8000 \
-        -p 8443:8000 \
+        -p 8765:8765 \
         -v $(pwd)/src/kubedash/kubedash.ini:/code/kubedash/kubedash.ini:ro \
         devopstales/kubedash:{{.VERSION}}
 
@@ -526,8 +525,7 @@ tasks:
       - |
         docker run -d \
         --name kubedash \
-        -p 8080:8000 \
-        -p 8443:8000 \
+        -p 8765:8765 \
         -v $(pwd)/src/kubedash/kubedash.ini:/code/kubedash/kubedash.ini:ro \
         devopstales/kubedash:{{.VERSION}}-devel
 

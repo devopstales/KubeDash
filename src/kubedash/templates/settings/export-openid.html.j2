@@ -72,6 +72,7 @@ https://github.com/devopstales/kubedash/releases</code></pre>
     <pre><code class="bash">$ kubectl kdlogin {{ base_uri }}/
 Configfile created with config for productioncluster to ~/.kube/config
 Happy Kubernetes interaction!</code></pre>
+    <p class="card-text small text-muted mt-3">If the dashboard cannot push config to your machine, finish login in the browser and use the one-time code: <code>kubectl kdlogin --code &lt;code&gt; --base-url {{ base_uri }}</code>. Use <code>--port</code> if the plugin listens on a port other than 8080.</p>
   </div>
 </div>
 

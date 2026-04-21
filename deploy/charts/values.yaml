@@ -42,7 +42,7 @@ image:
 # -- Service configuration
 service:
   # -- Service port for the KubeDash application
-  port: 8000
+  port: 8765
 
 # -- pullsecrets
 imagePullSecrets: []
@@ -410,13 +410,15 @@ ingress:
     nginx.ingress.kubernetes.io/proxy-body-size: "10m"
     nginx.ingress.kubernetes.io/proxy-read-timeout: "3600"
     nginx.ingress.kubernetes.io/proxy-send-timeout: "3600"
+    nginx.ingress.kubernetes.io/use-forwarded-headers: "true"
     nginx.ingress.kubernetes.io/server-snippets: |
       location / {
         proxy_set_header Upgrade $http_upgrade;
         proxy_http_version 1.1;
         proxy_set_header X-Forwarded-Host $http_host;
         proxy_set_header X-Forwarded-Proto $scheme;
-        proxy_set_header X-Forwarded-For $remote_addr;
+        proxy_set_header X-Real-IP $remote_addr;
+        proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
         proxy_set_header Host $host;
         proxy_set_header Connection "upgrade";
         proxy_cache_bypass $http_upgrade;
@@ -455,8 +457,6 @@ extensionApi:
   version: "v1"
   # -- Service port for the extension API (must be 443 for API aggregation)
   servicePort: 443
-  # -- Target port on the KubeDash service (defaults to service.port)
-  targetPort: 5000
   # -- CA bundle (base64-encoded) for TLS verification (recommended for production)
   # Leave empty to use insecureSkipTLSVerify (development only)
   caBundle: ""

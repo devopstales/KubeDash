@@ -99,5 +99,5 @@ RUN chown -R kubedash:kubedash /code
 
 COPY entrypoint.sh /entrypoint.sh
 USER kubedash
-EXPOSE 8000
+EXPOSE 8765
 CMD ["/entrypoint.sh"]

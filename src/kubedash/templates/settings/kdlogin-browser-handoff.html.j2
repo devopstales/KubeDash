@@ -1,0 +1,67 @@
+{% extends "base2.html.j2" %}
+
+{% block topmenu %}
+<ul class="header-nav d-lg-flex m-3">
+    <div class="container-fluid px-4">
+      <nav aria-label="breadcrumb">
+        <ol class="breadcrumb my-0">
+          <li class="breadcrumb-item"><span>Login</span></li>
+          <li class="breadcrumb-item active"><span>kdlogin</span></li>
+        </ol>
+      </nav>
+    </div>
+</ul>
+<ul class="header-nav ms-auto"></ul>
+<ul class="header-nav d-lg-flex">
+{% include "segments/partials/topmenu.html.j2" %}
+{% endblock %}
+
+{% block content %}
+<div class="card mb-4 mx-5">
+  <div class="card-header py-3">
+    <h5 class="m-0 font-weight-bold text-primary">Sending kubeconfig to kubectl</h5>
+  </div>
+  <div class="card-body">
+    <p class="card-text mb-0" id="kdlogin-handoff-status">Delivering configuration to the kdlogin plugin on this computer…</p>
+    <p class="card-text text-body-secondary small mt-3 mb-0">
+      If this message does not clear in a few seconds,
+      <a href="{{ fallback_url }}">continue with a one-time code</a> instead.
+    </p>
+  </div>
+</div>
+<script>
+(function () {
+  const payload = {{ payload_json | tojson }};
+  const port = {{ listen_port | int }};
+  const host = {{ handoff_host | tojson }};
+  const nextUrl = {{ next_url | tojson }};
+  const fallbackUrl = {{ fallback_url | tojson }};
+  const url = "http://" + host + ":" + port + "/";
+  const statusEl = document.getElementById("kdlogin-handoff-status");
+
+  function fail() {
+    if (statusEl) {
+      statusEl.textContent = "Could not reach the plugin on this machine. Redirecting to a one-time code…";
+    }
+    window.location.replace(fallbackUrl);
+  }
+
+  fetch(url, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify(payload),
+    mode: "cors",
+  })
+    .then(function (r) {
+      if (r.ok) {
+        window.location.replace(nextUrl);
+        return;
+      }
+      fail();
+    })
+    .catch(function () {
+      fail();
+    });
+})();
+</script>
+{% endblock %}

@@ -129,7 +129,7 @@ echo ${KUBEDASH_VERSION} > /code/kubedash/app-release
 echo ""
 echo "Start Applications"
 echo "###########################################################################################"
-#flask run --host=0.0.0.0 --port=8000
+#flask run --host=0.0.0.0 --port=8765
 #python3 kubedash.py
 # Use gunicorn executable from /usr/local/bin if available
 if [ -f /usr/local/bin/gunicorn ]; then

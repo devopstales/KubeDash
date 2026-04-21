@@ -1,6 +1,9 @@
 #!/usr/bin/env python3
 
+import hashlib
 import json
+import os
+import tempfile
 
 from flask_login import UserMixin
 from opentelemetry import trace
@@ -20,7 +23,30 @@ logger = get_logger()
 
 from lib.opentelemetry import get_tracer
 from opentelemetry import trace
+
 tracer = get_tracer()
+
+# Process-lifetime cache of temp CA files for issuer PEM from DB
+_oauth_ca_bundle_paths: dict[str, str] = {}
+
+
+def oauth_tls_verify_value(sso_server):
+    """Return the `verify` argument for requests to the IdP (bool or path to CA bundle)."""
+    if sso_server is None:
+        return True
+    env = os.getenv("KUBEDASH_OIDC_TLS_VERIFY", "true").lower()
+    if env in ("0", "false", "no"):
+        return False
+    ca_pem = (sso_server.oauth_server_ca or "").strip()
+    if not ca_pem:
+        return True
+    key = hashlib.sha256(ca_pem.encode("utf-8")).hexdigest()
+    if key not in _oauth_ca_bundle_paths:
+        fd, path = tempfile.mkstemp(prefix="kubedash-oidc-ca-", suffix=".pem")
+        with os.fdopen(fd, "w", encoding="utf-8") as fh:
+            fh.write(ca_pem)
+        _oauth_ca_bundle_paths[key] = path
+    return _oauth_ca_bundle_paths[key]
 
 ##############################################################
 ## functions
@@ -147,11 +173,12 @@ def get_auth_server_info():
         redirect_uri = redirect_uri,
         scope = ssoServer.scope
     )
+    verify = oauth_tls_verify_value(ssoServer)
     try:
         auth_server_info = oauth.get(
             f"{ssoServer.oauth_server_uri}/.well-known/openid-configuration",
             withhold_token=True,
-            verify=False,
+            verify=verify,
             timeout=10
         ).json()
         if tracer and span.is_recording():
@@ -211,13 +238,14 @@ def get_user_token(session):
             )
 
             try:
+                verify = oauth_tls_verify_value(ssoServer)
                 # Use OAuth2Session to refresh tokens
                 token_new = oauth.refresh_token(
                     token_url = auth_server_info["token_endpoint"],
                     refresh_token = session['refresh_token'],
                     client_id = ssoServer.client_id,
                     client_secret = ssoServer.client_secret,
-                    verify=False,
+                    verify=verify,
                     timeout=60,
                 )
             except Exception as e:
@@ -244,7 +272,7 @@ def get_user_token(session):
                 span.set_attribute("user.name", session['user_name'])
                 span.set_attribute("user.type", session['user_type'])
                 span.set_attribute("user.role", session['user_role'])
-                span.set_attribute("user.token", user_token)
+                span.set_attribute("user.token.present", True)
                 span.add_event("log", {
                     "log.severity": "info",
                     "log.message": "User token refreshed successfully.",
@@ -256,7 +284,7 @@ def get_user_token(session):
                 span.set_attribute("user.name", session['user_name'])
                 span.set_attribute("user.type", session['user_type'])
                 span.set_attribute("user.role", session['user_role'])
-                span.set_attribute("user.token", "None")
+                span.set_attribute("user.token.present", False)
                 span.add_event("log", {
                     "log.severity": "info",
                     "log.message": "User token is not OpenID, returning None.",

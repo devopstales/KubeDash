@@ -1,0 +1,38 @@
+{% extends "base2.html.j2" %}
+
+{% block topmenu %}
+<ul class="header-nav d-lg-flex m-3">
+    <div class="container-fluid px-4">
+      <nav aria-label="breadcrumb">
+        <ol class="breadcrumb my-0">
+          <li class="breadcrumb-item"><span>Login</span></li>
+          <li class="breadcrumb-item"><span>kdlogin</span></li>
+          <li class="breadcrumb-item active"><span>code</span></li>
+        </ol>
+      </nav>
+    </div>
+</ul>
+<ul class="header-nav ms-auto"></ul>
+<ul class="header-nav d-lg-flex">
+{% include "segments/partials/topmenu.html.j2" %}
+{% endblock %}
+
+{% block content %}
+<div class="card mb-4 mx-5">
+  <div class="card-header py-3">
+    <h5 class="m-0 font-weight-bold text-primary">{% if from_handoff_fallback|default(false) %}Backup: one-time code{% else %}One-time code{% endif %}</h5>
+  </div>
+  <div class="card-body">
+    {% if from_handoff_fallback|default(false) %}
+    <p class="card-text">The in-page step that posts kubeconfig to the local kdlogin process did not finish (for example the tab was closed early, or the browser blocked the request). That does not mean KubeDash failed — delivery from the cluster to your machine often uses this backup.</p>
+    <p class="card-text">If <code>kubectl kdlogin</code> already printed success in the terminal, your kubeconfig is likely already correct and you can close this page. Otherwise use this one-time code:</p>
+    {% else %}
+    <p class="card-text">Use this one-time code only if kubectl did not finish updating your kubeconfig automatically (for example when the browser could not reach the local plugin). If the terminal already reported success, you do not need this.</p>
+    {% endif %}
+    <p class="font-monospace fs-4 user-select-all text-break p-3 rounded bg-body-secondary border text-body">{{ exchange_code }}</p>
+    <p class="card-text text-body-secondary small">This code expires in a few minutes and can be used only once.</p>
+    <h6 class="mt-4">Run on your workstation</h6>
+    <pre class="bg-body-secondary border p-3 rounded mb-0"><code class="text-body">kubectl kdlogin --code {{ exchange_code }} --base-url {{ plugin_base_url }}</code></pre>
+  </div>
+</div>
+{% endblock %}

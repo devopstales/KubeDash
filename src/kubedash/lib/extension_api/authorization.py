@@ -14,7 +14,7 @@ from opentelemetry.trace.status import Status, StatusCode
 
 from . import logger, tracer
 from .authentication import AuthenticatedUser
-from lib.k8s.server import k8sClientConfigGet
+from lib.k8s.server import apply_k8s_client_no_connection_retries, k8sClientConfigGet
 
 ##############################################################
 ## Authorization Functions
@@ -251,6 +251,7 @@ def check_self_subject_access(
                     configuration.api_key_prefix['authorization'] = 'Bearer'
                     configuration.api_key["authorization"] = user_token
                     k8s_client.Configuration.set_default(configuration)
+                    apply_k8s_client_no_connection_retries()
             else:
                 k8sClientConfigGet("Admin", None)
             

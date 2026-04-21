@@ -8,7 +8,11 @@ from lib.helper_functions import ErrorHandler, trimAnnotations
 from lib.components import cache, short_cache_time, long_cache_time
 
 from . import logger, tracer
-from .server import k8sClientConfigGet
+from .server import (
+    K8S_DEFAULT_REQUEST_TIMEOUT,
+    is_k8s_unreachable_exception,
+    k8sClientConfigGet,
+)
 
 ##############################################################
 ## Kubernetes Namespace
@@ -31,7 +35,9 @@ def k8sListNamespaces(username_role, user_token):
             span.set_attribute("user.role", username_role)
         k8sClientConfigGet(username_role, user_token)
         try:
-            namespace_list = k8s_client.CoreV1Api().list_namespace(_request_timeout=1)
+            namespace_list = k8s_client.CoreV1Api().list_namespace(
+                _request_timeout=K8S_DEFAULT_REQUEST_TIMEOUT
+            )
             return namespace_list, None
         except ApiException as error:
             if error.status != 404:
@@ -41,7 +47,10 @@ def k8sListNamespaces(username_role, user_token):
             namespace_list = ""
             return namespace_list, error
         except Exception as error:
-            ErrorHandler(logger, "CannotConnect", "k8sListNamespaces: %s" % error)
+            if is_k8s_unreachable_exception(error):
+                logger.warning("Cannot connect to Kubernetes (list namespaces): %s", error)
+            else:
+                ErrorHandler(logger, error, "k8sListNamespaces: %s" % error)
             if tracer and span.is_recording():
                 span.set_status(Status(StatusCode.ERROR, "k8sListNamespaces: %s" % error))
             namespace_list = ""
@@ -73,7 +82,10 @@ def k8sNamespaceListGet(username_role, user_token):
             else:
                 return namespace_list, error
         except Exception as error:
-            ErrorHandler(logger, "CannotConnect", "k8sNamespaceListGet: %s" % error)
+            if is_k8s_unreachable_exception(error):
+                logger.warning("Cannot connect to Kubernetes (namespace list get): %s", error)
+            else:
+                ErrorHandler(logger, error, "k8sNamespaceListGet: %s" % error)
             if tracer and span.is_recording():
                 span.set_status(Status(StatusCode.ERROR, "k8sNamespaceListGet: %s" % error))
             return namespace_list, "CannotConnect"
@@ -130,7 +142,10 @@ def k8sNamespacesGet(username_role, user_token):
             else:
                 return NAMESPACE_LIST
         except Exception as error:
-            ErrorHandler(logger, "CannotConnect", "k8sNamespacesGet: %s" % error)
+            if is_k8s_unreachable_exception(error):
+                logger.warning("Cannot connect to Kubernetes (namespaces get): %s", error)
+            else:
+                ErrorHandler(logger, error, "k8sNamespacesGet: %s" % error)
             if tracer and span.is_recording():
                 span.set_status(Status(StatusCode.ERROR, "k8sNamespacesGet: %s" % error))
             return NAMESPACE_LIST

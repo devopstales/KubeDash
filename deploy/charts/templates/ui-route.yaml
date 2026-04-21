@@ -14,7 +14,7 @@ metadata:
 spec:
   host: {{ .Values.route.url }}
   port:
-    targetPort: 5000
+    targetPort: {{ .Values.service.port }}
   tls:
     insecureEdgeTerminationPolicy: Redirect
     termination: edge

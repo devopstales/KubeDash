@@ -74,7 +74,7 @@ To move from minimal-config mode to a full `kubedash.ini` configuration:
 You can verify which mode is active via the health endpoint:
 
 ```bash
-curl http://localhost:8000/api/health/ready | jq '.config_mode'
+curl http://localhost:8765/api/health/ready | jq '.config_mode'
 # Returns "minimal" or "full"
 ```
 

@@ -45,6 +45,11 @@ def initialize_blueprints(app: Flask):
     app.register_blueprint(other_resources_bp)
     app.register_blueprint(settings_bp)
 
+    from lib.components import csrf
+    from blueprint.api.kdlogin import kdlogin_api_bp
+
+    csrf.exempt(kdlogin_api_bp)
+
     # Kubernetes Extension API Server blueprint
     app.logger.info("Initialize Extension API blueprint")
     api_doc.register_blueprint(extension_api_bp)

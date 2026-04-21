@@ -29,16 +29,16 @@ spec:
         livenessProbe:
           httpGet:
             path: /healthz/live
-            port: 8000
+            port: 8765
           initialDelaySeconds: 5
           timeoutSeconds: 1
         readinessProbe:
           httpGet:
             path: /healthz/ready
-            port: 8000
+            port: 8765
           initialDelaySeconds: 5
           timeoutSeconds: 1
         ports:
-        - containerPort: 8000
+        - containerPort: 8765
           protocol: TCP
           name: http

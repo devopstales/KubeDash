@@ -23,6 +23,7 @@
 
 {% block add_tail_js %}
 <script nonce="{{ csp_nonce }}">
+    const exchange_code = {{ exchange_code | tojson }};
     // Escape HTML helper
     function escapeHtml(text) {
         if (!text) return '';
@@ -130,6 +131,10 @@ https://github.com/devopstales/kubedash/releases</code></pre>
     <pre><code class="bash">$ kubectl kdlogin ${base_uri}/
 Configfile created with config for productioncluster to ~/.kube/config
 Happy Kubernetes interaction!</code></pre>
+    <h5 class="card-title">One-time code (fallback).</h5>
+    <p class="card-text text-body-secondary small">If kubeconfig is not delivered automatically after login, KubeDash shows a one-time code. Example (use the real code from the KubeDash page; this line uses a sample token only):</p>
+    <pre><code class="bash">$ kubectl kdlogin --code ${exchange_code} --base-url ${base_uri}/</code></pre>
+    <p class="card-text text-body-secondary small mb-0">Use <code>--port</code> if the local kdlogin listener uses a port other than 8080.</p>
   </div>
 </div>
 
@@ -277,6 +282,10 @@ https://github.com/devopstales/kubedash/releases</code></pre>
     <pre><code class="bash">$ kubectl kdlogin ${base_uri}/
 Configfile created with config for productioncluster to ~/.kube/config
 Happy Kubernetes interaction!</code></pre>
+    <h5 class="card-title">One-time code (fallback).</h5>
+    <p class="card-text text-body-secondary small">If kubeconfig is not delivered automatically after login, KubeDash shows a one-time code. Example (use the real code from the KubeDash page; this line uses a sample token only):</p>
+    <pre><code class="bash">$ kubectl kdlogin --code ${exchange_code} --base-url ${base_uri}/</code></pre>
+    <p class="card-text text-body-secondary small mb-0">Use <code>--port</code> if the local kdlogin listener uses a port other than 8080.</p>
   </div>
 </div>
 

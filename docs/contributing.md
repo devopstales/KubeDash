@@ -371,7 +371,7 @@ def example_function(param1: str, param2: int = 10) -> bool:
 mkdocs serve
 
 # Open in browser
-open http://localhost:8000
+open http://localhost:8765
 ```
 
 ## Release Process

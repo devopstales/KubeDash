@@ -12,7 +12,11 @@ from lib.components import cache, short_cache_time, long_cache_time
 from . import logger, tracer
 from .node import k8sNodesListGet
 from .security import k8sPodListVulnsGet
-from .server import k8sClientConfigGet
+from .server import (
+    K8S_DEFAULT_REQUEST_TIMEOUT,
+    is_k8s_unreachable_exception,
+    k8sClientConfigGet,
+)
 from .workload import (k8sDaemonSetsGet, k8sDeploymentsGet, k8sReplicaSetsGet,
                        k8sStatefulSetsGet)
 
@@ -95,19 +99,18 @@ def k8sGetClusterMetric():
         }
         try:
             with tracer.start_as_current_span("k8s_client__list_node") as span:
-                # Increased timeout from 1s to 10s for better reliability in large clusters
-                node_list = k8s_client.CoreV1Api().list_node(_request_timeout=10)
+                # K8S_DEFAULT_REQUEST_TIMEOUT: short connect, generous read for large clusters
+                node_list = k8s_client.CoreV1Api().list_node(_request_timeout=K8S_DEFAULT_REQUEST_TIMEOUT)
             with tracer.start_as_current_span("k8s_client__list_pod_for_all_namespaces") as span:
-                # Increased timeout from 1s to 10s - listing all pods can be slow
+                # Listing all pods can be slow
                 # Use field selector to filter Running pods at API level instead of in Python
                 pod_list = k8s_client.CoreV1Api().list_pod_for_all_namespaces(
                     field_selector="status.phase=Running",
-                    _request_timeout=10
+                    _request_timeout=K8S_DEFAULT_REQUEST_TIMEOUT
                 )
             try:
                 with tracer.start_as_current_span("k8s_client__list_cluster_custom_object") as span:
-                    # Increased timeout from 1s to 10s for metrics API
-                    k8s_nodes = k8s_client.CustomObjectsApi().list_cluster_custom_object("metrics.k8s.io", "v1beta1", "nodes", _request_timeout=10)
+                    k8s_nodes = k8s_client.CustomObjectsApi().list_cluster_custom_object("metrics.k8s.io", "v1beta1", "nodes", _request_timeout=K8S_DEFAULT_REQUEST_TIMEOUT)
             except Exception as error:
                 k8s_nodes = None
                 if tracer and span.is_recording():
@@ -274,20 +277,32 @@ def k8sGetClusterMetric():
             # Extract more details about the connection error
             error_type = type(error).__name__
             error_message = str(error)
+            el = error_message.lower()
             
             # Check for common connection error patterns
-            if "timeout" in error_message.lower() or "timed out" in error_message.lower():
+            if "timeout" in el or "timed out" in el:
                 error_msg = f"Cannot Connect to Kubernetes - Connection Timeout: {error_message}"
-            elif "connection refused" in error_message.lower() or "econnrefused" in error_message.lower():
+            elif "connection refused" in el or "econnrefused" in el:
                 error_msg = f"Cannot Connect to Kubernetes - Connection Refused: {error_message}"
-            elif "name resolution" in error_message.lower() or "dns" in error_message.lower():
+            elif "name resolution" in el or "dns" in el:
                 error_msg = f"Cannot Connect to Kubernetes - DNS Resolution Failed: {error_message}"
-            elif "certificate" in error_message.lower() or "ssl" in error_message.lower():
+            elif "certificate" in el or "ssl" in el:
                 error_msg = f"Cannot Connect to Kubernetes - SSL/Certificate Error: {error_message}"
             else:
                 error_msg = f"Cannot Connect to Kubernetes - {error_type}: {error_message}"
             
-            logger.error(error_msg)
+            # Unreachable API is common in dev / wrong kubeconfig; avoid ERROR + alarm noise
+            if (
+                "max retries exceeded" in el
+                or "timeout" in el
+                or "timed out" in el
+                or "connection refused" in el
+                or "econnrefused" in el
+                or "name resolution" in el
+            ):
+                logger.warning(error_msg)
+            else:
+                logger.error(error_msg)
             if tracer and span.is_recording():
                 span.set_status(Status(StatusCode.ERROR, f"Cannot Connect to Kubernetes: {error_type} - {error_message}"))
             result = bad_clusterMetric
@@ -345,7 +360,7 @@ def k8sGetNodeMetric(node_name):
         # Optimize: Use read_node() instead of list_node() since we only need one specific node
         # This avoids fetching all nodes and looping through them
         try:
-            node = k8s_client.CoreV1Api().read_node(node_name, _request_timeout=10)
+            node = k8s_client.CoreV1Api().read_node(node_name, _request_timeout=K8S_DEFAULT_REQUEST_TIMEOUT)
         except ApiException as error:
             if error.status == 404:
                 return bad_node_metric
@@ -355,11 +370,11 @@ def k8sGetNodeMetric(node_name):
         # This avoids fetching all pods and looping through them
         pod_list = k8s_client.CoreV1Api().list_pod_for_all_namespaces(
             field_selector=f"spec.nodeName={node_name},status.phase=Running",
-            _request_timeout=10
+            _request_timeout=K8S_DEFAULT_REQUEST_TIMEOUT
         )
         
         try:
-            k8s_nodes = k8s_client.CustomObjectsApi().list_cluster_custom_object("metrics.k8s.io", "v1beta1", "nodes", _request_timeout=10)
+            k8s_nodes = k8s_client.CustomObjectsApi().list_cluster_custom_object("metrics.k8s.io", "v1beta1", "nodes", _request_timeout=K8S_DEFAULT_REQUEST_TIMEOUT)
         except Exception as error:
             k8s_nodes = None
             flash("Metrics Server is not installed. If you want to see usage date please install Metrics Server.", "warning")
@@ -436,7 +451,10 @@ def k8sGetNodeMetric(node_name):
             ErrorHandler(logger, error, "Cannot Connect to Kubernetes - %s " % error.status)
         return bad_node_metric
     except Exception as error:
-        ErrorHandler(logger, "CannotConnect", "Cannot Connect to Kubernetes")
+        if is_k8s_unreachable_exception(error):
+            logger.warning("Cannot connect to Kubernetes (node metric): %s", error)
+        else:
+            ErrorHandler(logger, error, "Cannot Connect to Kubernetes - node metric")
         return bad_node_metric
 
 @cache.memoize(timeout=long_cache_time)
@@ -455,8 +473,7 @@ def k8sPVCMetric(namespace):
         node_list = k8sNodesListGet("Admin", None)
         for mode in node_list:
             name = mode["name"]
-            # Increased timeout from 1s to 10s for node proxy calls
-            data = k8s_client.CoreV1Api().connect_get_node_proxy_with_path(name, path="stats/summary", _request_timeout=10)
+            data = k8s_client.CoreV1Api().connect_get_node_proxy_with_path(name, path="stats/summary", _request_timeout=K8S_DEFAULT_REQUEST_TIMEOUT)
             data_json = eval(data)
             for pod in data_json["pods"]:
                 if 'volume' in pod:
@@ -543,18 +560,17 @@ def k8sGetClusterEvents(username_role, user_token, limit=100):
         with tracer.start_as_current_span("k8s-get-cluster-event") as span:
             span.set_attribute("username_role", username_role)
             if user_token:
-                span.set_attribute("user_token", user_token)
+                span.set_attribute("user.token.present", True)
         
             # Use field selector to filter for non-Normal events at the API level
             # Kubernetes field selectors support '!=' operator to exclude values
             # This filters out Normal events before they're transferred, improving performance
             field_selector = "type!=Normal"
             
-            # Increased timeout from 1s to 10s - listing all events can be slow in large clusters
             event_list = k8s_client.CoreV1Api().list_event_for_all_namespaces(
                 field_selector=field_selector,
                 limit=limit,
-                _request_timeout=10
+                _request_timeout=K8S_DEFAULT_REQUEST_TIMEOUT
             )
             events = []
             # Reduced tracing overhead - process events without per-event spans
@@ -585,7 +601,10 @@ def k8sGetClusterEvents(username_role, user_token, limit=100):
     except Exception as error:
         if tracer and span.is_recording():
             span.set_status(Status(StatusCode.ERROR, "Cannot Connect to Kubernetes: %s" % error))
-        ErrorHandler(logger, "CannotConnect", "Cannot Connect to Kubernetes")
+        if is_k8s_unreachable_exception(error):
+            logger.warning("Cannot connect to Kubernetes (cluster events): %s", error)
+        else:
+            ErrorHandler(logger, error, "Cannot Connect to Kubernetes - cluster events")
         return []
     
 
@@ -726,8 +745,7 @@ def getNodeMetrics():
     }
     
     try:
-        # Increased timeout from 1s to 10s for metrics API
-        k8s_nodes = k8s_client.CustomObjectsApi().list_cluster_custom_object("metrics.k8s.io", "v1beta1", "nodes", _request_timeout=10)
+        k8s_nodes = k8s_client.CustomObjectsApi().list_cluster_custom_object("metrics.k8s.io", "v1beta1", "nodes", _request_timeout=K8S_DEFAULT_REQUEST_TIMEOUT)
         for node in k8s_nodes['items']:
             node_metric['name']    = node['metadata']['name']
             node_metric['cpu']     = float(parse_quantity(node['usage']['cpu']))
@@ -758,8 +776,7 @@ def getPodMetrics():
         "storage": "",
     }
     try:
-        # Increased timeout from 1s to 10s for metrics API
-        k8s_pods = k8s_client.CustomObjectsApi().list_cluster_custom_object("metrics.k8s.io", "v1beta1", "pods", _request_timeout=10)
+        k8s_pods = k8s_client.CustomObjectsApi().list_cluster_custom_object("metrics.k8s.io", "v1beta1", "pods", _request_timeout=K8S_DEFAULT_REQUEST_TIMEOUT)
         for pod in k8s_pods['items']:
             for container in pod['containers']:
                 pod_metric['name']      = pod['metadata']['name']

@@ -3,7 +3,12 @@ Helper functions for application catalog initialization and security policy upda
 """
 
 from urllib.parse import urlparse
+
 from lib.helper_functions import get_logger, ErrorHandler
+from lib.k8s.server import (
+    K8S_DEFAULT_REQUEST_TIMEOUT as _K8S_DISCOVERY_TIMEOUT,
+    is_k8s_unreachable_exception as _k8s_unreachable_error,
+)
 from .model import ApplicationCatalog
 from .application import ApplicationCreate, ApplicationUpdate
 
@@ -242,7 +247,9 @@ def discover_ingress_applications():
         
         # List all ingresses across all namespaces
         networking_api = k8s_client.NetworkingV1Api()
-        ingress_list = networking_api.list_ingress_for_all_namespaces(_request_timeout=10)
+        ingress_list = networking_api.list_ingress_for_all_namespaces(
+            _request_timeout=_K8S_DISCOVERY_TIMEOUT
+        )
         
         discovered_count = 0
         registered_count = 0
@@ -403,6 +410,12 @@ def discover_ingress_applications():
         else:
             ErrorHandler(logger, error, f"Error discovering ingress applications: {error}")
     except Exception as error:
+        if _k8s_unreachable_error(error):
+            logger.warning(
+                "Kubernetes API unreachable; skipping application catalog ingress discovery: %s",
+                error,
+            )
+            return
         ErrorHandler(logger, error, f"Error discovering ingress applications: {error}")
 
 
@@ -460,7 +473,9 @@ def discover_service_applications():
         
         # List all services across all namespaces
         core_api = k8s_client.CoreV1Api()
-        service_list = core_api.list_service_for_all_namespaces(_request_timeout=10)
+        service_list = core_api.list_service_for_all_namespaces(
+            _request_timeout=_K8S_DISCOVERY_TIMEOUT
+        )
         
         discovered_count = 0
         registered_count = 0
@@ -622,6 +637,12 @@ def discover_service_applications():
         else:
             ErrorHandler(logger, error, f"Error discovering service applications: {error}")
     except Exception as error:
+        if _k8s_unreachable_error(error):
+            logger.warning(
+                "Kubernetes API unreachable; skipping application catalog service discovery: %s",
+                error,
+            )
+            return
         ErrorHandler(logger, error, f"Error discovering service applications: {error}")
 
 

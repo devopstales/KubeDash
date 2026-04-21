@@ -1,6 +1,6 @@
 import requests
-from flask import (Blueprint, flash, g, redirect, render_template, request,
-                   session, url_for)
+from flask import (Blueprint, current_app, flash, g, redirect, render_template,
+                   request, session, url_for)
 from flask_login import login_required, login_user, logout_user
 from itsdangerous import base64_decode
 from werkzeug.security import check_password_hash
@@ -8,8 +8,11 @@ from werkzeug.security import check_password_hash
 from lib.audit import log_audit_event
 from lib.helper_functions import get_logger, is_safe_url
 from lib.k8s.server import k8sServerConfigGet
+from lib.kdlogin_push import (client_ip_for_kdlogin_push,
+                              try_push_cert_kubeconfig_to_kdlogin)
+from lib.oauth_pkce import generate_pkce_pair
 from lib.sso import SSOSererGet, get_auth_server_info
-from lib.user import KubectlConfig, Role, SSOTokenGet, User, UsersRoles
+from lib.user import KubectlConfig, Role, User, UsersRoles
 
 ##############################################################
 ## Helpers
@@ -35,10 +38,7 @@ def login():
     is_ldap_enabled = False
     authorization_url = None
 
-    if request.environ.get('HTTP_X_FORWARDED_FOR') is None:
-        remote_addr = request.remote_addr
-    else:
-        remote_addr = request.environ['HTTP_X_FORWARDED_FOR'].split(',')[0].strip()
+    remote_addr = client_ip_for_kdlogin_push(request)
 
     if tracer and span.is_recording():
         span.set_attribute("http.route", "/")
@@ -49,10 +49,13 @@ def login():
         auth_server_info, oauth = get_auth_server_info()
         if auth_server_info is not None:
             auth_url = auth_server_info["authorization_endpoint"]
+            code_verifier, code_challenge = generate_pkce_pair()
+            session["oauth_code_verifier"] = code_verifier
             authorization_url, state = oauth.authorization_url(
                 auth_url,
-                access_type="offline",  # not sure if it is actually always needed,
-                                        # may be a cargo-cult from Google-based example
+                access_type="offline",
+                code_challenge=code_challenge,
+                code_challenge_method="S256",
             )
             session['oauth_state'] = state
             is_sso_enabled = True
@@ -105,58 +108,31 @@ def login():
                 })
             logger.info("Kubectl Integration is configured.")
             k8s_server_ca = str(base64_decode(k8sConfig.k8s_server_ca), 'UTF-8')
-            try:
-                i = requests.get('http://%s:8080/info' % remote_addr, timeout=1)
-                info = i.json()
-                if info.get("message") == "kdlogin":
-                    # start a separate tracer
-                    user = User.query.filter_by(username=username, user_type = "OpenID").first()
-                    user2 = KubectlConfig.query.filter_by(name=session['user_name']).first()
-                    if is_sso_enabled and user:
-                        token = eval(SSOTokenGet(username))
-                        response_json = {
-                                            "username": username,
-                                            "context": k8sConfig.k8s_context,
-                                            "server": k8sConfig.k8s_server_url,
-                                            "certificate-authority-data": k8s_server_ca,
-                                            "client-id": ssoServer.client_id,
-                                            "id-token": token.get("id_token"),
-                                            "refresh-token": token.get("refresh_token"),
-                                            "idp-issuer-url": ssoServer.oauth_server_uri,
-                                            "client_secret": ssoServer.client_secret,
-                                        }
-                        
-                        if ssoServer.oauth_server_ca:
-                            response_json["idp-certificate-authority-data"] = ssoServer.oauth_server_ca
-                        else:
-                            response_json["idp-certificate-authority-data"] = None
-                        
-                        x = requests.post('http://%s:8080/' % remote_addr, json=response_json, timeout=5)
-                    elif user2:
-                        user_private_key = str(base64_decode(user2.private_key), 'UTF-8')
-                        user_certificate = str(base64_decode(user2.user_certificate), 'UTF-8')
-                        x = requests.post('http://%s:8080/' % remote_addr, json={
-                                "username": username,
-                                "context": k8sConfig.k8s_context,
-                                "server": k8sConfig.k8s_server_url,
-                                "certificate-authority-data": k8s_server_ca,
-                                "user-private-key": user_private_key,
-                                "user-certificate": user_certificate,
-                            },
-                            timeout=5
-                        )
-                    logger.info("Config sent to client")
-                    logger.info("Answer from clinet: %s" % x.text)
-            except (requests.exceptions.ConnectTimeout, requests.exceptions.ConnectionError):
-                # kubelogin client not running - expected for browser logins
-                logger.debug("No kubelogin client detected (connection refused/timeout)")
-            except Exception as e:
-                if tracer and span.is_recording():
-                    span.add_event("log", {
-                        "log.severity": "error",
-                        "log.message": "Failed to connect to client.",
-                    })
-                logger.error("Failed to connect to the kubectl client. (GET) %s" % e)
+            user2 = KubectlConfig.query.filter_by(name=session['user_name']).first()
+            if user2:
+                try:
+                    user_private_key = str(base64_decode(user2.private_key), 'UTF-8')
+                    user_certificate = str(base64_decode(user2.user_certificate), 'UTF-8')
+                    body = {
+                        "username": username,
+                        "context": k8sConfig.k8s_context,
+                        "server": k8sConfig.k8s_server_url,
+                        "certificate-authority-data": k8s_server_ca,
+                        "user-private-key": user_private_key,
+                        "user-certificate": user_certificate,
+                    }
+                    r = try_push_cert_kubeconfig_to_kdlogin(
+                        current_app, remote_addr, body
+                    )
+                    if r.success:
+                        logger.info("Config sent to kdlogin (cert)")
+                except Exception as e:
+                    if tracer and span.is_recording():
+                        span.add_event("log", {
+                            "log.severity": "error",
+                            "log.message": "kdlogin cert push failed.",
+                        })
+                    logger.error("kdlogin cert push failed: %s", e)
         return redirect(url_for('dashboard.cluster_metrics'))
     else:
         if tracer and span.is_recording():
@@ -176,10 +152,7 @@ def login_post():
     password = request.form.get('password')
     remember = True if request.form.get('remember') else False
 
-    if request.environ.get('HTTP_X_FORWARDED_FOR') is None:
-        remote_addr = request.remote_addr
-    else:
-        remote_addr = request.environ['HTTP_X_FORWARDED_FOR'].split(',')[0].strip()
+    remote_addr = client_ip_for_kdlogin_push(request)
 
     # Use SQLAlchemy ORM filter which automatically uses parameterized queries (SQL injection safe)
     # The username parameter is safely bound as a parameter, not concatenated into SQL
@@ -247,35 +220,33 @@ def login_post():
                 })
             logger.info("Kubectl Integration is configured.")
             k8s_server_ca = str(base64_decode(k8sConfig.k8s_server_ca), 'UTF-8')
-            try:
-                i = requests.get('http://%s:8080/info' % remote_addr, timeout=1)
-                info = i.json()
-                if info.get("message") == "kdlogin" and user2:
+            if user2:
+                try:
                     user_private_key = str(base64_decode(user2.private_key), 'UTF-8')
                     user_certificate = str(base64_decode(user2.user_certificate), 'UTF-8')
-                    x = requests.post('http://%s:8080/' % remote_addr, json={
-                            "username": username,
-                            "context": k8sConfig.k8s_context,
-                            "server": k8sConfig.k8s_server_url,
-                            "certificate-authority-data": k8s_server_ca,
-                            "user-private-key": user_private_key,
-                            "user-certificate": user_certificate,
-                        },
-                        timeout=5
+                    body = {
+                        "username": username,
+                        "context": k8sConfig.k8s_context,
+                        "server": k8sConfig.k8s_server_url,
+                        "certificate-authority-data": k8s_server_ca,
+                        "user-private-key": user_private_key,
+                        "user-certificate": user_certificate,
+                    }
+                    r = try_push_cert_kubeconfig_to_kdlogin(
+                        current_app, remote_addr, body
                     )
-                    logger.info("Config sent to client")
-                    logger.info("Answer from clinet: %s" % x.text)
-            except (requests.exceptions.ConnectTimeout, requests.exceptions.ConnectionError):
-                # kubelogin client not running - expected for browser logins
-                logger.debug("No kubelogin client detected (connection refused/timeout)")
-            except Exception as e:
-                if not request.args.get('next'):  # Only log if no 'next' parameter exists
-                    if tracer and span.is_recording():
-                        span.add_event("log", {
-                            "log.severity": "error",
-                            "log.message": f"Failed to connect to client: {str(e)}",
-                        })
-                    logger.error(f"Failed to connect to client: {str(e)}")
+                    if r.success:
+                        logger.info("Config sent to kdlogin (cert)")
+                except (requests.exceptions.ConnectTimeout, requests.exceptions.ConnectionError):
+                    logger.debug("No kdlogin client detected (connection refused/timeout)")
+                except Exception as e:
+                    if not request.args.get('next'):
+                        if tracer and span.is_recording():
+                            span.add_event("log", {
+                                "log.severity": "error",
+                                "log.message": f"kdlogin cert push: {str(e)}",
+                            })
+                        logger.error(f"kdlogin cert push: {str(e)}")
 
 
         log_audit_event(

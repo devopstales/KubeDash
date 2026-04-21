@@ -1,5 +1,7 @@
 
 import os
+import urllib3
+import urllib3.exceptions
 from flask_login import UserMixin
 from itsdangerous import base64_decode
 from kubernetes import client as k8s_client
@@ -11,6 +13,48 @@ from lib.components import db
 from lib.helper_functions import ErrorHandler
 
 from . import logger, tracer
+
+
+def apply_k8s_client_no_connection_retries():
+    """Disable urllib3 connection retries on the default Kubernetes client.
+
+    The client pool defaults to urllib3 Retry(total=3), which retries connection
+    failures (including unreachable API servers). That stacks with per-request
+    connect timeouts (e.g. 10s) and blocks ~30s per call.
+    """
+    try:
+        cfg = k8s_client.Configuration.get_default_copy()
+        cfg.retries = urllib3.util.Retry(total=0)
+        k8s_client.Configuration.set_default(cfg)
+    except Exception:
+        pass
+
+
+# (connect, read) seconds — short connect avoids long hangs when kubeconfig points at a dead API
+K8S_DEFAULT_REQUEST_TIMEOUT = (3, 30)
+
+
+def is_k8s_unreachable_exception(exc: BaseException) -> bool:
+    """True when the API server is unreachable (wrong host, network down, etc.)."""
+    if isinstance(
+        exc,
+        (
+            urllib3.exceptions.MaxRetryError,
+            urllib3.exceptions.ConnectTimeoutError,
+            urllib3.exceptions.ReadTimeoutError,
+            urllib3.exceptions.NewConnectionError,
+        ),
+    ):
+        return True
+    msg = str(exc).lower()
+    if "max retries exceeded" in msg:
+        return True
+    if "timed out" in msg and "connection" in msg:
+        return True
+    if "connection refused" in msg or "econnrefused" in msg:
+        return True
+    return False
+
 
 ##############################################################
 ## Kubernetes Cluster Config
@@ -106,11 +150,10 @@ def k8sGetClusterStatus(username_role="Admin", user_token=None):
     """
     k8sClientConfigGet(username_role, user_token)
     try:
-        api = k8s_client.CoreV1Api()
-        # Use a more reasonable timeout (10 seconds) instead of 1 second
-        # componentstatuses can be slow, especially in large clusters
-        # Note: componentstatuses is deprecated in K8s 1.19+, but still works
-        component_statuses = api.list_component_status(_request_timeout=10)
+        # GET /version is a cheap reachability check (see apply_k8s_client_no_connection_retries).
+        with k8s_client.ApiClient() as api_client:
+            version_api = k8s_client.VersionApi(api_client)
+            version_api.get_code(_request_timeout=(3, 5))
 
         return True
 
@@ -122,10 +165,16 @@ def k8sGetClusterStatus(username_role="Admin", user_token=None):
             ErrorHandler(logger, e, f"Error getting cluster status: {e}")
         return False
     except Exception as e:
-        # Check if it's a timeout error
         error_str = str(e).lower()
-        if "timeout" in error_str or "read timed out" in error_str:
-            logger.debug(f"Cluster status check timed out (this is acceptable): {e}")
+        if (
+            "timeout" in error_str
+            or "read timed out" in error_str
+            or (
+                "connection" in error_str
+                and ("refused" in error_str or "timed out" in error_str)
+            )
+        ):
+            logger.debug(f"Cluster status check failed (unreachable or slow API): {e}")
         else:
             ErrorHandler(logger, e, f"Unexpected error getting cluster status: {e}")
         return False
@@ -156,7 +205,6 @@ def k8sClientConfigGet(username_role, user_token):
         username_role (string): The role to get the client configuration
         user_token (string): The user_token to get the client configuration
     """
-    import urllib3
     urllib3.disable_warnings()
     with tracer.start_as_current_span("load-client-configs") as span:
         if tracer and span.is_recording():
@@ -167,12 +215,14 @@ def k8sClientConfigGet(username_role, user_token):
                 k8s_config.load_kube_config()
                 if tracer and span.is_recording():
                     span.set_attribute("client.config", "local")
+                apply_k8s_client_no_connection_retries()
             except Exception as error:
                 try:
                     logger.debug("Loading incluster kube config for Admin")
                     k8s_config.load_incluster_config()
                     if tracer and span.is_recording():
                         span.set_attribute("client.config", "incluster")
+                    apply_k8s_client_no_connection_retries()
                 except k8s_config.ConfigException as error:
                     ErrorHandler(logger, error, "Could not configure kubernetes python client")
                     if tracer and span.is_recording():
@@ -210,3 +260,4 @@ def k8sClientConfigGet(username_role, user_token):
                 if tracer and span.is_recording():
                     span.set_attribute("client.config", "oidc")
                 k8s_client.Configuration.set_default(configuration)
+                apply_k8s_client_no_connection_retries()

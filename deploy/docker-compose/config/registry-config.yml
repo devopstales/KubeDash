@@ -27,7 +27,7 @@ auth:
 notifications:
   endpoints:
     - name: kubedash
-      url: http://host.docker.internal:8000/plugins/registry/events
+      url: http://host.docker.internal:8765/plugins/registry/events
       timeout: 1s
       threshold: 5
       backoff: 10s

@@ -11,6 +11,7 @@ from flask import Flask
 from kubernetes import client, config
 from kubernetes.client.rest import ApiException
 
+from lib.k8s.server import apply_k8s_client_no_connection_retries
 from lib.prometheus import (
     METRIC_LEADER_IS_LEADER,
     METRIC_LEADER_TRANSITIONS,
@@ -78,6 +79,7 @@ class LeaderElector:
                 )
                 self._coordination_api = None
                 return
+        apply_k8s_client_no_connection_retries()
         self._coordination_api = client.CoordinationV1Api()
 
     def _build_lease_body(self) -> client.V1Lease:

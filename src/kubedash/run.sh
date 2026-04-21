@@ -74,14 +74,14 @@ echo "##########################################################################
 echo ""
 echo "Start Applications: KubeDash ${KUBEDASH_VERSION} (Replicas: ${REPLICAS})"
 echo "###########################################################################################"
-#flask run --host=0.0.0.0 --port=8000
+#flask run --host=0.0.0.0 --port=8765
 
 # For multi-replica testing, start multiple gunicorn processes
 if [ "$REPLICAS" -gt 1 ]; then
     echo "Starting $REPLICAS replica instances"
     PIDS=()
     for i in $(seq 0 $((REPLICAS-1))); do
-        PORT=$((8000 + i))
+        PORT=$((8765 + i))
         POD_NAME="kubedash-$i"
         REPLICA_ID=$i
         

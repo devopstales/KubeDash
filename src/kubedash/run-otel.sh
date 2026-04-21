@@ -24,4 +24,4 @@ export OTEL_METRICS_EXPORTER=""
 opentelemetry-instrument \
 	--traces_exporter console,otlp \
 	--metrics_exporter console \
-	flask run --host=0.0.0.0 --port=8000
+	flask run --host=0.0.0.0 --port=8765

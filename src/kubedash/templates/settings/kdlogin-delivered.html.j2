@@ -1,0 +1,37 @@
+{% extends "base2.html.j2" %}
+
+{% block topmenu %}
+<ul class="header-nav d-lg-flex m-3">
+    <div class="container-fluid px-4">
+      <nav aria-label="breadcrumb">
+        <ol class="breadcrumb my-0">
+          <li class="breadcrumb-item"><span>Login</span></li>
+          <li class="breadcrumb-item active"><span>kdlogin</span></li>
+        </ol>
+      </nav>
+    </div>
+</ul>
+<ul class="header-nav ms-auto"></ul>
+<ul class="header-nav d-lg-flex">
+{% include "segments/partials/topmenu.html.j2" %}
+{% endblock %}
+
+{% block content %}
+<div class="card mb-4 mx-5">
+  <div class="card-header py-3">
+    <h5 class="m-0 font-weight-bold text-primary">Kubeconfig sent</h5>
+  </div>
+  <div class="card-body">
+    <p class="card-text mb-3">
+      Your kubeconfig was written by the kdlogin plugin on this machine. You can close this tab
+      and return to the terminal, or continue to the dashboard.
+    </p>
+    <p class="card-text text-body-secondary small mb-0">
+      If <code>kubectl kdlogin</code> already printed success in the terminal, you are done.
+    </p>
+    <p class="card-text mt-4 mb-0">
+      <a class="btn btn-primary" href="{{ url_for('dashboard.cluster_metrics') }}">Continue to dashboard</a>
+    </p>
+  </div>
+</div>
+{% endblock %}

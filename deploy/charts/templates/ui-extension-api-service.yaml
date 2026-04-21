@@ -14,7 +14,7 @@ spec:
   ports:
     - name: https
       port: {{ .Values.extensionApi.servicePort }}
-      targetPort: {{ .Values.extensionApi.targetPort | default .Values.service.port }}
+      targetPort: {{ .Values.service.port }}
       protocol: TCP
   sessionAffinity: None
   type: ClusterIP
