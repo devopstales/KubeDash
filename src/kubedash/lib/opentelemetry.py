@@ -32,7 +32,7 @@ def init_opentelemetry_exporter(app: Flask, jaeger_base_url: str):
         url = urlparse(jaeger_base_url)
         with socket.create_connection((url.hostname, url.port), timeout=2):
             pass
-    except (socket.timeout, ConnectionRefusedError, ValueError) as e:
+    except (socket.timeout, ConnectionRefusedError, socket.gaierror, ValueError, OSError) as e:
         app.logger.error(f"Jaeger connection failed: {str(e)}")
         return False
 
@@ -50,15 +50,16 @@ def init_opentelemetry_exporter(app: Flask, jaeger_base_url: str):
             BatchSpanProcessor(OTLPSpanExporter(endpoint=endpoint))
         )
         # Optionally add console exporter for debugging
-        if app.config['ENV'] == 'production' and app.debug:
+        if app.config.get('ENV') == 'production' and app.debug:
             trace.get_tracer_provider().add_span_processor(
                 BatchSpanProcessor(ConsoleSpanExporter())
             )
-                
+
         global tracer
         tracer = trace.get_tracer(__name__)
-        
+
         app.logger.info(f"Jaeger exporter ready at {endpoint}")
+        app.logger.info(f"TracerProvider initialized: {trace.get_tracer_provider()}")
         return True
     except Exception as e:
         app.logger.error(f"Failed to initialize Jaeger exporter: {str(e)}")

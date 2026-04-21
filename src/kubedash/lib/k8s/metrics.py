@@ -1,3 +1,4 @@
+import json
 from os import wait4
 from flask import flash
 from kubernetes import client as k8s_client
@@ -398,7 +399,7 @@ def k8sGetClusterEvents(username_role, user_token):
         with tracer.start_as_current_span("k8s-get-cluster-event") as span:
             span.set_attribute("username_role", username_role)
             if user_token:
-                span.set_attribute("user_token", user_token)
+                span.set_attribute("user_token", json.dumps(user_token) if isinstance(user_token, dict) else user_token)
         
             event_list = k8s_client.CoreV1Api().list_event_for_all_namespaces(_request_timeout=1)
             events = []

@@ -217,12 +217,12 @@ def get_user_token(session):
             SSOTokenUpdate(session['user_name'], json.dumps(token_new))
 
             user_token = session['oauth_token']
-            
+
             if tracer and span.is_recording():
                 span.set_attribute("user.name", session['user_name'])
                 span.set_attribute("user.type", session['user_type'])
                 span.set_attribute("user.role", session['user_role'])
-                span.set_attribute("user.token", user_token)
+                span.set_attribute("user.token", json.dumps(user_token))
                 span.add_event("log", {
                     "log.severity": "info",
                     "log.message": "User token refreshed successfully.",

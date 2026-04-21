@@ -145,7 +145,7 @@ def callback():
         else:
             k8s_server_ca = str(base64_decode(k8sConfig.k8s_server_ca), 'UTF-8')
             try:
-                i = requests.get('http://%s:8080/info' % remote_addr)
+                i = requests.get('http://%s:8080/info' % remote_addr, timeout=2)
                 info = i.json()
                 response_json = {
                                     "username": user_data["preferred_username"],
