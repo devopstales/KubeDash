@@ -19,7 +19,7 @@
             <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
             <input type="hidden" name="ns_select" id="pod-exec-namespace" />
             <input type="hidden" name="po_name" id="pod-exec-name" />
-            <a class="card-link form-submit-link" data-bs-toggle="collapse" href="#" data-form-id="pod-exec-form">
+            <a class="card-link form-submit-link" href="#" data-form-id="pod-exec-form" title="Terminal">
                 <i class="material-icons">input</i>
             </a>
         </form>
@@ -27,7 +27,7 @@
             <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
             <input type="hidden" name="ns_select" id="pod-logs-namespace" />
             <input type="hidden" name="po_name" id="pod-logs-name" />
-            <a class="card-link form-submit-link" data-bs-toggle="collapse" href="#" data-form-id="pod-logs-form">
+            <a class="card-link form-submit-link" href="#" data-form-id="pod-logs-form" title="Logs">
                 <i class="material-icons">list</i>
             </a>
         </form>
@@ -991,13 +991,14 @@
 
     // Event delegation for inline forms (CSP-compliant)
     document.addEventListener('click', function(e) {
-        if (e.target.classList.contains('form-submit-link')) {
+        const link = e.target.closest('.form-submit-link');
+        if (link) {
             e.preventDefault();
-            const formId = e.target.dataset.formId;
+            const formId = link.dataset.formId;
             if (formId) {
                 document.getElementById(formId)?.submit();
             } else {
-                const form = e.target.closest('form');
+                const form = link.closest('form');
                 if (form) form.submit();
             }
         }

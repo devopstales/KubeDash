@@ -271,24 +271,26 @@ def workload_logs():
 @login_required
 def pod_logs():
     """
-    Pod logs page.
+    Enhanced pod logs page with filtering, search, and export.
 
+    Uses the new DOM-based log viewer with toolbar controls.
     Containers are loaded client-side via JavaScript API calls.
-    Websocket connection is handled server-side for log streaming.
+    WebSocket connection is handled server-side for log streaming.
     """
     from lib.helper_functions import validate_pod_name, validate_namespace
 
     # Get pod name and namespace from query params or form
     po_name = request.args.get('po_name') or request.form.get('po_name', '')
     namespace = request.form.get('ns_select', '')
-    
+    container_select = request.args.get('container') or request.form.get('container', '')
+
     # Validate pod name to prevent XSS and path traversal
     if po_name:
         is_valid, error_msg = validate_pod_name(po_name)
         if not is_valid:
             flash(f"Invalid pod name: {error_msg}", "danger")
             po_name = ''
-    
+
     # Validate namespace
     if namespace:
         is_valid_ns, error_msg_ns = validate_namespace(namespace)
@@ -297,12 +299,18 @@ def pod_logs():
             namespace = ''
         else:
             session['ns_select'] = namespace
-    
-    # Template loads containers via JavaScript from /api/v1/workloads/pods/<name>/containers
-    # Websocket connection is handled by the template's JavaScript
+
+    # Check feature flag
+    config = current_app.config.get('kubedash.ini')
+    feature_enabled = 'true'
+    if config:
+        feature_enabled = config.get('features', 'enhanced_log_viewer', fallback='true')
+
     return render_template(
-        'workload/pod-log.html.j2', 
+        'workload/pod-logs.html.j2',
         po_name=po_name or '',
+        container_select=container_select or '',
+        feature_enabled=feature_enabled,
         async_mode=socketio.async_mode
     )
 
@@ -460,23 +468,24 @@ def join_pod_logs(data):
 def pod_exec():
     """
     Pod exec page.
-    
+
     Containers are loaded client-side via JavaScript API calls.
     Websocket connection is handled server-side for exec streaming.
     """
     from lib.helper_functions import validate_pod_name, validate_namespace
-    
+
     # Get pod name and namespace from query params or form
     po_name = request.args.get('po_name') or request.form.get('po_name', '')
     namespace = request.form.get('ns_select', '')
-    
+    container_select = request.args.get('container') or request.form.get('container', '')
+
     # Validate pod name to prevent XSS and path traversal
     if po_name:
         is_valid, error_msg = validate_pod_name(po_name)
         if not is_valid:
             flash(f"Invalid pod name: {error_msg}", "danger")
             po_name = ''
-    
+
     # Validate namespace
     if namespace:
         is_valid_ns, error_msg_ns = validate_namespace(namespace)
@@ -485,12 +494,20 @@ def pod_exec():
             namespace = ''
         else:
             session['ns_select'] = namespace
-    
+
+    # Check feature flag
+    config = current_app.config.get('kubedash.ini')
+    feature_enabled = 'true'
+    if config:
+        feature_enabled = config.get('features', 'interactive_terminal', fallback='true')
+
     # Template loads containers via JavaScript from /api/v1/workloads/pods/<name>/containers
     # Websocket connection is handled by the template's JavaScript
     return render_template(
-        'workload/pod-exec.html.j2', 
+        'workload/pod-exec.html.j2',
         po_name=po_name or '',
+        container_select=container_select or '',
+        feature_enabled=feature_enabled,
         async_mode=socketio.async_mode
     )
 

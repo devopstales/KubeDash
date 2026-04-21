@@ -342,7 +342,7 @@
   white-space: nowrap;
 }
 
-/* Dark mode compatibility */
+/* Dark mode */
 [data-coreui-theme="dark"] .log-toolbar {
   background: var(--surface-color, #1e2a3a);
   border-color: #303b4a;
@@ -353,9 +353,51 @@
   color: #c9d1d9;
 }
 
+[data-coreui-theme="dark"] .log-status-bar {
+  background: var(--surface-color, #1e2a3a);
+  border-color: #303b4a;
+  color: #8b949e;
+}
+
+[data-coreui-theme="dark"] .log-timestamp {
+  color: #8b949e;
+}
+
+[data-coreui-theme="dark"] .log-line:hover {
+  background: rgba(255, 255, 255, 0.05);
+}
+
+[data-coreui-theme="dark"] .toolbar-label {
+  color: #8a96a3;
+}
+
+[data-coreui-theme="dark"] .search-match {
+  background: rgba(187, 128, 9, 0.4);
+}
+
+[data-coreui-theme="dark"] .search-match-current {
+  background: rgba(187, 128, 9, 0.7);
+}
+
+/* Light mode */
+[data-coreui-theme="light"] .log-viewer-card {
+  background: #f5f5f5;
+}
+
+[data-coreui-theme="light"] .log-toolbar {
+  background: #ffffff;
+  border-color: #e0e0e0;
+}
+
 [data-coreui-theme="light"] .log-content {
   background: #ffffff;
   color: #24292f;
+}
+
+[data-coreui-theme="light"] .log-status-bar {
+  background: #ffffff;
+  border-color: #e0e0e0;
+  color: #555555;
 }
 
 [data-coreui-theme="light"] .log-timestamp {
@@ -363,7 +405,76 @@
 }
 
 [data-coreui-theme="light"] .log-line:hover {
-  background: rgba(0, 0, 0, 0.05);
+  background: rgba(0, 0, 0, 0.04);
+}
+
+[data-coreui-theme="light"] .log-level-error .log-message { color: #cf222e; }
+[data-coreui-theme="light"] .log-level-warn .log-message  { color: #9a6700; }
+[data-coreui-theme="light"] .log-level-fatal .log-message { color: #a40e26; }
+[data-coreui-theme="light"] .log-level-info .log-message  { color: #0969da; }
+[data-coreui-theme="light"] .log-level-debug .log-message { color: #57606a; }
+
+[data-coreui-theme="light"] .toolbar-label {
+  color: #57606a;
+}
+
+[data-coreui-theme="light"] .toolbar-checkbox {
+  color: #24292f;
+}
+
+[data-coreui-theme="light"] .search-match {
+  background: rgba(255, 215, 0, 0.4);
+}
+
+[data-coreui-theme="light"] .search-match-current {
+  background: rgba(255, 215, 0, 0.7);
+  outline-color: #9a6700;
+}
+
+[data-coreui-theme="light"] .level-filter-menu {
+  background: #ffffff;
+  border-color: #e0e0e0;
+}
+
+[data-coreui-theme="light"] .level-checkbox-label {
+  color: #24292f;
+}
+
+[data-coreui-theme="light"] .level-checkbox-label:hover {
+  background: #f0f0f0;
+}
+
+[data-coreui-theme="light"] .btn-outline-secondary {
+  color: #24292f;
+  border-color: #d0d0d0;
+}
+
+[data-coreui-theme="light"] .btn-outline-secondary:hover {
+  background-color: #e8e8e8;
+  color: #24292f;
+}
+
+[data-coreui-theme="light"] .form-control {
+  background-color: #ffffff;
+  border-color: #d0d0d0;
+  color: #24292f;
+}
+
+[data-coreui-theme="light"] .form-control::placeholder {
+  color: #888888;
+}
+
+[data-coreui-theme="light"] .dropdown-menu {
+  background: #ffffff;
+  border-color: #e0e0e0;
+}
+
+[data-coreui-theme="light"] .dropdown-item {
+  color: #24292f;
+}
+
+[data-coreui-theme="light"] .dropdown-item:hover {
+  background-color: #f0f0f0;
 }
 
 /* Responsive layout for tablets */
@@ -405,4 +516,20 @@
     <script src="{{ url_for('static', filename='js/log_viewer/log_exporter.js') }}"></script>
     <script src="{{ url_for('static', filename='js/log_viewer/log_viewer.js') }}"></script>
     <script src="{{ url_for('static', filename='js/log_viewer/log_init.js') }}"></script>
+    <script nonce="{{ csp_nonce }}">
+    // Event delegation for inline forms (CSP-compliant)
+    document.addEventListener('click', function(e) {
+        const link = e.target.closest('.form-submit-link');
+        if (link) {
+            e.preventDefault();
+            const formId = link.dataset.formId;
+            if (formId) {
+                document.getElementById(formId)?.submit();
+            } else {
+                const form = link.closest('form');
+                if (form) form.submit();
+            }
+        }
+    });
+    </script>
 {% endblock %}

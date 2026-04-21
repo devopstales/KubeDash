@@ -1,0 +1,92 @@
+/* Shared terminal component styles
+ * Used by pod-log.html.j2 and pod-exec.html.j2
+ * Included via: {% include "segments/components/terminal.css" %}
+ */
+
+.terminalBody {
+  background: var(--cui-dark, #212631);
+  min-height: 450px;
+  max-height: calc(100vh - 300px);
+  padding: 0;
+  overflow: hidden;
+}
+
+.terminalBody .terminal.xterm {
+  padding: 1rem;
+}
+
+/* Fullscreen mode (exec only) */
+.terminalBody.fullscreen {
+  position: fixed;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  z-index: 9999;
+  max-height: unset;
+}
+
+.terminal-header {
+  padding: 0.5rem 1rem;
+}
+
+.terminal-label {
+  font-size: 0.875rem;
+  color: var(--cui-secondary-text, rgba(255, 255, 255, 0.6));
+}
+
+.terminal-status-bar {
+  padding: 0.4rem 1rem;
+  font-size: 0.8rem;
+  background: var(--cui-tertiary-bg, #f3f4f7);
+  border-top: 1px solid var(--cui-border-color, #dbdfe6);
+}
+
+[data-coreui-theme="dark"] .terminal-status-bar {
+  background: var(--cui-body-bg-dark, #212631);
+  border-top: 1px solid #4a566d;
+}
+
+.status-dot {
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  background: var(--cui-secondary, #6b7785);
+  margin-right: 0.5rem;
+  display: inline-block;
+  flex-shrink: 0;
+}
+
+.status-dot.connected { background: var(--cui-success, #1b9e3e); }
+.status-dot.disconnected { background: var(--cui-danger, #e55353); }
+
+.status-text {
+  color: var(--cui-body-color, rgba(37, 43, 54, 0.95));
+}
+
+[data-coreui-theme="dark"] .status-text {
+  color: var(--cui-body-color-dark, rgba(255, 255, 255, 0.87));
+}
+
+.status-info {
+  color: var(--cui-secondary-text, rgba(37, 43, 54, 0.681));
+}
+
+[data-coreui-theme="dark"] .status-info {
+  color: rgba(255, 255, 255, 0.6);
+}
+
+.status-info strong {
+  color: var(--cui-body-color, rgba(37, 43, 54, 0.95));
+}
+
+[data-coreui-theme="dark"] .status-info strong {
+  color: rgba(255, 255, 255, 0.87);
+}
+
+/* Quick command dropdown sizing */
+.quick-commands-dropdown {
+  max-height: 300px;
+  overflow-y: auto;
+  min-width: 220px;
+}

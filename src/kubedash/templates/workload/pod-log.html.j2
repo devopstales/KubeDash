@@ -17,7 +17,7 @@
               </form>
             </div>
           </li>
-          <li class="breadcrumb-item active"><span>Log</span></li>
+          <li class="breadcrumb-item active"><span>Logs</span></li>
         </ol>
       </nav>
     </div>
@@ -29,41 +29,74 @@
 
 {% block content %}
 <div class="card">
-    <div id="filter-menu" class="card-header">
-      <div class="row justify-content-between">
-        <div class="col-3">
-          <span>Status: <span id="status">connecting...</span></span>
-        </div>
-        <form name="add" method="POST" class="col-3">
-          <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
-          <input type="hidden" name="po_name" value="{{ po_name }}">
-          <div class="input-group">
-              <select name="container_select" class="form-select" id="containers" aria-label="Select Container">
+    <div class="card-header terminal-header">
+      <div class="d-flex align-items-center w-100">
+        <!-- Left: Container selector -->
+        <div class="d-inline-flex align-items-center">
+          <label for="containers" class="me-2 mb-0 terminal-label">Container:</label>
+          <form name="add" method="POST" class="mb-0">
+            <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+            <input type="hidden" name="po_name" value="{{ po_name }}">
+            <div class="d-flex align-items-center">
+              <select name="container_select" class="form-select form-select-sm me-2" id="containers" aria-label="Select Container" style="min-width: 200px;">
                 <option value="" selected disabled>Loading containers...</option>
               </select>
-              <button type="submit" class="btn btn-primary" type="button">Submit</button>
-          </div>
-        </form>
+            </div>
+          </form>
+        </div>
+        <!-- Spacer -->
+        <div class="ms-auto"></div>
+        <!-- Right: Action buttons -->
+        <div class="d-inline-flex align-items-center gap-2">
+          <button type="button" class="btn btn-sm btn-outline-secondary" id="copyLogsBtn" title="Copy logs to clipboard">
+            <i class="cil-clipboard"></i> Copy
+          </button>
+          <button type="button" class="btn btn-sm btn-outline-primary" id="downloadLogsBtn" title="Download logs">
+            <i class="cil-cloud-download"></i> Download
+          </button>
+        </div>
       </div>
     </div>
-    <div id="terminal" class="card-body terminalBody"></div>
+
+    <!-- Terminal body -->
+    <div id="terminal" class="terminalBody"></div>
+
+    <!-- Status bar -->
+    <div class="card-footer terminal-status-bar">
+      <div class="d-flex align-items-center w-100">
+        <div class="d-inline-flex align-items-center">
+          <span class="status-dot" id="statusDot"></span>
+          <span class="status-text" id="statusText">Connecting...</span>
+        </div>
+        <div class="ms-auto d-inline-flex align-items-center gap-3">
+          <span class="status-info">Pod: <strong id="statusPod">{{ po_name }}</strong></span>
+          <span class="status-info">NS: <strong id="statusNs">{{ session['ns_select'] }}</strong></span>
+          <span class="status-info">Container: <strong id="statusContainer">—</strong></span>
+          <span class="status-info" id="lineCount" style="display: none;">Lines: <strong id="lineCountValue">0</strong></span>
+        </div>
+      </div>
+    </div>
 </div>
 {% endblock %}
 
 {% block add_head_css %}
 {% include "segments/components/datatable_snippet.html.j2" %}
 {% include "segments/components/socket_snippet.html.j2" %}
+<link href="{{ url_for('static',filename='/css/terminal.css') }}" rel="stylesheet">
 {% endblock %}
 
 {% block add_tail_js %}
     <script nonce="{{ csp_nonce }}">
       const term = new Terminal({
-        cursorBlink: true,
+        cursorBlink: false,
+        cursorStyle: "bar",
         macOptionIsMeta: true,
         scrollback: 10000,
+        theme: {
+          background: "#000000",
+        },
       });
 
-      // https://github.com/xtermjs/xterm.js/issues/2941
       const fit = new FitAddon.FitAddon();
       term.loadAddon(fit);
       term.loadAddon(new WebLinksAddon.WebLinksAddon());
@@ -71,24 +104,36 @@
 
       term.open(document.getElementById("terminal"));
       fit.fit();
-      //console.log(`size: ${term.cols} columns, ${term.rows} rows`);
-      term.writeln("Welcome to kubedash!");
+
+      window.addEventListener("resize", () => { fit.fit(); });
 
       const socket = io.connect('/log');
-      const status = document.getElementById("status");
+      const statusDot = document.getElementById("statusDot");
+      const statusText = document.getElementById("statusText");
       const containersSelect = document.getElementById("containers");
+      const statusContainer = document.getElementById("statusContainer");
+      const lineCount = document.getElementById("lineCount");
+      const lineCountValue = document.getElementById("lineCountValue");
+
       const podName = "{{ po_name | e }}";
       const namespace = "{{ session['ns_select'] | e }}";
       const initialContainer = "{{ container_select | default('', true) | e }}";
 
       let socketConnected = false;
       let selectedContainer = "";
+      let totalLines = 0;
+
+      function setStatus(state, text) {
+        statusDot.className = "status-dot " + state;
+        statusText.textContent = text;
+      }
 
       function sendLogRequest(containerName) {
-        if (!containerName) {
-          return;
-        }
+        if (!containerName) return;
         selectedContainer = containerName;
+        statusContainer.textContent = containerName;
+        totalLines = 0;
+        lineCount.style.display = "none";
         if (socketConnected) {
           socket.send(podName, containerName);
           term.reset();
@@ -165,7 +210,7 @@
 
       socket.on("connect", () => {
         socketConnected = true;
-        status.innerHTML = '<span class="connected">connected</span>';
+        setStatus("connected", "Connected");
         if (selectedContainer) {
           socket.send(podName, selectedContainer);
           term.reset();
@@ -173,29 +218,61 @@
       });
 
       socket.on('response', function(msg) {
-          term.write(msg.data + "\r\n");
+        term.write(msg.data + "\r\n");
+        totalLines++;
+        if (totalLines % 100 === 0) {
+          lineCount.style.display = "inline";
+          lineCountValue.textContent = totalLines.toLocaleString();
+        }
       });
 
       socket.on("disconnect", () => {
-        status.innerHTML =
-          '<span class="disconnected">disconnected</span>';
+        setStatus("disconnected", "Disconnected");
       });
 
       containersSelect.addEventListener("change", (event) => {
         sendLogRequest(event.target.value);
       });
 
+      // Copy logs to clipboard
+      document.getElementById("copyLogsBtn").addEventListener("click", () => {
+        const text = term.buffer.active.getLength() > 0
+          ? Array.from({length: term.rows}, (_, i) =>
+              term.buffer.active.getLine(i)?.translateToString(true) || "").join("\n")
+          : "";
+        navigator.clipboard.writeText(text).then(() => {
+          showToast("success", "Logs copied to clipboard", "Success");
+        }).catch(() => {
+          showToast("error", "Failed to copy logs", "Error");
+        });
+      });
+
+      // Download logs
+      document.getElementById("downloadLogsBtn").addEventListener("click", () => {
+        const text = Array.from({length: term.buffer.active.getLength()}, (_, i) =>
+          term.buffer.active.getLine(i)?.translateToString(true) || "").join("\n");
+        const blob = new Blob([text], { type: "text/plain" });
+        const url = URL.createObjectURL(blob);
+        const a = document.createElement("a");
+        a.href = url;
+        a.download = `${namespace}_${podName}_logs.txt`;
+        a.click();
+        URL.revokeObjectURL(url);
+        showToast("success", `Logs downloaded for ${podName}`, "Success");
+      });
+
       loadContainers();
 
       // Event delegation for inline forms (CSP-compliant)
       document.addEventListener('click', function(e) {
-          if (e.target.classList.contains('form-submit-link')) {
+          const link = e.target.closest('.form-submit-link');
+        if (link) {
               e.preventDefault();
-              const formId = e.target.dataset.formId;
+              const formId = link.dataset.formId;
               if (formId) {
                   document.getElementById(formId)?.submit();
               } else {
-                  const form = e.target.closest('form');
+                  const form = link.closest('form');
                   if (form) form.submit();
               }
           }

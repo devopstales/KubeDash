@@ -17,7 +17,7 @@
               </form>
             </div>
           </li>
-          <li class="breadcrumb-item active"><span>Shell</span></li>
+          <li class="breadcrumb-item active"><span>Terminal</span></li>
         </ol>
       </nav>
     </div>
@@ -29,270 +29,182 @@
 
 {% block content %}
 <div class="card">
-    <div id="filter-menu" class="card-header">
-      <div class="row justify-content-between">
-        <div class="col-3">
-          <span>Status: <span id="status">connecting...</span></span>
-        </div>
-        <form name="add" method="POST" class="col-3">
-          <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
-          <input type="hidden" name="po_name" value="{{ po_name }}">
-          <div class="input-group">
-              <select name="container_select" class="form-select" id="containers" aria-label="Select Container">
+    <div class="card-header terminal-header">
+      <div class="d-flex align-items-center w-100">
+        <div class="d-inline-flex align-items-center">
+          <label for="containers" class="me-2 mb-0 terminal-label">Container:</label>
+          <form name="add" method="POST" class="mb-0">
+            <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+            <input type="hidden" name="po_name" value="{{ po_name }}">
+            <div class="d-flex align-items-center">
+              <select name="container_select" class="form-select form-select-sm me-2" id="containers" aria-label="Select Container" style="min-width: 200px;">
                 <option value="" selected disabled>Loading containers...</option>
               </select>
-              <button type="submit" class="btn btn-primary" type="button">Submit</button>
-              <button type="button" class="btn btn-outline-secondary" id="disconnectBtn" title="Disconnect from shell">Disconnect</button>
+              <button type="button" class="btn btn-sm btn-outline-primary me-2" id="connectBtn" title="Connect">
+                <i class="cil-plug"></i> Connect
+              </button>
+              <button type="button" class="btn btn-sm btn-outline-danger" id="disconnectBtn" title="Disconnect" disabled>
+                <i class="cil-x"></i> Disconnect
+              </button>
+              <button type="button" class="btn btn-sm btn-outline-secondary" id="clearBtn" title="Clear terminal">
+                <i class="cil-brush"></i> Clear
+              </button>
+            </div>
+          </form>
+        </div>
+        <div class="ms-auto"></div>
+        <div class="d-inline-flex align-items-center gap-1">
+          <div class="dropdown dropup">
+            <button class="btn btn-sm btn-outline-secondary dropdown-toggle" type="button" id="quickCmdDropdown" data-bs-toggle="dropdown" aria-expanded="false">
+              <i class="cil-command"></i> Quick Commands
+            </button>
+            <ul class="dropdown-menu dropdown-menu-end p-1" style="max-height: 300px; overflow-y: auto; min-width: 220px;" aria-labelledby="quickCmdDropdown">
+              <li><button class="dropdown-item quick-cmd" data-cmd="ls -la">ls -la</button></li>
+              <li><button class="dropdown-item quick-cmd" data-cmd="ps aux">ps aux</button></li>
+              <li><button class="dropdown-item quick-cmd" data-cmd="cat /etc/hostname">cat /etc/hostname</button></li>
+              <li><button class="dropdown-item quick-cmd" data-cmd="env">env</button></li>
+              <li><button class="dropdown-item quick-cmd" data-cmd="df -h">df -h</button></li>
+              <li><button class="dropdown-item quick-cmd" data-cmd="top -bn1 | head -20">top (1shot)</button></li>
+              <li><button class="dropdown-item quick-cmd" data-cmd="netstat -tlnp">netstat -tlnp</button></li>
+              <li><button class="dropdown-item quick-cmd" data-cmd="cat /etc/resolv.conf">cat resolv.conf</button></li>
+              <li><button class="dropdown-item quick-cmd" data-cmd="uname -a">uname -a</button></li>
+              <li><hr class="dropdown-divider"></li>
+              <li><button class="dropdown-item quick-cmd" data-cmd="tail -f /var/log/syslog">tail syslog</button></li>
+              <li><button class="dropdown-item quick-cmd" data-cmd="ls /tmp">ls /tmp</button></li>
+              <li><button class="dropdown-item quick-cmd" data-cmd="whoami">whoami</button></li>
+            </ul>
           </div>
-        </form>
+          <button type="button" class="btn btn-sm btn-outline-secondary" id="fullscreenBtn" title="Toggle fullscreen">
+            <i class="cil-fullscreen"></i>
+          </button>
+        </div>
       </div>
     </div>
-    <div id="terminal" class="card-body terminalBody"></div>
+    <div id="terminal" class="terminalBody"></div>
+    <div class="card-footer terminal-status-bar">
+      <div class="d-flex align-items-center w-100">
+        <div class="d-inline-flex align-items-center">
+          <span class="status-dot" id="statusDot"></span>
+          <span class="status-text" id="statusText">Connecting...</span>
+        </div>
+        <div class="ms-auto d-inline-flex align-items-center gap-3">
+          <span class="status-info">Pod: <strong id="statusPod">{{ po_name }}</strong></span>
+          <span class="status-info">NS: <strong id="statusNs">{{ session['ns_select'] }}</strong></span>
+          <span class="status-info">Container: <strong id="statusContainer">-</strong></span>
+          <span class="status-info">Shell: <strong>/bin/sh</strong></span>
+        </div>
+      </div>
+    </div>
 </div>
 {% endblock %}
 
 {% block add_head_css %}
 {% include "segments/components/datatable_snippet.html.j2" %}
 {% include "segments/components/socket_snippet.html.j2" %}
+<link href="{{ url_for('static',filename='/css/terminal.css') }}" rel="stylesheet">
 {% endblock %}
 
 {% block add_tail_js %}
     <script nonce="{{ csp_nonce }}">
-        const term = new Terminal({
-          cursorBlink: true,
-          macOptionIsMeta: true,
-          scrollback: 10000,
-        });
-
-        term.attachCustomKeyEventHandler(customKeyEventHandler);
-        // https://github.com/xtermjs/xterm.js/issues/2941
-        const fit = new FitAddon.FitAddon();
-        term.loadAddon(fit);
-        term.loadAddon(new WebLinksAddon.WebLinksAddon());
-        term.loadAddon(new SearchAddon.SearchAddon());
-
-        term.open(document.getElementById('terminal'));
-        fit.fit();
-
-        term.onKey(e => {
-            socket.emit("exec-input", {"input": e.key})
-        });
-
-        // Paste: use paste event so it works on Windows (Ctrl+V), Linux (Ctrl+Shift+V), macOS (Cmd+V), and context menu.
-        // Only send to server; do not term.write() — the server echoes input back, so we'd get double output.
-        term.element.addEventListener("paste", function(e) {
-          const text = (e.clipboardData || window.clipboardData).getData("text/plain");
-          if (text && socket && socket.connected) {
-            socket.emit("exec-input", { input: text });
-          }
-          e.preventDefault();
-        });
-
-        const socket = io.connect('/exec');
-        const status = document.getElementById("status");
-        const containersSelect = document.getElementById("containers");
-        const podName = "{{ po_name | e }}";
-        const namespace = "{{ session['ns_select'] | e }}";
-        const initialContainer = "{{ container_select | default('', true) | e }}";
-
-        let socketConnected = false;
-        let selectedContainer = "";
-
-        function sendExecRequest(containerName) {
-          if (!containerName) {
-            return;
-          }
-          selectedContainer = containerName;
-          if (socketConnected) {
-            socket.send(podName, containerName);
-            term.reset();
-          }
+      const term = new Terminal({
+        cursorBlink: true,
+        cursorStyle: "block",
+        macOptionIsMeta: true,
+        scrollback: 10000,
+      });
+      const fit = new FitAddon.FitAddon();
+      term.loadAddon(fit);
+      term.loadAddon(new WebLinksAddon.WebLinksAddon());
+      term.loadAddon(new SearchAddon.SearchAddon());
+      term.open(document.getElementById('terminal'));
+      fit.fit();
+      window.addEventListener("resize", () => { fit.fit(); });
+      term.onKey(e => {
+        if (socket && socket.connected) socket.emit("exec-input", {"input": e.key});
+      });
+      term.element.addEventListener("paste", function(e) {
+        const text = (e.clipboardData || window.clipboardData).getData("text/plain");
+        if (text && socket && socket.connected) socket.emit("exec-input", { input: text });
+        e.preventDefault();
+      });
+      const socket = io.connect('/exec');
+      const statusDot = document.getElementById("statusDot");
+      const statusText = document.getElementById("statusText");
+      const containersSelect = document.getElementById("containers");
+      const statusContainer = document.getElementById("statusContainer");
+      const connectBtn = document.getElementById("connectBtn");
+      const disconnectBtn = document.getElementById("disconnectBtn");
+      const podName = "{{ po_name | e }}";
+      const namespace = "{{ session['ns_select'] | e }}";
+      const initialContainer = "{{ container_select | default('', true) | e }}";
+      let socketConnected = false;
+      let selectedContainer = "";
+      let isFullscreen = false;
+      function setStatus(state, text) {
+        statusDot.className = "status-dot " + state;
+        statusText.textContent = text;
+        disconnectBtn.disabled = state !== "connected";
+        connectBtn.disabled = state === "connected";
+      }
+      function sendExecRequest(containerName) {
+        if (!containerName) return;
+        selectedContainer = containerName;
+        statusContainer.textContent = containerName;
+        if (socketConnected) { socket.send(podName, containerName); term.reset(); setStatus("connected", "Connected"); }
+      }
+      function buildContainerOptions(containers, initContainers) {
+        containersSelect.innerHTML = "";
+        if ((!containers || containers.length === 0) && (!initContainers || initContainers.length === 0)) {
+          const o = document.createElement("option"); o.value = ""; o.textContent = "No containers found"; o.disabled = true; o.selected = true; containersSelect.appendChild(o); return;
         }
-
-        function buildContainerOptions(containers, initContainers) {
+        if (initContainers && initContainers.length > 0) { const g = document.createElement("optgroup"); g.label = "Init containers"; initContainers.forEach(n => { const o = document.createElement("option"); o.value = n; o.textContent = n; g.appendChild(o); }); containersSelect.appendChild(g); }
+        if (containers && containers.length > 0) { const g = document.createElement("optgroup"); g.label = "Containers"; containers.forEach(n => { const o = document.createElement("option"); o.value = n; o.textContent = n; g.appendChild(o); }); containersSelect.appendChild(g); }
+      }
+      async function loadContainers() {
+        try {
+          const url = `/api/v1/workloads/pods/${encodeURIComponent(podName)}/containers?namespace=${encodeURIComponent(namespace)}`;
+          const resp = await fetch(url, { headers: { "Accept": "application/json" } });
+          if (!resp.ok) throw new Error(`Container fetch failed: ${resp.status}`);
+          const payload = await resp.json();
+          const containers = (payload.data && payload.data.containers) || [];
+          const initContainers = (payload.data && payload.data.init_containers) || [];
+          buildContainerOptions(containers, initContainers);
+          const desired = initialContainer || (containers[0] || initContainers[0] || "");
+          if (desired) { containersSelect.value = desired; sendExecRequest(desired); }
+        } catch (error) {
           containersSelect.innerHTML = "";
-
-          if ((!containers || containers.length === 0) && (!initContainers || initContainers.length === 0)) {
-            const option = document.createElement("option");
-            option.value = "";
-            option.textContent = "No containers found";
-            option.disabled = true;
-            option.selected = true;
-            containersSelect.appendChild(option);
-            return;
-          }
-
-          if (initContainers && initContainers.length > 0) {
-            const initGroup = document.createElement("optgroup");
-            initGroup.label = "Init containers";
-            initContainers.forEach((name) => {
-              const option = document.createElement("option");
-              option.value = name;
-              option.textContent = name;
-              initGroup.appendChild(option);
-            });
-            containersSelect.appendChild(initGroup);
-          }
-
-          if (containers && containers.length > 0) {
-            const mainGroup = document.createElement("optgroup");
-            mainGroup.label = "Containers";
-            containers.forEach((name) => {
-              const option = document.createElement("option");
-              option.value = name;
-              option.textContent = name;
-              mainGroup.appendChild(option);
-            });
-            containersSelect.appendChild(mainGroup);
-          }
+          const o = document.createElement("option"); o.value = ""; o.textContent = "Failed to load containers"; o.disabled = true; o.selected = true; containersSelect.appendChild(o); console.error(error);
         }
-
-        async function loadContainers() {
-          try {
-            const url = `/api/v1/workloads/pods/${encodeURIComponent(podName)}/containers?namespace=${encodeURIComponent(namespace)}`;
-            const response = await fetch(url, { headers: { "Accept": "application/json" } });
-            if (!response.ok) {
-              throw new Error(`Container fetch failed: ${response.status}`);
-            }
-            const payload = await response.json();
-            const containers = (payload.data && payload.data.containers) || [];
-            const initContainers = (payload.data && payload.data.init_containers) || [];
-
-            buildContainerOptions(containers, initContainers);
-
-            const desired = initialContainer || (containers[0] || initContainers[0] || "");
-            if (desired) {
-              containersSelect.value = desired;
-              sendExecRequest(desired);
-            }
-          } catch (error) {
-            containersSelect.innerHTML = "";
-            const option = document.createElement("option");
-            option.value = "";
-            option.textContent = "Failed to load containers";
-            option.disabled = true;
-            option.selected = true;
-            containersSelect.appendChild(option);
-            console.error(error);
-          }
-        }
-
-        socket.on("connect", () => {
-          socketConnected = true;
-          status.innerHTML = '<span class="connected">connected</span>';
-          if (selectedContainer) {
-            socket.send(podName, selectedContainer);
-            term.reset();
-          }
+      }
+      socket.on("connect", () => { socketConnected = true; setStatus("connected", "Connected"); if (selectedContainer) { socket.send(podName, selectedContainer); term.reset(); } });
+      socket.on("response", function(msg) { term.write(msg.output); });
+      socket.on("closed", function(msg) { setStatus("disconnected", "Disconnected"); if (msg && msg.message) term.writeln("\r\n" + (msg.message || "Stream ended.")); });
+      socket.on("disconnect", () => { setStatus("disconnected", "Disconnected"); });
+      containersSelect.addEventListener("change", (e) => { sendExecRequest(e.target.value); });
+      connectBtn.addEventListener("click", () => { if (selectedContainer && socketConnected) sendExecRequest(selectedContainer); });
+      disconnectBtn.addEventListener("click", () => { if (socket && socket.connected) { socket.emit("stop"); setStatus("disconnected", "Disconnected"); } });
+      document.getElementById("clearBtn").addEventListener("click", () => { term.reset(); });
+      document.querySelectorAll(".quick-cmd").forEach(btn => {
+        btn.addEventListener("click", () => {
+          if (socket && socket.connected) { socket.emit("exec-input", { input: btn.dataset.cmd + "\r\n" }); term.focus(); }
+          else showToast("error", "Not connected to a pod", "Error");
         });
-
-        socket.on("response", function(msg){
-            term.write(msg.output)
-        });
-
-        socket.on("closed", function(msg){
-          status.innerHTML =
-            '<span class="disconnected">disconnected</span>';
-          if (msg && msg.message) {
-            term.writeln("\r\n" + (msg.message || "Stream ended."));
-          }
-        });
-
-        socket.on("disconnect", () => {
-          status.innerHTML =
-            '<span class="disconnected">disconnected</span>';
-        });
-
-        containersSelect.addEventListener("change", (event) => {
-          sendExecRequest(event.target.value);
-        });
-
-        document.getElementById("disconnectBtn").addEventListener("click", () => {
-          if (socket && socket.connected) {
-            socket.emit("stop");
-          }
-        });
-
-        loadContainers();
-
-        // Event delegation for inline forms (CSP-compliant)
-        document.addEventListener('click', function(e) {
-            if (e.target.classList.contains('form-submit-link')) {
-                e.preventDefault();
-                const formId = e.target.dataset.formId;
-                if (formId) {
-                    document.getElementById(formId)?.submit();
-                } else {
-                    const form = e.target.closest('form');
-                    if (form) form.submit();
-                }
-            }
-        });
-
-        document.addEventListener('submit', function(e) {
-            if (e.target.classList.contains('inline-form')) {
-                e.preventDefault();
-                const form = e.target;
-                const nsSessionKey = form.dataset.namespaceSessionKey;
-                const nsSessionValue = form.dataset.namespaceValue;
-                if (nsSessionKey && nsSessionValue) sessionStorage.setItem(nsSessionKey, nsSessionValue);
-                form.submit();
-            }
-        });
-
-        /**
-         * Handle copy and paste key shortcuts. We must do paste here for Cmd+V/Ctrl+V
-         * because preventing default stops the browser from firing the paste event.
-         * Context-menu paste still uses the "paste" event listener.
-         */
-        function customKeyEventHandler(e) {
-          if (e.type !== "keydown") {
-            return true;
-          }
-          const key = e.key.toLowerCase();
-          // Paste: Ctrl+V (Windows/Linux), Cmd+V (macOS), Ctrl+Shift+V — do it here so it works when we preventDefault
-          if (key === "v" && (e.ctrlKey || e.metaKey)) {
-            e.preventDefault();
-            if (navigator.clipboard && navigator.clipboard.readText) {
-              navigator.clipboard.readText().then(function(toPaste) {
-                if (toPaste && socket && socket.connected) {
-                  socket.emit("exec-input", { input: toPaste });
-                }
-              }).catch(function() {});
-            }
-            return false;
-          }
-          // Copy: Ctrl+C / Cmd+C when there is selection
-          if ((e.ctrlKey || e.metaKey) && !e.shiftKey && (key === "c" || key === "x")) {
-            const toCopy = term.getSelection();
-            if (toCopy) {
-              const clip = (navigator.clipboard && navigator.clipboard.writeText) ? navigator.clipboard : null;
-              if (clip) {
-                clip.writeText(toCopy).catch(function() {});
-              } else if (window.clipboardData) {
-                window.clipboardData.setData("Text", toCopy);
-              }
-              term.focus();
-              e.preventDefault();
-              return false;
-            }
-          }
-          // Ctrl+Shift+C / Ctrl+Shift+X: copy selection (alternate when Ctrl+C is SIGINT)
-          if (e.ctrlKey && e.shiftKey && (key === "c" || key === "x")) {
-            const toCopy = term.getSelection();
-            if (toCopy) {
-              const clip = (navigator.clipboard && navigator.clipboard.writeText) ? navigator.clipboard : null;
-              if (clip) {
-                clip.writeText(toCopy).catch(function() {});
-              } else if (window.clipboardData) {
-                window.clipboardData.setData("Text", toCopy);
-              }
-              term.focus();
-              e.preventDefault();
-              return false;
-            }
-          }
-          return true;
-        }
+      });
+      document.getElementById("fullscreenBtn").addEventListener("click", () => {
+        const t = document.getElementById("terminal"); isFullscreen = !isFullscreen;
+        t.classList.toggle("fullscreen", isFullscreen); term.focus(); setTimeout(() => { fit.fit(); }, 100);
+      });
+      function customKeyEventHandler(e) {
+        if (e.type !== "keydown") return true;
+        const key = e.key.toLowerCase();
+        if (key === "v" && (e.ctrlKey || e.metaKey)) { e.preventDefault(); if (navigator.clipboard && navigator.clipboard.readText) navigator.clipboard.readText().then(t => { if (t && socket && socket.connected) socket.emit("exec-input", { input: t }); }).catch(()=>{}); return false; }
+        if ((e.ctrlKey || e.metaKey) && !e.shiftKey && (key === "c" || key === "x")) { const s = term.getSelection(); if (s) { if (navigator.clipboard && navigator.clipboard.writeText) navigator.clipboard.writeText(s).catch(()=>{}); else if (window.clipboardData) window.clipboardData.setData("Text", s); term.focus(); e.preventDefault(); return false; } }
+        if (e.ctrlKey && e.shiftKey && (key === "c" || key === "x")) { const s = term.getSelection(); if (s) { if (navigator.clipboard && navigator.clipboard.writeText) navigator.clipboard.writeText(s).catch(()=>{}); else if (window.clipboardData) window.clipboardData.setData("Text", s); term.focus(); e.preventDefault(); return false; } }
+        return true;
+      }
+      term.attachCustomKeyEventHandler(customKeyEventHandler);
+      loadContainers();
+      document.addEventListener('click', function(e) { if (e.target.closest('.form-submit-link')) { e.preventDefault(); const form = e.target.closest('form') || document.getElementById(e.target.dataset.formId); if (form) form.submit(); } });
+      document.addEventListener('submit', function(e) { if (e.target.classList.contains('inline-form')) { e.preventDefault(); sessionStorage.setItem(e.target.dataset.namespaceSessionKey, e.target.dataset.namespaceValue); e.target.submit(); } });
     </script>
 {% endblock %}

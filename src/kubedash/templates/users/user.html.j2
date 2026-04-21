@@ -583,9 +583,10 @@
 
     // Event delegation for inline forms and buttons (CSP-compliant)
     document.addEventListener('click', function(e) {
-        if (e.target.classList.contains('form-submit-link')) {
+        const link = e.target.closest('.form-submit-link');
+        if (link) {
             e.preventDefault();
-            const form = e.target.closest('form');
+            const form = link.closest('form');
             if (form) {
                 const username = form.dataset.username;
                 if (username) sessionStorage.setItem('privilege_username', username);
