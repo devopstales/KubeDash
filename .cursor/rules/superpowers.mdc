@@ -1,0 +1,12 @@
+---
+description: Use Superpowers plugin skills for disciplined AI workflows in this repo
+alwaysApply: true
+---
+
+# Superpowers (Cursor plugin)
+
+This project documents full expectations in `AGENTS.md`. In short:
+
+- Install the **Superpowers** plugin if you use Cursor’s agent for this codebase.
+- Invoke relevant skills **before** heavy work when applicable: **brainstorming** (new features/behavior), **systematic-debugging** (bugs), **test-driven-development** (implementation with tests), **verification-before-completion** (before claiming done or opening PRs).
+- User and project instructions override skill defaults when they conflict.

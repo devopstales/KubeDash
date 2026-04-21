@@ -77,3 +77,7 @@ You can verify which mode is active via the health endpoint:
 curl http://localhost:8000/api/health/ready | jq '.config_mode'
 # Returns "minimal" or "full"
 ```
+
+## AI-assisted development
+
+If you use Cursor on this repo, install the **Superpowers** plugin and read [`AGENTS.md`](AGENTS.md) for shared expectations (brainstorming before features, systematic debugging, verification before claiming work complete).

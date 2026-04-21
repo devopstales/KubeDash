@@ -223,7 +223,7 @@ def initialize_app_version(app: Flask):
     register_metrics(app, app_version=kubedash_version, app_config=app.config['ENV'])
 
 
-    LOGO = f"""
+    LOGO = rf"""
 {BLUE}     /$$   /$$           /$$                 /$$$$$$$                      /$$      
     | $$  /$$/          | $$                | $$__  $$                    | $$      
     | $$ /$$/  /$$   /$$| $$$$$$$   /$$$$$$ | $$  \ $$  /$$$$$$   /$$$$$$$| $$$$$$$ 
