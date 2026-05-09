@@ -7,5 +7,5 @@ pytest-playwright>=0.3.1
 selenium>=4.15.1
 
 # for git-changelog
-GitPython==3.1.42
+GitPython==3.1.50
 gitdb2==3.0.1
