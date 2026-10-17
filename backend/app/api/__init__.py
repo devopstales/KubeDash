@@ -11,9 +11,49 @@ def register_apis(app: Flask, api: Api) -> None:
     derived from resources_namespace, then run the subclass's on_init —
     where each domain Api wires its on_before_request auth hook and whose
     bound methods become the doc-registered views."""
-    from app.api.auth import AuthApi, ClustersApi
+    from app.api.access import AccessApi
+    from app.api.admin import AdminApi
+    from app.api.aggregated.projects import AggregatedProjectsApi
+    from app.api.aggregated.sso_groups import AggregatedSsoGroupsApi
+    from app.api.aggregated.sso_users import AggregatedSsoUsersApi
+    from app.api.audit import AuditApi
+    from app.api.auth import AuthApi
+    from app.api.clusters import ClusterApi
+    from app.api.kubeconfig import KubeconfigApi
+    from app.api.kubectl_auth import KubectlAuthApi
+    from app.api.logs import LogsApi
+    from app.api.metrics import MetricsApi
+    from app.api.namespaces import NamespacesApi
+    from app.api.permissions import PermissionsApi
+    from app.api.resources import ResourceApi  # ponytail: Task 5 replaces this stub
+    from app.api.scim.groups import ScimGroupsApi
+    from app.api.scim.users import ScimUsersApi
+    from app.api.traces import TracesApi
 
-    for cls in (AuthApi, ClustersApi):
+    for cls in (
+        AuthApi,
+        ClusterApi,
+        # R9 stub surface (Task 6) — additive registrations; Task 5's real
+        # ResourceApi replaces the resources placeholder (see its ponytail).
+        ResourceApi,
+        LogsApi,
+        MetricsApi,
+        TracesApi,
+        AuditApi,
+        PermissionsApi,
+        NamespacesApi,
+        AccessApi,
+        KubeconfigApi,
+        KubectlAuthApi,
+        AdminApi,
+        ScimUsersApi,
+        ScimGroupsApi,
+        # Aggregated (ADR-0012) route modules — on the main app for the base
+        # structure only; the owning change moves them to the 8443 mTLS app.
+        AggregatedProjectsApi,
+        AggregatedSsoUsersApi,
+        AggregatedSsoGroupsApi,
+    ):
         instance = cls()
         name = f"api.{instance.resources_namespace}"
         instance.on_init(app)

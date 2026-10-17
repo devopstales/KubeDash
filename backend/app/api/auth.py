@@ -4,19 +4,18 @@ JWT delivery contract: the callback redirects ``302 /?token=<access_jwt>
 &refresh=<refresh_token>``; the SPA (Task 8) parks both in localStorage.
 Auth routes are open pre-JWT; /auth/me uses the ``require_auth`` decorator.
 
-``ClustersApi`` below is the shared-hook exemplar: the EXACT on_init pattern
-Tasks 4-6 copy into their real domain APIs (it carries the 401 for
-``/api/v1/clusters`` until Task 4 replaces the stub).
+The domain Api's shared auth-hook pattern (app-wide ``before_request`` scoped
+to ``/api/v1/*``) now lives in ``app/api/clusters.py`` (Task 4 replaced the
+exemplar stub); Tasks 5-6 copy that ``on_init`` into their own domain APIs.
 """
 from datetime import UTC, datetime, timedelta
 
-from flask import g, jsonify, redirect, request
+from flask import g, redirect, request
 from flask_smorest import Api, Blueprint, abort
 
 from app.core import security
 from app.core.security import (
     REFRESH_TTL_DAYS,
-    _auth_check,
     consume_state,
     issue_token_pair,
     new_state,
@@ -52,7 +51,7 @@ class AuthApi(Api):
 
     def on_init(self, app: object) -> None:
         # Auth routes are open (pre-JWT); /auth/me uses require_auth per-route.
-        # The domain hook (ClustersApi._auth) path-scopes to /api/v1/* and
+        # The domain hook (app/api/_authhook.py) path-scopes to /api/v1/* and
         # skips /api/v1/auth/*, so auth needs no opt-out flag here.
         pass
 
@@ -118,39 +117,3 @@ class AuthApi(Api):
             "groups": u.groups or [],
             "role": u.role,
         }
-
-
-class ClustersApi(Api):
-    """Exemplar only — the shared auth-hook pattern Tasks 4-6 copy verbatim.
-    Task 4 replaces this stub with the real clusters routes (same on_init)."""
-
-    resources_namespace = "clusters"
-    tags = ["Clusters"]
-    blp = Blueprint("clusters", __name__, url_prefix="/v1")
-
-    def on_init(self, app: object) -> None:
-        # ponytail: flask-smorest 0.47 (the only 0.x release) has no
-        # Api.on_before_request, so the hook is registered app-wide. It must
-        # therefore SCOPE itself to the domain routes it protects: only
-        # /api/v1/* paths that are NOT the auth namespace (auth routes
-        # self-manage via require_auth) and NOT the OpenAPI doc paths.
-        # Everything else — /healthz, /readyz, /api/docs, /api/openapi.json,
-        # the SPA root — must pass through untouched. The upgrade path is
-        # smorest's Api.on_before_request(fn, blueprint=False) when it ships.
-        app.before_request(self._auth)  # type: ignore[attr-defined]
-
-    def _auth(self) -> None:
-        path = request.path
-        # Only enforce auth on /api/v1/* domain routes. Health probes, the
-        # OpenAPI doc, and the SPA live outside /api/v1/ and stay open.
-        if not path.startswith("/api/v1/"):
-            return
-        if path.startswith("/api/v1/auth/"):
-            return  # auth routes are open pre-JWT; /auth/me uses require_auth
-        _auth_check()
-
-    @blp.route("/clusters", methods=["GET"])
-    @blp.doc(responses={401: "UNAUTHORIZED"})
-    def list_clusters(self) -> tuple[object, int]:
-        # Stub — Task 4 implements listing. The 401 comes from on_before_request.
-        return jsonify([]), 200

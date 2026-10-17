@@ -23,6 +23,9 @@ dependencies = [
   "pyjwt>=2.8",
   "gunicorn>=21.2",
   "flask-redis>=0.4,<1.0",
+  "cryptography>=42",
+  "pyyaml>=6.0",
+  "types-pyyaml>=6.0.12.20260906",
 ]
 
 [dependency-groups]
@@ -63,6 +66,36 @@ ignore_missing_imports = true
 # security core and errors modules stay fully checked.
 module = ["app.api.auth"]
 disable_error_code = ["misc", "untyped-decorator", "no-untyped-def"]
+
+[[tool.mypy.overrides]]
+# flask-smorest 0.47's Api is untyped (Any) and its Blueprint decorators are
+# untyped, so domain Api classes and their view functions inherit Any — same
+# treatment as app.api.auth. The service layer (app.services.k8s_client) stays
+# fully checked.
+module = ["app.api.clusters"]
+disable_error_code = ["misc", "untyped-decorator", "no-untyped-def"]
+
+[[tool.mypy.overrides]]
+# R9 stub API surface (Task 6): flask-smorest 0.47's Api is untyped (Any) and
+# its Blueprint decorators are untyped — same treatment as app.api.auth /
+# app.api.clusters. The stub modules' 501 handlers and ADR docstrings stay
+# fully checked; only the Smorest-inherited codes are silenced.
+module = [
+    "app.api.logs", "app.api.metrics", "app.api.traces", "app.api.audit",
+    "app.api.permissions", "app.api.namespaces", "app.api.access",
+    "app.api.kubeconfig", "app.api.admin", "app.api.kubectl_auth",
+    "app.api.resources", "app.api.scim.users", "app.api.scim.groups",
+    "app.api.aggregated.projects", "app.api.aggregated.sso_users",
+    "app.api.aggregated.sso_groups",
+]
+disable_error_code = ["misc", "untyped-decorator", "no-untyped-def"]
+
+[[tool.mypy.overrides]]
+# kubernetes ships no py.typed marker (no inline types in the 30.x line);
+# its client objects are typed as Any at the seam — the pool's factory seam
+# keeps the rest of the codebase fully checked.
+module = ["kubernetes.*"]
+ignore_missing_imports = true
 
 [[tool.mypy.overrides]]
 # flask_sqlalchemy is py.typed, but the db.Model attribute is assigned in
