@@ -16,7 +16,9 @@ class Settings(BaseSettings):
         default="redis://localhost:6379/0",
         validation_alias=AliasChoices("KUBEDASH_REDIS_URL", "REDIS_URL"),
     )
-    kubedash_jwt_secret: str = "dev-jwt-secret"
+    # 32-byte dev default (PyJWT ≥2.10 warns below 32 bytes for HS256); set
+    # KUBEDASH_KUBEDASH_JWT_SECRET in real environments.
+    kubedash_jwt_secret: str = "dev-jwt-secret-32-bytes-long!!!!!01"
     kubedash_secret_key: str = "dev-enc-key-32-bytes-long!!!!"
     kubedash_role: str = "follower"  # leader | follower (ADR-0008)
     kubedash_replica_id: str = "local"

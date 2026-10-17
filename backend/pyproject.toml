@@ -51,9 +51,18 @@ strict = true
 python_version = "3.12"
 
 [[tool.mypy.overrides]]
-# flask_migrate, flask_redis, flask_smorest ship no stubs or py.typed marker.
-module = ["flask_migrate", "flask_redis", "flask_smorest.*"]
+# flask_migrate, flask_redis, flask_smorest, authlib ship no stubs or py.typed
+# marker. jwt (pyjwt) ships inline types, no override needed.
+module = ["flask_migrate", "flask_redis", "flask_smorest.*", "authlib.*"]
 ignore_missing_imports = true
+
+[[tool.mypy.overrides]]
+# app.api.auth: flask-smorest 0.47's Api is untyped (Any) and its Blueprint
+# decorators are untyped, so domain Api classes and their view functions
+# inherit Any. Silence exactly those codes for the auth/api module; the
+# security core and errors modules stay fully checked.
+module = ["app.api.auth"]
+disable_error_code = ["misc", "untyped-decorator", "no-untyped-def"]
 
 [[tool.mypy.overrides]]
 # flask_sqlalchemy is py.typed, but the db.Model attribute is assigned in

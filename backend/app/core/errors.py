@@ -17,7 +17,7 @@ class KubeDashHttpError(HTTPException):
 
     error_code: str = "ERROR"
 
-    def __init__(self, message: str, details: dict | None = None):
+    def __init__(self, message: str, details: dict[str, object] | None = None):
         self.details = details
         super().__init__(description=message)
 
@@ -25,8 +25,8 @@ class KubeDashHttpError(HTTPException):
     def message(self) -> str:
         return self.description or ""
 
-    def as_dict(self) -> dict:
-        d: dict = {"code": self.error_code, "message": self.message}
+    def as_dict(self) -> dict[str, object]:
+        d: dict[str, object] = {"code": self.error_code, "message": self.message}
         if self.details:
             d["details"] = self.details
         return d

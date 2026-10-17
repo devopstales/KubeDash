@@ -20,10 +20,10 @@ _CODES = (
 
 
 class Error(ma.Schema):
-    code = ma.fields.String(description="Stable OD-1 error code", enum=list(_CODES))
+    code = ma.fields.String(metadata={"description": f"Stable OD-1 error code: {sorted(_CODES)}"})
     message = ma.fields.String()
     details = ma.fields.Dict(required=False)
 
 
 class ErrorOut(ma.Schema):
-    error = ma.Nested(Error)
+    error = ma.fields.Nested(Error)
