@@ -1,0 +1,3 @@
+# Drop KubeDash sample dashboards (JSON) into this folder.
+# The dashboard provider (../providers.yml) auto-loads them into the
+# "KubeDash" Grafana folder.

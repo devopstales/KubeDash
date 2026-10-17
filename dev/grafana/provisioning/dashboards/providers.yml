@@ -1,0 +1,15 @@
+# Dashboard provider: reads JSON dashboards from the mounted folder so a
+# fresh stack auto-loads any dropped-in dashboard. Place KubeDash sample
+# dashboards (JSON) into ./dev/grafana/provisioning/dashboards/dashboards/
+apiVersion: 1
+
+providers:
+  - name: KubeDash
+    orgId: 1
+    folder: KubeDash
+    type: file
+    disableDeletion: false
+    updateIntervalSeconds: 30
+    allowUiUpdates: true
+    options:
+      path: /etc/grafana/provisioning/dashboards/dashboards

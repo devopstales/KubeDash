@@ -1,0 +1,48 @@
+version: '3'
+
+# Root-level developer-environment orchestration for KubeDash.
+#
+# The Go CLI keeps its own build tasks in cli/Taskfile.yaml; this file owns
+# the docker-compose dev stack (dev/docker-compose.yml). Run from the repo
+# root:  task dev-up / dev-down / dev-clean / dev-logs / dev-ps
+#
+# `-f` points at the compose file by absolute path. Compose v2 resolves
+# service-relative paths (e.g. ./prometheus/prometheus.yml) against the
+# compose file's directory (dev/), not the CWD, so these commands work from
+# any subdirectory of the repo.
+#
+# NOTE: every cmd string is quoted. A YAML scalar that begins with `{{`
+# (Go-template delimiters) otherwise fails to parse, so the quotes are load-bearing.
+
+vars:
+  # Compose v2 invocation for the dev stack. {{.TASKFILE_DIR}} is the directory
+  # holding this Taskfile (the repo root), so the -f path is absolute and works
+  # from any subdirectory. Quoted because the Go template delimiters make an
+  # unquoted scalar unparseable.
+  COMPOSE: "docker compose -f {{.TASKFILE_DIR}}/dev/docker-compose.yml"
+
+tasks:
+  dev-up:
+    desc: "Start the dev environment (postgres, redis, prometheus, grafana, jaeger)"
+    cmds:
+      - "{{.COMPOSE}} up -d"
+
+  dev-down:
+    desc: "Stop the dev environment (keeps data volumes)"
+    cmds:
+      - "{{.COMPOSE}} down"
+
+  dev-clean:
+    desc: "Stop the dev environment AND delete data volumes (destructive)"
+    cmds:
+      - "{{.COMPOSE}} down -v"
+
+  dev-logs:
+    desc: "Tail dev environment logs"
+    cmds:
+      - "{{.COMPOSE}} logs -f"
+
+  dev-ps:
+    desc: "Show dev environment status/health"
+    cmds:
+      - "{{.COMPOSE}} ps"

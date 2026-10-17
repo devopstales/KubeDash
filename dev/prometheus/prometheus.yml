@@ -1,0 +1,22 @@
+# KubeDash dev Prometheus.
+#
+# Query-only (ARCHITECTURE.md §6): the app reads metrics from Prometheus, it
+# does not scrape itself. This dev instance self-scrapes so there is at least
+# one live series to query, and Grafana has something to plot.
+global:
+  scrape_interval: 15s
+  evaluation_interval: 15s
+
+scrape_configs:
+  - job_name: prometheus
+    static_configs:
+      - targets:
+          - "localhost:9090"
+
+  # Add the real backends here as the dev stack grows, e.g.:
+  # - job_name: cadvisor
+  #   static_configs:
+  #     - targets: ["cadvisor:8080"]
+  # - job_name: kube-state-metrics
+  #   static_configs:
+  #     - targets: ["kube-state-metrics:8080"]
