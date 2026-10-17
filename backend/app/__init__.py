@@ -3,9 +3,15 @@ from collections.abc import Mapping
 from flask import Flask, Response, jsonify
 from werkzeug.exceptions import HTTPException
 
+from app import models  # noqa: F401
 from app.api import register_apis
 from app.core.config import get_settings
 from app.extensions import api, db, migrate, redis_client
+
+# `app.models` is imported for side effect only: it registers every table on
+# db.metadata so db.create_all() (conftest) and Alembic autogenerate see the
+# models. The factory stays pure — the Leader election thread is started from
+# wsgi.py / the RQ worker (Task 7), never here.
 
 
 def create_app(config_overrides: Mapping[str, object] | None = None) -> Flask:

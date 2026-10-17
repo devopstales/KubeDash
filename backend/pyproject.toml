@@ -50,6 +50,14 @@ python_version = "3.12"
 module = ["flask_migrate", "flask_redis", "flask_smorest.*"]
 ignore_missing_imports = true
 
+[[tool.mypy.overrides]]
+# flask_sqlalchemy is py.typed, but the db.Model attribute is assigned in
+# __init__ (untyped -> Any), so `class X(db.Model)` trips name-defined +
+# subclass-Any under --strict. Silence exactly those two codes for model
+# classes; everything else in the models stays fully checked.
+module = ["app.models.*"]
+disable_error_code = ["name-defined", "misc"]
+
 [tool.pytest.ini_options]
 testpaths = ["tests"]
 # Make the `app` package importable when pytest runs with rootdir=backend/
