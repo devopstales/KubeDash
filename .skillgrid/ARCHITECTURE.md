@@ -225,7 +225,7 @@ KubeDash/
 │   │   └── httpclient/          ← TLS-configured HTTP client
 │   ├── internal/testutil/       ← in-process mock OIDC provider
 │   ├── testdata/                ← sample kubeconfig for integration tests
-│   ├── Makefile                 ← cross-compile (5 targets)
+│   ├── Taskfile.yaml            ← go-task: build + cross (5 combos)
 │   └── .krew.yaml               ← Krew manifest
 ├── charts/kubedash/             ← Helm chart
 │   ├── Chart.yaml

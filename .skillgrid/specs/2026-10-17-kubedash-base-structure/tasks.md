@@ -168,10 +168,10 @@ Chain strategy: pending
 ### TICKET-11 — Go CLI skeleton
 
 - **Tracker ID:** TASK-012 (milestone m-0)
-- **Scope:** Blueprint Task 11. `cli/` Go module (1.22), cobra root + `version` (real, ldflags-overridable) + `get-token`/`clean`/`setup` (exit-2 stubs pointing at the in-flight plugin blueprint), `Makefile` (build + 5-target cross), `.krew.yaml`.
-- **Acceptance:** `cd cli && go vet ./... && go test ./... && make build && ./kubedash version` → `kubedash 0.1.0`; `./kubedash get-token` exits 2 with the pointer message, no panic.
+- **Scope:** Blueprint Task 11. `cli/` Go module (1.22), cobra root + `version` (real, ldflags-overridable) + `get-token`/`clean`/`setup` (exit-2 stubs pointing at the in-flight plugin blueprint), `Taskfile.yaml` (go-task: build + 5-combo cross), `.krew.yaml`.
+- **Acceptance:** `cd cli && go vet ./... && go test ./... && task build && ./kubedash version` → `kubedash 0.1.0`; `./kubedash get-token` exits 2 with the pointer message, no panic.
 - **SATISFIES:** `cli-version-prints`
-- **Files:** `cli/{main.go,go.mod,Makefile,.krew.yaml}`, `cli/cmd/{root,version,get_token,clean,setup}.go`, `cli/cmd/version_test.go` (~10 files, ~300 lines)
+- **Files:** `cli/{main.go,go.mod,Taskfile.yaml,.krew.yaml}`, `cli/cmd/{root,version,get_token,clean,setup}.go`, `cli/cmd/version_test.go` (~10 files, ~300 lines)
 - **Size:** ~300 (S)
 - **Blocks:** none
 - **Blocked by:** none (parallel in Wave 1)

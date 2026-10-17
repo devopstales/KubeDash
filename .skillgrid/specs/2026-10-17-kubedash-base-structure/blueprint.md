@@ -57,7 +57,7 @@
 - `backend/wsgi.py`, `backend/migrations/` (initial revision), `backend/pyproject.toml`, `backend/Dockerfile`
 - `backend/tests/conftest.py` + `tests/api/`, `tests/services/`, `tests/core/`, `tests/test_file_map.py`
 - `frontend/` (template + `views/Login|Clusters|Cluster/`, `lib/api.ts`, `store/`, `hooks/`, `tests/`, `e2e/`)
-- `cli/{main.go,go.mod,cmd/{version,get_token,clean,setup}.go,Makefile,.krew.yaml}`
+- `cli/{main.go,go.mod,cmd/{version,get_token,clean,setup}.go,Taskfile.yaml,.krew.yaml}`
 - `charts/kubedash/{Chart.yaml,values.yaml,templates/*}`
 - `.github/workflows/{ci.yaml,e2e.yaml}`
 
@@ -79,7 +79,7 @@
 
 | Boundary | Applicability | Design response | Planned RED test |
 |---|---|---|---|
-| Shell commands | Applicable: `Dockerfile` (pnpm/uv/gunicorn), `Makefile` (go cross-compile), CI steps, `helm` in chart template tests | No `sh -c` string concatenation of user input; all invocations use fixed arg lists; `helm template` input is values.yaml, not request data | T12 image build; T13 template render; a test asserts `Dockerfile` RUN lines contain no unquoted `$(...)` from ARGs (grep-based) |
+| Shell commands | Applicable: `Dockerfile` (pnpm/uv/gunicorn), `Taskfile.yaml` (go-task, go cross-compile), CI steps, `helm` in chart template tests | No `sh -c` string concatenation of user input; all invocations use fixed arg lists; `helm template` input is values.yaml, not request data | T12 image build; T13 template render; a test asserts `Dockerfile` RUN lines contain no unquoted `$(...)` from ARGs (grep-based) |
 | Subprocesses | Applicable: `cli/` prints to stdout — kubectl parses `ExecCredential` JSON (owned by the in-flight plugin change; this change only stubs `get-token`); `go test` runs the cobra tree | `version`/`get-token` write only to stdout/stderr via cobra; no `os/exec` in this change's `cli/` code | T14: capture stdout of `version` exactly; `get-token` exit code 2, no panic trace |
 | Version-control automation | N/A: this change adds no git hooks, PR automation, or branch logic (CI is a consumer, not a mutator) | — | — |
 | Executable-file classification | Applicable: the built SPA is served as static files by Flask; image entrypoint is `gunicorn` | Catch-all registered after API routes only; static served via `send_from_directory` (no `send_file` with user path); image runs as non-root UID 10001 | T11: `/api/v1/clusters` not shadowed; `GET /` returns `index.html` content-type html; `docker run` entrypoint check (T12) |
@@ -141,7 +141,7 @@
 - `frontend/tests/` — Vitest + RTL + MSW for the three views; `frontend/e2e/smoke.spec.ts` — Playwright login→pods journey
 
 **CLI:**
-- `cli/main.go`, `cli/go.mod` (module `github.com/org/kubedash-cli`), `cli/cmd/{version,get_token,clean,setup}.go`, `cli/Makefile` (5 cross-compile targets), `cli/.krew.yaml`
+- `cli/main.go`, `cli/go.mod` (module `github.com/org/kubedash-cli`), `cli/cmd/{version,get_token,clean,setup}.go`, `cli/Taskfile.yaml` (go-task: build + 5 cross-compile combos), `cli/.krew.yaml`
 
 **Chart + CI + root:**
 - `charts/kubedash/{Chart.yaml,values.yaml,templates/{deployment,service,configmap,secret,_helpers}.tpl}`
@@ -2667,13 +2667,13 @@ Task: 10
 - Create: `cli/cmd/get_token.go`
 - Create: `cli/cmd/clean.go`
 - Create: `cli/cmd/setup.go`
-- Create: `cli/Makefile`
+- Create: `cli/Taskfile.yaml`
 - Create: `cli/.krew.yaml`
 - Test: `cli/cmd/version_test.go`
 
 **Interfaces:**
 - Consumes: nothing (cobra only — the oauth2/keyring deps are the in-flight plugin change's)
-- Produces: `kubedash version` → `kubedash <version>` on stdout (version from `var version = "0.1.0"` overridable via `-ldflags "-X main.version=..."`, printed by `main.Execute()`); `kubedash get-token` → exits 2, stderr `get-token: not yet implemented (see .skillgrid/specs/2026-10-17-kubectl-oidc-plugin/blueprint.md)`; `clean` / `setup` → same not-implemented shape; `Makefile` targets `build` (local) + `cross` (5 combos: darwin/amd64, darwin/arm64, linux/amd64, linux/arm64, windows/amd64, `CGO_ENABLED=0`)
+- Produces: `kubedash version` → `kubedash <version>` on stdout (version from `var version = "0.1.0"` overridable via `-ldflags "-X main.version=..."`, printed by `main.Execute()`); `kubedash get-token` → exits 2, stderr `get-token: not yet implemented (see .skillgrid/specs/2026-10-17-kubectl-oidc-plugin/blueprint.md)`; `clean` / `setup` → same not-implemented shape; `Taskfile.yaml` (go-task) tasks `build` (local) + `cross` (5 combos: darwin/amd64, darwin/arm64, linux/amd64, linux/arm64, windows/amd64, `CGO_ENABLED=0`)
 - Seam: cobra command tree — `get-token`'s body is where the plugin change plugs its `pkg/oidc` flow
 - Deletion test: delete `cli/` and the in-flight plugin change has no module to land its `pkg/` packages in
 - Adapters: 1 (local binary) — no seam needed
@@ -2751,18 +2751,31 @@ var getTokenCmd = &cobra.Command{
 ```
 
 `clean.go` / `setup.go` — same not-implemented shape. `go mod tidy` adds
-`cobra`. `Makefile`:
+`cobra`. `Taskfile.yaml` (go-task):
 
-```make
-BIN=kubedash
-VERSION ?= 0.1.0
-build:
-	CGO_ENABLED=0 go build -ldflags "-X cmd.version=$(VERSION)" -o $(BIN) .
-cross:
-	for t in darwin_amd64 darwin_arm64 linux_amd64 linux_arm64 windows_amd64; do \
-	  os=$${t%_*}; arch=$${t#*_}; ext=""; [ $$os = windows ] && ext=.exe; \
-	  CGO_ENABLED=0 GOOS=$$os GOARCH=$$arch go build -ldflags "-X cmd.version=$(VERSION)" -o dist/$(BIN)-$$os-$$arch$$ext .; \
-	done
+```yaml
+version: '3'
+
+env:
+  VERSION: "0.1.0"   # override: task build VERSION=1.2.3
+
+vars:
+  BIN: kubedash
+  # -X requires the full import path of the package containing the variable;
+  # the bare "cmd.version" is silently ignored by go tool link.
+  VERSIONSYM: github.com/org/kubedash-cli/cmd.version
+
+tasks:
+  build:
+    cmds:
+      - CGO_ENABLED=0 go build -ldflags "-X {{.VERSIONSYM}}={{.VERSION}}" -o {{.BIN}} .
+  cross:
+    cmds:
+      - for t in darwin_amd64 darwin_arm64 linux_amd64 linux_arm64 windows_amd64; do
+          os=${t%_*}; arch=${t#*_}; ext="";
+          [ "$os" = "windows" ] && ext=".exe";
+          CGO_ENABLED=0 GOOS=$os GOARCH=$arch go build -ldflags "-X {{.VERSIONSYM}}={{.VERSION}}" -o dist/{{.BIN}}-$os-$arch$ext .;
+        done
 ```
 
 `.krew.yaml` — standard krew manifest (versioned binary references, 5
@@ -2770,7 +2783,7 @@ platforms), `version: v0.1.0`.
 
 - [ ] **Step 4: Run tests to verify they pass**
 
-Run: `cd cli && go vet ./... && go test ./... && make build && ./kubedash version && ./kubedash get-token; test $? -eq 2`
+Run: `cd cli && go vet ./... && go test ./... && task build && ./kubedash version && ./kubedash get-token; test $? -eq 2`
 Expected: all pass; `version` prints `kubedash 0.1.0`; `get-token` exits 2
 
 - [ ] **Step 5: Commit**
@@ -2898,7 +2911,7 @@ Feature: KubeDash 5.0 base structure tracer spine
 
 `README.md` — 5.0 layout tree (from ARCHITECTURE.md §2), per-component
 quickstart (backend: `cd backend && uv sync && uv run pytest`; frontend:
-`cd frontend && pnpm i && pnpm dev`; cli: `cd cli && make build`; chart:
+`cd frontend && pnpm i && pnpm dev`; cli: `cd cli && task build`; chart:
 `helm lint charts/kubedash`), the env-var table from §3.8, and a pointer to
 `.skillgrid/ARCHITECTURE.md` + `ASSUMPTIONS.md`. `.gitignore` additions per
 the Files list.
@@ -2907,7 +2920,7 @@ the Files list.
 
 Run: `cd backend && uv run pytest -v` (full, incl. integration if kind available)
 Run: `cd frontend && pnpm test && pnpm exec tsc --noEmit && pnpm lint && pnpm build`
-Run: `cd cli && go vet ./... && go test ./... && make build`
+Run: `cd cli && go vet ./... && go test ./... && task build`
 Run: `helm lint charts/kubedash && helm template t charts/kubedash > /dev/null`
 Run: `docker build -f backend/Dockerfile -t kubedash:base-structure .` (if Docker)
 Expected: all green — record any environment-blocked check (no Docker/kind) as a task note, not a silent skip

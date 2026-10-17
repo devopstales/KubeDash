@@ -94,7 +94,7 @@ users:
 | A7 | `backend/app/api/kubectl_auth.py` — Smorest `Api` for `/kubectl/auth/*` |
 | A8 | `backend/app/services/kubectl_auth.py` — server-side SSO config resolution |
 | A9 | `charts/kubedash/templates/kubectl-auth-configmap.yaml` — Helm: SSO config as ConfigMap |
-| A10 | `Makefile` — cross-compile targets for 5 OS/arch combos |
+| A10 | `Taskfile.yaml` (go-task) — `build` + `cross` targets for 5 OS/arch combos |
 | A11 | `.krew.yaml` — Krew manifest |
 | A12 | `docs/setup.md` — user + admin setup guide |
 
@@ -166,7 +166,7 @@ KubeDash/
 │   │       └── mock_oidc.go      ← in-process OIDC provider for tests
 │   ├── testdata/
 │   │   └── kubeconfig.yaml       ← sample kubeconfig for integration tests
-│   ├── Makefile                  ← cross-compile (5 targets)
+│   ├── Taskfile.yaml             ← go-task: build + cross (5 combos)
 │   ├── .krew.yaml                ← Krew manifest
 │   └── README.md
 ├── backend/
@@ -526,8 +526,8 @@ KubeDash/
        sha256: <hash>
      # ... (other 4 targets)
    ```
-3. CI workflow: on tag `cli/v*`, run `make cross`, upload `dist/` to GitHub Release, update `.krew.yaml` checksums.
-4. **RED test:** run `make cross` in CI. Verify 5 binaries + SHA256SUMS. Run `file dist/*` → "ELF 64-bit" / "Mach-O 64-bit" / "PE32+".
+3. CI workflow: on tag `cli/v*`, run `task cross`, upload `dist/` to GitHub Release, update `.krew.yaml` checksums.
+4. **RED test:** run `task cross` in CI. Verify 5 binaries + SHA256SUMS. Run `file dist/*` → "ELF 64-bit" / "Mach-O 64-bit" / "PE32+".
 5. **GREEN:** make the test pass.
 
 **Commit:** `feat(cli): cross-compile + Krew manifest + release workflow`
