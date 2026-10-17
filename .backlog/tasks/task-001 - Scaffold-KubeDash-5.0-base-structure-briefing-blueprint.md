@@ -5,7 +5,7 @@ status: In Progress
 assignee:
   - '@paladm'
 created_date: '2026-10-17 11:49'
-updated_date: '2026-10-17 12:53'
+updated_date: '2026-10-17 13:02'
 labels: []
 dependencies: []
 ordinal: 1000
@@ -47,4 +47,6 @@ The repo is on the rebase branch with docs/ADR layer only (no target-stack code)
 Briefing written and approved by user (answer-select: Approved). Scope: 5.0 stack tracer skeleton, spine R1-R5 real, stubs R9, CI R8, test infra R10. Assumptions: ADR-0010 informer deferred, Playwright smoke = full journey.
 
 Blueprint written (12 tasks). Critic subagent: NEEDS FIXES, 20 findings (4 CRIT/6 HIGH/6 MED/4 LOW). User chose 'Fix all' — all resolved inline, resolution log in blueprint.md. Awaiting final user approval.
+
+Sliced: 12 tickets in 8 waves (tasks.md). Published to Backlog.md milestone m-0 as TASK-002..TASK-013 (epic TASK-001 tracks the planning). Delivery strategy: ask-on-risk, High line estimate (~4-5.5k), 4 work units suggested.
 <!-- SECTION:NOTES:END -->
