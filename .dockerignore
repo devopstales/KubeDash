@@ -1,0 +1,8 @@
+.git
+node_modules
+*.md
+.skillgrid
+cli
+charts
+**/__pycache__
+.venv
