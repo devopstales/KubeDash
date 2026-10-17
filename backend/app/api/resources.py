@@ -1,25 +1,54 @@
-# ponytail: Task 5 replaces this placeholder with the real ResourceApi (R4).
-# Minimal one-route stub so the R9 file-map guard stays green before Wave 5.
-"""Generic K8s resource CRUD — per .skillgrid/artifacts/04-adr-0004-rbac-proxy-sar.md
-(ADR-0004). Task 5 (Wave 5) overwrites this module with the real
-``/clusters/<id>/resources/<kind>`` route; the route shape below is 501."""
+"""ResourceApi (R4) — the generic cluster-resource list endpoint:
+``GET /api/v1/clusters/<id>/resources/<kind>`` (query ``namespace?``).
+
+Replaces the Task 6 placeholder. The kind routing table ``_KINDS`` is the
+seam later kinds (deployments, services, …) plug into: adding a kind is one
+table row + one ``K8sClient.list_<kind>`` method, no API changes. The ADR-0004
+enforcement point is ``rbac.can`` — asked BEFORE the list, 403 RBAC_DENIED
+on deny; the binding gate is Task 4's ``bound_cluster_or_404`` (404
+CLUSTER_NOT_FOUND, which does not distinguish missing cluster from missing
+binding).
+"""
+from flask import g, request
 from flask_smorest import Api, Blueprint
 
 from app.api._authhook import apply_auth
-from app.core.errors import NotImplementedError_
+from app.core.errors import RbacDeniedError, ResourceKindNotSupportedError
+from app.schemas.resource import ResourceListOut
+from app.services import rbac
+from app.services.k8s_client import bound_cluster_or_404, pool
 
-blp = Blueprint("resources", __name__, url_prefix="/v1")
+#: kind → (K8sClient method, kubernetes api resource name)
+_KINDS: dict[str, tuple[str, str]] = {"pods": ("list_pods", "pods")}
 
 
 class ResourceApi(Api):
+    """The real ``/api/v1/clusters/<id>/resources/<kind>`` route."""
+
     resources_namespace = "resources"
     tags = ["Resources"]
-    blp = blp  # register_apis registers instance.blp
+    blp = Blueprint("resources", __name__, url_prefix="/v1")
 
     def on_init(self, app: object) -> None:
+        # The shared auth-hook pattern (app-wide before_request scoped to
+        # /api/v1/* domain routes): identical to Task 4's ClusterApi.
         apply_auth(app)
 
-    @blp.route("/resources/<kind>", methods=["GET"])
-    @blp.doc(responses={501: "NOT_IMPLEMENTED"})
-    def list_resources(self, kind: str) -> object:
-        raise NotImplementedError_("resources not implemented in base structure")
+    @blp.route("/clusters/<int:cluster_id>/resources/<kind>", methods=["GET"])
+    @blp.response(200, ResourceListOut)
+    @blp.doc(
+        responses={
+            404: "RESOURCE_KIND_NOT_SUPPORTED or CLUSTER_NOT_FOUND (binding gate)",
+            403: "RBAC_DENIED",
+        }
+    )
+    def list_resources(self, cluster_id: int, kind: str) -> dict[str, object]:
+        if kind not in _KINDS:
+            raise ResourceKindNotSupportedError(f"kind '{kind}' not supported")
+        cluster = bound_cluster_or_404(g.current_user, cluster_id)
+        method, api_resource = _KINDS[kind]
+        namespace = request.args.get("namespace")
+        if not rbac.can(g.current_user, cluster, "list", api_resource, namespace, None):
+            raise RbacDeniedError(f"list on {api_resource}")
+        items = getattr(pool.get(cluster), method)(namespace)
+        return {"items": items, "kind": kind, "cluster": cluster.name}

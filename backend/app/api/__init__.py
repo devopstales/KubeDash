@@ -26,7 +26,7 @@ def register_apis(app: Flask, api: Api) -> None:
     from app.api.metrics import MetricsApi
     from app.api.namespaces import NamespacesApi
     from app.api.permissions import PermissionsApi
-    from app.api.resources import ResourceApi  # ponytail: Task 5 replaces this stub
+    from app.api.resources import ResourceApi
     from app.api.scim.groups import ScimGroupsApi
     from app.api.scim.users import ScimUsersApi
     from app.api.traces import TracesApi
