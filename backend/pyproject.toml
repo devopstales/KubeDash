@@ -1,0 +1,56 @@
+[project]
+name = "kubedash-backend"
+version = "0.1.0"
+requires-python = ">=3.12"
+dependencies = [
+  "flask>=3.0",
+  # Flask-Smorest is still 0.47.x on PyPI; >=1.0 does not exist. A 1.0 pin would
+  # make `uv sync` unresolvable, so pin the latest 0.x series instead.
+  "flask-smorest>=0.47,<1.0",
+  "flask-sqlalchemy>=3.1",
+  "flask-migrate>=4.0",
+  "flask-socketio>=5.3",
+  "flask-limiter>=3.5",
+  "pydantic>=2.5",
+  "pydantic-settings>=2.1",
+  "sqlalchemy>=2.0",
+  "psycopg[binary]>=3.1",
+  "redis>=5.0",
+  "rq>=1.16",
+  "kubernetes>=29.0",
+  "httpx>=0.26",
+  "authlib>=1.3",
+  "pyjwt>=2.8",
+  "gunicorn>=21.2",
+]
+
+[dependency-groups]
+dev = [
+  "pytest>=8.0",
+  "testcontainers>=4.0",
+  "ruff>=0.4",
+  "mypy>=1.9",
+  "types-redis",
+]
+
+[tool.ruff]
+line-length = 100
+target-version = "py312"
+
+[tool.ruff.lint]
+select = ["E", "F", "I", "UP", "B", "SIM"]
+
+[tool.mypy]
+strict = true
+python_version = "3.12"
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+# Make the `app` package importable when pytest runs with rootdir=backend/
+# (pytest only puts test-file dirs on sys.path; the app package lives at the top).
+pythonpath = ["."]
+# testcontainers 4.x emits a DeprecationWarning from testcontainers.postgres/redis
+# pointing at testcontainers.community.*; the community modules are thin re-exports
+# of the same classes, so the brief's import path stays. Hide only that warning.
+filterwarnings = ["ignore:.*testcontainers\\.(postgres|redis) is deprecated.*:DeprecationWarning"]
+markers = ["integration: requires a kind cluster (deselect with -m 'not integration')"]

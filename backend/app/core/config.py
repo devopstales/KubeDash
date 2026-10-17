@@ -1,0 +1,40 @@
+from pydantic import AliasChoices, Field
+from pydantic_settings import BaseSettings, SettingsConfigDict
+
+
+class Settings(BaseSettings):
+    model_config = SettingsConfigDict(env_prefix="KUBEDASH_", env_file=".env", extra="ignore")
+
+    flask_env: str = "development"  # development | staging | production
+    # ARCHITECTURE.md §3.8 names these vars without the KUBEDASH_ prefix, so
+    # accept the unprefixed name too (prefix still wins when both are set).
+    database_url: str = Field(
+        default="postgresql://kubedash:kubedash@localhost:5432/kubedash",
+        validation_alias=AliasChoices("KUBEDASH_DATABASE_URL", "DATABASE_URL"),
+    )
+    redis_url: str = Field(
+        default="redis://localhost:6379/0",
+        validation_alias=AliasChoices("KUBEDASH_REDIS_URL", "REDIS_URL"),
+    )
+    kubedash_jwt_secret: str = "dev-jwt-secret"
+    kubedash_secret_key: str = "dev-enc-key-32-bytes-long!!!!"
+    kubedash_role: str = "follower"  # leader | follower (ADR-0008)
+    kubedash_replica_id: str = "local"
+    oidc_client_id: str = ""
+    oidc_client_secret: str = ""
+    oidc_issuer: str = ""
+    cors_origins: str = ""
+    # §7.5 tuning — the two keys this change consumes (the other four are
+    # deferred to the informer change, ADR-0010; see Task 10 Interfaces)
+    first_paint_backstop: str = "5m"  # KUBEDASH_FIRST_PAINT_BACKSTOP
+    namespace_list_timeout: str = "5s"  # KUBEDASH_NAMESPACE_LIST_TIMEOUT
+
+
+_settings: Settings | None = None
+
+
+def get_settings() -> Settings:
+    global _settings
+    if _settings is None:
+        _settings = Settings()
+    return _settings
