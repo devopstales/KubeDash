@@ -145,7 +145,7 @@ def register_static(app: Flask) -> None:
     """Last registration: /api/v1/* and /ws/* win over the SPA catch-all (OD-4).
     Idempotency-guarded: KUBEDASH_STATIC_DIR is read at registration time from
     app.config (set via config_overrides before create_app in tests)."""
-    if app.config.get("_STATIC_REGISTERED"):
+    if app.config.get("_STATIC_REGISTERED", False):
         return
     app.config["_STATIC_REGISTERED"] = True
     from flask import abort, send_from_directory

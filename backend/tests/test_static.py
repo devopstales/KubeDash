@@ -26,6 +26,14 @@ def static_app(pg_container, redis_container, tmp_path):
 def static_client(static_app):
     return static_app.test_client()
 
+def test_register_static_is_idempotent(static_app):
+    # A second explicit call must not re-register routes (OD-4 guard).
+    from app import register_static
+    register_static(static_app)
+    rules = [str(r) for r in static_app.url_map.iter_rules()]
+    assert rules.count("/<path:path_>") == 1
+    assert rules.count("/assets/<path:filename>") == 1
+
 def test_index_served_at_root_and_spa_fallback(static_client):
     r = static_client.get("/")
     assert r.status_code == 200 and b"kubedash" in r.data
