@@ -41,6 +41,11 @@ target-version = "py312"
 [tool.ruff.lint]
 select = ["E", "F", "I", "UP", "B", "SIM"]
 
+# Alembic-generated files are not hand-edited (flask db migrate owns them);
+# the generated import order and 119-char column lines are not lint errors.
+[tool.ruff.lint.per-file-ignores]
+"migrations/**" = ["E501", "I001"]
+
 [tool.mypy]
 strict = true
 python_version = "3.12"
