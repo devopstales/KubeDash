@@ -1,0 +1,62 @@
+/**
+ * Frontend API types — derived from the backend OpenAPI contract
+ * (openapi.json, dumped from Flask-Smorest via the backend test client;
+ * `pnpm exec openapi-typescript openapi.json` generated the raw schema,
+ * these are the view-facing extracts of its components).
+ */
+export interface ErrorEnvelope {
+  error: { code: string; message: string }
+}
+
+export interface Me {
+  sub: string
+  email: string | null
+  display_name: string | null
+  groups: string[]
+  role: string
+}
+
+export interface Cluster {
+  id: number
+  name: string
+  api_server?: string
+  context?: string | null
+  status?: string
+  last_probe_at?: string | null
+}
+
+export interface ClusterIn {
+  name: string
+  api_server: string
+  kubeconfig: string
+  context: string
+}
+
+export interface Health {
+  status: string
+}
+
+/** A Pod item as returned by /api/v1/clusters/<id>/resources/pods. */
+export interface Pod {
+  metadata?: {
+    name?: string
+    namespace?: string
+    [key: string]: unknown
+  }
+  status?: {
+    phase?: string
+    [key: string]: unknown
+  }
+  [key: string]: unknown
+}
+
+export interface ResourceList {
+  kind?: string
+  cluster?: string
+  items: Pod[]
+}
+
+export interface RefreshPair {
+  access: string
+  refresh?: string
+}

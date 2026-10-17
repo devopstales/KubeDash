@@ -1,0 +1,31 @@
+import React from 'react'
+import { CNavItem, CNavTitle } from '@coreui/react'
+import CIcon from '@coreui/icons-react'
+import { cilLayers, cilList } from '@coreui/icons'
+
+/**
+ * Sidebar navigation for the KubeDash SPA shell. The template's demo nav
+ * (components, forms, widgets, ...) is demo material and is not carried
+ * forward; the R5 surface (workflows, settings, docs) will add entries
+ * here when it lands.
+ */
+const _nav = [
+  {
+    component: CNavTitle,
+    name: 'KubeDash',
+  },
+  {
+    component: CNavItem,
+    name: 'Clusters',
+    to: '/clusters',
+    icon: <CIcon icon={cilLayers} customClassName="nav-icon" />,
+  },
+  {
+    component: CNavItem,
+    name: 'Cluster detail',
+    to: '/clusters/1',
+    icon: <CIcon icon={cilList} customClassName="nav-icon" />,
+  },
+]
+
+export default _nav
