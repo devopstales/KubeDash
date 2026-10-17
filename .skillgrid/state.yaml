@@ -7,9 +7,9 @@ pipeline:
   # The in-flight change (newest spec dir with in-flight artifacts).
   current_change: 2026-10-17-kubedash-base-structure
   # Derived from spec-zone artifacts:
-  #   briefing.md present, blueprint.md present, tasks.md present (sliced)
-  #   => slicing done, execution next.
-  current_phase: slicing
+  #   briefing.md present, blueprint.md present, tasks.md present (sliced),
+  #   all 12 tasks dispatched => executing.
+  current_phase: executing
   # Note: 2026-10-17-kubectl-oidc-plugin remains in flight (blueprint done,
   # awaiting slicing); it targets the stack this change scaffolds, so it
   # should start only after base-structure lands its backend spine.

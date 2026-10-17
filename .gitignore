@@ -1,0 +1,18 @@
+__pycache__/
+*.pyc
+.venv/
+.pytest_cache/
+.mypy_cache/
+.ruff_cache/
+
+# task multi-up / multi-logs state (instance logs)
+tmp/
+
+# tooling
+.opencode/
+.repocodex/
+
+# KubeDash 5.0 monorepo artifacts
+frontend/node_modules
+frontend/dist
+cli/dist
