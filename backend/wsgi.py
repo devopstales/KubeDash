@@ -98,4 +98,5 @@ def _start_worker_if_leader() -> None:
 _start_worker_if_leader()
 
 if __name__ == "__main__":
-    app.run(port=8080)
+    import os
+    app.run(port=int(os.environ.get("FLASK_RUN_PORT", "8080")))

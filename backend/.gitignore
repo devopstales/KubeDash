@@ -5,3 +5,7 @@ __pycache__/
 .mypy_cache/
 .ruff_cache/
 .env
+
+# local evidence artifacts (not part of the app)
+smoke_task*.py
+.coverage
