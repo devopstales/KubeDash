@@ -1,0 +1,53 @@
+name: e2e
+on:
+  push:
+    branches: [main]
+jobs:
+  e2e:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with: { node-version: 20 }
+      - uses: docker/setup-buildx-action@v3
+      - name: Build + load the single image (Task 9 contract)
+        uses: docker/build-push-action@v6
+        with:
+          context: .
+          file: backend/Dockerfile
+          tags: ghcr.io/org/kubedash:ci
+          load: true
+      - uses: helm/kind-action@v1.12.0
+      - name: Run the mock OIDC (CI service container, port 9096)
+        working-directory: e2e
+        run: |
+          python -m pip install -q flask
+          nohup python oidc-mock.py > oidc-mock.log 2>&1 &
+          for i in $(seq 1 30); do
+            curl -sf http://localhost:9096/.well-known/openid-configuration && break
+            sleep 1
+          done
+      - name: Install with dev values + OIDC → mock (port 9096)
+        run: |
+          helm install kubedash charts/kubedash \
+            --set image.repository=ghcr.io/org/kubedash \
+            --set image.tag=ci \
+            --set image.pullPolicy=Never \
+            --set auth.oidc.issuer=http://localhost:9096 \
+            --set auth.oidc.clientId=kubedash \
+            --set auth.oidc.clientSecret=e2e-secret \
+            --set databaseUrl="postgresql://kubedash:kubedash@localhost:5432/kubedash" \
+            --set redisUrl="redis://localhost:6379/0"
+      - name: Wait for the app to be reachable
+        run: |
+          for i in $(seq 1 60); do
+            curl -sf http://localhost:8080/healthz && break
+            sleep 2
+          done
+      - name: Run Playwright smoke
+        working-directory: frontend
+        run: |
+          corepack pnpm install --frozen-lockfile
+          corepack pnpm exec playwright install --with-deps chromium
+          E2E_BASE_URL="http://localhost:8080" \
+            corepack pnpm exec playwright test e2e/smoke.spec.ts

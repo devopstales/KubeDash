@@ -1,0 +1,63 @@
+name: ci
+on:
+  pull_request:
+  push:
+    branches: [rebase, main]
+jobs:
+  backend:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: astral-sh/setup-uv@v3
+      - run: uv sync
+        working-directory: backend
+      - run: uv run ruff check . && uv run mypy app
+        working-directory: backend
+      - run: uv run pytest -m "not integration"
+        working-directory: backend
+  frontend:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: pnpm/action-setup@v4
+      - uses: actions/setup-node@v4
+        with: { node-version: 20, cache: pnpm }
+      - run: pnpm install --frozen-lockfile
+        working-directory: frontend
+      - run: pnpm exec tsc --noEmit && pnpm lint && pnpm build
+        working-directory: frontend
+  cli:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-go@v5
+        with: { go-version: "1.22" }
+      - run: go vet ./... && go test ./...
+        working-directory: cli
+  chart:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: azure/setup-helm@v4
+      - run: helm lint charts/kubedash && helm template t charts/kubedash > /dev/null
+      - uses: astral-sh/setup-uv@v3
+      - run: uv sync
+        working-directory: backend
+      - run: uv run pytest tests/test_chart.py
+        working-directory: backend
+  image:
+    runs-on: ubuntu-latest
+    needs: [frontend, backend]
+    steps:
+      - uses: actions/checkout@v4
+      - uses: docker/setup-buildx-action@v3
+      - uses: docker/build-push-action@v6
+        with: { context: ., file: backend/Dockerfile, tags: kubedash:ci, load: true }
+      - uses: aquasecurity/trivy-action@0.24.0
+        with: { image-ref: kubedash:ci, severity: CRITICAL, exit-code: "1" }
+  lint-workflows:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - run: |
+          docker run --rm -v "${{ github.workspace }}":/wt rhysd/actionlint
