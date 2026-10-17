@@ -1,27 +1,57 @@
 version: '3'
 
-# Root-level developer-environment orchestration for KubeDash.
+# KubeDash root Taskfile — single entry point for all repo tasks.
 #
-# The Go CLI keeps its own build tasks in cli/Taskfile.yaml; this file owns
-# the docker-compose dev stack (dev/docker-compose.yml). Run from the repo
-# root:  task dev-up / dev-down / dev-clean / dev-logs / dev-ps
+#   CLI build tasks  (build, cross)   -> run in ./cli (dir: cli)
+#   Dev env tasks    (dev-*)          -> docker-compose stack in ./dev
 #
-# `-f` points at the compose file by absolute path. Compose v2 resolves
-# service-relative paths (e.g. ./prometheus/prometheus.yml) against the
-# compose file's directory (dev/), not the CWD, so these commands work from
-# any subdirectory of the repo.
+# Every task is CWD-independent: `dir` and the compose `-f` path resolve
+# relative to this file's location, so `task <name>` works from any
+# subdirectory of the repo.
 #
-# NOTE: every cmd string is quoted. A YAML scalar that begins with `{{`
-# (Go-template delimiters) otherwise fails to parse, so the quotes are load-bearing.
+# NOTE: every cmd/var string that embeds Go-template delimiters (`{{...}}`)
+# is quoted — a YAML scalar that *starts* with `{{` is otherwise
+# unparseable, so the quotes are load-bearing.
+
+# `env` is merged into every task's environment, so it's the cleanest way to
+# expose an overridable VERSION (task build VERSION=1.2.3) to the templates.
+env:
+  VERSION: "0.1.0"
 
 vars:
-  # Compose v2 invocation for the dev stack. {{.TASKFILE_DIR}} is the directory
-  # holding this Taskfile (the repo root), so the -f path is absolute and works
-  # from any subdirectory. Quoted because the Go template delimiters make an
-  # unquoted scalar unparseable.
+  # Compose v2 invocation for the dev stack. {{.TASKFILE_DIR}} is the
+  # directory holding this Taskfile (the repo root), so the -f path is
+  # absolute and CWD-independent. Quoted (template delimiters).
   COMPOSE: "docker compose -f {{.TASKFILE_DIR}}/dev/docker-compose.yml"
 
+  # Go CLI: full import path of the package holding the `version` symbol.
+  # -X needs the full import path; the bare package name "cmd.version" is
+  # silently ignored by go tool link, so ldflags would no-op without warning.
+  VERSIONSYM: github.com/org/kubedash-cli/cmd.version
+  BIN: kubedash
+
 tasks:
+  # ---- CLI build (runs in ./cli) -------------------------------------------
+
+  build:
+    desc: "Build kubedash for the current platform (override version: task build VERSION=1.2.3)"
+    dir: cli
+    cmds:
+      - "CGO_ENABLED=0 go build -ldflags \"-X {{.VERSIONSYM}}={{.VERSION}}\" -o {{.BIN}} ."
+
+  cross:
+    desc: "Cross-compile for 5 OS/arch combos into cli/dist/"
+    dir: cli
+    cmds:
+      - |
+        for t in darwin_amd64 darwin_arm64 linux_amd64 linux_arm64 windows_amd64; do
+          os=${t%_*}; arch=${t#*_}; ext="";
+          [ "$os" = "windows" ] && ext=".exe";
+          CGO_ENABLED=0 GOOS=$os GOARCH=$arch go build -ldflags "-X {{.VERSIONSYM}}={{.VERSION}}" -o dist/{{.BIN}}-$os-$arch$ext .;
+        done
+
+  # ---- Dev environment (docker-compose stack in ./dev) ---------------------
+
   dev-up:
     desc: "Start the dev environment (postgres, redis, prometheus, grafana, jaeger)"
     cmds:
