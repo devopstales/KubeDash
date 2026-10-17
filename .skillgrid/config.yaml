@@ -1,0 +1,32 @@
+# KubeDash skillgrid configuration
+# Validated with the user on 2026-10-17 (onboarding).
+
+project: kubedash
+
+# Where the knowledge base + ADRs + specs live.
+conventions:
+  artifacts: .skillgrid/artifacts
+  specs_root: .skillgrid/specs
+  archive_root: .skillgrid/archive
+  state_file: .skillgrid/state.yaml
+
+# ADR body shape (validated choice). The 7 existing ADRs (0014-0020) were
+# authored madr-minimal; new ADRs use madr-full. The LOCKED index in
+# ASSUMPTIONS.md is the in-force source of truth.
+adr_style: madr-full
+
+# ADR numbering: 4-digit, monotonic, never reused. Highest in use: 0020.
+adr:
+  zero_padded: 4
+  highest_sequence: 20
+
+# Backlog.md tracker: every ADR also gets a .backlog/decisions/decision-NNN
+# copy (validated choice). NNN is the ADR number zero-padded to 3.
+ticketing:
+  type: backlogmd
+  zero_padded_ids: 3
+  decisions_dir: .backlog/decisions
+
+# Mnemonic recall over the knowledge base (validated choice: enabled).
+mnemonic:
+  enabled: true
