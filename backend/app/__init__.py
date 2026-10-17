@@ -32,6 +32,12 @@ def create_app(config_overrides: Mapping[str, object] | None = None) -> Flask:
         overrides.get("KUBEDASH_REDIS_URL", overrides.get("REDIS_URL", settings.redis_url))
     )
     app.config["TESTING"] = bool(overrides.get("TESTING", False))
+    # Static dir seam (ADR-0006 / OD-4): config_overrides (tests' fake dist) is
+    # applied BEFORE register_static closes over it; the Dockerfile ENV
+    # KUBEDASH_STATIC_DIR=/app/static is the production value.
+    app.config.setdefault(
+        "KUBEDASH_STATIC_DIR", str(overrides.get("KUBEDASH_STATIC_DIR", "/app/static"))
+    )
 
     db.init_app(app)
     migrate.init_app(app, db)
@@ -136,5 +142,31 @@ def register_errors(app: Flask) -> None:
 
 
 def register_static(app: Flask) -> None:
-    """Registered last so /api/v1/* and /ws/* win. SPA fallback in Task 9."""
-    pass
+    """Last registration: /api/v1/* and /ws/* win over the SPA catch-all (OD-4).
+    Idempotency-guarded: KUBEDASH_STATIC_DIR is read at registration time from
+    app.config (set via config_overrides before create_app in tests)."""
+    if app.config.get("_STATIC_REGISTERED"):
+        return
+    app.config["_STATIC_REGISTERED"] = True
+    from flask import abort, send_from_directory
+    static_dir = app.config.get("KUBEDASH_STATIC_DIR", "/app/static")
+
+    @app.get("/assets/<path:filename>")
+    def assets(filename: str) -> Response:
+        resp = send_from_directory(str(static_dir), "assets/" + filename)
+        resp.headers["Cache-Control"] = "immutable, max-age=31536000"
+        return resp
+
+    @app.get("/")
+    def index() -> Response:
+        return spa("")
+
+    @app.get("/<path:path_>")
+    def spa(path_: str) -> Response:
+        if path_.startswith(("api/", "ws/")) or path_.endswith(
+            (".js", ".css", ".ico", ".png", ".json", ".map")
+        ):
+            abort(404)
+        resp = send_from_directory(str(static_dir), "index.html")
+        resp.headers["Cache-Control"] = "no-cache"
+        return resp
