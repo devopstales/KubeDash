@@ -1,7 +1,7 @@
 from collections.abc import Mapping
 
 from flask import Flask, Response, jsonify
-from werkzeug.exceptions import HTTPException
+from werkzeug.exceptions import HTTPException, Unauthorized
 
 from app import models  # noqa: F401
 from app.api import register_apis
@@ -44,6 +44,10 @@ def create_app(config_overrides: Mapping[str, object] | None = None) -> Flask:
     app.config.setdefault("API_TITLE", "KubeDash API")
     app.config.setdefault("API_VERSION", "v1")
     app.config.setdefault("OPENAPI_VERSION", "3.0.3")
+    # apispec 6 MarshmallowPlugin: @blp.doc(responses=(...)) tuples would
+    # confuse its resolver; smorest's default responses (400/404/405/500)
+    # already cover the envelope, so keep doc() calls responses-free.
+    app.config.setdefault("API_SPEC_OPTIONS", {"operationIdHelper": None})
     app.config["OPENAPI_URL_PREFIX"] = "/api"
     # Swagger UI needs BOTH the mount path and the CDN script URL to render;
     # setting only the path leaves the route unregistered (404). The path is
@@ -53,6 +57,11 @@ def create_app(config_overrides: Mapping[str, object] | None = None) -> Flask:
         "https://cdn.jsdelivr.net/npm/swagger-ui-dist@5/swagger-ui-bundle.js"
     )
     api.init_app(app)
+    # Authlib binds the OIDC client to this app (Task 3). The client config is
+    # Settings-driven; tests never reach the IdP (they patch the two seams).
+    from app.core.security import init_oidc
+
+    init_oidc(app)
     # A fresh underlying client per app, bound to THIS app. Never use the
     # module-global redis client with from_url in the factory: it would
     # rebind the first app's client when a second create_app runs (conftest
@@ -63,7 +72,7 @@ def create_app(config_overrides: Mapping[str, object] | None = None) -> Flask:
     # Imported at module top, NOT here: an in-function `from app.api import …`
     # compiles to IMPORT_NAME "app.api", which binds the submodule as a global
     # named `api` and shadows the Smorest Api instance on the next line.
-    register_apis(api)
+    register_apis(app, api)
 
     register_health(app)
     register_errors(app)
@@ -95,13 +104,35 @@ def register_health(app: Flask) -> None:
 
 
 def register_errors(app: Flask) -> None:
+    from app.core.errors import UNAUTHORIZED_STATUS, KubeDashHttpError, StateMismatchError
+
     def on_http_error(err: HTTPException) -> tuple[Response, int]:
+        # OD-1: stable codes win over the legacy name-based envelope.
+        if isinstance(err, StateMismatchError):
+            # consume_state failure is a client mistake (400), not an auth
+            # failure (401) — the dedicated class keeps the mapping exact.
+            return jsonify(error=err.as_dict()), 400
+        if isinstance(err, KubeDashHttpError):
+            return jsonify(error=err.as_dict()), err.code or 500
+        if isinstance(err, Unauthorized):
+            return (
+                jsonify(
+                    error={"code": "UNAUTHORIZED", "message": "missing or invalid token"}
+                ),
+                UNAUTHORIZED_STATUS,
+            )
         return jsonify(error={"code": err.name, "message": err.description}), err.code or 500
+
+    def on_unhandled(_err: Exception) -> tuple[Response, int]:
+        # 10th frozen code: generic message, never the exception repr — no
+        # stack-trace leak out of the envelope.
+        return jsonify(error={"code": "INTERNAL_ERROR", "message": "internal server error"}), 500
 
     # Register via the method, not the @errorhandler decorator: Flask's
     # errorhandler is identity-typed (Callable[[T], T]) and rejects handler
     # return types other than what it infers for the argument.
     app.register_error_handler(HTTPException, on_http_error)
+    app.register_error_handler(Exception, on_unhandled)
 
 
 def register_static(app: Flask) -> None:
