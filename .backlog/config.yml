@@ -1,0 +1,24 @@
+project_name: "KubeDash"
+default_status: "To Do"
+statuses: ["To Do", "In Progress", "Done"]
+labels: []
+types: ["feature", "bug", "enhancement", "refactor", "docs", "chore", "spike", "task"]
+definition_of_done:
+  - Tests pass
+  - Lint and formatting pass
+  - Edge cases covered
+  - No new warnings introduced
+  - Spec/docs updated if behavior changes
+date_format: yyyy-mm-dd
+max_column_width: 20
+default_editor: "nano"
+auto_open_browser: true
+default_port: 6420
+remote_operations: false
+auto_commit: false
+filesystem_only: true
+zero_padded_ids: 3
+bypass_git_hooks: false
+check_active_branches: false
+active_branch_days: 30
+task_prefix: "task"
