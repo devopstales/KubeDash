@@ -44,6 +44,11 @@ select = ["E", "F", "I", "UP", "B", "SIM"]
 strict = true
 python_version = "3.12"
 
+[[tool.mypy.overrides]]
+# flask_migrate ships no stubs or py.typed marker.
+module = "flask_migrate"
+ignore_missing_imports = true
+
 [tool.pytest.ini_options]
 testpaths = ["tests"]
 # Make the `app` package importable when pytest runs with rootdir=backend/

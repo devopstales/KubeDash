@@ -1,6 +1,6 @@
 import redis as redis_lib
 from flask_migrate import Migrate
-from flask_smorest import Api
+from flask_smorest import Api  # type: ignore[import-untyped]
 from flask_sqlalchemy import SQLAlchemy
 
 api = Api()
