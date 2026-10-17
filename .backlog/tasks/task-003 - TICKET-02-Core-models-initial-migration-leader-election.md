@@ -1,9 +1,11 @@
 ---
 id: TASK-003
 title: 'TICKET-02: Core models, initial migration, leader election'
-status: To Do
-assignee: []
+status: Done
+assignee:
+  - '@devopstales'
 created_date: '2026-10-17 12:57'
+updated_date: '2026-10-17 15:34'
 labels: []
 milestone: m-0
 dependencies:

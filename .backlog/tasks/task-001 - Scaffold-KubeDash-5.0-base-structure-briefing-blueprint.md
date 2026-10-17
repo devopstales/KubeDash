@@ -3,9 +3,9 @@ id: TASK-001
 title: Scaffold KubeDash 5.0 base structure (briefing + blueprint)
 status: In Progress
 assignee:
-  - '@paladm'
+  - '@devopstales'
 created_date: '2026-10-17 11:49'
-updated_date: '2026-10-17 13:02'
+updated_date: '2026-10-17 15:34'
 labels: []
 dependencies: []
 ordinal: 1000

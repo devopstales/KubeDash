@@ -1,11 +1,13 @@
 ---
 id: TASK-005
 title: >-
-  TICKET-04: Cluster registry — encrypted kubeconfig + client pool + binding
+  TICKET-04: Cluster registry - encrypted kubeconfig + client pool + binding
   gate
-status: To Do
-assignee: []
+status: In Progress
+assignee:
+  - '@devopstales'
 created_date: '2026-10-17 12:58'
+updated_date: '2026-10-17 15:34'
 labels: []
 milestone: m-0
 dependencies:

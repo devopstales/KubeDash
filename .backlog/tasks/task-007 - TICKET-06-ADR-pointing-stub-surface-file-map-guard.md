@@ -1,9 +1,11 @@
 ---
 id: TASK-007
 title: 'TICKET-06: ADR-pointing stub surface + file-map guard'
-status: To Do
-assignee: []
+status: In Progress
+assignee:
+  - '@devopstales'
 created_date: '2026-10-17 12:59'
+updated_date: '2026-10-17 15:34'
 labels: []
 milestone: m-0
 dependencies:
@@ -47,4 +49,6 @@ SDD ticket: every remaining backend/app/ path from ARCHITECTURE.md §2 as an ADR
 3. Stub models/services/tasks/sockets/aggregated per blueprint Task 6 patterns
 4. tests/test_file_map.py (EXPECTED list incl. aggregated/ + kubectl_auth) + tests/api/test_stubs.py
 5. pytest green; commit (Refs: TASK-003, TASK-004)
+
+TDD RED (test_file_map.py missing paths) -> stub surface -> GREEN; register stub APIs in api/__init__.py (additive); resources.py placeholder (Task 5 overwrites); env-block on Testcontainers tests; Docker-free 501 smoke.
 <!-- SECTION:PLAN:END -->
