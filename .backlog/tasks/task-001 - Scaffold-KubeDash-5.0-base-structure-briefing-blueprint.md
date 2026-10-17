@@ -5,7 +5,7 @@ status: In Progress
 assignee:
   - '@paladm'
 created_date: '2026-10-17 11:49'
-updated_date: '2026-10-17 11:55'
+updated_date: '2026-10-17 12:53'
 labels: []
 dependencies: []
 ordinal: 1000
@@ -45,4 +45,6 @@ The repo is on the rebase branch with docs/ADR layer only (no target-stack code)
 
 <!-- SECTION:NOTES:BEGIN -->
 Briefing written and approved by user (answer-select: Approved). Scope: 5.0 stack tracer skeleton, spine R1-R5 real, stubs R9, CI R8, test infra R10. Assumptions: ADR-0010 informer deferred, Playwright smoke = full journey.
+
+Blueprint written (12 tasks). Critic subagent: NEEDS FIXES, 20 findings (4 CRIT/6 HIGH/6 MED/4 LOW). User chose 'Fix all' — all resolved inline, resolution log in blueprint.md. Awaiting final user approval.
 <!-- SECTION:NOTES:END -->
