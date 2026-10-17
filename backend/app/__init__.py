@@ -3,6 +3,7 @@ from collections.abc import Mapping
 from flask import Flask, Response, jsonify
 from werkzeug.exceptions import HTTPException
 
+from app.api import register_apis
 from app.core.config import get_settings
 from app.extensions import api, db, migrate, redis_client
 
@@ -38,12 +39,24 @@ def create_app(config_overrides: Mapping[str, object] | None = None) -> Flask:
     app.config.setdefault("API_VERSION", "v1")
     app.config.setdefault("OPENAPI_VERSION", "3.0.3")
     app.config["OPENAPI_URL_PREFIX"] = "/api"
+    # Swagger UI needs BOTH the mount path and the CDN script URL to render;
+    # setting only the path leaves the route unregistered (404). The path is
+    # joined UNDER OPENAPI_URL_PREFIX, so "/docs" lands at /api/docs.
+    app.config["OPENAPI_SWAGGER_UI_PATH"] = "/docs"
+    app.config["OPENAPI_SWAGGER_UI_URL"] = (
+        "https://cdn.jsdelivr.net/npm/swagger-ui-dist@5/swagger-ui-bundle.js"
+    )
     api.init_app(app)
-    redis_client.from_url(app.config["KUBEDASH_REDIS_URL"])
+    # A fresh underlying client per app, bound to THIS app. Never use the
+    # module-global redis client with from_url in the factory: it would
+    # rebind the first app's client when a second create_app runs (conftest
+    # builds one app per test). flask-redis' init_app does exactly this.
+    redis_client.init_app(app)
 
-    # register domain APIs (later tasks add their lines; auth in Task 3)
-    from app.api import register_apis
-
+    # Register domain APIs (later tasks add their Api classes there).
+    # Imported at module top, NOT here: an in-function `from app.api import …`
+    # compiles to IMPORT_NAME "app.api", which binds the submodule as a global
+    # named `api` and shadows the Smorest Api instance on the next line.
     register_apis(api)
 
     register_health(app)

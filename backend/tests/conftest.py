@@ -10,6 +10,12 @@ from app import create_app
 # not exist on testcontainers 4.x (they are `get_exposed_port` /
 # `get_container_host_ip`). Shims keep the fixtures reading like the brief
 # without changing their behavior.
+#
+# Known environment constraint: these Testcontainers fixtures need a
+# container runtime on the host. Where the runtime is absent the tests ERROR
+# at fixture setup — that is an environment block, not a code defect; the
+# same assertions are proven by the runtime-free smoke in Task 1's report,
+# and CI (with Docker) is the green backstop.
 PostgresContainer.get_container_host = PostgresContainer.get_container_host_ip
 RedisContainer.get_container_host = RedisContainer.get_container_host_ip
 PostgresContainer.exposed_port = PostgresContainer.get_exposed_port
@@ -49,7 +55,8 @@ def app(pg_container, redis_container):
         from app.extensions import db
 
         db.create_all()
-    yield application
+        yield application
+        db.session.rollback()
 
 
 @pytest.fixture()

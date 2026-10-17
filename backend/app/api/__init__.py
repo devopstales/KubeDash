@@ -1,4 +1,4 @@
-from flask_smorest import Api  # type: ignore[import-untyped]
+from flask_smorest import Api
 
 
 def register_apis(api: Api) -> None:

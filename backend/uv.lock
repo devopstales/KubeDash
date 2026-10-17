@@ -739,6 +739,19 @@ wheels = [
 ]
 
 [[package]]
+name = "flask-redis"
+version = "0.4.0"
+source = { registry = "https://pypi.org/simple" }
+dependencies = [
+    { name = "flask" },
+    { name = "redis" },
+]
+sdist = { url = "https://files.pythonhosted.org/packages/b8/d1/6e5a087e2fd99782451312dd467bbf5f9f64d999de900047dc0854a7d175/flask-redis-0.4.0.tar.gz", hash = "sha256:e1fccc11e7ea35c2a4d68c0b9aa58226a098e45e834d615c7b6c4928b01ddd6c", size = 9906, upload-time = "2019-05-29T10:55:54.195Z" }
+wheels = [
+    { url = "https://files.pythonhosted.org/packages/9d/9c/cead8fff1c8da2bd31a83ec476c3364812ee74f3c7c3445d070555f681d1/flask_redis-0.4.0-py2.py3-none-any.whl", hash = "sha256:8d79eef4eb1217095edab603acc52f935b983ae4b7655ee7c82c0dfd87315d17", size = 8550, upload-time = "2019-05-29T10:55:52.456Z" },
+]
+
+[[package]]
 name = "flask-smorest"
 version = "0.47.0"
 source = { registry = "https://pypi.org/simple" }
@@ -979,6 +992,7 @@ dependencies = [
     { name = "flask" },
     { name = "flask-limiter" },
     { name = "flask-migrate" },
+    { name = "flask-redis" },
     { name = "flask-smorest" },
     { name = "flask-socketio" },
     { name = "flask-sqlalchemy" },
@@ -1009,6 +1023,7 @@ requires-dist = [
     { name = "flask", specifier = ">=3.0" },
     { name = "flask-limiter", specifier = ">=3.5" },
     { name = "flask-migrate", specifier = ">=4.0" },
+    { name = "flask-redis", specifier = ">=0.4,<1.0" },
     { name = "flask-smorest", specifier = ">=0.47,<1.0" },
     { name = "flask-socketio", specifier = ">=5.3" },
     { name = "flask-sqlalchemy", specifier = ">=3.1" },
