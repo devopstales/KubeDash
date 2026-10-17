@@ -113,9 +113,10 @@ def main() -> None:
         # 5. unhandled exception → 500 INTERNAL_ERROR (no leak)
         r3 = c.get("/test/smoke-500")
         assert r3.status_code == 500
-        assert r3.get_json() == {"error": {"code": "INTERNAL_ERROR", "message": "internal server error"}}
+        expected = {"error": {"code": "INTERNAL_ERROR", "message": "internal server error"}}
+        assert r3.get_json() == expected
         assert "secret-smoke-leak" not in r3.get_data(as_text=True)
-        print(f"PASS 5: unhandled → 500 INTERNAL_ERROR (no leak)")
+        print("PASS 5: unhandled → 500 INTERNAL_ERROR (no leak)")
 
         # 6. full login round-trip (mock OIDC) → 302 /?token=...&refresh=...
         r1 = c.post("/api/v1/auth/login")
