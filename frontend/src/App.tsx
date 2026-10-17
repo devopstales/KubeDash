@@ -20,9 +20,12 @@ const ClusterView = React.lazy(() => import('./views/Cluster'))
  * delivers the JWT pair as a query string, so BrowserRouter (not the
  * template's HashRouter) is the right router.
  */
+// ponytail: retry is off by default for this shell — the 401→refresh path
+// in apiFetch is the real retry, and surfacing a persistent 403 (RBAC) is
+// more honest than a spinner. Upgrade path: per-query retry for metrics.
 const queryClient = new QueryClient({
   defaultOptions: {
-    queries: { retry: 1, refetchOnWindowFocus: false },
+    queries: { retry: false, refetchOnWindowFocus: false },
   },
 })
 
@@ -30,6 +33,7 @@ const Fallback = () => <CSpinner color="primary" />
 
 const App = () => {
   const { isColorModeSet, setColorMode } = useColorModes('kubedash-theme')
+  // The template's theme bootstrap: one-time color-mode init.
   if (!isColorModeSet()) {
     setColorMode('light')
   }

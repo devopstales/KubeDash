@@ -65,6 +65,7 @@ const Pods = ({ clusterId }: { clusterId: number }) => {
                       <FontAwesomeIcon
                         icon={faCircle}
                         style={{ color: PHASE_COLOR[phase] ?? '#6c757d', marginRight: '0.5rem' }}
+                        aria-hidden="true"
                       />
                       <span>{phase}</span>
                     </td>
