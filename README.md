@@ -75,8 +75,8 @@ aliases per ARCHITECTURE.md §3.8 accepted):
 |---|---|
 | `KUBEDASH_ROLE` | `leader` runs the RQ worker; `worker` (default) is HTTP-only |
 | `KUBEDASH_REPLICA_ID` | unique replica id (K8s Downward API in the chart) |
-| `KUBEDASH_SECRET_KEY` | AES-256-GCM key for kubeconfig encryption (not the JWT key) |
 | `KUBEDASH_JWT_SECRET` | HS256 JWT signing key |
+| `KUBEDASH_SECRET_KEY` | AES-256-GCM key for kubeconfig encryption (not the JWT key) |
 | `KUBEDASH_DATABASE_URL` / `DATABASE_URL` | PostgreSQL connection string |
 | `KUBEDASH_REDIS_URL` / `REDIS_URL` | Redis connection string (cache + RQ broker) |
 | `KUBEDASH_CORS_ORIGINS` | comma-separated allowed origins |
