@@ -114,4 +114,6 @@ pythonpath = ["."]
 # pointing at testcontainers.community.*; the community modules are thin re-exports
 # of the same classes, so the brief's import path stays. Hide only that warning.
 filterwarnings = ["ignore:.*testcontainers\\.(postgres|redis) is deprecated.*:DeprecationWarning"]
-markers = ["integration: requires a kind cluster (deselect with -m 'not integration')"]
+markers = [
+  "integration: requires a kind cluster or Testcontainers (Postgres + Redis); deselect with -m 'not integration'",
+]

@@ -20,7 +20,10 @@ class Settings(BaseSettings):
     # KUBEDASH_KUBEDASH_JWT_SECRET in real environments.
     kubedash_jwt_secret: str = "dev-jwt-secret-32-bytes-long!!!!!01"
     kubedash_secret_key: str = "dev-enc-key-32-bytes-long!!!!"
-    kubedash_role: str = "follower"  # leader | follower (ADR-0008)
+    # Replica role for the leader-gated RQ worker (ADR-0008): "leader" starts
+    # the worker thread + Leader in wsgi.py; "worker" (default) and any other
+    # value keep this replica worker-only. Env: KUBEDASH_ROLE.
+    kubedash_role: str = "worker"
     kubedash_replica_id: str = "local"
     oidc_client_id: str = ""
     oidc_client_secret: str = ""
