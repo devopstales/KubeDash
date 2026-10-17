@@ -105,7 +105,13 @@ class K8sClient:
         self._loader = _kc.KubeConfigLoader(loaded)  # type: ignore[no-untyped-call]
         self._loader.load_and_set(client_config)  # type: ignore[no-untyped-call]
         self._config = client_config
-        self._v1 = k8s_client.CoreV1Api(k8s_client.ApiClient(self._config))
+        api_client = k8s_client.ApiClient(self._config)
+        self._v1 = k8s_client.CoreV1Api(api_client)
+        # AuthorizationV1Api is the SAR seam: services/rbac.py calls
+        # client._auth_api.create_self_subject_access_review(...) against a
+        # live cluster. (kubernetes 37 has no AuthV1Api — the SAR lives on
+        # AuthorizationV1Api.) Sharing the same ApiClient keeps one auth ctx.
+        self._auth_api = k8s_client.AuthorizationV1Api(api_client)
         self._host = self._v1.api_client.configuration.host
         # The kubeconfig's CA bundle is the TLS verification authority; fall
         # back to the system bundle when the config carries none.
