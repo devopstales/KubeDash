@@ -15,7 +15,11 @@ date: 2026-10-17
 supersedes: none
 ---
 
-## Context and Problem Statement
+**Decision-makers.** KubeDash platform team
+**Consulted.** —
+**Informed.** —
+
+#### Context and Problem Statement
 
 KubeDash discovers users and groups **only at SSO login**: a `users` row is
 created on first login and groups come from that login's `groups` claim. Two
@@ -31,17 +35,27 @@ so it must not reuse user SSO. And SCIM must manage *identity* (who the user
 is, their groups, active state) without entangling the *access* model
 (bindings), which stays an explicit admin/NaaS/PAM action.
 
-## Considered Options
+#### Decision Drivers
 
-- Keep login-driven discovery only. Simplest, but de-provisioning is invisible
-  and group membership is best-effort.
+- **De-provisioning must be visible**: IdP disables → KubeDash rejects login,
+  without a human noticing.
+- **Group membership must be authoritative** (pushed from the IdP, not
+  inferred from one login).
+- The channel must be **machine-to-machine** (not user SSO) with its own
+  scoped credential.
+- **Identity and access must stay decoupled**: a SCIM update never silently
+  changes a user's cluster bindings.
+- It must be the **standard protocol** the source systems (Okta/EntraID/
+  Keycloak) already speak.
+
+#### Considered Options
+
+- Keep login-driven discovery only.
 - A SCIM 2.0 server (RFC 7644) that the IdP/HR source pushes to, with a
-  dedicated machine-to-machine credential. Closes both gaps and is the
-  standard protocol Okta/EntraID/Keycloak already speak.
-- Poll the IdP's user API on a schedule. Works, but is not push, is not
-  standard, and needs per-IdP adapters.
+  dedicated machine-to-machine credential.
+- Poll the IdP's user API on a schedule.
 
-## Decision Outcome
+#### Decision Outcome
 
 Chosen option: "a SCIM 2.0 server the IdP/HR source pushes to", because it is
 the standard protocol the source systems already speak and it makes the IdP
@@ -59,7 +73,7 @@ default (`scim.deleteBindingsOnDeactivate: false`). The filter subset covers
 the Okta/EntraID/Keycloak provisioning cases; the full RFC 7644 filter
 grammar is deferred.
 
-### Consequences
+##### Consequences
 
 - Good, because de-provisioning is now visible (IdP disables → login
   rejected) and group membership is authoritative (pushed, not inferred).
@@ -69,3 +83,50 @@ grammar is deferred.
   resource model to maintain.
 - Bad, because the filter grammar is a subset — an IdP that sends an
   unsupported filter gets a 400 until the full grammar lands (deferred).
+
+##### Confirmation
+
+- A SCIM `active: false` PATCH → `users.status = disabled`; the next login is
+  rejected; bindings are retained.
+- A SCIM user upsert keyed on `externalId` is idempotent (re-POST is a no-op)
+  and out-of-order safe.
+- A SCIM create/update does **not** create bindings (verified: binding count
+  unchanged).
+- An unsupported SCIM filter returns `400` (not a SQL error).
+
+#### Pros and Cons of the Options
+
+##### Login-driven discovery only (status quo)
+
+Users/groups discovered only at SSO login.
+
+- Good, because simplest; no new surface.
+- Neutral, because it reuses the existing login path.
+- Bad, because de-provisioning is invisible and group membership is
+  best-effort (from one login's claim).
+
+##### SCIM 2.0 server (chosen)
+
+The IdP/HR source pushes user/group lifecycle via RFC 7644.
+
+- Good, because de-provisioning is visible, group membership is authoritative,
+  identity/access are decoupled, and it is the standard protocol.
+- Bad, because it adds a second auth surface (SCIM token) + a SCIM resource
+  model.
+- Bad, because the filter grammar is a subset (unsupported filter → 400).
+
+##### Poll the IdP's user API
+
+KubeDash periodically pulls users/groups from the IdP.
+
+- Good, because no change to the IdP side (no push config).
+- Neutral, because it can reuse the OIDC connection.
+- Bad, because it is not push (lagging de-provisioning), not standard, and
+  needs per-IdP adapters.
+
+#### More Information
+
+- OpenUnison's SCIM 2.0 Gateway is the reference pattern.
+- Related: ADR-0015/0016 (bindings — the access model SCIM stays decoupled
+  from), ADR-0014 (a disabled user's existing credentials are still
+  revocable).
