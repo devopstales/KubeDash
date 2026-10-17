@@ -5,6 +5,11 @@ before ``db.create_all()`` (conftest) and Alembic autogenerate (flask db
 migrate). The ``leader_lease`` import is the second line of the two-revision
 OD-3 split: keep it commented out while generating revision 1, restore it for
 revision 2 (see the Task 2 brief).
+
+Stub models (``rbac_template``, ``namespace_request``, ``access_request``,
+``scim_map``, ``audit`` — R9) stay UNIMPORTED here on purpose: their owning
+changes add both the import and the migration, so they do not touch
+``db.metadata`` or the existing revisions yet.
 """
 from app.models.binding import ClusterBinding
 from app.models.cluster import Cluster
