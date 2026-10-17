@@ -52,18 +52,9 @@ class AuthApi(Api):
 
     def on_init(self, app: object) -> None:
         # Auth routes are open (pre-JWT); /auth/me uses require_auth per-route.
-        # ponytail: ClustersApi's hook is registered as app.before_request,
-        # which would run for /auth/* too — skip it here (the upgrade path is
-        # flask-smorest's Api.on_before_request(fn, blueprint=False), which
-        # 0.47 does not ship).
-        app.before_request(self._skip_auth)  # type: ignore[attr-defined]
-
-    def _skip_auth(self) -> None:
-        # Only skip auth for /auth/* routes — the auth routes are open
-        # pre-JWT (login/callback/refresh/logout), and /auth/me uses
-        # require_auth per-route.
-        if request.path.startswith("/api/v1/auth"):
-            request.environ["KD_SKIP_AUTH"] = True
+        # The domain hook (ClustersApi._auth) path-scopes to /api/v1/* and
+        # skips /api/v1/auth/*, so auth needs no opt-out flag here.
+        pass
 
     @blp.route("/auth/login", methods=["POST"])
     @blp.doc(description="Start OIDC login: 302 to /v1/auth/callback?state=<s>&next=<idp>")
@@ -139,15 +130,23 @@ class ClustersApi(Api):
 
     def on_init(self, app: object) -> None:
         # ponytail: flask-smorest 0.47 (the only 0.x release) has no
-        # Api.on_before_request — the app-level hook below is the native
-        # equivalent; auth routes opt out via KD_SKIP_AUTH (set by
-        # AuthApi.on_init). The upgrade path is smorest's
-        # Api.on_before_request(fn, blueprint=False) when it ships.
+        # Api.on_before_request, so the hook is registered app-wide. It must
+        # therefore SCOPE itself to the domain routes it protects: only
+        # /api/v1/* paths that are NOT the auth namespace (auth routes
+        # self-manage via require_auth) and NOT the OpenAPI doc paths.
+        # Everything else — /healthz, /readyz, /api/docs, /api/openapi.json,
+        # the SPA root — must pass through untouched. The upgrade path is
+        # smorest's Api.on_before_request(fn, blueprint=False) when it ships.
         app.before_request(self._auth)  # type: ignore[attr-defined]
 
     def _auth(self) -> None:
-        if request.environ.get("KD_SKIP_AUTH"):
+        path = request.path
+        # Only enforce auth on /api/v1/* domain routes. Health probes, the
+        # OpenAPI doc, and the SPA live outside /api/v1/ and stay open.
+        if not path.startswith("/api/v1/"):
             return
+        if path.startswith("/api/v1/auth/"):
+            return  # auth routes are open pre-JWT; /auth/me uses require_auth
         _auth_check()
 
     @blp.route("/clusters", methods=["GET"])
