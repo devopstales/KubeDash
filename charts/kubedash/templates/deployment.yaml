@@ -1,0 +1,91 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: {{ include "kubedash.fullname" . }}
+  labels:
+    {{- include "kubedash.labels" . | nindent 4 }}
+spec:
+  replicas: {{ .Values.replicaCount }}
+  selector:
+    matchLabels:
+      {{- include "kubedash.selectorLabels" . | nindent 6 }}
+  template:
+    metadata:
+      labels:
+        {{- include "kubedash.selectorLabels" . | nindent 8 }}
+    spec:
+      {{- with .Values.imagePullSecrets }}
+      imagePullSecrets:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
+      containers:
+        - name: kubedash
+          image: "{{ .Values.image.repository }}:{{ .Values.image.tag }}"
+          imagePullPolicy: {{ .Values.image.pullPolicy }}
+          # Non-root: the image sets USER 10001 (Task 9).
+          securityContext:
+            runAsUser: 10001
+            runAsNonRoot: true
+          ports:
+            - name: http
+              containerPort: 8080
+          # Env: values → Settings seam. Only env that Settings (or the image
+          # CMD) actually reads is rendered — env with no Settings field is
+          # silently dropped by pydantic-settings (critic fix, §7.5).
+          env:
+            # Downward API: each replica is named by its Pod (leader election, §7.4)
+            - name: KUBEDASH_REPLICA_ID
+              valueFrom:
+                fieldRef:
+                  fieldPath: metadata.name
+            # All replicas are candidates; the election module decides (§7.4)
+            - name: KUBEDASH_ROLE
+              value: leader
+            - name: DATABASE_URL
+              value: {{ .Values.databaseUrl | quote }}
+            - name: REDIS_URL
+              value: {{ .Values.redisUrl | quote }}
+            # OIDC (Settings: oidc_issuer / oidc_client_id; secret below)
+            - name: KUBEDASH_OIDC_ISSUER
+              value: {{ .Values.auth.oidc.issuer | quote }}
+            - name: KUBEDASH_OIDC_CLIENT_ID
+              value: {{ .Values.auth.oidc.clientId | quote }}
+            - name: OIDC_CLIENT_SECRET
+              valueFrom:
+                secretKeyRef:
+                  name: {{ include "kubedash.fullname" . }}-secrets
+                  key: OIDC_CLIENT_SECRET
+            # JWT / field-encryption keys (Settings: kubedash_jwt_secret / kubedash_secret_key)
+            - name: KUBEDASH_JWT_SECRET
+              valueFrom:
+                secretKeyRef:
+                  name: {{ include "kubedash.fullname" . }}-secrets
+                  key: KUBEDASH_JWT_SECRET
+            - name: KUBEDASH_SECRET_KEY
+              valueFrom:
+                secretKeyRef:
+                  name: {{ include "kubedash.fullname" . }}-secrets
+                  key: KUBEDASH_SECRET_KEY
+            # §7.1 tunables — the image's CMD reads GUNICORN_* directly
+            - name: GUNICORN_WORKERS
+              value: {{ .Values.gunicorn.workers | quote }}
+            - name: GUNICORN_THREADS
+              value: {{ .Values.gunicorn.threads | quote }}
+            # §7.5 tuning — the two keys Settings reads (firstPaintBackstop,
+            # namespaceListTimeout); the other four are ADR-0010's
+            - name: KUBEDASH_FIRST_PAINT_BACKSTOP
+              value: {{ .Values.cluster.firstPaintBackstop | quote }}
+            - name: KUBEDASH_NAMESPACE_LIST_TIMEOUT
+              value: {{ .Values.cluster.namespaceListTimeout | quote }}
+          readinessProbe:
+            httpGet:
+              path: /readyz
+              port: http
+            initialDelaySeconds: 5
+            periodSeconds: 10
+          livenessProbe:
+            httpGet:
+              path: /healthz
+              port: http
+            initialDelaySeconds: 10
+            periodSeconds: 30

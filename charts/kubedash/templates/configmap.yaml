@@ -1,0 +1,14 @@
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: {{ include "kubedash.fullname" . }}-config
+  labels:
+    {{- include "kubedash.labels" . | nindent 4 }}
+data:
+  # Public OIDC config + feature flags (§7.2)
+  oidc-issuer: {{ .Values.auth.oidc.issuer | quote }}
+  oidc-client-id: {{ .Values.auth.oidc.clientId | quote }}
+  feature-exec: {{ .Values.features.exec | quote }}
+  feature-helm-write: {{ .Values.features.helmWrite | quote }}
+  feature-terminal: {{ .Values.features.terminal | quote }}
+  feature-mcp: {{ .Values.features.mcp | quote }}

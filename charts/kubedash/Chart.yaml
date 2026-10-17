@@ -1,0 +1,6 @@
+apiVersion: v2
+name: kubedash
+description: "KubeDash — live cluster dashboard (single container: API + SPA + RQ worker)"
+type: application
+version: 0.1.0
+appVersion: "0.1.0"

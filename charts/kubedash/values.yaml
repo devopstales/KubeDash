@@ -1,0 +1,65 @@
+# KubeDash values — the §7.2 subset with dev defaults (ARCHITECTURE.md §7).
+# prod vs dev clusters differ only in values; no chart fork.
+
+replicaCount: 1
+
+image:
+  repository: ghcr.io/org/kubedash
+  tag: "0.1.0"
+  pullPolicy: IfNotPresent
+
+imagePullSecrets: []
+
+# §7.1 tunables → GUNICORN_WORKERS / GUNICORN_THREADS (the image's CMD reads them)
+gunicorn:
+  workers: 4
+  threads: 2
+
+leaderElection:
+  heartbeatInterval: 10s   # how often leader renews lease
+  staleThreshold: 30s      # how long before a follower takes over
+
+auth:
+  oidc:
+    issuer: ""             # e.g. https://login.example.com
+    clientId: ""
+    clientSecret: ""       # rendered into the Secret (stringData)
+
+# Public OIDC + feature flags live in the ConfigMap (§7.2)
+features:
+  exec: true
+  helmWrite: true
+  terminal: true
+  mcp: true
+
+# §7.5 tuning keys. Only firstPaintBackstop + namespaceListTimeout are
+# rendered as env (they are the only two Settings fields this change adds —
+# see backend/app/core/config.py). The other four are deferred to the
+# informer change (ADR-0010) that first consumes them.
+cluster:
+  firstPaintBackstop: 5m
+  namespaceListTimeout: 5s
+  # --- deferred to ADR-0010 (not rendered as env yet) ---
+  contextSwitchTimeout: 30s
+  maxScopeCandidates: 20
+  listPageSize: 0
+  namespaceScope: false
+
+# External URLs when the subcharts are off (prod). DATABASE_URL / REDIS_URL
+# match the unprefixed Settings aliases (AliasChoices in config.py).
+# Dev defaults match Settings' (config.py) dev defaults so `helm install`
+# works out of the box; prod overrides via --set / values file.
+databaseUrl: "postgresql://kubedash:kubedash@kubedash-postgresql:5432/kubedash"
+redisUrl: "redis://kubedash-redis:6379/0"
+
+secrets:
+  jwtSecret: ""      # empty → Settings' 32-byte dev default
+  secretKey: ""      # empty → Settings' 32-byte dev default
+
+# All-in-one dev subcharts (bitnami) — off by default in the base structure;
+# prod points at external PG/Redis via DATABASE_URL / REDIS_URL.
+postgresql:
+  enabled: false
+
+redis:
+  enabled: false
