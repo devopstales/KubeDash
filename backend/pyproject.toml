@@ -26,6 +26,10 @@ dependencies = [
   "cryptography>=42",
   "pyyaml>=6.0",
   "types-pyyaml>=6.0.12.20260906",
+  # swagger-ui-dist is the NPM package name; the PyPI distribution is
+  # swagger-ui-bundle (module swagger_ui_bundle), which vendors the swagger-ui
+  # dist files. Air-gap (ADR-0020): see app/core/apidocs.py.
+  "swagger-ui-bundle>=1.1,<2",
 ]
 
 [dependency-groups]

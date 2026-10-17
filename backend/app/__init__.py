@@ -17,7 +17,7 @@ from app.extensions import api, db, migrate, redis_client
 def create_app(config_overrides: Mapping[str, object] | None = None) -> Flask:
     settings = get_settings()
     overrides = config_overrides or {}
-    app = Flask(__name__, static_folder=None)
+    app = Flask(__name__, static_folder=None, template_folder="templates")
     # The KUBEDASH_* names and the unprefixed ARCHITECTURE.md §3.8 names
     # (DATABASE_URL, REDIS_URL) are both accepted; where both spellings are
     # given the KUBEDASH_* form wins, and when neither is, the Settings
@@ -55,13 +55,16 @@ def create_app(config_overrides: Mapping[str, object] | None = None) -> Flask:
     # already cover the envelope, so keep doc() calls responses-free.
     app.config.setdefault("API_SPEC_OPTIONS", {"operationIdHelper": None})
     app.config["OPENAPI_URL_PREFIX"] = "/api"
-    # Swagger UI needs BOTH the mount path and the CDN script URL to render;
-    # setting only the path leaves the route unregistered (404). The path is
-    # joined UNDER OPENAPI_URL_PREFIX, so "/docs" lands at /api/docs.
+    # Swagger UI needs BOTH the mount path and the script URL key set to
+    # render; setting only the path leaves the route unregistered (404).
+    # The path is joined UNDER OPENAPI_URL_PREFIX, so "/docs" lands at
+    # /api/docs.
     app.config["OPENAPI_SWAGGER_UI_PATH"] = "/docs"
-    app.config["OPENAPI_SWAGGER_UI_URL"] = (
-        "https://cdn.jsdelivr.net/npm/swagger-ui-dist@5/swagger-ui-bundle.js"
-    )
+    # Local placeholder: keeps the /api/docs route registered (smorest only
+    # registers it when this key is set). The app template (app/templates/
+    # swagger_ui.html) ignores it and points the CSS/JS at /api/docs/* asset
+    # routes, so nothing is fetched from a CDN. Air-gap (ADR-0020).
+    app.config["OPENAPI_SWAGGER_UI_URL"] = "/api/docs/"
     api.init_app(app)
     # Authlib binds the OIDC client to this app (Task 3). The client config is
     # Settings-driven; tests never reach the IdP (they patch the two seams).
@@ -82,6 +85,12 @@ def create_app(config_overrides: Mapping[str, object] | None = None) -> Flask:
 
     register_health(app)
     register_errors(app)
+    # Serve the Swagger UI assets from the vendored package on /api/docs/*
+    # (air-gap, ADR-0020). MUST run before register_static so the SPA
+    # catch-all never sees these paths.
+    from app.core import apidocs
+
+    apidocs.register_asset_routes(app)
     register_static(app)
     return app
 
