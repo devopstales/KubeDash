@@ -1,0 +1,45 @@
+apiVersion: krew.googlecontainertools.github.com/v1alpha2
+kind: Plugin
+metadata:
+  name: kubedash
+  version: v0.1.0
+spec:
+  version: v0.1.0
+  homepage: https://github.com/org/kubedash
+  shortDescription: KubeDash kubectl credential plugin (OIDC)
+  description: |
+    kubectl credential plugin for KubeDash: prints an ExecCredential
+    (get-token) backed by OIDC. Base-structure release: version only.
+  platform:
+  - selector:
+      matchAny:
+      - os: darwin
+        arch: amd64
+    uri: https://github.com/org/kubedash/releases/download/v0.1.0/kubedash-darwin-amd64
+    sha256: TODO
+  - selector:
+      matchAny:
+      - os: darwin
+        arch: arm64
+    uri: https://github.com/org/kubedash/releases/download/v0.1.0/kubedash-darwin-arm64
+    sha256: TODO
+  - selector:
+      matchAny:
+      - os: linux
+        arch: amd64
+    uri: https://github.com/org/kubedash/releases/download/v0.1.0/kubedash-linux-amd64
+    sha256: TODO
+  - selector:
+      matchAny:
+      - os: linux
+        arch: arm64
+    uri: https://github.com/org/kubedash/releases/download/v0.1.0/kubedash-linux-arm64
+    sha256: TODO
+  - selector:
+      matchAny:
+      - os: windows
+        arch: amd64
+    uri: https://github.com/org/kubedash/releases/download/v0.1.0/kubedash-windows-amd64.exe
+    sha256: TODO
+  kind: Binary
+  target: bin
