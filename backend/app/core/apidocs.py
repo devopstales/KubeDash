@@ -50,6 +50,15 @@ def register_asset_routes(app: Flask) -> None:
         filename, media_type = SWAGGER_ASSETS[name]
         return Response(_asset_bytes(filename), mimetype=media_type)
 
+    # Fail at boot, not on first request: a pin/subdir drift (e.g. a future
+    # swagger-ui-bundle 1.x release renaming the vendored dir) must raise here.
+    try:
+        for filename, _ in SWAGGER_ASSETS.values():
+            _asset_bytes(filename)
+    except OSError as exc:
+        msg = f"swagger-ui asset missing from {_DIST_PKG}/{_DIST_SUBDIR}: {filename}"
+        raise RuntimeError(msg) from exc
+
     app.register_blueprint(bp)
 
 

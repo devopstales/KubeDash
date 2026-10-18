@@ -57,28 +57,11 @@ def test_asset_routes_serve_real_files(client):
 
 
 def test_docs_assets_map_to_swagger_assets_not_spa(client):
-    # Route-ordering guard: the asset routes win over the SPA catch-all.
-    # (If register_asset_routes ran AFTER register_static, these 404.)
-    #
-    # NOTE: the blueprint registers ONE rule, /api/docs/<name>, per asset
-    # (Flask url_map has no per-value rules; the blueprint's Step 3 code is a
-    # single dynamic route). The guard therefore asserts (a) the dynamic rule
-    # exists and (b) it does NOT fall through to the SPA catch-all — the
-    # catch-all would also match /api/docs/swagger-ui.css, so this passes only
-    # because the more specific /api/docs/<name> rule is registered and wins
-    # on specificity.
-    rules = {r.rule for r in client.application.url_map.iter_rules()}
-    assert "/api/docs/<name>" in rules
-    assert "/<path:path_>" in rules  # SPA catch-all exists
-    # Behavior check: a request for a known asset path hits the asset handler,
-    # NOT the SPA catch-all (which would 404 the .css/.js suffix or serve
-    # index.html).
-    css = client.get("/api/docs/swagger-ui.css")
-    assert css.status_code == 200
-    assert css.content_type.split(";")[0].strip() == "text/css"
-    js = client.get("/api/docs/swagger-ui-bundle.js")
-    assert js.status_code == 200
-    assert js.content_type.split(";")[0].strip() in {"application/javascript", "text/javascript"}
+    # The asset handler — not the SPA catch-all — must serve /api/docs/<asset>.
+    rules = {r.rule: r.endpoint for r in client.application.url_map.iter_rules()}
+    assert rules.get("/api/docs/<name>") == "swagger_assets.asset"
+    # The SPA catch-all must still be registered (regression net for ordering).
+    assert "/<path:path_>" in rules
 
 
 def test_served_bundle_is_byte_identical_to_package(client):
