@@ -2785,6 +2785,8 @@ These are **not** decisions yet. They will become ADRs when they are.
   provisioning subset. The complete RFC 7644 filter grammar is deferred.
 - **No-IdP (local password) mode** — § 7.7 air-gap assumes an internal IdP.
   A pure local username/password mode (no IdP at all) is deferred.
+  *Superseded-in-part (ADR-0021): the bootstrap-admin local mode is now
+  implemented; the multi-user no-IdP mode remains deferred (ADR-0013).*
 - **Celery migration** — if task volume grows beyond 4 periodic tasks or
   requires fan-out / priorities, migrate RQ → Celery (broker is already
   Redis; task modules are framework-agnostic).

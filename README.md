@@ -46,6 +46,13 @@ corepack pnpm dev                  # Vite dev server (proxies /api to :8080)
 corepack pnpm build                # production build → dist/
 ```
 
+Offline frontend loop (repo-root Taskfile — ADR-0020/ADR-0021):
+`task fe-install` (deps), `task fe-build` (typecheck + lint + build),
+`task fe-sync` (dist → `backend/static`), `task fe-check` (no-CDN air-gap
+assertion on the bundle). For the dev server use `task fe-dev`, not bare
+`pnpm dev` (the latter has no `VITE_API_BASE` and will CORS-fail against
+:8080).
+
 ### CLI
 
 ```bash
@@ -81,6 +88,8 @@ aliases per ARCHITECTURE.md §3.8 accepted):
 | `KUBEDASH_REDIS_URL` / `REDIS_URL` | Redis connection string (cache + RQ broker) |
 | `KUBEDASH_CORS_ORIGINS` | comma-separated allowed origins |
 | `KUBEDASH_OIDC_CLIENT_ID` / `_CLIENT_SECRET` / `_ISSUER` | OIDC SSO config |
+| `KUBEDASH_BOOTSTRAP_ADMIN_EMAIL` / `KUBEDASH_BOOTSTRAP_ADMIN_PASSWORD` | bootstrap local-admin credentials — both set enables local login (ADR-0021) |
+| `KUBEDASH_ADMIN_KUBECONFIG` | path to the kubeconfig for the local (admin) cluster; empty = in-cluster (ADR-0021) |
 | `KUBEDASH_STATIC_DIR` | built SPA location (`/app/static` in the image) |
 | `FLASK_RUN_PORT` | dev server port (default 8080) |
 

@@ -7,7 +7,7 @@
 > frontmatter, **not** here. One decision per ADR file at
 > `.skillgrid/artifacts/04-adr-NNNN-slug.md`.
 
-**Highest sequence in use:** 0020
+**Highest sequence in use:** 0021
 
 ---
 
@@ -76,7 +76,8 @@ are kept, with `In force: no`. Never delete a row; flip it instead (IRON RULE).
 | ADR-0017 | Just-In-Time login provisioning (Helm-declared builtin pipeline) | yes | `artifacts/04-adr-0017-jit-login-provisioning.md` |
 | ADR-0018 | SCIM 2.0 Gateway (IdP/HR push; identity decoupled from bindings) | yes | `artifacts/04-adr-0018-scim-2-0-gateway.md` |
 | ADR-0019 | Ingress Auth Integration (`/auth/verify` for NGINX/Traefik/Istio/Gateway API) | yes | `artifacts/04-adr-0019-ingress-auth-integration.md` |
-| ADR-0020 | Air-Gap Deployment (zero outbound calls at runtime; air-gap ≠ no-IdP) | yes | `artifacts/04-adr-0020-air-gap-deployment.md` |
+| ADR-0020 | Air-Gap Deployment (zero outbound calls at runtime; air-gap ≠ no-IdP) — superseded-in-part by ADR-0021 (the bootstrap-admin local mode is now implemented; the multi-user no-IdP deferral remains) | yes | `artifacts/04-adr-0020-air-gap-deployment.md` |
+| ADR-0021 | Local Admin Auth — bootstrap password mode (env-driven bootstrap admin + admin kubeconfig source; SSO stays primary) | yes | `artifacts/04-adr-0021-local-admin-auth.md` |
 
 > **Note on ADR-0001..0013:** these are listed in `ARCHITECTURE.md` §12 as the
 > initial-architecture decisions "to be authored at brainstorming time." As of
