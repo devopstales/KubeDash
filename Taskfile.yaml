@@ -128,3 +128,43 @@ tasks:
     desc: "Open a Postgres shell (observe leader_lease: SELECT * FROM leader_lease)"
     cmds:
       - "{{.COMPOSE}} exec postgres psql -U ${KUBEDASH_DB_USER:-kubedash} -d ${KUBEDASH_DB_NAME:-kubedash}"
+
+  # ---- Frontend (offline dev loop, ADR-0020 air-gap) -------------------------
+  #
+  # Mirrors the Dockerfile's `COPY --from=frontend /build/dist ./static`:
+  # fe-sync places the built bundle where the Flask app serves it from
+  # (KUBEDASH_STATIC_DIR, default backend/static). fe-check is ADR-0020's
+  # frontend proof — the same script CI calls directly.
+
+  fe-install:
+    desc: "Install frontend dependencies (pnpm, frozen lockfile)"
+    dir: frontend
+    cmds:
+      - "pnpm install --frozen-lockfile"
+
+  fe-build:
+    desc: "Typecheck + lint + build the frontend (frontend/dist)"
+    dir: frontend
+    cmds:
+      - "pnpm exec tsc --noEmit && pnpm lint && pnpm build"
+
+  fe-sync:
+    desc: "Sync frontend/dist -> backend/static (KUBEDASH_STATIC_DIR default)"
+    cmds:
+      - "rm -rf {{.TASKFILE_DIR}}/backend/static && cp -r {{.TASKFILE_DIR}}/frontend/dist {{.TASKFILE_DIR}}/backend/static"
+      - |
+        echo "Synced. index.html is no-cache, assets/ is immutable (ADR-0006 OD-4)."
+        echo "If this step failed after the rm, re-run 'task fe-build fe-sync'"
+
+  fe-dev:
+    desc: "Run the vite dev server (API proxied to http://localhost:8080)"
+    dir: frontend
+    cmds:
+      - "VITE_API_BASE=http://localhost:8080 pnpm dev"
+
+  fe-check:
+    desc: "Air-gap check: no https?:// or //cdn. references in the built bundle (ADR-0020)"
+    requires: { vars: [] }
+    deps: [fe-build]
+    cmds:
+      - "node {{.TASKFILE_DIR}}/scripts/fe-airgap-check.mjs {{.TASKFILE_DIR}}/frontend/dist {{if .ALLOW}}--allow \"{{.ALLOW}}\"{{end}}"

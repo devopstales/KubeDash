@@ -15,5 +15,7 @@ tmp/
 # KubeDash 5.0 monorepo artifacts
 frontend/node_modules
 frontend/dist
+# synced build output (task fe-sync); the Dockerfile bakes its own copy
+backend/static/
 cli/dist
 .skillgrid/sdd/
