@@ -170,11 +170,23 @@ def test_resources_zero_200_for_admin(app, client, monkeypatch) -> None:
     assert [p["metadata"]["name"] for p in body["items"]] == ["admin-pod"]
 
 
-def test_resources_zero_404_for_non_admin(app, client) -> None:
+def test_resources_zero_404_for_non_admin(app, client, monkeypatch) -> None:
     """Non-admin GETs /api/v1/clusters/0/resources/pods: 404 CLUSTER_NOT_FOUND
-    (the pool's role gate on the synthetic object — the binding gate would
-    404 first, no row 0 exists, but the code is stable either way)."""
+    from the pool's ``id: 0`` role gate. Both pools are patched (``res.pool``
+    and ``rb.pool``) with the FakeAdminK8s-based pool — with neither patched
+    the real pool's admin factory would ERROR on ``load_incluster_config()``
+    (no in-cluster env) and a 500, not the role-gate 404, would surface. This
+    test FAILS if the pool's ``id: 0`` role-gate branch is removed: the
+    non-admin then falls through to the registry factory, whose FakeAdminK8s
+    is built with zero args, so ``list_pods`` answers and the route returns
+    200 with the admin-pod item."""
     user_jwt = _user_jwt(app, "user-1", "user")
+    res = importlib.import_module("app.api.resources")
+    import app.services.rbac as rb
+
+    fake_pool = kc.K8sClientPool(admin_factory=FakeAdminK8s)
+    monkeypatch.setitem(res.__dict__, "pool", fake_pool)
+    monkeypatch.setitem(rb.__dict__, "pool", fake_pool)
     r = client.get(
         "/api/v1/clusters/0/resources/pods",
         headers={"Authorization": f"Bearer {user_jwt}"},
@@ -188,21 +200,39 @@ def test_cluster_get_and_health_zero_short_circuit(app, client, monkeypatch) -> 
     binding lookup) and /clusters/0/health (the admin client's readyz)."""
     admin_jwt = _user_jwt(app, "admin-2", "admin")
     h = {"Authorization": f"Bearer {admin_jwt}"}
+    # GET /clusters/0 is GATED through the pool (the id:0 role branch): patch
+    # kc.pool BEFORE the request so the handler's gate call hits the fake
+    # (the clusters module resolves the module-level `kc.pool` at call time).
+    import app.services.rbac as rb
+
+    fake_pool = kc.K8sClientPool(admin_factory=FakeAdminK8s)
+    monkeypatch.setitem(kc.__dict__, "pool", fake_pool)
+    monkeypatch.setitem(rb.__dict__, "pool", fake_pool)
     r = client.get("/api/v1/clusters/0", headers=h)
     assert r.status_code == 200
     body = r.get_json()
     assert body["id"] == 0
     assert body["name"] == "local"
     # health: the module pool must route id 0 to the admin client.
-    # The clusters module uses `kc.pool` (not `cl.pool`), so patch kc.pool.
-    import app.services.rbac as rb
-
-    fake_pool = kc.K8sClientPool(admin_factory=FakeAdminK8s)
-    monkeypatch.setitem(kc.__dict__, "pool", fake_pool)
-    monkeypatch.setitem(rb.__dict__, "pool", fake_pool)
     r2 = client.get("/api/v1/clusters/0/health", headers=h)
     assert r2.status_code == 200, r2.get_data(as_text=True)
     assert r2.get_json() == {"status": "up"}
+
+
+def test_cluster_get_zero_404_for_non_admin(app, client, monkeypatch) -> None:
+    """Non-admin GETs /api/v1/clusters/0: 404 CLUSTER_NOT_FOUND from the pool's
+    ``id: 0`` role gate — the handler must go THROUGH ``pool.get`` (the gate)
+    before answering, not return the synthetic row unconditionally (the brief's
+    short-circuit constraint: 'Non-admin + id 0 → 404 CLUSTER_NOT_FOUND')."""
+    user_jwt = _user_jwt(app, "user-2", "user")
+    fake_pool = kc.K8sClientPool(admin_factory=FakeAdminK8s)
+    monkeypatch.setitem(kc.__dict__, "pool", fake_pool)
+    r = client.get(
+        "/api/v1/clusters/0",
+        headers={"Authorization": f"Bearer {user_jwt}"},
+    )
+    assert r.status_code == 404
+    assert r.get_json()["error"]["code"] == "CLUSTER_NOT_FOUND"
 
 
 def test_readyz_503_when_admin_kubeconfig_file_missing(app, monkeypatch, tmp_path) -> None:

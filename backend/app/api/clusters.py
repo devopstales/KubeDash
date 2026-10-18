@@ -132,8 +132,12 @@ class ClusterApi(Api):
     @blp.doc(responses={404: "CLUSTER_NOT_FOUND"})
     def get_cluster(self, cluster_id: int) -> dict[str, object]:
         if cluster_id == LOCAL_CLUSTER_ID:
-            # id 0: the synthetic local cluster — the pool's role gate is the
-            # gate (non-admin → CLUSTER_NOT_FOUND), no binding lookup.
+            # id 0: the synthetic local cluster — the pool's role gate IS the
+            # gate (non-admin → CLUSTER_NOT_FOUND), no binding lookup. The
+            # gate call must precede the answer: without it a non-admin gets
+            # 200 on the synthetic row. The returned client is NOT used in
+            # the payload — the row is answered from the synthetic object.
+            kc.pool.get(_local_cluster())
             return _out(_local_cluster())
         cluster = bound_cluster_or_404(g.current_user, cluster_id)
         return _out(cluster)
