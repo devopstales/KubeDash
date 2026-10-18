@@ -16,6 +16,21 @@ def test_login_flow_issues_jwt_and_me_echoes_sub(client, auth_client):
     assert r3.get_json()["email"] == "jdoe@example.com"
 
 
+def test_callback_redirect_is_exact_issued_pair(client, mock_oidc):
+    """I-NEW-4 door check (pinned in test_auth.py, per the brief's file list):
+    the OIDC callback's 302 Location must be EXACTLY the issued pair — the
+    shared-builder contract (redirect_with_tokens) is pinned on BOTH sides;
+    the local route mirrors this assertion in test_local_auth.py."""
+    r1 = client.post("/api/v1/auth/login")
+    cb = r1.headers["Location"]
+    state = parse_qs(urlparse(cb).query)["state"][0]
+    r2 = client.get(f"{cb}&code={mock_oidc.CODE}&state={state}")
+    assert r2.status_code == 302
+    loc = r2.headers["Location"]
+    q = parse_qs(urlparse(loc).query)
+    assert loc == f"/?token={q['token'][0]}&refresh={q['refresh'][0]}"
+
+
 def test_state_mismatch_rejected(client, mock_oidc):
     r1 = client.post("/api/v1/auth/login")
     cb = r1.headers["Location"]

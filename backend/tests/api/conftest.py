@@ -13,6 +13,7 @@ from urllib.parse import parse_qs, urlparse
 
 import pytest
 
+import app.core.config as _config
 from app import create_app
 
 
@@ -51,6 +52,15 @@ def app(monkeypatch: pytest.MonkeyPatch) -> Iterator[object]:
     # after so each test app rebinds cleanly.
     _oauth.app = None
     _oauth._clients.clear()
+    # I-NEW-1 (ADR-0021): bootstrap env ON for the primary api-tier app. The
+    # Settings singleton (app.core.config._settings) caches from ENV on first
+    # read and is populated at module import (k8s_client.py calls
+    # get_settings() at import), so setenv + reset BEFORE create_app — that
+    # order is load-bearing: config_overrides alone reaches only app.config,
+    # never get_settings().
+    monkeypatch.setenv("KUBEDASH_BOOTSTRAP_ADMIN_EMAIL", "admin@local")
+    monkeypatch.setenv("KUBEDASH_BOOTSTRAP_ADMIN_PASSWORD", "correct-horse")
+    _config._settings = None
     application = create_app({
         "TESTING": True,
         "DATABASE_URL": "sqlite://",
@@ -74,6 +84,50 @@ def app(monkeypatch: pytest.MonkeyPatch) -> Iterator[object]:
             db.session.rollback()
             db.session.remove()
             db.drop_all()
+
+
+@pytest.fixture()
+def app_no_bootstrap(monkeypatch: pytest.MonkeyPatch) -> Iterator[object]:
+    """I-NEW-1 (ADR-0021): the same sqlite api-tier app with BOTH bootstrap
+    env vars empty — local login must answer 403 LOCAL_AUTH_DISABLED and the
+    settings route must report local_enabled False. (The sqlite tier SKIPS the
+    PG-dialect bootstrap hook, which lives in the root PG tier — C-NEW-1.)"""
+    import app.extensions as ext
+    from app.core.security import _oauth
+
+    _oauth.app = None
+    _oauth._clients.clear()
+    monkeypatch.setenv("KUBEDASH_BOOTSTRAP_ADMIN_EMAIL", "")
+    monkeypatch.setenv("KUBEDASH_BOOTSTRAP_ADMIN_PASSWORD", "")
+    _config._settings = None
+    application = create_app({
+        "TESTING": True,
+        "DATABASE_URL": "sqlite://",
+        "REDIS_URL": "redis://localhost:6390/0",
+        "KUBEDASH_KUBEDASH_JWT_SECRET": "test-jwt-secret-32-bytes-long!!!!!01",
+        "KUBEDASH_SECRET_KEY": "test-enc-key-32-bytes-long!!!!",
+    })
+    fake = _FakeRedis()
+    with application.app_context():
+        import app.extensions as ext
+
+        monkeypatch.setattr(ext, "redis_client", fake)
+        from app.extensions import db
+
+        db.create_all()
+        try:
+            yield application
+        finally:
+            _oauth.app = None
+            _oauth._clients.clear()
+            db.session.rollback()
+            db.session.remove()
+            db.drop_all()
+
+
+@pytest.fixture()
+def client_no_bootstrap(app_no_bootstrap) -> object:
+    return app_no_bootstrap.test_client()  # type: ignore[no-any-return]
 
 
 @pytest.fixture()
@@ -141,6 +195,10 @@ def auth_client(client, mock_oidc):
         loc = r2.headers["Location"]
         assert loc.startswith("/?token=")
         q = parse_qs(urlparse(loc).query)
+        # I-NEW-4 door check: the OIDC callback's redirect must be EXACTLY the
+        # issued pair — the shared-builder contract pinned on BOTH sides (the
+        # local route mirrors this assertion in test_local_auth.py).
+        assert loc == f"/?token={q['token'][0]}&refresh={q['refresh'][0]}"
         client.jwt = q["token"][0]
         client.refresh = q["refresh"][0]
 

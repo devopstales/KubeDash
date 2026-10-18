@@ -38,6 +38,22 @@ class UnauthorizedError(KubeDashHttpError):
     error_code = "UNAUTHORIZED"
 
 
+class InvalidCredentialsError(UnauthorizedError):
+    """Local password login (ADR-0021): wrong password OR unknown email —
+    ONE code for both (no user enumeration), including SSO-sourced rows."""
+    code = 401
+    name = "Invalid Credentials"
+    error_code = "INVALID_CREDENTIALS"
+
+
+class LocalAuthDisabledError(KubeDashHttpError):
+    """Local password login attempted with no bootstrap admin configured
+    (ADR-0021): both bootstrap env vars unset."""
+    code = 403
+    name = "Local Auth Disabled"
+    error_code = "LOCAL_AUTH_DISABLED"
+
+
 class StateMismatchError(UnauthorizedError):
     """Dedicated carrier for the OIDC callback's ``consume_state`` failure:
     the factory's error handler maps THIS class (not plain UnauthorizedError)
@@ -96,9 +112,12 @@ class InternalError(KubeDashHttpError):
     error_code = "INTERNAL_ERROR"
 
 
-#: Every frozen OD-1 code, one class each — the count is a contract.
+#: Every stable code, one class each — the count is a contract. ADR-0021
+#: (OD-B) adds the two local-auth codes to the frozen v1 contract.
 CODES: tuple[type[KubeDashHttpError], ...] = (
     UnauthorizedError,
+    InvalidCredentialsError,
+    LocalAuthDisabledError,
     StateMismatchError,
     RbacDeniedError,
     ClusterNotFoundError,

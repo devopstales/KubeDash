@@ -85,13 +85,15 @@ def test_unhandled_exception_maps_to_internal_error_envelope(_local_app):
     assert "secret-stack-trace-leak" not in resp.get_data(as_text=True)
 
 
-def test_all_ten_frozen_codes_are_distinct():
+def test_all_frozen_codes_are_distinct():
     import app.core.errors as errors
 
     codes = [cls.error_code for cls in errors.CODES]
-    assert len(codes) == 10
-    assert len(set(codes)) == 10
+    # 10 OD-1 codes + 2 ADR-0021 local-auth codes (OD-B) = 12.
+    assert len(codes) == 12
+    assert len(set(codes)) == 12
     assert "INTERNAL_ERROR" in codes and "STATE_MISMATCH" in codes
+    assert "INVALID_CREDENTIALS" in codes and "LOCAL_AUTH_DISABLED" in codes
 
 
 def test_error_code_to_status_mapping():

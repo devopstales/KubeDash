@@ -1,8 +1,10 @@
-"""AuthApi (R2) — the OIDC spine: login / callback / refresh / logout / me.
+"""AuthApi (R2) — the OIDC spine: login / callback / refresh / logout / me,
+plus ADR-0021's local password sibling: ``/auth/local`` + ``/auth/settings``.
 
-JWT delivery contract: the callback redirects ``302 /?token=<access_jwt>
-&refresh=<refresh_token>``; the SPA (Task 8) parks both in localStorage.
-Auth routes are open pre-JWT; /auth/me uses the ``require_auth`` decorator.
+JWT delivery contract: the callback AND local login redirect ``302
+/?token=<access_jwt>&refresh=<refresh_token>`` (one builder:
+``redirect_with_tokens``); the SPA parks both in localStorage. Auth routes
+are open pre-JWT; /auth/me uses the ``require_auth`` decorator.
 
 The domain Api's shared auth-hook pattern (app-wide ``before_request`` scoped
 to ``/api/v1/*``) now lives in ``app/api/clusters.py`` (Task 4 replaced the
@@ -14,10 +16,11 @@ from flask import g, redirect, request
 from flask_smorest import Api, Blueprint, abort
 
 from app.core import security
+from app.core.config import get_settings
+from app.core.errors import InvalidCredentialsError, LocalAuthDisabledError
 from app.core.security import (
     REFRESH_TTL_DAYS,
     consume_state,
-    issue_token_pair,
     new_state,
     require_auth,
     revoke_user_refresh_tokens,
@@ -26,7 +29,28 @@ from app.core.security import (
 from app.extensions import db
 from app.models.token import RefreshToken
 from app.models.user import User
-from app.schemas.auth import MeOut, RefreshIn, RefreshOut
+from app.schemas.auth import AuthSettingsOut, LocalLoginIn, MeOut, RefreshIn, RefreshOut
+
+
+def redirect_with_tokens(access: str, refresh: str) -> str:
+    """The JWT delivery contract — ONE builder shared by the OIDC callback
+    and local login (T1 key link: both routes cannot diverge)."""
+    return f"/?token={access}&refresh={refresh}"
+
+
+def _issue_and_persist(user: User) -> tuple[str, str]:
+    """issue_token_pair + the hashed RefreshToken row (TTL 30d) + commit —
+    the OIDC callback's block, verbatim, so local login cannot diverge."""
+    access, refresh = security.issue_token_pair(user)
+    db.session.add(
+        RefreshToken(
+            user_id=user.id,
+            token_hash=RefreshToken.hash_token(refresh),
+            expires_at=datetime.now(UTC) + timedelta(days=REFRESH_TTL_DAYS),
+        )
+    )
+    db.session.commit()
+    return access, refresh
 
 
 def _upsert_user(userinfo: dict[str, object]) -> User:
@@ -77,16 +101,50 @@ class AuthApi(Api):
         consume_state(state)  # StateMismatchError → 400 STATE_MISMATCH
         userinfo = security.oidc_exchange(code)
         user = _upsert_user(userinfo)
-        access, refresh = issue_token_pair(user)
-        db.session.add(
-            RefreshToken(
-                user_id=user.id,
-                token_hash=RefreshToken.hash_token(refresh),
-                expires_at=datetime.now(UTC) + timedelta(days=REFRESH_TTL_DAYS),
-            )
-        )
-        db.session.commit()
-        return redirect(f"/?token={access}&refresh={refresh}")  # JWT delivery contract
+        access, refresh = _issue_and_persist(user)
+        return redirect(redirect_with_tokens(access, refresh))  # JWT delivery contract
+
+    @blp.route("/auth/local", methods=["POST"])
+    @blp.arguments(LocalLoginIn)
+    @blp.doc(responses={
+        302: "Redirect to /?token=<jwt>&refresh=<token> (JWT delivery contract)",
+        401: "INVALID_CREDENTIALS (wrong password OR unknown email — no enumeration)",
+        403: "LOCAL_AUTH_DISABLED",
+    })
+    def local(self, args: dict[str, object]) -> object:
+        """ADR-0021: bootstrap-admin password login, sibling of OIDC. The
+        route gates on auth_source='local' so a row SSO has claimed (or a
+        pure-SSO row) never answers with a password — same 401 code, no
+        enumeration across auth sources (I-NEW-2)."""
+        s = get_settings()
+        if not (s.bootstrap_admin_email and s.bootstrap_admin_password):
+            raise LocalAuthDisabledError("local auth is not configured")
+        email = str(args["email"])
+        # scalar_one_or_none: a non-existent email → None (the 401 path), never
+        # a raised NoResultFound → 500. Multiple rows is impossible — email is
+        # the unique key (uq_users_email, TICKET-14).
+        user = db.session.execute(db.select(User).filter_by(email=email)).scalar_one_or_none()
+        if (
+            user is None
+            or user.auth_source != "local"
+            or user.password_hash is None
+            or not security.verify_password(user.password_hash, str(args["password"]))
+        ):
+            raise InvalidCredentialsError("invalid email or password")
+        user.last_login_at = datetime.now(UTC)
+        access, refresh = _issue_and_persist(user)
+        return redirect(redirect_with_tokens(access, refresh))  # JWT delivery contract
+
+    @blp.route("/auth/settings", methods=["GET"])
+    @blp.response(200, AuthSettingsOut)
+    def settings(self) -> dict[str, bool]:
+        """Open (pre-JWT) capability flags for the login page (R3): the SSO
+        button renders iff sso_enabled, the local form iff local_enabled."""
+        s = get_settings()
+        return {
+            "sso_enabled": bool(s.oidc_issuer),
+            "local_enabled": bool(s.bootstrap_admin_email and s.bootstrap_admin_password),
+        }
 
     @blp.route("/auth/refresh", methods=["POST"])
     @blp.arguments(RefreshIn)

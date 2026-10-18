@@ -29,6 +29,16 @@ class Settings(BaseSettings):
     oidc_client_secret: str = ""
     oidc_issuer: str = ""
     cors_origins: str = ""
+    # ADR-0021 (local admin auth): both set → the bootstrap admin row is
+    # created at boot and POST /auth/local is enabled; either empty → local
+    # login answers 403 LOCAL_AUTH_DISABLED. Double prefix is deliberate
+    # (env_prefix + field name), same convention as KUBEDASH_KUBEDASH_JWT_SECRET.
+    bootstrap_admin_email: str = ""
+    bootstrap_admin_password: str = ""
+    # ADR-0021: admin kubeconfig source — empty → in-cluster service account,
+    # set → kubeconfig file path. Declared here; CONSUMED by the next tickets
+    # (client pool admin source / TICKET-15).
+    admin_kubeconfig: str = ""
     # §7.5 tuning — the two keys this change consumes (the other four are
     # deferred to the informer change, ADR-0010; see Task 10 Interfaces)
     first_paint_backstop: str = "5m"  # KUBEDASH_FIRST_PAINT_BACKSTOP

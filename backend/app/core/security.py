@@ -9,6 +9,10 @@ refresh token (sha256-hashed row), and hands both to the SPA via
 monkeypatch exactly these names against ``app.core.security``; the Authlib
 client below is the production adapter.
 """
+import base64
+import hashlib
+import hmac
+import os
 import secrets
 import uuid
 from collections.abc import Callable
@@ -91,6 +95,34 @@ def issue_token_pair(user: User, expires_in: int = 900) -> tuple[str, str]:
     access = jwt.encode(claims, s.kubedash_jwt_secret, algorithm="HS256")
     refresh = uuid.uuid4().hex
     return access, refresh
+
+
+def hash_password(pw: str) -> str:
+    """ADR-0021: pbkdf2-sha256, 600_000 iterations, 16-byte salt — stdlib
+    only (air-gap, ADR-0020). Format: ``pbkdf2:sha256:600000$<b64salt>$<b64hash>``."""
+    salt = os.urandom(16)
+    dk = hashlib.pbkdf2_hmac("sha256", pw.encode(), salt, 600_000)
+    return f"pbkdf2:sha256:600000${base64.b64encode(salt).decode()}${base64.b64encode(dk).decode()}"
+
+
+def verify_password(stored: str, pw: str) -> bool:
+    """Constant-time (``hmac.compare_digest``) check against a stored hash.
+    A malformed ``stored`` value returns False — it never raises.
+
+    Format: ``pbkdf2:sha256:600000$<b64salt>$<b64hash>`` — the first token
+    carries the algorithm + iteration count colon-separated; salt and hash
+    are the two ``$``-separated fields."""
+    try:
+        algo_tok, salt_b64, hash_b64 = stored.split("$")
+        _, scheme, iters = algo_tok.split(":")
+        assert scheme == "sha256"
+        dk = hashlib.pbkdf2_hmac("sha256", pw.encode(), base64.b64decode(salt_b64), int(iters))
+    except (ValueError, AssertionError, TypeError):
+        # ValueError: b64decode / int() on a malformed field.
+        # AssertionError: wrong scheme token.
+        # TypeError: pbkdf2_hmac rejects a bad iteration count.
+        return False
+    return hmac.compare_digest(base64.b64encode(dk).decode(), hash_b64)
 
 
 def verify_jwt(token: str) -> dict[str, Any]:
