@@ -9,13 +9,13 @@ pipeline:
   # Derived from spec-zone artifacts:
   #   briefing.md present, blueprint.md present, tasks.md absent (not sliced) => blueprint.
   current_phase: blueprint
-  # Note: 2026-10-17-kubedash-base-structure is complete (all 12 tickets Done);
-  # 2026-10-17-kubectl-oidc-plugin and 2026-10-17-test-observability-pipeline
+  # Note: 2026-10-17-kubectl-oidc-plugin and 2026-10-17-test-observability-pipeline
   # remain in flight at their respective phases.
   # The spec dir this change lives in.
   specs_root: .skillgrid/specs
 
-completed_changes: []
+completed_changes:
+  - 2026-10-17-kubedash-base-structure
 
 # Onboarding state (2026-10-17): config.yaml + ASSUMPTIONS.md + state.yaml
 # created. Open items tracked in ASSUMPTIONS.md "Onboarding notes".
