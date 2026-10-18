@@ -15,7 +15,16 @@
 
 Assumptions confirmed against the code or a primary source.
 
-- (none recorded yet)
+- **Swagger UI assets are always served locally (no CDN, no toggle).** The
+  `/api/docs` page loads `swagger-ui.css` / `swagger-ui-standalone-preset.js` /
+  `swagger-ui-bundle.js` from the app (vendored `swagger-ui-bundle` PyPI package,
+  served via `importlib.resources` on `/api/docs/*` routes) — never a CDN or any
+  external host. `OPENAPI_SWAGGER_UI_URL` is a local placeholder kept only
+  because smorest 0.47 registers the page only when that key is set (verified in
+  `flask_smorest/spec/__init__.py:100-110`). The `BearerAuth` JWT security scheme
+  is declared on the spec; page-level auth wiring is deferred. Air-gap (ADR-0020).
+  Confirmed by `backend/tests/api/test_apidocs.py` (9 tests) + QA report
+  (`.skillgrid/specs/2026-10-17-swagger-ui-air-gap/report.md`).
 
 ## INFERRED
 
