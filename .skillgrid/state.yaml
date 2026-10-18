@@ -5,11 +5,14 @@
 
 pipeline:
   # The in-flight change (newest spec dir with in-flight artifacts).
-  # Cleared by ship (2026-10-18) — swagger-ui-air-gap archived, branch kept.
-  current_change: null
-  current_phase: reflect  # terminal phase in flight (close in progress, 2026-10-18)
-  # Note: 2026-10-17-kubectl-oidc-plugin and 2026-10-17-test-observability-pipeline
-  # remain in flight at their respective phases.
+  current_change: 2026-10-17-authentication-vertical
+  # Derived from spec-zone artifacts: briefing + blueprint (critic + plan-
+  # review passed) + acceptance.feature (7 scenarios) + tasks.md (sliced,
+  # 7 tickets / 5 waves) + backlog TASK-016..022 published with deps =>
+  # slicing done, awaiting execution handoff.
+  current_phase: sliced
+  # Note: 2026-10-17-kubectl-oidc-plugin and 2026-10-17-test-observability-
+  # pipeline remain in flight at their respective phases.
   # The spec dir this change lives in.
   specs_root: .skillgrid/specs
 
