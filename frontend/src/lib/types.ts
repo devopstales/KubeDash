@@ -14,6 +14,13 @@ export interface Me {
   display_name: string | null
   groups: string[]
   role: string
+  // MeOut growth (TICKET-16, re-dumped openapi.json): the Profile page's
+  // identity fields. auth_source is a plain string in the schema (no
+  // enum), so it stays un-unioned; kubeconfig_source/last_login_at are
+  // nullable.
+  auth_source: string
+  kubeconfig_source: string | null
+  last_login_at: string | null
 }
 
 export interface Cluster {
@@ -23,6 +30,10 @@ export interface Cluster {
   context?: string | null
   status?: string
   last_probe_at?: string | null
+  // ClusterOut growth (TICKET-16): 'registry' on every real row, 'admin' on
+  // the synthetic id-0 row the list prepends for admins. Plain string in the
+  // schema (no enum) — added for contract completeness; no view reads it yet.
+  source?: string
 }
 
 export interface ClusterIn {

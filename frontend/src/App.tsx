@@ -13,6 +13,7 @@ import './scss/style.scss'
 const LoginView = React.lazy(() => import('./views/Login'))
 const ClustersView = React.lazy(() => import('./views/Clusters'))
 const ClusterView = React.lazy(() => import('./views/Cluster'))
+const ProfileView = React.lazy(() => import('./views/Profile'))
 
 /**
  * KubeDash SPA root: QueryClientProvider (TanStack Query) wraps the
@@ -69,6 +70,14 @@ const App = () => {
                       element={
                         <ProtectedRoute>
                           <ClusterView />
+                        </ProtectedRoute>
+                      }
+                    />
+                    <Route
+                      path="/profile"
+                      element={
+                        <ProtectedRoute>
+                          <ProfileView />
                         </ProtectedRoute>
                       }
                     />
