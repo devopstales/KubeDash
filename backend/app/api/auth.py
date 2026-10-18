@@ -30,6 +30,7 @@ from app.extensions import db
 from app.models.token import RefreshToken
 from app.models.user import User
 from app.schemas.auth import AuthSettingsOut, LocalLoginIn, MeOut, RefreshIn, RefreshOut
+from app.services.k8s_client import resolve_admin_source
 
 
 def redirect_with_tokens(access: str, refresh: str) -> str:
@@ -174,10 +175,18 @@ class AuthApi(Api):
     @require_auth
     def me(self) -> dict[str, object]:
         u = g.current_user
+        # ADR-0021 (TICKET-16): the Profile page's identity fields.
+        # kubeconfig_source is admin-only: how the cluster KubeDash runs in is
+        # reachable only through the admin client, so non-admins get None.
         return {
             "sub": u.sub,
             "email": u.email,
             "display_name": u.display_name,
             "groups": u.groups or [],
             "role": u.role,
+            "auth_source": u.auth_source,
+            "kubeconfig_source": (
+                resolve_admin_source(get_settings()) if u.role == "admin" else None
+            ),
+            "last_login_at": u.last_login_at,
         }

@@ -45,3 +45,9 @@ class MeOut(ma.Schema):
     display_name = ma.fields.String(allow_none=True)
     groups = ma.fields.List(ma.fields.String())
     role = ma.fields.String()
+    # TICKET-16 (M-NEW-2: marshmallow, not Pydantic — @blp.response runs this
+    # schema). The Profile page (TICKET-17) renders the role/auth badges from
+    # these; the Login page (TICKET-17) reads auth_source.
+    auth_source = ma.fields.String()
+    kubeconfig_source = ma.fields.String(allow_none=True)
+    last_login_at = ma.fields.DateTime(allow_none=True)

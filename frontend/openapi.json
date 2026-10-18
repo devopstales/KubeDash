@@ -21,15 +21,73 @@
             "$ref": "#/components/responses/RESPONSE_DEFAULT_ERROR"
           },
           "302": {
-            "$ref": "#/components/responses/RESPONSE_?token=<jwt>&refresh=<token>_JWT_delivery_contract"
+            "$ref": "#/components/responses/RESPONSE_REDIRECT_TO_TOKEN_JWT_REFRESH_TOKEN_JWT_DELIVERY_CONTRACT"
           },
           "400": {
-            "$ref": "#/components/responses/RESPONSE__missing_state_or_code"
+            "$ref": "#/components/responses/RESPONSE_STATE_MISMATCH_MISSING_STATE_OR_CODE"
           },
           "401": {
             "$ref": "#/components/responses/RESPONSE_UNAUTHORIZED"
           }
         },
+        "tags": [
+          "api.auth"
+        ]
+      }
+    },
+    "/api/v1/auth/local": {
+      "post": {
+        "responses": {
+          "422": {
+            "$ref": "#/components/responses/RESPONSE_UNPROCESSABLE_ENTITY"
+          },
+          "default": {
+            "$ref": "#/components/responses/RESPONSE_DEFAULT_ERROR"
+          },
+          "302": {
+            "$ref": "#/components/responses/RESPONSE_REDIRECT_TO_TOKEN_JWT_REFRESH_TOKEN_JWT_DELIVERY_CONTRACT"
+          },
+          "401": {
+            "$ref": "#/components/responses/RESPONSE_INVALID_CREDENTIALS_WRONG_PASSWORD_OR_UNKNOWN_EMAIL_NO_ENUMERATION"
+          },
+          "403": {
+            "$ref": "#/components/responses/RESPONSE_LOCAL_AUTH_DISABLED"
+          }
+        },
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/LocalLoginIn"
+              }
+            }
+          }
+        },
+        "summary": "ADR-0021: bootstrap-admin password login, sibling of OIDC. The\nroute gates on auth_source='local' so a row SSO has claimed (or a\npure-SSO row) never answers with a password \u2014 same 401 code, no\nenumeration across auth sources (I-NEW-2).",
+        "tags": [
+          "api.auth"
+        ]
+      }
+    },
+    "/api/v1/auth/settings": {
+      "get": {
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/AuthSettingsOut"
+                }
+              }
+            }
+          },
+          "default": {
+            "$ref": "#/components/responses/RESPONSE_DEFAULT_ERROR"
+          }
+        },
+        "summary": "Open (pre-JWT) capability flags for the login page (R3): the SSO\nbutton renders iff sso_enabled, the local form iff local_enabled.",
         "tags": [
           "api.auth"
         ]
@@ -156,7 +214,7 @@
             "$ref": "#/components/responses/RESPONSE_DEFAULT_ERROR"
           },
           "200": {
-            "$ref": "#/components/responses/RESPONSE_Caller_s_bound_clusters_bare_list._None"
+            "$ref": "#/components/responses/RESPONSE_CALLER_S_BOUND_CLUSTERS_BARE_LIST_NONE"
           },
           "401": {
             "$ref": "#/components/responses/RESPONSE_UNAUTHORIZED"
@@ -260,7 +318,7 @@
             "$ref": "#/components/responses/RESPONSE_DEFAULT_ERROR"
           },
           "404": {
-            "$ref": "#/components/responses/RESPONSE_RESOURCE_KIND_NOT_SUPPORTED_or_CLUSTER_NOT_FOUND_binding_gate"
+            "$ref": "#/components/responses/RESPONSE_RESOURCE_KIND_NOT_SUPPORTED_OR_CLUSTER_NOT_FOUND_BINDING_GATE"
           },
           "403": {
             "$ref": "#/components/responses/RESPONSE_RBAC_DENIED"
@@ -793,6 +851,34 @@
         },
         "additionalProperties": false
       },
+      "LocalLoginIn": {
+        "type": "object",
+        "properties": {
+          "email": {
+            "type": "string"
+          },
+          "password": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "email",
+          "password"
+        ],
+        "additionalProperties": false
+      },
+      "AuthSettingsOut": {
+        "type": "object",
+        "properties": {
+          "sso_enabled": {
+            "type": "boolean"
+          },
+          "local_enabled": {
+            "type": "boolean"
+          }
+        },
+        "additionalProperties": false
+      },
       "RefreshIn": {
         "type": "object",
         "properties": {
@@ -839,6 +925,18 @@
           },
           "role": {
             "type": "string"
+          },
+          "auth_source": {
+            "type": "string"
+          },
+          "kubeconfig_source": {
+            "type": "string",
+            "nullable": true
+          },
+          "last_login_at": {
+            "type": "string",
+            "format": "date-time",
+            "nullable": true
           }
         },
         "additionalProperties": false
@@ -890,6 +988,9 @@
             "type": "string",
             "format": "date-time",
             "nullable": true
+          },
+          "source": {
+            "type": "string"
           }
         },
         "additionalProperties": false
@@ -924,84 +1025,50 @@
       }
     },
     "responses": {
-      "DEFAULT_ERROR": {
-        "description": "Default error response",
-        "content": {
-          "application/json": {
-            "schema": {
-              "$ref": "#/components/schemas/Error"
-            }
-          }
-        }
-      },
-      "UNAUTHORIZED": {
-        "description": "Unauthorized",
-        "content": {
-          "application/json": {
-            "schema": {
-              "$ref": "#/components/schemas/Error"
-            }
-          }
-        }
-      },
-      "UNPROCESSABLE_ENTITY": {
-        "description": "Unprocessable Entity",
-        "content": {
-          "application/json": {
-            "schema": {
-              "$ref": "#/components/schemas/Error"
-            }
-          }
-        }
-      },
-      "NOT_IMPLEMENTED": {
-        "description": "Not Implemented",
-        "content": {
-          "application/json": {
-            "schema": {
-              "$ref": "#/components/schemas/Error"
-            }
-          }
-        }
-      },
-      "RESPONSE_DEFAULT_ERROR": {
-        "description": "RESPONSE_DEFAULT_ERROR"
-      },
-      "RESPONSE_?token=<jwt>&refresh=<token>_JWT_delivery_contract": {
-        "description": "RESPONSE_?token=<jwt>&refresh=<token>_JWT_delivery_contract"
-      },
-      "RESPONSE__missing_state_or_code": {
-        "description": "RESPONSE__missing_state_or_code"
-      },
-      "RESPONSE_UNAUTHORIZED": {
-        "description": "RESPONSE_UNAUTHORIZED"
-      },
-      "RESPONSE_UNPROCESSABLE_ENTITY": {
-        "description": "RESPONSE_UNPROCESSABLE_ENTITY"
-      },
-      "RESPONSE_INVALID_KUBECONFIG": {
-        "description": "RESPONSE_INVALID_KUBECONFIG"
+      "RESPONSE_CALLER_S_BOUND_CLUSTERS_BARE_LIST_NONE": {
+        "description": "(\"Caller's bound clusters (bare list).\", None)"
       },
       "RESPONSE_CLUSTER_ALREADY_EXISTS": {
-        "description": "RESPONSE_CLUSTER_ALREADY_EXISTS"
-      },
-      "RESPONSE_Caller_s_bound_clusters_bare_list._None": {
-        "description": "RESPONSE_Caller_s_bound_clusters_bare_list._None"
+        "description": "CLUSTER_ALREADY_EXISTS"
       },
       "RESPONSE_CLUSTER_NOT_FOUND": {
-        "description": "RESPONSE_CLUSTER_NOT_FOUND"
+        "description": "CLUSTER_NOT_FOUND"
       },
       "RESPONSE_CLUSTER_UNREACHABLE": {
-        "description": "RESPONSE_CLUSTER_UNREACHABLE"
+        "description": "CLUSTER_UNREACHABLE"
       },
-      "RESPONSE_RESOURCE_KIND_NOT_SUPPORTED_or_CLUSTER_NOT_FOUND_binding_gate": {
-        "description": "RESPONSE_RESOURCE_KIND_NOT_SUPPORTED_or_CLUSTER_NOT_FOUND_binding_gate"
+      "RESPONSE_DEFAULT_ERROR": {
+        "description": "DEFAULT_ERROR"
       },
-      "RESPONSE_RBAC_DENIED": {
-        "description": "RESPONSE_RBAC_DENIED"
+      "RESPONSE_INVALID_CREDENTIALS_WRONG_PASSWORD_OR_UNKNOWN_EMAIL_NO_ENUMERATION": {
+        "description": "INVALID_CREDENTIALS (wrong password OR unknown email \u2014 no enumeration)"
+      },
+      "RESPONSE_INVALID_KUBECONFIG": {
+        "description": "INVALID_KUBECONFIG"
+      },
+      "RESPONSE_LOCAL_AUTH_DISABLED": {
+        "description": "LOCAL_AUTH_DISABLED"
       },
       "RESPONSE_NOT_IMPLEMENTED": {
-        "description": "RESPONSE_NOT_IMPLEMENTED"
+        "description": "NOT_IMPLEMENTED"
+      },
+      "RESPONSE_RBAC_DENIED": {
+        "description": "RBAC_DENIED"
+      },
+      "RESPONSE_RESOURCE_KIND_NOT_SUPPORTED_OR_CLUSTER_NOT_FOUND_BINDING_GATE": {
+        "description": "RESOURCE_KIND_NOT_SUPPORTED or CLUSTER_NOT_FOUND (binding gate)"
+      },
+      "RESPONSE_REDIRECT_TO_TOKEN_JWT_REFRESH_TOKEN_JWT_DELIVERY_CONTRACT": {
+        "description": "Redirect to /?token=<jwt>&refresh=<token> (JWT delivery contract)"
+      },
+      "RESPONSE_STATE_MISMATCH_MISSING_STATE_OR_CODE": {
+        "description": "STATE_MISMATCH / missing state or code"
+      },
+      "RESPONSE_UNAUTHORIZED": {
+        "description": "UNAUTHORIZED"
+      },
+      "RESPONSE_UNPROCESSABLE_ENTITY": {
+        "description": "UNPROCESSABLE_ENTITY"
       }
     }
   }

@@ -16,6 +16,27 @@ def test_login_flow_issues_jwt_and_me_echoes_sub(client, auth_client):
     assert r3.get_json()["email"] == "jdoe@example.com"
 
 
+def test_me_shape_growth_me_out_fields(client, auth_client, app):
+    """TICKET-16: the MeOut growth (profile-page-shows-identity, backend
+    half) — every me response carries auth_source / kubeconfig_source /
+    last_login_at. An OIDC-upserted user (role 'user') gets the source
+    column value 'oidc' and kubeconfig_source None (non-admin)."""
+    auth_client.login()
+    me = client.get(
+        "/api/v1/auth/me", headers={"Authorization": f"Bearer {auth_client.jwt}"}
+    ).get_json()
+    assert me["auth_source"] == "oidc"
+    assert me["kubeconfig_source"] is None
+    assert "last_login_at" in me and me["last_login_at"] is not None
+    # The OIDC login stamped last_login_at on the upsert.
+    with app.app_context():  # type: ignore[attr-defined]
+        from app.extensions import db
+        from app.models.user import User
+
+        u = db.session.execute(db.select(User).filter_by(sub="sub-oidc-1")).scalar_one()
+        assert u.last_login_at is not None
+
+
 def test_callback_redirect_is_exact_issued_pair(client, mock_oidc):
     """I-NEW-4 door check (pinned in test_auth.py, per the brief's file list):
     the OIDC callback's 302 Location must be EXACTLY the issued pair — the

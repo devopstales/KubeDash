@@ -11,6 +11,7 @@ from flask import g, jsonify
 from flask_smorest import Api, Blueprint
 
 from app.api._authhook import apply_auth
+from app.core.config import get_settings
 from app.core.errors import (
     ClusterAlreadyExistsError,
     ClusterUnreachableError,
@@ -21,7 +22,12 @@ from app.models.binding import ClusterBinding
 from app.models.cluster import Cluster
 from app.schemas.cluster import ClusterIn, ClusterOut, HealthOut
 from app.services import k8s_client as kc
-from app.services.k8s_client import LOCAL_CLUSTER_ID, bound_cluster_or_404, encrypt_kubeconfig
+from app.services.k8s_client import (
+    LOCAL_CLUSTER_ID,
+    bound_cluster_or_404,
+    encrypt_kubeconfig,
+    resolve_admin_source,
+)
 
 
 def _out(c: Cluster) -> dict[str, object]:
@@ -32,6 +38,10 @@ def _out(c: Cluster) -> dict[str, object]:
         "context": c.context,
         "status": c.status,
         "last_probe_at": c.last_probe_at,
+        # TICKET-16: every REAL registry row is source "registry" (the list's
+        # synthetic admin entry is source "admin" — the literal is built in
+        # list_clusters, not here).
+        "source": "registry",
     }
 
 
@@ -125,7 +135,33 @@ class ClusterApi(Api):
             .scalars()
             .all()
         )
-        return jsonify([_out(c) for c in rows]), 200
+        items = [_out(c) for c in rows]
+        if user.role == "admin":
+            # ADR-0021 (TICKET-16): the synthetic local cluster — the cluster
+            # KubeDash runs in (OD-D, reserved id 0). This block is the
+            # visibility seam: permission management later extends it
+            # (e.g. per-cluster binding status) without touching the pool.
+            # I13: api_server is the RESOLVED source — the file path in
+            # kubeconfig-file mode (the literal, not the resolve_admin_source
+            # tag), "in-cluster" in in-cluster mode.
+            s = get_settings()
+            items.insert(
+                0,
+                {
+                    "id": LOCAL_CLUSTER_ID,
+                    "name": "local",
+                    "api_server": (
+                        "in-cluster"
+                        if resolve_admin_source(s) == "in-cluster"
+                        else s.admin_kubeconfig
+                    ),
+                    "context": None,
+                    "status": None,
+                    "last_probe_at": None,
+                    "source": "admin",
+                },
+            )
+        return jsonify(items), 200
 
     @blp.route("/clusters/<int:cluster_id>", methods=["GET"])
     @blp.response(200, ClusterOut)

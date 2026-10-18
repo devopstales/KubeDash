@@ -25,6 +25,10 @@ class ClusterOut(Schema):
     context = String(allow_none=True)
     status = String()
     last_probe_at = DateTime(allow_none=True)
+    # TICKET-16: "registry" (a bound clusters row) or "admin" (the synthetic
+    # local cluster for admins) — docs-only for the bare list response, but
+    # keeps the OpenAPI spec honest (I6/I7).
+    source = String()
 
 
 class HealthOut(Schema):

@@ -48,16 +48,12 @@ class ResourceApi(Api):
         if cluster_id == LOCAL_CLUSTER_ID:
             # id 0: the synthetic local cluster bypasses the binding gate (no
             # row 0 exists) and goes straight to the pool, whose id-0 branch
-            # routes to the admin client or raises CLUSTER_NOT_FOUND.
-            from app.models.cluster import Cluster
+            # routes to the admin client or raises CLUSTER_NOT_FOUND. The
+            # synthetic object is built by clusters._local_cluster() (the
+            # single source for the OD-D reserved id-0 row).
+            from app.api.clusters import _local_cluster
 
-            cluster = Cluster(
-                id=LOCAL_CLUSTER_ID,
-                name="local",
-                api_server="local",
-                kubeconfig_enc=b"",
-                context=None,
-            )
+            cluster = _local_cluster()
         else:
             cluster = bound_cluster_or_404(g.current_user, cluster_id)
         method, api_resource = _KINDS[kind]
