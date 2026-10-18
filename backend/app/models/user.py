@@ -8,9 +8,14 @@ class User(db.Model):
     __tablename__ = "users"
 
     id = db.Column(db.Integer, primary_key=True)
-    # OIDC subject — stable identity across logins.
+    # Stable identity — OIDC sub, or ``local:<email>`` for the bootstrap
+    # admin (ADR-0021; the ``local:`` prefix is reserved — an IdP sub
+    # starting with ``local:`` would collide, M-NEW-1).
     sub = db.Column(db.String(255), unique=True, nullable=False, index=True)
-    email = db.Column(db.String(255))
+    # Unique (uq_users_email, migration 6feadb091ff4): the bootstrap
+    # upsert's ON CONFLICT (email) requires it (C-NEW-1); it also backstops
+    # the OIDC path where two IdP subs can share an email.
+    email = db.Column(db.String(255), unique=True)
     display_name = db.Column(db.String(255))
     # OIDC groups claim (JSON array); R9/RBAC consumes it later.
     # Postgres JSONB (the brief's `db.JSON` maps to plain JSON; JSONB is the

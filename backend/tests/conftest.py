@@ -5,7 +5,9 @@ import pytest
 from testcontainers.postgres import PostgresContainer
 from testcontainers.redis import RedisContainer
 
-from app import create_app
+import app.core.config as _config
+from app import _bootstrap_local_admin, create_app
+from app.extensions import db
 
 # The brief's snippets assume `exposed_port` / `get_container_host`, which do
 # not exist on testcontainers 4.x (they are `get_exposed_port` /
@@ -25,7 +27,9 @@ RedisContainer.exposed_port = RedisContainer.get_exposed_port
 
 @pytest.fixture(scope="session")
 def pg_container() -> Iterator[PostgresContainer]:
-    pg = PostgresContainer("postgres:16")
+    # driver="psycopg": the project pins psycopg 3 (binary); the
+    # testcontainers default is psycopg2, which is not installed.
+    pg = PostgresContainer("postgres:16", driver="psycopg")
     pg.start()
     try:
         yield pg
@@ -44,18 +48,28 @@ def redis_container() -> Iterator[RedisContainer]:
 
 
 @pytest.fixture()
-def app(pg_container, redis_container):
+def app(pg_container, redis_container, monkeypatch):
+    # I-NEW-1 (ADR-0021, TICKET-14): bootstrap env ON for the PG-tier app —
+    # the env triple: setenv BEFORE create_app (the Settings singleton caches
+    # from ENV on first read; config_overrides alone never reach
+    # get_settings()), then reset the cache. The hook runs after create_all
+    # and its committed row PERSISTS (test_bootstrap.py reads it directly;
+    # the "second boot" test re-invokes the hook for idempotency). The vars
+    # are SET (not setdefault'd): tests that want the env unset define their
+    # own app (test_bootstrap.app_no_bootstrap).
+    monkeypatch.setenv("KUBEDASH_BOOTSTRAP_ADMIN_EMAIL", "admin@local")
+    monkeypatch.setenv("KUBEDASH_BOOTSTRAP_ADMIN_PASSWORD", "correct-horse")
+    _config._settings = None
     application = create_app({
         "TESTING": True,
-        "DATABASE_URL": pg_container.get_connection_url(),
+        "DATABASE_URL": pg_container.get_connection_url(driver="psycopg"),
         "REDIS_URL": f"redis://{redis_container.get_container_host()}:{redis_container.exposed_port(6379)}",
         "KUBEDASH_JWT_SECRET": "test-jwt-secret",
         "KUBEDASH_SECRET_KEY": "test-enc-key-32-bytes-long!!!!",
     })
     with application.app_context():
-        from app.extensions import db
-
         db.create_all()
+        _bootstrap_local_admin(application)
         yield application
         db.session.rollback()
 
@@ -63,6 +77,15 @@ def app(pg_container, redis_container):
 @pytest.fixture()
 def client(app):
     return app.test_client()
+
+
+@pytest.fixture()
+def db_sess():
+    """The SQLAlchemy session bound to the (PG) test app. flask-sqlalchemy
+    3.x does not expose a pytest ``db`` fixture (that was 2.x), so the
+    root-tier tests request ``db_sess`` explicitly. Named to avoid shadowing
+    the ``db`` import in the same module."""
+    return db
 
 
 # ---------------------------------------------------------------------------
@@ -123,7 +146,7 @@ def kind_client(kind_cluster, app) -> tuple[int, bytes]:
     from app.extensions import db
     from app.models.binding import ClusterBinding
     from app.models.cluster import Cluster
-    from app.models.user import User
+    from app.models.user import User  # noqa: F811  (kind fixture — local scope overrides module import)
     from app.services.k8s_client import encrypt_kubeconfig
 
     # Session-scoped against a function-scoped app: the Cluster row is bound

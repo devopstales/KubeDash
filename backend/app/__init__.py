@@ -99,6 +99,47 @@ def create_app(config_overrides: Mapping[str, object] | None = None) -> Flask:
     return app
 
 
+def _bootstrap_local_admin(app: Flask) -> None:
+    """ADR-0021: idempotent local-admin upsert at boot. Both env vars must be
+    set. True Postgres upsert (ON CONFLICT email DO UPDATE) so concurrent
+    replicas converge. Own app context: create_app() stays pure (no DB init
+    inside the factory — wsgi/tests own the table lifecycle)."""
+    from sqlalchemy.dialects.postgresql import insert as pg_insert
+
+    from app.core import security
+    from app.models.user import User
+
+    s = get_settings()
+    if not (s.bootstrap_admin_email and s.bootstrap_admin_password):
+        return
+    new_hash = security.hash_password(s.bootstrap_admin_password)
+    with app.app_context():
+        stmt = pg_insert(User).values(
+            sub=f"local:{s.bootstrap_admin_email}",
+            email=s.bootstrap_admin_email,
+            display_name=s.bootstrap_admin_email.split("@")[0],
+            role="admin",
+            auth_source="local",
+            password_hash=new_hash,
+        )
+        stmt = stmt.on_conflict_do_update(
+            index_elements=["email"],
+            set_={
+                "role": "admin",
+                # SSO-collision rule (I-NEW-2): auth_source flips to local
+                # only if it is already local (an 'oidc' row stays 'oidc');
+                # password_hash refreshes only for local rows (an 'oidc'
+                # row's password stays as-is → 401 via the route's gate).
+                "auth_source": db.case((User.auth_source == "local", "local"), else_="oidc"),
+                "password_hash": db.case(
+                    (User.auth_source == "local", new_hash), else_=User.password_hash
+                ),
+            },
+        )
+        db.session.execute(stmt)
+        db.session.commit()
+
+
 def register_health(app: Flask) -> None:
     @app.get("/healthz")
     def healthz() -> Response:

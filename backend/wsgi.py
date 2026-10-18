@@ -18,12 +18,18 @@ import time
 import rq
 from flask import Flask
 
-from app import create_app
+from app import _bootstrap_local_admin, create_app
 from app.core.config import get_settings
 
 log = logging.getLogger(__name__)
 
 app: Flask = create_app()
+
+# ADR-0021: the local-admin upsert runs at boot, after the factory (which
+# stays pure — no DB init inside create_app) and BEFORE Leader/RQ startup,
+# so the row exists before any task or request can read it. No-op when the
+# bootstrap env is unset.
+_bootstrap_local_admin(app)
 
 # RQ task path -> enqueue interval (seconds). The worker thread below is the
 # scheduler: it enqueues a task only when it is due AND this replica leads.

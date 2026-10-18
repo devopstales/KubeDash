@@ -64,6 +64,12 @@ def _upsert_user(userinfo: dict[str, object]) -> User:
     user.email = userinfo.get("email")
     user.display_name = userinfo.get("name")
     user.groups = userinfo.get("groups", [])
+    # Honest write (I-NEW-2): the OIDC path DECLARES auth_source='oidc'
+    # explicitly rather than relying on the column default. The collision
+    # case (the bootstrap email claimed by an IdP) flips the row to 'oidc'
+    # as a written value — 'SSO wins' per ADR-0021 — and the bootstrap
+    # hook's case-gated refresh must not flip it back on the next boot.
+    user.auth_source = "oidc"
     db.session.commit()
     return user
 
