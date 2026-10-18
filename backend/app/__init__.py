@@ -159,6 +159,16 @@ def register_health(app: Flask) -> None:
                 checks["redis"] = "ok"
             except Exception:
                 checks["redis"] = "down"
+            # ADR-0021: the admin-kubeconfig PROBE (I-NEW-6): an isfile check
+            # when the source is a file — NOT a re-resolver (it never
+            # invalidates or touches the pooled client). In-cluster mode:
+            # the key is ABSENT (no file dependency to probe), not "ok".
+            # get_settings() (lazy, cached) — create_app's local `settings`
+            # is out of scope here.
+            from app.services.k8s_client import admin_client_ok, resolve_admin_source
+
+            if resolve_admin_source(get_settings()) == "kubeconfig-file":
+                checks["admin-kubeconfig"] = "ok" if admin_client_ok(get_settings()) else "down"
         healthy = all(v == "ok" for v in checks.values())
         return jsonify(checks), (200 if healthy else 503)
 

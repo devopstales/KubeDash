@@ -21,7 +21,7 @@ from app.models.binding import ClusterBinding
 from app.models.cluster import Cluster
 from app.schemas.cluster import ClusterIn, ClusterOut, HealthOut
 from app.services import k8s_client as kc
-from app.services.k8s_client import bound_cluster_or_404, encrypt_kubeconfig
+from app.services.k8s_client import LOCAL_CLUSTER_ID, bound_cluster_or_404, encrypt_kubeconfig
 
 
 def _out(c: Cluster) -> dict[str, object]:
@@ -33,6 +33,23 @@ def _out(c: Cluster) -> dict[str, object]:
         "status": c.status,
         "last_probe_at": c.last_probe_at,
     }
+
+
+def _local_cluster() -> Cluster:
+    """The synthetic local cluster (ADR-0021): the cluster KubeDash runs in.
+
+    No ``clusters`` row exists for id 0, so ``bound_cluster_or_404`` would
+    404 first — the synthetic object bypasses the binding gate and goes
+    straight to ``pool.get``, whose internal ``id: 0`` branch routes to the
+    admin client or raises ``ClusterNotFoundError`` for non-admins.
+    """
+    return Cluster(
+        id=LOCAL_CLUSTER_ID,
+        name="local",
+        api_server="local",
+        kubeconfig_enc=b"",
+        context=None,
+    )
 
 
 class ClusterApi(Api):
@@ -114,6 +131,10 @@ class ClusterApi(Api):
     @blp.response(200, ClusterOut)
     @blp.doc(responses={404: "CLUSTER_NOT_FOUND"})
     def get_cluster(self, cluster_id: int) -> dict[str, object]:
+        if cluster_id == LOCAL_CLUSTER_ID:
+            # id 0: the synthetic local cluster — the pool's role gate is the
+            # gate (non-admin → CLUSTER_NOT_FOUND), no binding lookup.
+            return _out(_local_cluster())
         cluster = bound_cluster_or_404(g.current_user, cluster_id)
         return _out(cluster)
 
@@ -121,7 +142,12 @@ class ClusterApi(Api):
     @blp.response(200, HealthOut)
     @blp.doc(responses={404: "CLUSTER_NOT_FOUND", 502: "CLUSTER_UNREACHABLE"})
     def cluster_health(self, cluster_id: int) -> dict[str, str]:
-        cluster = bound_cluster_or_404(g.current_user, cluster_id)
+        if cluster_id == LOCAL_CLUSTER_ID:
+            cluster = _local_cluster()
+            # Non-admin: the pool's id-0 branch raises ClusterNotFoundError
+            # (CLUSTER_NOT_FOUND) before any probe.
+        else:
+            cluster = bound_cluster_or_404(g.current_user, cluster_id)
         up = kc.pool.get(cluster).readyz()
         if not up:
             raise ClusterUnreachableError(f"cluster {cluster.name!r} /readyz failed")
