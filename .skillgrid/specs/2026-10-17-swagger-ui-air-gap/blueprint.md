@@ -18,6 +18,16 @@ integration risk lives entirely in "does the app-served asset + template
 override actually render" — proving that end-to-end first kills the whole
 hypothesis before we add anything else.
 
+> **CORRECTION (2026-10-17, Task 1 implementation):** the package name
+> `swagger-ui-dist` does not exist on PyPI (pypi.org returns 404 for it; it is
+> the npm package name). The real PyPI distribution is `swagger-ui-bundle`
+> (module `swagger_ui_bundle`), which vendors the swagger-ui dist files under
+> `vendor/swagger-ui-<ver>/` — NOT at the package root. Task 1 was implemented
+> against `swagger_ui_bundle` with `_DIST_SUBDIR` pointing at the versioned
+> vendor directory, so all other references to `swagger-ui-dist` /
+> `swagger_ui_dist` below should be read as `swagger-ui-bundle` /
+> `swagger_ui_bundle`.
+
 **Goal:** Make `/api/docs` fully functional in an air gap — serve the Swagger
 UI's CSS/JS from the app (no CDN, always) and declare a `BearerAuth` JWT
 security scheme on the spec, with the page staying open for browsing.
