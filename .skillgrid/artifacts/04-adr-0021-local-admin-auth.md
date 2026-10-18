@@ -141,8 +141,15 @@ Concretely, with the bootstrap env set:
   `cluster_bindings` is untouched.
 - Bad, because an SSO user whose IdP `email` collides with the
   bootstrap email is upserted to `auth_source='oidc'` at next SSO
-  login — the password then stops working for that identity (documented;
-  operators must not reuse the bootstrap email in their IdP).
+  login — the bootstrap hook's `password_hash` refresh is case-gated to
+  `auth_source='local'` rows, so once SSO has claimed the email the
+  password STOPS working for it (the local route gates on
+  `auth_source='local'`; 401 `INVALID_CREDENTIALS` from then on —
+  documented; operators must not reuse the bootstrap email in their IdP).
+- Bad, because the `local:<email>` sub prefix is reserved for the
+  bootstrap admin; an IdP that issues subs starting with `local:` would
+  collide with the convention (`sub` is unique, so it is a collision,
+  not a crash).
 - Bad, because the bootstrap password lives in the environment/secret —
   rotation means editing the secret and restarting (the boot upsert
   refreshes the hash). There is no in-UI password change in this scope.

@@ -178,40 +178,50 @@ def test_local_login_issues_jwt_same_contract_as_oidc(client_with_admin):
     assert claims["sub"].startswith("local:")  # the bootstrap admin's sub convention
     assert loc == f"/?token={access}&refresh={refresh}"
 
-def test_local_login_wrong_password_401(client):
-    res = client.post("/api/v1/auth/local", json={"email": "admin@local", "password": "nope"})
+def test_local_login_wrong_password_401(client_with_admin):
+    res = client_with_admin.post("/api/v1/auth/local", json={"email": "admin@local", "password": "nope"})
     assert res.status_code == 401
-    body = res.get_json()
-    assert body["error"]["code"] == "INVALID_CREDENTIALS"
+    assert res.get_json()["error"]["code"] == "INVALID_CREDENTIALS"
 
-def test_local_login_unknown_email_same_code(client):
-    res = client.post("/api/v1/auth/local", json={"email": "ghost@local", "password": "x"})
+def test_local_login_unknown_email_same_code(client_with_admin):
+    res = client_with_admin.post("/api/v1/auth/local", json={"email": "ghost@local", "password": "x"})
     assert res.status_code == 401
     assert res.get_json()["error"]["code"] == "INVALID_CREDENTIALS"  # no enumeration
 
+def test_local_login_sso_row_same_email_401(client, app):
+    # I-NEW-2: an SSO user's email (password_hash=None) at /auth/local → the
+    # same 401 code (the no-enumeration guarantee holds across auth sources)
+    with app.app_context():
+        from app.models.user import User
+        db.session.add(User(sub="sso:u1", email="sso@local", role="user", auth_source="oidc"))
+        db.session.commit()
+    res = client.post("/api/v1/auth/local", json={"email": "sso@local", "password": "x"})
+    assert res.status_code == 401
+    assert res.get_json()["error"]["code"] == "INVALID_CREDENTIALS"
+
 def test_local_login_disabled_when_env_unset(client_no_bootstrap):
-    res = client.post("/api/v1/auth/local", json={"email": "a@b", "password": "c"})
+    res = client_no_bootstrap.post("/api/v1/auth/local", json={"email": "a@b", "password": "c"})
     assert res.status_code == 403
     assert res.get_json()["error"]["code"] == "LOCAL_AUTH_DISABLED"
 
 def test_auth_settings_open_route_reflects_config(client_no_bootstrap):
-    res = client.get("/api/v1/auth/settings")  # pre-JWT: no Authorization header
+    res = client_no_bootstrap.get("/api/v1/auth/settings")  # pre-JWT: no Authorization header
     assert res.status_code == 200
     assert res.get_json() == {"sso_enabled": False, "local_enabled": False}
 ```
 
-Plus an amendment to `backend/tests/api/test_auth.py`: if the authhook's path-scope test asserts an exact open-path list, add `/api/v1/auth/settings` to it (the hook already skips the whole `/api/v1/auth/*` prefix — verify, don't assume).
+Plus amendments to `backend/tests/api/test_auth.py`: (1) if the authhook's path-scope test asserts an exact open-path list, add `/api/v1/auth/settings` (verified: `_authhook.py:27` skips the whole `/api/v1/auth/` prefix, so no amendment is expected — the test is a guard); (2) **I-NEW-4 door-check strengthening:** add an exact-match assertion to the existing OIDC callback test — `assert loc == f"/?token={access}&refresh={refresh}"` against the pair parsed from its own response (the current test only asserts prefix+parse; the shared-builder contract must be pinned on BOTH sides, not just the new local route).
 
 Conftest amendment — **both layers** (`backend/tests/conftest.py` root PG tier AND `backend/tests/api/conftest.py` sqlite tier; the hook's `on_conflict_do_update` is PG-dialect, so the sqlite api-tier app must SKIP the hook — see C-NEW-1): the `Settings` singleton (`app.core.config._settings`) caches from env on first read (and is populated at module import — `k8s_client.py:39` calls `get_settings()` at import), so the amendment must (a) in the primary app fixture: `monkeypatch.setenv("KUBEDASH_BOOTSTRAP_ADMIN_EMAIL", "admin@local")` + `monkeypatch.setenv("KUBEDASH_BOOTSTRAP_ADMIN_PASSWORD", "correct-horse")` + `app.core.config._settings = None` — in that order, BEFORE `create_app()` (reset-after-setenv is the load-bearing order; a wrong order makes `test_auth_settings_open_route_reflects_config` fail because an earlier test's `_settings` leaks in); (b) a `client_no_bootstrap` / `app_no_bootstrap` fixture doing the same with both vars `""`. Note: the `test_apidocs.py` second-app pattern the earlier draft cited builds a second app via `config_overrides` ONLY — it never resets `_settings` (verified); the reset is a NEW pattern this change introduces, stated here, not a citation. `config_overrides` alone is NOT sufficient — `get_settings()` reads env, not `app.config` (verified: the existing conftest's overrides dict reaches `app.config` only). The sqlite api-tier app runs the `local` route with the hook SKIPPED (its tests seed the admin row directly via `db.session.add(User(...))` — the PG-dialect upsert is exercised only in the root PG tier, which is where `test_bootstrap.py` lives).
 
 - [ ] **Step 2: Run tests to verify they fail**
 
 Run: `cd backend && uv run pytest tests/api/test_local_auth.py -v`
-Expected: 5 FAIL (routes 404/405; settings 404). Door-check assertion: the OIDC callback test in `tests/api/test_auth.py` still PASSES at this step (T4 baseline before touching `auth.py`).
+Expected: 6 FAIL (local 404/405 × 4 tests; settings 404; the sso-row test fails on the missing route too). Door-check assertion: the OIDC callback test in `tests/api/test_auth.py` still PASSES at this step (T4 baseline before touching `auth.py`).
 
 - [ ] **Step 3: Implement**
 
-`core/errors.py` — add the two subclasses following the existing 10-code pattern exactly (name → `code` property → status). `schemas/auth.py` — add `LocalLoginIn` + `AuthSettingsOut`. `config.py` — add:
+`core/errors.py` — add the two subclasses following the existing 10-code pattern exactly (name → `code` property → status). `schemas/auth.py` — add `LocalLoginIn` + `AuthSettingsOut` as **marshmallow** schemas (the file is `ma.Schema` — verified; smorest 0.47's `@blp.arguments` requires marshmallow). `config.py` — add:
 
 ```python
 bootstrap_admin_email: str = ""
@@ -254,7 +264,7 @@ def _issue_and_persist(user: User) -> tuple[str, str]:
     return access, refresh
 ```
 
-(`callback` now ends with `access, refresh = _issue_and_persist(user); return redirect(redirect_with_tokens(access, refresh))` — the OIDC redirect test passing unmodified is the door check.) `local`: if local auth disabled (both bootstrap env empty) → `raise LocalAuthDisabledError`; look up `User` by email; if no row or `password_hash is None` or `verify_password` fails → `raise InvalidCredentialsError` (one code — no enumeration); else set `last_login_at`, `_issue_and_persist`, 302 via `redirect_with_tokens`. `settings`: return `{"sso_enabled": bool(get_settings().oidc_issuer), "local_enabled": bool(get_settings().bootstrap_admin_email and get_settings().bootstrap_admin_password)}`. NOTE: the local route needs the `password_hash`/`auth_source` columns from Task 2's migration — Task 1's tests therefore run against the conftest app whose `db.create_all()` includes them (the model columns must be added in Task 1 Step 3 too, or Task 1/2 swap order; the plan keeps the order and adds the two model columns to Task 1's file list with the migration itself in Task 2 — `create_all` reads the model, not the migration, so this is coherent).
+(`callback` now ends with `access, refresh = _issue_and_persist(user); return redirect(redirect_with_tokens(access, refresh))` — the OIDC redirect test, now with the I-NEW-4 exact-match assertion, is the door check.) `local`: if local auth disabled (both bootstrap env empty) → `raise LocalAuthDisabledError`; look up `User` by email; if no row OR `auth_source != 'local'` OR `password_hash is None` OR `verify_password` fails → `raise InvalidCredentialsError` (one code — no enumeration, and the SSO-collision gate per I-NEW-2); else set `last_login_at`, `_issue_and_persist`, 302 via `redirect_with_tokens`. `settings`: return `{"sso_enabled": bool(get_settings().oidc_issuer), "local_enabled": bool(get_settings().bootstrap_admin_email and get_settings().bootstrap_admin_password)}`. NOTE: the local route needs the `password_hash`/`auth_source` columns from Task 2's migration — Task 1's tests therefore run against the conftest app whose `db.create_all()` includes them (the model columns must be added in Task 1 Step 3 too, or Task 1/2 swap order; the plan keeps the order and adds the two model columns to Task 1's file list with the migration itself in Task 2 — `create_all` reads the model, not the migration, so this is coherent).
 
 - [ ] **Step 4: Run tests to verify they pass**
 
@@ -273,7 +283,7 @@ git commit -m "feat(auth): local password login + settings route (ADR-0021)"
 
 ### Task 2: Migration + model columns + bootstrap boot hook
 
-> **Checkpoint:** ⚠ one-way: OD-A (additive migration; `auth_source NOT NULL DEFAULT 'oidc'` declares existing rows SSO). STOP for user approval before running the migration locally.
+> **Checkpoint:** ⚠ one-way: OD-A (additive migration; `auth_source NOT NULL DEFAULT 'oidc'` declares existing rows SSO; `uq_users_email` unique constraint — C-NEW-1: `ON CONFLICT (email)` is only valid with a matching unique index, which does not exist today (verified: `models/user.py` has `unique=True` on `sub` only)). STOP for user approval before running the migration locally.
 
 **Files:**
 - Create: `backend/migrations/versions/<newrev>_local_admin_auth_adr_0021.py`
@@ -324,7 +334,7 @@ def test_bootstrap_noop_when_env_unset(app_no_bootstrap, db):
     assert db.session.scalar(db.select(db.func.count()).select_from(User)) == 0
 ```
 
-Plus the SSO-collision case in `tests/api/test_auth.py` (amendment): the mock-OIDC callback running as `admin@local` (the bootstrap email) → after the callback the row has `auth_source='oidc'` (SSO wins); then re-run `_bootstrap_local_admin` → `auth_source` stays `'oidc'` (the hook does not flip an SSO-collided row) but `password_hash` is refreshed (the password keeps working for the local identity). `_upsert_user` gains `auth_source='oidc'` explicitly (not by default) so the collision is an honest write.
+Plus the SSO-collision case in `tests/api/test_auth.py` (amendment, container PG tier — the collision involves the hook, which is PG-dialect): the mock-OIDC callback running as `admin@local` (the bootstrap email) → after the callback the row has `auth_source='oidc'` (SSO wins); then re-run `_bootstrap_local_admin` → `auth_source` stays `'oidc'` AND `password_hash` is UNCHANGED (the case-gated refresh skips non-local rows — I-NEW-2); then `POST /api/v1/auth/local` with that email + the bootstrap password → **401 `INVALID_CREDENTIALS`** (the local route's `auth_source != 'local'` gate — the password genuinely stopped working, matching ADR-0021). `_upsert_user` gains `auth_source='oidc'` explicitly (not by default) so the collision is an honest write.
 
 `test_security_password.py` — round-trip only (format is an implementation detail):
 
@@ -346,7 +356,7 @@ Expected: bootstrap tests FAIL (hook missing). (The model columns already exist 
 
 - [ ] **Step 3: Implement**
 
-New Alembic revision (down-rev = `704b7637d05c`, the current head — the real rev id is generated by `flask db revision -m "local_admin_auth_adr_0021"`; the `<newrev>` filename in the Files list is that generated id): `op.add_column("users", sa.Column("password_hash", sa.String(255), nullable=True))`, `op.add_column("users", sa.Column("auth_source", sa.String(16), nullable=False, server_default="oidc"))`; downgrade drops both. `models/user.py` — update the `sub` column comment: "stable identity — OIDC sub, or `local:<email>` for the bootstrap admin (ADR-0021)". `app/__init__.py` — the hook (next to `register_health`):
+New Alembic revision (down-rev = `704b7637d05c`, the current head — the real rev id is generated by `flask db revision -m "local_admin_auth_adr_0021"`; the `<newrev>` filename in the Files list is that generated id): `op.add_column("users", sa.Column("password_hash", sa.String(255), nullable=True))`, `op.add_column("users", sa.Column("auth_source", sa.String(16), nullable=False, server_default="oidc"))`, **`op.create_unique_constraint("uq_users_email", "users", ["email"])`** (C-NEW-1 — the upsert's `ON CONFLICT (email)` requires it; also backstops the OIDC path where two IdP subs can share an email); downgrade drops the constraint + both columns. `models/user.py` — `email = db.Column(db.String(255), unique=True)` (model matches the constraint) + update the `sub` column comment: "stable identity — OIDC sub, or `local:<email>` for the bootstrap admin (ADR-0021; the `local:` prefix is reserved — an IdP sub starting with `local:` would collide, M-NEW-1)". `app/__init__.py` — the hook (next to `register_health`):
 
 ```python
 def _bootstrap_local_admin(app: Flask) -> None:
@@ -366,14 +376,19 @@ def _bootstrap_local_admin(app: Flask) -> None:
             role="admin", auth_source="local", password_hash=new_hash)
         stmt = stmt.on_conflict_do_update(
             index_elements=["email"],
-            set_={"password_hash": new_hash,
-                  "role": "admin",
-                  "auth_source": db.case((User.auth_source == "local", "local"), else_="oidc")})
+            set_={"role": "admin",
+                  # SSO-collision rule (I-NEW-2): auth_source flips to local
+                  # only if it is already local (an 'oidc' row stays 'oidc');
+                  # password_hash refreshes only for local rows (an 'oidc'
+                  # row's password stays as-is → 401 via the route's gate).
+                  "auth_source": db.case((User.auth_source == "local", "local"), else_="oidc"),
+                  "password_hash": db.case((User.auth_source == "local", new_hash),
+                                            else_=User.password_hash)})
         db.session.execute(stmt)
         db.session.commit()
 ```
 
-(The `auth_source` CASE is the SSO-collision rule: a row the OIDC callback flipped to `'oidc'` is NOT flipped back on the next boot — "SSO wins" per ADR-0021 — but `password_hash` still refreshes so the password keeps working for the local identity.) `wsgi.py` — call `_bootstrap_local_admin(app)` immediately after `app = create_app(...)` (before Leader/RQ startup) — the production boot path. Conftest: the app fixture invokes `_bootstrap_local_admin(app)` inside its `app.app_context()` AFTER `db.create_all()`; `app_no_bootstrap`/`client_no_bootstrap` (defined in Task 1's conftest amendment, reused here) skip it. `api/auth.py` `_upsert_user` — write `auth_source='oidc'` explicitly on the OIDC path (the collision rule is an honest write, not a default).
+(The `auth_source` CASE is the SSO-collision rule: a row the OIDC callback flipped to `'oidc'` is NOT flipped back on the next boot — "SSO wins" per ADR-0021. **Collision resolution (I-NEW-2, locked here):** the hook refreshes `password_hash` ONLY for rows with `auth_source='local'` (the `set_` dict uses `db.case` for BOTH `auth_source` and `password_hash`: `password_hash=db.case((User.auth_source == "local", new_hash), else_=User.password_hash)`). Consequence — pinned and ADR-consistent: once SSO has claimed the email (`auth_source='oidc'`), the local password STOPS working (401 `INVALID_CREDENTIALS`, because `verify_password` is gated on `auth_source='local'` in the `local` route) — exactly ADR-0021's "the password then stops working for that identity". The `local:` route check becomes: no row OR `auth_source != 'local'` OR `password_hash is None` OR `verify_password` fails → 401.) `wsgi.py` — call `_bootstrap_local_admin(app)` immediately after `app = create_app(...)` (before Leader/RQ startup) — the production boot path. Conftest (root PG tier): the app fixture invokes `_bootstrap_local_admin(app)` inside its `app.app_context()` AFTER `db.create_all()`; the sqlite api-tier app SKIPS the hook (PG-dialect `on_conflict_do_update` — C-NEW-1) and seeds rows directly; `app_no_bootstrap`/`client_no_bootstrap` (Task 1's amendment) skip it. `api/auth.py` `_upsert_user` — write `auth_source='oidc'` explicitly on the OIDC path (the collision rule is an honest write, not a default); `api/auth.py` `local` — the `auth_source != 'local'` gate per the collision resolution above.
 
 - [ ] **Step 4: Run tests to verify they pass**
 
@@ -403,7 +418,7 @@ git commit -m "feat(auth): local admin bootstrap hook + users columns migration 
 
 **Interfaces:**
 - Consumes: `Settings.admin_kubeconfig` (Task 1), `get_settings()`, the existing `K8sClientPool.get(cluster: Cluster)` (verified: `k8s_client.py:151` — takes a Cluster ROW, not an id; there is no `get_client`), the existing `bound_cluster_or_404(user, cluster_id)` binding gate (verified: `k8s_client.py:65-88` — raises `ClusterNotFoundError` BEFORE any pool lookup when no Cluster row OR no binding exists — the T7 blocker for `id: 0`), `K8sClient.__init__(kubeconfig: bytes)` (verified: `k8s_client.py:98` — bytes-only constructor; no file/in-cluster path exists), the existing `pool.get(cluster)` call sites — verified complete list: `api/clusters.py:125` (`cluster_health`), `api/resources.py:53` (`list_resources`), `services/rbac.py:77` (`can`), `tasks/health.py:28`, `tasks/cluster_sync.py:27` (5 sites, all pass a Cluster row — none change in this task), `kubernetes.config` (`load_kube_config`/`load_incluster_config`).
-- Produces: `AdminSource = Literal["in-cluster", "kubeconfig-file"]`; `resolve_admin_source(s: Settings) -> AdminSource` (pure: empty → `"in-cluster"`, non-empty → `"kubeconfig-file"`); a NEW builder `build_admin_client(s: Settings) -> K8sClient` (file: `load_kube_config(path)` → Configuration → the same `K8sClient`-shaped client, constructed via a small `_AdminK8sClient` subclass or a factory kwarg — the exact kubernetes-API shape is an implementation detail pinned by the test seam; in-cluster: `load_incluster_config()`); `K8sClientPool.get_admin_client(user: User) -> K8sClient` — LAZY (resolves `get_settings()` on first call, caches; I4: the pool is constructed at module import, so eager resolution would see pre-env Settings), raises the existing `ClusterNotFoundError` when `user.role != "admin"`; and a `cluster_id == 0` SHORT-CIRCUIT in `api/clusters.py` (`get_cluster`, `cluster_health`) and `api/resources.py` (`list_resources`): admin + `id 0` → `pool.get_admin_client(user)`, non-admin + `id 0` → the existing `ClusterNotFoundError` (stable 404, no new code) — the short-circuit happens BEFORE `bound_cluster_or_404` (which would 404 first, since no Cluster row 0 exists). `K8sClient`/`_AdminK8sClient` gains a `source: str` attribute (`"registry"` | `"admin"`) for test assertions.
+- Produces: `AdminSource = Literal["in-cluster", "kubeconfig-file"]`; `resolve_admin_source(s: Settings) -> AdminSource` (pure: empty → `"in-cluster"`, non-empty → `"kubeconfig-file"`); a NEW builder `build_admin_client(s: Settings) -> K8sClient` (file: `load_kube_config(path)` → Configuration → the same `K8sClient`-shaped client, constructed via a small `_AdminK8sClient` subclass or a factory kwarg — the exact kubernetes-API shape is an implementation detail pinned by the test seam; in-cluster: `load_incluster_config()`); **the `id: 0` branch lives INSIDE `K8sClientPool`** (C-NEW-2): `pool.get(cluster)` gains `if cluster.id == 0: return self._get_admin_client_for(g.current_user)` — so `rbac.py:77`'s `pool.get(cluster)` (the SAR path) converges on the admin client with NO change to `rbac.py`, `api/resources.py`, or any of the 5 verified call sites (they all pass a Cluster-shaped object; for `id: 0` the handlers pass a synthetic `Cluster(id=0, name="local", kubeconfig_enc=None, ...)` object constructed in the handler's short-circuit, BEFORE `bound_cluster_or_404` — which would 404 first since no row 0 exists); `K8sClientPool._get_admin_client_for(user)` — LAZY (resolves `get_settings()` on first call, caches the built client; I4: the pool is constructed at module import, so eager resolution would see pre-env Settings), raises the existing `ClusterNotFoundError` when `user.role != "admin"`. **Cache invariant (I-NEW-6):** the readyz `admin-kubeconfig` check is a PROBE, not a re-resolver — a file missing BEFORE first build → readyz 503 AND `pool.get(id:0)` raises on first call; a file deleted AFTER a successful build → readyz 503 but the pooled client is the old one (use → 502 `CLUSTER_UNREACHABLE` via the client's `readyz()`); the cache is NOT invalidated by readyz. `K8sClient`/`_AdminK8sClient` gains a `source: str` attribute (`"registry"` | `"admin"`) for test assertions.
 - Seam: `resolve_admin_source` is the config→source seam (pure, no k8s); `build_admin_client` is the k8s-client seam (the unit tier injects a fake via the same `factory` kwarg pattern the pool already has — verified: `K8sClientPool(factory=...)` at `k8s_client.py:147`).
 - Deletion test: deleting the admin source removes the admin's only way to act on the cluster KubeDash runs in (the whole point of ADR-0021's admin section); the pool reverts to registry-only and `id: 0` 404s for everyone.
 - Adapters: 2 (in-cluster path, file path) + 2 test doubles (fake factory in unit, kind in CI) = seam justified.
@@ -418,6 +433,11 @@ git commit -m "feat(auth): local admin bootstrap hook + users columns migration 
 from app.services import k8s_client as kc
 from app.core.config import Settings
 
+class FakeAdminK8s:  # the seam double: no real kubernetes load in the unit tier
+    source = "admin"
+    def list_pods(self, namespace): return []
+    def readyz(self): return True
+
 def test_resolve_admin_source_pure():
     assert kc.resolve_admin_source(Settings(admin_kubeconfig="")) == "in-cluster"
     assert kc.resolve_admin_source(Settings(admin_kubeconfig="/etc/kubeconfig.yaml")) == "kubeconfig-file"
@@ -425,11 +445,14 @@ def test_resolve_admin_source_pure():
 def test_pool_admin_client_role_gate(db):
     admin = _seed_user(db, role="admin")
     normal = _seed_user(db, role="user")
-    pool = kc.K8sClientPool()  # fresh instance; get_admin_client is lazy
-    c = pool.get_admin_client(admin)
+    # C-NEW-2: the unit test MUST inject the fake factory — the default
+    # K8sClient factory would attempt a real load_incluster_config() and
+    # ERROR (not FAIL) in the unit tier.
+    pool = kc.K8sClientPool(factory=FakeAdminK8s, admin_factory=FakeAdminK8s)
+    c = pool._get_admin_client_for(admin)
     assert c.source == "admin"
     with pytest.raises(kc.ClusterNotFoundError):
-        pool.get_admin_client(normal)  # stable 404 family, not a crash
+        pool._get_admin_client_for(normal)  # stable 404 family, not a crash
 
 def test_resources_zero_short_circuit_for_admin(app, client, db, monkeypatch):
     # admin JWT + fake pool admin client (monkeypatch kc.pool like the
@@ -459,14 +482,14 @@ def test_readyz_ok_when_admin_kubeconfig_empty(monkeypatch, client):
 - [ ] **Step 2: Run tests to verify they fail**
 
 Run: `cd backend && uv run pytest tests/test_admin_source.py -v`
-Expected: 5 FAIL (`resolve_admin_source` not defined; `get_admin_client` missing; no `id:0` short-circuit; readyz has no `admin-kubeconfig` check).
+Expected: 5 FAIL (`resolve_admin_source` not defined; `_get_admin_client_for` missing; the `admin_factory` kwarg missing → TypeError; no `id:0` branch in `pool.get`; readyz has no `admin-kubeconfig` check). (C-NEW-2: with the fake factory wired, the role-gate test FAILS on the missing method — it does not ERROR on a real kubernetes load.)
 - [ ] **Step 3: Implement**
 
-`k8s_client.py`: add `resolve_admin_source` (2 lines), `build_admin_client(s)` (the k8s construction; wrap file-missing in a `ValueError` with the path), `K8sClientPool.get_admin_client(user)` (lazy + cached + role gate), the `source` attribute (registry clients get `"registry"` in `__init__`; admin client `"admin"`), and a module-level `admin_client_ok(s) -> bool` helper (file set → `os.path.isfile`, else True) for readyz. `api/clusters.py` + `api/resources.py`: the `cluster_id == 0` short-circuit (admin → `pool.get_admin_client(user)`, else raise `ClusterNotFoundError`) placed BEFORE `bound_cluster_or_404`. `app/__init__.py` `readyz`: when `resolve_admin_source(settings) == "kubeconfig-file"`, add `checks["admin-kubeconfig"] = "ok" if admin_client_ok(settings) else "down"`. The 5 existing `pool.get(cluster)` call sites are UNCHANGED (they all hold a real Cluster row — verified; no arity change anywhere).
+`k8s_client.py`: add `resolve_admin_source` (2 lines), `build_admin_client(s)` (the k8s construction; wrap file-missing in a `ValueError` with the path), `K8sClientPool(admin_factory=...)` kwarg + `_get_admin_client_for(user)` (lazy + cached + role gate) + the `cluster.id == 0` branch inside `pool.get` (C-NEW-2 — the branch lives in the pool so `rbac.py:77` converges unchanged), the `source` attribute (registry clients get `"registry"` in `__init__`; admin client `"admin"`), and a module-level `admin_client_ok(s) -> bool` helper (file set → `os.path.isfile`, else True) for readyz. `api/clusters.py` (`get_cluster`, `cluster_health`) + `api/resources.py` (`list_resources`): the `cluster_id == 0` short-circuit — construct the synthetic `Cluster(id=0, name="local", kubeconfig_enc=None, api_server=..., context=None, status=None, last_probe_at=None)` object and pass it to `pool.get(...)`/`bound_cluster_or_404` BYPASS (the synthetic object goes straight to `pool.get`, which routes `id 0` to the admin client or raises `ClusterNotFoundError` for non-admins) — placed BEFORE the real-row `bound_cluster_or_404` call. `app/__init__.py` `readyz`: when `resolve_admin_source(settings) == "kubeconfig-file"`, add `checks["admin-kubeconfig"] = "ok" if admin_client_ok(settings) else "down"`. The 5 existing `pool.get(cluster)` call sites are UNCHANGED (C-NEW-2: `rbac.py:77` converges through the pool's internal `id: 0` branch — verified the branch makes "no change at the call sites" true).
 - [ ] **Step 4: Run tests to verify they pass**
 
-Run: `cd backend && uv run pytest tests/test_admin_source.py tests/api/test_clusters.py tests/api/test_resources.py tests/tasks/ -v`
-Expected: PASS — the existing cluster/resource/task suites green (the regression guard: the short-circuit must not perturb `id > 0` behavior).
+Run: `cd backend && uv run pytest tests/test_admin_source.py tests/api/test_clusters.py tests/api/test_resources.py tests/services/test_rbac.py tests/tasks/ -v`
+Expected: PASS — the existing cluster/resource/**rbac**/task suites green (the regression guard: the pool's internal `id: 0` branch must not perturb `id > 0` behavior — `tests/services/test_rbac.py` specifically proves the SAR path through `pool.get` still works).
 - [ ] **Step 5: Commit**
 
 ```bash
@@ -543,7 +566,7 @@ Run: `cd backend && uv run pytest tests/api/test_clusters_admin.py tests/api/tes
 Expected: 4 FAIL (no `source` field; no `id:0`; `MeOut` rejects unknown fields or omits the new ones).
 - [ ] **Step 3: Implement**
 
-`api/clusters.py` `_out()` (verified: the list is a BARE `jsonify([...])` — the Pydantic schema is docs-only in smorest 0.47, so the field must go in the handler dict, not just the schema): add `"source": "registry"` to `_out()`'s returned dict. `list_clusters`: after building the bound-registry list, `if user.role == "admin":` prepend `{"id": 0, "name": "local", "api_server": "in-cluster" if resolve_admin_source(s) == "in-cluster" else s.admin_kubeconfig, "context": None, "status": None, "last_probe_at": None, "source": "admin"}`. `schemas/cluster.py`: item schema +`source: Literal["registry", "admin"] = "registry"` (keeps the OpenAPI doc honest). `schemas/auth.py` `MeOut`: add `auth_source: Literal["local", "oidc"]`, `kubeconfig_source: Literal["in-cluster", "kubeconfig-file"] | None`, `last_login_at: datetime | None`. `api/auth.py` `me`: populate them from `g.current_user` + `resolve_admin_source(get_settings())` (`kubeconfig_source` only when `role == "admin"`, else None). **OpenAPI re-dump (I6/I7):** after `MeOut` grows, re-dump `frontend/openapi.json` from the test client (the same dump the base-structure Task 8 did — the committed `frontend/openapi.json` is the source for `types.ts`) so Task 5's `Me` extension matches the real spec, not a hand-guess.
+`api/clusters.py` `_out()` (verified: the list is a BARE `jsonify([...])` — the Pydantic schema is docs-only in smorest 0.47, so the field must go in the handler dict, not just the schema): add `"source": "registry"` to `_out()`'s returned dict. `list_clusters`: after building the bound-registry list, `if user.role == "admin":` prepend `{"id": 0, "name": "local", "api_server": "in-cluster" if resolve_admin_source(s) == "in-cluster" else s.admin_kubeconfig, "context": None, "status": None, "last_probe_at": None, "source": "admin"}`. `schemas/cluster.py`: item schema +`source` field (keeps the OpenAPI doc honest). `schemas/auth.py` `MeOut`: add the three fields in **marshmallow** syntax (verified: `MeOut` is `ma.Schema` — M-NEW-2: `auth_source = ma.fields.String()`, `kubeconfig_source = ma.fields.String(allow_none=True)`, `last_login_at = ma.fields.DateTime(allow_none=True)` — Pydantic `Literal[...]` syntax would break the existing `@blp.response(200, MeOut)`). `api/auth.py` `me`: populate them from `g.current_user` + `resolve_admin_source(get_settings())` (`kubeconfig_source` only when `role == "admin"`, else None). **OpenAPI re-dump (I6/I7):** after `MeOut` grows, re-dump `frontend/openapi.json` from the test client (the same dump the base-structure Task 8 did — the committed `frontend/openapi.json` is the source for `types.ts`) so Task 5's `Me` extension matches the real spec, not a hand-guess.
 - [ ] **Step 4: Run tests to verify they pass**
 
 Run: `cd backend && uv run pytest tests/api/ -v -m "not integration"`
@@ -567,7 +590,7 @@ git commit -m "feat(auth): synthetic local cluster for admins + me response grow
 
 **Interfaces:**
 - Consumes: `apiFetch` (unchanged — T1 door-check proof), the `/api/v1/auth/settings` contract (Task 1), the `/api/v1/auth/local` 302 (Task 1), `useCluster()`'s `me` (grows compatibly via `types.ts`), the re-dumped `frontend/openapi.json` (Task 4) as the source for the `Me` extension, CoreUI form components (the template's existing `views/forms` usage as the pattern reference).
-- Produces: Login view with (a) token-in-URL parking effect → `navigate('/profile', { replace: true })` via **react-router** (C6: raw `window.history.replaceState` does not re-render the router — the SPA is BrowserRouter, `App.tsx:43`; the router is the only way to move it), (b) SSO button iff `sso_enabled` → `window.location.assign('/api/v1/auth/login')` (full document navigation to the 302 entry — the browser follows to `/?token=…`, the SPA re-mounts at `/`, and the parking effect on mount consumes it: this is the EXISTING SSO mechanism, kept verbatim), (c) local form iff `local_enabled`: `fetch('/api/v1/auth/local', { method: 'POST', headers: {'Content-Type':'application/json'}, body: JSON.stringify({email, password}), redirect: 'follow' })` — **no document navigation**: the fetch follows the 302 in-process, and on success the handler reads the final URL (`res.url` ends `/?token=…&refresh=…`), parses the pair, parks both in localStorage, and calls `navigate('/profile', { replace: true })` (C5: the SPA never leaves `/login`, so no re-mount handoff is needed). The mount auto-bounce (`window.location.assign` on mount, current `Login/index.tsx:26`) is REMOVED (I11: with a no-SSO install it 404s at `/authorize`; the settings-gated SSO button replaces it). On 401/403 the form surfaces the envelope message inline. Profile view: identity card + logout. `App.tsx`: `{ path: '/profile', element: <ProtectedRoute><ProfileView/></ProtectedRoute> }` (lazy, same pattern as the other views).
+- Produces: Login view with (a) token-in-URL parking effect → `navigate('/profile', { replace: true })` via **react-router** (C6: raw `window.history.replaceState` does not re-render the router — the SPA is BrowserRouter, `App.tsx:43`; the router is the only way to move it), (b) SSO button iff `sso_enabled` → `window.location.assign('/api/v1/auth/login')` (full document navigation to the 302 entry — the browser follows to `/?token=…`, the SPA re-mounts at `/`, and the parking effect on mount consumes it: this is the EXISTING SSO mechanism, kept verbatim), (c) local form iff `local_enabled`: `fetch('/api/v1/auth/local', { method: 'POST', headers: {'Content-Type':'application/json'}, body: JSON.stringify({email, password}), redirect: 'follow' })` — **no document navigation**: the fetch follows the 302 in-process, and on success the handler reads the final URL (`res.url` ends `/?token=…&refresh=…`), parses the pair, parks both in localStorage, and calls `navigate('/profile', { replace: true })` (C5: the SPA never leaves `/login`, so no re-mount handoff is needed). The mount auto-bounce (`window.location.assign` on mount, current `Login/index.tsx:26`) is REMOVED (I11: with a no-SSO install it 404s at `/authorize`; the settings-gated SSO button replaces it). On 401/403 the form surfaces the envelope message inline. **Settings-fetch failure (I-NEW-5):** if the `['auth/settings']` query errors (network down, or the 401-refresh-fail path when a stale `kd_token` is present), the Login view FAILS OPEN — it renders BOTH the SSO button and the local form (the user can try either; a blank login page at the bootstrap moment is the exact failure this change exists to prevent). Profile view: identity card + logout. `App.tsx`: `{ path: '/profile', element: <ProtectedRoute><ProfileView/></ProtectedRoute> }` (lazy, inside the `/*` branch with `DefaultLayout` — I-NEW-7, locked: the profile page is a normal authenticated page, it gets the nav; for a fresh admin with no clusters the cluster switcher shows empty, which is honest; the Login/Profile tests render `/profile` as a bare probe div because they test the VIEW, not the layout — the layout wrapping is covered by the e2e smoke in CI).
 - Seam: the token-parking effect is the delivery seam — the single place that consumes `?token=&refresh=` from the URL (the SSO document-navigation path); the local form's `res.url` parse is its in-process sibling. Both land on `navigate('/profile')`.
 - Deletion test: deleting the Login rewrite re-creates the SSO-only dead-end (no-IdP install unreachable — the whole change's point); deleting Profile removes the post-login landing (users bounce to the clusters view with no identity context).
 - Adapters: MSW handlers in the two test files (settings-on/off, local 302/401/403, me admin/user).
@@ -644,7 +667,7 @@ Run: `cd frontend && pnpm vitest run tests/views/Login.test.tsx tests/views/Prof
 Expected: FAIL (current Login has no form/settings fetch; Profile route missing).
 - [ ] **Step 3: Implement**
 
-`Login/index.tsx` — REWRITE (the current auto-bounce at `useEffect` mount is deleted — I11): (1) parking effect: on mount, if `window.location.search` has `token` + `refresh` → park both in localStorage, `window.history.replaceState({}, '', window.location.pathname)` (drop the query so a refresh doesn't re-park stale tokens), then `navigate('/profile', { replace: true })` (react-router — C6); (2) settings fetch: `useQuery({ queryKey: ['auth/settings'], queryFn: ... apiFetch('/api/v1/auth/settings') })` (object form — M5: matches the `useCluster` style; open route, no token); (3) SSO button (iff `sso_enabled`) → `window.location.assign('/api/v1/auth/login')` (document navigation — the existing SSO entry, unchanged); (4) local form (iff `local_enabled`): `const res = await fetch('/api/v1/auth/local', { method: 'POST', headers: {'Content-Type': 'application/json'}, body: JSON.stringify({ email, password }), redirect: 'follow' })`; if `res.ok && res.redirected` → parse `new URL(res.url).searchParams` for `token`/`refresh`, park both, `navigate('/profile', { replace: true })` (C5: in-process, no document navigation); if `res.ok && !res.redirected` (shouldn't happen) → treat as an error envelope; else → surface `error.message` from the envelope in a `CAlert color="danger"`. `Profile/index.tsx` — identity card from `useCluster().me` (display name, email, groups as `CBadge` chips, role `CBadge`, auth-source `CBadge`, `last_login_at` via `Intl.DateTimeFormat`), logout `CButton` → `apiFetch('/api/v1/auth/logout', { method: 'POST' })` → `localStorage.removeItem('kd_token'); localStorage.removeItem('kd_refresh')` → `navigate('/login', { replace: true })`. `App.tsx` — lazy `ProfileView` import + the `/profile` route inside the `/*` branch, wrapped in `ProtectedRoute` (same pattern as `/clusters/:id`).
+`Login/index.tsx` — REWRITE (the current auto-bounce at `useEffect` mount is deleted — I11): (1) parking effect: on mount, if `window.location.search` has `token` + `refresh` → park both in localStorage, `window.history.replaceState({}, '', window.location.pathname)` (drop the query so a refresh doesn't re-park stale tokens), then `navigate('/profile', { replace: true })` (react-router — C6); (2) settings fetch: `useQuery({ queryKey: ['auth/settings'], queryFn: ... apiFetch('/api/v1/auth/settings') })` (object form — M5: matches the `useCluster` style; open route, no token); **on `isError` → fail-open: treat as `{ sso_enabled: true, local_enabled: true }` (I-NEW-5 — both options rendered, user can try either; no blank login page)**; (3) SSO button (iff `sso_enabled`) → `window.location.assign('/api/v1/auth/login')` (document navigation — the existing SSO entry, unchanged); (4) local form (iff `local_enabled`): `const res = await fetch('/api/v1/auth/local', { method: 'POST', headers: {'Content-Type': 'application/json'}, body: JSON.stringify({ email, password }), redirect: 'follow' })`; if `res.ok && res.redirected` → parse `new URL(res.url).searchParams` for `token`/`refresh`, park both, `navigate('/profile', { replace: true })` (C5: in-process, no document navigation); if `res.ok && !res.redirected` (shouldn't happen) → treat as an error envelope; else → surface `error.message` from the envelope in a `CAlert color="danger"`. `Profile/index.tsx` — identity card from `useCluster().me` (display name, email, groups as `CBadge` chips, role `CBadge`, auth-source `CBadge`, `last_login_at` via `Intl.DateTimeFormat`), logout `CButton` → `apiFetch('/api/v1/auth/logout', { method: 'POST' })` → `localStorage.removeItem('kd_token'); localStorage.removeItem('kd_refresh')` → `navigate('/login', { replace: true })`. `App.tsx` — lazy `ProfileView` import + the `/profile` route inside the `/*` branch, wrapped in `ProtectedRoute` (same pattern as `/clusters/:id`).
 - [ ] **Step 4: Run tests to verify they pass**
 
 Run: `cd frontend && pnpm test && pnpm exec tsc --noEmit && pnpm lint && pnpm build`
@@ -716,7 +739,7 @@ Run: `cd backend && uv run pytest tests/test_fe_airgap_check.py -v`
 Expected: 4 FAIL (script missing).
 - [ ] **Step 3: Implement**
 
-`scripts/fe-airgap-check.mjs` — plain ESM, ~40 lines: `fs.readdirSync` recursive walk, the two regexes, allow-list substring skip, offender lines, exit code. `Taskfile.yaml` — the five tasks per the Interfaces block, following the existing style (each task's `desc:` one-liner; `fe-check` declares `requires: { vars: [] }` — no new required vars; `ALLOW` is optional via `{{if .ALLOW}}`). `.gitignore` — add `backend/static/` with a comment (synced build output; the Dockerfile bakes its own copy from `frontend/dist`).
+`scripts/fe-airgap-check.mjs` — plain ESM, ~40 lines: `fs.readdirSync` recursive walk, the two regexes, allow-list substring skip, offender lines, exit code. **Pre-flight (I-NEW-3, a Step 3.5 inside this step):** before finalizing the script, run its regexes over the CURRENT `frontend/dist` (it exists from base-structure Task 8; if absent, `task fe-build` first) and pin any real offenders into the script's DEFAULT allow-list — the known suspect is `http://www.w3.org/2000/svg` in inlined CoreUI SVG icons (the `xmlns` attribute matches `https?://` and is not a loadable external reference). The default allow-list ships with the script (commented per entry with why); `--allow` EXTENDS it, never replaces it. `Taskfile.yaml` — the five tasks per the Interfaces block, following the existing style (each task's `desc:` one-liner; `fe-check` declares `requires: { vars: [] }` — no new required vars; `ALLOW` is optional via `{{if .ALLOW}}`). **`fe-sync` atomicity (I-NEW-8):** the cmd is `"rm -rf {{.TASKFILE_DIR}}/backend/static && cp -r {{.TASKFILE_DIR}}/frontend/dist {{.TASKFILE_DIR}}/backend/static"` — if the `cp` fails (disk full, permissions), `backend/static` is gone and `task backend-run` 500s on `/`; the task's printed note MUST say "if this step failed after the rm, re-run `task fe-build fe-sync`" (recovery one-liner; a mv-based atomic swap is the recorded follow-up, not this vertical). `.gitignore` — add `backend/static/` with a comment (synced build output; the Dockerfile bakes its own copy from `frontend/dist`).
 - [ ] **Step 4: Run tests to verify they pass + the real loop**
 
 Run: `cd backend && uv run pytest tests/test_fe_airgap_check.py -v && cd .. && task fe-install fe-build fe-sync fe-check`
@@ -735,6 +758,7 @@ git commit -m "build: offline fe loop + no-CDN air-gap check in Taskfile (ADR-00
 **Files:**
 - Modify: `.skillgrid/ASSUMPTIONS.md` (LOCKED index +0021 row, ADR-0020 row annotated, sequence → 0021), `README.md` (quickstart fe-loop + 3 env vars in the env table), `.github/workflows/ci.yaml` (frontend job: add the `node scripts/fe-airgap-check.mjs frontend/dist` step after `pnpm build`; the check script is the same artifact Task 6 built — no new CI dependency), `.skillgrid/state.yaml` (phase update at handoff), `.skillgrid/ARCHITECTURE.md` (§11 one-line superseded-in-part note)
 - Create: `.backlog/decisions/decision-021.md` (copy of the ADR per the ticketing convention), `.skillgrid/specs/2026-10-17-authentication-vertical/acceptance.feature` (7 scenarios — the exact names every task's SATISFIES references)
+- Modify: `README.md` quickstart — add the one-liner "use `task fe-dev`, not bare `pnpm dev` (the latter has no `VITE_API_BASE` and will CORS-fail against :8080)" (M-NEW-3)
 - Test: the full-suite verification below is this task's test step.
 
 **Interfaces:**
@@ -747,7 +771,7 @@ git commit -m "build: offline fe loop + no-CDN air-gap check in Taskfile (ADR-00
 **SATISFIES:** `adr-0021-local-mode-in-force`, all scenario-name cross-checks
 
 - [ ] **Step 1: Write `acceptance.feature`** — one Feature (`Authentication vertical: local admin + SSO + offline bundle`), 7 scenarios with the EXACT names: `local-admin-login-issues-jwt`, `admin-sees-local-cluster-from-config`, `login-page-offers-sso-and-local`, `profile-page-shows-identity`, `taskfile-fe-loop-serves-offline-bundle`, `adr-0021-local-mode-in-force`, `oidc-login-still-issues-jwt` (the no-regression guard: the existing OIDC scenario re-asserted in this change's feature file).
-- [ ] **Step 2: ADR bookkeeping** — `ASSUMPTIONS.md`: add the 0021 row to the LOCKED table, flip the ADR-0020 row's note to "superseded-in-part by 0021 (local-mode scope; see ADR-0021)", set "Highest sequence in use: 0021"; copy the ADR to `.backlog/decisions/decision-021.md`; `ARCHITECTURE.md` §11: one line — "The bootstrap-admin local mode is now implemented (ADR-0021); the multi-user no-IdP mode remains deferred (ADR-0013)."
+- [ ] **Step 2: ADR bookkeeping** — `ASSUMPTIONS.md`: add the 0021 row to the LOCKED table, flip the ADR-0020 row's note to "superseded-in-part by 0021 (local-mode scope; see ADR-0021)", set "Highest sequence in use: 0021"; copy the ADR to `.backlog/decisions/decision-021.md`; `ARCHITECTURE.md` §11: one line — "The bootstrap-admin local mode is now implemented (ADR-0021); the multi-user no-IdP mode remains deferred (ADR-0013)". `artifacts/04-adr-0021-local-admin-auth.md` Consequences: add the M-NEW-1 note — "The `local:` sub prefix is reserved for the bootstrap admin; an IdP that issues subs starting with `local:` would collide with the convention (sub is unique, so it is a collision, not a crash)."
 - [ ] **Step 3: CI wiring** — `ci.yaml` frontend job: after `pnpm build`, run `node scripts/fe-airgap-check.mjs frontend/dist` (fails the job on any CDN ref — T14 in CI).
 - [ ] **Step 4: Full verification (the L3 floor for a high-risk change)**
 
@@ -758,7 +782,7 @@ cd frontend && pnpm test && pnpm exec tsc --noEmit && pnpm lint && pnpm build
 cd ../cli && go vet ./... && go test ./...
 helm lint charts/kubedash && helm template t charts/kubedash
 grep -c "0021" .skillgrid/ASSUMPTIONS.md   # >= 2 (index row + ADR-0020 annotation)
-grep "SATISFIES" .skillgrid/specs/2026-10-17-authentication-vertical/blueprint.md | wc -l  # 7 tasks cite scenarios
+grep "SATISFIES" .skillgrid/specs/2026-10-17-authentication-vertical/blueprint.md | wc -l  # = 7 (one SATISFIES line per task; M-NEW-4)
 ```
 Expected: all green, or each non-green line explicitly recorded as environment-blocked (Docker-dependent integration tests = CI backstop, the base-structure pattern).
 - [ ] **Step 5: Commit (spec-zone + docs, separate from code per the zone guard)**
@@ -790,6 +814,12 @@ git commit -m "docs(auth): ADR-0021 in force + acceptance scenarios + CI no-CDN 
 - **`task fe-dev` proxy depth** (briefing Open Questions): `VITE_API_BASE` is the default (zero vite config change); `server.proxy` is the recorded follow-up if CORS noise appears (`cors_origins` already exists in Settings for it).
 - **Vendored node_modules for build-time offline install** — deferred per decision D2; `--frozen-lockfile` against a registry/`file:` store is the supported air-gap install path; T13/T14 cover the runtime guarantee.
 - **ADR-0001..0013 file backfill** (base-structure onboarding note) — still open, separate task; this change's ADR-0021 is the next in the sequence and uses madr-full per config.
+
+## Plan Review
+
+- Verdict: READY FOR EXECUTION (after revision)
+- Findings: 2 Critical (fixed: C-NEW-1 `uq_users_email` unique constraint added to the Task 2 revision + sqlite api-tier skips the PG-dialect hook; C-NEW-2 the `id:0` branch moved INSIDE `pool.get` so `rbac.py:77` converges unchanged + the role-gate unit test wires the fake factory), 8 Important (fixed: I-NEW-1 conftest `_settings` reset order + both fixture layers stated + the wrong `test_apidocs` citation corrected; I-NEW-2 SSO-collision locked — hash refresh case-gated to local rows, password stops working, ADR conformance pinned by a test; I-NEW-3 fe-check pre-flight over the real bundle with a pinned default allow-list incl. `www.w3.org`; I-NEW-4 exact-match assertion added to the OIDC-side redirect test; I-NEW-5 settings-fetch fail-open; I-NEW-6 readyz-probe-not-resolver invariant; I-NEW-7 `/profile` locked inside DefaultLayout with the test/impl mismatch explained; I-NEW-8 fe-sync failure recovery note), 5 Minor (M-NEW-1 `local:` prefix reserved — ADR consequence added; M-NEW-2 + M-NEW-5 `MeOut`/`LocalLoginIn` are marshmallow, not Pydantic — corrected; M-NEW-3 README `task fe-dev` note; M-NEW-4 grep comment clarified).
+- Reviewed: 2026-10-18 (two-gate: deep critic round C1–C6/I1–I14, then this structural plan-review round; all findings fixed inline and annotated in the task text)
 
 ## Execution Notes
 
