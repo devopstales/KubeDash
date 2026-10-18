@@ -5,6 +5,7 @@ Lives in tests/api/ to use the docker-free ``client`` fixture (tests/api/conftes
 from __future__ import annotations
 
 import importlib.resources
+import json
 
 from app.core import apidocs
 
@@ -89,3 +90,43 @@ def test_served_bundle_is_byte_identical_to_package(client):
     # Every asset in the map resolves to a real package file.
     for filename, _ in apidocs.SWAGGER_ASSETS.values():
         assert _read_package(filename)
+
+
+def test_spec_declares_bearer_scheme(client):
+    # T4
+    spec = client.get("/api/openapi.json").get_json()
+    assert spec["components"]["securitySchemes"]["BearerAuth"] == {
+        "type": "http",
+        "scheme": "bearer",
+        "bearerFormat": "JWT",
+    }
+
+
+def test_docs_page_is_open_without_token(client):
+    # T5: the page is browsable with no Authorization header.
+    resp = client.get("/api/docs")  # no Authorization header
+    assert resp.status_code == 200
+
+
+def test_register_security_scheme_is_idempotent():
+    # T7 — test the GUARD directly by double-invocation on one built spec.
+    # Building a second app does NOT test this (api.spec is rebuilt fresh per
+    # init_app), so a second-create_app test would pass trivially.
+    from app import create_app
+    from app.extensions import api
+
+    create_app({"DATABASE_URL": "sqlite://", "REDIS_URL": "redis://localhost:1/0"})
+    assert api.spec is not None  # init_app built it
+    apidocs.register_security_scheme(api)  # factory already called it once
+    apidocs.register_security_scheme(api)  # must be a no-op, not a raise
+    assert "BearerAuth" in api.spec.components.security_schemes
+
+
+def test_spec_paths_superset_of_baseline(client):
+    # T9 / R4: no previously documented operation vanished. Baseline = the
+    # paths present before this change (captured once; see Step 3 note).
+    from pathlib import Path
+
+    spec = client.get("/api/openapi.json").get_json()
+    baseline = set(json.loads((Path(__file__).parent / "apidocs_paths_baseline.json").read_text()))
+    assert baseline <= set(spec["paths"])

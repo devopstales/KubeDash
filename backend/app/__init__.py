@@ -66,6 +66,12 @@ def create_app(config_overrides: Mapping[str, object] | None = None) -> Flask:
     # routes, so nothing is fetched from a CDN. Air-gap (ADR-0020).
     app.config["OPENAPI_SWAGGER_UI_URL"] = "/api/docs/"
     api.init_app(app)
+    # Declare the BearerAuth JWT security scheme on the spec (air-gap, ADR-0020).
+    # After init_app so api.spec exists; before register_apis so the scheme is
+    # on the spec before domain routes are documented.
+    from app.core import apidocs
+
+    apidocs.register_security_scheme(api)
     # Authlib binds the OIDC client to this app (Task 3). The client config is
     # Settings-driven; tests never reach the IdP (they patch the two seams).
     from app.core.security import init_oidc
@@ -88,8 +94,6 @@ def create_app(config_overrides: Mapping[str, object] | None = None) -> Flask:
     # Serve the Swagger UI assets from the vendored package on /api/docs/*
     # (air-gap, ADR-0020). MUST run before register_static so the SPA
     # catch-all never sees these paths.
-    from app.core import apidocs
-
     apidocs.register_asset_routes(app)
     register_static(app)
     return app
