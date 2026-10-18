@@ -1,9 +1,11 @@
 ---
 id: TASK-006
 title: 'TICKET-05: RBAC SAR service + generic pod list + kind integration tier'
-status: To Do
-assignee: []
+status: Done
+assignee:
+  - '@paladm'
 created_date: '2026-10-17 12:58'
+updated_date: '2026-10-17 16:51'
 labels: []
 milestone: m-0
 dependencies:

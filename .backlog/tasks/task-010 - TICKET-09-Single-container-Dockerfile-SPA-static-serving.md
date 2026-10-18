@@ -1,9 +1,11 @@
 ---
 id: TASK-010
 title: 'TICKET-09: Single-container Dockerfile + SPA static serving'
-status: To Do
-assignee: []
+status: Done
+assignee:
+  - '@paladm'
 created_date: '2026-10-17 13:00'
+updated_date: '2026-10-17 18:40'
 labels: []
 milestone: m-0
 dependencies:

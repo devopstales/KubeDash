@@ -1,9 +1,11 @@
 ---
 id: TASK-011
 title: 'TICKET-10: Helm chart + CI/CD workflows + e2e mock OIDC'
-status: To Do
-assignee: []
+status: Done
+assignee:
+  - '@paladm'
 created_date: '2026-10-17 13:00'
+updated_date: '2026-10-17 19:18'
 labels: []
 milestone: m-0
 dependencies:

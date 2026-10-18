@@ -3,6 +3,8 @@
 FROM node:20 AS frontend
 WORKDIR /build
 COPY frontend/package.json frontend/pnpm-lock.yaml ./
+RUN npm install -g pnpm@10
+ENV CI=true
 RUN pnpm install --frozen-lockfile
 COPY frontend/ ./
 RUN pnpm build
@@ -10,7 +12,7 @@ RUN pnpm build
 # --- stage 2: python deps --------------------------------------------------
 FROM python:3.12-slim AS deps
 WORKDIR /app
-COPY --from=ghcr.io/astral-sh/uv:latest /uv /usr/local/bin/uv
+COPY --from=docker.io/astral/uv:latest /uv /usr/local/bin/uv
 COPY backend/pyproject.toml backend/uv.lock ./
 RUN uv sync --frozen --no-dev --no-install-project
 

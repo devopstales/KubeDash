@@ -1,9 +1,11 @@
 ---
 id: TASK-009
 title: 'TICKET-08: Frontend — CoreUI scaffold + SPA shell + three views + api client'
-status: To Do
-assignee: []
+status: Done
+assignee:
+  - '@paladm'
 created_date: '2026-10-17 12:59'
+updated_date: '2026-10-17 17:50'
 labels: []
 milestone: m-0
 dependencies:

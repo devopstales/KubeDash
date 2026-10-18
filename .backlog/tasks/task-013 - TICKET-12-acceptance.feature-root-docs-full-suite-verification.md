@@ -1,9 +1,11 @@
 ---
 id: TASK-013
 title: 'TICKET-12: acceptance.feature + root docs + full-suite verification'
-status: To Do
-assignee: []
+status: Done
+assignee:
+  - '@paladm'
 created_date: '2026-10-17 13:00'
+updated_date: '2026-10-17 19:18'
 labels: []
 milestone: m-0
 dependencies:

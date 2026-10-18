@@ -1,11 +1,11 @@
 ---
 id: TASK-004
 title: 'TICKET-03: v1 error contract + JWT/OIDC security core + auth API'
-status: In Progress
+status: Done
 assignee:
   - '@devopstales'
 created_date: '2026-10-17 12:58'
-updated_date: '2026-10-17 15:34'
+updated_date: '2026-10-17 19:18'
 labels: []
 milestone: m-0
 dependencies:

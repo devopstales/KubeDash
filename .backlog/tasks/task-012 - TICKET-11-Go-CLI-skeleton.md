@@ -1,9 +1,10 @@
 ---
 id: TASK-012
 title: 'TICKET-11: Go CLI skeleton'
-status: To Do
+status: Done
 assignee: []
 created_date: '2026-10-17 13:00'
+updated_date: '2026-10-17 19:18'
 labels: []
 milestone: m-0
 dependencies: []

@@ -24,6 +24,10 @@ vars:
   # absolute and CWD-independent. Quoted (template delimiters).
   COMPOSE: "docker compose -f {{.TASKFILE_DIR}}/dev/docker-compose.yml"
 
+  # Multi-instance backend driver (dev/mux-up.sh) — see that script for the
+  # two-process loop. {{.TASKFILE_DIR}} keeps it CWD-independent.
+  BACKEND_MULTI: "{{.TASKFILE_DIR}}/dev/mux.sh"
+
   # Go CLI: full import path of the package holding the `version` symbol.
   # -X needs the full import path; the bare package name "cmd.version" is
   # silently ignored by go tool link, so ldflags would no-op without warning.
@@ -76,3 +80,51 @@ tasks:
     desc: "Show dev environment status/health"
     cmds:
       - "{{.COMPOSE}} ps"
+
+  # ---- Backend (Flask app, runs on the host against the dev stack) ----------
+  #
+  # The app's default DB/Redis URLs already point at the compose stack's
+  # pinned ports, so no KUBEDASH_*_URL is needed for the stock setup.
+  #
+  # Multi-instance: each instance gets its own port and KUBEDASH_REPLICA_ID
+  # (the advisory-lock key is hashtext(replica_id)). Watch leadership with
+  # `task multi-logs`, or kill the leader and watch the follower promote
+  # within ~10 s (stale_seconds) — `task db-shell` shows the leader_lease
+  # row directly.
+
+  backend-run:
+    desc: "Run one backend instance on :8080 (leader role, starts RQ worker + Leader)"
+    dir: backend
+    cmds:
+      - "KUBEDASH_ROLE=leader KUBEDASH_REPLICA_ID=local .venv/bin/python wsgi.py"
+
+  backend-run-worker:
+    desc: "Run one backend instance on :8080 in worker-only role (no Leader/RQ worker)"
+    dir: backend
+    cmds:
+      - "KUBEDASH_ROLE=worker KUBEDASH_REPLICA_ID=local .venv/bin/python wsgi.py"
+
+  multi-up:
+    desc: "Start two backend instances (:8081 + :8082) for leader-election tests"
+    cmds:
+      - "{{.BACKEND_MULTI}} up"
+
+  multi-down:
+    desc: "Stop the multi-instance backend instances"
+    cmds:
+      - "{{.BACKEND_MULTI}} down"
+
+  multi-logs:
+    desc: "Tail the multi-instance backend logs"
+    cmds:
+      - "{{.BACKEND_MULTI}} logs"
+
+  failover:
+    desc: "Kill the current leader; watch the follower promote within ~10 s (task multi-logs)"
+    cmds:
+      - "{{.BACKEND_MULTI}} failover"
+
+  db-shell:
+    desc: "Open a Postgres shell (observe leader_lease: SELECT * FROM leader_lease)"
+    cmds:
+      - "{{.COMPOSE}} exec postgres psql -U ${KUBEDASH_DB_USER:-kubedash} -d ${KUBEDASH_DB_NAME:-kubedash}"

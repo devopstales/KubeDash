@@ -1,9 +1,10 @@
 ---
 id: TASK-002
 title: 'TICKET-01: Backend bootstrap — app factory, config, health probes, test infra'
-status: To Do
+status: Done
 assignee: []
 created_date: '2026-10-17 12:57'
+updated_date: '2026-10-17 19:18'
 labels: []
 milestone: m-0
 dependencies: []

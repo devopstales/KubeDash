@@ -5,10 +5,9 @@
 
 pipeline:
   # The in-flight change (newest spec dir with in-flight artifacts).
-  current_change: 2026-10-17-swagger-ui-air-gap
-  # Derived from spec-zone artifacts:
-  #   briefing.md + blueprint.md present, 2 tasks complete + QA PASS (report.md) => qa.
-  current_phase: qa
+  # Cleared by ship (2026-10-18) — swagger-ui-air-gap archived, branch kept.
+  current_change: null
+  current_phase: reflect  # terminal phase in flight (close in progress, 2026-10-18)
   # Note: 2026-10-17-kubectl-oidc-plugin and 2026-10-17-test-observability-pipeline
   # remain in flight at their respective phases.
   # The spec dir this change lives in.
@@ -16,6 +15,7 @@ pipeline:
 
 completed_changes:
   - 2026-10-17-kubedash-base-structure
+  - 2026-10-17-swagger-ui-air-gap
 
 # Onboarding state (2026-10-17): config.yaml + ASSUMPTIONS.md + state.yaml
 # created. Open items tracked in ASSUMPTIONS.md "Onboarding notes".

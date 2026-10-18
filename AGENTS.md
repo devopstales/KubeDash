@@ -22,3 +22,12 @@ Do not edit Backlog task, draft, document, decision, or milestone markdown files
 
 </CRITICAL_INSTRUCTION>
 <!-- BACKLOG.MD GUIDELINES END -->
+
+## Integration Rule
+
+**Ship keeps the work branch; it does not merge into `main` by default.** Closing
+a change (QA gate + archive move + `state.yaml`) leaves the work branch
+(currently `rebase`) as the deliverable and the rollback unit. Merging into
+`main` is a separate, explicit act — `main` tracks `origin`, so a large
+multi-concern merge is a deliberate decision, not a ship default. Rollback when
+a branch is kept = the branch itself. (See `.skillgrid/ASSUMPTIONS.md` § VERIFIED.)

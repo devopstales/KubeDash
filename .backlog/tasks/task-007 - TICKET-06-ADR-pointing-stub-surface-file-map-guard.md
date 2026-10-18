@@ -1,11 +1,11 @@
 ---
 id: TASK-007
 title: 'TICKET-06: ADR-pointing stub surface + file-map guard'
-status: In Progress
+status: Done
 assignee:
   - '@devopstales'
 created_date: '2026-10-17 12:59'
-updated_date: '2026-10-17 15:34'
+updated_date: '2026-10-17 15:56'
 labels: []
 milestone: m-0
 dependencies:
@@ -52,3 +52,9 @@ SDD ticket: every remaining backend/app/ path from ARCHITECTURE.md §2 as an ADR
 
 TDD RED (test_file_map.py missing paths) -> stub surface -> GREEN; register stub APIs in api/__init__.py (additive); resources.py placeholder (Task 5 overwrites); env-block on Testcontainers tests; Docker-free 501 smoke.
 <!-- SECTION:PLAN:END -->
+
+## Implementation Notes
+
+<!-- SECTION:NOTES:BEGIN -->
+Task 6 complete. Stubs + file-map guard + 501 stub tests + register_apis wiring. Commits d41509fb (stub surface) + 78842a0f (register_apis). ruff clean, mypy clean (67 files), test_file_map 62/66 (4 paths are Task 5's: rbac.py, cluster_sync.py, health.py, schemas/resource.py). Docker-free smoke: 17 stub routes 501 NOT_IMPLEMENTED. Env-block: 11 Testcontainers tests (no Docker).
+<!-- SECTION:NOTES:END -->

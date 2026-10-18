@@ -134,7 +134,7 @@
 
 **Interfaces:**
 - Consumes: `security.issue_token_pair(user) -> tuple[str, str]` (existing, `security.py:80`); the existing 302 redirect shape from `AuthApi.callback` (`auth.py:89`); `KubeDashHttpError` subclass pattern (`core/errors.py`).
-- Produces: `LocalLoginIn` (Pydantic: `email: str` — min_length=3, contains `@`; deliberately NOT `EmailStr`, which would pull in the `email-validator` dependency and break the "no new Python deps" constraint — the existing schemas use plain `str`), `AuthSettingsOut` (`sso_enabled: bool`, `local_enabled: bool`); `InvalidCredentialsError` (401, code `INVALID_CREDENTIALS`), `LocalAuthDisabledError` (403, code `LOCAL_AUTH_DISABLED`); `AuthApi.local` handler; `AuthApi.settings` handler. The 302 redirect is produced by a NEW module-level helper `redirect_with_tokens(access: str, refresh: str) -> str` in `api/auth.py` (delivery concern — both callers live there; `security.py` stays token-minting-only) extracted from `callback` so both routes share one builder (the T1 key link). `local` also persists the `RefreshToken` row exactly like `callback` does (issue_token_pair + `db.session.add(RefreshToken(...))` + commit — extracted into a shared `_issue_and_persist(user) -> tuple[str, str]` helper so callback and local cannot diverge).
+- Produces: `LocalLoginIn` (a **marshmallow** schema — verified: `schemas/auth.py` is `marshmallow` (`ma.Schema`, `ma.fields.String`), and flask-smorest 0.47's `@blp.arguments` requires marshmallow (M-NEW-5): `email = ma.fields.String(required=True)` + a validator asserting it contains `@` and is ≥3 chars — deliberately NOT `EmailStr`, which would pull in the `email-validator` dependency and break the "no new Python deps" constraint), `AuthSettingsOut` (`sso_enabled: bool`, `local_enabled: bool`, also marshmallow); `InvalidCredentialsError` (401, code `INVALID_CREDENTIALS`), `LocalAuthDisabledError` (403, code `LOCAL_AUTH_DISABLED`); `AuthApi.local` handler; `AuthApi.settings` handler. The 302 redirect is produced by a NEW module-level helper `redirect_with_tokens(access: str, refresh: str) -> str` in `api/auth.py` (delivery concern — both callers live there; `security.py` stays token-minting-only) extracted from `callback` so both routes share one builder (the T1 key link). `local` also persists the `RefreshToken` row exactly like `callback` does (issue_token_pair + `db.session.add(RefreshToken(...))` + commit — extracted into a shared `_issue_and_persist(user) -> tuple[str, str]` helper so callback and local cannot diverge).
 - Seam: `core/errors.py` is the error-contract seam (OD-1 pattern from base-structure); `redirect_with_tokens` in `api/auth.py` is the delivery-contract seam; `_issue_and_persist` is the token-persistence seam.
 - Deletion test: deleting `local` + `settings` removes the only pre-JWT way to enter without an IdP; deleting `redirect_with_tokens` re-inlines the f-string in two places (callback + local) — the duplication is the bug it prevents; deleting `_issue_and_persist` re-couples refresh-row persistence to two call sites (the reuse-detection regression T4 guards is exactly the divergence it prevents).
 - Adapters: 2 (OIDC callback + local login both call `redirect_with_tokens` and `_issue_and_persist`); tests use the Flask test client (existing `app`/`client` fixtures).
@@ -145,12 +145,25 @@
 
 ```python
 # backend/tests/api/test_local_auth.py
-"""T1-T2, T5: local login + settings. Container tier (same fixtures as
-tests/api/conftest.py — the primary `client` fixture runs create_app WITH
-bootstrap env set, so the admin row exists by the time we post)."""
+"""T1-T2, T5: local login + settings. The api-tier app (sqlite) seeds the
+admin row DIRECTLY (db.session.add) — the PG-dialect bootstrap upsert is
+exercised in tests/test_bootstrap.py (root PG tier); the local route itself
+is dialect-agnostic."""
 from urllib.parse import parse_qs, urlparse
 
-def test_local_login_issues_jwt_same_contract_as_oidc(client):
+@pytest.fixture()
+def client_with_admin(client, app):
+    with app.app_context():
+        from app.models.user import User
+        from app.core import security
+        db.session.add(User(sub="local:admin@local", email="admin@local",
+                            role="admin", auth_source="local",
+                            password_hash=security.hash_password("correct-horse")))
+        db.session.commit()
+    return client
+
+def test_local_login_issues_jwt_same_contract_as_oidc(client_with_admin):
+    client = client_with_admin
     res = client.post("/api/v1/auth/local", json={"email": "admin@local", "password": "correct-horse"})
     assert res.status_code == 302
     loc = res.headers["Location"]
@@ -189,7 +202,7 @@ def test_auth_settings_open_route_reflects_config(client_no_bootstrap):
 
 Plus an amendment to `backend/tests/api/test_auth.py`: if the authhook's path-scope test asserts an exact open-path list, add `/api/v1/auth/settings` to it (the hook already skips the whole `/api/v1/auth/*` prefix — verify, don't assume).
 
-Conftest amendment (`backend/tests/api/conftest.py`): the existing `Settings` singleton (`app.core.config._settings`) caches from env on first read, so the amendment must (a) `monkeypatch.setenv("KUBEDASH_BOOTSTRAP_ADMIN_EMAIL", "admin@local")` + `monkeypatch.setenv("KUBEDASH_BOOTSTRAP_ADMIN_PASSWORD", "correct-horse")` in the primary app fixture BEFORE `create_app()` (the bootstrap hook then creates the admin row; most base-structure tests run with local auth enabled — the intended default dev posture), and (b) add a `client_no_bootstrap` fixture that monkeypatches both vars to `""` AND resets `app.core.config._settings = None` before `create_app()` (the same reset pattern `tests/test_apidocs.py` uses for its second app) for the `LOCAL_AUTH_DISABLED` + settings-off cases. `config_overrides` alone is NOT sufficient — `get_settings()` reads env, not `app.config` (verified: the existing conftest's overrides dict reaches `app.config` only).
+Conftest amendment — **both layers** (`backend/tests/conftest.py` root PG tier AND `backend/tests/api/conftest.py` sqlite tier; the hook's `on_conflict_do_update` is PG-dialect, so the sqlite api-tier app must SKIP the hook — see C-NEW-1): the `Settings` singleton (`app.core.config._settings`) caches from env on first read (and is populated at module import — `k8s_client.py:39` calls `get_settings()` at import), so the amendment must (a) in the primary app fixture: `monkeypatch.setenv("KUBEDASH_BOOTSTRAP_ADMIN_EMAIL", "admin@local")` + `monkeypatch.setenv("KUBEDASH_BOOTSTRAP_ADMIN_PASSWORD", "correct-horse")` + `app.core.config._settings = None` — in that order, BEFORE `create_app()` (reset-after-setenv is the load-bearing order; a wrong order makes `test_auth_settings_open_route_reflects_config` fail because an earlier test's `_settings` leaks in); (b) a `client_no_bootstrap` / `app_no_bootstrap` fixture doing the same with both vars `""`. Note: the `test_apidocs.py` second-app pattern the earlier draft cited builds a second app via `config_overrides` ONLY — it never resets `_settings` (verified); the reset is a NEW pattern this change introduces, stated here, not a citation. `config_overrides` alone is NOT sufficient — `get_settings()` reads env, not `app.config` (verified: the existing conftest's overrides dict reaches `app.config` only). The sqlite api-tier app runs the `local` route with the hook SKIPPED (its tests seed the admin row directly via `db.session.add(User(...))` — the PG-dialect upsert is exercised only in the root PG tier, which is where `test_bootstrap.py` lives).
 
 - [ ] **Step 2: Run tests to verify they fail**
 

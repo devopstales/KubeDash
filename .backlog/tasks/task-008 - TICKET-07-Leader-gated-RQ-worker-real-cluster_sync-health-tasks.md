@@ -1,9 +1,11 @@
 ---
 id: TASK-008
 title: 'TICKET-07: Leader-gated RQ worker + real cluster_sync/health tasks'
-status: To Do
-assignee: []
+status: Done
+assignee:
+  - '@paladm'
 created_date: '2026-10-17 12:59'
+updated_date: '2026-10-17 16:51'
 labels: []
 milestone: m-0
 dependencies:

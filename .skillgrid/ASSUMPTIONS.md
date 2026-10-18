@@ -15,6 +15,16 @@
 
 Assumptions confirmed against the code or a primary source.
 
+- **Ship keeps the work branch; it does not merge into `main` by default.**
+  Closing a change (the `ship` phase: QA gate + archive move + `state.yaml`)
+  leaves the work branch (currently `rebase`) in place as the deliverable and
+  the rollback unit. Merging/rebasing a multi-concern work branch into `main`
+  is a separate, explicit act — `main` tracks `origin` (861 commits ahead of the
+  local work as of 2026-10-18), so a 60+-commit merge is a deliberate
+  blast-radius decision, not a ship default. Rollback when a branch is kept =
+  the branch itself (it never left the repo). *(Working agreement, 2026-10-18;
+  also stored in mnemonic as a project decision.)*
+
 - **Swagger UI assets are always served locally (no CDN, no toggle).** The
   `/api/docs` page loads `swagger-ui.css` / `swagger-ui-standalone-preset.js` /
   `swagger-ui-bundle.js` from the app (vendored `swagger-ui-bundle` PyPI package,
