@@ -33,12 +33,13 @@ session after each test but leaves committed schema changes behind, so this
 module's tests are self-contained: every test upgrades, asserts, and
 downgrades in its own ``try/finally`` (the same pattern
 ``tests/test_models.py::test_migration_revision_lands_email_unique`` uses
-for the ADR-0021 revision). Verified: with this module absent the full unit
-suite is 191 passed + 1 pre-existing failure (test_health readyz); with it,
-the only extra failure is ``test_models.py::test_user_and_binding_roundtrip``
-— an FK artifact of pytest path-order (``tests/migrations/*`` before
-``tests/test_models.py``) on the shared Testcontainers session, not a defect
-in the revision; the single-module gate command is unaffected.
+for the ADR-0021 revision). Because ``downgrade()`` legitimately drops the
+``cluster_bindings`` columns/constraint, each test that downgrades the
+fresh engine RESTORES the model (create_all) shape of ``cluster_bindings``
+right after (``_restore_cluster_bindings_model_shape``) — so the shared
+schema is left exactly as ``db.create_all()`` produced it and the full unit
+sweep is clean (no FK/column artifact for later tests such as
+``test_models.py::test_user_and_binding_roundtrip``).
 """
 
 import importlib.util
@@ -93,6 +94,48 @@ def _run(fn: object, engine: sa.engine.Engine) -> None:
         ctx = MigrationContext.configure(conn)
         with Operations.context(ctx):
             fn()
+
+
+def _restore_cluster_bindings_model_shape(engine: sa.engine.Engine) -> None:
+    """Re-add whatever ``downgrade()`` removed from the SHARED
+    ``cluster_bindings`` table so later tests see the create_all (model)
+    shape: namespace (VARCHAR(255) nullable + index), template (VARCHAR(255)
+    nullable), created_at (timestamptz NOT NULL DEFAULT now()), and the
+    named uq_cluster_binding_triple unique constraint. Surgical (rows are
+    preserved); each DDL is guarded by an inspector check so the helper is
+    idempotent. Matches ``ClusterBinding.__table__`` exactly."""
+    insp = sa.inspect(engine)
+    cols = {c["name"] for c in insp.get_columns("cluster_bindings")}
+    stmts: list[str] = []
+    if "namespace" not in cols:
+        stmts.append("ALTER TABLE cluster_bindings ADD COLUMN namespace VARCHAR(255)")
+    if "template" not in cols:
+        stmts.append("ALTER TABLE cluster_bindings ADD COLUMN template VARCHAR(255)")
+    if "created_at" not in cols:
+        stmts.append(
+            "ALTER TABLE cluster_bindings ADD COLUMN created_at "
+            "TIMESTAMP WITH TIME ZONE NOT NULL DEFAULT now()"
+        )
+    if stmts:
+        with engine.begin() as conn:
+            for stmt in stmts:
+                conn.execute(sa.text(stmt))
+    idx_names = {i["name"] for i in sa.inspect(engine).get_indexes("cluster_bindings")}
+    if not any("namespace" in n for n in idx_names):
+        with engine.begin() as conn:
+            conn.execute(sa.text("CREATE INDEX ix_cluster_bindings_namespace "
+                                 "ON cluster_bindings (namespace)"))
+    uqs = {
+        uq.get("name") for uq in sa.inspect(engine).get_unique_constraints("cluster_bindings")
+    }
+    if "uq_cluster_binding_triple" not in uqs:
+        with engine.begin() as conn:
+            conn.execute(
+                sa.text(
+                    "ALTER TABLE cluster_bindings ADD CONSTRAINT uq_cluster_binding_triple "
+                    "UNIQUE (user_id, cluster_id, namespace, template)"
+                )
+            )
 
 
 @pytest.fixture()
@@ -187,6 +230,10 @@ def test_builtin_templates_are_seeded_and_protected(fresh_engine) -> None:
         _run(mod.downgrade, fresh_engine)
         # downgrade restored the pre-upgrade state: table gone, seeds gone.
         assert not sa.inspect(fresh_engine).has_table("rbac_templates")
+        # Leave the SHARED cluster_bindings in the model (create_all) shape
+        # for later tests — downgrade() drops the extended columns + the
+        # unique constraint it does not know it was the one that added them.
+        _restore_cluster_bindings_model_shape(fresh_engine)
 
 
 def test_cluster_bindings_extended_with_unique_triple(fresh_engine) -> None:
@@ -217,6 +264,17 @@ def test_cluster_bindings_extended_with_unique_triple(fresh_engine) -> None:
             uq.get("name") == "uq_cluster_binding_triple"
             for uq in insp.get_unique_constraints("cluster_bindings")
         )
+        # Restore the SHARED table's model shape for later tests (see
+        # _restore_cluster_bindings_model_shape).
+        _restore_cluster_bindings_model_shape(fresh_engine)
+        restored = {
+            c["name"] for c in sa.inspect(fresh_engine).get_columns("cluster_bindings")
+        }
+        assert {"namespace", "template", "created_at"} <= restored
+        assert "uq_cluster_binding_triple" in {
+            uq.get("name")
+            for uq in sa.inspect(fresh_engine).get_unique_constraints("cluster_bindings")
+        }
 
 
 # ---------------------------------------------------------------------------
@@ -270,3 +328,4 @@ def test_upgrade_is_idempotent_safe(legacy_audit_engine) -> None:
     finally:
         _run(mod.downgrade, legacy_audit_engine)
         _run(mod.downgrade, legacy_audit_engine)
+        _restore_cluster_bindings_model_shape(legacy_audit_engine)
