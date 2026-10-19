@@ -57,9 +57,13 @@ describe('Profile view', () => {
     expect(screen.getByText('admin')).toBeInTheDocument()
     expect(screen.getByText('oidc')).toBeInTheDocument()
     expect(screen.getByText('/etc/kubedash/admin.kubeconfig')).toBeInTheDocument()
-    // Intl formats in the local timezone (Europe/Budapest here), so pin the
-    // rendered instant, not the literal RFC3339 date.
-    expect(await screen.findByText('Oct 18, 2026, 11:30:00 AM')).toBeInTheDocument()
+    // FU-3: Intl formats in the local timezone, so assert the "Last login"
+    // label is present with a non-empty formatted value (timezone-
+    // independent) rather than a zone-pinned literal string.
+    const lastLoginLabel = await screen.findByText('Last login')
+    const lastLoginValue = lastLoginLabel.nextElementSibling
+    expect(lastLoginValue).not.toBeNull()
+    expect(lastLoginValue?.textContent?.length).toBeGreaterThan(0)
   })
 
   it('renders a non-admin me without kubeconfig source and with the local auth-source badge', async () => {

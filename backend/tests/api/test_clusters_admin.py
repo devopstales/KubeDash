@@ -40,9 +40,9 @@ KUBECONFIG = (
 )
 
 
-def _seed(client, app, sub: str, email: str, role: str, last_login: datetime | None = None):
+def _seed(api_client, api_app, sub: str, email: str, role: str, last_login: datetime | None = None):
     """Seed a local user directly and return a bearer header for it."""
-    with app.app_context():  # type: ignore[attr-defined]
+    with api_app.app_context():  # type: ignore[attr-defined]
         from app.core.security import issue_token_pair
         from app.extensions import db
         from app.models.user import User
@@ -57,24 +57,24 @@ def _seed(client, app, sub: str, email: str, role: str, last_login: datetime | N
 
 
 @pytest.fixture()
-def client_admin(client, app):
+def client_admin(api_client, api_app):
     """An admin local user, minted (last_login_at seeded explicitly)."""
-    client.h_admin = _seed(
-        client, app, "local:admin@local", "admin@local", "admin",
+    api_client.h_admin = _seed(
+        api_client, api_app, "local:admin@local", "admin@local", "admin",
         last_login=datetime(2026, 10, 18, 12, 0, 0, tzinfo=UTC),
     )
-    return client
+    return api_client
 
 
 @pytest.fixture()
-def client_user(client, app):
+def client_user(api_client, api_app):
     """A non-admin local user, minted."""
-    client.h_user = _seed(client, app, "local:user@local", "user@local", "user")
-    return client
+    api_client.h_user = _seed(api_client, api_app, "local:user@local", "user@local", "user")
+    return api_client
 
 
-def _register(client, headers, name="prod") -> object:
-    return client.post(
+def _register(api_client, headers, name="prod") -> object:
+    return api_client.post(
         "/api/v1/clusters",
         json={
             "name": name,
@@ -216,7 +216,7 @@ def test_user_me_kubeconfig_source_null(client_user) -> None:
 
 
 @pytest.mark.integration
-def test_admin_pod_list_via_local_cluster(client, app, kind_cluster) -> None:
+def test_admin_pod_list_via_local_cluster(api_client, api_app, kind_cluster) -> None:
     """The admin's GET /clusters/0/resources/pods returns the kind pods
     (pool id:0 branch → admin client → SAR as usual); the non-admin gets the
     stable 404 CLUSTER_NOT_FOUND (the role gate).
@@ -233,8 +233,8 @@ def test_admin_pod_list_via_local_cluster(client, app, kind_cluster) -> None:
     tmp_path.write_bytes(kind_cluster)
     _config._settings = None
     # Re-seed: settings changed after the pool/app were built.
-    h_admin = _seed(client, app, "local:admin@local", "admin@local", "admin")
-    h_user = _seed(client, app, "local:user@local", "user@local", "user")
+    h_admin = _seed(api_client, api_app, "local:admin@local", "admin@local", "admin")
+    h_user = _seed(api_client, api_app, "local:user@local", "user@local", "user")
     try:
         os.environ["KUBEDASH_ADMIN_KUBECONFIG"] = str(tmp_path)
         _config._settings = None
@@ -242,13 +242,13 @@ def test_admin_pod_list_via_local_cluster(client, app, kind_cluster) -> None:
         orig_get, orig_set = rb._cache_get, rb._cache_set
         rb._cache_get, rb._cache_set = (lambda k: None, lambda k, v: None)
         try:
-            r = client.get("/api/v1/clusters/0/resources/pods", headers=h_admin)
+            r = api_client.get("/api/v1/clusters/0/resources/pods", headers=h_admin)
         finally:
             rb._cache_get, rb._cache_set = orig_get, orig_set
         assert r.status_code == 200, r.get_json()
         names = [p["metadata"]["name"] for p in r.get_json()["items"]]
         assert "kubedash-pod" in names
-        r = client.get("/api/v1/clusters/0/resources/pods", headers=h_user)
+        r = api_client.get("/api/v1/clusters/0/resources/pods", headers=h_user)
         assert r.status_code == 404
         assert r.get_json()["error"]["code"] == "CLUSTER_NOT_FOUND"
     finally:

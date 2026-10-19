@@ -42,7 +42,7 @@ class _FakeRedis:
 
 
 @pytest.fixture()
-def app(monkeypatch: pytest.MonkeyPatch) -> Iterator[object]:
+def api_app(monkeypatch: pytest.MonkeyPatch) -> Iterator[object]:
     import app.extensions as ext
     from app.core.security import _oauth
 
@@ -87,7 +87,7 @@ def app(monkeypatch: pytest.MonkeyPatch) -> Iterator[object]:
 
 
 @pytest.fixture()
-def app_no_bootstrap(monkeypatch: pytest.MonkeyPatch) -> Iterator[object]:
+def api_app_no_bootstrap(monkeypatch: pytest.MonkeyPatch) -> Iterator[object]:
     """I-NEW-1 (ADR-0021): the same sqlite api-tier app with BOTH bootstrap
     env vars empty — local login must answer 403 LOCAL_AUTH_DISABLED and the
     settings route must report local_enabled False. (The sqlite tier SKIPS the
@@ -126,13 +126,13 @@ def app_no_bootstrap(monkeypatch: pytest.MonkeyPatch) -> Iterator[object]:
 
 
 @pytest.fixture()
-def client_no_bootstrap(app_no_bootstrap) -> object:
-    return app_no_bootstrap.test_client()  # type: ignore[no-any-return]
+def client_no_bootstrap(api_app_no_bootstrap) -> object:
+    return api_app_no_bootstrap.test_client()  # type: ignore[no-any-return]
 
 
 @pytest.fixture()
-def client(app) -> object:
-    return app.test_client()  # type: ignore[no-any-return]
+def api_client(api_app) -> object:
+    return api_app.test_client()  # type: ignore[no-any-return]
 
 
 class MockOIDC:
@@ -169,28 +169,28 @@ def mock_oidc(monkeypatch: pytest.MonkeyPatch) -> MockOIDC:
     return m
 
 
-def _jwt_of(client) -> str:
+def _jwt_of(api_client) -> str:
     """Replay the login flow and return the access JWT from the callback's
     302 location (?token=... per the JWT delivery contract)."""
-    r1 = client.post("/api/v1/auth/login")
+    r1 = api_client.post("/api/v1/auth/login")
     cb = r1.headers["Location"]
     q = parse_qs(urlparse(cb).query)
     state = q["state"][0]
-    r2 = client.get(f"{cb}&code={MockOIDC.CODE}&state={state}")
+    r2 = api_client.get(f"{cb}&code={MockOIDC.CODE}&state={state}")
     return parse_qs(urlparse(r2.headers["Location"]).query)["token"][0]
 
 
 @pytest.fixture()
-def auth_client(client, mock_oidc):
-    """``client.login()`` performs the full OIDC round trip; ``client.jwt`` is
-    the resulting access token, ``client.refresh`` the raw refresh token."""
+def auth_client(api_client, mock_oidc):
+    """``api_client.login()`` performs the full OIDC round trip; ``api_client.jwt`` is
+    the resulting access token, ``api_client.refresh`` the raw refresh token."""
 
     def login() -> None:
-        r1 = client.post("/api/v1/auth/login")
+        r1 = api_client.post("/api/v1/auth/login")
         assert r1.status_code == 302
         cb = r1.headers["Location"]
         state = parse_qs(urlparse(cb).query)["state"][0]
-        r2 = client.get(f"{cb}&code={mock_oidc.CODE}&state={state}")
+        r2 = api_client.get(f"{cb}&code={mock_oidc.CODE}&state={state}")
         assert r2.status_code == 302
         loc = r2.headers["Location"]
         assert loc.startswith("/?token=")
@@ -199,8 +199,8 @@ def auth_client(client, mock_oidc):
         # issued pair — the shared-builder contract pinned on BOTH sides (the
         # local route mirrors this assertion in test_local_auth.py).
         assert loc == f"/?token={q['token'][0]}&refresh={q['refresh'][0]}"
-        client.jwt = q["token"][0]
-        client.refresh = q["refresh"][0]
+        api_client.jwt = q["token"][0]
+        api_client.refresh = q["refresh"][0]
 
-    client.login = login
-    return client
+    api_client.login = login
+    return api_client

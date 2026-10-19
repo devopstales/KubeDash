@@ -9,6 +9,11 @@ import app.core.config as _config
 from app import _bootstrap_local_admin, create_app
 from app.extensions import db
 
+# FU-2: import the api-tier fixtures so they are always available, even when
+# the root conftest is loaded first (pytest does not load a sub-package's
+# conftest when the parent conftest is already active in the same invocation).
+pytest_plugins = ["tests.api.conftest"]
+
 # The brief's snippets assume `exposed_port` / `get_container_host`, which do
 # not exist on testcontainers 4.x (they are `get_exposed_port` /
 # `get_container_host_ip`). Shims keep the fixtures reading like the brief

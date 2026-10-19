@@ -12,8 +12,8 @@ import pytest
 
 
 @pytest.fixture()
-def client_with_admin(client, app):
-    with app.app_context():  # type: ignore[attr-defined]
+def client_with_admin(api_client, api_app):
+    with api_app.app_context():  # type: ignore[attr-defined]
         from app.core import security
         from app.extensions import db
         from app.models.user import User
@@ -28,7 +28,7 @@ def client_with_admin(client, app):
             )
         )
         db.session.commit()
-    return client
+    return api_client
 
 
 def test_local_login_issues_jwt_same_contract_as_oidc(client_with_admin):
@@ -67,16 +67,16 @@ def test_local_login_unknown_email_same_code(client_with_admin):
     assert res.get_json()["error"]["code"] == "INVALID_CREDENTIALS"  # no enumeration
 
 
-def test_local_login_sso_row_same_email_401(client, app):
+def test_local_login_sso_row_same_email_401(api_client, api_app):
     # I-NEW-2: an SSO user's email (password_hash=None) at /auth/local → the
     # same 401 code (the no-enumeration guarantee holds across auth sources)
-    with app.app_context():  # type: ignore[attr-defined]
+    with api_app.app_context():  # type: ignore[attr-defined]
         from app.extensions import db
         from app.models.user import User
 
         db.session.add(User(sub="sso:u1", email="sso@local", role="user", auth_source="oidc"))
         db.session.commit()
-    res = client.post("/api/v1/auth/local", json={"email": "sso@local", "password": "x"})
+    res = api_client.post("/api/v1/auth/local", json={"email": "sso@local", "password": "x"})
     assert res.status_code == 401
     assert res.get_json()["error"]["code"] == "INVALID_CREDENTIALS"
 

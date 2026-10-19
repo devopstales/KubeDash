@@ -51,11 +51,11 @@ class FakeK8s:
 
 
 @pytest.fixture()
-def fake_k8s(app, monkeypatch) -> None:
+def fake_k8s(api_app, monkeypatch) -> None:
     """Inject the FakeK8s factory into the module pool (the Task 4 seam).
 
     The handler does ``from app.services.k8s_client import pool`` — a copy
-    into ``app.api.resources.__dict__`` — so the patch must target the
+    into ``api_app.api.resources.__dict__`` — so the patch must target the
     ``resources`` module's binding, not ``k8s_client.pool`` (the test_clusters
     fixture patches ``kc.pool`` and works there because no module holds a
     copied reference to the pool).
@@ -78,8 +78,8 @@ def _allow_sar(monkeypatch: pytest.MonkeyPatch) -> None:
     monkeypatch.setattr(rb, "_sar_allowed", lambda client, verb, resource, ns, name: True)
 
 
-def _register(client, headers, name="prod") -> object:
-    return client.post(
+def _register(api_client, headers, name="prod") -> object:
+    return api_client.post(
         "/api/v1/clusters",
         json={
             "name": name,
@@ -91,33 +91,33 @@ def _register(client, headers, name="prod") -> object:
     )
 
 
-def test_unknown_kind_404_stable_code(client, auth_client) -> None:
+def test_unknown_kind_404_stable_code(api_client, auth_client) -> None:
     auth_client.login()
     h = {"Authorization": f"Bearer {auth_client.jwt}"}
-    _register(client, h)
-    r = client.get("/api/v1/clusters/1/resources/widgets", headers=h)
+    _register(api_client, h)
+    r = api_client.get("/api/v1/clusters/1/resources/widgets", headers=h)
     assert r.status_code == 404
     assert r.get_json()["error"]["code"] == "RESOURCE_KIND_NOT_SUPPORTED"
 
 
-def test_unbound_cluster_404(client, auth_client) -> None:
+def test_unbound_cluster_404(api_client, auth_client) -> None:
     auth_client.login()
     h = {"Authorization": f"Bearer {auth_client.jwt}"}
     # No cluster 999 was ever registered — the binding gate fails first.
-    r = client.get("/api/v1/clusters/999/resources/pods", headers=h)
+    r = api_client.get("/api/v1/clusters/999/resources/pods", headers=h)
     assert r.status_code == 404
     assert r.get_json()["error"]["code"] == "CLUSTER_NOT_FOUND"
 
 
-def test_unbound_user_404(client, auth_client, app, fake_k8s, monkeypatch) -> None:
+def test_unbound_user_404(api_client, auth_client, api_app, fake_k8s, monkeypatch) -> None:
     """A cluster that exists but is bound to another user is invisible —
     same CLUSTER_NOT_FOUND, the binding gate does not distinguish (R3)."""
     auth_client.login()
     h = {"Authorization": f"Bearer {auth_client.jwt}"}
-    r1 = _register(client, h, name="other-users-cluster")
+    r1 = _register(api_client, h, name="other-users-cluster")
     assert r1.status_code == 201
     # A second, unbound user.
-    with app.app_context():
+    with api_app.app_context():
         from app.core.security import issue_token_pair
         from app.extensions import db
         from app.models.user import User
@@ -126,7 +126,7 @@ def test_unbound_user_404(client, auth_client, app, fake_k8s, monkeypatch) -> No
         db.session.add(u)
         db.session.commit()
         access, _ = issue_token_pair(u)
-    r = client.get(
+    r = api_client.get(
         f"/api/v1/clusters/{r1.get_json()['id']}/resources/pods",
         headers={"Authorization": f"Bearer {access}"},
     )
@@ -134,14 +134,14 @@ def test_unbound_user_404(client, auth_client, app, fake_k8s, monkeypatch) -> No
     assert r.get_json()["error"]["code"] == "CLUSTER_NOT_FOUND"
 
 
-def test_list_pods_200_with_items(client, auth_client, fake_k8s, monkeypatch) -> None:
+def test_list_pods_200_with_items(api_client, auth_client, fake_k8s, monkeypatch) -> None:
     """list-pods-for-bound-cluster (SATISFIES; acceptance.feature pending,
     Task 12): a bound user listing pods gets the pod list back."""
     auth_client.login()
     h = {"Authorization": f"Bearer {auth_client.jwt}"}
-    _register(client, h)
+    _register(api_client, h)
     _allow_sar(monkeypatch)
-    r = client.get("/api/v1/clusters/1/resources/pods", headers=h)
+    r = api_client.get("/api/v1/clusters/1/resources/pods", headers=h)
     assert r.status_code == 200
     body = r.get_json()
     assert body["kind"] == "pods"
@@ -150,39 +150,39 @@ def test_list_pods_200_with_items(client, auth_client, fake_k8s, monkeypatch) ->
     assert "kubedash-pod" in names
 
 
-def test_list_pods_namespaced(client, auth_client, fake_k8s, monkeypatch) -> None:
+def test_list_pods_namespaced(api_client, auth_client, fake_k8s, monkeypatch) -> None:
     auth_client.login()
     h = {"Authorization": f"Bearer {auth_client.jwt}"}
-    _register(client, h)
+    _register(api_client, h)
     _allow_sar(monkeypatch)
-    r = client.get("/api/v1/clusters/1/resources/pods?namespace=prod-ns", headers=h)
+    r = api_client.get("/api/v1/clusters/1/resources/pods?namespace=prod-ns", headers=h)
     assert r.status_code == 200
     items = r.get_json()["items"]
     assert [p["metadata"]["namespace"] for p in items] == ["prod-ns"]
 
 
-def test_rbac_denied_403(client, auth_client, fake_k8s, monkeypatch) -> None:
+def test_rbac_denied_403(api_client, auth_client, fake_k8s, monkeypatch) -> None:
     """SAR deny -> 403 RBAC_DENIED: the service seam (``_sar_allowed``) is
     the unit-tier stand-in for a cluster that lacks the grant."""
     auth_client.login()
     h = {"Authorization": f"Bearer {auth_client.jwt}"}
-    _register(client, h)
+    _register(api_client, h)
     import app.services.rbac as rb
 
     monkeypatch.setattr(rb, "_cache_get", lambda k: None)
     monkeypatch.setattr(rb, "_cache_set", lambda k, v: None)
-    monkeypatch.setattr(rb, "_sar_allowed", lambda client, verb, resource, ns, name: False)
-    r = client.get("/api/v1/clusters/1/resources/pods", headers=h)
+    monkeypatch.setattr(rb, "_sar_allowed", lambda api_client, verb, resource, ns, name: False)
+    r = api_client.get("/api/v1/clusters/1/resources/pods", headers=h)
     assert r.status_code == 403
     assert r.get_json()["error"]["code"] == "RBAC_DENIED"
 
 
 @pytest.mark.integration
-def test_list_pods_on_kind(client, auth_client, kind_client) -> None:
+def test_list_pods_on_kind(api_client, auth_client, kind_client) -> None:
     cid, kubeconfig = kind_client
     auth_client.login()
     h = {"Authorization": f"Bearer {auth_client.jwt}"}
-    client.post(
+    api_client.post(
         "/api/v1/clusters",
         json={
             "name": "kind-test",
@@ -192,14 +192,14 @@ def test_list_pods_on_kind(client, auth_client, kind_client) -> None:
         },
         headers=h,
     )
-    r = client.get(f"/api/v1/clusters/{cid}/resources/pods?namespace=default", headers=h)
+    r = api_client.get(f"/api/v1/clusters/{cid}/resources/pods?namespace=default", headers=h)
     assert r.status_code == 200
     items = r.get_json()["items"]
     assert any(p["metadata"]["name"] == "kubedash-pod" for p in items)
 
 
 @pytest.mark.integration
-def test_rbac_denied_403_on_kind(client, kind_client, app) -> None:
+def test_rbac_denied_403_on_kind(api_client, kind_client, api_app) -> None:
     """Denial path without kind RBAC gymnastics: a KubeDash user whose K8s
     identity has no grants. The kind kubeconfig's user is 'kind' (admin) —
     create a second binding for a KubeDash user and patch the SAR for that
@@ -213,7 +213,7 @@ def test_rbac_denied_403_on_kind(client, kind_client, app) -> None:
     from app.models.user import User
     from app.services.k8s_client import encrypt_kubeconfig
 
-    with app.app_context():
+    with api_app.app_context():
         c = Cluster.query.filter_by(name="kind-test").first()
         if c is None:  # test ordering: the register happens in the pod test
             enc = encrypt_kubeconfig(kubeconfig)
@@ -236,7 +236,7 @@ def test_rbac_denied_403_on_kind(client, kind_client, app) -> None:
     orig = rb._sar_allowed
     rb._sar_allowed = lambda *a, **k: False
     try:
-        r = client.get(
+        r = api_client.get(
             f"/api/v1/clusters/{c.id}/resources/pods",
             headers={"Authorization": f"Bearer {access}"},
         )

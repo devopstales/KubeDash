@@ -29,8 +29,8 @@ def test_package_ships_bundle():
     )
 
 
-def test_docs_page_uses_local_asset_routes(client):
-    html = client.get("/api/docs").get_data(as_text=True)
+def test_docs_page_uses_local_asset_routes(api_client):
+    html = api_client.get("/api/docs").get_data(as_text=True)
     assert "/api/docs/swagger-ui.css" in html
     assert "/api/docs/swagger-ui-standalone-preset.js" in html
     assert "/api/docs/swagger-ui-bundle.js" in html
@@ -40,13 +40,13 @@ def test_docs_page_uses_local_asset_routes(client):
     assert "http://" not in html
 
 
-def test_asset_routes_serve_real_files(client):
-    css = client.get("/api/docs/swagger-ui.css")
+def test_asset_routes_serve_real_files(api_client):
+    css = api_client.get("/api/docs/swagger-ui.css")
     assert css.status_code == 200
     assert css.content_type.split(";")[0].strip() == "text/css"
     assert css.get_data()
     for js in ("swagger-ui-standalone-preset.js", "swagger-ui-bundle.js"):
-        resp = client.get(f"/api/docs/{js}")
+        resp = api_client.get(f"/api/docs/{js}")
         assert resp.status_code == 200
         # Werkzeug may append a charset; the media type is the contract.
         assert resp.content_type.split(";")[0].strip() in {
@@ -56,28 +56,28 @@ def test_asset_routes_serve_real_files(client):
         assert resp.get_data()
 
 
-def test_docs_assets_map_to_swagger_assets_not_spa(client):
+def test_docs_assets_map_to_swagger_assets_not_spa(api_client):
     # The asset handler — not the SPA catch-all — must serve /api/docs/<asset>.
-    rules = {r.rule: r.endpoint for r in client.application.url_map.iter_rules()}
+    rules = {r.rule: r.endpoint for r in api_client.application.url_map.iter_rules()}
     assert rules.get("/api/docs/<name>") == "swagger_assets.asset"
     # The SPA catch-all must still be registered (regression net for ordering).
     assert "/<path:path_>" in rules
 
 
-def test_served_bundle_is_byte_identical_to_package(client):
+def test_served_bundle_is_byte_identical_to_package(api_client):
     # Proves identity with the vendored file (catches a transform/encoding
     # bug or a stale in-repo copy). It does NOT by itself prove "not a CDN
     # fetch" — that is test_docs_page_uses_local_asset_routes (no external URL).
-    served = client.get("/api/docs/swagger-ui-bundle.js").get_data()
+    served = api_client.get("/api/docs/swagger-ui-bundle.js").get_data()
     assert served == _read_package("swagger-ui-bundle.js")
     # Every asset in the map resolves to a real package file.
     for filename, _ in apidocs.SWAGGER_ASSETS.values():
         assert _read_package(filename)
 
 
-def test_spec_declares_bearer_scheme(client):
+def test_spec_declares_bearer_scheme(api_client):
     # T4
-    spec = client.get("/api/openapi.json").get_json()
+    spec = api_client.get("/api/openapi.json").get_json()
     assert spec["components"]["securitySchemes"]["BearerAuth"] == {
         "type": "http",
         "scheme": "bearer",
@@ -85,9 +85,9 @@ def test_spec_declares_bearer_scheme(client):
     }
 
 
-def test_docs_page_is_open_without_token(client):
+def test_docs_page_is_open_without_token(api_client):
     # T5: the page is browsable with no Authorization header.
-    resp = client.get("/api/docs")  # no Authorization header
+    resp = api_client.get("/api/docs")  # no Authorization header
     assert resp.status_code == 200
 
 
@@ -105,11 +105,11 @@ def test_register_security_scheme_is_idempotent():
     assert "BearerAuth" in api.spec.components.security_schemes
 
 
-def test_spec_paths_superset_of_baseline(client):
+def test_spec_paths_superset_of_baseline(api_client):
     # T9 / R4: no previously documented operation vanished. Baseline = the
     # paths present before this change (captured once; see Step 3 note).
     from pathlib import Path
 
-    spec = client.get("/api/openapi.json").get_json()
+    spec = api_client.get("/api/openapi.json").get_json()
     baseline = set(json.loads((Path(__file__).parent / "apidocs_paths_baseline.json").read_text()))
     assert baseline <= set(spec["paths"])

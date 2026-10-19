@@ -77,6 +77,12 @@ def _reload_wsgi(monkeypatch: pytest.MonkeyPatch, role: str) -> None:
     monkeypatch.setattr(wsgi.get_settings(), "kubedash_role", role)
     monkeypatch.setattr(Leader, "start", lambda self: None)
     monkeypatch.setattr(rq, "Worker", _FakeWorker)
+    # FU-1: no-op the bootstrap hook at its SOURCE (the app package) so the
+    # reload's `from app import _bootstrap_local_admin` re-binds the no-op
+    # instead of the real PG upsert (which would run under a leaked Settings
+    # singleton from the api-tier fixtures — order-dependent cross-tier bleed).
+    import app as _app_pkg
+    monkeypatch.setattr(_app_pkg, "_bootstrap_local_admin", lambda app: None)
     importlib.reload(wsgi)
 
 

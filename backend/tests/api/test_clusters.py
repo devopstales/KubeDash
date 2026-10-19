@@ -48,10 +48,10 @@ class FakeK8s:
 
 
 @pytest.fixture()
-def fake_k8s(app, monkeypatch) -> bool:
+def fake_k8s(api_app, monkeypatch) -> bool:
     """Inject the FakeK8s factory into the module pool and return a switch.
 
-    ``app`` is a fixture (function-scoped) here so the patch applies per test.
+    ``api_app`` is a fixture (function-scoped) here so the patch applies per test.
     """
     import app.services.k8s_client as kc
 
@@ -66,8 +66,8 @@ def fake_k8s(app, monkeypatch) -> bool:
     return state
 
 
-def _register(client, headers, name="prod") -> object:
-    return client.post(
+def _register(api_client, headers, name="prod") -> object:
+    return api_client.post(
         "/api/v1/clusters",
         json={
             "name": name,
@@ -79,16 +79,16 @@ def _register(client, headers, name="prod") -> object:
     )
 
 
-def test_register_stores_encrypted_and_roundtrips(app, client, auth_client) -> None:
+def test_register_stores_encrypted_and_roundtrips(api_app, api_client, auth_client) -> None:
     auth_client.login()
     h = {"Authorization": f"Bearer {auth_client.jwt}"}
-    r = _register(client, h)
+    r = _register(api_client, h)
     assert r.status_code == 201, r.get_json()
     body = r.get_json()
     assert body["name"] == "prod"
     assert body["id"] is not None
 
-    with app.app_context():
+    with api_app.app_context():
         from app.extensions import db
         from app.models.cluster import Cluster
         from app.services.k8s_client import decrypt_kubeconfig
@@ -109,29 +109,29 @@ def test_register_stores_encrypted_and_roundtrips(app, client, auth_client) -> N
         assert b.role == "admin"
 
 
-def test_register_and_list_bound(client, auth_client) -> None:
+def test_register_and_list_bound(api_client, auth_client) -> None:
     auth_client.login()
     h = {"Authorization": f"Bearer {auth_client.jwt}"}
-    r = _register(client, h)
+    r = _register(api_client, h)
     assert r.status_code in (200, 201)
-    r2 = client.get("/api/v1/clusters", headers=h)
+    r2 = api_client.get("/api/v1/clusters", headers=h)
     names = [c["name"] for c in r2.get_json()]
     assert "prod" in names
 
 
-def test_duplicate_name_409(client, auth_client) -> None:
+def test_duplicate_name_409(api_client, auth_client) -> None:
     auth_client.login()
     h = {"Authorization": f"Bearer {auth_client.jwt}"}
-    assert _register(client, h, name="dup").status_code in (200, 201)
-    r = _register(client, h, name="dup")
+    assert _register(api_client, h, name="dup").status_code in (200, 201)
+    r = _register(api_client, h, name="dup")
     assert r.status_code == 409
     assert r.get_json()["error"]["code"] == "CLUSTER_ALREADY_EXISTS"
 
 
-def test_invalid_kubeconfig_422(client, auth_client) -> None:
+def test_invalid_kubeconfig_422(api_client, auth_client) -> None:
     auth_client.login()
     h = {"Authorization": f"Bearer {auth_client.jwt}"}
-    r = client.post(
+    r = api_client.post(
         "/api/v1/clusters",
         json={
             "name": "bad",
@@ -145,9 +145,9 @@ def test_invalid_kubeconfig_422(client, auth_client) -> None:
     assert r.get_json()["error"]["code"] == "INVALID_KUBECONFIG"
 
 
-def test_unbound_user_does_not_see_cluster(client, auth_client, app) -> None:
+def test_unbound_user_does_not_see_cluster(api_client, auth_client, api_app) -> None:
     auth_client.login()
-    assert _register(client, {"Authorization": f"Bearer {auth_client.jwt}"}).status_code in (
+    assert _register(api_client, {"Authorization": f"Bearer {auth_client.jwt}"}).status_code in (
         200,
         201,
     )
@@ -155,66 +155,66 @@ def test_unbound_user_does_not_see_cluster(client, auth_client, app) -> None:
     from app.extensions import db
     from app.models.user import User
 
-    with app.app_context():
+    with api_app.app_context():
         u2 = User(sub="stranger", email="s@example.com")
         db.session.add(u2)
         db.session.commit()
         access, _ = issue_token_pair(u2)  # inside the app context
-    r = client.get("/api/v1/clusters", headers={"Authorization": f"Bearer {access}"})
+    r = api_client.get("/api/v1/clusters", headers={"Authorization": f"Bearer {access}"})
     assert r.status_code == 200
     assert r.get_json() == []
 
 
-def test_get_unbound_cluster_404(client, auth_client, app) -> None:
+def test_get_unbound_cluster_404(api_client, auth_client, api_app) -> None:
     """The binding gate: a cluster that EXISTS but the caller is not bound to
     is indistinguishable from a missing one — 404 CLUSTER_NOT_FOUND."""
     auth_client.login()
-    _register(client, {"Authorization": f"Bearer {auth_client.jwt}"})
+    _register(api_client, {"Authorization": f"Bearer {auth_client.jwt}"})
     from app.core.security import issue_token_pair
     from app.extensions import db
     from app.models.user import User
 
-    with app.app_context():
+    with api_app.app_context():
         u2 = User(sub="stranger2", email="s2@example.com")
         db.session.add(u2)
         db.session.commit()
         access, _ = issue_token_pair(u2)
-    r = client.get("/api/v1/clusters/1", headers={"Authorization": f"Bearer {access}"})
+    r = api_client.get("/api/v1/clusters/1", headers={"Authorization": f"Bearer {access}"})
     assert r.status_code == 404
     assert r.get_json()["error"]["code"] == "CLUSTER_NOT_FOUND"
 
 
-def test_health_up_with_fake_k8s(client, auth_client, fake_k8s) -> None:
+def test_health_up_with_fake_k8s(api_client, auth_client, fake_k8s) -> None:
     auth_client.login()
     h = {"Authorization": f"Bearer {auth_client.jwt}"}
-    assert _register(client, h).status_code in (200, 201)
+    assert _register(api_client, h).status_code in (200, 201)
     fake_k8s["readyz"] = True
-    r = client.get("/api/v1/clusters/1/health", headers=h)
+    r = api_client.get("/api/v1/clusters/1/health", headers=h)
     assert r.status_code == 200
     assert r.get_json() == {"status": "up"}
 
 
-def test_health_down_maps_to_502(client, auth_client, fake_k8s) -> None:
+def test_health_down_maps_to_502(api_client, auth_client, fake_k8s) -> None:
     auth_client.login()
     h = {"Authorization": f"Bearer {auth_client.jwt}"}
-    assert _register(client, h).status_code in (200, 201)
-    r = client.get("/api/v1/clusters/1/health", headers=h)  # readyz() = False
+    assert _register(api_client, h).status_code in (200, 201)
+    r = api_client.get("/api/v1/clusters/1/health", headers=h)  # readyz() = False
     assert r.status_code == 502
     assert r.get_json()["error"]["code"] == "CLUSTER_UNREACHABLE"
 
 
-def test_pool_decodes_stored_ciphertext(app, client, auth_client) -> None:
+def test_pool_decodes_stored_ciphertext(api_app, api_client, auth_client) -> None:
     """The pool must decrypt the at-rest form and hand the PLAINTEXT kubeconfig
     to the factory (the real K8sClient builds from it)."""
     auth_client.login()
     h = {"Authorization": f"Bearer {auth_client.jwt}"}
-    assert _register(client, h).status_code in (200, 201)
-    client.get("/api/v1/clusters/1/health", headers=h)  # forces pool.get()
+    assert _register(api_client, h).status_code in (200, 201)
+    api_client.get("/api/v1/clusters/1/health", headers=h)  # forces pool.get()
     assert FakeK8s.last is not None
     assert FakeK8s.last.kubeconfig == KUBECONFIG.encode()
 
 
-def test_health_blackholed_server_returns_within_budget(client, auth_client, fake_k8s) -> None:
+def test_health_blackholed_server_returns_within_budget(api_client, auth_client, fake_k8s) -> None:
     """A refused port is fast; a BLACKHOLED port (accepts, never responds)
     must still return within the 5 s probe budget (briefing edge case).
 
@@ -227,7 +227,7 @@ def test_health_blackholed_server_returns_within_budget(client, auth_client, fak
     try:
         auth_client.login()
         h = {"Authorization": f"Bearer {auth_client.jwt}"}
-        r = client.post(
+        r = api_client.post(
             "/api/v1/clusters",
             json={
                 "name": "blackhole",
@@ -244,7 +244,7 @@ def test_health_blackholed_server_returns_within_budget(client, auth_client, fak
 
         kc.pool = kc.K8sClientPool()  # default factory = K8sClient
         t0 = time.monotonic()
-        r = client.get("/api/v1/clusters/1/health", headers=h)
+        r = api_client.get("/api/v1/clusters/1/health", headers=h)
         assert r.status_code == 502
         assert r.get_json()["error"]["code"] == "CLUSTER_UNREACHABLE"
         assert time.monotonic() - t0 < 8  # 5 s budget + slack
