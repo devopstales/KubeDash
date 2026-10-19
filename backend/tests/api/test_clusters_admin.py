@@ -91,10 +91,12 @@ def _register(api_client, headers, name="prod") -> object:
 # ---------------------------------------------------------------------------
 
 
-def test_admin_sees_synthetic_local_cluster_exactly_once(client_admin) -> None:
+def test_admin_sees_synthetic_local_cluster_exactly_once(client_admin, monkeypatch) -> None:
     # Setup: the admin registers one registry cluster (auto-bind makes it
     # visible). The list must then carry exactly ONE synthetic admin entry.
     client = client_admin
+    # Isolate: no default kubeconfig → in-cluster source (deterministic).
+    monkeypatch.setenv("KUBECONFIG", "/nonexistent/kubeconfig-for-test")
     r = _register(client, client.h_admin)
     assert r.status_code == 201, r.get_json()
     items = client.get("/api/v1/clusters", headers=client.h_admin).get_json()
@@ -103,13 +105,23 @@ def test_admin_sees_synthetic_local_cluster_exactly_once(client_admin) -> None:
     assert locals_[0]["id"] == 0
     assert locals_[0]["name"] == "local"
     # I13: the synthetic api_server reflects the RESOLVED source — "in-cluster"
-    # when admin_kubeconfig is empty, else the literal path from settings.
+    # when admin_kubeconfig is empty AND no default kubeconfig, else the file
+    # path. Status is probed (up/down), not None.
     from app.core.config import get_settings
     from app.services.k8s_client import resolve_admin_source
 
     s = get_settings()
-    expected = "in-cluster" if resolve_admin_source(s) == "in-cluster" else s.admin_kubeconfig
+    src = resolve_admin_source(s)
+    if src == "kubeconfig-file":
+        expected = s.admin_kubeconfig
+    elif src == "local-kubeconfig":
+        import os
+
+        expected = os.environ.get("KUBECONFIG", os.path.expanduser("~/.kube/config"))
+    else:
+        expected = "in-cluster"
     assert locals_[0]["api_server"] == expected
+    assert locals_[0]["status"] in {"up", "down"}
     # The registered registry row is present and marked "registry".
     registries = [i for i in items if i.get("source") == "registry"]
     assert len(registries) == 1
@@ -119,7 +131,8 @@ def test_admin_sees_synthetic_local_cluster_exactly_once(client_admin) -> None:
 
 def test_admin_list_with_admin_kubeconfig_shows_path(client_admin, monkeypatch) -> None:
     """I13: in kubeconfig-file mode the synthetic api_server is the FILE PATH
-    (the resolved value), not the resolve_admin_source literal."""
+    (the resolved value), not the resolve_admin_source literal. Status is
+    probed (up/down), not None."""
     client = client_admin
     monkeypatch.setenv("KUBEDASH_ADMIN_KUBECONFIG", "/etc/kubedash/admin.kubeconfig")
     import app.core.config as _config
@@ -129,6 +142,7 @@ def test_admin_list_with_admin_kubeconfig_shows_path(client_admin, monkeypatch) 
     locals_ = [i for i in items if i.get("source") == "admin"]
     assert len(locals_) == 1
     assert locals_[0]["api_server"] == "/etc/kubedash/admin.kubeconfig"
+    assert locals_[0]["status"] in {"up", "down"}
 
 
 def test_non_admin_list_unchanged_shape(client_user) -> None:
@@ -176,12 +190,13 @@ def test_admin_single_row_routes_unchanged_shape(client_admin, monkeypatch) -> N
 # ---------------------------------------------------------------------------
 
 
-def test_admin_me_includes_kubeconfig_source(client_admin) -> None:
+def test_admin_me_includes_kubeconfig_source(client_admin, monkeypatch) -> None:
     client = client_admin
+    monkeypatch.setenv("KUBECONFIG", "/nonexistent/kubeconfig-for-test")
     me = client.get("/api/v1/auth/me", headers=client.h_admin).get_json()
     assert me["role"] == "admin"
     assert me["auth_source"] == "local"
-    assert me["kubeconfig_source"] in {"in-cluster", "kubeconfig-file"}
+    assert me["kubeconfig_source"] in {"in-cluster", "kubeconfig-file", "local-kubeconfig"}
     assert "last_login_at" in me
     # The seeded value is echoed (the column exists and is read, not
     # invented) — the UTC instant 2026-10-18T12:00:00, the wire form.

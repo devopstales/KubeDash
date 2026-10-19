@@ -94,7 +94,7 @@ def bound_cluster_or_404(user: Any, cluster_id: int) -> Any:
 # ``resolve_admin_source`` is the config→source seam (pure, no kubernetes);
 # ``build_admin_client`` is the k8s-client seam (the unit tier injects a fake
 # via the pool's ``admin_factory`` kwarg and never calls the real builder).
-AdminSource = Literal["in-cluster", "kubeconfig-file"]
+AdminSource = Literal["in-cluster", "kubeconfig-file", "local-kubeconfig"]
 
 #: Synthetic id of the cluster KubeDash runs in — no ``clusters`` row exists,
 #: so handlers pass a synthetic ``Cluster(id=0)`` straight to ``pool.get``
@@ -103,9 +103,20 @@ LOCAL_CLUSTER_ID = 0
 
 
 def resolve_admin_source(s: Settings) -> AdminSource:
-    """Config→source seam: empty → in-cluster service account, set → the
-    kubeconfig file at the path. Pure — no I/O, no kubernetes import."""
-    return "kubeconfig-file" if s.admin_kubeconfig else "in-cluster"
+    """Config→source seam. Pure — no kubernetes import.
+
+    Explicit path set → ``"kubeconfig-file"`` (no fallback, per main's
+    Admin branch: the configured file is THE source). Empty → the
+    main-4.x probe: a default kubeconfig (``KUBECONFIG`` / ``~/.kube/config``)
+    present → ``"local-kubeconfig"``; absent → ``"in-cluster"`` (the pod
+    service account). The presence check is a filesystem probe, not a load —
+    the load happens in ``build_admin_client``.
+    """
+    if s.admin_kubeconfig:
+        return "kubeconfig-file"
+    if os.path.isfile(os.environ.get("KUBECONFIG", os.path.expanduser("~/.kube/config"))):
+        return "local-kubeconfig"
+    return "in-cluster"
 
 
 class K8sClient:
@@ -179,29 +190,43 @@ def build_admin_client(s: Settings) -> K8sClient:
     """Build the admin client (``source = "admin"``) for the cluster
     KubeDash runs in.
 
-    File mode: ``load_kube_config(config_file=...)``; in-cluster mode:
-    ``load_incluster_config()`` — both mutate the kubernetes client's
-    module-global ``Configuration``, which the argless ``K8sClient()`` reads.
-    A missing file is a config error — ``ValueError`` naming the path — not
-    a 500 at request time. The unit tier never calls this (the pool's
-    ``admin_factory`` seam is injected).
+    Source resolution (main-4.x ``k8sClientConfigGet`` pattern, copied):
+    - ``kubeconfig-file``: ``load_kube_config(config_file=...)`` — a missing
+      file is a config error (``ValueError`` naming the path), not a 500.
+    - ``local-kubeconfig``: ``load_kube_config()`` (default path) — a load
+      failure falls back to in-cluster, exactly like main's try/except.
+    - ``in-cluster``: ``load_incluster_config()``.
+
+    Both mutate the kubernetes client's module-global ``Configuration``,
+    which the argless ``K8sClient()`` reads. The unit tier never calls this
+    (the pool's ``admin_factory`` seam is injected).
     """
     from kubernetes import config as k8s_config
 
-    if resolve_admin_source(s) == "kubeconfig-file":
+    src = resolve_admin_source(s)
+    if src == "kubeconfig-file":
         if not os.path.isfile(s.admin_kubeconfig):
             raise ValueError(f"admin kubeconfig file not found: {s.admin_kubeconfig}")
         k8s_config.load_kube_config(config_file=s.admin_kubeconfig)  # type: ignore[no-untyped-call]
+    elif src == "local-kubeconfig":
+        # main's pattern: try the default kubeconfig, fall back to in-cluster.
+        try:
+            k8s_config.load_kube_config()  # type: ignore[no-untyped-call]
+        except Exception:
+            k8s_config.load_incluster_config()  # type: ignore[no-untyped-call]
     else:
         k8s_config.load_incluster_config()  # type: ignore[no-untyped-call]
     return K8sClient(source="admin")
 
 
 def admin_client_ok(s: Settings) -> bool:
-    """readyz PROBE (I-NEW-6), not a re-resolver: file source → ``isfile``
-    on the path; in-cluster → True. It does NOT invalidate or touch the
-    pooled client — a file deleted after a successful build still serves the
-    cached client (its ``readyz()`` then answers the probe at use time)."""
+    """readyz PROBE (I-NEW-6), not a re-resolver: ``kubeconfig-file`` source →
+    ``isfile`` on the explicit path; ``local-kubeconfig`` and ``in-cluster``
+    → True (no explicit file dependency to probe — the default path's presence
+    was already established by ``resolve_admin_source``). It does NOT invalidate
+    or touch the pooled client — a file deleted after a successful build still
+    serves the cached client (its ``readyz()`` then answers the probe at use
+    time)."""
     if resolve_admin_source(s) != "kubeconfig-file":
         return True
     return os.path.isfile(s.admin_kubeconfig)

@@ -145,18 +145,36 @@ class ClusterApi(Api):
             # kubeconfig-file mode (the literal, not the resolve_admin_source
             # tag), "in-cluster" in in-cluster mode.
             s = get_settings()
+            # I13: api_server is the RESOLVED source — the explicit file path
+            # in kubeconfig-file mode, the default kubeconfig path in
+            # local-kubeconfig mode (main's probe), "in-cluster" in in-cluster
+            # mode. Status is probed via the admin client's readyz (5 s cap).
+            src = resolve_admin_source(s)
+            if src == "kubeconfig-file":
+                api_server = s.admin_kubeconfig
+            elif src == "local-kubeconfig":
+                import os
+
+                api_server = os.environ.get(
+                    "KUBECONFIG", os.path.expanduser("~/.kube/config")
+                )
+            else:
+                api_server = "in-cluster"
+            # Probe the admin client for a live status (up / down). The pool's
+            # id-0 branch builds the admin client (cached after first call).
+            try:
+                client = kc.pool.get(_local_cluster())
+                status = "up" if client.readyz() else "down"
+            except Exception:
+                status = "down"
             items.insert(
                 0,
                 {
                     "id": LOCAL_CLUSTER_ID,
                     "name": "local",
-                    "api_server": (
-                        "in-cluster"
-                        if resolve_admin_source(s) == "in-cluster"
-                        else s.admin_kubeconfig
-                    ),
+                    "api_server": api_server,
                     "context": None,
-                    "status": None,
+                    "status": status,
                     "last_probe_at": None,
                     "source": "admin",
                 },

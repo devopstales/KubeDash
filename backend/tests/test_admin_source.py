@@ -52,22 +52,31 @@ def _user_jwt(app, sub: str, role: str) -> str:
     return access
 
 
-def test_resolve_admin_source_pure() -> None:
-    """Config→source seam: pure, no kubernetes import, no app context."""
+def test_resolve_admin_source_pure(monkeypatch) -> None:
+    """Config→source seam: explicit path → kubeconfig-file; empty → probes
+    the default kubeconfig (main's pattern) → local-kubeconfig or in-cluster."""
+    monkeypatch.setenv("KUBECONFIG", "/nonexistent/kubeconfig-for-test")
     assert kc.resolve_admin_source(Settings(admin_kubeconfig="")) == "in-cluster"
     assert kc.resolve_admin_source(Settings(admin_kubeconfig="/etc/kubeconfig.yaml")) == (
         "kubeconfig-file"
     )
 
 
-def test_admin_client_ok_probe(tmp_path) -> None:
-    """readyz probe: file source → isfile check; empty (in-cluster) → ok."""
+def test_admin_client_ok_probe(tmp_path, monkeypatch) -> None:
+    """readyz probe: kubeconfig-file source → isfile check; local-kubeconfig
+    and in-cluster → ok (no explicit file dependency to probe)."""
     missing = tmp_path / "nope.yaml"
     present = tmp_path / "kubeconfig.yaml"
     present.write_text("clusters: []")
+    # local-kubeconfig source (default path present) → ok
+    monkeypatch.setenv("KUBECONFIG", str(present))
     assert kc.admin_client_ok(Settings(admin_kubeconfig="")) is True
+    # kubeconfig-file source → isfile on the explicit path
     assert kc.admin_client_ok(Settings(admin_kubeconfig=str(missing))) is False
     assert kc.admin_client_ok(Settings(admin_kubeconfig=str(present))) is True
+    # in-cluster source (no default kubeconfig) → ok
+    monkeypatch.setenv("KUBECONFIG", str(tmp_path / "absent.yaml"))
+    assert kc.admin_client_ok(Settings(admin_kubeconfig="")) is True
 
 
 def test_build_admin_client_missing_file_raises() -> None:
