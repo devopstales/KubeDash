@@ -23,7 +23,7 @@ const PermissionsView = () => {
   const [downloadError, setDownloadError] = useState<string | null>(null)
   const [downloading, setDownloading] = useState(false)
 
-  const { data, isLoading } = useQuery<MyAccessBinding[]>({
+  const { data, isLoading, error } = useQuery<MyAccessBinding[]>({
     queryKey: ['permissions', 'my-access'],
     queryFn: async () => {
       const r = await apiFetch<MyAccessBinding[]>('/api/v1/permissions/my-access')
@@ -57,6 +57,12 @@ const PermissionsView = () => {
           <CCardBody>
             {isLoading ? (
               <div>Loading your access…</div>
+            ) : error ? (
+              // Task 6 review carry-forward: a failed my-access fetch (e.g.
+              // 500) must not leave the user staring at "Loading…" forever.
+              <div className="text-danger">
+                {error instanceof Error ? error.message : 'Failed to load your access'}
+              </div>
             ) : bindings.length === 0 ? (
               <div>No cluster access yet.</div>
             ) : (

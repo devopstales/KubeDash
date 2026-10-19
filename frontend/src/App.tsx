@@ -4,7 +4,7 @@ import { QueryClient, QueryClientProvider } from '@tanstack/react-query'
 import { CSpinner } from '@coreui/react'
 
 import DefaultLayout from './layout/DefaultLayout'
-import { ProtectedRoute } from './routes'
+import { AdminRoute, ProtectedRoute } from './routes'
 import './scss/style.scss'
 
 // ponytail: the template's demo views are demo material, not KubeDash.
@@ -15,6 +15,7 @@ const ClustersView = React.lazy(() => import('./views/Clusters'))
 const ClusterView = React.lazy(() => import('./views/Cluster'))
 const ProfileView = React.lazy(() => import('./views/Profile'))
 const PermissionsView = React.lazy(() => import('./views/Permissions'))
+const AdminPermissionsView = React.lazy(() => import('./views/AdminPermissions'))
 
 /**
  * KubeDash SPA root: QueryClientProvider (TanStack Query) wraps the
@@ -81,6 +82,16 @@ const App = () => {
                       element={
                         <ProtectedRoute>
                           <PermissionsView />
+                        </ProtectedRoute>
+                      }
+                    />
+                    <Route
+                      path="/admin/permissions"
+                      element={
+                        <ProtectedRoute>
+                          <AdminRoute>
+                            <AdminPermissionsView />
+                          </AdminRoute>
                         </ProtectedRoute>
                       }
                     />

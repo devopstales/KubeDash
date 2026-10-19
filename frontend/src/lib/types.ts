@@ -79,3 +79,53 @@ export interface MyAccessBinding {
   template: string | null
   created_at: string
 }
+
+// --- Admin (TICKET-07) — shapes mirror backend/app/schemas/permissions.py ---
+
+/** A row of GET /api/v1/admin/users (UserOut). */
+export interface AdminUser {
+  id: number
+  sub: string
+  email: string | null
+  display_name: string | null
+  groups: string[]
+  role: string
+  status: string
+  cluster_count: number
+  last_login_at: string | null
+}
+
+/** One {api_groups, resources, verbs} row of an RBAC template (R2). */
+export interface RoleRule {
+  api_groups: string[]
+  resources: string[]
+  verbs: string[]
+}
+
+/** A row of GET /api/v1/admin/permissions/templates (TemplateOut). */
+export interface RBACTemplate {
+  id: number
+  name: string
+  description: string
+  scope: 'namespace' | 'cluster'
+  rules: RoleRule[]
+  builtin: boolean
+  created_by: string | null
+  created_at: string | null
+}
+
+/**
+ * A permission audit row — the documented shape of `audit_log` (AuditOut /
+ * app/models/audit.py). GET /api/v1/audit still 501s (base-structure stub);
+ * the Audit tab renders an empty state until the read route lands.
+ */
+export interface AuditEntry {
+  id: number
+  action: string
+  actor_sub: string
+  target: string
+  cluster: string | null
+  namespace: string | null
+  template: string | null
+  at: string
+}

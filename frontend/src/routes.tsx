@@ -22,3 +22,25 @@ export const ProtectedRoute: React.FC<{ children: React.ReactNode }> = ({ childr
   }
   return <>{children}</>
 }
+
+/**
+ * Admin gate for /admin/permissions (TICKET-07): the ROUTE redirect is the
+ * real control (scenario a-non-admin-is-redirected-away-from-the-admin-view)
+ * — `me` not yet fetched → render nothing (ProtectedRoute already checked
+ * the token; the first /auth/me flight is in progress); `me` loaded and
+ * role !== 'admin' → <Navigate to="/" />. Rendered INSIDE ProtectedRoute,
+ * so useCluster() shares the same cached ['me'] query.
+ */
+export const AdminRoute: React.FC<{ children: React.ReactNode }> = ({ children }) => {
+  const { me } = useCluster()
+  if (me === null) {
+    // ponytail: a spinner-free blank while the shared /auth/me flight is
+    // in progress (sub-second, same cache as the header); a CSpinner
+    // would need an extra import for no user-visible gain.
+    return null
+  }
+  if (me.role !== 'admin') {
+    return <Navigate to="/" replace />
+  }
+  return <>{children}</>
+}
