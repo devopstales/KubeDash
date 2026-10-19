@@ -8,11 +8,15 @@ Flask imports: ``db_session`` is a SQLAlchemy session, ``k8s`` is a
 appends on the SAME session (they commit atomically with the binding — no
 separate recorder seam). Task 4's API layer passes the dependencies in.
 """
+import base64
 from typing import Any, cast
+
+import yaml
 
 from app.core.errors import (
     ClusterNotFoundError,
     ClusterUnreachableError,
+    InternalError,
     InvalidKubeconfigError,
     NoBindingsError,
     ResourceKindNotSupportedError,
@@ -22,6 +26,8 @@ from app.models.binding import ClusterBinding
 from app.models.cluster import Cluster
 from app.models.rbac_template import RBACTemplate
 from app.models.user import User
+from app.services import k8s_client
+from app.services.kubeconfig_render import render_kubeconfig
 
 #: ADR-0013: every object KubeDash applies/collects carries these labels.
 TEMPLATE_LABEL = "kubedash.io/template"
@@ -192,3 +198,125 @@ def unbind(
         cluster=str(cluster_id), namespace=binding.namespace, template=template,
     )
     db_session.commit()
+
+
+# ---------------------------------------------------------------------------
+# TICKET-05 (tracer 2) — self-service kubeconfig (ARCHITECTURE.md §5B,
+# ADR-0011 / ADR-0002).
+# ---------------------------------------------------------------------------
+
+
+def _ca_from_kubeconfig(cluster_id: int, kubeconfig_enc: bytes) -> tuple[str, str]:
+    """(server, ca_data_b64) from a registry cluster's encrypted kubeconfig.
+
+    The CA comes from the DECRYPTED registry kubeconfig (ADR-0002) — never a
+    stored column. CA cases, in order:
+    1. ``certificate-authority-data`` — already base64, passed through.
+    2. ``certificate-authority`` — a file PATH; the file's bytes are read and
+       base64'd (a path relative to the registry kubeconfig is meaningless
+       outside the server that wrote it, so it is read as given).
+    3. neither — ``""`` (the renderer omits the CA field).
+
+    The server is ``clusters[0].cluster.server`` (the registered kubeconfig is
+    single-cluster — POST /clusters validates it via the kubernetes loader),
+    falling back to the ``Cluster.api_server`` column.
+    """
+    from app.extensions import db  # ponytail: local import — the module-level
+    # session model imports (binding/cluster/user) are needed by bind/unbind
+    # at import time, but the db session proxy resolves the same way here.
+
+    plain = k8s_client.decrypt_kubeconfig(kubeconfig_enc)
+    doc = yaml.safe_load(plain.decode())
+    assert isinstance(doc, dict)
+    entry: dict[str, Any] = {}
+    clusters = doc.get("clusters")
+    if isinstance(clusters, list) and clusters:
+        first = clusters[0]
+        if isinstance(first, dict) and isinstance(first.get("cluster"), dict):
+            entry = cast(dict[str, Any], first["cluster"])
+    server = entry.get("server") or ""
+    if not server:
+        row = db.session.get(Cluster, cluster_id)
+        server = row.api_server if row is not None else ""
+    ca = entry.get("certificate-authority-data")
+    if ca:
+        return str(server), str(ca)
+    ca_path = entry.get("certificate-authority")
+    if ca_path:
+        # ponytail: FileNotFoundError is a corrupt registry row, not a
+        # request-time error class of its own — let it 500 through the
+        # generic handler (no new stable code, per the brief).
+        with open(str(ca_path), "rb") as f:
+            return str(server), base64.b64encode(f.read()).decode()
+    return str(server), ""
+
+
+def generate_kubeconfig(
+    *,
+    user_sub: str,
+    db_session: Any,
+    settings: Any,
+) -> str:
+    """Render the caller's self-service kubeconfig (§5B) as a YAML string.
+
+    Order: 1. load the user + their bindings → ``NoBindingsError`` (404)
+    when there are none (a user with zero bindings has nothing to download);
+    2. one cluster entry per DISTINCT bound cluster (decrypt + CA extraction,
+    ``_ca_from_kubeconfig``); 3. one context PER BINDING (context name
+    ``kubedash-<cluster.name>`` — same cluster, two namespaces → two
+    contexts; a cluster-scoped binding omits ``namespace``); 4.
+    ``render_kubeconfig`` — ``InternalError`` (500) when
+    ``settings.plugin_server`` is None/empty (never emit an empty
+    ``--server=``). Pure: no Flask imports, the session is passed in.
+    """
+    user = db_session.execute(
+        db_session.query(User).filter_by(sub=user_sub).statement
+    ).scalar_one_or_none()
+    if user is None:
+        # The auth hook already guarantees the row exists; a deleted row is a
+        # missing-user 404, NOT a no-bindings one (the stable codes differ).
+        raise NoBindingsError("no binding found")
+    bindings = (
+        db_session.query(ClusterBinding)
+        .filter_by(user_id=user.id)
+        .order_by(ClusterBinding.cluster_id, ClusterBinding.id)
+        .all()
+    )
+    if not bindings:
+        raise NoBindingsError("no binding found")
+
+    # Distinct clusters, in binding order (first binding's cluster is first —
+    # that is also current-context's cluster).
+    cluster_ids: list[int] = []
+    for b in bindings:
+        if b.cluster_id not in cluster_ids:
+            cluster_ids.append(b.cluster_id)
+    cluster_rows = {
+        c.id: c for c in db_session.execute(
+            db_session.query(Cluster).filter(Cluster.id.in_(cluster_ids)).statement
+        ).scalars().all()
+    }
+
+    plugin_server = settings.plugin_server
+    if not plugin_server:
+        raise InternalError("KUBEDASH_PLUGIN_SERVER is not set")
+
+    clusters: list[dict[str, str]] = []
+    contexts: list[dict[str, str]] = []
+    for cid in cluster_ids:
+        c = cluster_rows[cid]
+        server, ca = _ca_from_kubeconfig(cid, c.kubeconfig_enc)
+        name = f"kubedash-{c.name}"
+        clusters.append({"name": name, "server": server, "ca_data_b64": ca})
+    for b in bindings:
+        # One context PER BINDING. Two bindings on the same cluster share the
+        # context NAME (``kubedash-<cluster>``) but are distinct list entries
+        # with their own namespace — kubectl resolves a context by name, so
+        # the entries stay addressable by name and each namespace is present
+        # in the file (the §5B shape, ARCHITECTURE.md: "one context per
+        # cluster + namespace" rendered as one entry per binding).
+        namespace = b.namespace or ""
+        contexts.append(
+            {"name": f"kubedash-{cluster_rows[b.cluster_id].name}", "namespace": namespace}
+        )
+    return render_kubeconfig(clusters, contexts, str(plugin_server))

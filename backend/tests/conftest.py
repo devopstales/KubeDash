@@ -119,7 +119,10 @@ def _kind_create_or_reuse() -> bytes:
         subprocess.run(["kind", "create", "cluster", "--name", _KIND], check=True)
     global _kind_pod_added
     if not _kind_pod_added:
-        subprocess.run(
+        # 409-tolerant: the pod may already exist on a REUSED cluster (the
+        # fixture creates the cluster only when absent, but _kind_pod_added is
+        # per-process — a fresh pytest run reuses the cluster and its pod).
+        r = subprocess.run(
             [
                 "kubectl",
                 f"--context=kind-{_KIND}",
@@ -128,8 +131,10 @@ def _kind_create_or_reuse() -> bytes:
                 "--image=nginx:alpine",
                 "--restart=Never",
             ],
-            check=True,
+            capture_output=True, text=True,
         )
+        if r.returncode != 0 and "AlreadyExists" not in r.stderr:
+            raise subprocess.CalledProcessError(r.returncode, r.args, r.stdout, r.stderr)
         _kind_pod_added = True
     out = subprocess.run(
         ["kind", "get", "kubeconfig", "--name", _KIND], capture_output=True, text=True
