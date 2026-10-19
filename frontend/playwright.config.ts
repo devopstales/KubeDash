@@ -3,11 +3,17 @@ import { defineConfig } from '@playwright/test'
 /**
  * Playwright e2e config.
  *
- * ENV-BLOCKED in this task: e2e needs the real Flask backend on :8080
- * (no Docker in this environment) plus a downloaded chromium. The spec
- * is committed as the scaffold; run it once the backend is up:
+ * Two specs, two targets:
+ *   - auth-smoke.spec.ts → the real Flask backend on :8080 (task dev-up +
+ *     wsgi.py with KUBEDASH_STATIC_DIR). No webServer — the backend serves
+ *     the built SPA.
+ *   - smoke.spec.ts      → the OIDC + kind-cluster journey (CI: kind +
+ *     mock IdP service container).
  *
- *   corepack pnpm exec playwright test
+ * Run the local auth smoke (no kind needed):
+ *   task dev-up
+ *   # (one-time schema + backend start — see auth-smoke.spec.ts header)
+ *   corepack pnpm exec playwright test e2e/auth-smoke.spec.ts
  */
 export default defineConfig({
   testDir: './e2e',
@@ -16,9 +22,10 @@ export default defineConfig({
     baseURL: process.env.E2E_BASE_URL ?? 'http://localhost:8080',
     trace: 'on-first-retry',
   },
-  webServer: {
-    command: 'corepack pnpm exec vite preview --port 4173',
-    port: 4173,
-    reuseExistingServer: true,
-  },
+  projects: [
+    {
+      name: 'chromium',
+      use: { browserName: 'chromium' },
+    },
+  ],
 })

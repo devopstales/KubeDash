@@ -1,7 +1,7 @@
 import React from 'react'
 import { BrowserRouter, Navigate, Route, Routes } from 'react-router-dom'
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query'
-import { CSpinner, useColorModes } from '@coreui/react'
+import { CSpinner } from '@coreui/react'
 
 import DefaultLayout from './layout/DefaultLayout'
 import { ProtectedRoute } from './routes'
@@ -33,12 +33,6 @@ const queryClient = new QueryClient({
 const Fallback = () => <CSpinner color="primary" />
 
 const App = () => {
-  const { isColorModeSet, setColorMode } = useColorModes('kubedash-theme')
-  // The template's theme bootstrap: one-time color-mode init.
-  if (!isColorModeSet()) {
-    setColorMode('light')
-  }
-
   return (
     <QueryClientProvider client={queryClient}>
       <BrowserRouter>

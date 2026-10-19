@@ -23,7 +23,12 @@ from app.core.config import get_settings
 
 log = logging.getLogger(__name__)
 
-app: Flask = create_app()
+import os
+
+_static_dir = os.environ.get("KUBEDASH_STATIC_DIR")
+app: Flask = create_app(
+    {"KUBEDASH_STATIC_DIR": _static_dir} if _static_dir else {}
+)
 
 # ADR-0021: the local-admin upsert runs at boot, after the factory (which
 # stays pure — no DB init inside create_app) and BEFORE Leader/RQ startup,

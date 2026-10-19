@@ -140,13 +140,13 @@ tasks:
     desc: "Install frontend dependencies (pnpm, frozen lockfile)"
     dir: frontend
     cmds:
-      - "pnpm install --frozen-lockfile"
+      - "corepack pnpm install --frozen-lockfile"
 
   fe-build:
     desc: "Typecheck + lint + build the frontend (frontend/dist)"
     dir: frontend
     cmds:
-      - "pnpm exec tsc --noEmit && pnpm lint && pnpm build"
+      - "corepack pnpm exec tsc --noEmit && corepack pnpm exec eslint src && corepack pnpm build"
 
   fe-sync:
     desc: "Sync frontend/dist -> backend/static (KUBEDASH_STATIC_DIR default)"
@@ -160,7 +160,7 @@ tasks:
     desc: "Run the vite dev server (API proxied to http://localhost:8080)"
     dir: frontend
     cmds:
-      - "VITE_API_BASE=http://localhost:8080 pnpm dev"
+      - "VITE_API_BASE=http://localhost:8080 corepack pnpm start"
 
   fe-check:
     desc: "Air-gap check: no https?:// or //cdn. references in the built bundle (ADR-0020)"
