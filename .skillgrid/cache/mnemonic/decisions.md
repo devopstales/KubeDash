@@ -16,6 +16,10 @@ pnpm 12 ignores pnpm-workspace.yaml allowBuilds — pin pnpm@10 in Dockerfile (d
 
 PyPI package is swagger-ui-bundle, not swagger-ui-dist (discovery)
 
+## skillgrid/2026-10-17-authentication-vertical/ship
+
+ship — 2026-10-17-authentication-vertical (architecture)
+
 ## skillgrid/2026-10-17-swagger-ui-air-gap/report
 
 report — 2026-10-17-swagger-ui-air-gap (learning)
