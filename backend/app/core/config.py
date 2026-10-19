@@ -43,6 +43,11 @@ class Settings(BaseSettings):
     # deferred to the informer change, ADR-0010; see Task 10 Interfaces)
     first_paint_backstop: str = "5m"  # KUBEDASH_FIRST_PAINT_BACKSTOP
     namespace_list_timeout: str = "5s"  # KUBEDASH_NAMESPACE_LIST_TIMEOUT
+    # ADR-0011 (user-management): the server URL the generated kubeconfig's
+    # exec entry passes to the credential plugin (--server=<value>); unset
+    # (None) → GET /kubeconfig answers 500 INTERNAL_ERROR. Consumed by the
+    # kubeconfig ticket, declared here.
+    plugin_server: str | None = None
 
 
 _settings: Settings | None = None

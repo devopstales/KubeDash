@@ -89,11 +89,13 @@ def test_all_frozen_codes_are_distinct():
     import app.core.errors as errors
 
     codes = [cls.error_code for cls in errors.CODES]
-    # 10 OD-1 codes + 2 ADR-0021 local-auth codes (OD-B) = 12.
-    assert len(codes) == 12
-    assert len(set(codes)) == 12
+    # 10 OD-1 codes + 2 ADR-0021 local-auth codes (OD-B) + 2 ADR-0013
+    # user-management codes = 14.
+    assert len(codes) == 14
+    assert len(set(codes)) == 14
     assert "INTERNAL_ERROR" in codes and "STATE_MISMATCH" in codes
     assert "INVALID_CREDENTIALS" in codes and "LOCAL_AUTH_DISABLED" in codes
+    assert "BUILTIN_TEMPLATE_PROTECTED" in codes and "NO_BINDINGS" in codes
 
 
 def test_error_code_to_status_mapping():
@@ -109,6 +111,8 @@ def test_error_code_to_status_mapping():
     assert errors.NotImplementedError_("x").code == 501
     assert errors.ClusterNotFoundError("x").code == 404
     assert errors.ResourceKindNotSupportedError("x").code == 404
+    assert errors.BuiltinTemplateProtectedError("x").code == 409
+    assert errors.NoBindingsError("x").code == 404
 
 
 def test_as_dict_envelope():

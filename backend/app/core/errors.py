@@ -2,7 +2,7 @@
 
 Every KubeDash API error leaves through this hierarchy and the ``{error:
 {code, message, details?}}`` envelope (``KubeDashHttpError.as_dict``). The
-10 stable codes below are frozen: Tasks 4-6 raise these, and Task 8's
+14 stable codes below are frozen: Tasks 4-6 raise these, and Task 8's
 frontend switches on ``error.code``. New code = new version.
 
 Smorest 0.47 ships no ``HttpError`` symbol, so the base extends
@@ -100,6 +100,23 @@ class InvalidKubeconfigError(KubeDashHttpError):
     error_code = "INVALID_KUBECONFIG"
 
 
+class BuiltinTemplateProtectedError(KubeDashHttpError):
+    """ADR-0013: a builtin role template cannot be mutated or deleted."""
+
+    code = 409
+    name = "Builtin Template Protected"
+    error_code = "BUILTIN_TEMPLATE_PROTECTED"
+
+
+class NoBindingsError(KubeDashHttpError):
+    """ADR-0013: no cluster binding exists for the user (e.g. kubeconfig
+    download with zero bindings)."""
+
+    code = 404
+    name = "No Bindings"
+    error_code = "NO_BINDINGS"
+
+
 class NotImplementedError_(KubeDashHttpError):
     code = 501
     name = "Not Implemented"
@@ -113,7 +130,8 @@ class InternalError(KubeDashHttpError):
 
 
 #: Every stable code, one class each — the count is a contract. ADR-0021
-#: (OD-B) adds the two local-auth codes to the frozen v1 contract.
+#: (OD-B) adds the two local-auth codes; ADR-0013 (user-management) adds the
+#: two template/binding codes — 14 total.
 CODES: tuple[type[KubeDashHttpError], ...] = (
     UnauthorizedError,
     InvalidCredentialsError,
@@ -127,6 +145,8 @@ CODES: tuple[type[KubeDashHttpError], ...] = (
     InvalidKubeconfigError,
     NotImplementedError_,
     InternalError,
+    BuiltinTemplateProtectedError,
+    NoBindingsError,
 )
 
 #: HTTP status of a bare (non-state) 401 auth failure.
