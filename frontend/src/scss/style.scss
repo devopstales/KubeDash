@@ -56,6 +56,47 @@ body {
   min-height: calc(3rem + 1px); // stylelint-disable-line function-disallowed-list
 }
 
+// ---- Notifications dropdown (mirrors main's custom.css) ---------------------
+.dropdown-menu-notifications {
+  width: 320px;
+  max-height: 500px;
+  overflow-y: auto;
+}
+
+.notification-item {
+  border-left: 3px solid transparent;
+  margin: 0.25rem 0;
+  transition: all 0.3s ease;
+  padding-left: 0.75rem;
+  margin-left: 0.75rem;
+  list-style: none;
+}
+
+.notification-item.notification-item-success {
+  border-left-color: var(--cui-success) !important;
+  background-color: rgba(var(--bs-success-rgb), 0.05);
+}
+
+.notification-item.notification-item-danger {
+  border-left-color: var(--cui-danger) !important;
+  background-color: rgba(var(--bs-danger-rgb), 0.05);
+}
+
+.notification-item.notification-item-warning {
+  border-left-color: var(--cui-warning) !important;
+  background-color: rgba(var(--bs-warning-rgb), 0.05);
+}
+
+.notification-item.notification-item-info {
+  border-left-color: var(--cui-info) !important;
+  background-color: rgba(var(--bs-info-rgb), 0.05);
+}
+
+.notification-time {
+  font-size: 0.8em;
+  color: var(--bs-secondary-color);
+}
+
 @include color-mode(dark) {
   body {
     background-color: var(--cui-dark-bg-subtle);

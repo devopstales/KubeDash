@@ -2,6 +2,7 @@ from collections.abc import Mapping
 
 from flask import Flask, Response, jsonify
 from werkzeug.exceptions import HTTPException, Unauthorized
+from werkzeug.routing import BaseConverter
 
 from app import models  # noqa: F401
 from app.api import register_apis
@@ -205,6 +206,16 @@ def register_errors(app: Flask) -> None:
     app.register_error_handler(Exception, on_unhandled)
 
 
+class _RootFileConverter(BaseConverter):
+    """URL converter matching only a single path segment with a static-file
+    extension (.ico/.png/.json). This lets /favicon.ico and /manifest.json be
+    served from the static-dir root while extensionless routes like /login
+    fall through to the SPA catch-all."""
+
+    regex = r"[^/]+\.(?:ico|png|json)"
+    weight = 20  # higher weight than the default path converter so it wins
+
+
 def register_static(app: Flask) -> None:
     """Last registration: /api/v1/* and /ws/* win over the SPA catch-all (OD-4).
     Idempotency-guarded: KUBEDASH_STATIC_DIR is read at registration time from
@@ -225,11 +236,22 @@ def register_static(app: Flask) -> None:
     def index() -> Response:
         return spa("")
 
+    # Root-level static files (favicon.ico, manifest.json) live at the static
+    # dir root, not under /assets/. The custom converter matches ONLY a file
+    # with a known static extension (no extension → the SPA catch-all below
+    # serves index.html instead). Served with the same immutable caching as
+    # hashed assets — they are build-stable.
+    app.url_map.converters["rootfile"] = _RootFileConverter
+
+    @app.get("/<rootfile:rootfile>")
+    def rootfile(rootfile: str) -> Response:
+        resp = send_from_directory(str(static_dir), rootfile)
+        resp.headers["Cache-Control"] = "immutable, max-age=31536000"
+        return resp
+
     @app.get("/<path:path_>")
     def spa(path_: str) -> Response:
-        if path_.startswith(("api/", "ws/")) or path_.endswith(
-            (".js", ".css", ".ico", ".png", ".json", ".map")
-        ):
+        if path_.startswith(("api/", "ws/")):
             abort(404)
         resp = send_from_directory(str(static_dir), "index.html")
         resp.headers["Cache-Control"] = "no-cache"

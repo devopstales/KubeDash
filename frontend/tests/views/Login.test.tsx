@@ -74,11 +74,11 @@ const renderLogin = (entry: string, tokens?: { token: string; refresh: string } 
 }
 
 const submitLocalForm = () => {
-  fireEvent.change(screen.getByLabelText(/email/i), { target: { value: 'admin@local' } })
-  fireEvent.change(screen.getByLabelText(/password/i), { target: { value: 'pw' } })
+  fireEvent.change(screen.getByPlaceholderText('Username'), { target: { value: 'admin@local' } })
+  fireEvent.change(screen.getByPlaceholderText('Password'), { target: { value: 'pw' } })
   // jsdom doesn't implement implicit form submit (clicking the submit
   // button), so submit the form element directly.
-  fireEvent.submit(screen.getByLabelText(/email/i).closest('form')!)
+  fireEvent.submit(screen.getByPlaceholderText('Username').closest('form')!)
 }
 
 describe('Login view', () => {
@@ -106,7 +106,7 @@ describe('Login view', () => {
     server.use(settingsHandler({ sso_enabled: false, local_enabled: true }))
     localLogin302()
     renderLogin('/login')
-    await screen.findByLabelText(/email/i)
+    await screen.findByPlaceholderText('Username')
     submitLocalForm()
     // The park + navigate are one atomic effect: the router move is the
     // observable, and the parked pair is asserted once the landing renders.
@@ -118,7 +118,7 @@ describe('Login view', () => {
   it('shows SSO button only when sso_enabled', async () => {
     server.use(settingsHandler({ sso_enabled: true, local_enabled: true }))
     renderLogin('/login')
-    expect(await screen.findByRole('button', { name: /sign in with sso/i })).toBeInTheDocument()
+    expect(await screen.findByRole('button', { name: /login with sso/i })).toBeInTheDocument()
   })
 
   it('hides SSO button and shows local form when sso disabled', async () => {
@@ -126,9 +126,9 @@ describe('Login view', () => {
     renderLogin('/login')
     // wait until the settings fetch has landed (the SSO button renders
     // fail-open while the query is still pending)
-    await screen.findByLabelText(/email/i)
+    await screen.findByPlaceholderText('Username')
     await waitFor(() =>
-      expect(screen.queryByRole('button', { name: /sign in with sso/i })).not.toBeInTheDocument(),
+      expect(screen.queryByRole('button', { name: /login with sso/i })).not.toBeInTheDocument(),
     )
   })
 
@@ -138,7 +138,7 @@ describe('Login view', () => {
       localLoginErrorHandler(401, { code: 'INVALID_CREDENTIALS', message: 'bad credentials' }),
     )
     renderLogin('/login')
-    await screen.findByLabelText(/email/i)
+    await screen.findByPlaceholderText('Username')
     submitLocalForm()
     expect(await screen.findByText(/bad credentials/i)).toBeInTheDocument()
   })
@@ -149,7 +149,7 @@ describe('Login view', () => {
       localLoginErrorHandler(403, { code: 'LOCAL_AUTH_DISABLED', message: 'local auth is not configured' }),
     )
     renderLogin('/login')
-    await screen.findByLabelText(/email/i)
+    await screen.findByPlaceholderText('Username')
     submitLocalForm()
     expect(await screen.findByText(/local auth is not configured/i)).toBeInTheDocument()
   })
@@ -157,7 +157,7 @@ describe('Login view', () => {
   it('fails open on settings error: renders BOTH the SSO button and the local form', async () => {
     server.use(http.get('*/api/v1/auth/settings', () => HttpResponse.error()))
     renderLogin('/login')
-    expect(await screen.findByRole('button', { name: /sign in with sso/i })).toBeInTheDocument()
-    expect(await screen.findByLabelText(/email/i)).toBeInTheDocument()
+    expect(await screen.findByRole('button', { name: /login with sso/i })).toBeInTheDocument()
+    expect(await screen.findByPlaceholderText('Username')).toBeInTheDocument()
   })
 })

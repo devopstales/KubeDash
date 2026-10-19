@@ -162,8 +162,11 @@ tasks:
       # data store, but the app needs the TCP port answering).
       - "{{.COMPOSE}} exec -T postgres pg_isready -U {{.DB_USER}} -d {{.DB_NAME}}"
       # Idempotent: free :8080 from a prior dev-stack backend before rebind
-      # (no-op if nothing is listening).
+      # (no-op if nothing is listening). pkill catches zombie wsgi.py children
+      # that survive the parent's SIGKILL (fuser only kills the port holder).
       - "fuser -k 8080/tcp 2>/dev/null || true"
+      - "pkill -f 'python.*wsgi.py' 2>/dev/null || true"
+      - "sleep 1"
       # Create the schema (dev shortcut — prod runs Alembic migrations).
       - task: backend-create-schema
       # Start the leader backend (foreground — the task blocks until Ctrl-C).
@@ -200,7 +203,10 @@ tasks:
       KUBEDASH_ROLE: "leader"
       KUBEDASH_REPLICA_ID: "local"
     cmds:
-      - ".venv/bin/python wsgi.py"
+      - "nohup .venv/bin/python wsgi.py > /tmp/kubedash-backend.log 2>&1 &"
+      - "sleep 2"
+      - "echo 'Backend started (PID $(pgrep -f 'python.*wsgi.py' | head -1)). Logs: /tmp/kubedash-backend.log'"
+      - "cat /tmp/kubedash-backend.log"
 
   # ---- E2E (Playwright auth-smoke, no kind needed) ---------------------------
   #

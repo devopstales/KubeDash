@@ -8,7 +8,10 @@ import { fileURLToPath } from 'node:url'
 const rootDir = path.dirname(fileURLToPath(import.meta.url))
 
 export default defineConfig({
-  base: './',
+  // Absolute base: the SPA is served at / (the Flask app serves the whole
+  // bundle at /, ADR-0006). Relative base ('./') rewrites /favicon.ico to
+  // ./favicon.ico, which breaks the favicon on non-root URLs.
+  base: '/',
   build: {
     // Task 9's Dockerfile bakes frontend/dist/; the template builds to
     // build/ but the base-structure contract is dist/.
