@@ -28,6 +28,20 @@ vars:
   # two-process loop. {{.TASKFILE_DIR}} keeps it CWD-independent.
   BACKEND_MULTI: "{{.TASKFILE_DIR}}/dev/mux.sh"
 
+  # dev-stack: backend interpreter + the dev DB/static paths. The DB creds and
+  # URL match the compose stack's pinned defaults (dev/docker-compose.yml), so
+  # no KUBEDASH_*_URL env is needed — the app's defaults already point here.
+  BACKEND_PY: "{{.TASKFILE_DIR}}/backend/.venv/bin/python"
+  DB_USER: "kubedash"
+  DB_NAME: "kubedash"
+  DB_URL: "postgresql+psycopg://kubedash:kubedash@localhost:5432/kubedash"
+  STATIC_DIR: "{{.TASKFILE_DIR}}/backend/static"
+  # Dev bootstrap admin (ADR-0021). Local auth is opt-in via these env vars;
+  # the dev stack sets them so `task dev-stack` logs in as admin/admin. Prod
+  # sets its own (or leaves them empty to disable local login).
+  ADMIN_EMAIL: "admin@local"
+  ADMIN_PASSWORD: "admin"
+
   # Go CLI: full import path of the package holding the `version` symbol.
   # -X needs the full import path; the bare package name "cmd.version" is
   # silently ignored by go tool link, so ldflags would no-op without warning.
@@ -128,6 +142,82 @@ tasks:
     desc: "Open a Postgres shell (observe leader_lease: SELECT * FROM leader_lease)"
     cmds:
       - "{{.COMPOSE}} exec postgres psql -U ${KUBEDASH_DB_USER:-kubedash} -d ${KUBEDASH_DB_NAME:-kubedash}"
+
+  # ---- One-command local env (compose + schema + backend) -------------------
+  #
+  # Brings up the full local dev loop in one shot: the compose data stores,
+  # the SQLAlchemy schema (db.create_all — dev-only; prod uses Alembic), and
+  # the leader backend on :8080 with the bootstrap admin + static dir wired.
+  # Idempotent: safe to re-run (compose up -d is a no-op when healthy; the
+  # schema create_all is idempotent; the backend rebinds the port).
+  #
+  #   task dev-stack          # foreground (Ctrl-C stops the backend; compose stays up)
+  #   task dev-stack-down     # stop the backend + compose stack
+
+  dev-stack:
+    desc: "Start the full local env: compose + schema + backend on :8080 (bootstrap admin, static wired)"
+    cmds:
+      - "{{.COMPOSE}} up -d"
+      # Wait for Postgres to accept connections (compose 'healthy' covers the
+      # data store, but the app needs the TCP port answering).
+      - "{{.COMPOSE}} exec -T postgres pg_isready -U {{.DB_USER}} -d {{.DB_NAME}}"
+      # Idempotent: free :8080 from a prior dev-stack backend before rebind
+      # (no-op if nothing is listening).
+      - "fuser -k 8080/tcp 2>/dev/null || true"
+      # Create the schema (dev shortcut — prod runs Alembic migrations).
+      - task: backend-create-schema
+      # Start the leader backend (foreground — the task blocks until Ctrl-C).
+      - task: backend-stack-run
+
+  dev-stack-down:
+    desc: "Stop the local env backend (task dev-stack) + compose stack"
+    cmds:
+      - "fuser -k 8080/tcp 2>/dev/null || true"
+      - "{{.COMPOSE}} down"
+
+  # Internal: create the SQLAlchemy schema from the backend dir (where the
+  # `app` package resolves). Dev shortcut — prod runs Alembic migrations.
+  backend-create-schema:
+    internal: true
+    dir: backend
+    cmds:
+      - >
+        .venv/bin/python -c
+        "from app import create_app; from app.extensions import db;
+        a = create_app({'DATABASE_URL': '{{.DB_URL}}'});
+        a.app_context().push(); db.create_all(); print('schema ready')"
+
+  # Internal: the dev-stack backend run (separate task so the `dir: backend`
+  # scoping + env block stay clean). Called by dev-stack, not meant to be
+  # invoked directly.
+  backend-stack-run:
+    internal: true
+    dir: backend
+    env:
+      KUBEDASH_BOOTSTRAP_ADMIN_EMAIL: "{{.ADMIN_EMAIL}}"
+      KUBEDASH_BOOTSTRAP_ADMIN_PASSWORD: "{{.ADMIN_PASSWORD}}"
+      KUBEDASH_STATIC_DIR: "{{.STATIC_DIR}}"
+      KUBEDASH_ROLE: "leader"
+      KUBEDASH_REPLICA_ID: "local"
+    cmds:
+      - ".venv/bin/python wsgi.py"
+
+  # ---- E2E (Playwright auth-smoke, no kind needed) ---------------------------
+  #
+  # Runs the local auth-smoke spec against the dev-stack backend on :8080.
+  # The stack must be up first (task dev-stack in another terminal, or the
+  # backend left running). Asserts the three seams unit tests miss: SPA shell
+  # render (no JS crash), local login → profile + synthetic cluster, and the
+  # wrong-password error path.
+  #
+  #   task dev-stack            # terminal 1 (keep running)
+  #   task e2e                  # terminal 2
+
+  e2e:
+    desc: "Run the Playwright auth-smoke e2e against the dev-stack backend (:8080)"
+    dir: frontend
+    cmds:
+      - "corepack pnpm exec playwright test e2e/auth-smoke.spec.ts"
 
   # ---- Frontend (offline dev loop, ADR-0020 air-gap) -------------------------
   #

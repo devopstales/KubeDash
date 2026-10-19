@@ -31,7 +31,7 @@ import { expect, test, type Page } from '@playwright/test'
  */
 
 const ADMIN_EMAIL = 'admin@local'
-const ADMIN_PASSWORD = 'correct-horse'
+const ADMIN_PASSWORD = 'admin'
 
 /** Collect pageerror events so we can assert the JS runtime didn't crash. */
 function attachErrorWatcher(page: Page): string[] {
@@ -57,7 +57,9 @@ test.describe('KubeDash auth smoke (local password)', () => {
     await expect(page).toHaveURL(/\/login/, { timeout: 10_000 })
 
     // The Login form is visible (settings route resolved, view rendered).
-    await expect(page.getByLabel('Email')).toBeVisible()
+    // The form uses placeholder-driven inputs (no <label>), so select by
+    // placeholder.
+    await expect(page.getByPlaceholder('Username')).toBeVisible()
 
     // No uncaught JS errors (infinite loop, null element, bad import).
     // Filter the benign favicon 404 (a resource error, not a pageerror).
@@ -74,12 +76,12 @@ test.describe('KubeDash auth smoke (local password)', () => {
 
     // --- 1. Land on /login ---
     await page.goto('/login')
-    await expect(page.getByLabel('Email')).toBeVisible()
+    await expect(page.getByPlaceholder('Username')).toBeVisible()
 
     // --- 2. Fill the local form and submit ---
-    await page.getByLabel('Email').fill(ADMIN_EMAIL)
-    await page.getByLabel('Password').fill(ADMIN_PASSWORD)
-    await page.getByRole('button', { name: 'Sign in' }).click()
+    await page.getByPlaceholder('Username').fill(ADMIN_EMAIL)
+    await page.getByPlaceholder('Password').fill(ADMIN_PASSWORD)
+    await page.getByRole('button', { name: 'Login', exact: true }).click()
 
     // --- 3. The 302 parks the token pair and navigates to /profile ---
     await expect(page).toHaveURL(/\/profile/, { timeout: 15_000 })
@@ -90,10 +92,13 @@ test.describe('KubeDash auth smoke (local password)', () => {
       .toBeTruthy()
 
     // --- 4. Profile renders the identity card ---
-    await expect(page.getByText(ADMIN_EMAIL)).toBeVisible()
-    // Role badge (the <span class="badge"> — not the nav link or dt label).
+    // Scope to the profile card: the email also appears in the header user
+    // dropdown, so a bare getByText would match two elements (strict-mode fail).
+    const profileCard = page.locator('.card').filter({ hasText: 'Profile' })
+    await expect(profileCard.getByText(ADMIN_EMAIL)).toBeVisible()
+    // Role badge (the <span class="badge"> inside the card).
     await expect(
-      page.locator('span.badge').filter({ hasText: 'admin' }),
+      profileCard.locator('span.badge').filter({ hasText: 'admin' }),
     ).toBeVisible()
 
     // --- 5. The admin sees the synthetic local cluster ---
@@ -116,9 +121,9 @@ test.describe('KubeDash auth smoke (local password)', () => {
     page,
   }) => {
     await page.goto('/login')
-    await page.getByLabel('Email').fill(ADMIN_EMAIL)
-    await page.getByLabel('Password').fill('wrong-password')
-    await page.getByRole('button', { name: 'Sign in' }).click()
+    await page.getByPlaceholder('Username').fill(ADMIN_EMAIL)
+    await page.getByPlaceholder('Password').fill('wrong-password')
+    await page.getByRole('button', { name: 'Login', exact: true }).click()
 
     // 401 → the view surfaces the envelope message, stays on /login.
     await expect(
