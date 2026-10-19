@@ -78,6 +78,60 @@ export async function apiFetch<T = unknown>(path: string, init: RequestInit = {}
   return { data: body as T, error: null, meta: { status: res.status } }
 }
 
+export interface DownloadResult {
+  ok: boolean
+  error: { code: string; message: string } | null
+  status: number
+}
+
+/**
+ * Binary-safe variant of apiFetch for file downloads (kubeconfig): attaches
+ * the Bearer token, runs the SAME single-in-flight 401 refresh+retry, fetches
+ * a Blob, and on success triggers a browser download of `filename`
+ * (ObjectURL → <a download> click → revoke). On non-ok it parses the JSON
+ * error envelope and returns it — the error body is NOT downloaded as a file.
+ */
+export async function downloadFile(path: string, filename: string): Promise<DownloadResult> {
+  const doFetch = (token: string | null) =>
+    fetch(`${API_BASE}${path}`, {
+      headers: token ? { Authorization: `Bearer ${token}` } : {},
+    })
+
+  let res = await doFetch(localStorage.getItem('kd_token'))
+  if (res.status === 401) {
+    try {
+      const t = await refreshOnce()
+      res = await doFetch(t)
+    } catch {
+      /* fall through to the error envelope below */
+    }
+  }
+  if (!res.ok) {
+    const body = await res.json().catch(() => ({}))
+    const err = (body as { error?: { code?: string; message?: string } }).error
+    return {
+      ok: false,
+      error: err
+        ? { code: err.code ?? 'UNKNOWN', message: err.message ?? String(res.status) }
+        : { code: 'UNKNOWN', message: String(res.status) },
+      status: res.status,
+    }
+  }
+  const blob = await res.blob()
+  // ponytail: no Content-Disposition parsing — the view passes the filename
+  // explicitly (it matches the backend's attachment name, ADR-0011).
+  const url = URL.createObjectURL(blob)
+  const a = document.createElement('a')
+  a.href = url
+  a.download = filename
+  a.style.display = 'none'
+  document.body.appendChild(a)
+  a.click()
+  document.body.removeChild(a)
+  URL.revokeObjectURL(url)
+  return { ok: true, error: null, status: res.status }
+}
+
 /** Test hook: drop a half-finished in-flight refresh (jsdom test isolation). */
 export function resetRefreshForTests(): void {
   inFlightRefresh = null

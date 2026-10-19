@@ -1,7 +1,7 @@
 import React from 'react'
 import { CNavItem, CNavTitle } from '@coreui/react'
 import CIcon from '@coreui/icons-react'
-import { cilLayers, cilList } from '@coreui/icons'
+import { cilLayers, cilList, cilShieldAlt } from '@coreui/icons'
 
 /**
  * Sidebar navigation for the KubeDash SPA shell. The template's demo nav
@@ -25,6 +25,12 @@ const _nav = [
     name: 'Cluster detail',
     to: '/clusters/1',
     icon: <CIcon icon={cilList} customClassName="nav-icon" />,
+  },
+  {
+    component: CNavItem,
+    name: 'My access',
+    to: '/permissions',
+    icon: <CIcon icon={cilShieldAlt} customClassName="nav-icon" />,
   },
 ]
 

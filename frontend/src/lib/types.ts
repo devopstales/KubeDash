@@ -71,3 +71,11 @@ export interface RefreshPair {
   access: string
   refresh?: string
 }
+
+/** A row of GET /api/v1/permissions/my-access — the caller's own bindings. */
+export interface MyAccessBinding {
+  cluster: string
+  namespace: string | null
+  template: string | null
+  created_at: string
+}
