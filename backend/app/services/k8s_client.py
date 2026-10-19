@@ -152,9 +152,13 @@ class K8sClient:
             self._verify: str | bool = base64.b64decode(ca).decode() if ca else True
         else:
             # Admin shape (ADR-0021): build_admin_client applied
-            # load_kube_config/load_incluster_config to the module-global
-            # Configuration BEFORE this — use it as-is, system CA bundle.
-            client_config = k8s_client.Configuration()
+            # load_kube_config/load_incluster_config BEFORE this, which sets
+            # the library's DEFAULT Configuration (not the module-global).
+            # Read it back — a fresh Configuration() would be empty.
+            try:
+                client_config = k8s_client.Configuration.get_default_copy()
+            except Exception:
+                client_config = k8s_client.Configuration()
             self._verify = True
         self._config = client_config
         api_client = k8s_client.ApiClient(self._config)
@@ -209,13 +213,24 @@ def build_admin_client(s: Settings) -> K8sClient:
             raise ValueError(f"admin kubeconfig file not found: {s.admin_kubeconfig}")
         k8s_config.load_kube_config(config_file=s.admin_kubeconfig)  # type: ignore[no-untyped-call]
     elif src == "local-kubeconfig":
-        # main's pattern: try the default kubeconfig, fall back to in-cluster.
+        # main's pattern: try the default kubeconfig, fall back to in-cluster,
+        # and if that also fails (pod-less host), leave the config unset —
+        # readyz() will report the cluster as unreachable.
         try:
             k8s_config.load_kube_config()  # type: ignore[no-untyped-call]
         except Exception:
-            k8s_config.load_incluster_config()  # type: ignore[no-untyped-call]
+            try:
+                k8s_config.load_incluster_config()  # type: ignore[no-untyped-call]
+            except Exception:
+                pass  # no in-cluster env; readyz() will fail gracefully
     else:
-        k8s_config.load_incluster_config()  # type: ignore[no-untyped-call]
+        # in-cluster: the pod service account. On a pod-less host (dev box)
+        # this raises ConfigException — catch it so the client is built with
+        # an empty config; readyz() then reports the cluster as unreachable.
+        try:
+            k8s_config.load_incluster_config()  # type: ignore[no-untyped-call]
+        except Exception:
+            pass  # no in-cluster env; readyz() will fail gracefully
     return K8sClient(source="admin")
 
 

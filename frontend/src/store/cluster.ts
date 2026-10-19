@@ -12,7 +12,7 @@ export interface SelectedCluster {
 
 interface ClusterStore {
   selectedCluster: SelectedCluster | null
-  setSelectedCluster: (c: SelectedCluster) => void
+  setSelectedCluster: (c: SelectedCluster | null) => void
 }
 
 export const useClusterStore = create<ClusterStore>()((set) => ({

@@ -44,9 +44,14 @@ export function useCluster() {
   useEffect(() => {
     const items = clustersQuery.data
     if (!items) return
-    // Keep the selection if it's still bound; otherwise pick the first.
+    // Keep the selection if it's still bound; otherwise clear it (a stale
+    // selection from a prior session would 404 on the cluster detail route)
+    // and auto-select the first.
     const stillBound = selectedCluster && items.some((c) => c.id === selectedCluster.id)
-    if (!stillBound && items.length > 0) setSelectedCluster({ id: items[0].id, name: items[0].name })
+    if (!stillBound) {
+      if (selectedCluster) setSelectedCluster(null)
+      if (items.length > 0) setSelectedCluster({ id: items[0].id, name: items[0].name })
+    }
   }, [clustersQuery.data, selectedCluster, setSelectedCluster])
 
   return {
