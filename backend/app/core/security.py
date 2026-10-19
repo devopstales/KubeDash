@@ -25,7 +25,7 @@ from authlib.integrations.flask_client import OAuth
 from flask import g, request
 
 from app.core.config import get_settings
-from app.core.errors import StateMismatchError, UnauthorizedError
+from app.core.errors import RbacDeniedError, StateMismatchError, UnauthorizedError
 from app.extensions import db
 from app.models.token import RefreshToken
 from app.models.user import User
@@ -192,8 +192,14 @@ def revoke_user_refresh_tokens(user_id: int) -> None:
 
 
 def _load_user_for_claims(claims: dict[str, Any]) -> None:
+    """Single choke point BOTH auth entry paths hit (``_auth_check`` and the
+    ``require_auth`` decorator route through it), so the disabled-user gate
+    (ADR-0013) lives here: a ``status == "disabled"`` row is a 401, same as a
+    missing one (no status enumeration)."""
     user = db.session.execute(db.select(User).filter_by(sub=claims["sub"])).scalar_one_or_none()
     if user is None:
+        raise UnauthorizedError("missing or invalid token")
+    if user.status == "disabled":
         raise UnauthorizedError("missing or invalid token")
     g.current_user = user
 
@@ -218,3 +224,12 @@ def require_auth(f: Callable[..., Any]) -> Callable[..., Any]:
         return f(*args, **kwargs)
 
     return wrapper
+
+
+def require_admin() -> None:
+    """ADR-0013 admin gate for the Task 4 admin APIs: reads
+    ``g.current_user`` (set by the ``require_auth``-family hooks) and raises
+    403 ``RBAC_DENIED`` when the caller's role is not ``"admin"``."""
+    user = g.current_user
+    if getattr(user, "role", None) != "admin":
+        raise RbacDeniedError("admin role required")

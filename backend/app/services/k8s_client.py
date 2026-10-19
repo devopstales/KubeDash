@@ -19,6 +19,7 @@ tests inject a ``FakeK8s`` double, integration (Task 5) uses the default
 real-kubernetes factory.
 """
 import base64
+import contextlib
 import hashlib
 import os
 import secrets
@@ -28,9 +29,10 @@ import httpx
 import yaml
 from cryptography.hazmat.primitives.ciphers.aead import AESGCM
 from kubernetes import client as k8s_client
+from kubernetes.client.exceptions import ApiException
 
 from app.core.config import Settings, get_settings
-from app.core.errors import ClusterNotFoundError
+from app.core.errors import ClusterNotFoundError, ClusterUnreachableError
 
 # OD-2 frozen form: version byte (cipher/key generation marker), then the
 # 96-bit nonce, then the AES-256-GCM ciphertext (includes the 16-byte tag).
@@ -168,6 +170,12 @@ class K8sClient:
         # live cluster. (kubernetes 37 has no AuthV1Api — the SAR lives on
         # AuthorizationV1Api.) Sharing the same ApiClient keeps one auth ctx.
         self._auth_api = k8s_client.AuthorizationV1Api(api_client)
+        # ADR-0013 (TICKET-03): RBAC apply seam for the bind/unbind service.
+        # ponytail: kubernetes 37 has NO `RbacV1Api` — the Role/RoleBinding
+        # APIs live on `RbacAuthorizationV1Api` (the brief's method names,
+        # e.g. create_namespaced_role, DO match that class). Same ApiClient
+        # keeps one auth context.
+        self._rbac = k8s_client.RbacAuthorizationV1Api(api_client)
         self._host = self._v1.api_client.configuration.host
 
     def list_pods(self, namespace: str | None) -> list[dict[str, Any]]:
@@ -188,6 +196,145 @@ class K8sClient:
             return r.status_code == 200
         except Exception:
             return False
+
+    # ------------------------------------------------------------------
+    # ADR-0013 (TICKET-03) — idempotent, label-aware RBAC apply/delete.
+    # ponytail (the ponytail rung): one `try create / except 409 -> patch`.
+    # A re-call with the same rules/labels is a no-op (patch to the same
+    # state). `ClusterUnreachableError` (502 CLUSTER_UNREACHABLE) wraps any
+    # transport failure — the service never sees a raw ApiException.
+    # ------------------------------------------------------------------
+
+    def _rules(self, rules: list[dict[str, Any]]) -> list[Any]:
+        """Dict rules → ``V1PolicyRule`` (kubernetes 37 keyword-only models)."""
+        return [
+            k8s_client.V1PolicyRule(
+                api_groups=r["api_groups"], resources=r["resources"], verbs=r["verbs"]
+            )
+            for r in rules
+        ]
+
+    def _unreachable(self, kind: str, e: ApiException) -> None:
+        """Map a transport ApiException to the stable 502 carrier (the
+        service raises nothing but stable codes); raises, does not return."""
+        raise ClusterUnreachableError(f"cluster unreachable ({kind})") from e
+
+    def _apply(self, kind: str, name: str, namespace: str | None, body: Any) -> None:
+        """Get-or-create + patch for a Role/RoleBinding/ClusterRole(/Binding).
+
+        ponytail (the ponytail rung): ONE ``try create / except 409 -> patch``
+        — no existence pre-check, no server-side apply, no conflict retry.
+        A re-call with the same rules/labels/subjects is a no-op (patch to the
+        same state). Any non-409 ApiException is a transport failure → 502
+        ``ClusterUnreachableError``; the service never sees a raw ApiException.
+        """
+        api = self._rbac
+        # (create, patch) per kind; the single tuple-union assignment keeps
+        # mypy from inferring one branch's V1Role for every later branch.
+        ops: tuple[Any, Any]
+        if kind == "role" and namespace is not None:
+            ops = (
+                lambda: api.create_namespaced_role(namespace, body),
+                lambda: api.patch_namespaced_role(name, namespace, body),
+            )
+        elif kind == "role_binding" and namespace is not None:
+            ops = (
+                lambda: api.create_namespaced_role_binding(namespace, body),
+                lambda: api.patch_namespaced_role_binding(name, namespace, body),
+            )
+        elif kind == "cluster_role":
+            ops = (
+                lambda: api.create_cluster_role(body),
+                lambda: api.patch_cluster_role(name, body),
+            )
+        else:  # cluster_role_binding
+            ops = (
+                lambda: api.create_cluster_role_binding(body),
+                lambda: api.patch_cluster_role_binding(name, body),
+            )
+        create, patch = ops
+        try:
+            create()
+        except ApiException as e:
+            if e.status != 409:
+                self._unreachable(kind, e)
+            try:
+                patch()
+            except ApiException as pe:
+                self._unreachable(kind, pe)
+
+    def _delete(self, kind: str, fn: Any) -> None:
+        """Run a delete; 404 = successful no-op (brief: a missing object is
+        already the desired state), any other ApiException = transport → 502."""
+        try:
+            fn()
+        except ApiException as e:
+            if e.status == 404:
+                return
+            self._unreachable(kind, e)
+
+    def apply_role(
+        self, namespace: str, name: str, rules: list[dict[str, Any]], labels: dict[str, str]
+    ) -> None:
+        body = k8s_client.V1Role(
+            metadata=k8s_client.V1ObjectMeta(name=name, labels=labels),
+            rules=self._rules(rules),
+        )
+        self._apply("role", name, namespace, body)
+
+    def apply_role_binding(
+        self, namespace: str, name: str, role_name: str, subject_user: str, labels: dict[str, str]
+    ) -> None:
+        body = k8s_client.V1RoleBinding(
+            metadata=k8s_client.V1ObjectMeta(name=name, labels=labels),
+            role_ref=k8s_client.V1RoleRef(
+                kind="Role", name=role_name, api_group="rbac.authorization.k8s.io"
+            ),
+            subjects=[
+                k8s_client.RbacV1Subject(kind="User", name=subject_user, api_group="")
+            ],
+        )
+        self._apply("role_binding", name, namespace, body)
+
+    def apply_cluster_role(
+        self, name: str, rules: list[dict[str, Any]], labels: dict[str, str]
+    ) -> None:
+        body = k8s_client.V1ClusterRole(
+            metadata=k8s_client.V1ObjectMeta(name=name, labels=labels),
+            rules=self._rules(rules),
+        )
+        self._apply("cluster_role", name, None, body)
+
+    def apply_cluster_role_binding(
+        self, name: str, role_name: str, subject_user: str, labels: dict[str, str]
+    ) -> None:
+        body = k8s_client.V1ClusterRoleBinding(
+            metadata=k8s_client.V1ObjectMeta(name=name, labels=labels),
+            role_ref=k8s_client.V1RoleRef(
+                kind="ClusterRole", name=role_name, api_group="rbac.authorization.k8s.io"
+            ),
+            subjects=[
+                k8s_client.RbacV1Subject(kind="User", name=subject_user, api_group="")
+            ],
+        )
+        self._apply("cluster_role_binding", name, None, body)
+
+    def delete_role_binding(self, namespace: str, name: str) -> None:
+        self._delete(
+            "delete_role_binding",
+            lambda: self._rbac.delete_namespaced_role_binding(name, namespace),
+        )
+
+    def delete_cluster_role_binding(self, name: str) -> None:
+        self._delete(
+            "delete_cluster_role_binding", lambda: self._rbac.delete_cluster_role_binding(name)
+        )
+
+    def delete_role(self, namespace: str, name: str) -> None:
+        self._delete("delete_role", lambda: self._rbac.delete_namespaced_role(name, namespace))
+
+    def delete_cluster_role(self, name: str) -> None:
+        self._delete("delete_cluster_role", lambda: self._rbac.delete_cluster_role(name))
 
 
 def build_admin_client(s: Settings) -> K8sClient:
@@ -219,18 +366,15 @@ def build_admin_client(s: Settings) -> K8sClient:
         try:
             k8s_config.load_kube_config()  # type: ignore[no-untyped-call]
         except Exception:
-            try:
+            with contextlib.suppress(Exception):
+                # no in-cluster env; readyz() will fail gracefully
                 k8s_config.load_incluster_config()  # type: ignore[no-untyped-call]
-            except Exception:
-                pass  # no in-cluster env; readyz() will fail gracefully
     else:
         # in-cluster: the pod service account. On a pod-less host (dev box)
         # this raises ConfigException — catch it so the client is built with
         # an empty config; readyz() then reports the cluster as unreachable.
-        try:
+        with contextlib.suppress(Exception):
             k8s_config.load_incluster_config()  # type: ignore[no-untyped-call]
-        except Exception:
-            pass  # no in-cluster env; readyz() will fail gracefully
     return K8sClient(source="admin")
 
 
