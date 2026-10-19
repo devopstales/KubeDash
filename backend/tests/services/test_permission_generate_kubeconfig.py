@@ -94,7 +94,7 @@ def test_ca_from_data_field() -> None:
     """CA case 1: ``certificate-authority-data`` → passed through as-is
     (already base64)."""
     enc = encrypt_kubeconfig(_KC_DATA.encode())
-    server, ca = permission._ca_from_kubeconfig(1, enc)
+    server, ca = permission._ca_from_kubeconfig(enc, "https://fallback.example.com:6443")
     assert server == "https://api.prod.example.com:6443"
     assert ca == base64.b64encode(CA_PEM).decode()
 
@@ -105,7 +105,7 @@ def test_ca_from_file_path(tmp_path) -> None:
     ca_file = tmp_path / "ca.crt"
     ca_file.write_bytes(CA2_PEM)
     enc = encrypt_kubeconfig(_kc_file_form(str(ca_file)).encode())
-    server, ca = permission._ca_from_kubeconfig(1, enc)
+    server, ca = permission._ca_from_kubeconfig(enc, "https://fallback.example.com:6443")
     assert server == "https://api.staging.example.com:6443"
     assert ca == base64.b64encode(CA2_PEM).decode()
 
@@ -113,9 +113,35 @@ def test_ca_from_file_path(tmp_path) -> None:
 def test_ca_absent_is_empty_string() -> None:
     """CA case 3: neither field → ``""`` (the renderer omits the key)."""
     enc = encrypt_kubeconfig(_kc_no_ca().encode())
-    server, ca = permission._ca_from_kubeconfig(1, enc)
+    server, ca = permission._ca_from_kubeconfig(enc, "https://fallback.example.com:6443")
     assert server == "https://api.noca.example.com:6443"
     assert ca == ""
+
+
+def test_ca_missing_server_uses_caller_fallback() -> None:
+    """The registry kubeconfig's cluster entry has no ``server`` → the caller's
+    ``api_server_fallback`` (the ``Cluster.api_server`` column) is used — the
+    value is passed IN (no session lookup inside the pure function)."""
+    kc_no_server = (
+        "apiVersion: v1\nkind: Config\nclusters:\n"
+        "- name: c\n  cluster:\n"
+        "    certificate-authority-data: Zm9vCg==\n"
+        "contexts:\n- name: c\n  context:\n    cluster: c\n    user: u\n"
+        "current-context: c\nusers:\n- name: u\n  user: {}\n"
+    )
+    enc = encrypt_kubeconfig(kc_no_server.encode())
+    server, ca = permission._ca_from_kubeconfig(enc, "https://column.example.com:6443")
+    assert server == "https://column.example.com:6443"
+    assert ca == base64.b64encode(b"foo\n").decode()
+
+
+def test_ca_non_mapping_doc_raises_value_error() -> None:
+    """A registry kubeconfig that parses to a non-mapping (corrupt row) →
+    explicit ``ValueError`` (→ 500), NOT a stripped assert / AttributeError."""
+    enc = encrypt_kubeconfig(b"- just\n- a\n- list\n")
+    with pytest.raises(ValueError) as exc:
+        permission._ca_from_kubeconfig(enc, "https://fallback.example.com:6443")
+    assert "not a YAML mapping" in str(exc.value)
 
 
 # ---------------------------------------------------------------------------
@@ -271,15 +297,29 @@ def test_no_ca_is_omitted(app, db_sess, _unique: str) -> None:
     assert "certificate-authority-data" not in doc["clusters"][0]["cluster"]
 
 
-# --- service purity: the two modules expose NO flask symbols at import time
-# (a top-level `import flask` / `from flask import ...` would leak a module
-# attribute; the local `from app.extensions import db` inside
-# _ca_from_kubeconfig is a SQLAlchemy session proxy, not flask, and is
-# function-local anyway). Module-level = checked at import time, so a Flask
-# import at the top of either module fails the suite before any test body. ---
-import app.services.kubeconfig_render as _kr
-import app.services.permission as _pm
+# --- service purity (AST-based, per the Task 5 review fix): walk EVERY import
+# statement in BOTH modules — module-level AND function-local — and fail on
+# any `flask*` or `app.extensions` import. The name-string heuristic
+# (vars(module) scan) cannot see a function-local `from app.extensions import
+# db` (app.extensions imports Flask transitively), which is exactly the
+# defect the reviewer found in _ca_from_kubeconfig; the AST walk catches it.
+# Module-level = checked at import time, so a regression fails the suite
+# before any test body runs. ---
+import ast
 
 for _mod in (_kr, _pm):
-    _flaskish = [n for n in vars(_mod) if "flask" in n.lower()]
-    assert not _flaskish, (_mod.__name__, _flaskish)
+    _tree = ast.parse(open(_mod.__file__).read())
+    _bad: list[str] = []
+    for _node in ast.walk(_tree):
+        if isinstance(_node, ast.Import):
+            _bad.extend(
+                a.name for a in _node.names
+                if a.name == "flask" or a.name.startswith("flask.")
+                or a.name.startswith("flask_") or a.name.startswith("app.extensions")
+            )
+        elif isinstance(_node, ast.ImportFrom) and _node.module:
+            _m = _node.module
+            if (_m == "flask" or _m.startswith("flask.") or _m.startswith("flask_")
+                    or _m == "app.extensions" or _m.startswith("app.extensions.")):
+                _bad.append(_m)
+    assert not _bad, (_mod.__name__, _bad)

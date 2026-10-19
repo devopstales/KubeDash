@@ -206,7 +206,7 @@ def unbind(
 # ---------------------------------------------------------------------------
 
 
-def _ca_from_kubeconfig(cluster_id: int, kubeconfig_enc: bytes) -> tuple[str, str]:
+def _ca_from_kubeconfig(kubeconfig_enc: bytes, api_server_fallback: str) -> tuple[str, str]:
     """(server, ca_data_b64) from a registry cluster's encrypted kubeconfig.
 
     The CA comes from the DECRYPTED registry kubeconfig (ADR-0002) — never a
@@ -219,25 +219,24 @@ def _ca_from_kubeconfig(cluster_id: int, kubeconfig_enc: bytes) -> tuple[str, st
 
     The server is ``clusters[0].cluster.server`` (the registered kubeconfig is
     single-cluster — POST /clusters validates it via the kubernetes loader),
-    falling back to the ``Cluster.api_server`` column.
+    falling back to the caller's ``api_server_fallback`` (the
+    ``Cluster.api_server`` column — the caller passes the value in, so this
+    function stays pure: no session, no Flask, no ``app.extensions``).
     """
-    from app.extensions import db  # ponytail: local import — the module-level
-    # session model imports (binding/cluster/user) are needed by bind/unbind
-    # at import time, but the db session proxy resolves the same way here.
-
     plain = k8s_client.decrypt_kubeconfig(kubeconfig_enc)
     doc = yaml.safe_load(plain.decode())
-    assert isinstance(doc, dict)
+    # A non-mapping registry kubeconfig is a corrupt row (ValueError → 500):
+    # an explicit raise, not an assert (asserts vanish under python -O and
+    # would leave a bare AttributeError in the production path).
+    if not isinstance(doc, dict):
+        raise ValueError("registry kubeconfig is not a YAML mapping")
     entry: dict[str, Any] = {}
     clusters = doc.get("clusters")
     if isinstance(clusters, list) and clusters:
         first = clusters[0]
         if isinstance(first, dict) and isinstance(first.get("cluster"), dict):
             entry = cast(dict[str, Any], first["cluster"])
-    server = entry.get("server") or ""
-    if not server:
-        row = db.session.get(Cluster, cluster_id)
-        server = row.api_server if row is not None else ""
+    server = str(entry.get("server") or api_server_fallback)
     ca = entry.get("certificate-authority-data")
     if ca:
         return str(server), str(ca)
@@ -305,7 +304,7 @@ def generate_kubeconfig(
     contexts: list[dict[str, str]] = []
     for cid in cluster_ids:
         c = cluster_rows[cid]
-        server, ca = _ca_from_kubeconfig(cid, c.kubeconfig_enc)
+        server, ca = _ca_from_kubeconfig(c.kubeconfig_enc, c.api_server)
         name = f"kubedash-{c.name}"
         clusters.append({"name": name, "server": server, "ca_data_b64": ca})
     for b in bindings:
