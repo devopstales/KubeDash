@@ -1,8 +1,8 @@
 # Report — Authentication vertical
 
 > Change: `.skillgrid/specs/2026-10-17-authentication-vertical/` (moves to `.skillgrid/archive/2026-10-17-authentication-vertical/` at ship)
-> Generated: 2026-10-18T21:10:00+02:00 (qa)
-> Gate: PASS / CONCERNS / FAIL / WAIVED
+> Generated: 2026-10-18T21:10:00+02:00 (qa); re-verified after fix `f5bae945`
+> Gate: PASS
 >
 > Two phases, one file: **qa** writes the QA half (the sections above `## Final-State Facts`,
 > through `## Gate Decision` + `## Human Override`) into the spec folder. **ship** reads the
@@ -275,16 +275,29 @@ Coverage: **n/a — no coverage tool detected** (`testing.coverage` not set in c
 
 ## Gate Decision
 
-**Verdict:** CONCERNS
+**Verdict:** PASS
 
-**Reasoning:** All 7 acceptance scenarios are covered by tests that ran and passed, all goal truths are VERIFIED, TDD evidence is complete (7/7), lint/typecheck/build/security are clean, and the floor's weakest dimension is a WARNING (not a FAIL). The gate is capped at CONCERNS — not PASS — because the verification-gap audit surfaced two test-infrastructure regressions introduced by this change's own fixture edits (FU-1, FU-2) that make the backend suite's green **order-dependent**: the canonical full-suite run passes (184), but a re-ordered or CI collection flips the api tier to 6 errors with no code change. Neither affects production behavior (the scenarios verify real auth/cluster/frontend behavior at the unit+integration seams), so this is a verification-robustness concern, not a correctness one.
+**Reasoning:** All 7 acceptance scenarios are covered by tests that ran and
+passed, all goal truths are VERIFIED, TDD evidence is complete (7/7),
+lint/typecheck/build/security are clean. The two test-infrastructure
+regressions the verification-gap audit surfaced (FU-1, FU-2) and the
+timezone-pinned assertion (FU-3) are now **fixed** in commit `f5bae945`:
+the api-tier fixtures are collision-free and always registered
+(`pytest_plugins`), the worker-gate reload no-ops the bootstrap, and the
+Profile last-login assertion is timezone-independent. Re-verification:
+backend 186 passed / 1 pre-existing env-blocked (FU-1 + FU-2 no longer fail),
+the FU-2 4-file reproduction is 41 passed in both file orders, and the
+frontend suite is 17/17 in UTC, America/New_York, and Asia/Tokyo. No
+dimension is at a FAIL value.
 
-**Open items (if CONCERNS):**
-- **FU-2** (cross-tier isolation) — fix: bind the api-tier app fixture's engine to in-memory sqlite explicitly; re-run the 4-file reproduction (`test_local_auth + test_auth + test_admin_source + test_clusters_admin`) to confirm 0 errors in any order.
-- **FU-1** (worker-gate leak) — fix: no-op the wsgi bootstrap hook (or clear the bootstrap env) in `test_worker_gate.py::_reload_wsgi`; re-run the full suite to confirm the 2 gate tests pass in-order.
-- **Timezone-pinned Profile assertion** — pin the render timezone or assert a locale-independent field (low-risk; CI-portability only).
-
-Each is a small, isolated test-infra fix; the production surface is unchanged. A re-verification run (Steps 3–9 on the fixed items) should render **PASS**.
+**Fixed in this gate (commit `f5bae945`):**
+- **FU-2** (cross-tier isolation) — api fixtures renamed to `api_app`/
+  `api_client` + registered from the root conftest via `pytest_plugins`;
+  4-file reproduction 0 errors in any order.
+- **FU-1** (worker-gate leak) — bootstrap no-oped at its source before the
+  `importlib.reload(wsgi)`; both gate tests pass in-order.
+- **FU-3** (timezone-pinned Profile assertion) — asserts the "Last login"
+  label + non-empty value; passes in 3 timezones.
 
 ## Human Override
 
