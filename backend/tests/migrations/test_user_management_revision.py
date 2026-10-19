@@ -34,12 +34,14 @@ module's tests are self-contained: every test upgrades, asserts, and
 downgrades in its own ``try/finally`` (the same pattern
 ``tests/test_models.py::test_migration_revision_lands_email_unique`` uses
 for the ADR-0021 revision). Because ``downgrade()`` legitimately drops the
-``cluster_bindings`` columns/constraint, each test that downgrades the
-fresh engine RESTORES the model (create_all) shape of ``cluster_bindings``
-right after (``_restore_cluster_bindings_model_shape``) — so the shared
-schema is left exactly as ``db.create_all()`` produced it and the full unit
-sweep is clean (no FK/column artifact for later tests such as
-``test_models.py::test_user_and_binding_roundtrip``).
+extended ``cluster_bindings`` columns/constraint AND the added
+``audit_log`` columns, every test that downgrades RESTORES BOTH model
+(create_all) shapes right after (``_restore_cluster_bindings_model_shape`` +
+``_restore_audit_log_shape``) — so the shared schema is left exactly as
+``db.create_all()`` produced it and the full unit sweep is clean regardless
+of module order (no FK/column artifact for later tests such as
+``test_models.py::test_user_and_binding_roundtrip`` or
+``tests/services/test_permission.py``'s AuditLog inserts).
 """
 
 import importlib.util
@@ -138,6 +140,21 @@ def _restore_cluster_bindings_model_shape(engine: sa.engine.Engine) -> None:
             )
 
 
+def _restore_audit_log_shape(engine: sa.engine.Engine) -> None:
+    """Drop and re-create the SHARED ``audit_log`` table from the model
+    metadata so later tests see the create_all (model) shape. ``downgrade()``
+    drops the added columns (actor_sub/target/cluster/namespace/template/at)
+    but leaves any legacy columns behind — a plain ``create(checkfirst=True)``
+    (as the legacy_audit_engine fixture uses on a legacy-shaped table) is
+    not enough here, so drop first, then create. Drops the test's own
+    probe rows (acceptable: nothing else reads audit_log in this tier);
+    later tests insert their own rows."""
+    from app.models.audit import AuditLog
+
+    AuditLog.__table__.drop(bind=engine, checkfirst=True)
+    AuditLog.__table__.create(bind=engine, checkfirst=True)
+
+
 @pytest.fixture()
 def fresh_engine(app) -> Iterator[sa.engine.Engine]:
     """The Testcontainers PG after ``db.create_all()``: the model-shaped
@@ -230,10 +247,11 @@ def test_builtin_templates_are_seeded_and_protected(fresh_engine) -> None:
         _run(mod.downgrade, fresh_engine)
         # downgrade restored the pre-upgrade state: table gone, seeds gone.
         assert not sa.inspect(fresh_engine).has_table("rbac_templates")
-        # Leave the SHARED cluster_bindings in the model (create_all) shape
-        # for later tests — downgrade() drops the extended columns + the
-        # unique constraint it does not know it was the one that added them.
+        # Leave the SHARED cluster_bindings + audit_log in the model
+        # (create_all) shape for later tests — downgrade() drops the
+        # extended columns/constraint and the added audit_log columns.
         _restore_cluster_bindings_model_shape(fresh_engine)
+        _restore_audit_log_shape(fresh_engine)
 
 
 def test_cluster_bindings_extended_with_unique_triple(fresh_engine) -> None:
@@ -275,6 +293,7 @@ def test_cluster_bindings_extended_with_unique_triple(fresh_engine) -> None:
             uq.get("name")
             for uq in sa.inspect(fresh_engine).get_unique_constraints("cluster_bindings")
         }
+        _restore_audit_log_shape(fresh_engine)
 
 
 # ---------------------------------------------------------------------------
@@ -329,3 +348,4 @@ def test_upgrade_is_idempotent_safe(legacy_audit_engine) -> None:
         _run(mod.downgrade, legacy_audit_engine)
         _run(mod.downgrade, legacy_audit_engine)
         _restore_cluster_bindings_model_shape(legacy_audit_engine)
+        _restore_audit_log_shape(legacy_audit_engine)
