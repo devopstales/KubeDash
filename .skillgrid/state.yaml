@@ -17,6 +17,19 @@ pipeline:
   # The spec dir this change lives in.
   specs_root: .skillgrid/specs
 
+# In-flight changes (besides pipeline.current_change). current_change stays on
+# the still-executing authentication vertical; user-management is tracked here
+# at its own phase so its pipeline position is durable without stealing the
+# current_change pointer.
+in_flight:
+  - change: 2026-10-19-user-management
+    phase: qa
+    # All 8 tickets (TICKET-01..08) implemented + reviewed; QA gate PASS
+    # (traceability 26/26, all truths VERIFIED, Trivy clean, scope COMPLETE).
+    # HEAD 41c8f928 (QA report). Next: requesting-code-review (final two-axis)
+    # -> ship. Delivery: feature-branch-chain on `rebase` (no merge to main).
+    tracker: [TASK-023, TASK-024]
+
 completed_changes:
   - 2026-10-17-kubedash-base-structure
   - 2026-10-17-swagger-ui-air-gap
