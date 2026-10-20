@@ -868,92 +868,59 @@ A new view in the KubeDash frontend: `src/views/Permissions/`.
 
 ### Backend service
 
+Implemented as **module-level pure functions** (services purity — no Flask
+imports); the API layer passes the dependencies in as arguments.
+
 ```python
 # backend/app/services/permission.py
-class PermissionService:
-    def __init__(self, db, k8s_client, rbac):
-        self.db = db
-        self.k8s = k8s_client
-        self.rbac = rbac
+TEMPLATE_LABEL = "kubedash.io/template"
+USER_LABEL = "kubedash.io/user"
 
-    def bind(self, username: str, cluster: str, namespace: str,
-             template_name: str) -> Binding:
-        """Apply a role template to a user in a namespace."""
-        template = self.db.rbac_templates.get_by_name(template_name)
-        if template.scope == "cluster" and namespace:
-            raise ValidationError("cluster-scoped template; omit namespace")
+def bind(*, user_sub, cluster_id, namespace, template_name,
+         actor_sub, db_session, k8s) -> ClusterBinding:
+    """Synchronous apply (ADR-0008). Missing cluster → 404
+    ClusterNotFoundError; missing template/user → 404 ResourceKindNotSupported
+    (the generic 404); scope mismatch → 422 InvalidKubeconfigError.
+    Idempotency check FIRST: an existing (user, cluster, namespace, template)
+    row returns 200 WITHOUT re-applying and without a new audit row. Otherwise
+    apply the Role/RoleBinding (or ClusterRole/ClusterRoleBinding) under the
+    kubedash.io/* labels — cluster failure → 502 ClusterUnreachableError,
+    nothing recorded — then commit the cluster_bindings row + the audit_log
+    row in the SAME transaction."""
 
-        # 1. Create/patch the Role in the cluster
-        role_name = f"kubedash-{template.name}"
-        self.k8s.apply_role(cluster, namespace, role_name,
-                            rules=template.rules,
-                            labels={"kubedash.io/template": template.name})
+def unbind(*, user_sub, cluster_id, namespace, actor_sub,
+           db_session, k8s) -> None:
+    """Row lookup → 404 NoBindingsError; delete the RoleBinding (the scope the
+    row was bound with is authoritative); Role GC — delete the
+    Role/ClusterRole `kubedash-<template>` only when no other binding on that
+    (cluster, namespace-or-cluster) still references the template; delete the
+    row + audit, committed together."""
 
-        # 2. Create/patch the RoleBinding
-        rb_name = f"kubedash-{username}-{namespace or 'cluster'}"
-        self.k8s.apply_role_binding(cluster, namespace, rb_name,
-                                    role_ref=role_name,
-                                    subjects=[{"kind": "User", "name": username}],
-                                    labels={"kubedash.io/user": username,
-                                            "kubedash.io/template": template.name})
-
-        # 3. Record in Postgres
-        binding = Binding(user=username, cluster=cluster,
-                          namespace=namespace, template=template.name)
-        self.db.session.add(binding)
-        self.db.session.commit()
-
-        # 4. Audit
-        self.db.audit_log.add(user=username, action="bind",
-                              cluster=cluster, namespace=namespace,
-                              template=template.name)
-        return binding
-
-    def unbind(self, username: str, cluster: str, namespace: str):
-        """Remove a user's binding in a namespace."""
-        binding = self.db.bindings.get(username, cluster, namespace)
-        if not binding:
-            raise NotFoundError("binding not found")
-
-        rb_name = f"kubedash-{username}-{namespace or 'cluster'}"
-        self.k8s.delete_role_binding(cluster, namespace, rb_name)
-
-        # Delete the Role if no other bindings reference it
-        role_name = f"kubedash-{binding.template}"
-        remaining = self.db.bindings.count_for_role(cluster, namespace,
-                                                     role_name)
-        if remaining == 0:
-            self.k8s.delete_role(cluster, namespace, role_name)
-
-        self.db.session.delete(binding)
-        self.db.session.commit()
-        self.db.audit_log.add(user=username, action="unbind",
-                              cluster=cluster, namespace=namespace)
-
-    def generate_kubeconfig(self, username: str) -> str:
-        """Generate a multi-cluster kubeconfig for the user."""
-        bindings = self.db.bindings.get_by_user(username)
-        clusters = {}
-        contexts = []
-        for b in bindings:
-            cluster = self.db.clusters.get(b.cluster)
-            ctx_name = f"kubedash-{b.cluster}"
-            clusters[ctx_name] = {
-                "server": cluster.api_server,
-                "certificate-authority-data": cluster.ca_data,
-            }
-            contexts.append({
-                "name": ctx_name,
-                "cluster": ctx_name,
-                "user": "kubedash",
-                "namespace": b.namespace,  # default ns
-            })
-        return render_kubeconfig(clusters, contexts)
-
-    def list_effective_permissions(self, username: str, cluster: str):
-        """Compute SSOUser (from § 5A)."""
-        return self.rbac.effective_permissions(username, cluster)
+def generate_kubeconfig(*, user_sub, db_session, settings) -> str:
+    """Self-service kubeconfig (below). No bindings → 404 NoBindingsError;
+    settings.plugin_server unset/empty → 500 InternalError (never emit an
+    empty --server=). One cluster entry per DISTINCT bound cluster; one
+    context PER BINDING (context name kubedash-<cluster>; same cluster, two
+    namespaces → two contexts; cluster-scoped bindings omit the namespace
+    key). The CA is read from the DECRYPTED registry kubeconfig (ADR-0002):
+    certificate-authority-data passthrough, then certificate-authority file
+    read, else omitted."""
 ```
+
+**Self-service kubeconfig** — the YAML emission lives in a separate pure
+module, `backend/app/services/kubeconfig_render.py`
+(`render_kubeconfig(clusters, contexts, plugin_server) -> str`):
+
+- One cluster entry per DISTINCT bound cluster; server + base64 CA inlined
+  (`certificate-authority-data`; the field is omitted when the registry
+  kubeconfig carries no CA).
+- One context per binding: `kubedash-<cluster.name>` + the binding's
+  namespace (omitted for cluster scope); `current-context` = the first
+  context.
+- **Exactly one shared `users[]` entry** (name `kubedash`) carrying an
+  `exec` reference — `kubectl kubedash get-token --server=<plugin_server>`
+  (ADR-0011). No `token` / `tokenFile` / `oidc-*` keys anywhere: the token
+  is minted fresh per exec (PKCE + keyring), never embedded.
 
 ### Drift detection (RQ task)
 

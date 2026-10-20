@@ -45,6 +45,10 @@ const DEFAULT_ALLOW = [
   // new URL('https://тест') (IDN host check).
   'https://x',
   'https://тест',
+  // Project docs/repo nav links (AppHeader/AppFooter) — target=_blank message-text
+  // links, not loadable CDN refs (no <script>/<link>/@import/fetch targets them).
+  'devopstales.github.io',
+  'github.com/devopstales',
 ];
 
 // The two air-gap regexes (I8 precision: protocol-relative non-CDN URLs are
