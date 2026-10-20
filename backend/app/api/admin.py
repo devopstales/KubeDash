@@ -20,6 +20,7 @@ from app.core.errors import (
     InvalidKubeconfigError,
     ResourceKindNotSupportedError,
 )
+from app.core import security
 from app.core.security import require_admin
 from app.extensions import db
 from app.models.audit import AuditLog
@@ -29,6 +30,7 @@ from app.models.user import User
 from app.schemas.permissions import (
     GroupIn,
     GroupMemberIn,
+    UserCreateIn,
     UserOut,
     UserPatch,
 )
@@ -55,6 +57,12 @@ def _effective_groups(claim: list[str] | None, stored: set[str]) -> list[str]:
     return sorted(set(claim or []) | stored)
 
 
+def _user_type(u: User) -> str:
+    """The main-branch "Type" column: 'Local' for auth_source=local rows,
+    'OIDC' otherwise (TASK-027)."""
+    return "Local" if u.auth_source == "local" else "OIDC"
+
+
 def _out(u: User, cluster_count: int, stored: dict[str, set[str]]) -> dict[str, object]:
     return {
         "id": u.id,
@@ -66,6 +74,7 @@ def _out(u: User, cluster_count: int, stored: dict[str, set[str]]) -> dict[str, 
         "status": u.status,
         "cluster_count": cluster_count,
         "last_login_at": u.last_login_at,
+        "user_type": _user_type(u),
     }
 
 
@@ -113,6 +122,80 @@ class AdminApi(Api):
         users = db.session.execute(db.select(User).order_by(User.id)).scalars().all()
         items = [_out(u, counts.get(u.id, 0), stored) for u in users]
         return jsonify(items), 200
+
+    @blp.route("/admin/users", methods=["POST"])
+    @blp.arguments(UserCreateIn)
+    @blp.doc(responses={
+        201: ("The created user.", None),
+        403: "RBAC_DENIED",
+        409: "CLUSTER_ALREADY_EXISTS (email/sub already exists)",
+        422: "INVALID_KUBECONFIG (blank username/password or bad role)",
+    })
+    def create_user(self, args: dict[str, object]) -> tuple[dict[str, object], int]:
+        """Create a local-password user (TASK-027, the main-branch Create
+        User modal). The password is hashed with the ADR-0021 pbkdf2 util
+        (``security.hash_password``); ``auth_source='local'`` so it can log
+        in via the local-auth route. A duplicate email or sub is 409 with the
+        frozen 409 code."""
+        require_admin()
+        username = str(args.get("username") or "").strip()
+        email = str(args.get("email") or "").strip()
+        password = str(args.get("password") or "")
+        role = str(args.get("role") or "")
+        if not username or not email or not password:
+            raise InvalidKubeconfigError("username, email and password are required")
+        if role not in ("user", "admin"):
+            raise InvalidKubeconfigError("role must be 'user' or 'admin'")
+        sub = f"local:{email}"
+        exists = db.session.execute(
+            db.select(User).filter(db.or_(User.email == email, User.sub == sub))
+        ).scalar_one_or_none()
+        if exists is not None:
+            raise ClusterAlreadyExistsError(f"user {email!r} already exists")
+        u = User(
+            sub=sub,
+            email=email,
+            display_name=username,
+            role=role,
+            auth_source="local",
+            password_hash=security.hash_password(password),
+        )
+        db.session.add(u)
+        db.session.add(AuditLog(
+            action="user.create", actor_sub=g.current_user.sub, target=sub,
+        ))
+        db.session.commit()
+        return _out(u, 0, {}), 201
+
+    @blp.route("/admin/users/<int:user_id>", methods=["DELETE"])
+    @blp.doc(responses={
+        200: ("Deleted.", None),
+        403: "RBAC_DENIED",
+        404: "RESOURCE_KIND_NOT_SUPPORTED (user not found)",
+        409: "CLUSTER_ALREADY_EXISTS (bootstrap admin or self are immutable)",
+    })
+    def delete_user(self, user_id: int) -> dict[str, object]:
+        """Delete a user (TASK-027, the main-branch delete action). The
+        bootstrap ``local:`` admin and the caller themselves are immutable
+        (409). Membership (``user_groups``) and bindings cascade via their
+        FK ``ondelete=CASCADE``."""
+        require_admin()
+        user = db.session.get(User, user_id)
+        if user is None:
+            raise ResourceKindNotSupportedError(f"user {user_id} not found")
+        # ponytail: the immutability gate keys on ``sub.startswith("local:")``
+        # — the bootstrap upsert's reserved sub convention (same as patch_user).
+        if user.sub.startswith("local:"):
+            raise ClusterAlreadyExistsError("bootstrap admin cannot be deleted")
+        if user.sub == g.current_user.sub:
+            raise ClusterAlreadyExistsError("you cannot delete your own account")
+        sub = user.sub
+        db.session.delete(user)
+        db.session.add(AuditLog(
+            action="user.delete", actor_sub=g.current_user.sub, target=sub,
+        ))
+        db.session.commit()
+        return {"sub": sub, "deleted": True}
 
     @blp.route("/admin/groups", methods=["GET"])
     @blp.doc(responses={

@@ -61,6 +61,23 @@ services:
       start_period: 15s
     restart: unless-stopped
 
+  # Pushgateway: durable landing zone for ephemeral test runs. pytest / e2e push
+  # a result gauge here; Prometheus scrapes it and the last push is retained, so
+  # Grafana always shows "what did the last test run produce" even after the run
+  # is gone. (Prometheus itself is query-only per ARCHITECTURE.md §6 — it never
+  # receives test metrics directly.)
+  pushgateway:
+    image: prom/pushgateway:latest
+    ports:
+      - "${PUSHGATEWAY_PORT:-9091}:9091"
+    healthcheck:
+      test: ["CMD", "wget", "-qO-", "http://localhost:9091/-/healthy"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+      start_period: 10s
+    restart: unless-stopped
+
   grafana:
     image: grafana/grafana
     ports:

@@ -1,0 +1,208 @@
+{
+  "annotations": { "list": [] },
+  "editable": true,
+  "fiscalYearStartMonth": 0,
+  "graphTooltip": 1,
+  "id": null,
+  "links": [],
+  "liveNow": false,
+  "panels": [
+    {
+      "type": "row",
+      "title": "Code quality",
+      "collapsed": false,
+      "gridPos": {"h": 1, "w": 24, "x": 0, "y": 0},
+      "id": 200,
+      "panels": []
+    },
+    {
+      "type": "stat",
+      "title": "Ruff violations",
+      "description": "Total lint violations (kubedash_ruff_violations{rule=\"_total\"}). Per-rule breakdown in the table below.",
+      "datasource": {"type": "prometheus", "uid": "${DS_PROMETHEUS}"},
+      "gridPos": {"h": 5, "w": 6, "x": 0, "y": 1},
+      "id": 21,
+      "options": {"colorMode": "value", "graphMode": "area", "justifyMode": "auto", "orientation": "auto", "reduceOptions": {"calcs": ["lastNotNull"], "fields": "", "values": false}, "textMode": "auto"},
+      "fieldConfig": {"defaults": {"color": {"mode": "thresholds"}, "mappings": [], "thresholds": {"mode": "absolute", "steps": [{"color": "green", "value": null}, {"color": "yellow", "value": 1}, {"color": "orange", "value": 10}, {"color": "red", "value": 50}]}}, "overrides": []},
+      "targets": [{"refId": "A", "expr": "kubedash_ruff_violations{job=\"kubedash-lint\",rule=\"_total\"}", "legendFormat": "violations", "queryType": "instant", "datasource": {"type": "prometheus", "uid": "${DS_PROMETHEUS}"}}]
+    },
+    {
+      "type": "stat",
+      "title": "mypy errors",
+      "description": "Type errors (kubedash_mypy_errors).",
+      "datasource": {"type": "prometheus", "uid": "${DS_PROMETHEUS}"},
+      "gridPos": {"h": 5, "w": 6, "x": 6, "y": 1},
+      "id": 22,
+      "options": {"colorMode": "value", "graphMode": "area", "justifyMode": "auto", "orientation": "auto", "reduceOptions": {"calcs": ["lastNotNull"], "fields": "", "values": false}, "textMode": "auto"},
+      "fieldConfig": {"defaults": {"color": {"mode": "thresholds"}, "mappings": [], "thresholds": {"mode": "absolute", "steps": [{"color": "green", "value": null}, {"color": "red", "value": 1}]}}, "overrides": []},
+      "targets": [{"refId": "A", "expr": "kubedash_mypy_errors{job=\"kubedash-lint\"}", "legendFormat": "errors", "queryType": "instant", "datasource": {"type": "prometheus", "uid": "${DS_PROMETHEUS}"}}]
+    },
+    {
+      "type": "stat",
+      "title": "Duplication %",
+      "description": "Duplicate code percentage over the frontend (kubedash_code_duplication_pct).",
+      "datasource": {"type": "prometheus", "uid": "${DS_PROMETHEUS}"},
+      "gridPos": {"h": 5, "w": 6, "x": 12, "y": 1},
+      "id": 23,
+      "options": {"colorMode": "value", "graphMode": "area", "justifyMode": "auto", "orientation": "auto", "reduceOptions": {"calcs": ["lastNotNull"], "fields": "", "values": false}, "textMode": "auto"},
+      "fieldConfig": {"defaults": {"unit": "percent", "color": {"mode": "thresholds"}, "mappings": [], "thresholds": {"mode": "absolute", "steps": [{"color": "green", "value": null}, {"color": "yellow", "value": 5}, {"color": "orange", "value": 10}, {"color": "red", "value": 20}]}}, "overrides": []},
+      "targets": [{"refId": "A", "expr": "kubedash_code_duplication_pct{job=\"kubedash-quality\"}", "legendFormat": "pct", "queryType": "instant", "datasource": {"type": "prometheus", "uid": "${DS_PROMETHEUS}"}}]
+    },
+    {
+      "type": "stat",
+      "title": "Dup clones",
+      "description": "Number of duplicate blocks found (kubedash_code_clones).",
+      "datasource": {"type": "prometheus", "uid": "${DS_PROMETHEUS}"},
+      "gridPos": {"h": 5, "w": 6, "x": 18, "y": 1},
+      "id": 24,
+      "options": {"colorMode": "value", "graphMode": "area", "justifyMode": "auto", "orientation": "auto", "reduceOptions": {"calcs": ["lastNotNull"], "fields": "", "values": false}, "textMode": "auto"},
+      "fieldConfig": {"defaults": {"color": {"mode": "thresholds"}, "mappings": [], "thresholds": {"mode": "absolute", "steps": [{"color": "green", "value": null}, {"color": "yellow", "value": 50}, {"color": "orange", "value": 100}]}}, "overrides": []},
+      "targets": [{"refId": "A", "expr": "kubedash_code_clones{job=\"kubedash-quality\"}", "legendFormat": "clones", "queryType": "instant", "datasource": {"type": "prometheus", "uid": "${DS_PROMETHEUS}"}}]
+    },
+    {
+      "type": "row",
+      "title": "Security (trivy)",
+      "collapsed": false,
+      "gridPos": {"h": 1, "w": 24, "x": 0, "y": 6},
+      "id": 201,
+      "panels": []
+    },
+    {
+      "type": "stat",
+      "title": "Critical",
+      "datasource": {"type": "prometheus", "uid": "${DS_PROMETHEUS}"},
+      "gridPos": {"h": 5, "w": 4, "x": 0, "y": 7},
+      "id": 25,
+      "options": {"colorMode": "value", "graphMode": "none", "justifyMode": "auto", "orientation": "auto", "reduceOptions": {"calcs": ["lastNotNull"], "fields": "", "values": false}, "textMode": "auto"},
+      "fieldConfig": {"defaults": {"color": {"mode": "thresholds"}, "mappings": [], "thresholds": {"mode": "absolute", "steps": [{"color": "green", "value": null}, {"color": "red", "value": 1}]}}, "overrides": []},
+      "targets": [{"refId": "A", "expr": "kubedash_trivy_findings{job=\"kubedash-security\",severity=\"CRITICAL\"}", "legendFormat": "critical", "queryType": "instant", "datasource": {"type": "prometheus", "uid": "${DS_PROMETHEUS}"}}]
+    },
+    {
+      "type": "stat",
+      "title": "High",
+      "datasource": {"type": "prometheus", "uid": "${DS_PROMETHEUS}"},
+      "gridPos": {"h": 5, "w": 4, "x": 4, "y": 7},
+      "id": 26,
+      "options": {"colorMode": "value", "graphMode": "none", "justifyMode": "auto", "orientation": "auto", "reduceOptions": {"calcs": ["lastNotNull"], "fields": "", "values": false}, "textMode": "auto"},
+      "fieldConfig": {"defaults": {"color": {"mode": "thresholds"}, "mappings": [], "thresholds": {"mode": "absolute", "steps": [{"color": "green", "value": null}, {"color": "orange", "value": 1}]}}, "overrides": []},
+      "targets": [{"refId": "A", "expr": "kubedash_trivy_findings{job=\"kubedash-security\",severity=\"HIGH\"}", "legendFormat": "high", "queryType": "instant", "datasource": {"type": "prometheus", "uid": "${DS_PROMETHEUS}"}}]
+    },
+    {
+      "type": "stat",
+      "title": "Medium",
+      "datasource": {"type": "prometheus", "uid": "${DS_PROMETHEUS}"},
+      "gridPos": {"h": 5, "w": 4, "x": 8, "y": 7},
+      "id": 27,
+      "options": {"colorMode": "value", "graphMode": "none", "justifyMode": "auto", "orientation": "auto", "reduceOptions": {"calcs": ["lastNotNull"], "fields": "", "values": false}, "textMode": "auto"},
+      "fieldConfig": {"defaults": {"color": {"mode": "thresholds"}, "mappings": [], "thresholds": {"mode": "absolute", "steps": [{"color": "green", "value": null}, {"color": "yellow", "value": 1}]}}, "overrides": []},
+      "targets": [{"refId": "A", "expr": "kubedash_trivy_findings{job=\"kubedash-security\",severity=\"MEDIUM\"}", "legendFormat": "medium", "queryType": "instant", "datasource": {"type": "prometheus", "uid": "${DS_PROMETHEUS}"}}]
+    },
+    {
+      "type": "stat",
+      "title": "Low",
+      "datasource": {"type": "prometheus", "uid": "${DS_PROMETHEUS}"},
+      "gridPos": {"h": 5, "w": 4, "x": 12, "y": 7},
+      "id": 28,
+      "options": {"colorMode": "value", "graphMode": "none", "justifyMode": "auto", "orientation": "auto", "reduceOptions": {"calcs": ["lastNotNull"], "fields": "", "values": false}, "textMode": "auto"},
+      "fieldConfig": {"defaults": {"color": {"mode": "fixed", "fixedColor": "blue"}, "mappings": [], "thresholds": {"mode": "absolute", "steps": [{"color": "blue"}]}}, "overrides": []},
+      "targets": [{"refId": "A", "expr": "kubedash_trivy_findings{job=\"kubedash-security\",severity=\"LOW\"}", "legendFormat": "low", "queryType": "instant", "datasource": {"type": "prometheus", "uid": "${DS_PROMETHEUS}"}}]
+    },
+    {
+      "type": "stat",
+      "title": "Total CVEs",
+      "datasource": {"type": "prometheus", "uid": "${DS_PROMETHEUS}"},
+      "gridPos": {"h": 5, "w": 8, "x": 16, "y": 7},
+      "id": 29,
+      "options": {"colorMode": "value", "graphMode": "area", "justifyMode": "auto", "orientation": "auto", "reduceOptions": {"calcs": ["lastNotNull"], "fields": "", "values": false}, "textMode": "auto"},
+      "fieldConfig": {"defaults": {"color": {"mode": "thresholds"}, "mappings": [], "thresholds": {"mode": "absolute", "steps": [{"color": "green", "value": null}, {"color": "yellow", "value": 1}, {"color": "orange", "value": 5}, {"color": "red", "value": 20}]}}, "overrides": []},
+      "targets": [{"refId": "A", "expr": "kubedash_trivy_findings{job=\"kubedash-security\",severity=\"_total\"}", "legendFormat": "total", "queryType": "instant", "datasource": {"type": "prometheus", "uid": "${DS_PROMETHEUS}"}}]
+    },
+    {
+      "type": "row",
+      "title": "Trends & breakdown",
+      "collapsed": false,
+      "gridPos": {"h": 1, "w": 24, "x": 0, "y": 12},
+      "id": 202,
+      "panels": []
+    },
+    {
+      "type": "timeseries",
+      "title": "Ruff violations by rule (trend)",
+      "datasource": {"type": "prometheus", "uid": "${DS_PROMETHEUS}"},
+      "gridPos": {"h": 8, "w": 12, "x": 0, "y": 13},
+      "id": 31,
+      "options": {"legend": {"displayMode": "table", "placement": "right", "calcs": ["lastNotNull"]}, "tooltip": {"mode": "multi", "sort": "desc"}},
+      "fieldConfig": {"defaults": {"custom": {"drawStyle": "line", "lineInterpolation": "stepAfter", "fillOpacity": 10, "showPoints": "always"}, "mappings": [], "thresholds": {"mode": "absolute", "steps": [{"color": "blue"}]}}, "overrides": []},
+      "targets": [{"refId": "A", "expr": "kubedash_ruff_violations{job=\"kubedash-lint\",rule!=\"_total\"}", "legendFormat": "{{rule}}", "datasource": {"type": "prometheus", "uid": "${DS_PROMETHEUS}"}}]
+    },
+    {
+      "type": "timeseries",
+      "title": "mypy errors + duplication % (trend)",
+      "datasource": {"type": "prometheus", "uid": "${DS_PROMETHEUS}"},
+      "gridPos": {"h": 8, "w": 12, "x": 12, "y": 13},
+      "id": 32,
+      "options": {"legend": {"displayMode": "list", "placement": "bottom", "calcs": ["lastNotNull", "max"]}, "tooltip": {"mode": "multi", "sort": "desc"}},
+      "fieldConfig": {"defaults": {"custom": {"drawStyle": "line", "lineInterpolation": "stepAfter", "fillOpacity": 10, "showPoints": "always"}, "mappings": [], "thresholds": {"mode": "absolute", "steps": [{"color": "blue"}]}}, "overrides": [
+        {"matcher": {"id": "byName", "options": "mypy_errors"}, "properties": [{"id": "color", "value": {"mode": "fixed", "fixedColor": "red"}}]},
+        {"matcher": {"id": "byName", "options": "duplication_pct"}, "properties": [{"id": "color", "value": {"mode": "fixed", "fixedColor": "orange"}}]}
+      ]},
+      "targets": [
+        {"refId": "A", "expr": "kubedash_mypy_errors{job=\"kubedash-lint\"}", "legendFormat": "mypy_errors", "datasource": {"type": "prometheus", "uid": "${DS_PROMETHEUS}"}},
+        {"refId": "B", "expr": "kubedash_code_duplication_pct{job=\"kubedash-quality\"}", "legendFormat": "duplication_pct", "datasource": {"type": "prometheus", "uid": "${DS_PROMETHEUS}"}}
+      ]
+    },
+    {
+      "type": "table",
+      "title": "Ruff violations by rule",
+      "description": "Per-rule breakdown (kubedash_ruff_violations).",
+      "datasource": {"type": "prometheus", "uid": "${DS_PROMETHEUS}"},
+      "gridPos": {"h": 6, "w": 12, "x": 0, "y": 21},
+      "id": 33,
+      "options": {"showHeader": true, "cellHeight": "sm", "footer": {"show": false}, "sortBy": [{"displayName": "Value", "desc": true}]},
+      "fieldConfig": {"defaults": {"color": {"mode": "thresholds"}, "custom": {"displayMode": "lcd"}}, "overrides": []},
+      "transformations": [
+        {"id": "labelsToFields", "options": {"keep": ["rule"]}},
+        {"id": "organize", "options": {"excludeByName": {"Time": true, "job": true}, "renameByName": {"rule": "rule", "Value": "count"}}}
+      ],
+      "targets": [{"refId": "A", "expr": "kubedash_ruff_violations{job=\"kubedash-lint\",rule!=\"_total\"}", "format": "table", "instant": true, "datasource": {"type": "prometheus", "uid": "${DS_PROMETHEUS}"}}]
+    },
+    {
+      "type": "table",
+      "title": "Trivy findings by severity",
+      "description": "CVE counts per severity (kubedash_trivy_findings).",
+      "datasource": {"type": "prometheus", "uid": "${DS_PROMETHEUS}"},
+      "gridPos": {"h": 6, "w": 12, "x": 12, "y": 21},
+      "id": 34,
+      "options": {"showHeader": true, "cellHeight": "sm", "footer": {"show": false}, "sortBy": [{"displayName": "Value", "desc": true}]},
+      "fieldConfig": {"defaults": {"color": {"mode": "thresholds"}, "custom": {"displayMode": "lcd"}}, "overrides": []},
+      "transformations": [
+        {"id": "labelsToFields", "options": {"keep": ["severity"]}},
+        {"id": "organize", "options": {"excludeByName": {"Time": true, "job": true}, "renameByName": {"severity": "severity", "Value": "count"}}}
+      ],
+      "targets": [{"refId": "A", "expr": "kubedash_trivy_findings{job=\"kubedash-security\",severity!=\"_total\"}", "format": "table", "instant": true, "datasource": {"type": "prometheus", "uid": "${DS_PROMETHEUS}"}}]
+    }
+  ],
+  "refresh": "30s",
+  "schemaVersion": 39,
+  "tags": ["kubedash", "quality", "security"],
+  "templating": {
+    "list": [
+      {
+        "type": "datasource",
+        "name": "DS_PROMETHEUS",
+        "label": "Datasource",
+        "query": "prometheus",
+        "refresh": 1,
+        "regex": "",
+        "current": {},
+        "hide": 0
+      }
+    ]
+  },
+  "time": {"from": "now-7d", "to": "now"},
+  "timepicker": {},
+  "timezone": "",
+  "title": "KubeDash Quality & Security",
+  "uid": "kubedash-quality-security",
+  "version": 1
+}

@@ -53,6 +53,12 @@ importers:
       core-js:
         specifier: ^3.50.0
         version: 3.50.0
+      datatables.net-dt:
+        specifier: ^3.1.4
+        version: 3.1.4
+      datatables.net-react:
+        specifier: ^2.0.0
+        version: 2.0.0(datatables.net@3.1.4)(react-dom@19.3.1(react@19.3.1))(react@19.3.1)
       monaco-editor:
         specifier: ^0.57.0
         version: 0.57.0
@@ -1228,6 +1234,19 @@ packages:
   data-view-byte-offset@1.0.1:
     resolution: {integrity: sha512-BS8PfmtDGnrgYdOonGZQdLZslWIeCGFP9tpan0hi1Co2Zr2NKADsvGYA8XxuG/4UWgJ6Cjtv+YJnB6MM69QGlQ==}
     engines: {node: '>= 0.4'}
+
+  datatables.net-dt@3.1.4:
+    resolution: {integrity: sha512-HST6HmWEMr6SA6FM2SpYu2ko0In5nHjUb03Ocop2gsHLWoRP18sgVbehxUtRS3QZP4eHfU68ujs/gnzd0U2t9g==}
+
+  datatables.net-react@2.0.0:
+    resolution: {integrity: sha512-Q8HJ8AT/y9R70eW92VMUXI1FTc4teC09gs+AQ4mgR0JealjT8gC24TBiU2Ow6/VldEZE3Wi+al1HGXsV7R1qhg==}
+    peerDependencies:
+      datatables.net: ^3.0.0
+      react: ^18.3.1 || ^19
+      react-dom: ^18.3.1 || ^19
+
+  datatables.net@3.1.4:
+    resolution: {integrity: sha512-tnk14y/AOr0Z1d7avIUvCcOGgqZpeo7B6g6RQiycMQckEMq2FaaZTG1Q1xD6Kci5gpAvdjZInDmbscoiVSTyGw==}
 
   debug@4.4.3:
     resolution: {integrity: sha512-RGwwWnwQvkVfavKVt22FGLw+xYSdzARwm0ru6DhTVA3umU5hZc28V3kO4stgYryrTlLpuvgI9GiijltAjNbcqA==}
@@ -3670,6 +3689,18 @@ snapshots:
       call-bound: 1.0.4
       es-errors: 1.3.0
       is-data-view: 1.0.2
+
+  datatables.net-dt@3.1.4:
+    dependencies:
+      datatables.net: 3.1.4
+
+  datatables.net-react@2.0.0(datatables.net@3.1.4)(react-dom@19.3.1(react@19.3.1))(react@19.3.1):
+    dependencies:
+      datatables.net: 3.1.4
+      react: 19.3.1
+      react-dom: 19.3.1(react@19.3.1)
+
+  datatables.net@3.1.4: {}
 
   debug@4.4.3(supports-color@10.2.2):
     dependencies:

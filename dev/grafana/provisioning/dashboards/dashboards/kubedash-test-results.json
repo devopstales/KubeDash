@@ -1,0 +1,211 @@
+{
+  "annotations": { "list": [] },
+  "editable": true,
+  "fiscalYearStartMonth": 0,
+  "graphTooltip": 1,
+  "id": null,
+  "links": [],
+  "liveNow": false,
+  "panels": [
+    {
+      "type": "row",
+      "title": "Test run overview",
+      "collapsed": false,
+      "gridPos": {"h": 1, "w": 24, "x": 0, "y": 0},
+      "id": 100,
+      "panels": []
+    },
+    {
+      "type": "stat",
+      "title": "Status",
+      "description": "Last run outcome. The query returns 1/2/3 for succeeded/failed/errored; the value mapping turns that into a colored word. No label expansion needed, so it always renders.",
+      "datasource": {"type": "prometheus", "uid": "${DS_PROMETHEUS}"},
+      "gridPos": {"h": 5, "w": 4, "x": 0, "y": 1},
+      "id": 1,
+      "options": {
+        "colorMode": "background",
+        "graphMode": "none",
+        "justifyMode": "auto",
+        "orientation": "auto",
+        "reduceOptions": {"calcs": ["lastNotNull"], "fields": "", "values": false},
+        "textMode": "auto"
+      },
+      "fieldConfig": {
+        "defaults": {
+          "mappings": [
+            {"type": "value", "options": {
+              "1": {"text": "PASSED", "color": "green"},
+              "2": {"text": "FAILED", "color": "red"},
+              "3": {"text": "ERROR", "color": "orange"}
+            }}
+          ],
+          "thresholds": {"mode": "absolute", "steps": [{"color": "green"}]}
+        },
+        "overrides": []
+      },
+      "targets": [
+        {"refId": "A", "expr": "(max(kubedash_unit_info{status=\"succeeded\",job=~\"$job\"}) or max(kubedash_smoke_info{status=\"succeeded\",job=~\"$job\"}) or max(kubedash_e2e_info{status=\"succeeded\",job=~\"$job\"}) or vector(0)) + (max(kubedash_unit_info{status=\"failed\",job=~\"$job\"}) or max(kubedash_smoke_info{status=\"failed\",job=~\"$job\"}) or max(kubedash_e2e_info{status=\"failed\",job=~\"$job\"}) or vector(0)) * 1 + (max(kubedash_unit_info{status=\"errored\",job=~\"$job\"}) or max(kubedash_smoke_info{status=\"errored\",job=~\"$job\"}) or max(kubedash_e2e_info{status=\"errored\",job=~\"$job\"}) or vector(0)) * 2", "queryType": "instant", "datasource": {"type": "prometheus", "uid": "${DS_PROMETHEUS}"}}
+      ]
+    },
+    {
+      "type": "stat",
+      "title": "Passed",
+      "datasource": {"type": "prometheus", "uid": "${DS_PROMETHEUS}"},
+      "gridPos": {"h": 5, "w": 4, "x": 4, "y": 1},
+      "id": 2,
+      "options": {"colorMode": "value", "graphMode": "none", "justifyMode": "auto", "orientation": "auto", "reduceOptions": {"calcs": ["lastNotNull"], "fields": "", "values": false}, "textMode": "auto"},
+      "fieldConfig": {"defaults": {"color": {"mode": "fixed", "fixedColor": "green"}, "mappings": [], "thresholds": {"mode": "absolute", "steps": [{"color": "green"}]}}, "overrides": []},
+      "targets": [{"refId": "A", "expr": "(sum(kubedash_unit_passed{job=~\"$job\"}) or vector(0)) + (sum(kubedash_smoke_passed{job=~\"$job\"}) or vector(0)) + (sum(kubedash_e2e_passed{job=~\"$job\"}) or vector(0))", "legendFormat": "passed", "queryType": "instant", "datasource": {"type": "prometheus", "uid": "${DS_PROMETHEUS}"}}]
+    },
+    {
+      "type": "stat",
+      "title": "Failed",
+      "datasource": {"type": "prometheus", "uid": "${DS_PROMETHEUS}"},
+      "gridPos": {"h": 5, "w": 4, "x": 8, "y": 1},
+      "id": 3,
+      "options": {"colorMode": "value", "graphMode": "none", "justifyMode": "auto", "orientation": "auto", "reduceOptions": {"calcs": ["lastNotNull"], "fields": "", "values": false}, "textMode": "auto"},
+      "fieldConfig": {"defaults": {"color": {"mode": "thresholds"}, "mappings": [], "thresholds": {"mode": "absolute", "steps": [{"color": "green", "value": null}, {"color": "red", "value": 1}]}}, "overrides": []},
+      "targets": [{"refId": "A", "expr": "(sum(kubedash_unit_failed{job=~\"$job\"}) or vector(0)) + (sum(kubedash_smoke_failed{job=~\"$job\"}) or vector(0)) + (sum(kubedash_e2e_failed{job=~\"$job\"}) or vector(0))", "legendFormat": "failed", "queryType": "instant", "datasource": {"type": "prometheus", "uid": "${DS_PROMETHEUS}"}}]
+    },
+    {
+      "type": "stat",
+      "title": "Errors",
+      "datasource": {"type": "prometheus", "uid": "${DS_PROMETHEUS}"},
+      "gridPos": {"h": 5, "w": 4, "x": 12, "y": 1},
+      "id": 4,
+      "options": {"colorMode": "value", "graphMode": "none", "justifyMode": "auto", "orientation": "auto", "reduceOptions": {"calcs": ["lastNotNull"], "fields": "", "values": false}, "textMode": "auto"},
+      "fieldConfig": {"defaults": {"color": {"mode": "thresholds"}, "mappings": [], "thresholds": {"mode": "absolute", "steps": [{"color": "green", "value": null}, {"color": "orange", "value": 1}]}}, "overrides": []},
+      "targets": [{"refId": "A", "expr": "(sum(kubedash_unit_error{job=~\"$job\"}) or vector(0)) + (sum(kubedash_smoke_error{job=~\"$job\"}) or vector(0)) + (sum(kubedash_e2e_error{job=~\"$job\"}) or vector(0))", "legendFormat": "error", "queryType": "instant", "datasource": {"type": "prometheus", "uid": "${DS_PROMETHEUS}"}}]
+    },
+    {
+      "type": "stat",
+      "title": "Skipped",
+      "datasource": {"type": "prometheus", "uid": "${DS_PROMETHEUS}"},
+      "gridPos": {"h": 5, "w": 4, "x": 16, "y": 1},
+      "id": 5,
+      "options": {"colorMode": "value", "graphMode": "none", "justifyMode": "auto", "orientation": "auto", "reduceOptions": {"calcs": ["lastNotNull"], "fields": "", "values": false}, "textMode": "auto"},
+      "fieldConfig": {"defaults": {"color": {"mode": "fixed", "fixedColor": "yellow"}, "mappings": [], "thresholds": {"mode": "absolute", "steps": [{"color": "green"}]}}, "overrides": []},
+      "targets": [{"refId": "A", "expr": "(sum(kubedash_unit_skipped{job=~\"$job\"}) or vector(0)) + (sum(kubedash_smoke_skipped{job=~\"$job\"}) or vector(0)) + (sum(kubedash_e2e_skipped{job=~\"$job\"}) or vector(0))", "legendFormat": "skipped", "queryType": "instant", "datasource": {"type": "prometheus", "uid": "${DS_PROMETHEUS}"}}]
+    },
+    {
+      "type": "stat",
+      "title": "Run duration",
+      "description": "Wall time of the last run.",
+      "datasource": {"type": "prometheus", "uid": "${DS_PROMETHEUS}"},
+      "gridPos": {"h": 5, "w": 4, "x": 20, "y": 1},
+      "id": 6,
+      "options": {"colorMode": "value", "graphMode": "none", "justifyMode": "auto", "orientation": "auto", "reduceOptions": {"calcs": ["lastNotNull"], "fields": "", "values": false}, "textMode": "auto"},
+      "fieldConfig": {"defaults": {"unit": "s", "decimals": 2, "mappings": [], "thresholds": {"mode": "absolute", "steps": [{"color": "blue"}]}}, "overrides": []},
+      "targets": [{"refId": "A", "expr": "max(kubedash_unit_last_run_duration_seconds{job=~\"$job\"}) or max(kubedash_smoke_last_run_duration_seconds{job=~\"$job\"}) or max(kubedash_e2e_last_run_duration_seconds{job=~\"$job\"})", "queryType": "instant", "datasource": {"type": "prometheus", "uid": "${DS_PROMETHEUS}"}}]
+    },
+    {
+      "type": "row",
+      "title": "Trends & timestamps",
+      "collapsed": false,
+      "gridPos": {"h": 1, "w": 24, "x": 0, "y": 6},
+      "id": 101,
+      "panels": []
+    },
+    {
+      "type": "timeseries",
+      "title": "Pass / fail / error trend",
+      "description": "Per-test outcome counts over time. Pushgateway retains the latest push per job; history builds as runs repeat.",
+      "datasource": {"type": "prometheus", "uid": "${DS_PROMETHEUS}"},
+      "gridPos": {"h": 8, "w": 12, "x": 0, "y": 7},
+      "id": 7,
+      "options": {"legend": {"displayMode": "list", "placement": "bottom", "calcs": []}, "tooltip": {"mode": "multi", "sort": "desc"}},
+      "fieldConfig": {"defaults": {"custom": {"drawStyle": "line", "lineInterpolation": "stepAfter", "fillOpacity": 10, "showPoints": "always", "pointSize": 6, "spanNulls": true}, "mappings": [], "thresholds": {"mode": "absolute", "steps": [{"color": "green"}]}}, "overrides": [
+        {"matcher": {"id": "byName", "options": "passed"}, "properties": [{"id": "color", "value": {"mode": "fixed", "fixedColor": "green"}}]},
+        {"matcher": {"id": "byName", "options": "failed"}, "properties": [{"id": "color", "value": {"mode": "fixed", "fixedColor": "red"}}]},
+        {"matcher": {"id": "byName", "options": "error"}, "properties": [{"id": "color", "value": {"mode": "fixed", "fixedColor": "orange"}}]}
+      ]},
+      "targets": [
+        {"refId": "A", "expr": "(sum(kubedash_unit_passed{job=~\"$job\"}) or vector(0)) + (sum(kubedash_smoke_passed{job=~\"$job\"}) or vector(0)) + (sum(kubedash_e2e_passed{job=~\"$job\"}) or vector(0))", "legendFormat": "passed", "datasource": {"type": "prometheus", "uid": "${DS_PROMETHEUS}"}},
+        {"refId": "B", "expr": "(sum(kubedash_unit_failed{job=~\"$job\"}) or vector(0)) + (sum(kubedash_smoke_failed{job=~\"$job\"}) or vector(0)) + (sum(kubedash_e2e_failed{job=~\"$job\"}) or vector(0))", "legendFormat": "failed", "datasource": {"type": "prometheus", "uid": "${DS_PROMETHEUS}"}},
+        {"refId": "C", "expr": "(sum(kubedash_unit_error{job=~\"$job\"}) or vector(0)) + (sum(kubedash_smoke_error{job=~\"$job\"}) or vector(0)) + (sum(kubedash_e2e_error{job=~\"$job\"}) or vector(0))", "legendFormat": "error", "datasource": {"type": "prometheus", "uid": "${DS_PROMETHEUS}"}}
+      ]
+    },
+    {
+      "type": "timeseries",
+      "title": "Run duration trend",
+      "datasource": {"type": "prometheus", "uid": "${DS_PROMETHEUS}"},
+      "gridPos": {"h": 8, "w": 12, "x": 12, "y": 7},
+      "id": 8,
+      "options": {"legend": {"displayMode": "list", "placement": "bottom", "calcs": ["mean", "max"]}, "tooltip": {"mode": "multi", "sort": "desc"}},
+      "fieldConfig": {"defaults": {"unit": "s", "decimals": 2, "custom": {"drawStyle": "line", "lineInterpolation": "linear", "fillOpacity": 15, "showPoints": "auto"}, "mappings": [], "thresholds": {"mode": "absolute", "steps": [{"color": "blue"}]}}, "overrides": []},
+      "targets": [
+        {"refId": "A", "expr": "max(kubedash_unit_last_run_duration_seconds{job=~\"$job\"}) or max(kubedash_smoke_last_run_duration_seconds{job=~\"$job\"}) or max(kubedash_e2e_last_run_duration_seconds{job=~\"$job\"})", "legendFormat": "duration", "datasource": {"type": "prometheus", "uid": "${DS_PROMETHEUS}"}}
+      ]
+    },
+    {
+      "type": "table",
+      "title": "Last run timestamps",
+      "description": "When the last run and the last successful run completed.",
+      "datasource": {"type": "prometheus", "uid": "${DS_PROMETHEUS}"},
+      "gridPos": {"h": 6, "w": 12, "x": 0, "y": 15},
+      "id": 9,
+      "options": {"showHeader": true, "cellHeight": "sm", "footer": {"show": false}, "sortBy": [{"displayName": "Metric", "desc": false}]},
+      "fieldConfig": {"defaults": {"unit": "dateTimeFromNow"}, "overrides": []},
+      "transformations": [
+        {"id": "organize", "options": {"excludeByName": {"Time": true, "instance": false, "detail": false, "status": false, "job": false}, "indexByName": {}}}
+      ],
+      "targets": [
+        {"refId": "A", "expr": "max(kubedash_unit_last_run_timestamp_seconds{job=~\"$job\"}) or max(kubedash_smoke_last_run_timestamp_seconds{job=~\"$job\"}) or max(kubedash_e2e_last_run_timestamp_seconds{job=~\"$job\"})", "format": "table", "instant": true, "datasource": {"type": "prometheus", "uid": "${DS_PROMETHEUS}"}},
+        {"refId": "B", "expr": "max(kubedash_unit_last_success_timestamp_seconds{job=~\"$job\"}) or max(kubedash_smoke_last_success_timestamp_seconds{job=~\"$job\"}) or max(kubedash_e2e_last_success_timestamp_seconds{job=~\"$job\"})", "format": "table", "instant": true, "datasource": {"type": "prometheus", "uid": "${DS_PROMETHEUS}"}}
+      ]
+    },
+    {
+      "type": "table",
+      "title": "Failing / erroring tests",
+      "description": "Per-test series currently > 0 for failed + error. Empty when the last run was clean.",
+      "datasource": {"type": "prometheus", "uid": "${DS_PROMETHEUS}"},
+      "gridPos": {"h": 6, "w": 12, "x": 12, "y": 15},
+      "id": 11,
+      "options": {"showHeader": true, "cellHeight": "sm", "footer": {"show": false}},
+      "fieldConfig": {"defaults": {"color": {"mode": "thresholds"}, "thresholds": {"mode": "absolute", "steps": [{"color": "red"}]}}, "overrides": []},
+      "transformations": [
+        {"id": "labelsToFields", "options": {"keep": ["testname"]}},
+        {"id": "organize", "options": {"excludeByName": {"Time": true, "Value": true, "job": true, "instance": true, "detail": true}, "renameByName": {"testname": "test"}}}
+      ],
+      "targets": [
+        {"refId": "A", "expr": "kubedash_unit_failed{job=~\"$job\"}", "format": "table", "instant": true, "datasource": {"type": "prometheus", "uid": "${DS_PROMETHEUS}"}},
+        {"refId": "B", "expr": "kubedash_unit_error{job=~\"$job\"}", "format": "table", "instant": true, "datasource": {"type": "prometheus", "uid": "${DS_PROMETHEUS}"}}
+      ]
+    }
+  ],
+  "refresh": "30s",
+  "schemaVersion": 39,
+  "tags": ["kubedash", "testing"],
+  "templating": {
+    "list": [
+      {
+        "type": "datasource",
+        "name": "DS_PROMETHEUS",
+        "label": "Datasource",
+        "query": "prometheus",
+        "refresh": 1,
+        "regex": "",
+        "current": {},
+        "hide": 0
+      },
+      {
+        "type": "query",
+        "name": "job",
+        "label": "Test job",
+        "datasource": {"type": "prometheus", "uid": "${DS_PROMETHEUS}"},
+        "query": "label_values({__name__=~\"kubedash_(unit|smoke|e2e)_info\"}, job)",
+        "refresh": 2,
+        "includeAll": false,
+        "multi": false,
+        "current": {"text": "kubedash-unit", "value": "kubedash-unit"},
+        "regex": ""
+      }
+    ]
+  },
+  "time": {"from": "now-24h", "to": "now"},
+  "timepicker": {},
+  "timezone": "",
+  "title": "KubeDash Test Results",
+  "uid": "kubedash-test-results",
+  "version": 5
+}

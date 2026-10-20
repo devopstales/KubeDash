@@ -22,6 +22,8 @@ class UserOut(Schema):
     status = fields.String()
     cluster_count = fields.Int()
     last_login_at = fields.DateTime(allow_none=True)
+    # The main-branch "Type" column: "Local" (auth_source=local) or "OIDC".
+    user_type = fields.String()
 
 
 class UserPatch(Schema):
@@ -57,6 +59,19 @@ class TemplateOut(Schema):
     builtin = fields.Boolean()
     created_by = fields.String(allow_none=True)
     created_at = fields.DateTime(allow_none=True)
+
+
+class UserCreateIn(Schema):
+    """Create body for ``POST /admin/users`` (TASK-027). Creates an
+    ``auth_source=local`` user with a pbkdf2 password (ADR-0021). Blank
+    username/password and an invalid role are 422 INVALID_KUBECONFIG (the
+    handler validates — marshmallow's ValidationError would map to a generic
+    422 without the stable code)."""
+
+    username = fields.String(required=True)
+    email = fields.String(required=True)
+    password = fields.String(required=True)
+    role = fields.String(required=True)
 
 
 class GroupIn(Schema):

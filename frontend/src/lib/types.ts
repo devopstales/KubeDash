@@ -93,6 +93,8 @@ export interface AdminUser {
   status: string
   cluster_count: number
   last_login_at: string | null
+  /** The main-branch "Type" column: "Local" (auth_source=local) or "OIDC". */
+  user_type: string
 }
 
 /** A row of GET /api/v1/admin/groups (group → member_count). */

@@ -1016,6 +1016,7 @@ dependencies = [
 dev = [
     { name = "mypy" },
     { name = "pytest" },
+    { name = "pytest-prometheus-pushgateway" },
     { name = "ruff" },
     { name = "testcontainers" },
     { name = "types-redis" },
@@ -1051,6 +1052,7 @@ requires-dist = [
 dev = [
     { name = "mypy", specifier = ">=1.9" },
     { name = "pytest", specifier = ">=8.0" },
+    { name = "pytest-prometheus-pushgateway", specifier = ">=0.3.2" },
     { name = "ruff", specifier = ">=0.4" },
     { name = "testcontainers", specifier = ">=4.0" },
     { name = "types-redis" },
@@ -1575,6 +1577,15 @@ wheels = [
 ]
 
 [[package]]
+name = "prometheus-client"
+version = "0.26.0"
+source = { registry = "https://pypi.org/simple" }
+sdist = { url = "https://files.pythonhosted.org/packages/52/73/f1334c29c2af4cd9dba6c7817e61b611bd0215e2eb5565c6064a4de18802/prometheus_client-0.26.0.tar.gz", hash = "sha256:04a91bcf94e2cf74a44a1a874d651a2e853ed354b6e822f3b7487751465d5c2b", size = 92910, upload-time = "2026-07-24T19:36:41.893Z" }
+wheels = [
+    { url = "https://files.pythonhosted.org/packages/eb/a3/b69efbf4143b5b9859b977770bbbabcc2796b702fa69dc40271e45cd5a56/prometheus_client-0.26.0-py3-none-any.whl", hash = "sha256:fa93d06737aa02bacd05794768508bb97d2fbee28cb3bca04eaae92f0ca953d6", size = 64494, upload-time = "2026-07-24T19:36:40.854Z" },
+]
+
+[[package]]
 name = "propcache"
 version = "0.5.4"
 source = { registry = "https://pypi.org/simple" }
@@ -1931,6 +1942,19 @@ dependencies = [
 sdist = { url = "https://files.pythonhosted.org/packages/e4/47/b9efed96c114afcfa3c9d3fe98a76a1d14c74a9e266d397cf6eb64be5e01/pytest-9.1.1.tar.gz", hash = "sha256:1088fbde8f2b49d95a549a195707afa7a76a3ce9bcadc26b6d71f0ffda5fe313", size = 1636369, upload-time = "2026-06-19T10:58:32.857Z" }
 wheels = [
     { url = "https://files.pythonhosted.org/packages/24/25/1de2678b631f5a49215c6c96fff41ba892b0a34df68d6d80292b1b48aa7f/pytest-9.1.1-py3-none-any.whl", hash = "sha256:37a86b45efb9a47a61a36449063e8e18d0cab3161329fc099eb21783169c4f0c", size = 386536, upload-time = "2026-06-19T10:58:31.347Z" },
+]
+
+[[package]]
+name = "pytest-prometheus-pushgateway"
+version = "0.3.2"
+source = { registry = "https://pypi.org/simple" }
+dependencies = [
+    { name = "prometheus-client" },
+    { name = "pytest" },
+]
+sdist = { url = "https://files.pythonhosted.org/packages/a2/4e/8013c2b232f1c88eda2e0350dd4b0d7a4576075a416c862c41c2436cb1a4/pytest-prometheus-pushgateway-0.3.2.tar.gz", hash = "sha256:a75761f6502518803f14efdae2a3d3eccb6007265701d66a3c6afc05b6e3612d", size = 10381, upload-time = "2022-09-27T08:49:39.095Z" }
+wheels = [
+    { url = "https://files.pythonhosted.org/packages/35/eb/ad9e155aada56042a0d3b62049a002f28f2d87e479a11381fbe58e415ad0/pytest_prometheus_pushgateway-0.3.2-py3-none-any.whl", hash = "sha256:2cd2b0c660a073975b44217af2c5b172b8a60cb6f45159c1929c446b5c1912b6", size = 19864, upload-time = "2022-09-27T08:49:36.014Z" },
 ]
 
 [[package]]

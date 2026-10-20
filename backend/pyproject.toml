@@ -39,6 +39,10 @@ dev = [
   "ruff>=0.4",
   "mypy>=1.9",
   "types-redis",
+  # Test-result metrics: pushes run-level pass/fail/total/duration gauges to the
+  # dev Pushgateway (PROMETHEUS_PUSHGATEWAY_URL). Only active when that env var
+  # is set — the docker-free loop (task test-unit) runs without it.
+  "pytest-prometheus-pushgateway>=0.3.2",
 ]
 
 [tool.ruff]

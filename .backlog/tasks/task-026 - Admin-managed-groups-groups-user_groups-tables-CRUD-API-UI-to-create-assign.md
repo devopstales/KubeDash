@@ -3,11 +3,11 @@ id: TASK-026
 title: >-
   Admin-managed groups: groups + user_groups tables, CRUD API, UI to
   create/assign
-status: In Progress
+status: Done
 assignee:
   - '@opencode'
 created_date: '2026-10-20 19:18'
-updated_date: '2026-10-20 19:19'
+updated_date: '2026-10-20 19:58'
 labels: []
 milestone: m-0
 dependencies: []
@@ -33,22 +33,22 @@ The /groups and /users admin pages render but show no content (2026-10-20): grou
 
 ## Acceptance Criteria
 <!-- AC:BEGIN -->
-- [ ] #1 A migration adds a groups table (id, name unique, created_at) and a user_groups mapping (user_id, group_id, unique together) — alembic revision, reversible, idempotent against the create_all-era shape
-- [ ] #2 Admin API: POST /api/v1/admin/groups (create, 409 on duplicate name), DELETE /api/v1/admin/groups/<name> (removes membership rows), POST /api/v1/admin/groups/<name>/members {user_sub} (assign), DELETE .../members/<user_sub> (unassign); all require_admin (403 non-admin); GET /api/v1/admin/groups now returns stored groups merged with OIDC-claim groups (a group with no stored row still appears if some user's claim has it)
-- [ ] #3 GET /api/v1/admin/users rows include the user's groups = stored memberships merged with the user's OIDC claim (deduped, sorted)
-- [ ] #4 /groups view: lists groups (name + member count); clicking a group shows its members (sub/email/name); an admin can create a new group (name prompt/form) and the list updates
-- [ ] #5 /users view: each user row shows their groups; the user detail panel lets the admin add a user to a group and remove them (membership controls wired to the API)
-- [ ] #6 vitest: /groups create + member expansion + non-admin redirect; /users group display + assign/unassign; backend: create/list/delete/assign/unassign/409/403/merge-with-claim unit tests (TDD red->green)
-- [ ] #7 task fe-build + task fe-check exit 0; backend unit suite not red beyond the pre-existing test_health failure; apidocs baseline updated for the new routes
+- [x] #1 A migration adds a groups table (id, name unique, created_at) and a user_groups mapping (user_id, group_id, unique together) — alembic revision, reversible, idempotent against the create_all-era shape
+- [x] #2 Admin API: POST /api/v1/admin/groups (create, 409 on duplicate name), DELETE /api/v1/admin/groups/<name> (removes membership rows), POST /api/v1/admin/groups/<name>/members {user_sub} (assign), DELETE .../members/<user_sub> (unassign); all require_admin (403 non-admin); GET /api/v1/admin/groups now returns stored groups merged with OIDC-claim groups (a group with no stored row still appears if some user's claim has it)
+- [x] #3 GET /api/v1/admin/users rows include the user's groups = stored memberships merged with the user's OIDC claim (deduped, sorted)
+- [x] #4 /groups view: lists groups (name + member count); clicking a group shows its members (sub/email/name); an admin can create a new group (name prompt/form) and the list updates
+- [x] #5 /users view: each user row shows their groups; the user detail panel lets the admin add a user to a group and remove them (membership controls wired to the API)
+- [x] #6 vitest: /groups create + member expansion + non-admin redirect; /users group display + assign/unassign; backend: create/list/delete/assign/unassign/409/403/merge-with-claim unit tests (TDD red->green)
+- [x] #7 task fe-build + task fe-check exit 0; backend unit suite not red beyond the pre-existing test_health failure; apidocs baseline updated for the new routes
 <!-- AC:END -->
 
 ## Definition of Done
 <!-- DOD:BEGIN -->
-- [ ] #1 Tests pass
-- [ ] #2 Lint and formatting pass
-- [ ] #3 Edge cases covered
-- [ ] #4 No new warnings introduced
-- [ ] #5 Spec/docs updated if behavior changes
+- [x] #1 Tests pass
+- [x] #2 Lint and formatting pass
+- [x] #3 Edge cases covered
+- [x] #4 No new warnings introduced
+- [x] #5 Spec/docs updated if behavior changes
 <!-- DOD:END -->
 
 ## Implementation Plan
@@ -66,3 +66,17 @@ Research (this session): main branch groups = sso_groups + sso_user_group_mappin
 9. Verify: backend unit (only pre-existing test_health red), ruff+mypy, task db-migrate on dev DB, vitest, task fe-build + fe-check. Commit (models, migration, admin.py, schemas, baseline, frontend views+tests, types if any).
 Risks: sqlite api tier — Group/UserGroup are plain relational (no JSONB) so portable; the merge query must work on sqlite (use Python-side or simple JOIN, not PG-only). member_count semantics: count distinct users having the group via stored OR claim (match the existing claim-based count so stored-only groups show their assigned members).
 <!-- SECTION:PLAN:END -->
+
+## Implementation Notes
+
+<!-- SECTION:NOTES:BEGIN -->
+All gates verified (2026-10-20): backend unit suite 282 passed (only the pre-existing test_health AttributeError red); ruff + mypy clean on changed files; 15/15 test_admin_groups green; apidocs baseline green. Frontend: 17/17 groups+users tests green; full vitest 44/45 (only the pre-existing Cluster pod-table flake); task fe-build (tsc+eslint+vite) exit 0; task fe-check (air-gap) exit 0. Live dev stack (task db-migrate applied 8b2c4d5e6f7a; backend restarted): create group 201, dup 409 CLUSTER_ALREADY_EXISTS, assign 200, list groups merged [{platform:1}], list users groups [platform]; real-browser DOM confirms /groups create form + platform row(1), /users Groups column + platform badge + detail-panel membership block (badge with × remove, Add-to-group picker, Add button). Commit e36cf42d (12 files).
+
+Two bugs caught during TDD/verification (in the commit's Tried: lines): (a) smorest @blp.arguments passes the decoded body positionally FIRST, so the handler arg must be named `args` — a body arg named `name` collides with the <name> path param ('got multiple values for argument name'); (b) the new /users group picker is a combobox that broke two pre-existing BindModal tests' getAllByRole('combobox') destructures — fixed to skip/select the right element.
+<!-- SECTION:NOTES:END -->
+
+## Final Summary
+
+<!-- SECTION:FINAL_SUMMARY:BEGIN -->
+Admin-managed groups (TASK-026): the /groups and /users pages are no longer empty. Groups are now first-class, admin-managed Postgres rows (groups + user_groups tables, migration 8b2c4d5e6f7a) — the 5.0 analogue of the legacy app's sso_groups/sso_user_group_mapping. Backend: POST/DELETE /admin/groups, POST/DELETE /admin/groups/<name>/members[/<user_sub>] (create/list/delete/assign/unassign, all require_admin; 409 CLUSTER_ALREADY_EXISTS on dup, 422 blank name, 404 unknown user/group/membership), and GET /admin/groups + /admin/users now merge stored rows ∪ OIDC-claim groups (member_count = distinct users via either source; user groups deduped+sorted). Frontend: /groups gains an inline 'New group' create form (409 surfaces as text-danger); /users gains a Groups column (badges) and a detail-panel membership block (remove × per group + Add-to-group picker). 15 backend + 7 frontend tests (TDD red->green); all gates green (only the pre-existing test_health + Cluster pod-table flakes red). Commit e36cf42d.
+<!-- SECTION:FINAL_SUMMARY:END -->

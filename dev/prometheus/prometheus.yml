@@ -13,6 +13,16 @@ scrape_configs:
       - targets:
           - "localhost:9090"
 
+  # Test-result metrics: pytest (test-unit) and Playwright e2e (test-smoke /
+  # test-e2e) push a result gauge to the Pushgateway; Prometheus scrapes it.
+  # The last push per job (kubedash-unit / kubedash-smoke / kubedash-e2e) is
+  # retained, giving Grafana a durable last-run feed.
+  - job_name: pushgateway
+    honor_labels: true
+    static_configs:
+      - targets:
+          - "pushgateway:9091"
+
   # Add the real backends here as the dev stack grows, e.g.:
   # - job_name: cadvisor
   #   static_configs:

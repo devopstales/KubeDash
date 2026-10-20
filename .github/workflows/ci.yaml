@@ -4,15 +4,30 @@ on:
   push:
     branches: [rebase, main]
 jobs:
+  # Ephemeral Pushgateway so CI's code-quality/security pushes have a durable
+  # landing zone. Exposes :9091 on localhost for the sibling jobs (same runner).
+  pushgateway:
+    runs-on: ubuntu-latest
+    container: prom/pushgateway:latest
+    ports:
+      - 9091:9091
+    # Container jobs have no default command; run the gateway binary.
+    entrypoint: ["/bin/pushgateway"]
   backend:
     runs-on: ubuntu-latest
+    needs: pushgateway
     steps:
       - uses: actions/checkout@v4
       - uses: astral-sh/setup-uv@v3
       - run: uv sync
         working-directory: backend
+      # Gate the build (existing behavior).
       - run: uv run ruff check . && uv run mypy app
         working-directory: backend
+      # Push lint metrics to the ephemeral gateway (non-gating; the run above gates).
+      - run: python3 scripts/collect-lint.py
+        env:
+          PROMETHEUS_PUSHGATEWAY_URL: http://localhost:9091
       - run: uv run pytest -m "not integration"
         working-directory: backend
   frontend:
@@ -48,14 +63,24 @@ jobs:
         working-directory: backend
   image:
     runs-on: ubuntu-latest
-    needs: [frontend, backend]
+    needs: [frontend, backend, pushgateway]
     steps:
       - uses: actions/checkout@v4
       - uses: docker/setup-buildx-action@v3
+      - uses: docker/setup-qemu-action@v3
       - uses: docker/build-push-action@v6
         with: { context: ., file: backend/Dockerfile, tags: kubedash:ci, load: true }
       - uses: aquasecurity/trivy-action@0.24.0
         with: { image-ref: kubedash:ci, severity: CRITICAL, exit-code: "1" }
+      # Push CVE counts by severity to the ephemeral gateway (non-gating; the
+      # trivy-action above gates on CRITICAL). Install trivy (trivy-action runs
+      # in its own container, so the binary isn't on PATH for this step).
+      - name: Push trivy metrics
+        run: |
+          curl -sfL https://raw.githubusercontent.com/aquasecurity/trivy/main/contrib/install.sh | sh -s -- -b /usr/local/bin
+          python3 scripts/collect-security.py --image kubedash:ci
+        env:
+          PROMETHEUS_PUSHGATEWAY_URL: http://localhost:9091
   lint-workflows:
     runs-on: ubuntu-latest
     steps:

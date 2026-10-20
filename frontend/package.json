@@ -35,6 +35,8 @@
     "chart.js": "^4.5.1",
     "classnames": "^2.5.1",
     "core-js": "^3.50.0",
+    "datatables.net-dt": "^3.1.4",
+    "datatables.net-react": "^2.0.0",
     "monaco-editor": "^0.57.0",
     "prop-types": "^15.8.1",
     "react": "^19.3.0",

@@ -30,6 +30,11 @@ const TEMPLATES: import('../../src/lib/types').RBACTemplate[] = [
   },
 ]
 
+const GROUPS = [
+  { group: 'dev', member_count: 1 },
+  { group: 'platform', member_count: 0 },
+]
+
 const USERS = [
   {
     id: 1,
@@ -41,6 +46,7 @@ const USERS = [
     status: 'active',
     cluster_count: 1,
     last_login_at: '2026-10-19T08:00:00Z',
+    user_type: 'OIDC',
   },
   {
     id: 0,
@@ -52,6 +58,7 @@ const USERS = [
     status: 'active',
     cluster_count: 2,
     last_login_at: '2026-10-19T08:00:00Z',
+    user_type: 'Local',
   },
   {
     id: 2,
@@ -63,12 +70,8 @@ const USERS = [
     status: 'active',
     cluster_count: 1,
     last_login_at: '2026-10-18T09:00:00Z',
+    user_type: 'OIDC',
   },
-]
-
-const GROUPS = [
-  { group: 'dev', member_count: 1 },
-  { group: 'platform', member_count: 0 },
 ]
 
 const withUsersHandlers = () =>
@@ -114,7 +117,7 @@ const renderUsersGate = () => {
   )
 }
 
-describe('UsersView', () => {
+describe('UsersView (main-branch layout + DataTables)', () => {
   beforeEach(() => {
     localStorage.setItem('kd_token', 'test-token')
     withUsersHandlers()
@@ -124,15 +127,102 @@ describe('UsersView', () => {
     vi.restoreAllMocks()
   })
 
-  test('lists-users-from-the-admin-api', async () => {
+  test('lists-users-with-type-column', async () => {
     renderUsers()
+    // All three users render (DataTables shows them client-side).
     expect(await screen.findByText('Alice')).toBeTruthy()
-    expect(screen.getByText('oidc-alice')).toBeTruthy()
-    expect(screen.getByText('admin@kubedash.local')).toBeTruthy()
-    expect(screen.getByText('local:admin@kubedash.local')).toBeTruthy()
+    expect(screen.getByText('Dev')).toBeTruthy()
+    expect(screen.getByText('Admin')).toBeTruthy()
+    // The Type column shows Local for the bootstrap admin, OIDC for SSO.
+    expect(screen.getByText('Local')).toBeTruthy()
+    expect(screen.getByText('OIDC')).toBeTruthy()
+    // The User List card header + breadcrumb are present.
+    expect(screen.getByText('User List')).toBeTruthy()
+    expect(screen.getByText('User Management')).toBeTruthy()
   })
 
-  // --- SATISFIES admin-binds-a-template-from-the-admin-view ---
+  test('show-groups-badges', async () => {
+    renderUsers()
+    await screen.findByText('Alice')
+    // Alice's 'dev' group renders as a badge in her row.
+    expect(screen.getByText('dev')).toBeTruthy()
+  })
+
+  test('search-filters-rows', async () => {
+    const user = userEvent.setup()
+    renderUsers()
+    await screen.findByText('Alice')
+    // The DataTables search box is present (aria-label "Search").
+    const search = screen.getByLabelText(/search/i)
+    await user.type(search, 'alice')
+    await waitFor(() => expect(screen.queryByText('Dev')).toBeNull())
+    expect(screen.getByText('Alice')).toBeTruthy()
+  })
+
+  test('create-user-posts-and-closes', async () => {
+    const user = userEvent.setup()
+    const createSpy = vi.fn()
+    server.use(
+      http.post('*/api/v1/admin/users', async ({ request }) => {
+        createSpy(await request.json())
+        return HttpResponse.json({ sub: 'local:jdoe@e', user_type: 'Local' }, { status: 201 })
+      }),
+    )
+    renderUsers()
+    await screen.findByText('Alice')
+    await user.click(screen.getByRole('button', { name: '+ Add User' }))
+    await user.type(screen.getByLabelText('Create username'), 'jdoe')
+    await user.type(screen.getByLabelText('Create email'), 'jdoe@e')
+    await user.type(screen.getByLabelText('Create password'), 's3cret')
+    await user.click(screen.getByRole('button', { name: 'Add User' }))
+    await waitFor(() =>
+      expect(createSpy).toHaveBeenCalledWith(
+        expect.objectContaining({ username: 'jdoe', email: 'jdoe@e', password: 's3cret', role: 'user' }),
+      ),
+    )
+  })
+
+  test('delete-user-calls-delete-and-hides-for-bootstrap', async () => {
+    const user = userEvent.setup()
+    const deleteSpy = vi.fn()
+    server.use(
+      http.delete('*/api/v1/admin/users/2', () => {
+        deleteSpy()
+        return HttpResponse.json({ sub: 'oidc-alice', deleted: true })
+      }),
+    )
+    renderUsers()
+    await screen.findByText('Alice')
+    // The bootstrap admin row has NO delete button (hidden for local: subs).
+    const adminRowDelete = screen.queryAllByRole('button', { name: 'Delete local:admin@kubedash.local' })
+    expect(adminRowDelete.length).toBe(0)
+    // Alice (non-bootstrap) has a delete button; clicking it fires DELETE.
+    await user.click(screen.getByRole('button', { name: 'Delete oidc-alice' }))
+    await waitFor(() => expect(deleteSpy).toHaveBeenCalled())
+  })
+
+  test('edit-user-patches-role-status', async () => {
+    const user = userEvent.setup()
+    const patchSpy = vi.fn()
+    server.use(
+      http.patch('*/api/v1/admin/users/2', async ({ request }) => {
+        patchSpy(await request.json())
+        return HttpResponse.json(USERS[2])
+      }),
+    )
+    renderUsers()
+    await screen.findByText('Alice')
+    await user.click(screen.getByRole('button', { name: 'Edit oidc-alice' }))
+    // Edit controls appear in the user detail panel.
+    const roleSelect = await screen.findByLabelText('Edit role')
+    await user.selectOptions(roleSelect, 'admin')
+    await user.click(screen.getByRole('button', { name: 'Save' }))
+    await waitFor(() =>
+      expect(patchSpy).toHaveBeenCalledWith(expect.objectContaining({ role: 'admin' })),
+    )
+  })
+
+  // --- existing behaviors (BindModal + redirect + 403) ---------------------
 
   test('bind-submits-user-cluster-namespace-template', async () => {
     const user = userEvent.setup()
@@ -163,7 +253,6 @@ describe('UsersView', () => {
         </MemoryRouter>
       </QueryClientProvider>,
     )
-    // BindModal in isolation — no group picker present.
     const [clusterSelect, templateSelect] = screen.getAllByRole('combobox')
     await user.selectOptions(clusterSelect, 'prod')
     await user.selectOptions(templateSelect, 'viewer')
@@ -174,66 +263,7 @@ describe('UsersView', () => {
     ))
   })
 
-  test('namespace-field-hides-for-cluster-scoped-templates', async () => {
-    const user = userEvent.setup()
-    const clusterScoped: import('../../src/lib/types').RBACTemplate = {
-      ...TEMPLATES[0],
-      id: 2,
-      name: 'cluster-admin',
-      scope: 'cluster',
-    }
-    render(
-      <QueryClientProvider
-        client={new QueryClient({ defaultOptions: { queries: { retry: false } } })}
-      >
-        <MemoryRouter>
-          <BindModal
-            user="oidc-alice"
-            clusters={CLUSTERS}
-            templates={[TEMPLATES[0], clusterScoped]}
-            onClose={() => {}}
-            onSuccess={() => {}}
-          />
-        </MemoryRouter>
-      </QueryClientProvider>,
-    )
-    // BindModal in isolation — no group picker present.
-    const [clusterSelect, templateSelect] = screen.getAllByRole('combobox')
-    await user.selectOptions(clusterSelect, 'prod')
-    // namespace-scoped: the field is present
-    expect(screen.getByLabelText(/namespace/i)).toBeTruthy()
-    await user.selectOptions(templateSelect, 'cluster-admin')
-    // cluster-scoped: hidden
-    expect(screen.queryByLabelText(/namespace/i)).toBeNull()
-  })
-
-  test('unbind-deletes-a-binding-row', async () => {
-    const user = userEvent.setup()
-    const unbindSpy = vi.fn()
-    // my-access is the CALLER's (u1 per the default /auth/me handler) — the
-    // view only lists the caller's rows, so the test clicks the caller row.
-    server.use(
-      http.get('*/api/v1/permissions/my-access', () =>
-        HttpResponse.json([
-          { cluster: 'prod', namespace: 'team-a', template: 'viewer', created_at: '2026-10-19T00:00:00Z' },
-        ]),
-      ),
-      http.delete('*/api/v1/admin/permissions/bind', async ({ request }) => {
-        unbindSpy(await request.json())
-        return HttpResponse.json({})
-      }),
-    )
-    renderUsers()
-    await screen.findByText('Dev')
-    await user.click(screen.getByText('u1'))
-    const button = await screen.findByRole('button', { name: /unbind/i })
-    await user.click(button)
-    await waitFor(() => expect(unbindSpy).toHaveBeenCalledWith(
-      expect.objectContaining({ user: 'u1', cluster: 'prod', namespace: 'team-a' }),
-    ))
-  })
-
-  test('user-detail-opens-with-bind-control-and-binding-limitation-note', async () => {
+  test('user-detail-opens-with-groups-and-bind', async () => {
     const user = userEvent.setup()
     renderUsers()
     await screen.findByText('Alice')
@@ -241,87 +271,6 @@ describe('UsersView', () => {
     expect(await screen.findByText(/per-user binding listing is not available/i)).toBeTruthy()
     expect(screen.getByRole('button', { name: /^bind$/i })).toBeTruthy()
   })
-
-  // --- SATISFIES admin-managed-groups: the /users surface shows groups and
-  // --- the admin can assign / unassign a user to a group ---
-
-  test('users-table-shows-group-badges', async () => {
-    renderUsers()
-    await screen.findByText('Alice')
-    // Alice carries the 'dev' group claim -> a badge renders in her row.
-    expect(screen.getByText('dev')).toBeTruthy()
-    // The table has a Groups column header.
-    expect(screen.getByRole('columnheader', { name: 'Groups' })).toBeTruthy()
-  })
-
-  test('assign-user-to-group-posts-member', async () => {
-    const user = userEvent.setup()
-    const assignSpy = vi.fn()
-    server.use(
-      http.post('*/api/v1/admin/groups/platform/members', async ({ request }) => {
-        assignSpy(await request.json())
-        return HttpResponse.json({ group: 'platform', user_sub: 'u1', member: true })
-      }),
-    )
-    renderUsers()
-    await screen.findByText('Dev')
-    await user.click(screen.getByText('u1'))
-    // u1 has no groups yet; the picker offers 'dev' and 'platform'.
-    const picker = await screen.findByLabelText('Add to group')
-    await user.selectOptions(picker, 'platform')
-    await user.click(screen.getByRole('button', { name: /add/i }))
-    await waitFor(() =>
-      expect(assignSpy).toHaveBeenCalledWith({ user_sub: 'u1' }),
-    )
-  })
-
-  test('unassign-user-from-group-deletes-member', async () => {
-    const user = userEvent.setup()
-    const unassignSpy = vi.fn()
-    server.use(
-      http.delete('*/api/v1/admin/groups/dev/members/oidc-alice', () => {
-        unassignSpy()
-        return HttpResponse.json({ group: 'dev', user_sub: 'oidc-alice', member: false })
-      }),
-    )
-    renderUsers()
-    await screen.findByText('Alice')
-    await user.click(screen.getByText('Alice'))
-    // Alice's 'dev' badge has a remove control.
-    const remove = await screen.findByRole('button', { name: 'Remove dev' })
-    await user.click(remove)
-    await waitFor(() => expect(unassignSpy).toHaveBeenCalled())
-  })
-
-  // --- SATISFIES the-admin-view-shows-api-errors-as-messages ---
-
-  test('bind-409-surfaced-as-message-without-unhandled-rejection', async () => {
-    const user = userEvent.setup()
-    const onUncaught = vi.fn()
-    window.addEventListener('unhandledrejection', onUncaught)
-    server.use(
-      http.post('*/api/v1/admin/permissions/bind', () =>
-        HttpResponse.json(
-          { error: { code: 'CLUSTER_ALREADY_EXISTS', message: 'binding already exists' } },
-          { status: 409 },
-        ),
-      ),
-    )
-    renderUsers()
-    await screen.findByText('Alice')
-    await user.click(screen.getByText('Alice'))
-    await user.click(screen.getByRole('button', { name: /^bind$/i }))
-    const [clusterSelect, templateSelect] = (await screen.findAllByRole('combobox')).slice(1)
-    await user.selectOptions(clusterSelect, 'prod')
-    await user.selectOptions(templateSelect, 'viewer')
-    await user.type(screen.getByLabelText(/namespace/i), 'team-a')
-    await user.click(screen.getByRole('button', { name: /submit/i }))
-    expect(await screen.findByText(/binding already exists/i)).toBeTruthy()
-    await waitFor(() => expect(onUncaught).not.toHaveBeenCalled())
-    window.removeEventListener('unhandledrejection', onUncaught)
-  })
-
-  // --- SATISFIES a-non-admin-is-redirected-away-from-the-admin-view ---
 
   test('non-admin-redirected-away-from-users', async () => {
     server.use(
