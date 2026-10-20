@@ -99,7 +99,15 @@ helm template t charts/kubedash > /dev/null
 task dev-up / dev-down / dev-logs / dev-ps
 task dev-clean   # destructive: deletes data volumes
 task db-shell    # psql; SELECT * FROM leader_lease to observe leadership
+task db-migrate  # apply Alembic migrations to the dev DB (flask db upgrade; idempotent)
 ```
+
+The dev DB is **migration-managed**: `task dev-stack` applies the Alembic
+migrations (the same path prod uses) instead of a `create_all` shortcut —
+a fresh stack boots at head with the built-in RBAC templates seeded, and a
+legacy `create_all`-era dev DB (no `alembic_version` table) is healed via
+`stamp <base>` + `upgrade` (data preserved). Never hand-edit the dev DB's
+schema — migrations are the source of truth.
 
 Multi-instance leader-election testing:
 
