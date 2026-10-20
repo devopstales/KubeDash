@@ -126,6 +126,7 @@ aliases per ARCHITECTURE.md §3.8).
 | `KUBEDASH_OIDC_CLIENT_ID` / `_CLIENT_SECRET` / `_ISSUER` | OIDC SSO config |
 | `KUBEDASH_BOOTSTRAP_ADMIN_EMAIL` / `_PASSWORD` | bootstrap local-admin — both set enables local login (ADR-0021) |
 | `KUBEDASH_ADMIN_KUBECONFIG` | kubeconfig path for the admin cluster; empty = in-cluster (ADR-0021) |
+| `KUBEDASH_PLUGIN_SERVER` | optional; server URL for the exec-plugin kubeconfig (`GET /kubeconfig`); empty → 500 INTERNAL_ERROR on download (ADR-0011/0013) |
 | `KUBEDASH_STATIC_DIR` | built SPA location (`/app/static` in the image) |
 | `FLASK_RUN_PORT` | dev server port (default 8080) |
 
