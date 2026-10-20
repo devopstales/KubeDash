@@ -95,6 +95,12 @@ export interface AdminUser {
   last_login_at: string | null
 }
 
+/** A row of GET /api/v1/admin/groups (group → member_count). */
+export interface GroupOut {
+  group: string
+  member_count: number
+}
+
 /** One {api_groups, resources, verbs} row of an RBAC template (R2). */
 export interface RoleRule {
   api_groups: string[]

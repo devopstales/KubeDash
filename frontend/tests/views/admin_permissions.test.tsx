@@ -1,22 +1,18 @@
 import { fireEvent, render, screen, waitFor } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query'
-import { MemoryRouter, Routes, Route, Navigate } from 'react-router-dom'
+import { MemoryRouter, Routes, Route } from 'react-router-dom'
 import { afterEach, beforeEach, describe, expect, test, vi } from 'vitest'
 import { server } from '../msw'
 import { http, HttpResponse } from 'msw'
 import AdminPermissionsView from '../../src/views/AdminPermissions'
-import BindModal from '../../src/views/AdminPermissions/components/BindModal'
 import TemplateEditor from '../../src/views/AdminPermissions/components/TemplateEditor'
 import { AdminRoute } from '../../src/routes'
 
 // ponytail: the default MSW server already serves role:admin for /auth/me;
-// the non-admin redirect test swaps it via server.use.
-
-const CLUSTERS = [
-  { id: 1, name: 'prod', api_server: 'https://api.prod', context: 'kubedash-prod', status: 'ok', source: 'registry' },
-  { id: 2, name: 'staging', api_server: 'https://api.stg', context: 'kubedash-staging', status: 'ok', source: 'registry' },
-]
+// the non-admin redirect test swaps it via server.use. The Users behaviors
+// (list / bind / unbind / 409 / 403 / non-admin redirect) live in
+// tests/views/users.test.tsx after the view moved to /users.
 
 const TEMPLATES: import('../../src/lib/types').RBACTemplate[] = [
   {
@@ -51,42 +47,6 @@ const TEMPLATES: import('../../src/lib/types').RBACTemplate[] = [
   },
 ]
 
-const USERS = [
-  {
-    id: 1,
-    sub: 'u1',
-    email: 'dev@kubedash.local',
-    display_name: 'Dev',
-    groups: [],
-    role: 'admin',
-    status: 'active',
-    cluster_count: 1,
-    last_login_at: '2026-10-19T08:00:00Z',
-  },
-  {
-    id: 0,
-    sub: 'local:admin@kubedash.local',
-    email: 'admin@kubedash.local',
-    display_name: 'Admin',
-    groups: [],
-    role: 'admin',
-    status: 'active',
-    cluster_count: 2,
-    last_login_at: '2026-10-19T08:00:00Z',
-  },
-  {
-    id: 2,
-    sub: 'oidc-alice',
-    email: 'alice@example.com',
-    display_name: 'Alice',
-    groups: [],
-    role: 'user',
-    status: 'active',
-    cluster_count: 1,
-    last_login_at: '2026-10-18T09:00:00Z',
-  },
-]
-
 // The admin view reads /audit, which is a confirmed 501 stub on the backend.
 // ponytail: HttpResponse instances are one-shot in MSW — a factory keeps
 // each test's fetch getting a fresh response.
@@ -98,9 +58,7 @@ const audit501 = () =>
 
 const withAdminHandlers = () =>
   server.use(
-    http.get('*/api/v1/admin/users', () => HttpResponse.json(USERS)),
     http.get('*/api/v1/admin/permissions/templates', () => HttpResponse.json(TEMPLATES)),
-    http.get('*/api/v1/clusters', () => HttpResponse.json({ items: CLUSTERS })),
     http.get('*/api/v1/audit', () => audit501()),
   )
 
@@ -139,7 +97,7 @@ const renderGate = (initialEntry = '/admin/permissions') => {
   )
 }
 
-describe('AdminPermissionsView', () => {
+describe('AdminPermissionsView (templates + audit)', () => {
   beforeEach(() => {
     localStorage.setItem('kd_token', 'test-token')
     withAdminHandlers()
@@ -149,142 +107,23 @@ describe('AdminPermissionsView', () => {
     vi.restoreAllMocks()
   })
 
-  // --- SATISFIES admin-binds-a-template-from-the-admin-view ---
-
-  test('users-tab-lists-users-from-the-admin-api', async () => {
+  test('templates-tab-lists-templates', async () => {
     renderAdmin()
-    expect(await screen.findByText('Alice')).toBeTruthy()
-    expect(screen.getByText('oidc-alice')).toBeTruthy()
-    expect(screen.getByText('admin@kubedash.local')).toBeTruthy()
-    expect(screen.getByText('local:admin@kubedash.local')).toBeTruthy()
+    expect(await screen.findByText('viewer')).toBeTruthy()
+    expect(screen.getByText('cluster-admin')).toBeTruthy()
+    expect(screen.getByText('pod-reader')).toBeTruthy()
+    // built-in rows are marked
+    expect(screen.getAllByText('builtin').length).toBeGreaterThanOrEqual(2)
   })
 
-  test('bind-submits-user-cluster-namespace-template', async () => {
-    const user = userEvent.setup()
-    const bindSpy = vi.fn()
-    server.use(
-      http.post('*/api/v1/admin/permissions/bind', async ({ request }) => {
-        bindSpy(await request.json())
-        return HttpResponse.json({
-          cluster: 'prod',
-          namespace: 'team-a',
-          template: 'viewer',
-          created_at: '2026-10-19T00:00:00Z',
-        })
-      }),
-    )
-    render(
-      <QueryClientProvider
-        client={new QueryClient({ defaultOptions: { queries: { retry: false } } })}
-      >
-        <MemoryRouter>
-          <BindModal
-            user="oidc-alice"
-            clusters={CLUSTERS}
-            templates={TEMPLATES}
-            onClose={() => {}}
-            onSuccess={() => {}}
-          />
-        </MemoryRouter>
-      </QueryClientProvider>,
-    )
-    const [clusterSelect, templateSelect] = screen.getAllByRole('combobox')
-    await user.selectOptions(clusterSelect, 'prod')
-    await user.selectOptions(templateSelect, 'viewer')
-    await user.type(screen.getByLabelText(/namespace/i), 'team-a')
-    await user.click(screen.getByRole('button', { name: /submit/i }))
-    await waitFor(() => expect(bindSpy).toHaveBeenCalledWith(
-      expect.objectContaining({ user: 'oidc-alice', cluster: 'prod', namespace: 'team-a', template: 'viewer' }),
-    ))
-  })
-
-  test('namespace-field-hides-for-cluster-scoped-templates', async () => {
-    const user = userEvent.setup()
-    render(
-      <QueryClientProvider
-        client={new QueryClient({ defaultOptions: { queries: { retry: false } } })}
-      >
-        <MemoryRouter>
-          <BindModal
-            user="oidc-alice"
-            clusters={CLUSTERS}
-            templates={TEMPLATES}
-            onClose={() => {}}
-            onSuccess={() => {}}
-          />
-        </MemoryRouter>
-      </QueryClientProvider>,
-    )
-    const [clusterSelect, templateSelect] = screen.getAllByRole('combobox')
-    await user.selectOptions(clusterSelect, 'prod')
-    // namespace-scoped: the field is present
-    expect(screen.getByLabelText(/namespace/i)).toBeTruthy()
-    await user.selectOptions(templateSelect, 'cluster-admin')
-    // cluster-scoped: hidden
-    expect(screen.queryByLabelText(/namespace/i)).toBeNull()
-  })
-
-  test('unbind-deletes-a-binding-row', async () => {
-    const user = userEvent.setup()
-    const unbindSpy = vi.fn()
-    // my-access is the CALLER's (u1 per the default /auth/me handler) — the
-    // view only lists the caller's rows, so the test clicks the caller row.
-    server.use(
-      http.get('*/api/v1/permissions/my-access', () =>
-        HttpResponse.json([
-          { cluster: 'prod', namespace: 'team-a', template: 'viewer', created_at: '2026-10-19T00:00:00Z' },
-        ]),
-      ),
-      http.delete('*/api/v1/admin/permissions/bind', async ({ request }) => {
-        unbindSpy(await request.json())
-        return HttpResponse.json({})
-      }),
-    )
+  test('audit-tab-renders-empty-state-on-501', async () => {
     renderAdmin()
-    await screen.findByText('Alice')
-    await user.click(screen.getByText('u1'))
-    const button = await screen.findByRole('button', { name: /unbind/i })
-    await user.click(button)
-    await waitFor(() => expect(unbindSpy).toHaveBeenCalledWith(
-      expect.objectContaining({ user: 'u1', cluster: 'prod', namespace: 'team-a' }),
-    ))
-  })
-
-  test('user-detail-opens-with-bind-control-and-binding-limitation-note', async () => {
-    const user = userEvent.setup()
-    renderAdmin()
-    await screen.findByText('Alice')
-    await user.click(screen.getByText('Alice'))
-    expect(await screen.findByText(/per-user binding listing is not available/i)).toBeTruthy()
-    expect(screen.getByRole('button', { name: /^bind$/i })).toBeTruthy()
-  })
-
-  // --- SATISFIES the-admin-view-shows-api-errors-as-messages ---
-
-  test('bind-409-surfaced-as-message-without-unhandled-rejection', async () => {
-    const user = userEvent.setup()
-    const onUncaught = vi.fn()
-    window.addEventListener('unhandledrejection', onUncaught)
-    server.use(
-      http.post('*/api/v1/admin/permissions/bind', () =>
-        HttpResponse.json(
-          { error: { code: 'CLUSTER_ALREADY_EXISTS', message: 'binding already exists' } },
-          { status: 409 },
-        ),
-      ),
-    )
-    renderAdmin()
-    await screen.findByText('Alice')
-    await user.click(screen.getByText('Alice'))
-    await user.click(screen.getByRole('button', { name: /^bind$/i }))
-    const [clusterSelect, templateSelect] = await screen.findAllByRole('combobox')
-    await user.selectOptions(clusterSelect, 'prod')
-    await user.selectOptions(templateSelect, 'viewer')
-    await user.type(screen.getByLabelText(/namespace/i), 'team-a')
-    await user.click(screen.getByRole('button', { name: /submit/i }))
-    expect(await screen.findByText(/binding already exists/i)).toBeTruthy()
-    await waitFor(() => expect(onUncaught).not.toHaveBeenCalled())
-    window.removeEventListener('unhandledrejection', onUncaught)
+    await screen.findByText('viewer')
+    // ponytail: CButton's role/active props don't compose cleanly with
+    // userEvent in jsdom — use fireEvent.click for the tab switch.
+    const auditTab = screen.getByText('Audit', { selector: 'button' })
+    fireEvent.click(auditTab)
+    expect(await screen.findByText(/audit log not available/i)).toBeTruthy()
   })
 
   // --- SATISFIES a-non-admin-is-redirected-away-from-the-admin-view ---
@@ -303,43 +142,6 @@ describe('AdminPermissionsView', () => {
     )
     renderGate()
     expect(await screen.findByText('Home page')).toBeTruthy()
-    expect(screen.queryByText(/users/i, { selector: '.c-tabs' })).toBeNull()
-  })
-
-  // --- SATISFIES the-admin-view-shows-api-errors-as-messages ---
-
-  test('users-tab-403-surfaced-as-text-danger', async () => {
-    server.use(
-      http.get('*/api/v1/admin/users', () =>
-        HttpResponse.json({ error: { code: 'RBAC_DENIED', message: 'admin role required' } }, { status: 403 }),
-      ),
-    )
-    renderAdmin()
-    expect(await screen.findByText(/admin role required/i, { selector: '.text-danger' })).toBeTruthy()
-  })
-
-  test('templates-tab-lists-templates', async () => {
-    const user = userEvent.setup()
-    renderAdmin()
-    await screen.findByText('Alice')
-    const templatesTab = screen.getByText('Templates', { selector: 'button' })
-    await user.click(templatesTab)
-    expect(await screen.findByText('viewer')).toBeTruthy()
-    expect(screen.getByText('cluster-admin')).toBeTruthy()
-    expect(screen.getByText('pod-reader')).toBeTruthy()
-    // built-in rows are marked
-    expect(screen.getAllByText('builtin').length).toBeGreaterThanOrEqual(2)
-  })
-
-  test('audit-tab-renders-empty-state-on-501', async () => {
-    const user = userEvent.setup()
-    renderAdmin()
-    await screen.findByText('Alice')
-    // ponytail: CButton's role/active props don't compose cleanly with
-    // userEvent in jsdom — use fireEvent.click for the tab switch.
-    const auditTab = screen.getByText('Audit', { selector: 'button' })
-    fireEvent.click(auditTab)
-    expect(await screen.findByText(/audit log not available/i)).toBeTruthy()
   })
 })
 

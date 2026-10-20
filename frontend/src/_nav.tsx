@@ -1,7 +1,7 @@
 import React from 'react'
 import { CNavItem, CNavTitle } from '@coreui/react'
 import CIcon from '@coreui/icons-react'
-import { cilLayers, cilList, cilShieldAlt, cilUserFollow } from '@coreui/icons'
+import { cilLayers, cilList, cilShieldAlt, cilUser, cilUserFollow } from '@coreui/icons'
 
 /**
  * Sidebar navigation for the KubeDash SPA shell. The template's demo nav
@@ -34,9 +34,27 @@ const _nav = [
   },
   {
     component: CNavItem,
-    name: 'Admin permissions',
-    to: '/admin/permissions',
+    name: 'Users',
+    to: '/users',
+    icon: <CIcon icon={cilUser} customClassName="nav-icon" />,
+    // ponytail: the ROUTE gate (AdminRoute in routes.tsx) is the real
+    // admin control — the nav entry is always rendered; a non-admin who
+    // clicks it lands on the redirect to /.
+  },
+  {
+    component: CNavItem,
+    name: 'Groups',
+    to: '/groups',
     icon: <CIcon icon={cilUserFollow} customClassName="nav-icon" />,
+    // ponytail: the ROUTE gate (AdminRoute in routes.tsx) is the real
+    // admin control — the nav entry is always rendered; a non-admin who
+    // clicks it lands on the redirect to /.
+  },
+  {
+    component: CNavItem,
+    name: 'Templates & Audit',
+    to: '/admin/permissions',
+    icon: <CIcon icon={cilList} customClassName="nav-icon" />,
     // ponytail: the ROUTE gate (AdminRoute in routes.tsx) is the real
     // admin control — the nav entry is always rendered; a non-admin who
     // clicks it lands on the redirect to /.

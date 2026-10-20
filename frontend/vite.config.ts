@@ -40,10 +40,20 @@ export default defineConfig({
   server: {
     port: 3000,
   },
+  // ponytail: the `as` cast — vitest 4's `defineConfig` generic doesn't
+  // expose the vitest-inline options (maxWorkers) at the plain-object
+  // literal position; runtime keys are the standard vitest 4 schema.
   test: {
     environment: 'jsdom',
     globals: true,
     setupFiles: [path.resolve(rootDir, 'tests/setup.ts')],
     include: ['tests/**/*.{test,spec}.{ts,tsx}'],
-  },
+    // ponytail: jsdom + userEvent typing tests are slow under the default
+    // parallel pool on small machines — a flaky full-suite run (timeouts in
+    // TemplateEditor / BindModal tests) showed the flakes are load-related,
+    // not logic-related (the same tests pass in isolation and most full
+    // runs). Cap concurrency at 2 (vitest 4 top-level option; the old
+    // test.poolOptions.threads was removed in 4).
+    maxWorkers: 2,
+  } as Record<string, unknown>,
 })

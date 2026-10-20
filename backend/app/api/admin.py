@@ -82,6 +82,28 @@ class AdminApi(Api):
         items = [_out(u, counts.get(u.id, 0)) for u in users]
         return jsonify(items), 200
 
+    @blp.route("/admin/groups", methods=["GET"])
+    @blp.doc(responses={
+        200: ("Every distinct user group with its member count (GroupOut items).", None),
+        403: "RBAC_DENIED",
+    })
+    def list_groups(self) -> object:
+        """Group → member_count for the /groups admin view.
+
+        Dialect-portable (the api unit tier is sqlite, prod is PG): the
+        groups JSONB array is aggregated in Python — ``jsonb_array_elements
+        text`` has no sqlite equivalent, and the users table is small
+        (one row per logged-in identity). Sorted by group name."""
+        require_admin()
+        counts: dict[str, int] = {}
+        for groups in db.session.execute(db.select(User.groups)).scalars():
+            for name in set(groups or []):
+                counts[name] = counts.get(name, 0) + 1
+        return jsonify([
+            {"group": name, "member_count": counts[name]}
+            for name in sorted(counts)
+        ]), 200
+
     @blp.route("/admin/users/<int:user_id>", methods=["PATCH"])
     @blp.arguments(UserPatch)
     @blp.response(200, UserOut)
