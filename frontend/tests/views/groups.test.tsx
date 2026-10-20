@@ -120,7 +120,7 @@ describe('GroupsView', () => {
       http.get('*/api/v1/admin/groups', () => HttpResponse.json([])),
     )
     renderGroups()
-    expect(await screen.findByText('No groups.')).toBeTruthy()
+    expect(await screen.findByText(/No groups/)).toBeTruthy()
   })
 
   test('non-admin-redirected-away-from-groups', async () => {
@@ -137,5 +137,44 @@ describe('GroupsView', () => {
     )
     renderGroupsGate()
     expect(await screen.findByText('Home page')).toBeTruthy()
+  })
+
+  test('create-group-posts-and-refetches', async () => {
+    const user = userEvent.setup()
+    let posted = false
+    server.use(
+      http.post('*/api/v1/admin/groups', async ({ request }) => {
+        const body = (await request.json()) as { name: string }
+        expect(body.name).toBe('sre')
+        posted = true
+        return HttpResponse.json({ id: 9, name: 'sre', member_count: 0 }, { status: 201 })
+      }),
+      http.get('*/api/v1/admin/groups', () =>
+        HttpResponse.json([...GROUPS, { group: 'sre', member_count: 0 }]),
+      ),
+    )
+    renderGroups()
+    await screen.findByText('dev')
+    await user.type(screen.getByLabelText('New group name'), 'sre')
+    await user.click(screen.getByRole('button', { name: 'Add group' }))
+    expect(posted).toBe(true)
+    expect(await screen.findByText('sre')).toBeTruthy()
+  })
+
+  test('create-group-duplicate-409-surfaces-error', async () => {
+    const user = userEvent.setup()
+    server.use(
+      http.post('*/api/v1/admin/groups', () =>
+        HttpResponse.json(
+          { error: { code: 'CLUSTER_ALREADY_EXISTS', message: "group 'dev' already exists" } },
+          { status: 409 },
+        ),
+      ),
+    )
+    renderGroups()
+    await screen.findByText('dev')
+    await user.type(screen.getByLabelText('New group name'), 'dev')
+    await user.click(screen.getByRole('button', { name: 'Add group' }))
+    expect(await screen.findByText(/CLUSTER_ALREADY_EXISTS/)).toBeTruthy()
   })
 })

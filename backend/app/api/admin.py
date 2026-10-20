@@ -15,22 +15,53 @@ from flask import g, jsonify
 from flask_smorest import Api, Blueprint
 
 from app.api._authhook import apply_auth
-from app.core.errors import ClusterAlreadyExistsError, InvalidKubeconfigError
+from app.core.errors import (
+    ClusterAlreadyExistsError,
+    InvalidKubeconfigError,
+    ResourceKindNotSupportedError,
+)
 from app.core.security import require_admin
 from app.extensions import db
 from app.models.audit import AuditLog
 from app.models.binding import ClusterBinding
+from app.models.group import Group, UserGroup
 from app.models.user import User
-from app.schemas.permissions import UserOut, UserPatch
+from app.schemas.permissions import (
+    GroupIn,
+    GroupMemberIn,
+    UserOut,
+    UserPatch,
+)
 
 
-def _out(u: User, cluster_count: int) -> dict[str, object]:
+def _stored_groups_by_user() -> dict[str, set[str]]:
+    """user sub -> set of group names assigned via the admin UI (TASK-026).
+    Dialect-portable (sqlite api tier + PG): one JOIN, no JSONB ops — the
+    users table is small (one row per logged-in identity)."""
+    rows = db.session.execute(
+        db.select(User.sub, Group.name)
+        .join(UserGroup, UserGroup.user_id == User.id)
+        .join(Group, Group.id == UserGroup.group_id)
+    )
+    out: dict[str, set[str]] = {}
+    for sub, name in rows:
+        out.setdefault(sub, set()).add(name)
+    return out
+
+
+def _effective_groups(claim: list[str] | None, stored: set[str]) -> list[str]:
+    """A user's groups = the OIDC claim ∪ stored memberships, deduped and
+    sorted (TASK-026)."""
+    return sorted(set(claim or []) | stored)
+
+
+def _out(u: User, cluster_count: int, stored: dict[str, set[str]]) -> dict[str, object]:
     return {
         "id": u.id,
         "sub": u.sub,
         "email": u.email,
         "display_name": u.display_name,
-        "groups": list(u.groups or []),
+        "groups": _effective_groups(u.groups, stored.get(u.sub, set())),
         "role": u.role,
         "status": u.status,
         "cluster_count": cluster_count,
@@ -78,31 +109,168 @@ class AdminApi(Api):
                 .group_by(ClusterBinding.user_id)
             )
         }
+        stored = _stored_groups_by_user()
         users = db.session.execute(db.select(User).order_by(User.id)).scalars().all()
-        items = [_out(u, counts.get(u.id, 0)) for u in users]
+        items = [_out(u, counts.get(u.id, 0), stored) for u in users]
         return jsonify(items), 200
 
     @blp.route("/admin/groups", methods=["GET"])
     @blp.doc(responses={
-        200: ("Every distinct user group with its member count (GroupOut items).", None),
+        200: ("Every group (stored rows ∪ OIDC-claim groups) with its member count.", None),
         403: "RBAC_DENIED",
     })
     def list_groups(self) -> object:
-        """Group → member_count for the /groups admin view.
+        """Group → member_count for the /groups admin view (TASK-026).
 
-        Dialect-portable (the api unit tier is sqlite, prod is PG): the
-        groups JSONB array is aggregated in Python — ``jsonb_array_elements
-        text`` has no sqlite equivalent, and the users table is small
-        (one row per logged-in identity). Sorted by group name."""
+        Groups come from TWO sources, merged: stored ``groups`` rows (admin-
+        managed) and the OIDC ``groups`` claim on each user. ``member_count``
+        is the number of DISTINCT users having that group via EITHER source
+        (a user with the group both ways counts once). Dialect-portable
+        (sqlite api tier + PG): the claim JSONB array is aggregated in
+        Python — ``jsonb_array_elements`` has no sqlite equivalent, and the
+        users table is small. Sorted by group name."""
         require_admin()
+        stored = _stored_groups_by_user()
+        per_user: dict[str, set[str]] = {}
+        for u in db.session.execute(db.select(User.sub, User.groups)).all():
+            per_user[u[0]] = set(u[1] or []) | stored.get(u[0], set())
         counts: dict[str, int] = {}
-        for groups in db.session.execute(db.select(User.groups)).scalars():
-            for name in set(groups or []):
+        for names in per_user.values():
+            for name in names:
                 counts[name] = counts.get(name, 0) + 1
         return jsonify([
             {"group": name, "member_count": counts[name]}
             for name in sorted(counts)
         ]), 200
+
+    @blp.route("/admin/groups", methods=["POST"])
+    @blp.arguments(GroupIn)
+    @blp.doc(responses={
+        201: ("The created group.", None),
+        403: "RBAC_DENIED",
+        409: "CLUSTER_ALREADY_EXISTS (name already exists)",
+        422: "INVALID_KUBECONFIG (blank name)",
+    })
+    def create_group(self, args: dict[str, object]) -> tuple[dict[str, object], int]:
+        """Create a group (TASK-026). A duplicate name is 409 with the
+        FROZEN 409 code ``CLUSTER_ALREADY_EXISTS`` (the v1 contract has no
+        group-specific 409; the message names the restriction — the same
+        pattern as the bootstrap-admin 409 in ``patch_user``)."""
+        require_admin()
+        name = str(args.get("name") or "").strip()
+        if not name:
+            raise InvalidKubeconfigError("group name must not be blank")
+        exists = db.session.execute(
+            db.select(Group).filter_by(name=name)
+        ).scalar_one_or_none()
+        if exists is not None:
+            raise ClusterAlreadyExistsError(f"group {name!r} already exists")
+        grp = Group(name=name)
+        db.session.add(grp)
+        db.session.add(AuditLog(
+            action="group.create", actor_sub=g.current_user.sub, target=name,
+        ))
+        db.session.commit()
+        return {"id": grp.id, "name": grp.name, "member_count": 0}, 201
+
+    @blp.route("/admin/groups/<name>", methods=["DELETE"])
+    @blp.doc(responses={
+        200: ("Deleted.", None),
+        403: "RBAC_DENIED",
+        404: "RESOURCE_KIND_NOT_SUPPORTED (group not found)",
+    })
+    def delete_group(self, name: str) -> dict[str, object]:
+        """Delete a group (TASK-026). Membership rows cascade (the
+        user_groups FK is ondelete=CASCADE); the claim-derived presence of
+        the name in other users' groups is untouched (claims live on the
+        user row, not the group row)."""
+        require_admin()
+        grp = db.session.execute(
+            db.select(Group).filter_by(name=name)
+        ).scalar_one_or_none()
+        if grp is None:
+            raise ResourceKindNotSupportedError(f"group {name!r} not found")
+        gid = grp.id
+        db.session.execute(
+            db.delete(UserGroup).where(UserGroup.group_id == gid)
+        )
+        db.session.delete(grp)
+        db.session.add(AuditLog(
+            action="group.delete", actor_sub=g.current_user.sub, target=name,
+        ))
+        db.session.commit()
+        return {"name": name, "deleted": True}
+
+    @blp.route("/admin/groups/<name>/members", methods=["POST"])
+    @blp.arguments(GroupMemberIn)
+    @blp.doc(responses={
+        200: ("Assigned (idempotent).", None),
+        403: "RBAC_DENIED",
+        404: "RESOURCE_KIND_NOT_SUPPORTED (user or group not found)",
+    })
+    def assign_member(self, args: dict[str, object], name: str) -> dict[str, object]:
+        """Assign a user to a group (TASK-026). Idempotent: a user already
+        in the group is a 200 no-op (the unique pair constraint is the
+        backstop). The decoded body is ``args`` (the smorest convention —
+        ``@blp.arguments`` passes it positionally first)."""
+        require_admin()
+        sub = str(args.get("user_sub") or "")
+        user = db.session.execute(
+            db.select(User).filter_by(sub=sub)
+        ).scalar_one_or_none()
+        if user is None:
+            raise ResourceKindNotSupportedError(f"user {sub!r} not found")
+        grp = db.session.execute(
+            db.select(Group).filter_by(name=name)
+        ).scalar_one_or_none()
+        if grp is None:
+            raise ResourceKindNotSupportedError(f"group {name!r} not found")
+        existing = db.session.execute(
+            db.select(UserGroup).filter_by(user_id=user.id, group_id=grp.id)
+        ).scalar_one_or_none()
+        if existing is None:
+            db.session.add(UserGroup(user_id=user.id, group_id=grp.id))
+            db.session.add(AuditLog(
+                action="group.assign", actor_sub=g.current_user.sub,
+                target=name,
+            ))
+            db.session.commit()
+        return {"group": name, "user_sub": sub, "member": True}
+
+    @blp.route("/admin/groups/<name>/members/<user_sub>", methods=["DELETE"])
+    @blp.doc(responses={
+        200: ("Unassigned.", None),
+        403: "RBAC_DENIED",
+        404: "RESOURCE_KIND_NOT_SUPPORTED (membership not found)",
+    })
+    def unassign_member(self, name: str, user_sub: str) -> dict[str, object]:
+        """Remove a user from a group (TASK-026). A 404 when the membership
+        row does not exist (nothing to remove)."""
+        require_admin()
+        user = db.session.execute(
+            db.select(User).filter_by(sub=user_sub)
+        ).scalar_one_or_none()
+        if user is None:
+            raise ResourceKindNotSupportedError(f"user {user_sub!r} not found")
+        grp = db.session.execute(
+            db.select(Group).filter_by(name=name)
+        ).scalar_one_or_none()
+        if grp is None:
+            raise ResourceKindNotSupportedError(f"group {name!r} not found")
+        existing = db.session.execute(
+            db.select(UserGroup).filter_by(user_id=user.id, group_id=grp.id)
+        ).scalar_one_or_none()
+        if existing is None:
+            raise ResourceKindNotSupportedError(
+                f"user {user_sub!r} is not a member of group {name!r}"
+            )
+        db.session.delete(existing)
+        db.session.add(AuditLog(
+            action="group.unassign", actor_sub=g.current_user.sub,
+            target=name,
+        ))
+        db.session.commit()
+        return {"group": name, "user_sub": user_sub, "member": False}
 
     @blp.route("/admin/users/<int:user_id>", methods=["PATCH"])
     @blp.arguments(UserPatch)
@@ -157,4 +325,4 @@ class AdminApi(Api):
             .filter_by(user_id=user.id)
             .filter(ClusterBinding.template.is_not(None))
         )
-        return _out(user, int(count or 0)), 200
+        return _out(user, int(count or 0), _stored_groups_by_user()), 200

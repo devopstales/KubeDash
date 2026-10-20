@@ -66,10 +66,16 @@ const USERS = [
   },
 ]
 
+const GROUPS = [
+  { group: 'dev', member_count: 1 },
+  { group: 'platform', member_count: 0 },
+]
+
 const withUsersHandlers = () =>
   server.use(
     http.get('*/api/v1/admin/users', () => HttpResponse.json(USERS)),
     http.get('*/api/v1/admin/permissions/templates', () => HttpResponse.json(TEMPLATES)),
+    http.get('*/api/v1/admin/groups', () => HttpResponse.json(GROUPS)),
     http.get('*/api/v1/clusters', () => HttpResponse.json({ items: CLUSTERS })),
   )
 
@@ -157,6 +163,7 @@ describe('UsersView', () => {
         </MemoryRouter>
       </QueryClientProvider>,
     )
+    // BindModal in isolation — no group picker present.
     const [clusterSelect, templateSelect] = screen.getAllByRole('combobox')
     await user.selectOptions(clusterSelect, 'prod')
     await user.selectOptions(templateSelect, 'viewer')
@@ -190,6 +197,7 @@ describe('UsersView', () => {
         </MemoryRouter>
       </QueryClientProvider>,
     )
+    // BindModal in isolation — no group picker present.
     const [clusterSelect, templateSelect] = screen.getAllByRole('combobox')
     await user.selectOptions(clusterSelect, 'prod')
     // namespace-scoped: the field is present
@@ -234,6 +242,57 @@ describe('UsersView', () => {
     expect(screen.getByRole('button', { name: /^bind$/i })).toBeTruthy()
   })
 
+  // --- SATISFIES admin-managed-groups: the /users surface shows groups and
+  // --- the admin can assign / unassign a user to a group ---
+
+  test('users-table-shows-group-badges', async () => {
+    renderUsers()
+    await screen.findByText('Alice')
+    // Alice carries the 'dev' group claim -> a badge renders in her row.
+    expect(screen.getByText('dev')).toBeTruthy()
+    // The table has a Groups column header.
+    expect(screen.getByRole('columnheader', { name: 'Groups' })).toBeTruthy()
+  })
+
+  test('assign-user-to-group-posts-member', async () => {
+    const user = userEvent.setup()
+    const assignSpy = vi.fn()
+    server.use(
+      http.post('*/api/v1/admin/groups/platform/members', async ({ request }) => {
+        assignSpy(await request.json())
+        return HttpResponse.json({ group: 'platform', user_sub: 'u1', member: true })
+      }),
+    )
+    renderUsers()
+    await screen.findByText('Dev')
+    await user.click(screen.getByText('u1'))
+    // u1 has no groups yet; the picker offers 'dev' and 'platform'.
+    const picker = await screen.findByLabelText('Add to group')
+    await user.selectOptions(picker, 'platform')
+    await user.click(screen.getByRole('button', { name: /add/i }))
+    await waitFor(() =>
+      expect(assignSpy).toHaveBeenCalledWith({ user_sub: 'u1' }),
+    )
+  })
+
+  test('unassign-user-from-group-deletes-member', async () => {
+    const user = userEvent.setup()
+    const unassignSpy = vi.fn()
+    server.use(
+      http.delete('*/api/v1/admin/groups/dev/members/oidc-alice', () => {
+        unassignSpy()
+        return HttpResponse.json({ group: 'dev', user_sub: 'oidc-alice', member: false })
+      }),
+    )
+    renderUsers()
+    await screen.findByText('Alice')
+    await user.click(screen.getByText('Alice'))
+    // Alice's 'dev' badge has a remove control.
+    const remove = await screen.findByRole('button', { name: 'Remove dev' })
+    await user.click(remove)
+    await waitFor(() => expect(unassignSpy).toHaveBeenCalled())
+  })
+
   // --- SATISFIES the-admin-view-shows-api-errors-as-messages ---
 
   test('bind-409-surfaced-as-message-without-unhandled-rejection', async () => {
@@ -252,7 +311,7 @@ describe('UsersView', () => {
     await screen.findByText('Alice')
     await user.click(screen.getByText('Alice'))
     await user.click(screen.getByRole('button', { name: /^bind$/i }))
-    const [clusterSelect, templateSelect] = await screen.findAllByRole('combobox')
+    const [clusterSelect, templateSelect] = (await screen.findAllByRole('combobox')).slice(1)
     await user.selectOptions(clusterSelect, 'prod')
     await user.selectOptions(templateSelect, 'viewer')
     await user.type(screen.getByLabelText(/namespace/i), 'team-a')

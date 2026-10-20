@@ -59,6 +59,21 @@ class TemplateOut(Schema):
     created_at = fields.DateTime(allow_none=True)
 
 
+class GroupIn(Schema):
+    """Group create body (TASK-026). A blank/whitespace name is a 422
+    INVALID_KUBECONFIG (the handler validates — marshmallow's ValidationError
+    would map to a generic 422 envelope without the stable code)."""
+
+    name = fields.String(required=True)
+
+
+class GroupMemberIn(Schema):
+    """Member assign body (TASK-026): the user's ``sub`` (the stable
+    identity; email can be None for legacy rows)."""
+
+    user_sub = fields.String(required=True)
+
+
 class BindIn(Schema):
     """Bind/Unbind body (R3/R4). ``cluster`` is the cluster NAME (resolved
     by the handler — 404 ``CLUSTER_NOT_FOUND`` if missing); ``user`` is the

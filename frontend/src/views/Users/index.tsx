@@ -1,15 +1,17 @@
 import React, { useState } from 'react'
 import {
+  CBadge,
   CButton,
   CCard,
   CCardBody,
   CCardHeader,
   CCardTitle,
+  CFormSelect,
   CTable,
 } from '@coreui/react'
 import { useQuery } from '@tanstack/react-query'
 import { apiFetch } from '../../lib/api'
-import type { AdminUser, RBACTemplate } from '../../lib/types'
+import type { AdminUser, GroupOut, RBACTemplate } from '../../lib/types'
 import { useCluster, type ClusterItem } from '../../hooks/useCluster'
 import BindModal from '../AdminPermissions/components/BindModal'
 
@@ -51,6 +53,16 @@ const UsersView = () => {
     },
   })
 
+  // The group list for the detail panel's "add to group" picker.
+  const groupsQuery = useQuery<GroupOut[]>({
+    queryKey: ['admin', 'groups'],
+    queryFn: async () => {
+      const r = await apiFetch<GroupOut[]>('/api/v1/admin/groups')
+      if (r.error) throw new Error(`${r.error.code}: ${r.error.message}`)
+      return r.data ?? []
+    },
+  })
+
   // ponytail: clusters come straight from apiFetch (same queryKey as
   // useCluster's, so the TanStack cache dedupes it with the header) — the
   // modal's picker stays decoupled from the selection-store side effect.
@@ -87,15 +99,54 @@ const UsersView = () => {
 
   const [selectedUser, setSelectedUser] = useState<AdminUser | null>(null)
   const [bindOpen, setBindOpen] = useState(false)
+  const [pickGroup, setPickGroup] = useState('')
+  const [memberError, setMemberError] = useState<string | null>(null)
 
   const closeUserDetail = () => {
     setSelectedUser(null)
     setBindOpen(false)
+    setPickGroup('')
+    setMemberError(null)
   }
 
   const onBound = () => {
     usersQuery.refetch()
     myAccessQuery.refetch()
+  }
+
+  const onGroupsChanged = () => {
+    usersQuery.refetch()
+    groupsQuery.refetch()
+  }
+
+  const assignGroup = async () => {
+    if (!selectedUser || !pickGroup) return
+    setMemberError(null)
+    const r = await apiFetch(`/api/v1/admin/groups/${encodeURIComponent(pickGroup)}/members`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ user_sub: selectedUser.sub }),
+    })
+    if (r.error) {
+      setMemberError(`${r.error.code}: ${r.error.message}`)
+      return
+    }
+    setPickGroup('')
+    onGroupsChanged()
+  }
+
+  const unassignGroup = async (groupName: string) => {
+    if (!selectedUser) return
+    setMemberError(null)
+    const r = await apiFetch(
+      `/api/v1/admin/groups/${encodeURIComponent(groupName)}/members/${encodeURIComponent(selectedUser.sub)}`,
+      { method: 'DELETE' },
+    )
+    if (r.error) {
+      setMemberError(`${r.error.code}: ${r.error.message}`)
+      return
+    }
+    onGroupsChanged()
   }
 
   if (usersQuery.isLoading) {
@@ -124,6 +175,7 @@ const UsersView = () => {
                 <th>Display name</th>
                 <th>Sub</th>
                 <th>Email</th>
+                <th>Groups</th>
                 <th>Role</th>
                 <th>Status</th>
                 <th>Clusters</th>
@@ -143,6 +195,17 @@ const UsersView = () => {
                   <td>{u.display_name ?? '—'}</td>
                   <td>{u.sub}</td>
                   <td>{u.email ?? '—'}</td>
+                  <td>
+                    {u.groups.length === 0 ? (
+                      '—'
+                    ) : (
+                      u.groups.map((gn) => (
+                        <CBadge color="secondary" className="me-1" key={gn}>
+                          {gn}
+                        </CBadge>
+                      ))
+                    )}
+                  </td>
                   <td>{u.role}</td>
                   <td>{u.status}</td>
                   <td>{u.cluster_count}</td>
@@ -240,6 +303,53 @@ const UsersView = () => {
                     the unbind surface arrives with the per-user endpoint.
                   </div>
                 )}
+
+                <div className="mt-3">
+                  <div className="mb-2">
+                    <strong>Groups:</strong>{' '}
+                    {selectedUser.groups.length === 0 ? (
+                      <span>none</span>
+                    ) : (
+                      selectedUser.groups.map((gn) => (
+                        <CBadge color="secondary" className="me-1" key={gn}>
+                          {gn}
+                          <CButton
+                            color="link"
+                            size="sm"
+                            className="px-1"
+                            aria-label={`Remove ${gn}`}
+                            onClick={() => unassignGroup(gn)}
+                          >
+                            ×
+                          </CButton>
+                        </CBadge>
+                      ))
+                    )}
+                  </div>
+                  {groupsQuery.data && groupsQuery.data.length > 0 && (
+                    <div className="d-flex gap-2">
+                      <CFormSelect
+                        value={pickGroup}
+                        aria-label="Add to group"
+                        onChange={(e) => setPickGroup(e.target.value)}
+                        style={{ maxWidth: 220 }}
+                      >
+                        <option value="">Add to group…</option>
+                        {groupsQuery.data
+                          .filter((g) => !selectedUser.groups.includes(g.group))
+                          .map((g) => (
+                            <option key={g.group} value={g.group}>
+                              {g.group}
+                            </option>
+                          ))}
+                      </CFormSelect>
+                      <CButton color="primary" disabled={!pickGroup} onClick={assignGroup}>
+                        Add
+                      </CButton>
+                    </div>
+                  )}
+                  {memberError && <div className="text-danger mt-2">{memberError}</div>}
+                </div>
 
                 <div className="mt-3 d-flex gap-2">
                   <CButton
