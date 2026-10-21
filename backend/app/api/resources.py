@@ -19,7 +19,10 @@ from app.services import rbac
 from app.services.k8s_client import LOCAL_CLUSTER_ID, bound_cluster_or_404, pool
 
 #: kind → (K8sClient method, kubernetes api resource name)
-_KINDS: dict[str, tuple[str, str]] = {"pods": ("list_pods", "pods")}
+_KINDS: dict[str, tuple[str, str]] = {
+    "pods": ("list_pods", "pods"),
+    "namespaces": ("list_namespaces", "namespaces"),
+}
 
 
 class ResourceApi(Api):

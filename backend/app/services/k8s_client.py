@@ -187,6 +187,11 @@ class K8sClient:
         )
         return [p.to_dict() for p in resp.items]
 
+    def list_namespaces(self, _namespace: str | None) -> list[dict[str, Any]]:
+        """Namespace list for the header selector. The resource route always
+        passes the query namespace; it does not apply to this cluster-scoped kind."""
+        return [n.to_dict() for n in self._v1.list_namespace().items]
+
     def readyz(self) -> bool:
         """GET ``<host>/readyz`` with the kubeconfig's CA as ``verify=`` and a
         5 s timeout; ANY failure (including timeout) returns ``False`` — the

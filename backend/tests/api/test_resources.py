@@ -36,6 +36,12 @@ class FakeK8s:
     def __init__(self, kubeconfig: bytes) -> None:
         self.kubeconfig = kubeconfig
 
+    def list_namespaces(self, namespace: str | None) -> list[dict]:
+        return [
+            {"metadata": {"name": "default"}},
+            {"metadata": {"name": "team-a"}},
+        ]
+
     def list_pods(self, namespace: str | None) -> list[dict]:
         if namespace is None:
             return [
@@ -148,6 +154,19 @@ def test_list_pods_200_with_items(api_client, auth_client, fake_k8s, monkeypatch
     assert body["cluster"] == "prod"
     names = [p["metadata"]["name"] for p in body["items"]]
     assert "kubedash-pod" in names
+
+
+def test_list_namespaces_200(api_client, auth_client, fake_k8s, monkeypatch) -> None:
+    """The header selector lists namespaces on the selected cluster."""
+    auth_client.login()
+    h = {"Authorization": f"Bearer {auth_client.jwt}"}
+    _register(api_client, h)
+    _allow_sar(monkeypatch)
+    r = api_client.get("/api/v1/clusters/1/resources/namespaces", headers=h)
+    assert r.status_code == 200
+    body = r.get_json()
+    assert body["kind"] == "namespaces"
+    assert [item["metadata"]["name"] for item in body["items"]] == ["default", "team-a"]
 
 
 def test_list_pods_namespaced(api_client, auth_client, fake_k8s, monkeypatch) -> None:
