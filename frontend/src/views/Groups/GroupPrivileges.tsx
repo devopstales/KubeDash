@@ -29,7 +29,7 @@ const GroupPrivilegesView = () => {
   const selected = useClusterStore((s) => s.selectedCluster)
   const [error, setError] = useState<string | null>(null)
 
-  const detailQuery = useQuery<GroupDetail>({
+  const detailQuery = useQuery<GroupDetail | null>({
     queryKey: ['admin', 'groups', group],
     queryFn: async () => {
       const r = await apiFetch<GroupDetail>(`/api/v1/admin/groups/${encodeURIComponent(group)}`)

@@ -17,7 +17,7 @@ import {
   CModalTitle,
 } from '@coreui/react'
 import CIcon from '@coreui/icons-react'
-import { cilPlusCircle, cilRefresh, cilUserPlus } from '@coreui/icons'
+import { cilPlus, cilSync, cilUserPlus } from '@coreui/icons'
 import { useQuery, useQueryClient } from '@tanstack/react-query'
 import { apiFetch } from '../../lib/api'
 import type { GroupRow } from '../../lib/groupTypes'
@@ -102,7 +102,7 @@ const GroupsList = () => {
           title="Add Group"
           onClick={() => setCreating(true)}
         >
-          <CIcon icon={cilPlusCircle} size="lg" />
+          <CIcon icon={cilPlus} size="lg" />
         </CButton>
       </TopMenu>
 
@@ -117,7 +117,7 @@ const GroupsList = () => {
             onClick={sync}
             disabled={busy}
           >
-            <CIcon icon={cilRefresh} className="me-1" />
+            <CIcon icon={cilSync} className="me-1" />
             Sync from SSO
           </CButton>
         </CCardHeader>

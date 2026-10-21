@@ -26,6 +26,7 @@ function expectedStubs() {
     '/clusters',
     '/permissions',
     '/user/list',
+    '/user/group',
     '/cluster-permission/service-account',
     '/cluster-permission/role',
   ])
