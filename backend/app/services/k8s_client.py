@@ -192,6 +192,15 @@ class K8sClient:
         passes the query namespace; it does not apply to this cluster-scoped kind."""
         return [n.to_dict() for n in self._v1.list_namespace().items]
 
+    def list_serviceaccounts(self, namespace: str | None) -> list[dict[str, Any]]:
+        """ServiceAccount list in the standard kubernetes dict form (``to_dict``)."""
+        resp = (
+            self._v1.list_namespaced_service_account(namespace)
+            if namespace
+            else self._v1.list_service_account_for_all_namespaces()
+        )
+        return [sa.to_dict() for sa in resp.items]
+
     def readyz(self) -> bool:
         """GET ``<host>/readyz`` with the kubeconfig's CA as ``verify=`` and a
         5 s timeout; ANY failure (including timeout) returns ``False`` — the
@@ -288,7 +297,13 @@ class K8sClient:
         self._apply("role", name, namespace, body)
 
     def apply_role_binding(
-        self, namespace: str, name: str, role_name: str, subject_user: str, labels: dict[str, str]
+        self,
+        namespace: str,
+        name: str,
+        role_name: str,
+        subject_user: str,
+        labels: dict[str, str],
+        subject_kind: str = "User",
     ) -> None:
         body = k8s_client.V1RoleBinding(
             metadata=k8s_client.V1ObjectMeta(name=name, labels=labels),
@@ -296,7 +311,7 @@ class K8sClient:
                 kind="Role", name=role_name, api_group="rbac.authorization.k8s.io"
             ),
             subjects=[
-                k8s_client.RbacV1Subject(kind="User", name=subject_user, api_group="")
+                k8s_client.RbacV1Subject(kind=subject_kind, name=subject_user, api_group="")
             ],
         )
         self._apply("role_binding", name, namespace, body)
@@ -311,7 +326,12 @@ class K8sClient:
         self._apply("cluster_role", name, None, body)
 
     def apply_cluster_role_binding(
-        self, name: str, role_name: str, subject_user: str, labels: dict[str, str]
+        self,
+        name: str,
+        role_name: str,
+        subject_user: str,
+        labels: dict[str, str],
+        subject_kind: str = "User",
     ) -> None:
         body = k8s_client.V1ClusterRoleBinding(
             metadata=k8s_client.V1ObjectMeta(name=name, labels=labels),
@@ -319,7 +339,7 @@ class K8sClient:
                 kind="ClusterRole", name=role_name, api_group="rbac.authorization.k8s.io"
             ),
             subjects=[
-                k8s_client.RbacV1Subject(kind="User", name=subject_user, api_group="")
+                k8s_client.RbacV1Subject(kind=subject_kind, name=subject_user, api_group="")
             ],
         )
         self._apply("cluster_role_binding", name, None, body)

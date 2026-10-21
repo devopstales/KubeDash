@@ -55,21 +55,28 @@ def bind(
     actor_sub: str,
     db_session: Any,
     k8s: Any,
+    subject_kind: str = "User",
 ) -> ClusterBinding:
-    """Bind a template to a user on a cluster (synchronous apply, ADR-0008).
+    """Bind a template to a user (or group, ``subject_kind="Group"``) on a
+    cluster (synchronous apply, ADR-0008).
 
     Order (the tracer core — do not reorder):
-    1. resolve template/user/cluster → 404 (missing cluster →
-       ``ClusterNotFoundError``; missing template/user →
+    1. resolve template/subject/cluster → 404 (missing cluster →
+       ``ClusterNotFoundError``; missing template/subject →
        ``ResourceKindNotSupportedError``, the only other generic stable 404).
     2. scope guard → 422 ``InvalidKubeconfigError`` (the only stable 422).
-    3. **idempotency check FIRST** — an existing (user, cluster, namespace,
-       template) row is returned WITHOUT re-applying and WITHOUT a new audit
-       row (200 no-op).
+    3. **idempotency check FIRST** — an existing (subject, cluster,
+       namespace, template) row is returned WITHOUT re-applying and WITHOUT
+       a new audit row (200 no-op).
     4. apply Role + RoleBinding (or ClusterRole + ClusterRoleBinding) — a
        cluster failure maps to 502 ``ClusterUnreachableError`` and records
        NOTHING.
     5. commit the binding row + an ``audit_log`` bind row (same transaction).
+
+    Group bindings reuse the ``cluster_bindings`` table (the row's
+    ``user_id`` holds the group id — the table is the subject-agnostic
+    binding registry; the audit ``target`` records the subject kind as
+    ``group:<name>`` so the audit read stays unambiguous).
     """
     # ponytail: the flask-sqlalchemy session proxy rejects a legacy Query in
     # execute() (ObjectNotExecutableError) — ``.statement`` lifts it back to
@@ -80,11 +87,19 @@ def bind(
     ).scalar_one_or_none()
     if template is None:
         raise ResourceKindNotSupportedError(f"template {template_name!r} not found")
-    user = db_session.execute(
-        db_session.query(User).filter_by(sub=user_sub).statement
-    ).scalar_one_or_none()
-    if user is None:
-        raise ResourceKindNotSupportedError(f"user {user_sub!r} not found")
+    if subject_kind == "Group":
+        from app.models.group import Group
+        subject = db_session.execute(
+            db_session.query(Group).filter_by(name=user_sub).statement
+        ).scalar_one_or_none()
+        if subject is None:
+            raise ResourceKindNotSupportedError(f"group {user_sub!r} not found")
+    else:
+        subject = db_session.execute(
+            db_session.query(User).filter_by(sub=user_sub).statement
+        ).scalar_one_or_none()
+        if subject is None:
+            raise ResourceKindNotSupportedError(f"user {user_sub!r} not found")
     cluster = db_session.get(Cluster, cluster_id)
     if cluster is None:
         raise ClusterNotFoundError("cluster not found")
@@ -96,7 +111,7 @@ def bind(
 
     existing = db_session.execute(
         db_session.query(ClusterBinding).filter_by(
-            user_id=user.id, cluster_id=cluster_id, namespace=namespace,
+            user_id=subject.id, cluster_id=cluster_id, namespace=namespace,
             template=template_name,
         ).statement
     ).scalar_one_or_none()
@@ -108,17 +123,19 @@ def bind(
     role_name = f"kubedash-{template_name}"
     labels = {TEMPLATE_LABEL: template_name}
     binding_labels = {USER_LABEL: user_sub, TEMPLATE_LABEL: template_name}
+    k8s_name = user_sub
     try:
         if namespace is not None:
             k8s.apply_role(namespace, role_name, template.rules, labels)
             k8s.apply_role_binding(
-                namespace, f"kubedash-{user_sub}-{namespace}",
-                role_name, user_sub, binding_labels,
+                namespace, f"kubedash-{k8s_name}-{namespace}",
+                role_name, user_sub, binding_labels, subject_kind=subject_kind,
             )
         else:
             k8s.apply_cluster_role(role_name, template.rules, labels)
             k8s.apply_cluster_role_binding(
-                f"kubedash-{user_sub}-cluster", role_name, user_sub, binding_labels,
+                f"kubedash-{k8s_name}-cluster", role_name, user_sub, binding_labels,
+                subject_kind=subject_kind,
             )
     except ClusterUnreachableError:
         raise
@@ -126,12 +143,15 @@ def bind(
         raise ClusterUnreachableError("cluster unreachable during bind") from e
 
     binding = ClusterBinding(
-        user_id=user.id, cluster_id=cluster_id, role="viewer",
+        user_id=subject.id, cluster_id=cluster_id, role="viewer",
         namespace=namespace, template=template_name,
     )
     db_session.add(binding)
     _audit(
-        db_session, actor_sub=actor_sub, action="bind", target=user_sub,
+        db_session,
+        actor_sub=actor_sub,
+        action="bind",
+        target=f"{'group' if subject_kind == 'Group' else 'user'}:{user_sub}",
         cluster=cluster.name, namespace=namespace, template=template_name,
     )
     db_session.commit()
@@ -146,8 +166,10 @@ def unbind(
     actor_sub: str,
     db_session: Any,
     k8s: Any,
+    subject_kind: str = "User",
 ) -> None:
-    """Unbind a user from a cluster (Role GC, ADR-0013).
+    """Unbind a user (or group, ``subject_kind="Group"``) from a cluster
+    (Role GC, ADR-0013).
 
     Order: 1. find the row → 404 ``NoBindingsError``; 2. delete the
     RoleBinding (the scope the row was bound with is authoritative); 3. Role
@@ -155,11 +177,15 @@ def unbind(
     (cluster, namespace-or-cluster) still references the same template;
     4. delete the row + audit, committed together.
     """
+    from app.models.group import Group
+
+    subject_model = Group if subject_kind == "Group" else User
+    subject_col = Group.name if subject_kind == "Group" else User.sub
     binding = (
         db_session.query(ClusterBinding)
-        .join(User, ClusterBinding.user_id == User.id)
+        .join(subject_model, ClusterBinding.user_id == subject_model.id)
         .filter(
-            User.sub == user_sub,
+            subject_col == user_sub,
             ClusterBinding.cluster_id == cluster_id,
             ClusterBinding.namespace == namespace,
         )
@@ -194,7 +220,10 @@ def unbind(
 
     db_session.delete(binding)
     _audit(
-        db_session, actor_sub=actor_sub, action="unbind", target=user_sub,
+        db_session,
+        actor_sub=actor_sub,
+        action="unbind",
+        target=f"{'group' if subject_kind == 'Group' else 'user'}:{user_sub}",
         cluster=str(cluster_id), namespace=binding.namespace, template=template,
     )
     db_session.commit()

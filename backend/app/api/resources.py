@@ -22,6 +22,7 @@ from app.services.k8s_client import LOCAL_CLUSTER_ID, bound_cluster_or_404, pool
 _KINDS: dict[str, tuple[str, str]] = {
     "pods": ("list_pods", "pods"),
     "namespaces": ("list_namespaces", "namespaces"),
+    "serviceaccounts": ("list_serviceaccounts", "serviceaccounts"),
 }
 
 

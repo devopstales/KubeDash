@@ -52,6 +52,15 @@ class FakeK8s:
             {"metadata": {"name": "kubedash-pod", "namespace": namespace}},
         ]
 
+    def list_serviceaccounts(self, namespace: str | None) -> list[dict]:
+        return [
+            {
+                "metadata": {"name": "builder", "namespace": namespace},
+                "secrets": [{"name": "builder-token"}],
+                "image_pull_secrets": [{"name": "registry-cred"}],
+            },
+        ]
+
     def readyz(self) -> bool:
         return True
 
@@ -178,6 +187,22 @@ def test_list_pods_namespaced(api_client, auth_client, fake_k8s, monkeypatch) ->
     assert r.status_code == 200
     items = r.get_json()["items"]
     assert [p["metadata"]["namespace"] for p in items] == ["prod-ns"]
+
+
+def test_list_serviceaccounts_namespaced(api_client, auth_client, fake_k8s, monkeypatch) -> None:
+    """The Cluster Permissions > ServiceAccounts page lists one namespace."""
+    auth_client.login()
+    h = {"Authorization": f"Bearer {auth_client.jwt}"}
+    _register(api_client, h)
+    _allow_sar(monkeypatch)
+    r = api_client.get("/api/v1/clusters/1/resources/serviceaccounts?namespace=team-a", headers=h)
+    assert r.status_code == 200
+    body = r.get_json()
+    assert body["kind"] == "serviceaccounts"
+    [sa] = body["items"]
+    assert sa["metadata"] == {"name": "builder", "namespace": "team-a"}
+    assert sa["secrets"] == [{"name": "builder-token"}]
+    assert sa["image_pull_secrets"] == [{"name": "registry-cred"}]
 
 
 def test_rbac_denied_403(api_client, auth_client, fake_k8s, monkeypatch) -> None:
