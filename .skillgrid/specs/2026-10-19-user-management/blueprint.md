@@ -3,7 +3,7 @@
 > **Status:** PROPOSED
 > **Goal:** Implement the ADR-0013 permission-management core end-to-end — admin users + RBAC role templates + idempotent bind/unbind + self-service multi-cluster kubeconfig download — on the backend (API + service + models + migration) and the frontend (My Access + admin view), so an admin can manage who can do what and any authenticated user can get a working kubeconfig.
 > **Architecture:** Existing Smorest domains (`admin`, `permissions`, `kubeconfig`) filled in from 501 stubs; pure-Python `services/permission.py`; `k8s_client` K8sClientPool for Role/RoleBinding apply; `cluster_bindings` extended (one-way-door migration) to carry namespace + template; new `KUBEDASH_PLUGIN_SERVER` setting drives the exec-plugin kubeconfig.
-> **Tech Stack:** Python 3.12 + Flask-Smorest + SQLAlchemy 2.0 + Alembic (backend); React 18 + TypeScript + CoreUI + TanStack Query/Vitest/MSW (frontend). **No new runtime deps** — `pyyaml` is already a direct dependency (`pyproject.toml`) and imported in `k8s_client.py`/`clusters.py`; the kubeconfig emitter reuses it.
+> **Tech Stack:** Python 3.12 + Flask-Smorest + SQLAlchemy 2.0 + Alembic (backend); React 18 + TypeScript + CoreUI + TanStack Query/Vitest/MSW (frontend). Lists use `datatables.net-react` + `datatables.net-bs5` (ADR-0023). **No other new runtime deps** — `pyyaml` is already a direct dependency (`pyproject.toml`) and imported in `k8s_client.py`/`clusters.py`; the kubeconfig emitter reuses it.
 > **Spec:** `.skillgrid/specs/2026-10-19-user-management/briefing.md`
 > **Build shape:** Tracer thread — bind → my-access → kubeconfig works end-to-end for ONE user on ONE cluster first (Task 3-5), then thickens to templates CRUD, multi-cluster, admin UI, and the frontend.
 > **Change classification:** `risky` (one-way-door `cluster_bindings` schema change + 2 new stable error codes + writes RBAC into clusters; L2 + security review)
@@ -28,6 +28,7 @@
 - **ADR-0008** — bind/unbind are synchronous HTTP; no RQ task in this change.
 - **Error contract** — frozen at 12 codes; add exactly **2**: `409 BUILTIN_TEMPLATE_PROTECTED`, `404 NO_BINDINGS`. Bump the count comment.
 - **One-way-door** — `cluster_bindings` schema change is migration-gated.
+- **ADR-0023** — every list in this feature is `datatables.net-react` with the Bootstrap 5 skin (`datatables.net-bs5`), wrapped in the CoreUI card. No `datatables.net-dt`, no DataTables Editor, no jQuery.
 - **Services purity** — `services/permission.py` has **no Flask imports** (takes db session + client pool as args).
 
 ---
@@ -58,17 +59,20 @@
 - `backend/app/services/kubeconfig_render.py` — `render_kubeconfig(clusters, contexts, plugin_server) -> str` (pure, testable YAML emitter).
 
 ### Frontend — modify
+- `frontend/package.json` — add `datatables.net-react` and `datatables.net-bs5` (ADR-0023). Do not add `datatables.net-dt`, `datatables.net-editor`, or jQuery.
 - `frontend/src/lib/api.ts` — add a `downloadFile(path, filename)` blob helper (reuses token + 401 refresh, returns the error envelope on failure).
 - `frontend/src/lib/types.ts` — add `User`, `Binding`, `RBACTemplate`, `AuditEntry` types.
-- `frontend/src/_nav.tsx` — add `Permissions` (all users) + `Admin Permissions` (admin-gated) nav entries.
-- `frontend/src/routes.tsx` — add `/permissions` + `/admin/permissions` routes.
-- `frontend/tests/views/permissions.test.tsx` — MSW-mocked Vitest (My Access, admin Users, bind modal, template editor, error paths).
+- `frontend/src/_nav.tsx` — Users opens `/admin/permissions`; Audit Log opens `/admin/permissions?tab=audit` (ADR-0022). My Access stays `/permissions`.
+- `frontend/src/routes.tsx` — `/permissions`, `/admin/permissions`, `/admin/permissions/users/:sub`.
+- `frontend/tests/views/permissions.test.tsx` — MSW-mocked Vitest. Mock `KubeDataTable` and assert columns and rows.
 
 ### Frontend — new
-- `frontend/src/views/Permissions/index.tsx` — My Access (all users) + Download kubeconfig.
-- `frontend/src/views/AdminPermissions/index.tsx` — Users / User Detail (Bind/Unbind) / Templates (rule editor + YAML preview) / Audit tabs.
-- `frontend/src/views/AdminPermissions/components/BindModal.tsx` — bind form (cluster, namespace hidden for cluster-scoped, template).
-- `frontend/src/views/AdminPermissions/components/TemplateEditor.tsx` — rule rows editor + Role YAML preview.
+- `frontend/src/components/KubeDataTable.tsx` — one `DataTable.use(datatables.net-bs5)` plus the Bootstrap 5 CSS import. Options `responsive: true`, `pageLength: 25`, class `table table-bordered`. Exports `Column`.
+- `frontend/src/views/Permissions/index.tsx` — CoreUI card + `KubeDataTable` (Cluster, Namespace, Template, Created) + Download kubeconfig. Empty state does not mount the table.
+- `frontend/src/views/AdminPermissions/index.tsx` — 4.1 User List only (no tab strip). Card header "User List". Columns Username, Email, Permission, Type, Action. Action: Privileges, Edit. Edit modal title "Update Information" patches role and status.
+- `frontend/src/views/AdminPermissions/Privileges.tsx` — bindings `KubeDataTable` for the header's selected cluster, Unbind per row, and the 4.1 privilege form (cluster-scoped template select; namespaced template + namespace multi-select + all-namespaces; add row).
+- `frontend/src/views/AdminPermissions/Templates.tsx` — own page at `?tab=templates`. Template `KubeDataTable` + rule editor + Role YAML preview.
+- `frontend/src/views/AdminPermissions/Audit.tsx` — own page at `?tab=audit`. Audit `KubeDataTable` + action filter.
 
 ---
 
@@ -120,21 +124,23 @@
 
 ### Task 6 — Frontend: My Access + download (all users)
 - **Do:**
-  1. `lib/api.ts`: `downloadFile(path, filename)` blob helper (token + 401 refresh, error envelope on failure).
-  2. `views/Permissions/index.tsx`: My Access table (R5) + Download kubeconfig button (R6) + empty state.
-  3. `lib/types.ts` types; `_nav.tsx` + `routes.tsx` for `/permissions`.
-  4. `tests/views/permissions.test.tsx` (MSW): render, download filename, empty state.
-- **Files:** `lib/api.ts`, `lib/types.ts`, `views/Permissions/*`, `_nav.tsx`, `routes.tsx`, `tests/views/permissions.test.tsx`.
+  1. Add `datatables.net-react` and `datatables.net-bs5`. Add `components/KubeDataTable.tsx` (`DataTable.use`, Bootstrap 5 CSS, `responsive`, `pageLength: 25`, `table table-bordered`).
+  2. `lib/api.ts`: `downloadFile(path, filename)` blob helper (token + 401 refresh, error envelope on failure).
+  3. `views/Permissions/index.tsx`: CoreUI card + `KubeDataTable` (R5 columns Cluster, Namespace, Template, Created) + Download kubeconfig (R6). Empty state does not mount the table.
+  4. `lib/types.ts` types; `_nav.tsx` + `routes.tsx` for `/permissions`.
+  5. `tests/views/permissions.test.tsx` (MSW): mock `KubeDataTable`, assert columns and rows, download filename, empty state.
+- **Files:** `package.json`, `components/KubeDataTable.tsx`, `lib/api.ts`, `lib/types.ts`, `views/Permissions/*`, `_nav.tsx`, `routes.tsx`, `tests/views/permissions.test.tsx`.
 - **Verify:** `task fe-build` (tsc + lint + build) green; `task fe-check` (no-CDN) green; Vitest MSW suite passes (no live backend); the download triggers `kubedash-kubeconfig.yaml`.
 
-### Task 7 — Frontend: admin permissions view
+### Task 7 — Frontend: 4.1 User List + privileges
 - **Do:**
-  1. `views/AdminPermissions/index.tsx`: tabs — Users (list → User Detail with Bind/Unbind + Download-as-user), Templates (list + rule editor + Role YAML preview + create/delete, built-in locked), Audit (history + filter).
-  2. `components/BindModal.tsx` (cluster + namespace hidden for cluster-scoped + template), `components/TemplateEditor.tsx` (rule rows + preview).
-  3. Nav entry (admin-gated) + route (non-admin redirect).
-  4. MSW tests: Users list, bind submit, unbind, template editor + preview, 403/409/404 error toasts.
+  1. `views/AdminPermissions/index.tsx`: User List card (header "User List"). Columns Username, Email, Permission, Type, Action. Privileges link. Edit modal "Update Information" (role, status). No tab strip, no Add User, no Delete.
+  2. `views/AdminPermissions/Privileges.tsx`: bindings table for the header's selected cluster, Unbind, and the 4.1 privilege form (cluster template select; namespaced template + namespaces + all-namespaces; add row). Save calls bind once per pair.
+  3. `Templates.tsx` at `?tab=templates` (rule editor + Role YAML preview, built-ins locked). `Audit.tsx` at `?tab=audit` (action filter). Both are separate pages.
+  4. Routes: `/admin/permissions`, `/admin/permissions/users/:sub`. Non-admin redirect.
+  5. MSW tests mock `KubeDataTable` and cover User List columns, privilege submit, unbind, template editor + preview, 403/409/404 messages.
 - **Files:** `views/AdminPermissions/*`, `_nav.tsx`, `routes.tsx`, `tests/views/admin_permissions.test.tsx`.
-- **Verify:** `task fe-build` + `task fe-check` green; MSW suite passes; error codes render as messages (no console errors); a Playwright e2e (kind + Helm) binds a template via the UI and downloads a kubeconfig.
+- **Verify:** `task fe-build` + `task fe-check` green; MSW suite passes; error codes render as messages (no console errors); a Playwright e2e (kind + Helm) opens the User List, binds a template from the privilege form, and downloads a kubeconfig from My Access.
 
 ### Task 8 — Docs + contract + full-suite verification
 - **Do:**
@@ -156,7 +162,7 @@
 | 4 | Task 4 (API: users + templates + bind) | Exposes Task 3 over HTTP; needs Task 1's schemas + codes. |
 | 5 | Task 5 (kubeconfig render + endpoint) | **Tracer end** — consumes bindings from Task 3/4; completes the user-facing loop. |
 | 6 | Task 6 (frontend My Access) | First UI on the now-real API; all-users surface (lowest risk). |
-| 7 | Task 7 (frontend admin view) | Richest UI; depends on Tasks 4 + 5 endpoints + Task 6's `downloadFile` helper. |
+| 7 | Task 7 (4.1 User List + privileges) | Richest UI; depends on Tasks 4 + 5 endpoints + Task 6's `KubeDataTable` and `downloadFile` helper. |
 | 8 | Task 8 (docs + full verification) | Closes the change; docs + baseline + full matrix. |
 
 Dependencies: `2 ← 1`, `3 ← 2`, `4 ← 1,3`, `5 ← 3`, `6 ← 5`, `7 ← 4,5,6`, `8 ← 4,5,6,7`.

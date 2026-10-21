@@ -79,12 +79,16 @@ and the aggregated API (5A) remain their own changes.
   - The generated YAML round-trips: `kubectl config view --kubeconfig <file>`
     parses it, and every `cluster.server` matches the registry's
     `api_server` for that cluster.
-  - Frontend: `/permissions` (all users) shows My Access + Download
-    kubeconfig; `/admin/permissions` (admin-gated) shows Users / User Detail
-    (Bind/Unbind modal) / Templates (rule editor + Role YAML preview) /
-    Audit. Error-envelope codes (`RBAC_DENIED`, `CONFLICT`, `NOT_FOUND`)
-    render as messages, not console errors. `task fe-check` (no-CDN) stays
-    green.
+  - Frontend lists use the 4.1 DataTable structure (ADR-0023): a CoreUI
+    card around `datatables.net-react` with the Bootstrap 5 skin
+    (`datatables.net-bs5`), `responsive`, `pageLength: 25`, class
+    `table table-bordered`. `/permissions` is My Access + Download
+    kubeconfig. `/admin/permissions` is the 4.1 User List (Username, Email,
+    Permission, Type, Action), not a tab strip. Privileges open a separate
+    page with the 4.1 template-and-namespace form. Templates and Audit are
+    their own pages at `?tab=templates` and `?tab=audit`. Error-envelope
+    codes (`RBAC_DENIED`, `CONFLICT`, `NOT_FOUND`) render as messages, not
+    console errors. `task fe-check` (no-CDN) stays green.
 - **Out of scope:**
   - **RBAC drift detection** (`tasks/rbac_drift.py`, 10-min leader-only loop,
     `driftPolicy: enforce|warn`) — tracked separately; the `kubedash.io/*`
@@ -156,6 +160,15 @@ and the aggregated API (5A) remain their own changes.
   that is already stored, requires a second encryption call, and widens the
   one-way-door surface for no gain — the registry kubeconfig is the single
   source of truth (ADR-0002).
+- **Chosen: 4.1 User List and privilege editor, drawn with DataTables
+  React.** The page chrome is the 4.1 CoreUI card and the grid is
+  `datatables.net-react` + `datatables.net-bs5` (ADR-0023), the React form
+  of 4.1's `dataTables.bootstrap5` include. Routes stay the ADR-0022
+  paths. The quick start's `datatables.net-dt` stylesheet is not used.
+- **Rejected: CoreUI `CTable` and a Users/Templates/Audit tab strip.**
+  That is a different information architecture from 4.1's User List and
+  privilege pages, and `CTable` has none of the DataTable behavior 4.1
+  ships (search, paging, Bootstrap skin).
 - **Chosen: single shared `users[]` entry (`kubedash`) across all
   contexts.** The exec plugin is cluster-agnostic (auto-detect from
   `cluster.server`); one entry keeps the YAML minimal and matches the
@@ -167,8 +180,8 @@ and the aggregated API (5A) remain their own changes.
 
 1. **R1 — Admin users list + patch.**
    `GET /api/v1/admin/users` returns every user: `sub`, `email`,
-   `display_name`, `groups`, `role`, `status`, `cluster_count` (count of
-   `cluster_bindings`), `last_login_at`. Auth: JWT (existing `apply_auth`) +
+   `display_name`, `groups`, `role`, `status`, `auth_source` (`oidc` or `local`),
+   `cluster_count` (count of `cluster_bindings`), `last_login_at`. Auth: JWT (existing `apply_auth`) +
    `role == "admin"` gate → `403 RBAC_DENIED` otherwise.
    `PATCH /api/v1/admin/users/<id>` accepts `{role?, status?}`; validates
    `role ∈ {user, admin}`, `status ∈ {active, disabled}`; writes
@@ -274,46 +287,66 @@ and the aggregated API (5A) remain their own changes.
    (`actor_sub`, `action`, `target`, `cluster`, `namespace`, `template`,
    `at`). `GET /api/v1/admin/audit?actions=bind,unbind,template_*,
    role_change,status_change` (admin-only, paginated) returns the history
-   the UI's Audit tab renders.
+   the Audit page renders.
    - **Acceptance:** each bind/unbind/template/role/status mutation produces
      exactly one audit row with the correct actor + target; the audit
      endpoint filters by action type; the reconciliation migration is a
      no-op on a fresh DB and additive on a dev DB.
 
 8. **R8 — Frontend: My Access + download (all users).**
-   New view `src/views/Permissions/` at route `/permissions`: a table of the
-   caller's bindings (cluster, namespace, template, created) from R5 and a
-   **Download kubeconfig** button that fetches R6 (blob), triggers a
-   download named `kubedash-kubeconfig.yaml`, and toasts the error-envelope
-   message on 404/500. Empty state (no bindings) shows a hint, not a broken
-   table. `apiFetch` gains a blob-capable path (or a thin `downloadFile`
-   helper) without breaking the JSON error-envelope contract.
-   - **Acceptance:** render + download flow covered by MSW-mocked Vitest
-     (no live backend); the download uses the right filename; the empty
-     state renders; `task fe-check` passes.
+   View `src/views/Permissions/` at route `/permissions`. The page is a
+   CoreUI card whose body is a `KubeDataTable` (ADR-0023) of the caller's
+   bindings from R5, columns **Cluster**, **Namespace**, **Template**,
+   **Created**. A **Download kubeconfig** button fetches R6 (blob),
+   triggers a download named `kubedash-kubeconfig.yaml`, and shows the
+   error-envelope message on 404/500. Empty state (no bindings) shows a
+   hint and does not mount the DataTable. `apiFetch` gains a blob-capable
+   `downloadFile` helper without breaking the JSON error-envelope contract.
+   - **Acceptance:** MSW-mocked Vitest asserts the columns and rows passed
+     to `KubeDataTable`, the download filename, and the empty state (the
+     DataTable component is mocked; the real grid is checked in the
+     browser); `task fe-check` passes.
 
-9. **R9 — Frontend: admin permissions view.**
-   New route `/admin/permissions` (sidebar entry gated on
-   `role == "admin"`; the route itself redirects non-admins to `/`):
-   - **Users tab** — DataTables list from R1 (sub, email, role, status,
-     cluster count, last login); click → **User Detail**: the user's
-     bindings + **Bind** (modal: pick cluster, namespace *hidden for
-     cluster-scoped templates*, template) → R3; **Unbind** per row → R4;
-     **Download kubeconfig** (as the admin, for that user) → R6 with a
-     `?user=<id>` param.
-   - **Templates tab** — list from R2; **rule editor** for a custom
-     template (add/remove `api_groups` + `resources` + `verbs` rows, scope
-     selector); a **Role YAML preview** rendered client-side from the rules;
-     create + delete buttons (built-in rows show a lock, delete disabled).
-   - **Audit tab** — R7 history table (actor, action, target, cluster,
-     namespace, template, at) with an action-type filter.
+9. **R9 — Frontend: 4.1 User List, privileges, templates, audit.**
+   Admin routes redirect non-admins to `/`. There is no Users/Templates/Audit
+   tab strip. Each destination is its own page, and every list is a
+   `KubeDataTable` inside a CoreUI card (ADR-0023). Reference markup is
+   branch `4.1`, `src/kubedash/templates/users/user.html.j2` and
+   `privilege-edit.html.j2`.
+   - **Users** (`/admin/permissions` and `?tab=users`) — card header
+     **User List**. Columns, in order: **Username** (`display_name`,
+     falling back to `sub`), **Email**, **Permission** (`role`, `user` or
+     `admin`), **Type** (`auth_source`: `oidc` shown as OpenID, `local`
+     shown as Local), **Action**. Action is two controls: **Privileges**
+     and **Edit**. Edit opens a modal titled **Update Information** that
+     patches `role` and `status` (R1). There is no Add User button and no
+     Delete action (users stay JIT SSO + the bootstrap admin). There is
+     no Kubernetes type (ADR-0011).
+   - **Privileges** (`/admin/permissions/users/:sub`) — card of that user's
+     bindings on the cluster selected in the header, columns Cluster,
+     Namespace, Template, and an **Unbind** action (R4). **Edit privileges**
+     opens the 4.1 form: one cluster-scoped template `<select>`, plus
+     namespaced rows of template `<select>` + namespace multi-select +
+     an **all namespaces** checkbox, with an **add** control for another
+     namespaced row. The cluster is the header selection, the way 4.1 used
+     the session cluster. Save calls R3 once per selected template and
+     namespace. A cluster-scoped template hides the namespace controls.
+   - **Templates** (`/admin/permissions?tab=templates`) — its own page, not
+     a tab on the User List. DataTable of R2. A custom template opens the
+     rule editor (rows of `api_groups`, `resources`, `verbs`, scope) and a
+     client-side Role YAML preview. Create and delete sit on this page.
+     Built-in rows show a lock and delete is disabled.
+   - **Audit** (`/admin/permissions?tab=audit`) — its own page. DataTable
+     of R7 (actor, action, target, cluster, namespace, template, at) with
+     an action-type filter. This is the Settings → Audit Log destination.
    Error handling: `RBAC_DENIED` (403), `CONFLICT` (409), `NO_BINDINGS`
-   (404), `CLUSTER_UNREACHABLE` (502) all render the envelope `message` in
-   a toast/inline; no unhandled console errors.
-   - **Acceptance:** MSW-mocked Vitest covers Users list, User Detail
-     bind-submit, unbind, template rule editor + preview, 403/409/404 error
-     paths; nav + routes updated; `task fe-check` passes; a Playwright e2e
-     (kind + Helm) binds a template via the UI and downloads a kubeconfig.
+   (404), `CLUSTER_UNREACHABLE` (502) all render the envelope `message`
+   inline; no unhandled console errors.
+   - **Acceptance:** MSW-mocked Vitest covers the User List columns and
+     action controls, the privilege form submit, unbind, the template rule
+     editor + preview, and 403/409/404 messages; `task fe-check` passes; a
+     Playwright e2e (kind + Helm) opens the User List, binds a template
+     from the privilege form, and downloads a kubeconfig from My Access.
 
 10. **R10 — Docs + contract.**
     Update `.skillgrid/ARCHITECTURE.md` (the stub `app/services/permission.py`

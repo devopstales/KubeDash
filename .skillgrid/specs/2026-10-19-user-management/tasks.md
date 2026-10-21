@@ -121,22 +121,22 @@ Chain strategy: feature-branch-chain
 ### TICKET-06 — Frontend: My Access + kubeconfig download (all users)
 
 - **Tracker ID:** TASK-024
-- **Scope:** `lib/api.ts` `downloadFile(path, filename)` blob helper (token + 401 refresh, error envelope on failure); `lib/types.ts` types; `views/Permissions/index.tsx` (My Access table from my-access + Download kubeconfig button + empty state); `_nav.tsx` + `routes.tsx` for `/permissions`; `tests/views/permissions.test.tsx` (MSW).
-- **Acceptance:** `task fe-build` (tsc+lint+build) green; `task fe-check` (no-CDN) green; MSW Vitest: render, download triggers `kubedash-kubeconfig.yaml`, empty state renders, 404/500 envelope shown as a message; no live backend needed.
+- **Scope:** Add `datatables.net-react` + `datatables.net-bs5` and `components/KubeDataTable.tsx` (ADR-0023). `lib/api.ts` `downloadFile(path, filename)` blob helper (token + 401 refresh, error envelope on failure); `lib/types.ts` types; `views/Permissions/index.tsx` (CoreUI card + KubeDataTable columns Cluster, Namespace, Template, Created + Download kubeconfig; empty state does not mount the table); `_nav.tsx` + `routes.tsx` for `/permissions`; `tests/views/permissions.test.tsx` (MSW, KubeDataTable mocked).
+- **Acceptance:** `task fe-build` (tsc+lint+build) green; `task fe-check` (no-CDN) green; MSW Vitest asserts columns and rows, download triggers `kubedash-kubeconfig.yaml`, empty state renders, 404/500 envelope shown as a message; no live backend needed.
 - **SATISFIES:** user-downloads-a-kubeconfig-from-my-access; my-access-shows-an-empty-state-for-no-bindings
-- **Files:** `frontend/src/lib/api.ts`, `frontend/src/lib/types.ts`, `frontend/src/views/Permissions/index.tsx` (new), `frontend/src/_nav.tsx`, `frontend/src/routes.tsx`, `frontend/tests/views/permissions.test.tsx` (new)
+- **Files:** `frontend/package.json`, `frontend/src/components/KubeDataTable.tsx` (new), `frontend/src/lib/api.ts`, `frontend/src/lib/types.ts`, `frontend/src/views/Permissions/index.tsx` (new), `frontend/src/_nav.tsx`, `frontend/src/routes.tsx`, `frontend/tests/views/permissions.test.tsx` (new)
 - **Size:** ~450 (M)
 - **Blocks:** TICKET-07, TICKET-08
 - **Blocked by:** TICKET-05
 - **Fails-when:** `task fe-build` or `task fe-check` exits non-zero, OR `cd frontend && corepack pnpm test -- permissions` exits non-zero
 
-### TICKET-07 — Frontend: admin permissions view (Users / Bind / Templates / Audit)
+### TICKET-07 — Frontend: 4.1 User List + privileges
 
 - **Tracker ID:** TASK-024
-- **Scope:** `views/AdminPermissions/index.tsx` tabs — Users (list → User Detail with Bind/Unbind + Download-as-user), Templates (list + rule editor + Role YAML preview + create/delete, built-in locked), Audit (history + action filter); `components/BindModal.tsx` (namespace hidden for cluster-scoped), `components/TemplateEditor.tsx`; admin-gated nav + route (non-admin redirect); MSW tests for Users list, bind submit, unbind, template editor+preview, 403/409/404 error toasts; a Playwright e2e (kind+Helm) binds via UI + downloads a kubeconfig.
-- **Acceptance:** `task fe-build` + `task fe-check` green; MSW Vitest passes (Users list, bind submit, unbind, editor+preview, error paths render the envelope message with no console errors); non-admin redirected; Playwright e2e (kind+Helm) binds a template through the UI and downloads a kubeconfig.
+- **Scope:** `views/AdminPermissions/index.tsx` is the 4.1 User List (card header "User List"; columns Username, Email, Permission, Type, Action; Privileges + Edit; Edit modal "Update Information"; no tab strip, no Add User, no Delete). `Privileges.tsx` at `/admin/permissions/users/:sub` lists bindings for the header's selected cluster and edits them with the 4.1 form (cluster template select; namespaced template + namespaces + all-namespaces; add row). `Templates.tsx` (`?tab=templates`) and `Audit.tsx` (`?tab=audit`) are separate pages, each a `KubeDataTable`. Admin route redirects non-admins. MSW tests mock `KubeDataTable`. Playwright e2e (kind+Helm) binds from the privilege form and downloads a kubeconfig from My Access.
+- **Acceptance:** `task fe-build` + `task fe-check` green; MSW Vitest passes (User List columns, privilege submit, unbind, editor+preview, error paths render the envelope message with no console errors); non-admin redirected; Playwright e2e (kind+Helm) opens the User List, binds a template, and downloads a kubeconfig.
 - **SATISFIES:** admin-binds-a-template-from-the-admin-view; the-admin-view-shows-api-errors-as-messages; a-non-admin-is-redirected-away-from-the-admin-view
-- **Files:** `frontend/src/views/AdminPermissions/index.tsx` (new), `frontend/src/views/AdminPermissions/components/BindModal.tsx` (new), `frontend/src/views/AdminPermissions/components/TemplateEditor.tsx` (new), `frontend/src/_nav.tsx`, `frontend/src/routes.tsx`, `frontend/tests/views/admin_permissions.test.tsx` (new), `frontend/e2e/admin_permissions.spec.ts` (new)
+- **Files:** `frontend/src/views/AdminPermissions/index.tsx`, `frontend/src/views/AdminPermissions/Privileges.tsx` (new), `frontend/src/views/AdminPermissions/Templates.tsx` (new), `frontend/src/views/AdminPermissions/Audit.tsx` (new), `frontend/src/_nav.tsx`, `frontend/src/routes.tsx`, `frontend/tests/views/admin_permissions.test.tsx`, `frontend/e2e/admin_permissions.spec.ts`
 - **Size:** ~750 (M)
 - **Blocks:** TICKET-08
 - **Blocked by:** TICKET-04, TICKET-05, TICKET-06

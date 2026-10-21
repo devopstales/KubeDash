@@ -165,12 +165,12 @@ Feature: KubeDash user management — role templates, bindings, and self-service
     Then an empty state is shown and no broken table is rendered
 
   Scenario: admin-binds-a-template-from-the-admin-view
-    # T7: admin view bind flow.
-    Given an admin and a bound user
-    When the admin opens the admin permissions view and selects the user
-    Then the user's bindings are shown with a Bind control
-    When the admin picks a cluster, namespace, and template and submits
-    Then the binding is created and the new binding is listed
+    # T7: 4.1 User List → privilege form.
+    Given an admin and a user
+    When the admin opens the User List
+    Then the list is a DataTable with columns Username, Email, Permission, Type, and Action
+    When the admin opens that user's privileges and saves a namespaced template on the selected cluster
+    Then the binding is created and listed on the privilege page
 
   Scenario: the-admin-view-shows-api-errors-as-messages
     # T7: error envelope.
