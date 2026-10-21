@@ -1,6 +1,6 @@
 # ADR-0020 air-gap check (frontend half) — unit tier, no Docker, drives the
 # Taskfile-free script via a subprocess so CI can rely on the exact CLI
-# contract: `node scripts/fe-airgap-check.mjs <distDir> [--allow "a,b,c"]`.
+# contract: `node tests/fe-airgap-check.mjs <distDir> [--allow "a,b,c"]`.
 from __future__ import annotations
 
 import subprocess
@@ -14,7 +14,7 @@ REPO_ROOT = Path(__file__).resolve().parents[2]
 
 def _run(dist: Path, *extra: str) -> subprocess.CompletedProcess[str]:
     return subprocess.run(
-        [NODE, str(REPO_ROOT / "scripts" / "fe-airgap-check.mjs"), str(dist), *extra],
+        [NODE, str(REPO_ROOT / "tests" / "fe-airgap-check.mjs"), str(dist), *extra],
         capture_output=True,
         text=True,
     )

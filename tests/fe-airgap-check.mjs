@@ -30,12 +30,19 @@ const DEFAULT_ALLOW = [
   // react-router useSearchParams warning that names an IE11 polyfill.
   // Message text only; the bundle does not load it.
   'github.com/ungap/url-search-params',
+  // Kubectl-config page install snippets (4.1 export page). Shown in <pre>,
+  // never fetched by the bundle.
+  'dl.k8s.io',
+  'github.com/devopstales',
   'fb.me',
   // core-js browser-compat warning + LICENSE attribution: message text.
   'zloirock',
   // Vite build placeholder + CoreUI template header comment in index.html
   // (attribution / install docs), never a loadable reference.
   'coreui',
+  // 4.1 header/footer hrefs. Click targets, not fetched assets.
+  'github.com/devopstales/KubeDash',
+  'devopstales.github.io',
   // Dev-mode defaults/placeholders in the bundle:
   //   http://localhost — react-router dev-mode origin fallback
   //   https://api.example:6443 — API-base input placeholder

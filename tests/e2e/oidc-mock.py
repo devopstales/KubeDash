@@ -76,7 +76,9 @@ def _encode_jwt(claims: dict) -> str:
     import hashlib
     import hmac
 
-    b64 = lambda d: base64.urlsafe_b64encode(d).rstrip(b"=").decode()
+    def b64(data: bytes) -> str:
+        return base64.urlsafe_b64encode(data).rstrip(b"=").decode()
+
     header = b64(json.dumps({"alg": "HS256", "typ": "JWT"}).encode())
     payload = b64(json.dumps(claims).encode())
     signing_input = f"{header}.{payload}".encode()

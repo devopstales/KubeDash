@@ -97,6 +97,14 @@ body {
   color: var(--bs-secondary-color);
 }
 
+/* 4.1 export page used highlight.js (an-old-hope). Dark block, no extra lib. */
+.kd-snippet {
+  background: #1c1d21;
+  color: #cbccc6;
+  padding: 1rem;
+  border-radius: 0.25rem;
+}
+
 @include color-mode(dark) {
   body {
     background-color: var(--cui-dark-bg-subtle);

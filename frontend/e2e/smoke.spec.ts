@@ -5,13 +5,13 @@ import { expect, test } from '@playwright/test'
  *
  * Journey (per Task 10 brief):
  *   1. Hit /login → the SPA bounces to /api/v1/auth/login → 302-chains
- *      through the mock IdP (e2e/oidc-mock.py) back to /?token=…&refresh=…
+ *      through the mock IdP (tests/e2e/oidc-mock.py) back to /?token=…&refresh=…
  *      → LoginView stores both in localStorage.
  *   2. /clusters renders the bound-cluster registry.
  *   3. Register the kind cluster via the form.
  *   4. /clusters/<id> → the Pods table renders.
  *
- * The mock OIDC (e2e/oidc-mock.py) is a CI service container on port 9096.
+ * The mock OIDC (tests/e2e/oidc-mock.py) is a CI service container on port 9096.
  * The real Authlib adapter runs — unit tier monkeypatches; e2e exercises the
  * real oidc_authorize_url / oidc_exchange bodies.
  */

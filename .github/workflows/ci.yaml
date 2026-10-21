@@ -41,7 +41,7 @@ jobs:
         working-directory: frontend
       - run: pnpm exec tsc --noEmit && pnpm lint && pnpm build
         working-directory: frontend
-      - run: node scripts/fe-airgap-check.mjs frontend/dist
+      - run: node tests/fe-airgap-check.mjs frontend/dist
   cli:
     runs-on: ubuntu-latest
     steps:
