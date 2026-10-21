@@ -8,8 +8,6 @@ export type StubRoute = {
 export const stubRoutes: StubRoute[] = [
   { path: '/dashboard/workload-map', title: 'Workload', admin: false },
   { path: '/user/group', title: 'Groups', admin: false },
-  { path: '/cluster-permission/service-account', title: 'ServiceAccounts', admin: false },
-  { path: '/cluster-permission/role', title: 'Roles', admin: false },
   { path: '/cluster-permission/role-binding', title: 'RoleBindings', admin: false },
   { path: '/cluster-permission/cluster-role', title: 'ClusterRoles', admin: false },
   { path: '/cluster-permission/cluster-role-binding', title: 'ClusterRoleBindings', admin: false },

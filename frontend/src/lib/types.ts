@@ -61,10 +61,42 @@ export interface Pod {
   [key: string]: unknown
 }
 
-export interface ResourceList {
+export interface ResourceList<T = Pod> {
   kind?: string
   cluster?: string
-  items: Pod[]
+  items: T[]
+}
+
+/** A Role item as returned by /api/v1/clusters/<id>/resources/roles. */
+export interface K8sRole {
+  metadata?: {
+    name?: string
+    namespace?: string
+    labels?: Record<string, string> | null
+    annotations?: Record<string, string> | null
+  }
+  rules?: PolicyRule[] | null
+  [key: string]: unknown
+}
+
+/** One rule on a Role. Kubernetes ``to_dict`` uses snake_case. */
+export interface PolicyRule {
+  api_groups?: string[] | null
+  resource_names?: string[] | null
+  resources?: string[] | null
+  verbs?: string[] | null
+}
+
+/** A ServiceAccount item as returned by /api/v1/clusters/<id>/resources/serviceaccounts. */
+export interface ServiceAccount {
+  metadata?: {
+    name?: string
+    namespace?: string
+    [key: string]: unknown
+  }
+  secrets?: { name?: string }[] | null
+  image_pull_secrets?: { name?: string }[] | null
+  [key: string]: unknown
 }
 
 export interface RefreshPair {

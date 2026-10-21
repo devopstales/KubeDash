@@ -21,6 +21,9 @@ const KubeconfigView = React.lazy(() => import('./views/Kubeconfig'))
 const AdminPermissionsView = React.lazy(() => import('./views/AdminPermissions'))
 const PrivilegesView = React.lazy(() => import('./views/AdminPermissions/Privileges'))
 const PrivilegeEditView = React.lazy(() => import('./views/AdminPermissions/PrivilegeEdit'))
+const ServiceAccountsView = React.lazy(() => import('./views/ClusterPermission/ServiceAccounts'))
+const RoleView = React.lazy(() => import('./views/ClusterPermission/Role'))
+const RoleDataView = React.lazy(() => import('./views/ClusterPermission/RoleData'))
 
 /**
  * KubeDash SPA root: QueryClientProvider (TanStack Query) wraps the
@@ -150,6 +153,30 @@ const App = () => {
                           <AdminRoute>
                             <AdminPermissionsView />
                           </AdminRoute>
+                        </ProtectedRoute>
+                      }
+                    />
+                    <Route
+                      path="/cluster-permission/service-account"
+                      element={
+                        <ProtectedRoute>
+                          <ServiceAccountsView />
+                        </ProtectedRoute>
+                      }
+                    />
+                    <Route
+                      path="/cluster-permission/role"
+                      element={
+                        <ProtectedRoute>
+                          <RoleView />
+                        </ProtectedRoute>
+                      }
+                    />
+                    <Route
+                      path="/cluster-permission/role/data"
+                      element={
+                        <ProtectedRoute>
+                          <RoleDataView />
                         </ProtectedRoute>
                       }
                     />

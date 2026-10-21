@@ -11,12 +11,24 @@ import { stubRoutes } from '../../src/views/Stub/routes'
 
 function leaves(items: NavItem[]): { name: string; to?: string }[] {
   return items.flatMap((item) =>
-    item.divider ? [] : item.items ? leaves(item.items) : item.to ? [{ name: item.name, to: item.to }] : [],
+    item.divider
+      ? []
+      : item.items
+        ? leaves(item.items)
+        : item.to
+          ? [{ name: item.name, to: item.to }]
+          : [],
   )
 }
 
 function expectedStubs() {
-  const viewPaths = new Set(['/clusters', '/permissions'])
+  const viewPaths = new Set([
+    '/clusters',
+    '/permissions',
+    '/user/list',
+    '/cluster-permission/service-account',
+    '/cluster-permission/role',
+  ])
   const seen = new Map<string, string>()
   for (const isAdmin of [true, false]) {
     for (const leaf of leaves(navigation({ clusterId: 7, isAdmin }))) {
@@ -62,7 +74,6 @@ test('every-stub-entry-has-a-page', () => {
   for (const title of [
     'Workload',
     'Groups',
-    'ServiceAccounts',
     'ClusterRoleBindings',
     'Namespaces',
     'CRDs',
