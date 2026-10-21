@@ -20,6 +20,7 @@ KubeDash/
 │   └── e2e/            Playwright
 ├── cli/                Go kubectl credential plugin (cobra)
 ├── charts/kubedash/    Helm chart (N replicas, leader election)
+├── tests/              e2e/oidc-mock.py, fe-airgap-check.mjs
 ├── dev/                docker-compose dev stack (Postgres, Redis, Grafana, …)
 ├── .github/workflows/  ci.yaml, e2e.yaml
 └── .skillgrid/         ARCHITECTURE.md, ASSUMPTIONS.md, specs/, artifacts/
