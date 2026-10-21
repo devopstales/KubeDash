@@ -170,8 +170,10 @@ tasks:
       - "{{.COMPOSE}} exec -T postgres pg_isready -U {{.DB_USER}} -d {{.DB_NAME}}"
       # Idempotent: free :8080 from a prior dev-stack backend before rebind
       # (no-op if nothing is listening). pkill catches zombie wsgi.py children
-      # that survive the parent's SIGKILL (fuser only kills the port holder).
-      - "fuser -k 8080/tcp 2>/dev/null || true"
+      # that survive the parent's SIGKILL (lsof only kills the port holder).
+      # lsof instead of fuser: macOS's fuser prints usage to stderr on a
+      # "file" argument and only kills the listener, not the process group.
+      - "lsof -ti tcp:8080 | xargs kill 2>/dev/null || true"
       - "pkill -f 'python.*wsgi.py' 2>/dev/null || true"
       - "sleep 1"
       # Build the SPA and sync it to backend/static before the backend starts,
@@ -186,7 +188,8 @@ tasks:
   dev-stack-down:
     desc: "Stop the local env backend (task dev-stack) + compose stack"
     cmds:
-      - "fuser -k 8080/tcp 2>/dev/null || true"
+      - "lsof -ti tcp:8080 | xargs kill 2>/dev/null || true"
+      - "pkill -f 'python.*wsgi.py' 2>/dev/null || true"
       - "{{.COMPOSE}} down"
 
   # Internal: bring the dev DB schema to migration head from the backend dir
@@ -249,7 +252,10 @@ tasks:
       KUBEDASH_ROLE: "leader"
       KUBEDASH_REPLICA_ID: "local"
     cmds:
-      - "nohup .venv/bin/python wsgi.py > /tmp/kubedash-backend.log 2>&1 &"
+      # Double-fork so the backend survives `task` exiting: the intermediate
+      # shell exits immediately, re-parenting the backend to init (macOS has
+      # no setsid; nohup alone was reaped with the task's process group).
+      - "sh -c 'nohup .venv/bin/python wsgi.py > /tmp/kubedash-backend.log 2>&1 &'"
       # Poll for actual readiness (Flask dev-server startup line or a
       # listening port) instead of a fixed sleep — the 2 s sleep was too
       # short on loaded machines, leaving the log at just `nohup: ignoring
@@ -257,7 +263,7 @@ tasks:
       - |
         for i in $(seq 1 30); do
           if grep -q "Running on" /tmp/kubedash-backend.log 2>/dev/null; then break; fi
-          if fuser 8080/tcp >/dev/null 2>&1; then break; fi
+          if lsof -ti tcp:8080 >/dev/null 2>&1; then break; fi
           sleep 1
         done
       - "echo \"Backend ready (PID $(pgrep -f 'python.*wsgi.py' | head -1)). Logs: /tmp/kubedash-backend.log\""
