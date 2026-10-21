@@ -72,7 +72,10 @@ const ITEMS = [
   },
 ]
 
-const renderNamespaces = (role: 'admin' | 'user', extraHandlers: Parameters<typeof server.use>[0][] = []) => {
+const renderNamespaces = (
+  role: 'admin' | 'user',
+  extraHandlers: Parameters<typeof server.use>[0][] = [],
+) => {
   useClusterStore.setState({
     selectedCluster: { id: 1, name: 'prod' },
     selectedNamespace: null,
@@ -91,9 +94,7 @@ const renderNamespaces = (role: 'admin' | 'user', extraHandlers: Parameters<type
         last_login_at: null,
       }),
     ),
-    http.get('*/api/v1/clusters', () =>
-      HttpResponse.json({ items: [{ id: 1, name: 'prod' }] }),
-    ),
+    http.get('*/api/v1/clusters', () => HttpResponse.json({ items: [{ id: 1, name: 'prod' }] })),
     http.get('*/api/v1/clusters/1/resources/namespaces', () =>
       HttpResponse.json({ items: ITEMS, kind: 'namespaces', cluster: 'prod' }),
     ),

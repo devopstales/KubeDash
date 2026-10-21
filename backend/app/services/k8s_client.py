@@ -204,7 +204,7 @@ class K8sClient:
             if e.status == 409:
                 raise ClusterAlreadyExistsError(f"namespace '{name}' already exists") from e
             self._unreachable("create_namespace", e)
-            raise AssertionError("unreachable")
+            raise AssertionError("unreachable") from e
 
     def delete_namespace(self, name: str) -> None:
         self._delete("delete_namespace", lambda: self._v1.delete_namespace(name))
@@ -239,6 +239,10 @@ class K8sClient:
     def list_cluster_roles(self, _namespace: str | None) -> list[dict[str, Any]]:
         """ClusterRole list. Cluster-scoped; the query namespace does not apply."""
         return [role.to_dict() for role in self._rbac.list_cluster_role().items]
+
+    def list_cluster_role_bindings(self, _namespace: str | None) -> list[dict[str, Any]]:
+        """ClusterRoleBinding list. Cluster-scoped; the query namespace does not apply."""
+        return [binding.to_dict() for binding in self._rbac.list_cluster_role_binding().items]
 
     def list_secrets(self, namespace: str | None) -> list[dict[str, Any]]:
         """Secret list in the standard kubernetes dict form (``to_dict``)

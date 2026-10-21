@@ -101,9 +101,7 @@ const AppHeader = () => {
       return r.data?.items ?? []
     },
   })
-  const namespaces = (namespacesQuery.data ?? [])
-    .map((item) => item.metadata?.name)
-    .filter(Boolean)
+  const namespaces = (namespacesQuery.data ?? []).map((item) => item.metadata?.name).filter(Boolean)
   const preferredNamespace =
     selectedNamespace && namespaces.includes(selectedNamespace)
       ? selectedNamespace
