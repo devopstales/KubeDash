@@ -6,8 +6,7 @@
 > `../../prototypes/001-dashboard-options/dashboard-1-41.html`. This blueprint is pure-technical
 > and cites them rather than restating.
 
-**Status:** ASSUMED — owes ratification (run `skillgrid:writing-blueprints` with this blueprint
-as the topic to ratify)
+**Status:** PROPOSED
 
 **Tier:** T2
 
@@ -32,7 +31,11 @@ marshmallow schemas, React 18 + CoreUI + TanStack Query + `KubeDataTable` (front
 
 **Findings:** `../2026-10-21-dashboard-options/findings.md`
 
-**Critic:** skipped (single-topic T2 feature; the self-review + plan-review gates still run) — *recorded, may change at review*
+**Ratified:** the metrics source is the **Kubernetes Metrics API** (`metrics.k8s.io/v1beta1`),
+query-only per ADR-0003, through the registry credentials (see `adr.md`). The ASSUMED flag was
+cleared at the blueprint gate (paladm, 2026-10-21).
+
+**Critic:** skipped (single-topic T2 feature; the self-review + plan-review gates still ran) — recorded
 
 ## Terms
 
@@ -42,15 +45,10 @@ Pointers only (canonical terms in `.skillgrid/artifacts/01-business-terms.md` / 
   metrics-server; provides per-node/pod CPU+memory *usage*. KubeDash reads it query-only (ADR-0003)
   and never writes to it.
 
-**Status: ASSUMED** — owes ratification (run `skillgrid:writing-blueprints` with this blueprint
-as the topic to ratify)
-
-| | |
-|---|---|
-| Owed decision | The **metrics data source** for the four tiles. `metrics.py` is a 501 stub and ADR-0003 has no body on disk, so the source is undecided. The blueprint assumes the **Kubernetes Metrics API** (`metrics.k8s.io/v1beta1`, via the python client). |
-| Assumption built on | CPU/Memory per node come from `metrics.k8s.io/v1beta1` (`NodeMetrics`), queried live (query-only, ADR-0003), through the registry credentials. If the endpoint is absent (404) or a node has no sample, that tile/metric renders `unknown` — never `0`. Storage and the "Pods total/limit" tiles have **no** source in metrics.k8s.io; they render `unknown` until a source is named. |
-| Code area | `backend/app/services/k8s_client.py` (`list_nodes`, `node_metrics`), `backend/app/api/metrics.py` + `backend/app/schemas/metrics.py` (new), `frontend/src/views/Cluster/Nodes.tsx` (new), `frontend/src/lib/types.ts`. |
-| Authorized by | paladm, at the blueprint gate (2026-10-21) — scope "Table + real tiles, needs metrics work". |
+**Decision note:** the metrics source was an owed decision (ADR-0003 has no body on disk). It was
+ratified at the blueprint gate — **metrics.k8s.io**, query-only — and recorded in `adr.md`. No
+other owed decisions; every displayed value has a named source (metrics.k8s.io for CPU/Mem usage,
+core-v1 node status for capacity/pods/created, and "unknown" where no source exists).
 
 ## Must-Haves (goal-backward verification)
 
