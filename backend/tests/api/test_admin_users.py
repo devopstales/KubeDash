@@ -109,6 +109,7 @@ def test_admin_lists_users_with_cluster_count(api_client, api_app, admin_headers
     assert by_sub["sub-admin-1"]["cluster_count"] == 0
     assert by_sub["sub-user-1"]["role"] == "user"
     assert by_sub["sub-user-1"]["status"] == "active"
+    assert by_sub["sub-user-1"]["auth_source"] == "oidc"
 
 
 def test_non_admin_get_admin_users_is_403(api_client, user_headers) -> None:
@@ -196,6 +197,121 @@ def test_patch_unknown_user_is_404(api_client, api_app, admin_headers) -> None:
     r = api_client.patch("/api/v1/admin/users/9999", json={"role": "user"}, headers=admin_headers)
     assert r.status_code == 404
     assert r.get_json()["error"]["code"] == "RESOURCE_KIND_NOT_SUPPORTED"
+
+
+def test_admin_creates_local_user(api_client, api_app, admin_headers) -> None:
+    """4.1 Create User: a Local password row, audited, not the bootstrap prefix."""
+    r = api_client.post(
+        "/api/v1/admin/users",
+        json={
+            "username": "pat",
+            "email": "pat@example.com",
+            "password": "Abcdef1!",
+            "role": "User",
+            "type": "Local",
+        },
+        headers=admin_headers,
+    )
+    assert r.status_code == 201, r.get_json()
+    body = r.get_json()
+    assert body["sub"] == "kubedash:pat@example.com"
+    assert body["display_name"] == "pat"
+    assert body["role"] == "user"
+    assert body["auth_source"] == "local"
+    with api_app.app_context():  # type: ignore[attr-defined]
+        from app.extensions import db
+        from app.models.audit import AuditLog
+        from app.models.user import User
+
+        u = db.session.execute(
+            db.select(User).filter_by(sub="kubedash:pat@example.com")
+        ).scalar_one()
+        assert u.password_hash
+        audit = db.session.execute(
+            db.select(AuditLog).filter_by(action="user_create", target="kubedash:pat@example.com")
+        ).scalar_one()
+        assert audit.actor_sub == "sub-admin-1"
+
+
+def test_create_user_weak_password_is_422(api_client, admin_headers) -> None:
+    r = api_client.post(
+        "/api/v1/admin/users",
+        json={
+            "username": "pat",
+            "email": "pat@example.com",
+            "password": "weak",
+            "role": "user",
+            "type": "Local",
+        },
+        headers=admin_headers,
+    )
+    assert r.status_code == 422
+    assert r.get_json()["error"]["code"] == "INVALID_KUBECONFIG"
+
+
+def test_create_duplicate_email_is_409(api_client, admin_headers, user_headers) -> None:
+    r = api_client.post(
+        "/api/v1/admin/users",
+        json={
+            "username": "again",
+            "email": "user@local",
+            "password": "Abcdef1!",
+            "role": "user",
+        },
+        headers=admin_headers,
+    )
+    assert r.status_code == 409
+    assert r.get_json()["error"]["code"] == "CLUSTER_ALREADY_EXISTS"
+
+
+def test_non_admin_cannot_create_user(api_client, user_headers) -> None:
+    r = api_client.post(
+        "/api/v1/admin/users",
+        json={
+            "username": "pat",
+            "email": "pat@example.com",
+            "password": "Abcdef1!",
+            "role": "user",
+        },
+        headers=user_headers,
+    )
+    assert r.status_code == 403
+    assert r.get_json()["error"]["code"] == "RBAC_DENIED"
+
+
+def test_admin_deletes_user(api_client, api_app, admin_headers, user_headers) -> None:
+    user_id = _user_id(api_app, "sub-user-1")
+    r = api_client.delete(f"/api/v1/admin/users/{user_id}", headers=admin_headers)
+    assert r.status_code == 200, r.get_json()
+    assert r.get_json()["deleted"] == "sub-user-1"
+    with api_app.app_context():  # type: ignore[attr-defined]
+        from app.extensions import db
+        from app.models.audit import AuditLog
+        from app.models.user import User
+
+        gone = db.session.execute(
+            db.select(User).filter_by(sub="sub-user-1")
+        ).scalar_one_or_none()
+        assert gone is None
+        audit = db.session.execute(
+            db.select(AuditLog).filter_by(action="user_delete", target="sub-user-1")
+        ).scalar_one()
+        assert audit.actor_sub == "sub-admin-1"
+
+
+def test_cannot_delete_bootstrap_admin(api_client, api_app, admin_headers) -> None:
+    _seed_bootstrap_admin(api_client, api_app)
+    user_id = _user_id(api_app, "local:admin@local")
+    r = api_client.delete(f"/api/v1/admin/users/{user_id}", headers=admin_headers)
+    assert r.status_code == 409
+    assert r.get_json()["error"]["code"] == "CLUSTER_ALREADY_EXISTS"
+
+
+def test_cannot_delete_self(api_client, api_app, admin_headers) -> None:
+    user_id = _user_id(api_app, "sub-admin-1")
+    r = api_client.delete(f"/api/v1/admin/users/{user_id}", headers=admin_headers)
+    assert r.status_code == 409
+    assert "own account" in r.get_json()["error"]["message"]
 
 
 def test_patch_invalid_role_is_422(api_client, api_app, admin_headers, user_headers) -> None:

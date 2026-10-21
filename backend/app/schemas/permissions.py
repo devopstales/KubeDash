@@ -20,6 +20,7 @@ class UserOut(Schema):
     groups = fields.List(fields.String())
     role = fields.String()
     status = fields.String()
+    auth_source = fields.String()
     cluster_count = fields.Int()
     last_login_at = fields.DateTime(allow_none=True)
     # The main-branch "Type" column: "Local" (auth_source=local) or "OIDC".
@@ -33,6 +34,18 @@ class UserPatch(Schema):
 
     role = fields.String(allow_none=True)
     status = fields.String(allow_none=True)
+
+
+class UserIn(Schema):
+    """POST body for the 4.1 Create User form. ``role`` is ``user`` or
+    ``admin`` (the form labels are User / Admin). ``type`` is ``Local`` —
+    created rows are password users, not SSO upserts."""
+
+    username = fields.String(required=True)
+    email = fields.String(required=True)
+    password = fields.String(required=True)
+    role = fields.String(required=True)
+    type = fields.String(load_default="Local")
 
 
 class TemplateIn(Schema):
