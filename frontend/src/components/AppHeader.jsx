@@ -43,7 +43,9 @@ import {
 import { useCluster } from '../hooks/useCluster'
 import { useClusterStore } from '../store/cluster'
 import { useSidebarStore } from '../store/sidebar'
+import { useTopMenuStore } from '../store/topmenu'
 import { apiFetch } from '../lib/api'
+import { TopMenuNav } from './TopMenu'
 
 const undrawProfile = '/assets/img/avatars/undraw_profile.svg'
 
@@ -75,6 +77,7 @@ const AppHeader = () => {
   const selectedNamespace = useClusterStore((s) => s.selectedNamespace)
   const setSelectedNamespace = useClusterStore((s) => s.setSelectedNamespace)
   const toggleSidebar = useSidebarStore((state) => state.toggle)
+  const setTopMenuSlot = useTopMenuStore((state) => state.setSlot)
   const [draftNamespace, setDraftNamespace] = useState(null)
   const [draftClusterId, setDraftClusterId] = useState(selectedCluster?.id)
   if (selectedCluster?.id !== draftClusterId) {
@@ -374,6 +377,10 @@ const AppHeader = () => {
             </CDropdownMenu>
           </CDropdown>
         </CHeaderNav>
+      </div>
+      <div className="container-fluid px-4 d-flex align-items-center">
+        <div ref={setTopMenuSlot} className="d-flex align-items-center flex-grow-1" />
+        <TopMenuNav />
       </div>
     </CHeader>
   )
