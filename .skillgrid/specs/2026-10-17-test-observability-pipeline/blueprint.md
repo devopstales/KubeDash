@@ -86,7 +86,7 @@ dev stack).
   fixture yields a `critical`/`high` finding; a clean tree pushes a zero series
   (present, not absent)
 - T11: `task test-dast` (Wapiti) runs against the running API with a JWT from
-  the `e2e/oidc-mock.py` `--form-script` bootstrap (verified by a
+  the `tests/e2e/oidc-mock.py` `--form-script` bootstrap (verified by a
   `/api/v1/auth/me` 200 before the scan) and pushes
   `kubedash_security_vulns_total{tool=wapiti,severity,type}`; with no stack it
   is `skipped` *(backstop — needs stack)*
@@ -741,7 +741,7 @@ policy changes during execution.
   leader setup (`task multi-up`) — both are live-app suites and degrade to
   `skipped` without it.
 - **TASK-011** (Helm chart + e2e mock OIDC, re-scoped to drop CI/CD) is the
-  sibling that owns `charts/kubedash` + the canonical `e2e/oidc-mock.py`; this
+  sibling that owns `charts/kubedash` + the canonical `tests/e2e/oidc-mock.py`; this
   change's Task 6 builds the same mock so the DAST bootstrap is self-contained,
   and the two should converge on one `oidc-mock.py` (TASK-011's is canonical —
   this change's Task 6 should reuse it once TASK-011 lands rather than fork it).

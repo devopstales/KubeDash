@@ -262,7 +262,7 @@ pipeline** (the repo has no GitHub CI by explicit decision).
    sql,xss,exec,file,xxe,crlf,csrf,http_headers,cookieflags,csp` against the
    running Flask **API** (the SPA's client-rendered routes are Playwright's
    surface, not Wapiti's — Wapiti is crawler-blind to JS routes). Auth via
-   `--form-script` reusing **TASK-011's `e2e/oidc-mock.py`** flow to obtain a
+   `--form-script` reusing **TASK-011's `tests/e2e/oidc-mock.py`** flow to obtain a
    JWT session (built in this change's Phase 4, per user decision). Writes
    `tmp/testing/security-wapiti.json` and pushes
    `kubedash_security_vulns_total{tool=wapiti, severity, type}`. Wapiti hits
@@ -348,7 +348,7 @@ pipeline** (the repo has no GitHub CI by explicit decision).
   - `frontend/package.json` (add `@vitest/coverage-v8`; confirm `jscpd`) —
     *modify*; `frontend/tests/` (new) — MSW + component tests;
     `frontend/playwright.config.ts` (fix webServer/baseURL) — *modify*
-  - `dev/e2e/oidc-mock.py` (new, or under `e2e/`) — the Wapiti
+  - `dev/e2e/oidc-mock.py` (new, or under `tests/e2e/`) — the Wapiti
     `--form-script` login bootstrap (shares the TASK-011 mock-OIDC design)
   - `dev/testing/k6/` (new) — k6 test scripts + `--summary-json` handling
   - Dev-only tool installs: `trivy`, `jscpd`, `k6`, `wapiti3` (Python 3.12–3.14)
@@ -408,7 +408,7 @@ pipeline** (the repo has no GitHub CI by explicit decision).
   "ci.yaml green on branch" clause (keep the `test_chart.py` + `helm
   lint/template` assertions). Plan step 2 drops `.github/workflows/ci.yaml +
   e2e.yaml`. A comment records the re-scope + that e2e now runs locally via
-  `task test-e2e`. The **`e2e/oidc-mock.py`** deliverable is shared by this
+  `task test-e2e`. The **`tests/e2e/oidc-mock.py`** deliverable is shared by this
   change's R8 (Wapiti auth bootstrap) — so this pipeline *consumes* a
   TASK-011 artifact.
 - `.skillgrid/ARCHITECTURE.md`: note the test-observability pipeline as a
@@ -450,7 +450,7 @@ framework, scope, TASK-011 re-scope, and the Trivy/Wapiti split).
   a Vue portion is later introduced, a parallel `@vue/test-utils` suite is
   additive.
 - **Assumption:** Wapiti's authenticated scan reuses **TASK-011's
-  `e2e/oidc-mock.py`**; the `--form-script` bootstrap is built in this
+  `tests/e2e/oidc-mock.py`**; the `--form-script` bootstrap is built in this
   change's Phase 4 (user chose to build it now rather than defer to
   TASK-011). If TASK-011's mock-OIDC shape differs, the bootstrap adapts to it.
 - **Assumption:** the no-app suites (unit, frontend-unit, dup, security-static)
