@@ -1,0 +1,198 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>KubeDash — Cluster Dashboard · Option C (new · mission control)</title>
+<!-- Local CoreUI + local Chart.js UMD. No CDN. -->
+<link rel="stylesheet" href="../../../frontend/node_modules/@coreui/coreui/dist/css/coreui.min.css" />
+<style>
+  body { background-color: var(--cui-tertiary-bg); }
+  [data-coreui-theme='dark'] body { background-color: var(--cui-dark-bg-subtle); }
+  .icon { width: 1rem; height: 1rem; }
+  .icon-lg { width: 1.25rem; height: 1.25rem; }
+  .gauge-wrap { position: relative; height: 170px; }
+  .donut-wrap { position: relative; height: 220px; }
+  .timeline { list-style: none; margin: 0; padding: 0; border-left: 2px solid var(--cui-border-color); }
+  .timeline li { position: relative; padding: 0 0 1rem 1.25rem; }
+  .timeline li::before {
+    content: ''; position: absolute; left: -7px; top: 4px; width: 12px; height: 12px;
+    border-radius: 50%; background: var(--cui-secondary); border: 2px solid var(--cui-body-bg);
+  }
+  .timeline li.crit::before { background: var(--cui-danger); }
+  .timeline li.warn::before { background: var(--cui-warning); }
+</style>
+</head>
+<body>
+<svg xmlns="http://www.w3.org/2000/svg" hidden>
+  <symbol id="i-sync" viewBox="0 0 512 512"><path fill="currentColor" d="M472.01 144H288V55.987A40 40 0 0 0 248 16h-32a16 16 0 0 0-16 16v80a16 16 0 0 0 16 16h168v192a16 16 0 0 0 16 16h32a40 40 0 0 0 40-40V184a40 40 0 0 0-40-40Zm-432 56v96a40 40 0 0 0 40 40h184v88.013A40 40 0 0 0 264 496h32a16 16 0 0 0 16-16v-80a16 16 0 0 0-16-16H128V192a16 16 0 0 0-16-16H80a40 40 0 0 0-40 40Z"/></symbol>
+</svg>
+
+<div class="wrapper d-flex flex-column min-vh-100">
+  <header class="header p-0 mb-4">
+    <div class="container-fluid px-4 d-flex align-items-center border-bottom">
+      <strong>KubeDash</strong>
+      <div class="ms-auto d-flex align-items-center gap-3">
+        <select class="form-select form-select-sm w-auto" aria-label="Cluster">
+          <option selected>production-1</option>
+          <option>staging-1</option>
+        </select>
+        <div class="btn-group" role="group" aria-label="Theme">
+          <button class="btn btn-ghost-secondary btn-sm" type="button" data-theme="light">Light</button>
+          <button class="btn btn-ghost-secondary btn-sm" type="button" data-theme="dark">Dark</button>
+        </div>
+      </div>
+    </div>
+    <div class="container-fluid px-4 d-flex align-items-center">
+      <nav aria-label="breadcrumb">
+        <ol class="breadcrumb my-0">
+          <li class="breadcrumb-item">Dashboard</li>
+          <li class="breadcrumb-item active" aria-current="page">Cluster Health</li>
+        </ol>
+      </nav>
+      <button class="btn btn-link header-toggler ms-auto" type="button" aria-label="Refresh" title="Refresh">
+        <svg class="icon icon-lg" aria-hidden="true"><use href="#i-sync" /></svg>
+      </button>
+    </div>
+  </header>
+
+  <main class="body flex-grow-1">
+    <div class="container-fluid px-4">
+
+      <!-- Row: two gauges (CPU, Memory) + a pods donut -->
+      <div class="row g-3 mb-4">
+        <div class="col-lg-4">
+          <div class="card shadow h-100">
+            <div class="card-header py-3"><h5 class="card-title m-0 fw-bold text-primary fs-6">CPU</h5></div>
+            <div class="card-body d-flex flex-column align-items-center">
+              <div class="gauge-wrap w-100"><canvas id="gauge-cpu" role="img" aria-label="CPU usage gauge"></canvas></div>
+              <div class="small text-muted">3,280 / 8,000 millicores · observed</div>
+            </div>
+          </div>
+        </div>
+        <div class="col-lg-4">
+          <div class="card shadow h-100">
+            <div class="card-header py-3"><h5 class="card-title m-0 fw-bold text-primary fs-6">Memory</h5></div>
+            <div class="card-body d-flex flex-column align-items-center">
+              <div class="gauge-wrap w-100"><canvas id="gauge-mem" role="img" aria-label="Memory usage gauge"></canvas></div>
+              <div class="small text-muted">101 / 160 GiB · observed</div>
+            </div>
+          </div>
+        </div>
+        <div class="col-lg-4">
+          <div class="card shadow h-100">
+            <div class="card-header py-3"><h5 class="card-title m-0 fw-bold text-primary fs-6">Pods</h5></div>
+            <div class="card-body d-flex flex-column align-items-center">
+              <div class="donut-wrap w-100"><canvas id="donut-pods" role="img" aria-label="Pods by phase"></canvas></div>
+              <div class="small text-muted">128 total · storage unknown</div>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- Events timeline (new: vertical feed, not a table) -->
+      <section class="card shadow mb-4">
+        <div class="card-header py-3 d-flex align-items-center">
+          <h5 class="card-title m-0 fw-bold text-primary fs-6">Event Stream</h5>
+          <span class="badge text-bg-secondary ms-2">Live · SSE</span>
+        </div>
+        <div class="card-body">
+          <ul class="timeline">
+            <li class="crit">
+              <div class="d-flex align-items-center gap-2"><span class="text-nowrap small text-muted">14:32:05</span><span class="badge text-bg-danger">FailedMount</span></div>
+              <div class="small"><a href="#">orders-service-7d9f</a> <span class="text-muted">· prod</span></div>
+              <div class="text-break small text-muted">MountVolume.SetUp failed: timeout waiting for volume <span class="text-muted">(×3)</span></div>
+            </li>
+            <li class="crit">
+              <div class="d-flex align-items-center gap-2"><span class="text-nowrap small text-muted">14:31:48</span><span class="badge text-bg-danger">OOMKilled</span></div>
+              <div class="small"><a href="#">billing-worker-4c2b</a> <span class="text-muted">· prod</span></div>
+              <div class="text-break small text-muted">Container billing exceeded memory limit 512Mi</div>
+            </li>
+            <li class="warn">
+              <div class="d-flex align-items-center gap-2"><span class="text-nowrap small text-muted">14:31:02</span><span class="badge text-bg-warning">BackOff</span></div>
+              <div class="small"><a href="#">search-api-5f1e</a> <span class="text-muted">· staging</span></div>
+              <div class="text-break small text-muted">Back-off restarting failed container <span class="text-muted">(×7)</span></div>
+            </li>
+            <li>
+              <div class="d-flex align-items-center gap-2"><span class="text-nowrap small text-muted">14:28:47</span><span class="badge text-bg-secondary">Pulled</span></div>
+              <div class="small"><a href="#">orders-service-7d9f</a> <span class="text-muted">· prod</span></div>
+              <div class="text-break small text-muted">Container image pulled (cache hit)</div>
+            </li>
+            <li class="crit">
+              <div class="d-flex align-items-center gap-2"><span class="text-nowrap small text-muted">14:25:19</span><span class="badge text-bg-danger">FailedScheduling</span></div>
+              <div class="small"><a href="#">ml-trainer-job-9x2</a> <span class="text-muted">· staging</span></div>
+              <div class="text-break small text-muted">0/4 nodes available: insufficient memory</div>
+            </li>
+          </ul>
+          <div class="mt-2 small text-muted">5 newest of 134 events in the last 15 minutes.</div>
+        </div>
+      </section>
+
+    </div>
+  </main>
+</div>
+
+<script src="../../../frontend/node_modules/chart.js/dist/chart.umd.min.js"></script>
+<script>
+  const charts = []
+  function gauge(id, pct, color) {
+    return new Chart(document.getElementById(id), {
+      type: 'doughnut',
+      data: {
+        datasets: [{
+          data: [pct, 100 - pct],
+          backgroundColor: [color, 'rgba(128,128,128,0.15)'],
+          borderWidth: 0,
+        }],
+      },
+      options: {
+        cutout: '72%', rotation: -90, circumference: 180, responsive: true, maintainAspectRatio: false,
+        plugins: { legend: { display: false }, tooltip: { enabled: false } },
+      },
+      plugins: [{
+        id: 'center',
+        afterDraw(c) {
+          const { ctx } = c
+          const meta = c.getDatasetMeta(0)
+          const arc = meta.data[0]
+          if (!arc) return
+          const { x, y } = arc
+          ctx.save()
+          ctx.font = '600 1.5rem system-ui, sans-serif'
+          ctx.textAlign = 'center'
+          ctx.textBaseline = 'middle'
+          ctx.fillStyle = getComputedStyle(document.body).color
+          ctx.fillText(pct + '%', x, y - 6)
+          ctx.restore()
+        },
+      }],
+    })
+  }
+  function redraw(dark) {
+    charts.forEach((c) => c.destroy())
+    charts.length = 0
+    const tick = dark ? '#a0a6bd' : '#4e5860'
+    charts.push(gauge('gauge-cpu', 41, '#5e5cd0'))
+    charts.push(gauge('gauge-mem', 63, '#f9b115'))
+    charts.push(new Chart(document.getElementById('donut-pods'), {
+      type: 'doughnut',
+      data: {
+        labels: ['Running', 'Pending', 'Succeeded/Completed'],
+        datasets: [{ data: [92, 36, 0], backgroundColor: ['#1b9e3e', '#f9b115', '#5e5cd0'], borderWidth: 0 }],
+      },
+      options: {
+        cutout: '60%', responsive: true, maintainAspectRatio: false,
+        plugins: { legend: { position: 'bottom', labels: { color: tick, boxWidth: 12 } } },
+      },
+    }))
+  }
+  document.querySelectorAll('[data-theme]').forEach((button) => {
+    button.addEventListener('click', () => {
+      document.documentElement.setAttribute('data-coreui-theme', button.dataset.theme)
+      redraw(button.dataset.theme === 'dark')
+    })
+  })
+  redraw(false)
+</script>
+</body>
+</html>
