@@ -72,6 +72,12 @@ def _upsert_user(userinfo: dict[str, object]) -> User:
     # hook's case-gated refresh must not flip it back on the next boot.
     user.auth_source = "oidc"
     db.session.commit()
+    # Materialize group memberships (the groups list stays current at login —
+    # idempotent upsert; groups the user LEFT are left alone here — the sync
+    # endpoint is the manual reconciliation point).
+    from app.services import groups as groups_svc
+    for name in user.groups or []:
+        groups_svc.sync_one_user(db.session, user_id=user.id, group_names=[name])
     return user
 
 
