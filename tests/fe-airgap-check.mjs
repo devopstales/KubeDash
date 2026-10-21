@@ -27,6 +27,9 @@ const DEFAULT_ALLOW = [
   // React error-message doc URLs (react-router data-router guidance +
   // dev-mode checkPropTypes pointer): user-facing message text.
   'reactrouter.com',
+  // react-router useSearchParams warning that names an IE11 polyfill.
+  // Message text only; the bundle does not load it.
+  'github.com/ungap/url-search-params',
   'fb.me',
   // core-js browser-compat warning + LICENSE attribution: message text.
   'zloirock',
