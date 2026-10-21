@@ -4,14 +4,15 @@
 # deeper truth (see .skillgrid/specs/).
 
 pipeline:
-  # The in-flight change the user asked to execute (2026-10-21).
-  # Tasks 1–7 are committed on rebase; Task 8 (docs + full verify) is open.
-  # Spec-zone artifacts: briefing + blueprint + acceptance.feature + tasks.md
-  # (sliced, 8 tickets / 7 waves). Ledger: .skillgrid/sdd/2026-10-19-user-management/
-  current_change: 2026-10-19-user-management
+  # Pointer repaired 2026-10-21: the user asked to execute
+  # 2026-10-21-namespace-page. Spec-zone artifacts: briefing + blueprint +
+  # acceptance.feature (no tasks.md — TASK-028 covers the blueprint as one
+  # sequential ticket). 2026-10-19-user-management remains in-flight on disk
+  # but is no longer the current pointer.
+  current_change: 2026-10-21-namespace-page
   current_phase: executing
-  # 2026-10-17-kubectl-oidc-plugin and 2026-10-17-test-observability-pipeline
-  # remain in flight at their own phases. This pointer names one current change.
+  # 2026-10-17-kubectl-oidc-plugin, 2026-10-17-test-observability-pipeline,
+  # and 2026-10-19-user-management remain in flight at their own phases.
   specs_root: .skillgrid/specs
 
 # In-flight changes (besides pipeline.current_change). current_change stays on
