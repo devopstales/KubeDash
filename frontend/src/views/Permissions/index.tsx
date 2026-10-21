@@ -7,8 +7,8 @@ import {
   CCardTitle,
   CCol,
   CRow,
-  CTable,
 } from '@coreui/react'
+import KubeDataTable, { Column } from '../../components/KubeDataTable'
 import { useQuery } from '@tanstack/react-query'
 import { apiFetch, downloadFile } from '../../lib/api'
 import type { MyAccessBinding } from '../../lib/types'
@@ -66,26 +66,16 @@ const PermissionsView = () => {
             ) : bindings.length === 0 ? (
               <div>No cluster access yet.</div>
             ) : (
-              <CTable striped hover>
-                <thead>
-                  <tr>
-                    <th>Cluster</th>
-                    <th>Namespace</th>
-                    <th>Template</th>
-                    <th>Created</th>
-                  </tr>
-                </thead>
-                <tbody>
-                  {bindings.map((b) => (
-                    <tr key={`${b.cluster}/${b.namespace ?? ''}/${b.template ?? ''}`}>
-                      <td>{b.cluster}</td>
-                      <td>{b.namespace ?? '\u2014'}</td>
-                      <td>{b.template ?? '\u2014'}</td>
-                      <td>{b.created_at}</td>
-                    </tr>
-                  ))}
-                </tbody>
-              </CTable>
+              <KubeDataTable data={bindings}>
+                <Column title="Cluster" data="cluster" />
+                <Column title="Namespace" data="namespace">
+                  {(namespace: string | null) => namespace ?? '\u2014'}
+                </Column>
+                <Column title="Template" data="template">
+                  {(template: string | null) => template ?? '\u2014'}
+                </Column>
+                <Column title="Created" data="created_at" />
+              </KubeDataTable>
             )}
             <div className="mt-3">
               <CButton onClick={onDownload} disabled={downloading}>

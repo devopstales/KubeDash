@@ -2,10 +2,52 @@ import { render, screen, waitFor } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query'
 import { MemoryRouter } from 'react-router-dom'
-import { afterEach, beforeEach, describe, expect, test, vi } from 'vitest'
+import { afterEach, describe, expect, test, vi } from 'vitest'
 import { server } from '../msw'
 import { http, HttpResponse } from 'msw'
 import PermissionsView from '../../src/views/Permissions'
+
+vi.mock('../../src/components/KubeDataTable', () => {
+  const React = require('react') as typeof import('react')
+  const Column = () => null
+  function KubeDataTable({
+    data,
+    children,
+  }: {
+    data: Record<string, unknown>[]
+    children: React.ReactNode
+  }) {
+    const cols = React.Children.toArray(children)
+      .filter(React.isValidElement)
+      .map((child) => (child as React.ReactElement<{ title: string; data?: string | null; children?: unknown }>).props)
+    return (
+      <table className="table table-bordered">
+        <thead>
+          <tr>
+            {cols.map((col) => (
+              <th key={col.title}>{col.title}</th>
+            ))}
+          </tr>
+        </thead>
+        <tbody>
+          {data.map((row, i) => (
+            <tr key={i}>
+              {cols.map((col) => {
+                const value = col.data == null ? row : row[col.data]
+                const node =
+                  typeof col.children === 'function'
+                    ? (col.children as (v: unknown, t: string, r: unknown) => React.ReactNode)(value, 'display', row)
+                    : (value as React.ReactNode)
+                return <td key={col.title}>{node ?? ''}</td>
+              })}
+            </tr>
+          ))}
+        </tbody>
+      </table>
+    )
+  }
+  return { default: KubeDataTable, Column }
+})
 
 // ponytail: jsdom has no real downloads — spy on URL.createObjectURL + the
 // anchor's click() to assert the download was TRIGGERED with the right
