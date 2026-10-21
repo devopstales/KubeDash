@@ -79,6 +79,7 @@ are kept, with `In force: no`. Never delete a row; flip it instead (IRON RULE).
 | ADR-0020 | Air-Gap Deployment (zero outbound calls at runtime; air-gap ≠ no-IdP) — superseded-in-part by ADR-0021 (the bootstrap-admin local mode is now implemented; the multi-user no-IdP deferral remains) | yes | `artifacts/04-adr-0020-air-gap-deployment.md` |
 | ADR-0021 | Local Admin Auth — bootstrap password mode (env-driven bootstrap admin + admin kubeconfig source; SSO stays primary) | yes | `artifacts/04-adr-0021-local-admin-auth.md` |
 | ADR-0022 | Sidebar navigation — 4.1 information-parity structure (sections, groups, entry names, order, admin gating); 4.1 Plugins group dropped (no 5.0 plugin system) | yes | `artifacts/04-adr-0022-sidebar-nav-4-1-parity.md` |
+| ADR-0023 | User-management lists use DataTables React with the Bootstrap 5 skin (4.1 table structure; CoreUI shell unchanged) | yes | `artifacts/04-adr-0023-datatables-react.md` |
 
 > **Note on ADR-0001..0013:** these are listed in `ARCHITECTURE.md` §12 as the
 > initial-architecture decisions "to be authored at brainstorming time." As of
