@@ -20,6 +20,7 @@ def register_apis(app: Flask, api: Api) -> None:
     from app.api.audit import AuditApi
     from app.api.auth import AuthApi
     from app.api.clusters import ClusterApi
+    from app.api.groups import GroupsApi
     from app.api.kubeconfig import KubeconfigApi
     from app.api.kubectl_auth import KubectlAuthApi
     from app.api.logs import LogsApi
@@ -44,6 +45,7 @@ def register_apis(app: Flask, api: Api) -> None:
         TracesApi,
         AuditApi,
         PermissionsApi,
+        GroupsApi,
         NamespacesApi,
         AccessApi,
         KubeconfigApi,
