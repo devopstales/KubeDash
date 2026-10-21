@@ -11,10 +11,11 @@
   [data-coreui-theme='dark'] body { background-color: var(--cui-dark-bg-subtle); }
   .icon { width: 1rem; height: 1rem; }
   .icon-lg { width: 1.25rem; height: 1.25rem; }
-  /* Quiet cell fills inside bordered tables — CoreUI theme tokens only */
-  .cell-ok { background-color: rgba(var(--cui-success-rgb), 0.1); }
-  .cell-warn { background-color: rgba(var(--cui-warning-rgb), 0.1); }
-  .cell-bad { background-color: rgba(var(--cui-danger-rgb), 0.1); }
+  /* Quiet cell fills inside bordered tables — CoreUI theme tokens only.
+     !important beats .table>:not(caption)>*>* which sets --cui-table-bg. */
+  .cell-ok { background-color: rgba(var(--cui-success-rgb), 0.1) !important; }
+  .cell-warn { background-color: rgba(var(--cui-warning-rgb), 0.1) !important; }
+  .cell-bad { background-color: rgba(var(--cui-danger-rgb), 0.1) !important; }
 </style>
 </head>
 <body>
