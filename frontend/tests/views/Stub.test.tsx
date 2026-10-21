@@ -31,6 +31,7 @@ function expectedStubs() {
     '/cluster-permission/role',
     '/cluster-permission/role-binding',
     '/cluster-permission/cluster-role',
+    '/cluster-permission/cluster-role-binding',
     '/security/secret',
     '/cluster/namespace',
   ])
@@ -78,7 +79,6 @@ test('every-stub-entry-has-a-page', () => {
   }
   for (const title of [
     'Workload',
-    'ClusterRoleBindings',
     'CRDs',
     'Ingress',
     'VolumeClaims',

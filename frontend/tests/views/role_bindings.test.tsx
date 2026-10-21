@@ -126,7 +126,7 @@ test('lists-role-bindings-in-selected-namespace', async () => {
   expect(screen.getByText('devs')).toBeTruthy()
   expect(screen.getByText('readers')).toBeTruthy()
   expect(screen.getByRole('link', { name: 'builder' }).getAttribute('href')).toBe(
-    '/cluster-permission/service-account?selected=builder',
+    '/cluster-permission/service-account/data?name=builder&namespace=ci',
   )
   expect(screen.getByText('view-binding')).toBeTruthy()
 })
