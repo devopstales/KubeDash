@@ -52,6 +52,14 @@ class FakeK8s:
             {"metadata": {"name": "kubedash-pod", "namespace": namespace}},
         ]
 
+    def list_roles(self, namespace: str | None) -> list[dict]:
+        return [
+            {
+                "metadata": {"name": "edit", "namespace": namespace},
+                "rules": [{"resources": ["pods"], "verbs": ["get"]}],
+            },
+        ]
+
     def list_serviceaccounts(self, namespace: str | None) -> list[dict]:
         return [
             {
@@ -187,6 +195,21 @@ def test_list_pods_namespaced(api_client, auth_client, fake_k8s, monkeypatch) ->
     assert r.status_code == 200
     items = r.get_json()["items"]
     assert [p["metadata"]["namespace"] for p in items] == ["prod-ns"]
+
+
+def test_list_roles_namespaced(api_client, auth_client, fake_k8s, monkeypatch) -> None:
+    """The Cluster Permissions > Roles page lists one namespace."""
+    auth_client.login()
+    h = {"Authorization": f"Bearer {auth_client.jwt}"}
+    _register(api_client, h)
+    _allow_sar(monkeypatch)
+    r = api_client.get("/api/v1/clusters/1/resources/roles?namespace=team-a", headers=h)
+    assert r.status_code == 200
+    body = r.get_json()
+    assert body["kind"] == "roles"
+    [role] = body["items"]
+    assert role["metadata"] == {"name": "edit", "namespace": "team-a"}
+    assert role["rules"] == [{"resources": ["pods"], "verbs": ["get"]}]
 
 
 def test_list_serviceaccounts_namespaced(api_client, auth_client, fake_k8s, monkeypatch) -> None:

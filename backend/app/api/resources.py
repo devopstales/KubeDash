@@ -23,6 +23,7 @@ _KINDS: dict[str, tuple[str, str]] = {
     "pods": ("list_pods", "pods"),
     "namespaces": ("list_namespaces", "namespaces"),
     "serviceaccounts": ("list_serviceaccounts", "serviceaccounts"),
+    "roles": ("list_roles", "roles"),
 }
 
 

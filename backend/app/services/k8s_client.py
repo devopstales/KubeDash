@@ -201,6 +201,15 @@ class K8sClient:
         )
         return [sa.to_dict() for sa in resp.items]
 
+    def list_roles(self, namespace: str | None) -> list[dict[str, Any]]:
+        """Role list in the standard kubernetes dict form (``to_dict``)."""
+        resp = (
+            self._rbac.list_namespaced_role(namespace)
+            if namespace
+            else self._rbac.list_role_for_all_namespaces()
+        )
+        return [role.to_dict() for role in resp.items]
+
     def readyz(self) -> bool:
         """GET ``<host>/readyz`` with the kubeconfig's CA as ``verify=`` and a
         5 s timeout; ANY failure (including timeout) returns ``False`` — the
