@@ -1,5 +1,5 @@
 import React from 'react'
-import { BrowserRouter, Navigate, Route, Routes } from 'react-router-dom'
+import { BrowserRouter, Navigate, Route, Routes, useParams } from 'react-router-dom'
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query'
 import { CSpinner } from '@coreui/react'
 
@@ -17,11 +17,10 @@ const ClustersView = React.lazy(() => import('./views/Clusters'))
 const ClusterView = React.lazy(() => import('./views/Cluster'))
 const ProfileView = React.lazy(() => import('./views/Profile'))
 const PermissionsView = React.lazy(() => import('./views/Permissions'))
-const AdminPermissionsView = React.lazy(() => import('./views/AdminPermissions'))
-const UsersView = React.lazy(() => import('./views/Users'))
-const GroupsView = React.lazy(() => import('./views/Groups'))
 const KubeconfigView = React.lazy(() => import('./views/Kubeconfig'))
+const AdminPermissionsView = React.lazy(() => import('./views/AdminPermissions'))
 const PrivilegesView = React.lazy(() => import('./views/AdminPermissions/Privileges'))
+const PrivilegeEditView = React.lazy(() => import('./views/AdminPermissions/PrivilegeEdit'))
 
 /**
  * KubeDash SPA root: QueryClientProvider (TanStack Query) wraps the
@@ -39,6 +38,13 @@ const queryClient = new QueryClient({
 })
 
 const Fallback = () => <CSpinner color="primary" />
+
+/** Old per-user privilege URL. The page now lives at /user/privilege. */
+const PrivilegeRedirect = () => {
+  const { sub = '' } = useParams()
+  const user = encodeURIComponent(sub)
+  return <Navigate to={user ? `/user/privilege?user=${user}` : '/user/privilege'} replace />
+}
 
 const App = () => {
   return (
@@ -100,7 +106,7 @@ const App = () => {
                       }
                     />
                     <Route
-                      path="/admin/permissions/users/:sub"
+                      path="/user/privilege"
                       element={
                         <ProtectedRoute>
                           <AdminRoute>
@@ -110,21 +116,29 @@ const App = () => {
                       }
                     />
                     <Route
-                      path="/users"
+                      path="/user/privilege/edit"
                       element={
                         <ProtectedRoute>
                           <AdminRoute>
-                            <UsersView />
+                            <PrivilegeEditView />
                           </AdminRoute>
                         </ProtectedRoute>
                       }
                     />
                     <Route
-                      path="/groups"
+                      path="/admin/permissions/users/:sub"
+                      element={
+                        <ProtectedRoute>
+                          <PrivilegeRedirect />
+                        </ProtectedRoute>
+                      }
+                    />
+                    <Route
+                      path="/user/list"
                       element={
                         <ProtectedRoute>
                           <AdminRoute>
-                            <GroupsView />
+                            <AdminPermissionsView />
                           </AdminRoute>
                         </ProtectedRoute>
                       }
