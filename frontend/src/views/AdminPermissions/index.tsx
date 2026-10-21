@@ -1,5 +1,5 @@
 import React, { useState } from 'react'
-import { Link, useSearchParams } from 'react-router-dom'
+import { Link, Navigate, useLocation, useSearchParams } from 'react-router-dom'
 import {
   CBreadcrumb,
   CBreadcrumbItem,
@@ -18,11 +18,12 @@ import {
   CModalTitle,
 } from '@coreui/react'
 import CIcon from '@coreui/icons-react'
-import { cilPencil, cilReload, cilShieldAlt, cilTrash, cilUserPlus } from '@coreui/icons'
+import { cilBadge, cilPencil, cilTrash, cilUserPlus } from '@coreui/icons'
 import { useQuery, useQueryClient } from '@tanstack/react-query'
 import { apiFetch } from '../../lib/api'
 import type { AdminUser } from '../../lib/types'
 import KubeDataTable, { Column } from '../../components/KubeDataTable'
+import TopMenu from '../../components/TopMenu'
 import { useCluster } from '../../hooks/useCluster'
 import TemplatesPage from './Templates'
 import AuditPage from './Audit'
@@ -61,8 +62,9 @@ const roleLabel = (role: string) => {
 const displayName = (user: AdminUser) => user.display_name || user.sub
 
 /**
- * 4.1 User List (`users/user.html.j2`): breadcrumb, Create User, reload,
- * CoreUI card, and icon actions (edit, delete, privileges).
+ * 4.1 User List (`users/user.html.j2`): header breadcrumb and Create User,
+ * CoreUI card, and icon actions (edit, delete, privilege edit). The
+ * bootstrap admin row has no actions.
  * `?tab=templates` and `?tab=audit` are separate pages, not a tab strip.
  */
 const UserList = () => {
@@ -79,7 +81,6 @@ const UserList = () => {
 
   const [editing, setEditing] = useState<AdminUser | null>(null)
   const [role, setRole] = useState('user')
-  const [status, setStatus] = useState('active')
   const [saveError, setSaveError] = useState<string | null>(null)
   const [busy, setBusy] = useState(false)
 
@@ -112,7 +113,6 @@ const UserList = () => {
   const openEdit = (user: AdminUser) => {
     setEditing(user)
     setRole(user.role)
-    setStatus(user.status)
     setSaveError(null)
   }
 
@@ -124,7 +124,7 @@ const UserList = () => {
     const r = await apiFetch(`/api/v1/admin/users/${editing.id}`, {
       method: 'PATCH',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ role, status }),
+      body: JSON.stringify({ role }),
     })
     setBusy(false)
     if (r.error) {
@@ -172,39 +172,29 @@ const UserList = () => {
 
   const users = usersQuery.data ?? []
   const mutable = (user: AdminUser) => !user.sub.startsWith('local:')
+  const privilegeTo = (sub: string, page = '/user/privilege') =>
+    me?.sub === sub ? page : `${page}?user=${encodeURIComponent(sub)}`
 
   return (
     <>
-      <div className="d-flex align-items-center justify-content-between mb-3">
+      <TopMenu>
         <CBreadcrumb className="my-0" aria-label="breadcrumb">
           <CBreadcrumbItem>User Management</CBreadcrumbItem>
           <CBreadcrumbItem active>Users</CBreadcrumbItem>
         </CBreadcrumb>
-        <div className="d-flex align-items-center">
-          <CButton
-            color="link"
-            className="header-toggler"
-            type="button"
-            aria-label="Create User"
-            onClick={() => setCreating(true)}
-          >
-            <CIcon icon={cilUserPlus} size="lg" />
-          </CButton>
-          <CButton
-            color="link"
-            className="p-0 ms-3"
-            type="button"
-            aria-label="Reload page"
-            title="Reload page"
-            style={{ color: '#6261cc' }}
-            onClick={reload}
-          >
-            <CIcon icon={cilReload} size="lg" />
-          </CButton>
-        </div>
-      </div>
+        <CButton
+          color="link"
+          className="header-toggler ms-auto"
+          type="button"
+          aria-label="Create User"
+          title="Create User"
+          onClick={() => setCreating(true)}
+        >
+          <CIcon icon={cilUserPlus} size="lg" />
+        </CButton>
+      </TopMenu>
 
-      <CCard className="shadow mb-4">
+      <CCard className="shadow mb-4 mx-4">
         <CCardHeader className="py-3">
           <h6 className="m-0 fw-bold text-primary">User List</h6>
         </CCardHeader>
@@ -223,7 +213,7 @@ const UserList = () => {
                 {(name: string | null, _type: string, row: AdminUser) => {
                   const label = name || row.sub
                   if (!mutable(row) && me?.sub !== row.sub) return label
-                  return <Link to={`/admin/permissions/users/${encodeURIComponent(row.sub)}`}>{label}</Link>
+                  return <Link to={privilegeTo(row.sub)}>{label}</Link>
                 }}
               </Column>
               <Column title="Email" data="email">
@@ -249,37 +239,26 @@ const UserList = () => {
                       >
                         <CIcon icon={cilPencil} />
                       </CButton>
-                      {me != null && me.sub !== row.sub && (
-                        <CButton
-                          color="danger"
-                          size="sm"
-                          type="button"
-                          aria-label={`Delete ${displayName(row)}`}
-                          title="Delete"
-                          onClick={() => removeUser(row)}
-                        >
-                          <CIcon icon={cilTrash} />
-                        </CButton>
-                      )}
-                      <Link
-                        to={`/admin/permissions/users/${encodeURIComponent(row.sub)}`}
-                        className="btn btn-secondary btn-sm"
-                        aria-label={`Privileges ${displayName(row)}`}
-                        title="Privileges"
+                      <CButton
+                        color="danger"
+                        size="sm"
+                        type="button"
+                        aria-label={`Delete ${displayName(row)}`}
+                        title="Delete"
+                        onClick={() => removeUser(row)}
                       >
-                        <CIcon icon={cilShieldAlt} />
+                        <CIcon icon={cilTrash} />
+                      </CButton>
+                      <Link
+                        to={privilegeTo(row.sub, '/user/privilege/edit')}
+                        className="btn btn-secondary btn-sm"
+                        aria-label={`Edit privileges ${displayName(row)}`}
+                        title="Edit privileges"
+                      >
+                        <CIcon icon={cilBadge} />
                       </Link>
                     </div>
-                  ) : (
-                    <Link
-                      to={`/admin/permissions/users/${encodeURIComponent(row.sub)}`}
-                      className="btn btn-secondary btn-sm"
-                      aria-label={`Privileges ${displayName(row)}`}
-                      title="Privileges"
-                    >
-                      <CIcon icon={cilShieldAlt} />
-                    </Link>
-                  )
+                  ) : null
                 }
               </Column>
             </KubeDataTable>
@@ -399,13 +378,6 @@ const UserList = () => {
                   <option value={typeLabel(editing.auth_source)}>{typeLabel(editing.auth_source)}</option>
                 </CFormSelect>
               </div>
-              <div className="mb-3">
-                <CFormLabel htmlFor="edit-status">Status</CFormLabel>
-                <CFormSelect id="edit-status" value={status} onChange={(e) => setStatus(e.target.value)}>
-                  <option value="active">active</option>
-                  <option value="disabled">disabled</option>
-                </CFormSelect>
-              </div>
               {saveError && <div className="text-danger">{saveError}</div>}
             </CModalBody>
             <CModalFooter>
@@ -425,9 +397,11 @@ const UserList = () => {
 
 const AdminPermissionsView = () => {
   const [params] = useSearchParams()
+  const { pathname } = useLocation()
   const tab = params.get('tab')
   if (tab === 'templates') return <TemplatesPage />
   if (tab === 'audit') return <AuditPage />
+  if (pathname !== '/user/list') return <Navigate to="/user/list" replace />
   return <UserList />
 }
 

@@ -1,12 +1,13 @@
 import { render, screen, waitFor } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query'
-import { MemoryRouter, Routes, Route } from 'react-router-dom'
+import { MemoryRouter, Routes, Route, useLocation } from 'react-router-dom'
 import { afterEach, beforeEach, describe, expect, test, vi } from 'vitest'
 import { server } from '../msw'
 import { http, HttpResponse } from 'msw'
 import AdminPermissionsView from '../../src/views/AdminPermissions'
 import PrivilegesView from '../../src/views/AdminPermissions/Privileges'
+import PrivilegeEditView from '../../src/views/AdminPermissions/PrivilegeEdit'
 import TemplateEditor from '../../src/views/AdminPermissions/components/TemplateEditor'
 import { AdminRoute } from '../../src/routes'
 import { useClusterStore } from '../../src/store/cluster'
@@ -150,12 +151,19 @@ const withAdminHandlers = () =>
     http.get('*/api/v1/audit', () => audit501()),
   )
 
-const renderAdmin = (initialEntry = '/admin/permissions') => {
+const Path = () => {
+  const { pathname, search } = useLocation()
+  return <div data-testid="path">{pathname + search}</div>
+}
+
+const renderAdmin = (initialEntry = '/user/list') => {
   const qc = new QueryClient({ defaultOptions: { queries: { retry: false } } })
   return render(
     <QueryClientProvider client={qc}>
       <MemoryRouter initialEntries={[initialEntry]}>
+        <Path />
         <Routes>
+          <Route path="/user/list" element={<AdminPermissionsView />} />
           <Route path="/admin/permissions" element={<AdminPermissionsView />} />
           <Route path="/" element={<div>Home page</div>} />
         </Routes>
@@ -164,19 +172,23 @@ const renderAdmin = (initialEntry = '/admin/permissions') => {
   )
 }
 
-const renderPrivileges = (sub: string) => {
+const renderPrivileges = (sub: string, page = '/user/privilege') => {
   useClusterStore.setState({ selectedCluster: { id: 1, name: 'prod' } })
   const qc = new QueryClient({ defaultOptions: { queries: { retry: false } } })
   return render(
     <QueryClientProvider client={qc}>
-      <MemoryRouter initialEntries={[`/admin/permissions/users/${encodeURIComponent(sub)}`]}>
+      <MemoryRouter initialEntries={[`${page}?user=${encodeURIComponent(sub)}`]}>
+        <Path />
         <Routes>
-          <Route path="/admin/permissions/users/:sub" element={<PrivilegesView />} />
+          <Route path="/user/privilege" element={<PrivilegesView />} />
+          <Route path="/user/privilege/edit" element={<PrivilegeEditView />} />
         </Routes>
       </MemoryRouter>
     </QueryClientProvider>,
   )
 }
+
+const renderPrivilegeEdit = (sub: string) => renderPrivileges(sub, '/user/privilege/edit')
 
 const renderGate = (initialEntry = '/admin/permissions') => {
   const qc = new QueryClient({ defaultOptions: { queries: { retry: false } } })
@@ -227,30 +239,25 @@ describe('AdminPermissionsView', () => {
     expect(screen.getByText('User')).toBeTruthy()
     expect(screen.getByText('User Management')).toBeTruthy()
     expect(screen.getByRole('button', { name: /create user/i })).toBeTruthy()
-    expect(screen.getByRole('button', { name: /reload page/i })).toBeTruthy()
-    expect(screen.getAllByRole('link', { name: /privileges/i }).length).toBe(USERS.length)
+    expect(screen.getByRole('link', { name: 'Alice' }).getAttribute('href')).toBe(
+      '/user/privilege?user=oidc-alice',
+    )
+    expect(screen.getByRole('link', { name: 'Edit privileges Alice' }).getAttribute('href')).toBe(
+      '/user/privilege/edit?user=oidc-alice',
+    )
+    await waitFor(() => {
+      expect(screen.getByRole('link', { name: 'Edit privileges Dev' }).getAttribute('href')).toBe(
+        '/user/privilege/edit',
+      )
+    })
     expect(screen.getByRole('button', { name: 'Edit Alice' })).toBeTruthy()
     expect(screen.getByRole('button', { name: 'Delete Alice' })).toBeTruthy()
-    expect(screen.queryByRole('button', { name: 'Delete Dev' })).toBeNull()
+    expect(screen.getByRole('button', { name: 'Delete Dev' })).toBeTruthy()
     expect(screen.queryByRole('button', { name: 'Edit Admin' })).toBeNull()
+    expect(screen.queryByRole('link', { name: 'Edit privileges Admin' })).toBeNull()
+    expect(screen.queryByRole('button', { name: 'Delete Admin' })).toBeNull()
     expect(screen.queryByRole('button', { name: /^add user$/i })).toBeNull()
     expect(screen.queryByRole('tab')).toBeNull()
-  })
-
-  test('reload-refetches-the-user-list', async () => {
-    const user = userEvent.setup()
-    let gets = 0
-    server.use(
-      http.get('*/api/v1/admin/users', () => {
-        gets += 1
-        return HttpResponse.json(USERS)
-      }),
-    )
-    renderAdmin()
-    expect(await screen.findByText('Alice')).toBeTruthy()
-    const before = gets
-    await user.click(screen.getByRole('button', { name: /reload page/i }))
-    await waitFor(() => expect(gets).toBeGreaterThan(before))
   })
 
   test('create-user-form-posts-a-local-user', async () => {
@@ -301,7 +308,7 @@ describe('AdminPermissionsView', () => {
     await user.selectOptions(screen.getByLabelText(/dashboard role/i), 'admin')
     await user.click(screen.getByRole('button', { name: /save changes/i }))
     await waitFor(() =>
-      expect(patched).toEqual({ id: '2', body: { role: 'admin', status: 'active' } }),
+      expect(patched).toEqual({ id: '2', body: { role: 'admin' } }),
     )
   })
 
@@ -333,7 +340,7 @@ describe('AdminPermissionsView', () => {
         })
       }),
     )
-    renderPrivileges('oidc-alice')
+    renderPrivilegeEdit('oidc-alice')
     expect(await screen.findByRole('option', { name: 'viewer' })).toBeTruthy()
     const templateSelect = screen.getByLabelText(/^template$/i)
     await user.selectOptions(templateSelect, 'viewer')
@@ -342,10 +349,20 @@ describe('AdminPermissionsView', () => {
     await waitFor(() => expect(bindSpy).toHaveBeenCalledWith(
       expect.objectContaining({ user: 'oidc-alice', cluster: 'prod', namespace: 'team-a', template: 'viewer' }),
     ))
+    await waitFor(() =>
+      expect(screen.getByTestId('path').textContent).toBe('/user/privilege?user=oidc-alice'),
+    )
+  })
+
+  test('privileges-page-links-to-the-edit-page', async () => {
+    renderPrivileges('oidc-alice')
+    const link = await screen.findByRole('link', { name: 'Edit privileges' })
+    expect(link.getAttribute('href')).toBe('/user/privilege/edit?user=oidc-alice')
+    expect(screen.queryByRole('button', { name: /^save$/i })).toBeNull()
   })
 
   test('cluster-template-has-no-namespace-field', async () => {
-    renderPrivileges('oidc-alice')
+    renderPrivilegeEdit('oidc-alice')
     expect(await screen.findByLabelText(/cluster template/i)).toBeTruthy()
     expect(screen.getByLabelText(/^template$/i)).toBeTruthy()
     expect(screen.getByLabelText(/^namespaces$/i)).toBeTruthy()
@@ -386,7 +403,7 @@ describe('AdminPermissionsView', () => {
         ),
       ),
     )
-    renderPrivileges('oidc-alice')
+    renderPrivilegeEdit('oidc-alice')
     expect(await screen.findByRole('option', { name: 'viewer' })).toBeTruthy()
     await user.selectOptions(screen.getByLabelText(/^template$/i), 'viewer')
     await user.type(screen.getByLabelText(/^namespaces$/i), 'team-a')
@@ -441,9 +458,10 @@ describe('AdminPermissionsView', () => {
     expect(screen.queryByText('User List')).toBeNull()
   })
 
-  test('unknown-tab-falls-back-to-users', async () => {
-    renderAdmin('/admin/permissions?tab=bogus')
+  test('old-users-address-opens-user-list', async () => {
+    renderAdmin('/admin/permissions?tab=users')
     expect(await screen.findByText('User List')).toBeTruthy()
+    expect(screen.getByTestId('path').textContent).toBe('/user/list')
     expect(screen.queryByRole('tab')).toBeNull()
   })
 
