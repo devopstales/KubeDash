@@ -29,7 +29,6 @@ import {
   useColorModes,
 } from '@coreui/react'
 import CIcon from '@coreui/icons-react'
-import { cibGithub } from '@coreui/icons'
 import {
   cilAccountLogout,
   cilBell,
@@ -164,21 +163,8 @@ const AppHeader = () => {
           </CNavItem>
         </CHeaderNav>
 
-        {/* Right-aligned nav: GitHub, theme switcher, user profile */}
+        {/* Right-aligned nav: notifications, theme switcher, user profile */}
         <CHeaderNav className="ms-auto">
-          {/* GitHub link */}
-          <CNavItem>
-            <a
-              className="nav-link"
-              href="https://github.com/devopstales/KubeDash"
-              target="_blank"
-              rel="noopener noreferrer"
-              aria-label="KubeDash on GitHub"
-            >
-              <CIcon icon={cibGithub} size="xl" />
-            </a>
-          </CNavItem>
-
           {/* Notifications bell (mirrors main's flash-message dropdown) */}
           <CDropdown variant="nav-item" placement="bottom-end">
             <CDropdownToggle
@@ -307,11 +293,8 @@ const AppHeader = () => {
                 <CIcon icon={cilUser} className="me-2" />
                 Profile
               </CDropdownItem>
-              <CDropdownItem
-                href="https://devopstales.github.io/KubeDash/latest/"
-                target="_blank"
-                rel="noopener noreferrer"
-              >
+              {/* ADR-0020: air-gapped bundle — no outbound docs URL, label only */}
+              <CDropdownItem disabled>
                 <CIcon icon={cilSettings} className="me-2" />
                 Docs
               </CDropdownItem>
