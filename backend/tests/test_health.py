@@ -29,7 +29,8 @@ def test_readyz_names_failing_database(client, monkeypatch):
         def connect(self) -> None:
             raise ConnectionError("db down")
 
-    monkeypatch.setattr(db, "engine", _BrokenEngine())
+    # flask-sqlalchemy exposes ``engine`` as a read-only property — patch the class.
+    monkeypatch.setattr(type(db), "engine", property(lambda _self: _BrokenEngine()))
     resp = client.get("/readyz")
     assert resp.status_code == 503
     body = resp.get_json()

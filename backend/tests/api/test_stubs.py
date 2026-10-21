@@ -3,7 +3,7 @@
 The user-management change (TICKET-04) replaced the ``/admin/users``,
 ``/admin/permissions/*``, and ``/permissions/my-access`` stubs with real
 routes — they are NO LONGER in the 501 list below. The routes that remain
-stubbed (``/kubeconfig`` until Task 5, ``/namespaces/*``, ``/access/*``,
+stubbed (``/namespaces/*``, ``/access/*``,
 observability, audit reads, SCIM, aggregated) keep their 501 guard.
 
 Uses the Docker-free sqlite + mock-OIDC ``app``/``client`` fixtures from
