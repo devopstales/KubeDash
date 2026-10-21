@@ -13,12 +13,60 @@ import {
 import CIcon from '@coreui/icons-react'
 import { cilLockLocked, cilLockUnlocked } from '@coreui/icons'
 import { useQuery } from '@tanstack/react-query'
+import { Light as SyntaxHighlighter } from 'react-syntax-highlighter'
+import json from 'react-syntax-highlighter/dist/esm/languages/hljs/json'
+import yaml from 'react-syntax-highlighter/dist/esm/languages/hljs/yaml'
+import xml from 'react-syntax-highlighter/dist/esm/languages/hljs/xml'
+import javascript from 'react-syntax-highlighter/dist/esm/languages/hljs/javascript'
+import anOldHope from 'react-syntax-highlighter/dist/esm/styles/hljs/an-old-hope'
 import { apiFetch } from '../../lib/api'
 import type { K8sSecret, ResourceList } from '../../lib/types'
 import { useClusterStore } from '../../store/cluster'
 import TopMenu from '../../components/TopMenu'
 
 const LAST_APPLIED = 'kubectl.kubernetes.io/last-applied-configuration'
+
+SyntaxHighlighter.registerLanguage('json', json)
+SyntaxHighlighter.registerLanguage('yaml', yaml)
+SyntaxHighlighter.registerLanguage('xml', xml)
+SyntaxHighlighter.registerLanguage('javascript', javascript)
+
+/**
+ * 4.1 `detectLanguage`: json, yaml, xml, and javascript get a grammar.
+ * Keys and PEM blocks (`-----BEGIN`) return `text`. Passing nothing makes
+ * the highlighter guess a language and color the block.
+ */
+export const secretLanguage = (key: string, value: string): string => {
+  const keyLower = key.toLowerCase()
+  const valueStr = value.toLowerCase()
+  const trimmed = valueStr.trim()
+  if (keyLower.includes('json') || trimmed.startsWith('{') || trimmed.startsWith('[')) return 'json'
+  if (
+    keyLower.includes('yaml') ||
+    keyLower.includes('yml') ||
+    (valueStr.includes('---') && valueStr.includes(':'))
+  ) {
+    return 'yaml'
+  }
+  if (keyLower.includes('xml') || trimmed.startsWith('<')) return 'xml'
+  if (
+    keyLower.includes('key') ||
+    keyLower.includes('cert') ||
+    keyLower.includes('pem') ||
+    valueStr.includes('-----begin')
+  ) {
+    return 'text'
+  }
+  if (
+    keyLower.includes('script') ||
+    valueStr.includes('function') ||
+    valueStr.includes('const ') ||
+    valueStr.includes('var ')
+  ) {
+    return 'javascript'
+  }
+  return 'text'
+}
 
 /** Base64 (standard or URL-safe, padding optional) to UTF-8 text; the input on failure. */
 const decodeBase64 = (value: string): string => {
@@ -57,6 +105,7 @@ const KeyValueTable = ({ entries, empty }: { entries: [string, string][]; empty:
 /** One data key. The decoded value stays out of the DOM until revealed. */
 const SecretValue = ({ name, encoded }: { name: string; encoded: string }) => {
   const [visible, setVisible] = useState(false)
+  const decoded = visible ? decodeBase64(encoded) : ''
   return (
     <tr>
       <th scope="row" className="text-nowrap">
@@ -74,9 +123,27 @@ const SecretValue = ({ name, encoded }: { name: string; encoded: string }) => {
           >
             <CIcon icon={visible ? cilLockUnlocked : cilLockLocked} />
           </CButton>
-          <pre className="mb-0 flex-grow-1 text-break" style={{ whiteSpace: 'pre-wrap' }}>
-            <code>{visible ? decodeBase64(encoded) : '••••••••'}</code>
-          </pre>
+          {visible ? (
+            <SyntaxHighlighter
+              language={secretLanguage(name, decoded)}
+              style={anOldHope}
+              wrapLongLines
+              customStyle={{
+                margin: 0,
+                flexGrow: 1,
+                minWidth: 0,
+                whiteSpace: 'pre-wrap',
+                wordBreak: 'break-word',
+              }}
+              codeTagProps={{ style: { whiteSpace: 'pre-wrap', wordBreak: 'break-word' } }}
+            >
+              {decoded}
+            </SyntaxHighlighter>
+          ) : (
+            <pre className="mb-0 flex-grow-1 text-break" style={{ whiteSpace: 'pre-wrap' }}>
+              <code>{'••••••••'}</code>
+            </pre>
+          )}
         </div>
       </td>
     </tr>

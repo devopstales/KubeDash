@@ -6,7 +6,7 @@ import type { ReactElement } from 'react'
 import { afterEach, expect, test, vi } from 'vitest'
 import { server } from '../msw'
 import SecretView from '../../src/views/Security/Secret'
-import SecretDataView from '../../src/views/Security/SecretData'
+import SecretDataView, { secretLanguage } from '../../src/views/Security/SecretData'
 import { useClusterStore } from '../../src/store/cluster'
 
 vi.mock('../../src/components/KubeDataTable', () => {
@@ -194,12 +194,12 @@ test('shows-secret-data-hidden-until-revealed', async () => {
   expect(screen.queryByText(/last-applied-configuration/)).toBeNull()
   expect(screen.getByText('app')).toBeTruthy()
 
-  expect(screen.queryByText('s3cr3t')).toBeNull()
+  expect(document.body.textContent).not.toContain('s3cr3t')
   fireEvent.click(screen.getByRole('button', { name: 'Show password' }))
-  expect(screen.getByText('s3cr3t')).toBeTruthy()
-  expect(screen.queryByText('admin')).toBeNull()
+  expect(document.body.textContent).toContain('s3cr3t')
+  expect(document.body.textContent).not.toContain('admin')
   fireEvent.click(screen.getByRole('button', { name: 'Hide password' }))
-  expect(screen.queryByText('s3cr3t')).toBeNull()
+  expect(document.body.textContent).not.toContain('s3cr3t')
 })
 
 test('secret-data-reports-a-missing-secret', async () => {
@@ -214,6 +214,56 @@ test('secret-data-reports-a-missing-secret', async () => {
   expect(
     await screen.findByText(/Error loading secret: Secret 'gone' not found in namespace 'team-a'/),
   ).toBeTruthy()
+})
+
+test('secret-language-matches-4-1', () => {
+  expect(secretLanguage('config.json', '{"a":1}')).toBe('json')
+  expect(secretLanguage('app.yaml', 'kind: Secret')).toBe('yaml')
+  expect(secretLanguage('note', '<note></note>')).toBe('xml')
+  expect(secretLanguage('startup.sh', 'const x = 1')).toBe('javascript')
+  expect(secretLanguage('ca.crt', '-----BEGIN CERTIFICATE-----\nMII')).toBe('text')
+  expect(secretLanguage('password', 's3cr3t')).toBe('text')
+})
+
+test('revealed-secret-uses-the-an-old-hope-block', async () => {
+  server.use(
+    http.get('*/api/v1/clusters/1/resources/secrets', () =>
+      HttpResponse.json({
+        kind: 'secrets',
+        cluster: 'prod',
+        items: [
+          {
+            ...dbSecret,
+            data: {
+              'ca.crt': btoa('-----BEGIN CERTIFICATE-----\nMII'),
+              'config.json': btoa('{"user":"admin"}'),
+            },
+          },
+        ],
+      }),
+    ),
+  )
+  selectTeamA()
+  renderAt(<SecretDataView />, '/security/secret/data?name=db-cred&namespace=team-a')
+
+  expect(await screen.findByText('Secret Data')).toBeTruthy()
+  fireEvent.click(await screen.findByRole('button', { name: 'Show ca.crt' }))
+  fireEvent.click(screen.getByRole('button', { name: 'Show config.json' }))
+  const code = Array.from(document.querySelectorAll('code')).map((el) => el.textContent ?? '')
+  const cert = Array.from(document.querySelectorAll('code')).find((el) =>
+    (el.textContent ?? '').includes('BEGIN CERTIFICATE'),
+  )
+  expect(cert).toBeTruthy()
+  const certColors = Array.from(cert!.querySelectorAll('span'))
+    .map((el) => el.style.color)
+    .filter((color) => color !== '')
+  expect(new Set(certColors).size).toBe(0)
+  expect(code.some((text) => text.includes('"user"'))).toBe(true)
+  const blocks = document.querySelectorAll('pre')
+  expect(blocks.length).toBeGreaterThan(0)
+  expect(
+    Array.from(blocks).some((block) => (block as HTMLElement).style.backgroundColor !== ''),
+  ).toBe(true)
 })
 
 test('secret-data-requires-a-name', async () => {
