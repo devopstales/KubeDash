@@ -1,0 +1,360 @@
+<!doctype html>
+<html lang="en" data-coreui-theme="dark">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>KubeDash style guide</title>
+    <!-- Local CoreUI only. No CDN. Open this file from the frontend directory. -->
+    <link rel="stylesheet" href="node_modules/@coreui/coreui/dist/css/coreui.min.css" />
+    <style>
+      body {
+        background-color: var(--cui-tertiary-bg);
+      }
+      [data-coreui-theme='dark'] body {
+        background-color: var(--cui-dark-bg-subtle);
+      }
+      .header > .container-fluid {
+        min-height: calc(4rem + 1px);
+      }
+      .header > .container-fluid + .container-fluid {
+        min-height: 3rem;
+      }
+      .icon {
+        width: 1rem;
+        height: 1rem;
+      }
+      .icon-lg {
+        width: 1.25rem;
+        height: 1.25rem;
+      }
+    </style>
+  </head>
+  <body>
+    <svg xmlns="http://www.w3.org/2000/svg" hidden>
+      <symbol id="i-plus" viewBox="0 0 512 512">
+        <path fill="currentColor" d="M440 240H272V72h-32v168H72v32h168v168h32V272h168z" />
+      </symbol>
+      <symbol id="i-trash" viewBox="0 0 512 512">
+        <path
+          fill="currentColor"
+          d="M96 472a23.82 23.82 0 0 0 23.579 24h272.842A23.82 23.82 0 0 0 416 472V152H96Zm32-288h256v280H128Z"
+        />
+        <path
+          fill="currentColor"
+          d="M168 216h32v200h-32zm72 0h32v200h-32zm72 0h32v200h-32zm16-128V40c0-13.458-9.488-24-21.6-24H205.6C193.488 16 184 26.542 184 40v48H64v32h384V88ZM216 48h80v40h-80Z"
+        />
+      </symbol>
+      <symbol id="i-pencil" viewBox="0 0 512 512">
+        <path
+          fill="currentColor"
+          d="m29.663 482.25.087.087a24.85 24.85 0 0 0 17.612 7.342 25.2 25.2 0 0 0 8.1-1.345l142.006-48.172 272.5-272.5A88.832 88.832 0 0 0 344.334 42.039l-272.5 272.5-48.168 142.002a24.84 24.84 0 0 0 5.997 25.709m337.3-417.584a56.832 56.832 0 0 1 80.371 80.373L411.5 180.873 331.127 100.5ZM99.744 331.884 308.5 123.127l80.373 80.373-208.757 208.756-121.634 41.262Z"
+        />
+      </symbol>
+      <symbol id="i-badge" viewBox="0 0 512 512">
+        <path
+          fill="currentColor"
+          d="m328.375 384 3.698 74.999-75.862-52.719-76.287 52.769L183.625 384h-32.039l-5.522 112h36.692l73.413-50.78L329.242 496h36.694l-5.522-112zm87.034-229.086-2.194-48.054L372.7 80.933l-25.932-40.519-48.055-2.2L256 16.093l-42.713 22.126-48.055 2.2L139.3 80.933 98.785 106.86l-2.194 48.054-22.127 42.714 22.127 42.715 2.2 48.053 40.509 25.927 25.928 40.52 48.055 2.195L256 379.164l42.713-22.126 48.055-2.195 25.928-40.52 40.518-25.923 2.195-48.053 22.127-42.715Zm-31.646 76.949L382 270.377l-32.475 20.78-20.78 32.475-38.515 1.76L256 343.125l-34.234-17.733-38.515-1.76-20.78-32.475L130 270.377l-1.759-38.514-17.741-34.235 17.737-34.228L130 124.88l32.471-20.78 20.78-32.474 38.515-1.76L256 52.132l34.234 17.733 38.515 1.76 20.78 32.474L382 124.88l1.759 38.515 17.741 34.233Z"
+        />
+      </symbol>
+    </svg>
+
+    <div class="wrapper d-flex flex-column min-vh-100">
+      <header class="header p-0 mb-4">
+        <div class="container-fluid px-4 d-flex align-items-center border-bottom">
+          <strong>KubeDash</strong>
+          <div class="ms-auto btn-group" role="group" aria-label="Theme">
+            <button class="btn btn-ghost-secondary" type="button" data-theme="light">Light</button>
+            <button class="btn btn-ghost-secondary" type="button" data-theme="dark">Dark</button>
+          </div>
+        </div>
+        <div class="container-fluid px-4 d-flex align-items-center">
+          <nav aria-label="breadcrumb">
+            <ol class="breadcrumb my-0">
+              <li class="breadcrumb-item">Settings</li>
+              <li class="breadcrumb-item active" aria-current="page">Style Guide</li>
+            </ol>
+          </nav>
+          <button
+            class="btn btn-link header-toggler ms-auto"
+            type="button"
+            aria-label="Add sample"
+            title="Add sample"
+            data-coreui-toggle="modal"
+            data-coreui-target="#add-sample"
+          >
+            <svg class="icon icon-lg" aria-hidden="true"><use href="#i-plus" /></svg>
+          </button>
+        </div>
+      </header>
+
+      <main class="body flex-grow-1">
+        <section class="card shadow mb-4 mx-4">
+          <div class="card-header py-3">
+            <h5 class="card-title m-0 fw-bold text-primary fs-6">Style Guide</h5>
+          </div>
+          <div class="card-body">
+            <p class="small text-muted">
+              These specimens use the CoreUI stylesheet installed with the app. Change that
+              package, and this page changes with it.
+            </p>
+            <p class="mb-0">
+              Written rules are in <code>frontend/STYLEGUIDE.md</code>. Open this file from the
+              <code>frontend</code> directory so the stylesheet resolves. Nothing is loaded from
+              the network.
+            </p>
+          </div>
+        </section>
+
+        <section class="card shadow mb-4 mx-4">
+          <div class="card-header py-3">
+            <h5 class="card-title m-0 fw-bold text-primary fs-6">Buttons</h5>
+          </div>
+          <div class="card-body">
+            <p class="small text-muted">
+              A header action is an icon. A dialog uses words. A row action is an icon with a verb
+              tooltip.
+            </p>
+            <div class="d-flex flex-row gap-1 align-items-center">
+              <button
+                class="btn btn-success btn-sm"
+                type="button"
+                aria-label="Edit sample"
+                title="Edit"
+                data-notice="Edit sample."
+              >
+                <svg class="icon" aria-hidden="true"><use href="#i-pencil" /></svg>
+              </button>
+              <button
+                class="btn btn-danger btn-sm"
+                type="button"
+                aria-label="Delete sample"
+                title="Delete"
+                data-delete="sample"
+              >
+                <svg class="icon" aria-hidden="true"><use href="#i-trash" /></svg>
+              </button>
+              <a
+                class="btn btn-secondary btn-sm"
+                href="#object"
+                aria-label="Edit privileges sample"
+                title="Edit privileges"
+                data-name="sample"
+              >
+                <svg class="icon" aria-hidden="true"><use href="#i-badge" /></svg>
+              </a>
+              <button class="btn btn-secondary" type="button" data-coreui-dismiss="modal">
+                Close
+              </button>
+              <button class="btn btn-primary" type="button" data-notice="Submitted sample.">
+                Add sample
+              </button>
+            </div>
+          </div>
+        </section>
+
+        <section class="card shadow mb-4 mx-4">
+          <div class="card-header py-3">
+            <h5 class="card-title m-0 fw-bold text-primary fs-6">Status</h5>
+          </div>
+          <div class="card-body">
+            <p class="small text-muted">
+              Healthy is a success badge. Anything else is secondary. Errors are inline text.
+            </p>
+            <div class="d-flex flex-row gap-2 mb-3">
+              <span class="badge text-bg-success">Active</span>
+              <span class="badge text-bg-secondary">Terminating</span>
+            </div>
+            <div>Loading samples...</div>
+            <div class="text-center text-muted">No samples found</div>
+            <div class="text-danger">Error loading samples: list denied</div>
+          </div>
+        </section>
+
+        <section class="card shadow mb-4 mx-4">
+          <div class="card-header py-3">
+            <h5 class="card-title m-0 fw-bold text-primary fs-6">List</h5>
+          </div>
+          <div class="card-body">
+            <p class="small text-muted">
+              Names select the object specimen. The Action column is icons.
+            </p>
+            <table class="table table-bordered align-middle mb-0">
+              <thead>
+                <tr>
+                  <th>Status</th>
+                  <th>Name</th>
+                  <th>Created</th>
+                  <th>Action</th>
+                </tr>
+              </thead>
+              <tbody>
+                <tr>
+                  <td><span class="badge text-bg-success">Active</span></td>
+                  <td><a href="#object" data-name="sample">sample</a></td>
+                  <td>Wed, 21 Oct 2026</td>
+                  <td>
+                    <div class="d-flex flex-row gap-1">
+                      <button
+                        class="btn btn-success btn-sm"
+                        type="button"
+                        aria-label="Edit sample"
+                        title="Edit"
+                        data-notice="Edit sample."
+                      >
+                        <svg class="icon" aria-hidden="true"><use href="#i-pencil" /></svg>
+                      </button>
+                      <button
+                        class="btn btn-danger btn-sm"
+                        type="button"
+                        aria-label="Delete sample"
+                        title="Delete"
+                        data-delete="sample"
+                      >
+                        <svg class="icon" aria-hidden="true"><use href="#i-trash" /></svg>
+                      </button>
+                    </div>
+                  </td>
+                </tr>
+                <tr>
+                  <td><span class="badge text-bg-secondary">Terminating</span></td>
+                  <td><a href="#object" data-name="other">other</a></td>
+                  <td>Tue, 20 Oct 2026</td>
+                  <td>
+                    <div class="d-flex flex-row gap-1">
+                      <button
+                        class="btn btn-success btn-sm"
+                        type="button"
+                        aria-label="Edit other"
+                        title="Edit"
+                        data-notice="Edit other."
+                      >
+                        <svg class="icon" aria-hidden="true"><use href="#i-pencil" /></svg>
+                      </button>
+                      <button
+                        class="btn btn-danger btn-sm"
+                        type="button"
+                        aria-label="Delete other"
+                        title="Delete"
+                        data-delete="other"
+                      >
+                        <svg class="icon" aria-hidden="true"><use href="#i-trash" /></svg>
+                      </button>
+                    </div>
+                  </td>
+                </tr>
+              </tbody>
+            </table>
+            <div id="notice" class="mt-3"></div>
+          </div>
+        </section>
+
+        <section class="card shadow mb-4 mx-4" id="object">
+          <div class="card-header py-3">
+            <h5 class="card-title m-0 fw-bold text-primary fs-6">Object</h5>
+          </div>
+          <div class="card-body">
+            <p class="small text-muted">
+              One object's fields sit in a bordered table. Only http and https addresses become
+              links.
+            </p>
+            <table class="table table-bordered mb-0">
+              <tbody>
+                <tr>
+                  <th scope="row">Name:</th>
+                  <td id="object-name">sample</td>
+                </tr>
+                <tr>
+                  <th scope="row">Repository:</th>
+                  <td>
+                    <a href="https://example.com/sample" target="_blank" rel="noreferrer"
+                      >Repository</a
+                    >
+                  </td>
+                </tr>
+                <tr>
+                  <th scope="row">Pipeline:</th>
+                  <td>—</td>
+                </tr>
+              </tbody>
+            </table>
+          </div>
+        </section>
+      </main>
+    </div>
+
+    <div
+      class="modal fade"
+      id="add-sample"
+      tabindex="-1"
+      aria-labelledby="add-sample-title"
+      aria-hidden="true"
+    >
+      <div class="modal-dialog modal-dialog-centered">
+        <form class="modal-content" id="sample-form">
+          <div class="modal-header">
+            <h5 class="modal-title" id="add-sample-title">New sample</h5>
+            <button class="btn-close" type="button" data-coreui-dismiss="modal" aria-label="Close"></button>
+          </div>
+          <div class="modal-body">
+            <label class="form-label" for="sample-name">Name</label>
+            <input class="form-control" id="sample-name" autocomplete="off" />
+            <div class="small text-muted mt-1">Lowercase letters, digits, and hyphens.</div>
+          </div>
+          <div class="modal-footer">
+            <button class="btn btn-secondary" type="button" data-coreui-dismiss="modal">Close</button>
+            <button class="btn btn-primary" type="submit" id="sample-submit" disabled>Add sample</button>
+          </div>
+        </form>
+      </div>
+    </div>
+
+    <script src="node_modules/@coreui/coreui/dist/js/coreui.bundle.min.js"></script>
+    <script>
+      const namePattern = /^[a-z0-9](?:[-a-z0-9]{0,61}[a-z0-9])?$/
+      const nameInput = document.getElementById('sample-name')
+      const submitButton = document.getElementById('sample-submit')
+      const notice = document.getElementById('notice')
+      const objectName = document.getElementById('object-name')
+
+      document.querySelectorAll('[data-theme]').forEach((button) => {
+        button.addEventListener('click', () => {
+          document.documentElement.setAttribute('data-coreui-theme', button.dataset.theme)
+        })
+      })
+
+      document.querySelectorAll('[data-name]').forEach((link) => {
+        link.addEventListener('click', () => {
+          objectName.textContent = link.dataset.name
+        })
+      })
+
+      document.querySelectorAll('[data-notice]').forEach((button) => {
+        button.addEventListener('click', () => {
+          notice.textContent = button.dataset.notice
+        })
+      })
+
+      document.querySelectorAll('[data-delete]').forEach((button) => {
+        button.addEventListener('click', () => {
+          notice.textContent = `Delete ${button.dataset.delete} would ask for confirmation.`
+        })
+      })
+
+      nameInput.addEventListener('input', () => {
+        const valid = namePattern.test(nameInput.value)
+        submitButton.disabled = !valid
+        nameInput.classList.toggle('is-invalid', nameInput.value.length > 0 && !valid)
+      })
+
+      document.getElementById('sample-form').addEventListener('submit', (event) => {
+        event.preventDefault()
+        if (!namePattern.test(nameInput.value)) return
+        notice.textContent = `Created ${nameInput.value}.`
+        nameInput.value = ''
+        submitButton.disabled = true
+        nameInput.classList.remove('is-invalid')
+        coreui.Modal.getOrCreateInstance(document.getElementById('add-sample')).hide()
+      })
+    </script>
+  </body>
+</html>
