@@ -1,5 +1,5 @@
 import React from 'react'
-import { Link } from 'react-router-dom'
+import { Link, useSearchParams } from 'react-router-dom'
 import {
   CBreadcrumb,
   CBreadcrumbItem,
@@ -29,9 +29,13 @@ const secretLink = (name: string) =>
 /**
  * 4.1 `cluster-permission/service-account.html.j2`: the service accounts in
  * the header-selected cluster and namespace, with their first token secret
- * and first image pull secret linked to the Secrets page.
+ * and first image pull secret linked to the Secrets page. The name opens
+ * the Service Account end page; `?selected=<name>` (RoleBinding links)
+ * bolds that account.
  */
 const ServiceAccountsView = () => {
+  const [params] = useSearchParams()
+  const selected = params.get('selected')
   const cluster = useClusterStore((s) => s.selectedCluster)
   const namespace = useClusterStore((s) => s.selectedNamespace) ?? 'default'
 
@@ -69,7 +73,19 @@ const ServiceAccountsView = () => {
           <div className="text-center text-muted">No service accounts found</div>
         ) : (
           <KubeDataTable data={query.data ?? []}>
-            <Column title="Name" data="name" />
+            <Column title="Name" data="name">
+              {(name: string) =>
+                name ? (
+                  <Link
+                    to={`/cluster-permission/service-account/data?name=${encodeURIComponent(name)}&namespace=${encodeURIComponent(namespace)}`}
+                    className={name === selected ? 'fw-bold' : undefined}
+                    aria-current={name === selected ? 'true' : undefined}
+                  >
+                    {name}
+                  </Link>
+                ) : null
+              }
+            </Column>
             <Column title="Secret" data="secret">
               {secretLink}
             </Column>

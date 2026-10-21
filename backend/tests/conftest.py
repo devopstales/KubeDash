@@ -101,7 +101,47 @@ def db_sess():
 # missing) and the whole tier deselects with -m "not integration".
 # ---------------------------------------------------------------------------
 _KIND = "kubedash-test"
-_kind_pod_added = False
+
+# Demo objects the integration tests read back. The token secret is a
+# service-account-token the SA lists under ``secrets``; the registry secret
+# is what it lists under ``imagePullSecrets``. ``kubectl apply`` is idempotent,
+# so a reused cluster and a cluster the file boundary just recreated both
+# converge on this set. The password is a fixed demo value, not a credential.
+_DOCKERCONFIG = (
+    '{"auths":{"https://index.docker.io/v1/":'
+    '{"username":"kubedash","password":"demo","auth":"a3ViZWRhc2g6ZGVtbw=="}}}'
+)
+# The account comes first. A service-account-token secret applied before its
+# account exists is deleted by the token controller as an orphan.
+_KIND_DEMO = f"""\
+apiVersion: v1
+kind: ServiceAccount
+metadata:
+  name: kubedash-builder
+  namespace: default
+secrets:
+- name: kubedash-builder-token
+imagePullSecrets:
+- name: kubedash-registry
+---
+apiVersion: v1
+kind: Secret
+metadata:
+  name: kubedash-builder-token
+  namespace: default
+  annotations:
+    kubernetes.io/service-account.name: kubedash-builder
+type: kubernetes.io/service-account-token
+---
+apiVersion: v1
+kind: Secret
+metadata:
+  name: kubedash-registry
+  namespace: default
+type: kubernetes.io/dockerconfigjson
+stringData:
+  .dockerconfigjson: '{_DOCKERCONFIG}'
+"""
 
 
 def _kind_available() -> bool:
@@ -109,33 +149,44 @@ def _kind_available() -> bool:
     return r.returncode == 0
 
 
+def _kind_seed_demo() -> None:
+    """Pod plus the service account, its token secret, and its pull secret."""
+    # 409-tolerant: the pod may already exist on a reused cluster.
+    r = subprocess.run(
+        [
+            "kubectl",
+            f"--context=kind-{_KIND}",
+            "run",
+            "kubedash-pod",
+            "--image=nginx:alpine",
+            "--restart=Never",
+        ],
+        capture_output=True,
+        text=True,
+    )
+    if r.returncode != 0 and "AlreadyExists" not in r.stderr:
+        raise subprocess.CalledProcessError(r.returncode, r.args, r.stdout, r.stderr)
+    applied = subprocess.run(
+        ["kubectl", f"--context=kind-{_KIND}", "apply", "-f", "-"],
+        input=_KIND_DEMO,
+        capture_output=True,
+        text=True,
+    )
+    if applied.returncode != 0:
+        raise subprocess.CalledProcessError(
+            applied.returncode, applied.args, applied.stdout, applied.stderr
+        )
+
+
 def _kind_create_or_reuse() -> bytes:
     """Ensure the kind cluster exists and return its kubeconfig; also drop
-    the ``kubedash-pod`` the pod-listing integration test asserts on."""
+    the demo objects the integration tests assert on."""
     existing = subprocess.run(
         ["kind", "get", "clusters"], capture_output=True, text=True
     ).stdout
     if _KIND not in existing:
         subprocess.run(["kind", "create", "cluster", "--name", _KIND], check=True)
-    global _kind_pod_added
-    if not _kind_pod_added:
-        # 409-tolerant: the pod may already exist on a REUSED cluster (the
-        # fixture creates the cluster only when absent, but _kind_pod_added is
-        # per-process — a fresh pytest run reuses the cluster and its pod).
-        r = subprocess.run(
-            [
-                "kubectl",
-                f"--context=kind-{_KIND}",
-                "run",
-                "kubedash-pod",
-                "--image=nginx:alpine",
-                "--restart=Never",
-            ],
-            capture_output=True, text=True,
-        )
-        if r.returncode != 0 and "AlreadyExists" not in r.stderr:
-            raise subprocess.CalledProcessError(r.returncode, r.args, r.stdout, r.stderr)
-        _kind_pod_added = True
+    _kind_seed_demo()
     out = subprocess.run(
         ["kind", "get", "kubeconfig", "--name", _KIND], capture_output=True, text=True
     )
@@ -208,5 +259,4 @@ def _kind_file_boundary(request: pytest.FixtureRequest) -> Iterator[None]:
     subprocess.run(
         ["kind", "create", "cluster", "--name", _KIND], capture_output=True
     )
-    global _kind_pod_added
-    _kind_pod_added = False
+    _kind_seed_demo()

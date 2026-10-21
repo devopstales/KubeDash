@@ -4,7 +4,9 @@ import { MemoryRouter } from 'react-router-dom'
 import { http, HttpResponse } from 'msw'
 import { afterEach, expect, test, vi } from 'vitest'
 import { server } from '../msw'
+import type { ReactElement } from 'react'
 import ServiceAccountsView from '../../src/views/ClusterPermission/ServiceAccounts'
+import ServiceAccountDataView from '../../src/views/ClusterPermission/ServiceAccountData'
 import { useClusterStore } from '../../src/store/cluster'
 
 vi.mock('../../src/components/KubeDataTable', () => {
@@ -52,16 +54,16 @@ vi.mock('../../src/components/KubeDataTable', () => {
   return { default: KubeDataTable, Column }
 })
 
-const renderView = () => {
+const renderAt = (ui: ReactElement, path = '/') => {
   const qc = new QueryClient({ defaultOptions: { queries: { retry: false } } })
   return render(
     <QueryClientProvider client={qc}>
-      <MemoryRouter>
-        <ServiceAccountsView />
-      </MemoryRouter>
+      <MemoryRouter initialEntries={[path]}>{ui}</MemoryRouter>
     </QueryClientProvider>,
   )
 }
+
+const renderView = (path = '/') => renderAt(<ServiceAccountsView />, path)
 
 afterEach(() => {
   useClusterStore.setState({ selectedCluster: null, selectedNamespace: null })
@@ -104,6 +106,9 @@ test('lists-service-accounts-in-selected-namespace', async () => {
     'Secret',
     'Pull Secret',
   ])
+  expect(screen.getByRole('link', { name: 'builder' }).getAttribute('href')).toBe(
+    '/cluster-permission/service-account/data?name=builder&namespace=team-a',
+  )
   expect(screen.getByRole('link', { name: 'builder-token' }).getAttribute('href')).toBe(
     '/security/secret?selected=builder-token',
   )
@@ -144,4 +149,89 @@ test('shows-rbac-error', async () => {
   renderView()
 
   expect(await screen.findByText(/RBAC_DENIED: list on serviceaccounts/)).toBeTruthy()
+})
+
+const builderAccount = {
+  metadata: {
+    name: 'builder',
+    namespace: 'team-a',
+    creation_timestamp: '2026-01-02T03:04:05Z',
+    labels: { app: 'ci' },
+    annotations: {
+      owner: 'platform',
+      'kubectl.kubernetes.io/last-applied-configuration': '{"kind":"ServiceAccount"}',
+    },
+  },
+  secrets: [{ name: 'builder-token' }, { name: 'builder-dockercfg' }],
+  image_pull_secrets: [{ name: 'registry-cred' }],
+}
+
+test('highlights-the-selected-service-account', async () => {
+  server.use(
+    http.get('*/api/v1/clusters/1/resources/serviceaccounts', () =>
+      HttpResponse.json({ kind: 'serviceaccounts', cluster: 'prod', items: [builderAccount] }),
+    ),
+  )
+  useClusterStore.setState({
+    selectedCluster: { id: 1, name: 'prod' },
+    selectedNamespace: 'team-a',
+  })
+  renderView('/cluster-permission/service-account?selected=builder')
+
+  expect(await screen.findByRole('link', { name: 'builder' })).toHaveAttribute(
+    'aria-current',
+    'true',
+  )
+})
+
+test('shows-service-account-secrets', async () => {
+  server.use(
+    http.get('*/api/v1/clusters/1/resources/serviceaccounts', () =>
+      HttpResponse.json({ kind: 'serviceaccounts', cluster: 'prod', items: [builderAccount] }),
+    ),
+  )
+  useClusterStore.setState({
+    selectedCluster: { id: 1, name: 'prod' },
+    selectedNamespace: 'team-a',
+  })
+  renderAt(
+    <ServiceAccountDataView />,
+    '/cluster-permission/service-account/data?name=builder&namespace=team-a',
+  )
+
+  expect(await screen.findByRole('link', { name: 'builder-token' })).toBeTruthy()
+  expect(screen.getByText('Service Account Data')).toBeTruthy()
+  expect(screen.getByRole('link', { name: 'Service Accounts' }).getAttribute('href')).toBe(
+    '/cluster-permission/service-account',
+  )
+  expect(screen.getByRole('rowheader', { name: 'Name:' })).toBeTruthy()
+  expect(screen.getByRole('rowheader', { name: 'Namespace:' })).toBeTruthy()
+  expect(screen.getByText('team-a')).toBeTruthy()
+  expect(screen.getByText('2026-01-02T03:04:05Z')).toBeTruthy()
+  expect(screen.getByText('owner')).toBeTruthy()
+  expect(screen.getByText('platform')).toBeTruthy()
+  expect(screen.queryByText(/last-applied-configuration/)).toBeNull()
+  expect(screen.getByText('app')).toBeTruthy()
+  expect(screen.getByText('ci')).toBeTruthy()
+  expect(screen.getByRole('rowheader', { name: 'Secret:' })).toBeTruthy()
+  expect(screen.getByRole('rowheader', { name: 'Pull Secret:' })).toBeTruthy()
+  expect(screen.getByRole('link', { name: 'builder-token' }).getAttribute('href')).toBe(
+    '/security/secret/data?name=builder-token&namespace=team-a',
+  )
+  expect(screen.getByRole('link', { name: 'builder-dockercfg' }).getAttribute('href')).toBe(
+    '/security/secret/data?name=builder-dockercfg&namespace=team-a',
+  )
+  expect(screen.getByRole('link', { name: 'registry-cred' }).getAttribute('href')).toBe(
+    '/security/secret/data?name=registry-cred&namespace=team-a',
+  )
+})
+
+test('service-account-data-requires-a-name', async () => {
+  useClusterStore.setState({
+    selectedCluster: { id: 1, name: 'prod' },
+    selectedNamespace: 'team-a',
+  })
+  renderAt(<ServiceAccountDataView />, '/cluster-permission/service-account/data')
+
+  expect(await screen.findByText('Error: Service account name not provided')).toBeTruthy()
 })

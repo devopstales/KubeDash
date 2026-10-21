@@ -131,7 +131,7 @@ const RoleBindingView = () => {
           <span key={`${account.namespace}-${account.name}-${i}`}>
             {i > 0 ? <br /> : null}
             <Link
-              to={`/cluster-permission/service-account?selected=${encodeURIComponent(account.name)}`}
+              to={`/cluster-permission/service-account/data?name=${encodeURIComponent(account.name)}&namespace=${encodeURIComponent(account.namespace)}`}
               onClick={() => {
                 if (account.namespace) setSelectedNamespace(account.namespace)
               }}

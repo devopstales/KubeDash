@@ -115,6 +115,9 @@ export interface K8sRoleBinding {
 /** A ClusterRole item from /resources/clusterroles. Same rule shape as a Role. */
 export type K8sClusterRole = K8sRole
 
+/** A ClusterRoleBinding item from /resources/clusterrolebindings. */
+export type K8sClusterRoleBinding = K8sRoleBinding
+
 /** One rule on a Role. Kubernetes ``to_dict`` uses snake_case. */
 export interface PolicyRule {
   api_groups?: string[] | null
@@ -128,6 +131,9 @@ export interface ServiceAccount {
   metadata?: {
     name?: string
     namespace?: string
+    creation_timestamp?: string | null
+    labels?: Record<string, string> | null
+    annotations?: Record<string, string> | null
     [key: string]: unknown
   }
   secrets?: { name?: string }[] | null
