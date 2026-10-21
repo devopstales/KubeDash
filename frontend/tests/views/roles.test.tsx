@@ -149,7 +149,8 @@ test('shows-role-rules', async () => {
   useClusterStore.setState({ selectedCluster: { id: 1, name: 'prod' }, selectedNamespace: 'team-a' })
   renderAt(<RoleDataView />, '/cluster-permission/role/data?name=edit&namespace=team-a')
 
-  expect(await screen.findByText('Rule List')).toBeTruthy()
+  expect(await screen.findByText('pods')).toBeTruthy()
+  expect(screen.getByText('Rule List')).toBeTruthy()
   expect(screen.getByRole('link', { name: 'Roles' }).getAttribute('href')).toBe('/cluster-permission/role')
   expect(screen.getByText('edit')).toBeTruthy()
   expect(screen.getAllByRole('columnheader').map((th) => th.textContent)).toEqual([

@@ -24,6 +24,9 @@ const PrivilegeEditView = React.lazy(() => import('./views/AdminPermissions/Priv
 const ServiceAccountsView = React.lazy(() => import('./views/ClusterPermission/ServiceAccounts'))
 const RoleView = React.lazy(() => import('./views/ClusterPermission/Role'))
 const RoleDataView = React.lazy(() => import('./views/ClusterPermission/RoleData'))
+const GroupsView = React.lazy(() => import('./views/Groups'))
+const GroupPrivilegesView = React.lazy(() => import('./views/Groups/GroupPrivileges'))
+const GroupPrivilegeEditView = React.lazy(() => import('./views/Groups/GroupPrivilegeEdit'))
 
 /**
  * KubeDash SPA root: QueryClientProvider (TanStack Query) wraps the
@@ -142,6 +145,36 @@ const App = () => {
                         <ProtectedRoute>
                           <AdminRoute>
                             <AdminPermissionsView />
+                          </AdminRoute>
+                        </ProtectedRoute>
+                      }
+                    />
+                    <Route
+                      path="/user/group"
+                      element={
+                        <ProtectedRoute>
+                          <AdminRoute>
+                            <GroupsView />
+                          </AdminRoute>
+                        </ProtectedRoute>
+                      }
+                    />
+                    <Route
+                      path="/user/group/privilege"
+                      element={
+                        <ProtectedRoute>
+                          <AdminRoute>
+                            <GroupPrivilegesView />
+                          </AdminRoute>
+                        </ProtectedRoute>
+                      }
+                    />
+                    <Route
+                      path="/user/group/privilege/edit"
+                      element={
+                        <ProtectedRoute>
+                          <AdminRoute>
+                            <GroupPrivilegeEditView />
                           </AdminRoute>
                         </ProtectedRoute>
                       }

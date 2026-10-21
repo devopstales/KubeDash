@@ -7,7 +7,6 @@ export type StubRoute = {
 /** Menu entries that have no view yet. Paths match navigation() in src/_nav.tsx. */
 export const stubRoutes: StubRoute[] = [
   { path: '/dashboard/workload-map', title: 'Workload', admin: false },
-  { path: '/user/group', title: 'Groups', admin: false },
   { path: '/cluster-permission/role-binding', title: 'RoleBindings', admin: false },
   { path: '/cluster-permission/cluster-role', title: 'ClusterRoles', admin: false },
   { path: '/cluster-permission/cluster-role-binding', title: 'ClusterRoleBindings', admin: false },

@@ -1,175 +1,212 @@
 import React, { useState } from 'react'
+import { Link } from 'react-router-dom'
 import {
+  CBreadcrumb,
+  CBreadcrumbItem,
   CButton,
   CCard,
   CCardBody,
   CCardHeader,
-  CCardTitle,
+  CForm,
   CFormInput,
-  CTable,
+  CFormLabel,
+  CModal,
+  CModalBody,
+  CModalFooter,
+  CModalHeader,
+  CModalTitle,
 } from '@coreui/react'
-import { useQuery } from '@tanstack/react-query'
+import CIcon from '@coreui/icons-react'
+import { cilPlusCircle, cilRefresh, cilUserPlus } from '@coreui/icons'
+import { useQuery, useQueryClient } from '@tanstack/react-query'
 import { apiFetch } from '../../lib/api'
-import type { AdminUser, GroupOut } from '../../lib/types'
+import type { GroupRow } from '../../lib/groupTypes'
+import KubeDataTable, { Column } from '../../components/KubeDataTable'
+import TopMenu from '../../components/TopMenu'
 
 /**
- * Groups (left-menu admin surface): list every group (stored rows ∪ OIDC-
- * claim groups) with its member count (GET /api/v1/admin/groups); clicking
- * a row shows the members of that group (filtered from the /admin/users
- * list — no extra endpoint; the users query carries each user's merged
- * groups). An admin creates a group with the inline "New group" form
- * (POST /api/v1/admin/groups); a duplicate name is a 409 that surfaces as
- * text-danger. Reachable at /groups, wrapped in ProtectedRoute + AdminRoute
- * (role === 'admin'; non-admins redirect to /). API errors surface as
- * text-danger messages.
+ * 4.1 Groups list (`users/group.html.j2`) at `/user/group`: the groups
+ * table (Name / Created / Action) with a row link to the group's
+ * privileges page and an action button to the privilege editor. Add Group
+ * and Sync (materialize memberships from OIDC claims) in the header.
  */
-const GroupsView = () => {
-  const groupsQuery = useQuery<GroupOut[]>({
+const GroupsList = () => {
+  const queryClient = useQueryClient()
+  const [creating, setCreating] = useState(false)
+  const [name, setName] = useState('')
+  const [busy, setBusy] = useState(false)
+  const [error, setError] = useState<string | null>(null)
+  const [syncMsg, setSyncMsg] = useState<string | null>(null)
+
+  const groupsQuery = useQuery<GroupRow[]>({
     queryKey: ['admin', 'groups'],
     queryFn: async () => {
-      const r = await apiFetch<GroupOut[]>('/api/v1/admin/groups')
+      const r = await apiFetch<GroupRow[]>('/api/v1/admin/groups')
       if (r.error) throw new Error(`${r.error.code}: ${r.error.message}`)
       return r.data ?? []
     },
   })
 
-  const usersQuery = useQuery<AdminUser[]>({
-    queryKey: ['admin', 'users'],
-    queryFn: async () => {
-      const r = await apiFetch<AdminUser[]>('/api/v1/admin/users')
-      if (r.error) throw new Error(`${r.error.code}: ${r.error.message}`)
-      return r.data ?? []
-    },
-  })
+  const reload = () => {
+    queryClient.invalidateQueries({ queryKey: ['admin', 'groups'] })
+  }
 
-  const [selected, setSelected] = useState<string | null>(null)
-  const [newName, setNewName] = useState('')
-  const [createError, setCreateError] = useState<string | null>(null)
-  const [creating, setCreating] = useState(false)
-
-  const onCreate = async (e: React.FormEvent) => {
+  const createGroup = async (e: React.FormEvent) => {
     e.preventDefault()
-    const name = newName.trim()
-    if (!name) return
-    setCreating(true)
-    setCreateError(null)
+    setBusy(true)
+    setError(null)
     const r = await apiFetch('/api/v1/admin/groups', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ name }),
     })
-    setCreating(false)
+    setBusy(false)
     if (r.error) {
-      setCreateError(`${r.error.code}: ${r.error.message}`)
+      setError(`${r.error.code}: ${r.error.message}`)
       return
     }
-    setNewName('')
-    groupsQuery.refetch()
+    setCreating(false)
+    setName('')
+    reload()
   }
 
-  if (groupsQuery.isLoading) {
-    return <div>Loading groups…</div>
-  }
-
-  if (groupsQuery.error) {
-    return (
-      <div className="text-danger">
-        {groupsQuery.error instanceof Error ? groupsQuery.error.message : 'Failed to load groups'}
-      </div>
-    )
+  const sync = async () => {
+    setSyncMsg(null)
+    setBusy(true)
+    const r = await apiFetch<{ created_members: number }>('/api/v1/admin/groups/sync', {
+      method: 'POST',
+    })
+    setBusy(false)
+    if (r.error) {
+      setSyncMsg(`Sync failed: ${r.error.code}: ${r.error.message}`)
+      return
+    }
+    setSyncMsg(`Synced — ${r.data?.created_members ?? 0} new member(s)`)
+    reload()
   }
 
   const groups = groupsQuery.data ?? []
-  const users = usersQuery.data ?? []
-  const members = selected ? users.filter((u) => u.groups.includes(selected)) : []
 
-  // A group is "stored" (admin-created) if it appears in the list with a
-  // membership; claim-derived groups (only present via an OIDC claim) look
-  // the same here — the API merges both sources. The "New group" form is
-  // how an admin makes a group first-class (stored).
   return (
-    <div>
-      <form onSubmit={onCreate} className="d-flex gap-2 mb-3" style={{ maxWidth: 420 }}>
-        <CFormInput
-          value={newName}
-          onChange={(e) => setNewName(e.target.value)}
-          placeholder="New group name"
-          aria-label="New group name"
-        />
-        <CButton type="submit" color="primary" disabled={creating}>
-          {creating ? 'Adding…' : 'Add group'}
+    <>
+      <TopMenu>
+        <CBreadcrumb className="my-0" aria-label="breadcrumb">
+          <CBreadcrumbItem>User Management</CBreadcrumbItem>
+          <CBreadcrumbItem active>Groups</CBreadcrumbItem>
+        </CBreadcrumb>
+        <CButton
+          color="link"
+          className="header-toggler ms-auto"
+          type="button"
+          aria-label="Add Group"
+          title="Add Group"
+          onClick={() => setCreating(true)}
+        >
+          <CIcon icon={cilPlusCircle} size="lg" />
         </CButton>
-      </form>
-      {createError && <div className="text-danger mb-3">{createError}</div>}
+      </TopMenu>
 
-      {groups.length === 0 ? (
-        <div>No groups. Create one above.</div>
-      ) : (
-        <CTable striped hover>
-          <thead>
-            <tr>
-              <th>Group</th>
-              <th>Members</th>
-            </tr>
-          </thead>
-          <tbody>
-            {groups.map((g) => (
-              <tr
-                key={g.group}
-                style={{ cursor: 'pointer' }}
-                onClick={() => setSelected(g.group === selected ? null : g.group)}
-              >
-                <td>{g.group}</td>
-                <td>{g.member_count}</td>
-              </tr>
-            ))}
-          </tbody>
-        </CTable>
-      )}
+      <CCard className="shadow mb-4 mx-4">
+        <CCardHeader className="py-3 d-flex flex-row align-items-center">
+          <h6 className="m-0 fw-bold text-primary">Groups List</h6>
+          <CButton
+            color="secondary"
+            size="sm"
+            className="ms-auto"
+            type="button"
+            onClick={sync}
+            disabled={busy}
+          >
+            <CIcon icon={cilRefresh} className="me-1" />
+            Sync from SSO
+          </CButton>
+        </CCardHeader>
+        <CCardBody>
+          {groupsQuery.isLoading ? (
+            <div>Loading groups…</div>
+          ) : groupsQuery.error ? (
+            <div className="text-danger">
+              {groupsQuery.error instanceof Error ? groupsQuery.error.message : 'Failed to load groups'}
+            </div>
+          ) : groups.length === 0 ? (
+            <div className="text-center text-muted">
+              No groups found — log an SSO user in or sync from SSO.
+            </div>
+          ) : (
+            <KubeDataTable data={groups}>
+              <Column title="Name" data="display_name">
+                {(_name: string, _type: string, row: GroupRow) => (
+                  <Link to={`/user/group/privilege?group=${encodeURIComponent(row.name)}`}>
+                    {row.display_name}
+                  </Link>
+                )}
+              </Column>
+              <Column title="Source" data="source">
+                {(value: string) => (value === 'oidc' ? 'SSO' : 'Manual')}
+              </Column>
+              <Column title="Members" data="member_count">
+                {(count: number) => String(count)}
+              </Column>
+              <Column title="Created" data="created_at">
+                {(value: string | null) =>
+                  value ? new Date(value).toLocaleString() : '\u2014'
+                }
+              </Column>
+              <Column title="Action" data={null}>
+                {(_data: unknown, _type: string, row: GroupRow) => (
+                  <Link
+                    to={`/user/group/privilege/edit?group=${encodeURIComponent(row.name)}`}
+                    className="btn btn-secondary btn-sm"
+                    aria-label={`Edit privileges ${row.display_name}`}
+                    title="Edit privileges"
+                  >
+                    <CIcon icon={cilUserPlus} />
+                  </Link>
+                )}
+              </Column>
+            </KubeDataTable>
+          )}
+          {syncMsg && (
+            <div className={syncMsg.startsWith('Sync failed') ? 'text-danger mt-3' : 'text-success mt-3'}>
+              {syncMsg}
+            </div>
+          )}
+        </CCardBody>
+      </CCard>
 
-      {selected && (
-        <CCard className="mt-3">
-          <CCardHeader>
-            <CCardTitle>Members of {selected}</CCardTitle>
-          </CCardHeader>
-          <CCardBody>
-            {usersQuery.isLoading ? (
-              <div>Loading members…</div>
-            ) : usersQuery.error ? (
-              <div className="text-danger">
-                {usersQuery.error instanceof Error
-                  ? usersQuery.error.message
-                  : 'Failed to load members'}
+      {creating && (
+        <CModal visible alignment="center" onClose={() => setCreating(false)} aria-labelledby="modalgroupLabel">
+          <CModalHeader>
+            <CModalTitle id="modalgroupLabel">Add Group</CModalTitle>
+          </CModalHeader>
+          <CForm onSubmit={createGroup}>
+            <CModalBody>
+              <div className="mb-3">
+                <CFormLabel>Name:</CFormLabel>
+                <CFormInput
+                  value={name}
+                  placeholder="Type the group name"
+                  onChange={(e) => setName(e.target.value)}
+                />
+                <div className="small text-muted mt-1">
+                  Created as a manual group — SSO users never join it automatically.
+                </div>
               </div>
-            ) : members.length === 0 ? (
-              <div>No members (count drifts only between the two queries).</div>
-            ) : (
-              <CTable striped hover>
-                <thead>
-                  <tr>
-                    <th>Display name</th>
-                    <th>Sub</th>
-                    <th>Email</th>
-                    <th>Role</th>
-                  </tr>
-                </thead>
-                <tbody>
-                  {members.map((u) => (
-                    <tr key={u.id}>
-                      <td>{u.display_name ?? '—'}</td>
-                      <td>{u.sub}</td>
-                      <td>{u.email ?? '—'}</td>
-                      <td>{u.role}</td>
-                    </tr>
-                  ))}
-                </tbody>
-              </CTable>
-            )}
-          </CCardBody>
-        </CCard>
+              {error && <div className="text-danger">{error}</div>}
+            </CModalBody>
+            <CModalFooter>
+              <CButton type="button" color="secondary" onClick={() => setCreating(false)}>
+                Close
+              </CButton>
+              <CButton type="submit" color="primary" disabled={busy || !name.trim()}>
+                {busy ? 'Saving…' : 'Add Group'}
+              </CButton>
+            </CModalFooter>
+          </CForm>
+        </CModal>
       )}
-    </div>
+    </>
   )
 }
 
-export default GroupsView
+export default GroupsList
