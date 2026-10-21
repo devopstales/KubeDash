@@ -143,26 +143,19 @@ tasks:
     cmds:
       - "{{.COMPOSE}} exec postgres psql -U ${KUBEDASH_DB_USER:-kubedash} -d ${KUBEDASH_DB_NAME:-kubedash}"
 
-  db-migrate:
-    desc: "Apply Alembic migrations to the dev DB (flask db upgrade; idempotent)"
-    dir: backend
-    cmds:
-      - "DATABASE_URL={{.DB_URL}} uv run flask db upgrade"
-
   # ---- One-command local env (compose + schema + backend) -------------------
   #
   # Brings up the full local dev loop in one shot: the compose data stores,
-  # the SQLAlchemy schema (Alembic migrations — the same path prod uses; a
-  # legacy create_all-era dev DB is healed via stamp base + upgrade), and
+  # the SQLAlchemy schema (db.create_all — dev-only; prod uses Alembic), and
   # the leader backend on :8080 with the bootstrap admin + static dir wired.
   # Idempotent: safe to re-run (compose up -d is a no-op when healthy; the
-  # migration upgrade is a no-op at head; the backend rebinds the port).
+  # schema create_all is idempotent; the backend rebinds the port).
   #
   #   task dev-stack          # foreground (Ctrl-C stops the backend; compose stays up)
   #   task dev-stack-down     # stop the backend + compose stack
 
   dev-stack:
-    desc: "Start the full local env: compose + schema + frontend build/sync + backend on :8080 (bootstrap admin, static wired)"
+    desc: "Start the full local env: compose + schema + backend on :8080 (bootstrap admin, static wired)"
     cmds:
       - "{{.COMPOSE}} up -d"
       # Wait for Postgres to accept connections (compose 'healthy' covers the
@@ -176,8 +169,9 @@ tasks:
       - "lsof -ti tcp:8080 | xargs kill 2>/dev/null || true"
       - "pkill -f 'python.*wsgi.py' 2>/dev/null || true"
       - "sleep 1"
-      # Build the SPA and sync it to backend/static before the backend starts,
-      # so the served UI is never stale (fe-sync wipes static/, so build first).
+      # Build + sync the SPA into backend/static so the first boot serves the
+      # current bundle (KUBEDASH_STATIC_DIR). fe-check stays the explicit
+      # air-gap gate — dev-stack only needs a working bundle.
       - task: fe-build
       - task: fe-sync
       # Create the schema (dev shortcut — prod runs Alembic migrations).
@@ -192,52 +186,17 @@ tasks:
       - "pkill -f 'python.*wsgi.py' 2>/dev/null || true"
       - "{{.COMPOSE}} down"
 
-  # Internal: bring the dev DB schema to migration head from the backend dir
-  # (where the `app` package resolves). Migration-managed — prod and dev now
-  # share the Alembic path. Three shapes:
-  #   (1) alembic_version present          -> upgrade (idempotent at head)
-  #   (2) tables present, no alembic_version (legacy create_all-era dev DB)
-  #                                          -> stamp 6feadb091ff4 + upgrade.
-  #      The stamp target is the ADR-0021 revision, NOT the base: the base's
-  #      upgrade() does unguarded create_table('users'...), so it must be
-  #      marked APPLIED (skipped) on a DB that already has the tables; the
-  #      two revisions after 6feadb091ff4 are idempotent against
-  #      create_all-shaped tables (guarded has_table/column checks), and data
-  #      is preserved.
-  #   (3) empty database (compose-created, no tables at all) -> upgrade from
-  #      the base (the normal migration path).
+  # Internal: create the SQLAlchemy schema from the backend dir (where the
+  # `app` package resolves). Dev shortcut — prod runs Alembic migrations.
   backend-create-schema:
     internal: true
     dir: backend
     cmds:
-      - |
-        set -euo pipefail
-        export DATABASE_URL='{{.DB_URL}}'
-        # set -e is off here so the probe's non-zero exit (legacy/fresh)
-        # doesn't abort the task before the case runs; the branch commands
-        # are the real gates.
-        set +e
-        state=$(uv run python -c "
-        from sqlalchemy import create_engine, inspect
-        e = create_engine('${DATABASE_URL}')
-        t = set(inspect(e).get_table_names())
-        if 'alembic_version' in t: print('managed')
-        elif 'users' in t: print('legacy')
-        else: print('fresh')
-        ")
-        set -e
-        case "$state" in
-          managed) uv run flask db upgrade ;;
-          legacy)
-            echo "Legacy create_all-era dev DB (no alembic_version): stamping 6feadb091ff4, then upgrading"
-            uv run flask db stamp 6feadb091ff4
-            uv run flask db upgrade
-            ;;
-          *)
-            echo "Fresh database: upgrading from the base revision"
-            uv run flask db upgrade
-            ;;
-        esac
+      - >
+        .venv/bin/python -c
+        "from app import create_app; from app.extensions import db;
+        a = create_app({'DATABASE_URL': '{{.DB_URL}}'});
+        a.app_context().push(); db.create_all(); print('schema ready')"
 
   # Internal: the dev-stack backend run (separate task so the `dir: backend`
   # scoping + env block stay clean). Called by dev-stack, not meant to be
@@ -256,98 +215,26 @@ tasks:
       # shell exits immediately, re-parenting the backend to init (macOS has
       # no setsid; nohup alone was reaped with the task's process group).
       - "sh -c 'nohup .venv/bin/python wsgi.py > /tmp/kubedash-backend.log 2>&1 &'"
-      # Poll for actual readiness (Flask dev-server startup line or a
-      # listening port) instead of a fixed sleep — the 2 s sleep was too
-      # short on loaded machines, leaving the log at just `nohup: ignoring
-      # input` when it was `cat`'d.
-      - |
-        for i in $(seq 1 30); do
-          if grep -q "Running on" /tmp/kubedash-backend.log 2>/dev/null; then break; fi
-          if lsof -ti tcp:8080 >/dev/null 2>&1; then break; fi
-          sleep 1
-        done
-      - "echo \"Backend ready (PID $(pgrep -f 'python.*wsgi.py' | head -1)). Logs: /tmp/kubedash-backend.log\""
-      - "tail -20 /tmp/kubedash-backend.log"
+      - "sleep 2"
+      - "echo 'Backend started (PID $(pgrep -f 'python.*wsgi.py' | head -1)). Logs: /tmp/kubedash-backend.log'"
+      - "cat /tmp/kubedash-backend.log"
 
-  # ---- Test tasks (unit / smoke / e2e) ---------------------------------------
+  # ---- E2E (Playwright auth-smoke, no kind needed) ---------------------------
   #
-  # All three push their results to the dev Prometheus Pushgateway when it is
-  # reachable (PROMETHEUS_PUSHGATEWAY_URL set), so Grafana always shows the
-  # last run. The push is a silent no-op when the gateway is absent, so the
-  # docker-free loop (test-unit) still works on a bare host.
+  # Runs the local auth-smoke spec against the dev-stack backend on :8080.
+  # The stack must be up first (task dev-stack in another terminal, or the
+  # backend left running). Asserts the three seams unit tests miss: SPA shell
+  # render (no JS crash), local login → profile + synthetic cluster, and the
+  # wrong-password error path.
   #
-  #   task test-unit                 # fast pytest unit loop
-  #   task test-unit FULL=1          # + the container-backed integration tier
-  #   task test-unit FILE=tests/api/test_local_auth.py   # narrow to a path/glob
-  #   task test-smoke                # Playwright auth smoke (needs task dev-stack)
-  #   task test-e2e                  # Playwright OIDC+kind journey (CI parity)
-  #
-  # Prometheus wiring: dev/docker-compose.yml runs the pushgateway; dev/
-  # prometheus/prometheus.yml scrapes it (job_name: pushgateway).
+  #   task dev-stack            # terminal 1 (keep running)
+  #   task e2e                  # terminal 2
 
-  test-unit:
-    desc: "Run the backend pytest unit loop (-m 'not integration'); FULL=1 adds the integration tier, FILE=... narrows; pushes results to Pushgateway when reachable"
-    dir: backend
-    env:
-      PROMETHEUS_PUSHGATEWAY_URL: "http://localhost:{{.PUSHGATEWAY_PORT | default 9091}}"
-      PROMETHEUS_PUSHGATEWAY_JOB: "kubedash-unit"
-    cmds:
-      - >
-        {{if .FULL}}uv run pytest -v --metrics {{.FILE}}{{else}}uv run pytest
-        -m "not integration" --metrics {{.FILE}}{{end}}
-
-  test-smoke:
-    desc: "Run the Playwright auth-smoke e2e against the dev-stack backend (:8080); needs task dev-stack running; pushes results to Pushgateway"
+  e2e:
+    desc: "Run the Playwright auth-smoke e2e against the dev-stack backend (:8080)"
     dir: frontend
-    env:
-      E2E_BASE_URL: "http://localhost:8080"
-      PROMETHEUS_PUSHGATEWAY_URL: "http://localhost:{{.PUSHGATEWAY_PORT | default 9091}}"
     cmds:
-      - "corepack pnpm exec playwright test e2e/auth-smoke.spec.ts --reporter=list,json"
-      - "uv run --project {{.TASKFILE_DIR}}/backend python {{.TASKFILE_DIR}}/scripts/prometheus-push-e2e.py --report playwright-report.json --job kubedash-smoke"
-
-  test-e2e:
-    desc: "Run the full Playwright e2e (OIDC + kind-cluster journey); CI parity — needs kind + mock IdP (see e2e.yaml); pushes results to Pushgateway"
-    dir: frontend
-    env:
-      E2E_BASE_URL: "http://localhost:8080"
-      PROMETHEUS_PUSHGATEWAY_URL: "http://localhost:{{.PUSHGATEWAY_PORT | default 9091}}"
-    cmds:
-      - "corepack pnpm exec playwright test e2e/smoke.spec.ts --reporter=list,json"
-      - "uv run --project {{.TASKFILE_DIR}}/backend python {{.TASKFILE_DIR}}/scripts/prometheus-push-e2e.py --report playwright-report.json --job kubedash-e2e"
-
-  # ---- Code quality / security (lint, type, duplication, CVEs) ----------------
-  #
-  # Each task runs the tool, reduces its output to gauges, and pushes them to
-  # the dev Pushgateway (job: kubedash-lint / kubedash-quality / kubedash-security).
-  # The push is a silent no-op when the gateway is absent. ruff/mypy/trivy/jscpd
-  # are all already in the toolchain (ruff+mypy are dev deps; trivy/jscpd are on
-  # PATH). See .skillgrid/ARCHITECTURE.md §6 for the query-only observability model.
-  #
-  #   task test-lint       # ruff + mypy -> kubedash-lint
-  #   task test-quality    # jscpd duplication -> kubedash-quality
-  #   task test-security   # trivy CVEs -> kubedash-security (IMAGE=... to scan an image)
-
-  test-lint:
-    desc: "Run ruff + mypy and push per-rule violation + type-error counts to Pushgateway (job kubedash-lint)"
-    env:
-      PROMETHEUS_PUSHGATEWAY_URL: "http://localhost:{{.PUSHGATEWAY_PORT | default 9091}}"
-    cmds:
-      - "python3 {{.TASKFILE_DIR}}/scripts/collect-lint.py"
-
-  test-quality:
-    desc: "Run jscpd over the frontend and push duplication % + clone count to Pushgateway (job kubedash-quality)"
-    env:
-      PROMETHEUS_PUSHGATEWAY_URL: "http://localhost:{{.PUSHGATEWAY_PORT | default 9091}}"
-    cmds:
-      - "python3 {{.TASKFILE_DIR}}/scripts/collect-quality.py"
-
-  test-security:
-    desc: "Run trivy and push CVE counts by severity to Pushgateway (job kubedash-security); IMAGE=... scans an image, else filesystem scan"
-    env:
-      PROMETHEUS_PUSHGATEWAY_URL: "http://localhost:{{.PUSHGATEWAY_PORT | default 9091}}"
-    cmds:
-      - "python3 {{.TASKFILE_DIR}}/scripts/collect-security.py {{if .IMAGE}}--image {{.IMAGE}}{{end}}"
+      - "corepack pnpm exec playwright test e2e/auth-smoke.spec.ts"
 
   # ---- Frontend (offline dev loop, ADR-0020 air-gap) -------------------------
   #
@@ -387,4 +274,4 @@ tasks:
     requires: { vars: [] }
     deps: [fe-build]
     cmds:
-      - "node {{.TASKFILE_DIR}}/scripts/fe-airgap-check.mjs {{.TASKFILE_DIR}}/frontend/dist {{if .ALLOW}}--allow \"{{.ALLOW}}\"{{end}}"
+      - "node {{.TASKFILE_DIR}}/tests/fe-airgap-check.mjs {{.TASKFILE_DIR}}/frontend/dist {{if .ALLOW}}--allow \"{{.ALLOW}}\"{{end}}"

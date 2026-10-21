@@ -13,18 +13,8 @@ const AppFooter = () => {
   return (
     <CFooter fixed={false} className="px-4">
       <div>
-        <a href="https://devopstales.github.io" target="_blank" rel="noopener noreferrer">
-          DevOpsTales
-        </a>{' '}
-        -{' '}
-        <a
-          href="https://devopstales.github.io/KubeDash/latest/"
-          target="_blank"
-          rel="noopener noreferrer"
-        >
-          KubeDash
-        </a>{' '}
-        Copyright &copy; 2021-2025
+        {/* ADR-0020: air-gapped bundle — labels only, no outbound docs links */}
+        DevOpsTales - KubeDash Copyright &copy; 2021-2025
       </div>
       <div className="ms-auto">
         Powered by&nbsp;
