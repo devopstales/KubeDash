@@ -1,0 +1,158 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>KubeDash 4.1 — Cluster Metrics (Option 1)</title>
+<!-- Local CoreUI only. No CDN. Open from the frontend directory. -->
+<link rel="stylesheet" href="../node_modules/@coreui/coreui/dist/css/coreui.min.css" />
+<style>
+  body { background-color: var(--cui-tertiary-bg); }
+  [data-coreui-theme='dark'] body { background-color: var(--cui-dark-bg-subtle); }
+  .icon { width: 1rem; height: 1rem; }
+  .icon-lg { width: 1.25rem; height: 1.25rem; }
+  .stat-value { font-size: 1.75rem; font-weight: 600; line-height: 1.2; }
+  .stat-label { font-size: .75rem; }
+</style>
+</head>
+<body>
+<svg xmlns="http://www.w3.org/2000/svg" hidden>
+  <symbol id="i-plus" viewBox="0 0 512 512"><path fill="currentColor" d="M440 240H272V72h-32v168H72v32h168v168h32V272h168z"/></symbol>
+  <symbol id="i-sync" viewBox="0 0 512 512"><path fill="currentColor" d="M472.01 144H288V55.987A40 40 0 0 0 248 16h-32a16 16 0 0 0-16 16v80a16 16 0 0 0 16 16h168v192a16 16 0 0 0 16 16h32a40 40 0 0 0 40-40V184a40 40 0 0 0-40-40Zm-432 56v96a40 40 0 0 0 40 40h184v88.013A40 40 0 0 0 264 496h32a16 16 0 0 0 16-16v-80a16 16 0 0 0-16-16H128V192a16 16 0 0 0-16-16H80a40 40 0 0 0-40 40Z"/></symbol>
+</svg>
+
+<div class="wrapper d-flex flex-column min-vh-100">
+  <header class="header p-0 mb-4">
+    <!-- Row 1: shared. No page actions here. -->
+    <div class="container-fluid px-4 d-flex align-items-center border-bottom">
+      <strong>KubeDash</strong>
+      <div class="ms-auto d-flex align-items-center gap-3">
+        <select class="form-select form-select-sm w-auto" aria-label="Namespace">
+          <option selected>All namespaces</option>
+          <option>default</option>
+          <option>prod</option>
+          <option>staging</option>
+        </select>
+        <div class="btn-group" role="group" aria-label="Theme">
+          <button class="btn btn-ghost-secondary btn-sm" type="button" data-theme="light">Light</button>
+          <button class="btn btn-ghost-secondary btn-sm" type="button" data-theme="dark">Dark</button>
+        </div>
+      </div>
+    </div>
+    <!-- Row 2: page. Breadcrumb + page action in TopMenu. -->
+    <div class="container-fluid px-4 d-flex align-items-center">
+      <nav aria-label="breadcrumb">
+        <ol class="breadcrumb my-0">
+          <li class="breadcrumb-item">Dashboard</li>
+          <li class="breadcrumb-item active" aria-current="page">Cluster Metrics</li>
+        </ol>
+      </nav>
+      <button class="btn btn-link header-toggler ms-auto" type="button" aria-label="Refresh" title="Refresh">
+        <svg class="icon icon-lg" aria-hidden="true"><use href="#i-sync" /></svg>
+      </button>
+    </div>
+  </header>
+
+  <main class="body flex-grow-1">
+    <div class="container-fluid px-4">
+
+      <!-- Cluster status strip: quiet, inline, no card -->
+      <div class="d-flex flex-wrap align-items-center gap-2 mb-3" role="status" aria-label="Cluster status">
+        <span class="text-primary fw-semibold small">production-1</span>
+        <span class="badge text-bg-success">Active</span>
+        <span class="text-muted small">API https://api.prod1.example:6443</span>
+        <span class="text-muted small ms-auto">Last probe 14:32:05 UTC · context prod1-admin</span>
+      </div>
+
+      <!-- One shadowed card, one title -->
+      <section class="card shadow mb-4">
+        <div class="card-header py-3">
+          <h5 class="card-title m-0 fw-bold text-primary fs-6">Cluster Metrics</h5>
+        </div>
+        <div class="card-body">
+          <!-- 4.1 metric tiles: plain divs inside the card body, CoreUI colors only -->
+          <div class="row row-cols-2 row-cols-lg-4 g-3 mb-4">
+            <div class="col"><div class="border rounded p-3 h-100">
+              <div class="stat-label text-muted text-uppercase">CPU usage</div>
+              <div class="stat-value">41<span class="fs-6 text-muted">%</span></div>
+              <div class="progress mt-2" style="height: 4px;"><div class="progress-bar" style="width: 41%"></div></div>
+            </div></div>
+            <div class="col"><div class="border rounded p-3 h-100">
+              <div class="stat-label text-muted text-uppercase">Memory usage</div>
+              <div class="stat-value">63<span class="fs-6 text-muted">%</span></div>
+              <div class="progress mt-2" style="height: 4px;"><div class="progress-bar bg-warning" style="width: 63%"></div></div>
+            </div></div>
+            <div class="col"><div class="border rounded p-3 h-100">
+              <div class="stat-label text-muted text-uppercase">Storage usage</div>
+              <div class="stat-value">28<span class="fs-6 text-muted">%</span></div>
+              <div class="progress mt-2" style="height: 4px;"><div class="progress-bar" style="width: 28%"></div></div>
+            </div></div>
+            <div class="col"><div class="border rounded p-3 h-100">
+              <div class="stat-label text-muted text-uppercase">Pods</div>
+              <div class="stat-value">128 <span class="fs-6 text-muted">/ 140</span></div>
+              <div class="progress mt-2" style="height: 4px;"><div class="progress-bar" style="width: 91%"></div></div>
+            </div></div>
+          </div>
+
+          <table class="table table-bordered align-middle mb-0" id="metrics-table">
+            <thead>
+              <tr>
+                <th>Status</th>
+                <th>Name</th>
+                <th>CPU</th>
+                <th>Memory</th>
+                <th>Pods</th>
+                <th>Created</th>
+              </tr>
+            </thead>
+            <tbody>
+              <tr>
+                <td><span class="badge text-bg-success">Ready</span></td>
+                <td><a href="#">node-prod-1</a></td>
+                <td>38%</td>
+                <td>61%</td>
+                <td>42/48</td>
+                <td>2026-01-12</td>
+              </tr>
+              <tr>
+                <td><span class="badge text-bg-success">Ready</span></td>
+                <td><a href="#">node-prod-2</a></td>
+                <td>44%</td>
+                <td>66%</td>
+                <td>45/48</td>
+                <td>2026-01-12</td>
+              </tr>
+              <tr>
+                <td><span class="badge text-bg-success">Ready</span></td>
+                <td><a href="#">node-prod-3</a></td>
+                <td>40%</td>
+                <td>62%</td>
+                <td>41/44</td>
+                <td>2026-02-03</td>
+              </tr>
+              <tr>
+                <td><span class="badge text-bg-secondary">NotReady</span></td>
+                <td><a href="#">node-staging-1</a></td>
+                <td>0%</td>
+                <td>12%</td>
+                <td>0/16</td>
+                <td>2026-03-19</td>
+              </tr>
+            </tbody>
+          </table>
+        </div>
+      </section>
+
+    </div>
+  </main>
+</div>
+
+<script>
+  document.querySelectorAll('[data-theme]').forEach((button) => {
+    button.addEventListener('click', () => {
+      document.documentElement.setAttribute('data-coreui-theme', button.dataset.theme)
+    })
+  })
+</script>
+</body>
+</html>

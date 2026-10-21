@@ -1,0 +1,153 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>KubeDash — Cluster Atlas (Option 3)</title>
+<!-- Local CoreUI only. No CDN. Open from the frontend directory. -->
+<link rel="stylesheet" href="../node_modules/@coreui/coreui/dist/css/coreui.min.css" />
+<style>
+  body { background-color: var(--cui-tertiary-bg); }
+  [data-coreui-theme='dark'] body { background-color: var(--cui-dark-bg-subtle); }
+  .icon { width: 1rem; height: 1rem; }
+  .icon-lg { width: 1.25rem; height: 1.25rem; }
+  /* Quiet cell fills inside bordered tables — CoreUI theme tokens only */
+  .cell-ok { background-color: rgba(var(--cui-success-rgb), 0.1); }
+  .cell-warn { background-color: rgba(var(--cui-warning-rgb), 0.1); }
+  .cell-bad { background-color: rgba(var(--cui-danger-rgb), 0.1); }
+</style>
+</head>
+<body>
+<svg xmlns="http://www.w3.org/2000/svg" hidden>
+  <symbol id="i-sync" viewBox="0 0 512 512"><path fill="currentColor" d="M472.01 144H288V55.987A40 40 0 0 0 248 16h-32a16 16 0 0 0-16 16v80a16 16 0 0 0 16 16h168v192a16 16 0 0 0 16 16h32a40 40 0 0 0 40-40V184a40 40 0 0 0-40-40Zm-432 56v96a40 40 0 0 0 40 40h184v88.013A40 40 0 0 0 264 496h32a16 16 0 0 0 16-16v-80a16 16 0 0 0-16-16H128V192a16 16 0 0 0-16-16H80a40 40 0 0 0-40 40Z"/></symbol>
+</svg>
+
+<div class="wrapper d-flex flex-column min-vh-100">
+  <header class="header p-0 mb-4">
+    <!-- Row 1: shared. No page actions here. -->
+    <div class="container-fluid px-4 d-flex align-items-center border-bottom">
+      <strong>KubeDash</strong>
+      <div class="ms-auto d-flex align-items-center gap-3">
+        <select class="form-select form-select-sm w-auto" aria-label="Cluster">
+          <option selected>production-1</option>
+          <option>staging-1</option>
+        </select>
+        <div class="btn-group" role="group" aria-label="Theme">
+          <button class="btn btn-ghost-secondary btn-sm" type="button" data-theme="light">Light</button>
+          <button class="btn btn-ghost-secondary btn-sm" type="button" data-theme="dark">Dark</button>
+        </div>
+      </div>
+    </div>
+    <!-- Row 2: page. Breadcrumb + page action in TopMenu. -->
+    <div class="container-fluid px-4 d-flex align-items-center">
+      <nav aria-label="breadcrumb">
+        <ol class="breadcrumb my-0">
+          <li class="breadcrumb-item">Dashboard</li>
+          <li class="breadcrumb-item active" aria-current="page">Cluster Atlas</li>
+        </ol>
+      </nav>
+      <button class="btn btn-link header-toggler ms-auto" type="button" aria-label="Refresh" title="Refresh">
+        <svg class="icon icon-lg" aria-hidden="true"><use href="#i-sync" /></svg>
+      </button>
+    </div>
+  </header>
+
+  <main class="body flex-grow-1">
+    <div class="container-fluid px-4">
+
+      <section class="card shadow mb-4">
+        <div class="card-header py-3">
+          <h5 class="card-title m-0 fw-bold text-primary fs-6">Cluster Atlas</h5>
+          <div class="small text-muted mt-1">
+            Rows are namespaces, columns are resource kinds. A cell is a link to the list for that
+            kind in that namespace. The first column is the cluster-level signal for the row.
+          </div>
+        </div>
+        <div class="card-body">
+          <table class="table table-bordered align-middle mb-0">
+            <thead>
+              <tr>
+                <th>Namespace</th>
+                <th>State</th>
+                <th>Pods</th>
+                <th>Deployments</th>
+                <th>Services</th>
+                <th>Ingress</th>
+                <th>Secrets</th>
+                <th>Problems</th>
+              </tr>
+            </thead>
+            <tbody>
+              <tr>
+                <th scope="row"><a href="#">prod</a></th>
+                <td><span class="badge text-bg-success">Active</span></td>
+                <td class="cell-warn text-center">48</td>
+                <td class="text-center"><a href="#">12</a></td>
+                <td class="text-center"><a href="#">15</a></td>
+                <td class="text-center"><a href="#">6</a></td>
+                <td class="text-center"><a href="#">9</a></td>
+                <td class="cell-bad text-center"><span class="fw-semibold text-danger">3</span></td>
+              </tr>
+              <tr>
+                <th scope="row"><a href="#">staging</a></th>
+                <td><span class="badge text-bg-success">Active</span></td>
+                <td class="text-center">16</td>
+                <td class="text-center"><a href="#">5</a></td>
+                <td class="text-center"><a href="#">6</a></td>
+                <td class="text-center"><a href="#">2</a></td>
+                <td class="text-center"><a href="#">4</a></td>
+                <td class="cell-warn text-center"><span class="fw-semibold text-warning">2</span></td>
+              </tr>
+              <tr>
+                <th scope="row"><a href="#">default</a></th>
+                <td><span class="badge text-bg-success">Active</span></td>
+                <td class="text-center">8</td>
+                <td class="text-center"><a href="#">3</a></td>
+                <td class="text-center"><a href="#">4</a></td>
+                <td class="text-center"><a href="#">1</a></td>
+                <td class="text-center"><a href="#">2</a></td>
+                <td class="cell-ok text-center">0</td>
+              </tr>
+              <tr>
+                <th scope="row"><a href="#">infra</a></th>
+                <td><span class="badge text-bg-success">Active</span></td>
+                <td class="text-center">12</td>
+                <td class="text-center"><a href="#">4</a></td>
+                <td class="text-center"><a href="#">7</a></td>
+                <td class="text-center">0</td>
+                <td class="text-center"><a href="#">6</a></td>
+                <td class="cell-ok text-center">0</td>
+              </tr>
+              <tr>
+                <th scope="row"><a href="#">batch</a></th>
+                <td><span class="badge text-bg-secondary">Terminating</span></td>
+                <td class="text-center">3</td>
+                <td class="text-center">0</td>
+                <td class="text-center"><a href="#">1</a></td>
+                <td class="text-center">0</td>
+                <td class="text-center"><a href="#">1</a></td>
+                <td class="cell-bad text-center"><span class="fw-semibold text-danger">4</span></td>
+              </tr>
+            </tbody>
+          </table>
+
+          <div class="mt-3 small text-muted">
+            Cluster total: 87 pods, 24 deployments, 33 services, 9 ingresses, 22 secrets.
+            Problems count objects with a non-ready phase or a recent error event.
+          </div>
+        </div>
+      </section>
+
+    </div>
+  </main>
+</div>
+
+<script>
+  document.querySelectorAll('[data-theme]').forEach((button) => {
+    button.addEventListener('click', () => {
+      document.documentElement.setAttribute('data-coreui-theme', button.dataset.theme)
+    })
+  })
+</script>
+</body>
+</html>
