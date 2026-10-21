@@ -4,17 +4,14 @@
 # deeper truth (see .skillgrid/specs/).
 
 pipeline:
-  # The in-flight change (newest spec dir with in-flight artifacts).
-  current_change: 2026-10-17-authentication-vertical
-  # Derived from spec-zone artifacts: briefing + blueprint (critic + plan-
-  # review passed) + acceptance.feature (7 scenarios) + tasks.md (sliced,
-  # 7 tickets / 5 waves) + backlog TASK-016..022 published with deps.
-  # All 7 tickets (TICKET-13..19) implemented and reviewed; this change is at
-  # the ADR-0021 bookkeeping / L3 verification commit (TICKET-19).
+  # The in-flight change the user asked to execute (2026-10-21).
+  # Tasks 1–7 are committed on rebase; Task 8 (docs + full verify) is open.
+  # Spec-zone artifacts: briefing + blueprint + acceptance.feature + tasks.md
+  # (sliced, 8 tickets / 7 waves). Ledger: .skillgrid/sdd/2026-10-19-user-management/
+  current_change: 2026-10-19-user-management
   current_phase: executing
-  # Note: 2026-10-17-kubectl-oidc-plugin and 2026-10-17-test-observability-
-  # pipeline remain in flight at their respective phases.
-  # The spec dir this change lives in.
+  # 2026-10-17-kubectl-oidc-plugin and 2026-10-17-test-observability-pipeline
+  # remain in flight at their own phases. This pointer names one current change.
   specs_root: .skillgrid/specs
 
 # In-flight changes (besides pipeline.current_change). current_change stays on
@@ -33,6 +30,7 @@ in_flight:
 completed_changes:
   - 2026-10-17-kubedash-base-structure
   - 2026-10-17-swagger-ui-air-gap
+  - 2026-10-17-authentication-vertical
 
 # Onboarding state (2026-10-17): config.yaml + ASSUMPTIONS.md + state.yaml
 # created. Open items tracked in ASSUMPTIONS.md "Onboarding notes".
