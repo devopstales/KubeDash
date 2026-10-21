@@ -30,3 +30,12 @@ sketch verdict; the blueprint reads this file, it does not re-run the experiment
     `resources/<kind>` exists but there is no one-call matrix endpoint.
 - **Decision needed:** the prototype does not pick the winner. Choose a direction (or a mix,
   e.g. Option 1 + Option 2 as tabs) before authoring the blueprint.
+
+## Decision (2026-10-21, user)
+
+**Winner: Option 1 — 4.1 Cluster Metrics → `/cluster/node`.** The metric tiles are exactly a
+node-metrics view, and Option 2 (Watchboard) / Option 3 (Atlas) are parked for a future change.
+Scope: node table **plus real metric tiles** — i.e. `list_nodes` **and** the `metrics.py`
+implementation (ADR-0003). The certainty rule is binding: a metric KubeDash cannot read (no
+metrics-server / node not reporting) renders `unknown`, never `0` or a healthy tone; declared
+vs observed state get distinct labels.

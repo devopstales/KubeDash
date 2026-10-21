@@ -9,10 +9,10 @@ pipeline:
   # acceptance.feature (no tasks.md — TASK-028 covers the blueprint as one
   # sequential ticket). 2026-10-19-user-management remains in-flight on disk
   # but is no longer the current pointer.
-  current_change: 2026-10-21-namespace-page
-  current_phase: executing
-  # 2026-10-17-kubectl-oidc-plugin, 2026-10-17-test-observability-pipeline,
-  # and 2026-10-19-user-management remain in flight at their own phases.
+  current_change: 2026-10-21-cluster-node
+  current_phase: blueprint
+  # 2026-10-21-namespace-page (executing) and 2026-10-17/2026-10-19 changes
+  # remain in flight at their own phases.
   specs_root: .skillgrid/specs
 
 # In-flight changes (besides pipeline.current_change). current_change stays on
