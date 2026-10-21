@@ -78,6 +78,8 @@ def _upsert_user(userinfo: dict[str, object]) -> User:
     from app.services import groups as groups_svc
     for name in user.groups or []:
         groups_svc.sync_one_user(db.session, user_id=user.id, group_names=[name])
+    groups_svc.sync_user_role_group(db.session, user)
+    db.session.commit()
     return user
 
 

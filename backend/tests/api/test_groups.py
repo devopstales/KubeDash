@@ -66,16 +66,73 @@ def _seed_user(api_app, sub: str) -> int:
         return u.id
 
 
+def test_default_local_groups_follow_permission_roles(
+    api_client, api_app, admin_headers
+) -> None:
+    """kubedash-admin / kubedash-user are local groups. Membership follows
+    the user permission role: admin → kubedash-admin, user → kubedash-user."""
+    _seed_user(api_app, "oidc-member")
+    r = api_client.get("/api/v1/admin/groups", headers=admin_headers)
+    assert r.status_code == 200, r.get_json()
+    by_name = {g["name"]: g for g in r.get_json()}
+    assert by_name["kubedash-admin"]["source"] == "local"
+    assert by_name["kubedash-user"]["source"] == "local"
+
+    admin = api_client.get(
+        "/api/v1/admin/groups/kubedash-admin", headers=admin_headers
+    ).get_json()
+    user = api_client.get(
+        "/api/v1/admin/groups/kubedash-user", headers=admin_headers
+    ).get_json()
+    admin_subs = [m["sub"] for m in admin["members"]]
+    user_subs = [m["sub"] for m in user["members"]]
+    assert "local:admin@local" in admin_subs
+    assert "oidc-member" not in admin_subs
+    assert "oidc-member" in user_subs
+    assert "local:admin@local" not in user_subs
+
+
+def test_permission_change_moves_role_group(
+    api_client, api_app, admin_headers
+) -> None:
+    """PATCH role admin moves the user from kubedash-user to kubedash-admin."""
+    _seed_user(api_app, "oidc-mover")
+    with api_app.app_context():  # type: ignore[attr-defined]
+        from app.extensions import db
+        from app.models.user import User
+
+        user_id = db.session.execute(
+            db.select(User.id).filter_by(sub="oidc-mover")
+        ).scalar_one()
+    api_client.get("/api/v1/admin/groups", headers=admin_headers)
+    r = api_client.patch(
+        f"/api/v1/admin/users/{user_id}",
+        json={"role": "admin"},
+        headers=admin_headers,
+    )
+    assert r.status_code == 200, r.get_json()
+    admin = api_client.get(
+        "/api/v1/admin/groups/kubedash-admin", headers=admin_headers
+    ).get_json()
+    user = api_client.get(
+        "/api/v1/admin/groups/kubedash-user", headers=admin_headers
+    ).get_json()
+    assert "oidc-mover" in [m["sub"] for m in admin["members"]]
+    assert "oidc-mover" not in [m["sub"] for m in user["members"]]
+
+
 def test_admin_lists_groups(api_client, api_app, admin_headers) -> None:
     _seed_group(api_app, "devs2")
-    _seed_group(api_app, "manual:ops", source="manual")
+    _seed_group(api_app, "local:ops", source="local")
     r = api_client.get("/api/v1/admin/groups", headers=admin_headers)
     assert r.status_code == 200, r.get_json()
     names = [g["name"] for g in r.get_json()]
-    # oidc first, then manual, each alphabetical.
-    assert names == ["devs2", "manual:ops"]
-    for g in r.get_json():
-        assert g["member_count"] == 0
+    # local first (role groups, then dashboard groups), then OpenID, each alphabetical.
+    assert names == ["kubedash-admin", "kubedash-user", "local:ops", "devs2"]
+    by_name = {g["name"]: g for g in r.get_json()}
+    assert by_name["devs2"]["member_count"] == 0
+    assert by_name["local:ops"]["member_count"] == 0
+    assert by_name["kubedash-admin"]["source"] == "local"
 
 
 def test_user_cannot_list_groups(api_client, api_app, user_headers) -> None:
@@ -129,7 +186,7 @@ def test_sync_materializes_memberships_from_claims(
     assert r2.status_code == 200
     assert r2.get_json()["created_members"] == 0
     names = [g["name"] for g in api_client.get("/api/v1/admin/groups", headers=admin_headers).get_json()]
-    assert names == ["devs2", "sre"]
+    assert names == ["kubedash-admin", "kubedash-user", "devs2", "sre"]
 
 
 def test_create_manual_group_and_name_collision(
@@ -139,8 +196,8 @@ def test_create_manual_group_and_name_collision(
         "/api/v1/admin/groups", json={"name": "ops"}, headers=admin_headers
     )
     assert r.status_code == 201, r.get_json()
-    assert r.get_json()["name"] == "manual:ops"
-    assert r.get_json()["source"] == "manual"
+    assert r.get_json()["name"] == "local:ops"
+    assert r.get_json()["source"] == "local"
     r2 = api_client.post(
         "/api/v1/admin/groups", json={"name": "ops"}, headers=admin_headers
     )

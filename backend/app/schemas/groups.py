@@ -7,8 +7,8 @@ from marshmallow import Schema, fields
 
 
 class GroupIn(Schema):
-    """POST body (manual group create). ``name`` is the display name — the
-    ``manual:`` prefix is applied server-side."""
+    """POST body (local group create). ``name`` is the display name — the
+    ``local:`` prefix is applied server-side."""
 
     name = fields.String(required=True)
 

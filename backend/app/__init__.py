@@ -139,6 +139,10 @@ def _bootstrap_local_admin(app: Flask) -> None:
         )
         db.session.execute(stmt)
         db.session.commit()
+        # The two local role groups exist as soon as the admin row does.
+        from app.services.groups import ensure_role_groups
+
+        ensure_role_groups(db.session)
 
 
 def register_health(app: Flask) -> None:

@@ -6,9 +6,11 @@ Create Date: 2026-10-21 12:00:00.000000
 
 One-way-door (ADR-0002) — the migration for the user/group FE change:
 
-- ``groups``: group identity (name unique; source ``oidc`` | ``manual``;
-  ``manual:`` name prefix reserved for dashboard-created groups, same
-  ruling as ``local:`` user subs — ADR-0021).
+- ``groups``: group identity (name unique; source ``oidc`` | ``local``;
+  ``local:`` name prefix reserved for dashboard-created groups, same
+  ruling as ``local:`` user subs — ADR-0021). ``kubedash-admin`` and
+  ``kubedash-user`` are seeded by the app (they back the permission roles),
+  not by this revision.
 - ``group_members``: user × group membership, unique (user_id, group_id).
   No seed — membership is materialized by the login upsert and
   ``POST /admin/groups/sync``.

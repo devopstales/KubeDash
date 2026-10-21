@@ -49,14 +49,15 @@ class GroupsApi(Api):
 
     @blp.route("/admin/groups", methods=["GET"])
     @blp.doc(responses={
-        200: "Every group, oidc first, name order (bare list, GroupOut items).",
+        200: "Every group, local first, name order (bare list, GroupOut items).",
         403: "RBAC_DENIED",
     })
     def list_groups(self) -> object:
         require_admin()
+        groups_svc.ensure_role_groups(db.session)
         rows = (
             db.session.execute(
-                db.select(Group).order_by(Group.source.desc(), Group.name)
+                db.select(Group).order_by(Group.source.asc(), Group.name)
             )
         ).scalars().all()
         return jsonify([self._out(group) for group in rows]), 200
@@ -69,6 +70,7 @@ class GroupsApi(Api):
     })
     def group_detail(self, name: str) -> object:
         require_admin()
+        groups_svc.ensure_role_groups(db.session)
         group = self._group_or_404(name)
         payload = self._out(group)
         payload["members"] = self._members(group)
@@ -86,6 +88,7 @@ class GroupsApi(Api):
         the 4.1 'groups appear after first login' behavior on demand."""
         require_admin()
         created = groups_svc.sync_from_users(db.session)
+        groups_svc.ensure_role_groups(db.session)
         db.session.add(AuditLog(
             action="groups.sync", actor_sub=g.current_user.sub, target="groups",
         ))

@@ -1,4 +1,4 @@
-"""Group rows — OIDC-synced and manual (ADR-0013 parity, 4.1 /user/group).
+"""Group rows — OpenID-synced and local (ADR-0013 parity, 4.1 /user/group).
 
 A group is the subject of RBAC bindings in the target clusters (K8s
 ``Group`` subjects), so group privileges mirror user privileges: a binding
@@ -17,13 +17,16 @@ class Group(db.Model):
 
     id = db.Column(db.Integer, primary_key=True)
     # Stable identity — the OIDC ``groups`` claim value (e.g.
-    # "cn=devs,ou=groups"). ``manual:<name>`` is the reserved prefix for
-    # groups created from the dashboard (an IdP claim starting with
-    # ``manual:`` would collide — same ruling as ``local:`` subs, ADR-0021).
+    # "cn=devs,ou=groups"). ``local:`` is the reserved prefix for groups
+    # created from the dashboard (an IdP claim starting with ``local:``
+    # would collide — same ruling as ``local:`` subs, ADR-0021).
+    # ``kubedash-admin`` and ``kubedash-user`` are the built-in local
+    # groups that back the admin and user permission roles.
     name = db.Column(db.String(255), unique=True, nullable=False, index=True)
     display_name = db.Column(db.String(255))
-    # 'oidc' (synced from an IdP claim) or 'manual' (dashboard-created).
-    source = db.Column(db.String(16), nullable=False, default="manual")
+    # 'oidc' (synced from an IdP claim) or 'local' (dashboard-created,
+    # including the two role groups). Same vocabulary as User.auth_source.
+    source = db.Column(db.String(16), nullable=False, default="local")
     # True when the name is known to an IdP (a claim was seen) — such rows
     # are kept on sync even with no members; manual rows are pruned when
     # their last member leaves (see GroupMember below).
@@ -34,11 +37,11 @@ class Group(db.Model):
         self,
         *,
         name: str,
-        source: str = "manual",
+        source: str = "local",
         display_name: str | None = None,
     ) -> None:
-        if source not in ("oidc", "manual"):
-            msg = f"unknown group source {source!r}; expected 'oidc' or 'manual'"
+        if source not in ("oidc", "local"):
+            msg = f"unknown group source {source!r}; expected 'oidc' or 'local'"
             raise ValueError(msg)
         self.name = name
         self.source = source
