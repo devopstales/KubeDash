@@ -68,7 +68,13 @@ class FakeK8s:
         self.calls.append(("apply_role", namespace, name))
 
     def apply_role_binding(
-        self, namespace: str, name: str, role_name: str, subject_user: str, labels: dict[str, str]
+        self,
+        namespace: str,
+        name: str,
+        role_name: str,
+        subject_user: str,
+        labels: dict[str, str],
+        subject_kind: str = "User",
     ) -> None:
         self._maybe_raise()
         self.calls.append(("apply_role_binding", namespace, name, role_name, subject_user))
@@ -78,7 +84,12 @@ class FakeK8s:
         self.calls.append(("apply_cluster_role", name))
 
     def apply_cluster_role_binding(
-        self, name: str, role_name: str, subject_user: str, labels: dict[str, str]
+        self,
+        name: str,
+        role_name: str,
+        subject_user: str,
+        labels: dict[str, str],
+        subject_kind: str = "User",
     ) -> None:
         self._maybe_raise()
         self.calls.append(("apply_cluster_role_binding", name, role_name, subject_user))
@@ -417,7 +428,7 @@ def test_admin_bind_records_binding_and_audits(api_client, api_app, admin_header
         assert rows[0].template == "viewer"
         assert rows[0].namespace == NS
         audits = db.session.execute(
-            db.select(AuditLog).filter_by(action="bind", target="sub-user-1")
+            db.select(AuditLog).filter_by(action="bind", target="user:sub-user-1")
         ).scalars().all()
         assert len(audits) == 1  # single audit row (service-side, no double)
 
@@ -444,7 +455,7 @@ def test_rebind_is_a_noop_no_new_audit(api_client, api_app, admin_headers, fake_
         n = db.session.execute(
             db.select(db.func.count())
             .select_from(AuditLog)
-            .filter_by(action="bind", target="sub-user-1")
+            .filter_by(action="bind", target="user:sub-user-1")
         ).scalar_one()
         assert n == 1
 

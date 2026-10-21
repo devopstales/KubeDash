@@ -43,7 +43,10 @@ describe('TopMenu', () => {
       </MemoryRouter>,
     )
     const nav = container.querySelector('.header-nav')
-    expect(nav?.firstElementChild?.querySelector('.vr')).toBeTruthy()
+    const rule = nav?.querySelector('.header-nav-separator')
+    expect(rule).toBeTruthy()
+    expect(nav?.firstElementChild).toBe(rule)
+    expect((rule as HTMLElement).style.height).toBe('1.25rem')
   })
 
   test('reload-reloads-the-page', async () => {

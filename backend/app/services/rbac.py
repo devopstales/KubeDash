@@ -7,10 +7,12 @@ cluster's own RBAC (SelfSubjectAccessReview) is the answer, and the 10 frozen
 OD-1 codes carry the result (403 RBAC_DENIED on deny).
 
 Decisions are cached in Redis for ``SAR_TTL`` seconds under
-``sar:<cluster.id>:<user.sub>:<verb>:<resource>``. The cache key deliberately
-excludes namespace/name: the SAR body carries them, and a coarse (verb,
-resource) verdict is the unit the API needs — a cache hit never re-asks the
-cluster (the seam the unit tests prove with a throwing ``pool.get``).
+``sar:<cluster.id>:<user.sub>:<verb>:<resource>:<group>:<namespace>:<name>``
+(empty segment = unset). The key carries every SAR attribute: the API lists
+with the registry's credentials, so the SAR is the only gate, and a verdict
+for one namespace or object must never answer for another (ADR-0004
+addendum). A cache hit never re-asks the cluster (the seam the unit tests
+prove with a throwing ``pool.get``).
 """
 from typing import Any
 
@@ -22,13 +24,25 @@ from app.services.k8s_client import pool
 SAR_TTL = 30  # seconds (ARCHITECTURE.md §3.3)
 
 
-def _cache_key(cluster_id: int, sub: str, verb: str, resource: str) -> str:
-    return f"sar:{cluster_id}:{sub}:{verb}:{resource}"
+def _cache_key(
+    cluster_id: int,
+    sub: str,
+    verb: str,
+    resource: str,
+    group: str = "",
+    namespace: str | None = None,
+    name: str | None = None,
+) -> str:
+    return f"sar:{cluster_id}:{sub}:{verb}:{resource}:{group}:{namespace or ''}:{name or ''}"
 
 
 def _cache_get(key: str) -> str | None:
-    hit: str | None = redis_client.get(key)
-    return hit
+    hit = redis_client.get(key)
+    if hit is None:
+        return None
+    # redis-py returns bytes unless decode_responses is on. b"1" == "1" is
+    # false, which turned every cache hit into a deny.
+    return hit.decode() if isinstance(hit, bytes) else str(hit)
 
 
 def _cache_set(key: str, value: str) -> None:
@@ -36,7 +50,12 @@ def _cache_set(key: str, value: str) -> None:
 
 
 def _sar_allowed(
-    client: Any, verb: str, resource: str, namespace: str | None, name: str | None
+    client: Any,
+    verb: str,
+    resource: str,
+    namespace: str | None,
+    name: str | None,
+    group: str = "",
 ) -> bool:
     """Ask the cluster: may the user's K8s identity do ``verb`` on
     ``resource`` (scoped to ``namespace``/``name`` when given)?"""
@@ -52,6 +71,8 @@ def _sar_allowed(
         "namespace": namespace,
         "name": name,
     }
+    if group:
+        attrs["group"] = group
     sar = k8s_client.V1SelfSubjectAccessReview(
         spec=k8s_client.V1SelfSubjectAccessReviewSpec(
             resource_attributes=attrs  # type: ignore[arg-type]
@@ -61,7 +82,13 @@ def _sar_allowed(
 
 
 def can(
-    user: Any, cluster: Any, verb: str, resource: str, namespace: str | None, name: str | None
+    user: Any,
+    cluster: Any,
+    verb: str,
+    resource: str,
+    namespace: str | None,
+    name: str | None,
+    group: str = "",
 ) -> bool:
     """The ADR-0004 enforcement point: cached SAR verdict, ``True``/``False``.
 
@@ -70,10 +97,10 @@ def can(
     asked through the pool's client (Task 4 seam) and the verdict is stored
     for ``SAR_TTL`` seconds.
     """
-    key = _cache_key(cluster.id, user.sub, verb, resource)
+    key = _cache_key(cluster.id, user.sub, verb, resource, group, namespace, name)
     hit = _cache_get(key)
     if hit is not None:
         return hit == "1"
-    ok = _sar_allowed(pool.get(cluster), verb, resource, namespace, name)
+    ok = _sar_allowed(pool.get(cluster), verb, resource, namespace, name, group)
     _cache_set(key, "1" if ok else "0")
     return ok

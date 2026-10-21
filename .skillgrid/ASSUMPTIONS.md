@@ -60,7 +60,7 @@ are kept, with `In force: no`. Never delete a row; flip it instead (IRON RULE).
 | ADR-0001 | Flask + Flask-Smorest over FastAPI (sync WSGI, auto-OpenAPI, Pydantic-native schemas, SocketIO) | yes | `artifacts/04-adr-0001-flask-smorest.md` |
 | ADR-0002 | Multi-cluster via encrypted kubeconfig registry (one-way-door) | yes | `artifacts/04-adr-0002-multi-cluster-registry.md` |
 | ADR-0003 | Observability as query-only (no ingest) | yes | `artifacts/04-adr-0003-observability-query-only.md` |
-| ADR-0004 | RBAC proxy via SubjectAccessReview (not local role mapping) | yes | `artifacts/04-adr-0004-rbac-proxy-sar.md` |
+| ADR-0004 | RBAC proxy via SubjectAccessReview (not local role mapping) — addendum 2026-10-21: the SAR verdict cache key carries every SAR attribute (`sar:<cluster>:<sub>:<verb>:<resource>:<group>:<namespace>:<name>`); resource reads use the registry credentials, so a verdict for one namespace or object must never answer for another | yes | `artifacts/04-adr-0004-rbac-proxy-sar.md` |
 | ADR-0005 | CoreUI React + free admin template over shadcn/ui/Tailwind | yes | `artifacts/04-adr-0005-coreui-react.md` |
 | ADR-0006 | Single-container deployment (Gunicorn serves API + static SPA) | yes | `artifacts/04-adr-0006-single-container.md` |
 | ADR-0007 | RQ over Celery for async tasks | yes | `artifacts/04-adr-0007-rq-over-celery.md` |

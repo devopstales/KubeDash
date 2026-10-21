@@ -120,10 +120,10 @@ class GroupsApi(Api):
         403: "RBAC_DENIED",
         404: "RESOURCE_KIND_NOT_SUPPORTED (group or user missing)",
     })
-    def add_group_member(self, name: str, args: dict[str, object]) -> dict[str, object]:
+    def add_group_member(self, args: dict[str, object], name: str) -> dict[str, object]:
         require_admin()
         member = groups_svc.add_member(
-            db.session, group_name=name, user_sub=str(args["user"])
+            db.session, group_name=str(args["name"]), user_sub=str(args["user"])
         )
         db.session.add(AuditLog(
             action="group.member_add", actor_sub=g.current_user.sub,
@@ -139,10 +139,10 @@ class GroupsApi(Api):
         403: "RBAC_DENIED",
         404: "RESOURCE_KIND_NOT_SUPPORTED (group, user, or membership missing)",
     })
-    def remove_group_member(self, name: str, args: dict[str, object]) -> dict[str, object]:
+    def remove_group_member(self, args: dict[str, object], name: str) -> dict[str, object]:
         require_admin()
         groups_svc.remove_member(
-            db.session, group_name=name, user_sub=str(args["user"])
+            db.session, group_name=str(args["name"]), user_sub=str(args["user"])
         )
         db.session.add(AuditLog(
             action="group.member_remove", actor_sub=g.current_user.sub,
@@ -193,7 +193,7 @@ class GroupsApi(Api):
         422: "INVALID_KUBECONFIG (scope mismatch)",
         502: "CLUSTER_UNREACHABLE",
     })
-    def bind_group(self, name: str, args: dict[str, object]) -> dict[str, object]:
+    def bind_group(self, args: dict[str, object], name: str) -> dict[str, object]:
         """Bind a template to the group on a cluster — mirrors the user
         bind endpoint, the subject is the group (k8s ``Group`` subject)."""
         require_admin()
@@ -228,7 +228,7 @@ class GroupsApi(Api):
         404: "CLUSTER_NOT_FOUND / NO_BINDINGS / RESOURCE_KIND_NOT_SUPPORTED",
         502: "CLUSTER_UNREACHABLE",
     })
-    def unbind_group(self, name: str, args: dict[str, object]) -> dict[str, object]:
+    def unbind_group(self, args: dict[str, object], name: str) -> dict[str, object]:
         require_admin()
         group = self._group_or_404(name)
         cluster = _cluster_by_name_or_404(str(args["cluster"]))

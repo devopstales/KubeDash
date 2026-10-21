@@ -79,6 +79,29 @@ export interface K8sRole {
   [key: string]: unknown
 }
 
+/** A RoleBinding item as returned by /api/v1/clusters/<id>/resources/rolebindings. */
+export interface K8sRoleBinding {
+  metadata?: {
+    name?: string
+    namespace?: string
+  }
+  role_ref?: {
+    kind?: string
+    name?: string
+    api_group?: string
+  } | null
+  subjects?:
+    | {
+        kind?: string
+        name?: string
+        namespace?: string
+      }[]
+    | null
+}
+
+/** A ClusterRole item from /resources/clusterroles. Same rule shape as a Role. */
+export type K8sClusterRole = K8sRole
+
 /** One rule on a Role. Kubernetes ``to_dict`` uses snake_case. */
 export interface PolicyRule {
   api_groups?: string[] | null
@@ -96,6 +119,24 @@ export interface ServiceAccount {
   }
   secrets?: { name?: string }[] | null
   image_pull_secrets?: { name?: string }[] | null
+  [key: string]: unknown
+}
+
+/**
+ * A Secret item as returned by /api/v1/clusters/<id>/resources/secrets.
+ * ``data`` (base64 values) is only present on a ``?name=`` lookup.
+ */
+export interface K8sSecret {
+  metadata?: {
+    name?: string
+    namespace?: string
+    creation_timestamp?: string | null
+    resource_version?: string | null
+    labels?: Record<string, string> | null
+    annotations?: Record<string, string> | null
+  }
+  type?: string | null
+  data?: Record<string, string> | null
   [key: string]: unknown
 }
 

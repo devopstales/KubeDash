@@ -267,7 +267,7 @@ tasks:
     desc: "Run the vite dev server (API proxied to http://localhost:8080)"
     dir: frontend
     cmds:
-      - "VITE_API_BASE=http://localhost:8080 corepack pnpm start"
+      - "corepack pnpm start"
 
   fe-check:
     desc: "Air-gap check: no https?:// or //cdn. references in the built bundle (ADR-0020)"

@@ -63,11 +63,18 @@ class FakeK8s:
         self.last_labels = labels
 
     def apply_role_binding(
-        self, namespace: str, name: str, role_name: str, subject_user: str, labels: dict[str, str]
+        self,
+        namespace: str,
+        name: str,
+        role_name: str,
+        subject_user: str,
+        labels: dict[str, str],
+        subject_kind: str = "User",
     ) -> None:
         self._maybe_raise()
         self.calls.append(("apply_role_binding", namespace, name, role_name, subject_user))
         self.last_labels = labels
+        self.last_subject_kind = subject_kind
 
     def apply_cluster_role(
         self, name: str, rules: list[dict[str, Any]], labels: dict[str, str]
@@ -78,11 +85,17 @@ class FakeK8s:
         self.last_labels = labels
 
     def apply_cluster_role_binding(
-        self, name: str, role_name: str, subject_user: str, labels: dict[str, str]
+        self,
+        name: str,
+        role_name: str,
+        subject_user: str,
+        labels: dict[str, str],
+        subject_kind: str = "User",
     ) -> None:
         self._maybe_raise()
         self.calls.append(("apply_cluster_role_binding", name, role_name, subject_user))
         self.last_labels = labels
+        self.last_subject_kind = subject_kind
 
     def delete_role_binding(self, namespace: str, name: str) -> None:
         self._maybe_raise()
@@ -169,7 +182,7 @@ def test_bind_applies_role_and_rolebinding(app, db_sess, _unique: str) -> None:
     audit = db_sess.session.execute(
         db_sess.select(AuditLog).filter_by(action="bind", actor_sub=p.admin_sub)
     ).scalar_one()
-    assert audit.target == p.user_sub
+    assert audit.target == f"user:{p.user_sub}"
     assert audit.template == p.template
     assert audit.namespace == NS
 
@@ -299,7 +312,7 @@ def test_unbind_last_referrer_deletes_role(app, db_sess, _unique: str) -> None:
     audit = db_sess.session.execute(
         db_sess.select(AuditLog).filter_by(action="unbind", actor_sub=p.admin_sub)
     ).scalar_one()
-    assert audit.target == p.user_sub
+    assert audit.target == f"user:{p.user_sub}"
 
 
 def test_unbind_cluster_scoped_gc_deletes_cluster_role(app, db_sess, _unique: str) -> None:

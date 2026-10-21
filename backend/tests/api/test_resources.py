@@ -60,12 +60,56 @@ class FakeK8s:
             },
         ]
 
+    def list_rolebindings(self, namespace: str | None) -> list[dict]:
+        return [
+            {
+                "metadata": {"name": "edit-binding", "namespace": namespace},
+                "role_ref": {
+                    "api_group": "rbac.authorization.k8s.io",
+                    "kind": "Role",
+                    "name": "edit",
+                },
+                "subjects": [
+                    {"kind": "User", "name": "jane"},
+                    {"kind": "Group", "name": "devs"},
+                    {"kind": "ServiceAccount", "name": "builder", "namespace": "team-a"},
+                ],
+            },
+        ]
+
+    def list_cluster_roles(self, _namespace: str | None) -> list[dict]:
+        return [
+            {
+                "metadata": {"name": "edit"},
+                "rules": [{"resources": ["pods"], "verbs": ["get"]}],
+            },
+        ]
+
     def list_serviceaccounts(self, namespace: str | None) -> list[dict]:
         return [
             {
                 "metadata": {"name": "builder", "namespace": namespace},
                 "secrets": [{"name": "builder-token"}],
                 "image_pull_secrets": [{"name": "registry-cred"}],
+            },
+        ]
+
+    def list_secrets(self, namespace: str | None) -> list[dict]:
+        return [
+            {
+                "metadata": {"name": "builder-token", "namespace": namespace},
+                "type": "kubernetes.io/service-account-token",
+            },
+        ]
+
+    def get_secret(self, namespace: str, name: str) -> list[dict]:
+        if name != "builder-token":
+            return []
+        return [
+            {
+                "metadata": {"name": name, "namespace": namespace},
+                "type": "kubernetes.io/service-account-token",
+                "data": {"token": "dG9rZW4="},
             },
         ]
 
@@ -98,7 +142,7 @@ def _allow_sar(monkeypatch: pytest.MonkeyPatch) -> None:
 
     monkeypatch.setattr(rb, "_cache_get", lambda k: None)
     monkeypatch.setattr(rb, "_cache_set", lambda k, v: None)
-    monkeypatch.setattr(rb, "_sar_allowed", lambda client, verb, resource, ns, name: True)
+    monkeypatch.setattr(rb, "_sar_allowed", lambda client, verb, resource, ns, name, group="": True)
 
 
 def _register(api_client, headers, name="prod") -> object:
@@ -197,6 +241,23 @@ def test_list_pods_namespaced(api_client, auth_client, fake_k8s, monkeypatch) ->
     assert [p["metadata"]["namespace"] for p in items] == ["prod-ns"]
 
 
+def test_list_rolebindings_namespaced(api_client, auth_client, fake_k8s, monkeypatch) -> None:
+    """The Cluster Permissions > RoleBindings page lists one namespace."""
+    auth_client.login()
+    h = {"Authorization": f"Bearer {auth_client.jwt}"}
+    _register(api_client, h)
+    _allow_sar(monkeypatch)
+    r = api_client.get("/api/v1/clusters/1/resources/rolebindings?namespace=team-a", headers=h)
+    assert r.status_code == 200
+    body = r.get_json()
+    assert body["kind"] == "rolebindings"
+    [binding] = body["items"]
+    assert binding["metadata"] == {"name": "edit-binding", "namespace": "team-a"}
+    assert binding["role_ref"]["kind"] == "Role"
+    assert binding["role_ref"]["name"] == "edit"
+    assert binding["subjects"][0]["name"] == "jane"
+
+
 def test_list_roles_namespaced(api_client, auth_client, fake_k8s, monkeypatch) -> None:
     """The Cluster Permissions > Roles page lists one namespace."""
     auth_client.login()
@@ -209,6 +270,21 @@ def test_list_roles_namespaced(api_client, auth_client, fake_k8s, monkeypatch) -
     assert body["kind"] == "roles"
     [role] = body["items"]
     assert role["metadata"] == {"name": "edit", "namespace": "team-a"}
+    assert role["rules"] == [{"resources": ["pods"], "verbs": ["get"]}]
+
+
+def test_list_clusterroles(api_client, auth_client, fake_k8s, monkeypatch) -> None:
+    """Cluster Permissions > Cluster Role lists the cluster-scoped kind."""
+    auth_client.login()
+    h = {"Authorization": f"Bearer {auth_client.jwt}"}
+    _register(api_client, h)
+    _allow_sar(monkeypatch)
+    r = api_client.get("/api/v1/clusters/1/resources/clusterroles?namespace=team-a", headers=h)
+    assert r.status_code == 200
+    body = r.get_json()
+    assert body["kind"] == "clusterroles"
+    [role] = body["items"]
+    assert role["metadata"] == {"name": "edit"}
     assert role["rules"] == [{"resources": ["pods"], "verbs": ["get"]}]
 
 
@@ -228,6 +304,99 @@ def test_list_serviceaccounts_namespaced(api_client, auth_client, fake_k8s, monk
     assert sa["image_pull_secrets"] == [{"name": "registry-cred"}]
 
 
+def test_list_secrets_namespaced_without_data(api_client, auth_client, fake_k8s, monkeypatch) -> None:
+    """The Security > Secrets page lists one namespace: names and types only."""
+    auth_client.login()
+    h = {"Authorization": f"Bearer {auth_client.jwt}"}
+    _register(api_client, h)
+    _allow_sar(monkeypatch)
+    r = api_client.get("/api/v1/clusters/1/resources/secrets?namespace=team-a", headers=h)
+    assert r.status_code == 200
+    body = r.get_json()
+    assert body["kind"] == "secrets"
+    [secret] = body["items"]
+    assert secret == {
+        "metadata": {"name": "builder-token", "namespace": "team-a"},
+        "type": "kubernetes.io/service-account-token",
+    }
+
+
+def test_get_secret_by_name_returns_data(api_client, auth_client, fake_k8s, monkeypatch) -> None:
+    """The secret data page reads one secret, data still base64."""
+    auth_client.login()
+    h = {"Authorization": f"Bearer {auth_client.jwt}"}
+    _register(api_client, h)
+    _allow_sar(monkeypatch)
+    r = api_client.get(
+        "/api/v1/clusters/1/resources/secrets?namespace=team-a&name=builder-token", headers=h
+    )
+    assert r.status_code == 200
+    [secret] = r.get_json()["items"]
+    assert secret["metadata"] == {"name": "builder-token", "namespace": "team-a"}
+    assert secret["data"] == {"token": "dG9rZW4="}
+
+
+def test_get_missing_secret_returns_no_items(api_client, auth_client, fake_k8s, monkeypatch) -> None:
+    auth_client.login()
+    h = {"Authorization": f"Bearer {auth_client.jwt}"}
+    _register(api_client, h)
+    _allow_sar(monkeypatch)
+    r = api_client.get("/api/v1/clusters/1/resources/secrets?namespace=team-a&name=gone", headers=h)
+    assert r.status_code == 200
+    assert r.get_json()["items"] == []
+
+
+def _record_sar(monkeypatch: pytest.MonkeyPatch) -> list[tuple]:
+    """Deny every SAR and record what was asked."""
+    import app.services.rbac as rb
+
+    asked: list[tuple] = []
+    monkeypatch.setattr(rb, "_cache_get", lambda k: None)
+    monkeypatch.setattr(rb, "_cache_set", lambda k, v: None)
+
+    def deny(client, verb, resource, ns, name, group=""):
+        asked.append((verb, resource, ns, name, group))
+        return False
+
+    monkeypatch.setattr(rb, "_sar_allowed", deny)
+    return asked
+
+
+def test_list_secrets_asks_sar_for_list(api_client, auth_client, fake_k8s, monkeypatch) -> None:
+    auth_client.login()
+    h = {"Authorization": f"Bearer {auth_client.jwt}"}
+    _register(api_client, h)
+    asked = _record_sar(monkeypatch)
+    r = api_client.get("/api/v1/clusters/1/resources/secrets?namespace=team-a", headers=h)
+    assert r.status_code == 403
+    assert asked == [("list", "secrets", "team-a", None, "")]
+
+
+def test_get_secret_asks_sar_for_get_on_that_name(
+    api_client, auth_client, fake_k8s, monkeypatch
+) -> None:
+    auth_client.login()
+    h = {"Authorization": f"Bearer {auth_client.jwt}"}
+    _register(api_client, h)
+    asked = _record_sar(monkeypatch)
+    r = api_client.get("/api/v1/clusters/1/resources/secrets?namespace=team-a&name=db", headers=h)
+    assert r.status_code == 403
+    assert r.get_json()["error"]["code"] == "RBAC_DENIED"
+    assert asked == [("get", "secrets", "team-a", "db", "")]
+
+
+def test_name_lookup_on_kind_without_getter_404(
+    api_client, auth_client, fake_k8s, monkeypatch
+) -> None:
+    auth_client.login()
+    h = {"Authorization": f"Bearer {auth_client.jwt}"}
+    _register(api_client, h)
+    _allow_sar(monkeypatch)
+    r = api_client.get("/api/v1/clusters/1/resources/pods?namespace=team-a&name=web", headers=h)
+    assert r.status_code == 404
+    assert r.get_json()["error"]["code"] == "RESOURCE_KIND_NOT_SUPPORTED"
+
+
 def test_rbac_denied_403(api_client, auth_client, fake_k8s, monkeypatch) -> None:
     """SAR deny -> 403 RBAC_DENIED: the service seam (``_sar_allowed``) is
     the unit-tier stand-in for a cluster that lacks the grant."""
@@ -238,7 +407,7 @@ def test_rbac_denied_403(api_client, auth_client, fake_k8s, monkeypatch) -> None
 
     monkeypatch.setattr(rb, "_cache_get", lambda k: None)
     monkeypatch.setattr(rb, "_cache_set", lambda k, v: None)
-    monkeypatch.setattr(rb, "_sar_allowed", lambda api_client, verb, resource, ns, name: False)
+    monkeypatch.setattr(rb, "_sar_allowed", lambda api_client, verb, resource, ns, name, group="": False)
     r = api_client.get("/api/v1/clusters/1/resources/pods", headers=h)
     assert r.status_code == 403
     assert r.get_json()["error"]["code"] == "RBAC_DENIED"

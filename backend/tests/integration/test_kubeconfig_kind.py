@@ -42,7 +42,6 @@ def test_downloaded_yaml_passes_kubectl_config_view(
         u = User(sub=f"kccfg-{suffix}", email=f"kccfg-{suffix}@example.com")
         db.session.add(u)
         db.session.commit()
-        u_id = u.id
         access, _ = issue_token_pair(u)
 
     h = {"Authorization": f"Bearer {access}"}

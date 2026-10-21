@@ -167,7 +167,7 @@ def test_resources_zero_200_for_admin(app, client, monkeypatch) -> None:
     monkeypatch.setitem(rb.__dict__, "pool", fake_pool)
     monkeypatch.setattr(rb, "_cache_get", lambda k: None)
     monkeypatch.setattr(rb, "_cache_set", lambda k, v: None)
-    monkeypatch.setattr(rb, "_sar_allowed", lambda client, verb, resource, ns, name: True)
+    monkeypatch.setattr(rb, "_sar_allowed", lambda client, verb, resource, ns, name, group="": True)
     r = client.get(
         "/api/v1/clusters/0/resources/pods",
         headers={"Authorization": f"Bearer {admin_jwt}"},

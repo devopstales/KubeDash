@@ -1,7 +1,7 @@
 import React from 'react'
 import { createPortal } from 'react-dom'
 import { useNavigate } from 'react-router-dom'
-import { CButton, CHeaderNav, CNavItem } from '@coreui/react'
+import { CButton, CHeaderNav } from '@coreui/react'
 import CIcon from '@coreui/icons-react'
 import { cilArrowLeft, cilReload } from '@coreui/icons'
 import { useTopMenuStore } from '../store/topmenu'
@@ -14,9 +14,11 @@ export const TopMenuNav = () => {
   const navigate = useNavigate()
   return (
     <CHeaderNav className="d-flex align-items-center ms-auto me-2 py-2">
-      <CNavItem className="py-1 align-self-stretch">
-        <div className="vr h-100 mx-2 text-body text-opacity-75" />
-      </CNavItem>
+      <span
+        className="header-nav-separator mx-3 flex-shrink-0"
+        aria-hidden="true"
+        style={{ width: 1, height: '1.25rem', backgroundColor: 'currentColor', opacity: 0.4 }}
+      />
       <a
         className="card-link me-3"
         href="#"

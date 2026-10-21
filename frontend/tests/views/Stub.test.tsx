@@ -29,6 +29,9 @@ function expectedStubs() {
     '/user/group',
     '/cluster-permission/service-account',
     '/cluster-permission/role',
+    '/cluster-permission/role-binding',
+    '/cluster-permission/cluster-role',
+    '/security/secret',
   ])
   const seen = new Map<string, string>()
   for (const isAdmin of [true, false]) {

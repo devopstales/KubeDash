@@ -39,6 +39,14 @@ export default defineConfig({
   },
   server: {
     port: 3000,
+    // Same-origin /api in dev. A cross-origin VITE_API_BASE leaves the
+    // header with no cluster and an empty namespace select (CORS).
+    proxy: {
+      '/api': {
+        target: 'http://127.0.0.1:8080',
+        changeOrigin: true,
+      },
+    },
   },
   // ponytail: the `as` cast — vitest 4's `defineConfig` generic doesn't
   // expose the vitest-inline options (maxWorkers) at the plain-object

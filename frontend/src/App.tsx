@@ -24,6 +24,11 @@ const PrivilegeEditView = React.lazy(() => import('./views/AdminPermissions/Priv
 const ServiceAccountsView = React.lazy(() => import('./views/ClusterPermission/ServiceAccounts'))
 const RoleView = React.lazy(() => import('./views/ClusterPermission/Role'))
 const RoleDataView = React.lazy(() => import('./views/ClusterPermission/RoleData'))
+const ClusterRoleView = React.lazy(() => import('./views/ClusterPermission/ClusterRole'))
+const ClusterRoleDataView = React.lazy(() => import('./views/ClusterPermission/ClusterRoleData'))
+const RoleBindingView = React.lazy(() => import('./views/ClusterPermission/RoleBinding'))
+const SecretView = React.lazy(() => import('./views/Security/Secret'))
+const SecretDataView = React.lazy(() => import('./views/Security/SecretData'))
 const GroupsView = React.lazy(() => import('./views/Groups'))
 const GroupPrivilegesView = React.lazy(() => import('./views/Groups/GroupPrivileges'))
 const GroupPrivilegeEditView = React.lazy(() => import('./views/Groups/GroupPrivilegeEdit'))
@@ -210,6 +215,46 @@ const App = () => {
                       element={
                         <ProtectedRoute>
                           <RoleDataView />
+                        </ProtectedRoute>
+                      }
+                    />
+                    <Route
+                      path="/cluster-permission/cluster-role"
+                      element={
+                        <ProtectedRoute>
+                          <ClusterRoleView />
+                        </ProtectedRoute>
+                      }
+                    />
+                    <Route
+                      path="/cluster-permission/cluster-role/data"
+                      element={
+                        <ProtectedRoute>
+                          <ClusterRoleDataView />
+                        </ProtectedRoute>
+                      }
+                    />
+                    <Route
+                      path="/cluster-permission/role-binding"
+                      element={
+                        <ProtectedRoute>
+                          <RoleBindingView />
+                        </ProtectedRoute>
+                      }
+                    />
+                    <Route
+                      path="/security/secret"
+                      element={
+                        <ProtectedRoute>
+                          <SecretView />
+                        </ProtectedRoute>
+                      }
+                    />
+                    <Route
+                      path="/security/secret/data"
+                      element={
+                        <ProtectedRoute>
+                          <SecretDataView />
                         </ProtectedRoute>
                       }
                     />

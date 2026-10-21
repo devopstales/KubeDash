@@ -27,17 +27,14 @@ class GroupOut(Schema):
 
 
 class GroupMemberIn(Schema):
-    """Member add/remove + privilege bind/unbind body. ``user`` is the user
-    sub (member ops); ``cluster`` / ``template`` / ``namespace`` are the
-    privilege ops' coordinates (cluster NAME — resolved by the handler).
-    ``required=True`` fields are omitted: the ops share one schema and
-    validation happens per-route in the handler (missing field → the
-    stable 404/422 the route already documents)."""
+    """Member add/remove body. ``user`` is the user sub. ``name`` is the
+    route's ``<name>`` path arg — included here because webargs 8.7's
+    positional injection (``USE_ARGS_POSITIONAL=True``) appends the parsed
+    JSON dict as a positional after Flask's view-args positionals, so a
+    field sharing a name with a path arg would collide."""
 
-    user = fields.String(allow_none=True)
-    cluster = fields.String(allow_none=True)
-    namespace = fields.String(allow_none=True)
-    template = fields.String(allow_none=True)
+    name = fields.String(required=True)
+    user = fields.String(required=True)
 
 
 class GroupBindIn(Schema):

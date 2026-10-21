@@ -156,7 +156,9 @@ def kind_client(kind_cluster, app) -> tuple[int, bytes]:
     from app.extensions import db
     from app.models.binding import ClusterBinding
     from app.models.cluster import Cluster
-    from app.models.user import User  # noqa: F811  (kind fixture — local scope overrides module import)
+    from app.models.user import (
+        User,  # noqa: F811  (kind fixture — local scope overrides module import)
+    )
     from app.services.k8s_client import encrypt_kubeconfig
 
     # Session-scoped against a function-scoped app: the Cluster row is bound

@@ -210,6 +210,45 @@ class K8sClient:
         )
         return [role.to_dict() for role in resp.items]
 
+    def list_rolebindings(self, namespace: str | None) -> list[dict[str, Any]]:
+        """RoleBinding list in the standard kubernetes dict form (``to_dict``)."""
+        resp = (
+            self._rbac.list_namespaced_role_binding(namespace)
+            if namespace
+            else self._rbac.list_role_binding_for_all_namespaces()
+        )
+        return [binding.to_dict() for binding in resp.items]
+
+    def list_cluster_roles(self, _namespace: str | None) -> list[dict[str, Any]]:
+        """ClusterRole list. Cluster-scoped; the query namespace does not apply."""
+        return [role.to_dict() for role in self._rbac.list_cluster_role().items]
+
+    def list_secrets(self, namespace: str | None) -> list[dict[str, Any]]:
+        """Secret list in the standard kubernetes dict form (``to_dict``)
+        without ``data``/``string_data``: values are read one secret at a
+        time through ``get_secret``."""
+        resp = (
+            self._v1.list_namespaced_secret(namespace)
+            if namespace
+            else self._v1.list_secret_for_all_namespaces()
+        )
+        items = []
+        for secret in resp.items:
+            item = secret.to_dict()
+            item.pop("data", None)
+            item.pop("string_data", None)
+            items.append(item)
+        return items
+
+    def get_secret(self, namespace: str, name: str) -> list[dict[str, Any]]:
+        """One Secret (``data`` base64-encoded) as a 0/1-item list; ``[]`` on 404."""
+        try:
+            return [self._v1.read_namespaced_secret(name, namespace).to_dict()]
+        except ApiException as e:
+            if e.status == 404:
+                return []
+            raise
+
     def readyz(self) -> bool:
         """GET ``<host>/readyz`` with the kubeconfig's CA as ``verify=`` and a
         5 s timeout; ANY failure (including timeout) returns ``False`` — the

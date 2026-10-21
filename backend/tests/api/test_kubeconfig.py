@@ -85,7 +85,7 @@ def test_bound_user_downloads_multi_cluster_yaml(
     auth_client.login()
     h = {"Authorization": f"Bearer {auth_client.jwt}"}
     prod = _register(api_client, h, "prod", KUBECONFIG)
-    staging = _register(api_client, h, "staging", KUBECONFIG2)
+    _register(api_client, h, "staging", KUBECONFIG2)
     # A second binding on prod, in its own namespace → a second context.
     _add_binding(api_app, "sub-oidc-1", prod["id"], "team-a")
 
