@@ -9,8 +9,8 @@ import {
   CFormInput,
   CFormLabel,
   CFormSelect,
-  CTable,
 } from '@coreui/react'
+import KubeDataTable, { Column } from '../../../components/KubeDataTable'
 import { useQuery } from '@tanstack/react-query'
 import { apiFetch } from '../../../lib/api'
 import type { RBACTemplate, RoleRule } from '../../../lib/types'
@@ -122,39 +122,26 @@ const TemplateEditor: React.FC<TemplateEditorProps> = ({ existingNames, onCreate
           {templatesQuery.error instanceof Error ? templatesQuery.error.message : 'Failed to load templates'}
         </div>
       ) : (
-        <CTable striped hover className="mb-3">
-          <thead>
-            <tr>
-              <th>Name</th>
-              <th>Scope</th>
-              <th>Rules</th>
-              <th>Description</th>
-              <th>Built-in</th>
-              <th />
-            </tr>
-          </thead>
-          <tbody>
-            {templates.map((t) => (
-              <tr key={t.id}>
-                <td>{t.name}</td>
-                <td>{t.scope}</td>
-                <td>{t.rules.length}</td>
-                <td>{t.description || '\u2014'}</td>
-                <td>{t.builtin ? 'builtin' : ''}</td>
-                <td>
-                  <CButton
-                    size="sm"
-                    color="danger"
-                    disabled={t.builtin || busy}
-                    onClick={() => del(t)}
-                  >
-                    Delete
-                  </CButton>
-                </td>
-              </tr>
-            ))}
-          </tbody>
-        </CTable>
+        <KubeDataTable data={templates}>
+          <Column title="Name" data="name" />
+          <Column title="Scope" data="scope" />
+          <Column title="Rules" data="rules">
+            {(rules: RBACTemplate['rules']) => rules.length}
+          </Column>
+          <Column title="Description" data="description">
+            {(description: string) => description || '\u2014'}
+          </Column>
+          <Column title="Built-in" data="builtin">
+            {(builtin: boolean) => (builtin ? 'builtin' : '')}
+          </Column>
+          <Column title="Action" data={null}>
+            {(_data: unknown, _type: string, row: RBACTemplate) => (
+              <CButton size="sm" color="danger" disabled={row.builtin || busy} onClick={() => del(row)}>
+                Delete
+              </CButton>
+            )}
+          </Column>
+        </KubeDataTable>
       )}
 
       <CCard>

@@ -1,40 +1,73 @@
 import React, { useState } from 'react'
-import { useSearchParams } from 'react-router-dom'
+import { Link, useSearchParams } from 'react-router-dom'
 import {
+  CBreadcrumb,
+  CBreadcrumbItem,
   CButton,
-  CButtonGroup,
   CCard,
   CCardBody,
   CCardHeader,
-  CCardTitle,
-  CTable,
+  CForm,
+  CFormInput,
+  CFormLabel,
+  CFormSelect,
+  CModal,
+  CModalBody,
+  CModalFooter,
+  CModalHeader,
+  CModalTitle,
 } from '@coreui/react'
-import { useQuery } from '@tanstack/react-query'
+import CIcon from '@coreui/icons-react'
+import { cilPencil, cilReload, cilShieldAlt, cilTrash, cilUserPlus } from '@coreui/icons'
+import { useQuery, useQueryClient } from '@tanstack/react-query'
 import { apiFetch } from '../../lib/api'
-import type { AdminUser, AuditEntry, RBACTemplate } from '../../lib/types'
-import { useCluster, type ClusterItem } from '../../hooks/useCluster'
-import BindModal from './components/BindModal'
-import TemplateEditor from './components/TemplateEditor'
+import type { AdminUser } from '../../lib/types'
+import KubeDataTable, { Column } from '../../components/KubeDataTable'
+import { useCluster } from '../../hooks/useCluster'
+import TemplatesPage from './Templates'
+import AuditPage from './Audit'
+
+const SPECIAL = /[ `!@#$%^ˇ&*()_+\-=[\]{};':"\\|,.<>/?~]/
+
+/** 4.1 Create User meter: all five criteria must pass before Add User enables. */
+const passwordCriteria = (password: string) => ({
+  length: password.length >= 6 && password.length <= 15,
+  capital: /[A-Z]/.test(password),
+  small: /[a-z]/.test(password),
+  number: /[0-9]/.test(password),
+  special: SPECIAL.test(password),
+})
+
+const CRITERIA: { key: keyof ReturnType<typeof passwordCriteria>; label: string }[] = [
+  { key: 'length', label: '6-15 characters' },
+  { key: 'capital', label: 'Uppercase letter (A-Z)' },
+  { key: 'small', label: 'Lowercase letter (a-z)' },
+  { key: 'number', label: 'Number (0-9)' },
+  { key: 'special', label: 'Special character' },
+]
+
+const typeLabel = (source: string | undefined) => {
+  if (source === 'oidc') return 'OpenID'
+  if (source === 'local') return 'Local'
+  return '\u2014'
+}
+
+const roleLabel = (role: string) => {
+  if (role === 'admin') return 'Admin'
+  if (role === 'user') return 'User'
+  return role
+}
+
+const displayName = (user: AdminUser) => user.display_name || user.sub
 
 /**
- * Admin permissions (TICKET-07): Users / Templates / Audit tabs over
- * /api/v1/admin/*. Reachable at /admin/permissions, wrapped in
- * ProtectedRoute + AdminRoute (role === 'admin'; non-admins redirect to /).
- * API errors surface as text-danger messages (no toasts, no unhandled
- * rejections).
- *
- * User Detail: an INLINE panel (not a CModal) below the users table when a
- * row is clicked — ponytail: a CModal renders into a portal overlay that
- * jsdom's default queries can't see without extra setup, and the inline
- * panel carries the same information. The "per-user bindings" section shows
- * the caller's own my-access rows when the selected user IS the caller
- * (the only per-user binding listing the backend exposes); for other users
- * it shows a limitation note. The Bind form below works for any user.
+ * 4.1 User List (`users/user.html.j2`): breadcrumb, Create User, reload,
+ * CoreUI card, and icon actions (edit, delete, privileges).
+ * `?tab=templates` and `?tab=audit` are separate pages, not a tab strip.
  */
-const AdminPermissionsView = () => {
+const UserList = () => {
+  const queryClient = useQueryClient()
   const { me } = useCluster()
-  const callersSub = me?.sub ?? null
-
   const usersQuery = useQuery<AdminUser[]>({
     queryKey: ['admin', 'users'],
     queryFn: async () => {
@@ -44,319 +77,358 @@ const AdminPermissionsView = () => {
     },
   })
 
-  const templatesQuery = useQuery<RBACTemplate[]>({
-    queryKey: ['admin', 'templates'],
-    queryFn: async () => {
-      const r = await apiFetch<RBACTemplate[]>('/api/v1/admin/permissions/templates')
-      if (r.error) throw new Error(`${r.error.code}: ${r.error.message}`)
-      return r.data ?? []
-    },
-  })
+  const [editing, setEditing] = useState<AdminUser | null>(null)
+  const [role, setRole] = useState('user')
+  const [status, setStatus] = useState('active')
+  const [saveError, setSaveError] = useState<string | null>(null)
+  const [busy, setBusy] = useState(false)
 
-  // ponytail: clusters come straight from apiFetch (same queryKey as
-  // useCluster's, so the TanStack cache dedupes it with the header) — the
-  // modal's picker stays decoupled from the selection-store side effect.
-  const clustersQuery = useQuery<ClusterItem[]>({
-    queryKey: ['clusters'],
-    queryFn: async () => {
-      const r = await apiFetch<ClusterItem[] | { items: ClusterItem[] }>('/api/v1/clusters')
-      if (r.error) throw new Error(r.error.message)
-      return Array.isArray(r.data) ? r.data : (r.data?.items ?? [])
-    },
-  })
+  const [creating, setCreating] = useState(false)
+  const [username, setUsername] = useState('')
+  const [email, setEmail] = useState('')
+  const [password, setPassword] = useState('')
+  const [createRole, setCreateRole] = useState('user')
+  const [passwordUnlocked, setPasswordUnlocked] = useState(false)
+  const [createError, setCreateError] = useState<string | null>(null)
+  const [rowError, setRowError] = useState<string | null>(null)
 
-  // The caller's own bindings — the only per-user binding listing the
-  // backend exposes (GET /permissions/my-access; there is no
-  // GET /admin/users/<id>/bindings endpoint).
-  const myAccessQuery = useQuery<{
-    cluster: string
-    namespace: string | null
-    template: string | null
-    created_at: string
-  }[]>({
-    queryKey: ['permissions', 'my-access'],
-    queryFn: async () => {
-      const r = await apiFetch<{
-        cluster: string
-        namespace: string | null
-        template: string | null
-        created_at: string
-      }[]>('/api/v1/permissions/my-access')
-      if (r.error) throw new Error(`${r.error.code}: ${r.error.message}`)
-      return r.data ?? []
-    },
-  })
+  const criteria = passwordCriteria(password)
+  const passwordStrong = CRITERIA.every((item) => criteria[item.key])
 
-  // GET /api/v1/audit is a confirmed 501 NOT_IMPLEMENTED stub on the
-  // backend (base structure, backend/app/api/audit.py); the tab renders an
-  // empty state until the read route lands. No new backend route (backend
-  // is closed for this change).
-  const auditQuery = useQuery<AuditEntry[] | null>({
-    queryKey: ['admin', 'audit'],
-    queryFn: async () => {
-      const r = await apiFetch<AuditEntry[]>('/api/v1/audit')
-      if (r.error) return null
-      return r.data ?? []
-    },
-  })
-
-  // ponytail: CTabs (CoreUI v5) renders the tab button + content as a flat
-  // sibling list, which confuses jsdom's queryByRole('tab') and makes
-  // nested content land INSIDE the button node (see unbind / audit test
-  // output). A CButtonGroup + content section gives us the same UX with
-  // plain DOM that the query helpers can see. The real UI trade-off is one
-  // extra click (no auto-focus / keyboard arrow navigation).
-  const [params] = useSearchParams()
-  const requested = params.get('tab')
-  const [tab, setTab] = useState<'users' | 'templates' | 'audit'>(
-    requested === 'templates' || requested === 'audit' ? requested : 'users',
-  )
-  const [selectedUser, setSelectedUser] = useState<AdminUser | null>(null)
-  const [bindOpen, setBindOpen] = useState(false)
-
-  const closeUserDetail = () => {
-    setSelectedUser(null)
-    setBindOpen(false)
+  const reload = () => {
+    queryClient.invalidateQueries({ queryKey: ['admin', 'users'] })
   }
 
-  const onBound = () => {
-    usersQuery.refetch()
-    myAccessQuery.refetch()
+  const closeCreate = () => {
+    setCreating(false)
+    setUsername('')
+    setEmail('')
+    setPassword('')
+    setCreateRole('user')
+    setPasswordUnlocked(false)
+    setCreateError(null)
   }
+
+  const openEdit = (user: AdminUser) => {
+    setEditing(user)
+    setRole(user.role)
+    setStatus(user.status)
+    setSaveError(null)
+  }
+
+  const save = async (e: React.FormEvent) => {
+    e.preventDefault()
+    if (!editing) return
+    setBusy(true)
+    setSaveError(null)
+    const r = await apiFetch(`/api/v1/admin/users/${editing.id}`, {
+      method: 'PATCH',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ role, status }),
+    })
+    setBusy(false)
+    if (r.error) {
+      setSaveError(`${r.error.code}: ${r.error.message}`)
+      return
+    }
+    setEditing(null)
+    reload()
+  }
+
+  const createUser = async (e: React.FormEvent) => {
+    e.preventDefault()
+    if (!passwordStrong) return
+    setBusy(true)
+    setCreateError(null)
+    const r = await apiFetch('/api/v1/admin/users', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        username,
+        email,
+        password,
+        role: createRole,
+        type: 'Local',
+      }),
+    })
+    setBusy(false)
+    if (r.error) {
+      setCreateError(`${r.error.code}: ${r.error.message}`)
+      return
+    }
+    closeCreate()
+    reload()
+  }
+
+  const removeUser = async (user: AdminUser) => {
+    setRowError(null)
+    const r = await apiFetch(`/api/v1/admin/users/${user.id}`, { method: 'DELETE' })
+    if (r.error) {
+      setRowError(`${r.error.code}: ${r.error.message}`)
+      return
+    }
+    reload()
+  }
+
+  const users = usersQuery.data ?? []
+  const mutable = (user: AdminUser) => !user.sub.startsWith('local:')
 
   return (
-    <div>
-      <CButtonGroup className="mb-3" role="tablist">
-        {(['users', 'templates', 'audit'] as const).map((t) => (
+    <>
+      <div className="d-flex align-items-center justify-content-between mb-3">
+        <CBreadcrumb className="my-0" aria-label="breadcrumb">
+          <CBreadcrumbItem>User Management</CBreadcrumbItem>
+          <CBreadcrumbItem active>Users</CBreadcrumbItem>
+        </CBreadcrumb>
+        <div className="d-flex align-items-center">
           <CButton
-            key={t}
-            color={tab === t ? 'primary' : 'secondary'}
-            active={tab === t}
-            onClick={() => setTab(t)}
-            aria-selected={tab === t}
-            role="tab"
+            color="link"
+            className="header-toggler"
+            type="button"
+            aria-label="Create User"
+            onClick={() => setCreating(true)}
           >
-            {t.charAt(0).toUpperCase() + t.slice(1)}
+            <CIcon icon={cilUserPlus} size="lg" />
           </CButton>
-        ))}
-      </CButtonGroup>
+          <CButton
+            color="link"
+            className="p-0 ms-3"
+            type="button"
+            aria-label="Reload page"
+            title="Reload page"
+            style={{ color: '#6261cc' }}
+            onClick={reload}
+          >
+            <CIcon icon={cilReload} size="lg" />
+          </CButton>
+        </div>
+      </div>
 
-      {tab === 'users' && (
-        <>
-        {usersQuery.isLoading ? (
-          <div>Loading users…</div>
-        ) : usersQuery.error ? (
-          <div className="text-danger">
-            {usersQuery.error instanceof Error ? usersQuery.error.message : 'Failed to load users'}
-          </div>
-        ) : (usersQuery.data ?? []).length === 0 ? (
-          <div>No users.</div>
-        ) : (
-          <>
-            <CTable striped hover>
-              <thead>
-                <tr>
-                  <th>Display name</th>
-                  <th>Sub</th>
-                  <th>Email</th>
-                  <th>Role</th>
-                  <th>Status</th>
-                  <th>Clusters</th>
-                  <th>Last login</th>
-                </tr>
-              </thead>
-              <tbody>
-                {(usersQuery.data ?? []).map((u) => (
-                  <tr
-                    key={u.id}
-                    style={{ cursor: 'pointer' }}
-                    onClick={() => {
-                      setSelectedUser(u)
-                      setBindOpen(false)
-                    }}
-                  >
-                    <td>{u.display_name ?? '\u2014'}</td>
-                    <td>{u.sub}</td>
-                    <td>{u.email ?? '\u2014'}</td>
-                    <td>{u.role}</td>
-                    <td>{u.status}</td>
-                    <td>{u.cluster_count}</td>
-                    <td>{u.last_login_at ?? '\u2014'}</td>
-                  </tr>
-                ))}
-              </tbody>
-            </CTable>
-
-            {selectedUser && (
-              <CCard className="mt-3">
-                <CCardHeader>
-                  <CCardTitle>User detail</CCardTitle>
-                </CCardHeader>
-                <CCardBody>
-                  <div className="mb-3">
-                    <strong>{selectedUser.display_name ?? selectedUser.sub}</strong>
-                    {' · '}
-                    {selectedUser.sub}
-                    {' · '}
-                    <strong>Role:</strong> {selectedUser.role}
-                    {' · '}
-                    <strong>Status:</strong> {selectedUser.status}
-                    {' · '}
-                    <strong>Cluster bindings:</strong> {selectedUser.cluster_count}
-                  </div>
-
-                  {selectedUser.sub === callersSub ? (
-                    myAccessQuery.isLoading ? (
-                      <div>Loading bindings…</div>
-                    ) : myAccessQuery.error ? (
-                      <div className="text-danger">
-                        {myAccessQuery.error instanceof Error
-                          ? myAccessQuery.error.message
-                          : 'Failed to load bindings'}
-                      </div>
-                    ) : (myAccessQuery.data ?? []).length === 0 ? (
-                      <div>No bindings for you (the caller).</div>
-                    ) : (
-                      <CTable striped hover>
-                        <thead>
-                          <tr>
-                            <th>Cluster</th>
-                            <th>Namespace</th>
-                            <th>Template</th>
-                            <th>Created</th>
-                            <th />
-                          </tr>
-                        </thead>
-                        <tbody>
-                          {(myAccessQuery.data ?? []).map((b) => (
-                            <tr key={`${b.cluster}/${b.namespace ?? ''}/${b.template ?? ''}`}>
-                              <td>{b.cluster}</td>
-                              <td>{b.namespace ?? '\u2014'}</td>
-                              <td>{b.template ?? '\u2014'}</td>
-                              <td>{b.created_at}</td>
-                              <td>
-                                <CButton
-                                  size="sm"
-                                  color="danger"
-                                  onClick={async (e) => {
-                                    e.stopPropagation()
-                                    const r = await apiFetch('/api/v1/admin/permissions/bind', {
-                                      method: 'DELETE',
-                                      headers: { 'Content-Type': 'application/json' },
-                                      body: JSON.stringify({
-                                        user: selectedUser.sub,
-                                        cluster: b.cluster,
-                                        namespace: b.namespace,
-                                      }),
-                                    })
-                                    if (!r.error) {
-                                      myAccessQuery.refetch()
-                                      usersQuery.refetch()
-                                    }
-                                  }}
-                                >
-                                  Unbind
-                                </CButton>
-                              </td>
-                            </tr>
-                          ))}
-                        </tbody>
-                      </CTable>
-                    )
+      <CCard className="shadow mb-4">
+        <CCardHeader className="py-3">
+          <h6 className="m-0 fw-bold text-primary">User List</h6>
+        </CCardHeader>
+        <CCardBody>
+          {usersQuery.isLoading ? (
+            <div>Loading users…</div>
+          ) : usersQuery.error ? (
+            <div className="text-danger">
+              {usersQuery.error instanceof Error ? usersQuery.error.message : 'Failed to load users'}
+            </div>
+          ) : users.length === 0 ? (
+            <div className="text-center text-muted">No users found</div>
+          ) : (
+            <KubeDataTable data={users}>
+              <Column title="Username" data="display_name">
+                {(name: string | null, _type: string, row: AdminUser) => {
+                  const label = name || row.sub
+                  if (!mutable(row) && me?.sub !== row.sub) return label
+                  return <Link to={`/admin/permissions/users/${encodeURIComponent(row.sub)}`}>{label}</Link>
+                }}
+              </Column>
+              <Column title="Email" data="email">
+                {(value: string | null) => value ?? '\u2014'}
+              </Column>
+              <Column title="Permission" data="role">
+                {(value: string) => roleLabel(value)}
+              </Column>
+              <Column title="Type" data="auth_source">
+                {(source: string | undefined) => typeLabel(source)}
+              </Column>
+              <Column title="Action" data={null}>
+                {(_data: unknown, _type: string, row: AdminUser) =>
+                  mutable(row) ? (
+                    <div className="d-flex flex-row gap-1">
+                      <CButton
+                        color="success"
+                        size="sm"
+                        type="button"
+                        aria-label={`Edit ${displayName(row)}`}
+                        title="Edit"
+                        onClick={() => openEdit(row)}
+                      >
+                        <CIcon icon={cilPencil} />
+                      </CButton>
+                      {me != null && me.sub !== row.sub && (
+                        <CButton
+                          color="danger"
+                          size="sm"
+                          type="button"
+                          aria-label={`Delete ${displayName(row)}`}
+                          title="Delete"
+                          onClick={() => removeUser(row)}
+                        >
+                          <CIcon icon={cilTrash} />
+                        </CButton>
+                      )}
+                      <Link
+                        to={`/admin/permissions/users/${encodeURIComponent(row.sub)}`}
+                        className="btn btn-secondary btn-sm"
+                        aria-label={`Privileges ${displayName(row)}`}
+                        title="Privileges"
+                      >
+                        <CIcon icon={cilShieldAlt} />
+                      </Link>
+                    </div>
                   ) : (
-                    // ponytail: no per-user binding listing endpoint exists
-                    // (my-access is the caller's only); the admin list
-                    // carries a cluster_count, not the rows. A clean
-                    // per-user list needs a backend endpoint this ticket
-                    // does not add.
-                    <div>
-                      Per-user binding listing is not available for other users (the
-                      admin list shows only a cluster count). Bind a template below;
-                      the unbind surface arrives with the per-user endpoint.
-                    </div>
-                  )}
-
-                  <div className="mt-3 d-flex gap-2">
-                    <CButton
-                      color="primary"
-                      onClick={() => setBindOpen((v) => !v)}
+                    <Link
+                      to={`/admin/permissions/users/${encodeURIComponent(row.sub)}`}
+                      className="btn btn-secondary btn-sm"
+                      aria-label={`Privileges ${displayName(row)}`}
+                      title="Privileges"
                     >
-                      {bindOpen ? 'Close' : 'Bind'}
-                    </CButton>
-                    <CButton color="secondary" onClick={closeUserDetail}>
-                      Close
-                    </CButton>
-                  </div>
+                      <CIcon icon={cilShieldAlt} />
+                    </Link>
+                  )
+                }
+              </Column>
+            </KubeDataTable>
+          )}
+          {rowError && <div className="text-danger mt-3">{rowError}</div>}
+        </CCardBody>
+      </CCard>
 
-                  {bindOpen && (
-                    <div className="mt-3">
-                      <BindModal
-                        user={selectedUser.sub}
-                        clusters={clustersQuery.data ?? []}
-                        templates={templatesQuery.data ?? []}
-                        onClose={() => setBindOpen(false)}
-                        onSuccess={onBound}
-                      />
-                    </div>
-                  )}
-                </CCardBody>
-              </CCard>
-            )}
-          </>
-        )}
-        </>
+      {creating && (
+        <CModal visible alignment="center" onClose={closeCreate} aria-labelledby="modaladdLabel">
+          <CModalHeader>
+            <CModalTitle id="modaladdLabel">Create User</CModalTitle>
+          </CModalHeader>
+          <CForm onSubmit={createUser}>
+            <CModalBody>
+              <div className="mb-3">
+                <CFormLabel>Name:</CFormLabel>
+                <CFormInput
+                  value={username}
+                  placeholder="Type your username"
+                  onChange={(e) => setUsername(e.target.value)}
+                />
+              </div>
+              <div className="mb-3">
+                <CFormLabel>Email:</CFormLabel>
+                <CFormInput
+                  type="text"
+                  value={email}
+                  placeholder="Type your email"
+                  onChange={(e) => setEmail(e.target.value)}
+                />
+              </div>
+              <div className="mb-3">
+                <CFormLabel htmlFor="PassEntry">Password:</CFormLabel>
+                <CFormInput
+                  type="password"
+                  id="PassEntry"
+                  value={password}
+                  placeholder="Type your password"
+                  readOnly={!passwordUnlocked}
+                  onClick={() => setPasswordUnlocked(true)}
+                  onChange={(e) => setPassword(e.target.value)}
+                />
+                <div id="password-strength-status" className="small mt-1">
+                  {passwordStrong
+                    ? 'Password is strong — you can add the user.'
+                    : password.length > 0
+                      ? 'Password not strong enough yet.'
+                      : ''}
+                </div>
+                <ul id="passwordCriterion" className="ps-3 mb-0 small">
+                  {CRITERIA.map((item) => (
+                    <li key={item.key} className={criteria[item.key] ? 'text-success' : 'text-danger'}>
+                      {item.label}
+                    </li>
+                  ))}
+                </ul>
+              </div>
+              <div className="mb-3">
+                <CFormLabel htmlFor="add-role">Permission:</CFormLabel>
+                <CFormSelect
+                  id="add-role"
+                  aria-label="Select role"
+                  value={createRole}
+                  onChange={(e) => setCreateRole(e.target.value)}
+                >
+                  <option value="user">User</option>
+                  <option value="admin">Admin</option>
+                </CFormSelect>
+              </div>
+              <div className="mb-3">
+                <CFormLabel htmlFor="add-user-type">Type:</CFormLabel>
+                <CFormSelect id="add-user-type" aria-label="Select type" value="Local">
+                  <option value="Local">Local</option>
+                </CFormSelect>
+              </div>
+              {createError && <div className="text-danger">{createError}</div>}
+            </CModalBody>
+            <CModalFooter>
+              <CButton type="button" color="secondary" onClick={closeCreate}>
+                Close
+              </CButton>
+              <CButton type="submit" color="primary" id="btnAddUser" disabled={!passwordStrong || busy}>
+                {busy ? 'Saving…' : 'Add User'}
+              </CButton>
+            </CModalFooter>
+          </CForm>
+        </CModal>
       )}
 
-      {tab === 'templates' && (
-        <TemplateEditor
-          existingNames={(templatesQuery.data ?? []).map((t) => t.name)}
-          onCreated={() => templatesQuery.refetch()}
-        />
+      {editing && (
+        <CModal visible alignment="center" onClose={() => setEditing(null)} aria-labelledby="modaleditLabel">
+          <CModalHeader>
+            <CModalTitle id="modaleditLabel">Update Information</CModalTitle>
+          </CModalHeader>
+          <CForm onSubmit={save}>
+            <CModalBody>
+              <div className="mb-3">
+                <CFormLabel htmlFor="edit-username-display">Name:</CFormLabel>
+                <CFormInput id="edit-username-display" value={displayName(editing)} readOnly />
+              </div>
+              <div className="mb-3">
+                <CFormLabel htmlFor="edit-role">Dashboard Role:</CFormLabel>
+                <CFormSelect
+                  id="edit-role"
+                  aria-label="Select role"
+                  value={role}
+                  onChange={(e) => setRole(e.target.value)}
+                >
+                  <option value="user">User</option>
+                  <option value="admin">Admin</option>
+                </CFormSelect>
+              </div>
+              <div className="mb-3">
+                <CFormLabel htmlFor="edit-type">Type:</CFormLabel>
+                <CFormSelect id="edit-type" aria-label="Select type" value={typeLabel(editing.auth_source)} disabled>
+                  <option value={typeLabel(editing.auth_source)}>{typeLabel(editing.auth_source)}</option>
+                </CFormSelect>
+              </div>
+              <div className="mb-3">
+                <CFormLabel htmlFor="edit-status">Status</CFormLabel>
+                <CFormSelect id="edit-status" value={status} onChange={(e) => setStatus(e.target.value)}>
+                  <option value="active">active</option>
+                  <option value="disabled">disabled</option>
+                </CFormSelect>
+              </div>
+              {saveError && <div className="text-danger">{saveError}</div>}
+            </CModalBody>
+            <CModalFooter>
+              <CButton type="button" color="secondary" onClick={() => setEditing(null)}>
+                Close
+              </CButton>
+              <CButton type="submit" color="primary" disabled={busy}>
+                {busy ? 'Saving…' : 'Save changes'}
+              </CButton>
+            </CModalFooter>
+          </CForm>
+        </CModal>
       )}
-
-      {tab === 'audit' && (
-        <>
-        {auditQuery.isLoading ? (
-          <div>Loading audit…</div>
-        ) : auditQuery.data === null ? (
-          // ponytail: the 501 body is not rendered — the read route is a
-          // known stub (verified in backend/app/api/audit.py); the tab
-          // carries the empty state and picks up rows when the route lands.
-          <div>Audit log not available.</div>
-        ) : (auditQuery.data ?? []).length === 0 ? (
-          <div>No audit entries.</div>
-        ) : (
-          <CTable striped hover>
-            <thead>
-              <tr>
-                <th>Action</th>
-                <th>Actor</th>
-                <th>Target</th>
-                <th>Cluster</th>
-                <th>Namespace</th>
-                <th>Template</th>
-                <th>At</th>
-              </tr>
-            </thead>
-            <tbody>
-              {(auditQuery.data ?? []).map((a) => (
-                <tr key={a.id}>
-                  <td>{a.action}</td>
-                  <td>{a.actor_sub}</td>
-                  <td>{a.target}</td>
-                  <td>{a.cluster ?? '\u2014'}</td>
-                  <td>{a.namespace ?? '\u2014'}</td>
-                  <td>{a.template ?? '\u2014'}</td>
-                  <td>{a.at}</td>
-                </tr>
-              ))}
-            </tbody>
-          </CTable>
-        )}
-        </>
-      )}
-    </div>
+    </>
   )
+}
+
+const AdminPermissionsView = () => {
+  const [params] = useSearchParams()
+  const tab = params.get('tab')
+  if (tab === 'templates') return <TemplatesPage />
+  if (tab === 'audit') return <AuditPage />
+  return <UserList />
 }
 
 export default AdminPermissionsView

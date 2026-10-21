@@ -1,14 +1,57 @@
-import { fireEvent, render, screen, waitFor } from '@testing-library/react'
+import { render, screen, waitFor } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query'
-import { MemoryRouter, Routes, Route, Navigate } from 'react-router-dom'
+import { MemoryRouter, Routes, Route } from 'react-router-dom'
 import { afterEach, beforeEach, describe, expect, test, vi } from 'vitest'
 import { server } from '../msw'
 import { http, HttpResponse } from 'msw'
 import AdminPermissionsView from '../../src/views/AdminPermissions'
-import BindModal from '../../src/views/AdminPermissions/components/BindModal'
+import PrivilegesView from '../../src/views/AdminPermissions/Privileges'
 import TemplateEditor from '../../src/views/AdminPermissions/components/TemplateEditor'
 import { AdminRoute } from '../../src/routes'
+import { useClusterStore } from '../../src/store/cluster'
+
+vi.mock('../../src/components/KubeDataTable', () => {
+  const React = require('react') as typeof import('react')
+  const Column = () => null
+  function KubeDataTable({
+    data,
+    children,
+  }: {
+    data: Record<string, unknown>[]
+    children: React.ReactNode
+  }) {
+    const cols = React.Children.toArray(children)
+      .filter(React.isValidElement)
+      .map((child) => (child as React.ReactElement<{ title: string; data?: string | null; children?: unknown }>).props)
+    return (
+      <table className="table table-bordered">
+        <thead>
+          <tr>
+            {cols.map((col) => (
+              <th key={col.title}>{col.title}</th>
+            ))}
+          </tr>
+        </thead>
+        <tbody>
+          {data.map((row, i) => (
+            <tr key={i}>
+              {cols.map((col) => {
+                const value = col.data == null ? row : row[col.data]
+                const node =
+                  typeof col.children === 'function'
+                    ? (col.children as (v: unknown, t: string, r: unknown) => React.ReactNode)(value, 'display', col.data == null ? value : row)
+                    : (value as React.ReactNode)
+                return <td key={col.title}>{node ?? ''}</td>
+              })}
+            </tr>
+          ))}
+        </tbody>
+      </table>
+    )
+  }
+  return { default: KubeDataTable, Column }
+})
 
 // ponytail: the default MSW server already serves role:admin for /auth/me;
 // the non-admin redirect test swaps it via server.use.
@@ -60,6 +103,7 @@ const USERS = [
     groups: [],
     role: 'admin',
     status: 'active',
+    auth_source: 'oidc',
     cluster_count: 1,
     last_login_at: '2026-10-19T08:00:00Z',
   },
@@ -71,6 +115,7 @@ const USERS = [
     groups: [],
     role: 'admin',
     status: 'active',
+    auth_source: 'local',
     cluster_count: 2,
     last_login_at: '2026-10-19T08:00:00Z',
   },
@@ -82,6 +127,7 @@ const USERS = [
     groups: [],
     role: 'user',
     status: 'active',
+    auth_source: 'oidc',
     cluster_count: 1,
     last_login_at: '2026-10-18T09:00:00Z',
   },
@@ -112,6 +158,20 @@ const renderAdmin = (initialEntry = '/admin/permissions') => {
         <Routes>
           <Route path="/admin/permissions" element={<AdminPermissionsView />} />
           <Route path="/" element={<div>Home page</div>} />
+        </Routes>
+      </MemoryRouter>
+    </QueryClientProvider>,
+  )
+}
+
+const renderPrivileges = (sub: string) => {
+  useClusterStore.setState({ selectedCluster: { id: 1, name: 'prod' } })
+  const qc = new QueryClient({ defaultOptions: { queries: { retry: false } } })
+  return render(
+    <QueryClientProvider client={qc}>
+      <MemoryRouter initialEntries={[`/admin/permissions/users/${encodeURIComponent(sub)}`]}>
+        <Routes>
+          <Route path="/admin/permissions/users/:sub" element={<PrivilegesView />} />
         </Routes>
       </MemoryRouter>
     </QueryClientProvider>,
@@ -151,12 +211,112 @@ describe('AdminPermissionsView', () => {
 
   // --- SATISFIES admin-binds-a-template-from-the-admin-view ---
 
-  test('users-tab-lists-users-from-the-admin-api', async () => {
+  test('user-list-shows-the-4.1-columns', async () => {
     renderAdmin()
     expect(await screen.findByText('Alice')).toBeTruthy()
-    expect(screen.getByText('oidc-alice')).toBeTruthy()
-    expect(screen.getByText('admin@kubedash.local')).toBeTruthy()
-    expect(screen.getByText('local:admin@kubedash.local')).toBeTruthy()
+    expect(screen.getByText('User List')).toBeTruthy()
+    expect(screen.getByText('Username')).toBeTruthy()
+    expect(screen.getByText('Email')).toBeTruthy()
+    expect(screen.getByText('Permission')).toBeTruthy()
+    expect(screen.getByText('Type')).toBeTruthy()
+    expect(screen.getByText('Alice')).toBeTruthy()
+    expect(screen.getByText('alice@example.com')).toBeTruthy()
+    expect(screen.getAllByText('OpenID').length).toBeGreaterThanOrEqual(1)
+    expect(screen.getByText('Local')).toBeTruthy()
+    expect(screen.getAllByText('Admin').length).toBeGreaterThanOrEqual(1)
+    expect(screen.getByText('User')).toBeTruthy()
+    expect(screen.getByText('User Management')).toBeTruthy()
+    expect(screen.getByRole('button', { name: /create user/i })).toBeTruthy()
+    expect(screen.getByRole('button', { name: /reload page/i })).toBeTruthy()
+    expect(screen.getAllByRole('link', { name: /privileges/i }).length).toBe(USERS.length)
+    expect(screen.getByRole('button', { name: 'Edit Alice' })).toBeTruthy()
+    expect(screen.getByRole('button', { name: 'Delete Alice' })).toBeTruthy()
+    expect(screen.queryByRole('button', { name: 'Delete Dev' })).toBeNull()
+    expect(screen.queryByRole('button', { name: 'Edit Admin' })).toBeNull()
+    expect(screen.queryByRole('button', { name: /^add user$/i })).toBeNull()
+    expect(screen.queryByRole('tab')).toBeNull()
+  })
+
+  test('reload-refetches-the-user-list', async () => {
+    const user = userEvent.setup()
+    let gets = 0
+    server.use(
+      http.get('*/api/v1/admin/users', () => {
+        gets += 1
+        return HttpResponse.json(USERS)
+      }),
+    )
+    renderAdmin()
+    expect(await screen.findByText('Alice')).toBeTruthy()
+    const before = gets
+    await user.click(screen.getByRole('button', { name: /reload page/i }))
+    await waitFor(() => expect(gets).toBeGreaterThan(before))
+  })
+
+  test('create-user-form-posts-a-local-user', async () => {
+    const user = userEvent.setup()
+    let posted: unknown = null
+    server.use(
+      http.post('*/api/v1/admin/users', async ({ request }) => {
+        posted = await request.json()
+        return HttpResponse.json({ ...USERS[2], id: 9, display_name: 'New' }, { status: 201 })
+      }),
+    )
+    renderAdmin()
+    await user.click(await screen.findByRole('button', { name: /create user/i }))
+    expect(screen.getByRole('heading', { name: 'Create User' })).toBeTruthy()
+    const add = screen.getByRole('button', { name: /^add user$/i })
+    expect(add).toBeDisabled()
+    await user.type(screen.getByPlaceholderText('Type your username'), 'New')
+    await user.type(screen.getByPlaceholderText('Type your email'), 'new@example.com')
+    const password = screen.getByLabelText(/^password:$/i)
+    await user.click(password)
+    await user.type(password, 'Abcdef1!')
+    expect(add).toBeEnabled()
+    await user.click(add)
+    await waitFor(() =>
+      expect(posted).toEqual({
+        username: 'New',
+        email: 'new@example.com',
+        password: 'Abcdef1!',
+        role: 'user',
+        type: 'Local',
+      }),
+    )
+  })
+
+  test('edit-opens-update-information-and-patches-role', async () => {
+    const user = userEvent.setup()
+    let patched: unknown = null
+    server.use(
+      http.patch('*/api/v1/admin/users/:id', async ({ request, params }) => {
+        patched = { id: params.id, body: await request.json() }
+        return HttpResponse.json({ ...USERS[2], role: 'admin' })
+      }),
+    )
+    renderAdmin()
+    await user.click(await screen.findByRole('button', { name: 'Edit Alice' }))
+    expect(screen.getByRole('heading', { name: 'Update Information' })).toBeTruthy()
+    expect(screen.getByLabelText(/^name:$/i)).toHaveProperty('readOnly', true)
+    await user.selectOptions(screen.getByLabelText(/dashboard role/i), 'admin')
+    await user.click(screen.getByRole('button', { name: /save changes/i }))
+    await waitFor(() =>
+      expect(patched).toEqual({ id: '2', body: { role: 'admin', status: 'active' } }),
+    )
+  })
+
+  test('delete-removes-a-user-row', async () => {
+    const user = userEvent.setup()
+    let deleted: unknown = null
+    server.use(
+      http.delete('*/api/v1/admin/users/:id', ({ params }) => {
+        deleted = params.id
+        return HttpResponse.json({ deleted: 'oidc-alice' })
+      }),
+    )
+    renderAdmin()
+    await user.click(await screen.findByRole('button', { name: 'Delete Alice' }))
+    await waitFor(() => expect(deleted).toBe('2'))
   })
 
   test('bind-submits-user-cluster-namespace-template', async () => {
@@ -173,62 +333,28 @@ describe('AdminPermissionsView', () => {
         })
       }),
     )
-    render(
-      <QueryClientProvider
-        client={new QueryClient({ defaultOptions: { queries: { retry: false } } })}
-      >
-        <MemoryRouter>
-          <BindModal
-            user="oidc-alice"
-            clusters={CLUSTERS}
-            templates={TEMPLATES}
-            onClose={() => {}}
-            onSuccess={() => {}}
-          />
-        </MemoryRouter>
-      </QueryClientProvider>,
-    )
-    const [clusterSelect, templateSelect] = screen.getAllByRole('combobox')
-    await user.selectOptions(clusterSelect, 'prod')
+    renderPrivileges('oidc-alice')
+    expect(await screen.findByRole('option', { name: 'viewer' })).toBeTruthy()
+    const templateSelect = screen.getByLabelText(/^template$/i)
     await user.selectOptions(templateSelect, 'viewer')
-    await user.type(screen.getByLabelText(/namespace/i), 'team-a')
-    await user.click(screen.getByRole('button', { name: /submit/i }))
+    await user.type(screen.getByLabelText(/^namespaces$/i), 'team-a')
+    await user.click(screen.getByRole('button', { name: /^save$/i }))
     await waitFor(() => expect(bindSpy).toHaveBeenCalledWith(
       expect.objectContaining({ user: 'oidc-alice', cluster: 'prod', namespace: 'team-a', template: 'viewer' }),
     ))
   })
 
-  test('namespace-field-hides-for-cluster-scoped-templates', async () => {
-    const user = userEvent.setup()
-    render(
-      <QueryClientProvider
-        client={new QueryClient({ defaultOptions: { queries: { retry: false } } })}
-      >
-        <MemoryRouter>
-          <BindModal
-            user="oidc-alice"
-            clusters={CLUSTERS}
-            templates={TEMPLATES}
-            onClose={() => {}}
-            onSuccess={() => {}}
-          />
-        </MemoryRouter>
-      </QueryClientProvider>,
-    )
-    const [clusterSelect, templateSelect] = screen.getAllByRole('combobox')
-    await user.selectOptions(clusterSelect, 'prod')
-    // namespace-scoped: the field is present
-    expect(screen.getByLabelText(/namespace/i)).toBeTruthy()
-    await user.selectOptions(templateSelect, 'cluster-admin')
-    // cluster-scoped: hidden
-    expect(screen.queryByLabelText(/namespace/i)).toBeNull()
+  test('cluster-template-has-no-namespace-field', async () => {
+    renderPrivileges('oidc-alice')
+    expect(await screen.findByLabelText(/cluster template/i)).toBeTruthy()
+    expect(screen.getByLabelText(/^template$/i)).toBeTruthy()
+    expect(screen.getByLabelText(/^namespaces$/i)).toBeTruthy()
+    expect(screen.getByRole('checkbox', { name: /all namespaces/i })).toBeDisabled()
   })
 
   test('unbind-deletes-a-binding-row', async () => {
     const user = userEvent.setup()
     const unbindSpy = vi.fn()
-    // my-access is the CALLER's (u1 per the default /auth/me handler) — the
-    // view only lists the caller's rows, so the test clicks the caller row.
     server.use(
       http.get('*/api/v1/permissions/my-access', () =>
         HttpResponse.json([
@@ -240,26 +366,13 @@ describe('AdminPermissionsView', () => {
         return HttpResponse.json({})
       }),
     )
-    renderAdmin()
-    await screen.findByText('Alice')
-    await user.click(screen.getByText('u1'))
+    renderPrivileges('u1')
     const button = await screen.findByRole('button', { name: /unbind/i })
     await user.click(button)
     await waitFor(() => expect(unbindSpy).toHaveBeenCalledWith(
       expect.objectContaining({ user: 'u1', cluster: 'prod', namespace: 'team-a' }),
     ))
   })
-
-  test('user-detail-opens-with-bind-control-and-binding-limitation-note', async () => {
-    const user = userEvent.setup()
-    renderAdmin()
-    await screen.findByText('Alice')
-    await user.click(screen.getByText('Alice'))
-    expect(await screen.findByText(/per-user binding listing is not available/i)).toBeTruthy()
-    expect(screen.getByRole('button', { name: /^bind$/i })).toBeTruthy()
-  })
-
-  // --- SATISFIES the-admin-view-shows-api-errors-as-messages ---
 
   test('bind-409-surfaced-as-message-without-unhandled-rejection', async () => {
     const user = userEvent.setup()
@@ -273,15 +386,11 @@ describe('AdminPermissionsView', () => {
         ),
       ),
     )
-    renderAdmin()
-    await screen.findByText('Alice')
-    await user.click(screen.getByText('Alice'))
-    await user.click(screen.getByRole('button', { name: /^bind$/i }))
-    const [clusterSelect, templateSelect] = await screen.findAllByRole('combobox')
-    await user.selectOptions(clusterSelect, 'prod')
-    await user.selectOptions(templateSelect, 'viewer')
-    await user.type(screen.getByLabelText(/namespace/i), 'team-a')
-    await user.click(screen.getByRole('button', { name: /submit/i }))
+    renderPrivileges('oidc-alice')
+    expect(await screen.findByRole('option', { name: 'viewer' })).toBeTruthy()
+    await user.selectOptions(screen.getByLabelText(/^template$/i), 'viewer')
+    await user.type(screen.getByLabelText(/^namespaces$/i), 'team-a')
+    await user.click(screen.getByRole('button', { name: /^save$/i }))
     expect(await screen.findByText(/binding already exists/i)).toBeTruthy()
     await waitFor(() => expect(onUncaught).not.toHaveBeenCalled())
     window.removeEventListener('unhandledrejection', onUncaught)
@@ -303,12 +412,10 @@ describe('AdminPermissionsView', () => {
     )
     renderGate()
     expect(await screen.findByText('Home page')).toBeTruthy()
-    expect(screen.queryByText(/users/i, { selector: '.c-tabs' })).toBeNull()
+    expect(screen.queryByText('User List')).toBeNull()
   })
 
-  // --- SATISFIES the-admin-view-shows-api-errors-as-messages ---
-
-  test('users-tab-403-surfaced-as-text-danger', async () => {
+  test('users-list-403-surfaced-as-text-danger', async () => {
     server.use(
       http.get('*/api/v1/admin/users', () =>
         HttpResponse.json({ error: { code: 'RBAC_DENIED', message: 'admin role required' } }, { status: 403 }),
@@ -318,33 +425,29 @@ describe('AdminPermissionsView', () => {
     expect(await screen.findByText(/admin role required/i, { selector: '.text-danger' })).toBeTruthy()
   })
 
-  test('templates-tab-lists-templates', async () => {
-    const user = userEvent.setup()
-    renderAdmin()
-    await screen.findByText('Alice')
-    const templatesTab = screen.getByText('Templates', { selector: 'button' })
-    await user.click(templatesTab)
+  test('templates-page-lists-templates', async () => {
+    renderAdmin('/admin/permissions?tab=templates')
     expect(await screen.findByText('viewer')).toBeTruthy()
     expect(screen.getByText('cluster-admin')).toBeTruthy()
     expect(screen.getByText('pod-reader')).toBeTruthy()
-    // built-in rows are marked
     expect(screen.getAllByText('builtin').length).toBeGreaterThanOrEqual(2)
+    expect(screen.queryByRole('tab')).toBeNull()
   })
 
-  test('audit-tab-opens-from-menu', async () => {
+  test('audit-page-opens-from-its-route', async () => {
     renderAdmin('/admin/permissions?tab=audit')
-    const auditTab = await screen.findByRole('tab', { name: 'Audit' })
-    expect(auditTab.getAttribute('aria-selected')).toBe('true')
     expect(await screen.findByText('Audit log not available.')).toBeTruthy()
+    expect(screen.queryByRole('tab')).toBeNull()
+    expect(screen.queryByText('User List')).toBeNull()
   })
 
   test('unknown-tab-falls-back-to-users', async () => {
     renderAdmin('/admin/permissions?tab=bogus')
-    const usersTab = await screen.findByRole('tab', { name: 'Users' })
-    expect(usersTab.getAttribute('aria-selected')).toBe('true')
+    expect(await screen.findByText('User List')).toBeTruthy()
+    expect(screen.queryByRole('tab')).toBeNull()
   })
 
-  test('non-admin-cannot-open-audit-tab', async () => {
+  test('non-admin-cannot-open-audit-page', async () => {
     server.use(
       http.get('*/api/v1/auth/me', () =>
         HttpResponse.json({
@@ -359,17 +462,6 @@ describe('AdminPermissionsView', () => {
     renderGate('/admin/permissions?tab=audit')
     expect(await screen.findByText('Home page')).toBeTruthy()
     expect(screen.queryByText('Audit log not available.')).toBeNull()
-  })
-
-  test('audit-tab-renders-empty-state-on-501', async () => {
-    const user = userEvent.setup()
-    renderAdmin()
-    await screen.findByText('Alice')
-    // ponytail: CButton's role/active props don't compose cleanly with
-    // userEvent in jsdom — use fireEvent.click for the tab switch.
-    const auditTab = screen.getByText('Audit', { selector: 'button' })
-    fireEvent.click(auditTab)
-    expect(await screen.findByText(/audit log not available/i)).toBeTruthy()
   })
 })
 
