@@ -91,6 +91,8 @@ export interface AdminUser {
   groups: string[]
   role: string
   status: string
+  /** `oidc` renders as OpenID, `local` as Local (4.1 Type column). */
+  auth_source?: string
   cluster_count: number
   last_login_at: string | null
   /** The main-branch "Type" column: "Local" (auth_source=local) or "OIDC". */
