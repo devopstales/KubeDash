@@ -32,7 +32,11 @@ from kubernetes import client as k8s_client
 from kubernetes.client.exceptions import ApiException
 
 from app.core.config import Settings, get_settings
-from app.core.errors import ClusterNotFoundError, ClusterUnreachableError
+from app.core.errors import (
+    ClusterAlreadyExistsError,
+    ClusterNotFoundError,
+    ClusterUnreachableError,
+)
 
 # OD-2 frozen form: version byte (cipher/key generation marker), then the
 # 96-bit nonce, then the AES-256-GCM ciphertext (includes the 16-byte tag).
@@ -191,6 +195,19 @@ class K8sClient:
         """Namespace list for the header selector. The resource route always
         passes the query namespace; it does not apply to this cluster-scoped kind."""
         return [n.to_dict() for n in self._v1.list_namespace().items]
+
+    def create_namespace(self, name: str) -> dict[str, Any]:
+        body = k8s_client.V1Namespace(metadata=k8s_client.V1ObjectMeta(name=name))
+        try:
+            return self._v1.create_namespace(body).to_dict()
+        except ApiException as e:
+            if e.status == 409:
+                raise ClusterAlreadyExistsError(f"namespace '{name}' already exists") from e
+            self._unreachable("create_namespace", e)
+            raise AssertionError("unreachable")
+
+    def delete_namespace(self, name: str) -> None:
+        self._delete("delete_namespace", lambda: self._v1.delete_namespace(name))
 
     def list_serviceaccounts(self, namespace: str | None) -> list[dict[str, Any]]:
         """ServiceAccount list in the standard kubernetes dict form (``to_dict``)."""
