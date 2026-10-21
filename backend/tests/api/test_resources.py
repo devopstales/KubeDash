@@ -35,6 +35,15 @@ class FakeK8s:
 
     def __init__(self, kubeconfig: bytes) -> None:
         self.kubeconfig = kubeconfig
+        self.created_namespaces: list[str] = []
+        self.deleted_namespaces: list[str] = []
+
+    def create_namespace(self, name: str) -> dict:
+        self.created_namespaces.append(name)
+        return {"metadata": {"name": name}}
+
+    def delete_namespace(self, name: str) -> None:
+        self.deleted_namespaces.append(name)
 
     def list_namespaces(self, namespace: str | None) -> list[dict]:
         return [
@@ -73,6 +82,23 @@ class FakeK8s:
                     {"kind": "User", "name": "jane"},
                     {"kind": "Group", "name": "devs"},
                     {"kind": "ServiceAccount", "name": "builder", "namespace": "team-a"},
+                ],
+            },
+        ]
+
+    def list_cluster_role_bindings(self, _namespace: str | None) -> list[dict]:
+        return [
+            {
+                "metadata": {"name": "cluster-admin"},
+                "role_ref": {
+                    "api_group": "rbac.authorization.k8s.io",
+                    "kind": "ClusterRole",
+                    "name": "cluster-admin",
+                },
+                "subjects": [
+                    {"kind": "User", "name": "jane"},
+                    {"kind": "Group", "name": "system:masters"},
+                    {"kind": "ServiceAccount", "name": "builder", "namespace": "ci"},
                 ],
             },
         ]
@@ -118,7 +144,7 @@ class FakeK8s:
 
 
 @pytest.fixture()
-def fake_k8s(api_app, monkeypatch) -> None:
+def fake_k8s(api_app, monkeypatch) -> FakeK8s:
     """Inject the FakeK8s factory into the module pool (the Task 4 seam).
 
     The handler does ``from app.services.k8s_client import pool`` — a copy
@@ -131,9 +157,11 @@ def fake_k8s(api_app, monkeypatch) -> None:
 
     import app.services.k8s_client as kc
 
+    fake = FakeK8s(b"unused")
     res = importlib.import_module("app.api.resources")
-    fake_pool = kc.K8sClientPool(factory=lambda plain: FakeK8s(plain))
+    fake_pool = kc.K8sClientPool(factory=lambda plain: fake)
     monkeypatch.setitem(res.__dict__, "pool", fake_pool)
+    return fake
 
 
 def _allow_sar(monkeypatch: pytest.MonkeyPatch) -> None:
@@ -143,6 +171,17 @@ def _allow_sar(monkeypatch: pytest.MonkeyPatch) -> None:
     monkeypatch.setattr(rb, "_cache_get", lambda k: None)
     monkeypatch.setattr(rb, "_cache_set", lambda k, v: None)
     monkeypatch.setattr(rb, "_sar_allowed", lambda client, verb, resource, ns, name, group="": True)
+
+
+def _make_admin(api_client) -> None:
+    """OIDC login creates a role=user row; namespace mutations require admin."""
+    from app.extensions import db
+    from app.models.user import User
+
+    with api_client.application.app_context():
+        user = db.session.execute(db.select(User).filter_by(sub="sub-oidc-1")).scalar_one()
+        user.role = "admin"
+        db.session.commit()
 
 
 def _register(api_client, headers, name="prod") -> object:
@@ -271,6 +310,25 @@ def test_list_roles_namespaced(api_client, auth_client, fake_k8s, monkeypatch) -
     [role] = body["items"]
     assert role["metadata"] == {"name": "edit", "namespace": "team-a"}
     assert role["rules"] == [{"resources": ["pods"], "verbs": ["get"]}]
+
+
+def test_list_clusterrolebindings(api_client, auth_client, fake_k8s, monkeypatch) -> None:
+    """Cluster Permissions > Cluster Role Bindings lists the cluster-scoped kind."""
+    auth_client.login()
+    h = {"Authorization": f"Bearer {auth_client.jwt}"}
+    _register(api_client, h)
+    _allow_sar(monkeypatch)
+    r = api_client.get(
+        "/api/v1/clusters/1/resources/clusterrolebindings?namespace=team-a", headers=h
+    )
+    assert r.status_code == 200
+    body = r.get_json()
+    assert body["kind"] == "clusterrolebindings"
+    [binding] = body["items"]
+    assert binding["metadata"] == {"name": "cluster-admin"}
+    assert binding["role_ref"]["kind"] == "ClusterRole"
+    assert binding["role_ref"]["name"] == "cluster-admin"
+    assert binding["subjects"][0]["name"] == "jane"
 
 
 def test_list_clusterroles(api_client, auth_client, fake_k8s, monkeypatch) -> None:
@@ -413,6 +471,121 @@ def test_rbac_denied_403(api_client, auth_client, fake_k8s, monkeypatch) -> None
     assert r.get_json()["error"]["code"] == "RBAC_DENIED"
 
 
+def test_admin_creates_namespace(api_client, auth_client, fake_k8s, monkeypatch) -> None:
+    auth_client.login()
+    _make_admin(api_client)
+    h = {"Authorization": f"Bearer {auth_client.jwt}"}
+    _register(api_client, h)
+    _allow_sar(monkeypatch)
+    r = api_client.post(
+        "/api/v1/clusters/1/resources/namespaces",
+        json={"name": "team-b"},
+        headers=h,
+    )
+    assert r.status_code == 201
+    assert r.get_json()["name"] == "team-b"
+    assert fake_k8s.created_namespaces == ["team-b"]
+
+
+@pytest.mark.parametrize(
+    "name", ["default", "kube-system", "kube-public", "kube-node-lease"]
+)
+def test_protected_namespace_delete_is_rejected_without_client_call(
+    api_client, auth_client, fake_k8s, monkeypatch, name
+) -> None:
+    auth_client.login()
+    _make_admin(api_client)
+    h = {"Authorization": f"Bearer {auth_client.jwt}"}
+    _register(api_client, h)
+    _allow_sar(monkeypatch)
+    r = api_client.delete(
+        f"/api/v1/clusters/1/resources/namespaces/{name}", headers=h
+    )
+    assert r.status_code == 409
+    assert r.get_json()["error"]["code"] == "CLUSTER_ALREADY_EXISTS"
+    assert fake_k8s.deleted_namespaces == []
+
+
+def test_admin_deletes_namespace(api_client, auth_client, fake_k8s, monkeypatch) -> None:
+    auth_client.login()
+    _make_admin(api_client)
+    h = {"Authorization": f"Bearer {auth_client.jwt}"}
+    _register(api_client, h)
+    _allow_sar(monkeypatch)
+    r = api_client.delete(
+        "/api/v1/clusters/1/resources/namespaces/team-b", headers=h
+    )
+    assert r.status_code == 200
+    assert r.get_json() == {"name": "team-b"}
+    assert fake_k8s.deleted_namespaces == ["team-b"]
+
+
+def test_namespace_create_requires_admin(
+    api_client, auth_client, api_app, fake_k8s, monkeypatch
+) -> None:
+    from app.core.security import issue_token_pair
+    from app.extensions import db
+    from app.models.binding import ClusterBinding
+    from app.models.cluster import Cluster
+    from app.models.user import User
+
+    auth_client.login()
+    admin_headers = {"Authorization": f"Bearer {auth_client.jwt}"}
+    _register(api_client, admin_headers)
+    with api_app.app_context():
+        cluster = db.session.get(Cluster, 1)
+        user = User(sub="plain-user", email="plain@example.com", role="user")
+        db.session.add(user)
+        db.session.flush()
+        db.session.add(ClusterBinding(user_id=user.id, cluster_id=cluster.id, role="viewer"))
+        db.session.commit()
+        access, _ = issue_token_pair(user)
+    _allow_sar(monkeypatch)
+    r = api_client.post(
+        "/api/v1/clusters/1/resources/namespaces",
+        json={"name": "team-b"},
+        headers={"Authorization": f"Bearer {access}"},
+    )
+    assert r.status_code == 403
+    assert r.get_json()["error"]["code"] == "RBAC_DENIED"
+    assert fake_k8s.created_namespaces == []
+
+
+def test_namespace_create_asks_sar_for_create(
+    api_client, auth_client, fake_k8s, monkeypatch
+) -> None:
+    auth_client.login()
+    _make_admin(api_client)
+    h = {"Authorization": f"Bearer {auth_client.jwt}"}
+    _register(api_client, h)
+    asked = _record_sar(monkeypatch)
+    r = api_client.post(
+        "/api/v1/clusters/1/resources/namespaces",
+        json={"name": "team-b"},
+        headers=h,
+    )
+    assert r.status_code == 403
+    assert asked == [("create", "namespaces", None, None, "")]
+
+
+def test_invalid_namespace_name_is_422(
+    api_client, auth_client, fake_k8s, monkeypatch
+) -> None:
+    auth_client.login()
+    _make_admin(api_client)
+    h = {"Authorization": f"Bearer {auth_client.jwt}"}
+    _register(api_client, h)
+    _allow_sar(monkeypatch)
+    r = api_client.post(
+        "/api/v1/clusters/1/resources/namespaces",
+        json={"name": "Not Valid"},
+        headers=h,
+    )
+    assert r.status_code == 422
+    assert r.get_json()["error"]["code"] == "INVALID_KUBECONFIG"
+    assert fake_k8s.created_namespaces == []
+
+
 @pytest.mark.integration
 def test_list_pods_on_kind(api_client, auth_client, kind_client) -> None:
     cid, kubeconfig = kind_client
@@ -432,6 +605,55 @@ def test_list_pods_on_kind(api_client, auth_client, kind_client) -> None:
     assert r.status_code == 200
     items = r.get_json()["items"]
     assert any(p["metadata"]["name"] == "kubedash-pod" for p in items)
+
+
+@pytest.mark.integration
+def test_demo_serviceaccount_with_secret_and_pullsecret(
+    api_client, auth_client, kind_client
+) -> None:
+    """The kind fixture's demo account lists its token secret and pull secret,
+    and the pull secret's value is only on the single-object read."""
+    cid, kubeconfig = kind_client
+    auth_client.login()
+    h = {"Authorization": f"Bearer {auth_client.jwt}"}
+    api_client.post(
+        "/api/v1/clusters",
+        json={
+            "name": "kind-test",
+            "api_server": "https://127.0.0.1:6443",
+            "kubeconfig": kubeconfig.decode(),
+            "context": "kind-kind-test",
+        },
+        headers=h,
+    )
+    accounts = api_client.get(
+        f"/api/v1/clusters/{cid}/resources/serviceaccounts?namespace=default", headers=h
+    )
+    assert accounts.status_code == 200, accounts.get_json()
+    account = next(
+        item
+        for item in accounts.get_json()["items"]
+        if item["metadata"]["name"] == "kubedash-builder"
+    )
+    assert account["secrets"] == [{"name": "kubedash-builder-token"}]
+    assert account["image_pull_secrets"] == [{"name": "kubedash-registry"}]
+
+    listed = api_client.get(
+        f"/api/v1/clusters/{cid}/resources/secrets?namespace=default", headers=h
+    )
+    assert listed.status_code == 200, listed.get_json()
+    by_name = {item["metadata"]["name"]: item for item in listed.get_json()["items"]}
+    assert by_name["kubedash-builder-token"]["type"] == "kubernetes.io/service-account-token"
+    assert by_name["kubedash-registry"]["type"] == "kubernetes.io/dockerconfigjson"
+    assert "data" not in by_name["kubedash-registry"]
+
+    one = api_client.get(
+        f"/api/v1/clusters/{cid}/resources/secrets?namespace=default&name=kubedash-registry",
+        headers=h,
+    )
+    assert one.status_code == 200, one.get_json()
+    [secret] = one.get_json()["items"]
+    assert ".dockerconfigjson" in secret["data"]
 
 
 @pytest.mark.integration

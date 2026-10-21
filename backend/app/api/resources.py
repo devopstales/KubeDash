@@ -11,14 +11,35 @@ on deny; the binding gate is Task 4's ``bound_cluster_or_404`` (404
 CLUSTER_NOT_FOUND, which does not distinguish missing cluster from missing
 binding).
 """
+import re
+
 from flask import g, request
 from flask_smorest import Api, Blueprint
 
 from app.api._authhook import apply_auth
-from app.core.errors import RbacDeniedError, ResourceKindNotSupportedError
-from app.schemas.resource import ResourceListOut
+from app.core.errors import (
+    ClusterAlreadyExistsError,
+    InvalidKubeconfigError,
+    RbacDeniedError,
+    ResourceKindNotSupportedError,
+)
+from app.core.security import require_admin
+from app.schemas.resource import NamespaceIn, NamespaceMutationOut, ResourceListOut
 from app.services import rbac
 from app.services.k8s_client import LOCAL_CLUSTER_ID, bound_cluster_or_404, pool
+
+_NAMESPACE_NAME = re.compile(r"^[a-z0-9](?:[-a-z0-9]{0,61}[a-z0-9])?$")
+_PROTECTED_NAMESPACES = frozenset(
+    {"default", "kube-system", "kube-public", "kube-node-lease"}
+)
+
+
+def _cluster_for(user: object, cluster_id: int) -> object:
+    if cluster_id == LOCAL_CLUSTER_ID:
+        from app.api.clusters import _local_cluster
+
+        return _local_cluster()
+    return bound_cluster_or_404(user, cluster_id)
 
 #: kind → (K8sClient method, kubernetes resource name, API group)
 _RBAC_GROUP = "rbac.authorization.k8s.io"
@@ -29,6 +50,7 @@ _KINDS: dict[str, tuple[str, str, str]] = {
     "roles": ("list_roles", "roles", _RBAC_GROUP),
     "rolebindings": ("list_rolebindings", "rolebindings", _RBAC_GROUP),
     "clusterroles": ("list_cluster_roles", "clusterroles", _RBAC_GROUP),
+    "clusterrolebindings": ("list_cluster_role_bindings", "clusterrolebindings", _RBAC_GROUP),
     "secrets": ("list_secrets", "secrets", ""),
 }
 
@@ -61,17 +83,7 @@ class ResourceApi(Api):
     def list_resources(self, cluster_id: int, kind: str) -> dict[str, object]:
         if kind not in _KINDS:
             raise ResourceKindNotSupportedError(f"kind '{kind}' not supported")
-        if cluster_id == LOCAL_CLUSTER_ID:
-            # id 0: the synthetic local cluster bypasses the binding gate (no
-            # row 0 exists) and goes straight to the pool, whose id-0 branch
-            # routes to the admin client or raises CLUSTER_NOT_FOUND. The
-            # synthetic object is built by clusters._local_cluster() (the
-            # single source for the OD-D reserved id-0 row).
-            from app.api.clusters import _local_cluster
-
-            cluster = _local_cluster()
-        else:
-            cluster = bound_cluster_or_404(g.current_user, cluster_id)
+        cluster = _cluster_for(g.current_user, cluster_id)
         method, api_resource, api_group = _KINDS[kind]
         namespace = request.args.get("namespace")
         name = request.args.get("name")
@@ -79,7 +91,10 @@ class ResourceApi(Api):
             if kind not in _GETTERS:
                 raise ResourceKindNotSupportedError(f"name lookup on kind '{kind}' not supported")
             namespace = namespace or "default"
-            if not rbac.can(g.current_user, cluster, "get", api_resource, namespace, name, api_group):
+            allowed = rbac.can(
+                g.current_user, cluster, "get", api_resource, namespace, name, api_group
+            )
+            if not allowed:
                 raise RbacDeniedError(f"get on {api_resource}")
             items = getattr(pool.get(cluster), _GETTERS[kind])(namespace, name)
             return {"items": items, "kind": kind, "cluster": cluster.name}
@@ -87,3 +102,51 @@ class ResourceApi(Api):
             raise RbacDeniedError(f"list on {api_resource}")
         items = getattr(pool.get(cluster), method)(namespace)
         return {"items": items, "kind": kind, "cluster": cluster.name}
+
+    @blp.route("/clusters/<int:cluster_id>/resources/namespaces", methods=["POST"])
+    @blp.arguments(NamespaceIn)
+    @blp.response(201, NamespaceMutationOut)
+    @blp.doc(
+        responses={
+            403: "RBAC_DENIED",
+            404: "CLUSTER_NOT_FOUND",
+            409: "CLUSTER_ALREADY_EXISTS",
+            422: "INVALID_KUBECONFIG",
+            502: "CLUSTER_UNREACHABLE",
+        }
+    )
+    def create_namespace(
+        self, args: dict[str, object], cluster_id: int
+    ) -> tuple[dict[str, str], int]:
+        require_admin()
+        name = str(args["name"])
+        if not _NAMESPACE_NAME.fullmatch(name):
+            raise InvalidKubeconfigError("invalid Kubernetes namespace name")
+        cluster = _cluster_for(g.current_user, cluster_id)
+        if not rbac.can(g.current_user, cluster, "create", "namespaces", None, None, ""):
+            raise RbacDeniedError("create on namespaces")
+        pool.get(cluster).create_namespace(name)
+        return {"name": name}, 201
+
+    @blp.route(
+        "/clusters/<int:cluster_id>/resources/namespaces/<name>",
+        methods=["DELETE"],
+    )
+    @blp.response(200, NamespaceMutationOut)
+    @blp.doc(
+        responses={
+            403: "RBAC_DENIED",
+            404: "CLUSTER_NOT_FOUND",
+            409: "CLUSTER_ALREADY_EXISTS (protected namespace)",
+            502: "CLUSTER_UNREACHABLE",
+        }
+    )
+    def delete_namespace(self, cluster_id: int, name: str) -> tuple[dict[str, str], int]:
+        require_admin()
+        if name in _PROTECTED_NAMESPACES:
+            raise ClusterAlreadyExistsError(f"namespace '{name}' is protected")
+        cluster = _cluster_for(g.current_user, cluster_id)
+        if not rbac.can(g.current_user, cluster, "delete", "namespaces", None, name, ""):
+            raise RbacDeniedError("delete on namespaces")
+        pool.get(cluster).delete_namespace(name)
+        return {"name": name}, 200

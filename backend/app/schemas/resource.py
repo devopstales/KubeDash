@@ -17,3 +17,11 @@ class ResourceListOut(Schema):
     kind = String()
     cluster = String()
     items = List(Dict())
+
+
+class NamespaceIn(Schema):
+    name = String(required=True)
+
+
+class NamespaceMutationOut(Schema):
+    name = String(required=True)
