@@ -24,11 +24,17 @@ import { AppSidebarNav } from './AppSidebarNav'
 import { logo } from 'src/assets/brand/logo'
 import { sygnet } from 'src/assets/brand/sygnet'
 
-// sidebar nav config
-import navigation from '../_nav'
+import { navigation } from '../_nav'
+import { useCluster } from '../hooks/useCluster'
+import { useClusterStore } from '../store/cluster'
+import { useSidebarStore } from '../store/sidebar'
 
 const AppSidebar = () => {
-  const [visible, setVisible] = useState(true)
+  const visible = useSidebarStore((state) => state.visible)
+  const setVisible = useSidebarStore((state) => state.setVisible)
+  const clusterId = useClusterStore((state) => state.selectedCluster?.id ?? null)
+  const { me } = useCluster()
+  const items = navigation({ clusterId, isAdmin: me?.role === 'admin' })
   const [unfoldable, setUnfoldable] = useState(false)
 
   return (
@@ -47,9 +53,12 @@ const AppSidebar = () => {
         </CSidebarBrand>
         <CCloseButton className="d-lg-none" dark onClick={() => setVisible(false)} />
       </CSidebarHeader>
-      <AppSidebarNav items={navigation} />
+      <AppSidebarNav items={items} />
       <CSidebarFooter className="border-top d-none d-lg-flex">
-        <CSidebarToggler onClick={() => setUnfoldable((v) => !v)} />
+        <CSidebarToggler
+          aria-label="Fold sidebar"
+          onClick={() => setUnfoldable((value) => !value)}
+        />
       </CSidebarFooter>
     </CSidebar>
   )

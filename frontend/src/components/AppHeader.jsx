@@ -43,6 +43,7 @@ import undrawProfile from '../../public/assets/img/avatars/undraw_profile.svg'
 
 import { useCluster } from '../hooks/useCluster'
 import { useClusterStore } from '../store/cluster'
+import { useSidebarStore } from '../store/sidebar'
 import { apiFetch } from '../lib/api'
 import { useNavigate } from 'react-router-dom'
 
@@ -67,7 +68,7 @@ const AppHeader = () => {
   const { clusters, me } = useCluster()
   const selectedCluster = useClusterStore((s) => s.selectedCluster)
   const setSelectedCluster = useClusterStore((s) => s.setSelectedCluster)
-  const [sidebarShow, setSidebarShow] = useState(true)
+  const toggleSidebar = useSidebarStore((state) => state.toggle)
   const [loggingOut, setLoggingOut] = useState(false)
   const navigate = useNavigate()
 
@@ -124,7 +125,7 @@ const AppHeader = () => {
   return (
     <CHeader sticky className="p-0 mb-4">
       <div className="container-fluid border-bottom px-4 d-flex align-items-center flex-nowrap">
-        <CHeaderToggler onClick={() => setSidebarShow((v) => !v)}>
+        <CHeaderToggler aria-label="Toggle sidebar" onClick={() => toggleSidebar()}>
           <CIcon icon={cilMenu} customClassName="icon icon-lg" alt="Toggle sidebar" />
         </CHeaderToggler>
 

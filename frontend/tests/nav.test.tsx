@@ -1,5 +1,15 @@
-import { describe, expect, test } from 'vitest'
+import { render, screen } from '@testing-library/react'
+import userEvent from '@testing-library/user-event'
+import { QueryClient, QueryClientProvider } from '@tanstack/react-query'
+import { MemoryRouter } from 'react-router-dom'
+import { http, HttpResponse } from 'msw'
+import { beforeEach, describe, expect, test } from 'vitest'
+import { server } from './msw'
 import { navigation, type NavItem } from '../src/_nav'
+import { useClusterStore } from '../src/store/cluster'
+import { useSidebarStore } from '../src/store/sidebar'
+import AppHeader from '../src/components/AppHeader'
+import AppSidebar from '../src/components/AppSidebar'
 
 function flat(items: NavItem[]): { name: string; to?: string }[] {
   return items.flatMap((item) =>
@@ -115,5 +125,97 @@ describe('navigation contract', () => {
     const workload = dashboard.items?.find((entry) => entry.name === 'Workload')
     expect(workload?.badge).toEqual({ color: 'warning', text: 'Beta' })
     expect(workload?.to).toBe('/dashboard/workload-map')
+  })
+})
+
+function renderShell(role: 'admin' | 'user') {
+  server.use(
+    http.get('*/api/v1/auth/me', () =>
+      HttpResponse.json({
+        sub: 'u1',
+        email: 'dev@kubedash.local',
+        display_name: 'Dev',
+        groups: [],
+        role,
+      }),
+    ),
+    http.get('*/api/v1/clusters', () =>
+      HttpResponse.json({ items: [{ id: 7, name: 'prod', status: 'ok' }] }),
+    ),
+  )
+  useClusterStore.setState({ selectedCluster: { id: 7, name: 'prod' } })
+  const qc = new QueryClient({ defaultOptions: { queries: { retry: false } } })
+  return render(
+    <QueryClientProvider client={qc}>
+      <MemoryRouter>
+        <AppSidebar />
+        <AppHeader />
+      </MemoryRouter>
+    </QueryClientProvider>,
+  )
+}
+
+describe('rendered sidebar', () => {
+  beforeEach(() => {
+    useSidebarStore.setState({ visible: true })
+  })
+
+  test('sidebar-shows-cluster-details-link', async () => {
+    renderShell('admin')
+    const details = await screen.findByRole('link', { name: 'Cluster Details' })
+    expect(details.getAttribute('href')).toBe('/clusters/7')
+    const permissions = screen.getByText('Permissions')
+    expect(
+      permissions.compareDocumentPosition(details) & Node.DOCUMENT_POSITION_FOLLOWING,
+    ).toBeTruthy()
+    expect(screen.getByRole('link', { name: 'My access' })).toBeTruthy()
+    expect(await screen.findByText('Settings')).toBeTruthy()
+  })
+
+  test('workload-entry-shows-beta-badge', async () => {
+    const user = userEvent.setup()
+    renderShell('user')
+    await user.click(await screen.findByText('Dashboard'))
+    expect(await screen.findByText('Beta')).toBeTruthy()
+    expect(screen.getByRole('link', { name: /Cluster Metrics/ })).toBeTruthy()
+    expect(screen.queryByText('Beta', { selector: 'a[href="/clusters"] *' })).toBeNull()
+  })
+
+  test('settings-hidden-for-non-admin', async () => {
+    renderShell('user')
+    await screen.findByRole('link', { name: 'Cluster Details' })
+    await screen.findByAltText('Dev')
+    expect(screen.queryByText('Settings')).toBeNull()
+    expect(screen.queryByText('Auth Provider')).toBeNull()
+    expect(screen.queryByText('Audit Log')).toBeNull()
+  })
+
+  test('header-toggler-hides-sidebar', async () => {
+    const user = userEvent.setup()
+    renderShell('user')
+    await screen.findByRole('link', { name: 'Cluster Details' })
+    const sidebar = document.querySelector('.sidebar')
+    expect(sidebar?.className).not.toContain('hide')
+    await user.click(screen.getByRole('button', { name: 'Toggle sidebar' }))
+    expect(document.querySelector('.sidebar')?.className).toContain('hide')
+  })
+
+  test('header-toggler-restores-sidebar', async () => {
+    const user = userEvent.setup()
+    renderShell('user')
+    await screen.findByRole('link', { name: 'Cluster Details' })
+    await user.click(screen.getByRole('button', { name: 'Toggle sidebar' }))
+    await user.click(screen.getByRole('button', { name: 'Toggle sidebar' }))
+    expect(document.querySelector('.sidebar')?.className).not.toContain('hide')
+  })
+
+  test('folding-the-sidebar-does-not-hide-it', async () => {
+    const user = userEvent.setup()
+    renderShell('user')
+    await screen.findByRole('link', { name: 'Cluster Details' })
+    await user.click(screen.getByRole('button', { name: 'Fold sidebar' }))
+    const sidebar = document.querySelector('.sidebar')
+    expect(sidebar?.className).not.toContain('hide')
+    expect(sidebar?.className).toContain('sidebar-narrow-unfoldable')
   })
 })
