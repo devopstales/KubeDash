@@ -69,7 +69,7 @@ are kept, with `In force: no`. Never delete a row; flip it instead (IRON RULE).
 | ADR-0010 | Informer-based in-memory cache | yes | `artifacts/04-adr-0010-informer-cache.md` |
 | ADR-0011 | kubectl credential plugin with server-managed SSO config | yes | `artifacts/04-adr-0011-kubectl-credential-plugin.md` |
 | ADR-0012 | Aggregated API server for Project + SSOUser + SSOGroup | yes | `artifacts/04-adr-0012-aggregated-api.md` |
-| ADR-0013 | Permission management: role templates + self-service kubeconfig + drift detection | yes | `artifacts/04-adr-0013-permission-management.md` |
+| ADR-0013 | Permission management: role templates + self-service kubeconfig + drift detection (core implemented: templates, bind/unbind, self-service kubeconfig; drift detection not in this change) | yes | `artifacts/04-adr-0013-permission-management.md` |
 | ADR-0014 | Session revocation propagation (web logout kills kubectl session) | yes | `artifacts/04-adr-0014-session-revocation-propagation.md` |
 | ADR-0015 | Namespace-as-a-Service (self-service onboarding + TTL'd grants) | yes | `artifacts/04-adr-0015-namespace-as-a-service.md` |
 | ADR-0016 | Privileged Access Management (additive elevation + auto-revert + break-glass) | yes | `artifacts/04-adr-0016-privileged-access-management.md` |
