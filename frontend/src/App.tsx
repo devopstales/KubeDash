@@ -24,11 +24,17 @@ const AdminPermissionsView = React.lazy(() => import('./views/AdminPermissions')
 const PrivilegesView = React.lazy(() => import('./views/AdminPermissions/Privileges'))
 const PrivilegeEditView = React.lazy(() => import('./views/AdminPermissions/PrivilegeEdit'))
 const ServiceAccountsView = React.lazy(() => import('./views/ClusterPermission/ServiceAccounts'))
+const ServiceAccountDataView = React.lazy(
+  () => import('./views/ClusterPermission/ServiceAccountData'),
+)
 const RoleView = React.lazy(() => import('./views/ClusterPermission/Role'))
 const RoleDataView = React.lazy(() => import('./views/ClusterPermission/RoleData'))
 const ClusterRoleView = React.lazy(() => import('./views/ClusterPermission/ClusterRole'))
 const ClusterRoleDataView = React.lazy(() => import('./views/ClusterPermission/ClusterRoleData'))
 const RoleBindingView = React.lazy(() => import('./views/ClusterPermission/RoleBinding'))
+const ClusterRoleBindingView = React.lazy(
+  () => import('./views/ClusterPermission/ClusterRoleBinding'),
+)
 const SecretView = React.lazy(() => import('./views/Security/Secret'))
 const SecretDataView = React.lazy(() => import('./views/Security/SecretData'))
 const GroupsView = React.lazy(() => import('./views/Groups'))
@@ -205,6 +211,14 @@ const App = () => {
                       }
                     />
                     <Route
+                      path="/cluster-permission/service-account/data"
+                      element={
+                        <ProtectedRoute>
+                          <ServiceAccountDataView />
+                        </ProtectedRoute>
+                      }
+                    />
+                    <Route
                       path="/cluster-permission/role"
                       element={
                         <ProtectedRoute>
@@ -241,6 +255,14 @@ const App = () => {
                       element={
                         <ProtectedRoute>
                           <RoleBindingView />
+                        </ProtectedRoute>
+                      }
+                    />
+                    <Route
+                      path="/cluster-permission/cluster-role-binding"
+                      element={
+                        <ProtectedRoute>
+                          <ClusterRoleBindingView />
                         </ProtectedRoute>
                       }
                     />

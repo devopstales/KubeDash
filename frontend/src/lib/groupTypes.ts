@@ -5,7 +5,7 @@ export interface GroupRow {
   id: number
   name: string
   display_name: string
-  source: 'oidc' | 'manual'
+  source: 'oidc' | 'local'
   member_count: number
   created_at: string
 }

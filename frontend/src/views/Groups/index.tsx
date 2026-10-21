@@ -30,6 +30,12 @@ import TopMenu from '../../components/TopMenu'
  * privileges page and an action button to the privilege editor. Add Group
  * and Sync (materialize memberships from OIDC claims) in the header.
  */
+const typeLabel = (source: string) => {
+  if (source === 'oidc') return 'OpenID'
+  if (source === 'local') return 'Local'
+  return source
+}
+
 const GroupsList = () => {
   const queryClient = useQueryClient()
   const [creating, setCreating] = useState(false)
@@ -143,8 +149,8 @@ const GroupsList = () => {
                   </Link>
                 )}
               </Column>
-              <Column title="Source" data="source">
-                {(value: string) => (value === 'oidc' ? 'SSO' : 'Manual')}
+              <Column title="Type" data="source">
+                {(value: string) => typeLabel(value)}
               </Column>
               <Column title="Members" data="member_count">
                 {(count: number) => String(count)}
@@ -198,7 +204,7 @@ const GroupsList = () => {
                   onChange={(e) => setName(e.target.value)}
                 />
                 <div className="small text-muted mt-1">
-                  Created as a manual group — SSO users never join it automatically.
+                  Created as a local group — OpenID users never join it automatically.
                 </div>
               </div>
               {error && <div className="text-danger">{error}</div>}
