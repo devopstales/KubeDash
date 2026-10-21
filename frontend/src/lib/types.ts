@@ -71,6 +71,7 @@ export interface K8sNamespace {
   metadata?: {
     name?: string
     creation_timestamp?: string | null
+    labels?: Record<string, string> | null
     annotations?: Record<string, string> | null
   }
   status?: {

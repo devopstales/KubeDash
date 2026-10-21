@@ -1,4 +1,5 @@
 import React, { useState } from 'react'
+import { Link } from 'react-router-dom'
 import {
   CBadge,
   CBreadcrumb,
@@ -17,6 +18,8 @@ import {
   CModalHeader,
   CModalTitle,
 } from '@coreui/react'
+import CIcon from '@coreui/icons-react'
+import { cilPlus, cilTrash } from '@coreui/icons'
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import KubeDataTable, { Column } from '../../components/KubeDataTable'
 import TopMenu from '../../components/TopMenu'
@@ -125,6 +128,10 @@ const NamespacesView = () => {
   }
 
   const rows = (query.data ?? []).map(toRow)
+  const nameLink = (namespace: string) =>
+    namespace ? (
+      <Link to={`/cluster/namespace/data?name=${encodeURIComponent(namespace)}`}>{namespace}</Link>
+    ) : null
   const externalLink = (label: string) => (url: string | null) =>
     url ? (
       <a href={url} target="_blank" rel="noreferrer">
@@ -143,8 +150,15 @@ const NamespacesView = () => {
             <CBreadcrumbItem active>Namespaces</CBreadcrumbItem>
           </CBreadcrumb>
           {role === 'admin' ? (
-            <CButton color="primary" onClick={() => setModalOpen(true)}>
-              Add Namespace
+            <CButton
+              color="link"
+              className="header-toggler ms-auto"
+              type="button"
+              aria-label="Add Namespace"
+              title="Add Namespace"
+              onClick={() => setModalOpen(true)}
+            >
+              <CIcon icon={cilPlus} size="lg" />
             </CButton>
           ) : null}
         </TopMenu>
@@ -167,7 +181,9 @@ const NamespacesView = () => {
                   <CBadge color={status === 'Active' ? 'success' : 'secondary'}>{status}</CBadge>
                 )}
               </Column>
-              <Column title="Namespace" data="name" />
+              <Column title="Namespace" data="name">
+                {nameLink}
+              </Column>
               <Column title="Repository" data="repository">
                 {externalLink('Repository')}
               </Column>
@@ -181,10 +197,12 @@ const NamespacesView = () => {
                     <CButton
                       color="danger"
                       size="sm"
+                      type="button"
                       aria-label={`Delete ${row.name}`}
+                      title="Delete"
                       onClick={() => remove(row.name)}
                     >
-                      Delete
+                      <CIcon icon={cilTrash} />
                     </CButton>
                   ) : null
                 }

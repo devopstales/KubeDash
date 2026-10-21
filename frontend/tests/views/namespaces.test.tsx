@@ -59,6 +59,7 @@ const ITEMS = [
     metadata: {
       name: 'team-a',
       creation_timestamp: '2026-10-20T10:00:00Z',
+      labels: { team: 'platform' },
       annotations: {
         'kubedash.io/repository': 'https://git.example/team-a',
         'kubedash.io/pipeline': 'javascript:alert(1)',
@@ -142,8 +143,10 @@ test('admin-creates-a-namespace-and-refreshes-the-shared-query', async () => {
     }),
   )
   renderNamespaces('admin')
-  await user.click(await screen.findByRole('button', { name: /add namespace/i }))
-  await user.type(screen.getByLabelText(/^namespace$/i), 'team-b')
+  expect(await screen.findByText('team-a')).toBeTruthy()
+  await user.click(screen.getByRole('button', { name: /add namespace/i }))
+  await user.click(screen.getByLabelText(/^namespace$/i))
+  await user.paste('team-b')
   const addButtons = screen.getAllByRole('button', { name: /^add namespace$/i })
   await user.click(addButtons[addButtons.length - 1])
   await waitFor(() => expect(posted).toHaveBeenCalledWith({ name: 'team-b' }))
@@ -184,8 +187,10 @@ test('mutation-error-renders-inline', async () => {
     ),
   )
   renderNamespaces('admin')
-  await user.click(await screen.findByRole('button', { name: /add namespace/i }))
-  await user.type(screen.getByLabelText(/^namespace$/i), 'team-a')
+  expect(await screen.findByText('team-a')).toBeTruthy()
+  await user.click(screen.getByRole('button', { name: /add namespace/i }))
+  await user.click(screen.getByLabelText(/^namespace$/i))
+  await user.paste('team-a')
   const addButtons = screen.getAllByRole('button', { name: /^add namespace$/i })
   await user.click(addButtons[addButtons.length - 1])
   expect(await screen.findByText(/namespace already exists/i)).toBeTruthy()
@@ -201,6 +206,16 @@ test('list-error-renders-inline', async () => {
     ),
   ])
   expect(await screen.findByText(/list denied/i, { selector: '.text-danger' })).toBeTruthy()
+})
+
+test('namespace-names-link-to-the-object-page', async () => {
+  renderNamespaces('user')
+  expect((await screen.findByRole('link', { name: 'team-a' })).getAttribute('href')).toBe(
+    '/cluster/namespace/data?name=team-a',
+  )
+  expect(screen.getByRole('link', { name: 'default' }).getAttribute('href')).toBe(
+    '/cluster/namespace/data?name=default',
+  )
 })
 
 test('empty-list-renders-without-the-table', async () => {
