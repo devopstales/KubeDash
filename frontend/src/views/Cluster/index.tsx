@@ -1,15 +1,7 @@
 import React, { useEffect } from 'react'
 import { useParams, useNavigate } from 'react-router-dom'
 import { useQuery } from '@tanstack/react-query'
-import {
-  CCard,
-  CCardBody,
-  CCardHeader,
-  CCardTitle,
-  CCol,
-  CRow,
-  CTable,
-} from '@coreui/react'
+import { CCard, CCardBody, CCardHeader, CCardTitle, CCol, CRow, CTable } from '@coreui/react'
 import { useClusterStore } from '../../store/cluster'
 import { useCluster } from '../../hooks/useCluster'
 import { apiFetch } from '../../lib/api'
@@ -28,10 +20,7 @@ const ClusterView = () => {
   const paramId = id ? Number(id) : null
   // Cross-reference the URL param against the bound clusters. A stale
   // param from a prior session redirects to the current selection.
-  const isStale =
-    paramId != null &&
-    clusters.length > 0 &&
-    !clusters.some((c) => c.id === paramId)
+  const isStale = paramId != null && clusters.length > 0 && !clusters.some((c) => c.id === paramId)
 
   useEffect(() => {
     if (isStale && selectedCluster) {
@@ -39,7 +28,7 @@ const ClusterView = () => {
     }
   }, [isStale, selectedCluster, navigate])
 
-  const clusterId = isStale ? selectedCluster?.id : paramId ?? selectedCluster?.id
+  const clusterId = isStale ? selectedCluster?.id : (paramId ?? selectedCluster?.id)
 
   const clusterQuery = useQuery<Cluster>({
     queryKey: ['cluster', clusterId],
@@ -105,7 +94,7 @@ const ClusterView = () => {
                         ? 'Checking…'
                         : healthQuery.error
                           ? healthQuery.error.message
-                          : healthQuery.data?.status ?? 'unknown'}
+                          : (healthQuery.data?.status ?? 'unknown')}
                     </td>
                   </tr>
                   <tr>

@@ -12,7 +12,13 @@ describe('ClustersView', () => {
       http.get('*/api/v1/clusters', () =>
         HttpResponse.json({
           items: [
-            { id: 1, name: 'prod', api_server: 'https://prod.example', context: 'prod-ctx', status: 'up' },
+            {
+              id: 1,
+              name: 'prod',
+              api_server: 'https://prod.example',
+              context: 'prod-ctx',
+              status: 'up',
+            },
           ],
         }),
       ),

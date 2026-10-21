@@ -19,7 +19,11 @@ vi.mock('../../src/components/KubeDataTable', () => {
   }) {
     const cols = React.Children.toArray(children)
       .filter(React.isValidElement)
-      .map((child) => (child as React.ReactElement<{ title: string; data?: string | null; children?: unknown }>).props)
+      .map(
+        (child) =>
+          (child as React.ReactElement<{ title: string; data?: string | null; children?: unknown }>)
+            .props,
+      )
     return (
       <table className="table table-bordered">
         <thead>
@@ -36,7 +40,11 @@ vi.mock('../../src/components/KubeDataTable', () => {
                 const value = col.data == null ? row : row[col.data]
                 const node =
                   typeof col.children === 'function'
-                    ? (col.children as (v: unknown, t: string, r: unknown) => React.ReactNode)(value, 'display', row)
+                    ? (col.children as (v: unknown, t: string, r: unknown) => React.ReactNode)(
+                        value,
+                        'display',
+                        row,
+                      )
                     : (value as React.ReactNode)
                 return <td key={col.title}>{node ?? ''}</td>
               })}
@@ -58,17 +66,15 @@ const makeDownloadSpy = () => {
     .spyOn(URL, 'createObjectURL')
     .mockImplementation(() => `blob:mock-${clicks.length + 1}`)
   const originalCreateElement = document.createElement.bind(document)
-  const createElement = vi.spyOn(document, 'createElement').mockImplementation(
-    (tag: string) => {
-      const el = originalCreateElement(tag)
-      if (tag.toLowerCase() === 'a') {
-        ;(el as HTMLAnchorElement).click = () => {
-          clicks.push((el as HTMLAnchorElement).download)
-        }
+  const createElement = vi.spyOn(document, 'createElement').mockImplementation((tag: string) => {
+    const el = originalCreateElement(tag)
+    if (tag.toLowerCase() === 'a') {
+      ;(el as HTMLAnchorElement).click = () => {
+        clicks.push((el as HTMLAnchorElement).download)
       }
-      return el
-    },
-  )
+    }
+    return el
+  })
   return {
     clicks,
     createObjectURL,
@@ -100,8 +106,18 @@ describe('PermissionsView', () => {
     server.use(
       http.get('*/api/v1/permissions/my-access', () =>
         HttpResponse.json([
-          { cluster: 'prod', namespace: 'team-a', template: 'developer', created_at: '2026-10-19T00:00:00Z' },
-          { cluster: 'staging', namespace: null, template: 'viewer', created_at: '2026-10-18T00:00:00Z' },
+          {
+            cluster: 'prod',
+            namespace: 'team-a',
+            template: 'developer',
+            created_at: '2026-10-19T00:00:00Z',
+          },
+          {
+            cluster: 'staging',
+            namespace: null,
+            template: 'viewer',
+            created_at: '2026-10-18T00:00:00Z',
+          },
         ]),
       ),
     )
@@ -118,17 +134,24 @@ describe('PermissionsView', () => {
     server.use(
       http.get('*/api/v1/permissions/my-access', () =>
         HttpResponse.json([
-          { cluster: 'prod', namespace: 'team-a', template: 'developer', created_at: '2026-10-19T00:00:00Z' },
+          {
+            cluster: 'prod',
+            namespace: 'team-a',
+            template: 'developer',
+            created_at: '2026-10-19T00:00:00Z',
+          },
         ]),
       ),
-      http.get('*/api/v1/kubeconfig', () =>
-        new HttpResponse('apiVersion: v1\nkind: Config\n', {
-          status: 200,
-          headers: {
-            'Content-Type': 'application/yaml',
-            'Content-Disposition': 'attachment; filename="kubedash-kubeconfig.yaml"',
-          },
-        }),
+      http.get(
+        '*/api/v1/kubeconfig',
+        () =>
+          new HttpResponse('apiVersion: v1\nkind: Config\n', {
+            status: 200,
+            headers: {
+              'Content-Type': 'application/yaml',
+              'Content-Disposition': 'attachment; filename="kubedash-kubeconfig.yaml"',
+            },
+          }),
       ),
     )
     const dl = makeDownloadSpy()
@@ -143,9 +166,7 @@ describe('PermissionsView', () => {
   })
 
   test('my-access-shows-an-empty-state-for-no-bindings', async () => {
-    server.use(
-      http.get('*/api/v1/permissions/my-access', () => HttpResponse.json([])),
-    )
+    server.use(http.get('*/api/v1/permissions/my-access', () => HttpResponse.json([])))
     renderView()
     expect(await screen.findByText(/no cluster access yet/i)).toBeTruthy()
     expect(document.querySelector('table')).toBeNull()
@@ -158,7 +179,10 @@ describe('PermissionsView', () => {
     server.use(
       http.get('*/api/v1/permissions/my-access', () => HttpResponse.json([])),
       http.get('*/api/v1/kubeconfig', () =>
-        HttpResponse.json({ error: { code: 'NO_BINDINGS', message: 'No cluster access yet' } }, { status: 404 }),
+        HttpResponse.json(
+          { error: { code: 'NO_BINDINGS', message: 'No cluster access yet' } },
+          { status: 404 },
+        ),
       ),
     )
     const dl = makeDownloadSpy()
@@ -167,7 +191,9 @@ describe('PermissionsView', () => {
     renderView()
     const button = await screen.findByRole('button', { name: /download kubeconfig/i })
     await user.click(button)
-    expect(await screen.findByText(/no cluster access yet/i, { selector: '.text-danger' })).toBeTruthy()
+    expect(
+      await screen.findByText(/no cluster access yet/i, { selector: '.text-danger' }),
+    ).toBeTruthy()
     // the 404 body must NOT have been saved as a file
     expect(dl.createObjectURL).not.toHaveBeenCalled()
     dl.cleanup()

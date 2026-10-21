@@ -48,7 +48,10 @@ async function refreshOnce(): Promise<string> {
   return inFlightRefresh
 }
 
-export async function apiFetch<T = unknown>(path: string, init: RequestInit = {}): Promise<ApiResult<T>> {
+export async function apiFetch<T = unknown>(
+  path: string,
+  init: RequestInit = {},
+): Promise<ApiResult<T>> {
   const doFetch = (token: string | null) =>
     fetch(`${API_BASE}${path}`, {
       ...init,

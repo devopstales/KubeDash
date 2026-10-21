@@ -43,7 +43,7 @@ const GroupPrivilegesView = () => {
     queryKey: ['admin', 'groups', group, 'privileges'],
     queryFn: async () => {
       const r = await apiFetch<GroupBinding[]>(
-        `/api/v1/admin/groups/${encodeURIComponent(group)}/privileges`
+        `/api/v1/admin/groups/${encodeURIComponent(group)}/privileges`,
       )
       if (r.error) throw new Error(`${r.error.code}: ${r.error.message}`)
       return r.data ?? []
@@ -52,18 +52,15 @@ const GroupPrivilegesView = () => {
   })
 
   const bindings = (bindingsQuery.data ?? []).filter(
-    (b) => !selected || b.cluster === selected.name
+    (b) => !selected || b.cluster === selected.name,
   )
 
   const unbind = async (b: GroupBinding) => {
-    const r = await apiFetch(
-      `/api/v1/admin/groups/${encodeURIComponent(group)}/privileges`,
-      {
-        method: 'DELETE',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ cluster: b.cluster, namespace: b.namespace, template: b.template }),
-      }
-    )
+    const r = await apiFetch(`/api/v1/admin/groups/${encodeURIComponent(group)}/privileges`, {
+      method: 'DELETE',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ cluster: b.cluster, namespace: b.namespace, template: b.template }),
+    })
     if (r.error) {
       setError(`${r.error.code}: ${r.error.message}`)
       return
@@ -109,7 +106,9 @@ const GroupPrivilegesView = () => {
           <div>Loading members…</div>
         ) : detailQuery.error ? (
           <div className="text-danger">
-            {detailQuery.error instanceof Error ? detailQuery.error.message : 'Failed to load group'}
+            {detailQuery.error instanceof Error
+              ? detailQuery.error.message
+              : 'Failed to load group'}
           </div>
         ) : members.length === 0 ? (
           <div className="text-muted">No members found</div>
@@ -122,7 +121,9 @@ const GroupPrivilegesView = () => {
               {(value: string | null) => value ?? '\u2014'}
             </Column>
             <Column title="Type" data="auth_source">
-              {(value: string) => (value === 'oidc' ? 'OpenID' : value === 'local' ? 'Local' : value)}
+              {(value: string) =>
+                value === 'oidc' ? 'OpenID' : value === 'local' ? 'Local' : value
+              }
             </Column>
           </KubeDataTable>
         )}
@@ -137,7 +138,9 @@ const GroupPrivilegesView = () => {
               : 'Failed to load role bindings'}
           </div>
         ) : bindings.length === 0 ? (
-          <div className="text-muted">No role bindings found on {selected?.name ?? 'this cluster'}</div>
+          <div className="text-muted">
+            No role bindings found on {selected?.name ?? 'this cluster'}
+          </div>
         ) : (
           <KubeDataTable data={bindings}>
             <Column title="Namespace" data="namespace">
@@ -153,12 +156,7 @@ const GroupPrivilegesView = () => {
             </Column>
             <Column title="Action" data={null}>
               {(_data: unknown, _type: string, row: GroupBinding) => (
-                <CButton
-                  color="danger"
-                  size="sm"
-                  type="button"
-                  onClick={() => unbind(row)}
-                >
+                <CButton color="danger" size="sm" type="button" onClick={() => unbind(row)}>
                   Unbind
                 </CButton>
               )}

@@ -24,7 +24,11 @@ vi.mock('../../src/components/KubeDataTable', () => {
   }) {
     const cols = React.Children.toArray(children)
       .filter(React.isValidElement)
-      .map((child) => (child as React.ReactElement<{ title: string; data?: string | null; children?: unknown }>).props)
+      .map(
+        (child) =>
+          (child as React.ReactElement<{ title: string; data?: string | null; children?: unknown }>)
+            .props,
+      )
     return (
       <table className="table table-bordered">
         <thead>
@@ -41,7 +45,11 @@ vi.mock('../../src/components/KubeDataTable', () => {
                 const value = col.data == null ? row : row[col.data]
                 const node =
                   typeof col.children === 'function'
-                    ? (col.children as (v: unknown, t: string, r: unknown) => React.ReactNode)(value, 'display', col.data == null ? value : row)
+                    ? (col.children as (v: unknown, t: string, r: unknown) => React.ReactNode)(
+                        value,
+                        'display',
+                        col.data == null ? value : row,
+                      )
                     : (value as React.ReactNode)
                 return <td key={col.title}>{node ?? ''}</td>
               })}
@@ -58,8 +66,22 @@ vi.mock('../../src/components/KubeDataTable', () => {
 // the non-admin redirect test swaps it via server.use.
 
 const CLUSTERS = [
-  { id: 1, name: 'prod', api_server: 'https://api.prod', context: 'kubedash-prod', status: 'ok', source: 'registry' },
-  { id: 2, name: 'staging', api_server: 'https://api.stg', context: 'kubedash-staging', status: 'ok', source: 'registry' },
+  {
+    id: 1,
+    name: 'prod',
+    api_server: 'https://api.prod',
+    context: 'kubedash-prod',
+    status: 'ok',
+    source: 'registry',
+  },
+  {
+    id: 2,
+    name: 'staging',
+    api_server: 'https://api.stg',
+    context: 'kubedash-staging',
+    status: 'ok',
+    source: 'registry',
+  },
 ]
 
 const TEMPLATES: import('../../src/lib/types').RBACTemplate[] = [
@@ -307,9 +329,7 @@ describe('AdminPermissionsView', () => {
     expect(screen.getByLabelText(/^name:$/i)).toHaveProperty('readOnly', true)
     await user.selectOptions(screen.getByLabelText(/dashboard role/i), 'admin')
     await user.click(screen.getByRole('button', { name: /save changes/i }))
-    await waitFor(() =>
-      expect(patched).toEqual({ id: '2', body: { role: 'admin' } }),
-    )
+    await waitFor(() => expect(patched).toEqual({ id: '2', body: { role: 'admin' } }))
   })
 
   test('delete-removes-a-user-row', async () => {
@@ -346,9 +366,16 @@ describe('AdminPermissionsView', () => {
     await user.selectOptions(templateSelect, 'viewer')
     await user.type(screen.getByLabelText(/^namespaces$/i), 'team-a')
     await user.click(screen.getByRole('button', { name: /^save$/i }))
-    await waitFor(() => expect(bindSpy).toHaveBeenCalledWith(
-      expect.objectContaining({ user: 'oidc-alice', cluster: 'prod', namespace: 'team-a', template: 'viewer' }),
-    ))
+    await waitFor(() =>
+      expect(bindSpy).toHaveBeenCalledWith(
+        expect.objectContaining({
+          user: 'oidc-alice',
+          cluster: 'prod',
+          namespace: 'team-a',
+          template: 'viewer',
+        }),
+      ),
+    )
     await waitFor(() =>
       expect(screen.getByTestId('path').textContent).toBe('/user/privilege?user=oidc-alice'),
     )
@@ -375,7 +402,12 @@ describe('AdminPermissionsView', () => {
     server.use(
       http.get('*/api/v1/permissions/my-access', () =>
         HttpResponse.json([
-          { cluster: 'prod', namespace: 'team-a', template: 'viewer', created_at: '2026-10-19T00:00:00Z' },
+          {
+            cluster: 'prod',
+            namespace: 'team-a',
+            template: 'viewer',
+            created_at: '2026-10-19T00:00:00Z',
+          },
         ]),
       ),
       http.delete('*/api/v1/admin/permissions/bind', async ({ request }) => {
@@ -386,9 +418,11 @@ describe('AdminPermissionsView', () => {
     renderPrivileges('u1')
     const button = await screen.findByRole('button', { name: /unbind/i })
     await user.click(button)
-    await waitFor(() => expect(unbindSpy).toHaveBeenCalledWith(
-      expect.objectContaining({ user: 'u1', cluster: 'prod', namespace: 'team-a' }),
-    ))
+    await waitFor(() =>
+      expect(unbindSpy).toHaveBeenCalledWith(
+        expect.objectContaining({ user: 'u1', cluster: 'prod', namespace: 'team-a' }),
+      ),
+    )
   })
 
   test('bind-409-surfaced-as-message-without-unhandled-rejection', async () => {
@@ -435,11 +469,16 @@ describe('AdminPermissionsView', () => {
   test('users-list-403-surfaced-as-text-danger', async () => {
     server.use(
       http.get('*/api/v1/admin/users', () =>
-        HttpResponse.json({ error: { code: 'RBAC_DENIED', message: 'admin role required' } }, { status: 403 }),
+        HttpResponse.json(
+          { error: { code: 'RBAC_DENIED', message: 'admin role required' } },
+          { status: 403 },
+        ),
       ),
     )
     renderAdmin()
-    expect(await screen.findByText(/admin role required/i, { selector: '.text-danger' })).toBeTruthy()
+    expect(
+      await screen.findByText(/admin role required/i, { selector: '.text-danger' }),
+    ).toBeTruthy()
   })
 
   test('templates-page-lists-templates', async () => {
@@ -496,20 +535,17 @@ describe('TemplateEditor', () => {
         client={new QueryClient({ defaultOptions: { queries: { retry: false } } })}
       >
         <MemoryRouter>
-          <TemplateEditor
-            existingNames={['viewer', 'cluster-admin']}
-            onCreated={() => {}}
-          />
+          <TemplateEditor existingNames={['viewer', 'cluster-admin']} onCreated={() => {}} />
         </MemoryRouter>
       </QueryClientProvider>,
     )
     // start with one empty rule row: type resources + verbs
-    const resources = screen.getAllByRole('textbox').find((el) =>
-      (el as HTMLInputElement).placeholder === 'pods, pods/log',
-    ) as HTMLInputElement
-    const verbs = screen.getAllByRole('textbox').find((el) =>
-      (el as HTMLInputElement).placeholder === 'get,list,watch',
-    ) as HTMLInputElement
+    const resources = screen
+      .getAllByRole('textbox')
+      .find((el) => (el as HTMLInputElement).placeholder === 'pods, pods/log') as HTMLInputElement
+    const verbs = screen
+      .getAllByRole('textbox')
+      .find((el) => (el as HTMLInputElement).placeholder === 'get,list,watch') as HTMLInputElement
     await user.type(resources, 'deployments')
     await user.type(verbs, 'getlist')
     // the <pre> preview renders the rule (single verb, no comma needed)
@@ -534,7 +570,16 @@ describe('TemplateEditor', () => {
       http.post('*/api/v1/admin/permissions/templates', async ({ request }) => {
         posted = await request.json()
         return HttpResponse.json(
-          { id: 9, name: 'pod-reader', description: '', scope: 'namespace', rules: [], builtin: false, created_by: 'u1', created_at: '2026-10-19T00:00:00Z' },
+          {
+            id: 9,
+            name: 'pod-reader',
+            description: '',
+            scope: 'namespace',
+            rules: [],
+            builtin: false,
+            created_by: 'u1',
+            created_at: '2026-10-19T00:00:00Z',
+          },
           { status: 201 },
         )
       }),
@@ -544,31 +589,30 @@ describe('TemplateEditor', () => {
         client={new QueryClient({ defaultOptions: { queries: { retry: false } } })}
       >
         <MemoryRouter>
-          <TemplateEditor
-            existingNames={['viewer', 'cluster-admin']}
-            onCreated={() => {}}
-          />
+          <TemplateEditor existingNames={['viewer', 'cluster-admin']} onCreated={() => {}} />
         </MemoryRouter>
       </QueryClientProvider>,
     )
     const nameInput = screen.getByLabelText(/^name$/i)
     await user.type(nameInput, 'pod-reader')
-    const resources = screen.getAllByRole('textbox').find((el) =>
-      (el as HTMLInputElement).placeholder === 'pods, pods/log',
-    ) as HTMLInputElement
-    const verbs = screen.getAllByRole('textbox').find((el) =>
-      (el as HTMLInputElement).placeholder === 'get,list,watch',
-    ) as HTMLInputElement
+    const resources = screen
+      .getAllByRole('textbox')
+      .find((el) => (el as HTMLInputElement).placeholder === 'pods, pods/log') as HTMLInputElement
+    const verbs = screen
+      .getAllByRole('textbox')
+      .find((el) => (el as HTMLInputElement).placeholder === 'get,list,watch') as HTMLInputElement
     await user.type(resources, 'pods')
     await user.type(verbs, 'get')
     await user.click(screen.getByRole('button', { name: /create/i }))
-    await waitFor(() => expect(posted).toEqual(
-      expect.objectContaining({
-        name: 'pod-reader',
-        scope: 'namespace',
-        rules: [{ api_groups: [''], resources: ['pods'], verbs: ['get'] }],
-      }),
-    ))
+    await waitFor(() =>
+      expect(posted).toEqual(
+        expect.objectContaining({
+          name: 'pod-reader',
+          scope: 'namespace',
+          rules: [{ api_groups: [''], resources: ['pods'], verbs: ['get'] }],
+        }),
+      ),
+    )
   })
 
   test('delete-sends-deletes-the-template', async () => {
@@ -580,19 +624,14 @@ describe('TemplateEditor', () => {
         return HttpResponse.json({})
       }),
       // the editor fetches the list from the API (same queryKey as the view)
-      http.get('*/api/v1/admin/permissions/templates', () =>
-        HttpResponse.json([TEMPLATES[2]]),
-      ),
+      http.get('*/api/v1/admin/permissions/templates', () => HttpResponse.json([TEMPLATES[2]])),
     )
     render(
       <QueryClientProvider
         client={new QueryClient({ defaultOptions: { queries: { retry: false } } })}
       >
         <MemoryRouter>
-          <TemplateEditor
-            existingNames={['viewer', 'cluster-admin']}
-            onCreated={() => {}}
-          />
+          <TemplateEditor existingNames={['viewer', 'cluster-admin']} onCreated={() => {}} />
         </MemoryRouter>
       </QueryClientProvider>,
     )
@@ -603,12 +642,15 @@ describe('TemplateEditor', () => {
 
   test('builtin-template-delete-refusal-surfaced-as-message', async () => {
     server.use(
-      http.get('*/api/v1/admin/permissions/templates', () =>
-        HttpResponse.json([TEMPLATES[0]]),
-      ),
+      http.get('*/api/v1/admin/permissions/templates', () => HttpResponse.json([TEMPLATES[0]])),
       http.delete('*/api/v1/admin/permissions/templates/:name', () =>
         HttpResponse.json(
-          { error: { code: 'BUILTIN_TEMPLATE_PROTECTED', message: 'builtin templates cannot be deleted' } },
+          {
+            error: {
+              code: 'BUILTIN_TEMPLATE_PROTECTED',
+              message: 'builtin templates cannot be deleted',
+            },
+          },
           { status: 409 },
         ),
       ),
@@ -618,10 +660,7 @@ describe('TemplateEditor', () => {
         client={new QueryClient({ defaultOptions: { queries: { retry: false } } })}
       >
         <MemoryRouter>
-          <TemplateEditor
-            existingNames={['viewer', 'cluster-admin']}
-            onCreated={() => {}}
-          />
+          <TemplateEditor existingNames={['viewer', 'cluster-admin']} onCreated={() => {}} />
         </MemoryRouter>
       </QueryClientProvider>,
     )

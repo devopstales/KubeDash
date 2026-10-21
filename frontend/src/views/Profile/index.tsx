@@ -37,7 +37,9 @@ const ProfileView = () => {
   const lastLogin = me.last_login_at ? new Date(me.last_login_at) : null
   const lastLoginText =
     lastLogin && !Number.isNaN(lastLogin.getTime())
-      ? new Intl.DateTimeFormat(undefined, { dateStyle: 'medium', timeStyle: 'medium' }).format(lastLogin)
+      ? new Intl.DateTimeFormat(undefined, { dateStyle: 'medium', timeStyle: 'medium' }).format(
+          lastLogin,
+        )
       : null
 
   return (

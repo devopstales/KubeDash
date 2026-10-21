@@ -12,7 +12,8 @@ import {
   CFormLabel,
   CFormSelect,
 } from '@coreui/react'
-import { useNavigate, useQuery } from '@tanstack/react-query'
+import { useNavigate } from 'react-router-dom'
+import { useQuery } from '@tanstack/react-query'
 import { apiFetch } from '../../lib/api'
 import type { RBACTemplate } from '../../lib/types'
 import { useClusterStore } from '../../store/cluster'
@@ -53,18 +54,15 @@ const GroupPrivilegeEditView = () => {
   const [error, setError] = useState<string | null>(null)
 
   const bind = async (template: string, namespace?: string) => {
-    const r = await apiFetch(
-      `/api/v1/admin/groups/${encodeURIComponent(group)}/privileges`,
-      {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          cluster: selected?.name,
-          template,
-          ...(namespace ? { namespace } : {}),
-        }),
-      }
-    )
+    const r = await apiFetch(`/api/v1/admin/groups/${encodeURIComponent(group)}/privileges`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        cluster: selected?.name,
+        template,
+        ...(namespace ? { namespace } : {}),
+      }),
+    })
     if (r.error) throw new Error(`${r.error.code}: ${r.error.message}`)
   }
 
@@ -80,7 +78,10 @@ const GroupPrivilegeEditView = () => {
       if (clusterTemplate) await bind(clusterTemplate)
       for (const row of rows) {
         if (!row.template) continue
-        const names = row.namespaces.split(',').map((s) => s.trim()).filter(Boolean)
+        const names = row.namespaces
+          .split(',')
+          .map((s) => s.trim())
+          .filter(Boolean)
         if (names.length === 0) {
           setError('A namespaced template needs at least one namespace')
           return
@@ -106,7 +107,9 @@ const GroupPrivilegeEditView = () => {
           <CBreadcrumbItem>
             <Link to="/user/group">Groups</Link>
           </CBreadcrumbItem>
-          <CBreadcrumbItem active>{group ? `Edit privileges — ${group}` : 'Edit privileges'}</CBreadcrumbItem>
+          <CBreadcrumbItem active>
+            {group ? `Edit privileges — ${group}` : 'Edit privileges'}
+          </CBreadcrumbItem>
         </CBreadcrumb>
       </TopMenu>
       <CCardHeader className="py-3">

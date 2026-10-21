@@ -1,6 +1,13 @@
 import React from 'react'
 import { Link, useSearchParams } from 'react-router-dom'
-import { CBreadcrumb, CBreadcrumbItem, CCard, CCardBody, CCardHeader, CCardTitle } from '@coreui/react'
+import {
+  CBreadcrumb,
+  CBreadcrumbItem,
+  CCard,
+  CCardBody,
+  CCardHeader,
+  CCardTitle,
+} from '@coreui/react'
 import { useQuery } from '@tanstack/react-query'
 import { apiFetch } from '../../lib/api'
 import type { K8sRole, PolicyRule, ResourceList } from '../../lib/types'

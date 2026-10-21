@@ -126,7 +126,9 @@ const GroupsList = () => {
             <div>Loading groups…</div>
           ) : groupsQuery.error ? (
             <div className="text-danger">
-              {groupsQuery.error instanceof Error ? groupsQuery.error.message : 'Failed to load groups'}
+              {groupsQuery.error instanceof Error
+                ? groupsQuery.error.message
+                : 'Failed to load groups'}
             </div>
           ) : groups.length === 0 ? (
             <div className="text-center text-muted">
@@ -148,9 +150,7 @@ const GroupsList = () => {
                 {(count: number) => String(count)}
               </Column>
               <Column title="Created" data="created_at">
-                {(value: string | null) =>
-                  value ? new Date(value).toLocaleString() : '\u2014'
-                }
+                {(value: string | null) => (value ? new Date(value).toLocaleString() : '\u2014')}
               </Column>
               <Column title="Action" data={null}>
                 {(_data: unknown, _type: string, row: GroupRow) => (
@@ -167,7 +167,11 @@ const GroupsList = () => {
             </KubeDataTable>
           )}
           {syncMsg && (
-            <div className={syncMsg.startsWith('Sync failed') ? 'text-danger mt-3' : 'text-success mt-3'}>
+            <div
+              className={
+                syncMsg.startsWith('Sync failed') ? 'text-danger mt-3' : 'text-success mt-3'
+              }
+            >
               {syncMsg}
             </div>
           )}
@@ -175,7 +179,12 @@ const GroupsList = () => {
       </CCard>
 
       {creating && (
-        <CModal visible alignment="center" onClose={() => setCreating(false)} aria-labelledby="modalgroupLabel">
+        <CModal
+          visible
+          alignment="center"
+          onClose={() => setCreating(false)}
+          aria-labelledby="modalgroupLabel"
+        >
           <CModalHeader>
             <CModalTitle id="modalgroupLabel">Add Group</CModalTitle>
           </CModalHeader>

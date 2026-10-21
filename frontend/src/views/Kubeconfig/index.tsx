@@ -63,7 +63,15 @@ const Snippet = ({ children }: { children: string }) => (
   </pre>
 )
 
-const Section = ({ id, title, children }: { id: string; title: string; children: React.ReactNode }) => (
+const Section = ({
+  id,
+  title,
+  children,
+}: {
+  id: string
+  title: string
+  children: React.ReactNode
+}) => (
   <CCard className="mb-4 mx-3 mx-lg-5">
     <CCardHeader className="py-3">
       <h5 className="m-0 fw-bold text-primary" id={id} style={{ scrollMarginTop: '5rem' }}>
@@ -83,7 +91,9 @@ const KubeconfigView = () => {
 
   const name = me?.display_name || me?.email || me?.sub || ''
   const clusterName = selectedCluster?.name ?? clusters[0]?.name ?? ''
-  const clusterPhrase = clusterName ? `the ${clusterName} Kubernetes cluster` : 'the Kubernetes cluster'
+  const clusterPhrase = clusterName
+    ? `the ${clusterName} Kubernetes cluster`
+    : 'the Kubernetes cluster'
   const server = typeof window === 'undefined' ? '' : window.location.origin
 
   const onDownload = async () => {
@@ -160,8 +170,8 @@ $ kubectl get namespaces`
 
       <Section id="DownloadKubeconfig" title="Download Kubeconfig File">
         <p className="card-text">
-          If you didn&apos;t want to use the kubectl plugin, save this file as <code>~/.kube/config</code> to
-          enable OIDC based <code>kubectl</code> authentication.
+          If you didn&apos;t want to use the kubectl plugin, save this file as{' '}
+          <code>~/.kube/config</code> to enable OIDC based <code>kubectl</code> authentication.
         </p>
         <CButton color="primary" disabled={downloading} onClick={() => void onDownload()}>
           {downloading ? 'Downloading…' : 'Download Config File'}
@@ -183,15 +193,16 @@ $ kubectl get namespaces`
 
       <Section id="lAdvanced" title="Authenticate Manually">
         <p className="card-text">
-          If you want to maintain your existing <code>~/.kube/config</code> file you can run the following
-          commands to add your user to the file:
+          If you want to maintain your existing <code>~/.kube/config</code> file you can run the
+          following commands to add your user to the file:
         </p>
         <Snippet>{manual}</Snippet>
       </Section>
 
       <Section id="RunningKubectl" title="Running kubectl">
         <p className="card-text">
-          Once you get the <code>~/.kube/config</code> file you should be able to run <code>kubectl</code>:
+          Once you get the <code>~/.kube/config</code> file you should be able to run{' '}
+          <code>kubectl</code>:
         </p>
         <Snippet>{RUNNING}</Snippet>
       </Section>

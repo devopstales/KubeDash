@@ -70,7 +70,17 @@ const TemplateEditor: React.FC<TemplateEditorProps> = ({ existingNames, onCreate
 
   const setRuleCell = (i: number, field: keyof RoleRule, value: string) => {
     setRules((rs) =>
-      rs.map((r, j) => (j === i ? { ...r, [field]: value.split(',').map((s) => s.trim()).filter(Boolean) } : r)),
+      rs.map((r, j) =>
+        j === i
+          ? {
+              ...r,
+              [field]: value
+                .split(',')
+                .map((s) => s.trim())
+                .filter(Boolean),
+            }
+          : r,
+      ),
     )
   }
   const addRule = () => setRules((rs) => [...rs, EMPTY_RULE()])
@@ -119,7 +129,9 @@ const TemplateEditor: React.FC<TemplateEditorProps> = ({ existingNames, onCreate
         <div>Loading templates…</div>
       ) : templatesQuery.error ? (
         <div className="text-danger">
-          {templatesQuery.error instanceof Error ? templatesQuery.error.message : 'Failed to load templates'}
+          {templatesQuery.error instanceof Error
+            ? templatesQuery.error.message
+            : 'Failed to load templates'}
         </div>
       ) : (
         <KubeDataTable data={templates}>
@@ -136,7 +148,12 @@ const TemplateEditor: React.FC<TemplateEditorProps> = ({ existingNames, onCreate
           </Column>
           <Column title="Action" data={null}>
             {(_data: unknown, _type: string, row: RBACTemplate) => (
-              <CButton size="sm" color="danger" disabled={row.builtin || busy} onClick={() => del(row)}>
+              <CButton
+                size="sm"
+                color="danger"
+                disabled={row.builtin || busy}
+                onClick={() => del(row)}
+              >
                 Delete
               </CButton>
             )}
@@ -239,7 +256,13 @@ const TemplateEditor: React.FC<TemplateEditorProps> = ({ existingNames, onCreate
 /** Client-side Role/ClusterRole YAML render of the rule rows. */
 function renderRoleYaml(name: string, scope: 'namespace' | 'cluster', rules: RoleRule[]): string {
   const kind = scope === 'cluster' ? 'ClusterRole' : 'Role'
-  const lines: string[] = ['apiVersion: rbac.authorization.k8s.io/v1', `kind: ${kind}`, 'metadata:', `  name: ${name}`, 'rules:']
+  const lines: string[] = [
+    'apiVersion: rbac.authorization.k8s.io/v1',
+    `kind: ${kind}`,
+    'metadata:',
+    `  name: ${name}`,
+    'rules:',
+  ]
   if (rules.length === 0) {
     lines.push('  []')
     return lines.join('\n')

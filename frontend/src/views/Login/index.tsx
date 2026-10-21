@@ -55,7 +55,9 @@ const parkTokens = (token: string | null, refresh: string | null) => {
  * auto-bounce (window.location.assign to /api/v1/auth/login) is gone — it
  * 404'd at /authorize on a no-IdP install.
  */
-const LoginView = ({ initialTokens }: { initialTokens?: { token: string; refresh: string } | null } = {}) => {
+const LoginView = ({
+  initialTokens,
+}: { initialTokens?: { token: string; refresh: string } | null } = {}) => {
   const navigate = useNavigate()
   // jsdom's history API never updates location.search (jsdom 20.0.3, #3395),
   // so the effect reads the router's location instead: same values in prod
@@ -230,12 +232,7 @@ const LoginView = ({ initialTokens }: { initialTokens?: { token: string; refresh
                       </div>
                       <div className="row">
                         <div className="col-6">
-                          <CButton
-                            className="px-4"
-                            color="primary"
-                            type="submit"
-                            disabled={busy}
-                          >
+                          <CButton className="px-4" color="primary" type="submit" disabled={busy}>
                             {busy ? 'Signing in…' : 'Login'}
                           </CButton>
                         </div>

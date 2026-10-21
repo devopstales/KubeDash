@@ -203,7 +203,9 @@ const UserList = () => {
             <div>Loading users…</div>
           ) : usersQuery.error ? (
             <div className="text-danger">
-              {usersQuery.error instanceof Error ? usersQuery.error.message : 'Failed to load users'}
+              {usersQuery.error instanceof Error
+                ? usersQuery.error.message
+                : 'Failed to load users'}
             </div>
           ) : users.length === 0 ? (
             <div className="text-center text-muted">No users found</div>
@@ -311,7 +313,10 @@ const UserList = () => {
                 </div>
                 <ul id="passwordCriterion" className="ps-3 mb-0 small">
                   {CRITERIA.map((item) => (
-                    <li key={item.key} className={criteria[item.key] ? 'text-success' : 'text-danger'}>
+                    <li
+                      key={item.key}
+                      className={criteria[item.key] ? 'text-success' : 'text-danger'}
+                    >
                       {item.label}
                     </li>
                   ))}
@@ -341,7 +346,12 @@ const UserList = () => {
               <CButton type="button" color="secondary" onClick={closeCreate}>
                 Close
               </CButton>
-              <CButton type="submit" color="primary" id="btnAddUser" disabled={!passwordStrong || busy}>
+              <CButton
+                type="submit"
+                color="primary"
+                id="btnAddUser"
+                disabled={!passwordStrong || busy}
+              >
                 {busy ? 'Saving…' : 'Add User'}
               </CButton>
             </CModalFooter>
@@ -350,7 +360,12 @@ const UserList = () => {
       )}
 
       {editing && (
-        <CModal visible alignment="center" onClose={() => setEditing(null)} aria-labelledby="modaleditLabel">
+        <CModal
+          visible
+          alignment="center"
+          onClose={() => setEditing(null)}
+          aria-labelledby="modaleditLabel"
+        >
           <CModalHeader>
             <CModalTitle id="modaleditLabel">Update Information</CModalTitle>
           </CModalHeader>
@@ -374,8 +389,15 @@ const UserList = () => {
               </div>
               <div className="mb-3">
                 <CFormLabel htmlFor="edit-type">Type:</CFormLabel>
-                <CFormSelect id="edit-type" aria-label="Select type" value={typeLabel(editing.auth_source)} disabled>
-                  <option value={typeLabel(editing.auth_source)}>{typeLabel(editing.auth_source)}</option>
+                <CFormSelect
+                  id="edit-type"
+                  aria-label="Select type"
+                  value={typeLabel(editing.auth_source)}
+                  disabled
+                >
+                  <option value={typeLabel(editing.auth_source)}>
+                    {typeLabel(editing.auth_source)}
+                  </option>
                 </CFormSelect>
               </div>
               {saveError && <div className="text-danger">{saveError}</div>}

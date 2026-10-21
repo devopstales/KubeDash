@@ -146,7 +146,10 @@ describe('Login view', () => {
   it('surfaces LOCAL_AUTH_DISABLED (403) inline', async () => {
     server.use(
       settingsHandler({ sso_enabled: false, local_enabled: true }),
-      localLoginErrorHandler(403, { code: 'LOCAL_AUTH_DISABLED', message: 'local auth is not configured' }),
+      localLoginErrorHandler(403, {
+        code: 'LOCAL_AUTH_DISABLED',
+        message: 'local auth is not configured',
+      }),
     )
     renderLogin('/login')
     await screen.findByPlaceholderText('Username')

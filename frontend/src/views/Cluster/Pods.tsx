@@ -1,12 +1,6 @@
 import React from 'react'
 import { useQuery } from '@tanstack/react-query'
-import {
-  CCard,
-  CCardBody,
-  CCardHeader,
-  CCardTitle,
-  CTable,
-} from '@coreui/react'
+import { CCard, CCardBody, CCardHeader, CCardTitle, CTable } from '@coreui/react'
 import { FontAwesomeIcon } from '@fortawesome/react-fontawesome'
 import { faCircle } from '@fortawesome/free-solid-svg-icons'
 import { apiFetch } from '../../lib/api'

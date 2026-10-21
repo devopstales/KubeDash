@@ -83,7 +83,10 @@ const PrivilegeEditView = () => {
       if (clusterTemplate) await bind(clusterTemplate)
       for (const row of rows) {
         if (!row.template) continue
-        const names = row.namespaces.split(',').map((s) => s.trim()).filter(Boolean)
+        const names = row.namespaces
+          .split(',')
+          .map((s) => s.trim())
+          .filter(Boolean)
         if (names.length === 0) {
           setError('A namespaced template needs at least one namespace')
           return
@@ -131,7 +134,9 @@ const PrivilegeEditView = () => {
                   id={`ns-template-${i}`}
                   value={row.template}
                   onChange={(e) =>
-                    setRows((rs) => rs.map((r, j) => (j === i ? { ...r, template: e.target.value } : r)))
+                    setRows((rs) =>
+                      rs.map((r, j) => (j === i ? { ...r, template: e.target.value } : r)),
+                    )
                   }
                 >
                   <option value="">None</option>
@@ -149,7 +154,9 @@ const PrivilegeEditView = () => {
                   value={row.namespaces}
                   placeholder="team-a, team-b"
                   onChange={(e) =>
-                    setRows((rs) => rs.map((r, j) => (j === i ? { ...r, namespaces: e.target.value } : r)))
+                    setRows((rs) =>
+                      rs.map((r, j) => (j === i ? { ...r, namespaces: e.target.value } : r)),
+                    )
                   }
                 />
               </div>

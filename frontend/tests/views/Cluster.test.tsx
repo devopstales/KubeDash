@@ -13,14 +13,16 @@ describe('ClusterView', () => {
     server.use(
       http.get('*/api/v1/clusters', () =>
         HttpResponse.json({
-          items: [{
-            id: 1,
-            name: 'prod',
-            api_server: 'https://api.prod:6443',
-            context: 'prod-admin',
-            status: 'ready',
-            last_probe_at: '2026-10-21T10:00:00Z',
-          }],
+          items: [
+            {
+              id: 1,
+              name: 'prod',
+              api_server: 'https://api.prod:6443',
+              context: 'prod-admin',
+              status: 'ready',
+              last_probe_at: '2026-10-21T10:00:00Z',
+            },
+          ],
         }),
       ),
       http.get('*/api/v1/clusters/1', () =>
@@ -33,9 +35,7 @@ describe('ClusterView', () => {
           last_probe_at: '2026-10-21T10:00:00Z',
         }),
       ),
-      http.get('*/api/v1/clusters/1/health', () =>
-        HttpResponse.json({ status: 'up' }),
-      ),
+      http.get('*/api/v1/clusters/1/health', () => HttpResponse.json({ status: 'up' })),
     )
   })
 

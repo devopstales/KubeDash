@@ -63,15 +63,11 @@ test.describe('KubeDash auth smoke (local password)', () => {
 
     // No uncaught JS errors (infinite loop, null element, bad import).
     // Filter the benign favicon 404 (a resource error, not a pageerror).
-    const fatal = errors.filter(
-      (e) => !e.includes('favicon') && !e.includes('Manifest'),
-    )
+    const fatal = errors.filter((e) => !e.includes('favicon') && !e.includes('Manifest'))
     expect(fatal, `uncaught page errors: ${fatal.join('\n')}`).toEqual([])
   })
 
-  test('local login → profile shows identity + synthetic cluster', async ({
-    page,
-  }) => {
+  test('local login → profile shows identity + synthetic cluster', async ({ page }) => {
     const errors = attachErrorWatcher(page)
 
     // --- 1. Land on /login ---
@@ -97,9 +93,7 @@ test.describe('KubeDash auth smoke (local password)', () => {
     const profileCard = page.locator('.card').filter({ hasText: 'Profile' })
     await expect(profileCard.getByText(ADMIN_EMAIL)).toBeVisible()
     // Role badge (the <span class="badge"> inside the card).
-    await expect(
-      profileCard.locator('span.badge').filter({ hasText: 'admin' }),
-    ).toBeVisible()
+    await expect(profileCard.locator('span.badge').filter({ hasText: 'admin' })).toBeVisible()
 
     // --- 5. The admin sees the synthetic local cluster ---
     // Navigate to /clusters; the registry table includes the id:0 "local"
@@ -107,32 +101,22 @@ test.describe('KubeDash auth smoke (local password)', () => {
     await page.goto('/clusters')
     // The table cell renders c.name = "local". Scope to the table to avoid
     // matching the "Admin kubeconfig source" label on other pages.
-    await expect(
-      page.locator('table td', { hasText: 'local' }),
-    ).toBeVisible({ timeout: 10_000 })
+    await expect(page.locator('table td', { hasText: 'local' })).toBeVisible({ timeout: 10_000 })
 
-    const fatal = errors.filter(
-      (e) => !e.includes('favicon') && !e.includes('Manifest'),
-    )
+    const fatal = errors.filter((e) => !e.includes('favicon') && !e.includes('Manifest'))
     expect(fatal, `uncaught page errors: ${fatal.join('\n')}`).toEqual([])
   })
 
-  test('wrong password shows inline error, stays on /login', async ({
-    page,
-  }) => {
+  test('wrong password shows inline error, stays on /login', async ({ page }) => {
     await page.goto('/login')
     await page.getByPlaceholder('Username').fill(ADMIN_EMAIL)
     await page.getByPlaceholder('Password').fill('wrong-password')
     await page.getByRole('button', { name: 'Login', exact: true }).click()
 
     // 401 → the view surfaces the envelope message, stays on /login.
-    await expect(
-      page.getByText('invalid email or password'),
-    ).toBeVisible({ timeout: 10_000 })
+    await expect(page.getByText('invalid email or password')).toBeVisible({ timeout: 10_000 })
     await expect(page).toHaveURL(/\/login/)
     // No token was parked.
-    await expect
-      .poll(async () => page.evaluate(() => localStorage.getItem('kd_token')))
-      .toBeNull()
+    await expect.poll(async () => page.evaluate(() => localStorage.getItem('kd_token'))).toBeNull()
   })
 })

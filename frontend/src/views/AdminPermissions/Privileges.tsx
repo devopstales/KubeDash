@@ -40,7 +40,9 @@ const PrivilegesView = () => {
     enabled: me?.sub === user,
   })
 
-  const bindings = (bindingsQuery.data ?? []).filter((b) => !selected || b.cluster === selected.name)
+  const bindings = (bindingsQuery.data ?? []).filter(
+    (b) => !selected || b.cluster === selected.name,
+  )
   const [error, setError] = useState<string | null>(null)
 
   const unbind = async (b: MyAccessBinding) => {
@@ -88,7 +90,9 @@ const PrivilegesView = () => {
           <div>Loading bindings…</div>
         ) : bindingsQuery.error ? (
           <div className="text-danger">
-            {bindingsQuery.error instanceof Error ? bindingsQuery.error.message : 'Failed to load bindings'}
+            {bindingsQuery.error instanceof Error
+              ? bindingsQuery.error.message
+              : 'Failed to load bindings'}
           </div>
         ) : bindings.length === 0 ? (
           <div className="mb-3">No bindings on this cluster.</div>

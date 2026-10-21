@@ -12,10 +12,19 @@ import { useClusterStore } from '../../src/store/cluster'
 vi.mock('../../src/components/KubeDataTable', () => {
   const React = require('react') as typeof import('react')
   const Column = () => null
-  function KubeDataTable({ data, children }: { data: Record<string, unknown>[]; children: React.ReactNode }) {
+  function KubeDataTable({
+    data,
+    children,
+  }: {
+    data: Record<string, unknown>[]
+    children: React.ReactNode
+  }) {
     const cols = React.Children.toArray(children)
       .filter(React.isValidElement)
-      .map((child) => (child as React.ReactElement<{ title: string; data: string; children?: unknown }>).props)
+      .map(
+        (child) =>
+          (child as React.ReactElement<{ title: string; data: string; children?: unknown }>).props,
+      )
     return (
       <table>
         <thead>
@@ -49,9 +58,7 @@ const renderAt = (ui: ReactElement, path = '/') => {
   const qc = new QueryClient({ defaultOptions: { queries: { retry: false } } })
   return render(
     <QueryClientProvider client={qc}>
-      <MemoryRouter initialEntries={[path]}>
-        {ui}
-      </MemoryRouter>
+      <MemoryRouter initialEntries={[path]}>{ui}</MemoryRouter>
     </QueryClientProvider>,
   )
 }
@@ -92,7 +99,10 @@ test('lists-roles-in-selected-namespace', async () => {
       })
     }),
   )
-  useClusterStore.setState({ selectedCluster: { id: 1, name: 'prod' }, selectedNamespace: 'team-a' })
+  useClusterStore.setState({
+    selectedCluster: { id: 1, name: 'prod' },
+    selectedNamespace: 'team-a',
+  })
   renderAt(<RoleView />)
 
   expect(await screen.findByRole('link', { name: 'edit' })).toBeTruthy()
@@ -131,10 +141,16 @@ test('defaults-to-default-namespace-and-shows-empty-state', async () => {
 test('shows-rbac-error', async () => {
   server.use(
     http.get('*/api/v1/clusters/1/resources/roles', () =>
-      HttpResponse.json({ error: { code: 'RBAC_DENIED', message: 'list on roles' } }, { status: 403 }),
+      HttpResponse.json(
+        { error: { code: 'RBAC_DENIED', message: 'list on roles' } },
+        { status: 403 },
+      ),
     ),
   )
-  useClusterStore.setState({ selectedCluster: { id: 1, name: 'prod' }, selectedNamespace: 'team-a' })
+  useClusterStore.setState({
+    selectedCluster: { id: 1, name: 'prod' },
+    selectedNamespace: 'team-a',
+  })
   renderAt(<RoleView />)
 
   expect(await screen.findByText(/Error loading roles: RBAC_DENIED: list on roles/)).toBeTruthy()
@@ -146,12 +162,17 @@ test('shows-role-rules', async () => {
       HttpResponse.json({ kind: 'roles', cluster: 'prod', items: [editRole] }),
     ),
   )
-  useClusterStore.setState({ selectedCluster: { id: 1, name: 'prod' }, selectedNamespace: 'team-a' })
+  useClusterStore.setState({
+    selectedCluster: { id: 1, name: 'prod' },
+    selectedNamespace: 'team-a',
+  })
   renderAt(<RoleDataView />, '/cluster-permission/role/data?name=edit&namespace=team-a')
 
   expect(await screen.findByText('pods')).toBeTruthy()
   expect(screen.getByText('Rule List')).toBeTruthy()
-  expect(screen.getByRole('link', { name: 'Roles' }).getAttribute('href')).toBe('/cluster-permission/role')
+  expect(screen.getByRole('link', { name: 'Roles' }).getAttribute('href')).toBe(
+    '/cluster-permission/role',
+  )
   expect(screen.getByText('edit')).toBeTruthy()
   expect(screen.getAllByRole('columnheader').map((th) => th.textContent)).toEqual([
     'API Groups',
@@ -168,7 +189,10 @@ test('shows-role-rules', async () => {
 })
 
 test('role-data-requires-a-name', async () => {
-  useClusterStore.setState({ selectedCluster: { id: 1, name: 'prod' }, selectedNamespace: 'team-a' })
+  useClusterStore.setState({
+    selectedCluster: { id: 1, name: 'prod' },
+    selectedNamespace: 'team-a',
+  })
   renderAt(<RoleDataView />, '/cluster-permission/role/data')
 
   expect(await screen.findByText('Error: Role name not provided')).toBeTruthy()

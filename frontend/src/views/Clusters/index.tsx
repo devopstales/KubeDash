@@ -91,11 +91,7 @@ const ClustersView = () => {
                 </thead>
                 <tbody>
                   {clusters.map((c) => (
-                    <tr
-                      key={c.id}
-                      style={{ cursor: 'pointer' }}
-                      onClick={() => openCluster(c)}
-                    >
+                    <tr key={c.id} style={{ cursor: 'pointer' }} onClick={() => openCluster(c)}>
                       <td>{c.name}</td>
                       <td>{c.api_server ?? ''}</td>
                       <td>{c.context ?? ''}</td>

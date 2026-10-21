@@ -58,11 +58,13 @@ describe('KubeconfigView', () => {
   test('download config file saves kubedash-kubeconfig.yaml', async () => {
     const user = userEvent.setup()
     server.use(
-      http.get('*/api/v1/kubeconfig', () =>
-        new HttpResponse('apiVersion: v1\nkind: Config\n', {
-          status: 200,
-          headers: { 'Content-Type': 'application/yaml' },
-        }),
+      http.get(
+        '*/api/v1/kubeconfig',
+        () =>
+          new HttpResponse('apiVersion: v1\nkind: Config\n', {
+            status: 200,
+            headers: { 'Content-Type': 'application/yaml' },
+          }),
       ),
     )
     const clicks: string[] = []

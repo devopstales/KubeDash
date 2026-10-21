@@ -69,10 +69,7 @@ export function navigation(input: { clusterId: number | null; isAdmin: boolean }
     ]),
     divider(),
     { component: CNavTitle, name: 'Permissions' },
-    group('User Management', cilUser, [
-      leaf('Users', '/user/list'),
-      leaf('Groups', '/user/group'),
-    ]),
+    group('User Management', cilUser, [leaf('Users', '/user/list'), leaf('Groups', '/user/group')]),
     group('Cluster Permissions', cilGroup, [
       leaf('ServiceAccounts', '/cluster-permission/service-account'),
       leaf('Roles', '/cluster-permission/role'),

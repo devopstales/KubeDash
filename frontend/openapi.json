@@ -8,9 +8,7 @@
             "$ref": "#/components/responses/RESPONSE_DEFAULT_ERROR"
           }
         },
-        "tags": [
-          "api.auth"
-        ],
+        "tags": ["api.auth"],
         "description": "Start OIDC login: 302 to /v1/auth/callback?state=<s>&next=<idp>"
       }
     },
@@ -30,9 +28,7 @@
             "$ref": "#/components/responses/RESPONSE_UNAUTHORIZED"
           }
         },
-        "tags": [
-          "api.auth"
-        ]
+        "tags": ["api.auth"]
       }
     },
     "/api/v1/auth/local": {
@@ -65,9 +61,7 @@
           }
         },
         "summary": "ADR-0021: bootstrap-admin password login, sibling of OIDC. The\nroute gates on auth_source='local' so a row SSO has claimed (or a\npure-SSO row) never answers with a password \u2014 same 401 code, no\nenumeration across auth sources (I-NEW-2).",
-        "tags": [
-          "api.auth"
-        ]
+        "tags": ["api.auth"]
       }
     },
     "/api/v1/auth/settings": {
@@ -88,9 +82,7 @@
           }
         },
         "summary": "Open (pre-JWT) capability flags for the login page (R3): the SSO\nbutton renders iff sso_enabled, the local form iff local_enabled.",
-        "tags": [
-          "api.auth"
-        ]
+        "tags": ["api.auth"]
       }
     },
     "/api/v1/auth/refresh": {
@@ -126,9 +118,7 @@
             }
           }
         },
-        "tags": [
-          "api.auth"
-        ]
+        "tags": ["api.auth"]
       }
     },
     "/api/v1/auth/logout": {
@@ -141,9 +131,7 @@
             "$ref": "#/components/responses/RESPONSE_UNAUTHORIZED"
           }
         },
-        "tags": [
-          "api.auth"
-        ]
+        "tags": ["api.auth"]
       }
     },
     "/api/v1/auth/me": {
@@ -166,9 +154,7 @@
             "$ref": "#/components/responses/RESPONSE_UNAUTHORIZED"
           }
         },
-        "tags": [
-          "api.auth"
-        ]
+        "tags": ["api.auth"]
       }
     },
     "/api/v1/clusters": {
@@ -204,9 +190,7 @@
             }
           }
         },
-        "tags": [
-          "api.clusters"
-        ]
+        "tags": ["api.clusters"]
       },
       "get": {
         "responses": {
@@ -221,9 +205,7 @@
           }
         },
         "summary": "Only the caller's bound clusters \u2014 the binding gate (R3).",
-        "tags": [
-          "api.clusters"
-        ]
+        "tags": ["api.clusters"]
       }
     },
     "/api/v1/clusters/{cluster_id}": {
@@ -246,9 +228,7 @@
             "$ref": "#/components/responses/RESPONSE_CLUSTER_NOT_FOUND"
           }
         },
-        "tags": [
-          "api.clusters"
-        ]
+        "tags": ["api.clusters"]
       },
       "parameters": [
         {
@@ -285,9 +265,7 @@
             "$ref": "#/components/responses/RESPONSE_CLUSTER_UNREACHABLE"
           }
         },
-        "tags": [
-          "api.clusters"
-        ]
+        "tags": ["api.clusters"]
       },
       "parameters": [
         {
@@ -324,9 +302,7 @@
             "$ref": "#/components/responses/RESPONSE_RBAC_DENIED"
           }
         },
-        "tags": [
-          "api.resources"
-        ]
+        "tags": ["api.resources"]
       },
       "parameters": [
         {
@@ -359,9 +335,7 @@
             "$ref": "#/components/responses/RESPONSE_NOT_IMPLEMENTED"
           }
         },
-        "tags": [
-          "api.logs"
-        ]
+        "tags": ["api.logs"]
       }
     },
     "/api/v1/metrics/query": {
@@ -374,9 +348,7 @@
             "$ref": "#/components/responses/RESPONSE_NOT_IMPLEMENTED"
           }
         },
-        "tags": [
-          "api.metrics"
-        ]
+        "tags": ["api.metrics"]
       }
     },
     "/api/v1/metrics/query_range": {
@@ -389,9 +361,7 @@
             "$ref": "#/components/responses/RESPONSE_NOT_IMPLEMENTED"
           }
         },
-        "tags": [
-          "api.metrics"
-        ]
+        "tags": ["api.metrics"]
       }
     },
     "/api/v1/traces": {
@@ -404,9 +374,7 @@
             "$ref": "#/components/responses/RESPONSE_NOT_IMPLEMENTED"
           }
         },
-        "tags": [
-          "api.traces"
-        ]
+        "tags": ["api.traces"]
       }
     },
     "/api/v1/traces/{trace_id}": {
@@ -419,9 +387,7 @@
             "$ref": "#/components/responses/RESPONSE_NOT_IMPLEMENTED"
           }
         },
-        "tags": [
-          "api.traces"
-        ]
+        "tags": ["api.traces"]
       },
       "parameters": [
         {
@@ -445,9 +411,7 @@
             "$ref": "#/components/responses/RESPONSE_NOT_IMPLEMENTED"
           }
         },
-        "tags": [
-          "api.audit"
-        ]
+        "tags": ["api.audit"]
       }
     },
     "/api/v1/audit/export": {
@@ -460,9 +424,7 @@
             "$ref": "#/components/responses/RESPONSE_NOT_IMPLEMENTED"
           }
         },
-        "tags": [
-          "api.audit"
-        ]
+        "tags": ["api.audit"]
       }
     },
     "/api/v1/admin/permissions/bind": {
@@ -475,9 +437,7 @@
             "$ref": "#/components/responses/RESPONSE_NOT_IMPLEMENTED"
           }
         },
-        "tags": [
-          "api.permissions"
-        ]
+        "tags": ["api.permissions"]
       }
     },
     "/api/v1/admin/permissions/templates": {
@@ -490,9 +450,7 @@
             "$ref": "#/components/responses/RESPONSE_NOT_IMPLEMENTED"
           }
         },
-        "tags": [
-          "api.permissions"
-        ]
+        "tags": ["api.permissions"]
       }
     },
     "/api/v1/namespaces/requests": {
@@ -505,9 +463,7 @@
             "$ref": "#/components/responses/RESPONSE_NOT_IMPLEMENTED"
           }
         },
-        "tags": [
-          "api.namespaces"
-        ]
+        "tags": ["api.namespaces"]
       }
     },
     "/api/v1/namespaces/requests/{request_id}/approve": {
@@ -520,9 +476,7 @@
             "$ref": "#/components/responses/RESPONSE_NOT_IMPLEMENTED"
           }
         },
-        "tags": [
-          "api.namespaces"
-        ]
+        "tags": ["api.namespaces"]
       },
       "parameters": [
         {
@@ -546,9 +500,7 @@
             "$ref": "#/components/responses/RESPONSE_NOT_IMPLEMENTED"
           }
         },
-        "tags": [
-          "api.access"
-        ]
+        "tags": ["api.access"]
       }
     },
     "/api/v1/access/requests/{request_id}/revoke": {
@@ -561,9 +513,7 @@
             "$ref": "#/components/responses/RESPONSE_NOT_IMPLEMENTED"
           }
         },
-        "tags": [
-          "api.access"
-        ]
+        "tags": ["api.access"]
       },
       "parameters": [
         {
@@ -587,9 +537,7 @@
             "$ref": "#/components/responses/RESPONSE_NOT_IMPLEMENTED"
           }
         },
-        "tags": [
-          "api.kubeconfig"
-        ]
+        "tags": ["api.kubeconfig"]
       }
     },
     "/api/v1/kubectl/auth/v1/config": {
@@ -602,9 +550,7 @@
             "$ref": "#/components/responses/RESPONSE_NOT_IMPLEMENTED"
           }
         },
-        "tags": [
-          "api.kubectl_auth"
-        ]
+        "tags": ["api.kubectl_auth"]
       }
     },
     "/api/v1/admin/users": {
@@ -617,9 +563,7 @@
             "$ref": "#/components/responses/RESPONSE_NOT_IMPLEMENTED"
           }
         },
-        "tags": [
-          "api.admin"
-        ]
+        "tags": ["api.admin"]
       }
     },
     "/api/v1/admin/clusters": {
@@ -632,9 +576,7 @@
             "$ref": "#/components/responses/RESPONSE_NOT_IMPLEMENTED"
           }
         },
-        "tags": [
-          "api.admin"
-        ]
+        "tags": ["api.admin"]
       }
     },
     "/api/v1/scim/v2/users": {
@@ -647,9 +589,7 @@
             "$ref": "#/components/responses/RESPONSE_NOT_IMPLEMENTED"
           }
         },
-        "tags": [
-          "api.scim_users"
-        ]
+        "tags": ["api.scim_users"]
       }
     },
     "/api/v1/scim/v2/groups": {
@@ -662,9 +602,7 @@
             "$ref": "#/components/responses/RESPONSE_NOT_IMPLEMENTED"
           }
         },
-        "tags": [
-          "api.scim_groups"
-        ]
+        "tags": ["api.scim_groups"]
       }
     },
     "/api/v1/projects": {
@@ -677,9 +615,7 @@
             "$ref": "#/components/responses/RESPONSE_NOT_IMPLEMENTED"
           }
         },
-        "tags": [
-          "api.agg_projects"
-        ]
+        "tags": ["api.agg_projects"]
       }
     },
     "/api/v1/sso-users": {
@@ -692,9 +628,7 @@
             "$ref": "#/components/responses/RESPONSE_NOT_IMPLEMENTED"
           }
         },
-        "tags": [
-          "api.agg_sso_users"
-        ]
+        "tags": ["api.agg_sso_users"]
       }
     },
     "/api/v1/sso-groups": {
@@ -707,9 +641,7 @@
             "$ref": "#/components/responses/RESPONSE_NOT_IMPLEMENTED"
           }
         },
-        "tags": [
-          "api.agg_sso_groups"
-        ]
+        "tags": ["api.agg_sso_groups"]
       }
     }
   },
@@ -861,10 +793,7 @@
             "type": "string"
           }
         },
-        "required": [
-          "email",
-          "password"
-        ],
+        "required": ["email", "password"],
         "additionalProperties": false
       },
       "AuthSettingsOut": {
@@ -886,9 +815,7 @@
             "type": "string"
           }
         },
-        "required": [
-          "refresh_token"
-        ],
+        "required": ["refresh_token"],
         "additionalProperties": false
       },
       "RefreshOut": {
@@ -957,12 +884,7 @@
             "type": "string"
           }
         },
-        "required": [
-          "api_server",
-          "context",
-          "kubeconfig",
-          "name"
-        ],
+        "required": ["api_server", "context", "kubeconfig", "name"],
         "additionalProperties": false
       },
       "ClusterOut": {
