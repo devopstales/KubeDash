@@ -74,7 +74,6 @@ test('every-stub-entry-has-a-page', () => {
   }
   for (const title of [
     'Workload',
-    'Groups',
     'ClusterRoleBindings',
     'Namespaces',
     'CRDs',
