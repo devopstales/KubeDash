@@ -5,6 +5,8 @@ import { CSpinner } from '@coreui/react'
 
 import DefaultLayout from './layout/DefaultLayout'
 import { AdminRoute, ProtectedRoute } from './routes'
+import StubView from './views/Stub'
+import { stubRoutes } from './views/Stub/routes'
 import './scss/style.scss'
 
 // ponytail: the template's demo views are demo material, not KubeDash.
@@ -117,6 +119,23 @@ const App = () => {
                         </ProtectedRoute>
                       }
                     />
+                    {stubRoutes.map((route) => (
+                      <Route
+                        key={route.path}
+                        path={route.path}
+                        element={
+                          <ProtectedRoute>
+                            {route.admin ? (
+                              <AdminRoute>
+                                <StubView title={route.title} />
+                              </AdminRoute>
+                            ) : (
+                              <StubView title={route.title} />
+                            )}
+                          </ProtectedRoute>
+                        }
+                      />
+                    ))}
                     <Route path="/" element={<Navigate to="/clusters" replace />} />
                     <Route path="*" element={<Navigate to="/clusters" replace />} />
                   </Routes>

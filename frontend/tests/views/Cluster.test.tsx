@@ -1,6 +1,6 @@
 import { render, screen } from '@testing-library/react'
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query'
-import { MemoryRouter } from 'react-router-dom'
+import { MemoryRouter, Route, Routes } from 'react-router-dom'
 import { beforeEach, describe, expect, test } from 'vitest'
 import { server } from '../msw'
 import { http, HttpResponse } from 'msw'
@@ -24,7 +24,9 @@ describe('ClusterView', () => {
     render(
       <QueryClientProvider client={qc}>
         <MemoryRouter initialEntries={['/clusters/1']}>
-          <ClusterView />
+          <Routes>
+            <Route path="/clusters/:id" element={<ClusterView />} />
+          </Routes>
         </MemoryRouter>
       </QueryClientProvider>,
     )
