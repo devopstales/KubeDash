@@ -20,6 +20,8 @@ const PermissionsView = React.lazy(() => import('./views/Permissions'))
 const AdminPermissionsView = React.lazy(() => import('./views/AdminPermissions'))
 const UsersView = React.lazy(() => import('./views/Users'))
 const GroupsView = React.lazy(() => import('./views/Groups'))
+const KubeconfigView = React.lazy(() => import('./views/Kubeconfig'))
+const PrivilegesView = React.lazy(() => import('./views/AdminPermissions/Privileges'))
 
 /**
  * KubeDash SPA root: QueryClientProvider (TanStack Query) wraps the
@@ -86,6 +88,24 @@ const App = () => {
                       element={
                         <ProtectedRoute>
                           <PermissionsView />
+                        </ProtectedRoute>
+                      }
+                    />
+                    <Route
+                      path="/settings/export"
+                      element={
+                        <ProtectedRoute>
+                          <KubeconfigView />
+                        </ProtectedRoute>
+                      }
+                    />
+                    <Route
+                      path="/admin/permissions/users/:sub"
+                      element={
+                        <ProtectedRoute>
+                          <AdminRoute>
+                            <PrivilegesView />
+                          </AdminRoute>
                         </ProtectedRoute>
                       }
                     />

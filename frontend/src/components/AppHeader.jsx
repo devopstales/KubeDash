@@ -1,16 +1,14 @@
 /**
  * AppHeader Component
  *
- * Top navigation bar for the KubeDash SPA shell, mirroring the main-branch
- * header (segments/header.html.j2): sidebar toggle, cluster switcher, then a
- * right-aligned nav of GitHub link, theme switcher, and user profile.
- *
- * The cluster switcher is the KubeDash analog of main's namespace selector —
- * it stays in the left nav. The main-branch notifications dropdown is dropped:
- * it was wired to Flask flash messages, which have no React equivalent here.
+ * Top navigation bar for the KubeDash SPA shell, mirroring 4.1
+ * segments/partials/header.html.j2: sidebar toggle, namespace selector,
+ * then GitHub, docs, and API links, notifications, theme, profile.
  */
 
 import React, { useEffect, useState } from 'react'
+import { useNavigate } from 'react-router-dom'
+import { useQuery } from '@tanstack/react-query'
 import {
   CButton,
   CDropdown,
@@ -32,6 +30,8 @@ import CIcon from '@coreui/icons-react'
 import {
   cilAccountLogout,
   cilBell,
+  cilBook,
+  cilCode,
   cilContrast,
   cilMenu,
   cilMoon,
@@ -39,13 +39,13 @@ import {
   cilSun,
   cilUser,
 } from '@coreui/icons'
-import undrawProfile from '../../public/assets/img/avatars/undraw_profile.svg'
 
 import { useCluster } from '../hooks/useCluster'
 import { useClusterStore } from '../store/cluster'
 import { useSidebarStore } from '../store/sidebar'
 import { apiFetch } from '../lib/api'
-import { useNavigate } from 'react-router-dom'
+
+const undrawProfile = '/assets/img/avatars/undraw_profile.svg'
 
 /**
  * One theme option (Light / Dark / Auto) in the switcher dropdown. Markup
@@ -64,11 +64,23 @@ const ThemeItem = ({ value, icon, label, colorMode, onSet }) => (
   </button>
 )
 
+const githubIcon = [
+  '32 32',
+  '<path fill="var(--ci-primary-color, currentColor)" d="M16 0.396c-8.839 0-16 7.167-16 16 0 7.073 4.584 13.068 10.937 15.183 0.803 0.151 1.093-0.344 1.093-0.772 0-0.38-0.009-1.385-0.015-2.719-4.453 0.964-5.391-2.151-5.391-2.151-0.729-1.844-1.781-2.339-1.781-2.339-1.448-0.989 0.115-0.968 0.115-0.968 1.604 0.109 2.448 1.645 2.448 1.645 1.427 2.448 3.744 1.74 4.661 1.328 0.14-1.031 0.557-1.74 1.011-2.135-3.552-0.401-7.287-1.776-7.287-7.907 0-1.751 0.62-3.177 1.645-4.297-0.177-0.401-0.719-2.031 0.141-4.235 0 0 1.339-0.427 4.4 1.641 1.281-0.355 2.641-0.532 4-0.541 1.36 0.009 2.719 0.187 4 0.541 3.043-2.068 4.381-1.641 4.381-1.641 0.859 2.204 0.317 3.833 0.161 4.235 1.015 1.12 1.635 2.547 1.635 4.297 0 6.145-3.74 7.5-7.296 7.891 0.556 0.479 1.077 1.464 1.077 2.959 0 2.14-0.020 3.864-0.020 4.385 0 0.416 0.28 0.916 1.104 0.755 6.4-2.093 10.979-8.093 10.979-15.156 0-8.833-7.161-16-16-16z"></path>',
+]
+
 const AppHeader = () => {
-  const { clusters, me } = useCluster()
+  const { me } = useCluster()
   const selectedCluster = useClusterStore((s) => s.selectedCluster)
-  const setSelectedCluster = useClusterStore((s) => s.setSelectedCluster)
+  const selectedNamespace = useClusterStore((s) => s.selectedNamespace)
+  const setSelectedNamespace = useClusterStore((s) => s.setSelectedNamespace)
   const toggleSidebar = useSidebarStore((state) => state.toggle)
+  const [draftNamespace, setDraftNamespace] = useState(null)
+  const [draftClusterId, setDraftClusterId] = useState(selectedCluster?.id)
+  if (selectedCluster?.id !== draftClusterId) {
+    setDraftClusterId(selectedCluster?.id)
+    setDraftNamespace(null)
+  }
   const [loggingOut, setLoggingOut] = useState(false)
   const navigate = useNavigate()
 
@@ -76,6 +88,25 @@ const AppHeader = () => {
   // data-coreui-theme to <html> (CoreUI's dark vars are already compiled in)
   // and persists the choice.
   const { colorMode, setColorMode } = useColorModes('coreui-theme')
+
+  const namespacesQuery = useQuery({
+    queryKey: ['namespaces', selectedCluster?.id],
+    enabled: selectedCluster != null,
+    queryFn: async () => {
+      const r = await apiFetch(`/api/v1/clusters/${selectedCluster.id}/resources/namespaces`)
+      if (r.error) throw new Error(r.error.message)
+      const items = r.data?.items ?? []
+      return items.map((item) => item.metadata?.name).filter(Boolean)
+    },
+  })
+  const namespaces = namespacesQuery.data ?? []
+  const preferredNamespace =
+    selectedNamespace && namespaces.includes(selectedNamespace)
+      ? selectedNamespace
+      : namespaces.includes('default')
+        ? 'default'
+        : (namespaces[0] ?? '')
+  const shownNamespace = draftNamespace ?? preferredNamespace
 
   // Notifications: mirrors main's flash-message bell, but wired to real in-app
   // events (auth failures, API errors) since the SPA has no Flask flash. State
@@ -129,34 +160,30 @@ const AppHeader = () => {
           <CIcon icon={cilMenu} customClassName="icon icon-lg" alt="Toggle sidebar" />
         </CHeaderToggler>
 
-        {/* Cluster switcher — the KubeDash analog of main's namespace selector:
-          a form-select + Submit button in an input-group. flex-grow-1 fills the
-          gap so the right nav sits at the header edge (main uses ms-auto). */}
-        <CHeaderNav className="d-none d-lg-flex flex-grow-1" style={{ minWidth: 0 }}>
+        {/* 4.1 namespace selector: the choice is applied on Submit. */}
+        <CHeaderNav className="d-none d-lg-flex" style={{ minWidth: 0 }}>
           <CNavItem>
-            <CForm className="form-inline row">
+            <CForm
+              className="form-inline row"
+              onSubmit={(e) => {
+                e.preventDefault()
+                setSelectedNamespace(shownNamespace || null)
+              }}
+            >
               <CInputGroup>
                 <CFormSelect
-                  aria-label="Select cluster"
-                  value={selectedCluster?.id ?? ''}
-                  onChange={(e) => {
-                    const c = clusters.find((x) => String(x.id) === e.target.value)
-                    if (c) setSelectedCluster({ id: c.id, name: c.name })
-                  }}
+                  aria-label="Select Namespace"
+                  name="ns_select"
+                  value={shownNamespace}
+                  onChange={(e) => setDraftNamespace(e.target.value)}
                 >
-                  {clusters.map((c) => (
-                    <option key={c.id} value={c.id}>
-                      {c.name}
+                  {namespaces.map((name) => (
+                    <option key={name} value={name}>
+                      {name}
                     </option>
                   ))}
                 </CFormSelect>
-                <CButton
-                  color="primary"
-                  type="button"
-                  onClick={() => {
-                    if (selectedCluster) navigate(`/clusters/${selectedCluster.id}`)
-                  }}
-                >
+                <CButton color="primary" type="submit">
                   Submit
                 </CButton>
               </CInputGroup>
@@ -164,8 +191,37 @@ const AppHeader = () => {
           </CNavItem>
         </CHeaderNav>
 
-        {/* Right-aligned nav: notifications, theme switcher, user profile */}
         <CHeaderNav className="ms-auto">
+          <CNavItem>
+            <a
+              className="nav-link"
+              href="https://github.com/devopstales/KubeDash"
+              target="_blank"
+              rel="noopener noreferrer"
+              aria-label="GitHub"
+            >
+              <CIcon icon={githubIcon} customClassName="icon icon-xl" />
+            </a>
+          </CNavItem>
+          <CNavItem>
+            <a
+              className="nav-link"
+              href="https://devopstales.github.io/KubeDash/latest/"
+              target="_blank"
+              rel="noopener noreferrer"
+              aria-label="Docs"
+            >
+              <CIcon icon={cilBook} customClassName="icon icon-xl" />
+            </a>
+          </CNavItem>
+          <CNavItem>
+            <a className="nav-link" href="/api/docs" aria-label="REST API">
+              <CIcon icon={cilCode} customClassName="icon icon-xl" />
+            </a>
+          </CNavItem>
+          <CNavItem className="py-1">
+            <div className="vr h-100 mx-2 text-body text-opacity-75" />
+          </CNavItem>
           {/* Notifications bell (mirrors main's flash-message dropdown) */}
           <CDropdown variant="nav-item" placement="bottom-end">
             <CDropdownToggle
@@ -294,10 +350,15 @@ const AppHeader = () => {
                 <CIcon icon={cilUser} className="me-2" />
                 Profile
               </CDropdownItem>
-              {/* ADR-0020: air-gapped bundle — no outbound docs URL, label only */}
-              <CDropdownItem disabled>
+              <CDropdownItem
+                href="/settings/export"
+                onClick={(e) => {
+                  e.preventDefault()
+                  navigate('/settings/export')
+                }}
+              >
                 <CIcon icon={cilSettings} className="me-2" />
-                Docs
+                Download KubeConfig
               </CDropdownItem>
               <CDropdownDivider />
               <CDropdownItem

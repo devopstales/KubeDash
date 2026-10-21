@@ -13,9 +13,14 @@ export interface SelectedCluster {
 interface ClusterStore {
   selectedCluster: SelectedCluster | null
   setSelectedCluster: (c: SelectedCluster | null) => void
+  /** Header scope, matching 4.1's session `ns_select`. */
+  selectedNamespace: string | null
+  setSelectedNamespace: (namespace: string | null) => void
 }
 
 export const useClusterStore = create<ClusterStore>()((set) => ({
   selectedCluster: null,
   setSelectedCluster: (selectedCluster) => set({ selectedCluster }),
+  selectedNamespace: null,
+  setSelectedNamespace: (selectedNamespace) => set({ selectedNamespace }),
 }))

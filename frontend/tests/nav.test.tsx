@@ -26,8 +26,6 @@ const adminLabels = [
   'Cluster Metrics',
   'Workload',
   'Permissions',
-  'Cluster Details',
-  'My access',
   'User Management',
   'Users',
   'Groups',
@@ -95,14 +93,10 @@ describe('navigation contract', () => {
     }
   })
 
-  test('cluster-details-follows-selection', () => {
-    const items = navigation({ clusterId: 7, isAdmin: true })
-    expect(flat(items).find((entry) => entry.name === 'Cluster Details')?.to).toBe('/clusters/7')
-  })
-
-  test('cluster-details-without-selection-opens-cluster-list', () => {
-    const items = navigation({ clusterId: null, isAdmin: false })
-    expect(flat(items).find((entry) => entry.name === 'Cluster Details')?.to).toBe('/clusters')
+  test('cluster-details-and-my-access-are-not-menu-entries', () => {
+    const names = flat(navigation({ clusterId: 7, isAdmin: true })).map((entry) => entry.name)
+    expect(names).not.toContain('Cluster Details')
+    expect(names).not.toContain('My access')
   })
 
   test('plugin-entries-never-appear', () => {
@@ -160,15 +154,39 @@ describe('rendered sidebar', () => {
     useSidebarStore.setState({ visible: true })
   })
 
-  test('sidebar-shows-cluster-details-link', async () => {
+  test('header-uses-namespace-and-4-1-links', async () => {
+    server.use(
+      http.get('*/api/v1/clusters/:id/resources/namespaces', () =>
+        HttpResponse.json({
+          items: [{ metadata: { name: 'default' } }, { metadata: { name: 'team-a' } }],
+          kind: 'namespaces',
+          cluster: 'prod',
+        }),
+      ),
+    )
+    const user = userEvent.setup()
     renderShell('admin')
-    const details = await screen.findByRole('link', { name: 'Cluster Details' })
-    expect(details.getAttribute('href')).toBe('/clusters/7')
-    const permissions = screen.getByText('Permissions')
+    expect(screen.queryByRole('link', { name: 'KubeDash' })).toBeNull()
+    expect(await screen.findByRole('link', { name: 'GitHub' })).toBeTruthy()
+    expect(screen.getByRole('link', { name: 'GitHub' }).getAttribute('href')).toBe(
+      'https://github.com/devopstales/KubeDash',
+    )
+    expect(screen.queryByLabelText('Select cluster')).toBeNull()
+    const namespace = await screen.findByLabelText('Select Namespace')
+    await user.selectOptions(namespace, 'team-a')
+    await user.click(screen.getByRole('button', { name: 'Submit' }))
+    expect(useClusterStore.getState().selectedNamespace).toBe('team-a')
+  })
+
+  test('sidebar-omits-cluster-details-and-my-access', async () => {
+    renderShell('admin')
+    const permissions = await screen.findByText('Permissions')
+    const users = await screen.findByText('User Management')
     expect(
-      permissions.compareDocumentPosition(details) & Node.DOCUMENT_POSITION_FOLLOWING,
+      permissions.compareDocumentPosition(users) & Node.DOCUMENT_POSITION_FOLLOWING,
     ).toBeTruthy()
-    expect(screen.getByRole('link', { name: 'My access' })).toBeTruthy()
+    expect(screen.queryByRole('link', { name: 'Cluster Details' })).toBeNull()
+    expect(screen.queryByRole('link', { name: 'My access' })).toBeNull()
     expect(await screen.findByText('Settings')).toBeTruthy()
   })
 
@@ -181,19 +199,23 @@ describe('rendered sidebar', () => {
     expect(screen.queryByText('Beta', { selector: 'a[href="/clusters"] *' })).toBeNull()
   })
 
-  test('settings-hidden-for-non-admin', async () => {
+  test('settings-is-in-the-sidebar', async () => {
     renderShell('user')
-    await screen.findByRole('link', { name: 'Cluster Details' })
-    await screen.findByAltText('Dev')
-    expect(screen.queryByText('Settings')).toBeNull()
-    expect(screen.queryByText('Auth Provider')).toBeNull()
-    expect(screen.queryByText('Audit Log')).toBeNull()
+    expect(await screen.findByText('Settings')).toBeTruthy()
+  })
+
+  test('header-opens-the-kubeconfig-page', async () => {
+    const user = userEvent.setup()
+    renderShell('user')
+    await user.click(await screen.findByAltText('Dev'))
+    const link = await screen.findByRole('link', { name: 'Download KubeConfig' })
+    expect(link.getAttribute('href')).toBe('/settings/export')
   })
 
   test('header-toggler-hides-sidebar', async () => {
     const user = userEvent.setup()
     renderShell('user')
-    await screen.findByRole('link', { name: 'Cluster Details' })
+    await screen.findByText('User Management')
     const sidebar = document.querySelector('.sidebar')
     expect(sidebar?.className).not.toContain('hide')
     await user.click(screen.getByRole('button', { name: 'Toggle sidebar' }))
@@ -203,7 +225,7 @@ describe('rendered sidebar', () => {
   test('header-toggler-restores-sidebar', async () => {
     const user = userEvent.setup()
     renderShell('user')
-    await screen.findByRole('link', { name: 'Cluster Details' })
+    await screen.findByText('User Management')
     await user.click(screen.getByRole('button', { name: 'Toggle sidebar' }))
     await user.click(screen.getByRole('button', { name: 'Toggle sidebar' }))
     expect(document.querySelector('.sidebar')?.className).not.toContain('hide')
@@ -212,7 +234,7 @@ describe('rendered sidebar', () => {
   test('folding-the-sidebar-does-not-hide-it', async () => {
     const user = userEvent.setup()
     renderShell('user')
-    await screen.findByRole('link', { name: 'Cluster Details' })
+    await screen.findByText('User Management')
     await user.click(screen.getByRole('button', { name: 'Fold sidebar' }))
     const sidebar = document.querySelector('.sidebar')
     expect(sidebar?.className).not.toContain('hide')

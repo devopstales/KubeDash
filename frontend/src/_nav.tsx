@@ -6,7 +6,6 @@ import {
   cilGroup,
   cilLan,
   cilLayers,
-  cilList,
   cilNotes,
   cilSettings,
   cilShieldAlt,
@@ -17,8 +16,8 @@ import {
 
 /**
  * Sidebar menu for the React shell. Labels and order follow the 4.1
- * information architecture (ADR-0022) minus Plugins. Cluster Details is the
- * first entry under Permissions. 4.1's Jinja templates are a visual
+ * information architecture (ADR-0022) minus Plugins. Cluster Details and
+ * My access are not menu entries. 4.1's Jinja templates are a visual
  * reference only; this module is the implementation.
  */
 
@@ -58,9 +57,6 @@ const divider = (): NavItem => ({
 })
 
 export function navigation(input: { clusterId: number | null; isAdmin: boolean }): NavItem[] {
-  const clusterDetails =
-    input.clusterId == null ? '/clusters' : `/clusters/${input.clusterId}`
-
   const items: NavItem[] = [
     group('Dashboard', cilSpeedometer, [
       leaf('Cluster Metrics', '/clusters'),
@@ -73,13 +69,6 @@ export function navigation(input: { clusterId: number | null; isAdmin: boolean }
     ]),
     divider(),
     { component: CNavTitle, name: 'Permissions' },
-    {
-      component: CNavItem,
-      name: 'Cluster Details',
-      to: clusterDetails,
-      icon: icon(cilList),
-    },
-    { component: CNavItem, name: 'My access', to: '/permissions', icon: icon(cilShieldAlt) },
     group('User Management', cilUser, [
       leaf('Users', '/admin/permissions?tab=users'),
       leaf('Groups', '/user/group'),
@@ -132,16 +121,14 @@ export function navigation(input: { clusterId: number | null; isAdmin: boolean }
     ]),
   ]
 
-  if (input.isAdmin) {
-    items.push(
-      group('Settings', cilSettings, [
-        leaf('Auth Provider', '/settings/sso-config'),
-        leaf('Kubernetes Cluster', '/clusters'),
-        leaf('HA Status', '/settings/cluster-status'),
-        leaf('Audit Log', '/admin/permissions?tab=audit'),
-      ]),
-    )
-  }
+  items.push(
+    group('Settings', cilSettings, [
+      leaf('Auth Provider', '/settings/sso-config'),
+      leaf('Kubernetes Cluster', '/clusters'),
+      leaf('HA Status', '/settings/cluster-status'),
+      leaf('Audit Log', '/admin/permissions?tab=audit'),
+    ]),
+  )
 
   return items
 }
