@@ -67,6 +67,18 @@ export interface ResourceList<T = Pod> {
   items: T[]
 }
 
+export interface K8sNamespace {
+  metadata?: {
+    name?: string
+    creation_timestamp?: string | null
+    annotations?: Record<string, string> | null
+  }
+  status?: {
+    phase?: string | null
+  }
+  [key: string]: unknown
+}
+
 /** A Role item as returned by /api/v1/clusters/<id>/resources/roles. */
 export interface K8sRole {
   metadata?: {

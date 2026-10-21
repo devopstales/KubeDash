@@ -32,6 +32,7 @@ function expectedStubs() {
     '/cluster-permission/role-binding',
     '/cluster-permission/cluster-role',
     '/security/secret',
+    '/cluster/namespace',
   ])
   const seen = new Map<string, string>()
   for (const isAdmin of [true, false]) {
@@ -78,7 +79,6 @@ test('every-stub-entry-has-a-page', () => {
   for (const title of [
     'Workload',
     'ClusterRoleBindings',
-    'Namespaces',
     'CRDs',
     'Ingress',
     'VolumeClaims',

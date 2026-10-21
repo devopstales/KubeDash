@@ -98,11 +98,12 @@ const AppHeader = () => {
     queryFn: async () => {
       const r = await apiFetch(`/api/v1/clusters/${selectedCluster.id}/resources/namespaces`)
       if (r.error) throw new Error(r.error.message)
-      const items = r.data?.items ?? []
-      return items.map((item) => item.metadata?.name).filter(Boolean)
+      return r.data?.items ?? []
     },
   })
-  const namespaces = namespacesQuery.data ?? []
+  const namespaces = (namespacesQuery.data ?? [])
+    .map((item) => item.metadata?.name)
+    .filter(Boolean)
   const preferredNamespace =
     selectedNamespace && namespaces.includes(selectedNamespace)
       ? selectedNamespace

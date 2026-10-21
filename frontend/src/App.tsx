@@ -15,6 +15,7 @@ import './scss/style.scss'
 const LoginView = React.lazy(() => import('./views/Login'))
 const ClustersView = React.lazy(() => import('./views/Clusters'))
 const ClusterView = React.lazy(() => import('./views/Cluster'))
+const NamespacesView = React.lazy(() => import('./views/Cluster/Namespaces'))
 const ProfileView = React.lazy(() => import('./views/Profile'))
 const PermissionsView = React.lazy(() => import('./views/Permissions'))
 const KubeconfigView = React.lazy(() => import('./views/Kubeconfig'))
@@ -239,6 +240,14 @@ const App = () => {
                       element={
                         <ProtectedRoute>
                           <RoleBindingView />
+                        </ProtectedRoute>
+                      }
+                    />
+                    <Route
+                      path="/cluster/namespace"
+                      element={
+                        <ProtectedRoute>
+                          <NamespacesView />
                         </ProtectedRoute>
                       }
                     />

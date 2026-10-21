@@ -8,7 +8,6 @@ export type StubRoute = {
 export const stubRoutes: StubRoute[] = [
   { path: '/dashboard/workload-map', title: 'Workload', admin: false },
   { path: '/cluster-permission/cluster-role-binding', title: 'ClusterRoleBindings', admin: false },
-  { path: '/cluster/namespace', title: 'Namespaces', admin: false },
   { path: '/cluster/node', title: 'Nodes', admin: false },
   { path: '/cluster/crd', title: 'CRDs', admin: false },
   { path: '/workload/pods', title: 'Pods', admin: false },
