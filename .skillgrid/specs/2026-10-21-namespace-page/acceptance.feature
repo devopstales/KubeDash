@@ -1,7 +1,7 @@
 Feature: Manage namespaces on the selected cluster
-  # briefing.md. 4.1 namespace list + guarded create/delete on the
-  # header-selected cluster. Scenario names are the SATISFIES oracle for
-  # TASK-028 and the Vitest/pytest titles.
+  # briefing.md. 4.1 namespace list + guarded create/delete + Namespace
+  # Data object page on the header-selected cluster. Scenario names are
+  # the SATISFIES oracle for TASK-028/TASK-029 and the Vitest/pytest titles.
 
   Background:
     Given the KubeDash single-page app with the API mocked
@@ -13,6 +13,7 @@ Feature: Manage namespaces on the selected cluster
     When the operator opens "/cluster/namespace"
     Then the page shows Status, Namespace, Repository, Pipeline, Created, and Action
     And safe repository and pipeline annotations are links
+    And each namespace name is a link to its Namespace Data page
 
   Scenario: authorized-admin-creates-a-namespace
     # happy path
@@ -60,6 +61,23 @@ Feature: Manage namespaces on the selected cluster
       | kube-system       |
       | kube-public       |
       | kube-node-lease   |
+
+  Scenario: operator-opens-a-namespace-object-page
+    # happy path
+    Given the selected cluster contains namespaces
+    When the operator opens a namespace name from the list
+    Then the Namespace Data page shows status, name, created, annotations, and labels
+
+  Scenario: namespace-object-page-without-a-name
+    # edge
+    When the operator opens the Namespace Data page without a name
+    Then the page shows that the namespace name was not provided
+
+  Scenario: namespace-object-page-missing-namespace
+    # failure
+    Given the selected cluster contains namespaces
+    When the operator opens the Namespace Data page for a name that is not in the list
+    Then the page shows that the namespace was not found
 
   Scenario: mutation-error-renders-inline
     # failure

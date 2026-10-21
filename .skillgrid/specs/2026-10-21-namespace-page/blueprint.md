@@ -30,7 +30,8 @@
 - Modify `frontend/src/lib/types.ts`: Kubernetes Namespace shape.
 - Modify `frontend/src/components/AppHeader.jsx`: keep the shared namespace query value as raw resource items.
 - Create `frontend/src/views/Cluster/Namespaces.tsx`: 4.1 list and mutation UI.
-- Modify `frontend/src/App.tsx`: real protected route.
+- Create `frontend/src/views/Cluster/NamespaceData.tsx`: 4.1 Namespace Data object page.
+- Modify `frontend/src/App.tsx`: real protected list and object-page routes.
 - Modify `frontend/src/views/Stub/routes.ts`: remove the namespace placeholder.
 - Create `frontend/tests/views/namespaces.test.tsx`: view behavior tests.
 - Modify `frontend/tests/views/Stub.test.tsx`: remove Namespaces from placeholder expectations.
@@ -1143,7 +1144,28 @@ git diff --cached --quiet || git commit -m "chore: satisfy namespace quality gat
 
 ## Self-Review
 
-- Spec coverage: list columns, annotation links, create/delete, two authorization gates, protected namespaces, shared cache refresh, selected namespace clearing, safe URLs, loading/empty/error states, and idempotent DELETE are all assigned to Tasks 2–4.
+- Spec coverage: list columns, name links to Namespace Data, annotation links, create/delete, two authorization gates, protected namespaces, shared cache refresh, selected namespace clearing, safe URLs, loading/empty/error states, and idempotent DELETE are all assigned to Tasks 2–4 and Task 6.
+
+---
+
+### Task 6: Namespace Data Object Page
+
+**Files:**
+- Modify: `frontend/src/lib/types.ts`
+- Modify: `frontend/src/views/Cluster/Namespaces.tsx`
+- Create: `frontend/src/views/Cluster/NamespaceData.tsx`
+- Modify: `frontend/src/App.tsx`
+- Modify: `frontend/tests/views/namespaces.test.tsx`
+
+**Interfaces:**
+- Consumes: shared `['namespaces', clusterId]` list and `K8sNamespace` metadata (name, status.phase, creation_timestamp, annotations, labels).
+- Produces: name links to `/cluster/namespace/data?name=<name>`; object page accepts 4.1 `?namespace=` as the object name.
+
+- [ ] **Step 1: Write failing link and object-page tests**
+- [ ] **Step 2: Confirm they fail because the name is plain text and the data view is missing**
+- [ ] **Step 3: Link the Namespace column and add the Namespace Data view plus route**
+- [ ] **Step 4: Run `pnpm --dir frontend exec vitest run tests/views/namespaces.test.tsx`**
+- [ ] **Step 5: Commit the object page**
 - Placeholder scan: no deferred implementation markers remain.
 - Type consistency: backend methods use `name: str`; API and frontend mutation payloads use `{name: string}`; frontend reads Kubernetes `creation_timestamp`, annotations, and `status.phase`.
 - Scope: NaaS requests, provisioning, annotation editing, and bulk delete remain excluded.

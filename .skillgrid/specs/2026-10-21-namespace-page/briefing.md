@@ -30,6 +30,12 @@ Status comes from `status.phase`. Created comes from
 Only HTTP(S) values render as links; missing or invalid values render as an
 em dash.
 
+Each Namespace cell is a link to the 4.1 Namespace Data object page at
+`/cluster/namespace/data?name=<name>` (the 4.1 `?namespace=` query is also
+accepted). That page shows Status, Name, Created, Annotations, and Labels
+for the named namespace on the selected cluster. A missing name or a
+namespace that is not in the list renders an error inside the card.
+
 The selected cluster comes from the shared cluster store. If no cluster is
 selected, the page shows a prompt and does not make a resource request.
 Loading, empty, and API-error states render inside the card.
@@ -103,14 +109,16 @@ After create or delete, it invalidates that key so both surfaces refresh.
 If the deleted namespace is selected, the store selection is cleared.
 
 The `/cluster/namespace` entry is removed from `stubRoutes` and replaced by a
-lazy-loaded protected route. External annotation links use
-`target="_blank"` and `rel="noreferrer"`.
+lazy-loaded protected route. `/cluster/namespace/data` is the Namespace Data
+object page. External annotation links use `target="_blank"` and
+`rel="noreferrer"`.
 
 ## Verification
 
 Write the acceptance feature before implementation. It covers:
 
-- Listing namespaces in the selected cluster.
+- Listing namespaces in the selected cluster with name links to Namespace Data.
+- Opening the Namespace Data object page for a named namespace.
 - Admin namespace creation.
 - Admin namespace deletion with confirmation.
 - Hidden mutation controls for non-admin users.
@@ -120,9 +128,10 @@ Backend tests cover create/delete client calls, admin and Kubernetes
 authorization gates, duplicate mapping, idempotent delete, protected
 namespaces, and the absence of a client call on rejected deletion.
 
-Frontend Vitest/MSW tests cover the six 4.1 columns, annotation links, add and
-delete flows, query refresh, admin-only actions, loading/empty/error states,
-and protected namespace behavior.
+Frontend Vitest/MSW tests cover the six 4.1 columns, name links to Namespace
+Data, the object page fields and missing-name/missing-namespace errors,
+annotation links, add and delete flows, query refresh, admin-only actions,
+loading/empty/error states, and protected namespace behavior.
 
 Final verification runs targeted backend and frontend tests, `task fe-build`,
 `task fe-check`, and `qlty check --fix --level=low --trigger agent`.
