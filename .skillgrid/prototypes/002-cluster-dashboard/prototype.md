@@ -36,15 +36,20 @@ build?"). The three variants differ only in the *metrics* visualization:
 > **Revision 2 (2026-10-22):** the user wanted more than used/free on CPU and Memory — **requests
 > and limits**, and a way to see **overcommit**. First cut added bars + an allocation table.
 >
-> **Revision 3 (2026-10-22, final C):** the user wanted **only two rows** — row 1 charts, row 2
-> events — and **multi-line donut charts** (not bars). C is now: **row 1** = three **multi-segment
-> donuts** (CPU / Memory / Pods), each donut carrying **used / requests / limits** as stacked
-> segments (the Pods donut: running / pending / completed / free); **row 2** = the same bordered
-> events table. The overcommit signal is now *in* the donut: a segment past the ring edge means
-> that value exceeds capacity (Memory's requests segment is the overcommit). The header badge keeps
-> the explicit flag ("Requests 98% · ok" / "Requests 150% · overbooked"). Encoded distinction holds:
-> **overcommit = requests vs capacity** (the real risk); **limits > 100% is burst headroom**, not
-> overcommit. Sample: CPU requests 98% (ok), Memory requests **150% (overbooked)**.
+> **Revision 3 (2026-10-22):** the user wanted **only two rows** — row 1 charts, row 2
+> events — and **multi-line donut charts** (not bars). First cut used *stacked segments in one
+> ring*; the user said that was **not** the 4.1 look.
+>
+> **Revision 4 (2026-10-22, final C):** "multi-line" = **concentric rings** (multiple parallel
+> donuts stacked, the 4.1 radial-gauge idiom). C is now: **row 1** = CPU / Memory as
+> **concentric multi-line donuts** — **three rings** on ONE capacity scale, outer = **limits**,
+> middle = **requests**, inner = **used** (each ring = that value's % of capacity; a ring drawn as a
+> full circle = at/past capacity). Plus the **Pods** donut (running / pending / completed / free).
+> **Row 2** = the same bordered events table. The overcommit signal is the **requests ring**: when
+> requests exceed capacity the ring is a full circle and the legend/badge carry the over-capacity
+> amount (Memory requests 150% → overbooked). Encoded distinction holds: **overcommit = requests vs
+> capacity** (the real risk); **limits > 100% is burst headroom**, not overcommit. Sample: CPU
+> requests 98% (ok), Memory requests **150% (overbooked)**.
 
 The real risk is not "does a canvas draw" but whether each layout holds inside the locked
 constraints: one shadowed card per *task* (metrics and events are two tasks → two cards is legal),
@@ -86,10 +91,10 @@ Each page: two-row header (page action in row 2), a quiet cluster-status strip, 
 - **A** — one metrics card (four `border` tiles + progress; Storage = **unknown**) + one events
   card (bordered table, severity badges, "Live · SSE"). No canvas.
 - **B** — four 4.1 tiles + a **line chart** (CPU % + Memory % over 1h) + events table.
-- **C** — **two rows**: row 1 = three **multi-line donut** cards (CPU / Memory / Pods, each with a
-  center % label and stacked **used/requests/limits** segments — the 4.1 donut idiom, overcommit
-  visible in the ring); row 2 = the **same bordered events table** as A/B. Most faithful to the
-  4.1 original.
+- **C** — **two rows**: row 1 = CPU / Memory as **concentric multi-line donuts** (three rings on one
+  capacity scale: **limits / requests / used**, the 4.1 radial-gauge idiom — overcommit = the
+  requests ring exceeding capacity) + a **Pods** donut (running/pending/completed/free); row 2 = the
+  **same bordered events table** as A/B. Most faithful to the 4.1 original.
 
 A failure would be: a canvas that doesn't draw, a chart that breaks in dark mode, a second accent
 color, a CDN request, or a metric with no source shown as `0`.
@@ -117,6 +122,11 @@ color, a CDN request, or a metric with no source shown as `0`.
   **multi-segment** (used/requests/limits stacked; Pods = running/pending/completed/free). Verified:
   `canvasCount:3`, `allDrew:true`, events is the bordered table, overcommit badges render
   ("Requests 98% · ok" / "Requests 150% · overbooked"), 0 external requests — light **and** dark.
+- **Edge case — C revision 4 (2026-10-22, final):** "multi-line" = **concentric rings**. CPU/Memory
+  donuts rebuilt as 3 rings (limits/requests/used, 6 data points each, `cutout:'40%'`), all on one
+  capacity scale; per-ring legend added. Verified via `Chart.getChart('donut-cpu')`:
+  `data.length:6`, `labels:['Limits','Requests','Used']`; `allDrew:true`; events is the bordered
+  table; 0 external requests — light **and** dark.
 - **Surprise:** `@coreui/chartjs` ships **ESM only** — no `window.` global — so it can't back a
   static mockup. Option A therefore uses CoreUI *native* primitives, which is exactly what
   "built-in CoreUI" means. (The real build can use `CWidget*`; the mockup can't via script tag.)

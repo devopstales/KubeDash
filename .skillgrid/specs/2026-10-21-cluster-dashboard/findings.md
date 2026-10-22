@@ -15,13 +15,14 @@ verdict; the blueprint reads this file, it does not re-run the experiment.
     bordered table** as A/B. File renamed `dashboard-c-mission-control.html` →
     `dashboard-c-41-donut.html`. The center-text donut idiom (`centerText` Chart.js plugin +
     `cutout:'68%'`) is the reusable pattern for the real build.
-  - **C revised again (2026-10-22):** the user wanted **requests + limits + overcommit**, not just
-    used/free. C's CPU/Memory cards now show a used donut + three bars (Used/Requests/Limits) with
-    the over-capacity portion **striped**, an **overcommit flag** (Σ requests ÷ capacity), and an
-    allocation summary table. Encoded distinction: **overcommit = requests ratio** (the real risk);
-    **limits > 100% is expected burst headroom, not overcommit**. The real build needs a **new
-    cluster-allocation rollup** endpoint (sum `spec.containers[].resources.requests/limits` vs
-    `status.capacity`) — the current `resources/<kind>` endpoint does not aggregate.
+  - **C revised again (2026-10-22, final):** the user wanted **requests + limits + overcommit**,
+    rendered as **concentric multi-line donuts** (the 4.1 radial-gauge idiom — three parallel rings),
+    in a **two-row** layout (row 1 charts, row 2 events). CPU/Memory = 3 rings on ONE capacity scale
+    (outer limits / middle requests / inner used); Pods = a single multi-segment donut. Overcommit =
+    the **requests ring** exceeding capacity. Encoded distinction: **overcommit = requests ratio**
+    (the real risk); **limits > 100% is expected burst headroom, not overcommit**. The real build
+    needs a **new cluster-allocation rollup** endpoint (sum `spec.containers[].resources.requests/limits`
+    vs `status.capacity`) — the current `resources/<kind>` endpoint does not aggregate.
   - **Chart.js is already vendored** (`chart.js`, `@coreui/react-chartjs`, `@coreui/chartjs` in
     `package.json`) — no new dependency, ADR gate not triggered. The UMD build loads via script tag
     for mockups; the real build uses `react-chartjs-2` / `@coreui/react-chartjs`.
