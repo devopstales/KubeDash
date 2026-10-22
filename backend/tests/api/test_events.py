@@ -26,35 +26,49 @@ KUBECONFIG = (
     "  user: {}\n"
 )
 
-# Events in OLDER-first order (the API must sort newest-first).
-EVENTS = [
-    {
-        "type": "Normal",
-        "reason": "Pulled",
-        "message": "Container image pulled",
-        "count": 1,
-        "firstTimestamp": "2026-10-20T00:00:00Z",
-        "lastTimestamp": "2026-10-20T00:00:00Z",
-        "involvedObject": {
+
+def _event(seq: int, ns: str = "default") -> dict:
+    """One event item in the EXACT ``CoreV1Event.to_dict()`` shape
+    (kubernetes 37.0.1): snake_case keys, ``datetime`` for
+    ``last_timestamp``, full ``involved_object`` reference with null
+    fields. ``seq`` maps to microsecond-offset from a fixed base so any
+    count produces unique, sortable timestamps."""
+    import datetime
+    import zoneinfo
+
+    base = datetime.datetime(2026, 10, 20, 0, 0, 0, tzinfo=zoneinfo.ZoneInfo("UTC"))
+    t = base + datetime.timedelta(microseconds=seq)
+    return {
+        "action": None,
+        "api_version": None,
+        "count": seq,
+        "event_time": None,
+        "first_timestamp": t,
+        "involved_object": {
+            "api_version": None,
+            "field_path": None,
             "kind": "Pod",
-            "name": "web-0",
-            "namespace": "default",
+            "name": f"pod-{seq}",
+            "namespace": ns,
+            "resource_version": None,
+            "uid": None,
         },
-    },
-    {
-        "type": "Warning",
-        "reason": "BackOff",
-        "message": "Back-off restarting failed container",
-        "count": 5,
-        "firstTimestamp": "2026-10-20T00:01:00Z",
-        "lastTimestamp": "2026-10-20T00:02:00Z",
-        "involvedObject": {
-            "kind": "Pod",
-            "name": "db-0",
-            "namespace": "prod",
-        },
-    },
-]
+        "kind": None,
+        "last_timestamp": t,
+        "message": f"message {seq}",
+        "metadata": {"name": f"evt-{seq}", "namespace": ns},
+        "reason": "BackOff" if seq % 2 else "Pulled",
+        "related": None,
+        "reporting_component": None,
+        "reporting_instance": None,
+        "series": None,
+        "source": None,
+        "type": "Warning" if seq % 2 else "Normal",
+    }
+
+
+# Two events in OLDER-first order (the API must sort newest-first).
+EVENTS = [_event(1), _event(2)]
 
 
 class FakeK8s:
@@ -123,7 +137,8 @@ def _events(api_client, headers) -> object:
 
 def test_events_200_newest_first(api_client, auth_client, fake_k8s, monkeypatch) -> None:
     """events-endpoint-lists (happy path): 200, events sorted newest-first
-    by last_timestamp desc, snake_case fields present."""
+    by last_timestamp desc, EventOut fields present in the real
+    ``CoreV1Event.to_dict()`` shape (snake_case, datetime timestamps)."""
     auth_client.login()
     h = {"Authorization": f"Bearer {auth_client.jwt}"}
     _register(api_client, h)
@@ -133,10 +148,10 @@ def test_events_200_newest_first(api_client, auth_client, fake_k8s, monkeypatch)
     body = r.get_json()
     assert isinstance(body, list)
     assert len(body) == 2
-    # Newest first: Warning/BackOff (lastTimestamp 00:02) before Normal/Pulled (00:00).
-    assert body[0]["reason"] == "BackOff"
-    assert body[1]["reason"] == "Pulled"
-    # snake_case fields present on each event.
+    # Newest first: seq 2 (last_timestamp 00:01) before seq 1 (00:00).
+    assert body[0]["involved_object"]["name"] == "pod-2"
+    assert body[1]["involved_object"]["name"] == "pod-1"
+    # EventOut fields present and shaped correctly on each event.
     for item in body:
         assert item["type"] in ("Normal", "Warning")
         assert "reason" in item
@@ -144,9 +159,12 @@ def test_events_200_newest_first(api_client, auth_client, fake_k8s, monkeypatch)
         assert "count" in item
         assert "last_timestamp" in item
         io = item["involved_object"]
-        assert io["kind"] is not None
-        assert io["name"] is not None
-        assert io["namespace"] is not None
+        assert io["kind"] == "Pod"
+        assert io["name"]
+        assert io["namespace"]
+    # last_timestamp round-trips as the RFC-1123 string jsonify emits for
+    # the datetime the client form carries.
+    assert "2026" in body[0]["last_timestamp"]
 
 
 def test_events_rbac_denied(api_client, auth_client, fake_k8s, monkeypatch) -> None:
@@ -175,3 +193,21 @@ def test_events_403_before_pool(api_client, auth_client, fake_k8s, monkeypatch) 
     fake_k8s.list_events = boom  # type: ignore[method-assign]
     r = _events(api_client, h)
     assert r.status_code == 403
+
+
+def test_events_limit_100(api_client, auth_client, fake_k8s, monkeypatch) -> None:
+    """Default limit: 150 events on the cluster -> exactly 100 returned,
+    the NEWEST 100, newest-first."""
+    fake_k8s.list_events = lambda _namespace: [_event(i) for i in range(150)]
+    auth_client.login()
+    h = {"Authorization": f"Bearer {auth_client.jwt}"}
+    _register(api_client, h)
+    _allow_all(monkeypatch)
+    r = _events(api_client, h)
+    assert r.status_code == 200, r.get_json()
+    body = r.get_json()
+    assert len(body) == 100
+    # Newest first: the first item is the newest (seq 149), the last the
+    # oldest of the returned window (seq 50).
+    assert body[0]["involved_object"]["name"] == "pod-149"
+    assert body[-1]["involved_object"]["name"] == "pod-50"
