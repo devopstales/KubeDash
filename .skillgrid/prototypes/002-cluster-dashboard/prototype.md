@@ -24,7 +24,14 @@ build?"). The three variants differ only in the *metrics* visualization:
 |---|------|-------------|------------|----------|----------|
 | A | `dashboard-a-coreui.html` | CoreUI built-in (border tiles + `progress` bars) | bordered table | **none** | minimal dependency; fastest to ship |
 | B | `dashboard-b-chartjs-41.html` | 4.1 tiles + a **line chart** (CPU/Mem, 1h) | bordered table | UMD | the 4.1 look with real trend history |
-| C | `dashboard-c-mission-control.html` | **gauges** (CPU/Mem) + **donut** (pod phases) | vertical **timeline** | UMD | at-a-glance "mission control" |
+| C | `dashboard-c-41-donut.html` | **donut** charts (CPU / Memory / Pods) with center % (4.1 donut style) | bordered table (same as A/B) | UMD | the 4.1 donut look, most faithful to the original |
+
+> **Revision (2026-10-22):** C was originally a "mission control" layout (half-gauges + a pods
+> donut + an events **timeline**). The user judged that the *most similar to the 4.1 original* is
+> the donut style, so C was revised: gauges → **donut** charts (CPU/Mem/Pods, center % label, the
+> 4.1 donut idiom), and the events **timeline** → the **same bordered table** used by A/B. The
+> revised file is `dashboard-c-41-donut.html` (the old `dashboard-c-mission-control.html` was
+> removed). A and B are unchanged.
 
 The real risk is not "does a canvas draw" but whether each layout holds inside the locked
 constraints: one shadowed card per *task* (metrics and events are two tasks → two cards is legal),
@@ -66,8 +73,8 @@ Each page: two-row header (page action in row 2), a quiet cluster-status strip, 
 - **A** — one metrics card (four `border` tiles + progress; Storage = **unknown**) + one events
   card (bordered table, severity badges, "Live · SSE"). No canvas.
 - **B** — four 4.1 tiles + a **line chart** (CPU % + Memory % over 1h) + events table.
-- **C** — two **gauge** cards (CPU/Mem, center % text) + a **pods donut** (Running/Pending) + an
-  **events timeline** (vertical feed, colored dots).
+- **C** — three **donut** cards (CPU / Memory / Pods, each with a center % label — the 4.1 donut
+  idiom) + the **same bordered events table** as A/B. Most faithful to the 4.1 original.
 
 A failure would be: a canvas that doesn't draw, a chart that breaks in dark mode, a second accent
 color, a CDN request, or a metric with no source shown as `0`.
@@ -84,9 +91,13 @@ color, a CDN request, or a metric with no source shown as `0`.
   `package.json` (no new dependency, ADR-gate not triggered).
 - **Edge case — dark mode (B):** toggled dark → `bodyBg rgb(29,34,43)`, chart redraws with
   theme-aware grid/tick colors, still drawn. ✔
-- **Edge case — dark mode (C):** toggled dark → all 3 canvases still drawn; gauge center-text color
-  follows `getComputedStyle(document.body).color` (light→dark text), so the "41%"/"63%" labels stay
-  legible. ✔
+- **Edge case — dark mode (C, revised):** toggled dark → all 3 donuts still drawn; the center %
+  text color follows `getComputedStyle(document.body).color` (light→dark), so "41%"/"63%" stay
+  legible; events table + `text-bg-danger` badge recompute to the dark danger tone
+  (`rgb(222,90,90)`). ✔
+- **Edge case — C revision (2026-10-22):** gauges replaced by donuts (same center-text plugin,
+  `cutout:'68%'`), events timeline replaced by the A/B bordered table. Verified: `canvasCount:3`,
+  `allDrew:true`, `eventsIsTable:true`, `timelineGone:true`, 0 external requests — light **and** dark.
 - **Surprise:** `@coreui/chartjs` ships **ESM only** — no `window.` global — so it can't back a
   static mockup. Option A therefore uses CoreUI *native* primitives, which is exactly what
   "built-in CoreUI" means. (The real build can use `CWidget*`; the mockup can't via script tag.)
@@ -119,7 +130,9 @@ Storage tile shows the word **unknown** (no source), never `0`.
 ## Signal for the Build
 
 - **What to use:** the three HTML files as visual/structural reference. All three already respect the
-  two-row header, single-shadowed-card-per-task, badge status, and the certainty rule.
+  two-row header, single-shadowed-card-per-task, badge status, and the certainty rule. C (revised) is
+  the 4.1-faithful donut layout; its center-text donut pattern (the `centerText` Chart.js plugin +
+  `cutout:'68%'`) is the reusable idiom for the real build.
 - **What to avoid:** a relative CSS/JS `<link>`/`<script>` in the final view (bundled). Don't add a
   second accent color or a marketing hero.
 - **What to watch out for:** (1) events endpoint is the real work, not the layout; (2) charts must

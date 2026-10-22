@@ -7,10 +7,14 @@ verdict; the blueprint reads this file, it does not re-run the experiment.
 
 - **Verdict:** VALIDATED ✓ (comparison — 3 variants, all buildable; winner is the user's call)
 - **What we learned:**
-  - All three cluster-dashboard layouts (CoreUI built-in / Chart.js 4.1 + line trend / mission
-    control gauges + donut + events timeline) render correctly inside the locked CoreUI
-    constraints — one shadowed card per task, status as badges, CoreUI tokens only, air-gapped,
-    light + dark.
+  - All three cluster-dashboard layouts (CoreUI built-in / Chart.js 4.1 + line trend / 4.1-faithful
+    donuts + events table) render correctly inside the locked CoreUI constraints — one shadowed card
+    per task, status as badges, CoreUI tokens only, air-gapped, light + dark.
+  - **C revised (2026-10-22):** the user judged the donut style most similar to the 4.1 original.
+    C's gauges → **donut** charts (CPU/Mem/Pods, center % label), events timeline → the **same
+    bordered table** as A/B. File renamed `dashboard-c-mission-control.html` →
+    `dashboard-c-41-donut.html`. The center-text donut idiom (`centerText` Chart.js plugin +
+    `cutout:'68%'`) is the reusable pattern for the real build.
   - **Chart.js is already vendored** (`chart.js`, `@coreui/react-chartjs`, `@coreui/chartjs` in
     `package.json`) — no new dependency, ADR gate not triggered. The UMD build loads via script tag
     for mockups; the real build uses `react-chartjs-2` / `@coreui/react-chartjs`.

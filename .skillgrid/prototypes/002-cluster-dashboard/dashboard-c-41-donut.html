@@ -3,7 +3,7 @@
 <head>
 <meta charset="utf-8" />
 <meta name="viewport" content="width=device-width, initial-scale=1" />
-<title>KubeDash — Cluster Dashboard · Option C (new · mission control)</title>
+<title>KubeDash — Cluster Dashboard · Option C (4.1 · donuts + events table)</title>
 <!-- Local CoreUI + local Chart.js UMD. No CDN. -->
 <link rel="stylesheet" href="../../../frontend/node_modules/@coreui/coreui/dist/css/coreui.min.css" />
 <style>
@@ -11,16 +11,7 @@
   [data-coreui-theme='dark'] body { background-color: var(--cui-dark-bg-subtle); }
   .icon { width: 1rem; height: 1rem; }
   .icon-lg { width: 1.25rem; height: 1.25rem; }
-  .gauge-wrap { position: relative; height: 170px; }
-  .donut-wrap { position: relative; height: 220px; }
-  .timeline { list-style: none; margin: 0; padding: 0; border-left: 2px solid var(--cui-border-color); }
-  .timeline li { position: relative; padding: 0 0 1rem 1.25rem; }
-  .timeline li::before {
-    content: ''; position: absolute; left: -7px; top: 4px; width: 12px; height: 12px;
-    border-radius: 50%; background: var(--cui-secondary); border: 2px solid var(--cui-body-bg);
-  }
-  .timeline li.crit::before { background: var(--cui-danger); }
-  .timeline li.warn::before { background: var(--cui-warning); }
+  .donut-wrap { position: relative; height: 200px; }
 </style>
 </head>
 <body>
@@ -59,13 +50,21 @@
   <main class="body flex-grow-1">
     <div class="container-fluid px-4">
 
-      <!-- Row: two gauges (CPU, Memory) + a pods donut -->
+      <!-- Cluster status strip -->
+      <div class="d-flex flex-wrap align-items-center gap-2 mb-3" role="status" aria-label="Cluster status">
+        <span class="text-primary fw-semibold small">production-1</span>
+        <span class="badge text-bg-success">Active</span>
+        <span class="text-muted small">API https://api.prod1.example:6443 · 4 nodes</span>
+        <span class="text-muted small ms-auto">Last probe 14:32:05 UTC</span>
+      </div>
+
+      <!-- Row: CPU donut + Memory donut + Pods donut (4.1 donut style, Chart.js) -->
       <div class="row g-3 mb-4">
         <div class="col-lg-4">
           <div class="card shadow h-100">
             <div class="card-header py-3"><h5 class="card-title m-0 fw-bold text-primary fs-6">CPU</h5></div>
             <div class="card-body d-flex flex-column align-items-center">
-              <div class="gauge-wrap w-100"><canvas id="gauge-cpu" role="img" aria-label="CPU usage gauge"></canvas></div>
+              <div class="donut-wrap w-100"><canvas id="donut-cpu" role="img" aria-label="CPU usage donut"></canvas></div>
               <div class="small text-muted">3,280 / 8,000 millicores · observed</div>
             </div>
           </div>
@@ -74,7 +73,7 @@
           <div class="card shadow h-100">
             <div class="card-header py-3"><h5 class="card-title m-0 fw-bold text-primary fs-6">Memory</h5></div>
             <div class="card-body d-flex flex-column align-items-center">
-              <div class="gauge-wrap w-100"><canvas id="gauge-mem" role="img" aria-label="Memory usage gauge"></canvas></div>
+              <div class="donut-wrap w-100"><canvas id="donut-mem" role="img" aria-label="Memory usage donut"></canvas></div>
               <div class="small text-muted">101 / 160 GiB · observed</div>
             </div>
           </div>
@@ -90,41 +89,56 @@
         </div>
       </div>
 
-      <!-- Events timeline (new: vertical feed, not a table) -->
+      <!-- Events: the SAME bordered table as A/B (not a timeline) -->
       <section class="card shadow mb-4">
         <div class="card-header py-3 d-flex align-items-center">
-          <h5 class="card-title m-0 fw-bold text-primary fs-6">Event Stream</h5>
+          <h5 class="card-title m-0 fw-bold text-primary fs-6">Events</h5>
           <span class="badge text-bg-secondary ms-2">Live · SSE</span>
         </div>
         <div class="card-body">
-          <ul class="timeline">
-            <li class="crit">
-              <div class="d-flex align-items-center gap-2"><span class="text-nowrap small text-muted">14:32:05</span><span class="badge text-bg-danger">FailedMount</span></div>
-              <div class="small"><a href="#">orders-service-7d9f</a> <span class="text-muted">· prod</span></div>
-              <div class="text-break small text-muted">MountVolume.SetUp failed: timeout waiting for volume <span class="text-muted">(×3)</span></div>
-            </li>
-            <li class="crit">
-              <div class="d-flex align-items-center gap-2"><span class="text-nowrap small text-muted">14:31:48</span><span class="badge text-bg-danger">OOMKilled</span></div>
-              <div class="small"><a href="#">billing-worker-4c2b</a> <span class="text-muted">· prod</span></div>
-              <div class="text-break small text-muted">Container billing exceeded memory limit 512Mi</div>
-            </li>
-            <li class="warn">
-              <div class="d-flex align-items-center gap-2"><span class="text-nowrap small text-muted">14:31:02</span><span class="badge text-bg-warning">BackOff</span></div>
-              <div class="small"><a href="#">search-api-5f1e</a> <span class="text-muted">· staging</span></div>
-              <div class="text-break small text-muted">Back-off restarting failed container <span class="text-muted">(×7)</span></div>
-            </li>
-            <li>
-              <div class="d-flex align-items-center gap-2"><span class="text-nowrap small text-muted">14:28:47</span><span class="badge text-bg-secondary">Pulled</span></div>
-              <div class="small"><a href="#">orders-service-7d9f</a> <span class="text-muted">· prod</span></div>
-              <div class="text-break small text-muted">Container image pulled (cache hit)</div>
-            </li>
-            <li class="crit">
-              <div class="d-flex align-items-center gap-2"><span class="text-nowrap small text-muted">14:25:19</span><span class="badge text-bg-danger">FailedScheduling</span></div>
-              <div class="small"><a href="#">ml-trainer-job-9x2</a> <span class="text-muted">· staging</span></div>
-              <div class="text-break small text-muted">0/4 nodes available: insufficient memory</div>
-            </li>
-          </ul>
-          <div class="mt-2 small text-muted">5 newest of 134 events in the last 15 minutes.</div>
+          <table class="table table-bordered align-middle mb-0">
+            <thead>
+              <tr><th>Time</th><th>Severity</th><th>Object</th><th>Namespace</th><th>Reason</th><th>Message</th><th>Count</th></tr>
+            </thead>
+            <tbody>
+              <tr>
+                <td class="text-nowrap">14:32:05</td>
+                <td><span class="badge text-bg-danger">Warning</span></td>
+                <td>orders-service-7d9f</td><td><a href="#">prod</a></td>
+                <td>FailedMount</td>
+                <td class="text-break">MountVolume.SetUp failed: timeout waiting for volume</td><td>3</td>
+              </tr>
+              <tr>
+                <td class="text-nowrap">14:31:48</td>
+                <td><span class="badge text-bg-danger">Warning</span></td>
+                <td>billing-worker-4c2b</td><td><a href="#">prod</a></td>
+                <td>OOMKilled</td>
+                <td class="text-break">Container billing exceeded memory limit 512Mi</td><td>1</td>
+              </tr>
+              <tr>
+                <td class="text-nowrap">14:31:02</td>
+                <td><span class="badge text-bg-warning">Warning</span></td>
+                <td>search-api-5f1e</td><td><a href="#">staging</a></td>
+                <td>BackOff</td>
+                <td class="text-break">Back-off restarting failed container</td><td>7</td>
+              </tr>
+              <tr>
+                <td class="text-nowrap">14:28:47</td>
+                <td><span class="badge text-bg-secondary">Normal</span></td>
+                <td>orders-service-7d9f</td><td><a href="#">prod</a></td>
+                <td>Pulled</td>
+                <td class="text-break">Container image pulled (cache hit)</td><td>1</td>
+              </tr>
+              <tr>
+                <td class="text-nowrap">14:25:19</td>
+                <td><span class="badge text-bg-danger">Warning</span></td>
+                <td>ml-trainer-job-9x2</td><td><a href="#">staging</a></td>
+                <td>FailedScheduling</td>
+                <td class="text-break">0/4 nodes available: insufficient memory</td><td>1</td>
+              </tr>
+            </tbody>
+          </table>
+          <div class="mt-3 small text-muted">5 newest of 134 events in the last 15 minutes · 3 critical, 1 warning, 1 normal.</div>
         </div>
       </section>
 
@@ -132,13 +146,34 @@
   </main>
 </div>
 
+<!-- Local Chart.js UMD (air-gapped). Same library react-chartjs-2 wraps. -->
 <script src="../../../frontend/node_modules/chart.js/dist/chart.umd.min.js"></script>
 <script>
-  const charts = []
-  function gauge(id, pct, color) {
+  // Center-text plugin: draw a % label in the donut hole (4.1 donut style).
+  const centerText = {
+    id: 'centerText',
+    afterDraw(c) {
+      const meta = c.getDatasetMeta(0)
+      const arc = meta.data[0]
+      if (!arc) return
+      const { x, y } = arc
+      const pct = c.$pct
+      c.ctx.save()
+      c.ctx.font = '600 1.5rem system-ui, sans-serif'
+      c.ctx.textAlign = 'center'
+      c.ctx.textBaseline = 'middle'
+      c.ctx.fillStyle = getComputedStyle(document.body).color
+      c.ctx.fillText(pct + '%', x, y - 6)
+      c.ctx.restore()
+    },
+  }
+
+  let charts = []
+  function donut(id, pct, color, pctLabel) {
     return new Chart(document.getElementById(id), {
       type: 'doughnut',
       data: {
+        labels: [pctLabel, 'Free'],
         datasets: [{
           data: [pct, 100 - pct],
           backgroundColor: [color, 'rgba(128,128,128,0.15)'],
@@ -146,42 +181,27 @@
         }],
       },
       options: {
-        cutout: '72%', rotation: -90, circumference: 180, responsive: true, maintainAspectRatio: false,
+        cutout: '68%', responsive: true, maintainAspectRatio: false,
         plugins: { legend: { display: false }, tooltip: { enabled: false } },
       },
-      plugins: [{
-        id: 'center',
-        afterDraw(c) {
-          const { ctx } = c
-          const meta = c.getDatasetMeta(0)
-          const arc = meta.data[0]
-          if (!arc) return
-          const { x, y } = arc
-          ctx.save()
-          ctx.font = '600 1.5rem system-ui, sans-serif'
-          ctx.textAlign = 'center'
-          ctx.textBaseline = 'middle'
-          ctx.fillStyle = getComputedStyle(document.body).color
-          ctx.fillText(pct + '%', x, y - 6)
-          ctx.restore()
-        },
-      }],
+      plugins: [centerText],
+      $pct: pct,
     })
   }
   function redraw(dark) {
     charts.forEach((c) => c.destroy())
-    charts.length = 0
+    charts = []
     const tick = dark ? '#a0a6bd' : '#4e5860'
-    charts.push(gauge('gauge-cpu', 41, '#5e5cd0'))
-    charts.push(gauge('gauge-mem', 63, '#f9b115'))
+    charts.push(donut('donut-cpu', 41, '#5e5cd0', 'CPU'))
+    charts.push(donut('donut-mem', 63, '#f9b115', 'Mem'))
     charts.push(new Chart(document.getElementById('donut-pods'), {
       type: 'doughnut',
       data: {
-        labels: ['Running', 'Pending', 'Succeeded/Completed'],
+        labels: ['Running', 'Pending', 'Completed'],
         datasets: [{ data: [92, 36, 0], backgroundColor: ['#1b9e3e', '#f9b115', '#5e5cd0'], borderWidth: 0 }],
       },
       options: {
-        cutout: '60%', responsive: true, maintainAspectRatio: false,
+        cutout: '68%', responsive: true, maintainAspectRatio: false,
         plugins: { legend: { position: 'bottom', labels: { color: tick, boxWidth: 12 } } },
       },
     }))
