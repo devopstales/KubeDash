@@ -3,7 +3,7 @@
 <head>
 <meta charset="utf-8" />
 <meta name="viewport" content="width=device-width, initial-scale=1" />
-<title>KubeDash — Cluster Dashboard · Option C (4.1 · donuts + overcommit + events table)</title>
+<title>KubeDash — Cluster Dashboard · Option C (4.1 · multi-line donuts + events)</title>
 <!-- Local CoreUI + local Chart.js UMD. No CDN. -->
 <link rel="stylesheet" href="../../../frontend/node_modules/@coreui/coreui/dist/css/coreui.min.css" />
 <style>
@@ -11,10 +11,7 @@
   [data-coreui-theme='dark'] body { background-color: var(--cui-dark-bg-subtle); }
   .icon { width: 1rem; height: 1rem; }
   .icon-lg { width: 1.25rem; height: 1.25rem; }
-  .donut-wrap { position: relative; height: 180px; }
-  /* bar rows: label + stacked usage bar */
-  .bar-row { margin-bottom: .75rem; }
-  .bar-label { display: flex; justify-content: space-between; font-size: .72rem; margin-bottom: .25rem; }
+  .donut-wrap { position: relative; height: 210px; }
 </style>
 </head>
 <body>
@@ -53,139 +50,57 @@
   <main class="body flex-grow-1">
     <div class="container-fluid px-4">
 
-      <!-- Cluster status strip -->
-      <div class="d-flex flex-wrap align-items-center gap-2 mb-3" role="status" aria-label="Cluster status">
-        <span class="text-primary fw-semibold small">production-1</span>
-        <span class="badge text-bg-success">Active</span>
-        <span class="text-muted small">API https://api.prod1.example:6443 · 4 nodes</span>
-        <span class="text-muted small ms-auto">Last probe 14:32:05 UTC</span>
-      </div>
-
-      <!-- CPU + Memory: donut (observed) + capacity/requests/limits bars + overcommit flag -->
+      <!-- Row 1: charts (multi-line donuts: used / requests / limits) -->
       <div class="row g-3 mb-4">
-        <!-- CPU (NOT overbooked: requests 7,800 / capacity 8,000) -->
-        <div class="col-lg-6">
+
+        <!-- CPU: capacity 8,000m. used 3,280 (41%), requests 7,800 (98%), limits 9,200 (115%). -->
+        <!-- Not overbooked (requests < capacity). Ring shows used+requests+limits stacked; the
+             ring overflows past the 8,000m capacity mark (the striped limits tail). -->
+        <div class="col-lg-4">
           <div class="card shadow h-100">
             <div class="card-header py-3 d-flex align-items-center">
               <h5 class="card-title m-0 fw-bold text-primary fs-6">CPU</h5>
-              <span class="badge text-bg-success ms-2" id="cpu-flag">Within limits</span>
+              <span class="badge text-bg-success ms-2">Requests 98% · ok</span>
             </div>
-            <div class="card-body">
-              <div class="row align-items-center g-3">
-                <div class="col-5">
-                  <div class="donut-wrap"><canvas id="donut-cpu" role="img" aria-label="CPU usage donut"></canvas></div>
-                </div>
-                <div class="col-7">
-                  <!-- Used (observed) -->
-                  <div class="bar-row">
-                    <div class="bar-label"><span class="text-muted">Used (observed)</span><span>41% · 3,280 / 8,000m</span></div>
-                    <div class="progress" style="height:10px;"><div class="progress-bar" style="width:41%"></div></div>
-                  </div>
-                  <!-- Requests (declared) -->
-                  <div class="bar-row">
-                    <div class="bar-label"><span class="text-muted">Requests (declared)</span><span>98% · 7,800 / 8,000m</span></div>
-                    <div class="progress" style="height:10px;"><div class="progress-bar bg-primary" style="width:98%"></div></div>
-                  </div>
-                  <!-- Limits (declared) -->
-                  <div class="bar-row">
-                    <div class="bar-label"><span class="text-muted">Limits (declared)</span><span>115% · 9,200 / 8,000m</span></div>
-                    <div class="progress" style="height:10px;">
-                      <div class="progress-bar bg-info" style="width:87%"></div>
-                      <div class="progress-bar bg-danger progress-bar-striped" style="width:13%"></div>
-                    </div>
-                  </div>
-                </div>
-              </div>
-              <div class="small text-muted mt-2">
-                Limits over capacity (115%) is normal — it's a burst ceiling, not overcommit.
-                Overcommit is the <strong>requests</strong> ratio; CPU requests are at 98% (healthy).
-              </div>
+            <div class="card-body d-flex flex-column align-items-center">
+              <div class="donut-wrap w-100"><canvas id="donut-cpu" role="img" aria-label="CPU used, requests and limits donut"></canvas></div>
+              <div class="small text-muted mt-2">capacity 8,000m · used 41% · limits 115% (burst headroom)</div>
             </div>
           </div>
         </div>
 
-        <!-- Memory (OVERBOOKED: requests 240 GiB / capacity 160 GiB = 150%) -->
-        <div class="col-lg-6">
+        <!-- Memory: capacity 160 GiB. used 101 (63%), requests 240 (150%), limits 288 (180%). -->
+        <!-- OVERBOOKED: requests (150%) alone exceed the ring. The requests segment is the overcommit. -->
+        <div class="col-lg-4">
           <div class="card shadow h-100">
             <div class="card-header py-3 d-flex align-items-center">
               <h5 class="card-title m-0 fw-bold text-primary fs-6">Memory</h5>
-              <span class="badge text-bg-warning ms-2" id="mem-flag">Overbooked · requests 150%</span>
+              <span class="badge text-bg-warning ms-2">Requests 150% · overbooked</span>
             </div>
-            <div class="card-body">
-              <div class="row align-items-center g-3">
-                <div class="col-5">
-                  <div class="donut-wrap"><canvas id="donut-mem" role="img" aria-label="Memory usage donut"></canvas></div>
-                </div>
-                <div class="col-7">
-                  <div class="bar-row">
-                    <div class="bar-label"><span class="text-muted">Used (observed)</span><span>63% · 101 / 160 GiB</span></div>
-                    <div class="progress" style="height:10px;"><div class="progress-bar bg-warning" style="width:63%"></div></div>
-                  </div>
-                  <div class="bar-row">
-                    <div class="bar-label"><span class="text-muted">Requests (declared)</span><span>150% · 240 / 160 GiB</span></div>
-                    <div class="progress" style="height:10px;">
-                      <div class="progress-bar bg-primary" style="width:67%"></div>
-                      <div class="progress-bar bg-warning progress-bar-striped" style="width:33%"></div>
-                    </div>
-                  </div>
-                  <div class="bar-row">
-                    <div class="bar-label"><span class="text-muted">Limits (declared)</span><span>180% · 288 / 160 GiB</span></div>
-                    <div class="progress" style="height:10px;">
-                      <div class="progress-bar bg-info" style="width:56%"></div>
-                      <div class="progress-bar bg-danger progress-bar-striped" style="width:44%"></div>
-                    </div>
-                  </div>
-                </div>
-              </div>
-              <div class="small text-muted mt-2">
-                <span class="text-warning fw-semibold">Overcommitted:</span> pods request 240 GiB but the
-                cluster has 160 GiB. If all requests were used at once, 80 GiB short → OOM eviction
-                risk under pressure. Observed usage (63%) is below capacity, so it's not tight <em>today</em>.
-              </div>
+            <div class="card-body d-flex flex-column align-items-center">
+              <div class="donut-wrap w-100"><canvas id="donut-mem" role="img" aria-label="Memory used, requests and limits donut"></canvas></div>
+              <div class="small text-muted mt-2">capacity 160 GiB · used 63% · requests exceed capacity by 50%</div>
             </div>
           </div>
         </div>
-      </div>
 
-      <!-- Pods donut (unchanged) -->
-      <div class="row g-3 mb-4">
+        <!-- Pods: capacity 140. running 92, pending 36, completed 0 (128 active). -->
         <div class="col-lg-4">
           <div class="card shadow h-100">
-            <div class="card-header py-3"><h5 class="card-title m-0 fw-bold text-primary fs-6">Pods</h5></div>
+            <div class="card-header py-3 d-flex align-items-center">
+              <h5 class="card-title m-0 fw-bold text-primary fs-6">Pods</h5>
+              <span class="badge text-bg-secondary ms-2">128 / 140</span>
+            </div>
             <div class="card-body d-flex flex-column align-items-center">
-              <div class="donut-wrap"><canvas id="donut-pods" role="img" aria-label="Pods by phase"></canvas></div>
-              <div class="small text-muted">128 total · storage unknown</div>
+              <div class="donut-wrap w-100"><canvas id="donut-pods" role="img" aria-label="Pods by phase donut"></canvas></div>
+              <div class="small text-muted mt-2">capacity 140 · running 92 · pending 36 · completed 0</div>
             </div>
           </div>
         </div>
-        <div class="col-lg-8">
-          <div class="card shadow h-100">
-            <div class="card-header py-3"><h5 class="card-title m-0 fw-bold text-primary fs-6">Allocation summary</h5></div>
-            <div class="card-body">
-              <table class="table table-bordered align-middle mb-0">
-                <thead><tr><th>Resource</th><th>Capacity</th><th>Used (observed)</th><th>Requests (declared)</th><th>Limits (declared)</th><th>Overcommit (requests)</th></tr></thead>
-                <tbody>
-                  <tr>
-                    <td>CPU</td><td>8,000m</td><td>3,280m (41%)</td><td>7,800m (98%)</td><td>9,200m (115%)</td>
-                    <td><span class="badge text-bg-success">98% · ok</span></td>
-                  </tr>
-                  <tr>
-                    <td>Memory</td><td>160 GiB</td><td>101 GiB (63%)</td><td>240 GiB (150%)</td><td>288 GiB (180%)</td>
-                    <td><span class="badge text-bg-warning">150% · overbooked</span></td>
-                  </tr>
-                </tbody>
-              </table>
-              <div class="small text-muted mt-2">
-                Overcommit = Σ requests ÷ capacity. Above 100% means the cluster promises more than
-                it has — schedulable today, but eviction risk if requests are realized. Limits over
-                100% is expected (burst headroom) and is <em>not</em> overcommit.
-              </div>
-            </div>
-          </div>
-        </div>
+
       </div>
 
-      <!-- Events: the SAME bordered table as A/B -->
+      <!-- Row 2: events (the SAME bordered table as A/B) -->
       <section class="card shadow mb-4">
         <div class="card-header py-3 d-flex align-items-center">
           <h5 class="card-title m-0 fw-bold text-primary fs-6">Events</h5>
@@ -245,17 +160,16 @@
 <!-- Local Chart.js UMD (air-gapped). -->
 <script src="../../../frontend/node_modules/chart.js/dist/chart.umd.min.js"></script>
 <script>
+  // Center % label (observed usage).
   const centerText = {
     id: 'centerText',
     afterDraw(c) {
-      const meta = c.getDatasetMeta(0)
-      const arc = meta.data[0]
+      const arc = c.getDatasetMeta(0).data[0]
       if (!arc) return
       const { x, y } = arc
       c.ctx.save()
       c.ctx.font = '600 1.4rem system-ui, sans-serif'
-      c.ctx.textAlign = 'center'
-      c.ctx.textBaseline = 'middle'
+      c.ctx.textAlign = 'center'; c.ctx.textBaseline = 'middle'
       c.ctx.fillStyle = getComputedStyle(document.body).color
       c.ctx.fillText(c.$pct + '%', x, y - 6)
       c.ctx.restore()
@@ -263,36 +177,50 @@
   }
 
   let charts = []
-  function donut(id, pct, color, label) {
+  // Multi-line donut: segments [used, requests, limits] normalized to the ring.
+  // The ring is scaled so the FIRST segment (used) maps to its real % of capacity;
+  // requests/limits are the same scale, so a segment past the ring edge = over capacity.
+  function resourceDonut(id, { used, requests, limits, capacity, color, pct }) {
+    // Scale: ring total = capacity. Segments in same unit. Chart.js draws them
+    // proportionally; the legend + caption carry the absolute numbers.
     return new Chart(document.getElementById(id), {
       type: 'doughnut',
       data: {
-        labels: [label, 'Free'],
-        datasets: [{ data: [pct, 100 - pct], backgroundColor: [color, 'rgba(128,128,128,0.15)'], borderWidth: 0 }],
+        labels: ['Used', 'Requests', 'Limits (headroom)'],
+        datasets: [{
+          // used, then requests-above-used, then limits-above-requests -> stacked multi-line ring
+          data: [used, Math.max(0, requests - used), Math.max(0, limits - requests)],
+          backgroundColor: [color, 'rgba(94,92,208,0.55)', 'rgba(128,128,128,0.35)'],
+          borderWidth: 0,
+        }],
       },
       options: {
-        cutout: '68%', responsive: true, maintainAspectRatio: false,
-        plugins: { legend: { display: false }, tooltip: { enabled: false } },
+        cutout: '62%', responsive: true, maintainAspectRatio: false,
+        plugins: {
+          legend: { position: 'bottom', labels: { color: cctx(), boxWidth: 12 } },
+          tooltip: { enabled: false },
+        },
       },
       plugins: [centerText],
       $pct: pct,
     })
   }
+  function cctx() { return document.documentElement.getAttribute('data-coreui-theme') === 'dark' ? '#a0a6bd' : '#4e5860' }
+
   function redraw(dark) {
     charts.forEach((c) => c.destroy())
     charts = []
-    const tick = dark ? '#a0a6bd' : '#4e5860'
-    charts.push(donut('donut-cpu', 41, '#5e5cd0', 'CPU'))
-    charts.push(donut('donut-mem', 63, '#f9b115', 'Mem'))
+    charts.push(resourceDonut('donut-cpu', { used: 3280, requests: 7800, limits: 9200, capacity: 8000, color: '#5e5cd0', pct: 41 }))
+    charts.push(resourceDonut('donut-mem', { used: 101, requests: 240, limits: 288, capacity: 160, color: '#f9b115', pct: 63 }))
     charts.push(new Chart(document.getElementById('donut-pods'), {
       type: 'doughnut',
       data: {
-        labels: ['Running', 'Pending', 'Completed'],
-        datasets: [{ data: [92, 36, 0], backgroundColor: ['#1b9e3e', '#f9b115', '#5e5cd0'], borderWidth: 0 }],
+        labels: ['Running', 'Pending', 'Completed', 'Free'],
+        datasets: [{ data: [92, 36, 0, 12], backgroundColor: ['#1b9e3e', '#f9b115', '#5e5cd0', 'rgba(128,128,128,0.15)'], borderWidth: 0 }],
       },
       options: {
-        cutout: '68%', responsive: true, maintainAspectRatio: false,
-        plugins: { legend: { position: 'bottom', labels: { color: tick, boxWidth: 12 } } },
+        cutout: '62%', responsive: true, maintainAspectRatio: false,
+        plugins: { legend: { position: 'bottom', labels: { color: cctx(), boxWidth: 12 } } },
       },
     }))
   }

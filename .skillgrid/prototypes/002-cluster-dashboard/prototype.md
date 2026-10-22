@@ -34,14 +34,17 @@ build?"). The three variants differ only in the *metrics* visualization:
 > removed). A and B are unchanged.
 >
 > **Revision 2 (2026-10-22):** the user wanted more than used/free on CPU and Memory — **requests
-> and limits**, and a way to see **overcommit**. C's CPU and Memory cards now show, per resource:
-> an observed **used** donut + three **bars** (Used-observed / Requests-declared / Limits-declared)
-> where the portion of a bar past 100% of capacity is rendered **striped** (over capacity), plus a
-> header **overcommit flag** (success "Within limits" / warning "Overbooked · requests 150%"). An
-> **allocation summary table** (Capacity / Used / Requests / Limits / Overcommit) sits beside the
-> pods donut. Key distinction encoded: **overcommit = Σ requests ÷ capacity** (the real risk);
-> **limits over 100% is expected** burst headroom and is *not* overcommit. Sample data: CPU
-> requests 98% (ok), Memory requests **150% (overbooked)**.
+> and limits**, and a way to see **overcommit**. First cut added bars + an allocation table.
+>
+> **Revision 3 (2026-10-22, final C):** the user wanted **only two rows** — row 1 charts, row 2
+> events — and **multi-line donut charts** (not bars). C is now: **row 1** = three **multi-segment
+> donuts** (CPU / Memory / Pods), each donut carrying **used / requests / limits** as stacked
+> segments (the Pods donut: running / pending / completed / free); **row 2** = the same bordered
+> events table. The overcommit signal is now *in* the donut: a segment past the ring edge means
+> that value exceeds capacity (Memory's requests segment is the overcommit). The header badge keeps
+> the explicit flag ("Requests 98% · ok" / "Requests 150% · overbooked"). Encoded distinction holds:
+> **overcommit = requests vs capacity** (the real risk); **limits > 100% is burst headroom**, not
+> overcommit. Sample: CPU requests 98% (ok), Memory requests **150% (overbooked)**.
 
 The real risk is not "does a canvas draw" but whether each layout holds inside the locked
 constraints: one shadowed card per *task* (metrics and events are two tasks → two cards is legal),
@@ -83,8 +86,10 @@ Each page: two-row header (page action in row 2), a quiet cluster-status strip, 
 - **A** — one metrics card (four `border` tiles + progress; Storage = **unknown**) + one events
   card (bordered table, severity badges, "Live · SSE"). No canvas.
 - **B** — four 4.1 tiles + a **line chart** (CPU % + Memory % over 1h) + events table.
-- **C** — three **donut** cards (CPU / Memory / Pods, each with a center % label — the 4.1 donut
-  idiom) + the **same bordered events table** as A/B. Most faithful to the 4.1 original.
+- **C** — **two rows**: row 1 = three **multi-line donut** cards (CPU / Memory / Pods, each with a
+  center % label and stacked **used/requests/limits** segments — the 4.1 donut idiom, overcommit
+  visible in the ring); row 2 = the **same bordered events table** as A/B. Most faithful to the
+  4.1 original.
 
 A failure would be: a canvas that doesn't draw, a chart that breaks in dark mode, a second accent
 color, a CDN request, or a metric with no source shown as `0`.
@@ -108,6 +113,10 @@ color, a CDN request, or a metric with no source shown as `0`.
 - **Edge case — C revision (2026-10-22):** gauges replaced by donuts (same center-text plugin,
   `cutout:'68%'`), events timeline replaced by the A/B bordered table. Verified: `canvasCount:3`,
   `allDrew:true`, `eventsIsTable:true`, `timelineGone:true`, 0 external requests — light **and** dark.
+- **Edge case — C revision 3 (2026-10-22):** collapsed to two rows (charts / events); donuts became
+  **multi-segment** (used/requests/limits stacked; Pods = running/pending/completed/free). Verified:
+  `canvasCount:3`, `allDrew:true`, events is the bordered table, overcommit badges render
+  ("Requests 98% · ok" / "Requests 150% · overbooked"), 0 external requests — light **and** dark.
 - **Surprise:** `@coreui/chartjs` ships **ESM only** — no `window.` global — so it can't back a
   static mockup. Option A therefore uses CoreUI *native* primitives, which is exactly what
   "built-in CoreUI" means. (The real build can use `CWidget*`; the mockup can't via script tag.)
