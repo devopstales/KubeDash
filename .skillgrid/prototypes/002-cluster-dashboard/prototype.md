@@ -40,16 +40,21 @@ build?"). The three variants differ only in the *metrics* visualization:
 > events — and **multi-line donut charts** (not bars). First cut used *stacked segments in one
 > ring*; the user said that was **not** the 4.1 look.
 >
-> **Revision 4 (2026-10-22, final C):** "multi-line" = **concentric rings** (multiple parallel
-> donuts stacked, the 4.1 radial-gauge idiom). C is now: **row 1** = CPU / Memory as
-> **concentric multi-line donuts** — **three rings** on ONE capacity scale, outer = **limits**,
-> middle = **requests**, inner = **used** (each ring = that value's % of capacity; a ring drawn as a
-> full circle = at/past capacity). Plus the **Pods** donut (running / pending / completed / free).
-> **Row 2** = the same bordered events table. The overcommit signal is the **requests ring**: when
-> requests exceed capacity the ring is a full circle and the legend/badge carry the over-capacity
-> amount (Memory requests 150% → overbooked). Encoded distinction holds: **overcommit = requests vs
-> capacity** (the real risk); **limits > 100% is burst headroom**, not overcommit. Sample: CPU
-> requests 98% (ok), Memory requests **150% (overbooked)**.
+> **Revision 4 (2026-10-22):** "multi-line" = **concentric rings** (the 4.1 radial-gauge idiom).
+> First cut used `data.flat()` in ONE dataset — that draws **stacked arcs in a single ring**, not
+> parallel rings. Wrong.
+>
+> **Revision 5 (2026-10-22, final C):** true concentric multi-line donut = **three datasets** (one
+> per ring) in a single Chart.js doughnut, same center, **different radii** (verified
+> `outerRadius` 110/92/73). C is now: **row 1** = CPU / Memory as **three parallel rings** on ONE
+> capacity scale — outer = **limits**, middle = **requests**, inner = **used** (each ring = that
+> value's % of capacity; a ring filled to 100% = at/past capacity). Plus the **Pods** donut
+> (running / pending / completed / free). **Row 2** = the same bordered events table. The overcommit
+> signal is the **requests ring**: when requests exceed capacity that ring is fully filled and the
+> legend/badge carry the over-capacity amount (Memory requests 150% → overbooked). Encoded
+> distinction holds: **overcommit = requests vs capacity** (the real risk); **limits > 100% is burst
+> headroom**, not overcommit. Sample: CPU requests 98% (ok), Memory requests **150% (overbooked)**.
+> Reusable idiom for the build: 3-dataset doughnut + a `centerText` plugin for the center label.
 
 The real risk is not "does a canvas draw" but whether each layout holds inside the locked
 constraints: one shadowed card per *task* (metrics and events are two tasks → two cards is legal),
@@ -122,10 +127,12 @@ color, a CDN request, or a metric with no source shown as `0`.
   **multi-segment** (used/requests/limits stacked; Pods = running/pending/completed/free). Verified:
   `canvasCount:3`, `allDrew:true`, events is the bordered table, overcommit badges render
   ("Requests 98% · ok" / "Requests 150% · overbooked"), 0 external requests — light **and** dark.
-- **Edge case — C revision 4 (2026-10-22, final):** "multi-line" = **concentric rings**. CPU/Memory
-  donuts rebuilt as 3 rings (limits/requests/used, 6 data points each, `cutout:'40%'`), all on one
-  capacity scale; per-ring legend added. Verified via `Chart.getChart('donut-cpu')`:
-  `data.length:6`, `labels:['Limits','Requests','Used']`; `allDrew:true`; events is the bordered
+- **Edge case — C revision 4 (2026-10-22):** first concentric attempt used `data.flat()` in one
+  dataset — rendered as **stacked arcs in a single ring** (6 segments), not parallel rings. The user
+  correctly rejected it ("still not parallel donuts with the same center").
+- **Edge case — C revision 5 (2026-10-22, final):** switched to **3 datasets** (one per ring).
+  Verified via `Chart.getChart('donut-cpu')`: `datasetCount:3`, per-ring `outerRadius` = **110 / 92 /
+  73** (three distinct radii, same center — true concentric); `allDrew:true`; events is the bordered
   table; 0 external requests — light **and** dark.
 - **Surprise:** `@coreui/chartjs` ships **ESM only** — no `window.` global — so it can't back a
   static mockup. Option A therefore uses CoreUI *native* primitives, which is exactly what

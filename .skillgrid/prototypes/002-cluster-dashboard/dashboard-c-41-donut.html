@@ -183,43 +183,39 @@
   }
   const tickColor = () => document.documentElement.getAttribute('data-coreui-theme') === 'dark' ? '#a0a6bd' : '#4e5860'
 
-  // Concentric multi-line donut: THREE rings, all scaled to ONE `scale` value.
-  //   outer ring  = limits   (value/scale of the full circle)
-  //   middle ring = requests (value/scale of the full circle)  <- overcommit when this > 100%
-  //   inner ring  = used     (value/scale of the full circle)
-  // A ring that exceeds 100% of its scale is drawn as a full circle (the value is
-  // shown in the legend; the over-capacity amount is the badge + legend text).
+  // True concentric multi-line donut: THREE datasets = THREE rings of different
+  // radius, SAME center, ONE capacity scale. In a Chart.js doughnut, dataset 0 is
+  // the OUTER ring and each later dataset sits at a smaller radius (inner).
+  //   ring 0 (outer)  = limits
+  //   ring 1 (middle) = requests   <- overcommit when this > 100% of capacity
+  //   ring 2 (inner)  = used
+  // Each ring shows [value%, track%] so the ring is a full circle with a filled
+  // arc = value/capacity. A ring at 100% (value >= capacity) is fully filled.
   function concentricDonut(id, { used, requests, limits, scale, color, pct }) {
-    const clampPct = (v) => Math.min(100, (v / scale) * 100)
-    const data = [
-      [clampPct(limits), 100 - clampPct(limits)],
-      [clampPct(requests), 100 - clampPct(requests)],
-      [clampPct(used), 100 - clampPct(used)],
-    ]
+    const pctOf = (v) => Math.min(100, (v / scale) * 100)
+    const track = 'rgba(128,128,128,0.12)'
+    const ring = (val, fill) => {
+      const p = pctOf(val)
+      return {
+        data: [p, 100 - p],
+        backgroundColor: [fill, track],
+        borderWidth: 0,
+        // explicit ring geometry: outer->inner
+      }
+    }
     const chart = new Chart(document.getElementById(id), {
       type: 'doughnut',
       data: {
         labels: ['Limits', 'Requests', 'Used'],
-        datasets: [{
-          data: data.flat(),
-          backgroundColor: [
-            'rgba(128,128,128,0.45)',          // limits (outer)
-            'rgba(94,92,208,0.85)',           // requests (middle)
-            color,                            // used (inner)
-            'rgba(128,128,128,0.12)',         // track
-            'rgba(128,128,128,0.12)',
-            'rgba(128,128,128,0.12)',
-          ],
-          borderWidth: 0,
-        }],
+        datasets: [
+          ring(limits, 'rgba(128,128,128,0.45)'),   // outer
+          ring(requests, 'rgba(94,92,208,0.85)'),   // middle
+          ring(used, color),                         // inner
+        ],
       },
       options: {
-        cutout: '40%', responsive: true, maintainAspectRatio: false,
-        // group into 3 rings: 2 segments per ring, 3 rings
-        plugins: {
-          legend: { display: false },
-          tooltip: { enabled: false },
-        },
+        responsive: true, maintainAspectRatio: false,
+        plugins: { legend: { display: false }, tooltip: { enabled: false } },
       },
       plugins: [centerText],
       $pct: pct, $sub: 'used',
