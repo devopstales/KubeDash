@@ -11,6 +11,7 @@
   "/api/v1/logs/query",
   "/api/v1/metrics/query",
   "/api/v1/metrics/query_range",
+  "/api/v1/clusters/{cluster_id}/metrics/summary",
   "/api/v1/traces",
   "/api/v1/traces/{trace_id}",
   "/api/v1/audit",
