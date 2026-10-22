@@ -55,5 +55,7 @@ verdict; the blueprint reads this file, it does not re-run the experiment.
     add an events API. "Live · SSE" (ADR-0009) aspirational until wired.
   - **Metrics source** = ratified `metrics.k8s.io` (query-only, ADR-0003; see
     `../2026-10-21-cluster-node/adr.md`). Storage has no source → stays `unknown`.
-- **Decision needed:** the prototype does not pick the winner. Choose A / B / C before authoring
-  the blueprint.
+- **Decision (2026-10-22, user):** **Option C wins** — concentric multi-line donuts (3 rings:
+  limits/requests/used) + overcommit color model (dark tones of one hue per resource, red overflow
+  bar for the over-capacity part) + events table, two rows. A and B rejected. Recorded in
+  `briefing.md`; blueprint authored from it.
