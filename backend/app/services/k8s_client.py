@@ -18,9 +18,11 @@ without touching the APIs). Its ``factory`` kwarg is the test seam: unit
 tests inject a ``FakeK8s`` double, integration (Task 5) uses the default
 real-kubernetes factory.
 """
+
 import base64
 import contextlib
 import hashlib
+import json
 import os
 import secrets
 from typing import Any, Literal
@@ -135,6 +137,11 @@ class K8sClient:
     the scheme — so ``readyz`` never double-prefixes it.
     """
 
+    #: The Metrics API (``metrics.k8s.io``) cluster node-metrics path. Read
+    #: through the shared ``ApiClient`` (kubernetes 37.0.1 has no generated
+    #: ``MetricsV1beta1Api`` — see ``node_usage``).
+    _NODES_METRICS_PATH = "/apis/metrics.k8s.io/v1beta1/nodes"
+
     def __init__(self, kubeconfig: bytes | None = None, source: str = "registry") -> None:
         # ADR-0021: "registry" (decrypted kubeconfig row) or "admin"
         # (build_admin_client) — test assertions + future per-source policy.
@@ -195,6 +202,84 @@ class K8sClient:
         """Namespace list for the header selector. The resource route always
         passes the query namespace; it does not apply to this cluster-scoped kind."""
         return [n.to_dict() for n in self._v1.list_namespace().items]
+
+    def list_nodes(self, _namespace: str | None) -> list[dict[str, Any]]:
+        """Node list in the standard kubernetes dict form (``to_dict``).
+        Cluster-scoped; the query namespace does not apply (mirrors
+        ``list_namespaces``)."""
+        return [n.to_dict() for n in self._v1.list_node().items]
+
+    def node_usage(self) -> tuple[bool, dict[str, dict[str, int]]]:
+        """Node resource usage from the Metrics API (``metrics.k8s.io``).
+
+        Returns ``(available, {node_name: {cpu_millicores, memory_bytes}})``.
+        ``(False, {})`` on a missing Metrics API (404/5xx) — a cluster without
+        a metrics-server is the EXPECTED state, not an error (query-only,
+        ADR-0003): the caller must render ``used`` unknown, never 0. Any other
+        ApiException is a transport failure → 502 ``ClusterUnreachableError``
+        (the service never sees a raw ApiException).
+
+        ponytail: kubernetes 37.0.1 has NO ``MetricsV1beta1Api`` and no
+        ``V1NodeMetricsList`` model, so the read goes through the shared
+        ``ApiClient.call_api`` and parses the raw JSON body directly. Ceiling:
+        if a vendored Metrics API is ever added, swap this for the generated
+        ``read_node_metrics()`` call (no consumer changes — the return
+        contract is stable).
+        """
+        try:
+            resp = self._api_client.call_api("GET", [self._NODES_METRICS_PATH])
+        except ApiException as e:
+            if e.status in (404, 500, 502, 503):
+                return False, {}
+            self._unreachable("node_usage", e)
+            raise AssertionError("unreachable") from e
+        # call_api returns the raw RESTResponse WITHOUT reading the body
+        # (resp.data stays None until read() — the generated methods read it
+        # via response_deserialize; we have no model to deserialize into, so
+        # read the bytes ourselves and parse the JSON directly).
+        body = json.loads(resp.read().decode())
+        usage: dict[str, dict[str, int]] = {}
+        for item in body.get("items", []):
+            name = item["metadata"]["name"]
+            u = item.get("usage", {})
+            usage[name] = {
+                "cpu_millicores": self._parse_cpu(u.get("cpu")),
+                "memory_bytes": self._parse_bytes(u.get("memory")),
+            }
+        return True, usage
+
+    @staticmethod
+    def _parse_cpu(qty: str | None) -> int:
+        """K8s CPU quantity → millicores (``"800m"`` → 800, ``"1"`` → 1000)."""
+        if qty is None:
+            return 0
+        if qty.endswith("m"):
+            return int(qty[:-1])
+        return int(float(qty) * 1000)
+
+    @staticmethod
+    def _parse_bytes(qty: str | None) -> int:
+        """K8s quantity → bytes (``"4Gi"`` → 4*2**30, ``"2000"`` → 2000)."""
+        if qty is None:
+            return 0
+        # Binary suffixes first (``Gi`` before ``G``); a bare integer has no suffix.
+        for suffix, mult in (
+            ("Ki", 2**10),
+            ("Mi", 2**20),
+            ("Gi", 2**30),
+            ("Ti", 2**40),
+            ("Pi", 2**50),
+            ("Ei", 2**60),
+            ("K", 10**3),
+            ("M", 10**6),
+            ("G", 10**9),
+            ("T", 10**12),
+            ("P", 10**15),
+            ("E", 10**18),
+        ):
+            if qty.endswith(suffix):
+                return int(float(qty[: -len(suffix)]) * mult)
+        return int(qty)
 
     def create_namespace(self, name: str) -> dict[str, Any]:
         body = k8s_client.V1Namespace(metadata=k8s_client.V1ObjectMeta(name=name))
@@ -379,9 +464,7 @@ class K8sClient:
             role_ref=k8s_client.V1RoleRef(
                 kind="Role", name=role_name, api_group="rbac.authorization.k8s.io"
             ),
-            subjects=[
-                k8s_client.RbacV1Subject(kind=subject_kind, name=subject_user, api_group="")
-            ],
+            subjects=[k8s_client.RbacV1Subject(kind=subject_kind, name=subject_user, api_group="")],
         )
         self._apply("role_binding", name, namespace, body)
 
@@ -407,9 +490,7 @@ class K8sClient:
             role_ref=k8s_client.V1RoleRef(
                 kind="ClusterRole", name=role_name, api_group="rbac.authorization.k8s.io"
             ),
-            subjects=[
-                k8s_client.RbacV1Subject(kind=subject_kind, name=subject_user, api_group="")
-            ],
+            subjects=[k8s_client.RbacV1Subject(kind=subject_kind, name=subject_user, api_group="")],
         )
         self._apply("cluster_role_binding", name, None, body)
 
@@ -497,9 +578,7 @@ class K8sClientPool:
     identity, not the user's).
     """
 
-    def __init__(
-        self, factory: Any = K8sClient, admin_factory: Any = build_admin_client
-    ) -> None:
+    def __init__(self, factory: Any = K8sClient, admin_factory: Any = build_admin_client) -> None:
         self._factory = factory
         self._admin_factory = admin_factory
         self._cache: dict[int, Any] = {}
