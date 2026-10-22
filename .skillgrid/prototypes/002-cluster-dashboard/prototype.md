@@ -55,6 +55,16 @@ build?"). The three variants differ only in the *metrics* visualization:
 > distinction holds: **overcommit = requests vs capacity** (the real risk); **limits > 100% is burst
 > headroom**, not overcommit. Sample: CPU requests 98% (ok), Memory requests **150% (overbooked)**.
 > Reusable idiom for the build: 3-dataset doughnut + a `centerText` plugin for the center label.
+>
+> **Revision 6 (2026-10-22, final C):** overcommit color model. One base hue per resource —
+> **CPU = blue**, **Memory = amber** (a different hue) — and **Used / Requests / Limits are
+> progressively darker tones** of that hue (alpha 1.0 / 0.7 / 0.45) on a gray track. Because a
+> donut ring's full 360° **is** 100% of capacity, the part of a value **over 100% cannot be drawn
+> in the ring** (the user picked "donut + separate red overflow bar"): a thin **red bar** under each
+> donut is filled proportionally to the amount over capacity (e.g. Memory requests +50% → red bar 50%;
+> limits +80%). The bar uses the CoreUI danger token (no new color). The ring arcs cap at 100%
+> (at/past capacity = full ring). Sample: CPU requests 98% (ok, limits +15% red), Memory requests
+> **150%** (overbooked, requests +50% / limits +80% red).
 
 The real risk is not "does a canvas draw" but whether each layout holds inside the locked
 constraints: one shadowed card per *task* (metrics and events are two tasks → two cards is legal),
@@ -130,10 +140,18 @@ color, a CDN request, or a metric with no source shown as `0`.
 - **Edge case — C revision 4 (2026-10-22):** first concentric attempt used `data.flat()` in one
   dataset — rendered as **stacked arcs in a single ring** (6 segments), not parallel rings. The user
   correctly rejected it ("still not parallel donuts with the same center").
-- **Edge case — C revision 5 (2026-10-22, final):** switched to **3 datasets** (one per ring).
+- **Edge case — C revision 5 (2026-10-22):** switched to **3 datasets** (one per ring).
   Verified via `Chart.getChart('donut-cpu')`: `datasetCount:3`, per-ring `outerRadius` = **110 / 92 /
   73** (three distinct radii, same center — true concentric); `allDrew:true`; events is the bordered
   table; 0 external requests — light **and** dark.
+- **Edge case — C revision 6 (2026-10-22, final):** overcommit color model. CPU = blue, Memory =
+  amber; Used/Requests/Limits = darker tones (alpha 1.0/0.7/0.45) of the resource hue. The ring caps
+  at 100% of capacity (360°), so the **over-100% part is a separate RED overflow bar** (proportional
+  to the amount over capacity), CoreUI danger token. Verified via `Chart.getChart`: `cpuRadii
+  [100,83,67]`, `cpuUsedFill rgba(22,92,255,1)` vs `cpuLimFill rgba(22,92,255,0.45)` (blue tones),
+  `memLimFill rgba(249,177,21,0.45)` (amber — distinct hue), `cpuOverflowBar 15%`
+  (`limits +15%`), `memOverflowLabel "requests +50% · limits +80%"`, overflow bar `rgb(222,90,90)`
+  (danger) — light **and** dark.
 - **Surprise:** `@coreui/chartjs` ships **ESM only** — no `window.` global — so it can't back a
   static mockup. Option A therefore uses CoreUI *native* primitives, which is exactly what
   "built-in CoreUI" means. (The real build can use `CWidget*`; the mockup can't via script tag.)

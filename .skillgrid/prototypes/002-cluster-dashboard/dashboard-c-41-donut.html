@@ -3,7 +3,7 @@
 <head>
 <meta charset="utf-8" />
 <meta name="viewport" content="width=device-width, initial-scale=1" />
-<title>KubeDash — Cluster Dashboard · Option C (4.1 · concentric multi-line donuts + events)</title>
+<title>KubeDash — Cluster Dashboard · Option C (4.1 · concentric donuts + overcapacity bar)</title>
 <!-- Local CoreUI + local Chart.js UMD. No CDN. -->
 <link rel="stylesheet" href="../../../frontend/node_modules/@coreui/coreui/dist/css/coreui.min.css" />
 <style>
@@ -11,10 +11,14 @@
   [data-coreui-theme='dark'] body { background-color: var(--cui-dark-bg-subtle); }
   .icon { width: 1rem; height: 1rem; }
   .icon-lg { width: 1.25rem; height: 1.25rem; }
-  .donut-wrap { position: relative; height: 220px; }
+  .donut-wrap { position: relative; height: 200px; }
   .ring-legend { list-style: none; padding: 0; margin: .5rem 0 0; font-size: .72rem; }
   .ring-legend li { display: flex; align-items: center; gap: .4rem; margin-bottom: .2rem; }
   .ring-legend .swatch { width: 10px; height: 10px; border-radius: 2px; flex: 0 0 auto; }
+  /* red overcapacity overflow bar */
+  .overflow-wrap { margin-top: .6rem; width: 100%; }
+  .overflow-label { display: flex; justify-content: space-between; font-size: .68rem; margin-bottom: .2rem; }
+  .overflow-track { height: 8px; border-radius: 4px; background: rgba(128,128,128,0.18); overflow: hidden; }
 </style>
 </head>
 <body>
@@ -53,11 +57,11 @@
   <main class="body flex-grow-1">
     <div class="container-fluid px-4">
 
-      <!-- Row 1: charts (concentric multi-line donuts: limits / requests / used) -->
+      <!-- Row 1: charts (concentric donuts: used/requests/limits in dark tones + red overflow) -->
       <div class="row g-3 mb-4">
 
-        <!-- CPU: capacity 8,000m. used 3,280 (41%), requests 7,800 (98%), limits 9,200 (115%).
-             Three concentric rings on ONE capacity scale. Requests ring = 98% (inside full circle). -->
+        <!-- CPU: blue hue. capacity 8,000m. used 3,280 (41%), requests 7,800 (98%), limits 9,200 (115%). -->
+        <!-- Overcapacity (vs capacity): used 0, requests 0, limits 20%. -->
         <div class="col-lg-4">
           <div class="card shadow h-100">
             <div class="card-header py-3 d-flex align-items-center">
@@ -65,15 +69,19 @@
               <span class="badge text-bg-success ms-2">Requests 98% · ok</span>
             </div>
             <div class="card-body d-flex flex-column align-items-center">
-              <div class="donut-wrap w-100"><canvas id="donut-cpu" role="img" aria-label="CPU limits, requests and used concentric donut"></canvas></div>
+              <div class="donut-wrap w-100"><canvas id="donut-cpu" role="img" aria-label="CPU used, requests, limits concentric donut"></canvas></div>
               <ul class="ring-legend text-center" id="legend-cpu"></ul>
-              <div class="small text-muted mt-2">capacity 8,000m</div>
+              <div class="overflow-wrap">
+                <div class="overflow-label"><span class="text-muted">Over capacity</span><span id="ov-cpu">limits +20%</span></div>
+                <div class="overflow-track"><div id="bar-cpu" style="height:100%; background: var(--cui-danger); width:0%"></div></div>
+              </div>
+              <div class="small text-muted mt-2">capacity 8,000m · blue = CPU</div>
             </div>
           </div>
         </div>
 
-        <!-- Memory: capacity 160 GiB. used 101 (63%), requests 240 (150%), limits 288 (180%).
-             OVERBOOKED: requests ring (150%) exceeds the full circle. -->
+        <!-- Memory: amber hue. capacity 160 GiB. used 101 (63%), requests 240 (150%), limits 288 (180%). -->
+        <!-- Overcapacity (vs capacity): used 0, requests 50%, limits 80%. OVERBOOKED. -->
         <div class="col-lg-4">
           <div class="card shadow h-100">
             <div class="card-header py-3 d-flex align-items-center">
@@ -81,14 +89,21 @@
               <span class="badge text-bg-warning ms-2">Requests 150% · overbooked</span>
             </div>
             <div class="card-body d-flex flex-column align-items-center">
-              <div class="donut-wrap w-100"><canvas id="donut-mem" role="img" aria-label="Memory limits, requests and used concentric donut"></canvas></div>
+              <div class="donut-wrap w-100"><canvas id="donut-mem" role="img" aria-label="Memory used, requests, limits concentric donut"></canvas></div>
               <ul class="ring-legend text-center" id="legend-mem"></ul>
-              <div class="small text-muted mt-2">capacity 160 GiB</div>
+              <div class="overflow-wrap">
+                <div class="overflow-label"><span class="text-muted">Over capacity</span><span id="ov-mem">requests +50% · limits +80%</span></div>
+                <div class="overflow-track">
+                  <div style="height:100%; background: var(--cui-danger); width:50%"></div>
+                  <div style="height:100%; background: var(--cui-danger); opacity:.55; width:30%"></div>
+                </div>
+              </div>
+              <div class="small text-muted mt-2">capacity 160 GiB · amber = Memory</div>
             </div>
           </div>
         </div>
 
-        <!-- Pods: capacity 140. running 92, pending 36, completed 0. Single multi-segment donut. -->
+        <!-- Pods: single multi-segment donut. capacity 140. -->
         <div class="col-lg-4">
           <div class="card shadow h-100">
             <div class="card-header py-3 d-flex align-items-center">
@@ -98,7 +113,7 @@
             <div class="card-body d-flex flex-column align-items-center">
               <div class="donut-wrap w-100"><canvas id="donut-pods" role="img" aria-label="Pods by phase donut"></canvas></div>
               <ul class="ring-legend text-center" id="legend-pods"></ul>
-              <div class="small text-muted mt-2">capacity 140</div>
+              <div class="small text-muted mt-2">capacity 140 · running 92 · pending 36</div>
             </div>
           </div>
         </div>
@@ -162,7 +177,6 @@
   </main>
 </div>
 
-<!-- Local Chart.js UMD (air-gapped). -->
 <script src="../../../frontend/node_modules/chart.js/dist/chart.umd.min.js"></script>
 <script>
   const centerText = {
@@ -181,36 +195,28 @@
       c.ctx.restore()
     },
   }
-  const tickColor = () => document.documentElement.getAttribute('data-coreui-theme') === 'dark' ? '#a0a6bd' : '#4e5860'
 
-  // True concentric multi-line donut: THREE datasets = THREE rings of different
-  // radius, SAME center, ONE capacity scale. In a Chart.js doughnut, dataset 0 is
-  // the OUTER ring and each later dataset sits at a smaller radius (inner).
-  //   ring 0 (outer)  = limits
-  //   ring 1 (middle) = requests   <- overcommit when this > 100% of capacity
-  //   ring 2 (inner)  = used
-  // Each ring shows [value%, track%] so the ring is a full circle with a filled
-  // arc = value/capacity. A ring at 100% (value >= capacity) is fully filled.
-  function concentricDonut(id, { used, requests, limits, scale, color, pct }) {
-    const pctOf = (v) => Math.min(100, (v / scale) * 100)
-    const track = 'rgba(128,128,128,0.12)'
-    const ring = (val, fill) => {
-      const p = pctOf(val)
-      return {
-        data: [p, 100 - p],
-        backgroundColor: [fill, track],
-        borderWidth: 0,
-        // explicit ring geometry: outer->inner
-      }
-    }
-    const chart = new Chart(document.getElementById(id), {
+  // Color model: one base hue per resource. Used/Requests/Limits are
+  // progressively DARKER tones of that hue (alpha .45/.7/1.0). Track = gray.
+  // The part of a value OVER 100% of capacity is NOT in the ring (the ring
+  // is the full 360 = capacity) — it's shown as a RED overflow bar below.
+  function resourceDonut(id, { used, requests, limits, capacity, base, pct }) {
+    const darkTone = (a) => base.map(v => v) // keep hue
+    const rgba = (a) => `rgba(${base.join(',')},${a})`
+    const clampPct = (v) => Math.min(100, (v / capacity) * 100)
+    const ring = (val, alpha) => ({
+      data: [clampPct(val), 100 - clampPct(val)],
+      backgroundColor: [rgba(alpha), 'rgba(128,128,128,0.12)'],
+      borderWidth: 0,
+    })
+    return new Chart(document.getElementById(id), {
       type: 'doughnut',
       data: {
         labels: ['Limits', 'Requests', 'Used'],
         datasets: [
-          ring(limits, 'rgba(128,128,128,0.45)'),   // outer
-          ring(requests, 'rgba(94,92,208,0.85)'),   // middle
-          ring(used, color),                         // inner
+          ring(limits, 0.45),     // outer  - darkest... (lightest alpha, drawn outer)
+          ring(requests, 0.7),    // middle
+          ring(used, 1.0),        // inner  - full tone
         ],
       },
       options: {
@@ -220,33 +226,48 @@
       plugins: [centerText],
       $pct: pct, $sub: 'used',
     })
-    return chart
   }
 
-  function setLegend(el, rows) {
-    document.getElementById(el).innerHTML = rows
+  const setLegend = (id, rows) => {
+    document.getElementById(id).innerHTML = rows
       .map(r => `<li><span class="swatch" style="background:${r.c}"></span>${r.t}</li>`)
       .join('')
   }
 
+  // Red overflow bar: width = max overcapacity among used/requests/limits (vs capacity).
+  function setOverflow(barId, labelId, { used, requests, limits, capacity }) {
+    const over = (v) => Math.max(0, v - capacity) / capacity * 100
+    const u = over(used), r = over(requests), l = over(limits)
+    const total = Math.max(u, r, l)
+    const bar = document.getElementById(barId)
+    if (bar) bar.style.width = Math.min(100, total) + '%'
+    const parts = []
+    if (r > 0) parts.push(`requests +${Math.round(r)}%`)
+    if (l > 0) parts.push(`limits +${Math.round(l)}%`)
+    document.getElementById(labelId).textContent = parts.length ? parts.join(' · ') : 'none'
+  }
+
   let charts = []
-  function redraw(dark) {
+  function redraw() {
     charts.forEach((c) => c.destroy())
     charts = []
-    const tick = tickColor()
+    // CPU = blue (22,92,255). Memory = amber (249,177,21).
+    const BLUE = [22, 92, 255]
+    const AMBER = [249, 177, 21]
 
-    charts.push(concentricDonut('donut-cpu', { used: 3280, requests: 7800, limits: 9200, scale: 8000, color: '#5e5cd0', pct: 41 }))
+    charts.push(resourceDonut('donut-cpu', { used: 3280, requests: 7800, limits: 9200, capacity: 8000, base: BLUE, pct: 41 }))
     setLegend('legend-cpu', [
-      { c: '#5e5cd0', t: 'Used 41% · 3,280m' },
-      { c: 'rgba(94,92,208,0.85)', t: 'Requests 98% · 7,800m' },
-      { c: 'rgba(128,128,128,0.45)', t: 'Limits 115% · 9,200m' },
+      { c: 'rgba(22,92,255,1)', t: 'Used 41% · 3,280m' },
+      { c: 'rgba(22,92,255,0.7)', t: 'Requests 98% · 7,800m' },
+      { c: 'rgba(22,92,255,0.45)', t: 'Limits 115% · 9,200m' },
     ])
+    setOverflow('bar-cpu', 'ov-cpu', { used: 3280, requests: 7800, limits: 9200, capacity: 8000 })
 
-    charts.push(concentricDonut('donut-mem', { used: 101, requests: 240, limits: 288, scale: 160, color: '#f9b115', pct: 63 }))
+    charts.push(resourceDonut('donut-mem', { used: 101, requests: 240, limits: 288, capacity: 160, base: AMBER, pct: 63 }))
     setLegend('legend-mem', [
-      { c: '#f9b115', t: 'Used 63% · 101 GiB' },
-      { c: 'rgba(94,92,208,0.85)', t: 'Requests 150% · 240 GiB' },
-      { c: 'rgba(128,128,128,0.45)', t: 'Limits 180% · 288 GiB' },
+      { c: 'rgba(249,177,21,1)', t: 'Used 63% · 101 GiB' },
+      { c: 'rgba(249,177,21,0.7)', t: 'Requests 150% · 240 GiB' },
+      { c: 'rgba(249,177,21,0.45)', t: 'Limits 180% · 288 GiB' },
     ])
 
     charts.push(new Chart(document.getElementById('donut-pods'), {
@@ -257,22 +278,23 @@
       },
       options: {
         cutout: '58%', responsive: true, maintainAspectRatio: false,
-        plugins: { legend: { position: 'bottom', labels: { color: tick, boxWidth: 12 } } },
+        plugins: { legend: { position: 'bottom', labels: { color: tick(), boxWidth: 12 } } },
       },
     }))
     setLegend('legend-pods', [
       { c: '#1b9e3e', t: 'Running 92' },
       { c: '#f9b115', t: 'Pending 36' },
-      { c: '#5e5cd0', t: 'Completed 0' },
     ])
   }
+  const tick = () => document.documentElement.getAttribute('data-coreui-theme') === 'dark' ? '#a0a6bd' : '#4e5860'
+
   document.querySelectorAll('[data-theme]').forEach((button) => {
     button.addEventListener('click', () => {
       document.documentElement.setAttribute('data-coreui-theme', button.dataset.theme)
-      redraw(button.dataset.theme === 'dark')
+      redraw()
     })
   })
-  redraw(false)
+  redraw()
 </script>
 </body>
 </html>

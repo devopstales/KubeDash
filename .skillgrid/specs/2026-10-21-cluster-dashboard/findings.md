@@ -28,6 +28,12 @@ verdict; the blueprint reads this file, it does not re-run the experiment.
     (dataset 0 = outer ring, each later dataset = smaller radius). Using one dataset with a flat
     array of 6 values renders **stacked arcs in a single ring**, not parallel rings. Reusable build
     idiom: 3-dataset doughnut + a `centerText` plugin for the center label.
+  - **Overcommit color model (final C):** one base hue per resource (**CPU = blue**, **Memory =
+    amber**), Used/Requests/Limits as **progressively darker tones** (alpha 1.0/0.7/0.45) on a gray
+    track. A donut ring's 360° **is** 100% of capacity, so the **over-100% part can't be drawn in
+    the ring** — it's a separate **red overflow bar** (proportional to the amount over capacity),
+    CoreUI danger token (no new color). Overcommit = requests vs capacity; limits over 100% is burst
+    headroom.
   - **Chart.js is already vendored** (`chart.js`, `@coreui/react-chartjs`, `@coreui/chartjs` in
     `package.json`) — no new dependency, ADR gate not triggered. The UMD build loads via script tag
     for mockups; the real build uses `react-chartjs-2` / `@coreui/react-chartjs`.
