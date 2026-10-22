@@ -85,7 +85,13 @@ Pointers only (canonical in `.skillgrid/artifacts/01-business-terms.md` / `02-te
 - `frontend/src/views/Cluster/Dashboard.tsx` — **new**, the Option C view.
 - `frontend/src/components/ConcentricDonut.tsx` — **new**, the reusable 3-ring donut (3-dataset doughnut + center % + optional overflow bar).
 - `frontend/src/lib/types.ts` — `MetricsSummary`, `ClusterEvent` types.
-- `frontend/src/App.tsx` — wire `/dashboard` (or the nav's dashboard route) to the new view.
+- `frontend/src/App.tsx` — wire `/dashboard/cluster-metric` to the new view.
+- `frontend/src/_nav.tsx` — retarget the **Cluster Metrics** sidebar leaf from `/clusters` to
+  `/dashboard/cluster-metric` (Kubernetes Cluster keeps `/clusters` — decision, paladm, 2026-10-22;
+  supersedes the ADR-0022 "share the cluster list" pairing for this entry).
+- `frontend/tests/nav.test.tsx` — the `cluster-metrics-and-kubernetes-cluster-share-cluster-list`
+  test now expects `Cluster Metrics` → `/dashboard/cluster-metric` and Kubernetes Cluster →
+  `/clusters` (rename accordingly).
 - Tests: `backend/tests/services/test_cluster_allocation.py`, `backend/tests/api/test_metrics_summary.py`, `backend/tests/api/test_events.py`, `frontend/tests/views/dashboard.test.tsx`, `frontend/tests/components/ConcentricDonut.test.tsx`.
 
 **Key links:**
@@ -125,7 +131,9 @@ Pointers only (canonical in `.skillgrid/artifacts/01-business-terms.md` / `02-te
 - `frontend/src/components/ConcentricDonut.tsx` — **new** reusable 3-ring donut + overflow bar.
 - `frontend/src/views/Cluster/Dashboard.tsx` — **new** Option C view.
 - `frontend/src/lib/types.ts` — add `MetricsSummary`, `ClusterEvent`.
-- `frontend/src/App.tsx` — route the dashboard entry to the new view.
+- `frontend/src/App.tsx` — route `/dashboard/cluster-metric` to the new view.
+- `frontend/src/_nav.tsx` — Cluster Metrics leaf → `/dashboard/cluster-metric`.
+- `frontend/tests/nav.test.tsx` — update the Cluster Metrics expectation.
 - Tests (listed under Artifacts).
 
 ---
@@ -270,7 +278,9 @@ def test_compute_summary_metrics_unavailable():
 **Files:**
 - Create: `frontend/src/views/Cluster/Dashboard.tsx`
 - Modify: `frontend/src/lib/types.ts` (add `MetricsSummary`, `ClusterEvent`)
-- Modify: `frontend/src/App.tsx` (route the dashboard entry → `Dashboard`)
+- Modify: `frontend/src/App.tsx` (route `/dashboard/cluster-metric` → `Dashboard`)
+- Modify: `frontend/src/_nav.tsx` (Cluster Metrics leaf → `/dashboard/cluster-metric`)
+- Modify: `frontend/tests/nav.test.tsx` (Cluster Metrics expectation)
 - Test: `frontend/tests/views/dashboard.test.tsx`
 
 **Interfaces:**
@@ -284,18 +294,18 @@ def test_compute_summary_metrics_unavailable():
 - [ ] **Step 2: Run test to verify it fails** → FAIL.
 - [ ] **Step 3: Implement** — the Option C layout from the prototype: `TopMenu` breadcrumb (Dashboard), row 1 = three cards (CPU `ConcentricDonut` blue, Memory amber, Pods donut), row 2 = events `KubeDataTable`. Overcommit is delegated to `ConcentricDonut` (single source). **"Live · SSE" badge only if an SSE events channel exists** — do not fake it (omit the badge when absent). **Version-skew (shared handler):** a 404 from *either* `/metrics/summary` or `/events` (old backend) maps to `{status:'unknown'}` — render unknown, **not** a red error (with `retry:false` a 404 throws → query `error` state, so the view must explicitly catch 404 per query). The events table renders the endpoint's newest-first order; **drop the prototype's "N newest of M" footer** (the endpoint returns a flat list with no total count) or add `total` to `EventOut` if the footer is wanted — pick one and note it.
 - [ ] **Step 4: Run test to verify it passes** → PASS.
-- [ ] **Step 5: Wire the route** in `App.tsx`.
-- [ ] **Step 6: Commit** — `git commit -m "feat(fe): cluster dashboard view (concentric donuts + events)"`.
+- [ ] **Step 5: Wire the route** in `App.tsx` at `/dashboard/cluster-metric` (lazy import, `ProtectedRoute`, matching the other cluster views), and retarget the **Cluster Metrics** leaf in `_nav.tsx` to that path; update the `cluster-metrics-and-kubernetes-cluster-share-cluster-list` test in `nav.test.tsx` (rename it — e.g. `cluster-metrics-opens-dashboard`) to expect `Cluster Metrics` → `/dashboard/cluster-metric` while Kubernetes Cluster keeps `/clusters`.
+- [ ] **Step 6: Commit** — `git commit -m "feat(fe): cluster dashboard view (concentric donuts + events) at /dashboard/cluster-metric"`.
 
 ### Task 7: acceptance + quality gate
 
 **Files:**
-- Create: `tests/features/cluster-dashboard.acceptance.feature` (Cucumber BDD)
+- Create: `.skillgrid/specs/2026-10-21-cluster-dashboard/acceptance.feature` (Cucumber BDD — spec folder, not `tests/features/`; matches the sibling changes' convention)
 - Run: `qlty fmt`, `qlty check --fix --level=low --trigger agent`, `jscpd .`, full suites.
 
 **SATISFIES:** all scenarios above.
 
-- [ ] **Step 1: Author the `.feature`** — scenarios: summary overcommit, summary metrics-unavailable-not-zero, events list, RBAC denied, view renders rows, unknown used, no cluster, metrics-404-unknown, light+dark.
+- [ ] **Step 1: Author the `.feature`** — scenarios: summary overcommit, summary metrics-unavailable-not-zero, events list, RBAC denied, view renders rows, unknown used, no cluster, metrics-404-unknown, light+dark, cluster-metrics-nav-opens-dashboard.
 - [ ] **Step 2: Run the gate** — `uv run pytest -m "not integration"` (backend), `task fe-check` (air-gap), `qlty check --fix --level=low --trigger agent`.
 - [ ] **Step 3: Integration smoke (kind-gated, optional)** — against a kind cluster with a metrics-server, confirm real numbers + a red bar when overbooked; without a metrics-server, used = unknown. *backstop*.
 - [ ] **Step 4: Commit** — `git commit -m "test: cluster dashboard acceptance + quality gate"`.
@@ -320,7 +330,8 @@ def test_compute_summary_metrics_unavailable():
 
 ## Self-Review
 
-- **Spec coverage:** R1 (metrics) → Tasks 1–3; R2 (overcommit) → Tasks 1 (rollup) + 5 (donut red bar) + 6 (view); R3 (events) → Task 4 + 6; R4 (layout/shell) → Task 6; R5 (themes) → Tasks 5–6 (theme-aware charts). ✔
+- **Spec coverage:** R1 (metrics) → Tasks 1–3; R2 (overcommit) → Tasks 1 (rollup) + 5 (donut red bar) + 6 (view); R3 (events) → Task 4 + 6; R4 (layout/shell) → Task 6 (view + `/dashboard/cluster-metric` route + nav retarget); R5 (themes) → Tasks 5–6 (theme-aware charts). ✔
+- **Route decision:** the view is routed at `/dashboard/cluster-metric` (user decision, 2026-10-22); the sidebar's Cluster Metrics entry is retargeted to it (ADR-0022 pairing superseded for this entry; nav test updated in Task 6). ✔
 - **Must-haves coverage:** every truth/artifact/key-link maps to a task. The "unknown not zero" rule is covered in Tasks 1, 3, 6 + the threat matrix. ✔
 - **One-way doors:** new API routes (Tasks 3, 4) and the metrics source (Task 2) are listed in Must-Haves and tagged. ✔
 - **Owed decision:** metrics source → decided (metrics.k8s.io, ratified in the sibling ADR; recorded in the Decision note). Events source → named (informer cache per ADR-0010, fallback to CoreV1Api through the pool). No other owed decisions — every displayed value has a named source (Metrics API for used, pod specs for requests/limits, node status for capacity, informer cache for events, "unknown" where absent). ✔

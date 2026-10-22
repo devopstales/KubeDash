@@ -61,7 +61,10 @@ push channel. An event source does not exist yet — this is part of the build.
 ### R4 — Layout & shell
 Two-row dashboard (charts / events) inside the CoreUI shell: two-row header (page action in `TopMenu`
 row), cluster selector, theme toggle. One shadowed card per task; status as badges; color from CoreUI
-tokens only. No second accent, no webfont, no CDN (air gap, ADR-0020).
+tokens only. No second accent, no webfont, no CDN (air gap, ADR-0020). The view is routed at
+`/dashboard/cluster-metric`, and the sidebar's **Cluster Metrics** entry is retargeted to that path
+(decision, paladm, 2026-10-22 — supersedes ADR-0022's "Cluster Metrics shares the cluster list"
+pairing for this entry; Kubernetes Cluster keeps `/clusters`).
 
 ### R5 — Themes
 Light + dark must both work, including the charts (Chart.js grid/tick/legend colors from CoreUI

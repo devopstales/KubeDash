@@ -4,14 +4,14 @@
 # deeper truth (see .skillgrid/specs/).
 
 pipeline:
-  # Pointer repaired 2026-10-21: the user asked to execute
-  # 2026-10-21-namespace-page. Spec-zone artifacts: briefing + blueprint +
-  # acceptance.feature (no tasks.md — TASK-028 covers the blueprint as one
-  # sequential ticket). 2026-10-19-user-management remains in-flight on disk
-  # but is no longer the current pointer.
-  current_change: 2026-10-21-cluster-node
-  current_phase: blueprint
-  # 2026-10-21-namespace-page (executing) and 2026-10-17/2026-10-19 changes
+  # Pointer set 2026-10-22: the user asked to execute
+  # 2026-10-21-cluster-dashboard at /dashboard/cluster-metric. Spec-zone
+  # artifacts: briefing + blueprint + adr + acceptance.feature; one backlog
+  # ticket covers the whole change (TASK-030). 2026-10-21-cluster-node was
+  # the previous pointer (blueprint, not yet executed) and remains in flight.
+  current_change: 2026-10-21-cluster-dashboard
+  current_phase: executing
+  # 2026-10-21-cluster-node (blueprint) and 2026-10-17/2026-10-19 changes
   # remain in flight at their own phases.
   specs_root: .skillgrid/specs
 
