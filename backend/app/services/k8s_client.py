@@ -329,6 +329,13 @@ class K8sClient:
         """ClusterRoleBinding list. Cluster-scoped; the query namespace does not apply."""
         return [binding.to_dict() for binding in self._rbac.list_cluster_role_binding().items]
 
+    def list_events(self, _namespace: str | None) -> list[dict[str, Any]]:
+        """Cluster-wide event list (``to_dict`` form). Cluster-scoped: the
+        namespace argument is ignored, matching the cluster-wide
+        ``list events`` SAR gate (ADR-0004). ADR-0010's informer cache
+        interposes here later; for now this is a live read."""
+        return [e.to_dict() for e in self._v1.list_event_for_all_namespaces().items]
+
     def list_secrets(self, namespace: str | None) -> list[dict[str, Any]]:
         """Secret list in the standard kubernetes dict form (``to_dict``)
         without ``data``/``string_data``: values are read one secret at a
