@@ -24,14 +24,24 @@ build?"). The three variants differ only in the *metrics* visualization:
 |---|------|-------------|------------|----------|----------|
 | A | `dashboard-a-coreui.html` | CoreUI built-in (border tiles + `progress` bars) | bordered table | **none** | minimal dependency; fastest to ship |
 | B | `dashboard-b-chartjs-41.html` | 4.1 tiles + a **line chart** (CPU/Mem, 1h) | bordered table | UMD | the 4.1 look with real trend history |
-| C | `dashboard-c-41-donut.html` | **donut** charts (CPU / Memory / Pods) with center % (4.1 donut style) | bordered table (same as A/B) | UMD | the 4.1 donut look, most faithful to the original |
+| C | `dashboard-c-41-donut.html` | **donut** charts (CPU / Memory / Pods) + **capacity/requests/limits bars** + **overcommit flag** + allocation summary table | bordered table (same as A/B) | UMD | the 4.1 donut look, most faithful to the original |
 
-> **Revision (2026-10-22):** C was originally a "mission control" layout (half-gauges + a pods
+> **Revision 1 (2026-10-22):** C was originally a "mission control" layout (half-gauges + a pods
 > donut + an events **timeline**). The user judged that the *most similar to the 4.1 original* is
 > the donut style, so C was revised: gauges → **donut** charts (CPU/Mem/Pods, center % label, the
 > 4.1 donut idiom), and the events **timeline** → the **same bordered table** used by A/B. The
 > revised file is `dashboard-c-41-donut.html` (the old `dashboard-c-mission-control.html` was
 > removed). A and B are unchanged.
+>
+> **Revision 2 (2026-10-22):** the user wanted more than used/free on CPU and Memory — **requests
+> and limits**, and a way to see **overcommit**. C's CPU and Memory cards now show, per resource:
+> an observed **used** donut + three **bars** (Used-observed / Requests-declared / Limits-declared)
+> where the portion of a bar past 100% of capacity is rendered **striped** (over capacity), plus a
+> header **overcommit flag** (success "Within limits" / warning "Overbooked · requests 150%"). An
+> **allocation summary table** (Capacity / Used / Requests / Limits / Overcommit) sits beside the
+> pods donut. Key distinction encoded: **overcommit = Σ requests ÷ capacity** (the real risk);
+> **limits over 100% is expected** burst headroom and is *not* overcommit. Sample data: CPU
+> requests 98% (ok), Memory requests **150% (overbooked)**.
 
 The real risk is not "does a canvas draw" but whether each layout holds inside the locked
 constraints: one shadowed card per *task* (metrics and events are two tasks → two cards is legal),
@@ -136,6 +146,11 @@ Storage tile shows the word **unknown** (no source), never `0`.
 - **What to avoid:** a relative CSS/JS `<link>`/`<script>` in the final view (bundled). Don't add a
   second accent color or a marketing hero.
 - **What to watch out for:** (1) events endpoint is the real work, not the layout; (2) charts must
-  redraw on theme change; (3) `@coreui/chartjs` is ESM-only — import it, don't script-tag it.
+  redraw on theme change; (3) `@coreui/chartjs` is ESM-only — import it, don't script-tag it;
+  (4) the overcommit math (Σ requests ÷ capacity) needs a **new backend aggregate** — the
+  `resources/<kind>` endpoint lists objects but does not sum `spec.containers[].resources.requests/limits`
+  against `status.capacity`; the build must add a cluster-allocation rollup (and the certainty rule
+  applies: if a pod has no requests, it contributes 0 to the requests sum, and a metric with no
+  source renders unknown, not 0).
 - **Decision needed:** the prototype does not pick the winner. Choose A (minimal, CoreUI-only) /
   B (4.1 + line trend) / C (mission control) before `skillgrid:writing-blueprints`.
