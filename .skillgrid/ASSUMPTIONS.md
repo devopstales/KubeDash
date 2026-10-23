@@ -7,7 +7,7 @@
 > frontmatter, **not** here. One decision per ADR file at
 > `.skillgrid/artifacts/04-adr-NNNN-slug.md`.
 
-**Highest sequence in use:** 0022
+**Highest sequence in use:** 0025
 
 ---
 
@@ -81,6 +81,7 @@ are kept, with `In force: no`. Never delete a row; flip it instead (IRON RULE).
 | ADR-0022 | Sidebar navigation — 4.1 information-parity structure (sections, groups, entry names, order, admin gating); 4.1 Plugins group dropped (no 5.0 plugin system) | yes | `artifacts/04-adr-0022-sidebar-nav-4-1-parity.md` |
 | ADR-0023 | User-management lists use DataTables React with the Bootstrap 5 skin (4.1 table structure; CoreUI shell unchanged) | yes | `artifacts/04-adr-0023-datatables-react.md` |
 | ADR-0024 | Secret values use react-syntax-highlighter (highlight.js grammars, an-old-hope theme) instead of the 4.1 highlight.js script | yes | `artifacts/04-adr-0024-secret-syntax-highlight.md` |
+| ADR-0025 | Browser session transport is HttpOnly cookies (`kd_access` + `kd_refresh`, hint `kd_session`); `Authorization: Bearer` stays accepted for the kubectl plugin; no credentials in URLs or `localStorage` | yes | `artifacts/04-adr-0025-http-only-session-cookie.md` |
 
 > **Note on ADR-0001..0013:** these are listed in `ARCHITECTURE.md` §12 as the
 > initial-architecture decisions "to be authored at brainstorming time." As of

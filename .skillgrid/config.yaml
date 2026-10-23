@@ -15,10 +15,10 @@ conventions:
 # ASSUMPTIONS.md is the in-force source of truth.
 adr_style: madr-full
 
-# ADR numbering: 4-digit, monotonic, never reused. Highest in use: 0023.
+# ADR numbering: 4-digit, monotonic, never reused. Highest in use: 0025.
 adr:
   zero_padded: 4
-  highest_sequence: 23
+  highest_sequence: 25
 
 # Backlog.md tracker: every ADR also gets a .backlog/decisions/decision-NNN
 # copy (validated choice). NNN is the ADR number zero-padded to 3.
