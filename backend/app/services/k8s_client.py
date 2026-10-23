@@ -272,9 +272,17 @@ class K8sClient:
 
     @staticmethod
     def _parse_cpu(qty: str | None) -> int:
-        """K8s CPU quantity → millicores (``"800m"`` → 800, ``"1"`` → 1000)."""
+        """K8s CPU quantity → millicores (``"800m"`` → 800, ``"1"`` → 1000).
+
+        The Metrics API reports ``usage.cpu`` in *nanocores* (``"270808684n"``)
+        — the ``n`` branch is load-bearing for the ``node_usage`` path. Must
+        be checked before ``m``; see the pure copy in
+        ``cluster_allocation._parse_cpu`` for the full rationale.
+        """
         if qty is None:
             return 0
+        if qty.endswith("n"):
+            return int(int(qty[:-1]) / 1_000_000)  # nanocores → millicores
         if qty.endswith("m"):
             return int(qty[:-1])
         return int(float(qty) * 1000)

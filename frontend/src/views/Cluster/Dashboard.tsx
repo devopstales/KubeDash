@@ -9,6 +9,8 @@ import {
   CCardTitle,
 } from '@coreui/react'
 import { useQuery } from '@tanstack/react-query'
+import CIcon from '@coreui/icons-react'
+import { cilBell } from '@coreui/icons'
 import ConcentricDonut from '../../components/ConcentricDonut'
 import KubeDataTable, { Column } from '../../components/KubeDataTable'
 import TopMenu from '../../components/TopMenu'
@@ -106,6 +108,19 @@ const DashboardView = () => {
             <div>Loading cluster metrics...</div>
           ) : (
             <>
+              {/* Certainty rule (AGENTS.md): "unknown" must say WHY. The
+                  donuts render "unknown" for used when the Metrics API is
+                  absent — this alert names the source and the fix so an
+                  operator isn't left guessing. */}
+              {metrics && !metrics.metrics_available && (
+                <CBadge color="warning" className="mb-3 d-inline-flex align-items-center gap-2 px-3 py-2">
+                  <CIcon icon={cilBell} customClassName="nav-icon" />
+                  Usage (used) is unknown — this cluster has no metrics-server
+                  (metrics.k8s.io unreachable). Install metrics-server to see
+                  live CPU/memory usage; requests and limits below are declared
+                  pod specs and are always available.
+                </CBadge>
+              )}
               {/* Row 1: allocation donuts — one card per donut. */}
               <div className="row g-4 mb-4">
                 <div className="col-12 col-md-4">

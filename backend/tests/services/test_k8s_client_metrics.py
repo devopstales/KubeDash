@@ -100,6 +100,21 @@ def test_node_usage_available_parses_multiple_nodes() -> None:
     }
 
 
+def test_node_usage_available_parses_nanocores() -> None:
+    # The REAL metrics-server shape: usage.cpu is reported in nanocores
+    # ("270808684n"), not millicores. A parser that only knows "m" raises
+    # ValueError on "n" → 500 (the production bug this test pins).
+    body = [_node_metrics("n1", "270808684n", "4Gi")]
+
+    def call_api(*a, **k):
+        return _response(200, body)
+
+    available, usage = _client(SimpleNamespace(list_node=lambda: None), call_api).node_usage()
+    assert available is True
+    # 270808684 nanocores = 270.808684 millicores → 270 (integer division).
+    assert usage == {"n1": {"cpu_millicores": 270, "memory_bytes": 4 * 2**30}}
+
+
 def test_node_usage_404_is_unavailable_not_error() -> None:
     call_api = _raise_api(404)
     client = _client(SimpleNamespace(list_node=lambda: None), call_api)

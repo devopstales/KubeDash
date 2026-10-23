@@ -25,9 +25,19 @@ __all__ = ["compute_summary"]
 
 
 def _parse_cpu(qty: str | None) -> int:
-    """K8s CPU quantity → millicores (``"800m"`` → 800, ``"1"`` → 1000)."""
+    """K8s CPU quantity → millicores (``"800m"`` → 800, ``"1"`` → 1000).
+
+    WHY the nano-suffix branch: the Metrics API reports ``usage.cpu`` in
+    *nanocores* (``"270808684n"``). ``"n"`` must be checked BEFORE ``"m"``
+    — both are single-letter suffixes and the milli form is the common one
+    in hand-written specs, so a naive ``endswith("m")`` is safe, but a
+    bare ``float("270808684n")`` raises ``ValueError`` → 500 (the original
+    bug this branch prevents).
+    """
     if qty is None:
         return 0
+    if qty.endswith("n"):
+        return int(int(qty[:-1]) / 1_000_000)  # nanocores → millicores
     if qty.endswith("m"):
         return int(qty[:-1])
     return int(float(qty) * 1000)

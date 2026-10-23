@@ -178,6 +178,9 @@ test('dashboard-unknown-used: metrics_available false → used unknown, declared
   expect(screen.getByRole('img', { name: /CPU/i }).textContent).toContain('unknown')
   expect(screen.getByRole('img', { name: /Memory/i }).textContent).toContain('unknown')
   expect(screen.queryByText('0:')).toBeNull()
+  // "Unknown" must say WHY: a warning names the missing source (metrics-server).
+  expect(screen.getByText(/no metrics-server/i)).toBeTruthy()
+  expect(screen.getByText(/metrics\.k8s\.io/i)).toBeTruthy()
 })
 
 test('dashboard-metrics-404-unknown: 404 from either endpoint → unknown, no red error', async () => {
