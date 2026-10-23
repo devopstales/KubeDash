@@ -125,3 +125,27 @@ def test_list_nodes_returns_node_dicts() -> None:
     # it is ignored for nodes (mirrors list_namespaces).
     result = _client(v1, lambda *a, **k: _response(200)).list_nodes("default")
     assert result == [{"metadata": {"name": "n1"}}]
+
+
+def test_real_init_stores_api_client_for_node_usage(monkeypatch: pytest.MonkeyPatch) -> None:
+    """The REAL ``__init__`` (admin/no-kubeconfig shape) must leave a working
+    ``_api_client`` on the instance: a missing attribute is an AttributeError
+    in production, not the clean ``(False, {})``/502 contract of
+    ``node_usage``. The stub sits at the ``call_api`` level; the ATTRIBUTE
+    comes from ``__init__`` (the other tests here build via ``object.__new__``
+    and set ``_api_client`` by hand — which is exactly the class of bug this
+    catches)."""
+    from kubernetes import client as k8s_client
+
+    real_api_client = object.__new__(k8s_client.ApiClient)
+    # __init__ reaches api_client.configuration.host (the readyz host); give
+    # the bare stub just that — call_api is set per-scenario below.
+    real_api_client.configuration = SimpleNamespace(host="https://1.2.3.4:6443")
+    monkeypatch.setattr(k8s_client, "ApiClient", lambda config: real_api_client)
+    client = K8sClient(kubeconfig=None)  # admin shape: default Configuration
+    assert client._api_client is real_api_client  # the attribute exists
+
+    # node_usage raises no AttributeError against the real attribute — the
+    # 404 shape still yields the clean (False, {}) contract.
+    real_api_client.call_api = lambda *a, **k: (_ for _ in ()).throw(ApiException(status=404))
+    assert client.node_usage() == (False, {})

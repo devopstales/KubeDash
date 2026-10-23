@@ -17,6 +17,7 @@ from flask import g, request
 from flask_smorest import Api, Blueprint
 
 from app.api._authhook import apply_auth
+from app.api._cluster import cluster_for as _cluster_for
 from app.core.errors import (
     ClusterAlreadyExistsError,
     InvalidKubeconfigError,
@@ -26,20 +27,12 @@ from app.core.errors import (
 from app.core.security import require_admin
 from app.schemas.resource import NamespaceIn, NamespaceMutationOut, ResourceListOut
 from app.services import rbac
-from app.services.k8s_client import LOCAL_CLUSTER_ID, bound_cluster_or_404, pool
+from app.services.k8s_client import pool
 
 _NAMESPACE_NAME = re.compile(r"^[a-z0-9](?:[-a-z0-9]{0,61}[a-z0-9])?$")
 _PROTECTED_NAMESPACES = frozenset(
     {"default", "kube-system", "kube-public", "kube-node-lease"}
 )
-
-
-def _cluster_for(user: object, cluster_id: int) -> object:
-    if cluster_id == LOCAL_CLUSTER_ID:
-        from app.api.clusters import _local_cluster
-
-        return _local_cluster()
-    return bound_cluster_or_404(user, cluster_id)
 
 #: kind → (K8sClient method, kubernetes resource name, API group)
 _RBAC_GROUP = "rbac.authorization.k8s.io"

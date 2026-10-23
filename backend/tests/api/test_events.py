@@ -2,29 +2,14 @@
 
 Docker-free unit tier (same fixture pattern as test_metrics_summary.py):
 FakeK8s injected through the pool's ``factory`` seam, the SAR answered by
-the ``rbac._sar_allowed`` module seam. SATISFIES: events-endpoint-lists;
-events-endpoint-rbac-denied.
+the ``rbac._sar_allowed`` module seam. The cluster-registration + SAR
+helpers are shared in ``tests/api/_helpers.py``. SATISFIES:
+events-endpoint-lists; events-endpoint-rbac-denied.
 """
 
 import pytest
 
-KUBECONFIG = (
-    "apiVersion: v1\n"
-    "kind: Config\n"
-    "clusters:\n"
-    "- name: c\n"
-    "  cluster:\n"
-    "    server: https://1.2.3.4:6443\n"
-    "contexts:\n"
-    "- name: c\n"
-    "  context:\n"
-    "    cluster: c\n"
-    "    user: u\n"
-    "current-context: c\n"
-    "users:\n"
-    "- name: u\n"
-    "  user: {}\n"
-)
+from tests.api._helpers import register_cluster as _register, sar as _sar
 
 
 def _event(seq: int, ns: str = "default") -> dict:
@@ -92,43 +77,8 @@ def fake_k8s(api_app, monkeypatch) -> FakeK8s:
     return fake
 
 
-def _sar(
-    monkeypatch: pytest.MonkeyPatch,
-    allow: set[tuple] | None = None,
-    record: list[tuple] | None = None,
-) -> None:
-    """Patch the SAR seam: allow the exact (verb, resource, group) calls in
-    ``allow`` (None = allow everything), record every call in ``record``."""
-    import app.services.rbac as rb
-
-    monkeypatch.setattr(rb, "_cache_get", lambda k: None)
-    monkeypatch.setattr(rb, "_cache_set", lambda k, v: None)
-
-    def sar_allowed(client, verb, resource, ns, name, group=""):
-        key = (verb, resource, group)
-        if record is not None:
-            record.append((verb, resource, ns, name, group))
-        return True if allow is None else key in allow
-
-    monkeypatch.setattr(rb, "_sar_allowed", sar_allowed)
-
-
 def _allow_all(monkeypatch: pytest.MonkeyPatch) -> None:
     _sar(monkeypatch)
-
-
-def _register(api_client, headers, name="prod") -> None:
-    r = api_client.post(
-        "/api/v1/clusters",
-        json={
-            "name": name,
-            "api_server": "https://1.2.3.4:6443",
-            "kubeconfig": KUBECONFIG,
-            "context": name,
-        },
-        headers=headers,
-    )
-    assert r.status_code == 201
 
 
 def _events(api_client, headers) -> object:

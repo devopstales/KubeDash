@@ -175,6 +175,12 @@ class K8sClient:
             self._verify = True
         self._config = client_config
         api_client = k8s_client.ApiClient(self._config)
+        # WHY stored: node_usage reads the Metrics API via the raw
+        # ApiClient.call_api (kubernetes 37 has no generated MetricsV1beta1Api)
+        # — dropping this line is an AttributeError in production, not the
+        # clean (False, {})/502 contract. The generated APIs hold their own
+        # handle, so only the raw read needs it here.
+        self._api_client = api_client
         self._v1 = k8s_client.CoreV1Api(api_client)
         # AuthorizationV1Api is the SAR seam: services/rbac.py calls
         # client._auth_api.create_self_subject_access_review(...) against a

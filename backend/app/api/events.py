@@ -19,21 +19,14 @@ from flask import g
 from flask_smorest import Api, Blueprint
 
 from app.api._authhook import apply_auth
+from app.api._cluster import cluster_for as _cluster_for
 from app.core.errors import RbacDeniedError
 from app.schemas.events import EventOut  # noqa: F401 — docs-only OpenAPI contract
 from app.services import rbac
-from app.services.k8s_client import LOCAL_CLUSTER_ID, bound_cluster_or_404, pool
+from app.services.k8s_client import pool
 
 #: Default maximum events returned by the endpoint.
 _DEFAULT_LIMIT = 100
-
-
-def _cluster_for(user: object, cluster_id: int) -> object:
-    if cluster_id == LOCAL_CLUSTER_ID:
-        from app.api.clusters import _local_cluster
-
-        return _local_cluster()
-    return bound_cluster_or_404(user, cluster_id)
 
 
 def _to_event_out(item: dict) -> dict:
