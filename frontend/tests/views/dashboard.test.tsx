@@ -43,12 +43,7 @@ vi.mock('../../src/components/KubeDataTable', () => {
   }) {
     const columns = React.Children.toArray(children)
       .filter(React.isValidElement)
-      .map(
-        (child) =>
-          (
-            child as React.ReactElement<{ title: string; data?: string | null }>
-          ).props,
-      )
+      .map((child) => (child as React.ReactElement<{ title: string; data?: string | null }>).props)
     return (
       <table>
         <thead>
@@ -75,8 +70,19 @@ vi.mock('../../src/components/KubeDataTable', () => {
 
 const SUMMARY_OK = {
   metrics_available: true,
-  cpu: { capacity_millicores: 4000, used_millicores: 800, requests_millicores: 2000, limits_millicores: 0 },
-  memory: { capacity_bytes: 8589934592, used_bytes: 4294967296, requests_bytes: 2147483648, limits_bytes: 0 },
+  metrics_denied: false,
+  cpu: {
+    capacity_millicores: 4000,
+    used_millicores: 800,
+    requests_millicores: 2000,
+    limits_millicores: 0,
+  },
+  memory: {
+    capacity_bytes: 8589934592,
+    used_bytes: 4294967296,
+    requests_bytes: 2147483648,
+    limits_bytes: 0,
+  },
   pods: { capacity: 110, running: 10, pending: 2, completed: 1 },
 }
 
@@ -163,6 +169,7 @@ test('dashboard-unknown-used: metrics_available false → used unknown, declared
   const summary = {
     ...SUMMARY_OK,
     metrics_available: false,
+    metrics_denied: false,
     cpu: { ...SUMMARY_OK.cpu, used_millicores: null },
     memory: { ...SUMMARY_OK.memory, used_bytes: null },
   }
@@ -183,6 +190,28 @@ test('dashboard-unknown-used: metrics_available false → used unknown, declared
   // AllByText: the phrase appears in both the warning and the ring legend.
   expect(screen.getByText(/no metrics-server/i)).toBeTruthy()
   expect(screen.getAllByText(/metrics\.k8s\.io/i).length).toBeGreaterThanOrEqual(1)
+})
+
+test('dashboard-metrics-denied: metrics_denied true → "lacks the grant", not "install metrics-server"', async () => {
+  const summary = {
+    ...SUMMARY_OK,
+    metrics_available: false,
+    metrics_denied: true,
+    cpu: { ...SUMMARY_OK.cpu, used_millicores: null },
+    memory: { ...SUMMARY_OK.memory, used_bytes: null },
+  }
+  renderDashboard([
+    http.get('http://localhost/api/v1/clusters/1/metrics/summary', () =>
+      HttpResponse.json(summary),
+    ),
+    http.get('http://localhost/api/v1/clusters/1/events', () => HttpResponse.json(EVENTS)),
+  ])
+
+  await screen.findByRole('img', { name: /CPU/i })
+  // The distinct state (OWASP A05/A10): a denied user must not be told to
+  // install a component; the fix is an RBAC grant.
+  expect(screen.getByText(/lacks the\s*metrics\.k8s\.io read grant/i)).toBeTruthy()
+  expect(screen.queryByText(/no metrics-server/i)).toBeNull()
 })
 
 test('dashboard-donut-legend: rings explained inside each card — used/requests/limits + declared vs observed', async () => {

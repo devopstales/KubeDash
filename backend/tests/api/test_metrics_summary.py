@@ -105,6 +105,7 @@ def test_summary_200_with_sums(api_client, auth_client, fake_k8s, monkeypatch) -
     assert r.status_code == 200, r.get_json()
     body = r.get_json()
     assert body["metrics_available"] is True
+    assert body["metrics_denied"] is False
     assert body["cpu"] == {
         "capacity_millicores": 4000,
         "used_millicores": 800,
@@ -176,6 +177,9 @@ def test_metrics_read_denied_keeps_declared(api_client, auth_client, fake_k8s, m
     assert r.status_code == 200
     body = r.get_json()
     assert body["metrics_available"] is False
+    # The distinct state (OWASP A05/A10): the UI must say "you lack the
+    # grant", not "install metrics-server".
+    assert body["metrics_denied"] is True
     assert body["cpu"]["used_millicores"] is None
     assert body["memory"]["used_bytes"] is None
     # Declared + capacity unaffected by the metrics gate.
@@ -201,6 +205,9 @@ def test_metrics_404_is_200_unknown_not_500(api_client, auth_client, fake_k8s, m
     assert r.status_code == 200, r.get_json()
     body = r.get_json()
     assert body["metrics_available"] is False
+    # RBAC passed; the Metrics API itself is absent. The UI must say
+    # "install metrics-server" (not "you lack the grant").
+    assert body["metrics_denied"] is False
     assert body["cpu"]["used_millicores"] is None
     assert body["memory"]["used_bytes"] is None
     # Declared state still returned from pod specs.

@@ -11,9 +11,15 @@ a user who cannot see the underlying resources:
   (namespace=None, matching the cluster-wide fetch). Denied -> 403
   RBAC_DENIED; a per-namespace-only user is 403 by design (tested).
 - Tier 2 (used only): ``get nodes`` on group ``metrics.k8s.io``. Denied ->
-  still 200, ``metrics_available: false``, ``used:*`` null — declared
-  requests/limits/capacity stay present (they come from pods/nodes, not from
-  the Metrics API).
+  still 200, ``metrics_denied: true``, ``metrics_available: false``,
+  ``used:*`` null — declared requests/limits/capacity stay present (they come
+  from pods/nodes, not from the Metrics API).
+
+The two flags are distinct by design (OWASP A05/A10, data integrity): the
+endpoint must not tell an operator "install metrics-server" when the real
+state is "you lack the metrics.k8s.io read grant". ``metrics_denied`` is the
+SAR verdict for the used tier; ``metrics_available`` is the Metrics API's
+health as seen by the caller.
 
 Certainty rule (AGENTS.md): a Metrics API 404/5xx is the EXPECTED state, not
 an error — ``node_usage`` answers ``(False, {})`` and the endpoint answers 200
@@ -77,10 +83,13 @@ class MetricsApi(Api):
         # Tier 2 — used is a distinct source with its own gate: if the user
         # cannot read metrics.k8s.io nodes, usage is neither fetched nor
         # rendered (unknown, never 0). Declared state is unaffected.
+        # ``metrics_denied`` is the SAR verdict for this tier; it is reported
+        # separately from the Metrics API's health so the UI can say "you lack
+        # the grant" instead of "install metrics-server" (see module docstring).
         metrics_allowed = rbac.can(user, cluster, "get", "nodes", None, None, "metrics.k8s.io")
         if metrics_allowed:
             available, usage = client.node_usage()
         else:
             available, usage = False, {}
         summary = compute_summary(nodes, pods, usage if available else None)
-        return {"metrics_available": available, **summary}
+        return {"metrics_available": available, "metrics_denied": not metrics_allowed, **summary}

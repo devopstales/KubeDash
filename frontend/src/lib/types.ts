@@ -164,6 +164,12 @@ export interface K8sSecret {
 /** A row of GET /api/v1/clusters/<id>/metrics/summary. `used_*` are null when the Metrics API is unreachable (certainty rule: unknown, never 0). */
 export interface MetricsSummary {
   metrics_available: boolean
+  /**
+   * True when the caller lacks the metrics.k8s.io read grant (SAR denied).
+   * Distinct from `metrics_available`: the UI must not tell a denied user
+   * "install metrics-server".
+   */
+  metrics_denied: boolean
   cpu: {
     capacity_millicores: number
     used_millicores: number | null

@@ -33,7 +33,9 @@ class PodSummary(Schema):
 class MetricsSummaryOut(Schema):
     """``GET /clusters/<id>/metrics/summary`` — the cluster-wide allocation
     rollup. ``metrics_available`` says whether the observed (used) tier came
-    from the Metrics API; declared state is always present.
+    from the Metrics API; ``metrics_denied`` says whether the caller lacks
+    the ``metrics.k8s.io`` read grant (a distinct state: the UI must not tell
+    a denied user "install metrics-server"). Declared state is always present.
 
     ponytail: marshmallow 4.3.1 does not auto-instance a ``Schema`` subclass
     declared as a class attribute — the nested dump silently drops the key
@@ -43,6 +45,7 @@ class MetricsSummaryOut(Schema):
     """
 
     metrics_available = fields.Boolean()
+    metrics_denied = fields.Boolean()
     cpu = fields.Nested(CpuSummary)
     memory = fields.Nested(MemorySummary)
     pods = fields.Nested(PodSummary)

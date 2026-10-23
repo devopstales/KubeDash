@@ -28,12 +28,20 @@ const HUE_MEMORY: [number, number, number] = [249, 177, 21]
 // Rendered inside each resource card so the explanation sits next to the
 // chart it explains. Declared (requests/limits, pod specs) vs observed
 // (used, metrics.k8s.io) are labeled distinctly — the certainty rule.
-const DonutLegend = ({ hue, ...rest }: { hue: [number, number, number] } & Record<string, unknown>) => {
+const DonutLegend = ({
+  hue,
+  ...rest
+}: { hue: [number, number, number] } & Record<string, unknown>) => {
   const [r, g, b] = hue
   const swatch = (alpha: number) => (
     <span
       className="d-inline-block"
-      style={{ width: 10, height: 10, borderRadius: '50%', background: `rgba(${r}, ${g}, ${b}, ${alpha})` }}
+      style={{
+        width: 10,
+        height: 10,
+        borderRadius: '50%',
+        background: `rgba(${r}, ${g}, ${b}, ${alpha})`,
+      }}
     />
   )
   return (
@@ -69,7 +77,7 @@ const toEventRow = (event: ClusterEvent): EventRow => {
   return {
     type: event.type ?? '',
     reason: event.reason ?? '',
-    object: obj.kind ? `${obj.kind} ${obj.name}`.trim() : obj.name ?? '',
+    object: obj.kind ? `${obj.kind} ${obj.name}`.trim() : (obj.name ?? ''),
     namespace: obj.namespace ?? '',
     message: event.message ?? '',
     count: event.count == null ? '—' : String(event.count),
@@ -85,9 +93,7 @@ const DashboardView = () => {
     queryKey: ['cluster-metrics-summary', cluster?.id],
     enabled,
     queryFn: async () => {
-      const r = await apiFetch<MetricsSummary>(
-        `/api/v1/clusters/${cluster!.id}/metrics/summary`,
-      )
+      const r = await apiFetch<MetricsSummary>(`/api/v1/clusters/${cluster!.id}/metrics/summary`)
       if (r.error) throw new Error(`${r.error.code}: ${r.error.message}`)
       return r.data!
     },
@@ -110,8 +116,7 @@ const DashboardView = () => {
   // apiFetch envelopes HTTP errors as `Error("<code>: <message>")` where
   // code is the backend's error code ('NOT_FOUND' for 404) — match on the
   // code prefix, not the message text.
-  const is404 = (error: unknown) =>
-    error instanceof Error && /^NOT_FOUND: /.test(error.message)
+  const is404 = (error: unknown) => error instanceof Error && /^NOT_FOUND: /.test(error.message)
   const metrics = !is404(summary.error) ? summary.data : null
   const eventRows = !is404(events.error) ? (events.data ?? []).map(toEventRow) : []
 
@@ -138,19 +143,35 @@ const DashboardView = () => {
             <div>Loading cluster metrics...</div>
           ) : (
             <>
-              {/* Certainty rule (AGENTS.md): "unknown" must say WHY. The
-                  donuts render "unknown" for used when the Metrics API is
-                  absent — this alert names the source and the fix so an
-                  operator isn't left guessing. */}
-              {metrics && !metrics.metrics_available && (
-                <CBadge color="warning" className="mb-3 d-inline-flex align-items-center gap-2 px-3 py-2">
+              {/* Certainty rule (AGENTS.md): "unknown" must say WHY — and say
+                  the RIGHT why. Two distinct states (OWASP A05/A10):
+                  - metrics_denied: the caller lacks the metrics.k8s.io read
+                    grant. Do NOT suggest installing metrics-server; the fix
+                    is an RBAC grant, not a component.
+                  - !metrics_available (and not denied): the Metrics API is
+                    genuinely absent on this cluster — the install advice
+                    applies. */}
+              {metrics && metrics.metrics_denied ? (
+                <CBadge
+                  color="warning"
+                  className="mb-3 d-inline-flex align-items-center gap-2 px-3 py-2"
+                >
                   <CIcon icon={cilBell} customClassName="nav-icon" />
-                  Usage (used) is unknown — this cluster has no metrics-server
-                  (metrics.k8s.io unreachable). Install metrics-server to see
-                  live CPU/memory usage; requests and limits below are declared
-                  pod specs and are always available.
+                  Usage (used) is hidden — your account lacks the metrics.k8s.io read grant on this
+                  cluster. An admin can grant it to see live CPU/memory usage; requests and limits
+                  below are declared pod specs and are always available.
                 </CBadge>
-              )}
+              ) : metrics && !metrics.metrics_available ? (
+                <CBadge
+                  color="warning"
+                  className="mb-3 d-inline-flex align-items-center gap-2 px-3 py-2"
+                >
+                  <CIcon icon={cilBell} customClassName="nav-icon" />
+                  Usage (used) is unknown — this cluster has no metrics-server (metrics.k8s.io
+                  unreachable). Install metrics-server to see live CPU/memory usage; requests and
+                  limits below are declared pod specs and are always available.
+                </CBadge>
+              ) : null}
               {/* Row 1: allocation donuts — one card per donut. The ring
                   legend lives INSIDE each card (operator ask): the donut
                   encodes three values on three concentric rings, declared
@@ -237,9 +258,7 @@ const DashboardView = () => {
                 </CCardHeader>
                 <CCardBody>
                   {eventsFailed ? (
-                    <div className="text-danger">
-                      Error loading events: {events.error!.message}
-                    </div>
+                    <div className="text-danger">Error loading events: {events.error!.message}</div>
                   ) : eventRows.length === 0 ? (
                     <div className="text-center text-muted">No events found</div>
                   ) : (
@@ -262,9 +281,7 @@ const DashboardView = () => {
             </>
           )}
           {summary.error && !is404(summary.error) ? (
-            <div className="text-danger mt-3">
-              Error loading metrics: {summary.error.message}
-            </div>
+            <div className="text-danger mt-3">Error loading metrics: {summary.error.message}</div>
           ) : null}
         </CCardBody>
       </CCard>

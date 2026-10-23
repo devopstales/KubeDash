@@ -14,6 +14,7 @@ test('dashboard fetch seam reaches MSW through the pinned VITE_API_BASE', async 
     http.get('*/api/v1/clusters/1/metrics/summary', () =>
       HttpResponse.json({
         metrics_available: true,
+        metrics_denied: false,
         cpu: {
           capacity_millicores: 100,
           used_millicores: 50,
