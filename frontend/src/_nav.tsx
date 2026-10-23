@@ -59,7 +59,7 @@ const divider = (): NavItem => ({
 export function navigation(input: { clusterId: number | null; isAdmin: boolean }): NavItem[] {
   const items: NavItem[] = [
     group('Dashboard', cilSpeedometer, [
-      leaf('Cluster Metrics', '/clusters'),
+      leaf('Cluster Metrics', '/dashboard/cluster-metric'),
       {
         component: CNavItem,
         name: 'Workload',

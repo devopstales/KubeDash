@@ -33,7 +33,10 @@ describe('apiFetch', () => {
     localStorage.setItem('kd_token', 'tok-1')
     const r = await apiFetch('/api/v1/clusters')
     const [url, init] = fetchMock.mock.calls[0] as [string, RequestInit]
-    expect(url).toBe('/api/v1/clusters')
+    // ponytail: the vitest suite pins VITE_API_BASE (vite.config.ts) so the
+    // fetch URL is hermetic under jsdom; in prod/CI the base is empty and
+    // this asserts the bare relative path.
+    expect(url).toBe(`${import.meta.env.VITE_API_BASE ?? ''}/api/v1/clusters`)
     expect((init.headers as Record<string, string>).Authorization).toBe('Bearer tok-1')
     expect(r.data).toEqual({ items: [] })
     expect(r.error).toBeNull()

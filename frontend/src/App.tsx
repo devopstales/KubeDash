@@ -15,6 +15,7 @@ import './scss/style.scss'
 const LoginView = React.lazy(() => import('./views/Login'))
 const ClustersView = React.lazy(() => import('./views/Clusters'))
 const ClusterView = React.lazy(() => import('./views/Cluster'))
+const ClusterDashboardView = React.lazy(() => import('./views/Cluster/Dashboard'))
 const NamespacesView = React.lazy(() => import('./views/Cluster/Namespaces'))
 const NamespaceDataView = React.lazy(() => import('./views/Cluster/NamespaceData'))
 const ProfileView = React.lazy(() => import('./views/Profile'))
@@ -97,6 +98,14 @@ const App = () => {
                       element={
                         <ProtectedRoute>
                           <ClusterView />
+                        </ProtectedRoute>
+                      }
+                    />
+                    <Route
+                      path="/dashboard/cluster-metric"
+                      element={
+                        <ProtectedRoute>
+                          <ClusterDashboardView />
                         </ProtectedRoute>
                       }
                     />

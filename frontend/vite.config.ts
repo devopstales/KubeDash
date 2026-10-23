@@ -48,20 +48,22 @@ export default defineConfig({
       },
     },
   },
-  // ponytail: the `as` cast — vitest 4's `defineConfig` generic doesn't
-  // expose the vitest-inline options (maxWorkers) at the plain-object
-  // literal position; runtime keys are the standard vitest 4 schema.
   test: {
     environment: 'jsdom',
     globals: true,
     setupFiles: [path.resolve(rootDir, 'tests/setup.ts')],
     include: ['tests/**/*.{test,spec}.{ts,tsx}'],
-    // ponytail: jsdom + userEvent typing tests are slow under the default
-    // parallel pool on small machines — a flaky full-suite run (timeouts in
-    // TemplateEditor / BindModal tests) showed the flakes are load-related,
-    // not logic-related (the same tests pass in isolation and most full
-    // runs). Cap concurrency at 2 (vitest 4 top-level option; the old
-    // test.poolOptions.threads was removed in 4).
-    maxWorkers: 2,
-  } as Record<string, unknown>,
+  },
+  // ponytail: vitest 4's `test.env` does NOT inject import.meta.env, so the
+  // suite's VITE_API_BASE pin lives here. Gated on VITEST so the production
+  // build (mode 'production') stays free of the test origin. Without it,
+  // api.ts fetches relative URLs and MSW's node interceptor resolves them
+  // against the dev-server origin (localhost:3000) — where a running `task
+  // dev` stack would ANSWER requests that should hit the MSW handlers (test
+  // results coupled to the env). Pinning to localhost:80, which nothing in
+  // the dev stack serves, keeps the suite hermetic.
+  define:
+    process.env.VITEST === 'true'
+      ? { 'import.meta.env.VITE_API_BASE': JSON.stringify('http://localhost') }
+      : undefined,
 })

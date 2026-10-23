@@ -34,6 +34,8 @@ function expectedStubs() {
     '/cluster-permission/cluster-role-binding',
     '/security/secret',
     '/cluster/namespace',
+    // Real view (2026-10-21-cluster-dashboard, Task 6) — not a stub route.
+    '/dashboard/cluster-metric',
   ])
   const seen = new Map<string, string>()
   for (const isAdmin of [true, false]) {

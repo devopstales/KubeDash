@@ -108,9 +108,13 @@ describe('navigation contract', () => {
     }
   })
 
-  test('cluster-metrics-and-kubernetes-cluster-share-cluster-list', () => {
+  test('cluster-metrics-opens-dashboard', () => {
+    // Retarget (2026-10-22): Cluster Metrics opens the cluster dashboard;
+    // the Kubernetes Cluster entry (Settings) keeps the cluster list.
     const entries = flat(navigation({ clusterId: 7, isAdmin: true }))
-    expect(entries.find((entry) => entry.name === 'Cluster Metrics')?.to).toBe('/clusters')
+    expect(entries.find((entry) => entry.name === 'Cluster Metrics')?.to).toBe(
+      '/dashboard/cluster-metric',
+    )
     expect(entries.find((entry) => entry.name === 'Kubernetes Cluster')?.to).toBe('/clusters')
   })
 

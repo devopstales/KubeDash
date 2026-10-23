@@ -159,6 +159,46 @@ export interface K8sSecret {
   [key: string]: unknown
 }
 
+// --- Cluster dashboard (2026-10-21-cluster-dashboard) — shapes mirror the wire contract ---
+
+/** A row of GET /api/v1/clusters/<id>/metrics/summary. `used_*` are null when the Metrics API is unreachable (certainty rule: unknown, never 0). */
+export interface MetricsSummary {
+  cluster?: string
+  metrics_available: boolean
+  cpu: {
+    capacity_millicores: number
+    used_millicores: number | null
+    requests_millicores: number
+    limits_millicores: number
+  }
+  memory: {
+    capacity_bytes: number
+    used_bytes: number | null
+    requests_bytes: number
+    limits_bytes: number
+  }
+  pods: {
+    capacity: number
+    running: number
+    pending: number
+    completed: number
+  }
+}
+
+/** A row of GET /api/v1/clusters/<id>/events (bare list, newest-first). */
+export interface ClusterEvent {
+  type: string
+  reason: string
+  involved_object: {
+    kind: string
+    name: string
+    namespace: string
+  }
+  message: string
+  count: number | null
+  last_timestamp: string | null
+}
+
 export interface RefreshPair {
   access: string
   refresh?: string

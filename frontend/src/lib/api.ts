@@ -8,6 +8,20 @@
  *   envelope so views can surface it (R4's RBAC 403 path is where it pays
  *   off).
  */
+/**
+ * The absolute API origin for fetch. Production/CI builds bake no VITE_API_BASE
+ * (Flask serves the SPA at /, same-origin /api, ADR-0006), so a relative fetch
+ * lands on the same origin the page loaded from.
+ *
+ * ponytail: the vitest suite (frontend/tests) runs under jsdom with NO dev
+ * server and NO vite proxy — a relative URL there would be fetched by Node
+ * (no host → 'fetch failed') or, worse, hit the dev stack via the proxy
+ * (test results coupled to the env). So tests pin VITE_API_BASE to
+ * http://localhost in the vitest config's env block (vite.config.ts): the
+ * page loads from http://localhost/ in the suite, and MSW intercepts every
+ * request on that origin. A missing pin would surface as a 'fetch failed'
+ * red error in the dashboard suite, not as a silent 404.
+ */
 const API_BASE: string = import.meta.env.VITE_API_BASE ?? ''
 
 let inFlightRefresh: Promise<string> | null = null
