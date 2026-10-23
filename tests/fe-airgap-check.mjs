@@ -48,6 +48,16 @@ const DEFAULT_ALLOW = [
   //   https://api.example:6443 — API-base input placeholder
   'localhost',
   'api.example',
+  // KubeDataTable vendor strings: DataTables' "tn/N" table-name feature
+  // identifiers + trial-version notice. Message/identifier text inside the
+  // bundled vendor code, never fetched by the SPA.
+  'datatables.net',
+  // highlight.js source-attribution URLs (issue/PR refs in the vendor
+  // source map comments + error message text). Never loaded.
+  'highlightjs',
+  // FontAwesome brand-icon symbol defs: attribution hrefs inside the SVG
+  // symbol sheet (icon metadata), not image loads.
+  'fontawesome.com',
   // core-js self-test URL strings (new URL('https://a...'), 'https://x', ...):
   // the self-test's host is 'a', so the allow key is that host.
   'https://a',

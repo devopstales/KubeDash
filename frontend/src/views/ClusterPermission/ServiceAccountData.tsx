@@ -19,7 +19,12 @@ const LAST_APPLIED = 'kubectl.kubernetes.io/last-applied-configuration'
 
 type SecretRef = { name: string }
 
-const names = (refs: SecretRef[] | null | undefined) =>
+// ponytail: the ServiceAccount wire type carries `{ name?: string }` refs
+// (types.ts) while `names` wants the SecretRef alias — the same shape, so
+// widen the parameter to the wire type instead of casting at the two call
+// sites. Ceiling: if the backend ever starts emitting refs without `name`,
+// the `.filter((name) => name.length > 0)` already handles it.
+const names = (refs: { name?: string }[] | null | undefined) =>
   (refs ?? []).map((ref) => ref.name ?? '').filter((name) => name.length > 0)
 
 const KeyValueTable = ({ entries, empty }: { entries: [string, string][]; empty: string }) =>
