@@ -31,7 +31,6 @@ export const server = setupServer(
   // `server.use(...)` overrides win for the 404 / unknown / RBAC cases.
   http.get('*/api/v1/clusters/:id/metrics/summary', () =>
     HttpResponse.json({
-      cluster: 'prod',
       metrics_available: true,
       cpu: { capacity_millicores: 4000, used_millicores: 800, requests_millicores: 2000, limits_millicores: 0 },
       memory: { capacity_bytes: 8589934592, used_bytes: 4294967296, requests_bytes: 2147483648, limits_bytes: 0 },

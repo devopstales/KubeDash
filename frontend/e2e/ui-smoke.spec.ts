@@ -80,6 +80,10 @@ const REAL_ROUTES = [
   '/cluster/namespace/data',
   '/security/secret',
   '/security/secret/data',
+  // Cluster dashboard (2026-10-21-cluster-dashboard): without a selected
+  // cluster it renders "No cluster selected." — the mount check below covers
+  // both states (no JS crash either way).
+  '/dashboard/cluster-metric',
 ]
 
 test.describe.serial('KubeDash UI smoke (local admin)', () => {
@@ -235,6 +239,23 @@ test.describe.serial('KubeDash UI smoke (local admin)', () => {
     await page.goto('/cluster/namespace')
     // The Namespace List card renders (table or empty state).
     await expect(page.getByText('Namespace List')).toBeVisible({ timeout: 20_000 })
+  })
+
+  test('real routes: every REAL_ROUTES path mounts the shell without a JS crash', async ({
+    page,
+  }) => {
+    await loginAs(page)
+    const errors = attachErrorWatcher(page)
+
+    for (const path of REAL_ROUTES) {
+      await page.goto(path)
+      await expect(page.locator('aside, nav, .sidebar, .c-sidebar').first()).toBeVisible({
+        timeout: 15_000,
+      })
+    }
+
+    const fatal = fatalErrors(errors)
+    expect(fatal, `uncaught page errors: ${fatal.join('\n')}`).toEqual([])
   })
 
   test('security: /security/secret + /security/secret/data mount', async ({ page }) => {

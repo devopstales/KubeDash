@@ -5,10 +5,12 @@
       "post": {
         "responses": {
           "default": {
-            "$ref": "#/components/responses/RESPONSE_DEFAULT_ERROR"
+            "$ref": "#/components/responses/DEFAULT_ERROR"
           }
         },
-        "tags": ["api.auth"],
+        "tags": [
+          "api.auth"
+        ],
         "description": "Start OIDC login: 302 to /v1/auth/callback?state=<s>&next=<idp>"
       }
     },
@@ -16,38 +18,40 @@
       "get": {
         "responses": {
           "default": {
-            "$ref": "#/components/responses/RESPONSE_DEFAULT_ERROR"
+            "$ref": "#/components/responses/DEFAULT_ERROR"
           },
           "302": {
-            "$ref": "#/components/responses/RESPONSE_REDIRECT_TO_TOKEN_JWT_REFRESH_TOKEN_JWT_DELIVERY_CONTRACT"
+            "$ref": "#/components/responses/Redirect to /?token=<jwt>&refresh=<token> (JWT delivery contract)"
           },
           "400": {
-            "$ref": "#/components/responses/RESPONSE_STATE_MISMATCH_MISSING_STATE_OR_CODE"
+            "$ref": "#/components/responses/STATE_MISMATCH / missing state or code"
           },
           "401": {
-            "$ref": "#/components/responses/RESPONSE_UNAUTHORIZED"
+            "$ref": "#/components/responses/UNAUTHORIZED"
           }
         },
-        "tags": ["api.auth"]
+        "tags": [
+          "api.auth"
+        ]
       }
     },
     "/api/v1/auth/local": {
       "post": {
         "responses": {
           "422": {
-            "$ref": "#/components/responses/RESPONSE_UNPROCESSABLE_ENTITY"
+            "$ref": "#/components/responses/UNPROCESSABLE_ENTITY"
           },
           "default": {
-            "$ref": "#/components/responses/RESPONSE_DEFAULT_ERROR"
+            "$ref": "#/components/responses/DEFAULT_ERROR"
           },
           "302": {
-            "$ref": "#/components/responses/RESPONSE_REDIRECT_TO_TOKEN_JWT_REFRESH_TOKEN_JWT_DELIVERY_CONTRACT"
+            "$ref": "#/components/responses/Redirect to /?token=<jwt>&refresh=<token> (JWT delivery contract)"
           },
           "401": {
-            "$ref": "#/components/responses/RESPONSE_INVALID_CREDENTIALS_WRONG_PASSWORD_OR_UNKNOWN_EMAIL_NO_ENUMERATION"
+            "$ref": "#/components/responses/INVALID_CREDENTIALS (wrong password OR unknown email — no enumeration)"
           },
           "403": {
-            "$ref": "#/components/responses/RESPONSE_LOCAL_AUTH_DISABLED"
+            "$ref": "#/components/responses/LOCAL_AUTH_DISABLED"
           }
         },
         "requestBody": {
@@ -60,8 +64,10 @@
             }
           }
         },
-        "summary": "ADR-0021: bootstrap-admin password login, sibling of OIDC. The\nroute gates on auth_source='local' so a row SSO has claimed (or a\npure-SSO row) never answers with a password \u2014 same 401 code, no\nenumeration across auth sources (I-NEW-2).",
-        "tags": ["api.auth"]
+        "summary": "ADR-0021: bootstrap-admin password login, sibling of OIDC. The\nroute gates on auth_source='local' so a row SSO has claimed (or a\npure-SSO row) never answers with a password — same 401 code, no\nenumeration across auth sources (I-NEW-2).",
+        "tags": [
+          "api.auth"
+        ]
       }
     },
     "/api/v1/auth/settings": {
@@ -78,18 +84,20 @@
             }
           },
           "default": {
-            "$ref": "#/components/responses/RESPONSE_DEFAULT_ERROR"
+            "$ref": "#/components/responses/DEFAULT_ERROR"
           }
         },
         "summary": "Open (pre-JWT) capability flags for the login page (R3): the SSO\nbutton renders iff sso_enabled, the local form iff local_enabled.",
-        "tags": ["api.auth"]
+        "tags": [
+          "api.auth"
+        ]
       }
     },
     "/api/v1/auth/refresh": {
       "post": {
         "responses": {
           "422": {
-            "$ref": "#/components/responses/RESPONSE_UNPROCESSABLE_ENTITY"
+            "$ref": "#/components/responses/UNPROCESSABLE_ENTITY"
           },
           "200": {
             "description": "OK",
@@ -102,10 +110,10 @@
             }
           },
           "default": {
-            "$ref": "#/components/responses/RESPONSE_DEFAULT_ERROR"
+            "$ref": "#/components/responses/DEFAULT_ERROR"
           },
           "401": {
-            "$ref": "#/components/responses/RESPONSE_UNAUTHORIZED"
+            "$ref": "#/components/responses/UNAUTHORIZED"
           }
         },
         "requestBody": {
@@ -118,20 +126,24 @@
             }
           }
         },
-        "tags": ["api.auth"]
+        "tags": [
+          "api.auth"
+        ]
       }
     },
     "/api/v1/auth/logout": {
       "post": {
         "responses": {
           "default": {
-            "$ref": "#/components/responses/RESPONSE_DEFAULT_ERROR"
+            "$ref": "#/components/responses/DEFAULT_ERROR"
           },
           "401": {
-            "$ref": "#/components/responses/RESPONSE_UNAUTHORIZED"
+            "$ref": "#/components/responses/UNAUTHORIZED"
           }
         },
-        "tags": ["api.auth"]
+        "tags": [
+          "api.auth"
+        ]
       }
     },
     "/api/v1/auth/me": {
@@ -148,20 +160,22 @@
             }
           },
           "default": {
-            "$ref": "#/components/responses/RESPONSE_DEFAULT_ERROR"
+            "$ref": "#/components/responses/DEFAULT_ERROR"
           },
           "401": {
-            "$ref": "#/components/responses/RESPONSE_UNAUTHORIZED"
+            "$ref": "#/components/responses/UNAUTHORIZED"
           }
         },
-        "tags": ["api.auth"]
+        "tags": [
+          "api.auth"
+        ]
       }
     },
     "/api/v1/clusters": {
       "post": {
         "responses": {
           "422": {
-            "$ref": "#/components/responses/RESPONSE_INVALID_KUBECONFIG"
+            "$ref": "#/components/responses/INVALID_KUBECONFIG"
           },
           "201": {
             "description": "Created",
@@ -174,10 +188,10 @@
             }
           },
           "default": {
-            "$ref": "#/components/responses/RESPONSE_DEFAULT_ERROR"
+            "$ref": "#/components/responses/DEFAULT_ERROR"
           },
           "409": {
-            "$ref": "#/components/responses/RESPONSE_CLUSTER_ALREADY_EXISTS"
+            "$ref": "#/components/responses/CLUSTER_ALREADY_EXISTS"
           }
         },
         "requestBody": {
@@ -190,22 +204,26 @@
             }
           }
         },
-        "tags": ["api.clusters"]
+        "tags": [
+          "api.clusters"
+        ]
       },
       "get": {
         "responses": {
           "default": {
-            "$ref": "#/components/responses/RESPONSE_DEFAULT_ERROR"
+            "$ref": "#/components/responses/DEFAULT_ERROR"
           },
           "200": {
-            "$ref": "#/components/responses/RESPONSE_CALLER_S_BOUND_CLUSTERS_BARE_LIST_NONE"
+            "$ref": "#/components/responses/(\"Caller's bound clusters (bare list).\", None)"
           },
           "401": {
-            "$ref": "#/components/responses/RESPONSE_UNAUTHORIZED"
+            "$ref": "#/components/responses/UNAUTHORIZED"
           }
         },
-        "summary": "Only the caller's bound clusters \u2014 the binding gate (R3).",
-        "tags": ["api.clusters"]
+        "summary": "Only the caller's bound clusters — the binding gate (R3).",
+        "tags": [
+          "api.clusters"
+        ]
       }
     },
     "/api/v1/clusters/{cluster_id}": {
@@ -222,13 +240,15 @@
             }
           },
           "default": {
-            "$ref": "#/components/responses/RESPONSE_DEFAULT_ERROR"
+            "$ref": "#/components/responses/DEFAULT_ERROR"
           },
           "404": {
-            "$ref": "#/components/responses/RESPONSE_CLUSTER_NOT_FOUND"
+            "$ref": "#/components/responses/CLUSTER_NOT_FOUND"
           }
         },
-        "tags": ["api.clusters"]
+        "tags": [
+          "api.clusters"
+        ]
       },
       "parameters": [
         {
@@ -256,16 +276,18 @@
             }
           },
           "default": {
-            "$ref": "#/components/responses/RESPONSE_DEFAULT_ERROR"
+            "$ref": "#/components/responses/DEFAULT_ERROR"
           },
           "404": {
-            "$ref": "#/components/responses/RESPONSE_CLUSTER_NOT_FOUND"
+            "$ref": "#/components/responses/CLUSTER_NOT_FOUND"
           },
           "502": {
-            "$ref": "#/components/responses/RESPONSE_CLUSTER_UNREACHABLE"
+            "$ref": "#/components/responses/CLUSTER_UNREACHABLE"
           }
         },
-        "tags": ["api.clusters"]
+        "tags": [
+          "api.clusters"
+        ]
       },
       "parameters": [
         {
@@ -293,16 +315,18 @@
             }
           },
           "default": {
-            "$ref": "#/components/responses/RESPONSE_DEFAULT_ERROR"
+            "$ref": "#/components/responses/DEFAULT_ERROR"
           },
           "404": {
-            "$ref": "#/components/responses/RESPONSE_RESOURCE_KIND_NOT_SUPPORTED_OR_CLUSTER_NOT_FOUND_BINDING_GATE"
+            "$ref": "#/components/responses/RESOURCE_KIND_NOT_SUPPORTED or CLUSTER_NOT_FOUND (binding gate)"
           },
           "403": {
-            "$ref": "#/components/responses/RESPONSE_RBAC_DENIED"
+            "$ref": "#/components/responses/RBAC_DENIED"
           }
         },
-        "tags": ["api.resources"]
+        "tags": [
+          "api.resources"
+        ]
       },
       "parameters": [
         {
@@ -325,69 +349,268 @@
         }
       ]
     },
+    "/api/v1/clusters/{cluster_id}/resources/namespaces": {
+      "post": {
+        "responses": {
+          "422": {
+            "$ref": "#/components/responses/INVALID_KUBECONFIG"
+          },
+          "201": {
+            "description": "Created",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/NamespaceMutationOut"
+                }
+              }
+            }
+          },
+          "default": {
+            "$ref": "#/components/responses/DEFAULT_ERROR"
+          },
+          "403": {
+            "$ref": "#/components/responses/RBAC_DENIED"
+          },
+          "404": {
+            "$ref": "#/components/responses/CLUSTER_NOT_FOUND"
+          },
+          "409": {
+            "$ref": "#/components/responses/CLUSTER_ALREADY_EXISTS"
+          },
+          "502": {
+            "$ref": "#/components/responses/CLUSTER_UNREACHABLE"
+          }
+        },
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/NamespaceIn"
+              }
+            }
+          }
+        },
+        "tags": [
+          "api.resources"
+        ]
+      },
+      "parameters": [
+        {
+          "in": "path",
+          "name": "cluster_id",
+          "required": true,
+          "schema": {
+            "type": "integer",
+            "minimum": 0
+          }
+        }
+      ]
+    },
+    "/api/v1/clusters/{cluster_id}/resources/namespaces/{name}": {
+      "delete": {
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/NamespaceMutationOut"
+                }
+              }
+            }
+          },
+          "default": {
+            "$ref": "#/components/responses/DEFAULT_ERROR"
+          },
+          "403": {
+            "$ref": "#/components/responses/RBAC_DENIED"
+          },
+          "404": {
+            "$ref": "#/components/responses/CLUSTER_NOT_FOUND"
+          },
+          "409": {
+            "$ref": "#/components/responses/CLUSTER_ALREADY_EXISTS (protected namespace)"
+          },
+          "502": {
+            "$ref": "#/components/responses/CLUSTER_UNREACHABLE"
+          }
+        },
+        "tags": [
+          "api.resources"
+        ]
+      },
+      "parameters": [
+        {
+          "in": "path",
+          "name": "cluster_id",
+          "required": true,
+          "schema": {
+            "type": "integer",
+            "minimum": 0
+          }
+        },
+        {
+          "in": "path",
+          "name": "name",
+          "required": true,
+          "schema": {
+            "type": "string",
+            "minLength": 1
+          }
+        }
+      ]
+    },
     "/api/v1/logs/query": {
       "get": {
         "responses": {
           "default": {
-            "$ref": "#/components/responses/RESPONSE_DEFAULT_ERROR"
+            "$ref": "#/components/responses/DEFAULT_ERROR"
           },
           "501": {
-            "$ref": "#/components/responses/RESPONSE_NOT_IMPLEMENTED"
+            "$ref": "#/components/responses/NOT_IMPLEMENTED"
           }
         },
-        "tags": ["api.logs"]
+        "tags": [
+          "api.logs"
+        ]
       }
     },
     "/api/v1/metrics/query": {
       "get": {
         "responses": {
           "default": {
-            "$ref": "#/components/responses/RESPONSE_DEFAULT_ERROR"
+            "$ref": "#/components/responses/DEFAULT_ERROR"
           },
           "501": {
-            "$ref": "#/components/responses/RESPONSE_NOT_IMPLEMENTED"
+            "$ref": "#/components/responses/NOT_IMPLEMENTED"
           }
         },
-        "tags": ["api.metrics"]
+        "tags": [
+          "api.metrics"
+        ]
       }
     },
     "/api/v1/metrics/query_range": {
       "get": {
         "responses": {
           "default": {
-            "$ref": "#/components/responses/RESPONSE_DEFAULT_ERROR"
+            "$ref": "#/components/responses/DEFAULT_ERROR"
           },
           "501": {
-            "$ref": "#/components/responses/RESPONSE_NOT_IMPLEMENTED"
+            "$ref": "#/components/responses/NOT_IMPLEMENTED"
           }
         },
-        "tags": ["api.metrics"]
+        "tags": [
+          "api.metrics"
+        ]
       }
+    },
+    "/api/v1/clusters/{cluster_id}/metrics/summary": {
+      "get": {
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/MetricsSummaryOut"
+                }
+              }
+            }
+          },
+          "default": {
+            "$ref": "#/components/responses/DEFAULT_ERROR"
+          },
+          "403": {
+            "$ref": "#/components/responses/RBAC_DENIED (no cluster-wide list pods/nodes)"
+          },
+          "404": {
+            "$ref": "#/components/responses/CLUSTER_NOT_FOUND (binding gate)"
+          },
+          "502": {
+            "$ref": "#/components/responses/CLUSTER_UNREACHABLE"
+          }
+        },
+        "tags": [
+          "api.metrics"
+        ]
+      },
+      "parameters": [
+        {
+          "in": "path",
+          "name": "cluster_id",
+          "required": true,
+          "schema": {
+            "type": "integer",
+            "minimum": 0
+          }
+        }
+      ]
+    },
+    "/api/v1/clusters/{cluster_id}/events": {
+      "get": {
+        "responses": {
+          "default": {
+            "$ref": "#/components/responses/DEFAULT_ERROR"
+          },
+          "200": {
+            "$ref": "#/components/responses/('Cluster events, newest-first (bare list of EventOut items).', None)"
+          },
+          "403": {
+            "$ref": "#/components/responses/RBAC_DENIED (no cluster-wide list events)"
+          },
+          "404": {
+            "$ref": "#/components/responses/CLUSTER_NOT_FOUND (binding gate)"
+          },
+          "502": {
+            "$ref": "#/components/responses/CLUSTER_UNREACHABLE"
+          }
+        },
+        "tags": [
+          "api.events"
+        ]
+      },
+      "parameters": [
+        {
+          "in": "path",
+          "name": "cluster_id",
+          "required": true,
+          "schema": {
+            "type": "integer",
+            "minimum": 0
+          }
+        }
+      ]
     },
     "/api/v1/traces": {
       "get": {
         "responses": {
           "default": {
-            "$ref": "#/components/responses/RESPONSE_DEFAULT_ERROR"
+            "$ref": "#/components/responses/DEFAULT_ERROR"
           },
           "501": {
-            "$ref": "#/components/responses/RESPONSE_NOT_IMPLEMENTED"
+            "$ref": "#/components/responses/NOT_IMPLEMENTED"
           }
         },
-        "tags": ["api.traces"]
+        "tags": [
+          "api.traces"
+        ]
       }
     },
     "/api/v1/traces/{trace_id}": {
       "get": {
         "responses": {
           "default": {
-            "$ref": "#/components/responses/RESPONSE_DEFAULT_ERROR"
+            "$ref": "#/components/responses/DEFAULT_ERROR"
           },
           "501": {
-            "$ref": "#/components/responses/RESPONSE_NOT_IMPLEMENTED"
+            "$ref": "#/components/responses/NOT_IMPLEMENTED"
           }
         },
-        "tags": ["api.traces"]
+        "tags": [
+          "api.traces"
+        ]
       },
       "parameters": [
         {
@@ -405,78 +628,598 @@
       "get": {
         "responses": {
           "default": {
-            "$ref": "#/components/responses/RESPONSE_DEFAULT_ERROR"
+            "$ref": "#/components/responses/DEFAULT_ERROR"
           },
           "501": {
-            "$ref": "#/components/responses/RESPONSE_NOT_IMPLEMENTED"
+            "$ref": "#/components/responses/NOT_IMPLEMENTED"
           }
         },
-        "tags": ["api.audit"]
+        "tags": [
+          "api.audit"
+        ]
       }
     },
     "/api/v1/audit/export": {
       "get": {
         "responses": {
           "default": {
-            "$ref": "#/components/responses/RESPONSE_DEFAULT_ERROR"
+            "$ref": "#/components/responses/DEFAULT_ERROR"
           },
           "501": {
-            "$ref": "#/components/responses/RESPONSE_NOT_IMPLEMENTED"
+            "$ref": "#/components/responses/NOT_IMPLEMENTED"
           }
         },
-        "tags": ["api.audit"]
-      }
-    },
-    "/api/v1/admin/permissions/bind": {
-      "post": {
-        "responses": {
-          "default": {
-            "$ref": "#/components/responses/RESPONSE_DEFAULT_ERROR"
-          },
-          "501": {
-            "$ref": "#/components/responses/RESPONSE_NOT_IMPLEMENTED"
-          }
-        },
-        "tags": ["api.permissions"]
+        "tags": [
+          "api.audit"
+        ]
       }
     },
     "/api/v1/admin/permissions/templates": {
       "get": {
         "responses": {
           "default": {
-            "$ref": "#/components/responses/RESPONSE_DEFAULT_ERROR"
+            "$ref": "#/components/responses/DEFAULT_ERROR"
           },
-          "501": {
-            "$ref": "#/components/responses/RESPONSE_NOT_IMPLEMENTED"
+          "200": {
+            "$ref": "#/components/responses/('Every template, built-ins first (bare list, TemplateOut items).', None)"
+          },
+          "403": {
+            "$ref": "#/components/responses/RBAC_DENIED"
           }
         },
-        "tags": ["api.permissions"]
+        "tags": [
+          "api.permissions"
+        ]
+      },
+      "post": {
+        "responses": {
+          "422": {
+            "$ref": "#/components/responses/INVALID_KUBECONFIG (rules shape)"
+          },
+          "201": {
+            "description": "Created",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/TemplateOut"
+                }
+              }
+            }
+          },
+          "default": {
+            "$ref": "#/components/responses/DEFAULT_ERROR"
+          },
+          "403": {
+            "$ref": "#/components/responses/RBAC_DENIED"
+          },
+          "409": {
+            "$ref": "#/components/responses/CLUSTER_ALREADY_EXISTS (name collision)"
+          }
+        },
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/TemplateIn"
+              }
+            }
+          }
+        },
+        "summary": "Create a CUSTOM template (built-ins are seeded by migration, not\ncreated here). 422 (rules shape) before 409 (name collision).",
+        "tags": [
+          "api.permissions"
+        ]
+      }
+    },
+    "/api/v1/admin/permissions/templates/{name}": {
+      "get": {
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/TemplateOut"
+                }
+              }
+            }
+          },
+          "default": {
+            "$ref": "#/components/responses/DEFAULT_ERROR"
+          },
+          "403": {
+            "$ref": "#/components/responses/RBAC_DENIED"
+          },
+          "404": {
+            "$ref": "#/components/responses/RESOURCE_KIND_NOT_SUPPORTED"
+          }
+        },
+        "tags": [
+          "api.permissions"
+        ]
+      },
+      "parameters": [
+        {
+          "in": "path",
+          "name": "name",
+          "required": true,
+          "schema": {
+            "type": "string",
+            "minLength": 1
+          }
+        }
+      ],
+      "put": {
+        "responses": {
+          "422": {
+            "$ref": "#/components/responses/INVALID_KUBECONFIG (rules shape)"
+          },
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/TemplateOut"
+                }
+              }
+            }
+          },
+          "default": {
+            "$ref": "#/components/responses/DEFAULT_ERROR"
+          },
+          "403": {
+            "$ref": "#/components/responses/RBAC_DENIED"
+          },
+          "404": {
+            "$ref": "#/components/responses/RESOURCE_KIND_NOT_SUPPORTED"
+          },
+          "409": {
+            "$ref": "#/components/responses/BUILTIN_TEMPLATE_PROTECTED"
+          }
+        },
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/TemplateIn"
+              }
+            }
+          }
+        },
+        "summary": "Update a CUSTOM template only; a built-in → 409.",
+        "tags": [
+          "api.permissions"
+        ]
+      },
+      "delete": {
+        "responses": {
+          "default": {
+            "$ref": "#/components/responses/DEFAULT_ERROR"
+          },
+          "403": {
+            "$ref": "#/components/responses/RBAC_DENIED"
+          },
+          "404": {
+            "$ref": "#/components/responses/RESOURCE_KIND_NOT_SUPPORTED"
+          },
+          "409": {
+            "$ref": "#/components/responses/BUILTIN_TEMPLATE_PROTECTED / CLUSTER_ALREADY_EXISTS (referenced)"
+          }
+        },
+        "summary": "Delete a CUSTOM template. Built-in → 409\n``BUILTIN_TEMPLATE_PROTECTED``; still referenced by a binding → 409\n``CLUSTER_ALREADY_EXISTS`` naming the referencing binding(s).",
+        "tags": [
+          "api.permissions"
+        ]
+      }
+    },
+    "/api/v1/admin/permissions/bind": {
+      "post": {
+        "responses": {
+          "422": {
+            "$ref": "#/components/responses/INVALID_KUBECONFIG (scope mismatch)"
+          },
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/BindingOut"
+                }
+              }
+            }
+          },
+          "default": {
+            "$ref": "#/components/responses/DEFAULT_ERROR"
+          },
+          "403": {
+            "$ref": "#/components/responses/RBAC_DENIED"
+          },
+          "404": {
+            "$ref": "#/components/responses/CLUSTER_NOT_FOUND / RESOURCE_KIND_NOT_SUPPORTED"
+          },
+          "502": {
+            "$ref": "#/components/responses/CLUSTER_UNREACHABLE"
+          }
+        },
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/BindIn"
+              }
+            }
+          }
+        },
+        "summary": "Resolve the cluster by NAME, then ``services/permission.bind``\n(synchronous apply, ADR-0008). The service's errors are already the\nstable codes — propagate, don't wrap. The audit row is written by\nthe service (no double-audit here).",
+        "tags": [
+          "api.permissions"
+        ]
+      },
+      "delete": {
+        "responses": {
+          "422": {
+            "$ref": "#/components/responses/UNPROCESSABLE_ENTITY"
+          },
+          "default": {
+            "$ref": "#/components/responses/DEFAULT_ERROR"
+          },
+          "403": {
+            "$ref": "#/components/responses/RBAC_DENIED"
+          },
+          "404": {
+            "$ref": "#/components/responses/CLUSTER_NOT_FOUND / NO_BINDINGS"
+          },
+          "502": {
+            "$ref": "#/components/responses/CLUSTER_UNREACHABLE"
+          }
+        },
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/BindIn"
+              }
+            }
+          }
+        },
+        "summary": "Resolve the cluster by NAME, then ``services/permission.unbind``\n(RoleBinding delete + Role GC). Propagates ``NoBindingsError`` (404)\netc. The audit row is written by the service.",
+        "tags": [
+          "api.permissions"
+        ]
+      }
+    },
+    "/api/v1/permissions/my-access": {
+      "get": {
+        "responses": {
+          "default": {
+            "$ref": "#/components/responses/DEFAULT_ERROR"
+          },
+          "200": {
+            "$ref": "#/components/responses/(\"The caller's bindings (bare list, BindingOut items); [] when none.\", None)"
+          },
+          "401": {
+            "$ref": "#/components/responses/UNAUTHORIZED"
+          }
+        },
+        "summary": "R5: the CALLER's bindings only — never another user's. ``[]``\n(not a 404) when the caller has none. No admin gate.",
+        "tags": [
+          "api.permissions"
+        ]
+      }
+    },
+    "/api/v1/admin/groups": {
+      "get": {
+        "responses": {
+          "default": {
+            "$ref": "#/components/responses/DEFAULT_ERROR"
+          },
+          "200": {
+            "$ref": "#/components/responses/Every group, local first, name order (bare list, GroupOut items)."
+          },
+          "403": {
+            "$ref": "#/components/responses/RBAC_DENIED"
+          }
+        },
+        "tags": [
+          "api.groups"
+        ]
+      },
+      "post": {
+        "responses": {
+          "422": {
+            "$ref": "#/components/responses/UNPROCESSABLE_ENTITY"
+          },
+          "201": {
+            "$ref": "#/components/responses/Created (GroupOut)."
+          },
+          "default": {
+            "$ref": "#/components/responses/DEFAULT_ERROR"
+          },
+          "403": {
+            "$ref": "#/components/responses/RBAC_DENIED"
+          },
+          "409": {
+            "$ref": "#/components/responses/CLUSTER_ALREADY_EXISTS (name collision)"
+          }
+        },
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/GroupIn"
+              }
+            }
+          }
+        },
+        "tags": [
+          "api.groups"
+        ]
+      }
+    },
+    "/api/v1/admin/groups/{name}": {
+      "get": {
+        "responses": {
+          "default": {
+            "$ref": "#/components/responses/DEFAULT_ERROR"
+          },
+          "200": {
+            "$ref": "#/components/responses/The group + its members (GroupOut with members populated)."
+          },
+          "403": {
+            "$ref": "#/components/responses/RBAC_DENIED"
+          },
+          "404": {
+            "$ref": "#/components/responses/RESOURCE_KIND_NOT_SUPPORTED"
+          }
+        },
+        "tags": [
+          "api.groups"
+        ]
+      },
+      "parameters": [
+        {
+          "in": "path",
+          "name": "name",
+          "required": true,
+          "schema": {
+            "type": "string",
+            "minLength": 1
+          }
+        }
+      ]
+    },
+    "/api/v1/admin/groups/sync": {
+      "post": {
+        "responses": {
+          "200": {
+            "$ref": "#/components/responses/Sync result."
+          },
+          "default": {
+            "$ref": "#/components/responses/DEFAULT_ERROR"
+          },
+          "403": {
+            "$ref": "#/components/responses/RBAC_DENIED"
+          }
+        },
+        "summary": "Materialize Group + GroupMember rows from users' OIDC claims —\nthe 4.1 'groups appear after first login' behavior on demand.",
+        "tags": [
+          "api.groups"
+        ]
+      }
+    },
+    "/api/v1/admin/groups/{name}/members": {
+      "post": {
+        "responses": {
+          "422": {
+            "$ref": "#/components/responses/UNPROCESSABLE_ENTITY"
+          },
+          "default": {
+            "$ref": "#/components/responses/DEFAULT_ERROR"
+          },
+          "200": {
+            "$ref": "#/components/responses/Member present (idempotent)."
+          },
+          "403": {
+            "$ref": "#/components/responses/RBAC_DENIED"
+          },
+          "404": {
+            "$ref": "#/components/responses/RESOURCE_KIND_NOT_SUPPORTED (group or user missing)"
+          }
+        },
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/GroupMemberIn"
+              }
+            }
+          }
+        },
+        "tags": [
+          "api.groups"
+        ]
+      },
+      "parameters": [
+        {
+          "in": "path",
+          "name": "name",
+          "required": true,
+          "schema": {
+            "type": "string",
+            "minLength": 1
+          }
+        }
+      ],
+      "delete": {
+        "responses": {
+          "422": {
+            "$ref": "#/components/responses/UNPROCESSABLE_ENTITY"
+          },
+          "default": {
+            "$ref": "#/components/responses/DEFAULT_ERROR"
+          },
+          "200": {
+            "$ref": "#/components/responses/Member removed."
+          },
+          "403": {
+            "$ref": "#/components/responses/RBAC_DENIED"
+          },
+          "404": {
+            "$ref": "#/components/responses/RESOURCE_KIND_NOT_SUPPORTED (group, user, or membership missing)"
+          }
+        },
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/GroupMemberIn"
+              }
+            }
+          }
+        },
+        "tags": [
+          "api.groups"
+        ]
+      }
+    },
+    "/api/v1/admin/groups/{name}/privileges": {
+      "get": {
+        "responses": {
+          "default": {
+            "$ref": "#/components/responses/DEFAULT_ERROR"
+          },
+          "200": {
+            "$ref": "#/components/responses/The group's bindings (bare list, GroupPrivilegeOut items)."
+          },
+          "403": {
+            "$ref": "#/components/responses/RBAC_DENIED"
+          },
+          "404": {
+            "$ref": "#/components/responses/RESOURCE_KIND_NOT_SUPPORTED"
+          }
+        },
+        "tags": [
+          "api.groups"
+        ]
+      },
+      "parameters": [
+        {
+          "in": "path",
+          "name": "name",
+          "required": true,
+          "schema": {
+            "type": "string",
+            "minLength": 1
+          }
+        }
+      ],
+      "post": {
+        "responses": {
+          "422": {
+            "$ref": "#/components/responses/INVALID_KUBECONFIG (scope mismatch)"
+          },
+          "200": {
+            "$ref": "#/components/responses/Bound (GroupPrivilegeOut)."
+          },
+          "default": {
+            "$ref": "#/components/responses/DEFAULT_ERROR"
+          },
+          "403": {
+            "$ref": "#/components/responses/RBAC_DENIED"
+          },
+          "404": {
+            "$ref": "#/components/responses/CLUSTER_NOT_FOUND / RESOURCE_KIND_NOT_SUPPORTED"
+          },
+          "502": {
+            "$ref": "#/components/responses/CLUSTER_UNREACHABLE"
+          }
+        },
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/GroupBindIn"
+              }
+            }
+          }
+        },
+        "summary": "Bind a template to the group on a cluster — mirrors the user\nbind endpoint, the subject is the group (k8s ``Group`` subject).",
+        "tags": [
+          "api.groups"
+        ]
+      },
+      "delete": {
+        "responses": {
+          "422": {
+            "$ref": "#/components/responses/UNPROCESSABLE_ENTITY"
+          },
+          "default": {
+            "$ref": "#/components/responses/DEFAULT_ERROR"
+          },
+          "200": {
+            "$ref": "#/components/responses/Unbound."
+          },
+          "403": {
+            "$ref": "#/components/responses/RBAC_DENIED"
+          },
+          "404": {
+            "$ref": "#/components/responses/CLUSTER_NOT_FOUND / NO_BINDINGS / RESOURCE_KIND_NOT_SUPPORTED"
+          },
+          "502": {
+            "$ref": "#/components/responses/CLUSTER_UNREACHABLE"
+          }
+        },
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/GroupBindIn"
+              }
+            }
+          }
+        },
+        "tags": [
+          "api.groups"
+        ]
       }
     },
     "/api/v1/namespaces/requests": {
       "post": {
         "responses": {
           "default": {
-            "$ref": "#/components/responses/RESPONSE_DEFAULT_ERROR"
+            "$ref": "#/components/responses/DEFAULT_ERROR"
           },
           "501": {
-            "$ref": "#/components/responses/RESPONSE_NOT_IMPLEMENTED"
+            "$ref": "#/components/responses/NOT_IMPLEMENTED"
           }
         },
-        "tags": ["api.namespaces"]
+        "tags": [
+          "api.namespaces"
+        ]
       }
     },
     "/api/v1/namespaces/requests/{request_id}/approve": {
       "post": {
         "responses": {
           "default": {
-            "$ref": "#/components/responses/RESPONSE_DEFAULT_ERROR"
+            "$ref": "#/components/responses/DEFAULT_ERROR"
           },
           "501": {
-            "$ref": "#/components/responses/RESPONSE_NOT_IMPLEMENTED"
+            "$ref": "#/components/responses/NOT_IMPLEMENTED"
           }
         },
-        "tags": ["api.namespaces"]
+        "tags": [
+          "api.namespaces"
+        ]
       },
       "parameters": [
         {
@@ -494,26 +1237,30 @@
       "post": {
         "responses": {
           "default": {
-            "$ref": "#/components/responses/RESPONSE_DEFAULT_ERROR"
+            "$ref": "#/components/responses/DEFAULT_ERROR"
           },
           "501": {
-            "$ref": "#/components/responses/RESPONSE_NOT_IMPLEMENTED"
+            "$ref": "#/components/responses/NOT_IMPLEMENTED"
           }
         },
-        "tags": ["api.access"]
+        "tags": [
+          "api.access"
+        ]
       }
     },
     "/api/v1/access/requests/{request_id}/revoke": {
       "post": {
         "responses": {
           "default": {
-            "$ref": "#/components/responses/RESPONSE_DEFAULT_ERROR"
+            "$ref": "#/components/responses/DEFAULT_ERROR"
           },
           "501": {
-            "$ref": "#/components/responses/RESPONSE_NOT_IMPLEMENTED"
+            "$ref": "#/components/responses/NOT_IMPLEMENTED"
           }
         },
-        "tags": ["api.access"]
+        "tags": [
+          "api.access"
+        ]
       },
       "parameters": [
         {
@@ -531,117 +1278,250 @@
       "get": {
         "responses": {
           "default": {
-            "$ref": "#/components/responses/RESPONSE_DEFAULT_ERROR"
+            "$ref": "#/components/responses/DEFAULT_ERROR"
           },
-          "501": {
-            "$ref": "#/components/responses/RESPONSE_NOT_IMPLEMENTED"
+          "200": {
+            "$ref": "#/components/responses/(\"The caller's kubeconfig as a YAML attachment.\", None)"
+          },
+          "401": {
+            "$ref": "#/components/responses/UNAUTHORIZED"
+          },
+          "404": {
+            "$ref": "#/components/responses/NO_BINDINGS"
+          },
+          "500": {
+            "$ref": "#/components/responses/INTERNAL_ERROR"
           }
         },
-        "tags": ["api.kubeconfig"]
+        "tags": [
+          "api.kubeconfig"
+        ]
       }
     },
     "/api/v1/kubectl/auth/v1/config": {
       "get": {
         "responses": {
           "default": {
-            "$ref": "#/components/responses/RESPONSE_DEFAULT_ERROR"
+            "$ref": "#/components/responses/DEFAULT_ERROR"
           },
           "501": {
-            "$ref": "#/components/responses/RESPONSE_NOT_IMPLEMENTED"
+            "$ref": "#/components/responses/NOT_IMPLEMENTED"
           }
         },
-        "tags": ["api.kubectl_auth"]
+        "tags": [
+          "api.kubectl_auth"
+        ]
       }
     },
     "/api/v1/admin/users": {
       "get": {
         "responses": {
           "default": {
-            "$ref": "#/components/responses/RESPONSE_DEFAULT_ERROR"
+            "$ref": "#/components/responses/DEFAULT_ERROR"
           },
-          "501": {
-            "$ref": "#/components/responses/RESPONSE_NOT_IMPLEMENTED"
+          "200": {
+            "$ref": "#/components/responses/('Every user (bare list, UserOut items).', None)"
+          },
+          "403": {
+            "$ref": "#/components/responses/RBAC_DENIED"
           }
         },
-        "tags": ["api.admin"]
+        "summary": "R1: the admin sees EVERY user with a binding count.",
+        "description": "The count is the number of user-management (template-scoped)\n``cluster_bindings`` rows — legacy rows auto-bound by cluster\nregistration (``template=None``, pre user-management) are not\npermission bindings and do not count.",
+        "tags": [
+          "api.admin"
+        ]
+      },
+      "post": {
+        "responses": {
+          "422": {
+            "$ref": "#/components/responses/INVALID_KUBECONFIG"
+          },
+          "201": {
+            "description": "Created",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/UserOut"
+                }
+              }
+            }
+          },
+          "default": {
+            "$ref": "#/components/responses/DEFAULT_ERROR"
+          },
+          "403": {
+            "$ref": "#/components/responses/RBAC_DENIED"
+          },
+          "409": {
+            "$ref": "#/components/responses/CLUSTER_ALREADY_EXISTS (email already registered)"
+          }
+        },
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/UserIn"
+              }
+            }
+          }
+        },
+        "summary": "4.1 Create User: a Local password account. The sub is\n``kubedash:<email>`` so it does not collide with the reserved\n``local:`` bootstrap prefix (those rows stay immutable).",
+        "tags": [
+          "api.admin"
+        ]
       }
     },
-    "/api/v1/admin/clusters": {
-      "get": {
+    "/api/v1/admin/users/{user_id}": {
+      "patch": {
         "responses": {
-          "default": {
-            "$ref": "#/components/responses/RESPONSE_DEFAULT_ERROR"
+          "422": {
+            "$ref": "#/components/responses/INVALID_KUBECONFIG"
           },
-          "501": {
-            "$ref": "#/components/responses/RESPONSE_NOT_IMPLEMENTED"
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/UserOut"
+                }
+              }
+            }
+          },
+          "default": {
+            "$ref": "#/components/responses/DEFAULT_ERROR"
+          },
+          "403": {
+            "$ref": "#/components/responses/RBAC_DENIED"
+          },
+          "404": {
+            "$ref": "#/components/responses/RESOURCE_KIND_NOT_SUPPORTED"
+          },
+          "409": {
+            "$ref": "#/components/responses/CLUSTER_ALREADY_EXISTS (bootstrap admin immutable)"
           }
         },
-        "tags": ["api.admin"]
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/UserPatch"
+              }
+            }
+          }
+        },
+        "summary": "R1: change ``role`` and/or ``status``; audit each change. The\nbootstrap ``local:`` admin is immutable (409).",
+        "tags": [
+          "api.admin"
+        ]
+      },
+      "parameters": [
+        {
+          "in": "path",
+          "name": "user_id",
+          "required": true,
+          "schema": {
+            "type": "integer",
+            "minimum": 0
+          }
+        }
+      ],
+      "delete": {
+        "responses": {
+          "default": {
+            "$ref": "#/components/responses/DEFAULT_ERROR"
+          },
+          "403": {
+            "$ref": "#/components/responses/RBAC_DENIED"
+          },
+          "404": {
+            "$ref": "#/components/responses/RESOURCE_KIND_NOT_SUPPORTED"
+          },
+          "409": {
+            "$ref": "#/components/responses/CLUSTER_ALREADY_EXISTS (bootstrap admin or self)"
+          }
+        },
+        "summary": "4.1 row delete. The bootstrap ``local:`` admin and the caller\nthemselves are refused (409). Bindings and refresh tokens go with\nthe row.",
+        "tags": [
+          "api.admin"
+        ]
       }
     },
     "/api/v1/scim/v2/users": {
       "post": {
         "responses": {
           "default": {
-            "$ref": "#/components/responses/RESPONSE_DEFAULT_ERROR"
+            "$ref": "#/components/responses/DEFAULT_ERROR"
           },
           "501": {
-            "$ref": "#/components/responses/RESPONSE_NOT_IMPLEMENTED"
+            "$ref": "#/components/responses/NOT_IMPLEMENTED"
           }
         },
-        "tags": ["api.scim_users"]
+        "tags": [
+          "api.scim_users"
+        ]
       }
     },
     "/api/v1/scim/v2/groups": {
       "post": {
         "responses": {
           "default": {
-            "$ref": "#/components/responses/RESPONSE_DEFAULT_ERROR"
+            "$ref": "#/components/responses/DEFAULT_ERROR"
           },
           "501": {
-            "$ref": "#/components/responses/RESPONSE_NOT_IMPLEMENTED"
+            "$ref": "#/components/responses/NOT_IMPLEMENTED"
           }
         },
-        "tags": ["api.scim_groups"]
+        "tags": [
+          "api.scim_groups"
+        ]
       }
     },
     "/api/v1/projects": {
       "get": {
         "responses": {
           "default": {
-            "$ref": "#/components/responses/RESPONSE_DEFAULT_ERROR"
+            "$ref": "#/components/responses/DEFAULT_ERROR"
           },
           "501": {
-            "$ref": "#/components/responses/RESPONSE_NOT_IMPLEMENTED"
+            "$ref": "#/components/responses/NOT_IMPLEMENTED"
           }
         },
-        "tags": ["api.agg_projects"]
+        "tags": [
+          "api.agg_projects"
+        ]
       }
     },
     "/api/v1/sso-users": {
       "get": {
         "responses": {
           "default": {
-            "$ref": "#/components/responses/RESPONSE_DEFAULT_ERROR"
+            "$ref": "#/components/responses/DEFAULT_ERROR"
           },
           "501": {
-            "$ref": "#/components/responses/RESPONSE_NOT_IMPLEMENTED"
+            "$ref": "#/components/responses/NOT_IMPLEMENTED"
           }
         },
-        "tags": ["api.agg_sso_users"]
+        "tags": [
+          "api.agg_sso_users"
+        ]
       }
     },
     "/api/v1/sso-groups": {
       "get": {
         "responses": {
           "default": {
-            "$ref": "#/components/responses/RESPONSE_DEFAULT_ERROR"
+            "$ref": "#/components/responses/DEFAULT_ERROR"
           },
           "501": {
-            "$ref": "#/components/responses/RESPONSE_NOT_IMPLEMENTED"
+            "$ref": "#/components/responses/NOT_IMPLEMENTED"
           }
         },
-        "tags": ["api.agg_sso_groups"]
+        "tags": [
+          "api.agg_sso_groups"
+        ]
       }
     }
   },
@@ -671,6 +1551,10 @@
       "description": ""
     },
     {
+      "name": "api.events",
+      "description": ""
+    },
+    {
       "name": "api.traces",
       "description": ""
     },
@@ -680,6 +1564,10 @@
     },
     {
       "name": "api.permissions",
+      "description": ""
+    },
+    {
+      "name": "api.groups",
       "description": ""
     },
     {
@@ -793,7 +1681,10 @@
             "type": "string"
           }
         },
-        "required": ["email", "password"],
+        "required": [
+          "email",
+          "password"
+        ],
         "additionalProperties": false
       },
       "AuthSettingsOut": {
@@ -815,7 +1706,9 @@
             "type": "string"
           }
         },
-        "required": ["refresh_token"],
+        "required": [
+          "refresh_token"
+        ],
         "additionalProperties": false
       },
       "RefreshOut": {
@@ -884,7 +1777,12 @@
             "type": "string"
           }
         },
-        "required": ["api_server", "context", "kubeconfig", "name"],
+        "required": [
+          "api_server",
+          "context",
+          "kubeconfig",
+          "name"
+        ],
         "additionalProperties": false
       },
       "ClusterOut": {
@@ -944,53 +1842,397 @@
           }
         },
         "additionalProperties": false
+      },
+      "NamespaceIn": {
+        "type": "object",
+        "properties": {
+          "name": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "name"
+        ],
+        "additionalProperties": false
+      },
+      "NamespaceMutationOut": {
+        "type": "object",
+        "properties": {
+          "name": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "name"
+        ],
+        "additionalProperties": false
+      },
+      "CpuSummary": {
+        "type": "object",
+        "properties": {
+          "capacity_millicores": {
+            "type": "integer"
+          },
+          "used_millicores": {
+            "type": "integer",
+            "nullable": true
+          },
+          "requests_millicores": {
+            "type": "integer"
+          },
+          "limits_millicores": {
+            "type": "integer"
+          }
+        },
+        "additionalProperties": false
+      },
+      "MemorySummary": {
+        "type": "object",
+        "properties": {
+          "capacity_bytes": {
+            "type": "integer"
+          },
+          "used_bytes": {
+            "type": "integer",
+            "nullable": true
+          },
+          "requests_bytes": {
+            "type": "integer"
+          },
+          "limits_bytes": {
+            "type": "integer"
+          }
+        },
+        "additionalProperties": false
+      },
+      "PodSummary": {
+        "type": "object",
+        "properties": {
+          "capacity": {
+            "type": "integer"
+          },
+          "running": {
+            "type": "integer"
+          },
+          "pending": {
+            "type": "integer"
+          },
+          "completed": {
+            "type": "integer"
+          }
+        },
+        "additionalProperties": false
+      },
+      "MetricsSummaryOut": {
+        "type": "object",
+        "properties": {
+          "metrics_available": {
+            "type": "boolean"
+          },
+          "cpu": {
+            "$ref": "#/components/schemas/CpuSummary"
+          },
+          "memory": {
+            "$ref": "#/components/schemas/MemorySummary"
+          },
+          "pods": {
+            "$ref": "#/components/schemas/PodSummary"
+          }
+        },
+        "additionalProperties": false
+      },
+      "TemplateIn": {
+        "type": "object",
+        "properties": {
+          "name": {
+            "type": "string"
+          },
+          "description": {
+            "type": "string",
+            "default": ""
+          },
+          "scope": {
+            "type": "string"
+          },
+          "rules": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "additionalProperties": {}
+            }
+          }
+        },
+        "required": [
+          "name",
+          "rules",
+          "scope"
+        ],
+        "additionalProperties": false
+      },
+      "TemplateOut": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "integer"
+          },
+          "name": {
+            "type": "string"
+          },
+          "description": {
+            "type": "string"
+          },
+          "scope": {
+            "type": "string"
+          },
+          "rules": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "additionalProperties": {}
+            }
+          },
+          "builtin": {
+            "type": "boolean"
+          },
+          "created_by": {
+            "type": "string",
+            "nullable": true
+          },
+          "created_at": {
+            "type": "string",
+            "format": "date-time",
+            "nullable": true
+          }
+        },
+        "additionalProperties": false
+      },
+      "BindIn": {
+        "type": "object",
+        "properties": {
+          "user": {
+            "type": "string"
+          },
+          "cluster": {
+            "type": "string"
+          },
+          "namespace": {
+            "type": "string",
+            "nullable": true
+          },
+          "template": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "cluster",
+          "template",
+          "user"
+        ],
+        "additionalProperties": false
+      },
+      "BindingOut": {
+        "type": "object",
+        "properties": {
+          "cluster": {
+            "type": "string"
+          },
+          "namespace": {
+            "type": "string",
+            "nullable": true
+          },
+          "template": {
+            "type": "string",
+            "nullable": true
+          },
+          "created_at": {
+            "type": "string",
+            "format": "date-time",
+            "nullable": true
+          }
+        },
+        "additionalProperties": false
+      },
+      "GroupIn": {
+        "type": "object",
+        "properties": {
+          "name": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "name"
+        ],
+        "additionalProperties": false
+      },
+      "GroupMemberIn": {
+        "type": "object",
+        "properties": {
+          "name": {
+            "type": "string"
+          },
+          "user": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "name",
+          "user"
+        ],
+        "additionalProperties": false
+      },
+      "GroupBindIn": {
+        "type": "object",
+        "properties": {
+          "cluster": {
+            "type": "string"
+          },
+          "namespace": {
+            "type": "string",
+            "nullable": true
+          },
+          "template": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "cluster",
+          "template"
+        ],
+        "additionalProperties": false
+      },
+      "UserPatch": {
+        "type": "object",
+        "properties": {
+          "role": {
+            "type": "string",
+            "nullable": true
+          },
+          "status": {
+            "type": "string",
+            "nullable": true
+          }
+        },
+        "additionalProperties": false
+      },
+      "UserOut": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "integer"
+          },
+          "sub": {
+            "type": "string"
+          },
+          "email": {
+            "type": "string",
+            "nullable": true
+          },
+          "display_name": {
+            "type": "string",
+            "nullable": true
+          },
+          "groups": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          },
+          "role": {
+            "type": "string"
+          },
+          "status": {
+            "type": "string"
+          },
+          "auth_source": {
+            "type": "string"
+          },
+          "cluster_count": {
+            "type": "integer"
+          },
+          "last_login_at": {
+            "type": "string",
+            "format": "date-time",
+            "nullable": true
+          }
+        },
+        "additionalProperties": false
+      },
+      "UserIn": {
+        "type": "object",
+        "properties": {
+          "username": {
+            "type": "string"
+          },
+          "email": {
+            "type": "string"
+          },
+          "password": {
+            "type": "string"
+          },
+          "role": {
+            "type": "string"
+          },
+          "type": {
+            "type": "string",
+            "default": "Local"
+          }
+        },
+        "required": [
+          "email",
+          "password",
+          "role",
+          "username"
+        ],
+        "additionalProperties": false
       }
     },
     "responses": {
-      "RESPONSE_CALLER_S_BOUND_CLUSTERS_BARE_LIST_NONE": {
-        "description": "(\"Caller's bound clusters (bare list).\", None)"
+      "DEFAULT_ERROR": {
+        "description": "Default error response",
+        "content": {
+          "application/json": {
+            "schema": {
+              "$ref": "#/components/schemas/Error"
+            }
+          }
+        }
       },
-      "RESPONSE_CLUSTER_ALREADY_EXISTS": {
-        "description": "CLUSTER_ALREADY_EXISTS"
+      "UNAUTHORIZED": {
+        "description": "Unauthorized",
+        "content": {
+          "application/json": {
+            "schema": {
+              "$ref": "#/components/schemas/Error"
+            }
+          }
+        }
       },
-      "RESPONSE_CLUSTER_NOT_FOUND": {
-        "description": "CLUSTER_NOT_FOUND"
+      "UNPROCESSABLE_ENTITY": {
+        "description": "Unprocessable Entity",
+        "content": {
+          "application/json": {
+            "schema": {
+              "$ref": "#/components/schemas/Error"
+            }
+          }
+        }
       },
-      "RESPONSE_CLUSTER_UNREACHABLE": {
-        "description": "CLUSTER_UNREACHABLE"
-      },
-      "RESPONSE_DEFAULT_ERROR": {
-        "description": "DEFAULT_ERROR"
-      },
-      "RESPONSE_INVALID_CREDENTIALS_WRONG_PASSWORD_OR_UNKNOWN_EMAIL_NO_ENUMERATION": {
-        "description": "INVALID_CREDENTIALS (wrong password OR unknown email \u2014 no enumeration)"
-      },
-      "RESPONSE_INVALID_KUBECONFIG": {
-        "description": "INVALID_KUBECONFIG"
-      },
-      "RESPONSE_LOCAL_AUTH_DISABLED": {
-        "description": "LOCAL_AUTH_DISABLED"
-      },
-      "RESPONSE_NOT_IMPLEMENTED": {
-        "description": "NOT_IMPLEMENTED"
-      },
-      "RESPONSE_RBAC_DENIED": {
-        "description": "RBAC_DENIED"
-      },
-      "RESPONSE_RESOURCE_KIND_NOT_SUPPORTED_OR_CLUSTER_NOT_FOUND_BINDING_GATE": {
-        "description": "RESOURCE_KIND_NOT_SUPPORTED or CLUSTER_NOT_FOUND (binding gate)"
-      },
-      "RESPONSE_REDIRECT_TO_TOKEN_JWT_REFRESH_TOKEN_JWT_DELIVERY_CONTRACT": {
-        "description": "Redirect to /?token=<jwt>&refresh=<token> (JWT delivery contract)"
-      },
-      "RESPONSE_STATE_MISMATCH_MISSING_STATE_OR_CODE": {
-        "description": "STATE_MISMATCH / missing state or code"
-      },
-      "RESPONSE_UNAUTHORIZED": {
-        "description": "UNAUTHORIZED"
-      },
-      "RESPONSE_UNPROCESSABLE_ENTITY": {
-        "description": "UNPROCESSABLE_ENTITY"
+      "NOT_IMPLEMENTED": {
+        "description": "Not Implemented",
+        "content": {
+          "application/json": {
+            "schema": {
+              "$ref": "#/components/schemas/Error"
+            }
+          }
+        }
+      }
+    },
+    "securitySchemes": {
+      "BearerAuth": {
+        "type": "http",
+        "scheme": "bearer",
+        "bearerFormat": "JWT"
       }
     }
   }

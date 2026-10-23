@@ -230,6 +230,31 @@ test.describe('KubeDash API smoke', () => {
     expect(missing.status()).toBe(404)
   })
 
+  test('metrics: /clusters/0/metrics/summary 200 with the summary contract', async ({
+    request,
+  }) => {
+    const headers = authHeaders(await loginToken(request))
+    const resp = await request.get('/api/v1/clusters/0/metrics/summary', { headers })
+    expect(resp.status(), 'GET /metrics/summary').toBe(200)
+    const body = await resp.json()
+    // metrics_available is a boolean — the bare dev cluster likely has no
+    // metrics-server, so `false` is the EXPECTED state, not a failure
+    // (certainty rule: never 500, never 0). The declared-state objects are
+    // always present (they come from pods/nodes, not the Metrics API).
+    expect(typeof body.metrics_available).toBe('boolean')
+    for (const key of ['cpu', 'memory', 'pods']) {
+      expect(body[key], `summary.${key} object present`).toBeTruthy()
+    }
+  })
+
+  test('events: /clusters/0/events 200 bare list (newest-first)', async ({ request }) => {
+    const headers = authHeaders(await loginToken(request))
+    const resp = await request.get('/api/v1/clusters/0/events', { headers })
+    expect(resp.status(), 'GET /events').toBe(200)
+    const body = await resp.json()
+    expect(Array.isArray(body)).toBe(true)
+  })
+
   test('admin/users: list, create → PATCH role → DELETE; bootstrap admin immutable', async ({
     request,
   }) => {

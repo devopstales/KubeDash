@@ -2,7 +2,6 @@ import { expect, test } from 'vitest'
 import { http, HttpResponse } from 'msw'
 import { server } from './msw'
 import { apiFetch } from '../src/lib/api'
-import { useClusterStore } from '../src/store/cluster'
 import type { ClusterEvent, MetricsSummary } from '../src/lib/types'
 
 // ponytail: jsdom has no layout — rendering the view pulls in CChart's
@@ -11,11 +10,9 @@ import type { ClusterEvent, MetricsSummary } from '../src/lib/types'
 // URLs from VITE_API_BASE (pinned in vite.config.ts), so a wildcard MSW
 // handler on the pinned origin is only reachable when the base is set.
 test('dashboard fetch seam reaches MSW through the pinned VITE_API_BASE', async () => {
-  useClusterStore.setState({ selectedCluster: { id: 1, name: 'prod' } })
   server.use(
     http.get('*/api/v1/clusters/1/metrics/summary', () =>
       HttpResponse.json({
-        cluster: 'prod',
         metrics_available: true,
         cpu: {
           capacity_millicores: 100,

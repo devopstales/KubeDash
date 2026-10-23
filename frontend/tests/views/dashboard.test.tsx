@@ -74,7 +74,6 @@ vi.mock('../../src/components/KubeDataTable', () => {
 })
 
 const SUMMARY_OK = {
-  cluster: 'prod',
   metrics_available: true,
   cpu: { capacity_millicores: 4000, used_millicores: 800, requests_millicores: 2000, limits_millicores: 0 },
   memory: { capacity_bytes: 8589934592, used_bytes: 4294967296, requests_bytes: 2147483648, limits_bytes: 0 },

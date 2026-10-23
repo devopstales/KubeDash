@@ -163,7 +163,6 @@ export interface K8sSecret {
 
 /** A row of GET /api/v1/clusters/<id>/metrics/summary. `used_*` are null when the Metrics API is unreachable (certainty rule: unknown, never 0). */
 export interface MetricsSummary {
-  cluster?: string
   metrics_available: boolean
   cpu: {
     capacity_millicores: number
