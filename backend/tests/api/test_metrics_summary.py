@@ -63,6 +63,25 @@ class FakeK8s:
             return (True, USAGE)
         return (True, USAGE.get(name))
 
+    def node_metrics(self) -> tuple[bool, list[dict]]:
+        # Mirrors the real contract: join USAGE with NODES' status.capacity,
+        # keyed by node name. Unavailable -> (False, []) (never zero-filled).
+        if not self.available:
+            return (False, [])
+        out = []
+        for name, u in USAGE.items():
+            cap = next((n["status"]["capacity"] for n in NODES if n["metadata"]["name"] == name), {})
+            out.append(
+                {
+                    "name": name,
+                    "cpu_used_millicores": u["cpu_millicores"],
+                    "cpu_capacity_millicores": int(str(cap.get("cpu", "0m")).rstrip("m") or 0),
+                    "memory_used_bytes": u["memory_bytes"],
+                    "memory_capacity_bytes": 8 * 2**30,  # NODES memory "8Gi"
+                }
+            )
+        return (True, out)
+
 
 @pytest.fixture()
 def fake_k8s(api_app, monkeypatch) -> FakeK8s:
@@ -218,6 +237,64 @@ def test_metrics_404_is_200_unknown_not_500(api_client, auth_client, fake_k8s, m
     assert body["cpu"]["requests_millicores"] == 2000
     assert body["memory"]["limits_bytes"] == 4 * 2**30
     assert fake_k8s.node_usage_calls == 1
+
+
+def _node_metrics(api_client, headers) -> object:
+    return api_client.get("/api/v1/clusters/1/metrics/nodes", headers=headers)
+
+
+def test_node_metrics_series_with_capacity(api_client, auth_client, fake_k8s, monkeypatch) -> None:
+    """metrics-nodes-series (blueprint Task 3): the per-node series joins the
+    Metrics API usage with core-v1 capacity, keyed by node name."""
+    auth_client.login()
+    h = {"Authorization": f"Bearer {auth_client.jwt}"}
+    _register(api_client, h)
+    _allow_all(monkeypatch)
+    r = _node_metrics(api_client, h)
+    assert r.status_code == 200, r.get_json()
+    body = r.get_json()
+    assert body["cluster"] == "prod"
+    assert body["metrics_available"] is True
+    assert body["source"] == "metrics.k8s.io"
+    item = body["items"][0]
+    assert item["name"] == "n1"
+    assert item["cpu_used_millicores"] == 800
+    assert item["cpu_capacity_millicores"] == 4000  # from NODES status.capacity
+    assert item["memory_used_bytes"] == 4 * 2**30
+    assert item["memory_capacity_bytes"] == 8 * 2**30
+
+
+def test_node_metrics_unavailable_is_empty_not_zero(
+    api_client, auth_client, fake_k8s, monkeypatch
+) -> None:
+    """metrics-nodes-unavailable (blueprint Task 3): Metrics API 404s ->
+    metrics_available false, items [] — never 500, never a zero-filled series."""
+    fake_k8s.available = False
+    auth_client.login()
+    h = {"Authorization": f"Bearer {auth_client.jwt}"}
+    _register(api_client, h)
+    _allow_all(monkeypatch)
+    r = _node_metrics(api_client, h)
+    assert r.status_code == 200, r.get_json()
+    body = r.get_json()
+    assert body["metrics_available"] is False
+    assert body["items"] == []
+
+
+def test_node_metrics_denied_is_200_empty(
+    api_client, auth_client, fake_k8s, monkeypatch
+) -> None:
+    """metrics-nodes-denied: get nodes on metrics.k8s.io denied -> 200 with
+    empty items (the table renders unknown used, not a 403)."""
+    auth_client.login()
+    h = {"Authorization": f"Bearer {auth_client.jwt}"}
+    _register(api_client, h)
+    _allow_core_only(monkeypatch)
+    r = _node_metrics(api_client, h)
+    assert r.status_code == 200, r.get_json()
+    body = r.get_json()
+    assert body["metrics_available"] is False
+    assert body["items"] == []
 
 
 def _node_usage(api_client, headers, name: str = "n1") -> object:

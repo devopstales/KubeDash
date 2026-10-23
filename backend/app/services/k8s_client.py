@@ -295,6 +295,56 @@ class K8sClient:
             return True, usage
         return True, usage.get(name)
 
+    def node_metrics(self) -> tuple[bool, list[dict[str, Any]]]:
+        """Per-node CPU/memory series for the node view (blueprint Task 3).
+
+        Returns ``(available, series)`` where each series item is
+        ``{name, cpu_used_millicores, cpu_capacity_millicores, memory_used_bytes,
+        memory_capacity_bytes}``. ``cpu_used_*`` / ``memory_used_*`` come from
+        the Metrics API (query-only, ADR-0003); ``*_capacity_*`` come from the
+        core-v1 node ``status.capacity`` (declared state, always present when
+        the node list is reachable). A node present in the metrics list but
+        missing from ``list_nodes`` (or vice versa) gets ``None`` for the
+        fields it lacks — the view renders ``unknown``, never ``0``.
+
+        ``available`` is False when the Metrics API is absent/broken (404/5xx)
+        — the caller renders the used tier unknown, never 0.
+        """
+        items = self._node_metrics()
+        if items is None:
+            return False, []
+        capacities: dict[str, dict[str, Any]] = {}
+        try:
+            for node in self.list_nodes(None):
+                name = (node.get("metadata") or {}).get("name")
+                if name:
+                    capacities[name] = (node.get("status") or {}).get("capacity") or {}
+        except Exception:
+            # The node list is a separate read; if it fails the capacity tier
+            # degrades to unknown (the used tier is still served from metrics).
+            capacities = {}
+        usage: dict[str, dict[str, int]] = {}
+        for item in items:
+            name = item["metadata"]["name"]
+            u = item.get("usage", {})
+            usage[name] = {
+                "cpu_millicores": self._parse_cpu(u.get("cpu")),
+                "memory_bytes": self._parse_bytes(u.get("memory")),
+            }
+        series: list[dict[str, Any]] = []
+        for name in sorted(set(usage) | set(capacities)):
+            cap = capacities.get(name, {})
+            series.append(
+                {
+                    "name": name,
+                    "cpu_used_millicores": usage.get(name, {}).get("cpu_millicores"),
+                    "cpu_capacity_millicores": self._parse_cpu(cap.get("cpu")),
+                    "memory_used_bytes": usage.get(name, {}).get("memory_bytes"),
+                    "memory_capacity_bytes": self._parse_bytes(cap.get("memory")),
+                }
+            )
+        return True, series
+
     @staticmethod
     def _parse_cpu(qty: str | None) -> int:
         """K8s CPU quantity → millicores (``"800m"`` → 800, ``"1"`` → 1000).

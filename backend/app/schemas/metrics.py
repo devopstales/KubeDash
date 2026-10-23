@@ -30,6 +30,29 @@ class PodSummary(Schema):
     completed = fields.Integer()
 
 
+class NodeMetricOut(Schema):
+    """One row of ``GET /clusters/<id>/metrics/nodes``. Used fields are
+    nullable (certainty rule): a node absent from the metrics list or the node
+    list renders ``None``, never ``0``."""
+
+    name = fields.String()
+    cpu_used_millicores = fields.Integer(allow_none=True)
+    cpu_capacity_millicores = fields.Integer(allow_none=True)
+    memory_used_bytes = fields.Integer(allow_none=True)
+    memory_capacity_bytes = fields.Integer(allow_none=True)
+
+
+class NodeMetricsOut(Schema):
+    """``GET /clusters/<id>/metrics/nodes`` — the per-node series for the node
+    view (blueprint Task 3). ``metrics_available`` says whether the Metrics API
+    answered; the source is fixed at ``metrics.k8s.io`` (ratified, ADR-0003)."""
+
+    cluster = fields.String()
+    metrics_available = fields.Boolean()
+    source = fields.String()
+    items = fields.List(fields.Nested(NodeMetricOut))
+
+
 class NodeUsageOut(Schema):
     """``GET /clusters/<id>/nodes/<name>/usage`` — a single node's observed
     (used) tier. ``metrics_available`` says whether the Metrics API answered;

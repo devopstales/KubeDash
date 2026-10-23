@@ -66,6 +66,12 @@ const fmtCpu = (m: number | null): string => {
 
 const PROBE_CONDITIONS = ['Ready', 'MemoryPressure', 'DiskPressure', 'PIDPressure']
 
+// ponytail: taints render as "key=value:effect" badges (4.1's format).
+const taintsOf = (node: K8sNode): string[] =>
+  (node.spec?.taints ?? []).map((t) =>
+    t.effect ? `${t.key ?? ''}=${t.value ?? ''}:${t.effect}` : `${t.key ?? ''}=${t.value ?? ''}`,
+  )
+
 // Certainty rule: used is a READ value. null → "unknown", never 0. The bar
 // shows the used/allocatable fraction; an unknown used renders an empty bar
 // (not a 0% bar, which would imply a healthy zero).
@@ -139,9 +145,10 @@ const NodeDataView = () => {
   const capMem = parseBytes(status?.capacity?.memory)
   const u = usage.data
 
-  const conditions = (status?.conditions ?? [])
-    .filter((c) => c.type && PROBE_CONDITIONS.includes(c.type))
-    .map((c) => [`${c.type}`, `${c.status}`] as [string, string])
+  const conditions = (status?.conditions ?? []).map(
+    (c) => [`${c.type ?? ''}`, `${c.status ?? ''}`, `${(c as { reason?: string }).reason ?? ''}`, `${(c as { message?: string }).message ?? ''}`] as [string, string, string, string],
+  )
+  const taints = node ? taintsOf(node) : []
   const info: [string, string][] = [
     ['Kubelet version', status?.node_info?.kubelet_version ?? ''],
     ['Container runtime', status?.node_info?.container_runtime_version ?? ''],
@@ -226,21 +233,39 @@ const NodeDataView = () => {
           </td>
         </tr>
         <tr>
+          <th scope="row">Taints:</th>
+          <td>
+            {taints.length ? (
+              taints.map((t) => (
+                <CBadge key={t} color="secondary" className="me-1">
+                  {t}
+                </CBadge>
+              ))
+            ) : (
+              'No taints'
+            )}
+          </td>
+        </tr>
+        <tr>
           <th scope="row">Conditions:</th>
           <td>
             {conditions.length ? (
               <CTable bordered small className="mb-0">
                 <thead>
                   <tr>
-                    <th>Condition</th>
+                    <th>Type</th>
                     <th>Status</th>
+                    <th>Reason</th>
+                    <th>Message</th>
                   </tr>
                 </thead>
                 <tbody>
-                  {conditions.map(([k, v]) => (
-                    <tr key={k}>
-                      <td>{k}</td>
-                      <td>{v}</td>
+                  {conditions.map(([type, st, reason, message], i) => (
+                    <tr key={i}>
+                      <td>{type}</td>
+                      <td>{st}</td>
+                      <td>{reason}</td>
+                      <td className="text-break">{message}</td>
                     </tr>
                   ))}
                 </tbody>

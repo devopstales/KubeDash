@@ -73,7 +73,11 @@ const NODES = {
   cluster: 'prod',
   items: [
     {
-      metadata: { name: 'worker-1', creation_timestamp: '2026-01-01T00:00:00Z' },
+      metadata: {
+        name: 'worker-1',
+        creation_timestamp: '2026-01-01T00:00:00Z',
+        labels: { 'node-role.kubernetes.io/control-plane': '' },
+      },
       status: {
         conditions: [{ type: 'Ready', status: 'True' }, { type: 'MemoryPressure', status: 'False' }],
         node_info: { kubelet_version: 'v1.31.0', os_image: 'kind' },
@@ -121,8 +125,34 @@ type NodeUsageBody = {
   used_bytes: number | null
 }
 
+type NodeMetricItem = {
+  name: string
+  cpu_used_millicores: number | null
+  cpu_capacity_millicores: number | null
+  memory_used_bytes: number | null
+  memory_capacity_bytes: number | null
+}
+
+const METRICS_OK = {
+  cluster: 'prod',
+  metrics_available: true,
+  source: 'metrics.k8s.io',
+  items: [
+    // worker-1: 800m/4000m = 20%, 4Gi/8Gi = 50%. notready-1 is absent → unknown.
+    {
+      name: 'worker-1',
+      cpu_used_millicores: 800,
+      cpu_capacity_millicores: 4000,
+      memory_used_bytes: 4 * 2 ** 30,
+      memory_capacity_bytes: 8 * 2 ** 30,
+    },
+  ] as NodeMetricItem[],
+}
+
 const nodesHandler = () =>
   http.get('*/api/v1/clusters/1/resources/nodes', () => HttpResponse.json(NODES))
+const metricsHandler = (body = METRICS_OK) =>
+  http.get('*/api/v1/clusters/1/metrics/nodes', () => HttpResponse.json(body))
 const usageHandler = (body: NodeUsageBody = USAGE_OK) =>
   http.get('*/api/v1/clusters/1/nodes/worker-1/usage', () => HttpResponse.json(body))
 
@@ -135,17 +165,38 @@ afterEach(() => {
   useClusterStore.setState({ selectedCluster: null, selectedNamespace: null })
 })
 
-test('node-list-renders: nodes render with Ready/NotReady tone and links to detail', async () => {
-  renderWith(<NodesView />, [nodesHandler()])
+test('node-list-renders: 4.1 columns (State/Name/Role/Version/IP/OS) + usage bars', async () => {
+  renderWith(<NodesView />, [nodesHandler(), metricsHandler()])
   await screen.findByRole('table')
+  // 4.1 column set is present.
+  for (const header of ['State', 'Name', 'Role', 'Version', 'IP', 'OS', 'CPU Usage', 'Memory Usage']) {
+    expect(screen.getByText(header)).toBeTruthy()
+  }
   // Two nodes, one Ready one NotReady — the tone is derived from conditions.
-  expect(screen.getByText('worker-1')).toBeTruthy()
-  expect(screen.getByText('notready-1')).toBeTruthy()
   expect(screen.getByText('Ready')).toBeTruthy()
   expect(screen.getByText('NotReady')).toBeTruthy()
+  // Role is derived from the node-role.kubernetes.io/<role> label (4.1).
+  expect(screen.getByText('Control-plane')).toBeTruthy()
+  // worker-1 has a metric: 800m/4000m → 20% CPU, 4Gi/8Gi → 50% memory.
+  expect(screen.getByText('20%')).toBeTruthy()
+  expect(screen.getByText('50%')).toBeTruthy()
+  // notready-1 is absent from metrics → its used cells are "unknown", never 0%.
+  expect(screen.getAllByText('unknown').length).toBeGreaterThanOrEqual(2)
   // The node name links to the detail page.
   const link = screen.getByRole('link', { name: 'worker-1' })
   expect(link.getAttribute('href')).toBe('/cluster/node/data?name=worker-1')
+})
+
+test('node-list-metrics-unavailable: usage columns show unknown, table still renders', async () => {
+  renderWith(<NodesView />, [
+    nodesHandler(),
+    metricsHandler({ cluster: 'prod', metrics_available: false, source: 'metrics.k8s.io', items: [] }),
+  ])
+  await screen.findByRole('table')
+  expect(screen.getByText('worker-1')).toBeTruthy()
+  // No metrics source → both used cells unknown (certainty rule, never 0).
+  expect(screen.getAllByText('unknown').length).toBeGreaterThanOrEqual(4)
+  expect(screen.queryByText('0%')).toBeNull()
 })
 
 test('node-detail-renders: node metadata + used-vs-allocatable bars', async () => {

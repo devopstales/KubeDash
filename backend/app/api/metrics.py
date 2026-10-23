@@ -32,7 +32,7 @@ from flask_smorest import Api, Blueprint
 from app.api._authhook import apply_auth
 from app.api._cluster import cluster_for as _cluster_for
 from app.core.errors import NotImplementedError_, RbacDeniedError
-from app.schemas.metrics import MetricsSummaryOut, NodeUsageOut
+from app.schemas.metrics import MetricsSummaryOut, NodeMetricsOut, NodeUsageOut
 from app.services import rbac
 from app.services.cluster_allocation import compute_summary
 from app.services.k8s_client import pool
@@ -93,6 +93,44 @@ class MetricsApi(Api):
             available, usage = False, {}
         summary = compute_summary(nodes, pods, usage if available else None)
         return {"metrics_available": available, "metrics_denied": not metrics_allowed, **summary}
+
+    @blp.route("/clusters/<int:cluster_id>/metrics/nodes", methods=["GET"])
+    @blp.response(200, NodeMetricsOut)
+    @blp.doc(
+        responses={
+            403: "RBAC_DENIED (no get nodes on metrics.k8s.io)",
+            404: "CLUSTER_NOT_FOUND (binding gate)",
+            502: "CLUSTER_UNREACHABLE",
+        }
+    )
+    def node_metrics(self, cluster_id: int) -> dict[str, object]:
+        """The per-node CPU/memory series for the node view (blueprint Task 3).
+
+        The node table's used tier joins this to ``/resources/nodes`` by node
+        name. Gated on ``get nodes`` on ``metrics.k8s.io`` (tier 2 of the
+        ADR-0004 two-tier gate): a user without the grant sees ``unknown``
+        used, not a 403 on the table (declared state still renders). The
+        Metrics API's health is reported as ``metrics_available`` — an absent
+        metrics-server is 200 with ``metrics_available: false``, never 500.
+        """
+        cluster = _cluster_for(g.current_user, cluster_id)
+        metrics_allowed = rbac.can(
+            g.current_user, cluster, "get", "nodes", None, None, "metrics.k8s.io"
+        )
+        if not metrics_allowed:
+            return {
+                "cluster": cluster.name,
+                "metrics_available": False,
+                "source": "metrics.k8s.io",
+                "items": [],
+            }
+        available, items = pool.get(cluster).node_metrics()
+        return {
+            "cluster": cluster.name,
+            "metrics_available": available,
+            "source": "metrics.k8s.io",
+            "items": items,
+        }
 
     @blp.route("/clusters/<int:cluster_id>/nodes/<path:node_name>/usage", methods=["GET"])
     @blp.response(200, NodeUsageOut)

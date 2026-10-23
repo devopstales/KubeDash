@@ -90,6 +90,7 @@ export interface K8sNode {
   }
   spec?: {
     unschedulable?: boolean | null
+    taints?: Array<{ key?: string | null; value?: string | null; effect?: string | null }> | null
     [key: string]: unknown
   }
   status?: {
