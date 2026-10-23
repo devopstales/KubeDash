@@ -1,0 +1,175 @@
+# metrics-server manifest for the local kind cluster (dev-stack).
+#
+# Upstream components.yaml (kubernetes-sigs/metrics-server) plus the two
+# args kind needs:
+#   --kubelet-insecure-tls          kind's kubelet serving cert has no IP
+#                                   SANs, so the default CA verification of
+#                                   the 10250 scrape fails ("cannot validate
+#                                   certificate ... no IP SANs").
+#   --kubelet-use-node-status-port  scrapes NodeStatus.Port (the actual
+#                                   kubelet port) instead of the hardcoded
+#                                   10250 — kind runs kubelets on random
+#                                   host ports behind the node's 10250.
+# Applied idempotently by `task kind-up` (kubectl apply --server-side: the
+# 3-way strategic merge chokes on the APIService's nil caBundle on k8s 1.35 —
+# "expected a struct, but received a nil" — server-side apply has no merge).
+
+apiVersion: v1
+kind: ServiceAccount
+metadata:
+  name: metrics-server
+  namespace: kube-system
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRole
+metadata:
+  name: system:metrics-server
+rules:
+  - apiGroups: [""]
+    resources:
+      - nodes/metrics
+    verbs: ["get"]
+  - apiGroups: [""]
+    resources:
+      - pods
+      - nodes
+    verbs: ["get", "list", "watch"]
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRole
+metadata:
+  name: system:aggregated-metrics-reader
+rules:
+  - apiGroups: ["metrics.k8s.io"]
+    resources:
+      - podmetrics
+      - nodemetrics
+    verbs: ["get", "list", "watch"]
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRoleBinding
+metadata:
+  name: system:metrics-server
+roleRef:
+  apiGroup: rbac.authorization.k8s.io
+  kind: ClusterRole
+  name: system:metrics-server
+subjects:
+  - kind: ServiceAccount
+    name: metrics-server
+    namespace: kube-system
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRoleBinding
+metadata:
+  name: system:aggregated-metrics-reader
+roleRef:
+  apiGroup: rbac.authorization.k8s.io
+  kind: ClusterRole
+  name: system:aggregated-metrics-reader
+subjects:
+  - kind: Group
+    apiGroup: rbac.authorization.k8s.io
+    name: system:auth-delegators
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: RoleBinding
+metadata:
+  name: metrics-server-auth-reader
+  namespace: kube-system
+roleRef:
+  apiGroup: rbac.authorization.k8s.io
+  kind: Role
+  name: extension-apiserver-authentication-reader
+subjects:
+  - kind: ServiceAccount
+    name: metrics-server
+    namespace: kube-system
+# (No PodSecurityPolicy — removed in K8s 1.25+; the kind dev cluster is 1.31.)
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: metrics-server
+  namespace: kube-system
+  labels:
+    k8s-app: metrics-server
+spec:
+  selector:
+    matchLabels:
+      k8s-app: metrics-server
+  template:
+    metadata:
+      name: metrics-server
+      labels:
+        k8s-app: metrics-server
+    spec:
+      serviceAccountName: metrics-server
+      nodeSelector:
+        kubernetes.io/os: linux
+      containers:
+        - name: metrics-server
+          image: registry.k8s.io/metrics-server/metrics-server:v0.7.2
+          imagePullPolicy: IfNotPresent
+          ports:
+            - name: main-port
+              containerPort: 10250
+              protocol: TCP
+          args:
+            - --cert-dir=/tmp
+            - --secure-port=10250
+            - --kubelet-insecure-tls
+            - --kubelet-use-node-status-port
+            - --metric-resolution=30s
+          volumeMounts:
+            - name: tmp-volume
+              mountPath: /tmp
+          securityContext:
+            runAsNonRoot: true
+            allowPrivilegeEscalation: false
+            capabilities:
+              drop: ["ALL"]
+            procMount: Default
+      hostNetwork: false
+      volumes:
+        - name: tmp-volume
+          emptyDir: {}
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: metrics-server
+  namespace: kube-system
+  labels:
+    k8s-app: metrics-server
+spec:
+  ports:
+    - port: 443
+      protocol: TCP
+      name: main-port
+      # The container listens on 10250 (secure-port); the service fronting it
+      # for the APIService must target that port, not 443 (connection refused
+      # on the discovery check otherwise — the kind of silent miswire the
+      # upstream manifest gets right and hand-rolled copies get wrong).
+      targetPort: 10250
+  selector:
+    k8s-app: metrics-server
+---
+apiVersion: apiregistration.k8s.io/v1
+kind: APIService
+metadata:
+  name: v1beta1.metrics.k8s.io
+spec:
+  service:
+    name: metrics-server
+    namespace: kube-system
+  group: metrics.k8s.io
+  version: v1beta1
+  insecureSkipTLSVerify: true
+  groupPriorityMinimum: 100
+  versionPriority: 100
+  # No caBundle: metrics-server self-signs at startup (cert-dir=/tmp) and the
+  # apiserver trusts it via insecureSkipTLSVerify. (An explicit empty-string
+  # caBundle breaks `kubectl apply`'s 3-way merge on k8s 1.35 — "expected a
+  # struct, but received a nil" — so the field is omitted; `kubectl apply`
+  # still matches the existing APIService by name.)

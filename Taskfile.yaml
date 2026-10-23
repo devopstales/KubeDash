@@ -28,6 +28,11 @@ vars:
   # two-process loop. {{.TASKFILE_DIR}} keeps it CWD-independent.
   BACKEND_MULTI: "{{.TASKFILE_DIR}}/dev/mux.sh"
 
+  # Local kind cluster name (kind-up/kind-down). The kubeconfig context kind
+  # generates is `kind-<name>`; the dev-stack flow registers this cluster in
+  # the app's registry, so the dashboard's id:0 admin lens reaches it.
+  KIND_CLUSTER: "kubedash-test"
+
   # dev-stack: backend interpreter + the dev DB/static paths. The DB creds and
   # URL match the compose stack's pinned defaults (dev/docker-compose.yml), so
   # no KUBEDASH_*_URL env is needed — the app's defaults already point here.
@@ -94,6 +99,38 @@ tasks:
     desc: "Show dev environment status/health"
     cmds:
       - "{{.COMPOSE}} ps"
+
+  # ---- Local kind cluster (dashboard backstop: real K8s API + metrics) -----
+  #
+  # The dashboard's /metrics/summary needs a live cluster; the e2e/dev flows
+  # use the synthetic id:0 admin cluster, but the allocation rollup and the
+  # metrics-server degrade path are only proven against a real API. kind-up
+  # is idempotent: it creates the cluster only if absent, then applies the
+  # metrics-server manifest (with kind's kubelet TLS quirks handled) and
+  # waits for the apiservice to be available.
+
+  kind-up:
+    desc: "Create the local kind cluster (if absent) + install metrics-server (idempotent)"
+    cmds:
+      - task: _kind-cluster
+      - task: _kind-metrics-server
+
+  kind-down:
+    desc: "Delete the local kind cluster (destructive)"
+    cmds:
+      - kind delete cluster --name {{.KIND_CLUSTER}}
+
+  _kind-cluster:
+    internal: true
+    cmds:
+      - kind get clusters | grep -q '^{{.KIND_CLUSTER}}$' || kind create cluster --name {{.KIND_CLUSTER}}
+
+  _kind-metrics-server:
+    internal: true
+    cmds:
+      - kubectl --context kind-{{.KIND_CLUSTER}} apply --server-side -f {{.TASKFILE_DIR}}/dev/metrics-server.yaml
+      - kubectl --context kind-{{.KIND_CLUSTER}} -n kube-system rollout status deploy/metrics-server --timeout=120s
+      - kubectl --context kind-{{.KIND_CLUSTER}} wait --for=condition=available apiservice/v1beta1.metrics.k8s.io --timeout=120s
 
   # ---- Backend (Flask app, runs on the host against the dev stack) ----------
   #
