@@ -177,14 +177,45 @@ test('node-list-renders: 4.1 columns (State/Name/Role/Version/IP/OS) + usage bar
   expect(screen.getByText('NotReady')).toBeTruthy()
   // Role is derived from the node-role.kubernetes.io/<role> label (4.1).
   expect(screen.getByText('Control-plane')).toBeTruthy()
-  // worker-1 has a metric: 800m/4000m → 20% CPU, 4Gi/8Gi → 50% memory.
-  expect(screen.getByText('20%')).toBeTruthy()
-  expect(screen.getByText('50%')).toBeTruthy()
+  // worker-1 has a metric: 800m/4000m → 20% CPU, 4Gi/8Gi → 50% memory
+  // (the table bars; the tiles may also show the same rollup values).
+  expect(screen.getAllByText('20%').length).toBeGreaterThanOrEqual(1)
+  expect(screen.getAllByText('50%').length).toBeGreaterThanOrEqual(1)
   // notready-1 is absent from metrics → its used cells are "unknown", never 0%.
   expect(screen.getAllByText('unknown').length).toBeGreaterThanOrEqual(2)
   // The node name links to the detail page.
   const link = screen.getByRole('link', { name: 'worker-1' })
   expect(link.getAttribute('href')).toBe('/cluster/node/data?name=worker-1')
+})
+
+test('node-tiles-renders: four cluster metric tiles (CPU/Memory/Pods/Storage)', async () => {
+  renderWith(<NodesView />, [nodesHandler(), metricsHandler()])
+  await screen.findByRole('table')
+  // All four tile labels present (blueprint Task 4).
+  for (const label of ['CPU usage', 'Memory usage', 'Pods', 'Storage']) {
+    expect(screen.getByText(label)).toBeTruthy()
+  }
+  // CPU rollup: 800m/4000m = 20% (the tile and the table bar both show it).
+  expect(screen.getAllByText('20%').length).toBeGreaterThanOrEqual(1)
+  // Memory rollup: 4Gi/8Gi = 50%.
+  expect(screen.getAllByText('50%').length).toBeGreaterThanOrEqual(1)
+  // Pods tile: 1 Ready / 2 total nodes (unique — only the tile shows "1/2").
+  expect(screen.getByText('1/2')).toBeTruthy()
+  // Storage has no source → "unknown" + the note (certainty rule, never 0).
+  expect(screen.getByText('no storage metrics source')).toBeTruthy()
+})
+
+test('node-tiles-unknown: metrics unavailable → CPU/Memory tiles unknown, never 0', async () => {
+  renderWith(<NodesView />, [
+    nodesHandler(),
+    metricsHandler({ cluster: 'prod', metrics_available: false, source: 'metrics.k8s.io', items: [] }),
+  ])
+  await screen.findByRole('table')
+  // CPU + Memory tiles show "unknown" (the source is absent), never 0%.
+  expect(screen.getAllByText('unknown').length).toBeGreaterThanOrEqual(4)
+  expect(screen.queryByText('0%')).toBeNull()
+  // Pods still has a source (the node list): Ready/Total.
+  expect(screen.getByText('1/2')).toBeTruthy()
 })
 
 test('node-list-metrics-unavailable: usage columns show unknown, table still renders', async () => {

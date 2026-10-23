@@ -96,6 +96,62 @@ const UsageCell = ({ value }: { value: number | null }) => {
   )
 }
 
+const fmtBytes = (n: number | null): string => {
+  if (n === null) return 'unknown'
+  const units = ['B', 'KiB', 'MiB', 'GiB', 'TiB', 'PiB']
+  let v = n
+  let i = 0
+  while (v >= 1024 && i < units.length - 1) {
+    v /= 1024
+    i++
+  }
+  return `${v >= 100 ? Math.round(v) : v.toFixed(1)} ${units[i]}`
+}
+const fmtCpu = (m: number | null): string => {
+  if (m === null) return 'unknown'
+  return m >= 1000 ? `${(m / 1000).toFixed(m % 1000 === 0 ? 0 : 2)} cores` : `${m}m`
+}
+
+// Cluster metric tile (blueprint Task 4). Certainty rule: value null → the
+// word "unknown", never 0 or a healthy tone. Storage has no source → unknown
+// with a "no storage metrics source" note.
+const Tile = ({
+  label,
+  value,
+  sub,
+  pctValue,
+}: {
+  label: string
+  value: string
+  sub?: string
+  pctValue: number | null
+}) => (
+  <CCard className="border-0">
+    <CCardBody className="py-3">
+      <div className="text-muted text-uppercase" style={{ fontSize: '.7rem', letterSpacing: '.04em' }}>
+        {label}
+      </div>
+      <div className="fs-5 fw-bold" style={{ margin: '.25rem 0' }}>
+        {pctValue === null && value === 'unknown' ? (
+          <span className="text-muted">unknown</span>
+        ) : (
+          value
+        )}
+      </div>
+      <CProgress
+        value={pctValue ?? 0}
+        color={pctValue === null ? 'secondary' : pctValue > 90 ? 'danger' : pctValue > 75 ? 'warning' : 'success'}
+        style={{ height: '6px' }}
+      />
+      {sub ? (
+        <div className="text-muted" style={{ fontSize: '.7rem', marginTop: '.25rem' }}>
+          {sub}
+        </div>
+      ) : null}
+    </CCardBody>
+  </CCard>
+)
+
 const NodesView = () => {
   const cluster = useClusterStore((s) => s.selectedCluster)
 
@@ -159,6 +215,24 @@ const NodesView = () => {
     )
   })
 
+  // Cluster rollup for the four tiles (blueprint Task 4): sum usage / sum
+  // capacity across nodes. Any term that can't be read (metrics unavailable,
+  // a node with no capacity) makes the tile "unknown" — never 0 (certainty
+  // rule). Pods = Ready/Total from the node list (always readable). Storage
+  // has no source → always unknown.
+  const items = metricsQuery.data?.items ?? []
+  const metricsAvailable = metricsQuery.data?.metrics_available ?? false
+  const hasUsed = items.length > 0 && items.every((i) => i.cpu_used_millicores !== null && i.memory_used_bytes !== null)
+  const hasCap = items.length > 0 && items.every((i) => i.cpu_capacity_millicores !== null && i.memory_capacity_bytes !== null)
+  const cpuUsed = hasUsed ? items.reduce((s, i) => s + (i.cpu_used_millicores ?? 0), 0) : null
+  const cpuCap = hasCap ? items.reduce((s, i) => s + (i.cpu_capacity_millicores ?? 0), 0) : null
+  const memUsed = hasUsed ? items.reduce((s, i) => s + (i.memory_used_bytes ?? 0), 0) : null
+  const memCap = hasCap ? items.reduce((s, i) => s + (i.memory_capacity_bytes ?? 0), 0) : null
+  const cpuPct = pct(cpuUsed, cpuCap)
+  const memPct = pct(memUsed, memCap)
+  const readyCount = rows.filter((r) => r.status === 'Ready').length
+  const totalPods = rows.length
+
   const statusCell = (tone: NodeRow['tone'], status: string) => (
     <CBadge color={tone}>{status}</CBadge>
   )
@@ -175,7 +249,7 @@ const NodesView = () => {
         </CBreadcrumb>
       </TopMenu>
       <CCardHeader className="py-3">
-        <CCardTitle className="m-0 fw-bold text-primary fs-6">Node List</CCardTitle>
+        <CCardTitle className="m-0 fw-bold text-primary fs-6">Cluster Metrics</CCardTitle>
       </CCardHeader>
       <CCardBody>
         {!cluster ? (
@@ -184,27 +258,68 @@ const NodesView = () => {
           <div>Loading nodes...</div>
         ) : nodesQuery.error ? (
           <div className="text-danger">Error loading nodes: {nodesQuery.error.message}</div>
-        ) : rows.length === 0 ? (
-          <div className="text-center text-muted">No nodes found</div>
         ) : (
-          <KubeDataTable data={rows}>
-            <Column title="State" data="status">
-              {(status: string, _type: string, row: NodeRow) => statusCell(row.tone, status)}
-            </Column>
-            <Column title="Name" data="name">
-              {(name: string) => nameCell(name)}
-            </Column>
-            <Column title="Role" data="role" />
-            <Column title="Version" data="version" />
-            <Column title="IP" data="ip" />
-            <Column title="OS" data="os" />
-            <Column title="CPU Usage" data="cpu_pct">
-              {(v: number | null) => <UsageCell value={v} />}
-            </Column>
-            <Column title="Memory Usage" data="mem_pct">
-              {(v: number | null) => <UsageCell value={v} />}
-            </Column>
-          </KubeDataTable>
+          <>
+            {/* Cluster metric tiles (blueprint Task 4): CPU/Memory usage,
+                Pods (Ready/Total), Storage (no source → unknown). The
+                certainty rule: an unreadable rollup is "unknown", never 0. */}
+            <div className="row row-cols-2 row-cols-lg-4 g-3 mb-4">
+              <div className="col">
+                <Tile
+                  label="CPU usage"
+                  value={cpuPct === null ? 'unknown' : `${cpuPct}%`}
+                  sub={cpuUsed !== null || cpuCap !== null ? `${fmtCpu(cpuUsed)} / ${fmtCpu(cpuCap)}` : 'no metrics source'}
+                  pctValue={cpuPct}
+                />
+              </div>
+              <div className="col">
+                <Tile
+                  label="Memory usage"
+                  value={memPct === null ? 'unknown' : `${memPct}%`}
+                  sub={memUsed !== null || memCap !== null ? `${fmtBytes(memUsed)} / ${fmtBytes(memCap)}` : 'no metrics source'}
+                  pctValue={memPct}
+                />
+              </div>
+              <div className="col">
+                <Tile
+                  label="Pods"
+                  value={`${readyCount}/${totalPods}`}
+                  sub="ready / total nodes"
+                  pctValue={totalPods > 0 ? Math.round((readyCount / totalPods) * 100) : 0}
+                />
+              </div>
+              <div className="col">
+                <Tile
+                  label="Storage"
+                  value="unknown"
+                  sub="no storage metrics source"
+                  pctValue={null}
+                />
+              </div>
+            </div>
+            {rows.length === 0 ? (
+              <div className="text-center text-muted">No nodes found</div>
+            ) : (
+              <KubeDataTable data={rows}>
+                <Column title="State" data="status">
+                  {(status: string, _type: string, row: NodeRow) => statusCell(row.tone, status)}
+                </Column>
+                <Column title="Name" data="name">
+                  {(name: string) => nameCell(name)}
+                </Column>
+                <Column title="Role" data="role" />
+                <Column title="Version" data="version" />
+                <Column title="IP" data="ip" />
+                <Column title="OS" data="os" />
+                <Column title="CPU Usage" data="cpu_pct">
+                  {(v: number | null) => <UsageCell value={v} />}
+                </Column>
+                <Column title="Memory Usage" data="mem_pct">
+                  {(v: number | null) => <UsageCell value={v} />}
+                </Column>
+              </KubeDataTable>
+            )}
+          </>
         )}
       </CCardBody>
     </CCard>
