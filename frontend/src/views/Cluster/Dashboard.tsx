@@ -121,6 +121,27 @@ const DashboardView = () => {
                   pod specs and are always available.
                 </CBadge>
               )}
+              {/* Legend: the donut encodes three values on three concentric
+                  rings — without it the chart is opaque (operator ask).
+                  Declared (requests/limits, pod specs) vs observed (used,
+                  metrics.k8s.io) are distinct: the certainty rule. */}
+              <div className="d-flex align-items-center flex-wrap gap-4 mb-3" data-testid="donut-legend">
+                <span className="d-inline-flex align-items-center gap-2 fs-6 text-muted">
+                  <span className="d-inline-block" style={{ width: 12, height: 12, borderRadius: '50%', background: `rgba(${HUE_CPU[0]}, ${HUE_CPU[1]}, ${HUE_CPU[2]}, 1)` }} />
+                  Used (observed · metrics.k8s.io)
+                </span>
+                <span className="d-inline-flex align-items-center gap-2 fs-6 text-muted">
+                  <span className="d-inline-block" style={{ width: 12, height: 12, borderRadius: '50%', background: `rgba(${HUE_CPU[0]}, ${HUE_CPU[1]}, ${HUE_CPU[2]}, 0.65)` }} />
+                  Requests (declared · pod specs)
+                </span>
+                <span className="d-inline-flex align-items-center gap-2 fs-6 text-muted">
+                  <span className="d-inline-block" style={{ width: 12, height: 12, borderRadius: '50%', background: `rgba(${HUE_CPU[0]}, ${HUE_CPU[1]}, ${HUE_CPU[2]}, 0.35)` }} />
+                  Limits (declared · pod specs)
+                </span>
+                <span className="fs-6 text-muted">
+                  Inner ring = used · outer = limits · each full circle = 100% of capacity
+                </span>
+              </div>
               {/* Row 1: allocation donuts — one card per donut. */}
               <div className="row g-4 mb-4">
                 <div className="col-12 col-md-4">

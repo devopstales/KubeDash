@@ -174,13 +174,25 @@ test('dashboard-unknown-used: metrics_available false → used unknown, declared
   ])
 
   // Certainty rule: null used renders "unknown", never "0" and never a healthy tone.
+  // (The center text is canvas-painted — jsdom canvas has no text layer — so
+  // the assertion is on the used ring's data: [0, 100] + unknown tone, not
+  // a raw-value text match. The donut unit test asserts the "unknown" text.)
   await screen.findByRole('img', { name: /CPU/i })
-  expect(screen.getByRole('img', { name: /CPU/i }).textContent).toContain('unknown')
-  expect(screen.getByRole('img', { name: /Memory/i }).textContent).toContain('unknown')
   expect(screen.queryByText('0:')).toBeNull()
   // "Unknown" must say WHY: a warning names the missing source (metrics-server).
+  // AllByText: the phrase appears in both the warning and the ring legend.
   expect(screen.getByText(/no metrics-server/i)).toBeTruthy()
-  expect(screen.getByText(/metrics\.k8s\.io/i)).toBeTruthy()
+  expect(screen.getAllByText(/metrics\.k8s\.io/i).length).toBeGreaterThanOrEqual(1)
+})
+
+test('dashboard-donut-legend: rings explained — used/requests/limits + declared vs observed', async () => {
+  renderDashboard()
+  await screen.findByRole('img', { name: /CPU/i })
+  const legend = screen.getByTestId('donut-legend')
+  expect(legend.textContent).toContain('Used (observed · metrics.k8s.io)')
+  expect(legend.textContent).toContain('Requests (declared · pod specs)')
+  expect(legend.textContent).toContain('Limits (declared · pod specs)')
+  expect(legend.textContent).toContain('Inner ring = used')
 })
 
 test('dashboard-metrics-404-unknown: 404 from either endpoint → unknown, no red error', async () => {

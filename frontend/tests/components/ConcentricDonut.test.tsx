@@ -88,6 +88,15 @@ const props = (over: Partial<ConcentricDonutProps> = {}) => ({
 const captureCharts: Chart[] = []
 ;(globalThis as Record<string, unknown>).__kubedashCaptureCharts = captureCharts
 
+// The centerText plugin instance, captured by the component (same registry
+// split reason as the chart array above: CChart's CJS chart.js can't be
+// reached from the test's ESM import, so the component hands over the
+// plugin object itself).
+const centerTextPlugin = () =>
+  (globalThis as Record<string, unknown>).__kubedashCaptureCenterText as {
+    afterDraw: (c: unknown) => void
+  }
+
 describe('ConcentricDonut', () => {
   // Patch once per test file so the chart's initial mount gets a 2d context
   // and a ResizeObserver (Chart.js' responsive platform uses both).
@@ -136,6 +145,16 @@ describe('ConcentricDonut', () => {
     expect(
       screen.getByRole('img', { name: 'CPU used, requests, limits concentric donut' }),
     ).toBeTruthy()
+
+    // The center text is a PERCENTAGE of capacity, not the raw value: with
+    // used=41 / capacity=100 the center says "41%", never "41" millicores.
+    // (The live bug: center painted the raw value → "1141182364%" memory.)
+    const drawn: string[] = []
+    centerTextPlugin().afterDraw({
+      getDatasetMeta: () => ({ data: [{ x: 0, y: 0 }] }),
+      ctx: { save: () => {}, restore: () => {}, fillText: (t: string) => drawn.push(t) },
+    })
+    expect(drawn).toContain('41%')
   })
 
   test('donut-overcommit-red-bar: over-capacity requests size the danger bar', () => {
@@ -166,6 +185,14 @@ describe('ConcentricDonut', () => {
     expect(bar.style.width).toBe('80%')
     expect(Number.isNaN(parseFloat(bar.style.width))).toBe(false)
     expect(screen.getByTestId('overflow-label')).toHaveTextContent('limits +80%')
+
+    // Center says "unknown", not "0%" (the read is absent, not zero).
+    const drawn: string[] = []
+    centerTextPlugin().afterDraw({
+      getDatasetMeta: () => ({ data: [{ x: 0, y: 0 }] }),
+      ctx: { save: () => {}, restore: () => {}, fillText: (t: string) => drawn.push(t) },
+    })
+    expect(drawn).toContain('unknown')
   })
 
   test('dashboard-renders-rows: no red overflow bar while requests are at or under capacity', () => {

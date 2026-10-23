@@ -162,7 +162,14 @@ const ConcentricDonut = ({
   // the closure's color on every draw. StrictMode double-mount is safe
   // because afterDraw is a pure draw with no stored state.
   const plugins = [
-    makeCenterText({ pct: used === null ? 'unknown' : used, sub: 'used', color: bodyColor }),
+    makeCenterText({
+      // The ring is a percentage of capacity — the center must be too.
+      // `used` itself is a raw millicore/byte value: showing it as the pct
+      // painted "247%" / "1141182364%" on a healthy cluster.
+      pct: used === null ? 'unknown' : Math.round(clampPct(used, capacity)),
+      sub: 'used',
+      color: bodyColor,
+    }),
   ]
 
   // M1: test-only capture plugin. The test file sets __kubedashCaptureCharts
@@ -173,6 +180,12 @@ const ConcentricDonut = ({
   // CChart's chart from the test's import.
   const gl = globalThis as Record<string, unknown>
   if (Array.isArray(gl.__kubedashCaptureCharts)) {
+    // __kubedashCaptureCenterText: the plugin instance itself. The chart
+    // captured above belongs to CChart's chart.js registry (CJS) while the
+    // test's import is ESM — two registries, so chart._plugins.get() from the
+    // test side can't see this instance. Storing the plugin object directly
+    // sidesteps the split.
+    gl.__kubedashCaptureCenterText = plugins[0]
     plugins.push({
       id: 'kubedash-capture',
       afterInit(chart: Chart) {
