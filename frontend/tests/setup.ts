@@ -19,10 +19,11 @@ Object.defineProperty(window, 'matchMedia', {
 
 // ponytail: apiFetch builds absolute URLs from VITE_API_BASE, so the jsdom
 // document URL (about:blank by default) only matters if a test reaches fetch
-// without it. VITE_API_BASE is pinned in vite.config.ts — the env: block
-// below — so these stay inert. The old prototype-setter trick is gone: in
-// jsdom 25 the own href descriptor is non-configurable and the setter
-// triggers "Not implemented: navigation" without ever mutating the URL.
+// without it. VITE_API_BASE is pinned in the VITEST-gated define block of
+// vite.config.ts, so these stay inert. The old prototype-setter trick is
+// gone: in jsdom 25 the own href descriptor is non-configurable and the
+// setter triggers "Not implemented: navigation" without ever mutating the
+// URL.
 
 afterEach(() => {
   cleanup()

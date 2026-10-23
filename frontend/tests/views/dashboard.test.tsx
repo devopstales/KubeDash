@@ -196,7 +196,13 @@ test('dashboard-metrics-404-unknown: 404 from either endpoint → unknown, no re
   await screen.findByRole('img', { name: /CPU/i })
   expect(screen.getByRole('img', { name: /CPU/i }).textContent).toContain('unknown')
   expect(screen.getByRole('img', { name: /Memory/i }).textContent).toContain('unknown')
-  // The pods counts come from the same summary — unknown, not a healthy 0.
+  // The pods counts come from the same summary as the used values: a summary
+  // 404 must render the Pods card as unknown, not a healthy 0. Scoped to the
+  // Pods card (via its heading) so a refactor that drops the pods-404 branch
+  // is caught even if the CPU/Memory donuts still render unknown.
+  const podsCard = screen.getByText('Pods').closest('.card')!
+  expect(podsCard.textContent).toContain('unknown')
+  expect(podsCard.textContent).not.toMatch(/\b\d+\b/)
   expect(screen.queryByText(/error/i)).toBeNull()
   await waitFor(() => expect(screen.queryByText(/not found/i)).toBeNull())
 })

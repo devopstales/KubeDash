@@ -10,7 +10,7 @@ import type { ClusterEvent, MetricsSummary } from '../src/lib/types'
 // throws unhandled. Assert the fetch seam instead: apiFetch builds absolute
 // URLs from VITE_API_BASE (pinned in vite.config.ts), so a wildcard MSW
 // handler on the pinned origin is only reachable when the base is set.
-test('probe W: dashboard fetches reach MSW through VITE_API_BASE', async () => {
+test('dashboard fetch seam reaches MSW through the pinned VITE_API_BASE', async () => {
   useClusterStore.setState({ selectedCluster: { id: 1, name: 'prod' } })
   server.use(
     http.get('*/api/v1/clusters/1/metrics/summary', () =>
