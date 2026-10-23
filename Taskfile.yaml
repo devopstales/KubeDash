@@ -147,9 +147,14 @@ tasks:
     desc: "Run one backend instance on :8080 (leader role, starts RQ worker + Leader)"
     dir: backend
     cmds:
+      # Local-admin bootstrap (ADR-0021): admin@local/admin — without these
+      # the login 403s with LOCAL_AUTH_DISABLED.
       # ADR-0025: the dev stack speaks http://localhost, where a Secure cookie
       # is stored but never sent back. Production stays Secure (the default).
-      - "KUBEDASH_ROLE=leader KUBEDASH_REPLICA_ID=local KUBEDASH_COOKIE_SECURE=false .venv/bin/python wsgi.py"
+      # KUBEDASH_STATIC_DIR points at the built SPA (task fe-build output);
+      # without it the catch-all 404s (the container default /app/static
+      # doesn't exist on a host checkout).
+      - "KUBEDASH_ROLE=leader KUBEDASH_REPLICA_ID=local KUBEDASH_BOOTSTRAP_ADMIN_EMAIL=admin@local KUBEDASH_BOOTSTRAP_ADMIN_PASSWORD=admin KUBEDASH_COOKIE_SECURE=false KUBEDASH_STATIC_DIR={{.TASKFILE_DIR}}/frontend/dist .venv/bin/python wsgi.py"
 
   backend-run-worker:
     desc: "Run one backend instance on :8080 in worker-only role (no Leader/RQ worker)"
