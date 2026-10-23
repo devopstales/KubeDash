@@ -215,29 +215,25 @@ class K8sClient:
         ``list_namespaces``)."""
         return [n.to_dict() for n in self._v1.list_node().items]
 
-    def node_usage(self) -> tuple[bool, dict[str, dict[str, int]]]:
-        """Node resource usage from the Metrics API (``metrics.k8s.io``).
+    def _node_metrics(self) -> list[dict[str, Any]] | None:
+        """Fetch the raw ``NodeMetricsList`` body from ``metrics.k8s.io``.
 
-        Returns ``(available, {node_name: {cpu_millicores, memory_bytes}})``.
-        ``(False, {})`` on a missing Metrics API (404/5xx) — a cluster without
-        a metrics-server is the EXPECTED state, not an error (query-only,
-        ADR-0003): the caller must render ``used`` unknown, never 0. Any other
-        ApiException is a transport failure → 502 ``ClusterUnreachableError``
+        Returns the parsed ``items`` list, or ``None`` when the Metrics API is
+        absent/broken (404/5xx, a transport failure, or a non-JSON body) —
+        the query-only degrade (ADR-0003): an unavailable metrics source is
+        the EXPECTED state, never an error. A *different* ApiException (not
+        404/5xx) is a transport failure → 502 ``ClusterUnreachableError``
         (the service never sees a raw ApiException).
 
-        ponytail: kubernetes 37.0.1 has NO ``MetricsV1beta1Api`` and no
-        ``V1NodeMetricsList`` model, so the read goes through the shared
-        ``ApiClient.call_api`` and parses the raw JSON body directly. Ceiling:
-        if a vendored Metrics API is ever added, swap this for the generated
-        ``read_node_metrics()`` call (no consumer changes — the return
-        contract is stable).
+        Shared by ``node_usage`` (cluster-wide) and ``node_usage(name)``
+        (single node) — both parse the same body.
         """
         try:
             # call_api does NOT prepend ``self.configuration.host`` — the
             # generated API methods build the absolute URL before calling it.
             # Without the host, urllib3 gets a bare path and raises
             # ``LocationValueError("No host specified")`` (not ``ApiException``)
-            # → 500 instead of the query-only ``(False, {})``.
+            # → 500 instead of the query-only degrade.
             metrics_url = f"{self._config.host}{self._NODES_METRICS_PATH}"
             resp = self._api_client.call_api("GET", metrics_url)
             # call_api returns the raw RESTResponse WITHOUT reading the body
@@ -248,27 +244,56 @@ class K8sClient:
             raw = resp.read().decode()
         except ApiException as e:
             if e.status in (404, 500, 502, 503):
-                return False, {}
+                return None
             self._unreachable("node_usage", e)
             raise AssertionError("unreachable") from e
         except Exception:
             # Non-ApiException transport failure (urllib3 errors, a non-JSON
             # body such as an LB/ingress error page): the metrics source is
             # absent or broken — query-only, answer unavailable, never 500.
-            return False, {}
+            return None
         try:
             body = json.loads(raw)
         except (json.JSONDecodeError, UnicodeDecodeError):
-            return False, {}
+            return None
+        return body.get("items", [])
+
+    def node_usage(self, name: str | None = None) -> tuple[bool, dict[str, int] | None]:
+        """Node resource usage from the Metrics API (``metrics.k8s.io``).
+
+        With no ``name``: cluster-wide — returns
+        ``(available, {node_name: {cpu_millicores, memory_bytes}})``. With a
+        ``name``: single node — returns ``(available, {cpu_millicores,
+        memory_bytes} | None)`` where ``None`` means the node is not in the
+        metrics list (a node the metrics-server has not yet scraped, or one
+        that vanished).
+
+        ``available`` is False when the Metrics API itself is absent/broken
+        (404/5xx) — a cluster without a metrics-server is the EXPECTED state,
+        not an error (query-only, ADR-0003): the caller must render ``used``
+        unknown, never 0.
+
+        ponytail: kubernetes 37.0.1 has NO ``MetricsV1beta1Api`` and no
+        ``V1NodeMetricsList`` model, so the read goes through the shared
+        ``ApiClient.call_api`` and parses the raw JSON body directly. Ceiling:
+        if a vendored Metrics API is ever added, swap this for the generated
+        ``read_node_metrics()`` call (no consumer changes — the return
+        contract is stable).
+        """
+        items = self._node_metrics()
+        if items is None:
+            return False, {} if name is None else None
         usage: dict[str, dict[str, int]] = {}
-        for item in body.get("items", []):
-            name = item["metadata"]["name"]
+        for item in items:
+            item_name = item["metadata"]["name"]
             u = item.get("usage", {})
-            usage[name] = {
+            usage[item_name] = {
                 "cpu_millicores": self._parse_cpu(u.get("cpu")),
                 "memory_bytes": self._parse_bytes(u.get("memory")),
             }
-        return True, usage
+        if name is None:
+            return True, usage
+        return True, usage.get(name)
 
     @staticmethod
     def _parse_cpu(qty: str | None) -> int:

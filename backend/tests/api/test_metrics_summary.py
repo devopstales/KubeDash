@@ -55,9 +55,13 @@ class FakeK8s:
     def list_pods(self, _namespace: str | None) -> list[dict]:
         return PODS
 
-    def node_usage(self) -> tuple[bool, dict]:
+    def node_usage(self, name: str | None = None) -> tuple[bool, dict | None]:
         self.node_usage_calls += 1
-        return (True, USAGE) if self.available else (False, {})
+        if not self.available:
+            return (False, {} if name is None else None)
+        if name is None:
+            return (True, USAGE)
+        return (True, USAGE.get(name))
 
 
 @pytest.fixture()
@@ -214,3 +218,76 @@ def test_metrics_404_is_200_unknown_not_500(api_client, auth_client, fake_k8s, m
     assert body["cpu"]["requests_millicores"] == 2000
     assert body["memory"]["limits_bytes"] == 4 * 2**30
     assert fake_k8s.node_usage_calls == 1
+
+
+def _node_usage(api_client, headers, name: str = "n1") -> object:
+    return api_client.get(f"/api/v1/clusters/1/nodes/{name}/usage", headers=headers)
+
+
+def test_node_usage_200_with_used(api_client, auth_client, fake_k8s, monkeypatch) -> None:
+    """node-detail-usage: metrics allowed + available -> 200 with the node's
+    used values (the node detail view's observed tier)."""
+    auth_client.login()
+    h = {"Authorization": f"Bearer {auth_client.jwt}"}
+    _register(api_client, h)
+    _allow_all(monkeypatch)
+    r = _node_usage(api_client, h, "n1")
+    assert r.status_code == 200, r.get_json()
+    body = r.get_json()
+    assert body["metrics_available"] is True
+    assert body["metrics_denied"] is False
+    assert body["used_millicores"] == 800
+    assert body["used_bytes"] == 4 * 2**30
+
+
+def test_node_usage_metrics_denied_is_200_not_403(
+    api_client, auth_client, fake_k8s, monkeypatch
+) -> None:
+    """node-detail-usage-gated: metrics.k8s.io read denied -> 200 with
+    metrics_denied true and null used (the declared state still renders; the
+    used tier degrades to unknown, never a 403 error on the detail page)."""
+    auth_client.login()
+    h = {"Authorization": f"Bearer {auth_client.jwt}"}
+    _register(api_client, h)
+    _allow_core_only(monkeypatch)
+    r = _node_usage(api_client, h, "n1")
+    assert r.status_code == 200, r.get_json()
+    body = r.get_json()
+    assert body["metrics_denied"] is True
+    assert body["used_millicores"] is None
+    assert body["used_bytes"] is None
+    assert fake_k8s.node_usage_calls == 0  # never fetched
+
+
+def test_node_usage_unavailable_is_null_not_zero(
+    api_client, auth_client, fake_k8s, monkeypatch
+) -> None:
+    """node-detail-usage-unavailable: metrics allowed but the Metrics API 404s
+    -> 200, metrics_available false, used null — never 0, never 500."""
+    fake_k8s.available = False
+    auth_client.login()
+    h = {"Authorization": f"Bearer {auth_client.jwt}"}
+    _register(api_client, h)
+    _allow_all(monkeypatch)
+    r = _node_usage(api_client, h, "n1")
+    assert r.status_code == 200, r.get_json()
+    body = r.get_json()
+    assert body["metrics_available"] is False
+    assert body["used_millicores"] is None
+
+
+def test_node_usage_unscraped_node_is_null(
+    api_client, auth_client, fake_k8s, monkeypatch
+) -> None:
+    """node-detail-usage-unscraped: metrics available but the node is not in
+    the metrics list (just added, or vanished) -> 200, used null, never 0."""
+    auth_client.login()
+    h = {"Authorization": f"Bearer {auth_client.jwt}"}
+    _register(api_client, h)
+    _allow_all(monkeypatch)
+    r = _node_usage(api_client, h, "ghost-node")
+    assert r.status_code == 200, r.get_json()
+    body = r.get_json()
+    assert body["metrics_available"] is True
+    assert body["used_millicores"] is None
+    assert body["used_bytes"] is None

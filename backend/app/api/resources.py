@@ -39,6 +39,7 @@ _RBAC_GROUP = "rbac.authorization.k8s.io"
 _KINDS: dict[str, tuple[str, str, str]] = {
     "pods": ("list_pods", "pods", ""),
     "namespaces": ("list_namespaces", "namespaces", ""),
+    "nodes": ("list_nodes", "nodes", ""),
     "serviceaccounts": ("list_serviceaccounts", "serviceaccounts", ""),
     "roles": ("list_roles", "roles", _RBAC_GROUP),
     "rolebindings": ("list_rolebindings", "rolebindings", _RBAC_GROUP),

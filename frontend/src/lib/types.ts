@@ -80,6 +80,34 @@ export interface K8sNamespace {
   [key: string]: unknown
 }
 
+/** A Node item as returned by /api/v1/clusters/<id>/resources/nodes. */
+export interface K8sNode {
+  metadata?: {
+    name?: string
+    creation_timestamp?: string | null
+    labels?: Record<string, string> | null
+    annotations?: Record<string, string> | null
+  }
+  spec?: {
+    unschedulable?: boolean | null
+    [key: string]: unknown
+  }
+  status?: {
+    conditions?: Array<{ type?: string | null; status?: string | null }> | null
+    node_info?: {
+      kubelet_version?: string | null
+      kube_proxy_version?: string | null
+      container_runtime_version?: string | null
+      os_image?: string | null
+      kernel_version?: string | null
+    } | null
+    addresses?: Array<{ type?: string | null; address?: string | null }> | null
+    allocatable?: Record<string, string> | null
+    capacity?: Record<string, string> | null
+  }
+  [key: string]: unknown
+}
+
 /** A Role item as returned by /api/v1/clusters/<id>/resources/roles. */
 export interface K8sRole {
   metadata?: {

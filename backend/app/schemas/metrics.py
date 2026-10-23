@@ -30,6 +30,20 @@ class PodSummary(Schema):
     completed = fields.Integer()
 
 
+class NodeUsageOut(Schema):
+    """``GET /clusters/<id>/nodes/<name>/usage`` — a single node's observed
+    (used) tier. ``metrics_available`` says whether the Metrics API answered;
+    ``metrics_denied`` whether the caller lacks the ``metrics.k8s.io`` grant
+    (distinct: the UI must not tell a denied user "install metrics-server").
+    ``used_*`` are nullable by the certainty rule: an absent metrics source or
+    an unscraped node is ``None``, never ``0``."""
+
+    metrics_available = fields.Boolean()
+    metrics_denied = fields.Boolean()
+    used_millicores = fields.Integer(allow_none=True)
+    used_bytes = fields.Integer(allow_none=True)
+
+
 class MetricsSummaryOut(Schema):
     """``GET /clusters/<id>/metrics/summary`` — the cluster-wide allocation
     rollup. ``metrics_available`` says whether the observed (used) tier came

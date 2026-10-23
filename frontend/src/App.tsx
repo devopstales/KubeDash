@@ -18,6 +18,8 @@ const ClusterView = React.lazy(() => import('./views/Cluster'))
 const ClusterDashboardView = React.lazy(() => import('./views/Cluster/Dashboard'))
 const NamespacesView = React.lazy(() => import('./views/Cluster/Namespaces'))
 const NamespaceDataView = React.lazy(() => import('./views/Cluster/NamespaceData'))
+const NodesView = React.lazy(() => import('./views/Cluster/Nodes'))
+const NodeDataView = React.lazy(() => import('./views/Cluster/NodeData'))
 const ProfileView = React.lazy(() => import('./views/Profile'))
 const PermissionsView = React.lazy(() => import('./views/Permissions'))
 const KubeconfigView = React.lazy(() => import('./views/Kubeconfig'))
@@ -288,6 +290,22 @@ const App = () => {
                       element={
                         <ProtectedRoute>
                           <NamespaceDataView />
+                        </ProtectedRoute>
+                      }
+                    />
+                    <Route
+                      path="/cluster/node"
+                      element={
+                        <ProtectedRoute>
+                          <NodesView />
+                        </ProtectedRoute>
+                      }
+                    />
+                    <Route
+                      path="/cluster/node/data"
+                      element={
+                        <ProtectedRoute>
+                          <NodeDataView />
                         </ProtectedRoute>
                       }
                     />

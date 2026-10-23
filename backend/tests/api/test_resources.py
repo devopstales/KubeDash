@@ -61,6 +61,31 @@ class FakeK8s:
             {"metadata": {"name": "kubedash-pod", "namespace": namespace}},
         ]
 
+    def list_nodes(self, _namespace: str | None) -> list[dict]:
+        # Cluster-scoped: the namespace argument is ignored (mirrors the real
+        # K8sClient.list_nodes). NodeStatus + a Ready condition are present so
+        # the dashboard's node view can assert on the real shape.
+        return [
+            {
+                "metadata": {"name": "worker-1"},
+                "status": {
+                    "conditions": [
+                        {"type": "Ready", "status": "True"},
+                        {"type": "MemoryPressure", "status": "False"},
+                    ],
+                    "node_info": {"kubelet_version": "v1.31.0", "os_image": "kind"},
+                    "addresses": [{"type": "InternalIP", "address": "192.168.0.2"}],
+                },
+            },
+            {
+                "metadata": {"name": "control-plane"},
+                "status": {
+                    "conditions": [{"type": "Ready", "status": "True"}],
+                    "node_info": {"kubelet_version": "v1.31.0", "os_image": "kind"},
+                },
+            },
+        ]
+
     def list_roles(self, namespace: str | None) -> list[dict]:
         return [
             {
@@ -267,6 +292,22 @@ def test_list_namespaces_200(api_client, auth_client, fake_k8s, monkeypatch) -> 
     body = r.get_json()
     assert body["kind"] == "namespaces"
     assert [item["metadata"]["name"] for item in body["items"]] == ["default", "team-a"]
+
+
+def test_list_nodes_200_cluster_scoped(api_client, auth_client, fake_k8s, monkeypatch) -> None:
+    """The node view lists cluster-scoped nodes (SATISFIES the node route).
+
+    Nodes are cluster-scoped: the namespace query does not apply, and the
+    SAR verb is ``list`` on ``nodes`` (ADR-0004 enforcement point)."""
+    auth_client.login()
+    h = {"Authorization": f"Bearer {auth_client.jwt}"}
+    _register(api_client, h)
+    _allow_sar(monkeypatch)
+    r = api_client.get("/api/v1/clusters/1/resources/nodes", headers=h)
+    assert r.status_code == 200
+    body = r.get_json()
+    assert body["kind"] == "nodes"
+    assert [item["metadata"]["name"] for item in body["items"]] == ["worker-1", "control-plane"]
 
 
 def test_list_pods_namespaced(api_client, auth_client, fake_k8s, monkeypatch) -> None:

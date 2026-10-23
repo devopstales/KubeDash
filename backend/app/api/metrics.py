@@ -32,7 +32,7 @@ from flask_smorest import Api, Blueprint
 from app.api._authhook import apply_auth
 from app.api._cluster import cluster_for as _cluster_for
 from app.core.errors import NotImplementedError_, RbacDeniedError
-from app.schemas.metrics import MetricsSummaryOut
+from app.schemas.metrics import MetricsSummaryOut, NodeUsageOut
 from app.services import rbac
 from app.services.cluster_allocation import compute_summary
 from app.services.k8s_client import pool
@@ -93,3 +93,41 @@ class MetricsApi(Api):
             available, usage = False, {}
         summary = compute_summary(nodes, pods, usage if available else None)
         return {"metrics_available": available, "metrics_denied": not metrics_allowed, **summary}
+
+    @blp.route("/clusters/<int:cluster_id>/nodes/<path:node_name>/usage", methods=["GET"])
+    @blp.response(200, NodeUsageOut)
+    @blp.doc(
+        responses={
+            403: "RBAC_DENIED (no metrics.k8s.io read)",
+            404: "CLUSTER_NOT_FOUND (binding gate)",
+            502: "CLUSTER_UNREACHABLE",
+        }
+    )
+    def node_usage(self, cluster_id: int, node_name: str) -> dict[str, object]:
+        """A single node's observed (used) tier for the node detail view.
+
+        Tier 2 of the ADR-0004 two-tier gate, in isolation: ``get`` on
+        ``metrics.k8s.io`` nodes. Denied -> 200 with ``metrics_denied: true``
+        and null used (never 403 — the node's declared state still renders,
+        and the used tier degrades to unknown, not error). The Metrics API's
+        health is reported separately as ``metrics_available`` (certainty
+        rule: a missing metrics-server is expected, not an error).
+        """
+        cluster = _cluster_for(g.current_user, cluster_id)
+        metrics_allowed = rbac.can(
+            g.current_user, cluster, "get", "nodes", None, None, "metrics.k8s.io"
+        )
+        if not metrics_allowed:
+            return {
+                "metrics_available": False,
+                "metrics_denied": True,
+                "used_millicores": None,
+                "used_bytes": None,
+            }
+        available, usage = pool.get(cluster).node_usage(node_name)
+        return {
+            "metrics_available": available,
+            "metrics_denied": False,
+            "used_millicores": usage.get("cpu_millicores") if usage else None,
+            "used_bytes": usage.get("memory_bytes") if usage else None,
+        }

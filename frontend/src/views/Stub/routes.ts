@@ -7,7 +7,6 @@ export type StubRoute = {
 /** Menu entries that have no view yet. Paths match navigation() in src/_nav.tsx. */
 export const stubRoutes: StubRoute[] = [
   { path: '/dashboard/workload-map', title: 'Workload', admin: false },
-  { path: '/cluster/node', title: 'Nodes', admin: false },
   { path: '/cluster/crd', title: 'CRDs', admin: false },
   { path: '/workload/pods', title: 'Pods', admin: false },
   { path: '/workload/deployments', title: 'Deployments', admin: false },
