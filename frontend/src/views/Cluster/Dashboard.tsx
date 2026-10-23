@@ -24,6 +24,36 @@ import { useClusterStore } from '../../store/cluster'
 const HUE_CPU: [number, number, number] = [22, 92, 255]
 const HUE_MEMORY: [number, number, number] = [249, 177, 21]
 
+// The donut's ring legend (operator ask: the three rings were opaque).
+// Rendered inside each resource card so the explanation sits next to the
+// chart it explains. Declared (requests/limits, pod specs) vs observed
+// (used, metrics.k8s.io) are labeled distinctly — the certainty rule.
+const DonutLegend = ({ hue, ...rest }: { hue: [number, number, number] } & Record<string, unknown>) => {
+  const [r, g, b] = hue
+  const swatch = (alpha: number) => (
+    <span
+      className="d-inline-block"
+      style={{ width: 10, height: 10, borderRadius: '50%', background: `rgba(${r}, ${g}, ${b}, ${alpha})` }}
+    />
+  )
+  return (
+    <div className="d-flex flex-column gap-1 mb-2" style={{ fontSize: '.72rem' }} {...rest}>
+      <span className="d-inline-flex align-items-center gap-2 text-muted">
+        {swatch(1)} Used (observed · metrics.k8s.io)
+      </span>
+      <span className="d-inline-flex align-items-center gap-2 text-muted">
+        {swatch(0.65)} Requests (declared · pod specs)
+      </span>
+      <span className="d-inline-flex align-items-center gap-2 text-muted">
+        {swatch(0.35)} Limits (declared · pod specs)
+      </span>
+      <span className="text-muted">
+        Inner ring = used · outer = limits · full circle = 100% of capacity
+      </span>
+    </div>
+  )
+}
+
 type EventRow = {
   type: string
   reason: string
@@ -121,28 +151,11 @@ const DashboardView = () => {
                   pod specs and are always available.
                 </CBadge>
               )}
-              {/* Legend: the donut encodes three values on three concentric
-                  rings — without it the chart is opaque (operator ask).
-                  Declared (requests/limits, pod specs) vs observed (used,
-                  metrics.k8s.io) are distinct: the certainty rule. */}
-              <div className="d-flex align-items-center flex-wrap gap-4 mb-3" data-testid="donut-legend">
-                <span className="d-inline-flex align-items-center gap-2 fs-6 text-muted">
-                  <span className="d-inline-block" style={{ width: 12, height: 12, borderRadius: '50%', background: `rgba(${HUE_CPU[0]}, ${HUE_CPU[1]}, ${HUE_CPU[2]}, 1)` }} />
-                  Used (observed · metrics.k8s.io)
-                </span>
-                <span className="d-inline-flex align-items-center gap-2 fs-6 text-muted">
-                  <span className="d-inline-block" style={{ width: 12, height: 12, borderRadius: '50%', background: `rgba(${HUE_CPU[0]}, ${HUE_CPU[1]}, ${HUE_CPU[2]}, 0.65)` }} />
-                  Requests (declared · pod specs)
-                </span>
-                <span className="d-inline-flex align-items-center gap-2 fs-6 text-muted">
-                  <span className="d-inline-block" style={{ width: 12, height: 12, borderRadius: '50%', background: `rgba(${HUE_CPU[0]}, ${HUE_CPU[1]}, ${HUE_CPU[2]}, 0.35)` }} />
-                  Limits (declared · pod specs)
-                </span>
-                <span className="fs-6 text-muted">
-                  Inner ring = used · outer = limits · each full circle = 100% of capacity
-                </span>
-              </div>
-              {/* Row 1: allocation donuts — one card per donut. */}
+              {/* Row 1: allocation donuts — one card per donut. The ring
+                  legend lives INSIDE each card (operator ask): the donut
+                  encodes three values on three concentric rings, declared
+                  (requests/limits, pod specs) vs observed (used,
+                  metrics.k8s.io) — the certainty rule made visible. */}
               <div className="row g-4 mb-4">
                 <div className="col-12 col-md-4">
                   <CCard>
@@ -150,6 +163,7 @@ const DashboardView = () => {
                       <CCardTitle className="m-0 fs-6 fw-bold">CPU</CCardTitle>
                     </CCardHeader>
                     <CCardBody>
+                      <DonutLegend hue={HUE_CPU} data-testid="donut-legend-cpu" />
                       <ConcentricDonut
                         used={metrics?.cpu.used_millicores ?? null}
                         requests={metrics?.cpu.requests_millicores ?? 0}
@@ -168,6 +182,7 @@ const DashboardView = () => {
                       <CCardTitle className="m-0 fs-6 fw-bold">Memory</CCardTitle>
                     </CCardHeader>
                     <CCardBody>
+                      <DonutLegend hue={HUE_MEMORY} data-testid="donut-legend-mem" />
                       <ConcentricDonut
                         used={metrics?.memory.used_bytes ?? null}
                         requests={metrics?.memory.requests_bytes ?? 0}

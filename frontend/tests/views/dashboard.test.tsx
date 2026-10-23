@@ -185,14 +185,19 @@ test('dashboard-unknown-used: metrics_available false → used unknown, declared
   expect(screen.getAllByText(/metrics\.k8s\.io/i).length).toBeGreaterThanOrEqual(1)
 })
 
-test('dashboard-donut-legend: rings explained — used/requests/limits + declared vs observed', async () => {
+test('dashboard-donut-legend: rings explained inside each card — used/requests/limits + declared vs observed', async () => {
   renderDashboard()
   await screen.findByRole('img', { name: /CPU/i })
-  const legend = screen.getByTestId('donut-legend')
-  expect(legend.textContent).toContain('Used (observed · metrics.k8s.io)')
-  expect(legend.textContent).toContain('Requests (declared · pod specs)')
-  expect(legend.textContent).toContain('Limits (declared · pod specs)')
-  expect(legend.textContent).toContain('Inner ring = used')
+  // Operator ask: the legend lives INSIDE the CPU and Memory cards, not as
+  // a separate row above them.
+  const cpu = screen.getByTestId('donut-legend-cpu')
+  const mem = screen.getByTestId('donut-legend-mem')
+  for (const legend of [cpu, mem]) {
+    expect(legend.textContent).toContain('Used (observed · metrics.k8s.io)')
+    expect(legend.textContent).toContain('Requests (declared · pod specs)')
+    expect(legend.textContent).toContain('Limits (declared · pod specs)')
+    expect(legend.textContent).toContain('Inner ring = used')
+  }
 })
 
 test('dashboard-metrics-404-unknown: 404 from either endpoint → unknown, no red error', async () => {
