@@ -24,21 +24,23 @@ vi.mock('../../src/components/KubeDataTable', () => {
     // Supports both Column shapes the codebase uses: a `data` key (string
     // lookup) and a render-function child (the node views). The render fn is
     // called with the row object, mirroring the real DataTables cell renderer.
+    type RenderFn = (data: unknown, type: string, row: Record<string, unknown>) => React.ReactNode
     const columns = React.Children.toArray(children)
       .filter(React.isValidElement)
       .map((child) => {
         const el = child as React.ReactElement<{
           title: string
           data?: string | null
-          children?: ((row: Record<string, unknown>) => React.ReactNode) | React.ReactNode
+          children?: RenderFn | React.ReactNode
         }>
-        return { title: el.props.title, data: el.props.data, render: el.props.children }
+        return { title: el.props.title, data: el.props.data, render: el.props.children as RenderFn | React.ReactNode }
       })
     const cellValue = (
       row: Record<string, unknown>,
-      col: { data?: string | null; render?: ((row: Record<string, unknown>) => React.ReactNode) | React.ReactNode },
+      col: { data?: string | null; render?: RenderFn | React.ReactNode },
     ) => {
-      if (typeof col.render === 'function') return col.render(row)
+      if (typeof col.render === 'function')
+        return col.render(col.data != null ? row[col.data] : undefined, 'display', row)
       if (col.data != null) return row[col.data] as React.ReactNode
       return null
     }
