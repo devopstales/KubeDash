@@ -11,9 +11,16 @@ const LOGIN_ENTRY = '2026-10-18T09:30:00Z'
 const meHandler = (me: Record<string, unknown>) =>
   http.get('*/api/v1/auth/me', () => HttpResponse.json(me))
 
+const hasSessionHint = () =>
+  document.cookie
+    .split(';')
+    .map((part) => part.trim())
+    .includes('kd_session=1')
+
 const renderProfile = () => {
-  localStorage.setItem('kd_token', 'tok')
-  localStorage.setItem('kd_refresh', 'ref')
+  // ADR-0025: the credentials are server-owned HttpOnly cookies. The router
+  // only reads the non-HttpOnly hint.
+  document.cookie = 'kd_session=1; path=/'
   const qc = new QueryClient({ defaultOptions: { queries: { retry: false } } })
   return render(
     <QueryClientProvider client={qc}>
@@ -87,7 +94,7 @@ describe('Profile view', () => {
     expect(screen.queryByText(/last login/i)).not.toBeInTheDocument()
   })
 
-  it('logout POSTs /api/v1/auth/logout, clears both storage keys, and navigates to /login', async () => {
+  it('logout POSTs /api/v1/auth/logout, clears the session hint, and navigates to /login', async () => {
     let logoutHits = 0
     server.use(
       meHandler({
@@ -107,15 +114,14 @@ describe('Profile view', () => {
     )
     const { container } = renderProfile()
     fireEvent.click(await screen.findByRole('button', { name: /log ?out/i }))
-    // the logout POST is the last await before storage-clear + navigate
+    // the logout POST is the last await before hint-clear + navigate
     await waitFor(() => expect(logoutHits).toBe(1))
-    expect(localStorage.getItem('kd_token')).toBeNull()
-    expect(localStorage.getItem('kd_refresh')).toBeNull()
+    expect(hasSessionHint()).toBe(false)
     expect(await screen.findByText('LOGIN-LANDING')).toBeInTheDocument()
     expect(container).toHaveTextContent('LOGIN-LANDING')
   })
 
-  it('logout still clears storage and navigates when the POST fails (revocation best-effort)', async () => {
+  it('logout still clears the hint and navigates when the POST fails (revocation best-effort)', async () => {
     server.use(
       meHandler({
         sub: 'u4',
@@ -132,7 +138,6 @@ describe('Profile view', () => {
     const { container } = renderProfile()
     fireEvent.click(await screen.findByRole('button', { name: /log ?out/i }))
     expect(await screen.findByText('LOGIN-LANDING')).toBeInTheDocument()
-    expect(localStorage.getItem('kd_token')).toBeNull()
-    expect(localStorage.getItem('kd_refresh')).toBeNull()
+    expect(hasSessionHint()).toBe(false)
   })
 })

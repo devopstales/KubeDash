@@ -29,6 +29,11 @@ class Settings(BaseSettings):
     oidc_client_secret: str = ""
     oidc_issuer: str = ""
     cors_origins: str = ""
+    # ADR-0025: the browser session travels in HttpOnly cookies. `Secure` is
+    # on by default (production is TLS-terminated); the local HTTP dev stack
+    # and the test client set KUBEDASH_COOKIE_SECURE=false. Keep the default
+    # True — a forgotten value must fail closed, not leak the cookie on HTTP.
+    cookie_secure: bool = True
     # ADR-0021 (local admin auth): both set → the bootstrap admin row is
     # created at boot and POST /auth/local is enabled; either empty → local
     # login answers 403 LOCAL_AUTH_DISABLED. Double prefix is deliberate

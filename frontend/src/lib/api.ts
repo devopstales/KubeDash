@@ -1,9 +1,13 @@
 /**
  * Single HTTP seam for the SPA: every request goes through `apiFetch`.
  *
- * - Attaches the Bearer token from localStorage (`kd_token`).
+ * - Sends the session as same-origin cookies (ADR-0025). The `kd_access` and
+ *   `kd_refresh` cookies are HttpOnly, so this module never sees a token and
+ *   an XSS payload cannot read one.
  * - On 401: a SINGLE in-flight `POST /api/v1/auth/refresh` (concurrent 401s
- *   share one refresh), stores the ROTATED access+refresh pair, retries once.
+ *   share one refresh), then retries once. A 401 that survives the retry
+ *   means the session is dead: the hint is cleared and the browser is sent to
+ *   `/login`.
  * - Never throws on HTTP errors: returns the `{error: {code, message}}`
  *   envelope so views can surface it (R4's RBAC 403 path is where it pays
  *   off).
@@ -20,9 +24,17 @@
  * request on that origin. A missing pin would surface as a 'fetch failed'
  * red error in the dashboard suite, not as a silent 404.
  */
+import { clearSessionHint, redirectToLogin } from './session'
+
 const API_BASE: string = import.meta.env.VITE_API_BASE ?? ''
 
 let inFlightRefresh: Promise<string> | null = null
+
+/** A 401 that survived the refresh: the cookies are gone or revoked. */
+function deadSession(): void {
+  clearSessionHint()
+  redirectToLogin()
+}
 
 export interface ApiResult<T = unknown> {
   data: T | null
@@ -39,18 +51,20 @@ async function refreshOnce(): Promise<string> {
   if (!inFlightRefresh) {
     inFlightRefresh = fetch(`${API_BASE}/api/v1/auth/refresh`, {
       method: 'POST',
+      // The refresh token rides in the path-scoped HttpOnly cookie; the empty
+      // JSON body keeps the request a non-simple one (no CSRF form post).
+      credentials: 'same-origin',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ refresh_token: localStorage.getItem('kd_refresh') ?? '' }),
+      body: '{}',
     })
       .then((r) => {
         if (!r.ok) throw new Error('refresh failed')
         return r.json() as Promise<RefreshPair>
       })
       .then((j) => {
-        localStorage.setItem('kd_token', j.access)
-        // The backend ALWAYS rotates the refresh token (R2); storing the
-        // rotated value is what makes the second 401 refresh work.
-        if (j.refresh) localStorage.setItem('kd_refresh', j.refresh)
+        // The server rotates AND re-sets both cookies; there is nothing for
+        // the client to persist. `access` is returned only so callers can
+        // keep the pre-ADR-0025 signature.
         return j.access
       })
       .finally(() => {
@@ -64,21 +78,25 @@ export async function apiFetch<T = unknown>(
   path: string,
   init: RequestInit = {},
 ): Promise<ApiResult<T>> {
-  const doFetch = (token: string | null) =>
+  const doFetch = () =>
     fetch(`${API_BASE}${path}`, {
       ...init,
-      headers: { ...(init.headers ?? {}), ...(token ? { Authorization: `Bearer ${token}` } : {}) },
+      // Same-origin: the SPA and the API ship in one container (ADR-0006), so
+      // the cookies need neither CORS nor a cross-site credential mode.
+      credentials: 'same-origin',
+      headers: { ...(init.headers ?? {}) },
     })
 
-  let res = await doFetch(localStorage.getItem('kd_token'))
+  let res = await doFetch()
   if (res.status === 401) {
     try {
-      const t = await refreshOnce()
-      res = await doFetch(t)
+      await refreshOnce()
+      res = await doFetch()
     } catch {
-      /* fall through to the error envelope below */
+      /* fall through: a dead session redirects below */
     }
   }
+  if (res.status === 401) deadSession()
   const body = await res.json().catch(() => ({}))
   if (!res.ok) {
     const err = (body as { error?: { code?: string; message?: string } }).error
@@ -107,20 +125,18 @@ export interface DownloadResult {
  * error envelope and returns it — the error body is NOT downloaded as a file.
  */
 export async function downloadFile(path: string, filename: string): Promise<DownloadResult> {
-  const doFetch = (token: string | null) =>
-    fetch(`${API_BASE}${path}`, {
-      headers: token ? { Authorization: `Bearer ${token}` } : {},
-    })
+  const doFetch = () => fetch(`${API_BASE}${path}`, { credentials: 'same-origin' })
 
-  let res = await doFetch(localStorage.getItem('kd_token'))
+  let res = await doFetch()
   if (res.status === 401) {
     try {
-      const t = await refreshOnce()
-      res = await doFetch(t)
+      await refreshOnce()
+      res = await doFetch()
     } catch {
-      /* fall through to the error envelope below */
+      /* fall through: a dead session redirects below */
     }
   }
+  if (res.status === 401) deadSession()
   if (!res.ok) {
     const body = await res.json().catch(() => ({}))
     const err = (body as { error?: { code?: string; message?: string } }).error

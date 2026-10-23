@@ -1,5 +1,6 @@
 import { afterEach, beforeEach, describe, expect, test, vi } from 'vitest'
 import { apiFetch, resetRefreshForTests } from '../src/lib/api'
+import { setLoginRedirectForTests } from '../src/lib/session'
 
 // The brief's tests mock `global.fetch` directly; install the spy in each
 // test (MSW is not involved in this suite — the seam is raw fetch).
@@ -15,43 +16,56 @@ const res = (status: number, body: unknown) => ({
   json: async () => body,
 })
 
+const hasSessionHint = () =>
+  document.cookie
+    .split(';')
+    .map((part) => part.trim())
+    .includes('kd_session=1')
+
 let fetchMock: ReturnType<typeof vi.fn>
 
 beforeEach(() => {
   localStorage.clear()
+  document.cookie = 'kd_session=; Max-Age=0; path=/'
   resetRefreshForTests()
   fetchMock = installFetch()
 })
 
 afterEach(() => {
+  setLoginRedirectForTests(null)
   vi.restoreAllMocks()
 })
 
 describe('apiFetch', () => {
-  test('attaches bearer token', async () => {
+  test('sends same-origin cookie credentials and no bearer header', async () => {
     fetchMock.mockResolvedValueOnce(res(200, { items: [] }))
-    localStorage.setItem('kd_token', 'tok-1')
     const r = await apiFetch('/api/v1/clusters')
     const [url, init] = fetchMock.mock.calls[0] as [string, RequestInit]
     // ponytail: the vitest suite pins VITE_API_BASE (vite.config.ts) so the
     // fetch URL is hermetic under jsdom; in prod/CI the base is empty and
     // this asserts the bare relative path.
     expect(url).toBe(`${import.meta.env.VITE_API_BASE ?? ''}/api/v1/clusters`)
-    expect((init.headers as Record<string, string>).Authorization).toBe('Bearer tok-1')
+    // ADR-0025: the HttpOnly cookie is the credential; there is no token in
+    // JS and therefore no Authorization header to assert.
+    expect(init.credentials).toBe('same-origin')
+    expect((init.headers as Record<string, string> | undefined)?.Authorization).toBeUndefined()
     expect(r.data).toEqual({ items: [] })
     expect(r.error).toBeNull()
   })
 
-  test('401 triggers single refresh then retry', async () => {
+  test('401 triggers single refresh (cookie, empty body) then retry', async () => {
     fetchMock
       .mockResolvedValueOnce(res(401, { error: { code: 'UNAUTHORIZED', message: 'x' } }))
-      .mockResolvedValueOnce(res(200, { access: 'tok-2' })) // refresh
+      .mockResolvedValueOnce(res(200, { access: 'server-owned' })) // refresh
       .mockResolvedValueOnce(res(200, { items: [1] }))
-    localStorage.setItem('kd_token', 'tok-1')
     const r = await apiFetch('/api/v1/clusters')
     expect(r.data).toEqual({ items: [1] })
     expect(fetchMock).toHaveBeenCalledTimes(3)
-    expect(localStorage.getItem('kd_token')).toBe('tok-2')
+    const [refreshUrl, refreshInit] = fetchMock.mock.calls[1] as [string, RequestInit]
+    expect(refreshUrl).toContain('/api/v1/auth/refresh')
+    expect(refreshInit.credentials).toBe('same-origin')
+    // The refresh token rides in the path-scoped cookie, not the body.
+    expect(refreshInit.body).toBe('{}')
   })
 
   test('error envelope is surfaced, not thrown', async () => {
@@ -63,21 +77,33 @@ describe('apiFetch', () => {
     expect(r.meta.status).toBe(403)
   })
 
-  test('second 401 uses the ROTATED refresh token (double rotation works)', async () => {
+  test('two sequential 401s each trigger exactly one refresh', async () => {
     fetchMock
       .mockResolvedValueOnce(res(401, { error: { code: 'UNAUTHORIZED', message: 'x' } }))
-      .mockResolvedValueOnce(res(200, { access: 'tok-2', refresh: 'rt-2' }))
+      .mockResolvedValueOnce(res(200, { access: 'a2' }))
       .mockResolvedValueOnce(res(200, { items: [1] }))
       .mockResolvedValueOnce(res(401, { error: { code: 'UNAUTHORIZED', message: 'x' } }))
-      .mockResolvedValueOnce(res(200, { access: 'tok-3', refresh: 'rt-3' }))
+      .mockResolvedValueOnce(res(200, { access: 'a3' }))
       .mockResolvedValueOnce(res(200, { items: [2] }))
-    localStorage.setItem('kd_token', 'tok-1')
-    localStorage.setItem('kd_refresh', 'rt-1')
     const r1 = await apiFetch('/api/v1/clusters')
     expect(r1.data).toEqual({ items: [1] })
-    expect(localStorage.getItem('kd_refresh')).toBe('rt-2')
     const r2 = await apiFetch('/api/v1/clusters')
     expect(r2.data).toEqual({ items: [2] })
-    expect(localStorage.getItem('kd_refresh')).toBe('rt-3')
+    // Both refreshes left the tokens absent from localStorage (server-owned).
+    expect(localStorage.getItem('kd_token')).toBeNull()
+  })
+
+  test('a dead session clears the hint after a failed refresh', async () => {
+    document.cookie = 'kd_session=1; path=/'
+    // The seam keeps jsdom from logging "Not implemented: navigation".
+    const assign = vi.fn()
+    setLoginRedirectForTests(assign)
+    fetchMock
+      .mockResolvedValueOnce(res(401, { error: { code: 'UNAUTHORIZED', message: 'x' } }))
+      .mockResolvedValueOnce(res(401, { error: { code: 'UNAUTHORIZED', message: 'x' } }))
+    const r = await apiFetch('/api/v1/clusters')
+    expect(r.error?.code).toBe('UNAUTHORIZED')
+    expect(hasSessionHint()).toBe(false)
+    expect(assign).toHaveBeenCalledWith('/login')
   })
 })

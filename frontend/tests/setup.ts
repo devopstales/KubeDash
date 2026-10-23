@@ -28,4 +28,7 @@ Object.defineProperty(window, 'matchMedia', {
 afterEach(() => {
   cleanup()
   vi.clearAllMocks()
+  // ADR-0025: the session hint lives in a cookie, which jsdom keeps across
+  // tests. Expire it so a "logged in" test cannot leak into the next one.
+  document.cookie = 'kd_session=; Max-Age=0; path=/'
 })

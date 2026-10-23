@@ -37,19 +37,55 @@ def test_me_shape_growth_me_out_fields(api_client, auth_client, api_app):
         assert u.last_login_at is not None
 
 
-def test_callback_redirect_is_exact_issued_pair(api_client, mock_oidc):
-    """I-NEW-4 door check (pinned in test_auth.py, per the brief's file list):
-    the OIDC callback's 302 Location must be EXACTLY the issued pair — the
-    shared-builder contract (redirect_with_tokens) is pinned on BOTH sides;
-    the local route mirrors this assertion in test_local_auth.py."""
+def test_callback_redirect_sets_cookies_not_url_tokens(api_client, mock_oidc):
+    """ADR-0025 door check: the OIDC callback's 302 Location is a bare ``/``
+    and the issued pair rides in HttpOnly cookies — nothing in the URL, so
+    nothing in access logs, proxy logs, or the first asset requests' Referer.
+    The local route mirrors this assertion in test_local_auth.py."""
+    from app.core.security import verify_jwt
+
     r1 = api_client.post("/api/v1/auth/login")
     cb = r1.headers["Location"]
     state = parse_qs(urlparse(cb).query)["state"][0]
     r2 = api_client.get(f"{cb}&code={mock_oidc.CODE}&state={state}")
     assert r2.status_code == 302
-    loc = r2.headers["Location"]
-    q = parse_qs(urlparse(loc).query)
-    assert loc == f"/?token={q['token'][0]}&refresh={q['refresh'][0]}"
+    assert r2.headers["Location"] == "/"
+    assert "token" not in r2.headers["Location"]
+    access = api_client.get_cookie("kd_access")
+    refresh = api_client.get_cookie("kd_refresh", path="/api/v1/auth")
+    assert access is not None and refresh is not None
+    # The cookie pair is the real issued pair, not an echo.
+    assert verify_jwt(str(access.value))["sub"] == "sub-oidc-1"
+    assert refresh.value
+    # The session hint is deliberately JS-readable; the credentials are not.
+    set_cookies = "\n".join(r2.headers.getlist("Set-Cookie"))
+    access_line = next(line for line in set_cookies.splitlines() if line.startswith("kd_access="))
+    refresh_line = next(line for line in set_cookies.splitlines() if line.startswith("kd_refresh="))
+    assert "HttpOnly" in access_line and "HttpOnly" in refresh_line
+    assert "Path=/api/v1/auth" in refresh_line
+
+
+def test_cookie_alone_authorizes_api_calls(api_client, auth_client):
+    """ADR-0025: the browser sends no Authorization header — the cookie alone
+    must authenticate (Bearer remains covered by every other api test)."""
+    auth_client.login()
+    r = api_client.get("/api/v1/auth/me")  # no Authorization header
+    assert r.status_code == 200
+    assert r.get_json()["sub"] == "sub-oidc-1"
+
+
+def test_refresh_reads_the_cookie_and_rotates(api_client, auth_client):
+    """ADR-0025: a browser refresh posts no body; the path-scoped cookie is
+    the source, and the rotation re-sets both cookies."""
+    auth_client.login()
+    old_refresh = auth_client.refresh
+    r = api_client.post("/api/v1/auth/refresh")  # no JSON body
+    assert r.status_code == 200
+    body = r.get_json()
+    assert body["access"] and body["refresh"]
+    assert body["refresh"] != old_refresh
+    assert api_client.get_cookie("kd_access") is not None
+    assert api_client.get_cookie("kd_refresh", path="/api/v1/auth") is not None
 
 
 def test_state_mismatch_rejected(api_client, mock_oidc):
@@ -149,6 +185,10 @@ def test_revoked_jti_returns_401(api_client, api_app):
 def test_refresh_rotation_reuse_rejected_and_row_deleted(api_client, auth_client, api_app):
     auth_client.login()
     old_refresh = auth_client.refresh
+    # This test drives the BODY contract; the login left a valid refresh cookie
+    # in the jar and the route prefers the cookie (ADR-0025). Drop it so each
+    # body call is the one under test.
+    api_client.delete_cookie("kd_refresh", path="/api/v1/auth")
     # first use: succeeds, returns a NEW rotated pair
     r1 = api_client.post("/api/v1/auth/refresh", json={"refresh_token": old_refresh})
     assert r1.status_code == 200
@@ -160,7 +200,9 @@ def test_refresh_rotation_reuse_rejected_and_row_deleted(api_client, auth_client
         "/api/v1/auth/me", headers={"Authorization": f"Bearer {body['access']}"}
     )
     assert r2.status_code == 200
-    # second use of the SAME (now-consumed) token: 401
+    # second use of the SAME (now-consumed) token: 401. The first call set a
+    # fresh cookie, so drop it again to keep the body as the source.
+    api_client.delete_cookie("kd_refresh", path="/api/v1/auth")
     r3 = api_client.post("/api/v1/auth/refresh", json={"refresh_token": old_refresh})
     assert r3.status_code == 401
     assert r3.get_json()["error"]["code"] == "UNAUTHORIZED"
@@ -186,14 +228,16 @@ def test_refresh_unknown_token_is_401(api_client):
     assert r1.get_json()["error"]["code"] == "UNAUTHORIZED"
 
 
-def test_logout_then_refresh_rejected(api_client, auth_client, api_app):
+def test_logout_clears_cookies_then_refresh_rejected(api_client, auth_client, api_app):
     auth_client.login()
     refresh = auth_client.refresh
-    r1 = api_client.post(
-        "/api/v1/auth/logout",
-        headers={"Authorization": f"Bearer {auth_client.jwt}"},
-    )
+    # Cookie-only logout: the browser sends no Authorization header.
+    r1 = api_client.post("/api/v1/auth/logout")
     assert r1.status_code == 200
+    assert api_client.get_cookie("kd_access") is None
+    assert api_client.get_cookie("kd_refresh", path="/api/v1/auth") is None
+    assert api_client.get_cookie("kd_session") is None
+    # The row is revoked too (ADR-0014), so the old token cannot be replayed.
     r2 = api_client.post("/api/v1/auth/refresh", json={"refresh_token": refresh})
     assert r2.status_code == 401
     assert r2.get_json()["error"]["code"] == "UNAUTHORIZED"

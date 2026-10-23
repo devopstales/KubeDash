@@ -1,10 +1,10 @@
 """AuthApi (R2) — the OIDC spine: login / callback / refresh / logout / me,
 plus ADR-0021's local password sibling: ``/auth/local`` + ``/auth/settings``.
 
-JWT delivery contract: the callback AND local login redirect ``302
-/?token=<access_jwt>&refresh=<refresh_token>`` (one builder:
-``redirect_with_tokens``); the SPA parks both in localStorage. Auth routes
-are open pre-JWT; /auth/me uses the ``require_auth`` decorator.
+Session delivery contract (ADR-0025): the callback AND local login answer
+``302 /`` and park the pair in HttpOnly cookies (one builder:
+``login_redirect``) — no credential ever rides in the URL. Auth routes are
+open pre-JWT; /auth/me uses the ``require_auth`` decorator.
 
 The domain Api's shared auth-hook pattern (app-wide ``before_request`` scoped
 to ``/api/v1/*``) now lives in ``app/api/clusters.py`` (Task 4 replaced the
@@ -12,31 +12,38 @@ exemplar stub); Tasks 5-6 copy that ``on_init`` into their own domain APIs.
 """
 from datetime import UTC, datetime, timedelta
 
-from flask import g, redirect, request
+from flask import Response, g, jsonify, make_response, redirect, request
 from flask_smorest import Api, Blueprint, abort
 
 from app.core import security
 from app.core.config import get_settings
 from app.core.errors import InvalidCredentialsError, LocalAuthDisabledError
 from app.core.security import (
+    REFRESH_COOKIE,
     REFRESH_TTL_DAYS,
+    clear_session_cookies,
     consume_state,
     new_state,
     require_auth,
     revoke_user_refresh_tokens,
     rotate_refresh,
+    set_session_cookies,
 )
 from app.extensions import db
 from app.models.token import RefreshToken
 from app.models.user import User
-from app.schemas.auth import AuthSettingsOut, LocalLoginIn, MeOut, RefreshIn, RefreshOut
+from app.schemas.auth import AuthSettingsOut, LocalLoginIn, MeOut
 from app.services.k8s_client import resolve_admin_source
 
 
-def redirect_with_tokens(access: str, refresh: str) -> str:
-    """The JWT delivery contract — ONE builder shared by the OIDC callback
-    and local login (T1 key link: both routes cannot diverge)."""
-    return f"/?token={access}&refresh={refresh}"
+def login_redirect(access: str, refresh: str) -> Response:
+    """The session delivery contract — ONE builder shared by the OIDC callback
+    and local login (both routes cannot diverge). The credentials ride in
+    HttpOnly cookies (ADR-0025); `Location` stays a bare ``/`` so nothing lands
+    in access logs, proxy logs, or `Referer`."""
+    resp = redirect("/")
+    resp.headers["Cache-Control"] = "no-store"
+    return set_session_cookies(resp, access, refresh)
 
 
 def _issue_and_persist(user: User) -> tuple[str, str]:
@@ -103,7 +110,7 @@ class AuthApi(Api):
 
     @blp.route("/auth/callback", methods=["GET"])
     @blp.doc(responses={
-        302: "Redirect to /?token=<jwt>&refresh=<token> (JWT delivery contract)",
+        302: "Redirect to / with HttpOnly session cookies (ADR-0025)",
         400: "STATE_MISMATCH / missing state or code",
         401: "UNAUTHORIZED",
     })
@@ -117,12 +124,12 @@ class AuthApi(Api):
         userinfo = security.oidc_exchange(code)
         user = _upsert_user(userinfo)
         access, refresh = _issue_and_persist(user)
-        return redirect(redirect_with_tokens(access, refresh))  # JWT delivery contract
+        return login_redirect(access, refresh)  # ADR-0025 delivery contract
 
     @blp.route("/auth/local", methods=["POST"])
     @blp.arguments(LocalLoginIn)
     @blp.doc(responses={
-        302: "Redirect to /?token=<jwt>&refresh=<token> (JWT delivery contract)",
+        302: "Redirect to / with HttpOnly session cookies (ADR-0025)",
         401: "INVALID_CREDENTIALS (wrong password OR unknown email — no enumeration)",
         403: "LOCAL_AUTH_DISABLED",
     })
@@ -148,7 +155,7 @@ class AuthApi(Api):
             raise InvalidCredentialsError("invalid email or password")
         user.last_login_at = datetime.now(UTC)
         access, refresh = _issue_and_persist(user)
-        return redirect(redirect_with_tokens(access, refresh))  # JWT delivery contract
+        return login_redirect(access, refresh)  # ADR-0025 delivery contract
 
     @blp.route("/auth/settings", methods=["GET"])
     @blp.response(200, AuthSettingsOut)
@@ -162,20 +169,31 @@ class AuthApi(Api):
         }
 
     @blp.route("/auth/refresh", methods=["POST"])
-    @blp.arguments(RefreshIn)
-    @blp.response(200, RefreshOut)
-    @blp.doc(responses={401: "UNAUTHORIZED"})
-    def refresh(self, args: dict[str, object]) -> dict[str, str]:
-        access, refresh = rotate_refresh(str(args["refresh_token"]))
-        return {"access": access, "refresh": refresh}  # BOTH tokens (rotation)
+    @blp.doc(
+        description="Rotate the refresh token. The `kd_refresh` cookie is the "
+        "normal source; a JSON body remains accepted for non-browser clients.",
+        responses={401: "UNAUTHORIZED"},
+    )
+    def refresh(self) -> Response:
+        # Cookie first (ADR-0025) — it is path-scoped to /api/v1/auth, so it
+        # never rides on ordinary API calls. The body is the pre-ADR-0025
+        # contract, kept for scripts; no browser path uses it.
+        body = request.get_json(silent=True) or {}
+        raw = request.cookies.get(REFRESH_COOKIE) or str(body.get("refresh_token") or "")
+        access, refresh = rotate_refresh(raw)
+        resp = make_response(jsonify(access=access, refresh=refresh))
+        resp.headers["Cache-Control"] = "no-store"
+        return set_session_cookies(resp, access, refresh)  # rotation re-sets both
 
     @blp.route("/auth/logout", methods=["POST"])
     @blp.doc(responses={401: "UNAUTHORIZED"})
     @require_auth
-    def logout(self) -> dict[str, str]:
+    def logout(self) -> Response:
         user = g.current_user
         revoke_user_refresh_tokens(user.id)
-        return {"status": "ok"}
+        resp = make_response(jsonify(status="ok"))
+        resp.headers["Cache-Control"] = "no-store"
+        return clear_session_cookies(resp)
 
     @blp.route("/auth/me", methods=["GET"])
     @blp.response(200, MeOut)

@@ -147,7 +147,9 @@ tasks:
     desc: "Run one backend instance on :8080 (leader role, starts RQ worker + Leader)"
     dir: backend
     cmds:
-      - "KUBEDASH_ROLE=leader KUBEDASH_REPLICA_ID=local .venv/bin/python wsgi.py"
+      # ADR-0025: the dev stack speaks http://localhost, where a Secure cookie
+      # is stored but never sent back. Production stays Secure (the default).
+      - "KUBEDASH_ROLE=leader KUBEDASH_REPLICA_ID=local KUBEDASH_COOKIE_SECURE=false .venv/bin/python wsgi.py"
 
   backend-run-worker:
     desc: "Run one backend instance on :8080 in worker-only role (no Leader/RQ worker)"
@@ -247,6 +249,8 @@ tasks:
       KUBEDASH_STATIC_DIR: "{{.STATIC_DIR}}"
       KUBEDASH_ROLE: "leader"
       KUBEDASH_REPLICA_ID: "local"
+      # ADR-0025: plain-HTTP local stack (see backend-run).
+      KUBEDASH_COOKIE_SECURE: "false"
     cmds:
       # Double-fork so the backend survives `task` exiting: the intermediate
       # shell exits immediately, re-parenting the backend to init (macOS has

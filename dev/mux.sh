@@ -38,6 +38,7 @@ start() {
       exec env "kubedash-mux instance-$i" \
         "KUBEDASH_ROLE=leader" \
         "KUBEDASH_REPLICA_ID=instance-$i" \
+        "KUBEDASH_COOKIE_SECURE=false" \
         "FLASK_RUN_PORT=$((8080 + i))" \
         "$PY" wsgi.py \
         >> "$STATE/backend-instance-$i.log" 2>&1

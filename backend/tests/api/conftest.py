@@ -67,6 +67,9 @@ def api_app(monkeypatch: pytest.MonkeyPatch) -> Iterator[object]:
         "REDIS_URL": "redis://localhost:6390/0",  # never dialed; client swapped
         "KUBEDASH_KUBEDASH_JWT_SECRET": "test-jwt-secret-32-bytes-long!!!!!01",
         "KUBEDASH_SECRET_KEY": "test-enc-key-32-bytes-long!!!!",
+        # ADR-0025: http://localhost test client — Secure cookies are stored but
+        # never sent back, so the session would vanish between calls.
+        "KUBEDASH_COOKIE_SECURE": False,
     })
     fake = _FakeRedis()
     with application.app_context():
@@ -106,6 +109,8 @@ def api_app_no_bootstrap(monkeypatch: pytest.MonkeyPatch) -> Iterator[object]:
         "REDIS_URL": "redis://localhost:6390/0",
         "KUBEDASH_KUBEDASH_JWT_SECRET": "test-jwt-secret-32-bytes-long!!!!!01",
         "KUBEDASH_SECRET_KEY": "test-enc-key-32-bytes-long!!!!",
+        # ADR-0025: same http://localhost constraint as the primary app.
+        "KUBEDASH_COOKIE_SECURE": False,
     })
     fake = _FakeRedis()
     with application.app_context():
@@ -171,13 +176,16 @@ def mock_oidc(monkeypatch: pytest.MonkeyPatch) -> MockOIDC:
 
 def _jwt_of(api_client) -> str:
     """Replay the login flow and return the access JWT from the callback's
-    302 location (?token=... per the JWT delivery contract)."""
+    HttpOnly cookie (ADR-0025 — no credential in the redirect URL)."""
     r1 = api_client.post("/api/v1/auth/login")
     cb = r1.headers["Location"]
     q = parse_qs(urlparse(cb).query)
     state = q["state"][0]
     r2 = api_client.get(f"{cb}&code={MockOIDC.CODE}&state={state}")
-    return parse_qs(urlparse(r2.headers["Location"]).query)["token"][0]
+    assert r2.status_code == 302
+    cookie = api_client.get_cookie("kd_access")
+    assert cookie is not None
+    return str(cookie.value)
 
 
 @pytest.fixture()
@@ -192,15 +200,14 @@ def auth_client(api_client, mock_oidc):
         state = parse_qs(urlparse(cb).query)["state"][0]
         r2 = api_client.get(f"{cb}&code={mock_oidc.CODE}&state={state}")
         assert r2.status_code == 302
-        loc = r2.headers["Location"]
-        assert loc.startswith("/?token=")
-        q = parse_qs(urlparse(loc).query)
-        # I-NEW-4 door check: the OIDC callback's redirect must be EXACTLY the
-        # issued pair — the shared-builder contract pinned on BOTH sides (the
-        # local route mirrors this assertion in test_local_auth.py).
-        assert loc == f"/?token={q['token'][0]}&refresh={q['refresh'][0]}"
-        api_client.jwt = q["token"][0]
-        api_client.refresh = q["refresh"][0]
+        # ADR-0025 door check: the redirect carries no credential, and the
+        # cookie jar holds the issued pair. The local route mirrors this.
+        assert r2.headers["Location"] == "/"
+        access = api_client.get_cookie("kd_access")
+        refresh = api_client.get_cookie("kd_refresh", path="/api/v1/auth")
+        assert access is not None and refresh is not None
+        api_client.jwt = str(access.value)
+        api_client.refresh = str(refresh.value)
 
     api_client.login = login
     return api_client

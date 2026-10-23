@@ -235,7 +235,7 @@ const renderGate = (initialEntry = '/admin/permissions') => {
 
 describe('AdminPermissionsView', () => {
   beforeEach(() => {
-    localStorage.setItem('kd_token', 'test-token')
+    document.cookie = 'kd_session=1; path=/'
     withAdminHandlers()
   })
   afterEach(() => {

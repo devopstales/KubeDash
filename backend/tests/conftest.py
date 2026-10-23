@@ -71,6 +71,9 @@ def app(pg_container, redis_container, monkeypatch):
         "REDIS_URL": f"redis://{redis_container.get_container_host()}:{redis_container.exposed_port(6379)}",
         "KUBEDASH_JWT_SECRET": "test-jwt-secret",
         "KUBEDASH_SECRET_KEY": "test-enc-key-32-bytes-long!!!!",
+        # ADR-0025: the test client speaks http://localhost; a Secure cookie is
+        # stored but never sent back, so the session would vanish between calls.
+        "KUBEDASH_COOKIE_SECURE": False,
     })
     with application.app_context():
         db.create_all()

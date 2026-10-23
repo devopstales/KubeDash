@@ -47,7 +47,7 @@ const renderAt = (ui: ReactElement, path = '/') => {
 }
 
 beforeEach(() => {
-  localStorage.setItem('kd_token', 'test-token')
+  document.cookie = 'kd_session=1; path=/'
 })
 
 afterEach(() => {

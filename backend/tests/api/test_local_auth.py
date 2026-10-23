@@ -6,8 +6,6 @@ is dialect-agnostic.
 SATISFIES: local-admin-login-issues-jwt, login-page-offers-sso-and-local
 (backend half: the settings contract).
 """
-from urllib.parse import parse_qs, urlparse
-
 import pytest
 
 
@@ -31,24 +29,23 @@ def client_with_admin(api_client, api_app):
     return api_client
 
 
-def test_local_login_issues_jwt_same_contract_as_oidc(client_with_admin):
+def test_local_login_sets_same_cookies_as_oidc(client_with_admin):
+    """ADR-0025: the local route reuses the OIDC callback's delivery builder —
+    a bare ``/`` redirect plus HttpOnly cookies, never a token in the URL."""
     client = client_with_admin
     res = client.post(
         "/api/v1/auth/local", json={"email": "admin@local", "password": "correct-horse"}
     )
     assert res.status_code == 302
-    loc = res.headers["Location"]
-    # Door check (Hypothesis): EXACT match against the issued pair — the local
-    # route must reuse the OIDC callback's redirect builder (T1 key link).
-    q = parse_qs(urlparse(loc).query)
-    assert set(q) == {"token", "refresh"} and len(q["token"]) == 1 and len(q["refresh"]) == 1
-    access, refresh = q["token"][0], q["refresh"][0]
-    # The issued JWT decodes to the admin's claims (the pair is real, not echo):
+    assert res.headers["Location"] == "/"
+    access = client.get_cookie("kd_access")
+    refresh = client.get_cookie("kd_refresh", path="/api/v1/auth")
+    assert access is not None and refresh is not None
+    # The issued JWT decodes to the admin's claims (the cookie is real, not echo):
     from app.core.security import verify_jwt
 
-    claims = verify_jwt(access)
+    claims = verify_jwt(str(access.value))
     assert claims["sub"].startswith("local:")  # the bootstrap admin's sub convention
-    assert loc == f"/?token={access}&refresh={refresh}"
 
 
 def test_local_login_wrong_password_401(client_with_admin):

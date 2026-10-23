@@ -33,6 +33,12 @@ def create_app(config_overrides: Mapping[str, object] | None = None) -> Flask:
         overrides.get("KUBEDASH_REDIS_URL", overrides.get("REDIS_URL", settings.redis_url))
     )
     app.config["TESTING"] = bool(overrides.get("TESTING", False))
+    # ADR-0025: the auth routes read the cookie flags from app.config (not
+    # Settings directly) so the test client can disable `Secure` — it speaks
+    # http://localhost, where a Secure cookie is stored but never sent back.
+    app.config["KUBEDASH_COOKIE_SECURE"] = bool(
+        overrides.get("KUBEDASH_COOKIE_SECURE", settings.cookie_secure)
+    )
     # Static dir seam (ADR-0006 / OD-4): config_overrides (tests' fake dist) is
     # applied BEFORE register_static closes over it; the Dockerfile ENV
     # KUBEDASH_STATIC_DIR=/app/static is the production value.

@@ -64,16 +64,22 @@ def register_asset_routes(app: Flask) -> None:
 
 _BEARER_SCHEME = {"type": "http", "scheme": "bearer", "bearerFormat": "JWT"}
 _BEARER_ID = "BearerAuth"
+#: ADR-0025: the browser source. Documented alongside Bearer because both are
+#: accepted by `_auth_check`; the OpenAPI UI cannot set an HttpOnly cookie, so
+#: this exists to make the contract visible, not to drive "Try it out".
+_COOKIE_SCHEME = {"type": "apiKey", "in": "cookie", "name": "kd_access"}
+_COOKIE_ID = "CookieAuth"
 
 
 def register_security_scheme(api: Api) -> None:
-    """Idempotently add the BearerAuth JWT scheme to the spec (called after
-    api.init_app, so api.spec exists). A no-op if the scheme is already
-    present on this spec — tested by double-invocation in
+    """Idempotently add the BearerAuth JWT and CookieAuth schemes to the spec
+    (called after api.init_app, so api.spec exists). A no-op if a scheme is
+    already present on this spec — tested by double-invocation in
     test_register_security_scheme_is_idempotent."""
     spec = api.spec
     if spec is None:
         return
-    if _BEARER_ID in spec.components.security_schemes:
-        return
-    spec.components.security_scheme(_BEARER_ID, _BEARER_SCHEME)
+    if _BEARER_ID not in spec.components.security_schemes:
+        spec.components.security_scheme(_BEARER_ID, _BEARER_SCHEME)
+    if _COOKIE_ID not in spec.components.security_schemes:
+        spec.components.security_scheme(_COOKIE_ID, _COOKIE_SCHEME)

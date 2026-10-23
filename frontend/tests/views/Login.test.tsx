@@ -19,51 +19,22 @@ const noAuthHandlers = () => {
 const settingsHandler = (flags: { sso_enabled: boolean; local_enabled: boolean }) =>
   http.get('*/api/v1/auth/settings', () => HttpResponse.json(flags))
 
-// The 302 contract: 302 → Location: /?token=…&refresh=…; a fetch with
-// redirect:'follow' follows it in-process, so in a real browser res.url is
-// the final URL (the view parses the pair from it).
-//
-// jsdom test-environment seam: MSW's node resolver emulates that redirect
-// hop by serving an HTML page at <requestPath>?redirectTo=<enc(target)>,
-// but Node 24's URLSearchParams mis-decodes the `/?token=…&refresh=…` shape
-// (it parses key `/?token`, so the view's pair parse misses). We therefore
-// stub fetch for the POST and return a Response whose res.url IS the
-// production final URL — the exact value a real browser would produce — so
-// the view's parse branch runs verbatim. Non-POST requests fall through to
-// MSW (the original fetch, which MSW's listen() patches onto the global).
-// jsdom's Response.url is a read-only empty string, so the stub returns a
-// plain object shaped like a Response (the view only reads res.ok/res.url).
-let msFetch: typeof fetch | null = null
-const localLogin302 = () => {
-  msFetch = window.fetch.bind(window)
-  return vi.spyOn(window, 'fetch').mockImplementation(async (input, init) => {
-    if (init?.method === 'POST' && String(input).includes('/api/v1/auth/local')) {
-      return {
-        ok: true,
-        status: 200,
-        url: 'http://localhost:3000/?token=AT2&refresh=RT2',
-        json: async () => ({}),
-      } as unknown as Response
-    }
-    return msFetch!(input, init)
-  })
-}
+// ADR-0025: the local route answers 302 / with HttpOnly cookies. A fetch with
+// redirect:'follow' lands on the SPA shell (200 HTML); the view's only signal
+// is `res.ok` — there is no token to parse. MSW models the landing response.
+const localLoginSuccessHandler = () =>
+  http.post('*/api/v1/auth/local', () => HttpResponse.html('<html>landing</html>'))
 
 const localLoginErrorHandler = (status: number, envelope: { code: string; message: string }) =>
   http.post('*/api/v1/auth/local', () => HttpResponse.json({ error: envelope }, { status }))
 
-// jsdom's history API never updates location.search (jsdom #3395), so the
-// router's location can't carry ?token=&refresh= in MemoryRouter. The SSO
-// document-navigation arrival is therefore handed off through
-// initialTokens — the same delivery contract, injected at render (the
-// local-form test exercises the other, in-process, delivery path instead).
-const renderLogin = (entry: string, tokens?: { token: string; refresh: string } | null) => {
+const renderLogin = (entry: string) => {
   const qc = new QueryClient({ defaultOptions: { queries: { retry: false } } })
   return render(
     <QueryClientProvider client={qc}>
       <MemoryRouter initialEntries={[entry]}>
         <Routes>
-          <Route path="/login" element={<LoginView initialTokens={tokens ?? null} />} />
+          <Route path="/login" element={<LoginView />} />
           <Route path="/profile" element={<div>PROFILE-LANDING</div>} />
           <Route path="/" element={<Navigate to="/clusters" replace />} />
           <Route path="*" element={<Navigate to="/clusters" replace />} />
@@ -89,30 +60,20 @@ describe('Login view', () => {
 
   afterEach(() => {
     vi.restoreAllMocks()
-    msFetch = null
   })
 
-  it('parks token-in-URL (SSO callback path) and navigates to /profile', async () => {
-    const { container } = renderLogin('/login', { token: 'AT', refresh: 'RT' })
-    // the SSO document navigation lands the router at /login with the pair;
-    // the park happens on mount, then the router moves.
-    expect(await screen.findByText('PROFILE-LANDING')).toBeInTheDocument()
-    expect(localStorage.getItem('kd_token')).toBe('AT')
-    expect(localStorage.getItem('kd_refresh')).toBe('RT')
-    expect(container).toHaveTextContent('PROFILE-LANDING') // the router actually moved
-  })
-
-  it('local form success: parses the 302 final URL, parks, navigates to /profile', async () => {
-    server.use(settingsHandler({ sso_enabled: false, local_enabled: true }))
-    localLogin302()
+  it('local form success: navigates to /profile and stores no credential', async () => {
+    server.use(
+      settingsHandler({ sso_enabled: false, local_enabled: true }),
+      localLoginSuccessHandler(),
+    )
     renderLogin('/login')
     await screen.findByPlaceholderText('Username')
     submitLocalForm()
-    // The park + navigate are one atomic effect: the router move is the
-    // observable, and the parked pair is asserted once the landing renders.
     expect(await screen.findByText('PROFILE-LANDING')).toBeInTheDocument()
-    expect(localStorage.getItem('kd_token')).toBe('AT2')
-    expect(localStorage.getItem('kd_refresh')).toBe('RT2')
+    // ADR-0025: the session is server-owned cookies; nothing in localStorage.
+    expect(localStorage.getItem('kd_token')).toBeNull()
+    expect(localStorage.getItem('kd_refresh')).toBeNull()
   })
 
   it('shows SSO button only when sso_enabled', async () => {

@@ -45,6 +45,7 @@ import { useClusterStore } from '../store/cluster'
 import { useSidebarStore } from '../store/sidebar'
 import { useTopMenuStore } from '../store/topmenu'
 import { apiFetch } from '../lib/api'
+import { clearSessionHint } from '../lib/session'
 import { TopMenuNav } from './TopMenu'
 
 const undrawProfile = '/assets/img/avatars/undraw_profile.svg'
@@ -137,9 +138,10 @@ const AppHeader = () => {
   const removeNotification = (id) => setNotifications((prev) => prev.filter((n) => n.id !== id))
   const clearAllNotifications = () => setNotifications([])
 
-  // Logout mirrors the Profile view's handler: best-effort server-side revoke,
-  // then clear the localStorage token pair and bounce to /login. One contract
-  // for session teardown, reachable from the header AND the profile page.
+  // Logout mirrors the Profile view's handler: best-effort server-side revoke
+  // (which clears the HttpOnly cookies, ADR-0025), then expire the local
+  // navigation hint and bounce to /login. One contract for session teardown,
+  // reachable from the header AND the profile page.
   const logout = async () => {
     if (loggingOut) return
     setLoggingOut(true)
@@ -148,8 +150,7 @@ const AppHeader = () => {
     } catch {
       addNotification('warning', 'Could not reach the server — session cleared locally.')
     } finally {
-      localStorage.removeItem('kd_token')
-      localStorage.removeItem('kd_refresh')
+      clearSessionHint()
       setLoggingOut(false)
       navigate('/login', { replace: true })
     }

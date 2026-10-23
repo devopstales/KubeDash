@@ -424,17 +424,28 @@ Browser ──/auth/login──► Flask ──302──► OIDC /authorize
                               ◄──code──
 Flask: code→token→userinfo, upsert `users`, issue short-lived JWT (15 min)
         + refresh token (30 d, stored hashed in `refresh_tokens`)
-Browser sends JWT in `Authorization: Bearer <jwt>` on every request.
-Smorest on_before_request hook: verify JWT → load `users` row →
-       stash in flask.g.current_user → allow/deny.
+Flask answers `302 /` with HttpOnly cookies (ADR-0025): `kd_access` (JWT,
+Path=/, SameSite=Lax) and `kd_refresh` (opaque, Path=/api/v1/auth,
+SameSite=Strict). No credential in the URL.
+Browser sends the cookies automatically; API clients and the kubectl plugin
+send `Authorization: Bearer <jwt>` instead.
+Smorest on_before_request hook: read Bearer first, then `kd_access`; verify
+       JWT → load `users` row → stash in flask.g.current_user → allow/deny.
 Handler: resolve cluster binding → `rbac.can(...)` (cached
        SubjectAccessReview) → allow/deny.
 ```
 
 - JWT: HS256, 15 min TTL, `sub` = OIDC subject, `cluster` claim optional.
-- Refresh: `/auth/refresh` rotates the refresh token.
-- Logout: `/auth/logout` revokes the refresh token; OIDC RP-initiated
-  logout if the provider supports it.
+  The access cookie and the JWT share one lifetime constant
+  (`ACCESS_TTL_SECONDS`), so they cannot drift.
+- Session delivery (ADR-0025): login answers `302 /` with `kd_access` +
+  `kd_refresh` HttpOnly cookies plus a non-HttpOnly `kd_session` navigation
+  hint (spoofable, grants nothing). `KUBEDASH_COOKIE_SECURE` defaults True;
+  the local HTTP dev stack sets it false.
+- Refresh: `/auth/refresh` reads `kd_refresh` (JSON body fallback for
+  scripts) and rotates the token, re-setting both cookies.
+- Logout: `/auth/logout` revokes the refresh rows (ADR-0014), clears all
+  three cookies; OIDC RP-initiated logout if the provider supports it.
 - **Smorest integration:** the JWT verify runs in each `Api`'s
   `on_before_request` hook (see § 3.2). Handlers access the user via
   `flask.g.current_user`. Per-cluster RBAC is enforced inside the handler
@@ -605,7 +616,8 @@ src/views/
 - `_nav.tsx` — sidebar config. Each entry maps to a `views/<Name>/` folder.
   Icons come from **Font Awesome** (`<FontAwesomeIcon icon={faKube} />`).
 - `routes.tsx` — route table. Protected routes are wrapped in
-  `<ProtectedRoute>` (JWT check + cluster binding check).
+  `<ProtectedRoute>` (`kd_session` hint check + cluster binding check;
+  the hint is not a credential — ADR-0025).
 
 **KubeDash-specific widgets** live in `components/` (not in views):
 `PodTable` (DataTables), `LogTail` (socket.io + highlight.js),
@@ -616,9 +628,14 @@ src/views/
 
 `lib/api.ts` — a single typed `fetch` wrapper:
 
-- Attaches JWT from `localStorage` (set after `/auth/callback`).
-- On 401, triggers a single in-flight refresh, then retries.
+- Sends the session as same-origin HttpOnly cookies (ADR-0025); JS never
+  holds a token.
+- On 401, triggers a single in-flight refresh (the `kd_refresh` cookie is
+  the source), then retries; a 401 that survives the retry clears the
+  `kd_session` hint and redirects to `/login`.
 - On 403, surfaces a "no permission" toast.
+- Session helpers (cookie name, hint read/clear, dead-session redirect) live
+  in `lib/session.ts` — the only place that knows the `kd_session` name.
 - Returns `{ data, error, meta }` shapes that map 1:1 to TanStack Query
   queryFn results.
 
@@ -974,7 +991,7 @@ becomes unusable **immediately**, not at its natural expiry.
 
 | Credential path | Revocation mechanism |
 |---|---|
-| Web session (JWT) | Logout deletes the row from `refresh_tokens`; the `jti` is added to a Redis revocation set checked by the JWT verify hook. The 15-min JWT is short enough that the revocation set only needs to live `TTL(JWT)` (15 min). |
+| Web session (JWT) | Logout deletes the row from `refresh_tokens`, adds the `jti` to a Redis revocation set checked by the JWT verify hook, and clears the session cookies. The 15-min JWT is short enough that the revocation set only needs to live `TTL(JWT)` (15 min). |
 | kubectl plugin (OIDC ID token) | Logout triggers **OIDC RP-initiated logout** (`end_session_endpoint`, `post_logout_redirect_uri`), so the IdP revokes the refresh token. The plugin's next `get-token` refresh fails → browser re-auth. For clusters where the K8s API server accepts a *KubeDash-issued* token (not the raw IdP token), the same `jti` revocation set is checked on the `/kubectl/auth/v1/token` endpoint. |
 | Cert-based access (CSR) | Logout calls `revoke_user_csr(user)` — the KubeDash-serving certificate (signer `kubernetes.io/kubedash-apiserver-client`) is revoked in the cluster's certificate authority. The cert remains valid in TLS terms but is rejected by the K8s API server's client CA check once revoked (CRL / OCSP, or the cert is removed from the CA bundle KubeDash publishes). |
 
@@ -2661,11 +2678,11 @@ These are not new features — they change **how** existing components work.
 | Concern              | Control                                                    |
 |----------------------|------------------------------------------------------------|
 | Transport            | TLS at ingress (cert-manager optional); HSTS on UI         |
-| AuthN                | OIDC SSO; short-lived JWT (15 min); rotating refresh tokens |
+| AuthN                | OIDC SSO; short-lived JWT (15 min) in an HttpOnly cookie (or Bearer for API clients); rotating refresh tokens |
 | AuthZ                | K8s RBAC proxy via SubjectAccessReview; per-cluster bindings |
 | Secrets              | kubeconfigs AES-256-GCM encrypted at rest; JWT + encryption keys in env |
 | Injection            | Pydantic validation on all inputs; SQLAlchemy parameterised; no raw SQL |
-| CSRF                 | Same-site `Lax` cookies for OIDC callback; JWT in header (not cookie) |
+| CSRF                 | Session cookies are `SameSite=Lax` (access) / `Strict` (path-scoped refresh), JSON-only state-changing endpoints, no state-changing GETs (ADR-0025) |
 | CORS                 | Locked to the UI origin (env `CORS_ORIGINS`)               |
 | Rate limiting        | Flask-Limiter, per-IP + per-user, Redis-backed             |
 | Audit                | Every mutating request → `audit_log` (who/what/when/diff)  |

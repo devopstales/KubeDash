@@ -3,13 +3,15 @@ import { useNavigate } from 'react-router-dom'
 import { CButton, CCard, CCardBody, CCardHeader, CCardTitle, CCol, CRow } from '@coreui/react'
 import { useCluster } from '../../hooks/useCluster'
 import { apiFetch } from '../../lib/api'
+import { clearSessionHint } from '../../lib/session'
 
 /**
  * ADR-0021: the post-login landing. Identity card from the app-wide
  * useCluster() me query (grew in TICKET-16: auth_source, kubeconfig_source,
  * last_login_at) + logout: POST /api/v1/auth/logout (revokes the session
- * refresh tokens; best-effort — storage is cleared and the user is sent to
- * /login even if the POST fails), then both kd_* keys are dropped.
+ * refresh tokens and clears the HttpOnly cookies, ADR-0025; best-effort —
+ * the local hint is expired and the user is sent to /login even if the POST
+ * fails).
  */
 const ProfileView = () => {
   const navigate = useNavigate()
@@ -23,8 +25,7 @@ const ProfileView = () => {
     } finally {
       // The client-side session is over either way: a failed revocation
       // only leaves server-side refresh tokens unexpired, not this login.
-      localStorage.removeItem('kd_token')
-      localStorage.removeItem('kd_refresh')
+      clearSessionHint()
       setLoggingOut(false)
       navigate('/login', { replace: true })
     }

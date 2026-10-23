@@ -2,8 +2,13 @@
 
 OIDC is the auth spine: login → IdP redirect → callback exchanges the code,
 upserts the User, issues a short-lived HS256 access JWT + an opaque rotating
-refresh token (sha256-hashed row), and hands both to the SPA via
-``302 /?token=<access_jwt>&refresh=<refresh>`` (no HttpOnly cookie).
+refresh token (sha256-hashed row), and hands both to the browser as HttpOnly
+cookies (`302 /`, ADR-0025). No credential ever travels in the URL.
+
+Two credential sources are accepted, in this order: ``Authorization: Bearer``
+(the kubectl plugin and API clients) and the ``kd_access`` cookie (the SPA).
+The cookie is what makes XSS unable to read the session; the Bearer path is
+what lets a non-browser client authenticate at all.
 
 ``oidc_authorize_url`` / ``oidc_exchange`` are the two mock seams: tests
 monkeypatch exactly these names against ``app.core.security``; the Authlib
@@ -22,7 +27,7 @@ from typing import Any
 
 import jwt
 from authlib.integrations.flask_client import OAuth
-from flask import g, request
+from flask import Response, current_app, g, request
 
 from app.core.config import get_settings
 from app.core.errors import RbacDeniedError, StateMismatchError, UnauthorizedError
@@ -32,6 +37,14 @@ from app.models.user import User
 
 REFRESH_TTL_DAYS = 30
 STATE_TTL_SECONDS = 300
+#: ADR-0025: one lifetime for the JWT and its cookie, so they cannot drift.
+ACCESS_TTL_SECONDS = 900
+ACCESS_COOKIE = "kd_access"
+REFRESH_COOKIE = "kd_refresh"
+#: Non-HttpOnly navigation hint for the SPA guard. It is spoofable by design
+#: and grants nothing — every API call is verified by `_auth_check`.
+SESSION_HINT_COOKIE = "kd_session"
+_REFRESH_COOKIE_PATH = "/api/v1/auth"
 
 _oauth = OAuth()
 # NOTE: do NOT hold a module-level client here — authlib's register() without
@@ -81,7 +94,7 @@ def oidc_exchange(code: str) -> dict[str, Any]:
     }
 
 
-def issue_token_pair(user: User, expires_in: int = 900) -> tuple[str, str]:
+def issue_token_pair(user: User, expires_in: int = ACCESS_TTL_SECONDS) -> tuple[str, str]:
     """Short-lived HS256 access JWT (jti carries the ADR-0014 deny-list key)
     + a random opaque refresh token (only its sha256 hash is ever persisted)."""
     s = get_settings()
@@ -95,6 +108,56 @@ def issue_token_pair(user: User, expires_in: int = 900) -> tuple[str, str]:
     access = jwt.encode(claims, s.kubedash_jwt_secret, algorithm="HS256")
     refresh = uuid.uuid4().hex
     return access, refresh
+
+
+def set_session_cookies(response: Response, access: str, refresh: str) -> Response:
+    """ADR-0025: park the pair in HttpOnly cookies — the ONLY delivery path.
+
+    `Secure` is read from app.config so the HTTP test client can opt out; the
+    Settings default is True, so a forgotten config cannot leak the token over
+    plain HTTP. The refresh cookie is path-scoped to the auth blueprint: it is
+    never sent on ordinary API calls, and `SameSite=Strict` keeps a cross-site
+    POST from rotating it.
+    """
+    secure = bool(current_app.config.get("KUBEDASH_COOKIE_SECURE", True))
+    response.set_cookie(
+        ACCESS_COOKIE,
+        access,
+        max_age=ACCESS_TTL_SECONDS,
+        httponly=True,
+        secure=secure,
+        samesite="Lax",
+        path="/",
+    )
+    response.set_cookie(
+        REFRESH_COOKIE,
+        refresh,
+        max_age=REFRESH_TTL_DAYS * 24 * 60 * 60,
+        httponly=True,
+        secure=secure,
+        samesite="Strict",
+        path=_REFRESH_COOKIE_PATH,
+    )
+    # Readable by the SPA router on purpose. It carries no credential: a forged
+    # `kd_session=1` only renders the shell, and every API call still 401s.
+    response.set_cookie(
+        SESSION_HINT_COOKIE,
+        "1",
+        max_age=REFRESH_TTL_DAYS * 24 * 60 * 60,
+        httponly=False,
+        secure=secure,
+        samesite="Lax",
+        path="/",
+    )
+    return response
+
+
+def clear_session_cookies(response: Response) -> Response:
+    """Logout: expire all three cookies at the paths they were set on."""
+    response.delete_cookie(ACCESS_COOKIE, path="/")
+    response.delete_cookie(REFRESH_COOKIE, path=_REFRESH_COOKIE_PATH)
+    response.delete_cookie(SESSION_HINT_COOKIE, path="/")
+    return response
 
 
 def hash_password(pw: str) -> str:
@@ -205,11 +268,21 @@ def _load_user_for_claims(claims: dict[str, Any]) -> None:
 
 
 def _auth_check() -> None:
-    """Verify the Bearer JWT and bind g.current_user. Raises UnauthorizedError."""
+    """Verify the request credential and bind g.current_user.
+
+    Bearer is checked first: an explicit header wins over the ambient cookie,
+    which keeps the kubectl plugin unambiguous when a browser happens to send
+    both. The cookie is the SPA's path (ADR-0025). Raises UnauthorizedError.
+    """
     header = request.headers.get("Authorization", "")
-    if not header.startswith("Bearer "):
+    token = (
+        header[len("Bearer "):]
+        if header.startswith("Bearer ")
+        else request.cookies.get(ACCESS_COOKIE)
+    )
+    if not token:
         raise UnauthorizedError("missing or invalid token")
-    claims = verify_jwt(header[len("Bearer "):])
+    claims = verify_jwt(token)
     _load_user_for_claims(claims)
 
 
