@@ -233,17 +233,33 @@ class K8sClient:
         contract is stable).
         """
         try:
-            resp = self._api_client.call_api("GET", [self._NODES_METRICS_PATH])
+            # call_api does NOT prepend ``self.configuration.host`` — the
+            # generated API methods build the absolute URL before calling it.
+            # Without the host, urllib3 gets a bare path and raises
+            # ``LocationValueError("No host specified")`` (not ``ApiException``)
+            # → 500 instead of the query-only ``(False, {})``.
+            metrics_url = f"{self._config.host}{self._NODES_METRICS_PATH}"
+            resp = self._api_client.call_api("GET", metrics_url)
+            # call_api returns the raw RESTResponse WITHOUT reading the body
+            # (resp.data stays None until read() — the generated methods read
+            # it via response_deserialize; we have no model to deserialize
+            # into, so read the bytes ourselves). Read INSIDE the try: a
+            # transport-level read failure is not an ``ApiException`` either.
+            raw = resp.read().decode()
         except ApiException as e:
             if e.status in (404, 500, 502, 503):
                 return False, {}
             self._unreachable("node_usage", e)
             raise AssertionError("unreachable") from e
-        # call_api returns the raw RESTResponse WITHOUT reading the body
-        # (resp.data stays None until read() — the generated methods read it
-        # via response_deserialize; we have no model to deserialize into, so
-        # read the bytes ourselves and parse the JSON directly).
-        body = json.loads(resp.read().decode())
+        except Exception:
+            # Non-ApiException transport failure (urllib3 errors, a non-JSON
+            # body such as an LB/ingress error page): the metrics source is
+            # absent or broken — query-only, answer unavailable, never 500.
+            return False, {}
+        try:
+            body = json.loads(raw)
+        except (json.JSONDecodeError, UnicodeDecodeError):
+            return False, {}
         usage: dict[str, dict[str, int]] = {}
         for item in body.get("items", []):
             name = item["metadata"]["name"]
