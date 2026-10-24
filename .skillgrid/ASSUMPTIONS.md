@@ -82,6 +82,7 @@ are kept, with `In force: no`. Never delete a row; flip it instead (IRON RULE).
 | ADR-0023 | User-management lists use DataTables React with the Bootstrap 5 skin (4.1 table structure; CoreUI shell unchanged) | yes | `artifacts/04-adr-0023-datatables-react.md` |
 | ADR-0024 | Secret values use react-syntax-highlighter (highlight.js grammars, an-old-hope theme) instead of the 4.1 highlight.js script | yes | `artifacts/04-adr-0024-secret-syntax-highlight.md` |
 | ADR-0025 | Browser session transport is HttpOnly cookies (`kd_access` + `kd_refresh`, hint `kd_session`); `Authorization: Bearer` stays accepted for the kubectl plugin; no credentials in URLs or `localStorage` | yes | `artifacts/04-adr-0025-http-only-session-cookie.md` |
+| ADR-0026 | TLS edge + security header layer (nginx edge with internal HTTPS; ProxyFix gated on KUBEDASH_TLS_EDGE; 4.1 header set restored with two recorded deviations) | yes | `artifacts/04-adr-0026-tls-edge-and-security-headers.md` |
 
 > **Note on ADR-0001..0013:** these are listed in `ARCHITECTURE.md` §12 as the
 > initial-architecture decisions "to be authored at brainstorming time." As of

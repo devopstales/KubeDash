@@ -4,12 +4,10 @@
 # deeper truth (see .skillgrid/specs/).
 
 pipeline:
-  # Pointer set 2026-10-22: the user asked to execute
-  # 2026-10-21-cluster-dashboard at /dashboard/cluster-metric. Spec-zone
-  # artifacts: briefing + blueprint + adr + acceptance.feature; one backlog
-  # ticket covers the whole change (TASK-030). 2026-10-21-cluster-node was
-  # the previous pointer (blueprint, not yet executed) and remains in flight.
-  current_change: 2026-10-21-cluster-dashboard
+  # Pointer set 2026-10-24: the 4.1 TLS edge + security header layer is
+  # restored per ADR-0026. Previous pointer 2026-10-21-cluster-dashboard
+  # stays in flight.
+  current_change: 2026-10-24-tls-security-headers
   current_phase: executing
   # 2026-10-21-cluster-node (blueprint) and 2026-10-17/2026-10-19 changes
   # remain in flight at their own phases.
