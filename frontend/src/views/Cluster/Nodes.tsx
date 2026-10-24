@@ -81,17 +81,30 @@ const pct = (used: number | null, capacity: number | null): number | null =>
     ? Math.min(100, Math.round((used / capacity) * 100))
     : null
 
+// Per-node usage cell: a THIN 4px bar (matching the tile style) with the %
+// to its right. The prototype's table cells are plain "38%" text; we keep the
+// bar because it's the "progress" the node view is built around, but match the
+// prototype's thin bar + muted % tone.
 const UsageCell = ({ value }: { value: number | null }) => {
   if (value === null) {
     return <span className="text-muted">unknown</span>
   }
   const color = value > 90 ? 'danger' : value > 75 ? 'warning' : 'success'
   return (
-    <div style={{ minWidth: '6rem' }}>
-      <CProgress value={value} color={color} height={8} />
-      <div className="text-end" style={{ fontSize: '.7rem' }}>
+    <div className="d-flex align-items-center gap-2" style={{ minWidth: '6rem' }}>
+      {/* className→outer .progress, progressBarClassName→inner bar. Do NOT
+          pass a `style` prop here: CProgress __rest-spreads it onto the bar
+          and overwrites the width (the empty-bar bug, commit 8ca17a2a). */}
+      <CProgress
+        value={value}
+        color={color}
+        height={4}
+        className="flex-grow-1"
+        progressBarClassName="progress-bar"
+      />
+      <span className="text-muted" style={{ fontSize: '.75rem', minWidth: '2.2rem', textAlign: 'right' }}>
         {value}%
-      </div>
+      </span>
     </div>
   )
 }
@@ -112,45 +125,61 @@ const fmtCpu = (m: number | null): string => {
   return m >= 1000 ? `${(m / 1000).toFixed(m % 1000 === 0 ? 0 : 2)} cores` : `${m}m`
 }
 
-// Cluster metric tile (blueprint Task 4). Certainty rule: value null → the
-// word "unknown", never 0 or a healthy tone. Storage has no source → unknown
-// with a "no storage metrics source" note.
+// Cluster metric tile (dashboard-1-41.html reference). The big number is the
+// stat value (fs-5→1.75rem scale, `%` as a small muted suffix), over a THIN
+// 4px bar (the prototype's `progress height:4px`). Certainty rule: value
+// null → the word "unknown", never 0 or a healthy tone. Storage has no source
+// → unknown with a "no storage metrics source" note.
 const Tile = ({
   label,
   value,
+  suffix,
   sub,
   pctValue,
 }: {
   label: string
   value: string
+  suffix?: string
   sub?: string
   pctValue: number | null
-}) => (
-  <CCard className="border-0">
-    <CCardBody className="py-3">
-      <div className="text-muted text-uppercase" style={{ fontSize: '.7rem', letterSpacing: '.04em' }}>
-        {label}
-      </div>
-      <div className="fs-5 fw-bold" style={{ margin: '.25rem 0' }}>
-        {pctValue === null && value === 'unknown' ? (
-          <span className="text-muted">unknown</span>
-        ) : (
-          value
-        )}
-      </div>
-      <CProgress
-        value={pctValue ?? 0}
-        color={pctValue === null ? 'secondary' : pctValue > 90 ? 'danger' : pctValue > 75 ? 'warning' : 'success'}
-        height={6}
-      />
-      {sub ? (
-        <div className="text-muted" style={{ fontSize: '.7rem', marginTop: '.25rem' }}>
-          {sub}
+}) => {
+  const unknown = pctValue === null && value === 'unknown'
+  return (
+    <CCard className="border-0 h-100">
+      <CCardBody className="py-3">
+        <div className="text-muted text-uppercase" style={{ fontSize: '.7rem', letterSpacing: '.04em' }}>
+          {label}
         </div>
-      ) : null}
-    </CCardBody>
-  </CCard>
-)
+        <div className="fw-semibold" style={{ fontSize: '1.5rem', lineHeight: 1.2, margin: '.25rem 0' }}>
+          {unknown ? (
+            <span className="text-muted" style={{ fontSize: '1.15rem' }}>
+              unknown
+            </span>
+          ) : (
+            <>
+              {value}
+              {suffix ? (
+                <span className="text-muted" style={{ fontSize: '.95rem' }}>
+                  {suffix}
+                </span>
+              ) : null}
+            </>
+          )}
+        </div>
+        <CProgress
+          value={pctValue ?? 0}
+          color={pctValue === null ? 'secondary' : pctValue > 90 ? 'danger' : pctValue > 75 ? 'warning' : 'success'}
+          height={4}
+        />
+        {sub ? (
+          <div className="text-muted" style={{ fontSize: '.7rem', marginTop: '.4rem' }}>
+            {sub}
+          </div>
+        ) : null}
+      </CCardBody>
+    </CCard>
+  )
+}
 
 const NodesView = () => {
   const cluster = useClusterStore((s) => s.selectedCluster)
@@ -267,7 +296,8 @@ const NodesView = () => {
               <div className="col">
                 <Tile
                   label="CPU usage"
-                  value={cpuPct === null ? 'unknown' : `${cpuPct}%`}
+                  value={cpuPct === null ? 'unknown' : `${cpuPct}`}
+                  suffix={cpuPct === null ? undefined : '%'}
                   sub={cpuUsed !== null || cpuCap !== null ? `${fmtCpu(cpuUsed)} / ${fmtCpu(cpuCap)}` : 'no metrics source'}
                   pctValue={cpuPct}
                 />
@@ -275,7 +305,8 @@ const NodesView = () => {
               <div className="col">
                 <Tile
                   label="Memory usage"
-                  value={memPct === null ? 'unknown' : `${memPct}%`}
+                  value={memPct === null ? 'unknown' : `${memPct}`}
+                  suffix={memPct === null ? undefined : '%'}
                   sub={memUsed !== null || memCap !== null ? `${fmtBytes(memUsed)} / ${fmtBytes(memCap)}` : 'no metrics source'}
                   pctValue={memPct}
                 />
