@@ -296,11 +296,41 @@ const NodeDataView = () => {
         </tr>
         <tr>
           <th scope="row">Addresses:</th>
-          <td>{addresses.map(([k, v]) => `${k} ${v}`).join(' · ') || 'None'}</td>
+          <td>
+            {addresses.length ? (
+              <CTable bordered small className="mb-0">
+                <tbody>
+                  {addresses.map(([k, v]) => (
+                    <tr key={k}>
+                      <td>{k}</td>
+                      <td>{v}</td>
+                    </tr>
+                  ))}
+                </tbody>
+              </CTable>
+            ) : (
+              'No addresses'
+            )}
+          </td>
         </tr>
         <tr>
           <th scope="row">Labels:</th>
-          <td>{labels.length ? labels.map(([k, v]) => `${k}=${v}`).join(' · ') : 'No labels'}</td>
+          <td>
+            {labels.length ? (
+              <CTable bordered small className="mb-0">
+                <tbody>
+                  {labels.map(([k, v]) => (
+                    <tr key={k}>
+                      <td className="text-break">{k}</td>
+                      <td className="text-break">{v}</td>
+                    </tr>
+                  ))}
+                </tbody>
+              </CTable>
+            ) : (
+              'No labels'
+            )}
+          </td>
         </tr>
       </tbody>
     </CTable>

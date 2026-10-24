@@ -237,8 +237,12 @@ test('node-detail-renders: node metadata + used-vs-allocatable bars', async () =
   // assert the metadata cell specifically.
   expect(screen.getAllByText('worker-1').length).toBeGreaterThanOrEqual(1)
   expect(screen.getByText('v1.31.0')).toBeTruthy()
-  // Addresses render as a single joined text node ("InternalIP 192.168.0.2").
-  expect(screen.getByText(/InternalIP 192\.168\.0\.2/)).toBeTruthy()
+  // Addresses render as a two-column table (type | address), Info-style —
+  // NOT a single joined string. So the type and value are separate cells.
+  expect(screen.getByText('InternalIP')).toBeTruthy()
+  expect(screen.getByText('192.168.0.2')).toBeTruthy()
+  // Labels render as a two-column table (key | value) the same way.
+  expect(screen.getByText('node-role.kubernetes.io/control-plane')).toBeTruthy()
   // Used tier: the "used / allocatable" value sits in its own span (whitespace
   // around the slash is JSX formatting). 800m / 4 cores CPU; 4 GiB / 8 GiB mem.
   expect(screen.getByText(/800m\s*\/\s*4 cores/)).toBeTruthy()
