@@ -79,13 +79,20 @@ test.describe('KubeDash auth smoke (local password)', () => {
     await page.getByPlaceholder('Password').fill(ADMIN_PASSWORD)
     await page.getByRole('button', { name: 'Login', exact: true }).click()
 
-    // --- 3. The 302 parks the token pair and navigates to /profile ---
+    // --- 3. The 302 parks the cookie pair and navigates to /profile ---
+    // ADR-0025: tokens live in HttpOnly cookies (kd_access/kd_refresh), NOT
+    // localStorage — the observable here is the kd_session hint cookie.
     await expect(page).toHaveURL(/\/profile/, { timeout: 15_000 })
     await expect
-      .poll(async () => page.evaluate(() => localStorage.getItem('kd_token')), {
+      .poll(async () => page.evaluate(() => document.cookie.includes('kd_session')), {
         timeout: 10_000,
       })
-      .toBeTruthy()
+      .toBe(true)
+
+    // ADR-0026 backstop: over the TLS edge the access cookie must carry the
+    // Secure attribute (KUBEDASH_COOKIE_SECURE=true in the dev stack).
+    const cookies = await page.context().cookies()
+    expect(cookies.find((c) => c.name === 'kd_access')?.secure).toBe(true)
 
     // --- 4. Profile renders the identity card ---
     // Scope to the profile card: the email also appears in the header user
@@ -116,7 +123,10 @@ test.describe('KubeDash auth smoke (local password)', () => {
     // 401 → the view surfaces the envelope message, stays on /login.
     await expect(page.getByText('invalid email or password')).toBeVisible({ timeout: 10_000 })
     await expect(page).toHaveURL(/\/login/)
-    // No token was parked.
-    await expect.poll(async () => page.evaluate(() => localStorage.getItem('kd_token'))).toBeNull()
+    // ADR-0025: no session hint was parked (kd_access/kd_refresh are HttpOnly,
+    // so the hint is the only client-visible observable of the 401).
+    await expect
+      .poll(async () => page.evaluate(() => document.cookie.includes('kd_session')))
+      .toBe(false)
   })
 })

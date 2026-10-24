@@ -19,6 +19,12 @@ export default defineConfig({
   testDir: './e2e',
   timeout: 30_000,
   use: {
+    // ADR-0026: the backstop target is https://kubedash.local:443 (task
+    // e2e-ssl sets E2E_BASE_URL). No CA launch args are needed: the mkcert
+    // rootCA is installed in the host keychain (`sudo mkcert -install`), and
+    // the Chromium Playwright launches reads it — proven by the backstop run
+    // with default (strict) TLS verification. E2E_TLS_CA is passed through
+    // for Node-side clients and a non-keychain fallback (CI).
     baseURL: process.env.E2E_BASE_URL ?? 'http://localhost:8080',
     trace: 'on-first-retry',
   },

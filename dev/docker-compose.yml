@@ -145,12 +145,21 @@ services:
     depends_on:
       - postgres
       - redis
-    # The edge healthchecks /healthz with the mkcert CA. --insecure is the
-    # HOSTNAME-mismatch escape hatch (the cert is for kubedash.local, the
-    # healthcheck dials localhost) — the CHAIN is still verified, which is
-    # the half that matters for the healthcheck.
+    # WHY curl (not wget): nginx:1.27 (debian) ships /usr/bin/curl 7.88 but
+    # NO wget — the original wget probe exited 127, so the container could
+    # never reach "healthy". --resolve maps kubedash.local to 127.0.0.1 so the
+    # mkcert SAN matches (no -k/--insecure needed) and --cacert verifies the
+    # CHAIN against the mkcert rootCA — the half that matters for a health
+    # check. A 502 (backend down) is NOT a health failure: the edge itself is
+    # healthy, so accept 2xx/3xx/502 and fail on anything else.
     healthcheck:
-      test: ["CMD-SHELL", "wget -qO- --cacert=/etc/nginx/certs/rootCA.pem --insecure https://localhost:443/healthz || exit 1"]
+      # WHY the case word is an inline substitution: compose parses $-
+      # sequences as variable refs BEFORE the shell runs, and it only
+      # substitutes $WORD forms — a bare $-sequence in the case word
+      # ($code, $hc_code, \$(...)) was silently blanked, leaving `case in`
+      # (dash: "word unexpected"). $(curl ...) contains no $, so the
+      # substitution itself survives to the shell.
+      test: ["CMD-SHELL", "case $(curl -s -o /dev/null -w '%{http_code}' --cacert /etc/nginx/certs/rootCA.pem --resolve kubedash.local:443:127.0.0.1 https://kubedash.local:443/healthz) in 2*|3*|502) exit 0;; *) exit 1;; esac"]
       interval: 10s
       timeout: 5s
       retries: 5

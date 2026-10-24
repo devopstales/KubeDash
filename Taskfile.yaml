@@ -24,6 +24,12 @@ vars:
   # absolute and CWD-independent. Quoted (template delimiters).
   COMPOSE: "docker compose -f {{.TASKFILE_DIR}}/dev/docker-compose.yml"
 
+  # ADR-0026: the TLS edge surface. EDGE_HTTPS is the host port the edge
+  # listens on (the backstop scenario names :443 explicitly); TLS_CA is the
+  # mkcert rootCA the e2e browser leg must verify against.
+  EDGE_HTTPS: "443"
+  TLS_CA: "{{.TASKFILE_DIR}}/dev/certs/rootCA.pem"
+
   # Multi-instance backend driver (dev/mux-up.sh) — see that script for the
   # two-process loop. {{.TASKFILE_DIR}} keeps it CWD-independent.
   BACKEND_MULTI: "{{.TASKFILE_DIR}}/dev/mux.sh"
@@ -76,9 +82,23 @@ tasks:
   # ---- Dev environment (docker-compose stack in ./dev) ---------------------
 
   dev-up:
-    desc: "Start the dev environment (postgres, redis, prometheus, grafana, jaeger)"
+    # ADR-0026 R5 carve-out: this is the plain-HTTP fast path. A manual
+    # `task backend-run` against it keeps KUBEDASH_COOKIE_SECURE=false; the
+    # secure stack is `task dev-up-ssl` + `task dev-stack`.
+    desc: "Start the dev environment (plain-HTTP fast path; add the TLS edge with dev-up-ssl)"
     cmds:
       - "{{.COMPOSE}} up -d"
+
+  dev-tls-setup:
+    desc: "Generate/verify dev TLS certs + hosts entry (ADR-0026, idempotent; hosts step needs sudo)"
+    cmds:
+      - "bash {{.TASKFILE_DIR}}/dev/setup-tls.sh generate"
+      - "bash {{.TASKFILE_DIR}}/dev/setup-tls.sh hosts"
+
+  dev-up-ssl:
+    desc: "Start the dev stack INCLUDING the nginx TLS edge (https://kubedash.local:443)"
+    cmds:
+      - "{{.COMPOSE}} up -d"   # the nginx service is part of the same compose file
 
   dev-down:
     desc: "Stop the dev environment (keeps data volumes)"
@@ -199,8 +219,11 @@ tasks:
   #   task dev-stack-down     # stop the backend + compose stack
 
   dev-stack:
-    desc: "Start the full local env: compose + schema + backend on :8080 (bootstrap admin, static wired)"
+    desc: "Start the full local env: compose + schema + backend behind the TLS edge (bootstrap admin, static wired)"
     cmds:
+      # ADR-0026: the certs are a *read* precondition — fail fast with the
+      # named fix instead of starting a backend that cannot serve TLS.
+      - "test -f {{.TLS_CA}} || (echo 'run task dev-tls-setup first (dev/certs missing)' && exit 1)"
       - "{{.COMPOSE}} up -d"
       # Wait for Postgres to accept connections (compose 'healthy' covers the
       # data store, but the app needs the TCP port answering).
@@ -254,9 +277,11 @@ tasks:
       KUBEDASH_STATIC_DIR: "{{.STATIC_DIR}}"
       KUBEDASH_ROLE: "leader"
       KUBEDASH_REPLICA_ID: "local"
-      # ADR-0025: plain-HTTP local stack (see backend-run). Task 5 flips this
-      # when the edge wiring lands.
-      KUBEDASH_COOKIE_SECURE: "false"
+      # ADR-0026: the dev stack now runs behind the TLS edge — the Secure
+      # cookie is honest end-to-end (browser leg HTTPS, internal leg HTTPS
+      # via :8443). The plain-HTTP carve-out is `task dev-up` + a manual
+      # `backend-run` (KUBEDASH_COOKIE_SECURE=false, no TLS).
+      KUBEDASH_COOKIE_SECURE: "true"
       # ADR-0026: the dev-stack backend serves :8443 over TLS — the nginx
       # edge's upstream target (proxy_ssl_verify checks it against the mkcert
       # rootCA). Single-port trade-off: with the cert set, the dev backend
@@ -288,6 +313,19 @@ tasks:
   e2e:
     desc: "Run the Playwright auth-smoke e2e against the dev-stack backend (:8080)"
     dir: frontend
+    cmds:
+      - "corepack pnpm exec playwright test e2e/auth-smoke.spec.ts"
+
+  e2e-ssl:
+    desc: "Run the Playwright auth-smoke e2e against https://kubedash.local:443 (ADR-0026 backstop)"
+    dir: frontend
+    env:
+      E2E_BASE_URL: "https://kubedash.local:{{.EDGE_HTTPS}}"
+      # The mkcert CA: today the Chromium launched by Playwright inherits it
+      # from the host keychain (`sudo mkcert -install`), so no launch args are
+      # needed — this var is kept for a non-keychain fallback (e.g. CI) and
+      # for Node-side clients. Verified by the 2026-10-24 backstop run.
+      E2E_TLS_CA: "{{.TLS_CA}}"
     cmds:
       - "corepack pnpm exec playwright test e2e/auth-smoke.spec.ts"
 
