@@ -120,6 +120,42 @@ services:
       start_period: 15s
     restart: unless-stopped
 
+  nginx:
+    image: nginx:1.27
+    # WHY: the image ships conf.d/default.conf (welcome page) which would
+    # 404/200 on :80 before our server block's 301 can run for Host mismatches;
+    # delete it so kubedash.conf is the only :80/:443 listener (ADR-0026).
+    # `nginx -g "daemon off;"` (not the entrypoint's `nginx`): the entrypoint
+    # runs nginx daemonized, which exits the container; the -g form keeps the
+    # master in the foreground (verified 2026-10-24).
+    entrypoint: ["/bin/sh", "-c"]
+    command: ["rm -f /etc/nginx/conf.d/default.conf && exec nginx -g 'daemon off;'"]
+    restart: unless-stopped
+    ports:
+      - "443:443"
+      - "80:80"
+    volumes:
+      - ./nginx/kubedash.conf:/etc/nginx/conf.d/kubedash.conf:ro
+      - ./certs:/etc/nginx/certs:ro
+    # 4.1's conf: the upstream is "host-gateway", which nginx cannot resolve
+    # at startup unless the container's /etc/hosts maps it — the backend
+    # listens on the host, not on the compose network.
+    extra_hosts:
+      - "host-gateway:host-gateway"
+    depends_on:
+      - postgres
+      - redis
+    # The edge healthchecks /healthz with the mkcert CA. --insecure is the
+    # HOSTNAME-mismatch escape hatch (the cert is for kubedash.local, the
+    # healthcheck dials localhost) — the CHAIN is still verified, which is
+    # the half that matters for the healthcheck.
+    healthcheck:
+      test: ["CMD-SHELL", "wget -qO- --cacert=/etc/nginx/certs/rootCA.pem --insecure https://localhost:443/healthz || exit 1"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+      start_period: 10s
+
 volumes:
   pgdata:
   redisdata:
