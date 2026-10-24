@@ -205,6 +205,43 @@ const NodeDataView = () => {
     )
   }
 
+  // Conditions live in their OWN card (not a row in the Node Data table): the
+  // 4-column Type/Status/Reason/Message grid is wide and would dominate the
+  // key/value table. Rendered as a CTable with a header row.
+  const conditionsCard = () => (
+    <CCard className="shadow mb-4">
+      <CCardHeader className="py-3">
+        <CCardTitle className="m-0 fw-bold text-primary fs-6">Conditions</CCardTitle>
+      </CCardHeader>
+      <CCardBody>
+        {conditions.length ? (
+          <CTable bordered small>
+            <thead>
+              <tr>
+                <th>Type</th>
+                <th>Status</th>
+                <th>Reason</th>
+                <th>Message</th>
+              </tr>
+            </thead>
+            <tbody>
+              {conditions.map(([type, st, reason, message], i) => (
+                <tr key={i}>
+                  <td>{type}</td>
+                  <td>{st}</td>
+                  <td>{reason}</td>
+                  <td className="text-break">{message}</td>
+                </tr>
+              ))}
+            </tbody>
+          </CTable>
+        ) : (
+          'No conditions'
+        )}
+      </CCardBody>
+    </CCard>
+  )
+
   const detailTable = (
     <CTable bordered>
       <tbody>
@@ -277,35 +314,6 @@ const NodeDataView = () => {
           </td>
         </tr>
         <tr>
-          <th scope="row">Conditions:</th>
-          <td>
-            {conditions.length ? (
-              <CTable bordered small className="mb-0">
-                <thead>
-                  <tr>
-                    <th>Type</th>
-                    <th>Status</th>
-                    <th>Reason</th>
-                    <th>Message</th>
-                  </tr>
-                </thead>
-                <tbody>
-                  {conditions.map(([type, st, reason, message], i) => (
-                    <tr key={i}>
-                      <td>{type}</td>
-                      <td>{st}</td>
-                      <td>{reason}</td>
-                      <td className="text-break">{message}</td>
-                    </tr>
-                  ))}
-                </tbody>
-              </CTable>
-            ) : (
-              'No conditions'
-            )}
-          </td>
-        </tr>
-        <tr>
           <th scope="row">Info:</th>
           <td>
             {info.length ? (
@@ -368,6 +376,9 @@ const NodeDataView = () => {
 
   return (
     <>
+      {/* Observed usage sits at the TOP (the live, operator-relevant signal),
+          before the static Node Data metadata. */}
+      {name && cluster && usageCard()}
       <CCard className="shadow mb-4">
         <TopMenu>
           <CBreadcrumb className="my-0" aria-label="breadcrumb">
@@ -397,7 +408,8 @@ const NodeDataView = () => {
           )}
         </CCardBody>
       </CCard>
-      {name && cluster && usageCard()}
+      {/* Conditions in their own card, after the metadata. */}
+      {name && cluster && conditionsCard()}
     </>
   )
 }

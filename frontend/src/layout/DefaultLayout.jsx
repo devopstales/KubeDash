@@ -23,7 +23,10 @@ const DefaultLayout = ({ children }) => {
       <AppSidebar />
       <div className="wrapper d-flex flex-column min-vh-100">
         <AppHeader />
-        <div className="body flex-grow-1">{children}</div>
+        {/* px-4 keeps the cards off the viewport edges on every page — CoreUI's
+            .body has no padding of its own, so without this the CCard blocks sit
+            flush against the left/right edges. */}
+        <div className="body flex-grow-1 px-4">{children}</div>
         <AppFooter />
       </div>
     </div>

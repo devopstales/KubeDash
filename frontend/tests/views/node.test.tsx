@@ -79,7 +79,15 @@ const NODES = {
         labels: { 'node-role.kubernetes.io/control-plane': '' },
       },
       status: {
-        conditions: [{ type: 'Ready', status: 'True' }, { type: 'MemoryPressure', status: 'False' }],
+        conditions: [
+          { type: 'Ready', status: 'True', reason: 'KubeletReady', message: 'kubelet is ready' },
+          {
+            type: 'MemoryPressure',
+            status: 'False',
+            reason: 'KubeletHasSufficientMemory',
+            message: 'kubelet has sufficient memory available',
+          },
+        ],
         node_info: { kubelet_version: 'v1.31.0', os_image: 'kind' },
         allocatable: { cpu: '4000m', memory: '8Gi' },
         capacity: { cpu: '4', memory: '8Gi' },
@@ -252,6 +260,13 @@ test('node-detail-renders: node metadata + used-vs-allocatable bars', async () =
   expect(screen.getAllByText('8.0 GiB').length).toBeGreaterThanOrEqual(1)
   // Taints: the fixture node has none → "No taints" (no badge list).
   expect(screen.getByText('No taints')).toBeTruthy()
+  // Conditions are in their OWN card (not a "Conditions:" row in the Node Data
+  // table): the card header "Conditions" is present, and the table row label
+  // "Conditions:" is gone. The fixture's MemoryPressure condition renders.
+  expect(screen.getByText('Conditions')).toBeTruthy()
+  expect(screen.queryByText('Conditions:')).toBeNull()
+  expect(screen.getByText('MemoryPressure')).toBeTruthy()
+  expect(screen.getByText('KubeletHasSufficientMemory')).toBeTruthy()
   // Used tier: the "used / allocatable" value sits in its own span (whitespace
   // around the slash is JSX formatting). 800m / 4 cores CPU; 4 GiB / 8 GiB mem.
   expect(screen.getByText(/800m\s*\/\s*4 cores/)).toBeTruthy()
