@@ -243,6 +243,15 @@ test('node-detail-renders: node metadata + used-vs-allocatable bars', async () =
   expect(screen.getByText('192.168.0.2')).toBeTruthy()
   // Labels render as a two-column table (key | value) the same way.
   expect(screen.getByText('node-role.kubernetes.io/control-plane')).toBeTruthy()
+  // Allocatable renders as a field|value table (Info-style), not a joined
+  // string: the field labels and the values are separate cells.
+  expect(screen.getByText('Capacity CPU')).toBeTruthy()
+  expect(screen.getByText('Capacity Memory')).toBeTruthy()
+  // The capacity values (4 / 8Gi in the fixture) render as their own cells.
+  expect(screen.getAllByText('4 cores').length).toBeGreaterThanOrEqual(1)
+  expect(screen.getAllByText('8.0 GiB').length).toBeGreaterThanOrEqual(1)
+  // Taints: the fixture node has none → "No taints" (no badge list).
+  expect(screen.getByText('No taints')).toBeTruthy()
   // Used tier: the "used / allocatable" value sits in its own span (whitespace
   // around the slash is JSX formatting). 800m / 4 cores CPU; 4 GiB / 8 GiB mem.
   expect(screen.getByText(/800m\s*\/\s*4 cores/)).toBeTruthy()

@@ -227,20 +227,50 @@ const NodeDataView = () => {
         <tr>
           <th scope="row">Allocatable:</th>
           <td>
-            CPU {fmtCpu(allocCpu)} · Memory {fmtBytes(allocMem)}
-            {capCpu !== null ? ` · Capacity CPU ${fmtCpu(capCpu)}` : ''}
-            {capMem !== null ? ` · Capacity Mem ${fmtBytes(capMem)}` : ''}
+            <CTable bordered small className="mb-0">
+              <tbody>
+                <tr>
+                  <td>CPU</td>
+                  <td>{fmtCpu(allocCpu)}</td>
+                </tr>
+                <tr>
+                  <td>Memory</td>
+                  <td>{fmtBytes(allocMem)}</td>
+                </tr>
+                <tr>
+                  <td>Capacity CPU</td>
+                  <td>{fmtCpu(capCpu)}</td>
+                </tr>
+                <tr>
+                  <td>Capacity Memory</td>
+                  <td>{fmtBytes(capMem)}</td>
+                </tr>
+              </tbody>
+            </CTable>
           </td>
         </tr>
         <tr>
           <th scope="row">Taints:</th>
           <td>
             {taints.length ? (
-              taints.map((t) => (
-                <CBadge key={t} color="secondary" className="me-1">
-                  {t}
-                </CBadge>
-              ))
+              <CTable bordered small className="mb-0">
+                <tbody>
+                  {taints.map((t, i) => {
+                    const eq = t.indexOf('=')
+                    const colon = t.indexOf(':')
+                    const key = eq >= 0 ? t.slice(0, eq) : t
+                    const value = eq >= 0 ? t.slice(eq + 1, colon > eq ? colon : undefined) : ''
+                    const effect = colon > eq ? t.slice(colon + 1) : ''
+                    return (
+                      <tr key={i}>
+                        <td className="text-break">{key}</td>
+                        <td>{value}</td>
+                        <td>{effect}</td>
+                      </tr>
+                    )
+                  })}
+                </tbody>
+              </CTable>
             ) : (
               'No taints'
             )}
