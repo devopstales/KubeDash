@@ -48,8 +48,16 @@ def login_redirect(access: str, refresh: str) -> Response:
 
 def _issue_and_persist(user: User) -> tuple[str, str]:
     """issue_token_pair + the hashed RefreshToken row (TTL 30d) + commit —
-    the OIDC callback's block, verbatim, so local login cannot diverge."""
+    the OIDC callback's block, verbatim, so local login cannot diverge.
+
+    A login REVOKES the user's prior refresh tokens first (one-way, same as
+    logout). Why: a second tab/login used to leave the old token live, so the
+    next 401→refresh could present a stale token the server had already
+    consumed on a parallel refresh → 401 → a logged-in user bounced to /login.
+    One live token per user keeps the consume-once model unambiguous and the
+    table bounded."""
     access, refresh = security.issue_token_pair(user)
+    revoke_user_refresh_tokens(user.id)
     db.session.add(
         RefreshToken(
             user_id=user.id,

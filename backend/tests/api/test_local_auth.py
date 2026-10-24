@@ -48,6 +48,27 @@ def test_local_login_sets_same_cookies_as_oidc(client_with_admin):
     assert claims["sub"].startswith("local:")  # the bootstrap admin's sub convention
 
 
+def test_local_login_revokes_prior_refresh_tokens(client_with_admin):
+    """A re-login leaves exactly ONE live refresh token (revokes the old).
+
+    Why: login used to ADD a token without deleting the prior one, so a
+    stale token could survive — and a 401→refresh presenting an already-
+    consumed token 401'd a still-logged-in user off to /login. One-way
+    revoke-on-login (same as logout) keeps the consume-once model
+    unambiguous and the table bounded."""
+    client = client_with_admin
+    # First login issues token #1.
+    client.post("/api/v1/auth/local", json={"email": "admin@local", "password": "correct-horse"})
+    # Second login must revoke token #1 and leave only token #2.
+    client.post("/api/v1/auth/local", json={"email": "admin@local", "password": "correct-horse"})
+    with client.application.app_context():
+        from app.extensions import db
+        from app.models.token import RefreshToken
+
+        rows = db.session.execute(db.select(RefreshToken)).scalars().all()
+    assert len(rows) == 1  # not 2 — the prior token was revoked on re-login
+
+
 def test_local_login_wrong_password_401(client_with_admin):
     res = client_with_admin.post(
         "/api/v1/auth/local", json={"email": "admin@local", "password": "nope"}
