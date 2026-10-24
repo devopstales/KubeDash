@@ -88,7 +88,7 @@ const UsageCell = ({ value }: { value: number | null }) => {
   const color = value > 90 ? 'danger' : value > 75 ? 'warning' : 'success'
   return (
     <div style={{ minWidth: '6rem' }}>
-      <CProgress value={value} color={color} style={{ height: '8px' }} />
+      <CProgress value={value} color={color} height={8} />
       <div className="text-end" style={{ fontSize: '.7rem' }}>
         {value}%
       </div>
@@ -141,7 +141,7 @@ const Tile = ({
       <CProgress
         value={pctValue ?? 0}
         color={pctValue === null ? 'secondary' : pctValue > 90 ? 'danger' : pctValue > 75 ? 'warning' : 'success'}
-        style={{ height: '6px' }}
+        height={6}
       />
       {sub ? (
         <div className="text-muted" style={{ fontSize: '.7rem', marginTop: '.25rem' }}>

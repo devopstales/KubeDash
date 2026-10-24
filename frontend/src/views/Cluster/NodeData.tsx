@@ -93,7 +93,7 @@ const UsedBar = ({ label, used, capacity, fmt }: {
       <CProgress
         value={pct ?? 0}
         color={pct === null ? 'secondary' : pct > 90 ? 'danger' : pct > 75 ? 'warning' : 'success'}
-        style={{ height: '8px' }}
+        height={8}
       />
     </div>
   )
