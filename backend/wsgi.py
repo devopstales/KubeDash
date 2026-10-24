@@ -23,12 +23,37 @@ from app.core.config import get_settings
 
 log = logging.getLogger(__name__)
 
+
+def _apply_proxyfix(app: Flask) -> None:
+    """ADR-0026: trust the TLS edge's ``X-Forwarded-*`` when (and only when)
+    we run behind it.
+
+    WHY env-gated: the test client and the plain-HTTP dev fast path send no
+    forwarded headers; unconditional ProxyFix would let a spoofed
+    ``X-Forwarded-Proto`` flip ``request.is_secure`` — and with it the HSTS
+    emission (security_headers reads ``request.is_secure``) and the
+    Secure-cookie semantics. The gate reads Settings at CALL time (not import
+    time) so the test can flip ``KUBEDASH_TLS_EDGE`` and re-apply.
+    """
+    if not get_settings().tls_edge:
+        return
+    from werkzeug.middleware.proxy_fix import ProxyFix
+
+    app.wsgi_app = ProxyFix(app.wsgi_app, x_for=1, x_proto=1, x_host=1, x_prefix=1)
+
+
 import os
 
 _static_dir = os.environ.get("KUBEDASH_STATIC_DIR")
 app: Flask = create_app(
     {"KUBEDASH_STATIC_DIR": _static_dir} if _static_dir else {}
 )
+
+# ADR-0026: wrap in ProxyFix only when behind the TLS edge. Ordered BEFORE
+# _bootstrap_local_admin on purpose: the bootstrap is a one-time DB upsert
+# that never reads request.is_secure, so the two are independent — the
+# ordering is documented here only so a future reader doesn't "fix" it.
+_apply_proxyfix(app)
 
 # ADR-0021: the local-admin upsert runs at boot, after the factory (which
 # stays pure — no DB init inside create_app) and BEFORE Leader/RQ startup,
