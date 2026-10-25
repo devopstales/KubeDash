@@ -254,8 +254,17 @@ tasks:
       KUBEDASH_STATIC_DIR: "{{.STATIC_DIR}}"
       KUBEDASH_ROLE: "leader"
       KUBEDASH_REPLICA_ID: "local"
-      # ADR-0025: plain-HTTP local stack (see backend-run).
+      # ADR-0025: plain-HTTP local stack (see backend-run). Task 5 flips this
+      # when the edge wiring lands.
       KUBEDASH_COOKIE_SECURE: "false"
+      # ADR-0026: the dev-stack backend serves :8443 over TLS — the nginx
+      # edge's upstream target (proxy_ssl_verify checks it against the mkcert
+      # rootCA). Single-port trade-off: with the cert set, the dev backend
+      # serves 8443-over-TLS and NOT plain :8080 (see wsgi.py __main__).
+      KUBEDASH_SSL_CERT: "{{.TASKFILE_DIR}}/dev/certs/backend.pem"
+      KUBEDASH_SSL_KEY: "{{.TASKFILE_DIR}}/dev/certs/backend-key.pem"
+      KUBEDASH_TLS_EDGE: "true"
+      FLASK_RUN_PORT: "8443"
     cmds:
       # Double-fork so the backend survives `task` exiting: the intermediate
       # shell exits immediately, re-parenting the backend to init (macOS has

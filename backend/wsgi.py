@@ -135,4 +135,23 @@ _start_worker_if_leader()
 
 if __name__ == "__main__":
     import os
-    app.run(port=int(os.environ.get("FLASK_RUN_PORT", "8080")))
+
+    cert = os.environ.get("KUBEDASH_SSL_CERT")
+    ssl_context = (
+        (cert, os.environ["KUBEDASH_SSL_KEY"])
+        if cert
+        else None
+    )
+    # ADR-0026: single-port decision (recorded). The __main__ dev backend serves
+    # ONE port, chosen by FLASK_RUN_PORT (default 8080). WHY env-gated: with
+    # KUBEDASH_SSL_CERT set, that port is served over TLS (the dev stack uses
+    # 8443, the nginx edge's upstream target) and plain :8080 is NOT served by
+    # the dev backend — the nginx edge IS the browser surface, so a second plain
+    # listener would be an unauthenticated back door around it. With the env
+    # unset, :8080 plain is exactly today's behavior (dev fast path, multi-up,
+    # test client). The gunicorn/container path (backend/Dockerfile) keeps its
+    # own :8080 bind — the in-cluster leg is plain behind the ingress, which
+    # terminates TLS (ADR-0019). If both ports are ever needed simultaneously,
+    # that is a gunicorn-arg change, not a wsgi change.
+    port = int(os.environ.get("FLASK_RUN_PORT", "8080"))
+    app.run(port=port, ssl_context=ssl_context)
