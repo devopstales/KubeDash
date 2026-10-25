@@ -85,9 +85,11 @@ tasks:
     # ADR-0026 R5 carve-out: this is the plain-HTTP fast path. A manual
     # `task backend-run` against it keeps KUBEDASH_COOKIE_SECURE=false; the
     # secure stack is `task dev-up-ssl` + `task dev-stack`.
-    desc: "Start the dev environment (plain-HTTP fast path; add the TLS edge with dev-up-ssl)"
+    desc: "Start the dev environment (no TLS edge — the edge comes up with dev-up-ssl)"
     cmds:
-      - "{{.COMPOSE}} up -d"
+      # Explicit service list: the nginx TLS edge is NOT part of the
+      # fast path — it comes up with `task dev-up-ssl`.
+      - "{{.COMPOSE}} up -d postgres redis prometheus grafana jaeger"
 
   dev-tls-setup:
     desc: "Generate/verify dev TLS certs + hosts entry (ADR-0026, idempotent; hosts step needs sudo)"
@@ -96,7 +98,7 @@ tasks:
       - "bash {{.TASKFILE_DIR}}/dev/setup-tls.sh hosts"
 
   dev-up-ssl:
-    desc: "Start the dev stack INCLUDING the nginx TLS edge (https://kubedash.local:443)"
+    desc: "Start the full dev stack INCLUDING the nginx TLS edge (https://kubedash.local:443)"
     cmds:
       - "{{.COMPOSE}} up -d"   # the nginx service is part of the same compose file
 
@@ -222,18 +224,23 @@ tasks:
     desc: "Start the full local env: compose + schema + backend behind the TLS edge (bootstrap admin, static wired)"
     cmds:
       # ADR-0026: the certs are a *read* precondition — fail fast with the
-      # named fix instead of starting a backend that cannot serve TLS.
-      - "test -f {{.TLS_CA}} || (echo 'run task dev-tls-setup first (dev/certs missing)' && exit 1)"
+      # named fix instead of starting a backend that cannot serve TLS. The
+      # backend needs the leaf + key too (KUBEDASH_SSL_CERT/KEY), not just
+      # the CA the edge verifies against.
+      - "test -f {{.TLS_CA}} && test -f {{.TASKFILE_DIR}}/dev/certs/backend.pem && test -f {{.TASKFILE_DIR}}/dev/certs/backend-key.pem || (echo 'run task dev-tls-setup first (dev/certs incomplete)' && exit 1)"
       - "{{.COMPOSE}} up -d"
       # Wait for Postgres to accept connections (compose 'healthy' covers the
       # data store, but the app needs the TCP port answering).
       - "{{.COMPOSE}} exec -T postgres pg_isready -U {{.DB_USER}} -d {{.DB_NAME}}"
-      # Idempotent: free :8080 from a prior dev-stack backend before rebind
-      # (no-op if nothing is listening). pkill catches zombie wsgi.py children
+      # Idempotent: free the dev backend ports from prior runs before rebind
+      # (no-op if nothing is listening). 8443 is the dev-stack backend's
+      # TLS port (ADR-0026); 8080 covers the plain-HTTP fast-path instances
+      # (task backend-run / multi-up). pkill catches zombie wsgi.py children
       # that survive the parent's SIGKILL (lsof only kills the port holder).
       # lsof instead of fuser: macOS's fuser prints usage to stderr on a
       # "file" argument and only kills the listener, not the process group.
       - "lsof -ti tcp:8080 | xargs kill 2>/dev/null || true"
+      - "lsof -ti tcp:8443 | xargs kill 2>/dev/null || true"
       - "pkill -f 'python.*wsgi.py' 2>/dev/null || true"
       - "sleep 1"
       # Build + sync the SPA into backend/static so the first boot serves the
@@ -249,7 +256,10 @@ tasks:
   dev-stack-down:
     desc: "Stop the local env backend (task dev-stack) + compose stack"
     cmds:
+      # Both dev backend ports: 8443 (the dev-stack TLS backend, ADR-0026)
+      # and 8080 (plain-HTTP fast-path instances).
       - "lsof -ti tcp:8080 | xargs kill 2>/dev/null || true"
+      - "lsof -ti tcp:8443 | xargs kill 2>/dev/null || true"
       - "pkill -f 'python.*wsgi.py' 2>/dev/null || true"
       - "{{.COMPOSE}} down"
 
@@ -301,17 +311,18 @@ tasks:
 
   # ---- E2E (Playwright auth-smoke, no kind needed) ---------------------------
   #
-  # Runs the local auth-smoke spec against the dev-stack backend on :8080.
-  # The stack must be up first (task dev-stack in another terminal, or the
-  # backend left running). Asserts the three seams unit tests miss: SPA shell
-  # render (no JS crash), local login → profile + synthetic cluster, and the
-  # wrong-password error path.
+  # Runs the local auth-smoke spec against the plain-HTTP fast path:
+  # `task dev-up` (data stores) + `task backend-run` on :8080. The backend
+  # must be up first (task backend-run in another terminal, or the backend
+  # left running). The TLS edge's browser test is `task e2e-ssl`. Asserts the
+  # three seams unit tests miss: SPA shell render (no JS crash), local login
+  # → profile + synthetic cluster, and the wrong-password error path.
   #
-  #   task dev-stack            # terminal 1 (keep running)
-  #   task e2e                  # terminal 2
+  #   task dev-up + task backend-run   # terminal 1 (keep running)
+  #   task e2e                         # terminal 2
 
   e2e:
-    desc: "Run the Playwright auth-smoke e2e against the dev-stack backend (:8080)"
+    desc: "Run the Playwright auth-smoke e2e against the plain-HTTP fast path (task dev-up + task backend-run on :8080; the TLS edge is e2e-ssl)"
     dir: frontend
     cmds:
       - "corepack pnpm exec playwright test e2e/auth-smoke.spec.ts"
@@ -326,6 +337,11 @@ tasks:
       # needed — this var is kept for a non-keychain fallback (e.g. CI) and
       # for Node-side clients. Verified by the 2026-10-24 backstop run.
       E2E_TLS_CA: "{{.TLS_CA}}"
+      # WHY: the bundled Chrome for Testing's NSS rejects the mkcert CA
+      # (probed); run the strict backstop on the system Chrome, which trusts
+      # it via the host keychain (sudo mkcert -install). Feeds the `channel`
+      # option in playwright.config.ts.
+      E2E_BROWSER_CHANNEL: "chrome"
     cmds:
       - "corepack pnpm exec playwright test e2e/auth-smoke.spec.ts"
 

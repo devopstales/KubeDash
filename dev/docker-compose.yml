@@ -142,9 +142,6 @@ services:
     # listens on the host, not on the compose network.
     extra_hosts:
       - "host-gateway:host-gateway"
-    depends_on:
-      - postgres
-      - redis
     # WHY curl (not wget): nginx:1.27 (debian) ships /usr/bin/curl 7.88 but
     # NO wget — the original wget probe exited 127, so the container could
     # never reach "healthy". --resolve maps kubedash.local to 127.0.0.1 so the

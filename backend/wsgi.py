@@ -134,8 +134,6 @@ def _start_worker_if_leader() -> None:
 _start_worker_if_leader()
 
 if __name__ == "__main__":
-    import os
-
     cert = os.environ.get("KUBEDASH_SSL_CERT")
     ssl_context = (
         (cert, os.environ["KUBEDASH_SSL_KEY"])
