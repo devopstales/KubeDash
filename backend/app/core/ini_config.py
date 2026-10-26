@@ -38,7 +38,7 @@ _FIELDS: dict[str, tuple[str, str, tuple[str, ...], bool, str, bool]] = {
     ),
     "bootstrap_admin_password": (
         "security", "admin_password",
-        ("KUBEDASH_BOOTSTRAP_ADMIN_PASSWORD",), False, "", False,
+        ("KUBEDASH_BOOTSTRAP_ADMIN_PASSWORD",), True, "changeme", False,
     ),
     "flask_env": (
         "DEFAULT", "app_mode", ("KUBEDASH_FLASK_ENV",), True, "development", False,
@@ -75,7 +75,7 @@ _FIELDS: dict[str, tuple[str, str, tuple[str, ...], bool, str, bool]] = {
     ),
     "bootstrap_admin_email": (
         "bootstrap", "bootstrap_admin_email",
-        ("KUBEDASH_BOOTSTRAP_ADMIN_EMAIL",), True, "", False,
+        ("KUBEDASH_BOOTSTRAP_ADMIN_EMAIL",), True, "admin@kubedash.local", False,
     ),
     "admin_kubeconfig": (
         "deployment", "admin_kubeconfig", ("KUBEDASH_ADMIN_KUBECONFIG",), True, "", False,
@@ -105,12 +105,12 @@ _ENV_TO_FIELD: dict[str, str] = {
 }
 
 # Required keys: absent from overrides + env + INI -> ConfigError at boot.
-# (Full set finalized in TICKET-03; declared here so `resolve` can reference it.)
+# bootstrap_admin_email / bootstrap_admin_password are NOT required: they
+# have in-code defaults (4.1 parity: a default admin is created, and the
+# user is warned to change the password after first login).
 REQUIRED: frozenset[str] = frozenset({
     "kubedash_jwt_secret",
     "kubedash_secret_key",
-    "bootstrap_admin_email",
-    "bootstrap_admin_password",
     "admin_kubeconfig",
 })
 

@@ -199,3 +199,51 @@ def test_app_mode_no_default_leak(tmp_path: pathlib.Path, monkeypatch: pytest.Mo
     ini_config.reset()
     # app_mode under [deployment] is seen (fallback), not from a leaked DEFAULT
     assert _config.get_settings().flask_env == "production"
+
+
+# ---------------------------------------------------------------------------
+# TICKET-03: fail-fast on required keys + retired [k8s]/[plugin_settings]
+# ---------------------------------------------------------------------------
+
+
+def test_required_key_missing_fails_fast(tmp_path: pathlib.Path, monkeypatch: pytest.MonkeyPatch) -> None:
+    # REQUIRED = {kubedash_jwt_secret, kubedash_secret_key, admin_kubeconfig}.
+    # bootstrap_admin_email / bootstrap_admin_password are NOT required (they
+    # have in-code defaults: admin@kubedash.local / changeme — 4.1 parity).
+    home = _write_ini(_home(tmp_path), "[DEFAULT]\napp_mode = development\n")  # no [security]
+    monkeypatch.setenv("KUBEDASH_HOME", str(home))
+    for v in ("KUBEDASH_KUBEDASH_JWT_SECRET", "KUBEDASH_SECRET_KEY", "KUBEDASH_ADMIN_KUBECONFIG"):
+        monkeypatch.delenv(v, raising=False)
+    ini_config.reset()
+    with pytest.raises(ini_config.ConfigError) as e:
+        _config.get_settings()()
+    assert "jwt_secret" in str(e.value)
+
+
+def test_bootstrap_admin_defaults_4_1_parity(tmp_path: pathlib.Path, monkeypatch: pytest.MonkeyPatch) -> None:
+    # 4.1 parity: the bootstrap admin has a hard-coded default (admin@kubedash.local
+    # / changeme). The INI can override; absent -> the default applies.
+    home = _write_ini(_home(tmp_path), "[DEFAULT]\napp_mode = development\n")
+    monkeypatch.setenv("KUBEDASH_HOME", str(home))
+    for v in ("KUBEDASH_BOOTSTRAP_ADMIN_EMAIL", "KUBEDASH_BOOTSTRAP_ADMIN_PASSWORD"):
+        monkeypatch.delenv(v, raising=False)
+    ini_config.reset()
+    s = _config.get_settings()
+    assert s.bootstrap_admin_email == "admin@kubedash.local"
+    assert s.bootstrap_admin_password == "changeme"
+
+
+def test_retired_k8s_and_plugin_sections_ignored(tmp_path: pathlib.Path, monkeypatch: pytest.MonkeyPatch) -> None:
+    home = _write_ini(
+        _home(tmp_path),
+        "[security]\njwt_secret = a\nsecret_key = b\nadmin_password = c\n"
+        "[bootstrap]\nbootstrap_admin_email = a@x\n"
+        "[deployment]\nadmin_kubeconfig = /kc\n"
+        "[k8s]\ncluster_name = kdev\napi_server = https://x\napi_ca = Zm9v\n"
+        "[plugin_settings]\nregistry = true\n",
+    )
+    monkeypatch.setenv("KUBEDASH_HOME", str(home))
+    ini_config.reset()
+    s = _config.get_settings()  # must NOT raise on [k8s]/[plugin_settings]
+    assert s.kubedash_jwt_secret == "a"
+    assert s.admin_kubeconfig == "/kc"
