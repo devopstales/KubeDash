@@ -19,8 +19,10 @@ advisory lock for a single-row lease (recorded so it is not "fixed" back).
 
 import threading
 import uuid
+from contextlib import contextmanager
 from datetime import UTC, datetime, timedelta
 
+from flask import Flask, has_app_context
 from sqlalchemy import text
 
 from app.core.config import Settings
@@ -31,7 +33,12 @@ class Leader:
     """One replica's view of the election; the advisory-lock call is the seam."""
 
     def __init__(
-        self, settings: Settings, *, stale_seconds: int = 10, heartbeat_seconds: int = 5
+        self,
+        settings: Settings,
+        app: Flask | None = None,
+        *,
+        stale_seconds: int = 10,
+        heartbeat_seconds: int = 5,
     ) -> None:
         self.replica_id: str = settings.kubedash_replica_id
         self._token = uuid.uuid4()
@@ -40,6 +47,29 @@ class Leader:
         self._is_leader = False
         self._stop = threading.Event()
         self._thread: threading.Thread | None = None
+        # The leader thread runs OUTSIDE a request — under Gunicorn the
+        # master's main thread is the arbiter loop, so ``db.engine`` (bound to
+        # the Flask app via app-context) is unreachable from it. Keep the app
+        # handle and re-open ``db.engine`` in a short ``app.app_context()``
+        # window on each access. WHY a context window rather than a bare
+        # ``create_engine``: reusing the app's engine keeps one connection
+        # pool and the app's SQLAlchemy lifecycle (disposal/teardown).
+        # ``app`` is optional: tests that already run inside an
+        # ``app.app_context()`` (test_leader.py) pass none and rely on the
+        # active context. ADR-0040: makes the leader path runnable under the
+        # same Gunicorn master as prod (previously it only ran, if at all,
+        # under the single-process ``python wsgi.py`` dev path).
+        self._app = app
+
+    @contextmanager
+    def _engine_ctx(self):
+        if self._app is None or has_app_context():
+            # Already inside an app context (tests) or no app handle — the
+            # ambient context is active; just hand out the engine.
+            yield db.engine
+        else:
+            with self._app.app_context():
+                yield db.engine
 
     def start(self) -> None:
         if self._thread is None or not self._thread.is_alive():
@@ -69,7 +99,7 @@ class Leader:
     def acquire_once(self) -> bool:
         """One attempt; returns False when the lock is held or the lease is
         fresh and owned by another replica. Never blocks on staleness."""
-        with db.engine.connect() as conn:
+        with self._engine_ctx() as engine, engine.connect() as conn:
             row = conn.execute(
                 text("SELECT replica_id, heartbeat_at FROM leader_lease WHERE id = 1")
             ).first()
@@ -99,7 +129,7 @@ class Leader:
         return True
 
     def _heartbeat(self) -> None:
-        with db.engine.connect() as conn:
+        with self._engine_ctx() as engine, engine.connect() as conn:
             conn.execute(
                 text("UPDATE leader_lease SET heartbeat_at = now() "
                      "WHERE id = 1 AND replica_id = :rid"),
@@ -108,7 +138,7 @@ class Leader:
             conn.commit()
 
     def _release(self) -> None:
-        with db.engine.connect() as conn:
+        with self._engine_ctx() as engine, engine.connect() as conn:
             conn.execute(text(f"SELECT pg_advisory_unlock({self._lock_key()})"), self._binds())
             conn.execute(
                 text("DELETE FROM leader_lease WHERE id = 1 AND replica_id = :rid"),

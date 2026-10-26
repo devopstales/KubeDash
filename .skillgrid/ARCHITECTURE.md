@@ -7,8 +7,8 @@
 
 This file is the **live** description of KubeDash's program structure. It is updated
 as the codebase changes. It is *not* a blueprint, *not* a spec, and *not* a decision
-record. Load-bearing decisions live in `.skillgrid/artifacts/04-adr-*.md`; the
-glossary lives in `.skillgrid/artifacts/01-business-terms.md` and
+record. Load-bearing decisions live in `.skillgrid/knowledge/decisions/04-adr-*.md`; the
+glossary lives in `.skillgrid/knowledge/glossary/01-business-terms.md` and
 `02-technical-terms.md`; the ADR index lives in `.skillgrid/ASSUMPTIONS.md`.
 
 ---
@@ -85,14 +85,20 @@ KubeDash/
 ├── .skillgrid/
 │   ├── ARCHITECTURE.md          ← this file
 │   ├── ASSUMPTIONS.md           ← VERIFIED / INFERRED / LOCKED (ADR index)
+│   ├── WINDOWS.md               ← cross-change defect register (open warnings/suggestions)
 │   ├── config.yaml
 │   ├── state.yaml
-│   ├── artifacts/
-│   │   ├── 01-business-terms.md
-│   │   ├── 02-technical-terms.md
-│   │   └── 04-adr-NNNN-slug.md  ← one locked decision per file
+│   ├── knowledge/               ← knowledge base (OKF v0.2 bundle)
+│   │   ├── index.md / log.md / reverse-index.md  ← catalog, journal, path→concept map
+│   │   ├── decisions/           ← ADRs: 04-adr-NNNN-slug.md, one locked decision per file
+│   │   ├── glossary/            ← 01-business-terms.md, 02-technical-terms.md
+│   │   ├── invariants/          ← must-hold contracts (claims + anchors)
+│   │   ├── workflows/           ← thin cross-package business flows
+│   │   └── reference/           ← PRDs, research, roadmaps
 │   ├── specs/                   ← per-change folders (briefing, blueprint, tasks, adr)
-│   └── prototypes/              ← retained feasibility probes
+│   ├── sdd/                     ← per-change SDD execution folders (progress.md, review diffs)
+│   ├── prototypes/              ← retained feasibility probes
+│   └── archive/                 ← shipped per-change folders (YYYY-MM-DD-slug)
 ├── backend/
 │   ├── app/
 │   │   ├── __init__.py          ← create_app factory
@@ -2772,7 +2778,7 @@ These are **not** decisions yet. They will become ADRs when they are.
 ## 12. ADR Index (pointer)
 
 See `.skillgrid/ASSUMPTIONS.md` § `## LOCKED` for the in-force ADR index.
-Each ADR is a file at `.skillgrid/artifacts/04-adr-NNNN-slug.md`.
+Each ADR is a file at `.skillgrid/knowledge/decisions/04-adr-NNNN-slug.md`.
 
 Initial ADRs expected for this change (to be authored at brainstorming time):
 
@@ -2829,8 +2835,8 @@ Initial ADRs expected for this change (to be authored at brainstorming time):
 
 ## 13. Glossary pointer
 
-- **Business terms** — `.skillgrid/artifacts/01-business-terms.md`
-- **Technical terms** — `.skillgrid/artifacts/02-technical-terms.md`
+- **Business terms** — `.skillgrid/knowledge/glossary/01-business-terms.md`
+- **Technical terms** — `.skillgrid/knowledge/glossary/02-technical-terms.md`
 
 Canonical terms used in this file (details in the terms files):
 

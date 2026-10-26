@@ -30,6 +30,12 @@ def run() -> None:
             ok = False
         c.status = "up" if ok else "down"
         c.last_probe_at = datetime.now(UTC)
+        # Flush per-row so the commit does NOT use psycopg3 executemany: the
+        # RQ work-horse reuses a prepared statement name across rows and
+        # psycopg3 raises DuplicatePreparedStatement on a bulk executemany
+        # (ADR-0040 surfaced this — the task path was previously dead under
+        # the KUBEDASH_ROLE env bug). flush() issues one UPDATE per row.
+        db.session.flush()
         if not ok:
             log.warning("cluster %r (id=%s) is down — alert path is a later change", c.name, c.id)
     db.session.commit()

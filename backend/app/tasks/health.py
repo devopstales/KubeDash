@@ -31,4 +31,7 @@ def run() -> None:
             ok = False
         c.status = "up" if ok else "down"
         c.last_probe_at = datetime.now(UTC)
+        # Flush per-row so the commit does NOT use psycopg3 executemany (same
+        # RQ work-horse DuplicatePreparedStatement issue as cluster_sync).
+        db.session.flush()
     db.session.commit()

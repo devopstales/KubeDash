@@ -34,12 +34,12 @@ KubeDash/
 - **Architecture (live):** `.skillgrid/ARCHITECTURE.md` — layout, API, data
   model, auth flow, deployment. Update it when the codebase changes.
 - **Locked decisions:** `.skillgrid/ASSUMPTIONS.md` (ADR index) and
-  `.skillgrid/artifacts/04-adr-NNNN-slug.md`. ADRs are gated: check the index
-  before changing architecture (stack, deployment shape, auth, push
+  `.skillgrid/knowledge/decisions/04-adr-NNNN-slug.md`. ADRs are gated: check
+  the index before changing architecture (stack, deployment shape, auth, push
   transport, task runner, caching).
 - **Change specs:** `.skillgrid/specs/` — per-change briefing, blueprint,
   tasks, acceptance.
-- **Glossary:** `.skillgrid/artifacts/01-business-terms.md`,
+- **Glossary:** `.skillgrid/knowledge/glossary/01-business-terms.md`,
   `02-technical-terms.md`.
 
 ## Commands
@@ -99,7 +99,10 @@ helm template t charts/kubedash > /dev/null
 task dev-up / dev-down / dev-logs / dev-ps
 task dev-clean   # destructive: deletes data volumes
 task db-shell    # psql; SELECT * FROM leader_lease to observe leadership
-task db-migrate  # apply Alembic migrations to the dev DB (flask db upgrade; idempotent)
+task dev-stack   # one-command plain-HTTP env: compose + schema + backend on http://localhost:8080 (ADR-0027 default)
+task dev-stack-ssl  # same, behind the nginx TLS edge: https://kubedash.dev.local:443, backend :8443, Secure cookie (ADR-0026/0027)
+task dev-stack-down   # stop the backend (all dev ports) + compose stack
+task dev-tls-setup    # mkcert certs + hosts entry for dev-stack-ssl (idempotent; hosts needs sudo)
 ```
 
 The dev DB is **migration-managed**: `task dev-stack` applies the Alembic
