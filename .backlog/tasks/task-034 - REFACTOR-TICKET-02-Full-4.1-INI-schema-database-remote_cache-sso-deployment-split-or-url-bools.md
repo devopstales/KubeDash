@@ -3,10 +3,10 @@ id: TASK-034
 title: >-
   [REFACTOR] TICKET-02: Full 4.1 INI schema
   (database/remote_cache/sso/deployment, split-or-url, bools)
-status: To Do
+status: Done
 assignee: []
 created_date: '2026-10-26 13:17'
-updated_date: '2026-10-26 13:19'
+updated_date: '2026-10-26 14:34'
 labels: []
 dependencies:
   - TASK-033

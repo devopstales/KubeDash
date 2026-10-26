@@ -3,10 +3,10 @@ id: TASK-037
 title: >-
   [CHORE] TICKET-05: Dev wiring (Taskfile + Dockerfile) + chart env-override
   backstop
-status: To Do
+status: Done
 assignee: []
 created_date: '2026-10-26 13:19'
-updated_date: '2026-10-26 13:19'
+updated_date: '2026-10-26 14:43'
 labels: []
 dependencies:
   - TASK-036

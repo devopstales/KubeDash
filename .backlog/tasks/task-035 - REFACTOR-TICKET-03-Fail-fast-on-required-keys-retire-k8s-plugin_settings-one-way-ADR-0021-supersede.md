@@ -3,10 +3,10 @@ id: TASK-035
 title: >-
   [REFACTOR] TICKET-03: Fail-fast on required keys + retire k8s/plugin_settings
   (one-way: ADR-0021 supersede)
-status: To Do
+status: Done
 assignee: []
 created_date: '2026-10-26 13:18'
-updated_date: '2026-10-26 13:19'
+updated_date: '2026-10-26 14:34'
 labels: []
 dependencies:
   - TASK-034

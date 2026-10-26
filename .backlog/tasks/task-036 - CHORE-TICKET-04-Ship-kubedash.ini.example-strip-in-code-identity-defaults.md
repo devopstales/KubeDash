@@ -1,10 +1,10 @@
 ---
 id: TASK-036
 title: '[CHORE] TICKET-04: Ship kubedash.ini.example + strip in-code identity defaults'
-status: To Do
+status: Done
 assignee: []
 created_date: '2026-10-26 13:18'
-updated_date: '2026-10-26 13:19'
+updated_date: '2026-10-26 14:38'
 labels: []
 dependencies:
   - TASK-035

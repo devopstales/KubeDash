@@ -2,10 +2,10 @@
 id: decision-026
 title: "ADR-0026 TLS edge + security header layer"
 date: '2026-10-24'
-status: accepted
+status: superseded
 ---
 
-Source: `.skillgrid/artifacts/04-adr-0026-tls-edge-and-security-headers.md`
+Source: `.skillgrid/knowledge/decisions/04-adr-0026-tls-edge-and-security-headers.md`
 
 # ADR-0026: TLS edge + security header layer
 
