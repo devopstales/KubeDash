@@ -29,9 +29,11 @@ spec:
           ports:
             - name: http
               containerPort: 8080
-          # Env: values → Settings seam. Only env that Settings (or the image
-          # CMD) actually reads is rendered — env with no Settings field is
-          # silently dropped by pydantic-settings (critic fix, §7.5).
+          # ADR-0028: the config is INI-primary (the operator mounts
+          # /app/kubedash.ini). These env vars OVERRIDE the INI — the chart
+          # Secret carries 3 of 5 REQUIRED keys (jwt_secret, secret_key,
+          # admin_kubeconfig must come from the INI or env). KUBEDASH_HOME
+          # is set to /app in the Dockerfile; the INI is /app/kubedash.ini.
           env:
             # Downward API: each replica is named by its Pod (leader election, §7.4)
             - name: KUBEDASH_REPLICA_ID

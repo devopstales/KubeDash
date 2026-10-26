@@ -9,3 +9,6 @@ __pycache__/
 # local evidence artifacts (not part of the app)
 smoke_task*.py
 .coverage
+
+# Dev INI (gitignored; seeded from kubedash.ini.example)
+kubedash.ini

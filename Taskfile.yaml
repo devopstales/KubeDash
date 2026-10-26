@@ -172,17 +172,26 @@ tasks:
   # row directly.
 
   backend-run:
-    desc: "Run one backend instance on :8080 (leader role, starts RQ worker + Leader)"
+    desc: "Run one backend instance on :8080 under Gunicorn (same CMD as the container; leader role starts RQ worker + Leader)"
     dir: backend
     cmds:
-      # Local-admin bootstrap (ADR-0021): admin@local/admin — without these
-      # the login 403s with LOCAL_AUTH_DISABLED.
-      # ADR-0025: the dev stack speaks http://localhost, where a Secure cookie
-      # is stored but never sent back. Production stays Secure (the default).
-      # KUBEDASH_STATIC_DIR points at the built SPA (task fe-build output);
-      # without it the catch-all 404s (the container default /app/static
-      # doesn't exist on a host checkout).
-      - "KUBEDASH_ROLE=leader KUBEDASH_REPLICA_ID=local KUBEDASH_BOOTSTRAP_ADMIN_EMAIL=admin@local KUBEDASH_BOOTSTRAP_ADMIN_PASSWORD=admin KUBEDASH_COOKIE_SECURE=false KUBEDASH_STATIC_DIR={{.TASKFILE_DIR}}/frontend/dist .venv/bin/python wsgi.py"
+      # ADR-0028: the config comes from backend/kubedash.ini (KUBEDASH_HOME
+      # is derived from wsgi.py's location = <repo>/backend). The INI carries
+      # the bootstrap admin, cookie_secure, role, etc. — no inline env needed.
+      # KUBEDASH_STATIC_DIR is gone: the static dir is derived from
+      # KUBEDASH_HOME (ini_config.home_paths()["static"] = backend/static).
+      # ADR-0040: dev runs the SAME server as prod (Gunicorn, the container
+      # CMD) so realistic testing exercises the pre-fork worker model, SSE
+      # under real workers, and the leader-gated RQ scheduler + worker child
+      # inside a Gunicorn master. GUNICORN_WORKERS/THREADS match the chart
+      # defaults (4/2); the single-process dev path (python wsgi.py, Werkzeug)
+      # is retained for pdb/debug in wsgi.py's __main__ block.
+      # OBJC_DISABLE_INITIALIZE_FORK_SAFETY: macOS-only — the RQ worker child
+      # forks a work-horse, and on a macOS Python with the Objective-C runtime
+      # loaded, a fork after ObjC init crashes with "NSCharacterSet initialize
+      # in progress in another thread". Harmless on Linux (no ObjC runtime),
+      # so it's set here (dev host is macOS) not in the Dockerfile.
+      - "OBJC_DISABLE_INITIALIZE_FORK_SAFETY=YES .venv/bin/gunicorn -w 4 --threads 2 -b 0.0.0.0:8080 wsgi:main"
 
   backend-run-worker:
     desc: "Run one backend instance on :8080 in worker-only role (no Leader/RQ worker)"
@@ -339,15 +348,12 @@ tasks:
     internal: true
     dir: backend
     env:
-      KUBEDASH_BOOTSTRAP_ADMIN_EMAIL: "{{.ADMIN_EMAIL}}"
-      KUBEDASH_BOOTSTRAP_ADMIN_PASSWORD: "{{.ADMIN_PASSWORD}}"
-      KUBEDASH_STATIC_DIR: "{{.STATIC_DIR}}"
+      # ADR-0028: the INI (backend/kubedash.ini) carries the bootstrap admin,
+      # cookie_secure, role, replica_id, database, remote_cache. The env
+      # overrides below are for the OIDC SSO trio (dev-stack specific) and
+      # the SSO bootstrap users — these override the INI's empty values.
       KUBEDASH_ROLE: "leader"
       KUBEDASH_REPLICA_ID: "local"
-      # ADR-0025/0027: plain-HTTP fast path — the Secure flag off is the
-      # honest state for http://localhost (a Secure cookie over plain HTTP is
-      # stored but never sent back). Production stays Secure (the default).
-      KUBEDASH_COOKIE_SECURE: "false"
       FLASK_RUN_PORT: "8080"
       # SSO (dev-stack OIDC provider on :8888): the backend speaks OIDC to
       # the SSO server; the two pre-created users are bootstrapped at start.
@@ -368,9 +374,8 @@ tasks:
     internal: true
     dir: backend
     env:
-      KUBEDASH_BOOTSTRAP_ADMIN_EMAIL: "{{.ADMIN_EMAIL}}"
-      KUBEDASH_BOOTSTRAP_ADMIN_PASSWORD: "{{.ADMIN_PASSWORD}}"
-      KUBEDASH_STATIC_DIR: "{{.STATIC_DIR}}"
+      # ADR-0028: the INI carries the bootstrap admin + database + remote_cache.
+      # The env overrides below are process-level (TLS edge, port, certs).
       KUBEDASH_ROLE: "leader"
       KUBEDASH_REPLICA_ID: "local"
       # ADR-0026: behind the TLS edge the Secure cookie is honest end-to-end

@@ -24,9 +24,13 @@ COPY backend/app ./app
 COPY backend/wsgi.py ./
 COPY --from=frontend /build/dist ./static
 ENV PATH="/app/.venv/bin:$PATH" \
-    KUBEDASH_STATIC_DIR=/app/static \
+    KUBEDASH_HOME=/app \
     GUNICORN_WORKERS=4 GUNICORN_THREADS=2
 USER 10001
 EXPOSE 8080
 HEALTHCHECK --interval=30s --timeout=5s CMD python -c "import urllib.request;urllib.request.urlopen('http://127.0.0.1:8080/healthz')"
-CMD ["sh", "-c", "exec gunicorn -w \"$GUNICORN_WORKERS\" --threads \"$GUNICORN_THREADS\" -b 0.0.0.0:8080 wsgi:app"]
+# ADR-0028: the config is <KUBEDASH_HOME>/kubedash.ini (/app/kubedash.ini);
+# the operator mounts it. The static dir is derived: <KUBEDASH_HOME>/static
+# (= /app/static, where the SPA is copied). wsgi:main builds the app + starts
+# the leader-gated RQ scheduler.
+CMD ["sh", "-c", "exec gunicorn -w \"$GUNICORN_WORKERS\" --threads \"$GUNICORN_THREADS\" -b 0.0.0.0:8080 wsgi:main"]
