@@ -35,10 +35,14 @@ type CrdRow = {
   scope: string
   served: ServedVersion[]
   created: string
-  // Composite field the Kind column renders a <Link> from: {kind, plural}.
+  // Composite field the Kind column renders a <Link> from: {kind, crdName}.
   // The renderer receives only row[data], so the link target must ride on the
   // field (the Roles/Namespaces views use the same toRow pattern).
-  kindLink: { kind: string; plural: string }
+  //
+  // IMPORTANT: the detail route is keyed on the CRD's metadata.name
+  // (`<plural>.<group>`, e.g. `ciliumbgpadvertisements.cilium.io`), NOT the
+  // bare plural — the backend `get_crd` API call 404s on a bare plural.
+  kindLink: { kind: string; crdName: string }
 }
 
 const toRow = (crd: K8sCrd): CrdRow => {
@@ -47,7 +51,8 @@ const toRow = (crd: K8sCrd): CrdRow => {
     .filter((v) => v.served && v.name)
     .map((v) => ({ name: v.name as string, storage: Boolean(v.storage) }))
   const kind = spec.names?.kind ?? ''
-  const plural = spec.names?.plural ?? crd.metadata?.name ?? ''
+  const plural = spec.names?.plural ?? ''
+  const crdName = crd.metadata?.name ?? ''
   return {
     kind,
     group: spec.group ?? '',
@@ -55,13 +60,13 @@ const toRow = (crd: K8sCrd): CrdRow => {
     scope: spec.scope ?? 'Unknown',
     served: versions,
     created: crd.metadata?.creationTimestamp ?? '',
-    kindLink: { kind, plural },
+    kindLink: { kind, crdName },
   }
 }
 
-const kindLink = ({ kind, plural }: CrdRow['kindLink']) =>
-  plural ? (
-    <Link to={`/cluster/crd/data?name=${encodeURIComponent(plural)}`}>{kind || '\u2014'}</Link>
+const kindLink = ({ kind, crdName }: CrdRow['kindLink']) =>
+  crdName ? (
+    <Link to={`/cluster/crd/data?name=${encodeURIComponent(crdName)}`}>{kind || '\u2014'}</Link>
   ) : (
     kind || '\u2014'
   )

@@ -137,9 +137,11 @@ test('crd-list-renders: 4.1 columns + served versions + kind link', async () => 
   // The non-storage served version (v1) — a word boundary keeps the match
   // distinct from the v1alpha1 badge above.
   expect(screen.getByText(/^v1$/)).toBeTruthy()
-  // The kind links to the detail page with the PLURAL (not the kind).
+  // The kind links to the detail page with the CRD's metadata.name
+  // (`<plural>.<group>`), not the bare plural — the backend get_crd 404s on a
+  // bare plural.
   const link = screen.getByRole('link', { name: 'Application' })
-  expect(link.getAttribute('href')).toBe('/cluster/crd/data?name=applications')
+  expect(link.getAttribute('href')).toBe('/cluster/crd/data?name=applications.argoproj.io')
 })
 
 test('crd-detail-renders: CRD identity + instance rows', async () => {
