@@ -123,3 +123,79 @@ def test_optional_and_behavior_knobs_keep_defaults(tmp_path: pathlib.Path, monke
     assert s.flask_env == "production"  # INI value
     assert s.kubedash_role == "worker"  # optional default
     assert s.kubedash_replica_id == "local"
+
+
+# ---------------------------------------------------------------------------
+# TICKET-02: full 4.1 schema mapping (database/remote_cache/sso/deployment)
+# ---------------------------------------------------------------------------
+
+
+def test_database_split_fields(tmp_path: pathlib.Path, monkeypatch: pytest.MonkeyPatch) -> None:
+    home = _write_ini(
+        _home(tmp_path),
+        "[database]\ntype = postgres\nhost = db:5432\nname = kubedash\nuser = u\npassword = p\n",
+    )
+    monkeypatch.setenv("KUBEDASH_HOME", str(home))
+    ini_config.reset()
+    assert _config.get_settings().database_url == "postgresql://u:p@db:5432/kubedash"
+
+
+def test_database_split_quotes_password(tmp_path: pathlib.Path, monkeypatch: pytest.MonkeyPatch) -> None:
+    home = _write_ini(
+        _home(tmp_path),
+        "[database]\ntype = postgres\nhost = db:5432\nname = kubedash\nuser = u\npassword = p@ss:wd\n",
+    )
+    monkeypatch.setenv("KUBEDASH_HOME", str(home))
+    ini_config.reset()
+    assert _config.get_settings().database_url == "postgresql://u:p%40ss%3Awd@db:5432/kubedash"
+
+
+def test_database_url_wins_over_split(tmp_path: pathlib.Path, monkeypatch: pytest.MonkeyPatch) -> None:
+    home = _write_ini(
+        _home(tmp_path),
+        "[database]\ntype = postgres\nhost = db:5432\nname = kubedash\nuser = u\npassword = p\n"
+        "url = postgresql://x:y@z/q\n",
+    )
+    monkeypatch.setenv("KUBEDASH_HOME", str(home))
+    ini_config.reset()
+    assert _config.get_settings().database_url == "postgresql://x:y@z/q"
+
+
+def test_remote_cache_split_or_url(tmp_path: pathlib.Path, monkeypatch: pytest.MonkeyPatch) -> None:
+    home = _write_ini(
+        _home(tmp_path),
+        "[remote_cache]\nredis_host = cache:6380\nredis_db = 2\n",
+    )
+    monkeypatch.setenv("KUBEDASH_HOME", str(home))
+    ini_config.reset()
+    assert _config.get_settings().redis_url == "redis://cache:6380/2"
+    # Rewrite the INI in the SAME home (url wins over split fields).
+    _write_ini(home, "[remote_cache]\nurl = redis://other:6379/9\nredis_host = cache\n")
+    ini_config.reset()
+    assert _config.get_settings().redis_url == "redis://other:6379/9"
+
+
+def test_sso_and_deployment_and_optional(tmp_path: pathlib.Path, monkeypatch: pytest.MonkeyPatch) -> None:
+    home = _write_ini(
+        _home(tmp_path),
+        "[sso_settings]\nissuer_url = https://idp\nclient_id = cid\nsecret = csec\n"
+        "bootstrap_users = a@x,b@y\n"
+        "[deployment]\nkubedash_role = leader\ntls_edge = true\n",
+    )
+    monkeypatch.setenv("KUBEDASH_HOME", str(home))
+    ini_config.reset()
+    s = _config.get_settings()
+    assert s.oidc_issuer == "https://idp"
+    assert s.oidc_client_id == "cid"
+    assert s.oidc_client_secret == "csec"
+    assert s.sso_bootstrap_users == "a@x,b@y"
+    assert s.kubedash_role == "leader"
+    assert s.tls_edge is True
+
+
+def test_app_mode_no_default_leak(tmp_path: pathlib.Path, monkeypatch: pytest.MonkeyPatch) -> None:
+    home = _write_ini(_home(tmp_path), "[deployment]\napp_mode = production\n")
+    monkeypatch.setenv("KUBEDASH_HOME", str(home))
+    ini_config.reset()
+    # app_mode under [deployment] is seen (fallback), not from a leaked DEFAULT
+    assert _config.get_settings().flask_env == "production"

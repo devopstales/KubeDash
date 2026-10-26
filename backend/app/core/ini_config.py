@@ -219,24 +219,46 @@ def _resolve_database() -> str:
 
 def _resolve_redis() -> str:
     """[remote_cache]: a single ``url`` wins; else build ``redis://[pass@]host:port/db``
-    (port defaults to 6379, db to 0)."""
+    (port defaults to 6379, db to 0). The 4.1 ``redis_host`` may carry an
+    embedded ``:port`` (``cache:6380``); a separate ``redis_port`` wins when
+    both are present."""
     url = _ini("remote_cache", "url")
     if url:
         return url
     host = _ini("remote_cache", "redis_host")
     if not host:
         return ""
-    port = _ini("remote_cache", "redis_port") or "6379"
+    # 4.1 style: redis_host may be "host:port"; a separate redis_port wins.
+    if ":" in host:
+        host, embedded_port = host.rsplit(":", 1)
+    else:
+        embedded_port = ""
+    port = _ini("remote_cache", "redis_port") or embedded_port or "6379"
     db = _ini("remote_cache", "redis_db") or "0"
     password = _ini("remote_cache", "redis_password")
     auth = f":{password}@" if password else ""
     return f"redis://{auth}{host}:{port}/{db}"
 
 
+def _resolve_flask_env() -> str:
+    """flask_env: read ``app_mode`` from the literal ``DEFAULT`` section; if
+    absent, fall back to ``[deployment] app_mode``. A ``app_mode`` set under an
+    unrelated section must NOT leak (configparser's DEFAULT leakage is
+    suppressed by reading the named sections explicitly)."""
+    p = _get_parser()
+    # Read DEFAULT explicitly (not via the fallback that leaks into every section).
+    if p.defaults().get("app_mode"):
+        return p.defaults()["app_mode"]
+    if p.has_section("deployment") and p.get("deployment", "app_mode", fallback=""):
+        return p.get("deployment", "app_mode")
+    return ""
+
+
 # Fields whose INI value is composed from multiple section keys (TICKET-02).
 _SPECIAL_RESOLVERS = {
     "database_url": _resolve_database,
     "redis_url": _resolve_redis,
+    "flask_env": _resolve_flask_env,
 }
 
 
