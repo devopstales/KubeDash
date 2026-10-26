@@ -1,0 +1,14 @@
+# Kind config for the KubeDash dev cluster (task kind-up).
+#
+# disableDefaultCNI: true — Cilium (installed by _kind-cilium) is the CNI.
+# The cluster is a single control-plane node (dev box; no workers needed for
+# the dashboard's read-only lens). Subnets match kind's defaults so existing
+# manifests (metrics-server, demo pods) don't need CIDR tweaks.
+kind: Cluster
+apiVersion: kind.x-k8s.io/v1alpha4
+nodes:
+  - role: control-plane
+networking:
+  disableDefaultCNI: true
+  podSubnet: "10.244.0.0/16"
+  serviceSubnet: "10.96.0.0/12"

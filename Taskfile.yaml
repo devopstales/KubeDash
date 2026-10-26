@@ -30,9 +30,9 @@ vars:
   EDGE_HTTPS: "443"
   TLS_CA: "{{.TASKFILE_DIR}}/dev/certs/rootCA.pem"
 
-  # Multi-instance backend driver (dev/mux-up.sh) — see that script for the
-  # two-process loop. {{.TASKFILE_DIR}} keeps it CWD-independent.
-  BACKEND_MULTI: "{{.TASKFILE_DIR}}/dev/mux.sh"
+  # Multi-instance backend driver (dev/scripts/mux.sh) — see that script for
+  # the two-process loop. {{.TASKFILE_DIR}} keeps it CWD-independent.
+  BACKEND_MULTI: "{{.TASKFILE_DIR}}/dev/scripts/mux.sh"
 
   # Local kind cluster name (kind-up/kind-down). The kubeconfig context kind
   # generates is `kind-<name>`; the dev-stack flow registers this cluster in
@@ -82,25 +82,16 @@ tasks:
   # ---- Dev environment (docker-compose stack in ./dev) ---------------------
 
   dev-up:
-    # ADR-0026 R5 carve-out: this is the plain-HTTP fast path. A manual
-    # `task backend-run` against it keeps KUBEDASH_COOKIE_SECURE=false; the
-    # secure stack is `task dev-up-ssl` + `task dev-stack`.
-    desc: "Start the dev environment (no TLS edge — the edge comes up with dev-up-ssl)"
+    desc: "Start the dev environment (postgres, redis, prometheus, grafana, jaeger)"
     cmds:
-      # Explicit service list: the nginx TLS edge is NOT part of the
-      # fast path — it comes up with `task dev-up-ssl`.
       - "{{.COMPOSE}} up -d postgres redis prometheus grafana jaeger"
 
   dev-tls-setup:
     desc: "Generate/verify dev TLS certs + hosts entry (ADR-0026, idempotent; hosts step needs sudo)"
     cmds:
-      - "bash {{.TASKFILE_DIR}}/dev/setup-tls.sh generate"
-      - "bash {{.TASKFILE_DIR}}/dev/setup-tls.sh hosts"
+      - "bash {{.TASKFILE_DIR}}/dev/scripts/setup-tls.sh generate"
+      - "bash {{.TASKFILE_DIR}}/dev/scripts/setup-tls.sh hosts"
 
-  dev-up-ssl:
-    desc: "Start the full dev stack INCLUDING the nginx TLS edge (https://kubedash.local:443)"
-    cmds:
-      - "{{.COMPOSE}} up -d"   # the nginx service is part of the same compose file
 
   dev-down:
     desc: "Stop the dev environment (keeps data volumes)"
@@ -132,10 +123,11 @@ tasks:
   # waits for the apiservice to be available.
 
   kind-up:
-    desc: "Create the local kind cluster (if absent) + install metrics-server (idempotent)"
+    desc: "Create the local kind cluster (if absent) + install metrics-server + Cilium + Traefik (idempotent)"
     cmds:
       - task: _kind-cluster
       - task: _kind-metrics-server
+      - task: _kind-cilium-traefik
 
   kind-down:
     desc: "Delete the local kind cluster (destructive)"
@@ -145,7 +137,7 @@ tasks:
   _kind-cluster:
     internal: true
     cmds:
-      - kind get clusters | grep -q '^{{.KIND_CLUSTER}}$' || kind create cluster --name {{.KIND_CLUSTER}}
+      - kind get clusters | grep -q '^{{.KIND_CLUSTER}}$' || kind create cluster --name {{.KIND_CLUSTER}} --config {{.TASKFILE_DIR}}/dev/kind-config.yaml
 
   _kind-metrics-server:
     internal: true
@@ -153,6 +145,20 @@ tasks:
       - kubectl --context kind-{{.KIND_CLUSTER}} apply --server-side -f {{.TASKFILE_DIR}}/dev/metrics-server.yaml
       - kubectl --context kind-{{.KIND_CLUSTER}} -n kube-system rollout status deploy/metrics-server --timeout=120s
       - kubectl --context kind-{{.KIND_CLUSTER}} wait --for=condition=available apiservice/v1beta1.metrics.k8s.io --timeout=120s
+
+  _kind-cilium-traefik:
+    internal: true
+    cmds:
+      - bash {{.TASKFILE_DIR}}/dev/cilium-traefik-up.sh
+
+  # Internal: dev-stack demo data — kind cluster + metrics-server + demo pods
+  # + registry registration. Skipped (with a notice) when kind/kubectl are
+  # absent, so the plain-HTTP loop still works on a machine without the K8s
+  # toolchain. Each step is idempotent (see dev/scripts/demo-data-up.sh).
+  _dev-kind-and-demo-data:
+    internal: true
+    cmds:
+      - bash {{.TASKFILE_DIR}}/dev/scripts/demo-data-up.sh
 
   # ---- Backend (Flask app, runs on the host against the dev stack) ----------
   #
@@ -212,72 +218,123 @@ tasks:
   # ---- One-command local env (compose + schema + backend) -------------------
   #
   # Brings up the full local dev loop in one shot: the compose data stores,
-  # the SQLAlchemy schema (db.create_all — dev-only; prod uses Alembic), and
-  # the leader backend on :8080 with the bootstrap admin + static dir wired.
-  # Idempotent: safe to re-run (compose up -d is a no-op when healthy; the
-  # schema create_all is idempotent; the backend rebinds the port).
+  # the Alembic schema, and the leader backend on :8080 (plain HTTP) with the
+  # bootstrap admin + static dir wired. Idempotent: safe to re-run (compose
+  # up -d is a no-op when healthy; db upgrade is idempotent; the backend
+  # rebinds the port). ADR-0027: the TLS edge is opt-in — `task dev-stack-ssl`
+  # adds the nginx edge, the :8443 TLS backend, and the honest Secure cookie.
   #
-  #   task dev-stack          # foreground (Ctrl-C stops the backend; compose stays up)
+  #   task dev-stack          # plain HTTP :8080 (fast daily loop)
+  #   task dev-stack-ssl      # same, behind https://kubedash.dev.local:443
   #   task dev-stack-down     # stop the backend + compose stack
 
   dev-stack:
-    desc: "Start the full local env: compose + schema + backend behind the TLS edge (bootstrap admin, static wired)"
+    desc: "Start the full local env: compose + schema + backend on plain HTTP :8080 (bootstrap admin, static wired)"
+    cmds:
+      - "{{.COMPOSE}} up -d postgres redis prometheus grafana jaeger"
+      # Wait for Postgres to accept connections (compose 'healthy' covers the
+      # data store, but the app needs the TCP port answering).
+      - "{{.COMPOSE}} exec -T postgres pg_isready -U {{.DB_USER}} -d {{.DB_NAME}}"
+      # Idempotent: free the dev backend ports from prior runs before rebind
+      # (no-op if nothing is listening). 8080 is this task's plain-HTTP
+      # backend; 8443 covers the dev-stack-ssl TLS backend (ADR-0026/0027);
+      # 8081/8082 cover the multi-up leader-election instances. pkill goes
+      # FIRST: the nohup'd backend is re-parented to launchd (PPID 1) and a
+      # SIGTERM (lsof/xargs kill) does not reach it — pkill's SIGKILL is the
+      # reliable stop. lsof covers any non-python port holder.
+      - "pkill -f 'python.*wsgi.py' 2>/dev/null || true"
+      - "lsof -ti tcp:8080 | xargs kill 2>/dev/null || true"
+      - "lsof -ti tcp:8443 | xargs kill 2>/dev/null || true"
+      - "lsof -ti tcp:8081 | xargs kill 2>/dev/null || true"
+      - "lsof -ti tcp:8082 | xargs kill 2>/dev/null || true"
+      # Wait for the ports to actually be free (the kill above is async): a
+      # busy loop of at most ~5 s, then re-run if something still holds them.
+      - 'for i in 1 2 3 4 5 6 7 8 9 10; do if lsof -ti tcp:8080,tcp:8443,tcp:8081,tcp:8082 >/dev/null 2>&1; then sleep 0.5; else break; fi; done'
+      - "lsof -ti tcp:8080 >/dev/null 2>&1 && { echo 'port 8080 still busy — kill the holder and re-run'; exit 1; } || true"
+      # The nginx edge belongs to dev-stack-ssl only (ADR-0027): stop it so
+      # the plain run is the full service set (and frees host :443/:80).
+      - "{{.COMPOSE}} stop nginx"
+      # Build + sync the SPA into backend/static so the first boot serves the
+      # current bundle (KUBEDASH_STATIC_DIR). fe-check stays the explicit
+      # air-gap gate — dev-stack only needs a working bundle.
+      - task: fe-build
+      - task: fe-sync
+      # Migrate the dev DB to head (same Alembic path as prod — idempotent).
+      - task: backend-create-schema
+      # Start the leader backend (background — dev-stack returns once the
+      # boot log is printed; stop it with task dev-stack-down).
+      - task: backend-stack-run
+      # Demo data (optional — the dashboard is empty without a registered
+      # cluster). Bring up the kind cluster + metrics-server, seed a demo
+      # namespace with busy pods + one crashlooping pod (so metrics and
+      # events render), and register the cluster in the registry. Skipped
+      # when kind/kubectl are absent so the plain-HTTP loop still works on a
+      # machine without the K8s toolchain.
+      - task: _dev-kind-and-demo-data
+
+  dev-stack-ssl:
+    desc: "Start the full local env behind the nginx TLS edge (https://kubedash.dev.local:443, backend :8443, Secure cookie) (ADR-0026/0027)"
     cmds:
       # ADR-0026: the certs are a *read* precondition — fail fast with the
       # named fix instead of starting a backend that cannot serve TLS. The
       # backend needs the leaf + key too (KUBEDASH_SSL_CERT/KEY), not just
       # the CA the edge verifies against.
       - "test -f {{.TLS_CA}} && test -f {{.TASKFILE_DIR}}/dev/certs/backend.pem && test -f {{.TASKFILE_DIR}}/dev/certs/backend-key.pem || (echo 'run task dev-tls-setup first (dev/certs incomplete)' && exit 1)"
-      - "{{.COMPOSE}} up -d"
+      - "{{.COMPOSE}} up -d"   # all services incl. the nginx TLS edge
       # Wait for Postgres to accept connections (compose 'healthy' covers the
       # data store, but the app needs the TCP port answering).
       - "{{.COMPOSE}} exec -T postgres pg_isready -U {{.DB_USER}} -d {{.DB_NAME}}"
       # Idempotent: free the dev backend ports from prior runs before rebind
-      # (no-op if nothing is listening). 8443 is the dev-stack backend's
-      # TLS port (ADR-0026); 8080 covers the plain-HTTP fast-path instances
-      # (task backend-run / multi-up). pkill catches zombie wsgi.py children
-      # that survive the parent's SIGKILL (lsof only kills the port holder).
-      # lsof instead of fuser: macOS's fuser prints usage to stderr on a
-      # "file" argument and only kills the listener, not the process group.
+      # (no-op if nothing is listening). pkill first + wait loop — see
+      # dev-stack for the rationale.
+      - "pkill -f 'python.*wsgi.py' 2>/dev/null || true"
       - "lsof -ti tcp:8080 | xargs kill 2>/dev/null || true"
       - "lsof -ti tcp:8443 | xargs kill 2>/dev/null || true"
-      - "pkill -f 'python.*wsgi.py' 2>/dev/null || true"
-      - "sleep 1"
+      - "lsof -ti tcp:8081 | xargs kill 2>/dev/null || true"
+      - "lsof -ti tcp:8082 | xargs kill 2>/dev/null || true"
+      - 'for i in 1 2 3 4 5 6 7 8 9 10; do if lsof -ti tcp:8080,tcp:8443,tcp:8081,tcp:8082 >/dev/null 2>&1; then sleep 0.5; else break; fi; done'
+      - "lsof -ti tcp:8080,tcp:8443 >/dev/null 2>&1 && { echo 'port 8080/8443 still busy — kill the holder and re-run'; exit 1; } || true"
       # Build + sync the SPA into backend/static so the first boot serves the
       # current bundle (KUBEDASH_STATIC_DIR). fe-check stays the explicit
-      # air-gap gate — dev-stack only needs a working bundle.
+      # air-gap gate — dev-stack-ssl only needs a working bundle.
       - task: fe-build
       - task: fe-sync
-      # Create the schema (dev shortcut — prod runs Alembic migrations).
+      # Migrate the dev DB to head (same Alembic path as prod — idempotent).
       - task: backend-create-schema
-      # Start the leader backend (foreground — the task blocks until Ctrl-C).
-      - task: backend-stack-run
+      # Start the leader backend (background — dev-stack-ssl returns once the
+      # boot log is printed; stop it with task dev-stack-down).
+      - task: backend-stack-run-ssl
 
   dev-stack-down:
-    desc: "Stop the local env backend (task dev-stack) + compose stack"
+    desc: "Stop the local env backend (task dev-stack / dev-stack-ssl) + compose stack"
     cmds:
-      # Both dev backend ports: 8443 (the dev-stack TLS backend, ADR-0026)
-      # and 8080 (plain-HTTP fast-path instances).
+      # All dev backend ports: 8080 (dev-stack plain HTTP), 8443 (the
+      # dev-stack-ssl TLS backend, ADR-0026/0027), 8081/8082 (multi-up).
       - "lsof -ti tcp:8080 | xargs kill 2>/dev/null || true"
       - "lsof -ti tcp:8443 | xargs kill 2>/dev/null || true"
+      - "lsof -ti tcp:8081 | xargs kill 2>/dev/null || true"
+      - "lsof -ti tcp:8082 | xargs kill 2>/dev/null || true"
       - "pkill -f 'python.*wsgi.py' 2>/dev/null || true"
       - "{{.COMPOSE}} down"
 
-  # Internal: create the SQLAlchemy schema from the backend dir (where the
-  # `app` package resolves). Dev shortcut — prod runs Alembic migrations.
+  # Internal: apply Alembic migrations to the dev DB from the backend dir
+  # (where the `app` package resolves) — the same path prod uses, so the dev
+  # stack boots at head with the seed data the migrations carry (AGENTS.md:
+  # the dev DB is migration-managed; no create_all shortcut). Idempotent:
+  # re-running is a no-op at head.
   backend-create-schema:
     internal: true
     dir: backend
     cmds:
-      - >
-        .venv/bin/python -c
-        "from app import create_app; from app.extensions import db;
-        a = create_app({'DATABASE_URL': '{{.DB_URL}}'});
-        a.app_context().push(); db.create_all(); print('schema ready')"
+      - "DATABASE_URL={{.DB_URL}} KUBEDASH_DATABASE_URL={{.DB_URL}} .venv/bin/python -m flask --app wsgi db upgrade"
 
-  # Internal: the dev-stack backend run (separate task so the `dir: backend`
-  # scoping + env block stay clean). Called by dev-stack, not meant to be
-  # invoked directly.
+  # Internal: the dev-stack backend runs (separate tasks so the `dir: backend`
+  # scoping + env block stay clean). Called by dev-stack / dev-stack-ssl, not
+  # meant to be invoked directly. ADR-0027: dev-stack is the plain-HTTP daily
+  # loop (:8080, COOKIE_SECURE=false — the honest flag for plain HTTP,
+  # ADR-0025); dev-stack-ssl is the TLS variant (backend :8443 over HTTPS,
+  # Secure cookie honest end-to-end, ProxyFix via KUBEDASH_TLS_EDGE).
+
   backend-stack-run:
     internal: true
     dir: backend
@@ -287,12 +344,33 @@ tasks:
       KUBEDASH_STATIC_DIR: "{{.STATIC_DIR}}"
       KUBEDASH_ROLE: "leader"
       KUBEDASH_REPLICA_ID: "local"
-      # ADR-0026: the dev stack now runs behind the TLS edge — the Secure
-      # cookie is honest end-to-end (browser leg HTTPS, internal leg HTTPS
-      # via :8443). The plain-HTTP carve-out is `task dev-up` + a manual
-      # `backend-run` (KUBEDASH_COOKIE_SECURE=false, no TLS).
+      # ADR-0025/0027: plain-HTTP fast path — the Secure flag off is the
+      # honest state for http://localhost (a Secure cookie over plain HTTP is
+      # stored but never sent back). Production stays Secure (the default).
+      KUBEDASH_COOKIE_SECURE: "false"
+      FLASK_RUN_PORT: "8080"
+    cmds:
+      # Double-fork so the backend survives `task` exiting: the intermediate
+      # shell exits immediately, re-parenting the backend to init (macOS has
+      # no setsid; nohup alone was reaped with the task's process group).
+      - "sh -c 'nohup .venv/bin/python wsgi.py > /tmp/kubedash-backend.log 2>&1 &'"
+      - "sleep 2"
+      - "echo 'Backend started (PID $(pgrep -f 'python.*wsgi.py' | head -1)). Logs: /tmp/kubedash-backend.log'"
+      - "cat /tmp/kubedash-backend.log"
+
+  backend-stack-run-ssl:
+    internal: true
+    dir: backend
+    env:
+      KUBEDASH_BOOTSTRAP_ADMIN_EMAIL: "{{.ADMIN_EMAIL}}"
+      KUBEDASH_BOOTSTRAP_ADMIN_PASSWORD: "{{.ADMIN_PASSWORD}}"
+      KUBEDASH_STATIC_DIR: "{{.STATIC_DIR}}"
+      KUBEDASH_ROLE: "leader"
+      KUBEDASH_REPLICA_ID: "local"
+      # ADR-0026: behind the TLS edge the Secure cookie is honest end-to-end
+      # (browser leg HTTPS, internal leg HTTPS via :8443).
       KUBEDASH_COOKIE_SECURE: "true"
-      # ADR-0026: the dev-stack backend serves :8443 over TLS — the nginx
+      # ADR-0026: the dev-stack-ssl backend serves :8443 over TLS — the nginx
       # edge's upstream target (proxy_ssl_verify checks it against the mkcert
       # rootCA). Single-port trade-off: with the cert set, the dev backend
       # serves 8443-over-TLS and NOT plain :8080 (see wsgi.py __main__).
@@ -311,27 +389,28 @@ tasks:
 
   # ---- E2E (Playwright auth-smoke, no kind needed) ---------------------------
   #
-  # Runs the local auth-smoke spec against the plain-HTTP fast path:
-  # `task dev-up` (data stores) + `task backend-run` on :8080. The backend
-  # must be up first (task backend-run in another terminal, or the backend
-  # left running). The TLS edge's browser test is `task e2e-ssl`. Asserts the
-  # three seams unit tests miss: SPA shell render (no JS crash), local login
-  # → profile + synthetic cluster, and the wrong-password error path.
+  # Runs the local auth-smoke spec against the plain-HTTP backend:
+  # `task dev-stack` (or `task dev-up` + `task backend-run`) on :8080. The
+  # backend must be up first (dev-stack leaves it running in the background).
+  # The TLS edge's browser test is `task e2e-ssl` (against dev-stack-ssl).
+  # Asserts the three seams unit tests miss: SPA shell render (no JS crash),
+  # local login → profile + synthetic cluster, and the wrong-password error
+  # path.
   #
-  #   task dev-up + task backend-run   # terminal 1 (keep running)
+  #   task dev-stack                   # terminal 1 (backend stays up)
   #   task e2e                         # terminal 2
 
   e2e:
-    desc: "Run the Playwright auth-smoke e2e against the plain-HTTP fast path (task dev-up + task backend-run on :8080; the TLS edge is e2e-ssl)"
+    desc: "Run the Playwright auth-smoke e2e against the plain-HTTP backend (task dev-stack / backend-run on :8080; the TLS edge is e2e-ssl)"
     dir: frontend
     cmds:
       - "corepack pnpm exec playwright test e2e/auth-smoke.spec.ts"
 
   e2e-ssl:
-    desc: "Run the Playwright auth-smoke e2e against https://kubedash.local:443 (ADR-0026 backstop)"
+    desc: "Run the Playwright auth-smoke e2e against https://kubedash.dev.local:443 (needs task dev-stack-ssl; ADR-0026/0027 backstop)"
     dir: frontend
     env:
-      E2E_BASE_URL: "https://kubedash.local:{{.EDGE_HTTPS}}"
+      E2E_BASE_URL: "https://kubedash.dev.local:{{.EDGE_HTTPS}}"
       # The mkcert CA: today the Chromium launched by Playwright inherits it
       # from the host keychain (`sudo mkcert -install`), so no launch args are
       # needed — this var is kept for a non-keychain fallback (e.g. CI) and
