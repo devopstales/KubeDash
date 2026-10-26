@@ -19,12 +19,13 @@ pipeline:
 # current_change pointer.
 in_flight:
   - change: 2026-10-26-ini-config-source
-    phase: blueprint
+    phase: slicing
     # Spec trio + blueprint + ADR-0028 written 2026-10-26; T2 critic ran
-    # (NEEDS FIXES -> all 19 findings applied + user confirmed the resolution
-    # set). Next: user approves the final blueprint -> slicing (tasks.md) ->
-    # execution handoff. ADR-0021 supersede (bootstrap-admin delivery) is the
-    # one-way-door STOP on Task 3.
+    # (19 findings applied); KUBEDASH_HOME anchor added (replaces
+    # KUBEDASH_STATIC_DIR + config-file knob). Sliced 2026-10-26: 5 tickets,
+    # 5 serial waves, feature-branch-chain (High risk ~900-1100 lines).
+    # One-way checkpoint on TICKET-03 (ADR-0021 supersede). Next: ticketing
+    # -> execution handoff.
     tracker: []
   - change: 2026-10-26-network-policy
     phase: blueprint
