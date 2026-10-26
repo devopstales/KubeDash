@@ -2,7 +2,7 @@ import { render, screen } from '@testing-library/react'
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query'
 import { MemoryRouter } from 'react-router-dom'
 import { afterEach, beforeEach, expect, test } from 'vitest'
-import { http, HttpResponse } from 'msw'
+import { http, HttpResponse, type AnyHandler } from 'msw'
 import type { ReactElement } from 'react'
 import { server } from '../msw'
 import CrdsView from '../../src/views/Cluster/CRDs'
@@ -90,7 +90,7 @@ const INSTANCES = {
   ],
 }
 
-const renderAt = (ui: ReactElement, path: string, handlers: Parameters<typeof server.use>[]) => {
+const renderAt = (ui: ReactElement, path: string, handlers: AnyHandler[]) => {
   useClusterStore.setState({
     selectedCluster: { id: 1, name: 'prod' },
     selectedNamespace: 'team-a',
