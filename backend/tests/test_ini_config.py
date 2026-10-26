@@ -193,6 +193,26 @@ def test_sso_and_deployment_and_optional(tmp_path: pathlib.Path, monkeypatch: py
     assert s.tls_edge is True
 
 
+def test_monitoring_jaeger_section(tmp_path: pathlib.Path, monkeypatch: pytest.MonkeyPatch) -> None:
+    # [monitoring] is the 5.0 observability section (ADR-0003): a bool gate +
+    # the OTLP HTTP endpoint. Defaults: disabled, empty endpoint.
+    home = _write_ini(
+        _home(tmp_path),
+        "[monitoring]\njaeger_enabled = true\njaeger_http_endpoint = http://jaeger:4318\n",
+    )
+    monkeypatch.setenv("KUBEDASH_HOME", str(home))
+    ini_config.reset()
+    s = _config.get_settings()
+    assert s.jaeger_enabled is True
+    assert s.jaeger_http_endpoint == "http://jaeger:4318"
+    # Absent section -> disabled by default.
+    _write_ini(home, "[DEFAULT]\napp_mode = development\n")
+    ini_config.reset()
+    s = _config.get_settings()
+    assert s.jaeger_enabled is False
+    assert s.jaeger_http_endpoint == ""
+
+
 def test_app_mode_no_default_leak(tmp_path: pathlib.Path, monkeypatch: pytest.MonkeyPatch) -> None:
     home = _write_ini(_home(tmp_path), "[deployment]\napp_mode = production\n")
     monkeypatch.setenv("KUBEDASH_HOME", str(home))
@@ -261,3 +281,4 @@ def test_example_file_parses_and_has_no_secrets() -> None:
     for k in ("jwt_secret", "secret_key", "admin_password"):
         assert (parser.get("security", k) or "").strip() == ""
     assert (parser.get("sso_settings", "secret") or "").strip() == ""
+    assert (parser.get("monitoring", "jaeger_http_endpoint") or "").strip() == ""

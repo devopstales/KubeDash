@@ -61,6 +61,13 @@ issuer_url =
 # Optional: comma-separated "email:role" pairs for dev-stack bootstrap.
 bootstrap_users =
 
+[monitoring]
+# OTel -> Jaeger/Tempo trace export (ADR-0003).  Override via
+# KUBEDASH_JAEGER_ENABLED / KUBEDASH_JAEGER_HTTP_ENDPOINT.
+jaeger_enabled = false
+# OTLP HTTP collector the app exports spans to (e.g. http://localhost:4318).
+jaeger_http_endpoint =
+
 [deployment]
 # REQUIRED: path to the admin cluster's kubeconfig (empty = in-cluster).
 admin_kubeconfig =

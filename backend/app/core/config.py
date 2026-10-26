@@ -78,6 +78,13 @@ class Settings(BaseSettings):
     sso_bootstrap_users: str = Field(
         default_factory=lambda: ini_config.resolve("sso_bootstrap_users")
     )
+    # [monitoring] Jaeger/OTel (ADR-0003 observability; ADR-0028 new 5.0 section)
+    jaeger_enabled: bool = Field(
+        default_factory=lambda: ini_config.resolve_bool("jaeger_enabled")
+    )
+    jaeger_http_endpoint: str = Field(
+        default_factory=lambda: ini_config.resolve("jaeger_http_endpoint")
+    )
 
 
 _settings: Settings | None = None

@@ -97,6 +97,13 @@ _FIELDS: dict[str, tuple[str, str, tuple[str, ...], bool, str, bool]] = {
     "sso_bootstrap_users": (
         "sso_settings", "bootstrap_users", ("KUBEDASH_SSO_BOOTSTRAP_USERS",), True, "", False,
     ),
+    # [monitoring] (ADR-0003 observability; ADR-0028 new 5.0 section)
+    "jaeger_enabled": (
+        "monitoring", "jaeger_enabled", ("KUBEDASH_JAEGER_ENABLED",), True, "false", True,
+    ),
+    "jaeger_http_endpoint": (
+        "monitoring", "jaeger_http_endpoint", ("KUBEDASH_JAEGER_HTTP_ENDPOINT",), True, "", False,
+    ),
 }
 
 # env name -> field (for apply_overrides: the mapping keys are env names)
