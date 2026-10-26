@@ -20,6 +20,8 @@ from app.api._authhook import apply_auth
 from app.api._cluster import cluster_for as _cluster_for
 from app.core.errors import (
     ClusterAlreadyExistsError,
+    ClusterNotFoundError,
+    ClusterUnreachableError,
     InvalidKubeconfigError,
     RbacDeniedError,
     ResourceKindNotSupportedError,
@@ -36,6 +38,7 @@ _PROTECTED_NAMESPACES = frozenset(
 
 #: kind → (K8sClient method, kubernetes resource name, API group)
 _RBAC_GROUP = "rbac.authorization.k8s.io"
+_CRD_GROUP = "apiextensions.k8s.io"
 _KINDS: dict[str, tuple[str, str, str]] = {
     "pods": ("list_pods", "pods", ""),
     "namespaces": ("list_namespaces", "namespaces", ""),
@@ -46,11 +49,13 @@ _KINDS: dict[str, tuple[str, str, str]] = {
     "clusterroles": ("list_cluster_roles", "clusterroles", _RBAC_GROUP),
     "clusterrolebindings": ("list_cluster_role_bindings", "clusterrolebindings", _RBAC_GROUP),
     "secrets": ("list_secrets", "secrets", ""),
+    "crds": ("list_crds", "customresourcedefinitions", _CRD_GROUP),
 }
 
 #: kind → K8sClient method for a single-object ``?name=`` lookup
 _GETTERS: dict[str, str] = {
     "secrets": "get_secret",
+    "crds": "get_crd",
 }
 
 
@@ -96,6 +101,58 @@ class ResourceApi(Api):
             raise RbacDeniedError(f"list on {api_resource}")
         items = getattr(pool.get(cluster), method)(namespace)
         return {"items": items, "kind": kind, "cluster": cluster.name}
+
+    @blp.route("/clusters/<int:cluster_id>/resources/crds/instances", methods=["GET"])
+    @blp.response(200, ResourceListOut)
+    @blp.doc(
+        responses={
+            403: "RBAC_DENIED (either SAR)",
+            404: "CLUSTER_NOT_FOUND (binding gate) or the CRD does not exist",
+            502: "CLUSTER_UNREACHABLE",
+        }
+    )
+    def list_crd_instances(self, cluster_id: int) -> dict[str, object]:
+        """Instances of one CRD's resource — the detail page behind a CRD.
+
+        Two SAR gates, both asked BEFORE the read (ADR-0004: the SAR is the
+        only gate, no exceptions — including for the CRD's own definition):
+        ``list`` on the CRD (``customresourcedefinitions``, needed to resolve
+        served version + scope) and ``list`` on the CRD's resource itself
+        (e.g. ``applications`` in ``argoproj.io``). Each 403 names the denied
+        resource so the view can say which grant is missing.
+
+        Query: ``name`` = the CRD plural (e.g. ``applications.argoproj.io``);
+        ``namespace`` = applied only when the CRD is namespaced-scoped.
+        """
+        name = request.args.get("name")
+        if not name:
+            raise ResourceKindNotSupportedError("instances lookup on kind 'crds' needs ?name=")
+        cluster = _cluster_for(g.current_user, cluster_id)
+        client = pool.get(cluster)
+        if not rbac.can(g.current_user, cluster, "list", "customresourcedefinitions", None, name, _CRD_GROUP):
+            raise RbacDeniedError("list on customresourcedefinitions")
+        crds = client.get_crd(None, name)
+        if not crds:
+            raise ClusterNotFoundError(f"CRD '{name}' not found")
+        crd = crds[0]
+        spec = crd.get("spec") or {}
+        group = spec.get("group") or ""
+        # Prefer the storage version (the API server's write path); fall back
+        # to any served version. Explicit over ``next(...)`` which would pick
+        # the first declared version regardless of storage.
+        versions = spec.get("versions") or []
+        served = next(
+            (v for v in versions if v.get("served") and v.get("name") and v.get("storage")), None
+        ) or next((v for v in versions if v.get("served") and v.get("name")), None)
+        if served is None:
+            raise ClusterUnreachableError(f"CRD '{name}' has no served version")
+        plural = ((spec.get("names") or {}).get("plural")) or name
+        scope_namespaced = spec.get("scope") == "Namespaced"
+        namespace = request.args.get("namespace") if scope_namespaced else None
+        if not rbac.can(g.current_user, cluster, "list", plural, namespace, None, group):
+            raise RbacDeniedError(f"list on {plural}")
+        items = client.list_crd_instances(group, served["name"], plural, namespace)
+        return {"items": items, "kind": "crds", "cluster": cluster.name}
 
     @blp.route("/clusters/<int:cluster_id>/resources/namespaces", methods=["POST"])
     @blp.arguments(NamespaceIn)

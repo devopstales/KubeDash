@@ -38,6 +38,10 @@ function expectedStubs() {
     // the list at /cluster/node; the detail is /cluster/node/data.
     '/cluster/node',
     '/cluster/node/data',
+    // Real view (CRD endpoint + views) — not a stub route. The nav leaf
+    // targets the list at /cluster/crd; the detail is /cluster/crd/data.
+    '/cluster/crd',
+    '/cluster/crd/data',
     // Real view (2026-10-21-cluster-dashboard, Task 6) — not a stub route.
     '/dashboard/cluster-metric',
   ])
@@ -85,7 +89,6 @@ test('every-stub-entry-has-a-page', () => {
   }
   for (const title of [
     'Workload',
-    'CRDs',
     'Ingress',
     'VolumeClaims',
     'Network Policies',

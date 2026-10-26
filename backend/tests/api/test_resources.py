@@ -164,6 +164,49 @@ class FakeK8s:
             },
         ]
 
+    def list_crds(self, _namespace: str | None) -> list[dict]:
+        # Cluster-scoped: the namespace argument is ignored (mirrors the real
+        # K8sClient.list_crds). The shape mirrors a real CRD to_dict — the
+        # instances route reads spec.group/names/scope/versions off it.
+        return [
+            {
+                "metadata": {"name": "applications.argoproj.io"},
+                "spec": {
+                    "group": "argoproj.io",
+                    "names": {"kind": "Application", "plural": "applications"},
+                    "scope": "Namespaced",
+                    "versions": [
+                        {"name": "v1alpha1", "served": True, "storage": True},
+                        {"name": "v1", "served": True, "storage": False},
+                    ],
+                },
+            }
+        ]
+
+    def get_crd(self, _namespace: str, name: str) -> list[dict]:
+        [crd] = self.list_crds(None)
+        if crd["metadata"]["name"] != name:
+            return []
+        return [crd]
+
+    def list_crd_instances(
+        self, group: str, version: str, plural: str, namespace: str | None
+    ) -> list[dict]:
+        # Projected 4.1 shape; the fake echoes the namespace when namespaced.
+        self.crd_instance_calls: list[tuple] = []
+        self.crd_instance_calls.append((group, version, plural, namespace))
+        return [
+            {
+                "name": "app-1",
+                "namespace": namespace,
+                "status": "True",
+                "type": "Ready",
+                "reason": "Ok",
+                "message": "all good",
+                "created": "2026-01-02T03:04:05Z",
+            }
+        ]
+
     def readyz(self) -> bool:
         return True
 
@@ -625,6 +668,194 @@ def test_invalid_namespace_name_is_422(
     assert r.status_code == 422
     assert r.get_json()["error"]["code"] == "INVALID_KUBECONFIG"
     assert fake_k8s.created_namespaces == []
+
+
+def test_list_crds_200_cluster_scoped(api_client, auth_client, fake_k8s, monkeypatch) -> None:
+    """The CRDs view lists cluster-scoped CRDs (SAR on
+    ``list customresourcedefinitions`` in ``apiextensions.k8s.io``)."""
+    auth_client.login()
+    h = {"Authorization": f"Bearer {auth_client.jwt}"}
+    _register(api_client, h)
+    _allow_sar(monkeypatch)
+    r = api_client.get("/api/v1/clusters/1/resources/crds", headers=h)
+    assert r.status_code == 200
+    body = r.get_json()
+    assert body["kind"] == "crds"
+    assert body["cluster"] == "prod"
+    [crd] = body["items"]
+    assert crd["metadata"]["name"] == "applications.argoproj.io"
+
+
+def test_get_crd_by_name_returns_single_item(api_client, auth_client, fake_k8s, monkeypatch) -> None:
+    """The CRD detail page reads one CRD via the ``_GETTERS`` path."""
+    auth_client.login()
+    h = {"Authorization": f"Bearer {auth_client.jwt}"}
+    _register(api_client, h)
+    _allow_sar(monkeypatch)
+    r = api_client.get(
+        "/api/v1/clusters/1/resources/crds?name=applications.argoproj.io", headers=h
+    )
+    assert r.status_code == 200
+    [crd] = r.get_json()["items"]
+    assert crd["spec"]["group"] == "argoproj.io"
+
+
+def test_get_missing_crd_returns_no_items(api_client, auth_client, fake_k8s, monkeypatch) -> None:
+    auth_client.login()
+    h = {"Authorization": f"Bearer {auth_client.jwt}"}
+    _register(api_client, h)
+    _allow_sar(monkeypatch)
+    r = api_client.get("/api/v1/clusters/1/resources/crds?name=gone.example.io", headers=h)
+    assert r.status_code == 200
+    assert r.get_json()["items"] == []
+
+
+def test_list_crds_asks_sar_for_list(api_client, auth_client, fake_k8s, monkeypatch) -> None:
+    auth_client.login()
+    h = {"Authorization": f"Bearer {auth_client.jwt}"}
+    _register(api_client, h)
+    asked = _record_sar(monkeypatch)
+    r = api_client.get("/api/v1/clusters/1/resources/crds", headers=h)
+    assert r.status_code == 403
+    assert asked == [("list", "customresourcedefinitions", None, None, "apiextensions.k8s.io")]
+
+
+def test_get_crd_asks_sar_for_get_on_that_name(api_client, auth_client, fake_k8s, monkeypatch) -> None:
+    """The ``?name=`` lookup is SAR-gated with ``get`` (matching the secrets
+    ``_GETTERS`` precedent), not ``list``."""
+    auth_client.login()
+    h = {"Authorization": f"Bearer {auth_client.jwt}"}
+    _register(api_client, h)
+    asked = _record_sar(monkeypatch)
+    r = api_client.get(
+        "/api/v1/clusters/1/resources/crds?name=applications.argoproj.io", headers=h
+    )
+    assert r.status_code == 403
+    assert r.get_json()["error"]["code"] == "RBAC_DENIED"
+    # namespace defaults to "default" on the ``?name=`` path (the shared
+    # _GETTERS convention — see the secrets ``?name=`` tests); the CRD is
+    # cluster-scoped so the value is cosmetic, but the SAR cache key carries it.
+    assert asked == [
+        ("get", "customresourcedefinitions", "default", "applications.argoproj.io", "apiextensions.k8s.io")
+    ]
+
+
+def test_get_crd_by_name_sar_allow_returns_item(
+    api_client, auth_client, fake_k8s, monkeypatch
+) -> None:
+    auth_client.login()
+    h = {"Authorization": f"Bearer {auth_client.jwt}"}
+    _register(api_client, h)
+    _allow_sar(monkeypatch)
+    r = api_client.get(
+        "/api/v1/clusters/1/resources/crds?name=applications.argoproj.io", headers=h
+    )
+    assert r.status_code == 200
+    assert len(r.get_json()["items"]) == 1
+
+
+def test_list_crd_instances_200_namespaced(
+    api_client, auth_client, fake_k8s, monkeypatch
+) -> None:
+    """The CRD detail page lists the CRD's instances: two SARs (list on the
+    CRD + list on the instances) both pass, the namespace is applied because
+    the fake CRD is Namespaced-scoped."""
+    auth_client.login()
+    h = {"Authorization": f"Bearer {auth_client.jwt}"}
+    _register(api_client, h)
+    _allow_sar(monkeypatch)
+    r = api_client.get(
+        "/api/v1/clusters/1/resources/crds/instances"
+        "?name=applications.argoproj.io&namespace=team-a",
+        headers=h,
+    )
+    assert r.status_code == 200
+    body = r.get_json()
+    assert body["kind"] == "crds"
+    [inst] = body["items"]
+    assert inst["name"] == "app-1"
+    assert inst["namespace"] == "team-a"
+    # The instances route prefers the STORAGE served version (v1alpha1 in the
+    # fake CRD), not the first declared version.
+    assert fake_k8s.crd_instance_calls == [("argoproj.io", "v1alpha1", "applications", "team-a")]
+
+
+def test_list_crd_instances_first_sar_denied(
+    api_client, auth_client, fake_k8s, monkeypatch
+) -> None:
+    """A deny on the FIRST gate (list on the CRD) short-circuits: only one
+    SAR is recorded, and the 403 names customresourcedefinitions. The second
+    SAR (list on the instances) is never asked."""
+    auth_client.login()
+    h = {"Authorization": f"Bearer {auth_client.jwt}"}
+    _register(api_client, h)
+    asked = _record_sar(monkeypatch)
+    r = api_client.get(
+        "/api/v1/clusters/1/resources/crds/instances?name=applications.argoproj.io",
+        headers=h,
+    )
+    assert r.status_code == 403
+    assert r.get_json()["error"]["code"] == "RBAC_DENIED"
+    assert asked == [
+        ("list", "customresourcedefinitions", None, "applications.argoproj.io", "apiextensions.k8s.io")
+    ]
+
+
+def test_list_crd_instances_second_sar_denied(
+    api_client, auth_client, fake_k8s, monkeypatch
+) -> None:
+    """The first SAR (list on the CRD) passes; the second (list on the
+    instances) is denied — the 403 names the instance plural, and the client
+    method is never called."""
+    auth_client.login()
+    h = {"Authorization": f"Bearer {auth_client.jwt}"}
+    _register(api_client, h)
+    import app.services.rbac as rb
+
+    asked: list[tuple] = []
+
+    def selective(client, verb, resource, ns, name, group=""):
+        asked.append((verb, resource, ns, name, group))
+        # Allow the CRD read, deny the instance list.
+        return resource == "customresourcedefinitions"
+
+    monkeypatch.setattr(rb, "_cache_get", lambda k: None)
+    monkeypatch.setattr(rb, "_cache_set", lambda k, v: None)
+    monkeypatch.setattr(rb, "_sar_allowed", selective)
+    r = api_client.get(
+        "/api/v1/clusters/1/resources/crds/instances?name=applications.argoproj.io&namespace=team-a",
+        headers=h,
+    )
+    assert r.status_code == 403
+    assert r.get_json()["error"]["code"] == "RBAC_DENIED"
+    assert asked == [
+        ("list", "customresourcedefinitions", None, "applications.argoproj.io", "apiextensions.k8s.io"),
+        ("list", "applications", "team-a", None, "argoproj.io"),
+    ]
+
+
+def test_list_crd_instances_missing_crd_404(api_client, auth_client, fake_k8s, monkeypatch) -> None:
+    """A ``?name=`` that no CRD matches is a CLUSTER_NOT_FOUND, not a 500 —
+    the second SAR is never asked (the CRD read is what resolves it)."""
+    auth_client.login()
+    h = {"Authorization": f"Bearer {auth_client.jwt}"}
+    _register(api_client, h)
+    _allow_sar(monkeypatch)
+    r = api_client.get(
+        "/api/v1/clusters/1/resources/crds/instances?name=gone.example.io", headers=h
+    )
+    assert r.status_code == 404
+    assert r.get_json()["error"]["code"] == "CLUSTER_NOT_FOUND"
+
+
+def test_list_crd_instances_requires_name(api_client, auth_client, fake_k8s, monkeypatch) -> None:
+    auth_client.login()
+    h = {"Authorization": f"Bearer {auth_client.jwt}"}
+    _register(api_client, h)
+    _allow_sar(monkeypatch)
+    r = api_client.get("/api/v1/clusters/1/resources/crds/instances", headers=h)
+    assert r.status_code == 404
+    assert r.get_json()["error"]["code"] == "RESOURCE_KIND_NOT_SUPPORTED"
 
 
 @pytest.mark.integration

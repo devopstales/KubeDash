@@ -441,6 +441,132 @@ class K8sClient:
         interposes here later; for now this is a live read."""
         return [e.to_dict() for e in self._v1.list_event_for_all_namespaces().items]
 
+    # CRD reads (apiextensions.k8s.io/v1). kubernetes 37 has no generated
+    # ApiextensionsV1Api — the same gap as metrics.k8s.io (see ``node_usage``)
+    # — so the reads go through the shared ``ApiClient``'s CustomObjectsApi.
+    _CRD_GROUP_VERSION = "apiextensions.k8s.io/v1"
+    _CRD_PLURAL = "customresourcedefinitions"
+
+    def _custom(self) -> Any:
+        """A ``CustomObjectsApi`` on this client's ``ApiClient`` (one auth ctx).
+
+        Unit tests substitute ``self._api_client`` with a fake exposing the
+        ``select_header_*``/``param_serialize``/``_call_with_legacy_options``
+        contract (the same seam ``node_usage`` relies on for metrics.k8s.io).
+        """
+        return k8s_client.CustomObjectsApi(self._api_client)
+
+    @staticmethod
+    def _crd_body(resp: Any) -> dict[str, Any]:
+        """The generated ``CustomObjectsApi`` methods return the 3-tuple
+        ``(data, status, headers)`` (the raw-``call_api`` path in
+        ``node_usage`` reads the body itself; the CustomObjectsApi generated
+        methods do not). ``data`` is a plain dict — no ``to_dict``.
+
+        Only ``401`` is raised as an ``ApiException`` by the generated
+        method (its ``_response_types_map``); any other non-2xx status comes
+        back in the tuple and is mapped to ``ClusterUnreachableError`` here
+        (the service never sees a raw status the caller must interpret).
+        """
+        if isinstance(resp, tuple):
+            data, status = resp[0], resp[1]
+        else:
+            data, status = resp, 200
+        if status is not None and status >= 400:
+            raise ClusterUnreachableError(f"cluster unreachable (status {status})")
+        return data if isinstance(data, dict) else {}
+
+    def list_crds(self, _namespace: str | None) -> list[dict[str, Any]]:
+        """CRD list in dict form. Cluster-scoped; the namespace argument does
+        not apply (mirrors ``list_nodes``)."""
+        group, _, version = self._CRD_GROUP_VERSION.partition("/")
+        try:
+            resp = self._custom().list_cluster_custom_object(group, version, self._CRD_PLURAL)
+        except ApiException as e:
+            self._unreachable("list_crds", e)
+            raise AssertionError("unreachable") from e
+        body = self._crd_body(resp)
+        items = body.get("items", [])
+        return [item.to_dict() if hasattr(item, "to_dict") else item for item in items]
+
+    def get_crd(self, _namespace: str, name: str) -> list[dict[str, Any]]:
+        """One CRD as a 0/1-item list (mirrors ``get_secret``); ``[]`` on 404.
+
+        ``_namespace`` is accepted for the ``_GETTERS`` call convention but
+        ignored — CRDs are cluster-scoped.
+        """
+        group, _, version = self._CRD_GROUP_VERSION.partition("/")
+        try:
+            item = self._custom().get_cluster_custom_object(group, version, self._CRD_PLURAL, name)
+        except ApiException as e:
+            if e.status == 404:
+                return []
+            self._unreachable("get_crd", e)
+            raise AssertionError("unreachable") from e
+        item = self._crd_body(item)
+        return [item.to_dict() if hasattr(item, "to_dict") else item]
+
+    @staticmethod
+    def _crd_served(crd: dict[str, Any]) -> tuple[str, str] | None:
+        """The established served version + scope of a CRD dict.
+
+        Returns ``(version, scope)`` or ``None`` when the CRD has no
+        established served version (a version being added is not served yet).
+        The CRD's OWN status is the scope/version authority — no client-side
+        guessing (the 4.1 namespaced→cluster fallback is deliberately absent).
+        """
+        spec = crd.get("spec") or {}
+        scope = "Namespaced" if spec.get("scope") == "Namespaced" else "Cluster"
+        for v in spec.get("versions") or []:
+            if v.get("served") and v.get("name"):
+                return (v["name"], scope)
+        return None
+
+    def list_crd_instances(
+        self, group: str, version: str, plural: str, namespace: str | None
+    ) -> list[dict[str, Any]]:
+        """Instances of one CRD's resource, projected to the 4.1 shape:
+        ``{name, namespace, status, type, reason, message, created}``.
+
+        ``namespace`` is honored only for namespaced-scoped CRDs; a
+        cluster-scoped list ignores it (the view reads the scope from the CRD
+        itself and only sends the topbar namespace when it applies).
+        Condition extraction prefers a ``Ready`` condition, else the first
+        (4.1 ``get_custom_resource_data``), falling back to top-level
+        ``status.phase``/``status.state``.
+        """
+        custom = self._custom()
+        resp = (
+            custom.list_namespaced_custom_object(group, version, namespace, plural)
+            if namespace
+            else custom.list_cluster_custom_object(group, version, plural)
+        )
+        body = self._crd_body(resp)
+        results: list[dict[str, Any]] = []
+        for item in body.get("items", []):
+            item = item.to_dict() if hasattr(item, "to_dict") else item
+            metadata = item.get("metadata") or {}
+            status = item.get("status") or {}
+            conditions = status.get("conditions") or []
+            condition: dict[str, Any] = {}
+            ready = next((c for c in conditions if c.get("type") == "Ready"), None)
+            if ready is not None:
+                condition = ready
+            elif conditions:
+                condition = conditions[0]
+            results.append(
+                {
+                    "name": metadata.get("name") or "",
+                    "namespace": metadata.get("namespace"),
+                    "status": condition.get("status") or status.get("phase") or status.get("state") or "",
+                    "type": condition.get("type") or "",
+                    "reason": condition.get("reason") or status.get("reason") or "",
+                    "message": condition.get("message") or status.get("message") or "",
+                    "created": metadata.get("creationTimestamp"),
+                }
+            )
+        return results
+
     def list_secrets(self, namespace: str | None) -> list[dict[str, Any]]:
         """Secret list in the standard kubernetes dict form (``to_dict``)
         without ``data``/``string_data``: values are read one secret at a

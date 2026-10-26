@@ -20,6 +20,8 @@ const NamespacesView = React.lazy(() => import('./views/Cluster/Namespaces'))
 const NamespaceDataView = React.lazy(() => import('./views/Cluster/NamespaceData'))
 const NodesView = React.lazy(() => import('./views/Cluster/Nodes'))
 const NodeDataView = React.lazy(() => import('./views/Cluster/NodeData'))
+const CrdsView = React.lazy(() => import('./views/Cluster/CRDs'))
+const CrdDataView = React.lazy(() => import('./views/Cluster/CrdData'))
 const ProfileView = React.lazy(() => import('./views/Profile'))
 const PermissionsView = React.lazy(() => import('./views/Permissions'))
 const KubeconfigView = React.lazy(() => import('./views/Kubeconfig'))
@@ -306,6 +308,22 @@ const App = () => {
                       element={
                         <ProtectedRoute>
                           <NodeDataView />
+                        </ProtectedRoute>
+                      }
+                    />
+                    <Route
+                      path="/cluster/crd"
+                      element={
+                        <ProtectedRoute>
+                          <CrdsView />
+                        </ProtectedRoute>
+                      }
+                    />
+                    <Route
+                      path="/cluster/crd/data"
+                      element={
+                        <ProtectedRoute>
+                          <CrdDataView />
                         </ProtectedRoute>
                       }
                     />

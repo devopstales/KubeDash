@@ -188,6 +188,51 @@ export interface K8sSecret {
   [key: string]: unknown
 }
 
+/**
+ * A CustomResourceDefinition item as returned by
+ * /api/v1/clusters/<id>/resources/crds. Kubernetes ``to_dict`` uses snake_case
+ * on the metadata/spec nesting, but the CustomObjectsApi items keep the
+ * camelCase ``creationTimestamp`` (the raw dict, not a generated model).
+ */
+export interface K8sCrd {
+  metadata?: {
+    name?: string
+    creationTimestamp?: string | null
+    [key: string]: unknown
+  }
+  spec?: {
+    group?: string | null
+    names?: {
+      kind?: string | null
+      plural?: string | null
+    } | null
+    scope?: string | null
+    versions?:
+      | {
+          name?: string | null
+          served?: boolean | null
+          storage?: boolean | null
+        }[]
+      | null
+  }
+  [key: string]: unknown
+}
+
+/**
+ * A projected row of GET /api/v1/clusters/<id>/resources/crds/instances —
+ * the 4.1 condition projection ({name, namespace, status, type, reason,
+ * message, created}), not a raw custom object (CRD schemas are arbitrary).
+ */
+export interface CrdInstance {
+  name: string
+  namespace: string | null
+  status: string
+  type: string
+  reason: string
+  message: string
+  created: string | null
+}
+
 // --- Cluster dashboard (2026-10-21-cluster-dashboard) — shapes mirror the wire contract ---
 
 /** A row of GET /api/v1/clusters/<id>/metrics/summary. `used_*` are null when the Metrics API is unreachable (certainty rule: unknown, never 0). */

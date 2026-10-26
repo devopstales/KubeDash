@@ -8,6 +8,7 @@
   "/api/v1/clusters/{cluster_id}",
   "/api/v1/clusters/{cluster_id}/health",
   "/api/v1/clusters/{cluster_id}/resources/{kind}",
+  "/api/v1/clusters/{cluster_id}/resources/crds/instances",
   "/api/v1/logs/query",
   "/api/v1/metrics/query",
   "/api/v1/metrics/query_range",
@@ -31,7 +32,7 @@
   "/api/v1/admin/groups",
   "/api/v1/admin/groups/{name}",
   "/api/v1/admin/groups/{name}/members",
-  "/api/v1/admin/groups/{name}/members/{user_sub}",
+
   "/api/v1/scim/v2/users",
   "/api/v1/scim/v2/groups",
   "/api/v1/projects",
