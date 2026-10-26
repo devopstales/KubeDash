@@ -4,8 +4,11 @@
 project: kubedash
 
 # Where the knowledge base + ADRs + specs live.
+# 2026-10-26: knowledge root moved .skillgrid/artifacts/ -> .skillgrid/knowledge/
+# (OKF v0.2 bundle: decisions/, glossary/, invariants/, workflows/, reference/
+# + index.md / log.md / reverse-index.md).
 conventions:
-  artifacts: .skillgrid/artifacts
+  artifacts: .skillgrid/knowledge
   specs_root: .skillgrid/specs
   archive_root: .skillgrid/archive
   state_file: .skillgrid/state.yaml
