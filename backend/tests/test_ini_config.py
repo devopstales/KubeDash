@@ -247,3 +247,17 @@ def test_retired_k8s_and_plugin_sections_ignored(tmp_path: pathlib.Path, monkeyp
     s = _config.get_settings()  # must NOT raise on [k8s]/[plugin_settings]
     assert s.kubedash_jwt_secret == "a"
     assert s.admin_kubeconfig == "/kc"
+
+
+# ---------------------------------------------------------------------------
+# TICKET-04: example file sanity
+# ---------------------------------------------------------------------------
+
+
+def test_example_file_parses_and_has_no_secrets() -> None:
+    p = pathlib.Path(__file__).resolve().parent.parent / "kubedash.ini.example"
+    parser = ini_config.load_ini(str(p))  # interpolation OFF -> '%' safe
+    assert parser.get("DEFAULT", "app_mode") == "development"
+    for k in ("jwt_secret", "secret_key", "admin_password"):
+        assert (parser.get("security", k) or "").strip() == ""
+    assert (parser.get("sso_settings", "secret") or "").strip() == ""

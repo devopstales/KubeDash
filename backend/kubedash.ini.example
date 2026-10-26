@@ -1,0 +1,82 @@
+# KubeDash configuration (4.1 format, minus plugins).
+#
+# Precedence (highest wins):
+#   create_app overrides  >  env (KUBEDASH_* / unprefixed alias)  >  INI
+#     >  optional/behavior default  >  ConfigError (required key missing).
+#
+# This file is the PRIMARY source for identities and credentials. Env vars
+# (KUBEDASH_*) override INI values — use them for secrets you don't want in
+# the file (the chart's Secret does this for jwt_secret / secret_key).
+#
+# REQUIRED keys (fail-fast at boot if absent from all sources):
+#   [security] jwt_secret
+#   [security] secret_key
+#   [deployment] admin_kubeconfig
+#
+# OPTIONAL keys (in-code defaults):
+#   bootstrap_admin_email = admin@kubedash.local  (4.1 parity)
+#   bootstrap_admin_password = changeme           (4.1 parity)
+#   cookie_secure = true   (ADR-0025 fail-closed)
+#   flask_env = development
+#   kubedash_role = worker
+#   kubedash_replica_id = local
+#
+# Retired sections (4.1 legacy — present in old files, IGNORED by 5.0):
+#   [k8s], [plugin_settings]
+
+[DEFAULT]
+app_mode = development
+
+[security]
+# REQUIRED: 32+ byte random string.  Override via KUBEDASH_JWT_SECRET.
+jwt_secret =
+# REQUIRED: 32+ byte random string (AES-256-GCM key). Override via KUBEDASH_SECRET_KEY.
+secret_key =
+# Optional: bootstrap admin password (default: changeme). Override via KUBEDASH_BOOTSTRAP_ADMIN_PASSWORD.
+admin_password =
+
+[database]
+# EITHER a single url (wins) OR split fields.  4.1 type=sqlite3 maps to
+# postgres + a warning (5.0 is Postgres-only).
+# url = postgresql://user:pass@host:5432/kubedash
+type = postgres
+host = localhost:5432
+name = kubedash
+user = kubedash
+password = kubedash
+
+[remote_cache]
+# EITHER a single url (wins) OR split fields.
+# url = redis://:pass@host:6379/0
+redis_host = localhost
+redis_port = 6379
+redis_db = 0
+redis_password =
+
+[sso_settings]
+# OIDC SSO (optional).  Override via KUBEDASH_OIDC_CLIENT_ID / _SECRET / _ISSUER.
+client_id =
+secret =
+issuer_url =
+# Optional: comma-separated "email:role" pairs for dev-stack bootstrap.
+bootstrap_users =
+
+[deployment]
+# REQUIRED: path to the admin cluster's kubeconfig (empty = in-cluster).
+admin_kubeconfig =
+# Optional knobs (defaults shown):
+kubedash_role = worker
+kubedash_replica_id = local
+cookie_secure = true
+tls_edge = false
+# CORS origins (comma-separated). Empty = same-origin only.
+cors_origins =
+# Plugin server URL (empty = 500 INTERNAL_ERROR on kubeconfig download).
+plugin_server =
+# Tuning (§7.5):
+first_paint_backstop = 5m
+namespace_list_timeout = 5s
+
+[bootstrap]
+# Optional: bootstrap admin email (default: admin@kubedash.local).
+bootstrap_admin_email =
