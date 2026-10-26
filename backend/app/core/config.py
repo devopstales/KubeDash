@@ -40,6 +40,10 @@ class Settings(BaseSettings):
     # (env_prefix + field name), same convention as KUBEDASH_KUBEDASH_JWT_SECRET.
     bootstrap_admin_email: str = ""
     bootstrap_admin_password: str = ""
+    # SSO bootstrap: pre-create users at boot (dev-stack OIDC provider).
+    # Format: comma-separated "email:role" pairs, e.g. "dev@local:user,admin-ss@local:admin".
+    # These are OIDC users (auth_source='oidc'), NOT the local bootstrap admin.
+    sso_bootstrap_users: str = ""
     # ADR-0021: admin kubeconfig source — empty → in-cluster service account,
     # set → kubeconfig file path. Declared here; CONSUMED by the next tickets
     # (client pool admin source / TICKET-15).
@@ -53,6 +57,10 @@ class Settings(BaseSettings):
     # (None) → GET /kubeconfig answers 500 INTERNAL_ERROR. Consumed by the
     # kubeconfig ticket, declared here.
     plugin_server: str | None = None
+    # ADR-0026 (TLS edge): when True, the app assumes it is behind a TLS
+    # terminating proxy and applies ProxyFix + Secure cookies. Dev stack
+    # sets KUBEDASH_TLS_EDGE=true; in-cluster is False by default.
+    tls_edge: bool = False
 
 
 _settings: Settings | None = None

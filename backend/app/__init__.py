@@ -149,6 +149,48 @@ def _bootstrap_local_admin(app: Flask) -> None:
         from app.services.groups import ensure_role_groups
 
         ensure_role_groups(db.session)
+    # SSO bootstrap: pre-create OIDC users (dev-stack). Runs after the local
+    # admin so ensure_role_groups covers both.
+    _bootstrap_sso_users(app)
+
+
+def _bootstrap_sso_users(app: Flask) -> None:
+    """Pre-create OIDC users from KUBEDASH_SSO_BOOTSTRAP_USERS (dev-stack).
+
+    Format: comma-separated "email:role" pairs. Each user gets sub=<email>,
+    auth_source='oidc'. Idempotent: on_conflict_do_nothing on the unique
+    email constraint. Roles: 'user' (default) or 'admin'."""
+    s = get_settings()
+    if not s.sso_bootstrap_users:
+        return
+    from sqlalchemy.dialects.postgresql import insert as pg_insert
+
+    from app.models.user import User
+
+    pairs = [p.strip() for p in s.sso_bootstrap_users.split(",") if p.strip()]
+    if not pairs:
+        return
+    with app.app_context():
+        for pair in pairs:
+            if ":" not in pair:
+                continue
+            email, role = pair.rsplit(":", 1)
+            role = role.strip() if role.strip() in ("user", "admin") else "user"
+            email = email.strip()
+            stmt = pg_insert(User).values(
+                sub=email,
+                email=email,
+                display_name=email.split("@")[0],
+                role=role,
+                auth_source="oidc",
+                groups=[],
+            )
+            stmt = stmt.on_conflict_do_nothing(index_elements=["email"])
+            db.session.execute(stmt)
+        db.session.commit()
+        from app.services.groups import ensure_role_groups
+
+        ensure_role_groups(db.session)
 
 
 def register_health(app: Flask) -> None:

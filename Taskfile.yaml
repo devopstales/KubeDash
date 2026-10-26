@@ -229,9 +229,9 @@ tasks:
   #   task dev-stack-down     # stop the backend + compose stack
 
   dev-stack:
-    desc: "Start the full local env: compose + schema + backend on plain HTTP :8080 (bootstrap admin, static wired)"
+    desc: "Start the full local env: compose + schema + backend on plain HTTP :8080 (bootstrap admin, SSO, static wired)"
     cmds:
-      - "{{.COMPOSE}} up -d postgres redis prometheus grafana jaeger"
+      - "{{.COMPOSE}} up -d postgres redis prometheus grafana jaeger sso"
       # Wait for Postgres to accept connections (compose 'healthy' covers the
       # data store, but the app needs the TCP port answering).
       - "{{.COMPOSE}} exec -T postgres pg_isready -U {{.DB_USER}} -d {{.DB_NAME}}"
@@ -349,6 +349,12 @@ tasks:
       # stored but never sent back). Production stays Secure (the default).
       KUBEDASH_COOKIE_SECURE: "false"
       FLASK_RUN_PORT: "8080"
+      # SSO (dev-stack OIDC provider on :8888): the backend speaks OIDC to
+      # the SSO server; the two pre-created users are bootstrapped at start.
+      KUBEDASH_OIDC_ISSUER: "http://localhost:8888"
+      KUBEDASH_OIDC_CLIENT_ID: "kubedash-dev"
+      KUBEDASH_OIDC_CLIENT_SECRET: "dev-sso-secret-32-bytes!!!!!01"
+      KUBEDASH_SSO_BOOTSTRAP_USERS: "dev@local:user,admin-ss@local:admin"
     cmds:
       # Double-fork so the backend survives `task` exiting: the intermediate
       # shell exits immediately, re-parenting the backend to init (macOS has

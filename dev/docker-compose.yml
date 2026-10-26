@@ -144,9 +144,9 @@ services:
       - "host-gateway:host-gateway"
     # WHY curl (not wget): nginx:1.27 (debian) ships /usr/bin/curl 7.88 but
     # NO wget — the original wget probe exited 127, so the container could
-    # never reach "healthy". --resolve maps kubedash.local to 127.0.0.1 so the
-    # mkcert SAN matches (no -k/--insecure needed) and --cacert verifies the
-    # CHAIN against the mkcert rootCA — the half that matters for a health
+    # never reach "healthy". --resolve maps kubedash.dev.local to 127.0.0.1 so
+    # the mkcert SAN matches (no -k/--insecure needed) and --cacert verifies
+    # the CHAIN against the mkcert rootCA — the half that matters for a health
     # check. A 502 (backend down) is NOT a health failure: the edge itself is
     # healthy, so accept 2xx/3xx/502 and fail on anything else.
     healthcheck:
@@ -156,11 +156,25 @@ services:
       # ($code, $hc_code, \$(...)) was silently blanked, leaving `case in`
       # (dash: "word unexpected"). $(curl ...) contains no $, so the
       # substitution itself survives to the shell.
-      test: ["CMD-SHELL", "case $(curl -s -o /dev/null -w '%{http_code}' --cacert /etc/nginx/certs/rootCA.pem --resolve kubedash.local:443:127.0.0.1 https://kubedash.local:443/healthz) in 2*|3*|502) exit 0;; *) exit 1;; esac"]
+      test: ["CMD-SHELL", "case $(curl -s -o /dev/null -w '%{http_code}' --cacert /etc/nginx/certs/rootCA.pem --resolve kubedash.dev.local:443:127.0.0.1 https://kubedash.dev.local:443/healthz) in 2*|3*|502) exit 0;; *) exit 1;; esac"]
       interval: 10s
       timeout: 5s
       retries: 5
       start_period: 10s
+
+  sso:
+    build:
+      context: ./sso
+    ports:
+      - "${SSO_PORT:-8888}:8888"
+    environment:
+      SSO_ISSUER: "http://localhost:${SSO_PORT:-8888}"
+      SSO_CLIENT_ID: "kubedash-dev"
+      SSO_SECRET: "dev-sso-secret-32-bytes!!!!!01"
+      # Pre-created SSO users: email:name:role (comma-separated).
+      # These are NOT the local bootstrap admin (KUBEDASH_BOOTSTRAP_ADMIN_*).
+      SSO_USERS: "dev@local:Dev User:user,admin-ss@local:SSO Admin:admin"
+    restart: unless-stopped
 
 volumes:
   pgdata:
