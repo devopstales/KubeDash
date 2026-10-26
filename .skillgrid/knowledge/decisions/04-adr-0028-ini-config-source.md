@@ -59,6 +59,10 @@ The question this ADR decides: what is the configuration source of record for
 - **Testability** — tests must inject configuration without writing files; the
   existing `config_overrides` seam in `create_app` and the `monkeypatch.setenv`
   usage in the suite must keep working under the new resolution model.
+- **One anchor, derived paths** — a single `KUBEDASH_HOME` (the app root) is the
+  only location the operator/app reasons about; the INI, the static dir, and any
+  other home-relative path are *derived* from it, not separately configured.
+  `KUBEDASH_STATIC_DIR` (and a `KUBEDASH_CONFIG_FILE` knob) are dropped.
 
 #### Considered Options
 
@@ -87,8 +91,12 @@ Configuration is resolved, per key, in this order:
 
 1. **`kubedash.ini`** — the primary operator-facing source. Shipped as
    `kubedash.ini.example` (sane, commented, `app_mode=development`, empty
-   operator secrets) and read from a configurable location
-   (`KUBEDASH_CONFIG` / `KUBEDASH_CONFIG_FILE`, default `kubedash.ini`).
+   operator secrets). Its location is **derived, not configured**:
+   `<KUBEDASH_HOME>/kubedash.ini`. `KUBEDASH_HOME` is the app root — set in the
+   container (`/app`), and in dev hard-derived from `wsgi.py`'s own location
+   (`<repo>/backend`), so it is never manually set in the dev loop. The INI and
+   the static dir (`<KUBEDASH_HOME>/static`) and any other home-relative path
+   all derive from this single anchor; `KUBEDASH_STATIC_DIR` is dropped.
 2. **Environment (`KUBEDASH_*`)** — overrides the INI for the same key. This is
    the chart's Secret/ConfigMap injection path. Env values are *not* a
    fallback: they win, but they do not fill a gap that the operator is expected
@@ -126,9 +134,17 @@ the values now live in the INI, env still overrides.
 
 - **Negative / accepted trade-offs.**
   - **Migration cost.** The `Settings` class, the `create_app` override seam,
-    every `get_settings()` consumer, the Taskfile, the chart, and the test
-    fixtures (which inject env via `monkeypatch.setenv`) all change. This is a
-    cross-cutting refactor, not a one-file swap.
+    every `get_settings()` consumer, the Taskfile, the chart, the Dockerfile,
+    and the test fixtures (which inject env via `monkeypatch.setenv`) all
+    change. This is a cross-cutting refactor, not a one-file swap.
+  - **`KUBEDASH_HOME` is a new contract.** The app now *discovers* its home at
+    start and derives every home-relative path from it. The dev fallback
+    (`wsgi.py`'s own dir = `<repo>/backend`) is load-bearing: the INI and the
+    static bundle must both live under `<home>/` (`backend/kubedash.ini`,
+    `backend/static`). `fe-sync` already targets `backend/static`, so the static
+    side is unchanged; the INI simply moves to `backend/kubedash.ini`. The
+    container bakes `KUBEDASH_HOME=/app` (where `dist` is copied to `/app/static`
+    and the operator mounts `/app/kubedash.ini`).
   - **Two sources to reason about.** INI + env means precedence rules must be
     documented and the resolution code must be explicit and unit-tested.
   - **`[k8s]` is not 4.1.** 5.0's multi-cluster registry (clusters as DB rows,

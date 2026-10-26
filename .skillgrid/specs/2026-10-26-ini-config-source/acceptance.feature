@@ -47,6 +47,27 @@ Feature: Configuration source (kubedash.ini)
     Then cookie_secure is true and flask_env is development
     And kubedash_role is worker and kubedash_replica_id is local
 
+  Scenario: home-paths-derived-from-kubedash-home
+    # happy path — home derivation
+    Given KUBEDASH_HOME is set to a home directory
+    When the app discovers its home at start
+    Then the INI path is home/kubedash.ini
+    And the static dir is home/static
+
+  Scenario: home-falls-back-to-wsgi-dir
+    # edge — home derivation (dev: KUBEDASH_HOME unset)
+    Given KUBEDASH_HOME is unset
+    When the app discovers its home at start
+    Then the home is the directory containing wsgi.py (backend)
+    And the INI path is backend/kubedash.ini and the static dir is backend/static
+
+  Scenario: static-dir-from-home-paths
+    # happy path — KUBEDASH_STATIC_DIR dropped
+    Given the SPA is built into the home static dir
+    When a browser requests the SPA index
+    Then the app serves it from the home-derived static dir
+    And no KUBEDASH_STATIC_DIR environment variable is set or read
+
   # ------------------------------------------------------------------ schema
 
   Scenario: database-split-or-url
@@ -87,9 +108,10 @@ Feature: Configuration source (kubedash.ini)
 
   Scenario: dev-stack-boots-from-ini
     # backstop — R1, R7 (runtime: full dev stack, not the test client)
-    Given task dev-stack points KUBEDASH_CONFIG_FILE at dev/kubedash.ini
+    Given task dev-stack with KUBEDASH_HOME derived to backend
     When the backend boots
-    Then the bootstrap admin and KUBEDASH_ROLE come from the INI
+    Then the bootstrap admin and KUBEDASH_ROLE come from backend/kubedash.ini
+    And the SPA is served from backend/static (home-derived, no KUBEDASH_STATIC_DIR)
     And the health endpoint returns 200
 
   Scenario: chart-env-overrides-ini
