@@ -47,6 +47,7 @@ Chain strategy: feature-branch-chain
 
 ### TICKET-01 — INI>env>override resolution core + home derivation + Settings projection
 
+- **Tracker ID:** TASK-033
 - **Scope:** New `app/core/ini_config.py` (home discovery, `home_paths()`, `load_ini`,
   `apply_overrides`, `resolve`, `reset`, `ConfigError`) with a partial `_FIELDS` (security +
   behavior/optional knobs); rewrite `config.py` fields to `default_factory=ini_config.resolve`;
@@ -72,6 +73,7 @@ Chain strategy: feature-branch-chain
 
 ### TICKET-02 — Full 4.1 INI schema (database/remote_cache/sso/deployment, split-or-url, bools)
 
+- **Tracker ID:** TASK-034
 - **Scope:** Complete `_FIELDS` for every current `Settings` field; add `_resolve_database`
   (split-or-url + `quote_plus`) and `_resolve_redis` (split-or-url, port/db defaults); `flask_env`
   DEFAULT/no-leak fallback; `sso_bootstrap_users` optional; bool parse for `tls_edge`/
@@ -89,6 +91,7 @@ Chain strategy: feature-branch-chain
 
 ### TICKET-03 — Fail-fast on required keys + retire [k8s]/[plugin_settings]
 
+- **Tracker ID:** TASK-035
 - **Scope:** Define `REQUIRED = {kubedash_jwt_secret, kubedash_secret_key, bootstrap_admin_email,
   bootstrap_admin_password, admin_kubeconfig}`; `resolve` raises `ConfigError` for these when
   absent from overrides/env/INI; confirm `[k8s]`/`[plugin_settings]` are unmapped (a 4.1 file
@@ -106,6 +109,7 @@ Chain strategy: feature-branch-chain
 
 ### TICKET-04 — Ship kubedash.ini.example + strip in-code identity defaults
 
+- **Tracker ID:** TASK-036
 - **Scope:** Create `backend/kubedash.ini.example` (4.1 format, empty secrets, commented
   retired sections); strip the dead in-code defaults from `config.py` (identity/credential fields
   are `default_factory=ini_config.resolve` with no literal; only optional/behavior knobs keep a
@@ -122,6 +126,7 @@ Chain strategy: feature-branch-chain
 
 ### TICKET-05 — Dev wiring (Taskfile + Dockerfile) + chart env-override backstop
 
+- **Tracker ID:** TASK-037
 - **Scope:** Create `backend/kubedash.ini` (gitignored, dev values); drop `KUBEDASH_STATIC_DIR`
   from all four Taskfile targets (`backend-run`, `backend-run-worker`, `dev-stack`,
   `dev-stack-ssl`) and the inline bootstrap/cookie env (INI carries them); keep

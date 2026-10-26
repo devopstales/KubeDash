@@ -26,7 +26,7 @@ in_flight:
     # 5 serial waves, feature-branch-chain (High risk ~900-1100 lines).
     # One-way checkpoint on TICKET-03 (ADR-0021 supersede). Next: ticketing
     # -> execution handoff.
-    tracker: []
+    tracker: [TASK-033, TASK-034, TASK-035, TASK-036, TASK-037]
   - change: 2026-10-26-network-policy
     phase: blueprint
     # Spec trio + blueprint written 2026-10-26; T2 critic ran
