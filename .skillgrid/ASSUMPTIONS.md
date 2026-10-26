@@ -5,9 +5,9 @@
 > architectural decisions apply. The index stores a short description + the
 > path to each ADR file; `status` / `date` / `supersedes` live in the file's
 > frontmatter, **not** here. One decision per ADR file at
-> `.skillgrid/artifacts/04-adr-NNNN-slug.md`.
+> `.skillgrid/knowledge/decisions/04-adr-NNNN-slug.md`.
 
-**Highest sequence in use:** 0025
+**Highest sequence in use:** 0028
 
 ---
 
@@ -57,32 +57,34 @@ are kept, with `In force: no`. Never delete a row; flip it instead (IRON RULE).
 
 | Seq | Title | In force | Path |
 |---|---|---|---|
-| ADR-0001 | Flask + Flask-Smorest over FastAPI (sync WSGI, auto-OpenAPI, Pydantic-native schemas, SocketIO) | yes | `artifacts/04-adr-0001-flask-smorest.md` |
-| ADR-0002 | Multi-cluster via encrypted kubeconfig registry (one-way-door) | yes | `artifacts/04-adr-0002-multi-cluster-registry.md` |
-| ADR-0003 | Observability as query-only (no ingest) | yes | `artifacts/04-adr-0003-observability-query-only.md` |
-| ADR-0004 | RBAC proxy via SubjectAccessReview (not local role mapping) — addendum 2026-10-21: the SAR verdict cache key carries every SAR attribute (`sar:<cluster>:<sub>:<verb>:<resource>:<group>:<namespace>:<name>`); resource reads use the registry credentials, so a verdict for one namespace or object must never answer for another | yes | `artifacts/04-adr-0004-rbac-proxy-sar.md` |
-| ADR-0005 | CoreUI React + free admin template over shadcn/ui/Tailwind | yes | `artifacts/04-adr-0005-coreui-react.md` |
-| ADR-0006 | Single-container deployment (Gunicorn serves API + static SPA) | yes | `artifacts/04-adr-0006-single-container.md` |
-| ADR-0007 | RQ over Celery for async tasks | yes | `artifacts/04-adr-0007-rq-over-celery.md` |
-| ADR-0008 | Leader election via PG advisory lock + lease table | yes | `artifacts/04-adr-0008-leader-election.md` |
-| ADR-0009 | SSE over WebSocket for server→client push | yes | `artifacts/04-adr-0009-sse-over-websocket.md` |
-| ADR-0010 | Informer-based in-memory cache | yes | `artifacts/04-adr-0010-informer-cache.md` |
-| ADR-0011 | kubectl credential plugin with server-managed SSO config | yes | `artifacts/04-adr-0011-kubectl-credential-plugin.md` |
-| ADR-0012 | Aggregated API server for Project + SSOUser + SSOGroup | yes | `artifacts/04-adr-0012-aggregated-api.md` |
-| ADR-0013 | Permission management: role templates + self-service kubeconfig + drift detection (core implemented: templates, bind/unbind, self-service kubeconfig; drift detection not in this change) | yes | `artifacts/04-adr-0013-permission-management.md` |
-| ADR-0014 | Session revocation propagation (web logout kills kubectl session) | yes | `artifacts/04-adr-0014-session-revocation-propagation.md` |
-| ADR-0015 | Namespace-as-a-Service (self-service onboarding + TTL'd grants) | yes | `artifacts/04-adr-0015-namespace-as-a-service.md` |
-| ADR-0016 | Privileged Access Management (additive elevation + auto-revert + break-glass) | yes | `artifacts/04-adr-0016-privileged-access-management.md` |
-| ADR-0017 | Just-In-Time login provisioning (Helm-declared builtin pipeline) | yes | `artifacts/04-adr-0017-jit-login-provisioning.md` |
-| ADR-0018 | SCIM 2.0 Gateway (IdP/HR push; identity decoupled from bindings) | yes | `artifacts/04-adr-0018-scim-2-0-gateway.md` |
-| ADR-0019 | Ingress Auth Integration (`/auth/verify` for NGINX/Traefik/Istio/Gateway API) | yes | `artifacts/04-adr-0019-ingress-auth-integration.md` |
-| ADR-0020 | Air-Gap Deployment (zero outbound calls at runtime; air-gap ≠ no-IdP) — superseded-in-part by ADR-0021 (the bootstrap-admin local mode is now implemented; the multi-user no-IdP deferral remains) | yes | `artifacts/04-adr-0020-air-gap-deployment.md` |
-| ADR-0021 | Local Admin Auth — bootstrap password mode (env-driven bootstrap admin + admin kubeconfig source; SSO stays primary) | yes | `artifacts/04-adr-0021-local-admin-auth.md` |
-| ADR-0022 | Sidebar navigation — 4.1 information-parity structure (sections, groups, entry names, order, admin gating); 4.1 Plugins group dropped (no 5.0 plugin system) | yes | `artifacts/04-adr-0022-sidebar-nav-4-1-parity.md` |
-| ADR-0023 | User-management lists use DataTables React with the Bootstrap 5 skin (4.1 table structure; CoreUI shell unchanged) | yes | `artifacts/04-adr-0023-datatables-react.md` |
-| ADR-0024 | Secret values use react-syntax-highlighter (highlight.js grammars, an-old-hope theme) instead of the 4.1 highlight.js script | yes | `artifacts/04-adr-0024-secret-syntax-highlight.md` |
-| ADR-0025 | Browser session transport is HttpOnly cookies (`kd_access` + `kd_refresh`, hint `kd_session`); `Authorization: Bearer` stays accepted for the kubectl plugin; no credentials in URLs or `localStorage` | yes | `artifacts/04-adr-0025-http-only-session-cookie.md` |
-| ADR-0026 | TLS edge + security header layer (nginx edge with internal HTTPS; ProxyFix gated on KUBEDASH_TLS_EDGE; 4.1 header set restored with two recorded deviations) | yes | `artifacts/04-adr-0026-tls-edge-and-security-headers.md` |
+| ADR-0001 | Flask + Flask-Smorest over FastAPI (sync WSGI, auto-OpenAPI, Pydantic-native schemas, SocketIO) | yes | `knowledge/decisions/04-adr-0001-flask-smorest.md` |
+| ADR-0002 | Multi-cluster via encrypted kubeconfig registry (one-way-door) | yes | `knowledge/decisions/04-adr-0002-multi-cluster-registry.md` |
+| ADR-0003 | Observability as query-only (no ingest) | yes | `knowledge/decisions/04-adr-0003-observability-query-only.md` |
+| ADR-0004 | RBAC proxy via SubjectAccessReview (not local role mapping) — addendum 2026-10-21: the SAR verdict cache key carries every SAR attribute (`sar:<cluster>:<sub>:<verb>:<resource>:<group>:<namespace>:<name>`); resource reads use the registry credentials, so a verdict for one namespace or object must never answer for another | yes | `knowledge/decisions/04-adr-0004-rbac-proxy-sar.md` |
+| ADR-0005 | CoreUI React + free admin template over shadcn/ui/Tailwind | yes | `knowledge/decisions/04-adr-0005-coreui-react.md` |
+| ADR-0006 | Single-container deployment (Gunicorn serves API + static SPA) | yes | `knowledge/decisions/04-adr-0006-single-container.md` |
+| ADR-0007 | RQ over Celery for async tasks | yes | `knowledge/decisions/04-adr-0007-rq-over-celery.md` |
+| ADR-0008 | Leader election via PG advisory lock + lease table | yes | `knowledge/decisions/04-adr-0008-leader-election.md` |
+| ADR-0009 | SSE over WebSocket for server→client push | yes | `knowledge/decisions/04-adr-0009-sse-over-websocket.md` |
+| ADR-0010 | Informer-based in-memory cache | yes | `knowledge/decisions/04-adr-0010-informer-cache.md` |
+| ADR-0011 | kubectl credential plugin with server-managed SSO config | yes | `knowledge/decisions/04-adr-0011-kubectl-credential-plugin.md` |
+| ADR-0012 | Aggregated API server for Project + SSOUser + SSOGroup | yes | `knowledge/decisions/04-adr-0012-aggregated-api.md` |
+| ADR-0013 | Permission management: role templates + self-service kubeconfig + drift detection (core implemented: templates, bind/unbind, self-service kubeconfig; drift detection not in this change) | yes | `knowledge/decisions/04-adr-0013-permission-management.md` |
+| ADR-0014 | Session revocation propagation (web logout kills kubectl session) | yes | `knowledge/decisions/04-adr-0014-session-revocation-propagation.md` |
+| ADR-0015 | Namespace-as-a-Service (self-service onboarding + TTL'd grants) | yes | `knowledge/decisions/04-adr-0015-namespace-as-a-service.md` |
+| ADR-0016 | Privileged Access Management (additive elevation + auto-revert + break-glass) | yes | `knowledge/decisions/04-adr-0016-privileged-access-management.md` |
+| ADR-0017 | Just-In-Time login provisioning (Helm-declared builtin pipeline) | yes | `knowledge/decisions/04-adr-0017-jit-login-provisioning.md` |
+| ADR-0018 | SCIM 2.0 Gateway (IdP/HR push; identity decoupled from bindings) | yes | `knowledge/decisions/04-adr-0018-scim-2-0-gateway.md` |
+| ADR-0019 | Ingress Auth Integration (`/auth/verify` for NGINX/Traefik/Istio/Gateway API) | yes | `knowledge/decisions/04-adr-0019-ingress-auth-integration.md` |
+| ADR-0020 | Air-Gap Deployment (zero outbound calls at runtime; air-gap ≠ no-IdP) — superseded-in-part by ADR-0021 (the bootstrap-admin local mode is now implemented; the multi-user no-IdP deferral remains) | yes | `knowledge/decisions/04-adr-0020-air-gap-deployment.md` |
+| ADR-0021 | Local Admin Auth — bootstrap password mode (env-driven bootstrap admin + admin kubeconfig source; SSO stays primary) | yes | `knowledge/decisions/04-adr-0021-local-admin-auth.md` |
+| ADR-0022 | Sidebar navigation — 4.1 information-parity structure (sections, groups, entry names, order, admin gating); 4.1 Plugins group dropped (no 5.0 plugin system) | yes | `knowledge/decisions/04-adr-0022-sidebar-nav-4-1-parity.md` |
+| ADR-0023 | User-management lists use DataTables React with the Bootstrap 5 skin (4.1 table structure; CoreUI shell unchanged) | yes | `knowledge/decisions/04-adr-0023-datatables-react.md` |
+| ADR-0024 | Secret values use react-syntax-highlighter (highlight.js grammars, an-old-hope theme) instead of the 4.1 highlight.js script | yes | `knowledge/decisions/04-adr-0024-secret-syntax-highlight.md` |
+| ADR-0025 | Browser session transport is HttpOnly cookies (`kd_access` + `kd_refresh`, hint `kd_session`); `Authorization: Bearer` stays accepted for the kubectl plugin; no credentials in URLs or `localStorage` | yes | `knowledge/decisions/04-adr-0025-http-only-session-cookie.md` |
+| ADR-0026 | TLS edge + security header layer (nginx edge with internal HTTPS; ProxyFix gated on KUBEDASH_TLS_EDGE; 4.1 header set restored with two recorded deviations) — superseded by ADR-0027 (the TLS edge is no longer the `dev-stack` default) | no | `knowledge/decisions/04-adr-0026-tls-edge-and-security-headers.md` |
+| ADR-0027 | Plain-HTTP dev-stack default (backend :8080, COOKIE_SECURE=false, no cert precondition, no host :443/:80 bind); the ADR-0026 TLS edge is the opt-in `task dev-stack-ssl` (backend :8443, COOKIE_SECURE=true, KUBEDASH_TLS_EDGE) | yes | `knowledge/decisions/04-adr-0027-plain-http-dev-stack-default.md` |
+| ADR-0028 | Configuration source: `kubedash.ini` (4.1 format, minus plugins) as the primary operator-facing config, env (`KUBEDASH_*`) as override, no hard-coded defaults for identities/credentials (fail fast at boot) — supersedes-in-part the env-driven bootstrap-admin delivery of ADR-0021 | yes | `knowledge/decisions/04-adr-0028-ini-config-source.md` |
 
 > **Note on ADR-0001..0013:** these are listed in `ARCHITECTURE.md` §12 as the
 > initial-architecture decisions "to be authored at brainstorming time." As of

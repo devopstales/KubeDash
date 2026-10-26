@@ -18,6 +18,14 @@ pipeline:
 # at its own phase so its pipeline position is durable without stealing the
 # current_change pointer.
 in_flight:
+  - change: 2026-10-26-ini-config-source
+    phase: blueprint
+    # Spec trio + blueprint + ADR-0028 written 2026-10-26; T2 critic ran
+    # (NEEDS FIXES -> all 19 findings applied + user confirmed the resolution
+    # set). Next: user approves the final blueprint -> slicing (tasks.md) ->
+    # execution handoff. ADR-0021 supersede (bootstrap-admin delivery) is the
+    # one-way-door STOP on Task 3.
+    tracker: []
   - change: 2026-10-26-network-policy
     phase: blueprint
     # Spec trio + blueprint written 2026-10-26; T2 critic ran
