@@ -173,6 +173,7 @@ services:
       SSO_SECRET: "dev-sso-secret-32-bytes!!!!!01"
       # Pre-created SSO users: email:name:role (comma-separated).
       # These are NOT the local bootstrap admin (KUBEDASH_BOOTSTRAP_ADMIN_*).
+      # Extra (non-role) groups are hardcoded in server.py (_user_extra_groups).
       SSO_USERS: "dev@local:Dev User:user,admin-ss@local:SSO Admin:admin"
     restart: unless-stopped
 

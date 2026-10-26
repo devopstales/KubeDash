@@ -58,6 +58,14 @@ for _entry in os.environ.get("SSO_USERS", "").split(","):
             "role": "user",
         })
 
+# Hardcoded extra (non-role) groups per user — for testing group-based RBAC
+# from the IdP. These ride alongside the kubedash-role group in the OIDC
+# `groups` claim.
+_user_extra_groups: dict[str, list[str]] = {
+    "dev@local": ["team-platform", "team-observability"],
+    "admin-ss@local": ["team-platform"],
+}
+
 # In-memory code store: {code: (user, redirect_uri, state, expires)}
 _codes: dict[str, tuple[dict, str, str, float]] = {}
 
@@ -79,9 +87,17 @@ def _make_id_token(user: dict) -> str:
         "iat": now,
         "email": user["email"],
         "name": user["name"],
-        "groups": [f"kubedash-{user['role']}"],
+        "groups": _groups_for(user),
     }
     return jwt.encode(payload, SSO_SECRET, algorithm="HS256")
+
+
+def _groups_for(user: dict) -> list[str]:
+    """The role group + any extra groups from SSO_USER_GROUPS."""
+    groups = [f"kubedash-{user['role']}"]
+    extra = _user_extra_groups.get(user["sub"], [])
+    groups.extend(extra)
+    return groups
 
 
 def _make_access_token(user: dict) -> str:
@@ -214,7 +230,7 @@ def userinfo():
         "sub": user["sub"],
         "email": user["email"],
         "name": user["name"],
-        "groups": [f"kubedash-{user['role']}"],
+        "groups": _groups_for(user),
     })
 
 
