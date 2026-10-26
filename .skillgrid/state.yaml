@@ -18,6 +18,13 @@ pipeline:
 # at its own phase so its pipeline position is durable without stealing the
 # current_change pointer.
 in_flight:
+  - change: 2026-10-26-network-policy
+    phase: blueprint
+    # Spec trio + blueprint written 2026-10-26; T2 critic ran
+    # (NEEDS FIXES -> all findings applied + user-decided the Created
+    # column's local-time format). Next: user approves the final
+    # blueprint -> slicing (tasks.md) -> execution handoff.
+    tracker: []
   - change: 2026-10-19-user-management
     phase: qa
     # All 8 tickets (TICKET-01..08) implemented + reviewed; QA gate PASS
