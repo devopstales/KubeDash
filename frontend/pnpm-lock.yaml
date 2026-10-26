@@ -1275,7 +1275,7 @@ packages:
     resolution: {integrity: sha512-bTdQtbF+m6lPd5UdVvyqD7AT+xV1eLgGFYtyRlREEnB7ynmsVRBxGqKdsVRjOJfwtA9k9BYiR1R+g0SxBKGcqA==}
 
   datatables.net-dt@3.1.4:
-    resolution: {integrity: sha512-bTdQtbF+m6lPd5UdVvyqD7AT+xV1eLgGFQxyRlREEnB7ynmsVRBxGqKdsVRjOJfwtA9k9BYiR1R+g0SxBKGcqA==}
+    resolution: {integrity: sha512-HST6HmWEMr6SA6FM2SpYu2ko0In5nHjUb03Ocop2gsHLWoRP18sgVbehxUtRS3QZP4eHfU68ujs/gnzd0U2t9g==}
 
   datatables.net-react@2.0.0:
     resolution: {integrity: sha512-Q8HJ8AT/y9R70eW92VMUXI1FTc4teC09gs+AQ4mgR0JealjT8gC24TBiU2Ow6/VldEZE3Wi+al1HGXsV7R1qhg==}
