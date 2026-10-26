@@ -17,10 +17,10 @@
 # Invoked by the root Taskfile:  task multi-up / multi-down / multi-logs
 set -euo pipefail
 
-# Repo root: this file lives in dev/, the Taskfile resolves this script via
-# {{.TASKFILE_DIR}}/dev/mux.sh. Derive the root from the script's own path so
-# the driver works even if moved alongside the Taskfile.
-ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
+# Repo root: this file lives in dev/scripts/, the Taskfile resolves this
+# script via {{.TASKFILE_DIR}}/dev/scripts/mux.sh. Derive the root from the
+# script's own path so the driver works even if moved.
+ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/../.." && pwd)"
 STATE="$ROOT/tmp"
 PY="$ROOT/backend/.venv/bin/python"
 
