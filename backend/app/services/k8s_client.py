@@ -45,13 +45,28 @@ from app.core.errors import (
 _VERSION = 0x01
 _NONCE_LEN = 12
 
-_key: bytes = hashlib.sha256(get_settings().kubedash_secret_key.encode()).digest()
+# The AES key is derived from ``kubedash_secret_key`` LAZILY (I4): a
+# REQUIRED field that resolves on first encrypt/decrypt, not at module
+# import. Import-time resolution would fail-fast before the INI/env is
+# configured (e.g. ``import app.services.k8s_client`` in a test that never
+# builds an app). The key is invariant for the process lifetime, so cache
+# the first derivation.
+_key_cache: bytes | None = None
+
+
+def _key() -> bytes:
+    global _key_cache
+    if _key_cache is None:
+        _key_cache = hashlib.sha256(
+            get_settings().kubedash_secret_key.encode()
+        ).digest()
+    return _key_cache
 
 
 def encrypt_kubeconfig(plain: bytes) -> bytes:
     """Store form: ``0x01 || nonce || AES-GCM(nonce, key, plaintext)``."""
     nonce = secrets.token_bytes(_NONCE_LEN)
-    ct = AESGCM(_key).encrypt(nonce, plain, None)
+    ct = AESGCM(_key()).encrypt(nonce, plain, None)
     return bytes([_VERSION]) + nonce + ct
 
 
@@ -66,7 +81,7 @@ def decrypt_kubeconfig(enc: bytes) -> bytes:
         raise ValueError("unknown kubeconfig version")
     nonce = enc[1 : 1 + _NONCE_LEN]
     try:
-        return AESGCM(_key).decrypt(nonce, enc[1 + _NONCE_LEN :], None)
+        return AESGCM(_key()).decrypt(nonce, enc[1 + _NONCE_LEN :], None)
     except Exception as e:  # cryptography raises InvalidTag/ValueError
         raise ValueError("kubeconfig decryption failed") from e
 

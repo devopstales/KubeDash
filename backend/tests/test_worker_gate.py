@@ -10,11 +10,13 @@ Tier split:
 
 import importlib
 import importlib.util
+import os
 from collections.abc import Iterator
 from pathlib import Path
 
 import pytest
 
+from app.core import ini_config
 from app.core.leader import Leader
 
 # wsgi.py lives at backend/wsgi.py (next to the app package), NOT at
@@ -36,6 +38,22 @@ def _import_wsgi():
 import sys  # noqa: E402
 
 wsgi = _import_wsgi()  # module-level import; reload below re-executes
+# ADR-0028: wsgi.main() builds the app (create_app) — it now fail-fasts on
+# missing REQUIRED keys, so set a fixture KUBEDASH_HOME + required env before
+# the first main() call (below). Importing wsgi is a no-op (app stays None).
+_ini_config_home = Path(__file__).resolve().parents[1] / "tests" / "_worker_gate_home"
+_ini_config_home.mkdir(exist_ok=True)
+(_ini_config_home / "kubedash.ini").write_text(
+    "[DEFAULT]\napp_mode = development\n"
+    "[security]\njwt_secret = test-jwt\nsecret_key = test-enc-key-32-bytes-long!!!!\nadmin_password = test-pw\n"
+    "[database]\nurl = sqlite://\n"
+    "[remote_cache]\nurl = redis://localhost:6390/0\n"
+    "[bootstrap]\nbootstrap_admin_email = admin@local\n"
+    "[deployment]\nadmin_kubeconfig = /test/admin.kubeconfig\n"
+)
+os.environ["KUBEDASH_HOME"] = str(_ini_config_home)
+ini_config.reset()
+wsgi.main()  # build app + start worker (leader-gated; role=worker by default)
 
 
 def _reload_wsgi(monkeypatch: pytest.MonkeyPatch, role: str) -> None:
@@ -44,39 +62,37 @@ def _reload_wsgi(monkeypatch: pytest.MonkeyPatch, role: str) -> None:
     create_app() runs per reload with the default (dev) settings; the gate
     under test is the role branch, not the app factory.
 
-    Note: pydantic-settings with ``env_prefix="KUBEDASH_"`` doubles the
-    prefix for the ``kubedash_role`` field, so the env name is
-    ``KUBEDASH_KUBEDASH_ROLE`` (same pattern as the existing
-    ``KUBEDASH_KUBEDASH_JWT_SECRET``). Tests patch the Settings instance
-    directly to keep the intent explicit.
+    The scheduler thread reads ``leader.is_leader()`` every 5 s poll, so the
+    fake Leader must stub BOTH ``start`` (no thread) and ``is_leader`` (the
+    scheduler's gate). A real Leader would also race for the PG advisory lock
+    on the sqlite test app.
 
-    The default Redis (localhost:6379) is NOT dialed on this host — the
-    ``rq.Worker`` constructor is faked so the gate test stays pure.
+    ADR-0040: the RQ worker is a child process spawned lazily on the first
+    due enqueue. With ``is_leader`` faked False (default) the scheduler never
+    enqueues, so no child is spawned and the test stays pure — no Redis, no
+    subprocess. (The old thread-hosted worker needed a faked ``rq.Worker`` to
+    avoid dialing Redis at import; that seam is gone.)
     """
-    import rq
+    class _FakeLeader:
+        """Structural fake for Leader — the gate test only asserts the
+        scheduler thread is spawned on the leader role. ``start`` is a no-op
+        (no real advisory-lock thread); ``is_leader`` is False so the
+        scheduler never enqueues or spawns a worker child. Accepts the
+        ``(settings, app)`` constructor args ``wsgi`` passes."""
 
-    class _FakeWorker:
-        """Stand-in for rq.Worker — the gate test only asserts the thread
-        is spawned, not that the worker drains a real queue. ``work`` is a
-        no-op so the loop never touches a real Redis."""
-
-        def __init__(self, *args: object, **kwargs: object) -> None:
+        def __init__(self, settings: object, app: object, **kwargs: object) -> None:
             pass
 
-        def work(self, *args: object, **kwargs: object) -> bool:
+        def start(self) -> None:
+            pass
+
+        def is_leader(self) -> bool:
             return False
 
-    class _FakeRedis:
-        """Stand-in for the FlaskRedis instance — the worker thread's
-        ``rq.Queue`` would otherwise dial the default Redis (localhost:6379)
-        which is not up on this host."""
-
-        def ping(self) -> bool:
-            return True
+    import app.core.leader as _leader_mod
 
     monkeypatch.setattr(wsgi.get_settings(), "kubedash_role", role)
-    monkeypatch.setattr(Leader, "start", lambda self: None)
-    monkeypatch.setattr(rq, "Worker", _FakeWorker)
+    monkeypatch.setattr(_leader_mod, "Leader", _FakeLeader)
     # FU-1: no-op the bootstrap hook at its SOURCE (the app package) so the
     # reload's `from app import _bootstrap_local_admin` re-binds the no-op
     # instead of the real PG upsert (which would run under a leaked Settings
@@ -84,31 +100,37 @@ def _reload_wsgi(monkeypatch: pytest.MonkeyPatch, role: str) -> None:
     import app as _app_pkg
     monkeypatch.setattr(_app_pkg, "_bootstrap_local_admin", lambda app: None)
     importlib.reload(wsgi)
+    # ADR-0028: main() builds the app + starts the worker (the reload's
+    # _start_worker_if_leader is now inside main). The role was faked above
+    # via monkeypatch.setattr(wsgi.get_settings(), "kubedash_role", role), so
+    # the gate branch is exercised by main()'s _start_worker_if_leader call.
+    wsgi.main()
 
 
 @pytest.fixture(autouse=True)
 def _stop_worker(monkeypatch: pytest.MonkeyPatch) -> Iterator[None]:
-    """Stop the worker thread a leader-role test may have spawned (its loop
-    would otherwise keep draining the default-redis queue for the rest of
-    the suite) and reset the wsgi globals for later tests.
+    """Stop the scheduler thread a leader-role test may have spawned (its loop
+    would otherwise keep polling for the rest of the suite) and reset the wsgi
+    globals for later tests.
 
-    The fake ``rq.Worker.work`` returns immediately (no real Redis), so
-    ``join`` returns as soon as the thread notices the stop — no 5 s block.
+    ADR-0040: the RQ worker is no longer thread-hosted — it's a child process
+    spawned lazily on the first enqueue. The scheduler thread here only
+    enqueues + spawns; with no tasks due it never spawns a child, so there's
+    nothing to reap. ``join(timeout=1)`` is enough: the loop sleeps 5 s, so
+    the thread is in its sleep most of the time.
     """
     yield
     thread = wsgi.worker_thread
     if thread is not None:
-        # The _run loop calls worker.work(max_idle_time=5) — the fake's
-        # work() returns instantly, so the thread is between work() calls
-        # most of the time and join(timeout=1) is enough.
         thread.join(timeout=1)
         monkeypatch.setattr(wsgi, "worker_thread", None, raising=False)
-        monkeypatch.setattr(wsgi, "worker", None, raising=False)
+        monkeypatch.setattr(wsgi, "worker_process", None, raising=False)
 
 
 def test_worker_thread_not_started_on_follower(monkeypatch: pytest.MonkeyPatch) -> None:
     _reload_wsgi(monkeypatch, "follower")
     assert wsgi.worker_thread is None
+    assert wsgi.worker_process is None
 
 
 def test_worker_thread_started_on_leader_candidate(monkeypatch: pytest.MonkeyPatch) -> None:
@@ -116,7 +138,9 @@ def test_worker_thread_started_on_leader_candidate(monkeypatch: pytest.MonkeyPat
     assert wsgi.worker_thread is not None
     assert wsgi.worker_thread.daemon
     assert wsgi.worker_thread.name == "kubedash-worker"
-    assert wsgi.worker is not None
+    # ADR-0040: no worker child is spawned until the first task is due; the
+    # scheduler thread (not a worker) is what the leader role starts eagerly.
+    assert wsgi.worker_process is None
 
 
 def test_schedule_if_leader_skips_when_not_leader() -> None:

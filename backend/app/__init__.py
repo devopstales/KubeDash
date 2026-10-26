@@ -6,6 +6,7 @@ from werkzeug.routing import BaseConverter
 
 from app import models  # noqa: F401
 from app.api import register_apis
+from app.core import ini_config
 from app.core.config import get_settings
 from app.extensions import api, db, migrate, redis_client
 
@@ -16,6 +17,11 @@ from app.extensions import api, db, migrate, redis_client
 
 
 def create_app(config_overrides: Mapping[str, object] | None = None) -> Flask:
+    # ADR-0028: the override leg applies BEFORE get_settings() builds the
+    # Settings (and before the fail-fast), so the existing config_overrides seam
+    # reaches the INI>env>override chain. The override already lands in
+    # ini_config; get_settings() then projects it.
+    ini_config.apply_overrides(config_overrides)
     settings = get_settings()
     overrides = config_overrides or {}
     app = Flask(__name__, static_folder=None, template_folder="templates")
@@ -39,12 +45,9 @@ def create_app(config_overrides: Mapping[str, object] | None = None) -> Flask:
     app.config["KUBEDASH_COOKIE_SECURE"] = bool(
         overrides.get("KUBEDASH_COOKIE_SECURE", settings.cookie_secure)
     )
-    # Static dir seam (ADR-0006 / OD-4): config_overrides (tests' fake dist) is
-    # applied BEFORE register_static closes over it; the Dockerfile ENV
-    # KUBEDASH_STATIC_DIR=/app/static is the production value.
-    app.config.setdefault(
-        "KUBEDASH_STATIC_DIR", str(overrides.get("KUBEDASH_STATIC_DIR", "/app/static"))
-    )
+    # ADR-0028: the static dir is DERIVED from KUBEDASH_HOME
+    # (ini_config.home_paths()["static"] = <home>/static), not an env var.
+    # register_static reads it at registration time; KUBEDASH_STATIC_DIR is gone.
 
     db.init_app(app)
     migrate.init_app(app, db)
@@ -276,7 +279,8 @@ def register_static(app: Flask) -> None:
         return
     app.config["_STATIC_REGISTERED"] = True
     from flask import abort, send_from_directory
-    static_dir = app.config.get("KUBEDASH_STATIC_DIR", "/app/static")
+    # ADR-0028: the static dir is derived from KUBEDASH_HOME, not an env var.
+    static_dir = ini_config.home_paths()["static"]
 
     @app.get("/assets/<path:filename>")
     def assets(filename: str) -> Response:

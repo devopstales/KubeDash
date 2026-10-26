@@ -2,16 +2,28 @@
 
 ``KUBEDASH_ROLE=leader`` (default: ``worker``) additionally starts:
   - the ``Leader`` (Task 2, ADR-0008) — PG advisory lock + leader_lease row;
-  - a daemon thread running ``rq.Worker`` on the ``kubedash`` queue that
-    doubles as the scheduler: each iteration it enqueues the due tasks from
-    ``INTERVALS`` ONLY while ``leader.is_leader()`` is true, then drains via
-    ``worker.work(timeout=5)``. A replica that loses leadership stops
-    scheduling within one 5 s poll; a promoted replica resumes within one
-    interval. RQ's built-in cron is deliberately NOT used — it would fire on
-    every replica regardless of leadership (the exact duplicate-job failure
-    ADR-0008's gate prevents).
+  - a daemon scheduler thread that enqueues the due tasks from ``INTERVALS``
+    ONLY while ``leader.is_leader()`` is true. RQ's built-in cron is
+    deliberately NOT used — it would fire on every replica regardless of
+    leadership (the exact duplicate-job failure ADR-0008's gate prevents).
+
+ADR-0040 (Gunicorn dev): the RQ worker itself runs in a CHILD PROCESS
+(``_rq_worker_main``), not a daemon thread. WHY: RQ installs signal handlers
+(``signal.signal`` for SIGINT/SIGTERM, plus a SIGALRM death-penalty around
+each job) that only work on a process's MAIN thread. Under ``python wsgi.py``
+the old thread was the main thread, so it worked; under Gunicorn the master's
+main thread is the arbiter loop, so a thread-hosted worker raised ``ValueError:
+signal only works in main thread``. A child process makes the RQ worker the
+main thread of its own process — signals, the horse monitor, and per-job
+forking all behave as RQ expects. The scheduler thread stays in the master and
+reads ``leader.is_leader()`` (cheap cross-thread bool); it spawns the worker
+child lazily on the first enqueue and lets it exit (``work(burst=True)``) when
+the queue drains, re-spawning on the next interval.
 """
 import logging
+import os
+import subprocess
+import sys
 import threading
 import time
 
@@ -44,22 +56,11 @@ def _apply_proxyfix(app: Flask) -> None:
 
 import os
 
-_static_dir = os.environ.get("KUBEDASH_STATIC_DIR")
-app: Flask = create_app(
-    {"KUBEDASH_STATIC_DIR": _static_dir} if _static_dir else {}
-)
-
-# ADR-0026: wrap in ProxyFix only when behind the TLS edge. Ordered BEFORE
-# _bootstrap_local_admin on purpose: the bootstrap is a one-time DB upsert
-# that never reads request.is_secure, so the two are independent — the
-# ordering is documented here only so a future reader doesn't "fix" it.
-_apply_proxyfix(app)
-
-# ADR-0021: the local-admin upsert runs at boot, after the factory (which
-# stays pure — no DB init inside create_app) and BEFORE Leader/RQ startup,
-# so the row exists before any task or request can read it. No-op when the
-# bootstrap env is unset.
-_bootstrap_local_admin(app)
+# ADR-0028: the app is built in main() (not at import) so that importing
+# wsgi is a no-op (test_worker_gate reloads it; test_proxyfix imports it for
+# _apply_proxyfix). Gunicorn loads the module and calls main(); running as a
+# script keeps dev behavior identical.
+app: Flask | None = None
 
 # RQ task path -> enqueue interval (seconds). The worker thread below is the
 # scheduler: it enqueues a task only when it is due AND this replica leads.
@@ -68,8 +69,27 @@ INTERVALS: dict[str, int] = {
     "app.tasks.cluster_sync.run": 300,
 }
 
-worker: rq.Worker | None = None
+# The scheduler thread (leader-gated) lives in the master; the RQ worker runs
+# in a child PROCESS (ADR-0040 — see module docstring). worker_thread is the
+# scheduler; worker_process is the spawned RQ child (None between drains).
 worker_thread: threading.Thread | None = None
+worker_process: subprocess.Popen | None = None
+_worker_lock = threading.Lock()
+
+
+def _rq_worker_main() -> None:
+    """RQ worker entry point — runs as the MAIN thread of the child process.
+
+    ``work(burst=True)`` drains the queue once and returns, so the process
+    exits cleanly after each scheduler interval; the scheduler re-spawns it on
+    the next due enqueue. ``app.app_context()`` wraps the drain so the task
+    functions' ``db.session`` (Flask-SQLAlchemy, app-bound) resolves.
+    """
+    from app.extensions import redis_client
+
+    with app.app_context():
+        w = rq.Worker(["kubedash"], connection=redis_client)
+        w.work(burst=True)
 
 
 def _schedule_if_leader(leader_obj: object, queue: rq.Queue) -> None:
@@ -92,9 +112,17 @@ def _schedule_if_leader(leader_obj: object, queue: rq.Queue) -> None:
 
 
 def _start_worker_if_leader() -> None:
-    """Spawn the leader-gated RQ worker (wsgi-level, not app-factory level —
-    the factory must stay pure so tests can create apps freely)."""
-    global worker, worker_thread
+    """Spawn the leader-gated RQ scheduler (wsgi-level, not app-factory level
+    — the factory must stay pure so tests can create apps freely).
+
+    ADR-0040: the scheduler is a daemon thread in the master; it spawns the
+    RQ worker as a CHILD PROCESS on the first enqueue (``_run_worker_child``)
+    and lets it exit after each drain (``work(burst=True)``). The child is
+    the main thread of its own process, so RQ's signal handlers + SIGALRM
+    death-penalty work — the exact failure mode a thread-hosted worker hit
+    under Gunicorn (master main thread = arbiter loop).
+    """
+    global worker_thread, worker_process
 
     settings = get_settings()
     if settings.kubedash_role != "leader":
@@ -104,36 +132,91 @@ def _start_worker_if_leader() -> None:
     from app.core.leader import Leader
     from app.extensions import redis_client
 
-    leader = Leader(settings)
+    leader = Leader(settings, app)
     leader.start()
-    worker = rq.Worker(["kubedash"], connection=redis_client)
-    w = worker  # capture in closure (avoids the global-lookup on every poll)
+
+    def _run_worker_child() -> None:
+        """Spawn (or re-spawn) the RQ worker child. Idempotent per interval.
+
+        A live child is left alone (it will drain the freshly-enqueued job);
+        a dead/absent one is re-spawned. ``start_new_session`` detaches the
+        child from the master's process group so a Ctrl-C on ``task backend-run``
+        doesn't signal the worker child mid-drain.
+        """
+        global worker_process
+        with _worker_lock:
+            if worker_process is not None and worker_process.poll() is None:
+                return  # a live child is already draining the queue
+            env = dict(os.environ)
+            env.setdefault("PYTHONPATH", os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
+            worker_process = subprocess.Popen(
+                [sys.executable, "-c", "import wsgi; wsgi._rq_worker_main()"],
+                env=env,
+                start_new_session=True,
+            )
 
     def _run() -> None:
         queue = rq.Queue("kubedash", connection=redis_client)
         last: dict[str, float] = {}
         while True:
             now = time.monotonic()
+            due = False
             for path, interval in INTERVALS.items():
-                # The leader check is PER TASK and PER POLL — a leadership
+                # The leader check is PER TASK AND PER POLL — a leadership
                 # loss stops all scheduling within one 5 s drain window.
                 if leader.is_leader() and now - last.get(path, 0.0) >= interval:
                     queue.enqueue(path)
                     last[path] = now
-            # rq 2.x dropped work(timeout=...); work() blocks up to 5 s
-            # (max_idle_time) between job polls, which is the drain window.
-            w.work(max_idle_time=5)
+                    due = True
+            if due:
+                _run_worker_child()
+            time.sleep(5)  # poll cadence == the old max_idle_time drain window
 
     worker_thread = threading.Thread(target=_run, name="kubedash-worker", daemon=True)
     worker_thread.start()
-    log.info("leader-gated RQ worker started (queue=kubedash, intervals=%s)", INTERVALS)
+    log.info("leader-gated RQ scheduler started (queue=kubedash, intervals=%s)", INTERVALS)
 
 
-# Gunicorn loads the module without executing ``__main__`` (workers use the
-# module-level ``app``); running as a script keeps dev behavior identical.
-_start_worker_if_leader()
+def main() -> Flask:
+    """Build the app and start the leader-gated RQ scheduler.
+
+    Called by Gunicorn (``wsgi:main``) and by ``python wsgi.py``. Importing
+    wsgi is a no-op: ``app`` stays ``None`` until ``main()`` runs, so
+    test modules that import wsgi (test_worker_gate reloads it; test_proxyfix
+    imports ``_apply_proxyfix``) do not trigger the create_app fail-fast.
+    """
+    global app
+    # ADR-0028: the static dir is derived from KUBEDASH_HOME (ini_config
+    # .home_paths()["static"]), so there is no KUBEDASH_STATIC_DIR env to pass.
+    app = create_app()
+
+    # ADR-0026: wrap in ProxyFix only when behind the TLS edge. Ordered
+    # BEFORE _bootstrap_local_admin on purpose: the bootstrap is a one-time
+    # DB upsert that never reads request.is_secure, so the two are
+    # independent — the ordering is documented here only so a future reader
+    # doesn't "fix" it.
+    _apply_proxyfix(app)
+
+    # ADR-0021: the local-admin upsert runs at boot, after the factory (which
+    # stays pure — no DB init inside create_app) and BEFORE Leader/RQ startup,
+    # so the row exists before any task or request can read it. No-op when the
+    # bootstrap env is unset. A missing table (tests that build the app before
+    # db.create_all) is non-fatal: log and continue — the next boot (or an
+    # explicit create_all) will upsert the row.
+    try:
+        _bootstrap_local_admin(app)
+    except Exception:
+        log.exception("local-admin bootstrap skipped (will retry next boot)")
+
+    # Gunicorn loads the module without executing ``__main__`` (workers use
+    # the module-level ``app``); running as a script keeps dev behavior
+    # identical.
+    _start_worker_if_leader()
+    return app
+
 
 if __name__ == "__main__":
+    main()
     cert = os.environ.get("KUBEDASH_SSL_CERT")
     ssl_context = (
         (cert, os.environ["KUBEDASH_SSL_KEY"])

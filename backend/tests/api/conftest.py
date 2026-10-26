@@ -9,12 +9,29 @@ backstop remains CI.
 from __future__ import annotations
 
 from collections.abc import Iterator
+from pathlib import Path
 from urllib.parse import parse_qs, urlparse
 
 import pytest
 
 import app.core.config as _config
 from app import create_app
+from app.core import ini_config
+
+
+def _make_fixture_home(tmp_path: pathlib.Path) -> pathlib.Path:
+    """ADR-0028 fixture home: a temp dir whose <home>/kubedash.ini carries the
+    values the api-tier tests need. Secrets/bootstrap stay env-sourced (the
+    override/env legs win); the INI exists so home_paths() has a real file."""
+    home = tmp_path / "home"
+    home.mkdir()
+    (home / "kubedash.ini").write_text(
+        "[DEFAULT]\napp_mode = development\n"
+        "[database]\nurl = sqlite://\n"
+        "[remote_cache]\nurl = redis://localhost:6390/0\n"
+        "[deployment]\nadmin_kubeconfig = /test/admin.kubeconfig\n"
+    )
+    return home
 
 
 class _FakeRedis:
@@ -42,7 +59,7 @@ class _FakeRedis:
 
 
 @pytest.fixture()
-def api_app(monkeypatch: pytest.MonkeyPatch) -> Iterator[object]:
+def api_app(monkeypatch: pytest.MonkeyPatch, tmp_path: Path) -> Iterator[object]:
     import app.extensions as ext
     from app.core.security import _oauth
 
@@ -58,9 +75,17 @@ def api_app(monkeypatch: pytest.MonkeyPatch) -> Iterator[object]:
     # get_settings() at import), so setenv + reset BEFORE create_app — that
     # order is load-bearing: config_overrides alone reaches only app.config,
     # never get_settings().
+    #
+    # ADR-0028: the app is configured from a fixture KUBEDASH_HOME (the INI is
+    # <home>/kubedash.ini); admin_kubeconfig (a REQUIRED key) is supplied via
+    # config_overrides, which apply_overrides feeds ahead of env/INI. The reset
+    # is ini_config.reset() (clears the Settings singleton AND the INI parser
+    # + derived home), not `_config._settings = None` alone.
+    home = _make_fixture_home(tmp_path)
+    monkeypatch.setenv("KUBEDASH_HOME", str(home))
     monkeypatch.setenv("KUBEDASH_BOOTSTRAP_ADMIN_EMAIL", "admin@local")
     monkeypatch.setenv("KUBEDASH_BOOTSTRAP_ADMIN_PASSWORD", "correct-horse")
-    _config._settings = None
+    ini_config.reset()
     application = create_app({
         "TESTING": True,
         "DATABASE_URL": "sqlite://",
@@ -90,7 +115,7 @@ def api_app(monkeypatch: pytest.MonkeyPatch) -> Iterator[object]:
 
 
 @pytest.fixture()
-def api_app_no_bootstrap(monkeypatch: pytest.MonkeyPatch) -> Iterator[object]:
+def api_app_no_bootstrap(monkeypatch: pytest.MonkeyPatch, tmp_path: Path) -> Iterator[object]:
     """I-NEW-1 (ADR-0021): the same sqlite api-tier app with BOTH bootstrap
     env vars empty — local login must answer 403 LOCAL_AUTH_DISABLED and the
     settings route must report local_enabled False. (The sqlite tier SKIPS the
@@ -100,9 +125,12 @@ def api_app_no_bootstrap(monkeypatch: pytest.MonkeyPatch) -> Iterator[object]:
 
     _oauth.app = None
     _oauth._clients.clear()
+    # ADR-0028: fixture home + reset; bootstrap env OFF (empty) for this app.
+    home = _make_fixture_home(tmp_path)
+    monkeypatch.setenv("KUBEDASH_HOME", str(home))
     monkeypatch.setenv("KUBEDASH_BOOTSTRAP_ADMIN_EMAIL", "")
     monkeypatch.setenv("KUBEDASH_BOOTSTRAP_ADMIN_PASSWORD", "")
-    _config._settings = None
+    ini_config.reset()
     application = create_app({
         "TESTING": True,
         "DATABASE_URL": "sqlite://",

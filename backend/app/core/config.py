@@ -1,73 +1,92 @@
-from pydantic import AliasChoices, Field
+"""Settings is a thin PROJECTION over ``ini_config`` (ADR-0028).
+
+Every field sources from ``ini_config.resolve`` / ``resolve_bool`` via
+``default_factory`` — pydantic-settings no longer reads env directly
+(``env_prefix``/``AliasChoices``/``env_file`` are retired as value sources;
+the unprefixed ``DATABASE_URL``/``REDIS_URL`` aliases now live in
+``ini_config._FIELDS``). The only in-code defaults are the optional/behavior
+knobs; identities/credentials are INI/env-resolved with no literal fallback.
+
+``get_settings()`` returns a LAZY ``ini_config._SettingsProxy``: the real
+``Settings()`` (which runs the ``default_factory`` fail-fast) is constructed on
+first field access, so module-import-time calls that never read a field do not
+trigger the fail-fast. The public surface (``settings.<field>`` and the
+``settings()`` test-call) is unchanged.
+"""
+from __future__ import annotations
+
+from pydantic import Field
 from pydantic_settings import BaseSettings, SettingsConfigDict
+
+from app.core import ini_config
 
 
 class Settings(BaseSettings):
-    model_config = SettingsConfigDict(env_prefix="KUBEDASH_", env_file=".env", extra="ignore")
+    model_config = SettingsConfigDict(extra="ignore")
 
-    flask_env: str = "development"  # development | staging | production
-    # ARCHITECTURE.md §3.8 names these vars without the KUBEDASH_ prefix, so
-    # accept the unprefixed name too (prefix still wins when both are set).
-    database_url: str = Field(
-        default="postgresql://kubedash:kubedash@localhost:5432/kubedash",
-        validation_alias=AliasChoices("KUBEDASH_DATABASE_URL", "DATABASE_URL"),
+    # [DEFAULT] app_mode -> development|production
+    flask_env: str = Field(default_factory=lambda: ini_config.resolve("flask_env"))
+    # [database] -> database_url (split-or-url)
+    database_url: str = Field(default_factory=lambda: ini_config.resolve("database_url"))
+    # [remote_cache] -> redis_url (split-or-url)
+    redis_url: str = Field(default_factory=lambda: ini_config.resolve("redis_url"))
+    # [security] jwt_secret / secret_key (moved out of code defaults, ADR-0028)
+    kubedash_jwt_secret: str = Field(
+        default_factory=lambda: ini_config.resolve("kubedash_jwt_secret")
     )
-    redis_url: str = Field(
-        default="redis://localhost:6379/0",
-        validation_alias=AliasChoices("KUBEDASH_REDIS_URL", "REDIS_URL"),
+    kubedash_secret_key: str = Field(
+        default_factory=lambda: ini_config.resolve("kubedash_secret_key")
     )
-    # 32-byte dev default (PyJWT ≥2.10 warns below 32 bytes for HS256); set
-    # KUBEDASH_KUBEDASH_JWT_SECRET in real environments.
-    kubedash_jwt_secret: str = "dev-jwt-secret-32-bytes-long!!!!!01"
-    kubedash_secret_key: str = "dev-enc-key-32-bytes-long!!!!"
-    # Replica role for the leader-gated RQ worker (ADR-0008): "leader" starts
-    # the worker thread + Leader in wsgi.py; "worker" (default) and any other
-    # value keep this replica worker-only. Env: KUBEDASH_ROLE.
-    kubedash_role: str = "worker"
-    kubedash_replica_id: str = "local"
-    oidc_client_id: str = ""
-    oidc_client_secret: str = ""
-    oidc_issuer: str = ""
-    cors_origins: str = ""
-    # ADR-0025: the browser session travels in HttpOnly cookies. `Secure` is
-    # on by default (production is TLS-terminated); the local HTTP dev stack
-    # and the test client set KUBEDASH_COOKIE_SECURE=false. Keep the default
-    # True — a forgotten value must fail closed, not leak the cookie on HTTP.
-    cookie_secure: bool = True
-    # ADR-0021 (local admin auth): both set → the bootstrap admin row is
-    # created at boot and POST /auth/local is enabled; either empty → local
-    # login answers 403 LOCAL_AUTH_DISABLED. Double prefix is deliberate
-    # (env_prefix + field name), same convention as KUBEDASH_KUBEDASH_JWT_SECRET.
-    bootstrap_admin_email: str = ""
-    bootstrap_admin_password: str = ""
-    # SSO bootstrap: pre-create users at boot (dev-stack OIDC provider).
-    # Format: comma-separated "email:role" pairs, e.g. "dev@local:user,admin-ss@local:admin".
-    # These are OIDC users (auth_source='oidc'), NOT the local bootstrap admin.
-    sso_bootstrap_users: str = ""
-    # ADR-0021: admin kubeconfig source — empty → in-cluster service account,
-    # set → kubeconfig file path. Declared here; CONSUMED by the next tickets
-    # (client pool admin source / TICKET-15).
-    admin_kubeconfig: str = ""
-    # §7.5 tuning — the two keys this change consumes (the other four are
-    # deferred to the informer change, ADR-0010; see Task 10 Interfaces)
-    first_paint_backstop: str = "5m"  # KUBEDASH_FIRST_PAINT_BACKSTOP
-    namespace_list_timeout: str = "5s"  # KUBEDASH_NAMESPACE_LIST_TIMEOUT
-    # ADR-0011 (user-management): the server URL the generated kubeconfig's
-    # exec entry passes to the credential plugin (--server=<value>); unset
-    # (None) → GET /kubeconfig answers 500 INTERNAL_ERROR. Consumed by the
-    # kubeconfig ticket, declared here.
-    plugin_server: str | None = None
-    # ADR-0026 (TLS edge): when True, the app assumes it is behind a TLS
-    # terminating proxy and applies ProxyFix + Secure cookies. Dev stack
-    # sets KUBEDASH_TLS_EDGE=true; in-cluster is False by default.
-    tls_edge: bool = False
+    # [deployment] kubedash_role / kubedash_replica_id
+    kubedash_role: str = Field(default_factory=lambda: ini_config.resolve("kubedash_role"))
+    kubedash_replica_id: str = Field(
+        default_factory=lambda: ini_config.resolve("kubedash_replica_id")
+    )
+    # [sso_settings] client_id / client_secret / issuer
+    oidc_client_id: str = Field(default_factory=lambda: ini_config.resolve("oidc_client_id"))
+    oidc_client_secret: str = Field(
+        default_factory=lambda: ini_config.resolve("oidc_client_secret")
+    )
+    oidc_issuer: str = Field(default_factory=lambda: ini_config.resolve("oidc_issuer"))
+    # optional empty-string knobs
+    cors_origins: str = Field(default_factory=lambda: ini_config.resolve("cors_origins"))
+    # ADR-0025: Secure flag, fail-closed True default (behavior knob)
+    cookie_secure: bool = Field(default_factory=lambda: ini_config.resolve_bool("cookie_secure"))
+    # [bootstrap] bootstrap_admin_email / bootstrap_admin_password (ADR-0021)
+    bootstrap_admin_email: str = Field(
+        default_factory=lambda: ini_config.resolve("bootstrap_admin_email")
+    )
+    bootstrap_admin_password: str = Field(
+        default_factory=lambda: ini_config.resolve("bootstrap_admin_password")
+    )
+    # [deployment] admin_kubeconfig (ADR-0021)
+    admin_kubeconfig: str = Field(default_factory=lambda: ini_config.resolve("admin_kubeconfig"))
+    # [deployment] tuning (§7.5)
+    first_paint_backstop: str = Field(
+        default_factory=lambda: ini_config.resolve("first_paint_backstop")
+    )
+    namespace_list_timeout: str = Field(
+        default_factory=lambda: ini_config.resolve("namespace_list_timeout")
+    )
+    # [deployment] plugin_server (ADR-0011); None when unset
+    plugin_server: str | None = Field(
+        default_factory=lambda: ini_config.resolve("plugin_server") or None
+    )
+    # [deployment] tls_edge (ADR-0026/0027)
+    tls_edge: bool = Field(default_factory=lambda: ini_config.resolve_bool("tls_edge"))
+    # [sso_settings] bootstrap_users (optional empty-string knob)
+    sso_bootstrap_users: str = Field(
+        default_factory=lambda: ini_config.resolve("sso_bootstrap_users")
+    )
 
 
 _settings: Settings | None = None
+_proxy = ini_config._SettingsProxy()
 
 
-def get_settings() -> Settings:
-    global _settings
-    if _settings is None:
-        _settings = Settings()
-    return _settings
+def get_settings():
+    """Return the lazy settings proxy. The real ``Settings`` is constructed on
+    first field access (see ``ini_config._SettingsProxy``). Tests that call
+    ``settings()`` get the constructed ``Settings`` via the proxy's
+    ``__call__``."""
+    return _proxy

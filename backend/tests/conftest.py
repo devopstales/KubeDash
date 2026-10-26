@@ -1,5 +1,7 @@
+import os
 import subprocess
 from collections.abc import Iterator
+from pathlib import Path
 
 import pytest
 from testcontainers.postgres import PostgresContainer
@@ -7,12 +9,34 @@ from testcontainers.redis import RedisContainer
 
 import app.core.config as _config
 from app import _bootstrap_local_admin, create_app
+from app.core import ini_config
 from app.extensions import db
 
 # FU-2: import the api-tier fixtures so they are always available, even when
 # the root conftest is loaded first (pytest does not load a sub-package's
 # conftest when the parent conftest is already active in the same invocation).
 pytest_plugins = ["tests.api.conftest"]
+
+# ADR-0028: a session-scoped fixture home + required env so that modules
+# importing wsgi (test_worker_gate) or calling get_settings() at import time
+# (test_encryption's lazy _key) have a valid config for the whole run. This
+# runs before any test module is imported (autouse, session scope). Test
+# fixtures that need a different config set KUBEDASH_HOME + env explicitly
+# (they monkeypatch, which wins over the session default).
+_SESSION_HOME = Path(__file__).resolve().parent / "_session_home"
+
+
+@pytest.fixture(scope="session", autouse=True)
+def _session_config() -> None:
+    _SESSION_HOME.mkdir(exist_ok=True)
+    (_SESSION_HOME / "kubedash.ini").write_text(
+        "[security]\n"
+        "jwt_secret = test-jwt-secret-32-bytes-long!!!!!01\n"
+        "secret_key = test-enc-key-32-bytes-long!!!!\n"
+        "admin_password = test-pw\n"
+    )
+    os.environ["KUBEDASH_HOME"] = str(_SESSION_HOME)
+    ini_config.reset()
 
 # The brief's snippets assume `exposed_port` / `get_container_host`, which do
 # not exist on testcontainers 4.x (they are `get_exposed_port` /
@@ -53,7 +77,7 @@ def redis_container() -> Iterator[RedisContainer]:
 
 
 @pytest.fixture()
-def app(pg_container, redis_container, monkeypatch):
+def app(pg_container, redis_container, monkeypatch, tmp_path):
     # I-NEW-1 (ADR-0021, TICKET-14): bootstrap env ON for the PG-tier app —
     # the env triple: setenv BEFORE create_app (the Settings singleton caches
     # from ENV on first read; config_overrides alone never reach
@@ -62,9 +86,19 @@ def app(pg_container, redis_container, monkeypatch):
     # the "second boot" test re-invokes the hook for idempotency). The vars
     # are SET (not setdefault'd): tests that want the env unset define their
     # own app (test_bootstrap.app_no_bootstrap).
+    #
+    # ADR-0028: fixture KUBEDASH_HOME (INI = <home>/kubedash.ini); the reset is
+    # ini_config.reset() (Settings singleton + INI parser + derived home);
+    # admin_kubeconfig (REQUIRED) is supplied via config_overrides.
+    from app.core import ini_config as _ini
+
+    home = tmp_path / "home"
+    home.mkdir()
+    (home / "kubedash.ini").write_text("[DEFAULT]\napp_mode = development\n")
+    monkeypatch.setenv("KUBEDASH_HOME", str(home))
     monkeypatch.setenv("KUBEDASH_BOOTSTRAP_ADMIN_EMAIL", "admin@local")
     monkeypatch.setenv("KUBEDASH_BOOTSTRAP_ADMIN_PASSWORD", "correct-horse")
-    _config._settings = None
+    _ini.reset()
     application = create_app({
         "TESTING": True,
         "DATABASE_URL": pg_container.get_connection_url(driver="psycopg"),
@@ -74,6 +108,7 @@ def app(pg_container, redis_container, monkeypatch):
         # ADR-0025: the test client speaks http://localhost; a Secure cookie is
         # stored but never sent back, so the session would vanish between calls.
         "KUBEDASH_COOKIE_SECURE": False,
+        "KUBEDASH_ADMIN_KUBECONFIG": "/test/admin.kubeconfig",
     })
     with application.app_context():
         db.create_all()

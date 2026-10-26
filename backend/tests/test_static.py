@@ -1,13 +1,20 @@
 # The conftest `app` fixture is rebuilt for these tests with a fake dist dir
-# passed via config_overrides BEFORE create_app() (no re-registration):
+# under a fixture KUBEDASH_HOME (ADR-0028): <home>/static holds the bundle.
 import pytest
 
 
 @pytest.fixture()
-def static_app(pg_container, redis_container, tmp_path):
-    (tmp_path / "assets").mkdir()
-    (tmp_path / "assets" / "main.abc.js").write_text("console.log(1)")
-    (tmp_path / "index.html").write_text("<html>kubedash</html>")
+def static_app(pg_container, redis_container, tmp_path, monkeypatch):
+    from app.core import ini_config
+
+    home = tmp_path / "home"
+    static = home / "static"
+    (static / "assets").mkdir(parents=True)
+    (static / "assets" / "main.abc.js").write_text("console.log(1)")
+    (static / "index.html").write_text("<html>kubedash</html>")
+    (home / "kubedash.ini").write_text("[security]\njwt_secret = s\n")
+    monkeypatch.setenv("KUBEDASH_HOME", str(home))
+    ini_config.reset()
     from app import create_app
     application = create_app({
         "TESTING": True,
@@ -15,7 +22,7 @@ def static_app(pg_container, redis_container, tmp_path):
         "REDIS_URL": f"redis://{redis_container.get_container_host()}:{redis_container.exposed_port(6379)}",
         "KUBEDASH_JWT_SECRET": "test-jwt-secret",
         "KUBEDASH_SECRET_KEY": "test-enc-key-32-bytes-long!!!!",
-        "KUBEDASH_STATIC_DIR": str(tmp_path),
+        "KUBEDASH_ADMIN_KUBECONFIG": "/test/admin.kubeconfig",
     })
     with application.app_context():
         from app.extensions import db
