@@ -5,7 +5,7 @@ classes, docs-only where the response is a bare list (smorest dumps handler
 returns THROUGH the response schema — see the ponytail note in
 ``app/api/clusters.py``).
 """
-from marshmallow import Schema, fields
+from marshmallow import Schema, fields, validate
 
 
 class UserOut(Schema):
@@ -87,19 +87,10 @@ class UserCreateIn(Schema):
     role = fields.String(required=True)
 
 
-class GroupIn(Schema):
-    """Group create body (TASK-026). A blank/whitespace name is a 422
-    INVALID_KUBECONFIG (the handler validates — marshmallow's ValidationError
-    would map to a generic 422 envelope without the stable code)."""
-
-    name = fields.String(required=True)
-
-
-class GroupMemberIn(Schema):
-    """Member assign body (TASK-026): the user's ``sub`` (the stable
-    identity; email can be None for legacy rows)."""
-
-    user_sub = fields.String(required=True)
+# NOTE: GroupIn / GroupMemberIn used to live here (TASK-026) but the groups
+# surface moved to the GroupsApi, whose schemas live in
+# app/schemas/groups.py — the duplicate names here collided in apispec
+# (Multiple schemas resolved to the name "GroupIn"). Removed 2026-10-26.
 
 
 class BindIn(Schema):

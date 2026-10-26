@@ -81,7 +81,7 @@ class ClusterApi(Api):
     @blp.arguments(ClusterIn)
     @blp.response(201, ClusterOut)
     @blp.doc(responses={409: "CLUSTER_ALREADY_EXISTS", 422: "INVALID_KUBECONFIG"})
-    def register_cluster(self, args: dict[str, object]) -> tuple[dict[str, object], int]:
+    def register_cluster(self, args: dict[str, object]) -> object:
         user = g.current_user
         # 422 first: an unparseable kubeconfig is stored NOTHING (briefing
         # edge case) — validation precedes the duplicate-name check.
@@ -109,7 +109,11 @@ class ClusterApi(Api):
         # Auto-bind: the registering user owns the cluster they registered.
         db.session.add(ClusterBinding(user_id=user.id, cluster_id=cluster.id, role="admin"))
         db.session.commit()
-        return _out(cluster), 201
+        # Location header per the REST convention for 201 Created.
+        resp = jsonify(_out(cluster))
+        resp.status_code = 201
+        resp.headers["Location"] = f"/api/v1/clusters/{cluster.id}"
+        return resp
 
     @blp.route("/clusters", methods=["GET"])
     # ponytail: smorest dumps the handler's return value THROUGH the response

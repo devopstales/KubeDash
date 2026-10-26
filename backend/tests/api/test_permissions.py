@@ -689,3 +689,49 @@ def test_my_access_non_admin_can_call(api_client, user_headers) -> None:
     r = api_client.get("/api/v1/permissions/my-access", headers=user_headers)
     assert r.status_code == 200
     assert r.get_json() == []
+
+
+def test_admin_lists_another_users_bindings(
+    api_client, api_app, admin_headers, user_headers, fake_k8s
+) -> None:
+    """Admin enumeration of ANOTHER user's bindings — the surface
+    my-access withholds. Admin sees the target's rows; a non-admin gets
+    403; an unknown sub is 404."""
+    _seed_template(api_app, "viewer", "namespace", RULES_NS, builtin=True)
+    _seed(api_client, api_app, "sub-enum-1", "enum@local", "user")
+    cluster_id = _register_cluster(api_client, api_app, admin_headers, "prod")
+    r = api_client.post(
+        "/api/v1/admin/permissions/bind",
+        json={
+            "user": "sub-enum-1",
+            "cluster": _cluster_name(api_app, cluster_id),
+            "namespace": NS,
+            "template": "viewer",
+        },
+        headers=admin_headers,
+    )
+    assert r.status_code == 200, r.get_json()
+
+    # Admin sees the target user's binding.
+    r2 = api_client.get(
+        "/api/v1/admin/permissions/users/sub-enum-1/bindings", headers=admin_headers
+    )
+    assert r2.status_code == 200, r2.get_json()
+    body = r2.get_json()
+    assert len(body) == 1
+    assert (body[0]["cluster"], body[0]["namespace"], body[0]["template"]) == (
+        _cluster_name(api_app, cluster_id), NS, "viewer",
+    )
+
+    # A non-admin cannot enumerate.
+    r3 = api_client.get(
+        "/api/v1/admin/permissions/users/sub-enum-1/bindings", headers=user_headers
+    )
+    assert r3.status_code == 403
+    assert r3.get_json()["error"]["code"] == "RBAC_DENIED"
+
+    # An unknown sub is 404.
+    r4 = api_client.get(
+        "/api/v1/admin/permissions/users/sub-ghost/bindings", headers=admin_headers
+    )
+    assert r4.status_code == 404

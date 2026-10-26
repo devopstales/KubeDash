@@ -31,13 +31,18 @@ const PrivilegesView = () => {
   const selected = useClusterStore((s) => s.selectedCluster)
 
   const bindingsQuery = useQuery<MyAccessBinding[]>({
-    queryKey: ['permissions', 'my-access'],
+    queryKey: ['permissions', 'my-access', user],
     queryFn: async () => {
-      const r = await apiFetch<MyAccessBinding[]>('/api/v1/permissions/my-access')
+      // Own bindings come from my-access (caller-only, R5); another user's
+      // come from the admin route (admin-gated enumeration).
+      const url =
+        me?.sub === user
+          ? '/api/v1/permissions/my-access'
+          : `/api/v1/admin/permissions/users/${encodeURIComponent(user)}/bindings`
+      const r = await apiFetch<MyAccessBinding[]>(url)
       if (r.error) throw new Error(`${r.error.code}: ${r.error.message}`)
       return r.data ?? []
     },
-    enabled: me?.sub === user,
   })
 
   const bindings = (bindingsQuery.data ?? []).filter(
@@ -81,12 +86,7 @@ const PrivilegesView = () => {
           <strong>Cluster:</strong> {selected?.name ?? 'none selected'}
         </div>
 
-        {me?.sub !== user ? (
-          <div className="mb-3">
-            Bindings for other users are not listed (the API returns only the caller&apos;s access).
-            Use Edit privileges to bind a template.
-          </div>
-        ) : bindingsQuery.isLoading ? (
+        {bindingsQuery.isLoading ? (
           <div>Loading bindings…</div>
         ) : bindingsQuery.error ? (
           <div className="text-danger">

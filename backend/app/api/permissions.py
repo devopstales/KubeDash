@@ -344,3 +344,40 @@ class PermissionsApi(Api):
             for b, cluster_name in rows
         ]
         return jsonify(items), 200
+
+    @blp.route("/admin/permissions/users/<user_sub>/bindings", methods=["GET"])
+    @blp.doc(
+        responses={
+            200: ("The user's bindings (bare list, BindingOut items); [] when none.", None),
+            403: "RBAC_DENIED",
+            404: "RESOURCE_KIND_NOT_SUPPORTED (unknown user sub)",
+        }
+    )
+    def list_user_bindings(self, user_sub: str) -> object:
+        """Admin view of ANOTHER user's bindings — the surface
+        ``/permissions/my-access`` deliberately withholds (R5 is caller-only).
+        Admin-gated: a non-admin cannot enumerate someone else's grants."""
+        require_admin()
+        user = (
+            db.session.execute(db.select(User).filter_by(sub=user_sub))
+        ).scalar_one_or_none()
+        if user is None:
+            raise ResourceKindNotSupportedError(f"user {user_sub!r} not found")
+        rows = (
+            db.session.execute(
+                db.select(ClusterBinding, Cluster.name)
+                .join(Cluster, ClusterBinding.cluster_id == Cluster.id)
+                .filter(ClusterBinding.user_id == user.id)
+                .order_by(ClusterBinding.id)
+            )
+        ).all()
+        items = [
+            {
+                "cluster": cluster_name,
+                "namespace": b.namespace,
+                "template": b.template,
+                "created_at": b.created_at,
+            }
+            for b, cluster_name in rows
+        ]
+        return jsonify(items), 200

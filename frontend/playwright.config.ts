@@ -19,7 +19,7 @@ export default defineConfig({
   testDir: './e2e',
   timeout: 30_000,
   use: {
-    // ADR-0026: the backstop target is https://kubedash.local:443 (task
+    // ADR-0026: the backstop target is https://kubedash.dev.local:443 (task
     // e2e-ssl sets E2E_BASE_URL). Playwright's bundled Chromium does NOT
     // inherit the host keychain — it keeps its own trust store, so
     // `sudo mkcert -install` alone is not enough and a fresh host would

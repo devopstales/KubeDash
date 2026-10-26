@@ -16,7 +16,7 @@ the live tables.
 from app.models.audit import AuditLog
 from app.models.binding import ClusterBinding
 from app.models.cluster import Cluster
-from app.models.group import Group, UserGroup
+from app.models.group import Group, GroupMember
 from app.models.leader_lease import LeaderLease
 from app.models.rbac_template import RBACTemplate
 from app.models.token import RefreshToken
@@ -28,7 +28,7 @@ __all__ = [
     "Cluster",
     "Group",
     "LeaderLease",
-    "UserGroup",
+    "GroupMember",
     "RBACTemplate",
     "RefreshToken",
     "User",

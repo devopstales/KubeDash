@@ -145,6 +145,10 @@ def add_member(db_session: Any, *, group_name: str, user_sub: str) -> GroupMembe
         db_session.query(Group).filter_by(name=group_name).statement
     ).scalar_one_or_none()
     if group is None:
+        group = db_session.execute(
+            db_session.query(Group).filter_by(name=LOCAL_PREFIX + group_name).statement
+        ).scalar_one_or_none()
+    if group is None:
         raise ResourceKindNotSupportedError(f"group {group_name!r} not found")
     if group.name in RESERVED_ROLE_GROUPS:
         raise ClusterAlreadyExistsError("membership follows the user permission role")
@@ -168,6 +172,10 @@ def remove_member(db_session: Any, *, group_name: str, user_sub: str) -> None:
     group = db_session.execute(
         db_session.query(Group).filter_by(name=group_name).statement
     ).scalar_one_or_none()
+    if group is None:
+        group = db_session.execute(
+            db_session.query(Group).filter_by(name=LOCAL_PREFIX + group_name).statement
+        ).scalar_one_or_none()
     if group is None:
         raise ResourceKindNotSupportedError(f"group {group_name!r} not found")
     if group.name in RESERVED_ROLE_GROUPS:

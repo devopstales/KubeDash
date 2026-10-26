@@ -27,14 +27,14 @@ class GroupOut(Schema):
 
 
 class GroupMemberIn(Schema):
-    """Member add/remove body. ``user`` is the user sub. ``name`` is the
+    """Member add/remove body. ``user_sub`` is the user sub. ``name`` is the
     route's ``<name>`` path arg — included here because webargs 8.7's
     positional injection (``USE_ARGS_POSITIONAL=True``) appends the parsed
     JSON dict as a positional after Flask's view-args positionals, so a
     field sharing a name with a path arg would collide."""
 
-    name = fields.String(required=True)
-    user = fields.String(required=True)
+    name = fields.String(load_default=None)
+    user_sub = fields.String(required=True)
 
 
 class GroupBindIn(Schema):

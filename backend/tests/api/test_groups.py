@@ -205,19 +205,40 @@ def test_create_manual_group_and_name_collision(
     assert r2.get_json()["error"]["code"] == "CLUSTER_ALREADY_EXISTS"
 
 
+def test_create_manual_group_whitespace_name_is_rejected(
+    api_client, api_app, admin_headers
+) -> None:
+    """A whitespace-only display name is blank after strip — it must 422,
+    not create a nameless ``local:  `` group (regression: the blank-name
+    rows that appeared on /user/group)."""
+    r = api_client.post(
+        "/api/v1/admin/groups", json={"name": "   "}, headers=admin_headers
+    )
+    assert r.status_code == 422, r.get_json()
+    # No group was created.
+    with api_app.app_context():  # type: ignore[attr-defined]
+        from app.extensions import db
+        from app.models.group import Group
+
+        row = db.session.execute(
+            db.select(Group).filter(Group.name.in_(["local:", "local:   "]))
+        ).scalars().first()
+        assert row is None
+
+
 def test_add_and_remove_group_member(api_client, api_app, admin_headers) -> None:
     _seed_group(api_app, "devs2")
     _seed_user(api_app, "sub-mem-2")
     r = api_client.post(
         "/api/v1/admin/groups/devs2/members",
-        json={"name": "devs2", "user": "sub-mem-2"},
+        json={"user_sub": "sub-mem-2"},
         headers=admin_headers,
     )
     assert r.status_code == 200, r.get_json()
     # Idempotent re-add.
     r = api_client.post(
         "/api/v1/admin/groups/devs2/members",
-        json={"name": "devs2", "user": "sub-mem-2"},
+        json={"user_sub": "sub-mem-2"},
         headers=admin_headers,
     )
     assert r.status_code == 200
@@ -225,7 +246,7 @@ def test_add_and_remove_group_member(api_client, api_app, admin_headers) -> None
     assert body["member_count"] == 1
     r = api_client.delete(
         "/api/v1/admin/groups/devs2/members",
-        json={"name": "devs2", "user": "sub-mem-2"},
+        json={"user_sub": "sub-mem-2"},
         headers=admin_headers,
     )
     assert r.status_code == 200, r.get_json()
@@ -234,7 +255,7 @@ def test_add_and_remove_group_member(api_client, api_app, admin_headers) -> None
     # Removing a non-member is a 404.
     r = api_client.delete(
         "/api/v1/admin/groups/devs2/members",
-        json={"name": "devs2", "user": "sub-mem-2"},
+        json={"user_sub": "sub-mem-2"},
         headers=admin_headers,
     )
     assert r.status_code == 404

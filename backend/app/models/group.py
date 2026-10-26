@@ -43,6 +43,8 @@ class Group(db.Model):
         if source not in ("oidc", "local"):
             msg = f"unknown group source {source!r}; expected 'oidc' or 'local'"
             raise ValueError(msg)
+        if not name:
+            raise ValueError("group name must not be blank")
         self.name = name
         self.source = source
         self.display_name = display_name

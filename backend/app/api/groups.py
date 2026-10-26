@@ -11,6 +11,7 @@ from flask_smorest import Api, Blueprint
 
 from app.api._authhook import apply_auth
 from app.api.permissions import _cluster_by_name_or_404
+from app.core.errors import InvalidKubeconfigError
 from app.core.security import require_admin
 from app.extensions import db
 from app.models.audit import AuditLog
@@ -109,7 +110,10 @@ class GroupsApi(Api):
     })
     def create_group(self, args: dict[str, object]) -> tuple[dict[str, object], int]:
         require_admin()
-        group = groups_svc.add_manual_group(db.session, name=str(args["name"]))
+        name = str(args.get("name") or "").strip()
+        if not name:
+            raise InvalidKubeconfigError("group name must not be blank")
+        group = groups_svc.add_manual_group(db.session, name=name)
         db.session.add(AuditLog(
             action="group.create", actor_sub=g.current_user.sub, target=group.name,
         ))
@@ -125,8 +129,9 @@ class GroupsApi(Api):
     })
     def add_group_member(self, args: dict[str, object], name: str) -> dict[str, object]:
         require_admin()
+        user_sub = str(args.get("user_sub") or "")
         member = groups_svc.add_member(
-            db.session, group_name=str(args["name"]), user_sub=str(args["user"])
+            db.session, group_name=name, user_sub=user_sub
         )
         db.session.add(AuditLog(
             action="group.member_add", actor_sub=g.current_user.sub,
@@ -144,8 +149,9 @@ class GroupsApi(Api):
     })
     def remove_group_member(self, args: dict[str, object], name: str) -> dict[str, object]:
         require_admin()
+        user_sub = str(args.get("user_sub") or "")
         groups_svc.remove_member(
-            db.session, group_name=str(args["name"]), user_sub=str(args["user"])
+            db.session, group_name=name, user_sub=user_sub
         )
         db.session.add(AuditLog(
             action="group.member_remove", actor_sub=g.current_user.sub,

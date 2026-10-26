@@ -23,9 +23,22 @@ depends_on = None
 
 
 def upgrade():
-    op.add_column('users', sa.Column('password_hash', sa.String(length=255), nullable=True))
-    op.add_column('users', sa.Column('auth_source', sa.String(length=16), nullable=False, server_default='oidc'))
-    op.create_unique_constraint('uq_users_email', 'users', ['email'])
+    # Guarded: a create_all-era dev DB (healed via stamp base + upgrade)
+    # already carries these columns/constraint.
+    bind = op.get_bind()
+    inspector = sa.inspect(bind)
+    cols = {c['name'] for c in inspector.get_columns('users')}
+    uniques = {
+        frozenset(c['column_names'])
+        for c in inspector.get_unique_constraints('users')
+    }
+
+    if 'password_hash' not in cols:
+        op.add_column('users', sa.Column('password_hash', sa.String(length=255), nullable=True))
+    if 'auth_source' not in cols:
+        op.add_column('users', sa.Column('auth_source', sa.String(length=16), nullable=False, server_default='oidc'))
+    if frozenset(['email']) not in uniques:
+        op.create_unique_constraint('uq_users_email', 'users', ['email'])
 
 
 def downgrade():
