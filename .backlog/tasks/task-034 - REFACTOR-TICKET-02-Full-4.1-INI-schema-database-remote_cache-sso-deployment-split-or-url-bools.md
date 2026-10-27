@@ -6,7 +6,7 @@ title: >-
 status: Done
 assignee: []
 created_date: '2026-10-26 13:17'
-updated_date: '2026-10-26 14:34'
+updated_date: '2026-10-27 09:03'
 labels: []
 dependencies:
   - TASK-033
@@ -54,3 +54,9 @@ Config source change (ADR-0028). Complete _FIELDS for every Settings field; add 
 5. Point remaining config.py fields at ini_config.resolve
 6. Full unit suite green
 <!-- SECTION:PLAN:END -->
+
+## Implementation Notes
+
+<!-- SECTION:NOTES:BEGIN -->
+Close-out 2026-10-27: full unit suite 416 passed / 3 skipped / 7 deselected (exit 0). test_ini_config.py 18/18 green. Dev stack backstop: healthz 200, readyz database+redis ok, SPA 200. helm template shows KUBEDASH_JWT_SECRET secretKeyRef. fe-build + fe-check green.
+<!-- SECTION:NOTES:END -->

@@ -6,7 +6,7 @@ title: >-
 status: Done
 assignee: []
 created_date: '2026-10-26 13:17'
-updated_date: '2026-10-26 14:18'
+updated_date: '2026-10-27 09:03'
 labels: []
 dependencies: []
 references:
@@ -53,3 +53,9 @@ Config source change (ADR-0028). Create app/core/ini_config.py (home discovery v
 5. Update conftest reset to ini_config.reset() + KUBEDASH_HOME fixtures
 6. Full unit suite green
 <!-- SECTION:PLAN:END -->
+
+## Implementation Notes
+
+<!-- SECTION:NOTES:BEGIN -->
+Close-out 2026-10-27: full unit suite 416 passed / 3 skipped / 7 deselected (exit 0). test_ini_config.py 18/18 green. Dev stack backstop: healthz 200, readyz database+redis ok, SPA 200. helm template shows KUBEDASH_JWT_SECRET secretKeyRef. fe-build + fe-check green.
+<!-- SECTION:NOTES:END -->

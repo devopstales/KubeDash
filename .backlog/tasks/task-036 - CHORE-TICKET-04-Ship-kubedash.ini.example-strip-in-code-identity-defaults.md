@@ -4,7 +4,7 @@ title: '[CHORE] TICKET-04: Ship kubedash.ini.example + strip in-code identity de
 status: Done
 assignee: []
 created_date: '2026-10-26 13:18'
-updated_date: '2026-10-26 14:38'
+updated_date: '2026-10-27 09:03'
 labels: []
 dependencies:
   - TASK-035
@@ -51,3 +51,9 @@ Config source change (ADR-0028). Create backend/kubedash.ini.example (4.1 format
 4. wsgi.py WHY-comment (env-only process knobs)
 5. Full unit suite green
 <!-- SECTION:PLAN:END -->
+
+## Implementation Notes
+
+<!-- SECTION:NOTES:BEGIN -->
+Close-out 2026-10-27: full unit suite 416 passed / 3 skipped / 7 deselected (exit 0). test_ini_config.py 18/18 green. Dev stack backstop: healthz 200, readyz database+redis ok, SPA 200. helm template shows KUBEDASH_JWT_SECRET secretKeyRef. fe-build + fe-check green.
+<!-- SECTION:NOTES:END -->
