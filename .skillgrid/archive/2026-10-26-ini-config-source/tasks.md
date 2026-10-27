@@ -1,6 +1,6 @@
 # Tasks — Configuration source: kubedash.ini (4.1 format)
 
-> **STATUS:** `sliced` (2026-10-26)
+> **STATUS:** `executed` (2026-10-27)
 
 > Sliced from `.skillgrid/specs/2026-10-26-ini-config-source/blueprint.md`.
 > Vertical tracer-bullet tickets, dependency-ordered, sized for one fresh agent context window.
@@ -45,7 +45,7 @@ Chain strategy: feature-branch-chain
 
 ## Tickets
 
-### TICKET-01 — INI>env>override resolution core + home derivation + Settings projection
+### TICKET-01 — INI>env>override resolution core + home derivation + Settings projection ✅
 
 - **Tracker ID:** TASK-033
 - **Scope:** New `app/core/ini_config.py` (home discovery, `home_paths()`, `load_ini`,
@@ -71,7 +71,7 @@ Chain strategy: feature-branch-chain
 - **Fails-when:** `uv run pytest tests/test_ini_config.py -v` exits non-zero, or the full unit
   suite reports a failure.
 
-### TICKET-02 — Full 4.1 INI schema (database/remote_cache/sso/deployment, split-or-url, bools)
+### TICKET-02 — Full 4.1 INI schema (database/remote_cache/sso/deployment, split-or-url, bools) ✅
 
 - **Tracker ID:** TASK-034
 - **Scope:** Complete `_FIELDS` for every current `Settings` field; add `_resolve_database`
@@ -89,7 +89,7 @@ Chain strategy: feature-branch-chain
 - **Fails-when:** `uv run pytest tests/test_ini_config.py -k "database or remote or sso or app_mode" -v`
   exits non-zero.
 
-### TICKET-03 — Fail-fast on required keys + retire [k8s]/[plugin_settings]
+### TICKET-03 — Fail-fast on required keys + retire [k8s]/[plugin_settings] ✅
 
 - **Tracker ID:** TASK-035
 - **Scope:** Define `REQUIRED = {kubedash_jwt_secret, kubedash_secret_key, bootstrap_admin_email,
@@ -107,7 +107,7 @@ Chain strategy: feature-branch-chain
 - **Fails-when:** `uv run pytest tests/test_ini_config.py -k "required_key or retired" -v` exits
   non-zero.
 
-### TICKET-04 — Ship kubedash.ini.example + strip in-code identity defaults
+### TICKET-04 — Ship kubedash.ini.example + strip in-code identity defaults ✅
 
 - **Tracker ID:** TASK-036
 - **Scope:** Create `backend/kubedash.ini.example` (4.1 format, empty secrets, commented
@@ -124,7 +124,7 @@ Chain strategy: feature-branch-chain
 - **Blocked by:** TICKET-03
 - **Fails-when:** `uv run pytest tests/test_ini_config.py -k example -v` exits non-zero.
 
-### TICKET-05 — Dev wiring (Taskfile + Dockerfile) + chart env-override backstop
+### TICKET-05 — Dev wiring (Taskfile + Dockerfile) + chart env-override backstop ✅
 
 - **Tracker ID:** TASK-037
 - **Scope:** Create `backend/kubedash.ini` (gitignored, dev values); drop `KUBEDASH_STATIC_DIR`

@@ -32,5 +32,12 @@
 - **`jwt_secret`/`secret_key` moved from `[security]` in-code defaults to INI-required.** 4.1
   carried `admin_password` in `[security]`; 5.0 also requires the JWT + kubeconfig-encryption
   keys there (one-way-door keys, ADR-0002), so they are INI-required with no code default.
+- **`bootstrap_admin_email`/`bootstrap_admin_password` are NOT required — they keep 4.1-parity
+  in-code defaults** (`admin@kubedash.local` / `changeme`). Ruling 2026-10-27 (TICKET-03
+  one-way checkpoint, user-approved): the original spec listed them in `REQUIRED`, but an
+  unedited 4.1 file must still boot in dev, and the 4.1 parity default is the boot path.
+  An *empty* env value (`KUBEDASH_BOOTSTRAP_ADMIN_EMAIL=""`) means "local login off" (it
+  overrides the default to unset) — `resolve` treats `None` as "absent", `""` as
+  "explicitly unset".
 - **Process/runtime knobs stay env-only** (`FLASK_RUN_PORT`, `KUBEDASH_STATIC_DIR`,
   `KUBEDASH_SSL_CERT`/`_KEY`) — these are not app config and are deliberately not INI fields.

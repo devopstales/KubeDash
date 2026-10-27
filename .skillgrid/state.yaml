@@ -5,27 +5,21 @@
 
 pipeline:
   # Pointer set 2026-10-24: the 4.1 TLS edge + security header layer is
-  # restored per ADR-0026. Previous pointer 2026-10-21-cluster-dashboard
-  # stays in flight.
+  # restored per ADR-0026. 2026-10-26 changes are sliced/executed and
+  # tracked in in_flight below.
   current_change: 2026-10-24-tls-security-headers
   current_phase: executing
-  # 2026-10-21-cluster-node (blueprint) and 2026-10-17/2026-10-19 changes
-  # remain in flight at their own phases.
   specs_root: .skillgrid/specs
 
-# In-flight changes (besides pipeline.current_change). current_change stays on
-# the still-executing authentication vertical; user-management is tracked here
-# at its own phase so its pipeline position is durable without stealing the
-# current_change pointer.
+# In-flight changes (besides pipeline.current_change).
 in_flight:
   - change: 2026-10-26-ini-config-source
-    phase: slicing
-    # Spec trio + blueprint + ADR-0028 written 2026-10-26; T2 critic ran
-    # (19 findings applied); KUBEDASH_HOME anchor added (replaces
-    # KUBEDASH_STATIC_DIR + config-file knob). Sliced 2026-10-26: 5 tickets,
-    # 5 serial waves, feature-branch-chain (High risk ~900-1100 lines).
-    # One-way checkpoint on TICKET-03 (ADR-0021 supersede). Next: ticketing
-    # -> execution handoff.
+    phase: qa
+    # ARCHIVED 2026-10-27 to .skillgrid/archive/ (user decision, code-verified
+    # in tree: INI-primary config, ADR-0028 locked). All 5 tickets
+    # (TASK-033..037) Done in Backlog. KNOWN OPEN: TICKET-05 dev wiring
+    # (Taskfile/Dockerfile/chart env-override backstop) not yet verified in
+    # code — see archive/2026-10-26-ini-config-source/tasks.md.
     tracker: [TASK-033, TASK-034, TASK-035, TASK-036, TASK-037]
   - change: 2026-10-26-network-policy
     phase: blueprint
@@ -34,18 +28,18 @@ in_flight:
     # column's local-time format). Next: user approves the final
     # blueprint -> slicing (tasks.md) -> execution handoff.
     tracker: []
-  - change: 2026-10-19-user-management
-    phase: qa
-    # All 8 tickets (TICKET-01..08) implemented + reviewed; QA gate PASS
-    # (traceability 26/26, all truths VERIFIED, Trivy clean, scope COMPLETE).
-    # HEAD 41c8f928 (QA report). Next: requesting-code-review (final two-axis)
-    # -> ship. Delivery: feature-branch-chain on `rebase` (no merge to main).
-    tracker: [TASK-023, TASK-024]
 
 completed_changes:
   - 2026-10-17-kubedash-base-structure
   - 2026-10-17-swagger-ui-air-gap
   - 2026-10-17-authentication-vertical
+  # Archived 2026-10-27 (ship, user decision; code-verified in tree):
+  - 2026-10-19-user-management        # QA PASS per 2026-10-26 state (report.md Gate FAIL header is STALE, pre-ADR-0023 rescope — regenerate at reflect)
+  - 2026-10-21-namespace-page
+  - 2026-10-21-cluster-dashboard
+  - 2026-10-21-cluster-node
+  - 2026-10-23-http-only-session-cookie
+  - 2026-10-21-sidebar-nav            # done-but-diverged: commit 81f9eff4 (Settings ungated, footer links, no Cluster Details menu entry)
 
 # Onboarding state (2026-10-17): config.yaml + ASSUMPTIONS.md + state.yaml
 # created. Open items tracked in ASSUMPTIONS.md "Onboarding notes".
