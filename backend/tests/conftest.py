@@ -227,26 +227,45 @@ def _kind_seed_demo() -> None:
         )
 
 
-def _kind_create_or_reuse() -> bytes:
-    """Ensure the kind cluster exists and return its kubeconfig; also drop
-    the demo objects the integration tests assert on."""
+def _kind_create_or_reuse() -> tuple[bytes, bool]:
+    """Ensure the kind cluster exists and return (kubeconfig, created_by_run).
+
+    ``created_by_run`` is True only when THIS run created the cluster (it was
+    absent on entry). The session teardown deletes the cluster only in that
+    case — a cluster the developer deliberately kept (or a CI-provisioned one)
+    is left alone. This is the fix for the stranded-control-plane leak: an
+    interrupted run used to leave ``kubedash-test`` idling at ~8 cores for
+    the next session to find."""
     existing = subprocess.run(
         ["kind", "get", "clusters"], capture_output=True, text=True
     ).stdout
-    if _KIND not in existing:
+    created_by_run = _KIND not in existing
+    if created_by_run:
         subprocess.run(["kind", "create", "cluster", "--name", _KIND], check=True)
     _kind_seed_demo()
     out = subprocess.run(
         ["kind", "get", "kubeconfig", "--name", _KIND], capture_output=True, text=True
     )
-    return out.stdout.encode()
+    return out.stdout.encode(), created_by_run
 
 
 @pytest.fixture(scope="session")
 def kind_cluster() -> bytes:
     if not _kind_available():
         pytest.skip("kind not available")
-    return _kind_create_or_reuse()
+    kubeconfig, created_by_run = _kind_create_or_reuse()
+    try:
+        yield kubeconfig
+    finally:
+        # Tear down only what this run created. The per-FILE boundary
+        # (_kind_file_boundary) recreates between files, so by session end the
+        # cluster exists iff an integration file ran — delete it so the control
+        # plane cannot linger after the run (Ctrl-C, timeout, or clean exit).
+        if created_by_run:
+            subprocess.run(
+                ["kind", "delete", "cluster", "--name", _KIND],
+                capture_output=True,
+            )
 
 
 @pytest.fixture(scope="session")
