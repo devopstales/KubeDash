@@ -1,5 +1,5 @@
 ---
-id: TASK-025
+id: TASK-039
 title: 'Migration-managed dev DB: task db-migrate + dev-stack alembic path'
 status: Done
 assignee:
