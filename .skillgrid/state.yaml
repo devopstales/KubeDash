@@ -39,6 +39,7 @@ completed_changes:
   - 2026-10-21-cluster-dashboard
   - 2026-10-21-cluster-node
   - 2026-10-23-http-only-session-cookie
+  - 2026-10-21-dashboard-options         # decision artifact: Option 1 won -> implemented as 2026-10-21-cluster-node
   - 2026-10-21-sidebar-nav            # done-but-diverged: commit 81f9eff4 (Settings ungated, footer links, no Cluster Details menu entry)
 
 # Onboarding state (2026-10-17): config.yaml + ASSUMPTIONS.md + state.yaml
