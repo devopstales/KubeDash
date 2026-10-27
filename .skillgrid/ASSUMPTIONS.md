@@ -7,7 +7,7 @@
 > frontmatter, **not** here. One decision per ADR file at
 > `.skillgrid/knowledge/decisions/04-adr-NNNN-slug.md`.
 
-**Highest sequence in use:** 0028
+**Highest sequence in use:** 0031
 
 ---
 
@@ -63,14 +63,14 @@ are kept, with `In force: no`. Never delete a row; flip it instead (IRON RULE).
 | ADR-0004 | RBAC proxy via SubjectAccessReview (not local role mapping) — addendum 2026-10-21: the SAR verdict cache key carries every SAR attribute (`sar:<cluster>:<sub>:<verb>:<resource>:<group>:<namespace>:<name>`); resource reads use the registry credentials, so a verdict for one namespace or object must never answer for another | yes | `knowledge/decisions/04-adr-0004-rbac-proxy-sar.md` |
 | ADR-0005 | CoreUI React + free admin template over shadcn/ui/Tailwind | yes | `knowledge/decisions/04-adr-0005-coreui-react.md` |
 | ADR-0006 | Single-container deployment (Gunicorn serves API + static SPA) | yes | `knowledge/decisions/04-adr-0006-single-container.md` |
-| ADR-0007 | RQ over Celery for async tasks | yes | `knowledge/decisions/04-adr-0007-rq-over-celery.md` |
-| ADR-0008 | Leader election via PG advisory lock + lease table | yes | `knowledge/decisions/04-adr-0008-leader-election.md` |
+| ADR-0007 | RQ over Celery for async tasks — superseded by ADR-0029 (queue on Postgres; ADR-0007 was index-only, no body file) | no | `knowledge/decisions/04-adr-0007-rq-over-celery.md` |
+| ADR-0008 | Leader election via PG advisory lock + lease table — superseded by ADR-0031 (active-active pgEdge/Spock + strict fencing token; ADR-0008 was index-only, no body file) | no | `knowledge/decisions/04-adr-0008-leader-election.md` |
 | ADR-0009 | SSE over WebSocket for server→client push | yes | `knowledge/decisions/04-adr-0009-sse-over-websocket.md` |
 | ADR-0010 | Informer-based in-memory cache | yes | `knowledge/decisions/04-adr-0010-informer-cache.md` |
 | ADR-0011 | kubectl credential plugin with server-managed SSO config | yes | `knowledge/decisions/04-adr-0011-kubectl-credential-plugin.md` |
 | ADR-0012 | Aggregated API server for Project + SSOUser + SSOGroup | yes | `knowledge/decisions/04-adr-0012-aggregated-api.md` |
 | ADR-0013 | Permission management: role templates + self-service kubeconfig + drift detection (core implemented: templates, bind/unbind, self-service kubeconfig; drift detection not in this change) | yes | `knowledge/decisions/04-adr-0013-permission-management.md` |
-| ADR-0014 | Session revocation propagation (web logout kills kubectl session) | yes | `knowledge/decisions/04-adr-0014-session-revocation-propagation.md` |
+| ADR-0014 | Session revocation propagation (web logout kills kubectl session) — superseded by ADR-0030 (the `jti` deny-list moves from Redis to a Postgres `revoked_jtis` table; the guarantee is preserved) | no | `knowledge/decisions/04-adr-0014-session-revocation-propagation.md` |
 | ADR-0015 | Namespace-as-a-Service (self-service onboarding + TTL'd grants) | yes | `knowledge/decisions/04-adr-0015-namespace-as-a-service.md` |
 | ADR-0016 | Privileged Access Management (additive elevation + auto-revert + break-glass) | yes | `knowledge/decisions/04-adr-0016-privileged-access-management.md` |
 | ADR-0017 | Just-In-Time login provisioning (Helm-declared builtin pipeline) | yes | `knowledge/decisions/04-adr-0017-jit-login-provisioning.md` |
@@ -85,6 +85,9 @@ are kept, with `In force: no`. Never delete a row; flip it instead (IRON RULE).
 | ADR-0026 | TLS edge + security header layer (nginx edge with internal HTTPS; ProxyFix gated on KUBEDASH_TLS_EDGE; 4.1 header set restored with two recorded deviations) — superseded by ADR-0027 (the TLS edge is no longer the `dev-stack` default) | no | `knowledge/decisions/04-adr-0026-tls-edge-and-security-headers.md` |
 | ADR-0027 | Plain-HTTP dev-stack default (backend :8080, COOKIE_SECURE=false, no cert precondition, no host :443/:80 bind); the ADR-0026 TLS edge is the opt-in `task dev-stack-ssl` (backend :8443, COOKIE_SECURE=true, KUBEDASH_TLS_EDGE) | yes | `knowledge/decisions/04-adr-0027-plain-http-dev-stack-default.md` |
 | ADR-0028 | Configuration source: `kubedash.ini` (4.1 format, minus plugins) as the primary operator-facing config, env (`KUBEDASH_*`) as override, no hard-coded defaults for identities/credentials (fail fast at boot) — supersedes-in-part the env-driven bootstrap-admin delivery of ADR-0021 | yes | `knowledge/decisions/04-adr-0028-ini-config-source.md` |
+| ADR-0029 | Queue on Postgres: `tasks` table + `SELECT ... FOR UPDATE SKIP LOCKED` poll worker (reaper + 3× exponential-backoff retry + dead-letter), replacing RQ/Redis as the task broker; poll, not `LISTEN`/`NOTIFY` | yes | `knowledge/decisions/04-adr-0029-queue-on-postgres.md` |
+| ADR-0030 | Session revocation on Postgres: `revoked_jtis` deny-list table (PK lookup on the verify-hook hot path + leader reaper), replacing the Redis `jti` set; with ADR-0029 this removes Redis's last consumers → Redis dropped from the stack | yes | `knowledge/decisions/04-adr-0030-session-revocation-on-postgres.md` |
+| ADR-0031 | Active-active Postgres via pgEdge/Spock (`ghcr.io/pgedge/pgedge-postgres:17-spock5-minimal`, thin operator-less Helm chart + run-once init Job, `dev/` docker-compose, `autoddl` for one-shot migrations) + a **strict fencing token** on `leader_lease` (every task write fenced) to keep the ADR-0008 election correct under last-write-wins | yes | `knowledge/decisions/04-adr-0031-active-active-pgedge-spock.md` |
 
 > **Note on ADR-0001..0013:** these are listed in `ARCHITECTURE.md` §12 as the
 > initial-architecture decisions "to be authored at brainstorming time." As of

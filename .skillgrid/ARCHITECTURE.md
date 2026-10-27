@@ -484,43 +484,73 @@ reserved for **bidirectional** cases only (exec / terminal).
   client falls behind, the server sends a `reconnect` event and the client
   re-issues with a fresh `since` cursor.
 
-### 3.7 Async tasks (RQ + leader election)
+### 3.7 Async tasks (Postgres queue + leader election)
 
-**RQ** (Redis Queue) is the async task runner. Tasks are defined in
-`app/tasks/` and enqueued via `rq.Queue`. The worker runs **in-process**
-inside the Gunicorn container (spawned as a background thread at startup),
-**gated by leader election**: only the replica holding the `leader_lease`
-runs the worker. Followers skip it.
+**Queue on Postgres** (ADR-0029, supersedes the RQ/Redis design). Tasks are
+defined in `app/tasks/`. The leader-gated scheduler in `wsgi.py` enqueues a due
+task as an `INSERT` into a Postgres `tasks` table; a worker loop claims rows
+with `SELECT ... FOR UPDATE SKIP LOCKED`, runs them, and marks them done.
+**Gated by leader election**: only the replica holding the `leader_lease`
+enqueues; any replica runs the claim loop, but `SKIP LOCKED` guarantees a job
+is claimed by exactly one worker. Redis is **no longer in the task path** —
+Postgres is the only stateful dependency (ADR-0029 + ADR-0030 remove its last
+two consumers).
 
-| Task                  | Schedule       | Purpose                                    |
-|-----------------------|----------------|--------------------------------------------|
-| `cluster_sync`        | every 5 min    | Reconcile `clusters` table with live state |
-| `health_probe`        | every 1 min    | Hit each cluster's `/readyz`, update status|
-| `alerts.evaluate`     | every 1 min    | Evaluate Prometheus alert rules, upsert `alerts` |
-| `audit.archive`       | nightly        | Compress + move audit rows > 90 d to cold  |
-| `access_expiry`       | every 1 min    | Revoke PAM elevations + TTL'd NaaS grants whose `expires_at` has passed (§ 5C, § 5D) |
+| Task                  | Schedule       | Purpose                                    | Wired |
+|-----------------------|----------------|--------------------------------------------|-------|
+| `health.run`          | every 1 min    | Hit each cluster's `/readyz`, update status| yes   |
+| `cluster_sync.run`    | every 5 min    | Reconcile `clusters` table with live state | yes   |
+| `alerts.evaluate`     | every 1 min    | Evaluate Prometheus alert rules, upsert `alerts` | stub |
+| `access_expiry.run`   | every 1 min    | Revoke PAM elevations + TTL'd grants whose `expires_at` has passed (§ 5C, § 5D); also reaps `revoked_jtis` (ADR-0030) | stub |
+| `rbac_drift.run`      | every 10 min   | Detect RBAC drift vs. role templates (§ 5B) | stub  |
 
-**Leader election** (`app/core/leader.py`):
+Claim / recovery semantics (ADR-0029): the claim is `FOR UPDATE SKIP LOCKED`
+(atomic, non-blocking, cluster-wide under the active-active topology); a
+**reaper** re-queues a `processing` row whose `locked_at` is stale (crash
+recovery, replaces RQ's death penalty); a task that raises is retried up to 3×
+with exponential backoff (`available_at`), then dead-lettered (`status=
+'failed'`). The worker **polls** (5 s) rather than using `LISTEN`/`NOTIFY` —
+a `NOTIFY` does not replicate across active-active nodes and the tasks are
+periodic, so poll latency is immaterial.
+
+**Leader election** (`app/core/leader.py`, ADR-0031, supersedes the
+single-writable assumption of ADR-0008):
 
 - A `leader_lease` table with `replica_id`, `acquired_at`, `heartbeat_at`,
-  `token` (UUID).
-- At startup, each replica attempts `SELECT ... FOR UPDATE SKIP LOCKED`
-  on the lease row. The first to commit becomes leader.
-- The leader heartbeats every 5 s (`UPDATE heartbeat_at = now()`).
+  `token` (UUID), and a monotonic **`fence`** column (ADR-0031).
+- The **advisory lock** (`pg_try_advisory_lock(hashtext(:rid))`) is the mutex;
+  it is **session-local** and not guaranteed to replicate across active-active
+  nodes — the `leader_lease` row (which *does* replicate) + the staleness check
+  + the fence are the source of truth.
+- The leader heartbeats every 5 s (`UPDATE heartbeat_at = now() WHERE id=1 AND
+  fence = :my_fence`).
 - A background thread on every replica checks: if `heartbeat_at` is stale
-  (> 10 s) and I'm not the leader, attempt acquisition.
-- The in-memory `is_leader` flag is updated by this thread; the RQ worker
-  thread checks it and idles when `False`.
-- **Failover:** leader dies → followers detect stale heartbeat within 10 s
-  → one acquires the lease → starts its RQ worker. No data loss; in-flight
-  RQ tasks are retried by RQ's own retry policy (3 retries, exponential
-  backoff).
+  (> 10 s) and I'm not the leader, attempt acquisition (`... SET fence=fence+1
+  ... RETURNING fence`).
+- **Strict fencing (ADR-0031):** *every* leader-gated task DB-write carries the
+  leader's in-memory `fence` and is conditioned on `WHERE fence = :my_fence`.
+  Under the active-active last-write-wins conflict resolution, a leader that
+  loses the lease row to another node finds its `fence` stale → its writes
+  affect 0 rows → it demotes. No two leaders commit task state.
+- The in-memory `is_leader` flag is updated by this thread; the scheduler
+  checks it per task, per poll and idles when `False`.
+- **Failover:** leader dies → followers detect stale heartbeat within 10 s →
+  one acquires the lease (fresh advisory lock + `fence+1`) → resumes enqueue.
+  No data loss; a dead worker's in-flight job is re-claimed by the reaper and
+  retried (3×, exponential backoff).
 
-**Why RQ over Celery:** RQ is lighter (single-process worker, no broker
-config, no separate worker container), pairs naturally with the
-single-container deployment, and its in-process worker + leader gate means
-zero additional moving parts. Celery is overkill for this task volume
-(4 periodic tasks, no fan-out).
+**Why Postgres over RQ/Redis (ADR-0029) and active-active pgEdge (ADR-0031):**
+the queue's payload (a task path + timestamps) has no need to live in a
+different engine than the data the tasks mutate, and Postgres is already a hard
+requirement — moving the queue (and, per ADR-0030, the session-revocation
+deny-list) onto it removes Redis as a stateful dependency entirely. The
+task volume is tiny and periodic (no fan-out), so a hand-rolled
+`SKIP LOCKED` claim + reaper is simpler than a queue library, and plain
+Postgres core (no `CREATE EXTENSION`). The database is run **active-active**
+via pgEdge/Spock (`ghcr.io/pgedge/pgedge-postgres:17-spock5-minimal`, a thin
+operator-less Helm chart with a run-once init `Job`, `dev/` docker-compose) so
+a node loss opens no read-only promotion gap; `autoddl` replicates Alembic DDL
+so migrations run once.
 
 ### 3.8 Config
 
@@ -2690,11 +2720,11 @@ These are not new features — they change **how** existing components work.
 | Injection            | Pydantic validation on all inputs; SQLAlchemy parameterised; no raw SQL |
 | CSRF                 | Session cookies are `SameSite=Lax` (access) / `Strict` (path-scoped refresh), JSON-only state-changing endpoints, no state-changing GETs (ADR-0025) |
 | CORS                 | Locked to the UI origin (env `CORS_ORIGINS`)               |
-| Rate limiting        | Flask-Limiter, per-IP + per-user, Redis-backed             |
+| Rate limiting        | Flask-Limiter, per-IP + per-user (storage backend to be re-pointed off Redis at implementation — ADR-0029/0030 remove Redis as a stateful dep) |
 | Audit                | Every mutating request → `audit_log` (who/what/when/diff)  |
 | Dependencies         | `pip-audit` + `npm audit` in CI; Dependabot enabled         |
 | Images               | Slim base, non-root, SCANNED (Trivy) in CI                  |
-| Leader election      | PG advisory lock + lease table; no split-brain (single leader) |
+| Leader election      | PG advisory lock + `leader_lease` table + strict `fence` token (ADR-0031); no split-brain (single logical leader, fenced under active-active) |
 
 ---
 
@@ -2792,9 +2822,12 @@ Initial ADRs expected for this change (to be authored at brainstorming time):
 - ADR-0006 — Single-container deployment (Gunicorn serves API + static SPA;
   no separate frontend container)
 - ADR-0007 — RQ over Celery for async tasks (lighter, in-process, pairs with
-  single-container; Redis is already a dep)
+  single-container; Redis is already a dep) — **superseded by ADR-0029**
+  (queue on Postgres; ADR-0007 was index-only, no body file)
 - ADR-0008 — Leader election via PG advisory lock + lease table (single
-  leader runs RQ worker; N replicas for HA; failover < 15 s)
+  leader runs the task worker; N replicas for HA; failover < 15 s) —
+  **superseded by ADR-0031** (active-active pgEdge/Spock + strict `fence`
+  token; ADR-0008 was index-only, no body file)
 - ADR-0009 — SSE over WebSocket for server→client push (stateless,
   HTTP-native, LB-friendly; WebSocket only for bidirectional exec)
 - ADR-0010 — Informer-based in-memory cache (per-cluster watch, no
@@ -2810,7 +2843,9 @@ Initial ADRs expected for this change (to be authored at brainstorming time):
   (kubeconfig) patterns, extended for multi-cluster + SSO.
 - ADR-0014 — Session revocation propagation: web logout invalidates the
   kubectl session (Redis jti revocation set + OIDC RP-initiated logout +
-  CSR revocation). Additive deny-list, TTL-bounded. (OpenUnison-derived.)
+  CSR revocation). Additive deny-list, TTL-bounded. (OpenUnison-derived.) —
+  **superseded by ADR-0030** (the `jti` deny-list moves from Redis to a
+  Postgres `revoked_jtis` table; the guarantee is preserved)
 - ADR-0015 — Namespace-as-a-Service: self-service namespace onboarding via
   request → approve → provision, with optional TTL'd grants auto-revoked by
   the `access_expiry` task. (OpenUnison-derived.)
@@ -2830,6 +2865,19 @@ Initial ADRs expected for this change (to be authored at brainstorming time):
 - ADR-0020 — Air-Gap Deployment: zero outbound calls at runtime (local JWTs,
   cached JWKS, pre-loaded images, offline CLI, vendored Helm); air-gap ≠
   no-IdP (the IdP is on the internal network). (OpenUnison-derived.)
+- ADR-0029 — Queue on Postgres: `tasks` table + `SELECT ... FOR UPDATE SKIP
+  LOCKED` poll worker (reaper + 3× exponential-backoff retry + dead-letter),
+  replacing RQ/Redis as the task broker. Supersedes ADR-0007 (index-only).
+  With ADR-0030, removes Redis as a stateful dependency.
+- ADR-0030 — Session revocation on Postgres: `revoked_jtis` deny-list table
+  (PK lookup on the verify-hook hot path + leader reaper), replacing the Redis
+  `jti` set. Supersedes ADR-0014 (file retained).
+- ADR-0031 — Active-active Postgres via pgEdge/Spock:
+  `ghcr.io/pgedge/pgedge-postgres:17-spock5-minimal`, thin operator-less Helm
+  chart + run-once init `Job`, `dev/` docker-compose, `autoddl` for one-shot
+  migrations, + a **strict fencing token** on `leader_lease` so the ADR-0008
+  election stays correct under last-write-wins. Supersedes ADR-0008
+  (index-only).
 
 ---
 
@@ -2850,9 +2898,13 @@ Canonical terms used in this file (details in the terms files):
   CoreUI free admin template convention. *Not* a "feature" folder.
 - **CoreUI shell** — the Header + Sidebar + Footer + `_nav` + `routes`
   scaffold adopted from `coreui/coreui-free-react-admin-template`.
-- **Leader** — the replica holding the `leader_lease`; runs the RQ worker.
+- **Leader** — the replica holding the `leader_lease`; enqueues the
+  leader-gated tasks and holds the current `fence` (ADR-0031).
 - **Follower** — a replica without the lease; serves HTTP only.
-- **RQ** — Redis Queue; the async task runner (in-process, leader-gated).
+- **Task queue** — the Postgres `tasks` table + `FOR UPDATE SKIP LOCKED` claim
+  loop (ADR-0029); replaced RQ/Redis. The `fence` is the monotonic
+  leader-election token that fences a stale leader's writes under active-
+  active (ADR-0031).
 - **Informer cache** — the per-cluster, in-memory dict of K8s resources
   maintained by long-lived watches. The read path for all UI + services.
 - **SSE stream** — a `text/event-stream` HTTP response used for
