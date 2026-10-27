@@ -17,9 +17,10 @@ in_flight:
     phase: qa
     # ARCHIVED 2026-10-27 to .skillgrid/archive/ (user decision, code-verified
     # in tree: INI-primary config, ADR-0028 locked). All 5 tickets
-    # (TASK-033..037) Done in Backlog. KNOWN OPEN: TICKET-05 dev wiring
-    # (Taskfile/Dockerfile/chart env-override backstop) not yet verified in
-    # code — see archive/2026-10-26-ini-config-source/tasks.md.
+    # (TASK-033..037) Done in Backlog. QA gate PASS 2026-10-27
+    # (report.md in archive: traceability 14/14, all truths VERIFIED,
+    # 416/416 suite, dev-stack + chart backstops executed — TICKET-05's
+    # "KNOWN OPEN" resolved). Next: requesting-code-review -> ship.
     tracker: [TASK-033, TASK-034, TASK-035, TASK-036, TASK-037]
   - change: 2026-10-26-network-policy
     phase: blueprint
