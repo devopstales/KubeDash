@@ -19,11 +19,11 @@ Replace all four Redis consumers (RQ broker, `jti` revocation, OIDC `state`, SAR
 | Chained PRs recommended | Yes |
 | Suggested split | PR 1 (schema+pgqueue+wsgi) → PR 2 (fence+auth+rbac) → PR 3 (redis removal+pgEdge dev) |
 | Delivery strategy | ask-on-risk |
-| Chain strategy | feature-branch-chain (repo convention: work on `rebase`, no default merge to `main`) |
+| Chain strategy | single-branch on `rebase` (user decision 2026-10-27: keep all 7 tickets on the `rebase` work branch — no PR chain; the branch is the deliverable + rollback unit) |
 
-Decision needed before apply: Yes
-Chained PRs recommended: Yes
-Chain strategy: feature-branch-chain
+Decision needed before apply: No (user decided 2026-10-27)
+Chained PRs recommended: No (single-branch on `rebase`; the 3-unit split above is the logical rollback boundary, not a PR chain)
+Chain strategy: single-branch on `rebase`
 400-line budget risk: High
 
 ### Suggested Work Units
