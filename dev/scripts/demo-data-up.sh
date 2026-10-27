@@ -18,6 +18,8 @@ if ! command -v kind >/dev/null 2>&1 || ! command -v kubectl >/dev/null 2>&1; th
 fi
 
 # kind-up: cluster (if absent) + metrics-server, then the demo pods + register.
+# This script lives in dev/scripts/, so sibling scripts are $SCRIPT_DIR/<name>.sh.
 (cd "$ROOT" && task kind-up)
-bash "$ROOT/dev/scripts/demo-data.sh"
-bash "$ROOT/dev/scripts/cluster-register.sh"
+SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+bash "$SCRIPT_DIR/demo-data.sh"
+bash "$SCRIPT_DIR/cluster-register.sh"
