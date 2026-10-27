@@ -4,11 +4,16 @@
 # deeper truth (see .skillgrid/specs/).
 
 pipeline:
-  # Pointer set 2026-10-24: the 4.1 TLS edge + security header layer is
-  # restored per ADR-0026. Previous pointer 2026-10-21-cluster-dashboard
-  # stays in flight.
-  current_change: 2026-10-24-tls-security-headers
-  current_phase: executing
+  # Pointer set 2026-10-27: the Postgres queue + revocation + OIDC state +
+  # SAR cache + active-active pgEdge change is sliced (ADR-0029/0030/0031).
+  # Sliced 2026-10-27: 7 tickets, 4 waves (W1 serial migration; W2 parallel
+  # pgqueue/fence/kvstore; W3 parallel wsgi/auth+rbac; W4 redis removal +
+  # pgEdge dev). High risk ~1400-1900 lines -> feature-branch-chain on
+  # `rebase`. One-way checkpoints on TICKET-01 (migration) + TICKET-07
+  # (redis removal + dev-default switch). Previous pointer
+  # 2026-10-24-tls-security-headers stays in flight at executing.
+  current_change: 2026-10-27-postgres-queue-revocation-active-active
+  current_phase: slicing
   # 2026-10-21-cluster-node (blueprint) and 2026-10-17/2026-10-19 changes
   # remain in flight at their own phases.
   specs_root: .skillgrid/specs
