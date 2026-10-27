@@ -175,6 +175,34 @@ def test_remote_cache_split_or_url(tmp_path: pathlib.Path, monkeypatch: pytest.M
     assert _config.get_settings().redis_url == "redis://other:6379/9"
 
 
+def test_database_sqlite_type_warns(tmp_path: pathlib.Path, monkeypatch: pytest.MonkeyPatch) -> None:
+    # The 4.1 file's [database] type = sqlite3 is not a 5.0 driver — it must
+    # be warned (documented in _resolve_database + kubedash.ini.example), not
+    # silently upgraded to postgres.
+    home = _write_ini(
+        _home(tmp_path),
+        "[database]\ntype = sqlite3\nhost = db:5432\nname = kubedash\nuser = u\npassword = p\n",
+    )
+    monkeypatch.setenv("KUBEDASH_HOME", str(home))
+    ini_config.reset()
+    import logging
+
+    with pytest.warns(UserWarning, match="sqlite"):
+        _config.get_settings().database_url
+
+
+def test_remote_cache_password_is_quoted(tmp_path: pathlib.Path, monkeypatch: pytest.MonkeyPatch) -> None:
+    # Parity with _resolve_database: an @ or : in redis_password must be
+    # percent-encoded or the redis:// URL mis-parses (p@ss -> host "ss").
+    home = _write_ini(
+        _home(tmp_path),
+        "[remote_cache]\nredis_host = cache\nredis_password = p@ss:wd\n",
+    )
+    monkeypatch.setenv("KUBEDASH_HOME", str(home))
+    ini_config.reset()
+    assert _config.get_settings().redis_url == "redis://:p%40ss%3Awd@cache:6379/0"
+
+
 def test_sso_and_deployment_and_optional(tmp_path: pathlib.Path, monkeypatch: pytest.MonkeyPatch) -> None:
     home = _write_ini(
         _home(tmp_path),

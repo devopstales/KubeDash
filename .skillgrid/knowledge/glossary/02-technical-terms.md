@@ -27,3 +27,5 @@
 | **JIT** | Just-In-Time: provisioning that runs at login / elevation / NaaS approval. |
 | **PKCE** | Proof Key for Code Exchange (S256) — the OIDC public-client flow the kubectl plugin uses (no `client_secret`). |
 | **RP-initiated logout** | The OIDC `end_session_endpoint` flow that revokes the IdP refresh token on KubeDash logout. |
+| **kubedash.ini** | The operator-facing configuration file (4.1 format, minus plugins) read with `configparser` (interpolation off). The PRIMARY config source; `KUBEDASH_*` env is the higher-priority override; a missing required value fails fast at boot. (ADR-0028.) |
+| **KUBEDASH_HOME** | The single anchor env var (app root): the INI is `<home>/kubedash.ini`, the built SPA `<home>/static`. Baked as `/app` in the container; in dev derived from `wsgi.py`'s own location, never set manually. (ADR-0028; replaces `KUBEDASH_STATIC_DIR`.) |

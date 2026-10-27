@@ -18,6 +18,7 @@ from __future__ import annotations
 import configparser
 import os
 import pathlib
+import warnings
 from collections.abc import Mapping
 
 # field -> (section, key, env_names, has_default, default, is_bool)
@@ -230,6 +231,14 @@ def _resolve_database() -> str:
         return url
     from urllib.parse import quote_plus
 
+    db_type = _ini("database", "type")
+    if db_type and db_type.lower() != "postgres" and db_type.lower() != "postgresql":
+        warnings.warn(
+            f"[database] type={db_type!r} is not a 5.0 driver — the INI is "
+            "read for parity, but 5.0 connects to PostgreSQL",
+            UserWarning,
+            stacklevel=2,
+        )
     host = _ini("database", "host")
     name = _ini("database", "name")
     if not host and not name:
@@ -246,7 +255,10 @@ def _resolve_redis() -> str:
     """[remote_cache]: a single ``url`` wins; else build ``redis://[pass@]host:port/db``
     (port defaults to 6379, db to 0). The 4.1 ``redis_host`` may carry an
     embedded ``:port`` (``cache:6380``); a separate ``redis_port`` wins when
-    both are present."""
+    both are present. The password is ``quote_plus``-ed (parity with
+    ``_resolve_database``) so an ``@``/``:`` in it cannot mis-parse the URL."""
+    from urllib.parse import quote_plus
+
     url = _ini("remote_cache", "url")
     if url:
         return url
@@ -260,7 +272,7 @@ def _resolve_redis() -> str:
         embedded_port = ""
     port = _ini("remote_cache", "redis_port") or embedded_port or "6379"
     db = _ini("remote_cache", "redis_db") or "0"
-    password = _ini("remote_cache", "redis_password")
+    password = quote_plus(_ini("remote_cache", "redis_password"))
     auth = f":{password}@" if password else ""
     return f"redis://{auth}{host}:{port}/{db}"
 

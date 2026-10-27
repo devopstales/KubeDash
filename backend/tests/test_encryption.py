@@ -30,13 +30,15 @@ def test_wrong_key_fails() -> None:
     import app.services.k8s_client as kc
 
     enc = encrypt_kubeconfig(b"data")
-    old = kc._key
-    kc._key = b"x" * 32
+    # The key is a LAZY module cache (_key_cache), not a function: swap the
+    # cached derivation for a different 32-byte key, then restore it.
+    old = kc._key_cache
+    kc._key_cache = b"x" * 32
     try:
         with pytest.raises(ValueError, match="kubeconfig decryption failed"):
             kc.decrypt_kubeconfig(enc)
     finally:
-        kc._key = old
+        kc._key_cache = old
 
 
 def test_wrong_version_byte_fails() -> None:

@@ -217,12 +217,6 @@ def main() -> Flask:
 
 if __name__ == "__main__":
     main()
-    cert = os.environ.get("KUBEDASH_SSL_CERT")
-    ssl_context = (
-        (cert, os.environ["KUBEDASH_SSL_KEY"])
-        if cert
-        else None
-    )
     # WHY env-only (not INI): FLASK_RUN_PORT, KUBEDASH_SSL_CERT, and
     # KUBEDASH_SSL_KEY are process-level knobs — they control HOW the server
     # listens, not WHAT the app is configured with. The INI is the app's

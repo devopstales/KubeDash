@@ -171,6 +171,35 @@ graph LR
 > builds on the previous `ini_config` state), so there is no parallel wave — the tracer-thread
 > shape thickens one slice at a time.
 
+## Review Verdict
+
+> Ship fan-out (skillgrid:parallel-code-review, 2026-10-27): 7 specialists (Standards, Spec,
+> Edge cases, Verification gaps, Security, Performance, Red team) on the pinned change diff
+> (commits `5121b87d`..`d87d905f`). **Verdict: REVIEW-PASS with-fixes** — 0 Critical, 0
+> unresolved High; all 5 in-scope fixes applied in `review-fixes` (below) and re-verified
+> (418 passed / 3 skipped; helm lint + template OK).
+>
+> **Fixed (this commit):** (1) `quote_plus` on `redis_password` in `_resolve_redis` (parity
+> with `_resolve_database`; new test `test_remote_cache_password_is_quoted`); (2) dead
+> duplicated cert/ssl block in `wsgi.py __main__`; (3) `test_wrong_key_fails` now pokes the
+> real `_key_cache` seam (was a silent no-op on the `_key` function); (4) the documented
+> sqlite→postgres `[database] type` warning is now actually emitted (`warnings.warn`; new
+> test `test_database_sqlite_type_warns`); (5) chart `values.yaml` stale "Settings' dev
+> default" comment corrected (the fallback lives in the template, not Settings).
+>
+> **Deferred (parked, with reasons):** chart `secret.yaml` dev-default fallback (out-of-diff
+> file; the values comment now names it as DEV ONLY; dropping the fallback is a chart
+> contract decision for the chart change); RQ worker child env inheritance (dev-only by
+> design — master + child share the same INI path in dev; prod runs RQ separately via
+> `backend-run-worker`; future hardening ticket); the 8 verification-gap test-patch items
+> (real, non-blocking — behaviors covered at some layer; park as a test-coverage ticket);
+> `changeme` fail-open default (user-approved 4.1-parity ruling; boot-warning mitigation
+> rides on the chart doc work); wsgi "import is a no-op" invariant wording + function-local
+> imports; `_FIELDS`/`_SPECIAL_RESOLVERS` registry consolidation; `smoke_task9.py`
+> `KUBEDASH_STATIC_DIR` override (silently ignored — update when the smoke is next touched);
+> stale `KUBEDASH_STATIC_DIR` doc lines in AGENTS.md/README/Taskfile/playwright comment
+> (doc-only; the AGENTS.md env table row is the one worth fixing next session).
+
 ## Slicing Notes
 
 - **Serial, not parallel.** The change is one concern (config resolution) thickened across 5

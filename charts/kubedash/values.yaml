@@ -53,8 +53,8 @@ databaseUrl: "postgresql://kubedash:kubedash@kubedash-postgresql:5432/kubedash"
 redisUrl: "redis://kubedash-redis:6379/0"
 
 secrets:
-  jwtSecret: ""      # empty → Settings' 32-byte dev default
-  secretKey: ""      # empty → Settings' 32-byte dev default
+  jwtSecret: ""      # empty → the template's dev fallback (DEV ONLY — set a real 32+ byte value in prod; ADR-0028 makes it the REQUIRED boot key)
+  secretKey: ""      # empty → the template's dev fallback (DEV ONLY — set a real 32+ byte value in prod; ADR-0028 makes it the REQUIRED boot key)
 
 # All-in-one dev subcharts (bitnami) — off by default in the base structure;
 # prod points at external PG/Redis via DATABASE_URL / REDIS_URL.
