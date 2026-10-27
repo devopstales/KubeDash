@@ -83,31 +83,53 @@ Lesson: **never call a function in the verify-hook WHERE clause**; bind the
 `jti` as a parameter (which the app already does). The `expires_at > now()`
 predicate is fine (applied as a post-index filter on the single PK row).
 
-### F6 — pgEdge image pull is access-gated (topology not exercised)
+### F6 — pgEdge image: use Docker Hub `pgedge/pgedge:pg17-latest` (ghcr is access-gated)
 `ghcr.io/pgedge/pgedge-postgres:17-spock5-minimal` **exists** (confirmed in the
-ghcr tags list: `17-spock5-minimal`, `17-spock5-standard`, `17.6-spock5.0.1-…`,
-`18-spock5-minimal`, etc.) but the local Docker credential (user
-`devopstales`) gets **HTTP 403** on the manifest — the ghcr token lacks the
-`pgedge` package pull-scope (even a public `actions/actions-runner` 403s with
-the same token, so it's token-scope, not image-specific). The two-node Spock
-topology (replication, `autoddl`, cross-node row-lock claim) is therefore
-**not exercised here** — it needs a credential with ghcr pull access. The SQL
-semantics (F2–F5) do not depend on it.
+ghcr tags list) but the local Docker credential (user `devopstales`) gets
+**HTTP 403** on the manifest — the ghcr token lacks the `pgedge` package
+pull-scope (even a public `actions/actions-runner` 403s with the same token, so
+it's token-scope, not image-specific).
+
+**Resolution:** pgEdge also publishes the official free image on **Docker Hub**:
+`pgedge/pgedge:pg17-latest` (Spock 5.0.1, PostgreSQL 17.6, 2.05 GB,
+`spock.control` present, entrypoint `/home/pgedge/scripts/run-database.sh`). It
+pulls **publicly, no auth** — this is the image to use in the dev compose and
+Helm chart (the ghcr image is the same build, just org-gated).
+
+**Two gotchas found standing it up:**
+1. `db.json` **must** include the `pgedge` `internal_admin` user, else the
+   entrypoint aborts: `ERROR: pgedge user missing from spec`.
+2. Spock wires on boot in ~30 s (`spock.node` shows both nodes); config is a
+   `db.json` with `options:["autoddl:enabled"]`, nodes `n1`/`n2`, and the
+   `admin` + `pgedge` users. Hostnames in `db.json` must match the compose
+   service names (`kdpg-n1`/`kdpg-n2`).
+
+**Topology validated on the two-node cluster (`runF6.sh`):**
+- **F6a** cross-node DML: write on n1 → readable on n2. ✓
+- **F6b** `autoddl`: `ALTER TABLE … ADD COLUMN` on n1 → column appears on n2,
+  "DDL statement replicated". ✓ (migrations run once, per ADR-0031)
+- **F6c** cross-node `FOR UPDATE SKIP LOCKED` claim: 6 claimers on n1 + 6 on
+  n2 → **12 claimed, 0 double-claimed, 12 distinct**. The row-lock claim is
+  **cluster-wide** — exactly what ADR-0029 needs. ✓
+- **F6d** `spock.node` on each node lists both `n1` and `n2`. ✓ (columns are
+  `node_id, node_name, location, country, info` — no `region` column)
 
 ## Verdict
 
-**VALIDATED ✓** for the SQL semantics (F2 exactly-once claim, F3 fence reject,
-F4 reaper/dead-letter, F5 hot-path latency) — each with the edge case that
-would have killed it (concurrent double-claim; stale-leader LWW; dead worker;
-planner regression). **PARTIAL ⚠** on the pgEdge *topology* (F6): the image is
-real and the tags exist, but pull access is gated in this environment, so
-replication/`autoddl`/cross-node claim are unverified.
+**VALIDATED ✓** across the board:
+- SQL semantics (F2 exactly-once claim, F3 fence reject, F4 reaper/dead-letter,
+  F5 hot-path latency) — each with the edge case that would have killed it
+  (concurrent double-claim; stale-leader LWW; dead worker; planner regression).
+- pgEdge *topology* (F6) — validated on a live two-node Docker-Hub cluster:
+  cross-node DML replication, `autoddl` DDL propagation, and a cluster-wide
+  `FOR UPDATE SKIP LOCKED` claim (12 claimers across 2 nodes, 0 double-claimed).
 
 The verdict that drives the build: **the Postgres queue + strict fence +
-revocation table are sound and the hot path is fast enough to drop Redis.**
-The open item is purely operational (get a ghcr pull for the pgEdge image, or
-confirm the org grants access) and one migration detail (F1: no partial
-`now()` index).
+revocation table are sound, the hot path is fast enough to drop Redis, and the
+active-active pgEdge topology (Docker Hub `pgedge/pgedge:pg17-latest`) is
+confirmed working.** Two migration/ops details to carry: F1 (no partial
+`now()` index) and F6's `db.json` must include the `pgedge` internal_admin
+user.
 
 ## Liftable module
 
@@ -128,5 +150,7 @@ benchmark (`bench.sql`) is throwaway.
    `UPDATE … SET fence=fence+1 … RETURNING fence`.
 4. **Reaper backoff** `LEAST(cap, base * 5^attempts)`, dead-letter at
    `attempts >= 3` (F4).
-5. **pgEdge pull access** (F6) — resolve the ghcr scope before standing up the
-   two-node dev compose; the SQL works on a single node regardless.
+5. **Use Docker Hub `pgedge/pgedge:pg17-latest`** (F6), not the ghcr image —
+   it pulls publicly, no auth. The `db.json` must include the `pgedge`
+   internal_admin user, and node hostnames must match the compose service
+   names. Spock wires on boot in ~30 s.

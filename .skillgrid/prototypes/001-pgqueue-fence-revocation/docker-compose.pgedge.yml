@@ -1,0 +1,30 @@
+services:
+  kdpg-n1:
+    image: pgedge/pgedge:pg17-latest
+    container_name: kdpg-n1
+    environment:
+      - NODE_NAME=n1
+      - PGDATA=/data/pgdata
+    volumes:
+      - ./db.json:/home/pgedge/db.json
+      - kdpg-n1-data:/data
+    ports:
+      - "16432:5432"
+
+  kdpg-n2:
+    image: pgedge/pgedge:pg17-latest
+    container_name: kdpg-n2
+    environment:
+      - NODE_NAME=n2
+      - PGDATA=/data/pgdata
+    volumes:
+      - ./db.json:/home/pgedge/db.json
+      - kdpg-n2-data:/data
+    ports:
+      - "16433:5432"
+    depends_on:
+      - kdpg-n1
+
+volumes:
+  kdpg-n1-data:
+  kdpg-n2-data:

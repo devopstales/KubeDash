@@ -547,7 +547,7 @@ deny-list) onto it removes Redis as a stateful dependency entirely. The
 task volume is tiny and periodic (no fan-out), so a hand-rolled
 `SKIP LOCKED` claim + reaper is simpler than a queue library, and plain
 Postgres core (no `CREATE EXTENSION`). The database is run **active-active**
-via pgEdge/Spock (`ghcr.io/pgedge/pgedge-postgres:17-spock5-minimal`, a thin
+via pgEdge/Spock (`pgedge/pgedge:pg17-latest` on Docker Hub, a thin
 operator-less Helm chart with a run-once init `Job`, `dev/` docker-compose) so
 a node loss opens no read-only promotion gap; `autoddl` replicates Alembic DDL
 so migrations run once.
@@ -2873,7 +2873,7 @@ Initial ADRs expected for this change (to be authored at brainstorming time):
   (PK lookup on the verify-hook hot path + leader reaper), replacing the Redis
   `jti` set. Supersedes ADR-0014 (file retained).
 - ADR-0031 — Active-active Postgres via pgEdge/Spock:
-  `ghcr.io/pgedge/pgedge-postgres:17-spock5-minimal`, thin operator-less Helm
+  `pgedge/pgedge:pg17-latest` (Docker Hub), thin operator-less Helm
   chart + run-once init `Job`, `dev/` docker-compose, `autoddl` for one-shot
   migrations, + a **strict fencing token** on `leader_lease` so the ADR-0008
   election stays correct under last-write-wins. Supersedes ADR-0008

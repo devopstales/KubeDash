@@ -74,8 +74,8 @@ mechanism, while preserving its advisory-lock + lease-row core.
 #### Considered Options
 
 - **pgEdge / Spock (chosen).** A Postgres distribution (fork) whose
-  `ghcr.io/pgedge/pgedge-postgres:17-spock5-minimal` image ships the Spock
-  multi-master extension pre-installed (constraint 5), has a first-party
+  `pgedge/pgedge:pg17-latest` Docker Hub image ships the Spock multi-master
+  extension pre-installed (constraint 5) and pulls publicly, has a first-party
   docker-compose two-node example (constraint 4), and can be wrapped in a thin
   operator-less Helm chart with a run-once init `Job` (constraint 3). Spock
   provides bi-directional (active-active) replication, `autoddl` (DDL
@@ -105,10 +105,13 @@ mechanism, while preserving its advisory-lock + lease-row core.
 **Chosen option: pgEdge / Spock, wrapped in a thin operator-less Helm chart,
 with a strict fencing token on `leader_lease`.**
 
-**Image.** `ghcr.io/pgedge/pgedge-postgres:17-spock5-minimal` (Spock + lolor +
-snowflake pre-baked; no build). If a migration or app path needs an extension
-not in the `minimal` flavor, step up to the `standard` flavor — still a
-pre-built image, no custom build.
+**Image.** `pgedge/pgedge:pg17-latest` on **Docker Hub** (Spock 5.0.1,
+PostgreSQL 17.6; pulls publicly, no auth — validated in prototype 001). The
+equivalent ghcr build (`ghcr.io/pgedge/pgedge-postgres:17-spock5-minimal`) is
+the same image but org-gated (403 without the `pgedge` ghcr scope), so the
+public Docker Hub tag is the one to pin. If a migration or app path needs an
+extension not in the base image, pick the matching `-standard`-flavored tag —
+still a pre-built image, no custom build.
 
 **Helm (no operator).** A thin chart section in `charts/kubedash/` (or a
 sibling chart) that deploys, with **no controller**:
