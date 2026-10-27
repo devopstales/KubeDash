@@ -29,6 +29,13 @@ reads this; it does not re-run the experiments.
     LOCKED` claim (12 claimers across 2 nodes, 0 double-claimed). `db.json`
     must include the `pgedge` internal_admin user; hostnames must match the
     compose service names; Spock wires on boot in ~30 s.
+  - **Unplanned exit (SIGKILL/OOM/power loss) does not wedge the queue** (runE).
+    Crash recovery is *time-based* (reaper `WHERE locked_at < now() - 2min`),
+    not lock-based — a killed worker leaves a stuck `processing` row, the reaper
+    re-queues it. The advisory lock is session-scoped → self-releases when the
+    backend dies (no explicit unlock). The strict fence rejects a SIGKILL'd
+    leader's *late* in-flight write (fence mismatch → 0 rows) after the
+    survivor takes over.
 - **What's liftable:** `schema.sql` (DDL, modulo the F1 index fix) and the
   claim/reaper/fence SQL in `runA.sh`/`runB.sh`/`runC.sh` → the Alembic
   migration + `wsgi.py` worker + `leader.py` fence.
@@ -43,3 +50,5 @@ reads this; it does not re-run the experiments.
   5. Use Docker Hub `pgedge/pgedge:pg17-latest` (public pull); `db.json` needs
      the `pgedge` internal_admin user + hostnames matching compose service
      names; Spock wires in ~30 s.
+  6. Reaper interval > longest task runtime (else a slow-but-alive job
+     is double-run); crash recovery is time-based, not lock-based (runE).
