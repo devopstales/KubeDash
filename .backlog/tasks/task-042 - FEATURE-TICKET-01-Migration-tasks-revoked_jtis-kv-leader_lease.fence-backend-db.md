@@ -3,9 +3,10 @@ id: TASK-042
 title: >-
   [FEATURE] TICKET-01 Migration: tasks, revoked_jtis, kv, leader_lease.fence
   (backend-db)
-status: To Do
+status: Done
 assignee: []
 created_date: '2026-10-27 19:15'
+updated_date: '2026-10-27 20:01'
 labels: []
 milestone: m-2
 dependencies: []
