@@ -1,10 +1,10 @@
 ---
 id: TASK-043
 title: '[FEATURE] TICKET-02 pgqueue: SKIP LOCKED claim, reaper, backoff (backend-core)'
-status: To Do
+status: Done
 assignee: []
 created_date: '2026-10-27 19:15'
-updated_date: '2026-10-27 19:16'
+updated_date: '2026-10-27 21:29'
 labels: []
 milestone: m-2
 dependencies:
