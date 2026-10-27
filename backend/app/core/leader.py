@@ -13,6 +13,14 @@ Mechanism per ARCHITECTURE §3.7:
 - ``stop()`` releases the advisory lock (``pg_advisory_unlock``) and deletes
   the row, so a follower can take over immediately.
 
+Strict fence (ADR-0031): the advisory lock is **session-local** — it is NOT
+a cross-node mutex (two peers on different Postgres nodes can both hold
+their local session's lock). The ``leader_lease.fence`` column is the
+cross-node LWW tiebreaker: every acquire upserts ``fence = fence + 1`` and
+captures the returned value, and every leader write is fenced with
+``WHERE fence = :f`` — a stale leader's write affects zero rows and it
+demotes. Whichever peer's upsert commits second holds the higher fence.
+
 The ``SELECT ... FOR UPDATE SKIP LOCKED`` path in §3.7 is subsumed by the
 advisory lock for a single-row lease (recorded so it is not "fixed" back).
 """
@@ -45,6 +53,11 @@ class Leader:
         self._stale = stale_seconds
         self._beat = heartbeat_seconds
         self._is_leader = False
+        # Strict fence (ADR-0031): the fence value this replica captured on
+        # its last acquire; ``None`` until acquired. Cross-node LWW
+        # tiebreaker (the advisory lock is session-local, not a cross-node
+        # mutex) — see the module docstring.
+        self._fence: int | None = None
         self._stop = threading.Event()
         self._thread: threading.Thread | None = None
         # The leader thread runs OUTSIDE a request — under Gunicorn the
@@ -88,6 +101,11 @@ class Leader:
     def is_leader(self) -> bool:
         return self._is_leader
 
+    @property
+    def fence(self) -> int | None:
+        """The fence captured on the last acquire, or None (ADR-0031)."""
+        return self._fence
+
     def _lock_key(self) -> str:
         # hashtext(:rid) — the brief spells it "hashintext"; the real Postgres
         # function is hashtext.
@@ -115,27 +133,58 @@ class Leader:
             ).scalar()
             if got != 1:
                 return False
-            conn.execute(
+            # Strict fence (ADR-0031): increment on EVERY acquire and capture
+            # the value we now hold — whichever peer's upsert commits second
+            # holds the higher fence. The advisory lock is session-local (NOT
+            # a cross-node mutex), so this is the cross-node LWW tiebreaker.
+            #
+            # Both the INSERT VALUES and the DO UPDATE SET side cannot
+            # reference the target column unqualified (Postgres: the column
+            # is "not visible" from the insert side, and a bare `fence` on
+            # the update side is ambiguous between the excluded row and the
+            # target). Postgres' excluded table is only readable, so
+            # `excluded.fence + 1` does not work either. Read the current
+            # fence in a first statement (same transaction — the following
+            # upsert takes the row lock, so the read + upsert are atomic
+            # against other upserts on this single row) and bind the next
+            # value explicitly. ponytail: one extra SELECT on the acquire
+            # path is cheaper than a CTE or a partial-index rewrite, and it
+            # keeps the brief's "increment + RETURNING fence" semantics.
+            current = conn.execute(text(
+                "SELECT fence FROM leader_lease WHERE id = 1"
+            )).scalar()
+            next_fence = (current + 1) if current is not None else 1
+            row = conn.execute(
                 text(
-                    "INSERT INTO leader_lease (id, replica_id, token, acquired_at, heartbeat_at) "
-                    "VALUES (1, :rid, :tok, now(), now()) "
+                    "INSERT INTO leader_lease (id, replica_id, token, acquired_at, heartbeat_at, fence) "
+                    "VALUES (1, :rid, :tok, now(), now(), :nf) "
                     "ON CONFLICT (id) DO UPDATE SET replica_id = :rid, token = :tok, "
-                    "acquired_at = now(), heartbeat_at = now()"
+                    "acquired_at = now(), heartbeat_at = now(), fence = :nf "
+                    "RETURNING fence"
                 ),
-                {**self._binds(), "tok": str(self._token)},
-            )
+                {**self._binds(), "tok": str(self._token), "nf": next_fence},
+            ).first()
+            self._fence = row.fence
             conn.commit()
         self._is_leader = True
         return True
 
-    def _heartbeat(self) -> None:
+    def _heartbeat(self) -> int:
+        """Beat the lease row; returns rows affected (0 = fenced out)."""
         with self._engine_ctx() as engine, engine.connect() as conn:
-            conn.execute(
+            r = conn.execute(
                 text("UPDATE leader_lease SET heartbeat_at = now() "
-                     "WHERE id = 1 AND replica_id = :rid"),
-                self._binds(),
+                     "WHERE id = 1 AND replica_id = :rid AND fence = :f"),
+                {**self._binds(), "f": self._fence},
             )
             conn.commit()
+            # 0 rows: the lease row was re-acquired by a peer (its fence is
+            # now higher) — we are the stale leader. Demote; the loop's next
+            # tick re-attempts acquire. (This is the demote mechanism — do
+            # not drop the fence condition.)
+            if r.rowcount == 0 and self._is_leader:
+                self._is_leader = False
+            return r.rowcount
 
     def _release(self) -> None:
         with self._engine_ctx() as engine, engine.connect() as conn:
