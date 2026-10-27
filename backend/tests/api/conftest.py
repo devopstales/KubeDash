@@ -126,6 +126,9 @@ def api_app_no_bootstrap(monkeypatch: pytest.MonkeyPatch, tmp_path: Path) -> Ite
     _oauth.app = None
     _oauth._clients.clear()
     # ADR-0028: fixture home + reset; bootstrap env OFF (empty) for this app.
+    # The empty string is an EXPLICIT UNSET (ini_config._env_value): it
+    # overrides the 4.1-parity in-code defaults so no bootstrap admin is
+    # configured — that is what LOCAL_AUTH_DISABLED keys on.
     home = _make_fixture_home(tmp_path)
     monkeypatch.setenv("KUBEDASH_HOME", str(home))
     monkeypatch.setenv("KUBEDASH_BOOTSTRAP_ADMIN_EMAIL", "")

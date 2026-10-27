@@ -188,6 +188,24 @@ def apply_overrides(mapping: Mapping[str, object] | None) -> None:
             _overrides[field] = value
 
 
+def _env_value(field: str):
+    """The env leg of the precedence chain. ``None`` means ABSENT (keep
+    resolving); ``""`` is an EXPLICIT UNSET — it wins over the INI and the
+    in-code default. WHY the distinction (TICKET-03 ruling): the bootstrap
+    admin keeps 4.1-parity in-code defaults so an unedited 4.1 file boots;
+    the no-local-login case is expressed as an *empty* env value
+    (``KUBEDASH_BOOTSTRAP_ADMIN_EMAIL=""``) that must override that default
+    to unset, not be treated as 'not set'. The ``create_app`` override leg
+    already carries the value verbatim (bools included), so it needs no
+    normalization."""
+    section, _key, env_names, _has_default, _default, _is_bool = _FIELDS[field]
+    for env in env_names:
+        ev = os.environ.get(env)
+        if ev is not None:
+            return ev
+    return None
+
+
 def _parse_bool(value: str, field: str) -> bool:
     v = value.strip().lower()
     if v in ("true", "1", "yes", "on"):
@@ -270,15 +288,19 @@ _SPECIAL_RESOLVERS = {
 
 
 def resolve(field: str) -> str:
-    """The one precedence chain for a single field."""
-    if field in _overrides and _overrides[field] is not None:
-        val = _overrides[field]
-        return val if isinstance(val, str) else str(val)
-    section, key, env_names, has_default, default, _is_bool = _FIELDS[field]
-    for env in env_names:
-        ev = os.environ.get(env)
-        if ev is not None and ev != "":
-            return ev
+    """The one precedence chain for a single field.
+
+    ``None`` in the override leg means "absent" (a test passing
+    ``None`` for an optional key does not unset it); ``None`` in the env
+    leg means the env var is not set. Any non-``None`` value — including
+    the empty string — is a resolved value (see ``_env_value``)."""
+    ov = _overrides.get(field)
+    if ov is not None:
+        return ov if isinstance(ov, str) else str(ov)
+    section, key, _env_names, has_default, default, _is_bool = _FIELDS[field]
+    ev = _env_value(field)
+    if ev is not None:
+        return ev
     # A composed field (database/redis split-or-url) reads its section keys
     # directly rather than a single section/key.
     if field in _SPECIAL_RESOLVERS:

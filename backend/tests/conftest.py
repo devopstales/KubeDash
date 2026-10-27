@@ -98,6 +98,7 @@ def app(pg_container, redis_container, monkeypatch, tmp_path):
     monkeypatch.setenv("KUBEDASH_HOME", str(home))
     monkeypatch.setenv("KUBEDASH_BOOTSTRAP_ADMIN_EMAIL", "admin@local")
     monkeypatch.setenv("KUBEDASH_BOOTSTRAP_ADMIN_PASSWORD", "correct-horse")
+    monkeypatch.delenv("KUBEDASH_ADMIN_KUBECONFIG", raising=False)
     _ini.reset()
     application = create_app({
         "TESTING": True,
@@ -108,8 +109,18 @@ def app(pg_container, redis_container, monkeypatch, tmp_path):
         # ADR-0025: the test client speaks http://localhost; a Secure cookie is
         # stored but never sent back, so the session would vanish between calls.
         "KUBEDASH_COOKIE_SECURE": False,
-        "KUBEDASH_ADMIN_KUBECONFIG": "/test/admin.kubeconfig",
+        # In-cluster mode (empty): the readyz admin-kubeconfig probe is
+        # ABSENT (no file to check). Tests that need a file path set
+        # KUBEDASH_ADMIN_KUBECONFIG explicitly.
     })
+    # ADR-0028: re-clear the Settings singleton AFTER create_app. The wsgi
+    # module (imported by test_worker_gate at collection time) reads
+    # get_settings() at import time — before KUBEDASH_HOME is set — and the
+    # cached Settings would then carry the REAL dev INI's admin_kubeconfig
+    # (backend/kubedash.ini, gitignored) into every PG-tier test. The readyz
+    # probe re-resolves lazily on the FIRST request (after create_all), so
+    # clearing here is safe and pins the probe to this fixture's config.
+    _config._settings = None
     with application.app_context():
         db.create_all()
         _bootstrap_local_admin(application)

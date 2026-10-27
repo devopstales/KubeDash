@@ -248,9 +248,10 @@ def test_readyz_503_when_admin_kubeconfig_file_missing(app, monkeypatch, tmp_pat
     """KUBEDASH_ADMIN_KUBECONFIG → a missing file: /readyz is 503 naming
     admin-kubeconfig (the probe, I-NEW-6: an isfile check, not a re-resolver).
 
-    The ``app`` fixture resets ``_config._settings`` BEFORE ``create_app``;
-    setenv + reset AFTER the build still works because the readyz probe
-    resolves ``get_settings()`` lazily at request time (I4)."""
+    The ``app`` fixture resets ``_config._settings`` BEFORE ``create_app``
+    and AFTER it (the wsgi import-time read); setenv + reset AFTER the build
+    still works because the readyz probe resolves ``get_settings()`` lazily
+    at request time (I4)."""
     missing = tmp_path / "missing-kubeconfig.yaml"
     monkeypatch.setenv("KUBEDASH_ADMIN_KUBECONFIG", str(missing))
     _config._settings = None
