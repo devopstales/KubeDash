@@ -83,6 +83,40 @@ Lesson: **never call a function in the verify-hook WHERE clause**; bind the
 `jti` as a parameter (which the app already does). The `expires_at > now()`
 predicate is fine (applied as a post-index filter on the single PK row).
 
+### F7 — An UNPLANNED worker/leader exit (SIGKILL/OOM/power loss) does not wedge the queue
+The risk the platform team asked about: a worker claims a job (`status=
+'processing'`) then dies **unexpectedly** — no cleanup runs, no advisory lock
+released, no `stop()`. Three mechanisms make this safe, and each was tested
+(`runE.sh`):
+
+1. **The queue recovers by TIME, not by lock release.** The reaper is
+   `WHERE status='processing' AND locked_at < now() - interval '2 minutes'` —
+   it never waits on the dead worker to release anything. A SIGKILL'd worker
+   leaves a stuck `processing` row (E1: confirmed, `locked_ago_s=180`), and the
+   reaper re-queues it `pending` with backoff (E2: confirmed, a new worker then
+   re-claims it, `attempts` 1→2). **The queue is not wedged.** This is the key
+   property: crash recovery is independent of the lock.
+2. **The stale threshold must exceed the longest task runtime** (E4). A worker
+   that died **< 2 min** ago is *not* re-queued yet — preventing a still-in-
+   flight job from being double-run. **Constraint for the build:** set the
+   reaper interval `>` the p99 task runtime (health/cluster_sync are seconds;
+   2 min is a safe default; revisit if a task can run longer).
+3. **The advisory lock is session-scoped, so it self-releases on crash.** A
+   SIGKILL'd leader's `pg_try_advisory_lock` is held on its backend session;
+   when the session dies (crash/OOM/power), Postgres frees it automatically —
+   no `pg_advisory_unlock` needed. (On a *node* crash the whole session table
+   is rebuilt; the lock is gone.)
+4. **The strict fence closes the "late write" window** (E3). A SIGKILL'd leader
+   A (fence 1) may have an in-flight write buffered/flushed *after* survivor B
+   has taken over (fence 2). A's late write is fenced on `fence=1` → affects
+   **0 rows** (rejected); B's write (fence 2) commits. Final owner B, fence 2.
+   No split-brain, even with a write in flight at the moment of the kill.
+
+**Conclusion:** unplanned exit is safe for the queue (time-based reaper, E1/E2)
+and for the election (session-scoped advisory lock self-releases + strict
+fence rejects late writes, E3). The one build constraint: **reaper interval >
+longest task runtime** (E4), else a slow-but-alive job gets double-run.
+
 ### F6 — pgEdge image: use Docker Hub `pgedge/pgedge:pg17-latest` (ghcr is access-gated)
 `ghcr.io/pgedge/pgedge-postgres:17-spock5-minimal` **exists** (confirmed in the
 ghcr tags list) but the local Docker credential (user `devopstales`) gets
@@ -154,3 +188,8 @@ benchmark (`bench.sql`) is throwaway.
    it pulls publicly, no auth. The `db.json` must include the `pgedge`
    internal_admin user, and node hostnames must match the compose service
    names. Spock wires on boot in ~30 s.
+  6. **Reaper interval > longest task runtime** (F7/E4) — a worker that died <
+    the threshold is not re-queued (prevents double-running a slow-but-alive
+    job). Default 2 min is safe for the current sub-minute tasks; revisit if a
+    task can run longer. Crash recovery is time-based (the reaper), not lock-
+    based, so SIGKILL/OOM/power loss does not wedge the queue (F7).
