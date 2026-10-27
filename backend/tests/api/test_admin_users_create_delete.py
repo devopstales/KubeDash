@@ -95,7 +95,7 @@ def test_create_local_user_201(api_client, api_app, admin_headers) -> None:
 def test_create_user_duplicate_email_is_409(api_client, api_app, admin_headers) -> None:
     _seed(api_client, api_app, "sub-dup", "dup@e", "user", auth_source="oidc")
     r = _create(api_client, admin_headers, {
-        "username": "dup2", "email": "dup@e", "password": "pw", "role": "user",
+        "username": "dup2", "email": "dup@e", "password": "s3cret!", "role": "user",
     })
     assert r.status_code == 409
     assert r.get_json()["error"]["code"] == "CLUSTER_ALREADY_EXISTS"

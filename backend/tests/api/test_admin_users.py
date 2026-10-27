@@ -239,7 +239,7 @@ def test_create_user_weak_password_is_422(api_client, admin_headers) -> None:
         json={
             "username": "pat",
             "email": "pat@example.com",
-            "password": "weak",
+            "password": "abc",
             "role": "user",
             "type": "Local",
         },

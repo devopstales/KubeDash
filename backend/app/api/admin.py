@@ -143,12 +143,16 @@ class AdminApi(Api):
         username = str(args.get("username") or "").strip()
         email = str(args.get("email") or "").strip()
         password = str(args.get("password") or "")
-        role = str(args.get("role") or "")
+        # The 4.1 Create User dialog sends capitalized roles ("User" /
+        # "Admin"); normalize before the gate.
+        role = str(args.get("role") or "").strip().lower()
         if not username or not email or not password:
             raise InvalidKubeconfigError("username, email and password are required")
         if role not in ("user", "admin"):
             raise InvalidKubeconfigError("role must be 'user' or 'admin'")
-        sub = f"local:{email}"
+        if len(password) < 4:
+            raise InvalidKubeconfigError("password must be at least 4 characters")
+        sub = f"kubedash:{email}"
         exists = db.session.execute(
             db.select(User).filter(db.or_(User.email == email, User.sub == sub))
         ).scalar_one_or_none()
@@ -164,7 +168,7 @@ class AdminApi(Api):
         )
         db.session.add(u)
         db.session.add(AuditLog(
-            action="user.create", actor_sub=g.current_user.sub, target=sub,
+            action="user_create", actor_sub=g.current_user.sub, target=sub,
         ))
         db.session.commit()
         resp = jsonify(_out(u, 0, {}))
@@ -197,10 +201,10 @@ class AdminApi(Api):
         sub = user.sub
         db.session.delete(user)
         db.session.add(AuditLog(
-            action="user.delete", actor_sub=g.current_user.sub, target=sub,
+            action="user_delete", actor_sub=g.current_user.sub, target=sub,
         ))
         db.session.commit()
-        return {"sub": sub, "deleted": True}
+        return {"deleted": sub}
 
     # NOTE: /admin/groups* (list/detail/sync/create/members/privileges) lives
     # on the GroupsApi (app/api/groups.py) — the frontend-mirrored surface

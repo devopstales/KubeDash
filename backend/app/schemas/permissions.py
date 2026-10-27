@@ -5,7 +5,7 @@ classes, docs-only where the response is a bare list (smorest dumps handler
 returns THROUGH the response schema — see the ponytail note in
 ``app/api/clusters.py``).
 """
-from marshmallow import Schema, fields, validate
+from marshmallow import EXCLUDE, Schema, fields, validate
 
 
 class UserOut(Schema):
@@ -79,7 +79,14 @@ class UserCreateIn(Schema):
     ``auth_source=local`` user with a pbkdf2 password (ADR-0021). Blank
     username/password and an invalid role are 422 INVALID_KUBECONFIG (the
     handler validates — marshmallow's ValidationError would map to a generic
-    422 without the stable code)."""
+    422 without the stable code).
+
+    ``unknown = EXCLUDE``: the 4.1 Create User dialog sends a ``type`` field
+    (``Local`` / ``SSO``) the 5.0 schema does not model — it is dropped, not
+    rejected, so the dialog's body parses unchanged."""
+
+    class Meta:
+        unknown = EXCLUDE
 
     username = fields.String(required=True)
     email = fields.String(required=True)
