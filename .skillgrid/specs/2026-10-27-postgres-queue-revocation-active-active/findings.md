@@ -6,7 +6,7 @@ reads this; it does not re-run the experiments.
 
 ## Prototype: 001-pgqueue-fence-revocation
 
-- **Verdict:** VALIDATED ✓ (SQL semantics) / PARTIAL ⚠ (pgEdge topology)
+- **Verdict:** VALIDATED ✓ (SQL semantics + pgEdge two-node topology)
 - **What we learned:**
   - `FOR UPDATE SKIP LOCKED` gives exactly-once claim under 10-way concurrency
     (10 distinct rows, 0 double-claimed).
@@ -22,10 +22,13 @@ reads this; it does not re-run the experiments.
   - `CREATE INDEX … WHERE expires_at > now()` is **invalid** (`now()` is
     STABLE, not IMMUTABLE) — use a plain index or none; the reaper bounds the
     table.
-  - `ghcr.io/pgedge/pgedge-postgres:17-spock5-minimal` exists (tags confirmed)
-    but pull is 403 in this env (token lacks the `pgedge` ghcr scope) — the
-    two-node Spock topology (replication / `autoddl` / cross-node claim) is
-    unverified.
+  - pgEdge image: **use Docker Hub `pgedge/pgedge:pg17-latest`** (Spock 5.0.1,
+    PG 17.6) — pulls publicly, no auth. The ghcr image is org-gated (403 here).
+    **Two-node topology validated on a live cluster:** cross-node DML
+    replication, `autoddl` DDL propagation, and a cluster-wide `FOR UPDATE SKIP
+    LOCKED` claim (12 claimers across 2 nodes, 0 double-claimed). `db.json`
+    must include the `pgedge` internal_admin user; hostnames must match the
+    compose service names; Spock wires on boot in ~30 s.
 - **What's liftable:** `schema.sql` (DDL, modulo the F1 index fix) and the
   claim/reaper/fence SQL in `runA.sh`/`runB.sh`/`runC.sh` → the Alembic
   migration + `wsgi.py` worker + `leader.py` fence.
@@ -37,5 +40,6 @@ reads this; it does not re-run the experiments.
      `UPDATE … fence=fence+1 … RETURNING fence`.
   4. Reaper backoff `LEAST(cap, base*5^attempts)`, dead-letter at
      `attempts >= 3`.
-  5. Resolve ghcr pull access for the pgEdge image before the two-node dev
-     compose; the SQL works on a single node regardless.
+  5. Use Docker Hub `pgedge/pgedge:pg17-latest` (public pull); `db.json` needs
+     the `pgedge` internal_admin user + hostnames matching compose service
+     names; Spock wires in ~30 s.
