@@ -1,11 +1,12 @@
 """Worker-gate tests (Task 7 / ADR-0008).
 
 Tier split:
-- follower / leader-candidate gate: pure — reloads ``app.wsgi`` with a faked
+- follower / leader-candidate gate: pure — reloads ``wsgi`` with a faked
   Leader and asserts the daemon worker thread spawns only on the leader role.
-- enqueued-job-runs: needs a live Redis (``rq``'s queue) — marked
-  ``integration``; env-blocked on this host, green in CI (with Docker).
-- ``_schedule_if_leader``: pure unit tier on a fake leader + fake queue.
+- enqueued-job-runs: needs Testcontainers Postgres (the pgqueue ``tasks``
+  table) — marked ``integration``; env-blocked on this host, green in CI.
+- ``_run_once``: pure unit tier on a fake leader + a pgqueue-shaped fake
+  (``enqueue(path, engine)``).
 """
 
 import importlib
@@ -17,7 +18,6 @@ from pathlib import Path
 import pytest
 
 from app.core import ini_config
-from app.core.leader import Leader
 
 # wsgi.py lives at backend/wsgi.py (next to the app package), NOT at
 # backend/app/wsgi.py — so `import app.wsgi` does not work. Load it by
@@ -45,7 +45,8 @@ _ini_config_home = Path(__file__).resolve().parents[1] / "tests" / "_worker_gate
 _ini_config_home.mkdir(exist_ok=True)
 (_ini_config_home / "kubedash.ini").write_text(
     "[DEFAULT]\napp_mode = development\n"
-    "[security]\njwt_secret = test-jwt\nsecret_key = test-enc-key-32-bytes-long!!!!\nadmin_password = test-pw\n"
+    "[security]\njwt_secret = test-jwt\n"
+    "secret_key = test-enc-key-32-bytes-long!!!!\nadmin_password = test-pw\n"
     "[database]\nurl = sqlite://\n"
     "[remote_cache]\nurl = redis://localhost:6390/0\n"
     "[bootstrap]\nbootstrap_admin_email = admin@local\n"
@@ -62,28 +63,31 @@ def _reload_wsgi(monkeypatch: pytest.MonkeyPatch, role: str) -> None:
     create_app() runs per reload with the default (dev) settings; the gate
     under test is the role branch, not the app factory.
 
-    The scheduler thread reads ``leader.is_leader()`` every 5 s poll, so the
+    The worker thread reads ``leader.is_leader()`` every 5 s poll, so the
     fake Leader must stub BOTH ``start`` (no thread) and ``is_leader`` (the
     scheduler's gate). A real Leader would also race for the PG advisory lock
     on the sqlite test app.
 
-    ADR-0040: the RQ worker is a child process spawned lazily on the first
-    due enqueue. With ``is_leader`` faked False (default) the scheduler never
-    enqueues, so no child is spawned and the test stays pure — no Redis, no
-    subprocess. (The old thread-hosted worker needed a faked ``rq.Worker`` to
-    avoid dialing Redis at import; that seam is gone.)
+    ADR-0029: the pgqueue worker is a daemon THREAD, not a child process —
+    with ``is_leader`` faked False (default) the scheduler never enqueues and
+    the sqlite claim/reap statements are no-ops, so the gate test stays pure
+    — no Redis, no subprocess.
     """
+
     class _FakeLeader:
         """Structural fake for Leader — the gate test only asserts the
-        scheduler thread is spawned on the leader role. ``start`` is a no-op
+        worker thread is spawned on the leader role. ``start`` is a no-op
         (no real advisory-lock thread); ``is_leader`` is False so the
-        scheduler never enqueues or spawns a worker child. Accepts the
-        ``(settings, app)`` constructor args ``wsgi`` passes."""
+        scheduler never enqueues. Accepts the ``(settings, app)``
+        constructor args ``wsgi`` passes."""
 
         def __init__(self, settings: object, app: object, **kwargs: object) -> None:
             pass
 
         def start(self) -> None:
+            pass
+
+        def stop(self) -> None:
             pass
 
         def is_leader(self) -> bool:
@@ -98,7 +102,15 @@ def _reload_wsgi(monkeypatch: pytest.MonkeyPatch, role: str) -> None:
     # instead of the real PG upsert (which would run under a leaked Settings
     # singleton from the api-tier fixtures — order-dependent cross-tier bleed).
     import app as _app_pkg
+
     monkeypatch.setattr(_app_pkg, "_bootstrap_local_admin", lambda app: None)
+    # ADR-0028: a prior module's KUBEDASH_HOME (e.g. conftest's session
+    # home) wins on reload and the required [deployment]/[database] keys
+    # are missing — restore both the home and the env DB/redis URLs the
+    # module-level main() started with.
+    monkeypatch.setenv("KUBEDASH_HOME", str(_ini_config_home))
+    monkeypatch.setenv("KUBEDASH_DATABASE_URL", "sqlite://")
+    monkeypatch.setenv("KUBEDASH_REDIS_URL", "redis://localhost:6390/0")
     importlib.reload(wsgi)
     # ADR-0028: main() builds the app + starts the worker (the reload's
     # _start_worker_if_leader is now inside main). The role was faked above
@@ -109,28 +121,24 @@ def _reload_wsgi(monkeypatch: pytest.MonkeyPatch, role: str) -> None:
 
 @pytest.fixture(autouse=True)
 def _stop_worker(monkeypatch: pytest.MonkeyPatch) -> Iterator[None]:
-    """Stop the scheduler thread a leader-role test may have spawned (its loop
+    """Stop the worker thread a leader-role test may have spawned (its loop
     would otherwise keep polling for the rest of the suite) and reset the wsgi
     globals for later tests.
 
-    ADR-0040: the RQ worker is no longer thread-hosted — it's a child process
-    spawned lazily on the first enqueue. The scheduler thread here only
-    enqueues + spawns; with no tasks due it never spawns a child, so there's
-    nothing to reap. ``join(timeout=1)`` is enough: the loop sleeps 5 s, so
-    the thread is in its sleep most of the time.
+    ADR-0029: there is no worker child process to reap — the worker IS the
+    daemon thread. ``stop.wait(5)`` makes ``join(timeout=1)`` enough: the
+    thread is in its wait most of the time.
     """
     yield
     thread = wsgi.worker_thread
     if thread is not None:
         thread.join(timeout=1)
         monkeypatch.setattr(wsgi, "worker_thread", None, raising=False)
-        monkeypatch.setattr(wsgi, "worker_process", None, raising=False)
 
 
 def test_worker_thread_not_started_on_follower(monkeypatch: pytest.MonkeyPatch) -> None:
     _reload_wsgi(monkeypatch, "follower")
     assert wsgi.worker_thread is None
-    assert wsgi.worker_process is None
 
 
 def test_worker_thread_started_on_leader_candidate(monkeypatch: pytest.MonkeyPatch) -> None:
@@ -138,71 +146,127 @@ def test_worker_thread_started_on_leader_candidate(monkeypatch: pytest.MonkeyPat
     assert wsgi.worker_thread is not None
     assert wsgi.worker_thread.daemon
     assert wsgi.worker_thread.name == "kubedash-worker"
-    # ADR-0040: no worker child is spawned until the first task is due; the
-    # scheduler thread (not a worker) is what the leader role starts eagerly.
-    assert wsgi.worker_process is None
+    # ADR-0029: no RQ child process at all — the worker IS the daemon
+    # thread the leader role starts eagerly. (The old worker_process global
+    # is gone with the RQ child; its absence is the no-child assertion.)
 
 
-def test_schedule_if_leader_skips_when_not_leader() -> None:
-    enqueued: list[str] = []
+def test_run_once_skips_when_not_leader() -> None:
+    enqueued: list[tuple[str, object]] = []
 
     class _Leader:
         def is_leader(self) -> bool:
             return False
 
     class _Queue:
-        def enqueue(self, path: str) -> None:
-            enqueued.append(path)
+        def enqueue(self, path: str, engine: object) -> None:
+            enqueued.append((path, engine))
 
-    wsgi._schedule_if_leader(_Leader(), _Queue())
+    assert wsgi._run_once(_Leader(), _Queue(), object(), {}) is False
     assert enqueued == []
 
 
-def test_schedule_if_leader_enqueues_due_tasks_when_leader() -> None:
-    enqueued: list[str] = []
+def test_run_once_enqueues_due_tasks_when_leader() -> None:
+    enqueued: list[tuple[str, object]] = []
 
     class _Leader:
         def is_leader(self) -> bool:
             return True
 
     class _Queue:
-        def enqueue(self, path: str) -> None:
-            enqueued.append(path)
+        def enqueue(self, path: str, engine: object) -> None:
+            enqueued.append((path, engine))
 
-    wsgi._schedule_if_leader(_Leader(), _Queue())
-    assert sorted(enqueued) == sorted(wsgi.INTERVALS)
+    last: dict[str, float] = {}
+    assert wsgi._run_once(_Leader(), _Queue(), object(), last) is True
+    assert sorted(path for path, _ in enqueued) == sorted(wsgi.INTERVALS)
+    # the due-map is advanced, so an immediate second tick enqueues nothing
+    assert wsgi._run_once(_Leader(), _Queue(), object(), last) is False
+    assert len(enqueued) == len(wsgi.INTERVALS)
+
+
+def test_reap_once_skips_when_not_leader() -> None:
+    """The reaper is leader-gated: a follower sweeps nothing (the ADR-0029
+    'crashed-claim-is-requeued' wiring half — only the leader runs it)."""
+    import app.core.kvstore as _kv
+    import app.core.pgqueue as _pq
+    import app.services.revocation as _rev
+
+    # The module must read the sweep functions from these modules at call
+    # time (not bind them at its own import) for the monkeypatch to reach.
+    assert wsgi.pgqueue is _pq
+    assert wsgi.revocation is _rev
+    assert wsgi.kvstore is _kv
+
+    called: list[str] = []
+
+    class _Leader:
+        def is_leader(self) -> bool:
+            return False
+
+    mp = pytest.MonkeyPatch()
+    mp.setattr(_pq, "reap", lambda engine, *a, **k: called.append("pgqueue") or 0)
+    mp.setattr(_rev, "reap_expired", lambda engine: called.append("revocation") or 0)
+    mp.setattr(_kv, "kv_reap", lambda engine: called.append("kv") or 0)
+    try:
+        wsgi._reap_once(_Leader(), object())
+    finally:
+        mp.undo()
+    assert called == []
+
+
+def test_reap_once_sweeps_when_leader() -> None:
+    """The leader sweeps pgqueue.reap + revocation.reap_expired + kvstore.kv_reap
+    — the 'crashed-claim-is-requeued-by-the-time-based-reaper' wiring half."""
+    import app.core.kvstore as _kv
+    import app.core.pgqueue as _pq
+    import app.services.revocation as _rev
+
+    called: list[str] = []
+
+    class _Leader:
+        def is_leader(self) -> bool:
+            return True
+
+    mp = pytest.MonkeyPatch()
+    mp.setattr(_pq, "reap", lambda engine, *a, **k: called.append("pgqueue") or 3)
+    mp.setattr(_rev, "reap_expired", lambda engine: called.append("revocation") or 1)
+    mp.setattr(_kv, "kv_reap", lambda engine: called.append("kv") or 2)
+    try:
+        wsgi._reap_once(_Leader(), object())
+    finally:
+        mp.undo()
+    assert called == ["pgqueue", "revocation", "kv"]
 
 
 @pytest.mark.integration
 def test_enqueued_job_runs_when_leader(app: object, monkeypatch: pytest.MonkeyPatch) -> None:
     """The gate must not just exist — a job enqueued while this replica is
     the leader's must actually execute (ADR-0008 prevents duplicate runs,
-    not all runs). Needs a live Redis (Testcontainers): env-blocked on this
-    host (no Docker), green in CI.
-
-    The brief's snippet calls ``wsgi.worker.work_one()`` — rq 2.x has no
-    work_one; the deterministic equivalent is a fresh ``rq.Worker`` on the
-    Testcontainers Redis drained with ``work(burst=True)`` (process queued
-    jobs, then return — never blocks).
+    not all runs). No Redis (ADR-0029): the queue is the Postgres ``tasks``
+    table; the deterministic equivalent of draining the old RQ queue is one
+    claim + run + complete against a Testcontainers engine.
     """
-    import rq
+    from app.core import pgqueue
+    from app.extensions import db
 
-    from app.extensions import redis_client
+    with app.app_context():
+        engine = db.engine
+        ran: list[int] = []
 
-    client = redis_client._redis_client  # underlying redis-py client
-    assert client is not None
+        def fake_health() -> None:
+            ran.append(1)
 
-    ran: list[int] = []
+        monkeypatch.setattr("app.tasks.health.run", fake_health)
 
-    def fake_health() -> None:
-        ran.append(1)
+        pgqueue.enqueue("app.tasks.health.run", engine)
+        claimed = pgqueue.claim(engine, "test-replica")
+        assert claimed is not None
+        path, task_id = claimed
+        mod, _, fn = path.rpartition(".")
+        import importlib as _importlib
 
-    monkeypatch.setattr("app.tasks.health.run", fake_health)
-
-    q = rq.Queue("kubedash", connection=client)
-    q.enqueue("app.tasks.health.run")
-
-    worker = rq.Worker(["kubedash"], connection=client)
-    worker.work(burst=True)
+        getattr(_importlib.import_module(mod), fn)()
+        pgqueue.complete(task_id, engine)
 
     assert ran == [1]

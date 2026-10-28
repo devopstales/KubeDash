@@ -87,7 +87,7 @@ def task_id(app, engine):
 def test_enqueue_then_claim_returns_path(app, engine, task_id):
     # BDD: enqueue-then-claim-returns-the-task-path
     path = _row(task_id).path
-    assert pgqueue.claim(engine, "replica-a") == path
+    assert pgqueue.claim(engine, "replica-a") == (path, task_id)
 
     row = _row(task_id)
     assert row.status == "processing"
@@ -104,7 +104,7 @@ def test_two_concurrent_claimers_do_not_double_claim(app, engine):
         pgqueue.enqueue(f"app.tasks.test.{base}.{i}", engine)
         ids.append(_task_id(f"app.tasks.test.{base}.{i}"))
 
-    claims: list[str | None] = [None] * 10
+    claims: list[tuple[str, int] | None] = [None] * 10
     barrier = threading.Barrier(10)  # fire all 10 claims at the same instant
 
     def _claim(i: int) -> None:
@@ -119,7 +119,7 @@ def test_two_concurrent_claimers_do_not_double_claim(app, engine):
 
     got = [c for c in claims if c is not None]
     assert len(got) == 10, "exactly one claim per thread"
-    assert len(set(got)) == 10, "no two threads claimed the same row"
+    assert len({c[0] for c in got}) == 10, "no two threads claimed the same row"
 
     with db.engine.connect() as conn:
         rows = conn.execute(
@@ -138,7 +138,7 @@ def test_two_concurrent_claimers_do_not_double_claim(app, engine):
 def test_reaper_requeues_stale_processing(app, engine, task_id):
     # BDD: crashed-claim-is-requeued-by-the-time-based-reaper
     path = _row(task_id).path
-    assert pgqueue.claim(engine, "crashed-replica") == path
+    assert pgqueue.claim(engine, "crashed-replica") == (path, task_id)
 
     # crash the worker: backdate locked_at 3 min (past the 120 s stale line)
     with db.engine.begin() as conn:

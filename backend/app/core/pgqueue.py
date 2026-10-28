@@ -41,9 +41,9 @@ def enqueue(path: str, engine: Engine) -> None:
         )
 
 
-def claim(engine: Engine, replica_id: str) -> str | None:
-    """Atomically claim the oldest claimable row; return its path, or
-    None when nothing is claimable.
+def claim(engine: Engine, replica_id: str) -> tuple[str, int] | None:
+    """Atomically claim the oldest claimable row; return ``(path, task_id)``,
+    or None when nothing is claimable.
 
     Single statement: the subselect locks one row (``FOR UPDATE SKIP
     LOCKED`` — concurrent claimants skip it), the update marks it
@@ -63,11 +63,12 @@ def claim(engine: Engine, replica_id: str) -> str | None:
                 "  WHERE status = 'pending' AND available_at <= now() "
                 "  ORDER BY enqueued_at LIMIT 1 FOR UPDATE SKIP LOCKED"
                 ") "
-                "RETURNING path"
+                "RETURNING path, id"
             ),
             {"rid": replica_id},
         ).first()
-    return row.path if row is not None else None
+    # the id travels with the claim — the worker needs it to complete/fail
+    return (row.path, row.id) if row is not None else None
 
 
 def complete(task_id: int, engine: Engine) -> None:
