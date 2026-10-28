@@ -58,6 +58,7 @@ class Leader:
         # tiebreaker (the advisory lock is session-local, not a cross-node
         # mutex) — see the module docstring.
         self._fence: int | None = None
+        self._advisory_conn = None  # holds the advisory lock for the lease lifetime
         self._stop = threading.Event()
         self._thread: threading.Thread | None = None
         # The leader thread runs OUTSIDE a request — under Gunicorn the
@@ -116,56 +117,74 @@ class Leader:
 
     def acquire_once(self) -> bool:
         """One attempt; returns False when the lock is held or the lease is
-        fresh and owned by another replica. Never blocks on staleness."""
-        with self._engine_ctx() as engine, engine.connect() as conn:
-            row = conn.execute(
-                text("SELECT replica_id, heartbeat_at FROM leader_lease WHERE id = 1")
-            ).first()
-            if row is not None and row.replica_id != self.replica_id:
-                if row.heartbeat_at.tzinfo is None:
-                    heartbeat_at = row.heartbeat_at.replace(tzinfo=UTC)
-                else:
-                    heartbeat_at = row.heartbeat_at
-                if (datetime.now(UTC) - heartbeat_at) <= timedelta(seconds=self._stale):
+        fresh and owned by another replica. Never blocks on staleness.
+
+        The advisory lock is session-scoped: it lives on the connection that
+        took it and is released only by ``pg_advisory_unlock`` on that SAME
+        connection (or when that session dies). We therefore keep the
+        lock-holding connection open (``self._advisory_conn``) for the whole
+        lease lifetime and close it in ``_release`` — closing the connection
+        inside ``acquire_once`` would return it to the pool still holding the
+        lock, and ``_release`` unlocking on a *different* pooled connection
+        would be a no-op, leaking the lock (poisoning later acquires, e.g.
+        across test files that share the engine pool).
+        """
+        with self._engine_ctx() as engine:
+            conn = engine.connect()
+            try:
+                row = conn.execute(
+                    text("SELECT replica_id, heartbeat_at FROM leader_lease WHERE id = 1")
+                ).first()
+                if row is not None and row.replica_id != self.replica_id:
+                    if row.heartbeat_at.tzinfo is None:
+                        heartbeat_at = row.heartbeat_at.replace(tzinfo=UTC)
+                    else:
+                        heartbeat_at = row.heartbeat_at
+                    if (datetime.now(UTC) - heartbeat_at) <= timedelta(seconds=self._stale):
+                        return False
+                got = conn.execute(
+                    text(f"SELECT pg_try_advisory_lock({self._lock_key()})"), self._binds()
+                ).scalar()
+                if got != 1:
                     return False
-            got = conn.execute(
-                text(f"SELECT pg_try_advisory_lock({self._lock_key()})"), self._binds()
-            ).scalar()
-            if got != 1:
-                return False
-            # Strict fence (ADR-0031): increment on EVERY acquire and capture
-            # the value we now hold — whichever peer's upsert commits second
-            # holds the higher fence. The advisory lock is session-local (NOT
-            # a cross-node mutex), so this is the cross-node LWW tiebreaker.
-            #
-            # Both the INSERT VALUES and the DO UPDATE SET side cannot
-            # reference the target column unqualified (Postgres: the column
-            # is "not visible" from the insert side, and a bare `fence` on
-            # the update side is ambiguous between the excluded row and the
-            # target). Postgres' excluded table is only readable, so
-            # `excluded.fence + 1` does not work either. Read the current
-            # fence in a first statement (same transaction — the following
-            # upsert takes the row lock, so the read + upsert are atomic
-            # against other upserts on this single row) and bind the next
-            # value explicitly. ponytail: one extra SELECT on the acquire
-            # path is cheaper than a CTE or a partial-index rewrite, and it
-            # keeps the brief's "increment + RETURNING fence" semantics.
-            current = conn.execute(text(
-                "SELECT fence FROM leader_lease WHERE id = 1"
-            )).scalar()
-            next_fence = (current + 1) if current is not None else 1
-            row = conn.execute(
-                text(
-                    "INSERT INTO leader_lease (id, replica_id, token, acquired_at, heartbeat_at, fence) "
-                    "VALUES (1, :rid, :tok, now(), now(), :nf) "
-                    "ON CONFLICT (id) DO UPDATE SET replica_id = :rid, token = :tok, "
-                    "acquired_at = now(), heartbeat_at = now(), fence = :nf "
-                    "RETURNING fence"
-                ),
-                {**self._binds(), "tok": str(self._token), "nf": next_fence},
-            ).first()
-            self._fence = row.fence
-            conn.commit()
+                # Strict fence (ADR-0031): increment on EVERY acquire and
+                # capture the value we now hold — whichever peer's upsert
+                # commits second holds the higher fence. The advisory lock is
+                # session-local (NOT a cross-node mutex), so this is the
+                # cross-node LWW tiebreaker.
+                #
+                # Both the INSERT VALUES and the DO UPDATE SET side cannot
+                # reference the target column unqualified (Postgres: the
+                # column is "not visible" from the insert side, and a bare
+                # `fence` on the update side is ambiguous between the excluded
+                # row and the target). Postgres' excluded table is only
+                # readable, so `excluded.fence + 1` does not work either.
+                # Read the current fence in a first statement (same
+                # transaction — the following upsert takes the row lock, so
+                # the read + upsert are atomic against other upserts on this
+                # single row) and bind the next value explicitly.
+                current = conn.execute(
+                    text("SELECT fence FROM leader_lease WHERE id = 1")
+                ).scalar()
+                next_fence = (current + 1) if current is not None else 1
+                row = conn.execute(
+                    text(
+                        "INSERT INTO leader_lease (id, replica_id, token, acquired_at, heartbeat_at, fence) "
+                        "VALUES (1, :rid, :tok, now(), now(), :nf) "
+                        "ON CONFLICT (id) DO UPDATE SET replica_id = :rid, token = :tok, "
+                        "acquired_at = now(), heartbeat_at = now(), fence = :nf "
+                        "RETURNING fence"
+                    ),
+                    {**self._binds(), "tok": str(self._token), "nf": next_fence},
+                ).first()
+                self._fence = row.fence
+                conn.commit()
+                self._advisory_conn = conn  # keep the lock-conn open; _release closes it
+            finally:
+                if self._advisory_conn is None:
+                    # We never got the lock (stale-check / try_advisory_lock
+                    # returned <1) — close this connection.
+                    conn.close()
         self._is_leader = True
         return True
 
@@ -187,8 +206,21 @@ class Leader:
             return r.rowcount
 
     def _release(self) -> None:
+        # pg_advisory_unlock must run on the SAME session that holds the lock
+        # (the one ``acquire_once`` kept open in ``self._advisory_conn``) —
+        # unlocking on a different pooled connection is a no-op and leaks the
+        # lock. Close the lock-conn (which also releases it as a belt-and-
+        # braces) and delete the lease row.
+        lock_conn = self._advisory_conn
+        self._advisory_conn = None
+        if lock_conn is not None:
+            try:
+                lock_conn.execute(
+                    text(f"SELECT pg_advisory_unlock({self._lock_key()})"), self._binds()
+                )
+            finally:
+                lock_conn.close()
         with self._engine_ctx() as engine, engine.connect() as conn:
-            conn.execute(text(f"SELECT pg_advisory_unlock({self._lock_key()})"), self._binds())
             conn.execute(
                 text("DELETE FROM leader_lease WHERE id = 1 AND replica_id = :rid"),
                 self._binds(),
