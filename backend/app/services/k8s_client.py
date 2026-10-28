@@ -173,11 +173,15 @@ class K8sClient:
             self._loader.load_and_set(client_config)  # type: ignore[no-untyped-call]
             # The kubeconfig's CA bundle is the TLS verification authority;
             # fall back to the system bundle when the config carries none.
-            cluster_entry = loaded["clusters"][0]
+            cluster_entry = loaded["clusters"][0]["cluster"]
             ca = cluster_entry.get("certificate-authority-data")
-            # httpx verify= accepts str (PEM bundle) or bool — decode the CA
-            # to a PEM string so mypy strict is happy.
-            self._verify: str | bool = base64.b64decode(ca).decode() if ca else True
+            # httpx verify= treats a str as a FILE PATH (passed to
+            # ssl.create_default_context as cafile), NOT as PEM content.
+            # Write the CA to a temp file at init; readyz() passes that path.
+            if ca:
+                self._verify: str | bool = self._ca_to_tempfile(base64.b64decode(ca))
+            else:
+                self._verify = True
         else:
             # Admin shape (ADR-0021): build_admin_client applied
             # load_kube_config/load_incluster_config BEFORE this, which sets
@@ -187,7 +191,16 @@ class K8sClient:
                 client_config = k8s_client.Configuration.get_default_copy()
             except Exception:
                 client_config = k8s_client.Configuration()
-            self._verify = True
+            # The kubeconfig's CA bundle is the TLS verification authority
+            # (self-signed in kind). kubernetes writes the CA to a temp file
+            # and stores the PATH in ssl_ca_cert — pass it directly to
+            # httpx verify= (it expects a file path, not PEM content).
+            # Falls back to True when no CA is set (in-cluster mode).
+            ssl_ca = client_config.ssl_ca_cert
+            if isinstance(ssl_ca, str) and ssl_ca:
+                self._verify: str | bool = ssl_ca
+            else:
+                self._verify = True
         self._config = client_config
         api_client = k8s_client.ApiClient(self._config)
         # WHY stored: node_usage reads the Metrics API via the raw
@@ -209,6 +222,21 @@ class K8sClient:
         # keeps one auth context.
         self._rbac = k8s_client.RbacAuthorizationV1Api(api_client)
         self._host = self._v1.api_client.configuration.host
+
+    @staticmethod
+    def _ca_to_tempfile(ca_pem: bytes) -> str:
+        """Write the CA PEM to a temp file and return its path.
+
+        httpx ``verify=`` treats a str as a file path (``cafile``), not PEM
+        content. The file lives for the process lifetime (one per cluster) —
+        acceptable for a long-lived gunicorn worker.
+        """
+        import tempfile
+
+        fd, path = tempfile.mkstemp(suffix=".ca.pem")
+        with os.fdopen(fd, "wb") as f:
+            f.write(ca_pem)
+        return path
 
     def list_pods(self, namespace: str | None) -> list[dict[str, Any]]:
         """Pod list in the standard kubernetes dict form (``to_dict``)."""
