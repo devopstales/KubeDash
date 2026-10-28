@@ -164,7 +164,10 @@ def test_namespace_and_name_are_separate_cache_entries(monkeypatch: pytest.Monke
     monkeypatch.setattr(rb, "_cache_get", lambda e, k: cache.get(k))
     monkeypatch.setattr(rb, "_cache_set", lambda e, k, v: cache.__setitem__(k, v))
     assert rb.can(_user(), _cluster(), "list", "secrets", "team-a", None, engine=_ENGINE) is True
-    assert rb.can(_user(), _cluster(), "list", "secrets", "kube-system", None, engine=_ENGINE) is False
+    assert (
+        rb.can(_user(), _cluster(), "list", "secrets", "kube-system", None, engine=_ENGINE)
+        is False
+    )
     assert rb.can(_user(), _cluster(), "get", "secrets", "team-a", "db", engine=_ENGINE) is True
     assert rb.can(_user(), _cluster(), "get", "secrets", "team-a", "other", engine=_ENGINE) is False
     assert asked == [("team-a", None), ("kube-system", None), ("team-a", "db"), ("team-a", "other")]
@@ -190,7 +193,10 @@ def test_sar_carries_api_group_for_rbac_resources(monkeypatch: pytest.MonkeyPatc
     monkeypatch.setattr(rb, "_cache_get", lambda e, k: None)
     monkeypatch.setattr(rb, "_cache_set", lambda e, k, v: None)
     assert (
-        rb.can(_user(), _cluster(), "list", "roles", "default", None, "rbac.authorization.k8s.io", engine=_ENGINE)
+        rb.can(
+            _user(), _cluster(), "list", "roles", "default", None,
+            "rbac.authorization.k8s.io", engine=_ENGINE,
+        )
         is True
     )
     assert seen == ["rbac.authorization.k8s.io"]

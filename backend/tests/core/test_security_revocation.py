@@ -174,9 +174,8 @@ def test_current_jti_reads_the_cookie_when_no_header(app, engine, jti, user_row)
 def test_current_jti_without_a_token_is_unauthorized(app):
     # TRIANGULATE: no header, no cookie → UnauthorizedError (the same 401
     # the verify hook raises, not a 500).
-    with app.test_request_context():
-        with pytest.raises(UnauthorizedError):
-            security._current_jti()
+    with app.test_request_context(), pytest.raises(UnauthorizedError):
+        security._current_jti()
 
 
 def test_new_state_is_stored_and_consumed_once(app, engine):
