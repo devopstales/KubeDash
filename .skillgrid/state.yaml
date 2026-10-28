@@ -33,6 +33,15 @@ in_flight:
     # (786100f5). Verification floor green (unit 471 passed; vitest 14/14
     # targeted; fe-build + fe-check). Awaits QA gate + review (orchestrator).
     tracker: [TASK-046]
+  - change: 2026-10-28-resourcequota-views
+    phase: execution
+    # Executed 2026-10-28 (TASK-047): 4 commits on `rebase` — backend
+    # resourcequotas kind (core, namespaced, SAR-gated, 783cff0a), list
+    # view (14d8af2b), data view (0d08d0a1), routes + stub removal
+    # (0b3b97bf). Verification floor green (unit 483 passed; vitest 15/15
+    # targeted; fe-build + fe-check; _nav.tsx untouched). Awaits QA gate +
+    # review (orchestrator).
+    tracker: [TASK-047]
 completed_changes:
   - 2026-10-17-kubedash-base-structure
   - 2026-10-17-swagger-ui-air-gap
