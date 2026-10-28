@@ -222,6 +222,21 @@ export interface CiliumPolicyItem {
   [key: string]: unknown
 }
 
+/** A PriorityClass item as returned by /api/v1/clusters/<id>/resources/priorityclasses (kubernetes to_dict, snake_case; cluster-scoped). */
+export interface PriorityClassItem {
+  metadata?: {
+    name?: string
+    creation_timestamp?: string | null
+    labels?: Record<string, string> | null
+    annotations?: Record<string, string> | null
+  }
+  value?: number
+  global_default?: boolean
+  preemption_policy?: string
+  description?: string
+  [key: string]: unknown
+}
+
 /** Closed set for the detail page's ?kind= param (4.1 parity). */
 export const POLICY_KINDS = ['NetworkPolicy', 'CiliumNetworkPolicy', 'CiliumClusterwideNetworkPolicy'] as const
 export type PolicyKind = (typeof POLICY_KINDS)[number]

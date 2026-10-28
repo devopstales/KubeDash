@@ -85,7 +85,7 @@ mapping):
 | **Interface** Storage | SnapshotClass | `/storage/snapshot-class` | stub | stub |
 | **Interface** Security | Secrets | `/security/secret` | stub | stub |
 | **Interface** Security | Network Policies | `/security/network-policy` | stub | stub |
-| **Interface** Security | Priority Classes | `/security/priorityclass` | stub | stub |
+| **Interface** Security | Priority Classes | `/security/priorityclass` | `/other-resource/priorityclass` | implemented (feature) — moved to Other Resources (ratified deviation, 2026-10-27: 4.1's API already lived in other-resources; first real page in the group) |
 | **Interface** Other Resources | HPAs | `/other-resource/horizontal-pod-autoscaler` | stub | stub |
 | **Interface** Other Resources | VPAs | `/other-resource/vertical-pod-autoscaler` | stub | stub |
 | **Interface** Other Resources | Pod Disruption Budget | `/other-resource/pod-disruption-budget` | stub | stub |

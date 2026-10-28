@@ -106,7 +106,6 @@ export function navigation(input: { clusterId: number | null; isAdmin: boolean }
     group('Security', cilShieldAlt, [
       leaf('Secrets', '/security/secret'),
       leaf('Network Policies', '/security/network-policy'),
-      leaf('Priority Classes', '/security/priorityclass'),
     ]),
     group('Other Resources', cilNotes, [
       leaf('HPAs', '/other-resource/horizontal-pod-autoscaler'),
@@ -115,6 +114,7 @@ export function navigation(input: { clusterId: number | null; isAdmin: boolean }
       leaf('Resource Quota', '/other-resource/resource-quota'),
       leaf('Limit Range', '/other-resource/limit-range'),
       leaf('Runtime Class', '/other-resource/runtimeclass'),
+      leaf('Priority Classes', '/other-resource/priorityclass'),
     ]),
   ]
 

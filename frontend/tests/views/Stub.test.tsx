@@ -46,6 +46,8 @@ function expectedStubs() {
     '/dashboard/cluster-metric',
     // Real view (2026-10-26-network-policy, Task 3) — not a stub route.
     '/security/network-policy',
+    // Real view (2026-10-27-priority-class, Task 2) — not a stub route.
+    '/other-resource/priorityclass',
   ])
   const seen = new Map<string, string>()
   for (const isAdmin of [true, false]) {

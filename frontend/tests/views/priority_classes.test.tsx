@@ -1,0 +1,196 @@
+import { render, screen } from '@testing-library/react'
+import { QueryClient, QueryClientProvider } from '@tanstack/react-query'
+import { MemoryRouter } from 'react-router-dom'
+import { http, HttpResponse } from 'msw'
+import type { ReactElement } from 'react'
+import { afterEach, expect, test, vi } from 'vitest'
+import { server } from '../msw'
+import PriorityClassView from '../../src/views/OtherResource/PriorityClass'
+import { useClusterStore } from '../../src/store/cluster'
+
+// Same KubeDataTable fake as secrets.test.tsx: renders the real row
+// mapping (children-as-render-fns included) so cell assertions test the
+// view's `toRow` output, not DataTables' DOM. The factory is async: a
+// hoisted mock may not touch module-scope consts, so react is imported
+// inline (`vi.mock` calls are hoisted above the imports below).
+vi.mock('../../src/components/KubeDataTable', async () => {
+  const React = (await import('react')) as typeof import('react')
+  const Column = () => null
+  function KubeDataTable({
+    data,
+    children,
+  }: {
+    data: Record<string, unknown>[]
+    children: React.ReactNode
+  }) {
+    const cols = React.Children.toArray(children)
+      .filter(React.isValidElement)
+      .map(
+        (child) =>
+          (
+            child as React.ReactElement<{
+              title: string
+              data: string | null
+              children?: unknown
+            }>
+          ).props,
+      )
+    return (
+      <table>
+        <thead>
+          <tr>
+            {cols.map((col) => (
+              <th key={col.title}>{col.title}</th>
+            ))}
+          </tr>
+        </thead>
+        <tbody>
+          {data.map((row, i) => (
+            <tr key={i}>
+              {cols.map((col) => {
+                // `data={null}` hands the render fn the whole row (the
+                // datatables.net-react contract, see Namespaces.tsx).
+                const value = col.data === null ? row : row[col.data]
+                const node =
+                  typeof col.children === 'function'
+                    ? (col.children as (v: unknown) => React.ReactNode)(value)
+                    : (value as React.ReactNode)
+                return <td key={col.title}>{node ?? ''}</td>
+              })}
+            </tr>
+          ))}
+        </tbody>
+      </table>
+    )
+  }
+  return { default: KubeDataTable, Column }
+})
+
+const renderAt = (ui: ReactElement, path = '/other-resource/priorityclass') => {
+  const qc = new QueryClient({ defaultOptions: { queries: { retry: false } } })
+  return render(
+    <QueryClientProvider client={qc}>
+      <MemoryRouter initialEntries={[path]}>{ui}</MemoryRouter>
+    </QueryClientProvider>,
+  )
+}
+
+afterEach(() => {
+  useClusterStore.setState({ selectedCluster: null, selectedNamespace: null })
+})
+
+const selectProd = () =>
+  useClusterStore.setState({
+    selectedCluster: { id: 1, name: 'prod' },
+    selectedNamespace: 'team-a',
+  })
+
+// kubernetes to_dict shape: snake_case. Cluster-scoped — no namespace field.
+const high = {
+  apiVersion: 'scheduling.k8s.io/v1',
+  kind: 'PriorityClass',
+  metadata: {
+    name: 'high',
+    creation_timestamp: '2026-10-26T10:00:00Z',
+  },
+  value: 1000,
+  global_default: false,
+  preemption_policy: 'PreemptLowerPriority',
+  description: 'High priority',
+}
+
+// list-renders-priority-classes
+test('list-renders-priority-classes', async () => {
+  let requestedPath = ''
+  let requestedUrl = ''
+  server.use(
+    http.get('*/api/v1/clusters/1/resources/priorityclasses', ({ request }) => {
+      const u = new URL(request.url)
+      requestedPath = u.pathname
+      requestedUrl = u.href
+      return HttpResponse.json({
+        kind: 'priorityclasses',
+        cluster: 'prod',
+        items: [high],
+      })
+    }),
+  )
+  selectProd()
+  renderAt(<PriorityClassView />)
+
+  const link = await screen.findByRole('link', { name: 'high' })
+  expect(link.getAttribute('href')).toBe('/other-resource/priorityclass/data?name=high')
+  // fetch path is EXACTLY the cluster-scoped kind URL, no namespace substring.
+  expect(requestedPath).toBe('/api/v1/clusters/1/resources/priorityclasses')
+  expect(requestedUrl).not.toContain('namespace')
+
+  // card title: EXACT string (the e2e smoke asserts it with exact: true).
+  // Both the breadcrumb and the card title render it — at least one must exist.
+  expect(screen.getAllByText('Priority Classes', { exact: true }).length).toBeGreaterThanOrEqual(1)
+  // breadcrumb: Other Resources → Priority Classes.
+  expect(screen.getByText('Other Resources')).toBeTruthy()
+  // columns: name, value, preemption policy, global default, description, created.
+  expect(screen.getAllByRole('columnheader').map((th) => th.textContent)).toEqual([
+    'Name',
+    'Value',
+    'Preemption Policy',
+    'Global Default',
+    'Description',
+    'Created',
+  ])
+  // row: value, preemption policy, global default, description.
+  expect(screen.getByText('1000')).toBeTruthy()
+  expect(screen.getByText('PreemptLowerPriority')).toBeTruthy()
+  expect(screen.getByText('false')).toBeTruthy()
+  expect(screen.getByText('High priority')).toBeTruthy()
+  // created: local time (no raw ISO 'T'), rendered by formatTimestamp.
+  const nameCell = link.closest('tr')
+  expect(nameCell?.textContent).not.toContain('2026-10-26T10:00:00Z')
+  expect(nameCell?.textContent).toMatch(/2026/)
+})
+
+// Pin the kind URL (the view↔API seam): an exact-path capture so a
+// kind-string drift (e.g. `priority-class` singular) fails here, not in a
+// browser. The default msw handler answers any other resource URL with
+// `{items: []}`, which would hide such drift.
+function capturePaths(): string[] {
+  const seen: string[] = []
+  server.use(
+    http.get('*/api/v1/clusters/:id/resources/*', ({ request }) => {
+      seen.push(new URL(request.url).pathname)
+      return HttpResponse.json({ items: [] })
+    }),
+  )
+  return seen
+}
+
+// list-no-cluster-state
+test('list-no-cluster-state', async () => {
+  selectProd()
+  useClusterStore.setState({ selectedCluster: null, selectedNamespace: null })
+  const seen = capturePaths()
+  renderAt(<PriorityClassView />)
+
+  expect(await screen.findByText('No cluster selected.')).toBeTruthy()
+  expect(seen).toHaveLength(0) // no resource fetch is made
+})
+
+// list-error-state
+test('list-error-state', async () => {
+  server.use(
+    http.get('*/api/v1/clusters/1/resources/priorityclasses', () =>
+      HttpResponse.json(
+        { error: { code: 'RBAC_DENIED', message: 'list on priorityclasses' } },
+        { status: 403 },
+      ),
+    ),
+  )
+  selectProd()
+  renderAt(<PriorityClassView />)
+
+  expect(
+    await screen.findByText(/Error loading priority classes: RBAC_DENIED: list on priorityclasses/),
+  ).toBeTruthy()
+  // no blank table, no rows.
+  expect(screen.queryAllByRole('link', { name: 'high' })).toHaveLength(0)
+})

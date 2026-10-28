@@ -20,7 +20,6 @@ export const stubRoutes: StubRoute[] = [
   { path: '/storage/volumesnapshot', title: 'VolumeSnapshot', admin: false },
   { path: '/storage/storage-class', title: 'StorageClass', admin: false },
   { path: '/storage/snapshot-class', title: 'SnapshotClass', admin: false },
-  { path: '/security/priorityclass', title: 'Priority Classes', admin: false },
   { path: '/other-resource/horizontal-pod-autoscaler', title: 'HPAs', admin: false },
   { path: '/other-resource/vertical-pod-autoscaler', title: 'VPAs', admin: false },
   { path: '/other-resource/pod-disruption-budget', title: 'Pod Disruption Budget', admin: false },

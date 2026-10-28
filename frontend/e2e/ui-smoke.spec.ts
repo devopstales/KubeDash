@@ -43,12 +43,12 @@ const SMOKE_STUB_ROUTES: Array<{ path: string; title: string }> = [
   { path: '/storage/storage-class', title: 'StorageClass' },
   { path: '/storage/snapshot-class', title: 'SnapshotClass' },
   { path: '/security/network-policy', title: 'Network Policies' },
-  { path: '/security/priorityclass', title: 'Priority Classes' },
   { path: '/other-resource/horizontal-pod-autoscaler', title: 'HPAs' },
   { path: '/other-resource/vertical-pod-autoscaler', title: 'VPAs' },
   { path: '/other-resource/pod-disruption-budget', title: 'Pod Disruption Budget' },
   { path: '/other-resource/resource-quota', title: 'Resource Quota' },
   { path: '/other-resource/limit-range', title: 'Limit Range' },
+  { path: '/other-resource/priorityclass', title: 'Priority Classes' },
   // Admin-gated stubs (render for the bootstrap admin):
   { path: '/settings/sso-config', title: 'Auth Provider' },
   { path: '/settings/cluster-status', title: 'HA Status' },
