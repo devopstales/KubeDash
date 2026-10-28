@@ -57,6 +57,7 @@ _KINDS: dict[str, tuple[str, str, str]] = {
         "ciliumclusterwidenetworkpolicies",
         "cilium.io",
     ),
+    "priorityclasses": ("list_priority_classes", "priorityclasses", "scheduling.k8s.io"),
 }
 
 #: kind → K8sClient method for a single-object ``?name=`` lookup
@@ -65,6 +66,7 @@ _GETTERS: dict[str, str] = {
     "crds": "get_crd",
     "networkpolicies": "get_network_policy",
     "ciliumnetworkpolicies": "get_cilium_network_policy",
+    "priorityclasses": "get_priority_class",
 }
 
 

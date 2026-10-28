@@ -222,6 +222,8 @@ class K8sClient:
         # keeps one auth context.
         self._rbac = k8s_client.RbacAuthorizationV1Api(api_client)
         self._networking = k8s_client.NetworkingV1Api(api_client)
+        # PriorityClass (scheduling.k8s.io) — the R4 "priorityclasses" kind.
+        self._scheduling = k8s_client.SchedulingV1Api(api_client)
         self._host = self._v1.api_client.configuration.host
 
     @staticmethod
@@ -258,6 +260,17 @@ class K8sClient:
         Cluster-scoped; the query namespace does not apply (mirrors
         ``list_namespaces``)."""
         return [n.to_dict() for n in self._v1.list_node().items]
+
+    def list_priority_classes(self, _namespace: str | None) -> list[dict[str, Any]]:
+        """PriorityClass list in the standard kubernetes dict form
+        (``to_dict``). Cluster-scoped: the namespace argument is accepted
+        and ignored (the ``list_nodes`` pattern)."""
+        try:
+            resp = self._scheduling.list_priority_class()
+        except ApiException as e:
+            self._unreachable("list_priority_classes", e)
+            raise AssertionError("unreachable") from e
+        return [pc.to_dict() for pc in resp.items]
 
     def _node_metrics(self) -> list[dict[str, Any]] | None:
         """Fetch the raw ``NodeMetricsList`` body from ``metrics.k8s.io``.
@@ -757,6 +770,19 @@ class K8sClient:
             if e.status == 404:
                 return []
             self._unreachable("get_network_policy", e)
+            raise AssertionError("unreachable") from e
+
+    def get_priority_class(self, _namespace: str, name: str) -> list[dict[str, Any]]:
+        """One PriorityClass as a 0/1-item list; ``[]`` on 404. Cluster-
+        scoped: the namespace argument is accepted and ignored. Any other
+        ApiException maps to ``ClusterUnreachableError`` (502), matching
+        ``get_secret``'s transport contract."""
+        try:
+            return [self._scheduling.read_priority_class(name).to_dict()]
+        except ApiException as e:
+            if e.status == 404:
+                return []
+            self._unreachable("get_priority_class", e)
             raise AssertionError("unreachable") from e
 
     def readyz(self) -> bool:

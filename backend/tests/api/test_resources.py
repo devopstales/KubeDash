@@ -285,6 +285,29 @@ class FakeK8s:
             }
         ]
 
+    def list_priority_classes(self, _namespace: str | None) -> list[dict]:
+        # Cluster-scoped: the namespace argument is accepted-and-ignored
+        # (mirrors the real K8sClient.list_priority_classes).
+        return [
+            {
+                "metadata": {
+                    "name": "high",
+                    "creation_timestamp": "2026-01-02T03:04:05Z",
+                    "annotations": None,
+                    "labels": {"tier": "critical"},
+                },
+                "value": 1000,
+                "global_default": False,
+                "preemption_policy": "PreemptLowerPriority",
+                "description": "High priority",
+            }
+        ]
+
+    def get_priority_class(self, _namespace: str, name: str) -> list[dict]:
+        if name == "high":
+            return self.list_priority_classes(None)
+        return []
+
     def readyz(self) -> bool:
         return True
 
@@ -1188,6 +1211,98 @@ def test_get_cilium_network_policy_absent_crds_empty(
     )
     assert r.status_code == 200
     assert r.get_json()["items"] == []
+
+
+def test_list_priorityclasses_200(api_client, auth_client, fake_k8s, monkeypatch) -> None:
+    """[priorityclasses-list-200] a bound user listing priorityclasses gets
+    the to_dict items back, spec fields (value, preemption_policy,
+    global_default, description) intact."""
+    auth_client.login()
+    h = {"Authorization": f"Bearer {auth_client.jwt}"}
+    _register(api_client, h)
+    _allow_sar(monkeypatch)
+    r = api_client.get("/api/v1/clusters/1/resources/priorityclasses", headers=h)
+    assert r.status_code == 200
+    body = r.get_json()
+    assert body["kind"] == "priorityclasses"
+    [item] = body["items"]
+    assert item["metadata"]["name"] == "high"
+    assert item["value"] == 1000
+    assert item["preemption_policy"] == "PreemptLowerPriority"
+    assert item["global_default"] is False
+    assert item["description"] == "High priority"
+
+
+def test_list_priorityclasses_ignores_namespace(
+    api_client, auth_client, fake_k8s, monkeypatch
+) -> None:
+    """[priorityclasses-list-ignores-namespace] the kind is cluster-scoped:
+    ?namespace=team-a is accepted and ignored — the same "high" item comes
+    back."""
+    auth_client.login()
+    h = {"Authorization": f"Bearer {auth_client.jwt}"}
+    _register(api_client, h)
+    _allow_sar(monkeypatch)
+    r = api_client.get(
+        "/api/v1/clusters/1/resources/priorityclasses?namespace=team-a", headers=h
+    )
+    assert r.status_code == 200
+    body = r.get_json()
+    [item] = body["items"]
+    assert item["metadata"]["name"] == "high"
+    assert "namespace" not in item["metadata"]
+
+
+def test_get_priority_class_by_name(api_client, auth_client, fake_k8s, monkeypatch) -> None:
+    """[priorityclasses-get-by-name] ?name= returns a 0/1-item list: a hit
+    returns the one item, a miss returns [] (mirrors get_secret)."""
+    auth_client.login()
+    h = {"Authorization": f"Bearer {auth_client.jwt}"}
+    _register(api_client, h)
+    _allow_sar(monkeypatch)
+    r = api_client.get("/api/v1/clusters/1/resources/priorityclasses?name=high", headers=h)
+    assert r.status_code == 200
+    [item] = r.get_json()["items"]
+    assert item["metadata"]["name"] == "high"
+    r = api_client.get("/api/v1/clusters/1/resources/priorityclasses?name=ghost", headers=h)
+    assert r.status_code == 200
+    assert r.get_json()["items"] == []
+
+
+def test_list_priorityclasses_sar_denied(api_client, auth_client, fake_k8s, monkeypatch) -> None:
+    """[priorityclasses-sar-denied] ADR-0004: the SAR is asked BEFORE the
+    read, with the scheduling.k8s.io group and namespace None (the
+    cluster-scoped SAR cache key) — a deny short-circuits to 403
+    RBAC_DENIED."""
+    auth_client.login()
+    h = {"Authorization": f"Bearer {auth_client.jwt}"}
+    _register(api_client, h)
+    asked = _record_sar(monkeypatch)  # denies every SAR and records calls
+    r = api_client.get("/api/v1/clusters/1/resources/priorityclasses", headers=h)
+    assert r.status_code == 403
+    assert r.get_json()["error"]["code"] == "RBAC_DENIED"
+    assert ("list", "priorityclasses", None, None, "scheduling.k8s.io") in asked
+
+
+def test_priorityclasses_binding_404(api_client, auth_client) -> None:
+    """[priorityclasses-binding-404] an unbound user: the binding gate
+    fails before the SAR, CLUSTER_NOT_FOUND."""
+    auth_client.login()
+    h = {"Authorization": f"Bearer {auth_client.jwt}"}
+    r = api_client.get("/api/v1/clusters/999/resources/priorityclasses", headers=h)
+    assert r.status_code == 404
+    assert r.get_json()["error"]["code"] == "CLUSTER_NOT_FOUND"
+
+
+def test_priorityclass_kind_singular_rejected(api_client, auth_client) -> None:
+    """[priorityclasses-kind-singular-rejected] the 4.1 route name
+    (singular) is not a kind — RESOURCE_KIND_NOT_SUPPORTED."""
+    auth_client.login()
+    h = {"Authorization": f"Bearer {auth_client.jwt}"}
+    _register(api_client, h)
+    r = api_client.get("/api/v1/clusters/1/resources/priorityclass", headers=h)
+    assert r.status_code == 404
+    assert r.get_json()["error"]["code"] == "RESOURCE_KIND_NOT_SUPPORTED"
 
 
 @pytest.mark.integration
