@@ -38,18 +38,6 @@ in_flight:
     # change's Task 2 App.tsx hunk — see W006; ship/archive both together.
     # Next: ship.
     tracker: []
-  - change: 2026-10-27-priority-class
-    phase: execution
-    # Executed 2026-10-28 on branch `rebase` (sdd ledger
-    # 2026-10-27-priority-class): 4 tasks complete — 77d3bcbe (kind, R4 row),
-    # 1bd5afab + b5243e13 (list view + nav move + stub retirement + ADR-0022
-    # row), 049fd05d (detail view), 88622fed (kind-gated backstop, run live on
-    # kind cluster kubedash-test). QA gate PASS (report.md, 2026-10-28):
-    # backend 460 passed, priority-class view tests 7/7, fe-build + fe-check
-    # exit 0; 13 pre-existing frontend red (W007) not this change's.
-    # Next: final whole-branch review -> ship.
-    tracker: []
-
 completed_changes:
   - 2026-10-17-kubedash-base-structure
   - 2026-10-17-swagger-ui-air-gap
@@ -62,6 +50,9 @@ completed_changes:
   - 2026-10-23-http-only-session-cookie
   - 2026-10-21-dashboard-options         # decision artifact: Option 1 won -> implemented as 2026-10-21-cluster-node
   - 2026-10-21-sidebar-nav            # done-but-diverged: commit 81f9eff4 (Settings ungated, footer links, no Cluster Details menu entry)
+  # Shipped 2026-10-28 (keep branch as-is; QA PASS, final review clean after
+  # fix wave b02c2ef9; folder archived in 27137670's working tree):
+  - 2026-10-27-priority-class
 
 # Onboarding state (2026-10-17): config.yaml + ASSUMPTIONS.md + state.yaml
 # created. Open items tracked in ASSUMPTIONS.md "Onboarding notes".
