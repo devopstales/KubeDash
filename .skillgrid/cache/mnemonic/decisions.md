@@ -128,6 +128,10 @@ Fixed metrics-server authorization delegation (cluster-scope SAR) + node-view me
 
 Env gotcha: repo gitleaks wrapper bypassed, history scan slow (discovery)
 
+## execution/2026-10-26-network-policy
+
+Executed 2026-10-26-network-policy: 5 tasks + QA + final review, phase=qa (architecture)
+
 ## execution/ini-config-source
 
 QA gate PASS for 2026-10-26-ini-config-source; report.md committed in archive (architecture)
@@ -652,6 +656,10 @@ Created scan-findings spec for skillgrid-v2 (decision)
 
 KubeDash 4.1 codebase research — full capability map (discovery)
 
+## session/2026-10-28-network-policy-exec
+
+Committed dirty rebase tree (7 commits) before network-policy execution (decision)
+
 ## skillgrid-init/KubeDash
 
 KubeDash 5.0 onboarding — Go rewrite, Backlog.md tracker, T3 rigor (config)
@@ -667,6 +675,10 @@ Node list progress matched to 4.1 prototype: thin 4px bars + big stat value (arc
 ## skillgrid/2026-10-26-ini-config-source/ship
 
 ship — 2026-10-26-ini-config-source (architecture)
+
+## skillgrid/2026-10-26-network-policy/ship
+
+ship — 2026-10-26-network-policy (architecture)
 
 ## skillgrid/KubeDash/issue_tracker
 
