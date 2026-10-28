@@ -48,6 +48,8 @@ function expectedStubs() {
     '/security/network-policy',
     // Real view (2026-10-27-priority-class, Task 2) — not a stub route.
     '/other-resource/priorityclass',
+    // Real view (2026-10-28-runtimeclass-views, Task 2) — not a stub route.
+    '/other-resource/runtimeclass',
   ])
   const seen = new Map<string, string>()
   for (const isAdmin of [true, false]) {
@@ -91,12 +93,7 @@ test('every-stub-entry-has-a-page', () => {
   for (const route of stubRoutes) {
     expect(route.admin).toBe(route.path.startsWith('/settings/'))
   }
-  for (const title of [
-    'Workload',
-    'Ingress',
-    'VolumeClaims',
-    'Runtime Class',
-  ]) {
+  for (const title of ['Workload', 'Ingress', 'VolumeClaims']) {
     expect(stubRoutes.some((route) => route.title === title)).toBe(true)
   }
 })

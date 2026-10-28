@@ -25,7 +25,6 @@ export const stubRoutes: StubRoute[] = [
   { path: '/other-resource/pod-disruption-budget', title: 'Pod Disruption Budget', admin: false },
   { path: '/other-resource/resource-quota', title: 'Resource Quota', admin: false },
   { path: '/other-resource/limit-range', title: 'Limit Range', admin: false },
-  { path: '/other-resource/runtimeclass', title: 'Runtime Class', admin: false },
   { path: '/settings/sso-config', title: 'Auth Provider', admin: true },
   { path: '/settings/cluster-status', title: 'HA Status', admin: true },
 ]
