@@ -44,6 +44,8 @@ function expectedStubs() {
     '/cluster/crd/data',
     // Real view (2026-10-21-cluster-dashboard, Task 6) — not a stub route.
     '/dashboard/cluster-metric',
+    // Real view (2026-10-26-network-policy, Task 3) — not a stub route.
+    '/security/network-policy',
   ])
   const seen = new Map<string, string>()
   for (const isAdmin of [true, false]) {
@@ -91,7 +93,6 @@ test('every-stub-entry-has-a-page', () => {
     'Workload',
     'Ingress',
     'VolumeClaims',
-    'Network Policies',
     'Runtime Class',
   ]) {
     expect(stubRoutes.some((route) => route.title === title)).toBe(true)

@@ -188,6 +188,44 @@ export interface K8sSecret {
   [key: string]: unknown
 }
 
+/** A NetworkPolicy item as returned by /api/v1/clusters/<id>/resources/networkpolicies (kubernetes to_dict, snake_case). */
+export interface NetworkPolicyItem {
+  metadata?: {
+    name?: string
+    namespace?: string
+    creation_timestamp?: string | null
+    labels?: Record<string, string> | null
+    annotations?: Record<string, string> | null
+  }
+  spec?: {
+    pod_selector?: { match_labels?: Record<string, string> | null } | null
+    policy_types?: string[] | null
+    ingress?: unknown[] | null
+    egress?: unknown[] | null
+  }
+  [key: string]: unknown
+}
+
+/** A CiliumNetworkPolicy / CiliumClusterwideNetworkPolicy item (full CRD to_dict). */
+export interface CiliumPolicyItem {
+  metadata?: {
+    name?: string
+    namespace?: string | null
+    creation_timestamp?: string | null
+    labels?: Record<string, string> | null
+  }
+  spec?: {
+    endpointSelector?: { matchLabels?: Record<string, string> | null } | null
+    ingress?: unknown[] | null
+    egress?: unknown[] | null
+  }
+  [key: string]: unknown
+}
+
+/** Closed set for the detail page's ?kind= param (4.1 parity). */
+export const POLICY_KINDS = ['NetworkPolicy', 'CiliumNetworkPolicy', 'CiliumClusterwideNetworkPolicy'] as const
+export type PolicyKind = (typeof POLICY_KINDS)[number]
+
 /**
  * A CustomResourceDefinition item as returned by
  * /api/v1/clusters/<id>/resources/crds. Kubernetes ``to_dict`` uses snake_case

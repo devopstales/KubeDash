@@ -42,6 +42,7 @@ const ClusterRoleBindingView = React.lazy(
 )
 const SecretView = React.lazy(() => import('./views/Security/Secret'))
 const SecretDataView = React.lazy(() => import('./views/Security/SecretData'))
+const NetworkPolicyView = React.lazy(() => import('./views/Security/NetworkPolicy'))
 const GroupsView = React.lazy(() => import('./views/Groups'))
 const GroupPrivilegesView = React.lazy(() => import('./views/Groups/GroupPrivileges'))
 const GroupPrivilegeEditView = React.lazy(() => import('./views/Groups/GroupPrivilegeEdit'))
@@ -340,6 +341,14 @@ const App = () => {
                       element={
                         <ProtectedRoute>
                           <SecretDataView />
+                        </ProtectedRoute>
+                      }
+                    />
+                    <Route
+                      path="/security/network-policy"
+                      element={
+                        <ProtectedRoute>
+                          <NetworkPolicyView />
                         </ProtectedRoute>
                       }
                     />
