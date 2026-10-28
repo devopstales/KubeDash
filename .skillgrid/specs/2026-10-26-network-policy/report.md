@@ -183,6 +183,31 @@ No CRITICAL findings; all hard gates pass. Open items (each with a path):
 
 Human override: none exercised.
 
+## Re-verification (2026-10-28, post CONCERNS)
+
+**WARNING #1 (API-tier 502) — FIXED.** `test_list_ciliumnetworkpolicies_502_on_unreachable`
+added (commit 2bb6e853): a `cilium_unreachable` flag on the local `FakeK8s`
+(default `False` — no existing test touched) makes
+`list_cilium_network_policies` raise `ClusterUnreachableError`; the test
+asserts the API responds 502 `CLUSTER_UNREACHABLE`. Parent re-verified:
+`uv run pytest tests/api/test_resources.py -m "not integration" -q` →
+**59 passed, 6 deselected** (exit 0); ruff on the file → 8 E501s (same
+pre-existing baseline, 0 new). The clusterwide kind shares the same handler
+mapping (one `except ClusterUnreachableError → 502` branch for all kinds) —
+the namespaced kind now pins it at the API tier.
+
+**WARNING #2 (live CRD-absent leg) — deferred (named re-run path).** The
+e2e job's bare kind cluster confirms it; the local dev cluster has Cilium
+by design (the dev stack installs it). No code change possible locally.
+
+**SUGGESTIONS #3-5 — deferred** (detail-page browser e2e = e2e job's
+concern; Cilium list-method duplication = plan-mandated shape; `policyUrl`
+dead `ns` param = plan-mandated verbatim signature, test-guarded).
+
+**Gate re-render: CONCERNS → PASS** on the re-verification floor (the
+in-scope fix landed; the remaining open items are out-of-scope deferrals
+with named paths, not non-answers the change owes).
+
 ## Human Override
 
 (none)
