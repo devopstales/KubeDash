@@ -48,6 +48,10 @@ fi
 # If the cluster was created with the default CNI (kindnet), Cilium installs
 # as a second CNI — kindnet keeps working. The image is preloaded into the
 # kind node so the agent pod starts fast.
+# Check the DaemonSet (Cilium's actual object), not a Pod: a Pod can be
+# present while the DaemonSet is mid-rollout or absent after a fresh
+# `kind create` (disableDefaultCNI leaves the node with no CNI until Cilium
+# is installed). The daemonset rollout-status wait below handles readiness.
 if k -n kube-system get daemonset cilium >/dev/null 2>&1; then
   echo "Cilium already installed — skipping."
 else

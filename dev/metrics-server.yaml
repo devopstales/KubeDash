@@ -72,15 +72,42 @@ subjects:
     apiGroup: rbac.authorization.k8s.io
     name: system:auth-delegators
 ---
+# Authorization delegation (CRITICAL — easy to drop from a hand-rolled copy):
+# the Metrics API authenticates the calling user via a token, then asks the
+# API server to AUTHORIZE that user via SubjectAccessReview. metrics-server
+# performs those reviews from its kube-system ServiceAccount. It needs:
+#   - tokenreviews (create)  — to validate the caller's token (namespace-scoped
+#     is enough; kept here for parity with the upstream manifest).
+#   - subjectaccessreviews (create) — CLUSTER-scoped. On k8s 1.35
+#     subjectaccessreviews is a cluster-scoped resource, and the API-server-
+#     delegated authz path reviews at cluster scope, so a namespace Role is
+#     NOT sufficient ("cannot create ... at the cluster scope"). A
+#     ClusterRole + ClusterRoleBinding is required.
+# Without it every metrics request 500s with "subjectaccessreviews.
+# authorization.k8s.io is forbidden: User system:serviceaccount:kube-system:
+# metrics-server cannot create ..." — the pod is Running/Ready, the APIService
+# is Available, yet `kubectl top` and the dashboard's metrics.k8s.io reads all
+# fail. This is the #1 silent metrics miswire, so it gets its own comment.
 apiVersion: rbac.authorization.k8s.io/v1
-kind: RoleBinding
+kind: ClusterRole
 metadata:
-  name: metrics-server-auth-reader
-  namespace: kube-system
+  name: metrics-server-auth-delegator
+rules:
+  - apiGroups: ["authentication.k8s.io"]
+    resources: ["tokenreviews"]
+    verbs: ["create"]
+  - apiGroups: ["authorization.k8s.io"]
+    resources: ["subjectaccessreviews", "selfsubjectaccessreviews"]
+    verbs: ["create"]
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRoleBinding
+metadata:
+  name: metrics-server-auth-delegator
 roleRef:
   apiGroup: rbac.authorization.k8s.io
-  kind: Role
-  name: extension-apiserver-authentication-reader
+  kind: ClusterRole
+  name: metrics-server-auth-delegator
 subjects:
   - kind: ServiceAccount
     name: metrics-server

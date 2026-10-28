@@ -39,6 +39,10 @@ vars:
   # the app's registry, so the dashboard's id:0 admin lens reaches it.
   KIND_CLUSTER: "kubedash-test"
 
+  # Path where the dev kind cluster's kubeconfig is written. Matches
+  # [deployment] admin_kubeconfig in backend/kubedash.ini (ADR-0021).
+  ADMIN_KUBECONFIG: "/tmp/admin.kubeconfig"
+
   # dev-stack: backend interpreter + the dev DB/static paths. The DB creds and
   # URL match the compose stack's pinned defaults (dev/docker-compose.yml), so
   # no KUBEDASH_*_URL env is needed — the app's defaults already point here.
@@ -126,6 +130,7 @@ tasks:
     desc: "Create the local kind cluster (if absent) + install metrics-server + Cilium + Traefik (idempotent)"
     cmds:
       - task: _kind-cluster
+      - task: _kind-kubeconfig
       - task: _kind-metrics-server
       - task: _kind-cilium-traefik
 
@@ -139,6 +144,14 @@ tasks:
     cmds:
       - kind get clusters | grep -q '^{{.KIND_CLUSTER}}$' || kind create cluster --name {{.KIND_CLUSTER}} --config {{.TASKFILE_DIR}}/dev/kind-config.yaml
 
+  # Internal: write the kind cluster's kubeconfig to ADMIN_KUBECONFIG so the
+  # synthetic local cluster (id:0, ADR-0021) can probe it. Runs after
+  # _kind-cluster in kind-up; idempotent (overwrite on every kind-up call).
+  _kind-kubeconfig:
+    internal: true
+    cmds:
+      - "kind get kubeconfig --name {{.KIND_CLUSTER}} > {{.ADMIN_KUBECONFIG}}"
+
   _kind-metrics-server:
     internal: true
     cmds:
@@ -151,14 +164,29 @@ tasks:
     cmds:
       - bash {{.TASKFILE_DIR}}/dev/cilium-traefik-up.sh
 
-  # Internal: dev-stack demo data — kind cluster + metrics-server + demo pods
-  # + registry registration. Skipped (with a notice) when kind/kubectl are
-  # absent, so the plain-HTTP loop still works on a machine without the K8s
-  # toolchain. Each step is idempotent (see dev/scripts/demo-data-up.sh).
+  # Internal: dev-stack kind + demo pods (BEFORE the backend). Brings up the
+  # kind cluster + metrics-server + Cilium/Traefik and seeds the demo
+  # namespace (busy pods + one broken pod). Skipped (with a notice) when
+  # kind/kubectl are absent so the plain-HTTP loop still works on a machine
+  # without the K8s toolchain. Each step is idempotent.
+  #
+  # NOTE: cluster REGISTRATION is NOT here — it needs the backend's API
+  # (POST /api/v1/clusters), which only exists once the backend is up. Since
+  # kind now runs before the backend, registration is a separate step
+  # (_dev-register-cluster) run AFTER backend-stack-run.
   _dev-kind-and-demo-data:
     internal: true
     cmds:
       - bash {{.TASKFILE_DIR}}/dev/scripts/demo-data-up.sh
+
+  # Internal: register the kind cluster in the registry (AFTER the backend).
+  # Idempotent (409 = already registered is a no-op). Waits for the backend's
+  # /healthz before logging in. Skipped with a notice when kind/kubectl are
+  # absent (nothing to register).
+  _dev-register-cluster:
+    internal: true
+    cmds:
+      - 'if command -v kind >/dev/null 2>&1 && command -v kubectl >/dev/null 2>&1; then bash {{.TASKFILE_DIR}}/dev/scripts/cluster-register.sh; else echo "kind/kubectl not found — skipping cluster registration."; fi'
 
   # ---- Backend (Flask app, runs on the host against the dev stack) ----------
   #
@@ -191,7 +219,7 @@ tasks:
       # loaded, a fork after ObjC init crashes with "NSCharacterSet initialize
       # in progress in another thread". Harmless on Linux (no ObjC runtime),
       # so it's set here (dev host is macOS) not in the Dockerfile.
-      - "OBJC_DISABLE_INITIALIZE_FORK_SAFETY=YES .venv/bin/gunicorn -w 4 --threads 2 -b 0.0.0.0:8080 wsgi:main"
+      - "OBJC_DISABLE_INITIALIZE_FORK_SAFETY=YES .venv/bin/gunicorn -w 4 --threads 2 -b 0.0.0.0:8080 wsgi:wsgi"
 
   backend-run-worker:
     desc: "Run one backend instance on :8080 in worker-only role (no Leader/RQ worker)"
@@ -250,7 +278,10 @@ tasks:
       # 8081/8082 cover the multi-up leader-election instances. pkill goes
       # FIRST: the nohup'd backend is re-parented to launchd (PPID 1) and a
       # SIGTERM (lsof/xargs kill) does not reach it — pkill's SIGKILL is the
-      # reliable stop. lsof covers any non-python port holder.
+      # reliable stop. The dev backend is Gunicorn (wsgi:wsgi), so both the
+      # gunicorn master AND the legacy `python wsgi.py` dev path are killed;
+      # lsof covers any remaining port holder.
+      - "pkill -f 'gunicorn.*wsgi:wsgi' 2>/dev/null || true"
       - "pkill -f 'python.*wsgi.py' 2>/dev/null || true"
       - "lsof -ti tcp:8080 | xargs kill 2>/dev/null || true"
       - "lsof -ti tcp:8443 | xargs kill 2>/dev/null || true"
@@ -264,22 +295,27 @@ tasks:
       # the plain run is the full service set (and frees host :443/:80).
       - "{{.COMPOSE}} stop nginx"
       # Build + sync the SPA into backend/static so the first boot serves the
-      # current bundle (KUBEDASH_STATIC_DIR). fe-check stays the explicit
-      # air-gap gate — dev-stack only needs a working bundle.
+      # current bundle (KUBEDASH_HOME/static). fe-build is content-cached (no
+      # source change -> no rebuild) and fe-sync copies only when the bundle
+      # changed; fe-check stays the explicit air-gap gate.
       - task: fe-build
       - task: fe-sync
       # Migrate the dev DB to head (same Alembic path as prod — idempotent).
       - task: backend-create-schema
+      # kind + demo data BEFORE the backend: the app boots against a
+      # registered cluster, so the kind cluster + metrics-server + demo pods +
+      # registry row must exist first. Otherwise the first boot has no
+      # cluster in the registry (empty dashboard) and the leader's admin
+      # kubeconfig points at a cluster that isn't up yet. Skipped when
+      # kind/kubectl are absent so the plain-HTTP loop still works on a
+      # machine without the K8s toolchain.
+      - task: _dev-kind-and-demo-data
       # Start the leader backend (background — dev-stack returns once the
       # boot log is printed; stop it with task dev-stack-down).
       - task: backend-stack-run
-      # Demo data (optional — the dashboard is empty without a registered
-      # cluster). Bring up the kind cluster + metrics-server, seed a demo
-      # namespace with busy pods + one crashlooping pod (so metrics and
-      # events render), and register the cluster in the registry. Skipped
-      # when kind/kubectl are absent so the plain-HTTP loop still works on a
-      # machine without the K8s toolchain.
-      - task: _dev-kind-and-demo-data
+      # Register the kind cluster in the registry (needs the backend's API,
+      # hence after backend-stack-run). Idempotent; waits for /healthz.
+      - task: _dev-register-cluster
 
   dev-stack-ssl:
     desc: "Start the full local env behind the nginx TLS edge (https://kubedash.dev.local:443, backend :8443, Secure cookie) (ADR-0026/0027)"
@@ -295,7 +331,9 @@ tasks:
       - "{{.COMPOSE}} exec -T postgres pg_isready -U {{.DB_USER}} -d {{.DB_NAME}}"
       # Idempotent: free the dev backend ports from prior runs before rebind
       # (no-op if nothing is listening). pkill first + wait loop — see
-      # dev-stack for the rationale.
+      # dev-stack for the rationale. The dev backend is Gunicorn (wsgi:wsgi),
+      # so both the gunicorn master and the legacy `python wsgi.py` path die.
+      - "pkill -f 'gunicorn.*wsgi:wsgi' 2>/dev/null || true"
       - "pkill -f 'python.*wsgi.py' 2>/dev/null || true"
       - "lsof -ti tcp:8080 | xargs kill 2>/dev/null || true"
       - "lsof -ti tcp:8443 | xargs kill 2>/dev/null || true"
@@ -303,27 +341,36 @@ tasks:
       - "lsof -ti tcp:8082 | xargs kill 2>/dev/null || true"
       - 'for i in 1 2 3 4 5 6 7 8 9 10; do if lsof -ti tcp:8080,tcp:8443,tcp:8081,tcp:8082 >/dev/null 2>&1; then sleep 0.5; else break; fi; done'
       - "lsof -ti tcp:8080,tcp:8443 >/dev/null 2>&1 && { echo 'port 8080/8443 still busy — kill the holder and re-run'; exit 1; } || true"
-      # Build + sync the SPA into backend/static so the first boot serves the
-      # current bundle (KUBEDASH_STATIC_DIR). fe-check stays the explicit
-      # air-gap gate — dev-stack-ssl only needs a working bundle.
+      # Build + sync the SPA (KUBEDASH_HOME/static). fe-build is content-cached
+      # and fe-sync copies only when the bundle changed; fe-check stays the
+      # explicit air-gap gate.
       - task: fe-build
       - task: fe-sync
       # Migrate the dev DB to head (same Alembic path as prod — idempotent).
       - task: backend-create-schema
+      # kind + demo data BEFORE the backend (same reason as dev-stack): the
+      # app boots against a live cluster. Skipped when kind/kubectl absent.
+      - task: _dev-kind-and-demo-data
       # Start the leader backend (background — dev-stack-ssl returns once the
       # boot log is printed; stop it with task dev-stack-down).
       - task: backend-stack-run-ssl
+      # Register the kind cluster (needs the backend's API → after the backend).
+      - task: _dev-register-cluster
 
   dev-stack-down:
     desc: "Stop the local env backend (task dev-stack / dev-stack-ssl) + compose stack"
     cmds:
       # All dev backend ports: 8080 (dev-stack plain HTTP), 8443 (the
       # dev-stack-ssl TLS backend, ADR-0026/0027), 8081/8082 (multi-up).
+      # The dev backend is Gunicorn (wsgi:wsgi) — kill the master first
+      # (SIGKILL reaches the re-parented nohup'd process), then the legacy
+      # `python wsgi.py` dev path, then any remaining port holder.
+      - "pkill -f 'gunicorn.*wsgi:wsgi' 2>/dev/null || true"
+      - "pkill -f 'python.*wsgi.py' 2>/dev/null || true"
       - "lsof -ti tcp:8080 | xargs kill 2>/dev/null || true"
       - "lsof -ti tcp:8443 | xargs kill 2>/dev/null || true"
       - "lsof -ti tcp:8081 | xargs kill 2>/dev/null || true"
       - "lsof -ti tcp:8082 | xargs kill 2>/dev/null || true"
-      - "pkill -f 'python.*wsgi.py' 2>/dev/null || true"
       - "{{.COMPOSE}} down"
 
   # Internal: apply Alembic migrations to the dev DB from the backend dir
@@ -347,55 +394,50 @@ tasks:
   backend-stack-run:
     internal: true
     dir: backend
-    env:
-      # ADR-0028: the INI (backend/kubedash.ini) carries the bootstrap admin,
-      # cookie_secure, role, replica_id, database, remote_cache. The env
-      # overrides below are for the OIDC SSO trio (dev-stack specific) and
-      # the SSO bootstrap users — these override the INI's empty values.
-      KUBEDASH_ROLE: "leader"
-      KUBEDASH_REPLICA_ID: "local"
-      FLASK_RUN_PORT: "8080"
-      # SSO (dev-stack OIDC provider on :8888): the backend speaks OIDC to
-      # the SSO server; the two pre-created users are bootstrapped at start.
-      KUBEDASH_OIDC_ISSUER: "http://localhost:8888"
-      KUBEDASH_OIDC_CLIENT_ID: "kubedash-dev"
-      KUBEDASH_OIDC_CLIENT_SECRET: "dev-sso-secret-32-bytes!!!!!01"
-      KUBEDASH_SSO_BOOTSTRAP_USERS: "dev@local:user,admin-ss@local:admin"
     cmds:
+      # ADR-0028: the config comes ENTIRELY from backend/kubedash.ini
+      # (KUBEDASH_HOME is derived from wsgi.py's location = <repo>/backend) —
+      # no KUBEDASH_* env. role=leader, replica_id=local, the SSO trio, and
+      # bootstrap users all live in the INI. Matches the container CMD
+      # (Dockerfile: gunicorn ... wsgi:wsgi) so dev exercises the same
+      # pre-fork server model as prod.
       # Double-fork so the backend survives `task` exiting: the intermediate
       # shell exits immediately, re-parenting the backend to init (macOS has
       # no setsid; nohup alone was reaped with the task's process group).
-      - "sh -c 'nohup .venv/bin/python wsgi.py > /tmp/kubedash-backend.log 2>&1 &'"
+      # OBJC_DISABLE_INITIALIZE_FORK_SAFETY (macOS-only, see backend-run): the
+      # RQ worker child forks a work-horse out of a multithreaded Gunicorn
+      # master (scheduler thread + request threads); a fork after ObjC init
+      # crashes the horse with "NSCharacterSet initialize in progress in
+      # another thread" (ret_val=6). Harmless on Linux (no ObjC runtime).
+      - "sh -c 'OBJC_DISABLE_INITIALIZE_FORK_SAFETY=YES nohup .venv/bin/gunicorn -w 4 --threads 2 -b 0.0.0.0:8080 wsgi:wsgi > /tmp/kubedash-backend.log 2>&1 &'"
       - "sleep 2"
-      - "echo 'Backend started (PID $(pgrep -f 'python.*wsgi.py' | head -1)). Logs: /tmp/kubedash-backend.log'"
+      - "echo 'Backend started (gunicorn :8080). Logs: /tmp/kubedash-backend.log'"
       - "cat /tmp/kubedash-backend.log"
 
   backend-stack-run-ssl:
     internal: true
     dir: backend
-    env:
-      # ADR-0028: the INI carries the bootstrap admin + database + remote_cache.
-      # The env overrides below are process-level (TLS edge, port, certs).
-      KUBEDASH_ROLE: "leader"
-      KUBEDASH_REPLICA_ID: "local"
-      # ADR-0026: behind the TLS edge the Secure cookie is honest end-to-end
-      # (browser leg HTTPS, internal leg HTTPS via :8443).
-      KUBEDASH_COOKIE_SECURE: "true"
-      # ADR-0026: the dev-stack-ssl backend serves :8443 over TLS — the nginx
-      # edge's upstream target (proxy_ssl_verify checks it against the mkcert
-      # rootCA). Single-port trade-off: with the cert set, the dev backend
-      # serves 8443-over-TLS and NOT plain :8080 (see wsgi.py __main__).
-      KUBEDASH_SSL_CERT: "{{.TASKFILE_DIR}}/dev/certs/backend.pem"
-      KUBEDASH_SSL_KEY: "{{.TASKFILE_DIR}}/dev/certs/backend-key.pem"
-      KUBEDASH_TLS_EDGE: "true"
-      FLASK_RUN_PORT: "8443"
     cmds:
+      # ADR-0026: the TLS cert/key are INI-sourced (ADR-0028 single config
+      # source) — Gunicorn never runs wsgi.__main__, so the old env-only
+      # KUBEDASH_SSL_CERT/KEY was a dead config under Gunicorn. Write the
+      # mkcert backend cert into [deployment] ssl_cert/ssl_key so wsgi's
+      # get_settings() resolves it; Gunicorn serves :8443 over TLS via
+      # --certfile/--keyfile (the nginx edge's upstream target). tls_edge +
+      # cookie_secure come from the INI (the dev ini is plain-HTTP by default;
+      # set tls_edge/cookie_secure = true in [deployment] for the full
+      # Secure-cookie dev path — read by _apply_proxyfix/security).
+      - 'sed -i.bak -e "s|^ssl_cert =.*|ssl_cert = {{.TASKFILE_DIR}}/dev/certs/backend.pem|" -e "s|^ssl_key =.*|ssl_key = {{.TASKFILE_DIR}}/dev/certs/backend-key.pem|" kubedash.ini'
       # Double-fork so the backend survives `task` exiting: the intermediate
       # shell exits immediately, re-parenting the backend to init (macOS has
       # no setsid; nohup alone was reaped with the task's process group).
-      - "sh -c 'nohup .venv/bin/python wsgi.py > /tmp/kubedash-backend.log 2>&1 &'"
+      # OBJC_DISABLE_INITIALIZE_FORK_SAFETY (macOS-only, see backend-run): the
+      # RQ worker child forks a work-horse out of a multithreaded Gunicorn
+      # master; a fork after ObjC init crashes the horse (ret_val=6).
+      # Harmless on Linux (no ObjC runtime).
+      - "sh -c 'OBJC_DISABLE_INITIALIZE_FORK_SAFETY=YES nohup .venv/bin/gunicorn -w 4 --threads 2 --certfile {{.TASKFILE_DIR}}/dev/certs/backend.pem --keyfile {{.TASKFILE_DIR}}/dev/certs/backend-key.pem -b 0.0.0.0:8443 wsgi:wsgi > /tmp/kubedash-backend.log 2>&1 &'"
       - "sleep 2"
-      - "echo 'Backend started (PID $(pgrep -f 'python.*wsgi.py' | head -1)). Logs: /tmp/kubedash-backend.log'"
+      - "echo 'Backend started (gunicorn :8443 TLS). Logs: /tmp/kubedash-backend.log'"
       - "cat /tmp/kubedash-backend.log"
 
   # ---- E2E (Playwright auth-smoke, no kind needed) ---------------------------
@@ -453,14 +495,54 @@ tasks:
     dir: frontend
     cmds:
       - "corepack pnpm exec tsc --noEmit && corepack pnpm exec eslint src && corepack pnpm build"
+    # Vite is content-hashed: a rebuild with no source change produces the
+    # same dist, so stamp the tree hash and skip when unchanged. FORCE=yes
+    # bypasses the stamp (e.g. after a lockfile or toolchain change).
+    methods: [cache]
+    cache:
+      path: .cache
+      force: "{{if .FORCE}}true{{else}}false{{end}}"
+      cmd: "git status --porcelain -- . ../Taskfile.yaml"
+    sources:
+      - "src/**"
+      - "index.html"
+      - "vite.config.*"
+      - "tsconfig*.json"
+      - "eslint.config.*"
+      - "package.json"
+      - "pnpm-lock.yaml"
+      - "../Taskfile.yaml"
 
   fe-sync:
-    desc: "Sync frontend/dist -> backend/static (KUBEDASH_STATIC_DIR default)"
+    desc: "Sync frontend/dist -> backend/static (KUBEDASH_STATIC_DIR default); no-op when the bundle is unchanged"
     cmds:
-      - "rm -rf {{.TASKFILE_DIR}}/backend/static && cp -r {{.TASKFILE_DIR}}/frontend/dist {{.TASKFILE_DIR}}/backend/static"
+      # Only copy when the built bundle actually changed (fe-build's cache
+      # stamp). Skips the rm/cp churn when nothing rebuilt. FORCE=yes copies
+      # regardless (e.g. backend/static was deleted or is stale).
       - |
+        set -eu
+        DIST="{{.TASKFILE_DIR}}/frontend/dist"
+        STATIC="{{.TASKFILE_DIR}}/backend/static"
+        # Stamp = sha256 over dist/** (content, not mtime): the same bundle
+        # always yields the same digest, so a re-sync after an unchanged
+        # fe-build is a no-op. Recomputed here from dist/ itself (not read
+        # from a fe-build cache file, which taskfile's [cache] method does not
+        # write) so fe-sync is correct on a fresh checkout.
+        hash_bundle() { find . -type f ! -name '.sync-stamp' -print0 | sort -z | xargs -0 shasum -a 256 | shasum -a 256 | cut -d' ' -f1; }
+        if [ ! -d "$DIST" ]; then echo "fe-sync: $DIST missing — run 'task fe-build' first" >&2; exit 1; fi
+        DIST_HASH="$(cd "$DIST" && hash_bundle)"
+        if [ "{{.FORCE}}" = "true" ]; then
+          reason="forced"
+        elif [ -f "$STATIC/.sync-stamp" ] && [ "$(cat "$STATIC/.sync-stamp")" = "$DIST_HASH" ]; then
+          echo "fe-sync: bundle unchanged (stamp ${DIST_HASH:0:12}…) — skipping copy"
+          exit 0
+        else
+          reason="changed"
+        fi
+        echo "fe-sync: copying dist -> backend/static ($reason)"
+        rm -rf "$STATIC" && cp -r "$DIST" "$STATIC"
+        printf '%s' "$DIST_HASH" > "$STATIC/.sync-stamp"
         echo "Synced. index.html is no-cache, assets/ is immutable (ADR-0006 OD-4)."
-        echo "If this step failed after the rm, re-run 'task fe-build fe-sync'"
 
   fe-dev:
     desc: "Run the vite dev server (API proxied to http://localhost:8080)"

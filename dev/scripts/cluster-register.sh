@@ -20,13 +20,22 @@ API_SERVER="$(kubectl --cluster "$CTX" config view --minify -o jsonpath='{.clust
 
 # Log in → kd_access cookie. The 302 parks the tokens in the Location; we only
 # need the session cookie the API uses.
-# Wait for the backend to accept connections (dev-stack starts it in the
-# background; the boot — app factory + local-admin upsert + RQ — can take a
-# few seconds, longer than the task's `sleep 2`).
+# Wait for the backend to actually answer /healthz with 200. dev-stack now
+# brings up kind BEFORE the backend (so the app boots against a live cluster),
+# so :8080 may not be up yet when this runs — the boot (app factory +
+# local-admin upsert + RQ) can take a few seconds. A bare `curl && break`
+# would not work: with -o /dev/null -w '' a connection-refused curl still
+# exits 0, so the loop would never detect a live backend. Gate on HTTP 200.
+UP=""
 for i in $(seq 1 30); do
-  curl -sS -o /dev/null -w '' "$BASE/healthz" 2>/dev/null && break
+  CODE="$(curl -sS -o /dev/null -w '%{http_code}' "$BASE/healthz" 2>/dev/null || true)"
+  if [ "$CODE" = "200" ]; then UP=1; break; fi
   sleep 1
 done
+if [ -z "$UP" ]; then
+  echo "backend not ready at $BASE/healthz after 30 s — is the dev-stack backend running?" >&2
+  exit 1
+fi
 
 COOKIE_JAR="$(mktemp)"
 trap 'rm -f "$COOKIE_JAR"' EXIT
