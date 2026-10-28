@@ -200,7 +200,6 @@ def test_unassign_non_admin_is_403(api_client, user_headers) -> None:
     assert r.status_code == 403
 
 
-@pytest.mark.skip(reason="OPEN TASK: no DELETE /admin/groups/<name> route on GroupsApi — the AdminApi delete was removed 2026-10-26; re-add when the route lands")
 def test_delete_group_200_cascades_members(api_client, api_app, admin_headers) -> None:
     _seed(api_client, api_app, "sub-del-u", "du@e", "user")
     _create(api_client, admin_headers, "team")
@@ -215,13 +214,11 @@ def test_delete_group_200_cascades_members(api_client, api_app, admin_headers) -
     assert _create(api_client, admin_headers, "team").status_code == 201
 
 
-@pytest.mark.skip(reason="OPEN TASK: no DELETE /admin/groups/<name> route on GroupsApi — the AdminApi delete was removed 2026-10-26; re-add when the route lands")
 def test_delete_unknown_group_is_404(api_client, admin_headers) -> None:
     r = api_client.delete("/api/v1/admin/groups/ghost", headers=admin_headers)
     assert r.status_code == 404
 
 
-@pytest.mark.skip(reason="OPEN TASK: no DELETE /admin/groups/<name> route on GroupsApi — the AdminApi delete was removed 2026-10-26; re-add when the route lands")
 def test_delete_group_non_admin_is_403(api_client, user_headers) -> None:
     r = api_client.delete("/api/v1/admin/groups/whatever", headers=user_headers)
     assert r.status_code == 403

@@ -78,3 +78,45 @@ def render_kubeconfig(
     # whole "renderer" — no template, no line splicing, valid YAML by
     # construction (the tests parse it back with safe_load).
     return yaml.safe_dump(doc, sort_keys=False)
+
+
+def render_ca_kubeconfig(
+    *,
+    context: str,
+    server: str,
+    ca_data_b64: str,
+    client_cert_b64: str,
+    client_key_b64: str,
+) -> str:
+    """Render a 4.1-style CA-based (client-certificate) kubeconfig.
+
+    The single-cluster, single-context, single-user shape 4.1's ``type: cert``
+    branch produced: a ``clusters`` entry with the server CA inlined, a
+    ``users`` entry carrying the client cert/key inlined (base64), and the
+    context wiring them together. ``client_cert_b64``/``client_key_b64`` are
+    the base64-PEM values stored on ``KubectlConfig``. Unlike
+    :func:`render_kubeconfig` there is no credential-plugin exec — the user
+    authenticates with the client certificate the cluster CA signed.
+    """
+    cluster: dict[str, object] = {"server": server}
+    if ca_data_b64:
+        cluster["certificate-authority-data"] = ca_data_b64
+    doc: dict[str, object] = {
+        "apiVersion": "v1",
+        "kind": "Config",
+        "clusters": [{"name": context, "cluster": cluster}],
+        "contexts": [
+            {"name": context, "context": {"cluster": context, "user": context}}
+        ],
+        "users": [
+            {
+                "name": context,
+                "user": {
+                    "client-certificate-data": client_cert_b64,
+                    "client-key-data": client_key_b64,
+                },
+            }
+        ],
+        "current-context": context,
+    }
+    return yaml.safe_dump(doc, sort_keys=False)

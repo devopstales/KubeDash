@@ -27,7 +27,8 @@ from app.models.cluster import Cluster
 from app.models.rbac_template import RBACTemplate
 from app.models.user import User
 from app.services import k8s_client
-from app.services.kubeconfig_render import render_kubeconfig
+from app.services import kubectl_config as kubectl_config_service
+from app.services.kubeconfig_render import render_ca_kubeconfig, render_kubeconfig
 
 #: ADR-0013: every object KubeDash applies/collects carries these labels.
 TEMPLATE_LABEL = "kubedash.io/template"
@@ -324,6 +325,24 @@ def generate_kubeconfig(
             db_session.query(Cluster).filter(Cluster.id.in_(cluster_ids)).statement
         ).scalars().all()
     }
+
+    # 4.1 parity: a LOCAL user with a minted client certificate (``KubectlConfig``
+    # row, CN = email local part) downloads a CA-based kubeconfig — the cert
+    # authenticates directly, no credential plugin, and ``KUBEDASH_PLUGIN_SERVER``
+    # is NOT required. A local user WITHOUT a cert, and every OIDC user, fall
+    # through to the credential-plugin exec (ADR-0011), which needs plugin_server.
+    cn = (user.email.split("@")[0]) if user.email and "@" in user.email else (user.sub or "")
+    ca_cfg = kubectl_config_service.get_by_cn(db_session, cn)
+    if ca_cfg and ca_cfg.private_key and ca_cfg.user_certificate:
+        first = cluster_rows[cluster_ids[0]]
+        server, ca = _ca_from_kubeconfig(first.kubeconfig_enc, first.api_server)
+        return render_ca_kubeconfig(
+            context=first.name,
+            server=server,
+            ca_data_b64=ca,
+            client_cert_b64=ca_cfg.user_certificate,
+            client_key_b64=ca_cfg.private_key,
+        )
 
     plugin_server = settings.plugin_server
     if not plugin_server:

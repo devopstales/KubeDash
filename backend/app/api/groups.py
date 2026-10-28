@@ -11,7 +11,7 @@ from flask_smorest import Api, Blueprint
 
 from app.api._authhook import apply_auth
 from app.api.permissions import _cluster_by_name_or_404
-from app.core.errors import InvalidKubeconfigError
+from app.core.errors import ClusterAlreadyExistsError, InvalidKubeconfigError
 from app.core.security import require_admin
 from app.extensions import db
 from app.models.audit import AuditLog
@@ -119,6 +119,45 @@ class GroupsApi(Api):
         ))
         db.session.commit()
         return self._out(group), 201
+
+    @blp.route("/admin/groups/<name>", methods=["DELETE"])
+    @blp.doc(responses={
+        200: "Deleted.",
+        403: "RBAC_DENIED",
+        404: "RESOURCE_KIND_NOT_SUPPORTED (group missing)",
+        409: "CLUSTER_ALREADY_EXISTS (reserved role group)",
+    })
+    def delete_group(self, name: str) -> dict[str, object]:
+        """Delete a manual (local:) group and its memberships.
+
+        Reserved role groups (kubedash-admin, kubedash-user) are protected
+        — they back the permission-role sync and cannot be removed.
+        """
+        require_admin()
+        # The URL path carries the name as stored (with or without the
+        # local: prefix). Normalise to the full stored name.
+        full_name = name if name.startswith(groups_svc.LOCAL_PREFIX) else groups_svc.LOCAL_PREFIX + name
+        # Reserved role groups are stored WITHOUT the local: prefix
+        # (kubedash-admin, kubedash-user). Check both forms.
+        bare_name = name if not name.startswith(groups_svc.LOCAL_PREFIX) else name[len(groups_svc.LOCAL_PREFIX):]
+        if full_name in groups_svc.RESERVED_ROLE_GROUPS or bare_name in groups_svc.RESERVED_ROLE_GROUPS:
+            raise ClusterAlreadyExistsError("reserved role group cannot be deleted")
+        group = db.session.execute(
+            db.select(Group).filter_by(name=full_name)
+        ).scalar_one_or_none()
+        if group is None:
+            from app.core.errors import ResourceKindNotSupportedError
+            raise ResourceKindNotSupportedError(f"group {name!r} not found")
+        # Delete memberships first (FK), then the group row.
+        db.session.execute(
+            db.delete(GroupMember).filter_by(group_id=group.id)
+        )
+        db.session.delete(group)
+        db.session.add(AuditLog(
+            action="group.delete", actor_sub=g.current_user.sub, target=full_name,
+        ))
+        db.session.commit()
+        return {"deleted": full_name}
 
     @blp.route("/admin/groups/<name>/members", methods=["POST"])
     @blp.arguments(GroupMemberIn)

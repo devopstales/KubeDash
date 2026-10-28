@@ -90,6 +90,14 @@ const KubeconfigView = () => {
   const [downloadError, setDownloadError] = useState<string | null>(null)
 
   const name = me?.display_name || me?.email || me?.sub || ''
+  // 4.1 logic (settings/export): the page branches on the auth mechanism, not
+  // a single OIDC banner. `me.auth_source` is this repo's signal for 4.1's
+  // `data.type`: 'oidc' (4.1 OpenID user) vs 'local' (a local-admin / password
+  // user). A local user's kubeconfig is a kubectl CREDENTIAL PLUGIN exec
+  // (ADR-0011), NOT an OIDC auth-provider — so telling them to "configure
+  // OpenID Connect" is wrong (and the plugin path below is what the file
+  // actually uses). Branch the headline on it.
+  const isLocal = me?.auth_source === 'local'
   const clusterName = selectedCluster?.name ?? clusters[0]?.name ?? ''
   const clusterPhrase = clusterName
     ? `the ${clusterName} Kubernetes cluster`
@@ -114,13 +122,39 @@ const KubeconfigView = () => {
     document.getElementById(id)?.scrollIntoView({ block: 'start' })
   }
 
-  const manual = `# Keep your existing contexts and add the downloaded file
+  // 4.1 logic: the "Authenticate Manually" card depends on the auth mechanism.
+  // A LOCAL user downloads a CA-based kubeconfig (client cert + key inlined),
+  // so the commands ADD a client-cert user to the existing ~/.kube/config
+  // (4.1's cert manual card). An OIDC user downloads the credential-plugin exec
+  // kubeconfig (ADR-0011), so the commands MERGE that file and select its
+  // `kubedash-<cluster>` context. The context name below is the one the
+  // downloaded file actually carries.
+  const ctxName = clusterName || 'CLUSTER'
+  const manual = isLocal
+    ? `# Pull the server, server CA, and client cert/key out of the downloaded
+# CA-based kubeconfig (kubedash-kubeconfig.yaml).
+KD=$(pwd)/kubedash-kubeconfig.yaml
+SERVER=$(kubectl config view --raw -o jsonpath="{.clusters[0].cluster.server}" "$KD")
+kubectl config view --raw -o jsonpath="{.clusters[0].cluster['certificate-authority-data']}" "$KD" | base64 -d > kd-ca.pem
+kubectl config view --raw -o jsonpath="{.users[0].user['client-certificate-data']}" "$KD" | base64 -d > kd-cert.pem
+kubectl config view --raw -o jsonpath="{.users[0].user['client-key-data']}" "$KD" | base64 -d > kd-key.pem
+
+# Register the cluster (server CA) and the user (client cert + key)
+kubectl config set-cluster ${ctxName} --server="$SERVER" --certificate-authority=kd-ca.pem --embed-certs
+kubectl config set-credentials ${ctxName} --client-certificate=kd-cert.pem --client-key=kd-key.pem --embed-certs
+kubectl config set-context ${ctxName} --cluster ${ctxName} --user ${ctxName}
+kubectl config use-context ${ctxName}
+rm -f kd-ca.pem kd-cert.pem kd-key.pem
+
+# Tip (dev): if you already have a kubeconfig for this cluster (e.g.
+# \`kind get kubeconfig\`), use it directly — no download is needed.`
+    : `# Keep your existing contexts and add the downloaded file
 mkdir -p ~/.kube
 KUBECONFIG=~/.kube/config:kubedash-kubeconfig.yaml kubectl config view --flatten > ~/.kube/config.merged
 mv ~/.kube/config.merged ~/.kube/config
 
-# Select this cluster
-kubectl config use-context ${clusterName || 'CLUSTER'}
+# Select this cluster (the file's context is \`kubedash-<cluster>\`)
+kubectl config use-context kubedash-${ctxName}
 
 # The user entry is the kubedash credential plugin.
 # The file stores no token, client secret, or certificate.`
@@ -147,8 +181,17 @@ $ kubectl get namespaces`
 
       <h2 className="text-center my-4">Welcome {name}</h2>
       <h3 className="text-center my-4 mx-3">
-        In order to get command-line access to {clusterPhrase}, you will need to configure OpenID
-        Connect (OIDC) authentication for your kubectl client.
+        {isLocal ? (
+          <>
+            In order to get command-line access to {clusterPhrase}, you will need to configure
+            certificate (client-cert) authentication for your <code>kubectl</code> client.
+          </>
+        ) : (
+          <>
+            In order to get command-line access to {clusterPhrase}, you will need to configure
+            OpenID Connect (OIDC) authentication for your <code>kubectl</code> client.
+          </>
+        )}
       </h3>
 
       <ul className="nav nav-tabs mb-4 mx-3 mx-lg-5">
@@ -170,8 +213,19 @@ $ kubectl get namespaces`
 
       <Section id="DownloadKubeconfig" title="Download Kubeconfig File">
         <p className="card-text">
-          If you didn&apos;t want to use the kubectl plugin, save this file as{' '}
-          <code>~/.kube/config</code> to enable OIDC based <code>kubectl</code> authentication.
+          {isLocal ? (
+            <>
+              This file carries a <strong>client certificate</strong> signed by the cluster CA.
+              Save it as <code>~/.kube/config</code>, or merge it into your existing config via
+              &ldquo;Authenticate Manually&rdquo; below. In dev, if you already have a kubeconfig
+              for this cluster (e.g. <code>kind get kubeconfig</code>), you can skip the download.
+            </>
+          ) : (
+            <>
+              If you didn&apos;t want to use the kubectl plugin, save this file as{' '}
+              <code>~/.kube/config</code> to enable OIDC based <code>kubectl</code> authentication.
+            </>
+          )}
         </p>
         <CButton color="primary" disabled={downloading} onClick={() => void onDownload()}>
           {downloading ? 'Downloading…' : 'Download Config File'}

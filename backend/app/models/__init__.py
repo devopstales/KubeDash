@@ -17,6 +17,7 @@ from app.models.audit import AuditLog
 from app.models.binding import ClusterBinding
 from app.models.cluster import Cluster
 from app.models.group import Group, GroupMember
+from app.models.kubectl_config import KubectlConfig
 from app.models.leader_lease import LeaderLease
 from app.models.rbac_template import RBACTemplate
 from app.models.token import RefreshToken
@@ -29,6 +30,7 @@ __all__ = [
     "Group",
     "LeaderLease",
     "GroupMember",
+    "KubectlConfig",
     "RBACTemplate",
     "RefreshToken",
     "User",
