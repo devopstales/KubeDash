@@ -280,4 +280,103 @@ PASS.
 
 ## Final-State Facts
 
-(for `reflect` to complete at archive time)
+Completed by `reflect` 2026-10-28 (after ship; the folder is in `xarchive/`).
+
+### Integration
+
+- **Base branch / strategy:** `rebase` work branch, keep-branch (user decision at
+  ship; the repo VERIFIED assumption — ship does not merge `main` by default).
+  No merge commit, no PR; the branch (41 commits ahead of `origin/rebase`) is
+  the deliverable and the rollback unit.
+- **Integrated-tree evidence (fresh run at ship, 2026-10-28):**
+  `cd backend && uv run pytest -m "not integration"` → **461 passed, 10
+  deselected** (green); `corepack pnpm test` → 177 passed / 13 failed — all 13
+  in the pre-existing W007 set (users/groups/node/admin_permissions), none in
+  this change's files; `task fe-build` → exit 0; `task fe-check` → exit 0.
+- **Worktree:** the main working tree (`/Users/paladm/git/kubedash_4`), branch
+  `rebase` — preserved (keep-branch). No worktree cleanup.
+- **Archive move:** `specs/` → `xarchive/` mechanical (`git mv`), `diff -r`
+  readback against the pre-move snapshot EMPTY. The move was absorbed into the
+  concurrent session's commit `27137670` window (verified: 4 zero-change
+  renames in that commit's stat); the state pointer landed as `733ea3ec`.
+
+### Decisions (retro)
+
+- **Keep-branch integration** — the work branch is the rollback unit; merging
+  into `main` stays a separate deliberate act (ASSUMPTIONS.md VERIFIED).
+- **JSON, not YAML, for the detail block** (final-review Important fix,
+  `b02c2ef9`): the block is `JSON.stringify` of the `to_dict` item; the `yaml`
+  hljs grammar was a misclassification of JSON lines; no YAML emitter exists in
+  the dependency tree (ADR-0020 air gap). Ratified delta recorded in the view
+  doc — the briefing's R3 "YAML" wording is intent, JSON is the shipped shape.
+- **ADR-0022 parity row keeps the 4.1-provenance group column**; the 5.0 group
+  is stated in the Status cell (ratified-deviation note).
+- **Kind backstop pins the live image's actual built-in** (`PreemptLowerPriority`,
+  `value 2000000000`) per the blueprint's fallback clause — the blueprint's
+  `Never`/`exempt` constants were image-stale (annotated in the blueprint).
+
+### Lessons
+
+- **Concurrent sessions on one working tree interleave at the commit boundary.**
+  Twice this run, the parallel network-policy session swept or rebase-replayed
+  the shared tree (the `App.tsx` hunk absorption → W006; the archive move
+  landing in `27137670`). Both were safe by direction, but the clean rollback
+  unit for Task 2 is now `fcc40567..1bd5afab` + one hunk. When two agents share
+  a tree, prefer explicit-path staging (done) and verify each commit's stat
+  immediately after committing.
+- **A "YAML" requirement on a JSON-shaped payload needs the serialization
+  named in the spec.** The final review caught it in 3 minutes; a spec line
+  ("rendered via `JSON.stringify`, json highlighter") would have caught it at
+  plan time.
+- **Blueprint constants about live cluster state go stale.** Kind base images
+  change; the fallback clause is what makes the backstop honest.
+
+### Patterns (reusable)
+
+- **Cluster-scoped R4 kind = 2 table rows + 2 `K8sClient` methods + 0 handler
+  changes** — binding gate, SAR gate (ns `None` in the ADR-0004 cache key), and
+  `ResourceListOut` all come from the shared machinery. Template for the five
+  remaining Other-Resources stubs. (Saved to mnemonic:
+  `architecture/r4-resource-kinds`.)
+- **View↔API seam pinning:** exact-fetch-path capture + `not.toContain('namespace')`
+  in the MSW handler, so a kind-string drift or a leaked namespace param fails
+  in Vitest, not in a browser.
+- **No-fetch proof** via a catch-all MSW handler asserting zero hits (stronger
+  than a specific-path handler).
+
+### Surprises
+
+- **The kind image disagrees with the blueprint** (`PreemptLowerPriority` vs
+  `Never`, no `exempt`) — expected-ish, but it turned Task 4's RED into a
+  shape fix (the real apiserver emits `metadata.namespace: None`, which the
+  unit fake's absence-shape assertion did not model).
+- **The mnemonic store was down** (FK constraint on session rows) for both the
+  session-summary and ship saves — the in-repo ledger + archive carried the
+  record; no data lost.
+- **`git commit` timed out twice at 120–180 s** (hook pipeline: gitleaks +
+  skillgrid checkpoint guards) — the commits landed; raise the shell timeout
+  for commits in this repo.
+
+## Environment Retro
+
+| Category | Finding | Fix lands in | Source |
+|----------|---------|--------------|--------|
+| Automated checks | **Unwired repo hook:** `.git/hooks/commit-msg` is a shim that `exec`s `$root/git-hooks/commit-msg` — a directory that does not exist in this repo (`git config core.hooksPath` points at `~/.skillgrid/git-hooks`, whose `commit-msg.js` has no `skillgrid-context` check). Result: the context-block discipline is unenforced — ~1 of the 30 recent commits (`27137670`) ships without a `[skillgrid-context]` block. The AGENTS.md promise "The git hooks enforce the guards" is stale for this checkout. | wire a pre-commit/commit-msg guard into the live hooksPath (`~/.skillgrid/git-hooks/`) — e.g. a `precommit-context-block.js` in `~/.skillgrid/hooks/` called from `checkpoint-state.js guard` — or restore the repo-local `git-hooks/` dir the shim expects | session: `git log -30` context-block audit; `.git/hooks/commit-msg` (shim); missing `git-hooks/` dir |
+| Automated checks | **ruff E501 is selected (`select = ["E", ...]`, `line-length = 100`) but no backend lint gate exists** — no `task backend-lint`, no ruff step in `ci.yaml`, and the pre-commit pipeline (gitleaks + skillgrid guards) never runs it. 10 pre-existing E501s sit in the four files this change touched. | add `task backend-lint` (`uv run ruff check`) + a CI job step; optionally a pre-commit hook running it on staged python files | `backend/pyproject.toml:53,49`; `.github/workflows/ci.yaml` (no ruff); session: `uv run ruff check` on changed files |
+| Navigation | **The kind cluster's live state is invisible to the agent.** The backstop's expected constants (`Never`, `exempt`) had to be discovered by running `kubectl` mid-task; the blueprint's "NOTE 2026-10-28" annotation is the durable record, but the next change writing kind-gated expectations will rediscover it. | add a `task kind-state` (or a line in `AGENTS.md` Testing) that prints `kubectl get priorityclass,crd -o name \| grep -E 'priorityclass\|cilium'` — the live built-ins the backstops assert against | session: Task 4 RED→GREEN; `blueprint.md:702-713` annotation |
+| Tool economy | **Shell 120 s default timeout < commit duration.** Two `git commit` calls (this run) exceeded the default timeout while the hook pipeline (gitleaks + checkpoint guards) ran; the commits still landed, so the tool result misreports failure. | raise the default shell timeout for `git commit` in this repo to 300 s (or run commits with an explicit `timeout: 300000`) | session: two timed-out commit tool calls (`b5243e13`, `b02c2ef9` wave) |
+| Information access | **The mnemonic store's FK failure mode is silent-ish.** `mem_save` with `session_id: "current"` failed with a raw `FOREIGN KEY constraint failed (787)` — no hint that the session row was missing; the `mem_session_start` row itself then collided (`UNIQUE constraint failed: sessions.id`). The in-repo ledger covered for it, but the store needs a health check. | report to the mnemonic tooling owner: `mem_save` should surface "session row missing — call mem_session_start" instead of the raw FK error; add a `mem_status`/health probe | session: two failed `mem_save` calls (session summary + ship) |
+
+*Clean categories:* **Coding standards** (the final reviewer caught the
+json/yaml misclassification and the stale comment — no standard to add; the
+mechanical parts are already lint-covered once ruff is wired) and
+**Steering-file no-ops** (AGENTS.md stayed accurate; the one stale line — "the
+git hooks enforce the guards" — is the unwired-hook finding above, not a no-op
+to delete).
+
+### Offered follow-ups (not implemented here)
+
+1. **Wire the `[skillgrid-context]` block guard** into the live hooksPath
+   (small: one guard script + one line in `checkpoint-state.js guard`).
+2. **Add `task backend-lint` + CI ruff step** (small: Taskfile + ci.yaml).
+3. **Add `task kind-state`** for live-cluster expectation discovery (trivial).
