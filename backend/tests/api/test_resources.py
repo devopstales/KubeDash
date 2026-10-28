@@ -341,6 +341,58 @@ class FakeK8s:
             return self.list_runtime_classes(None)
         return []
 
+    def list_resource_quotas(self, namespace: str | None) -> list[dict]:
+        # Namespaced kind (core): the namespace is forwarded (the real
+        # K8sClient.list_resource_quotas pattern). The all-namespaces branch is
+        # DISTINCTLY named (team-b) so the API tests can tell the branches
+        # apart, mirroring list_network_policies.
+        if namespace is None:
+            return [
+                {
+                    "metadata": {"name": "compute", "namespace": "team-b"},
+                    "status": {"used": {"pods": "1"}, "hard": {"pods": "10"}},
+                },
+            ]
+        return [
+            {
+                "metadata": {
+                    "name": "compute",
+                    "namespace": namespace or "team-a",
+                    "creation_timestamp": "2026-01-02T03:04:05Z",
+                    "labels": {"team": "a"},
+                    "annotations": {"quota.kubernetes.io/managed-by": "kubedash"},
+                },
+                "spec": {
+                    "hard": {
+                        "requests.cpu": "4",
+                        "requests.memory": "10Gi",
+                        "limits.cpu": "8",
+                        "limits.memory": "20Gi",
+                    },
+                    "scopes": ["NotBestEffort"],
+                },
+                "status": {
+                    "hard": {
+                        "requests.cpu": "4",
+                        "requests.memory": "10Gi",
+                        "limits.cpu": "8",
+                        "limits.memory": "20Gi",
+                    },
+                    "used": {
+                        "requests.cpu": "2",
+                        "requests.memory": "4Gi",
+                        "limits.cpu": "4",
+                        "limits.memory": "8Gi",
+                    },
+                },
+            }
+        ]
+
+    def get_resource_quota(self, namespace: str, name: str) -> list[dict]:
+        if name == "compute":
+            return self.list_resource_quotas(namespace)
+        return []
+
     def readyz(self) -> bool:
         return True
 
@@ -1452,6 +1504,111 @@ def test_runtimeclass_kind_singular_rejected(api_client, auth_client) -> None:
     h = {"Authorization": f"Bearer {auth_client.jwt}"}
     _register(api_client, h)
     r = api_client.get("/api/v1/clusters/1/resources/runtimeclass", headers=h)
+    assert r.status_code == 404
+    assert r.get_json()["error"]["code"] == "RESOURCE_KIND_NOT_SUPPORTED"
+
+
+def test_list_resourcequotas_200_in_namespace(
+    api_client, auth_client, fake_k8s, monkeypatch
+) -> None:
+    """[resourcequotas-list-200-in-namespace] a bound user listing
+    resourcequotas?namespace=team-a gets the to_dict items back, and the
+    namespace is forwarded to the client (namespaced core kind)."""
+    auth_client.login()
+    h = {"Authorization": f"Bearer {auth_client.jwt}"}
+    _register(api_client, h)
+    _allow_sar(monkeypatch)
+    r = api_client.get(
+        "/api/v1/clusters/1/resources/resourcequotas?namespace=team-a", headers=h
+    )
+    assert r.status_code == 200
+    body = r.get_json()
+    assert body["kind"] == "resourcequotas"
+    assert body["cluster"] == "prod"
+    [item] = body["items"]
+    assert item["metadata"]["name"] == "compute"
+    assert item["metadata"]["namespace"] == "team-a"
+    assert item["status"]["used"]["requests.cpu"] == "2"
+    assert item["status"]["hard"]["limits.memory"] == "20Gi"
+
+
+def test_list_resourcequotas_all_namespaces_without_param(
+    api_client, auth_client, fake_k8s, monkeypatch
+) -> None:
+    """[resourcequotas-list-all-namespaces-without-param] no namespace query
+    hits the all-namespaces branch: the FakeK8s receives None and the
+    distinctly-named team-b item is present."""
+    auth_client.login()
+    h = {"Authorization": f"Bearer {auth_client.jwt}"}
+    _register(api_client, h)
+    _allow_sar(monkeypatch)
+    r = api_client.get("/api/v1/clusters/1/resources/resourcequotas", headers=h)
+    assert r.status_code == 200
+    body = r.get_json()
+    assert body["kind"] == "resourcequotas"
+    assert [item["metadata"]["namespace"] for item in body["items"]] == ["team-b"]
+
+
+def test_list_resourcequotas_get_by_name(
+    api_client, auth_client, fake_k8s, monkeypatch
+) -> None:
+    """[resourcequotas-get-by-name] ?name= returns a 0/1-item list: a hit
+    returns the one item in team-a, a miss returns [] (mirrors get_secret)."""
+    auth_client.login()
+    h = {"Authorization": f"Bearer {auth_client.jwt}"}
+    _register(api_client, h)
+    _allow_sar(monkeypatch)
+    r = api_client.get(
+        "/api/v1/clusters/1/resources/resourcequotas?name=compute&namespace=team-a",
+        headers=h,
+    )
+    assert r.status_code == 200
+    [item] = r.get_json()["items"]
+    assert item["metadata"]["name"] == "compute"
+    assert item["metadata"]["namespace"] == "team-a"
+    r = api_client.get(
+        "/api/v1/clusters/1/resources/resourcequotas?name=ghost&namespace=team-a",
+        headers=h,
+    )
+    assert r.status_code == 200
+    assert r.get_json()["items"] == []
+
+
+def test_list_resourcequotas_sar_denied(api_client, auth_client, fake_k8s, monkeypatch) -> None:
+    """[resourcequotas-sar-denied] ADR-0004: the SAR is asked BEFORE the
+    read, with the core group (empty string) and the query namespace — a
+    deny short-circuits to 403 RBAC_DENIED."""
+    auth_client.login()
+    h = {"Authorization": f"Bearer {auth_client.jwt}"}
+    _register(api_client, h)
+    asked = _record_sar(monkeypatch)  # denies every SAR and records calls
+    r = api_client.get(
+        "/api/v1/clusters/1/resources/resourcequotas?namespace=team-a", headers=h
+    )
+    assert r.status_code == 403
+    assert r.get_json()["error"]["code"] == "RBAC_DENIED"
+    assert ("list", "resourcequotas", "team-a", None, "") in asked
+
+
+def test_resourcequotas_binding_404(api_client, auth_client) -> None:
+    """[resourcequotas-binding-404] an unbound user: the binding gate fails
+    before the SAR, CLUSTER_NOT_FOUND."""
+    auth_client.login()
+    h = {"Authorization": f"Bearer {auth_client.jwt}"}
+    r = api_client.get(
+        "/api/v1/clusters/999/resources/resourcequotas?namespace=team-a", headers=h
+    )
+    assert r.status_code == 404
+    assert r.get_json()["error"]["code"] == "CLUSTER_NOT_FOUND"
+
+
+def test_resourcequota_kind_singular_rejected(api_client, auth_client) -> None:
+    """[resourcequota-kind-singular-rejected] the 4.1 route name (singular)
+    is not a kind — RESOURCE_KIND_NOT_SUPPORTED."""
+    auth_client.login()
+    h = {"Authorization": f"Bearer {auth_client.jwt}"}
+    _register(api_client, h)
+    r = api_client.get("/api/v1/clusters/1/resources/resourcequota", headers=h)
     assert r.status_code == 404
     assert r.get_json()["error"]["code"] == "RESOURCE_KIND_NOT_SUPPORTED"
 
