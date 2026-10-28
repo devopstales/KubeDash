@@ -268,12 +268,36 @@ test('list-cilium-section-hidden-when-empty', async () => {
 
 test('list-no-cluster-state', async () => {
   const seen = capturePaths()
-  selectTeamA()
   useClusterStore.setState({ selectedCluster: null, selectedNamespace: null })
   renderAt(<NetworkPolicyView />)
 
   expect(await screen.findByText('No cluster selected.')).toBeTruthy()
   expect(seen).toHaveLength(0) // no resource fetch is made
+})
+
+test('list-cilium-error-renders-when-rows-empty', async () => {
+  server.use(
+    http.get('*/api/v1/clusters/1/resources/ciliumnetworkpolicies', () =>
+      HttpResponse.json(
+        { error: { code: 'CLUSTER_UNREACHABLE', message: 'cilium apiserver unreachable' } },
+        { status: 502 },
+      ),
+    ),
+  )
+  selectTeamA()
+  renderAt(<NetworkPolicyView />)
+
+  // One Cilium query rejects and the sibling returns [] (no rows): the
+  // section must still appear with its error line — a failure swallowed
+  // because `ciliumRows.length === 0` is a silent outage.
+  expect(
+    await screen.findByText(
+      /Error loading Cilium policies: CLUSTER_UNREACHABLE: cilium apiserver unreachable/,
+    ),
+  ).toBeTruthy()
+  // no rows, no links.
+  expect(screen.queryAllByRole('link', { name: 'cnp' })).toHaveLength(0)
+  expect(screen.queryAllByRole('link', { name: 'ccnp' })).toHaveLength(0)
 })
 
 test('list-error-state', async () => {
