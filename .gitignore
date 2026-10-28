@@ -28,3 +28,9 @@ dev/certs/
 backend/static/
 cli/dist
 .skillgrid/sdd/
+
+# local tooling artifacts (per-machine, regenerated)
+.playwright-mcp/
+.task/
+.gitleaks-report.json
+.skip_gitleaks

@@ -16,6 +16,10 @@ Migrated browser session to HttpOnly cookies (ADR-0025) (architecture)
 
 Split metrics_denied from metrics_available on the cluster dashboard (bugfix)
 
+## architecture/dev-server
+
+Switched dev backend-run to Gunicorn (same server as prod) (decision)
+
 ## architecture/file-layout
 
 Adopt src layout for KubeDash 5.0 backend + frontend (decision)
@@ -27,6 +31,10 @@ flask-session + module-level SQLAlchemy: second create_app collides on sessions 
 ## architecture/flask-smorest-0x-route-pattern
 
 Fixed smorest 0.47 bare-dict status inference on API blueprints (bugfix)
+
+## architecture/frontend-store-persistence
+
+Persisted cluster-scope store for ns_select (4.1 parity) (architecture)
 
 ## architecture/k8s-dual-mode-client
 
@@ -60,6 +68,22 @@ SA token auth: V1-prefixed models, AuthenticationV1Api, SAR user=USERNAME not to
 
 Decided SPA React migration architecture for KubeDash (decision)
 
+## backend/ca-based-local-user-kubeconfig
+
+Ported 4.1 CA-based local-user kubeconfig: CSR mint + CA download + CA manual commands (decision)
+
+## backend/gunicorn-wsgi-entrypoint-ini-config
+
+dev-stack now runs Gunicorn (wsgi:wsgi) with INI-only config; fixed broken wsgi:main load target (architecture)
+
+## backend/rq-work-horse-macos-fork-objc
+
+RQ work-horse SIGABRT (ret_val=6) on macOS: fork-after-ObjC-init in multithreaded dev backend (bugfix)
+
+## backend/wsgi-rq-worker-child-app
+
+Fixed RQ worker child None-app crash (ADR-0028 missed the -c entry point) (bugfix)
+
 ## backlog/spec-status-2026-10-04
 
 Validated backlog/spec status against code for 7 KubeDash epics (discovery)
@@ -84,6 +108,30 @@ Fixed ccc index Ollama connection failure (bugfix)
 
 Fix stale Poetry pins + src-layout test invocation (discovery)
 
+## dev/demo-data-demo-broken
+
+dev-stack demo-broken shows 2 ImagePullBackOff pods, not 1 crashlooping (discovery)
+
+## dev/dev-stack-fe-cache-cni-register-order
+
+dev-stack: fe build/sync cached, CNI install gated, kind-before-backend with register-after-backend (config)
+
+## dev/dev-stack-kind-before-backend
+
+dev-stack: kind/demo-data now runs BEFORE the backend; kills cover Gunicorn (config)
+
+## dev/metrics-server-sar-delegation
+
+Fixed metrics-server authorization delegation (cluster-scope SAR) + node-view metrics warning consistency (bugfix)
+
+## env/git-hooks
+
+Env gotcha: repo gitleaks wrapper bypassed, history scan slow (discovery)
+
+## execution/ini-config-source
+
+QA gate PASS for 2026-10-26-ini-config-source; report.md committed in archive (architecture)
+
 ## feature/logs-socketio
 
 Added SocketIO /logs namespace for pod log follow (pattern)
@@ -91,6 +139,10 @@ Added SocketIO /logs namespace for pod log follow (pattern)
 ## frontend/coreui-shell-verification
 
 Verified KubeDash 5.0 frontend shell with mocked cluster APIs (discovery)
+
+## frontend/events-table-message-wrap
+
+Cluster-metric events table: Message wraps, Last seen keeps space (bugfix)
 
 ## init/docs/.skillgrid/ARCHITECTURE.md
 
@@ -611,6 +663,10 @@ KubeDash Skillgrid onboarding — project context (architecture)
 ## skillgrid/2026-10-21-cluster-dashboard/execution-progress
 
 Node list progress matched to 4.1 prototype: thin 4px bars + big stat value (architecture)
+
+## skillgrid/2026-10-26-ini-config-source/ship
+
+ship — 2026-10-26-ini-config-source (architecture)
 
 ## skillgrid/KubeDash/issue_tracker
 
