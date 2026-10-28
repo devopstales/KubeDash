@@ -26,12 +26,17 @@ in_flight:
     # (completes report.md retro half in the archive + session close).
     tracker: [TASK-033, TASK-034, TASK-035, TASK-036, TASK-037]
   - change: 2026-10-26-network-policy
-    phase: shipped
-    # All 5 tasks complete (sdd ledger 2026-10-26-network-policy): backend
-    # networkpolicies + cilium kinds (8f6bdbb9, 3e6dc041), frontend list +
-    # detail views (2a93c006, fcc40567), kind backstops (98497d24). Note:
-    # fcc40567 (its Task 4) swept the shared working tree and absorbed the
-    # priority-class change's Task 2 App.tsx hunk — see W006.
+    phase: qa
+    # Executed 2026-10-28 on branch `rebase` (sdd ledger
+    # 2026-10-26-network-policy): 5 tasks — 8f6bdbb9 (networkpolicies kind),
+    # 3e6dc041 (cilium kinds), 2a93c006 (list view), fcc40567 (detail view),
+    # 98497d24 (kind backstops) + 2bb6e853 (QA: API-tier 502) + fix wave
+    # (ef9b2abf, 1ae0be3a, 421770d8, 10074744) + 0b673fa0 (ADR-0022 row).
+    # QA gate PASS (re-verified after the 502 fix). Final two-axis review
+    # clean (6/6 findings addressed, re-reviewed). Note: fcc40567 (its
+    # Task 4) swept the shared working tree and absorbed the priority-class
+    # change's Task 2 App.tsx hunk — see W006; ship/archive both together.
+    # Next: ship.
     tracker: []
   - change: 2026-10-27-priority-class
     phase: execution
