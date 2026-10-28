@@ -237,6 +237,24 @@ export interface PriorityClassItem {
   [key: string]: unknown
 }
 
+/** A RuntimeClass item as returned by /api/v1/clusters/<id>/resources/runtimeclasses (kubernetes to_dict, snake_case; cluster-scoped). */
+export interface RuntimeClassItem {
+  metadata?: {
+    name?: string
+    creation_timestamp?: string
+    labels?: Record<string, string>
+    annotations?: Record<string, string>
+  }
+  handler?: string
+  overwrite_node_sel_no_toleration?: boolean
+  scheduling?: {
+    node_selector?: Record<string, string>
+    tolerations?: unknown[]
+  }
+  pod_level_overhead?: { memory?: string; cpu?: string }
+  [key: string]: unknown
+}
+
 /** Closed set for the detail page's ?kind= param (4.1 parity). */
 export const POLICY_KINDS = ['NetworkPolicy', 'CiliumNetworkPolicy', 'CiliumClusterwideNetworkPolicy'] as const
 export type PolicyKind = (typeof POLICY_KINDS)[number]
