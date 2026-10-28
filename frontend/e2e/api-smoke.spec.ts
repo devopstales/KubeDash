@@ -34,6 +34,44 @@ test.describe('KubeDash API smoke', () => {
     expect(resp.status(), 'dev stack (Flask :8080) must be up — run `task dev-up`').toBe(200)
   })
 
+  /**
+   * Clean up all e2e test artifacts after the suite finishes (pass or fail).
+   * Without this, every run leaves stale rows in the registry that clutter
+   * the /clusters and /user/group views. The DELETE endpoints were added for
+   * this purpose (TASK-044).
+   */
+  test.afterAll(async ({ request }) => {
+    try {
+      const token = await loginToken(request)
+      const headers = authHeaders(token)
+
+      // Delete e2e-smoke* / e2e-badyaml* cluster rows.
+      const clusters = await request.get('/api/v1/clusters', { headers })
+      if (clusters.ok()) {
+        const rows = await clusters.json()
+        for (const row of rows as Array<{ id: number; name: string }>) {
+          if (row.name.startsWith('e2e-smoke') || row.name.startsWith('e2e-badyaml')) {
+            await request.delete(`/api/v1/clusters/${row.id}`, { headers })
+          }
+        }
+      }
+
+      // Delete e2e-group* / e2e-tpl* group + template rows.
+      const groups = await request.get('/api/v1/admin/groups', { headers })
+      if (groups.ok()) {
+        const groupRows = await groups.json()
+        for (const row of groupRows as Array<{ name: string }>) {
+          if (row.name.startsWith('local:e2e-group') || row.name.startsWith('local:e2e-tpl')) {
+            await request.delete(`/api/v1/admin/groups/${encodeURIComponent(row.name)}`, { headers })
+          }
+        }
+      }
+    } catch {
+      // Cleanup is best-effort: a failure here (e.g. backend down) must not
+      // mask the real test results.
+    }
+  })
+
   test('open surface: /healthz 200 + /api/v1/auth/settings 200 flags', async ({ request }) => {
     const settings = await request.get('/api/v1/auth/settings')
     expect(settings.status()).toBe(200)

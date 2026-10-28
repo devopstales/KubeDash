@@ -14,8 +14,10 @@ from app.api._authhook import apply_auth
 from app.core.config import get_settings
 from app.core.errors import (
     ClusterAlreadyExistsError,
+    ClusterNotFoundError,
     ClusterUnreachableError,
     InvalidKubeconfigError,
+    RbacDeniedError,
 )
 from app.extensions import db
 from app.models.binding import ClusterBinding
@@ -199,6 +201,41 @@ class ClusterApi(Api):
             return _out(_local_cluster())
         cluster = bound_cluster_or_404(g.current_user, cluster_id)
         return _out(cluster)
+
+    @blp.route("/clusters/<int:cluster_id>", methods=["DELETE"])
+    @blp.doc(responses={404: "CLUSTER_NOT_FOUND", 403: "RBAC_DENIED"})
+    def delete_cluster(self, cluster_id: int) -> object:
+        """Delete a registered cluster and its bindings.
+
+        The synthetic local cluster (id 0) is not deletable — it is the
+        cluster KubeDash runs in, not a registry row. Admin role or the
+        cluster's registering admin (binding role == "admin") may delete.
+        """
+        if cluster_id == LOCAL_CLUSTER_ID:
+            raise ClusterNotFoundError("synthetic local cluster is not deletable")
+        cluster = bound_cluster_or_404(g.current_user, cluster_id)
+        user = g.current_user
+        # Gate: the caller must be a platform admin OR hold an "admin"
+        # binding on this cluster (the registering user's auto-binding).
+        is_platform_admin = user.role == "admin"
+        is_cluster_admin = (
+            db.session.execute(
+                db.select(ClusterBinding).filter_by(
+                    user_id=user.id, cluster_id=cluster.id, role="admin"
+                )
+            )
+            .scalar_one_or_none()
+            is not None
+        )
+        if not (is_platform_admin or is_cluster_admin):
+            raise RbacDeniedError("only the cluster admin or a platform admin can delete")
+        # Delete bindings first (FK constraint), then the cluster row.
+        db.session.execute(
+            db.delete(ClusterBinding).filter_by(cluster_id=cluster.id)
+        )
+        db.session.delete(cluster)
+        db.session.commit()
+        return jsonify({"deleted": cluster.id}), 200
 
     @blp.route("/clusters/<int:cluster_id>/health", methods=["GET"])
     @blp.response(200, HealthOut)
