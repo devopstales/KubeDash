@@ -188,13 +188,12 @@ def _client_with_custom(
     crd_read_404: bool = False,
     custom_list: object | None = None,
     custom_list_raises: Exception | None = None,
-    record_custom_calls: bool = False,
 ) -> K8sClient:
     """``object.__new__(K8sClient)`` with ``_api_client`` bound to a
     per-path ``_FakeMultiCallApiClient`` (pattern:
-    backend/tests/services/test_k8s_client_crds.py:35-68). ``record_custom_calls``
-    is accepted for the brief's signature; the fake always records the
-    instance-list calls (``custom_paths``) — the tests read them directly."""
+    backend/tests/services/test_k8s_client_crds.py:35-68). The fake always
+    records the instance-list calls (``custom_paths``) — the tests read them
+    directly."""
     client = object.__new__(K8sClient)
     client._api_client = _FakeMultiCallApiClient(
         crd=crd,
@@ -239,7 +238,7 @@ def test_get_crd_served_no_served_version_raises() -> None:
 def test_list_cilium_network_policies_absent_crds_empty() -> None:
     # [cilium-crds-absent-empty] get_crd_served is None -> [] WITHOUT calling
     # the custom list (one less 404 to interpret).
-    client = _client_with_custom(crd_read_404=True, record_custom_calls=True)
+    client = _client_with_custom(crd_read_404=True)
     assert client.list_cilium_network_policies("team-a") == []
     # The instance-list call was never made.
     assert client._api_client.custom_paths == []
@@ -292,7 +291,7 @@ def test_get_cilium_network_policy_404_returns_empty() -> None:
 
 def test_get_cilium_network_policy_absent_crds_empty() -> None:
     # [cilium-get-by-name] CRD absent -> [] (Cilium not installed).
-    client = _client_with_custom(crd_read_404=True, record_custom_calls=True)
+    client = _client_with_custom(crd_read_404=True)
     assert client.get_cilium_network_policy("team-a", "cnp") == []
     assert client._api_client.custom_paths == []
 
