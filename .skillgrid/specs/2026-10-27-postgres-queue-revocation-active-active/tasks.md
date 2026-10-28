@@ -80,7 +80,7 @@ Chain strategy: single-branch on `rebase`
 
 - **Tracker ID:** TASK-046
 - **Scope:** `app/core/kvstore.py` — `kv_set`/`kv_get`/`kv_delete`/`kv_reap` (generic TTL kv; `kv_get` returns None if absent **or** expired; `kv_delete` one-shot). `app/services/revocation.py` — `revoke_jti`/`is_revoked`/`reap_expired` (pure; no Flask). Both bind the key/`jti` as a **parameter** — no function in the WHERE clause (findings #1).
-- **Acceptance:** `kv_set`→`kv_get`→`kv_delete` round-trips; an expired key reads as absent; `kv_reap` deletes only expired rows; `revoke_jti`→`is_revoked` is True, a different jti is False; `reap_expired` deletes only passed jtis. The revocation lookup plans as a PK Index Only Scan.
+- **Acceptance:** `kv_set`→`kv_get`→`kv_delete` round-trips; an expired key reads as absent; `kv_reap` deletes only expired rows; `revoke_jti`→`is_revoked` is True, a different jti is False; `reap_expired` deletes only passed jtis. The revocation lookup plans as a PK Index Scan (one probe on `revoked_jtis_pkey`; the `expires_at > now()` predicate requires a heap recheck, so an Index Only Scan is unplanable — recorded 2026-10-28, Task 4 ruling).
 - **SATISFIES:** `oidc-state-is-stored-and-consumed-once` (kv half — one-shot delete), `revoked-jti-is-rejected-on-the-verify-hook` (deny-list half — the PK lookup)
 - **Files:** `backend/app/core/kvstore.py`, `backend/app/services/revocation.py`, `backend/tests/core/test_kvstore.py`, `backend/tests/services/test_revocation.py`
 - **Size:** ~300 (S)
