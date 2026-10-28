@@ -380,3 +380,8 @@ to delete).
    (small: one guard script + one line in `checkpoint-state.js guard`).
 2. **Add `task backend-lint` + CI ruff step** (small: Taskfile + ci.yaml).
 3. **Add `task kind-state`** for live-cluster expectation discovery (trivial).
+
+> Durable-findings `mem_save` (timeout guard, unwired-hook discovery): **FAILED
+> — the mnemonic store's FK constraint (787) persists for this project**
+> (every `mem_save` since the 2026-10-28 session summary hits it, on fresh
+> session rows). The retro table above is the durable record.
