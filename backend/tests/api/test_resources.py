@@ -1421,3 +1421,184 @@ def test_rbac_denied_403_on_kind(api_client, kind_client, api_app) -> None:
         rb._sar_allowed = orig
     assert r.status_code == 403
     assert r.get_json()["error"]["code"] == "RBAC_DENIED"
+
+
+# A minimal deny-all NetworkPolicy: no ingress rule + an empty egress rule
+# deny every flow, so spec.policy_types is exactly ["Ingress", "Egress"] —
+# the assertion below matches this fixture (not vice versa).
+_DENY_ALL_NP = """\
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: kubedash-deny-all
+  namespace: default
+spec:
+  podSelector: {}
+  policyTypes: [Ingress, Egress]
+  ingress: []
+  egress: []
+"""
+
+
+# --- kind-tier login + cluster registration ---------------------------------
+#
+# The kind tier CANNOT use ``kind_client`` as-is: it is session-scoped
+# against the function-scoped PG ``app`` fixture, which pytest 9 rejects at
+# setup with ScopeMismatch (known debt — all three pre-existing kind tests
+# fail identically, so they are not green evidence either). These two tests
+# sidestep it by depending on the session-scoped ``kind_cluster`` fixture
+# DIRECTLY (kubeconfig bytes + demo seed only — no PG ``app``), and register
+# the cluster on the sqlite ``api_app`` the api-tier tests run against
+# (uncommitted; rolled back by ``api_app`` teardown, so no DB pollution).
+#
+# Local admin login (ADR-0021) is the docker-free auth path: no OIDC mock
+# (the ``mock_oidc`` monkeypatch is function-scoped and cannot reach the
+# session-scoped PG app context the fixture row would need). The admin has
+# K8s role ``admin`` via the cluster binding, so SAR and namespace
+# mutations pass.
+
+
+@pytest.fixture()
+def kind_kubeconfig(kind_cluster) -> bytes:
+    """The session-scoped kind cluster's kubeconfig (no PG ``app`` involved),
+    so these tests avoid the ``kind_client`` ScopeMismatch debt."""
+    return kind_cluster
+
+
+@pytest.fixture()
+def kind_admin_api_client(api_app, monkeypatch) -> object:
+    """A sqlite api-tier client whose app has the bootstrap admin row
+    (``_bootstrap_local_admin`` — wsgi runs it at boot; the test fixture must
+    mirror it because the api_app fixture's sqlite tier has no boot hook).
+
+    The SAR cache is BYPASSED (``_cache_get``/``_cache_set`` stubbed): the
+    sqlite ``api_app``'s fake-redis swap does not cover the rbac module's
+    own ``redis_client`` import (a different binding), so a real cache read
+    would dial redis://localhost:6390 and 500. The decision itself is the
+    REAL SAR against the kind apiserver (``_sar_allowed`` unpatched) — the
+    kind kubeconfig's user is the cluster admin, so the verdict is true,
+    exactly like production."""
+    import app.services.rbac as rb
+    from app import _bootstrap_local_admin
+
+    _bootstrap_local_admin(api_app)
+    monkeypatch.setattr(rb, "_cache_get", lambda k: None)
+    monkeypatch.setattr(rb, "_cache_set", lambda k, v: None)
+    return api_app.test_client()
+
+
+def _kind_admin_jwt(api_client) -> str:
+    """Login as the bootstrapped local admin (ADR-0021); return the access
+    JWT from the response's Set-Cookie (ADR-0025 delivery contract). The
+    302's ``Location`` (``/``) is NOT followed — under ``TESTING`` the SPA
+    catch-all is not registered, so it would 404; the cookies are set on the
+    login response itself, which is all the JWT read needs."""
+    r1 = api_client.post(
+        "/api/v1/auth/local", json={"email": "admin@local", "password": "correct-horse"}
+    )
+    assert r1.status_code == 302, r1.get_json()
+    cookie = api_client.get_cookie("kd_access")
+    assert cookie is not None, "no kd_access cookie after local login"
+    return str(cookie.value)
+
+
+def _register_kind_cluster(api_client, h: dict, kubeconfig: bytes) -> int:
+    """Register the kind cluster on the sqlite app (uncommitted); return the
+    new cluster id. Idempotent per test: each test registers its own row
+    (no cross-test DB assumptions, mirroring test_rbac_denied_403_on_kind's
+    self-sufficient setup)."""
+    r = api_client.post(
+        "/api/v1/clusters",
+        json={
+            "name": "kind-test",
+            "api_server": "https://127.0.0.1:6443",
+            "kubeconfig": kubeconfig.decode(),
+            "context": "kind-kind-test",
+        },
+        headers=h,
+    )
+    assert r.status_code == 201, r.get_json()
+    return r.get_json()["id"]
+
+
+@pytest.mark.integration
+def test_list_networkpolicies_on_kind(kind_admin_api_client, kind_kubeconfig) -> None:
+    """[networkpolicies-list-on-kind] a real NetworkPolicy round-trips through
+    the R4 route on a live kind cluster: apply a deny-all policy into
+    ``default``, GET the list, assert the item's spec is intact, then clean
+    up (the dev cluster is reused — a leaked policy would pollute later runs)."""
+    import subprocess
+
+    api_client = kind_admin_api_client
+    h = {"Authorization": f"Bearer {_kind_admin_jwt(api_client)}"}
+    cid = _register_kind_cluster(api_client, h, kind_kubeconfig)
+    applied = subprocess.run(
+        ["kubectl", "--context=kind-kubedash-test", "apply", "-f", "-"],
+        input=_DENY_ALL_NP,
+        capture_output=True,
+        text=True,
+    )
+    assert applied.returncode == 0, applied.stderr
+    try:
+        r = api_client.get(
+            f"/api/v1/clusters/{cid}/resources/networkpolicies?namespace=default",
+            headers=h,
+        )
+        assert r.status_code == 200, r.get_json()
+        body = r.get_json()
+        assert body["kind"] == "networkpolicies"
+        [policy] = [
+            item for item in body["items"] if item["metadata"]["name"] == "kubedash-deny-all"
+        ]
+        assert policy["metadata"]["namespace"] == "default"
+        assert policy["spec"]["policy_types"] == ["Ingress", "Egress"]
+        # The real API server returns null for the empty ingress/egress
+        # lists; to_dict() maps JSON null -> None. The unit fake returns []
+        # (its own dict literal). Assert the deny-all shape (both types
+        # declared, no rules) without pinning empty-list vs null.
+        assert not policy["spec"].get("ingress")
+        assert not policy["spec"].get("egress")
+    finally:
+        deleted = subprocess.run(
+            [
+                "kubectl",
+                "--context=kind-kubedash-test",
+                "delete",
+                "networkpolicy",
+                "kubedash-deny-all",
+                "-n",
+                "default",
+            ],
+            capture_output=True,
+            text=True,
+        )
+        assert deleted.returncode == 0, deleted.stderr
+
+
+@pytest.mark.integration
+def test_cilium_absent_degrades_to_empty_on_kind(kind_admin_api_client, kind_kubeconfig) -> None:
+    """[cilium-absent-on-live-cluster-empty] the backstop the unit fakes
+    cannot cover: on a REAL apiserver, a bare cluster (no cilium.io CRDs)
+    degrades to 200 with ``items == []`` for both Cilium kinds — never a 502.
+    A Cilium-installed cluster (e.g. the dev cluster) takes the other path —
+    group registered, list empty — and degrades to the SAME 200 + []. If
+    either ever 502s, the CRD-absent/_crd_body contract is wrong in
+    production."""
+    api_client = kind_admin_api_client
+    h = {"Authorization": f"Bearer {_kind_admin_jwt(api_client)}"}
+    cid = _register_kind_cluster(api_client, h, kind_kubeconfig)
+    r = api_client.get(
+        f"/api/v1/clusters/{cid}/resources/ciliumnetworkpolicies?namespace=default",
+        headers=h,
+    )
+    assert r.status_code == 200, r.get_json()
+    assert r.get_json()["kind"] == "ciliumnetworkpolicies"
+    assert r.get_json()["items"] == []
+
+    r = api_client.get(
+        f"/api/v1/clusters/{cid}/resources/ciliumclusterwidenetworkpolicies",
+        headers=h,
+    )
+    assert r.status_code == 200, r.get_json()
+    assert r.get_json()["kind"] == "ciliumclusterwidenetworkpolicies"
+    assert r.get_json()["items"] == []
