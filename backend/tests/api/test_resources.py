@@ -1602,3 +1602,31 @@ def test_cilium_absent_degrades_to_empty_on_kind(kind_admin_api_client, kind_kub
     assert r.status_code == 200, r.get_json()
     assert r.get_json()["kind"] == "ciliumclusterwidenetworkpolicies"
     assert r.get_json()["items"] == []
+
+
+@pytest.mark.integration
+def test_list_priorityclasses_on_kind(kind_admin_api_client, kind_kubeconfig) -> None:
+    """[priorityclasses-list-on-kind] the held-out backstop: the REAL
+    K8sClient (not the FakeK8s double) lists cluster-scoped PriorityClasses
+    through the R4 route. A bare kind cluster ships the built-in
+    system-cluster-critical PriorityClass — assert it comes back.
+    ponytail: the built-in is asserted as-is; no kubectl fallback, no
+    kubectl-created object (upgrade path: kubectl apply an inline
+    PriorityClass if a future kind base image ever drops the built-in)."""
+    api_client = kind_admin_api_client
+    h = {"Authorization": f"Bearer {_kind_admin_jwt(api_client)}"}
+    cid = _register_kind_cluster(api_client, h, kind_kubeconfig)
+    r = api_client.get(f"/api/v1/clusters/{cid}/resources/priorityclasses", headers=h)
+    assert r.status_code == 200, r.get_json()
+    body = r.get_json()
+    assert body["kind"] == "priorityclasses"
+    [critical] = [
+        item
+        for item in body["items"]
+        if item["metadata"]["name"] == "system-cluster-critical"
+    ]
+    assert critical["value"] == 2000000000
+    assert critical["preemption_policy"] == "PreemptLowerPriority"
+    # Cluster-scoped: the real apiserver serializes namespace as null
+    # (to_dict maps it to None) — unlike namespace-scoped kinds.
+    assert critical["metadata"].get("namespace") is None
