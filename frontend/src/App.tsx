@@ -48,6 +48,8 @@ const PriorityClassView = React.lazy(() => import('./views/OtherResource/Priorit
 const PriorityClassDataView = React.lazy(() => import('./views/OtherResource/PriorityClassData'))
 const RuntimeClassView = React.lazy(() => import('./views/OtherResource/RuntimeClass'))
 const RuntimeClassDataView = React.lazy(() => import('./views/OtherResource/RuntimeClassData'))
+const ResourceQuotaView = React.lazy(() => import('./views/OtherResource/ResourceQuota'))
+const ResourceQuotaDataView = React.lazy(() => import('./views/OtherResource/ResourceQuotaData'))
 const GroupsView = React.lazy(() => import('./views/Groups'))
 const GroupPrivilegesView = React.lazy(() => import('./views/Groups/GroupPrivileges'))
 const GroupPrivilegeEditView = React.lazy(() => import('./views/Groups/GroupPrivilegeEdit'))
@@ -394,6 +396,22 @@ const App = () => {
                       element={
                         <ProtectedRoute>
                           <RuntimeClassDataView />
+                        </ProtectedRoute>
+                      }
+                    />
+                    <Route
+                      path="/other-resource/resource-quota"
+                      element={
+                        <ProtectedRoute>
+                          <ResourceQuotaView />
+                        </ProtectedRoute>
+                      }
+                    />
+                    <Route
+                      path="/other-resource/resource-quota/data"
+                      element={
+                        <ProtectedRoute>
+                          <ResourceQuotaDataView />
                         </ProtectedRoute>
                       }
                     />

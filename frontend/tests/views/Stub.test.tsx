@@ -50,6 +50,11 @@ function expectedStubs() {
     '/other-resource/priorityclass',
     // Real view (2026-10-28-runtimeclass-views, Task 2) — not a stub route.
     '/other-resource/runtimeclass',
+    // Real view (2026-10-28-resourcequota-views, Task 2) — not a stub route.
+    // The nav leaf targets the list at /other-resource/resource-quota; the
+    // detail is /other-resource/resource-quota/data.
+    '/other-resource/resource-quota',
+    '/other-resource/resource-quota/data',
   ])
   const seen = new Map<string, string>()
   for (const isAdmin of [true, false]) {
