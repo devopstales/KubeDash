@@ -1,10 +1,10 @@
 ---
 id: TASK-044
 title: '[FEATURE] TICKET-03 leader.py strict fence (ADR-0031) (backend-core)'
-status: To Do
+status: Done
 assignee: []
 created_date: '2026-10-27 19:15'
-updated_date: '2026-10-27 19:16'
+updated_date: '2026-10-28 18:35'
 labels: []
 milestone: m-2
 dependencies:
