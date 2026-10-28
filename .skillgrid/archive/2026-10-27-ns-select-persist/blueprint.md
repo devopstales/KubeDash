@@ -4,8 +4,10 @@
 > (recommended) or skillgrid:simple-execution to implement this plan
 > task-by-task. Steps use checkbox (`- [ ]`) syntax for tracking.
 
-**Status:** EXECUTED (2026-10-27) — Task 1 steps 1–2, 6 done and verified;
-steps 3–5 (manual browser matrix) deferred to the acceptance pass.
+**Status:** COMPLETE (2026-10-28) — all Task 1 steps done. Steps 1–2, 6, 7
+committed (`8ba2ef62`); steps 3–5 executed in the browser on 2026-10-28
+(TASK-042; dev stack + fe-dev on :3000; two-cluster matrix with the
+`kubedash-test` kind cluster).
 
 **Tier:** T1 (from `briefing.md`).
 
@@ -128,18 +130,18 @@ default pattern; no unproven contract.
       `SelectedCluster` interface and the `ClusterStore` interface
       unchanged — persistence is an implementation detail of the store,
       not part of its type.
-- [ ] **Step 3 — Verify store behavior in the browser.** `task fe-dev`,
+- [x] **Step 3 — Verify store behavior in the browser.** `task fe-dev`,
       then manually: pick cluster + ns in the header → hard reload →
       header is on the same cluster/ns. Check
       `localStorage['kd-cluster-scope']` in devtools: exactly the two
       fields. Repeat with a second namespace. Repeat after switching
       clusters.
-- [ ] **Step 4 — Stale-ns fallback.** In a cluster whose namespace list
+- [x] **Step 4 — Stale-ns fallback.** In a cluster whose namespace list
       lacks the persisted ns (temporarily edit the stored value in
       devtools to a name that doesn't exist, reload): the select shows
       `default` (or the first ns), not the stale name; no console error.
       Restore the value.
-- [ ] **Step 5 — Clear-ns path.** On the Namespaces page, delete the
+- [x] **Step 5 — Clear-ns path.** On the Namespaces page, delete the
       currently selected namespace: the store goes to `null`, the
       select falls back, and `localStorage` now holds
       `selectedNamespace: null`.
@@ -158,7 +160,7 @@ default pattern; no unproven contract.
 | Frontend typecheck + lint + build | `task fe-build` | green |
 | Full frontend suite | `cd frontend && corepack pnpm test` | green |
 | Air-gap bundle | `task fe-check` | no `https?://` or `//cdn.` refs |
-| Manual reload matrix | `task fe-dev` + browser | acceptance 1–5 in `briefing.md` (deferred to acceptance pass) |
+| Manual reload matrix | `task fe-dev` + browser | acceptance 1–5 in `briefing.md` — all 5 PASS (2026-10-28, TASK-042; two-cluster matrix) |
 
 **Not verified here (and why):** cross-device persistence (deferred —
 briefing.md Intent 1); server-side per-user defaults (Option B, deferred);
