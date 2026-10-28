@@ -45,6 +45,7 @@ const SecretDataView = React.lazy(() => import('./views/Security/SecretData'))
 const NetworkPolicyView = React.lazy(() => import('./views/Security/NetworkPolicy'))
 const NetworkPolicyDataView = React.lazy(() => import('./views/Security/NetworkPolicyData'))
 const PriorityClassView = React.lazy(() => import('./views/OtherResource/PriorityClass'))
+const PriorityClassDataView = React.lazy(() => import('./views/OtherResource/PriorityClassData'))
 const GroupsView = React.lazy(() => import('./views/Groups'))
 const GroupPrivilegesView = React.lazy(() => import('./views/Groups/GroupPrivileges'))
 const GroupPrivilegeEditView = React.lazy(() => import('./views/Groups/GroupPrivilegeEdit'))
@@ -367,6 +368,14 @@ const App = () => {
                       element={
                         <ProtectedRoute>
                           <PriorityClassView />
+                        </ProtectedRoute>
+                      }
+                    />
+                    <Route
+                      path="/other-resource/priorityclass/data"
+                      element={
+                        <ProtectedRoute>
+                          <PriorityClassDataView />
                         </ProtectedRoute>
                       }
                     />
