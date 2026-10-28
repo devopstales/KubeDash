@@ -706,7 +706,11 @@ git commit -m "feat(web): priority class detail view (single-read, yaml render)"
   `preemption_policy == "Never"`. (If the running kind image's built-ins
   differ, `kubectl create priorityclass` an inline minimal object first
   and assert on that — the test's contract is "the real client's list
-  comes back through the R4 route", not a specific built-in.)
+  comes back through the R4 route", not a specific built-in. NOTE 2026-10-28:
+  on the local kind image `system-cluster-critical` ships
+  `PreemptLowerPriority`, not `Never`, and `exempt` is absent — the
+  executed backstop pins the live built-in's actual value/policy per this
+  fallback clause.)
 
 - [ ] **Step 2: Run** (only when a kind cluster is available — CI's
   `e2e.yaml` has one): `cd backend && uv run pytest

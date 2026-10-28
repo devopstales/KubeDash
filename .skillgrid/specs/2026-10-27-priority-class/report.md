@@ -189,7 +189,7 @@ MISSING_RED, no STALE.
 | `?namespace=` on the DETAIL URL is ignored server-side | the handler's single dispatch covers it; the view test pins the view sends none; the list-level API test pins the server ignores it — the detail uses the same handler path (`_GETTERS` branch) | no (named: a `?namespace=` on the detail URL reaches the same `_GETTERS` call that ignores it — pinned at the shared seam) |
 | Detail view YAML block = full fetched object (not a projection) | `detail-renders-priority-class-yaml` pins `<pre>` contains the class name + `preemption_policy` | no |
 | Air gap (no new dependency) | `task fe-check` exit 0 + the diff's import list (all pre-existing) | no |
-| Rollback unit integrity | the App.tsx hunk for the list route lives in the concurrent `fcc40567` (network-policy Task 4 committed the shared working tree during the Task 2 window) — reverting `1bd5afab` alone leaves the route without a stub at the old path but WITH a live route at the new path (no gap; the gap direction is safe) | WARNING W001 (recorded; no functional gap at any commit boundary) |
+| Rollback unit integrity | the App.tsx hunk for the list route lives in the concurrent `fcc40567` (network-policy Task 4 committed the shared working tree during the Task 2 window) — reverting `1bd5afab` alone leaves the route without a stub at the old path but WITH a live route at the new path (no gap; the gap direction is safe) | WARNING W006 (recorded; no functional gap at any commit boundary) |
 
 **PRESENT_BEHAVIOR_UNVERIFIED: none.** Every behavior in the diff has a named
 covering test that ran.
@@ -263,7 +263,7 @@ PASS.
 
 ### WARNING
 
-- **W001 (rollback unit split):** the list route's `App.tsx` hunk landed in
+- **W006 (rollback unit split):** the list route's `App.tsx` hunk landed in
   `fcc40567` (the concurrent network-policy change's Task 4 committed the shared
   working tree during this change's Task 2 window). Reverting `1bd5afab` alone
   leaves the new route live (safe direction — no 404 window), but the clean

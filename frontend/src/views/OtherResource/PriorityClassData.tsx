@@ -11,7 +11,7 @@ import {
 } from '@coreui/react'
 import { useQuery } from '@tanstack/react-query'
 import { Light as SyntaxHighlighter } from 'react-syntax-highlighter'
-import yaml from 'react-syntax-highlighter/dist/esm/languages/hljs/yaml'
+import json from 'react-syntax-highlighter/dist/esm/languages/hljs/json'
 import anOldHope from 'react-syntax-highlighter/dist/esm/styles/hljs/an-old-hope'
 import { apiFetch } from '../../lib/api'
 import type { PriorityClassItem, ResourceList } from '../../lib/types'
@@ -19,20 +19,25 @@ import { useClusterStore } from '../../store/cluster'
 import TopMenu from '../../components/TopMenu'
 
 // Same pattern as SecretData.tsx / NetworkPolicyData.tsx: the hljs language
-// module is a singleton, so a second registration is harmless. Register only
-// `yaml` — this view shows one whole-object block, not SecretData's per
-// key/value `secretLanguage` guesser (the wrong classifier for a whole object).
-SyntaxHighlighter.registerLanguage('yaml', yaml)
+// module is a singleton, so a second registration is harmless. Register
+// `json` — the block is `JSON.stringify` of the to_dict object (a YAML
+// subset), so the json grammar is the truthful classifier for the exact text
+// rendered. The yaml language was a prior misclassification (its grammar does
+// not parse JSON lines), found by the final branch review.
+SyntaxHighlighter.registerLanguage('json', json)
 
 const NOT_FOUND = 'not found'
 
 /**
  * 4.1 `other-resources/priorityclass-data.html.j2` parity: one
- * PriorityClass's metadata plus the full object as YAML. The read is a
- * SINGLE `?name=` fetch (not 4.1's list-then-filter); the kind is
- * cluster-scoped, so the URL carries no namespace param. Empty `items` is a
- * not-found STATE (pinned copy), not an error. The list view's name links are
- * the sole producer of these query strings.
+ * PriorityClass's metadata plus the full object as a syntax-highlighted block
+ * (`JSON.stringify` of the `to_dict` item — JSON is a YAML subset; ratified
+ * delta, final review 2026-10-28: the block is JSON text with the truthful
+ * `json` highlighter). The read is a SINGLE `?name=` fetch (not 4.1's
+ * list-then-filter); the kind is cluster-scoped, so the URL carries no
+ * namespace param. Empty `items` is a not-found STATE (pinned copy), not an
+ * error. The list view's name links are the sole producer of these query
+ * strings.
  */
 const PriorityClassDataView = () => {
   const [params] = useSearchParams()
@@ -174,7 +179,7 @@ const PriorityClassDataView = () => {
               </CCardHeader>
               <CCardBody>
                 <SyntaxHighlighter
-                  language="yaml"
+                  language="json"
                   style={anOldHope}
                   wrapLongLines
                   customStyle={{ margin: 0 }}

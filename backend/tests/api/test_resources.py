@@ -293,8 +293,6 @@ class FakeK8s:
             }
         ]
 
-    # The duplicate signature below is a typo; see the original
-    # ``list_cilium_network_policies`` defined earlier in this class.
     def list_priority_classes(self, _namespace: str | None) -> list[dict]:
         # Cluster-scoped: the namespace argument is accepted-and-ignored
         # (mirrors the real K8sClient.list_priority_classes).
