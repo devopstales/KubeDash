@@ -125,8 +125,9 @@ test('list-renders-priority-classes', async () => {
   expect(requestedUrl).not.toContain('namespace')
 
   // card title: EXACT string (the e2e smoke asserts it with exact: true).
-  // Both the breadcrumb and the card title render it — at least one must exist.
-  expect(screen.getAllByText('Priority Classes', { exact: true }).length).toBeGreaterThanOrEqual(1)
+  // Pinned on the heading specifically: the breadcrumb renders the same
+  // text, and a card-title regression must not survive via the breadcrumb.
+  expect(screen.getByRole('heading', { name: 'Priority Classes' })).toBeTruthy()
   // breadcrumb: Other Resources → Priority Classes.
   expect(screen.getByText('Other Resources')).toBeTruthy()
   // columns: name, value, preemption policy, global default, description, created.
@@ -149,11 +150,9 @@ test('list-renders-priority-classes', async () => {
   expect(nameCell?.textContent).toMatch(/2026/)
 })
 
-// Pin the kind URL (the view↔API seam): an exact-path capture so a
-// kind-string drift (e.g. `priority-class` singular) fails here, not in a
-// browser. The default msw handler answers any other resource URL with
-// `{items: []}`, which would hide such drift.
-function capturePaths(): string[] {
+// list-no-cluster-state
+test('list-no-cluster-state', async () => {
+  useClusterStore.setState({ selectedCluster: null, selectedNamespace: null })
   const seen: string[] = []
   server.use(
     http.get('*/api/v1/clusters/:id/resources/*', ({ request }) => {
@@ -161,14 +160,6 @@ function capturePaths(): string[] {
       return HttpResponse.json({ items: [] })
     }),
   )
-  return seen
-}
-
-// list-no-cluster-state
-test('list-no-cluster-state', async () => {
-  selectProd()
-  useClusterStore.setState({ selectedCluster: null, selectedNamespace: null })
-  const seen = capturePaths()
   renderAt(<PriorityClassView />)
 
   expect(await screen.findByText('No cluster selected.')).toBeTruthy()
