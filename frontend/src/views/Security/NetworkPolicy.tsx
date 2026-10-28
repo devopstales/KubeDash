@@ -105,6 +105,10 @@ const NetworkPolicyView = () => {
   })
 
   const ciliumRows = [...(ciliumQuery.data ?? []), ...(clusterwideQuery.data ?? [])]
+  // The section is visible when there are rows OR a query errored: an error
+  // with the sibling query empty (no rows) must still surface, not vanish
+  // behind an empty-section condition.
+  const ciliumError = ciliumQuery.error ?? clusterwideQuery.error ?? null
 
   return (
     <CCard className="shadow mb-4">
@@ -141,16 +145,15 @@ const NetworkPolicyView = () => {
                 <Column title="Created" data="created" />
               </KubeDataTable>
             )}
-            {ciliumRows.length > 0 && (
+            {(ciliumRows.length > 0 || ciliumError) && (
               <CCard className="shadow mb-0">
                 <CCardHeader className="py-3">
                   <CCardTitle className="m-0 fw-bold text-primary fs-6">Cilium Policies</CCardTitle>
                 </CCardHeader>
                 <CCardBody>
-                  {ciliumQuery.error || clusterwideQuery.error ? (
+                  {ciliumError ? (
                     <div className="text-danger">
-                      Error loading Cilium policies:{' '}
-                      {ciliumQuery.error?.message ?? clusterwideQuery.error?.message}
+                      Error loading Cilium policies: {ciliumError.message}
                     </div>
                   ) : (
                     <KubeDataTable data={ciliumRows}>
