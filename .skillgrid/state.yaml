@@ -25,6 +25,14 @@ in_flight:
     # (AGENTS.md KUBEDASH_HOME row, glossary terms). Next: reflect
     # (completes report.md retro half in the archive + session close).
     tracker: [TASK-033, TASK-034, TASK-035, TASK-036, TASK-037]
+  - change: 2026-10-28-runtimeclass-views
+    phase: execution
+    # Executed 2026-10-28 (TASK-046): 4 commits on `rebase` — backend
+    # runtimeclasses kind (node.k8s.io, cluster-scoped, SAR-gated, 718eda35),
+    # list view (7580d592), data view (33adbbe7), routes + stub removal
+    # (786100f5). Verification floor green (unit 471 passed; vitest 14/14
+    # targeted; fe-build + fe-check). Awaits QA gate + review (orchestrator).
+    tracker: [TASK-046]
 completed_changes:
   - 2026-10-17-kubedash-base-structure
   - 2026-10-17-swagger-ui-air-gap
