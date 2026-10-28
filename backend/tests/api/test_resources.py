@@ -207,6 +207,52 @@ class FakeK8s:
             }
         ]
 
+    def list_network_policies(self, namespace: str | None) -> list[dict]:
+        # The all-namespaces branch is DISTINCTLY named (team-b) so the API
+        # tests can tell the two branches apart, mirroring list_pods.
+        if namespace is None:
+            return [
+                {
+                    "metadata": {"name": "deny-all", "namespace": "default"},
+                    "spec": {
+                        "pod_selector": {},
+                        "policy_types": ["Ingress", "Egress"],
+                        "ingress": [],
+                        "egress": [{"to": [{"ip_block": {"cidr": "0.0.0.0/0"}}]}],
+                    },
+                },
+                {
+                    "metadata": {"name": "deny-all", "namespace": "team-b"},
+                    "spec": {"pod_selector": {}, "policy_types": ["Ingress"]},
+                },
+            ]
+        return [
+            {
+                "metadata": {"name": "deny-all", "namespace": namespace},
+                "spec": {
+                    "pod_selector": {},
+                    "policy_types": ["Ingress", "Egress"],
+                    "ingress": [],
+                    "egress": [{"to": [{"ip_block": {"cidr": "0.0.0.0/0"}}]}],
+                },
+            }
+        ]
+
+    def get_network_policy(self, namespace: str, name: str) -> list[dict]:
+        if name != "deny-all":
+            return []
+        return [
+            {
+                "metadata": {"name": name, "namespace": namespace},
+                "spec": {
+                    "pod_selector": {},
+                    "policy_types": ["Ingress", "Egress"],
+                    "ingress": [],
+                    "egress": [{"to": [{"ip_block": {"cidr": "0.0.0.0/0"}}]}],
+                },
+            }
+        ]
+
     def readyz(self) -> bool:
         return True
 
@@ -854,6 +900,104 @@ def test_list_crd_instances_requires_name(api_client, auth_client, fake_k8s, mon
     _register(api_client, h)
     _allow_sar(monkeypatch)
     r = api_client.get("/api/v1/clusters/1/resources/crds/instances", headers=h)
+    assert r.status_code == 404
+    assert r.get_json()["error"]["code"] == "RESOURCE_KIND_NOT_SUPPORTED"
+
+
+def test_list_networkpolicies_200(api_client, auth_client, fake_k8s, monkeypatch) -> None:
+    """[networkpolicies-list-namespaced] a bound user listing
+    networkpolicies in one namespace gets the to_dict items back, spec
+    (policy_types, ingress, egress) intact."""
+    auth_client.login()
+    h = {"Authorization": f"Bearer {auth_client.jwt}"}
+    _register(api_client, h)
+    _allow_sar(monkeypatch)
+    r = api_client.get(
+        "/api/v1/clusters/1/resources/networkpolicies?namespace=team-a",
+        headers=h,
+    )
+    assert r.status_code == 200
+    body = r.get_json()
+    assert body["kind"] == "networkpolicies"
+    [policy] = body["items"]
+    assert policy["metadata"]["name"] == "deny-all"
+    assert policy["metadata"]["namespace"] == "team-a"
+    assert policy["spec"]["policy_types"] == ["Ingress", "Egress"]
+    assert policy["spec"]["egress"] == [{"to": [{"ip_block": {"cidr": "0.0.0.0/0"}}]}]
+
+
+def test_list_networkpolicies_all_namespaces(
+    api_client, auth_client, fake_k8s, monkeypatch
+) -> None:
+    """[networkpolicies-list-all-namespaces] no namespace query hits the
+    all-namespaces branch: the distinctly-named team-b item is present."""
+    auth_client.login()
+    h = {"Authorization": f"Bearer {auth_client.jwt}"}
+    _register(api_client, h)
+    _allow_sar(monkeypatch)
+    r = api_client.get("/api/v1/clusters/1/resources/networkpolicies", headers=h)
+    assert r.status_code == 200
+    body = r.get_json()
+    assert body["kind"] == "networkpolicies"
+    assert [item["metadata"]["namespace"] for item in body["items"]] == ["default", "team-b"]
+
+
+def test_get_network_policy_by_name(api_client, auth_client, fake_k8s, monkeypatch) -> None:
+    """[networkpolicies-get-by-name] ``?name=`` returns a 0/1-item list: a
+    hit returns the one item, a miss returns ``[]`` (mirrors get_secret)."""
+    auth_client.login()
+    h = {"Authorization": f"Bearer {auth_client.jwt}"}
+    _register(api_client, h)
+    _allow_sar(monkeypatch)
+    r = api_client.get(
+        "/api/v1/clusters/1/resources/networkpolicies?namespace=team-a&name=deny-all",
+        headers=h,
+    )
+    assert r.status_code == 200
+    [policy] = r.get_json()["items"]
+    assert policy["metadata"] == {"name": "deny-all", "namespace": "team-a"}
+    r = api_client.get(
+        "/api/v1/clusters/1/resources/networkpolicies?namespace=team-a&name=ghost",
+        headers=h,
+    )
+    assert r.status_code == 200
+    assert r.get_json()["items"] == []
+
+
+def test_list_networkpolicies_sar_denied(api_client, auth_client, fake_k8s, monkeypatch) -> None:
+    """[networkpolicies-sar-denied] ADR-0004: the SAR is asked BEFORE the
+    read, with the group — a deny short-circuits to 403 RBAC_DENIED."""
+    auth_client.login()
+    h = {"Authorization": f"Bearer {auth_client.jwt}"}
+    _register(api_client, h)
+    asked = _record_sar(monkeypatch)  # denies every SAR and records calls
+    r = api_client.get(
+        "/api/v1/clusters/1/resources/networkpolicies?namespace=team-a",
+        headers=h,
+    )
+    assert r.status_code == 403
+    assert r.get_json()["error"]["code"] == "RBAC_DENIED"
+    # the SAR was asked BEFORE the read, with the group (ADR-0004 cache key):
+    assert ("list", "networkpolicies", "team-a", None, "networking.k8s.io") in asked
+
+
+def test_networkpolicies_binding_404(api_client, auth_client) -> None:
+    """[networkpolicies-binding-404] an unbound user: the binding gate
+    fails before the SAR, CLUSTER_NOT_FOUND."""
+    auth_client.login()
+    h = {"Authorization": f"Bearer {auth_client.jwt}"}
+    r = api_client.get("/api/v1/clusters/999/resources/networkpolicies", headers=h)
+    assert r.status_code == 404
+    assert r.get_json()["error"]["code"] == "CLUSTER_NOT_FOUND"
+
+
+def test_kind_singular_network_policy_rejected(api_client, auth_client) -> None:
+    """[networkpolicies-kind-singular-rejected] the 4.1 route name
+    (singular) is not a kind — RESOURCE_KIND_NOT_SUPPORTED."""
+    auth_client.login()
+    h = {"Authorization": f"Bearer {auth_client.jwt}"}
+    _register(api_client, h)
+    r = api_client.get("/api/v1/clusters/1/resources/network-policy", headers=h)
     assert r.status_code == 404
     assert r.get_json()["error"]["code"] == "RESOURCE_KIND_NOT_SUPPORTED"
 

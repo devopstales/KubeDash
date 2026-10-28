@@ -221,6 +221,7 @@ class K8sClient:
         # e.g. create_namespaced_role, DO match that class). Same ApiClient
         # keeps one auth context.
         self._rbac = k8s_client.RbacAuthorizationV1Api(api_client)
+        self._networking = k8s_client.NetworkingV1Api(api_client)
         self._host = self._v1.api_client.configuration.host
 
     @staticmethod
@@ -635,6 +636,33 @@ class K8sClient:
             if e.status == 404:
                 return []
             raise
+
+    def list_network_policies(self, namespace: str | None) -> list[dict[str, Any]]:
+        """NetworkPolicy list in the standard kubernetes dict form (``to_dict``).
+        No field stripping — a policy's spec is what the view renders. A
+        transport ApiException maps to ``ClusterUnreachableError`` (502)."""
+        try:
+            resp = (
+                self._networking.list_namespaced_network_policy(namespace)
+                if namespace
+                else self._networking.list_network_policy_for_all_namespaces()
+            )
+        except ApiException as e:
+            self._unreachable("list_network_policies", e)
+            raise AssertionError("unreachable") from e
+        return [p.to_dict() for p in resp.items]
+
+    def get_network_policy(self, namespace: str, name: str) -> list[dict[str, Any]]:
+        """One NetworkPolicy as a 0/1-item list; ``[]`` on 404. Any other
+        ApiException maps to ``ClusterUnreachableError`` (502), matching
+        ``get_secret``'s transport contract."""
+        try:
+            return [self._networking.read_namespaced_network_policy(name, namespace).to_dict()]
+        except ApiException as e:
+            if e.status == 404:
+                return []
+            self._unreachable("get_network_policy", e)
+            raise AssertionError("unreachable") from e
 
     def readyz(self) -> bool:
         """GET ``<host>/readyz`` with the kubeconfig's CA as ``verify=`` and a

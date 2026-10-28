@@ -50,12 +50,14 @@ _KINDS: dict[str, tuple[str, str, str]] = {
     "clusterrolebindings": ("list_cluster_role_bindings", "clusterrolebindings", _RBAC_GROUP),
     "secrets": ("list_secrets", "secrets", ""),
     "crds": ("list_crds", "customresourcedefinitions", _CRD_GROUP),
+    "networkpolicies": ("list_network_policies", "networkpolicies", "networking.k8s.io"),
 }
 
 #: kind → K8sClient method for a single-object ``?name=`` lookup
 _GETTERS: dict[str, str] = {
     "secrets": "get_secret",
     "crds": "get_crd",
+    "networkpolicies": "get_network_policy",
 }
 
 
