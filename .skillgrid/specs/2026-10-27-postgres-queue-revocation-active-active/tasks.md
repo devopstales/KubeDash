@@ -41,7 +41,7 @@ Chain strategy: single-branch on `rebase`
 ### TICKET-01 — Migration: `tasks`, `revoked_jtis`, `kv`, `leader_lease.fence`
 
 - **Tracker ID:** TASK-042
-- **Scope:** one Alembic migration creating the three tables creating the three tables + the `fence` column; the three ORM models; export them from `app.models`. The tracer-thread foundation every later ticket reads.
+- **Scope:** one Alembic migration creating the three tables + the `fence` column; the three ORM models; export them from `app.models`. The tracer-thread foundation every later ticket reads.
 - **Acceptance:** after `alembic upgrade head`, `tasks`/`revoked_jtis`/`kv` exist with the right columns/constraints (`tasks`: id/path/status/attempts/enqueued_at/locked_at/locked_by/available_at + plain index; `revoked_jtis`: jti PK + expires_at; `kv`: key PK + value + expires_at + index); `leader_lease.fence` is NOT NULL default 0. **No** partial index with `now()` in the predicate (findings #2).
 - **SATISFIES:** `enqueue-then-claim-returns-the-task-path` (schema half — the `tasks` row is claimable once it exists)
 - **Files:** `backend/migrations/versions/<new>_queue_revocation_kv_fence.py`, `backend/app/models/{task,revocation,kv}.py`, `backend/app/models/__init__.py`, `backend/tests/models/test_new_tables.py`
