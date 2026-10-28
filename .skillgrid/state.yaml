@@ -25,19 +25,6 @@ in_flight:
     # (AGENTS.md KUBEDASH_HOME row, glossary terms). Next: reflect
     # (completes report.md retro half in the archive + session close).
     tracker: [TASK-033, TASK-034, TASK-035, TASK-036, TASK-037]
-  - change: 2026-10-26-network-policy
-    phase: qa
-    # Executed 2026-10-28 on branch `rebase` (sdd ledger
-    # 2026-10-26-network-policy): 5 tasks — 8f6bdbb9 (networkpolicies kind),
-    # 3e6dc041 (cilium kinds), 2a93c006 (list view), fcc40567 (detail view),
-    # 98497d24 (kind backstops) + 2bb6e853 (QA: API-tier 502) + fix wave
-    # (ef9b2abf, 1ae0be3a, 421770d8, 10074744) + 0b673fa0 (ADR-0022 row).
-    # QA gate PASS (re-verified after the 502 fix). Final two-axis review
-    # clean (6/6 findings addressed, re-reviewed). Note: fcc40567 (its
-    # Task 4) swept the shared working tree and absorbed the priority-class
-    # change's Task 2 App.tsx hunk — see W006; ship/archive both together.
-    # Next: ship.
-    tracker: []
 completed_changes:
   - 2026-10-17-kubedash-base-structure
   - 2026-10-17-swagger-ui-air-gap
@@ -53,6 +40,10 @@ completed_changes:
   # Shipped 2026-10-28 (keep branch as-is; QA PASS, final review clean after
   # fix wave b02c2ef9; folder archived in 27137670's working tree):
   - 2026-10-27-priority-class
+  # Shipped 2026-10-28 (keep branch `rebase` as-is, user decision; QA PASS
+  # re-verified after the API-tier-502 fix, final two-axis review clean 6/6;
+  # folder archived this commit):
+  - 2026-10-26-network-policy
 
 # Onboarding state (2026-10-17): config.yaml + ASSUMPTIONS.md + state.yaml
 # created. Open items tracked in ASSUMPTIONS.md "Onboarding notes".
