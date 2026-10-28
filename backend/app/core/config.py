@@ -74,6 +74,12 @@ class Settings(BaseSettings):
     )
     # [deployment] tls_edge (ADR-0026/0027)
     tls_edge: bool = Field(default_factory=lambda: ini_config.resolve_bool("tls_edge"))
+    # [deployment] ssl_cert / ssl_key (ADR-0026): the process TLS cert/key the
+    # server binds. Empty = plain HTTP. wsgi reads these (not the env directly)
+    # so the INI is the single source — Gunicorn never runs wsgi.__main__, so
+    # the env-only read there was a dead config under Gunicorn.
+    ssl_cert: str = Field(default_factory=lambda: ini_config.resolve("ssl_cert"))
+    ssl_key: str = Field(default_factory=lambda: ini_config.resolve("ssl_key"))
     # [sso_settings] bootstrap_users (optional empty-string knob)
     sso_bootstrap_users: str = Field(
         default_factory=lambda: ini_config.resolve("sso_bootstrap_users")

@@ -58,9 +58,12 @@ import os
 
 # ADR-0028: the app is built in main() (not at import) so that importing
 # wsgi is a no-op (test_worker_gate reloads it; test_proxyfix imports it for
-# _apply_proxyfix). Gunicorn loads the module and calls main(); running as a
-# script keeps dev behavior identical.
+# _apply_proxyfix). ``wsgi`` (below) is the module-level WSGI callable
+# Gunicorn loads (``wsgi:wsgi``): it lazy-builds the app on the FIRST request
+# (once per master process), so importing wsgi stays a no-op and the RQ
+# scheduler (main() -> _start_worker_if_leader) starts in the master.
 app: Flask | None = None
+_app_lock = threading.Lock()
 
 # RQ task path -> enqueue interval (seconds). The worker thread below is the
 # scheduler: it enqueues a task only when it is due AND this replica leads.
@@ -84,12 +87,35 @@ def _rq_worker_main() -> None:
     exits cleanly after each scheduler interval; the scheduler re-spawns it on
     the next due enqueue. ``app.app_context()`` wraps the drain so the task
     functions' ``db.session`` (Flask-SQLAlchemy, app-bound) resolves.
+
+    ``_build_worker_app()`` runs BEFORE the context: the child is spawned with
+    ``import wsgi; wsgi._rq_worker_main()`` — it imports wsgi fresh, so the
+    module-level ``app`` is None there (ADR-0028: the app is built in main(),
+    not at import). The Gunicorn master (wsgi:wsgi) and ``python wsgi.py``
+    both call main(), but the child's -c line calls only this function, so it
+    must build its own app or ``app.app_context()`` crashes on None.
     """
     from app.extensions import redis_client
 
-    with app.app_context():
+    with _build_worker_app().app_context():
         w = rq.Worker(["kubedash"], connection=redis_client)
         w.work(burst=True)
+
+
+def _build_worker_app() -> Flask:
+    """Build a standalone app for the RQ worker child (ADR-0028).
+
+    The child is spawned with ``import wsgi; wsgi._rq_worker_main()`` — it
+    imports wsgi fresh, so the module-level ``app`` is None there (the app is
+    built in ``main()`` at import time, not here). Building it inside the
+    child keeps the child self-contained: it re-reads the same INI/env, so
+    the task functions' ``db.session`` and Redis bind identically to the
+    master. ``create_app`` is pure (no DB init, no RQ startup) — the factory
+    stays testable — and the bootstrap hook is deliberately NOT re-run here:
+    it is a one-time DB upsert the master already did at boot, and re-running
+    it per drain would be a no-op at best.
+    """
+    return create_app()
 
 
 def _schedule_if_leader(leader_obj: object, queue: rq.Queue) -> None:
@@ -180,10 +206,16 @@ def _start_worker_if_leader() -> None:
 def main() -> Flask:
     """Build the app and start the leader-gated RQ scheduler.
 
-    Called by Gunicorn (``wsgi:main``) and by ``python wsgi.py``. Importing
-    wsgi is a no-op: ``app`` stays ``None`` until ``main()`` runs, so
-    test modules that import wsgi (test_worker_gate reloads it; test_proxyfix
-    imports ``_apply_proxyfix``) do not trigger the create_app fail-fast.
+    The Gunicorn master reaches this via the module-level ``wsgi`` callable
+    (the first request triggers ``_ensure_app()`` -> ``main()``), and the dev
+    script path calls it directly in ``__main__``. Importing wsgi stays a
+    no-op: ``app`` is None until ``main()`` runs, so test modules that import
+    wsgi (test_worker_gate reloads it; test_proxyfix imports _apply_proxyfix)
+    do not trigger the create_app fail-fast.
+
+    Returns the built Flask app (the WSGI callable). TLS is a server concern,
+    not a WSGI one — Gunicorn serves TLS via its own ``--certfile``/``--keyfile``
+    (see the Dockerfile CMD / Taskfile), so there is no ssl_context to return.
     """
     global app
     # ADR-0028: the static dir is derived from KUBEDASH_HOME (ini_config
@@ -208,24 +240,45 @@ def main() -> Flask:
     except Exception:
         log.exception("local-admin bootstrap skipped (will retry next boot)")
 
-    # Gunicorn loads the module without executing ``__main__`` (workers use
-    # the module-level ``app``); running as a script keeps dev behavior
-    # identical.
     _start_worker_if_leader()
     return app
 
 
+def wsgi(environ, start_response):
+    """Module-level WSGI entry point — the object Gunicorn loads (``wsgi:wsgi``).
+
+    Gunicorn's ``import_app`` resolves ``module:name`` to a CALLABLE and never
+    inspects its return value, so ``wsgi:main`` was wrong: it handed Gunicorn
+    the 0-arg ``main`` function itself, which then took ``environ``/
+    ``start_response`` per request and blew up (and ``main`` was never called,
+    so the RQ scheduler never started). ``wsgi`` lazy-builds the app exactly
+    once per master process (``_ensure_app`` is idempotent + locked) and then
+    delegates to the Flask WSGI app. The first request therefore starts the
+    leader-gated RQ scheduler in the master, exactly as the old ``main()``
+    call was meant to.
+    """
+    _ensure_app()
+    return app(environ, start_response)
+
+
+def _ensure_app() -> Flask:
+    """Build the app once (idempotent + thread-safe) and return it."""
+    global app
+    if app is None:
+        with _app_lock:
+            if app is None:
+                app = main()
+    return app
+
+
 if __name__ == "__main__":
-    main()
-    # WHY env-only (not INI): FLASK_RUN_PORT, KUBEDASH_SSL_CERT, and
-    # KUBEDASH_SSL_KEY are process-level knobs — they control HOW the server
-    # listens, not WHAT the app is configured with. The INI is the app's
-    # identity; the process port/SSL is the deployment's concern.
-    cert = os.environ.get("KUBEDASH_SSL_CERT")
-    ssl_context = (
-        (cert, os.environ["KUBEDASH_SSL_KEY"])
-        if cert
-        else None
-    )
+    _ensure_app()
+    # WHY env-only: FLASK_RUN_PORT is a process knob — it controls HOW the
+    # server listens, not WHAT the app is configured with. The cert/key are
+    # INI-sourced (ADR-0026) so the INI is the single TLS source for BOTH
+    # entry paths; the env (KUBEDASH_SSL_CERT/KEY) still overrides the INI
+    # through the standard precedence chain (see config.ssl_cert/ssl_key).
     port = int(os.environ.get("FLASK_RUN_PORT", "8080"))
+    cert = get_settings().ssl_cert
+    ssl_context = (cert, get_settings().ssl_key) if cert else None
     app.run(port=port, ssl_context=ssl_context)

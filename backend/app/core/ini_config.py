@@ -98,6 +98,17 @@ _FIELDS: dict[str, tuple[str, str, tuple[str, ...], bool, str, bool]] = {
     "sso_bootstrap_users": (
         "sso_settings", "bootstrap_users", ("KUBEDASH_SSO_BOOTSTRAP_USERS",), True, "", False,
     ),
+    # [deployment] ssl_cert / ssl_key (ADR-0026): the process-level TLS cert +
+    # key. Read by wsgi (Gunicorn) and wsgi.__main__ (dev script) for the
+    # server's TLS context. Empty = plain HTTP (the default; the container CMD
+    # binds -b 0.0.0.0:8080 plain). dev-stack-ssl sets both (+ Gunicorn
+    # --certfile/--keyfile) so :8443 serves TLS — the nginx edge's upstream.
+    "ssl_cert": (
+        "deployment", "ssl_cert", ("KUBEDASH_SSL_CERT",), True, "", False,
+    ),
+    "ssl_key": (
+        "deployment", "ssl_key", ("KUBEDASH_SSL_KEY",), True, "", False,
+    ),
     # [monitoring] (ADR-0003 observability; ADR-0028 new 5.0 section)
     "jaeger_enabled": (
         "monitoring", "jaeger_enabled", ("KUBEDASH_JAEGER_ENABLED",), True, "false", True,

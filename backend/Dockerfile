@@ -33,4 +33,4 @@ HEALTHCHECK --interval=30s --timeout=5s CMD python -c "import urllib.request;url
 # the operator mounts it. The static dir is derived: <KUBEDASH_HOME>/static
 # (= /app/static, where the SPA is copied). wsgi:main builds the app + starts
 # the leader-gated RQ scheduler.
-CMD ["sh", "-c", "exec gunicorn -w \"$GUNICORN_WORKERS\" --threads \"$GUNICORN_THREADS\" -b 0.0.0.0:8080 wsgi:main"]
+CMD ["sh", "-c", "exec gunicorn -w \"$GUNICORN_WORKERS\" --threads \"$GUNICORN_THREADS\" -b 0.0.0.0:8080 wsgi:wsgi"]

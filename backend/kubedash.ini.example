@@ -76,6 +76,12 @@ kubedash_role = worker
 kubedash_replica_id = local
 cookie_secure = true
 tls_edge = false
+# TLS server cert/key (ADR-0026): empty = plain HTTP (the container CMD binds
+# -b 0.0.0.0:8080 plain). Set both to make Gunicorn serve TLS (pair with
+# --certfile/--keyfile, or wsgi.__main__'s app.run ssl_context); override via
+# KUBEDASH_SSL_CERT / KUBEDASH_SSL_KEY.
+ssl_cert =
+ssl_key =
 # CORS origins (comma-separated). Empty = same-origin only.
 cors_origins =
 # Plugin server URL (empty = 500 INTERNAL_ERROR on kubeconfig download).

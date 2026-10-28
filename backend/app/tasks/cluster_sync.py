@@ -38,4 +38,7 @@ def run() -> None:
         db.session.flush()
         if not ok:
             log.warning("cluster %r (id=%s) is down — alert path is a later change", c.name, c.id)
+    # COMMIT is required (see health.run): the worker's per-job app context
+    # rolls back uncommitted changes on exit, so flush() alone loses the
+    # status/last_probe_at writes.
     db.session.commit()

@@ -34,4 +34,9 @@ def run() -> None:
         # Flush per-row so the commit does NOT use psycopg3 executemany (same
         # RQ work-horse DuplicatePreparedStatement issue as cluster_sync).
         db.session.flush()
+    # COMMIT is required: the RQ worker runs the task in its own app context
+    # (wsgi._rq_worker_main wraps work(burst=True) in app.app_context()), so
+    # when the context exits the session rolls back any uncommitted changes.
+    # flush() alone only reaches the DB inside the open transaction — the
+    # status/last_probe_at writes would vanish at context exit.
     db.session.commit()
