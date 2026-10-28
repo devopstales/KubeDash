@@ -6,19 +6,24 @@ Every KubeDash API that lists or mutates cluster resources asks
 cluster's own RBAC (SelfSubjectAccessReview) is the answer, and the 10 frozen
 OD-1 codes carry the result (403 RBAC_DENIED on deny).
 
-Decisions are cached in Redis for ``SAR_TTL`` seconds under
-``sar:<cluster.id>:<user.sub>:<verb>:<resource>:<group>:<namespace>:<name>``
+Decisions are cached in the Postgres ``kv`` table (ADR-0030) for ``SAR_TTL``
+seconds under ``sar:<cluster.id>:<user.sub>:<verb>:<resource>:<group>:<namespace>:<name>``
 (empty segment = unset). The key carries every SAR attribute: the API lists
 with the registry's credentials, so the SAR is the only gate, and a verdict
 for one namespace or object must never answer for another (ADR-0004
 addendum). A cache hit never re-asks the cluster (the seam the unit tests
 prove with a throwing ``pool.get``).
+
+The storage backend moved Redis → ``kv`` under the SAME key (TICKET-06);
+this module is Flask-free (``app/services/`` seam rule), so the engine
+arrives from the call site as a parameter — never a module global.
 """
 from typing import Any
 
 from kubernetes import client as k8s_client
+from sqlalchemy import Engine
 
-from app.extensions import redis_client
+from app.core import kvstore
 from app.services.k8s_client import pool
 
 SAR_TTL = 30  # seconds (ARCHITECTURE.md §3.3)
@@ -36,17 +41,14 @@ def _cache_key(
     return f"sar:{cluster_id}:{sub}:{verb}:{resource}:{group}:{namespace or ''}:{name or ''}"
 
 
-def _cache_get(key: str) -> str | None:
-    hit = redis_client.get(key)
-    if hit is None:
-        return None
-    # redis-py returns bytes unless decode_responses is on. b"1" == "1" is
-    # false, which turned every cache hit into a deny.
-    return hit.decode() if isinstance(hit, bytes) else str(hit)
+def _cache_get(engine: Engine, key: str) -> str | None:
+    # A miss (absent OR expired) is None; ``kv`` stores text, so the
+    # redis-py bytes-decode branch is gone.
+    return kvstore.kv_get(engine, key)
 
 
-def _cache_set(key: str, value: str) -> None:
-    redis_client.set(key, value, ex=SAR_TTL)
+def _cache_set(engine: Engine, key: str, value: str) -> None:
+    kvstore.kv_set(engine, key, value, SAR_TTL)
 
 
 def _sar_allowed(
@@ -89,6 +91,7 @@ def can(
     namespace: str | None,
     name: str | None,
     group: str = "",
+    engine: Engine | None = None,
 ) -> bool:
     """The ADR-0004 enforcement point: cached SAR verdict, ``True``/``False``.
 
@@ -96,11 +99,16 @@ def can(
     ``.id`` (the key + the pool lookup). On a cache miss the cluster is
     asked through the pool's client (Task 4 seam) and the verdict is stored
     for ``SAR_TTL`` seconds.
+
+    ``engine`` is the ``kv`` storage seam (ADR-0030): the API call sites
+    pass ``db.engine``; the pure unit tests monkeypatch ``_cache_get``/
+    ``_cache_set`` (the storage seam, not the caller), so ``None`` never
+    reaches a storage function in unit tests.
     """
     key = _cache_key(cluster.id, user.sub, verb, resource, group, namespace, name)
-    hit = _cache_get(key)
+    hit = _cache_get(engine, key)
     if hit is not None:
         return hit == "1"
     ok = _sar_allowed(pool.get(cluster), verb, resource, namespace, name, group)
-    _cache_set(key, "1" if ok else "0")
+    _cache_set(engine, key, "1" if ok else "0")
     return ok

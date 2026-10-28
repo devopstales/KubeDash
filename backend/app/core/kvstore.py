@@ -23,6 +23,28 @@ from sqlalchemy import Engine, text
 # is simply already-expired). No clamp here: callers (security.py, rbac.py)
 # pass sane constants. Upgrade path: validate ttl_seconds >= 1 if a dynamic
 # TTL ever comes from user input.
+#
+# ponytail: the Docker-free sqlite api-tier (tests/api/conftest.py) cannot
+# run Postgres's ``make_interval``/``now()`` — the dialect-aware branches
+# below keep that tier on a functionally equivalent ``strftime``/
+# ``CURRENT_TIMESTAMP`` path. Production is Postgres-only (ADR-0030); the
+# sqlite path exists solely so the api-tier tests run without a container
+# runtime. Both paths keep ``now()``/the timestamp on the SQL side.
+
+_PG_SET_SQL = (
+    "INSERT INTO kv (key, value, expires_at) "
+    "VALUES (:k, :v, now() + make_interval(secs => :ttl)) "
+    "ON CONFLICT (key) DO UPDATE SET "
+    "value = EXCLUDED.value, expires_at = EXCLUDED.expires_at"
+)
+_SQLITE_SET_SQL = (
+    "INSERT INTO kv (key, value, expires_at) "
+    "VALUES (:k, :v, datetime('now', :ttl || ' seconds')) "
+    "ON CONFLICT (key) DO UPDATE SET "
+    "value = EXCLUDED.value, expires_at = EXCLUDED.expires_at"
+)
+_PG_NOW_SQL = "SELECT value FROM kv WHERE key = :k AND expires_at > now()"
+_SQLITE_NOW_SQL = "SELECT value FROM kv WHERE key = :k AND expires_at > datetime('now')"
 
 
 def kv_set(engine: Engine, key: str, value: str | None, ttl_seconds: int) -> None:
@@ -31,16 +53,9 @@ def kv_set(engine: Engine, key: str, value: str | None, ttl_seconds: int) -> Non
     ``value`` may be None (a tombstone row is a legal one-shot state).
     Re-setting the same key overwrites its value AND extends its TTL.
     """
+    sql = _PG_SET_SQL if engine.dialect.name == "postgresql" else _SQLITE_SET_SQL
     with engine.begin() as conn:
-        conn.execute(
-            text(
-                "INSERT INTO kv (key, value, expires_at) "
-                "VALUES (:k, :v, now() + make_interval(secs => :ttl)) "
-                "ON CONFLICT (key) DO UPDATE SET "
-                "value = EXCLUDED.value, expires_at = EXCLUDED.expires_at"
-            ),
-            {"k": key, "v": value, "ttl": ttl_seconds},
-        )
+        conn.execute(text(sql), {"k": key, "v": value, "ttl": ttl_seconds})
 
 
 def kv_get(engine: Engine, key: str) -> str | None:
@@ -50,11 +65,9 @@ def kv_get(engine: Engine, key: str) -> str | None:
     is the one-shot delete and ``kv_reap`` is the pruner, so a read
     never hides a tombstone from its consumer's delete.
     """
+    sql = _PG_NOW_SQL if engine.dialect.name == "postgresql" else _SQLITE_NOW_SQL
     with engine.begin() as conn:
-        row = conn.execute(
-            text("SELECT value FROM kv WHERE key = :k AND expires_at > now()"),
-            {"k": key},
-        ).first()
+        row = conn.execute(text(sql), {"k": key}).first()
     return row.value if row is not None else None
 
 

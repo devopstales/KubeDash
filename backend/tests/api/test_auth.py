@@ -157,10 +157,13 @@ def test_garbage_jwt_returns_401(api_client):
 
 
 def test_revoked_jti_returns_401(api_client, api_app):
+    import jwt as pyjwt
+
     from app.core.config import get_settings
     from app.core.security import issue_token_pair
     from app.extensions import db
     from app.models.user import User
+    from app.services import revocation
 
     with api_app.app_context():  # type: ignore[attr-defined]
         u = (
@@ -171,12 +174,11 @@ def test_revoked_jti_returns_401(api_client, api_app):
         db.session.add(u)
         db.session.commit()
         access, _ = issue_token_pair(u)
-        import jwt as pyjwt
-
+        # ADR-0030: the deny-list row is Postgres, not the Redis key — written
+        # through the same service the logout route uses.
         jti = pyjwt.decode(access, get_settings().kubedash_jwt_secret, algorithms=["HS256"])["jti"]
-        from app.extensions import redis_client
-
-        redis_client.set(f"revoked:{jti}", "1", ex=900)
+        revocation.revoke_jti(db.engine, jti, ttl_seconds=900)
+        db.session.commit()
     resp = api_client.get("/api/v1/clusters", headers={"Authorization": f"Bearer {access}"})
     assert resp.status_code == 401
     assert resp.get_json()["error"]["code"] == "UNAUTHORIZED"

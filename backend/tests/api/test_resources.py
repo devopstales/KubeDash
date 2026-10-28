@@ -236,8 +236,8 @@ def _allow_sar(monkeypatch: pytest.MonkeyPatch) -> None:
     """Let every SAR through (the unit tier does not model cluster RBAC)."""
     import app.services.rbac as rb
 
-    monkeypatch.setattr(rb, "_cache_get", lambda k: None)
-    monkeypatch.setattr(rb, "_cache_set", lambda k, v: None)
+    monkeypatch.setattr(rb, "_cache_get", lambda e, k: None)
+    monkeypatch.setattr(rb, "_cache_set", lambda e, k, v: None)
     monkeypatch.setattr(rb, "_sar_allowed", lambda client, verb, resource, ns, name, group="": True)
 
 
@@ -493,8 +493,8 @@ def _record_sar(monkeypatch: pytest.MonkeyPatch) -> list[tuple]:
     import app.services.rbac as rb
 
     asked: list[tuple] = []
-    monkeypatch.setattr(rb, "_cache_get", lambda k: None)
-    monkeypatch.setattr(rb, "_cache_set", lambda k, v: None)
+    monkeypatch.setattr(rb, "_cache_get", lambda e, k: None)
+    monkeypatch.setattr(rb, "_cache_set", lambda e, k, v: None)
 
     def deny(client, verb, resource, ns, name, group=""):
         asked.append((verb, resource, ns, name, group))
@@ -547,8 +547,8 @@ def test_rbac_denied_403(api_client, auth_client, fake_k8s, monkeypatch) -> None
     _register(api_client, h)
     import app.services.rbac as rb
 
-    monkeypatch.setattr(rb, "_cache_get", lambda k: None)
-    monkeypatch.setattr(rb, "_cache_set", lambda k, v: None)
+    monkeypatch.setattr(rb, "_cache_get", lambda e, k: None)
+    monkeypatch.setattr(rb, "_cache_set", lambda e, k, v: None)
     monkeypatch.setattr(rb, "_sar_allowed", lambda api_client, verb, resource, ns, name, group="": False)
     r = api_client.get("/api/v1/clusters/1/resources/pods", headers=h)
     assert r.status_code == 403
@@ -819,8 +819,8 @@ def test_list_crd_instances_second_sar_denied(
         # Allow the CRD read, deny the instance list.
         return resource == "customresourcedefinitions"
 
-    monkeypatch.setattr(rb, "_cache_get", lambda k: None)
-    monkeypatch.setattr(rb, "_cache_set", lambda k, v: None)
+    monkeypatch.setattr(rb, "_cache_get", lambda e, k: None)
+    monkeypatch.setattr(rb, "_cache_set", lambda e, k, v: None)
     monkeypatch.setattr(rb, "_sar_allowed", selective)
     r = api_client.get(
         "/api/v1/clusters/1/resources/crds/instances?name=applications.argoproj.io&namespace=team-a",

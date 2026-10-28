@@ -24,16 +24,19 @@ from collections.abc import Callable
 from datetime import UTC, datetime, timedelta
 from functools import wraps
 from typing import Any
+from uuid import UUID
 
 import jwt
 from authlib.integrations.flask_client import OAuth
 from flask import Response, current_app, g, request
 
+from app.core import kvstore
 from app.core.config import get_settings
 from app.core.errors import RbacDeniedError, StateMismatchError, UnauthorizedError
 from app.extensions import db
 from app.models.token import RefreshToken
 from app.models.user import User
+from app.services import revocation
 
 REFRESH_TTL_DAYS = 30
 STATE_TTL_SECONDS = 300
@@ -196,29 +199,39 @@ def verify_jwt(token: str) -> dict[str, Any]:
         claims: dict[str, Any] = jwt.decode(token, s.kubedash_jwt_secret, algorithms=["HS256"])
     except jwt.PyJWTError as e:
         raise UnauthorizedError("missing or invalid token") from e
-    # ADR-0014 deny-list: jti revocation set in Redis, TTL = JWT lifetime.
-    from app.extensions import redis_client
-
-    if redis_client.get(f"revoked:{claims['jti']}"):
+    # ADR-0014 deny-list (ADR-0030): the jti row in ``revoked_jtis``, TTL =
+    # JWT lifetime. ``db.engine`` is the call-site seam — core may touch the
+    # engine, ``app/services/`` may not.
+    if revocation.is_revoked(db.engine, UUID(claims["jti"])):
         raise UnauthorizedError("token revoked")
     return claims
 
 
 def new_state() -> str:
-    """Per-session opaque state: 32-byte hex in ``oidc_state:<state>``, TTL 300s."""
-    from app.extensions import redis_client
-
+    """Per-session opaque state: 32-byte hex in ``kv`` under
+    ``oidc_state:<state>``, TTL 300s (ADR-0030). The value is a one-shot
+    marker — the ROW is what ``consume_state`` reads."""
     st = secrets.token_hex(16)
-    redis_client.set(f"oidc_state:{st}", "1", ex=STATE_TTL_SECONDS)
+    kvstore.kv_set(db.engine, f"oidc_state:{st}", "1", STATE_TTL_SECONDS)
     return st
 
 
 def consume_state(state: str) -> None:
     """One-shot check-and-delete: a missing/mismatched state raises
-    StateMismatchError, which the factory maps to 400 STATE_MISMATCH."""
-    from app.extensions import redis_client
+    StateMismatchError, which the factory maps to 400 STATE_MISMATCH.
 
-    if not redis_client.delete(f"oidc_state:{state}"):
+    The delete is the one-shot: a second consume finds no row (kv_delete
+    returned False) and raises — a read-then-delete would let a replay win
+    the race."""
+    # kv_delete is the one-shot (False = absent), but it also deletes an
+    # EXPIRED row: a callback after the TTL must 400, not pass (the TTL
+    # half). A fresh row is never deleted here, so the one-shot semantics
+    # hold either way.
+    key = f"oidc_state:{state}"
+    if kvstore.kv_get(db.engine, key) is None:
+        kvstore.kv_delete(db.engine, key)  # prune the expired tombstone
+        raise StateMismatchError("state mismatch")
+    if not kvstore.kv_delete(db.engine, key):
         raise StateMismatchError("state mismatch")
 
 
@@ -284,6 +297,30 @@ def _auth_check() -> None:
         raise UnauthorizedError("missing or invalid token")
     claims = verify_jwt(token)
     _load_user_for_claims(claims)
+
+
+def _current_jti() -> UUID:
+    """Decode the ambient access token's ``jti`` (ADR-0030) — the credential
+    the request authenticated with, under the SAME precedence as
+    ``_auth_check`` (Bearer header first, then the ``kd_access`` cookie).
+
+    ``verify_jwt`` is not re-run: ``logout`` is ``@require_auth`` (already
+    verified + deny-list-checked), and a second PK probe per logout is
+    wasted work. A request without a credential raises UnauthorizedError —
+    the same 401, not a 500."""
+    header = request.headers.get("Authorization", "")
+    token = (
+        header[len("Bearer "):]
+        if header.startswith("Bearer ")
+        else request.cookies.get(ACCESS_COOKIE)
+    )
+    if not token:
+        raise UnauthorizedError("missing or invalid token")
+    try:
+        claims = jwt.decode(token, get_settings().kubedash_jwt_secret, algorithms=["HS256"])
+        return UUID(claims["jti"])
+    except (jwt.PyJWTError, ValueError, KeyError) as e:
+        raise UnauthorizedError("missing or invalid token") from e
 
 
 def require_auth(f: Callable[..., Any]) -> Callable[..., Any]:

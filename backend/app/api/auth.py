@@ -19,6 +19,7 @@ from app.core import security
 from app.core.config import get_settings
 from app.core.errors import InvalidCredentialsError, LocalAuthDisabledError
 from app.core.security import (
+    ACCESS_TTL_SECONDS,
     REFRESH_COOKIE,
     REFRESH_TTL_DAYS,
     clear_session_cookies,
@@ -33,6 +34,7 @@ from app.extensions import db
 from app.models.token import RefreshToken
 from app.models.user import User
 from app.schemas.auth import AuthSettingsOut, LocalLoginIn, MeOut
+from app.services import revocation
 from app.services.k8s_client import resolve_admin_source
 
 
@@ -199,6 +201,10 @@ class AuthApi(Api):
     def logout(self) -> Response:
         user = g.current_user
         revoke_user_refresh_tokens(user.id)
+        # ADR-0030: the access token's jti hits the Postgres deny-list too —
+        # a replayed token 401s "token revoked" before its own expiry.
+        # revocation stays pure (no Flask); this call site passes db.engine.
+        revocation.revoke_jti(db.engine, security._current_jti(), ACCESS_TTL_SECONDS)
         resp = make_response(jsonify(status="ok"))
         resp.headers["Cache-Control"] = "no-store"
         return clear_session_cookies(resp)

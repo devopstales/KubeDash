@@ -1,16 +1,22 @@
 """ADR-0004 — the SAR decision service (R4).
 
-Pure unit tier: no app, no Docker, no Redis. ``can`` is tested through the two
-seams it exposes — ``_cache_get``/``_cache_set`` (the Redis production seam)
-and ``pool.get`` (the k8s client seam, with a ``FakeSar`` double standing in
-for the cluster's AuthorizationV1Api). The cache key is
+Pure unit tier: no app, no Docker, no Postgres. ``can`` is tested through the
+two seams it exposes — ``_cache_get``/``_cache_set`` (the ``kv`` production
+seam, ADR-0030) and ``pool.get`` (the k8s client seam, with a ``FakeSar``
+double standing in for the cluster's AuthorizationV1Api). The cache key is
 ``sar:<cluster.id>:<user.sub>:<verb>:<resource>:<group>:<namespace>:<name>``:
 every SAR attribute is in it, so one namespace's verdict never answers for
 another.
+
+The engine parameter is a no-op here — the storage seam is monkeypatched, so
+the engine value never reaches a storage function (the engine plumbing is
+proven in ``test_rbac_cache.py`` against a real Postgres).
 """
 from types import SimpleNamespace
 
 import pytest
+
+_ENGINE = object()  # sentinel; the storage seam is monkeypatched, never called for real
 
 
 def _user(sub: str = "u-1") -> SimpleNamespace:
@@ -43,9 +49,9 @@ def test_can_denied_returns_false(monkeypatch: pytest.MonkeyPatch) -> None:
     import app.services.rbac as rb
 
     monkeypatch.setattr(rb.pool, "get", lambda c: _client_allows(set()))
-    monkeypatch.setattr(rb, "_cache_get", lambda k: None)
-    monkeypatch.setattr(rb, "_cache_set", lambda k, v: None)
-    assert rb.can(_user(), _cluster(), "list", "pods", None, None) is False
+    monkeypatch.setattr(rb, "_cache_get", lambda e, k: None)
+    monkeypatch.setattr(rb, "_cache_set", lambda e, k, v: None)
+    assert rb.can(_user(), _cluster(), "list", "pods", None, None, engine=_ENGINE) is False
 
 
 def test_can_allowed_and_cached(monkeypatch: pytest.MonkeyPatch) -> None:
@@ -53,44 +59,45 @@ def test_can_allowed_and_cached(monkeypatch: pytest.MonkeyPatch) -> None:
 
     sets: list[tuple[str, str]] = []
     monkeypatch.setattr(rb.pool, "get", lambda c: _client_allows({"list"}))
-    monkeypatch.setattr(rb, "_cache_get", lambda k: None)
-    monkeypatch.setattr(rb, "_cache_set", lambda k, v: sets.append((k, v)))
-    assert rb.can(_user(), _cluster(), "list", "pods", None, None) is True
+    monkeypatch.setattr(rb, "_cache_get", lambda e, k: None)
+    monkeypatch.setattr(rb, "_cache_set", lambda e, k, v: sets.append((k, v)))
+    assert rb.can(_user(), _cluster(), "list", "pods", None, None, engine=_ENGINE) is True
     # The production seam wrote the verdict under the frozen key format.
     assert sets == [("sar:1:u-1:list:pods:::", "1")]
 
 
-def test_cache_hit_decodes_redis_bytes(monkeypatch: pytest.MonkeyPatch) -> None:
-    """A stored allow is bytes from redis-py. It must still count as allow."""
+def test_cache_hit_is_a_hit(monkeypatch: pytest.MonkeyPatch) -> None:
+    """A stored allow must count as allow (the ``kv`` seam returns text; the
+    redis-py bytes-decode branch is gone, ADR-0030)."""
     import app.services.rbac as rb
 
-    monkeypatch.setattr(rb, "redis_client", SimpleNamespace(get=lambda k: b"1"))
+    monkeypatch.setattr(rb, "_cache_get", lambda e, k: "1")
 
     def _boom(_c):
         raise AssertionError("SAR called on cache hit")
 
     monkeypatch.setattr(rb.pool, "get", _boom)
-    assert rb.can(_user(), _cluster(), "list", "pods", None, None) is True
+    assert rb.can(_user(), _cluster(), "list", "pods", None, None, engine=_ENGINE) is True
 
 
 def test_can_reads_cache_without_sar(monkeypatch: pytest.MonkeyPatch) -> None:
     import app.services.rbac as rb
 
-    monkeypatch.setattr(rb, "_cache_get", lambda k: "1")  # cache hit
+    monkeypatch.setattr(rb, "_cache_get", lambda e, k: "1")  # cache hit
 
     def _boom(_c):
         raise AssertionError("SAR called on cache hit")
 
     monkeypatch.setattr(rb.pool, "get", _boom)
-    assert rb.can(_user(), _cluster(), "list", "pods", None, None) is True
+    assert rb.can(_user(), _cluster(), "list", "pods", None, None, engine=_ENGINE) is True
     # A different sub is a DIFFERENT cache key — a hit for u-1 must not answer
     # for u-2 (the sub is in the key, the SAR is not re-asked for u-1).
     monkeypatch.setattr(
-        rb, "_cache_get", lambda k: "1" if k == "sar:1:u-1:list:pods:::" else None
+        rb, "_cache_get", lambda e, k: "1" if k == "sar:1:u-1:list:pods:::" else None
     )
     monkeypatch.setattr(rb.pool, "get", lambda c: _client_allows({"list"}))
-    monkeypatch.setattr(rb, "_cache_set", lambda k, v: None)
-    assert rb.can(_user("u-2"), _cluster(), "list", "pods", None, None) is True
+    monkeypatch.setattr(rb, "_cache_set", lambda e, k, v: None)
+    assert rb.can(_user("u-2"), _cluster(), "list", "pods", None, None, engine=_ENGINE) is True
 
 
 def test_denial_is_cached_too(monkeypatch: pytest.MonkeyPatch) -> None:
@@ -98,18 +105,18 @@ def test_denial_is_cached_too(monkeypatch: pytest.MonkeyPatch) -> None:
 
     gets: list[str] = []
     monkeypatch.setattr(rb.pool, "get", lambda c: _client_allows(set()))
-    monkeypatch.setattr(rb, "_cache_get", lambda k: (gets.append(k), None)[1])
-    monkeypatch.setattr(rb, "_cache_set", lambda k, v: None)
-    assert rb.can(_user(), _cluster(), "list", "pods", None, None) is False
+    monkeypatch.setattr(rb, "_cache_get", lambda e, k: (gets.append(k), None)[1])
+    monkeypatch.setattr(rb, "_cache_set", lambda e, k, v: None)
+    assert rb.can(_user(), _cluster(), "list", "pods", None, None, engine=_ENGINE) is False
     assert gets == ["sar:1:u-1:list:pods:::"]
     # The next call is a cache hit: the pool is never reached.
     monkeypatch.setattr(
-        rb, "_cache_get", lambda k: "0" if k == "sar:1:u-1:list:pods:::" else None
+        rb, "_cache_get", lambda e, k: "0" if k == "sar:1:u-1:list:pods:::" else None
     )
     monkeypatch.setattr(
         rb.pool, "get", lambda c: (_ for _ in ()).throw(AssertionError("SAR called"))
     )
-    assert rb.can(_user(), _cluster(), "list", "pods", None, None) is False
+    assert rb.can(_user(), _cluster(), "list", "pods", None, None, engine=_ENGINE) is False
 
 
 def test_sar_carries_namespace_and_name(monkeypatch: pytest.MonkeyPatch) -> None:
@@ -127,9 +134,9 @@ def test_sar_carries_namespace_and_name(monkeypatch: pytest.MonkeyPatch) -> None
             return SimpleNamespace(status=FakeStatus())
 
     monkeypatch.setattr(rb.pool, "get", lambda c: SimpleNamespace(_auth_api=FakeSarApi()))
-    monkeypatch.setattr(rb, "_cache_get", lambda k: None)
-    monkeypatch.setattr(rb, "_cache_set", lambda k, v: None)
-    assert rb.can(_user(), _cluster(), "delete", "pods", "default", "nginx") is True
+    monkeypatch.setattr(rb, "_cache_get", lambda e, k: None)
+    monkeypatch.setattr(rb, "_cache_set", lambda e, k, v: None)
+    assert rb.can(_user(), _cluster(), "delete", "pods", "default", "nginx", engine=_ENGINE) is True
     assert seen == [("default", "nginx")]
 
 
@@ -152,14 +159,16 @@ def test_namespace_and_name_are_separate_cache_entries(monkeypatch: pytest.Monke
             return SimpleNamespace(status=FakeStatus(ra.namespace == "team-a" and ra.name != "other"))
 
     monkeypatch.setattr(rb.pool, "get", lambda c: SimpleNamespace(_auth_api=FakeSarApi()))
-    monkeypatch.setattr(rb, "_cache_get", cache.get)
-    monkeypatch.setattr(rb, "_cache_set", cache.__setitem__)
-    assert rb.can(_user(), _cluster(), "list", "secrets", "team-a", None) is True
-    assert rb.can(_user(), _cluster(), "list", "secrets", "kube-system", None) is False
-    assert rb.can(_user(), _cluster(), "get", "secrets", "team-a", "db") is True
-    assert rb.can(_user(), _cluster(), "get", "secrets", "team-a", "other") is False
+    # The storage seam is now (engine, key) — the cache dict ignores the
+    # engine (a sentinel here; see the module docstring).
+    monkeypatch.setattr(rb, "_cache_get", lambda e, k: cache.get(k))
+    monkeypatch.setattr(rb, "_cache_set", lambda e, k, v: cache.__setitem__(k, v))
+    assert rb.can(_user(), _cluster(), "list", "secrets", "team-a", None, engine=_ENGINE) is True
+    assert rb.can(_user(), _cluster(), "list", "secrets", "kube-system", None, engine=_ENGINE) is False
+    assert rb.can(_user(), _cluster(), "get", "secrets", "team-a", "db", engine=_ENGINE) is True
+    assert rb.can(_user(), _cluster(), "get", "secrets", "team-a", "other", engine=_ENGINE) is False
     assert asked == [("team-a", None), ("kube-system", None), ("team-a", "db"), ("team-a", "other")]
-    assert rb.can(_user(), _cluster(), "list", "secrets", "team-a", None) is True
+    assert rb.can(_user(), _cluster(), "list", "secrets", "team-a", None, engine=_ENGINE) is True
     assert len(asked) == 4
 
 
@@ -178,10 +187,10 @@ def test_sar_carries_api_group_for_rbac_resources(monkeypatch: pytest.MonkeyPatc
             return SimpleNamespace(status=FakeStatus())
 
     monkeypatch.setattr(rb.pool, "get", lambda c: SimpleNamespace(_auth_api=FakeSarApi()))
-    monkeypatch.setattr(rb, "_cache_get", lambda k: None)
-    monkeypatch.setattr(rb, "_cache_set", lambda k, v: None)
+    monkeypatch.setattr(rb, "_cache_get", lambda e, k: None)
+    monkeypatch.setattr(rb, "_cache_set", lambda e, k, v: None)
     assert (
-        rb.can(_user(), _cluster(), "list", "roles", "default", None, "rbac.authorization.k8s.io")
+        rb.can(_user(), _cluster(), "list", "roles", "default", None, "rbac.authorization.k8s.io", engine=_ENGINE)
         is True
     )
     assert seen == ["rbac.authorization.k8s.io"]
