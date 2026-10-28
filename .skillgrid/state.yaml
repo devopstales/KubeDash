@@ -26,11 +26,23 @@ in_flight:
     # (completes report.md retro half in the archive + session close).
     tracker: [TASK-033, TASK-034, TASK-035, TASK-036, TASK-037]
   - change: 2026-10-26-network-policy
-    phase: blueprint
-    # Spec trio + blueprint written 2026-10-26; T2 critic ran
-    # (NEEDS FIXES -> all findings applied + user-decided the Created
-    # column's local-time format). Next: user approves the final
-    # blueprint -> slicing (tasks.md) -> execution handoff.
+    phase: shipped
+    # All 5 tasks complete (sdd ledger 2026-10-26-network-policy): backend
+    # networkpolicies + cilium kinds (8f6bdbb9, 3e6dc041), frontend list +
+    # detail views (2a93c006, fcc40567), kind backstops (98497d24). Note:
+    # fcc40567 (its Task 4) swept the shared working tree and absorbed the
+    # priority-class change's Task 2 App.tsx hunk — see W006.
+    tracker: []
+  - change: 2026-10-27-priority-class
+    phase: execution
+    # Executed 2026-10-28 on branch `rebase` (sdd ledger
+    # 2026-10-27-priority-class): 4 tasks complete — 77d3bcbe (kind, R4 row),
+    # 1bd5afab + b5243e13 (list view + nav move + stub retirement + ADR-0022
+    # row), 049fd05d (detail view), 88622fed (kind-gated backstop, run live on
+    # kind cluster kubedash-test). QA gate PASS (report.md, 2026-10-28):
+    # backend 460 passed, priority-class view tests 7/7, fe-build + fe-check
+    # exit 0; 13 pre-existing frontend red (W007) not this change's.
+    # Next: final whole-branch review -> ship.
     tracker: []
 
 completed_changes:
