@@ -58,6 +58,9 @@ _KINDS: dict[str, tuple[str, str, str]] = {
         "cilium.io",
     ),
     "priorityclasses": ("list_priority_classes", "priorityclasses", "scheduling.k8s.io"),
+    # RuntimeClass (node.k8s.io, cluster-scoped) — the 4.1-parity nav leaf
+    # resolved by TASK-046 (list + data views; ADR-0022 placement).
+    "runtimeclasses": ("list_runtime_classes", "runtimeclasses", "node.k8s.io"),
 }
 
 #: kind → K8sClient method for a single-object ``?name=`` lookup
@@ -67,6 +70,7 @@ _GETTERS: dict[str, str] = {
     "networkpolicies": "get_network_policy",
     "ciliumnetworkpolicies": "get_cilium_network_policy",
     "priorityclasses": "get_priority_class",
+    "runtimeclasses": "get_runtime_class",
 }
 
 

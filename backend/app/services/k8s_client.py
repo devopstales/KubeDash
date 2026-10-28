@@ -224,6 +224,9 @@ class K8sClient:
         self._networking = k8s_client.NetworkingV1Api(api_client)
         # PriorityClass (scheduling.k8s.io) — the R4 "priorityclasses" kind.
         self._scheduling = k8s_client.SchedulingV1Api(api_client)
+        # RuntimeClass (node.k8s.io) — cluster-scoped, the R4 "runtimeclasses"
+        # kind (the 4.1 nav leaf had no view; ADR-0022 placement, TASK-046).
+        self._node = k8s_client.NodeV1Api(api_client)
         self._host = self._v1.api_client.configuration.host
 
     @staticmethod
@@ -271,6 +274,17 @@ class K8sClient:
             self._unreachable("list_priority_classes", e)
             raise AssertionError("unreachable") from e
         return [pc.to_dict() for pc in resp.items]
+
+    def list_runtime_classes(self, _namespace: str | None) -> list[dict[str, Any]]:
+        """RuntimeClass list in the standard kubernetes dict form
+        (``to_dict``). Cluster-scoped: the namespace argument is accepted
+        and ignored (the ``list_nodes`` pattern)."""
+        try:
+            resp = self._node.list_runtime_class()
+        except ApiException as e:
+            self._unreachable("list_runtime_classes", e)
+            raise AssertionError("unreachable") from e
+        return [rc.to_dict() for rc in resp.items]
 
     def _node_metrics(self) -> list[dict[str, Any]] | None:
         """Fetch the raw ``NodeMetricsList`` body from ``metrics.k8s.io``.
@@ -783,6 +797,19 @@ class K8sClient:
             if e.status == 404:
                 return []
             self._unreachable("get_priority_class", e)
+            raise AssertionError("unreachable") from e
+
+    def get_runtime_class(self, _namespace: str, name: str) -> list[dict[str, Any]]:
+        """One RuntimeClass as a 0/1-item list; ``[]`` on 404. Cluster-
+        scoped: the namespace argument is accepted and ignored. Any other
+        ApiException maps to ``ClusterUnreachableError`` (502), matching
+        ``get_priority_class``'s transport contract."""
+        try:
+            return [self._node.read_runtime_class(name).to_dict()]
+        except ApiException as e:
+            if e.status == 404:
+                return []
+            self._unreachable("get_runtime_class", e)
             raise AssertionError("unreachable") from e
 
     def readyz(self) -> bool:

@@ -316,6 +316,31 @@ class FakeK8s:
             return self.list_priority_classes(None)
         return []
 
+    def list_runtime_classes(self, _namespace: str | None) -> list[dict]:
+        # Cluster-scoped: the namespace argument is accepted-and-ignored
+        # (mirrors the real K8sClient.list_runtime_classes).
+        return [
+            {
+                "metadata": {
+                    "name": "runc",
+                    "creation_timestamp": "2026-01-02T03:04:05Z",
+                    "labels": {"provider": "docker"},
+                },
+                "handler": "runc",
+                "overwrite_node_sel_no_toleration": False,
+                "scheduling": {
+                    "node_selector": {"kubernetes.io/runtime": "runc"},
+                    "tolerations": [],
+                },
+                "pod_level_overhead": {"memory": "128Mi", "cpu": "100m"},
+            }
+        ]
+
+    def get_runtime_class(self, _namespace: str, name: str) -> list[dict]:
+        if name == "runc":
+            return self.list_runtime_classes(None)
+        return []
+
     def readyz(self) -> bool:
         return True
 
@@ -1332,6 +1357,101 @@ def test_priorityclass_kind_singular_rejected(api_client, auth_client) -> None:
     h = {"Authorization": f"Bearer {auth_client.jwt}"}
     _register(api_client, h)
     r = api_client.get("/api/v1/clusters/1/resources/priorityclass", headers=h)
+    assert r.status_code == 404
+    assert r.get_json()["error"]["code"] == "RESOURCE_KIND_NOT_SUPPORTED"
+
+
+def test_list_runtimeclasses_200(api_client, auth_client, fake_k8s, monkeypatch) -> None:
+    """[runtimeclasses-list-200] a bound user listing runtimeclasses gets
+    the to_dict items back, spec fields (handler,
+    overwrite_node_sel_no_toleration, scheduling, pod_level_overhead)
+    intact."""
+    auth_client.login()
+    h = {"Authorization": f"Bearer {auth_client.jwt}"}
+    _register(api_client, h)
+    _allow_sar(monkeypatch)
+    r = api_client.get("/api/v1/clusters/1/resources/runtimeclasses", headers=h)
+    assert r.status_code == 200
+    body = r.get_json()
+    assert body["kind"] == "runtimeclasses"
+    [item] = body["items"]
+    assert item["metadata"]["name"] == "runc"
+    assert item["handler"] == "runc"
+    assert item["overwrite_node_sel_no_toleration"] is False
+    assert item["scheduling"]["node_selector"] == {"kubernetes.io/runtime": "runc"}
+    assert item["pod_level_overhead"] == {"memory": "128Mi", "cpu": "100m"}
+
+
+def test_list_runtimeclasses_ignores_namespace(
+    api_client, auth_client, fake_k8s, monkeypatch
+) -> None:
+    """[runtimeclasses-list-ignores-namespace] the kind is cluster-scoped:
+    ?namespace=team-a is accepted and ignored — the same "runc" item comes
+    back."""
+    auth_client.login()
+    h = {"Authorization": f"Bearer {auth_client.jwt}"}
+    _register(api_client, h)
+    _allow_sar(monkeypatch)
+    r = api_client.get(
+        "/api/v1/clusters/1/resources/runtimeclasses?namespace=team-a", headers=h
+    )
+    assert r.status_code == 200
+    body = r.get_json()
+    [item] = body["items"]
+    assert item["metadata"]["name"] == "runc"
+    assert "namespace" not in item["metadata"]
+
+
+def test_list_runtimeclasses_get_by_name(
+    api_client, auth_client, fake_k8s, monkeypatch
+) -> None:
+    """[runtimeclasses-get-by-name] ?name= returns a 0/1-item list: a hit
+    returns the one item, a miss returns [] (mirrors get_priority_class)."""
+    auth_client.login()
+    h = {"Authorization": f"Bearer {auth_client.jwt}"}
+    _register(api_client, h)
+    _allow_sar(monkeypatch)
+    r = api_client.get("/api/v1/clusters/1/resources/runtimeclasses?name=runc", headers=h)
+    assert r.status_code == 200
+    [item] = r.get_json()["items"]
+    assert item["metadata"]["name"] == "runc"
+    r = api_client.get("/api/v1/clusters/1/resources/runtimeclasses?name=ghost", headers=h)
+    assert r.status_code == 200
+    assert r.get_json()["items"] == []
+
+
+def test_list_runtimeclasses_sar_denied(api_client, auth_client, fake_k8s, monkeypatch) -> None:
+    """[runtimeclasses-sar-denied] ADR-0004: the SAR is asked BEFORE the
+    read, with the node.k8s.io group and namespace None (the
+    cluster-scoped SAR cache key) — a deny short-circuits to 403
+    RBAC_DENIED."""
+    auth_client.login()
+    h = {"Authorization": f"Bearer {auth_client.jwt}"}
+    _register(api_client, h)
+    asked = _record_sar(monkeypatch)  # denies every SAR and records calls
+    r = api_client.get("/api/v1/clusters/1/resources/runtimeclasses", headers=h)
+    assert r.status_code == 403
+    assert r.get_json()["error"]["code"] == "RBAC_DENIED"
+    assert ("list", "runtimeclasses", None, None, "node.k8s.io") in asked
+
+
+def test_runtimeclasses_binding_404(api_client, auth_client) -> None:
+    """[runtimeclasses-binding-404] an unbound user: the binding gate
+    fails before the SAR, CLUSTER_NOT_FOUND."""
+    auth_client.login()
+    h = {"Authorization": f"Bearer {auth_client.jwt}"}
+    r = api_client.get("/api/v1/clusters/999/resources/runtimeclasses", headers=h)
+    assert r.status_code == 404
+    assert r.get_json()["error"]["code"] == "CLUSTER_NOT_FOUND"
+
+
+def test_runtimeclass_kind_singular_rejected(api_client, auth_client) -> None:
+    """[runtimeclass-kind-singular-rejected] the 4.1 route name
+    (singular) is not a kind — RESOURCE_KIND_NOT_SUPPORTED."""
+    auth_client.login()
+    h = {"Authorization": f"Bearer {auth_client.jwt}"}
+    _register(api_client, h)
+    r = api_client.get("/api/v1/clusters/1/resources/runtimeclass", headers=h)
     assert r.status_code == 404
     assert r.get_json()["error"]["code"] == "RESOURCE_KIND_NOT_SUPPORTED"
 
