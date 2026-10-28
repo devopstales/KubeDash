@@ -611,6 +611,101 @@ class K8sClient:
             )
         return results
 
+    # Cilium kinds (R2): served-version autodetect + absence degrade. The
+    # CRD's OWN spec is the version+scope authority (no hardcoded
+    # cilium.io/v2). Cilium absent (CRD 404) is the EXPECTED state -> [];
+    # any other read failure -> ClusterUnreachableError (502).
+
+    _CILIUM_GROUP = "cilium.io"
+
+    def get_crd_served(self, group: str, plural: str) -> tuple[str, str] | None:
+        """(served_version, scope) for a CRD, or None when the CRD is absent.
+
+        The CRD's OWN spec is the version+scope authority (reuses
+        ``_crd_served``). A 404 on the CRD read means the API group/CRD is
+        not installed (e.g. Cilium absent) — the EXPECTED state, so it
+        resolves to ``None`` instead of an error. Any other ApiException is
+        a transport failure -> ``ClusterUnreachableError``.
+        """
+        crds = self.get_crd(None, plural)
+        if not crds:
+            return None
+        served = self._crd_served(crds[0])
+        if served is None:
+            # A CRD that exists but declares no served version is
+            # mis-registered Cilium, not "absent": mirror resources.py:147-148
+            raise ClusterUnreachableError(f"CRD '{plural}' has no served version")
+        return served
+
+    def list_cilium_network_policies(self, namespace: str | None) -> list[dict[str, Any]]:
+        """CiliumNetworkPolicy items, full to_dict() shape (spec intact).
+        CRD absent -> [] (expected state); other failures -> 502 via
+        _unreachable (inherited from the custom calls)."""
+        served = self.get_crd_served(self._CILIUM_GROUP, "ciliumnetworkpolicies")
+        if served is None:
+            return []
+        version, scope = served
+        custom = self._custom()
+        try:
+            resp = (
+                custom.list_namespaced_custom_object(
+                    self._CILIUM_GROUP, version, namespace, "ciliumnetworkpolicies"
+                )
+                if namespace and scope == "Namespaced"
+                else custom.list_cluster_custom_object(
+                    self._CILIUM_GROUP, version, "ciliumnetworkpolicies"
+                )
+            )
+        except ApiException as e:
+            self._unreachable("list_cilium_network_policies", e)
+            raise AssertionError("unreachable") from e
+        body = self._crd_body(resp)
+        items = body.get("items", [])
+        return [item.to_dict() if hasattr(item, "to_dict") else item for item in items]
+
+    def list_cilium_clusterwide_network_policies(
+        self, _namespace: str | None
+    ) -> list[dict[str, Any]]:
+        """CiliumClusterwideNetworkPolicy items. Cluster-scoped: the namespace
+        argument is accepted-and-ignored (mirrors list_crds). CRD absent -> [];
+        other failures -> 502."""
+        served = self.get_crd_served(self._CILIUM_GROUP, "ciliumclusterwidenetworkpolicies")
+        if served is None:
+            return []
+        version, _scope = served
+        custom = self._custom()
+        try:
+            resp = custom.list_cluster_custom_object(
+                self._CILIUM_GROUP, version, "ciliumclusterwidenetworkpolicies"
+            )
+        except ApiException as e:
+            self._unreachable("list_cilium_clusterwide_network_policies", e)
+            raise AssertionError("unreachable") from e
+        body = self._crd_body(resp)
+        items = body.get("items", [])
+        return [item.to_dict() if hasattr(item, "to_dict") else item for item in items]
+
+    def get_cilium_network_policy(self, namespace: str, name: str) -> list[dict[str, Any]]:
+        """One CiliumNetworkPolicy as a 0/1-item list; ``[]`` on 404 or when
+        the CRD is absent (Cilium not installed). Any other ApiException maps
+        to ``ClusterUnreachableError`` (502), matching get_secret."""
+        served = self.get_crd_served(self._CILIUM_GROUP, "ciliumnetworkpolicies")
+        if served is None:
+            return []
+        version, _scope = served
+        custom = self._custom()
+        try:
+            item = custom.get_namespaced_custom_object(
+                self._CILIUM_GROUP, version, namespace, "ciliumnetworkpolicies", name
+            )
+        except ApiException as e:
+            if e.status == 404:
+                return []
+            self._unreachable("get_cilium_network_policy", e)
+            raise AssertionError("unreachable") from e
+        item = self._crd_body(item)
+        return [item.to_dict() if hasattr(item, "to_dict") else item]
+
     def list_secrets(self, namespace: str | None) -> list[dict[str, Any]]:
         """Secret list in the standard kubernetes dict form (``to_dict``)
         without ``data``/``string_data``: values are read one secret at a

@@ -253,6 +253,38 @@ class FakeK8s:
             }
         ]
 
+    def list_cilium_network_policies(self, namespace: str | None) -> list[dict]:
+        # The fake models Cilium PRESENT by default (the absence case is
+        # tested by overriding to [] on the instance). Namespaced kind: the
+        # namespace is honored like the real K8sClient.
+        self.cilium_ns_calls: list[str | None] = []
+        self.cilium_ns_calls.append(namespace)
+        return [
+            {
+                "metadata": {"name": "cnp", "namespace": namespace},
+                "spec": {"endpointSelector": {}, "ingress": [{"from": []}]},
+            }
+        ]
+
+    def list_cilium_clusterwide_network_policies(
+        self, _namespace: str | None
+    ) -> list[dict]:
+        # Cluster-scoped: the namespace argument is accepted-and-ignored
+        # (mirrors the real K8sClient.list_cilium_clusterwide_network_policies).
+        return [
+            {"metadata": {"name": "ccnp"}, "spec": {"endpointSelector": {}, "egress": []}}
+        ]
+
+    def get_cilium_network_policy(self, namespace: str, name: str) -> list[dict]:
+        if name != "cnp":
+            return []
+        return [
+            {
+                "metadata": {"name": name, "namespace": namespace},
+                "spec": {"endpointSelector": {}, "ingress": [{"from": []}]},
+            }
+        ]
+
     def readyz(self) -> bool:
         return True
 
@@ -1000,6 +1032,162 @@ def test_kind_singular_network_policy_rejected(api_client, auth_client) -> None:
     r = api_client.get("/api/v1/clusters/1/resources/network-policy", headers=h)
     assert r.status_code == 404
     assert r.get_json()["error"]["code"] == "RESOURCE_KIND_NOT_SUPPORTED"
+
+
+def test_list_ciliumnetworkpolicies_200(api_client, auth_client, fake_k8s, monkeypatch) -> None:
+    """[cilium-list-uses-served-version] a bound user listing ciliumnetworkpolicies
+    in one namespace gets the to_dict items back, spec (endpointSelector,
+    ingress) intact. The served version is resolved from the CRD's own spec
+    (autodetect) — the fake models Cilium present on v2alpha1."""
+    auth_client.login()
+    h = {"Authorization": f"Bearer {auth_client.jwt}"}
+    _register(api_client, h)
+    _allow_sar(monkeypatch)
+    r = api_client.get(
+        "/api/v1/clusters/1/resources/ciliumnetworkpolicies?namespace=team-a",
+        headers=h,
+    )
+    assert r.status_code == 200
+    body = r.get_json()
+    assert body["kind"] == "ciliumnetworkpolicies"
+    [policy] = body["items"]
+    assert policy["metadata"]["name"] == "cnp"
+    assert policy["metadata"]["namespace"] == "team-a"
+    assert policy["spec"]["endpointSelector"] == {}
+    assert policy["spec"]["ingress"] == [{"from": []}]
+
+
+def test_list_ciliumclusterwidenetworkpolicies_200_ignores_namespace(
+    api_client, auth_client, fake_k8s, monkeypatch
+) -> None:
+    """[cilium-clusterwide-ignores-namespace] called WITH ?namespace=team-a,
+    still 200; the clusterwide kind is cluster-scoped — the namespace is
+    accepted-and-ignored (the same ccnp item comes back)."""
+    auth_client.login()
+    h = {"Authorization": f"Bearer {auth_client.jwt}"}
+    _register(api_client, h)
+    _allow_sar(monkeypatch)
+    r = api_client.get(
+        "/api/v1/clusters/1/resources/ciliumclusterwidenetworkpolicies?namespace=team-a",
+        headers=h,
+    )
+    assert r.status_code == 200
+    body = r.get_json()
+    assert body["kind"] == "ciliumclusterwidenetworkpolicies"
+    [policy] = body["items"]
+    assert policy["metadata"]["name"] == "ccnp"
+    # No namespace on a cluster-scoped item.
+    assert "namespace" not in policy["metadata"]
+
+
+def test_ciliumclusterwidenetworkpolicies_name_lookup_not_supported(
+    api_client, auth_client, fake_k8s, monkeypatch
+) -> None:
+    """[cilium-clusterwide-ignores-namespace] ?name= on the clusterwide kind
+    is 404 RESOURCE_KIND_NOT_SUPPORTED (no _GETTERS row — list-only by design)."""
+    auth_client.login()
+    h = {"Authorization": f"Bearer {auth_client.jwt}"}
+    _register(api_client, h)
+    _allow_sar(monkeypatch)
+    r = api_client.get(
+        "/api/v1/clusters/1/resources/ciliumclusterwidenetworkpolicies?name=ccnp",
+        headers=h,
+    )
+    assert r.status_code == 404
+    assert r.get_json()["error"]["code"] == "RESOURCE_KIND_NOT_SUPPORTED"
+
+
+def test_cilium_sar_gated(api_client, auth_client, fake_k8s, monkeypatch) -> None:
+    """[cilium-sar-gated] ADR-0004: the SAR is asked BEFORE the read, with the
+    cilium.io group — a deny short-circuits to 403 RBAC_DENIED."""
+    auth_client.login()
+    h = {"Authorization": f"Bearer {auth_client.jwt}"}
+    _register(api_client, h)
+    asked = _record_sar(monkeypatch)
+    r = api_client.get(
+        "/api/v1/clusters/1/resources/ciliumnetworkpolicies?namespace=team-a",
+        headers=h,
+    )
+    assert r.status_code == 403
+    assert r.get_json()["error"]["code"] == "RBAC_DENIED"
+    # The SAR was asked BEFORE the read, with the cilium.io group and the
+    # namespace (ADR-0004 cache key).
+    assert ("list", "ciliumnetworkpolicies", "team-a", None, "cilium.io") in asked
+
+
+def test_cilium_absent_crds_empty_200(
+    api_client, auth_client, fake_k8s, monkeypatch
+) -> None:
+    """[cilium-crds-absent-empty] Cilium not installed = expected state, not
+    an error: the FakeK8s Cilium methods return [] and the API responds 200
+    with zero items for both Cilium kinds."""
+    auth_client.login()
+    h = {"Authorization": f"Bearer {auth_client.jwt}"}
+    _register(api_client, h)
+    _allow_sar(monkeypatch)
+    # Model Cilium absent: both Cilium kinds return empty.
+    fake_k8s.list_cilium_network_policies = lambda ns: []
+    fake_k8s.list_cilium_clusterwide_network_policies = lambda ns: []
+    fake_k8s.get_cilium_network_policy = lambda ns, name: []
+
+    r = api_client.get(
+        "/api/v1/clusters/1/resources/ciliumnetworkpolicies?namespace=team-a",
+        headers=h,
+    )
+    assert r.status_code == 200
+    assert r.get_json()["items"] == []
+    assert r.get_json()["kind"] == "ciliumnetworkpolicies"
+
+    r = api_client.get(
+        "/api/v1/clusters/1/resources/ciliumclusterwidenetworkpolicies",
+        headers=h,
+    )
+    assert r.status_code == 200
+    assert r.get_json()["items"] == []
+    assert r.get_json()["kind"] == "ciliumclusterwidenetworkpolicies"
+
+
+def test_get_cilium_network_policy_by_name(api_client, auth_client, fake_k8s, monkeypatch) -> None:
+    """[cilium-get-by-name] ?name= on the namespaced kind: a hit returns the
+    one item, a miss returns [] (mirrors get_secret)."""
+    auth_client.login()
+    h = {"Authorization": f"Bearer {auth_client.jwt}"}
+    _register(api_client, h)
+    _allow_sar(monkeypatch)
+    r = api_client.get(
+        "/api/v1/clusters/1/resources/ciliumnetworkpolicies?namespace=team-a&name=cnp",
+        headers=h,
+    )
+    assert r.status_code == 200
+    [policy] = r.get_json()["items"]
+    assert policy["metadata"]["name"] == "cnp"
+    assert policy["metadata"]["namespace"] == "team-a"
+    assert policy["spec"]["ingress"] == [{"from": []}]
+
+    r = api_client.get(
+        "/api/v1/clusters/1/resources/ciliumnetworkpolicies?namespace=team-a&name=ghost",
+        headers=h,
+    )
+    assert r.status_code == 200
+    assert r.get_json()["items"] == []
+
+
+def test_get_cilium_network_policy_absent_crds_empty(
+    api_client, auth_client, fake_k8s, monkeypatch
+) -> None:
+    """[cilium-get-by-name] CRD absent (Cilium not installed) -> 200 with
+    zero items, not an error."""
+    auth_client.login()
+    h = {"Authorization": f"Bearer {auth_client.jwt}"}
+    _register(api_client, h)
+    _allow_sar(monkeypatch)
+    fake_k8s.get_cilium_network_policy = lambda ns, name: []
+    r = api_client.get(
+        "/api/v1/clusters/1/resources/ciliumnetworkpolicies?namespace=team-a&name=cnp",
+        headers=h,
+    )
+    assert r.status_code == 200
+    assert r.get_json()["items"] == []
 
 
 @pytest.mark.integration

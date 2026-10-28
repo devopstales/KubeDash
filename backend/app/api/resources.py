@@ -51,6 +51,12 @@ _KINDS: dict[str, tuple[str, str, str]] = {
     "secrets": ("list_secrets", "secrets", ""),
     "crds": ("list_crds", "customresourcedefinitions", _CRD_GROUP),
     "networkpolicies": ("list_network_policies", "networkpolicies", "networking.k8s.io"),
+    "ciliumnetworkpolicies": ("list_cilium_network_policies", "ciliumnetworkpolicies", "cilium.io"),
+    "ciliumclusterwidenetworkpolicies": (
+        "list_cilium_clusterwide_network_policies",
+        "ciliumclusterwidenetworkpolicies",
+        "cilium.io",
+    ),
 }
 
 #: kind → K8sClient method for a single-object ``?name=`` lookup
@@ -58,6 +64,7 @@ _GETTERS: dict[str, str] = {
     "secrets": "get_secret",
     "crds": "get_crd",
     "networkpolicies": "get_network_policy",
+    "ciliumnetworkpolicies": "get_cilium_network_policy",
 }
 
 
