@@ -1,10 +1,10 @@
 ---
 id: TASK-047
 title: '[FEATURE] TICKET-06 wire auth + RBAC to Postgres (backend-auth)'
-status: To Do
+status: Done
 assignee: []
 created_date: '2026-10-27 19:16'
-updated_date: '2026-10-27 19:16'
+updated_date: '2026-10-28 19:53'
 labels: []
 milestone: m-2
 dependencies:
