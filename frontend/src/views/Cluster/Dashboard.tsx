@@ -262,7 +262,7 @@ const DashboardView = () => {
                   ) : eventRows.length === 0 ? (
                     <div className="text-center text-muted">No events found</div>
                   ) : (
-                    <KubeDataTable data={eventRows}>
+                    <KubeDataTable data={eventRows} id="cluster-events-table">
                       <Column title="Type" data="type">
                         {(type: string) => (
                           <CBadge color={type === 'Warning' ? 'warning' : 'success'}>{type}</CBadge>
@@ -271,9 +271,21 @@ const DashboardView = () => {
                       <Column title="Reason" data="reason" />
                       <Column title="Object" data="object" />
                       <Column title="Namespace" data="namespace" />
-                      <Column title="Message" data="message" />
+                      {/* Message: long event text must wrap (DataTables defaults
+                          to nowrap), so it stacks to a new line instead of
+                          overflowing and squeezing the trailing "Last seen"
+                          column. `cluster-event-message` is scoped in style.scss
+                          (white-space:normal + break-word); the column width is
+                          constrained so "Last seen" keeps its space. */}
+                      <Column
+                        title="Message"
+                        data="message"
+                        options={{ className: 'cluster-event-message', width: '38%' }}
+                      >
+                        {(message: string) => message}
+                      </Column>
                       <Column title="Count" data="count" />
-                      <Column title="Last seen" data="last" />
+                      <Column title="Last seen" data="last" options={{ width: '110px' }} />
                     </KubeDataTable>
                   )}
                 </CCardBody>

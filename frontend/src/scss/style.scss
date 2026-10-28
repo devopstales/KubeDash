@@ -114,3 +114,15 @@ body {
     --cui-footer-bg: var(--cui-body-bg);
   }
 }
+
+// The cluster-metric events table: KubeDataTable (DataTables) cells are nowrap
+// by default, so a long event Message overflows its cell and squeezes the
+// trailing "Last seen" column. Scope the wrap override to this table's
+// Message column (`.cluster-event-message`) so other DataTables keep their
+// default single-line cells. The Message column width is constrained in
+// Dashboard.tsx (options.width) so "Last seen" keeps its space.
+#cluster-events-table td.cluster-event-message {
+  white-space: normal;
+  word-break: break-word;
+  overflow-wrap: anywhere;
+}

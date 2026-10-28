@@ -172,8 +172,15 @@ const NodeDataView = () => {
   // Metrics API is absent or the node is unscraped (certainty rule). The bar
   // compares used against ALLOCATABLE (the schedulable ceiling), not capacity
   // (which includes system-reserved headroom).
+  // Consistency with /dashboard/cluster-metric: the metrics warning must show
+  // whenever the node is selected and metrics are unavailable/denied — NOT only
+  // after the usage query resolves. Previously `if (!u) return null` hid the
+  // whole card (and the warning) while the query was loading or if it errored,
+  // so /cluster/node showed no metrics-server warning while the cluster view
+  // did. Now: render the card for any selected node; show the warning from the
+  // resolved state, or a neutral loading line while the query is in flight.
   const usageCard = () => {
-    if (!u) return null
+    if (!name || !cluster) return null
     return (
       <CCard className="shadow mb-4">
         <CCardHeader className="py-3">
@@ -182,7 +189,9 @@ const NodeDataView = () => {
           </CCardTitle>
         </CCardHeader>
         <CCardBody>
-          {u.metrics_denied ? (
+          {!u ? (
+            <div className="text-secondary">Loading usage…</div>
+          ) : u.metrics_denied ? (
             <div className="text-warning">
               Usage is unknown — you lack the metrics.k8s.io read grant (RBAC
               denied). An admin can grant <code>get</code> on
