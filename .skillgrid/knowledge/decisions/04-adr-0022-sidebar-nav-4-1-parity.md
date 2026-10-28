@@ -84,7 +84,7 @@ mapping):
 | **Interface** Storage | StorageClass | `/storage/storage-class` | stub | stub |
 | **Interface** Storage | SnapshotClass | `/storage/snapshot-class` | stub | stub |
 | **Interface** Security | Secrets | `/security/secret` | stub | stub |
-| **Interface** Security | Network Policies | `/security/network-policy` | stub | stub |
+| **Interface** Security | Network Policies | `/security/network-policy` | `/security/network-policy` (+ `/data` detail) | implemented (feature) — 4.1 parity list + detail on three R4 kinds (networkpolicies, ciliumnetworkpolicies, ciliumclusterwidenetworkpolicies), SAR-gated (2026-10-28) |
 | **Interface** Security | Priority Classes | `/security/priorityclass` | `/other-resource/priorityclass` | implemented (feature) — 5.0 group: Other Resources (ratified deviation, 2026-10-27: 4.1's API already lived in other-resources; first real page in the group) |
 | **Interface** Other Resources | HPAs | `/other-resource/horizontal-pod-autoscaler` | stub | stub |
 | **Interface** Other Resources | VPAs | `/other-resource/vertical-pod-autoscaler` | stub | stub |
