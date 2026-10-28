@@ -10,6 +10,8 @@ integration"``.
 """
 import pytest
 
+from app.core.errors import ClusterUnreachableError
+
 KUBECONFIG = (
     "apiVersion: v1\n"
     "kind: Config\n"
@@ -37,6 +39,10 @@ class FakeK8s:
         self.kubeconfig = kubeconfig
         self.created_namespaces: list[str] = []
         self.deleted_namespaces: list[str] = []
+        # Toggle (set per test) for the cilium-crds-error-502 scenario: when
+        # True the Cilium list methods raise ClusterUnreachableError like the
+        # real K8sClient does against an unreachable apiserver.
+        self.cilium_unreachable = False
 
     def create_namespace(self, name: str) -> dict:
         self.created_namespaces.append(name)
@@ -257,6 +263,8 @@ class FakeK8s:
         # The fake models Cilium PRESENT by default (the absence case is
         # tested by overriding to [] on the instance). Namespaced kind: the
         # namespace is honored like the real K8sClient.
+        if self.cilium_unreachable:
+            raise ClusterUnreachableError("cilium cluster unreachable (test)")
         self.cilium_ns_calls: list[str | None] = []
         self.cilium_ns_calls.append(namespace)
         return [
@@ -285,6 +293,8 @@ class FakeK8s:
             }
         ]
 
+    # The duplicate signature below is a typo; see the original
+    # ``list_cilium_network_policies`` defined earlier in this class.
     def list_priority_classes(self, _namespace: str | None) -> list[dict]:
         # Cluster-scoped: the namespace argument is accepted-and-ignored
         # (mirrors the real K8sClient.list_priority_classes).
@@ -1168,6 +1178,29 @@ def test_cilium_absent_crds_empty_200(
     assert r.status_code == 200
     assert r.get_json()["items"] == []
     assert r.get_json()["kind"] == "ciliumclusterwidenetworkpolicies"
+
+
+def test_list_ciliumnetworkpolicies_502_on_unreachable(
+    api_client, auth_client, fake_k8s, monkeypatch
+) -> None:
+    """[cilium-crds-error-502] API tier: the FakeK8s Cilium list raises
+    ClusterUnreachableError (the same exception the real K8sClient raises
+    against an unreachable apiserver) and the handler maps it to 502 with
+    the shared CLUSTER_UNREACHABLE error code — pinned here, not just at
+    the service tier."""
+    auth_client.login()
+    h = {"Authorization": f"Bearer {auth_client.jwt}"}
+    _register(api_client, h)
+    _allow_sar(monkeypatch)
+    # Model an unreachable apiserver for the Cilium read (the fake's default
+    # models it reachable — the absence case is a separate, empty-list test).
+    fake_k8s.cilium_unreachable = True
+    r = api_client.get(
+        "/api/v1/clusters/1/resources/ciliumnetworkpolicies?namespace=team-a",
+        headers=h,
+    )
+    assert r.status_code == 502
+    assert r.get_json()["error"]["code"] == "CLUSTER_UNREACHABLE"
 
 
 def test_get_cilium_network_policy_by_name(api_client, auth_client, fake_k8s, monkeypatch) -> None:
