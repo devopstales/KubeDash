@@ -127,12 +127,11 @@ tasks:
   # waits for the apiservice to be available.
 
   kind-up:
-    desc: "Create the local kind cluster (if absent) + install metrics-server + Cilium + Traefik (idempotent)"
+    desc: "Create the local kind cluster (if absent) + install dev apps (idempotent)"
     cmds:
       - task: _kind-cluster
       - task: _kind-kubeconfig
-      - task: _kind-metrics-server
-      - task: _kind-cilium-traefik
+      - task: _kind-apps
 
   kind-down:
     desc: "Delete the local kind cluster (destructive)"
@@ -152,16 +151,17 @@ tasks:
     cmds:
       - "kind get kubeconfig --name {{.KIND_CLUSTER}} > {{.ADMIN_KUBECONFIG}}"
 
-  _kind-metrics-server:
+  # Internal: install the dev apps into the kind cluster (metrics-server for
+  # the dashboard's allocation rollup + metrics degrade path, then Cilium +
+  # Traefik for the e2e ingress). Both are idempotent; each waits for its own
+  # readiness. metrics-server runs first — the dashboard reads metrics.k8s.io
+  # and Cilium/Traefik is independent of it.
+  _kind-apps:
     internal: true
     cmds:
       - kubectl --context kind-{{.KIND_CLUSTER}} apply --server-side -f {{.TASKFILE_DIR}}/dev/metrics-server.yaml
       - kubectl --context kind-{{.KIND_CLUSTER}} -n kube-system rollout status deploy/metrics-server --timeout=120s
       - kubectl --context kind-{{.KIND_CLUSTER}} wait --for=condition=available apiservice/v1beta1.metrics.k8s.io --timeout=120s
-
-  _kind-cilium-traefik:
-    internal: true
-    cmds:
       - bash {{.TASKFILE_DIR}}/dev/cilium-traefik-up.sh
 
   # Internal: dev-stack kind + demo pods (BEFORE the backend). Brings up the
