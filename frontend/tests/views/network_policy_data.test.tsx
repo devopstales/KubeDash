@@ -166,6 +166,30 @@ test('detail-clusterwide-omits-namespace', async () => {
   expect(searchParams.get('name')).toBe('ccnp')
 })
 
+test('detail-empty-kind-client-error', async () => {
+  const seen: string[] = []
+  server.use(
+    http.get('*/api/v1/clusters/:id/resources/:kind', ({ request }) => {
+      seen.push(new URL(request.url).pathname)
+      return HttpResponse.json({ items: [] })
+    }),
+  )
+  selectTeamA()
+  const { container } = renderAt(
+    <NetworkPolicyDataView />,
+    '/security/network-policy/data?name=deny-all&kind=&namespace=team-a',
+  )
+
+  // valid name + empty kind: the enum check (NOT the name check) must
+  // reject it — `detail-bad-kind-client-error` covers a bad kind only with
+  // a valid kind string, so without this case the kind validation could be
+  // deleted and every test would stay green. The error line names the
+  // invalid kind, and no fetch is made.
+  expect(await screen.findByText("Error: unknown policy kind ''")).toBeTruthy()
+  expect(container.querySelector('pre')).toBeNull()
+  expect(seen).toHaveLength(0)
+})
+
 test('detail-missing-name-error', async () => {
   const seen: string[] = []
   server.use(
