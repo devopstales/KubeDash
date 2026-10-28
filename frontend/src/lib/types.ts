@@ -255,6 +255,27 @@ export interface RuntimeClassItem {
   [key: string]: unknown
 }
 
+/** A ResourceQuota item as returned by /api/v1/clusters/<id>/resources/resourcequotas (kubernetes to_dict, snake_case; namespaced, core group). */
+export interface ResourceQuotaItem {
+  metadata?: {
+    name?: string
+    namespace?: string
+    creation_timestamp?: string
+    labels?: Record<string, string>
+    annotations?: Record<string, string>
+  }
+  spec?: {
+    hard?: Record<string, string>
+    scopes?: string[]
+    scope_selector?: unknown
+  }
+  status?: {
+    hard?: Record<string, string>
+    used?: Record<string, string>
+  }
+  [key: string]: unknown
+}
+
 /** Closed set for the detail page's ?kind= param (4.1 parity). */
 export const POLICY_KINDS = ['NetworkPolicy', 'CiliumNetworkPolicy', 'CiliumClusterwideNetworkPolicy'] as const
 export type PolicyKind = (typeof POLICY_KINDS)[number]
