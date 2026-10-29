@@ -276,6 +276,42 @@ export interface ResourceQuotaItem {
   [key: string]: unknown
 }
 
+/** A PodDisruptionBudget item as returned by /api/v1/clusters/<id>/resources/poddisruptionbudgets (kubernetes to_dict, snake_case; namespaced, policy/v1). */
+export interface PodDisruptionBudgetItem {
+  metadata?: {
+    name?: string
+    namespace?: string
+    creation_timestamp?: string
+    labels?: Record<string, string>
+    annotations?: Record<string, string>
+  }
+  spec?: {
+    min_available?: number
+    max_unavailable?: number
+    selector?: {
+      match_labels?: Record<string, string>
+      match_expressions?: unknown[]
+    }
+    unhealthy_pod_eviction_policy?: string
+  }
+  status?: {
+    observed_generation?: number
+    current_healthy?: number
+    desired?: number
+    total_pods?: number
+    expected_pods?: number
+    disruptions_allowed?: number
+    conditions?: Array<{
+      type?: string
+      status?: string
+      reason?: string
+      message?: string
+      last_transition_time?: string
+    }>
+  }
+  [key: string]: unknown
+}
+
 /** Closed set for the detail page's ?kind= param (4.1 parity). */
 export const POLICY_KINDS = ['NetworkPolicy', 'CiliumNetworkPolicy', 'CiliumClusterwideNetworkPolicy'] as const
 export type PolicyKind = (typeof POLICY_KINDS)[number]
