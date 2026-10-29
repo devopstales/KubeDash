@@ -26,12 +26,12 @@ in_flight:
     # (completes report.md retro half in the archive + session close).
     tracker: [TASK-033, TASK-034, TASK-035, TASK-036, TASK-037]
   - change: 2026-10-28-runtimeclass-views
-    phase: execution
+    phase: qa
     # Executed 2026-10-28 (TASK-046): 4 commits on `rebase` — backend
     # runtimeclasses kind (node.k8s.io, cluster-scoped, SAR-gated, 718eda35),
     # list view (7580d592), data view (33adbbe7), routes + stub removal
-    # (786100f5). Verification floor green (unit 471 passed; vitest 14/14
-    # targeted; fe-build + fe-check). Awaits QA gate + review (orchestrator).
+    # (786100f5). QA 2026-10-29 (batch of 6): PASS after re-executed floor
+    # (qa-report.md in 2026-10-28-other-resource-views). Awaits review.
     tracker: [TASK-046]
   - change: 2026-10-28-resourcequota-views
     phase: execution
@@ -39,8 +39,9 @@ in_flight:
     # resourcequotas kind (core, namespaced, SAR-gated, 783cff0a), list
     # view (14d8af2b), data view (0d08d0a1), routes + stub removal
     # (0b3b97bf). Verification floor green (unit 483 passed; vitest 15/15
-    # targeted; fe-build + fe-check; _nav.tsx untouched). Awaits QA gate +
-    # review (orchestrator).
+    # targeted; fe-build + fe-check; _nav.tsx untouched). QA 2026-10-29
+    # (batch of 6): PASS after re-executed floor (qa-report.md in
+    # 2026-10-28-other-resource-views). Awaits review.
     tracker: [TASK-047]
   - change: 2026-10-28-pdb-views
     phase: execution
@@ -48,8 +49,9 @@ in_flight:
     # poddisruptionbudgets kind (policy, namespaced, SAR-gated, 5f1f9244),
     # list view (7a1ab3a5), data view (305a44c6), routes + stub removal
     # (7b3e35be). Verification floor green (unit 495 passed; vitest 16/16
-    # targeted; fe-build + fe-check; _nav.tsx untouched). Awaits QA gate +
-    # review (orchestrator).
+    # targeted; fe-build + fe-check; _nav.tsx untouched). QA 2026-10-29
+    # (batch of 6): PASS after re-executed floor (qa-report.md in
+    # 2026-10-28-other-resource-views). Awaits review.
     tracker: [TASK-048]
   - change: 2026-10-28-vpa-views
     phase: execution
@@ -58,7 +60,9 @@ in_flight:
     # custom object, SAR-gated, c0616fa4), list view (638acda3), data view
     # (ecd6e98a), routes + stub removal (6bb35dd9). Verification floor green
     # (unit 507 passed; vitest 17/17 targeted; fe-build + fe-check;
-    # _nav.tsx untouched). Awaits QA gate + review (orchestrator).
+    # _nav.tsx untouched). QA 2026-10-29 (batch of 6): PASS after
+    # re-executed floor (qa-report.md in 2026-10-28-other-resource-views).
+    # Awaits review.
     tracker: [TASK-049]
   - change: 2026-10-28-hpa-views
     phase: execution
@@ -67,7 +71,9 @@ in_flight:
     # snake_case to_dict, SAR-gated, 0178df05), list view (233e827c), data
     # view (954e7a0b), routes + stub removal (3aabed9d). Verification floor
     # green (unit suite green; vitest 17/17 targeted; fe-build + fe-check;
-    # _nav.tsx untouched). Awaits QA gate + review (orchestrator).
+    # _nav.tsx untouched). QA 2026-10-29 (batch of 6): PASS after
+    # re-executed floor (qa-report.md in 2026-10-28-other-resource-views).
+    # Awaits review.
     tracker: [TASK-050]
   - change: 2026-10-28-limitrange-views
     phase: execution
@@ -75,8 +81,9 @@ in_flight:
     # limitranges kind (core, namespaced, SAR-gated, aadef0d5), list view
     # (38e16aaf), data view (fdb8ca33), routes + stub removal + e2e move
     # (2a6e478b). Verification floor green (unit 532 passed; vitest 16/16
-    # targeted; fe-build + fe-check; _nav.tsx untouched). Awaits QA gate +
-    # review (orchestrator).
+    # targeted; fe-build + fe-check; _nav.tsx untouched). QA 2026-10-29
+    # (batch of 6): PASS after re-executed floor (qa-report.md in
+    # 2026-10-28-other-resource-views). Awaits review.
     tracker: [TASK-054]
 completed_changes:
   - 2026-10-17-kubedash-base-structure
