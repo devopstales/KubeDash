@@ -162,8 +162,8 @@ tasks:
 
   # ---- Backend (Flask app, runs on the host against the dev stack) ----------
   #
-  # The app's default DB/Redis URLs already point at the compose stack's
-  # pinned ports, so no KUBEDASH_*_URL is needed for the stock setup.
+  # The app's default DB URL already points at the compose stack's
+  # pinned port, so no KUBEDASH_DATABASE_URL is needed for the stock setup.
   #
   # Multi-instance: each instance gets its own port and KUBEDASH_REPLICA_ID
   # (the advisory-lock key is hashtext(replica_id)). Watch leadership with

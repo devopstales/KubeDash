@@ -21,7 +21,6 @@ dist = Path(tempfile.mkdtemp(prefix="kd-dist-"))
 app = create_app({
     "TESTING": True,
     "DATABASE_URL": "sqlite://",
-
     "KUBEDASH_JWT_SECRET": "test-jwt-secret",
     "KUBEDASH_SECRET_KEY": "test-enc-key-32-bytes-long!!!!",
 })
