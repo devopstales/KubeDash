@@ -52,6 +52,8 @@ const ResourceQuotaView = React.lazy(() => import('./views/OtherResource/Resourc
 const ResourceQuotaDataView = React.lazy(() => import('./views/OtherResource/ResourceQuotaData'))
 const PodDisruptionBudgetView = React.lazy(() => import('./views/OtherResource/PodDisruptionBudget'))
 const PodDisruptionBudgetDataView = React.lazy(() => import('./views/OtherResource/PodDisruptionBudgetData'))
+const VerticalPodAutoscalerView = React.lazy(() => import('./views/OtherResource/VerticalPodAutoscaler'))
+const VerticalPodAutoscalerDataView = React.lazy(() => import('./views/OtherResource/VerticalPodAutoscalerData'))
 const GroupsView = React.lazy(() => import('./views/Groups'))
 const GroupPrivilegesView = React.lazy(() => import('./views/Groups/GroupPrivileges'))
 const GroupPrivilegeEditView = React.lazy(() => import('./views/Groups/GroupPrivilegeEdit'))
@@ -430,6 +432,22 @@ const App = () => {
                       element={
                         <ProtectedRoute>
                           <PodDisruptionBudgetDataView />
+                        </ProtectedRoute>
+                      }
+                    />
+                    <Route
+                      path="/other-resource/vertical-pod-autoscaler"
+                      element={
+                        <ProtectedRoute>
+                          <VerticalPodAutoscalerView />
+                        </ProtectedRoute>
+                      }
+                    />
+                    <Route
+                      path="/other-resource/vertical-pod-autoscaler/data"
+                      element={
+                        <ProtectedRoute>
+                          <VerticalPodAutoscalerDataView />
                         </ProtectedRoute>
                       }
                     />
