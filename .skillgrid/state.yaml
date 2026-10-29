@@ -42,6 +42,15 @@ in_flight:
     # targeted; fe-build + fe-check; _nav.tsx untouched). Awaits QA gate +
     # review (orchestrator).
     tracker: [TASK-047]
+  - change: 2026-10-28-pdb-views
+    phase: execution
+    # Executed 2026-10-29 (TASK-048): 4 commits on `rebase` — backend
+    # poddisruptionbudgets kind (policy, namespaced, SAR-gated, 5f1f9244),
+    # list view (7a1ab3a5), data view (305a44c6), routes + stub removal
+    # (7b3e35be). Verification floor green (unit 495 passed; vitest 16/16
+    # targeted; fe-build + fe-check; _nav.tsx untouched). Awaits QA gate +
+    # review (orchestrator).
+    tracker: [TASK-048]
 completed_changes:
   - 2026-10-17-kubedash-base-structure
   - 2026-10-17-swagger-ui-air-gap
