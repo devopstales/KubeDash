@@ -60,6 +60,8 @@ const HorizontalPodAutoscalerView = React.lazy(
 const HorizontalPodAutoscalerDataView = React.lazy(
   () => import('./views/OtherResource/HorizontalPodAutoscalerData'),
 )
+const LimitRangeView = React.lazy(() => import('./views/OtherResource/LimitRange'))
+const LimitRangeDataView = React.lazy(() => import('./views/OtherResource/LimitRangeData'))
 const GroupsView = React.lazy(() => import('./views/Groups'))
 const GroupPrivilegesView = React.lazy(() => import('./views/Groups/GroupPrivileges'))
 const GroupPrivilegeEditView = React.lazy(() => import('./views/Groups/GroupPrivilegeEdit'))
@@ -470,6 +472,22 @@ const App = () => {
                       element={
                         <ProtectedRoute>
                           <HorizontalPodAutoscalerDataView />
+                        </ProtectedRoute>
+                      }
+                    />
+                    <Route
+                      path="/other-resource/limit-range"
+                      element={
+                        <ProtectedRoute>
+                          <LimitRangeView />
+                        </ProtectedRoute>
+                      }
+                    />
+                    <Route
+                      path="/other-resource/limit-range/data"
+                      element={
+                        <ProtectedRoute>
+                          <LimitRangeDataView />
                         </ProtectedRoute>
                       }
                     />

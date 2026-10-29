@@ -71,6 +71,11 @@ function expectedStubs() {
     // /other-resource/horizontal-pod-autoscaler/data.
     '/other-resource/horizontal-pod-autoscaler',
     '/other-resource/horizontal-pod-autoscaler/data',
+    // Real view (2026-10-28-limitrange-views, Task 4) — not a stub route.
+    // The nav leaf targets the list at /other-resource/limit-range; the
+    // detail is /other-resource/limit-range/data.
+    '/other-resource/limit-range',
+    '/other-resource/limit-range/data',
   ])
   const seen = new Map<string, string>()
   for (const isAdmin of [true, false]) {

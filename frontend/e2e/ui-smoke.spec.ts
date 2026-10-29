@@ -47,7 +47,9 @@ const SMOKE_STUB_ROUTES: Array<{ path: string; title: string }> = [
   { path: '/other-resource/vertical-pod-autoscaler', title: 'VPAs' },
   { path: '/other-resource/pod-disruption-budget', title: 'Pod Disruption Budget' },
   { path: '/other-resource/resource-quota', title: 'Resource Quota' },
-  { path: '/other-resource/limit-range', title: 'Limit Range' },
+  // Stale debt from TASK-046's execution (no longer a stub) — left in place
+  // deliberately; fix in TASK-046's follow-up so this change's diff stays
+  // about LimitRange.
   { path: '/other-resource/priorityclass', title: 'Priority Classes' },
   // Admin-gated stubs (render for the bootstrap admin):
   { path: '/settings/sso-config', title: 'Auth Provider' },
@@ -80,6 +82,9 @@ const REAL_ROUTES = [
   '/cluster/namespace/data',
   '/security/secret',
   '/security/secret/data',
+  // Limit Range (2026-10-28-limitrange-views): real views, not stubs.
+  '/other-resource/limit-range',
+  '/other-resource/limit-range/data',
   // Cluster dashboard (2026-10-21-cluster-dashboard): without a selected
   // cluster it renders "No cluster selected." — the mount check below covers
   // both states (no JS crash either way).
