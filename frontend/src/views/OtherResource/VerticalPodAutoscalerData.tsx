@@ -29,10 +29,14 @@ SyntaxHighlighter.registerLanguage('json', json)
 
 const NOT_FOUND = 'not found'
 
-// Min/Max Allowed render "resource: value" lines (N/A when the bound is
-// absent — certainty rule: never guess).
-const bounds = (b?: Record<string, string>) =>
-  b && Object.keys(b).length ? Object.entries(b).map(([k, v]) => `${k}: ${v}`) : ['N/A']
+// Min/Max Allowed render "resource: value" lines. An ABSENT bound renders
+// N/A (certainty rule: never guess); a present-but-empty object renders —
+// (the bound exists, it is simply empty — not the absence sentinel).
+const bounds = (b?: Record<string, string>) => {
+  if (b == null) return ['N/A']
+  const entries = Object.entries(b).map(([k, v]) => `${k}: ${v}`)
+  return entries.length > 0 ? entries : ['—']
+}
 
 /**
  * 4.1 `other-resources/vpa-data.html.j2` port: one VerticalPodAutoscaler's

@@ -159,6 +159,50 @@ test('vpa-data-container-policies', async () => {
   expect(screen.getByText('cpu, memory')).toBeTruthy()
 })
 
+test('vpa-data-empty-vs-absent-bounds', async () => {
+  // A present-but-empty minAllowed object is NOT an absent bound: it
+  // renders —, while a truly absent bound renders 4.1's N/A literal.
+  // Max Allowed is absent here (triangulation: both branches, one row).
+  const emptyBounds = {
+    ...webVpa,
+    spec: {
+      ...webVpa.spec,
+      resourcePolicy: {
+        containerPolicies: [
+          {
+            containerName: 'app',
+            controlledValues: 'RequestsLimits',
+            mode: 'Auto',
+            minAllowed: {},
+            controlledResources: ['cpu', 'memory'],
+          },
+        ],
+      },
+    },
+    status: {},
+  }
+  server.use(
+    http.get('*/api/v1/clusters/1/resources/verticalpodautoscalers', () =>
+      HttpResponse.json({ kind: 'verticalpodautoscalers', cluster: 'prod', items: [emptyBounds] }),
+    ),
+  )
+  selectProd()
+  const { container } = renderAt(<VerticalPodAutoscalerDataView />, dataPath)
+
+  await waitFor(() => {
+    expect(container.textContent).toContain('"targetRef"')
+  })
+  // The policy row: container name, mode, and controlled resources render.
+  const inTable = async (text: string) =>
+    (await screen.findAllByText(text)).some((el) => el.closest('table'))
+  expect(await inTable('app')).toBe(true)
+  // present-but-empty minAllowed → — (not N/A).
+  const emptyBoundCells = (await screen.findAllByText('—')).filter((el) => el.closest('table'))
+  expect(emptyBoundCells.length).toBeGreaterThanOrEqual(1)
+  // absent maxAllowed → N/A in the same row.
+  expect(await inTable('N/A')).toBe(true)
+})
+
 test('vpa-data-missing-policy', async () => {
   // No resourcePolicy and no status.conditions: both tables degrade to
   // their pinned empty states (certainty rule: never guess).
