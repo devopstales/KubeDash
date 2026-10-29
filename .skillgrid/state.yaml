@@ -51,6 +51,15 @@ in_flight:
     # targeted; fe-build + fe-check; _nav.tsx untouched). Awaits QA gate +
     # review (orchestrator).
     tracker: [TASK-048]
+  - change: 2026-10-28-vpa-views
+    phase: execution
+    # Executed 2026-10-29 (TASK-049): 4 commits on `rebase` — backend
+    # verticalpodautoscalers kind (autoscaling.k8s.io, namespaced CRD, full
+    # custom object, SAR-gated, c0616fa4), list view (638acda3), data view
+    # (ecd6e98a), routes + stub removal (6bb35dd9). Verification floor green
+    # (unit 507 passed; vitest 17/17 targeted; fe-build + fe-check;
+    # _nav.tsx untouched). Awaits QA gate + review (orchestrator).
+    tracker: [TASK-049]
 completed_changes:
   - 2026-10-17-kubedash-base-structure
   - 2026-10-17-swagger-ui-air-gap
