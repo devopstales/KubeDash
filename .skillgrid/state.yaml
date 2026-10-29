@@ -60,6 +60,15 @@ in_flight:
     # (unit 507 passed; vitest 17/17 targeted; fe-build + fe-check;
     # _nav.tsx untouched). Awaits QA gate + review (orchestrator).
     tracker: [TASK-049]
+  - change: 2026-10-28-hpa-views
+    phase: execution
+    # Executed 2026-10-29 (TASK-050): 4 commits on `rebase` — backend
+    # horizontalpodautoscalers kind (autoscaling/v1, namespaced core kind,
+    # snake_case to_dict, SAR-gated, 0178df05), list view (233e827c), data
+    # view (954e7a0b), routes + stub removal (3aabed9d). Verification floor
+    # green (unit suite green; vitest 17/17 targeted; fe-build + fe-check;
+    # _nav.tsx untouched). Awaits QA gate + review (orchestrator).
+    tracker: [TASK-050]
 completed_changes:
   - 2026-10-17-kubedash-base-structure
   - 2026-10-17-swagger-ui-air-gap
