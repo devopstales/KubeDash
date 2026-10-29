@@ -65,6 +65,10 @@ _KINDS: dict[str, tuple[str, str, str]] = {
     # TASK-047 (list + data views; ADR-0022 placement). The 4.1 route name was
     # singular; the API kind is the plural.
     "resourcequotas": ("list_resource_quotas", "resourcequotas", ""),
+    # PodDisruptionBudget (policy, namespaced) — the 4.1-parity nav leaf
+    # resolved by TASK-048 (list + data views; ADR-0022 placement). The 4.1
+    # route name was singular; the API kind is the plural.
+    "poddisruptionbudgets": ("list_pod_disruption_budgets", "poddisruptionbudgets", "policy"),
 }
 
 #: kind → K8sClient method for a single-object ``?name=`` lookup
@@ -76,6 +80,7 @@ _GETTERS: dict[str, str] = {
     "priorityclasses": "get_priority_class",
     "runtimeclasses": "get_runtime_class",
     "resourcequotas": "get_resource_quota",
+    "poddisruptionbudgets": "get_pod_disruption_budget",
 }
 
 

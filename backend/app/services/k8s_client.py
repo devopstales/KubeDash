@@ -227,6 +227,9 @@ class K8sClient:
         # RuntimeClass (node.k8s.io) — cluster-scoped, the R4 "runtimeclasses"
         # kind (the 4.1 nav leaf had no view; ADR-0022 placement, TASK-046).
         self._node = k8s_client.NodeV1Api(api_client)
+        # PodDisruptionBudget (policy/v1, namespaced) — the R4
+        # "poddisruptionbudgets" kind (4.1-parity nav leaf; ADR-0022 placement).
+        self._policy = k8s_client.PolicyV1Api(api_client)
         self._host = self._v1.api_client.configuration.host
 
     @staticmethod
@@ -814,6 +817,37 @@ class K8sClient:
             if e.status == 404:
                 return []
             self._unreachable("get_network_policy", e)
+            raise AssertionError("unreachable") from e
+
+    def list_pod_disruption_budgets(self, namespace: str | None) -> list[dict[str, Any]]:
+        """PodDisruptionBudget list in the standard kubernetes dict form
+        (``to_dict``) for one namespace, or across all namespaces when the
+        namespace is ``None`` (the ``list_secrets`` branch). No field
+        stripping — the view renders ``spec.min_available``/
+        ``spec.max_unavailable``/``status.disruptions_allowed`` and the data
+        page the full object. A transport ApiException maps to
+        ``ClusterUnreachableError`` (502)."""
+        try:
+            resp = (
+                self._policy.list_namespaced_pod_disruption_budget(namespace)
+                if namespace
+                else self._policy.list_pod_disruption_budget_for_all_namespaces()
+            )
+        except ApiException as e:
+            self._unreachable("list_pod_disruption_budgets", e)
+            raise AssertionError("unreachable") from e
+        return [p.to_dict() for p in resp.items]
+
+    def get_pod_disruption_budget(self, namespace: str, name: str) -> list[dict[str, Any]]:
+        """One PodDisruptionBudget as a 0/1-item list; ``[]`` on 404. Any
+        other ApiException maps to ``ClusterUnreachableError`` (502),
+        matching ``get_secret``'s transport contract."""
+        try:
+            return [self._policy.read_namespaced_pod_disruption_budget(name, namespace).to_dict()]
+        except ApiException as e:
+            if e.status == 404:
+                return []
+            self._unreachable("get_pod_disruption_budget", e)
             raise AssertionError("unreachable") from e
 
     def get_priority_class(self, _namespace: str, name: str) -> list[dict[str, Any]]:

@@ -393,6 +393,57 @@ class FakeK8s:
             return self.list_resource_quotas(namespace)
         return []
 
+    def list_pod_disruption_budgets(self, namespace: str | None) -> list[dict]:
+        # Namespaced kind (policy/v1): the namespace is forwarded (the real
+        # K8sClient.list_pod_disruption_budgets pattern). The all-namespaces
+        # branch is DISTINCTLY named (team-b) so the API tests can tell the
+        # branches apart, mirroring list_network_policies.
+        if namespace is None:
+            return [
+                {
+                    "metadata": {"name": "web", "namespace": "team-b"},
+                    "spec": {"min_available": 3, "selector": {"match_labels": {"app": "web"}}},
+                    "status": {"disruptions_allowed": 1, "current_healthy": 4},
+                },
+            ]
+        return [
+            {
+                "metadata": {
+                    "name": "web",
+                    "namespace": namespace or "team-a",
+                    "creation_timestamp": "2026-01-02T03:04:05Z",
+                    "labels": {"team": "a"},
+                    "annotations": {"pdb.kubernetes.io/managed-by": "kubedash"},
+                },
+                "spec": {
+                    "min_available": 3,
+                    "selector": {"match_labels": {"app": "web"}},
+                    "unhealthy_pod_eviction_policy": "AlwaysAllow",
+                },
+                "status": {
+                    "observed_generation": 1,
+                    "current_healthy": 4,
+                    "desired": 3,
+                    "total_pods": 4,
+                    "expected_pods": 3,
+                    "disruptions_allowed": 1,
+                    "conditions": [
+                        {
+                            "type": "Available",
+                            "status": "True",
+                            "reason": "SufficientPods",
+                            "message": "PodDisruptionBudget is available",
+                        }
+                    ],
+                },
+            }
+        ]
+
+    def get_pod_disruption_budget(self, namespace: str, name: str) -> list[dict]:
+        if name == "web":
+            return self.list_pod_disruption_budgets(namespace)
+        return []
+
     def readyz(self) -> bool:
         return True
 
@@ -1609,6 +1660,112 @@ def test_resourcequota_kind_singular_rejected(api_client, auth_client) -> None:
     h = {"Authorization": f"Bearer {auth_client.jwt}"}
     _register(api_client, h)
     r = api_client.get("/api/v1/clusters/1/resources/resourcequota", headers=h)
+    assert r.status_code == 404
+    assert r.get_json()["error"]["code"] == "RESOURCE_KIND_NOT_SUPPORTED"
+
+
+def test_list_poddisruptionbudgets_200_in_namespace(
+    api_client, auth_client, fake_k8s, monkeypatch
+) -> None:
+    """[poddisruptionbudgets-list-200-in-namespace] a bound user listing
+    poddisruptionbudgets?namespace=team-a gets the to_dict items back, and
+    the namespace is forwarded to the client (namespaced policy kind)."""
+    auth_client.login()
+    h = {"Authorization": f"Bearer {auth_client.jwt}"}
+    _register(api_client, h)
+    _allow_sar(monkeypatch)
+    r = api_client.get(
+        "/api/v1/clusters/1/resources/poddisruptionbudgets?namespace=team-a", headers=h
+    )
+    assert r.status_code == 200
+    body = r.get_json()
+    assert body["kind"] == "poddisruptionbudgets"
+    assert body["cluster"] == "prod"
+    [item] = body["items"]
+    assert item["metadata"]["name"] == "web"
+    assert item["metadata"]["namespace"] == "team-a"
+    assert item["spec"]["min_available"] == 3
+    assert item["status"]["disruptions_allowed"] == 1
+
+
+def test_list_poddisruptionbudgets_all_namespaces_without_param(
+    api_client, auth_client, fake_k8s, monkeypatch
+) -> None:
+    """[poddisruptionbudgets-list-all-namespaces-without-param] no namespace
+    query hits the all-namespaces branch: the FakeK8s receives None and the
+    distinctly-named team-b item is present."""
+    auth_client.login()
+    h = {"Authorization": f"Bearer {auth_client.jwt}"}
+    _register(api_client, h)
+    _allow_sar(monkeypatch)
+    r = api_client.get("/api/v1/clusters/1/resources/poddisruptionbudgets", headers=h)
+    assert r.status_code == 200
+    body = r.get_json()
+    assert body["kind"] == "poddisruptionbudgets"
+    assert [item["metadata"]["namespace"] for item in body["items"]] == ["team-b"]
+
+
+def test_list_poddisruptionbudgets_get_by_name(
+    api_client, auth_client, fake_k8s, monkeypatch
+) -> None:
+    """[poddisruptionbudgets-get-by-name] ?name= returns a 0/1-item list: a
+    hit returns the one item in team-a, a miss returns [] (mirrors
+    get_secret)."""
+    auth_client.login()
+    h = {"Authorization": f"Bearer {auth_client.jwt}"}
+    _register(api_client, h)
+    _allow_sar(monkeypatch)
+    r = api_client.get(
+        "/api/v1/clusters/1/resources/poddisruptionbudgets?name=web&namespace=team-a",
+        headers=h,
+    )
+    assert r.status_code == 200
+    [item] = r.get_json()["items"]
+    assert item["metadata"]["name"] == "web"
+    assert item["metadata"]["namespace"] == "team-a"
+    r = api_client.get(
+        "/api/v1/clusters/1/resources/poddisruptionbudgets?name=ghost&namespace=team-a",
+        headers=h,
+    )
+    assert r.status_code == 200
+    assert r.get_json()["items"] == []
+
+
+def test_list_poddisruptionbudgets_sar_denied(api_client, auth_client, fake_k8s, monkeypatch) -> None:
+    """[poddisruptionbudgets-sar-denied] ADR-0004: the SAR is asked BEFORE
+    the read, with the policy group and the query namespace — a deny
+    short-circuits to 403 RBAC_DENIED."""
+    auth_client.login()
+    h = {"Authorization": f"Bearer {auth_client.jwt}"}
+    _register(api_client, h)
+    asked = _record_sar(monkeypatch)  # denies every SAR and records calls
+    r = api_client.get(
+        "/api/v1/clusters/1/resources/poddisruptionbudgets?namespace=team-a", headers=h
+    )
+    assert r.status_code == 403
+    assert r.get_json()["error"]["code"] == "RBAC_DENIED"
+    assert ("list", "poddisruptionbudgets", "team-a", None, "policy") in asked
+
+
+def test_poddisruptionbudgets_binding_404(api_client, auth_client) -> None:
+    """[poddisruptionbudgets-binding-404] an unbound user: the binding gate
+    fails before the SAR, CLUSTER_NOT_FOUND."""
+    auth_client.login()
+    h = {"Authorization": f"Bearer {auth_client.jwt}"}
+    r = api_client.get(
+        "/api/v1/clusters/999/resources/poddisruptionbudgets?namespace=team-a", headers=h
+    )
+    assert r.status_code == 404
+    assert r.get_json()["error"]["code"] == "CLUSTER_NOT_FOUND"
+
+
+def test_poddisruptionbudget_kind_singular_rejected(api_client, auth_client) -> None:
+    """[poddisruptionbudget-kind-singular-rejected] the 4.1 route name
+    (singular) is not a kind — RESOURCE_KIND_NOT_SUPPORTED."""
+    auth_client.login()
+    h = {"Authorization": f"Bearer {auth_client.jwt}"}
+    _register(api_client, h)
+    r = api_client.get("/api/v1/clusters/1/resources/poddisruptionbudget", headers=h)
     assert r.status_code == 404
     assert r.get_json()["error"]["code"] == "RESOURCE_KIND_NOT_SUPPORTED"
 
