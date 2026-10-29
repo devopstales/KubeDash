@@ -206,6 +206,37 @@ export interface NetworkPolicyItem {
   [key: string]: unknown
 }
 
+/** A HorizontalPodAutoscaler item as returned by /api/v1/clusters/<id>/resources/horizontalpodautoscalers (kubernetes to_dict, snake_case; namespaced, autoscaling/v1). */
+export interface HorizontalPodAutoscalerItem {
+  metadata?: {
+    name?: string
+    namespace?: string
+    creation_timestamp?: string
+    labels?: Record<string, string>
+    annotations?: Record<string, string>
+  }
+  spec?: {
+    scale_target_ref?: { kind?: string; name?: string; api_version?: string }
+    min_replicas?: number
+    max_replicas?: number
+    target_cpu_utilization_percentage?: number
+    metrics?: unknown[]
+  }
+  status?: {
+    current_replicas?: number
+    desired_replicas?: number
+    current_cpu_utilization_percentage?: number
+    conditions?: Array<{
+      type?: string
+      status?: string
+      last_transition_time?: string
+      reason?: string
+      message?: string
+    }>
+  }
+  [key: string]: unknown
+}
+
 /** A CiliumNetworkPolicy / CiliumClusterwideNetworkPolicy item (full CRD to_dict). */
 export interface CiliumPolicyItem {
   metadata?: {
