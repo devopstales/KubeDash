@@ -312,6 +312,41 @@ export interface PodDisruptionBudgetItem {
   [key: string]: unknown
 }
 
+/** A VerticalPodAutoscaler custom object as returned by /api/v1/clusters/<id>/resources/verticalpodautoscalers (autoscaling.k8s.io CRD, camelCase wire form; namespaced). */
+export interface VerticalPodAutoscalerItem {
+  metadata?: {
+    name?: string
+    namespace?: string
+    creationTimestamp?: string
+    labels?: Record<string, string>
+    annotations?: Record<string, string>
+  }
+  spec?: {
+    targetRef?: { kind?: string; name?: string; apiVersion?: string }
+    updatePolicy?: { updateMode?: string }
+    resourcePolicy?: {
+      containerPolicies?: Array<{
+        containerName?: string
+        controlledValues?: string
+        mode?: string
+        minAllowed?: Record<string, string>
+        maxAllowed?: Record<string, string>
+        controlledResources?: string[]
+      }>
+    }
+  }
+  status?: {
+    conditions?: Array<{
+      type?: string
+      status?: string
+      lastTransitionTime?: string
+      reason?: string
+      message?: string
+    }>
+  }
+  [key: string]: unknown
+}
+
 /** Closed set for the detail page's ?kind= param (4.1 parity). */
 export const POLICY_KINDS = ['NetworkPolicy', 'CiliumNetworkPolicy', 'CiliumClusterwideNetworkPolicy'] as const
 export type PolicyKind = (typeof POLICY_KINDS)[number]
