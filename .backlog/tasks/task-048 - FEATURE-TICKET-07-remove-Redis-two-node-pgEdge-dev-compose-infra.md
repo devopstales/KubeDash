@@ -5,7 +5,7 @@ status: Done
 assignee:
   - opencode/qwen3.8-uncensored
 created_date: '2026-10-27 19:16'
-updated_date: '2026-10-29 09:04'
+updated_date: '2026-10-29 10:00'
 labels: []
 milestone: m-2
 dependencies:
@@ -81,3 +81,9 @@ Implementation is already in the working tree (31 modified + 3 new files). This 
 ### Commit
 - One conventional commit for the TICKET-07 working tree once tests are green: `refactor(dev): remove Redis, pgEdge two-node dev default (ADR-0029/0030/0031)`. Then docs(tracker) commit flipping TASK-048 to Done.
 <!-- SECTION:PLAN:END -->
+
+## Implementation Notes
+
+<!-- SECTION:NOTES:BEGIN -->
+Forward session (2026-10-29): fixed the 8 unit-test failures ruled 'pre-existing' in TICKET-07's completion note. They were host env-drift (missing /test/admin.kubeconfig, KUBEDASH_REPLICA_ID in the shell, ~/.kube/config present) + test-vs-handler contract drift (sub convention, role case, audit action names), not regressions. Full unit suite now 460 passed / 0 failed (was 452/8). Commit 3978cc56. The proxy's _test_stash (attribute writes stashed + cleared by reset()) is a small test-seam addition to app/core/ini_config.py to stop test_leader_fence.py's singleton mutation from leaking across modules. SDD ledger updated.
+<!-- SECTION:NOTES:END -->
