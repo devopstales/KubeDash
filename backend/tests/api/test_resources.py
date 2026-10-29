@@ -503,6 +503,58 @@ class FakeK8s:
             return self.list_vertical_pod_autoscalers(namespace)
         return []
 
+    def list_horizontal_pod_autoscalers(self, namespace: str | None) -> list[dict]:
+        # Namespaced kind (autoscaling/v1, core): the namespace is forwarded
+        # (the real K8sClient.list_horizontal_pod_autoscalers pattern). The
+        # all-namespaces branch is DISTINCTLY named (team-b) so the API
+        # tests can tell the branches apart, mirroring list_network_policies.
+        self.hpa_ns_calls: list[str | None] = []
+        self.hpa_ns_calls.append(namespace)
+        if namespace is None:
+            return [
+                {
+                    "metadata": {"name": "web-hpa", "namespace": "team-b"},
+                    "spec": {"max_replicas": 10, "min_replicas": 2},
+                    "status": {"current_replicas": 3},
+                },
+            ]
+        return [
+            {
+                "metadata": {
+                    "name": "web-hpa",
+                    "namespace": namespace or "team-a",
+                    "creation_timestamp": "2026-01-02T03:04:05Z",
+                    "labels": {"team": "a"},
+                    "annotations": {},
+                },
+                "spec": {
+                    "scale_target_ref": {"kind": "Deployment", "name": "web", "api_version": "apps/v1"},
+                    "min_replicas": 2,
+                    "max_replicas": 10,
+                    "target_cpu_utilization_percentage": 80,
+                },
+                "status": {
+                    "current_replicas": 3,
+                    "desired_replicas": 3,
+                    "current_cpu_utilization_percentage": 50,
+                    "conditions": [
+                        {
+                            "type": "AbleToScale",
+                            "status": "True",
+                            "last_transition_time": "2026-01-02T03:04:06Z",
+                            "reason": "SuccessfulRescale",
+                            "message": "Ready to scale",
+                        }
+                    ],
+                },
+            }
+        ]
+
+    def get_horizontal_pod_autoscaler(self, namespace: str, name: str) -> list[dict]:
+        if name == "web-hpa":
+            return self.list_horizontal_pod_autoscalers(namespace)
+        return []
+
     def readyz(self) -> bool:
         return True
 
@@ -1938,6 +1990,121 @@ def test_verticalpodautoscaler_kind_singular_rejected(api_client, auth_client) -
     h = {"Authorization": f"Bearer {auth_client.jwt}"}
     _register(api_client, h)
     r = api_client.get("/api/v1/clusters/1/resources/verticalpodautoscaler", headers=h)
+    assert r.status_code == 404
+    assert r.get_json()["error"]["code"] == "RESOURCE_KIND_NOT_SUPPORTED"
+
+
+def test_list_horizontalpodautoscalers_200_in_namespace(
+    api_client, auth_client, fake_k8s, monkeypatch
+) -> None:
+    """[horizontalpodautoscalers-list-200-in-namespace] a bound user listing
+    horizontalpodautoscalers in one namespace gets the to_dict items back,
+    spec (scale_target_ref, min/max replicas) and status (conditions)
+    intact; the namespace is forwarded to the client."""
+    auth_client.login()
+    h = {"Authorization": f"Bearer {auth_client.jwt}"}
+    _register(api_client, h)
+    _allow_sar(monkeypatch)
+    r = api_client.get(
+        "/api/v1/clusters/1/resources/horizontalpodautoscalers?namespace=team-a",
+        headers=h,
+    )
+    assert r.status_code == 200
+    body = r.get_json()
+    assert body["kind"] == "horizontalpodautoscalers"
+    [item] = body["items"]
+    assert item["metadata"]["name"] == "web-hpa"
+    assert item["metadata"]["namespace"] == "team-a"
+    assert item["spec"]["scale_target_ref"]["name"] == "web"
+    assert item["spec"]["min_replicas"] == 2
+    assert item["spec"]["max_replicas"] == 10
+    assert item["status"]["conditions"][0]["type"] == "AbleToScale"
+    assert fake_k8s.hpa_ns_calls == ["team-a"]
+
+
+def test_list_horizontalpodautoscalers_all_namespaces_without_param(
+    api_client, auth_client, fake_k8s, monkeypatch
+) -> None:
+    """[horizontalpodautoscalers-list-all-namespaces-without-param] no
+    namespace query hits the all-namespaces branch: the FakeK8s receives
+    None and the distinctly-named team-b item is present."""
+    auth_client.login()
+    h = {"Authorization": f"Bearer {auth_client.jwt}"}
+    _register(api_client, h)
+    _allow_sar(monkeypatch)
+    r = api_client.get("/api/v1/clusters/1/resources/horizontalpodautoscalers", headers=h)
+    assert r.status_code == 200
+    body = r.get_json()
+    assert body["kind"] == "horizontalpodautoscalers"
+    assert [item["metadata"]["namespace"] for item in body["items"]] == ["team-b"]
+    assert fake_k8s.hpa_ns_calls == [None]
+
+
+def test_list_horizontalpodautoscalers_get_by_name(
+    api_client, auth_client, fake_k8s, monkeypatch
+) -> None:
+    """[horizontalpodautoscalers-get-by-name] ?name= returns a 0/1-item
+    list: a hit returns the one object in team-a, a miss returns []
+    (mirrors get_secret)."""
+    auth_client.login()
+    h = {"Authorization": f"Bearer {auth_client.jwt}"}
+    _register(api_client, h)
+    _allow_sar(monkeypatch)
+    r = api_client.get(
+        "/api/v1/clusters/1/resources/horizontalpodautoscalers?name=web-hpa&namespace=team-a",
+        headers=h,
+    )
+    assert r.status_code == 200
+    [item] = r.get_json()["items"]
+    assert item["metadata"]["name"] == "web-hpa"
+    assert item["metadata"]["namespace"] == "team-a"
+    assert item["spec"]["target_cpu_utilization_percentage"] == 80
+    r = api_client.get(
+        "/api/v1/clusters/1/resources/horizontalpodautoscalers?name=ghost&namespace=team-a",
+        headers=h,
+    )
+    assert r.status_code == 200
+    assert r.get_json()["items"] == []
+
+
+def test_list_horizontalpodautoscalers_sar_denied(
+    api_client, auth_client, fake_k8s, monkeypatch
+) -> None:
+    """[horizontalpodautoscalers-sar-denied] ADR-0004: the SAR is asked
+    BEFORE the read, on the CORE group ("") with the query namespace — a
+    deny short-circuits to 403 RBAC_DENIED."""
+    auth_client.login()
+    h = {"Authorization": f"Bearer {auth_client.jwt}"}
+    _register(api_client, h)
+    asked = _record_sar(monkeypatch)  # denies every SAR and records calls
+    r = api_client.get(
+        "/api/v1/clusters/1/resources/horizontalpodautoscalers?namespace=team-a", headers=h
+    )
+    assert r.status_code == 403
+    assert r.get_json()["error"]["code"] == "RBAC_DENIED"
+    # the SAR was asked BEFORE the read, core group (a generated v1 kind):
+    assert ("list", "horizontalpodautoscalers", "team-a", None, "") in asked
+
+
+def test_horizontalpodautoscalers_binding_404(api_client, auth_client) -> None:
+    """[horizontalpodautoscalers-binding-404] an unbound user: the binding
+    gate fails before the SAR, CLUSTER_NOT_FOUND."""
+    auth_client.login()
+    h = {"Authorization": f"Bearer {auth_client.jwt}"}
+    r = api_client.get(
+        "/api/v1/clusters/999/resources/horizontalpodautoscalers?namespace=team-a", headers=h
+    )
+    assert r.status_code == 404
+    assert r.get_json()["error"]["code"] == "CLUSTER_NOT_FOUND"
+
+
+def test_horizontalpodautoscaler_kind_singular_rejected(api_client, auth_client) -> None:
+    """[horizontalpodautoscaler-kind-singular-rejected] the 4.1 route name
+    (singular) is not a kind — RESOURCE_KIND_NOT_SUPPORTED."""
+    auth_client.login()
+    h = {"Authorization": f"Bearer {auth_client.jwt}"}
+    _register(api_client, h)
+    r = api_client.get("/api/v1/clusters/1/resources/horizontalpodautoscaler", headers=h)
     assert r.status_code == 404
     assert r.get_json()["error"]["code"] == "RESOURCE_KIND_NOT_SUPPORTED"
 

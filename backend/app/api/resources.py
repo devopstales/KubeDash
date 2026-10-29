@@ -78,6 +78,15 @@ _KINDS: dict[str, tuple[str, str, str]] = {
         "verticalpodautoscalers",
         "autoscaling.k8s.io",
     ),
+    # HorizontalPodAutoscaler (autoscaling/v1, namespaced core kind) — the
+    # 4.1-parity nav leaf resolved by TASK-050 (list + data views;
+    # ADR-0022 placement). The 4.1 route name was singular; the API kind is
+    # the plural.
+    "horizontalpodautoscalers": (
+        "list_horizontal_pod_autoscalers",
+        "horizontalpodautoscalers",
+        "",
+    ),
 }
 
 #: kind → K8sClient method for a single-object ``?name=`` lookup
@@ -91,6 +100,7 @@ _GETTERS: dict[str, str] = {
     "resourcequotas": "get_resource_quota",
     "poddisruptionbudgets": "get_pod_disruption_budget",
     "verticalpodautoscalers": "get_vertical_pod_autoscaler",
+    "horizontalpodautoscalers": "get_horizontal_pod_autoscaler",
 }
 
 

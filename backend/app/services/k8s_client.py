@@ -230,6 +230,10 @@ class K8sClient:
         # PodDisruptionBudget (policy/v1, namespaced) — the R4
         # "poddisruptionbudgets" kind (4.1-parity nav leaf; ADR-0022 placement).
         self._policy = k8s_client.PolicyV1Api(api_client)
+        # HorizontalPodAutoscaler (autoscaling/v1, namespaced) — the R4
+        # "horizontalpodautoscalers" kind (4.1-parity nav leaf; ADR-0022
+        # placement). A generated core-API model: ``to_dict`` is snake_case.
+        self._autoscaling = k8s_client.AutoscalingV1Api(api_client)
         self._host = self._v1.api_client.configuration.host
 
     @staticmethod
@@ -878,6 +882,36 @@ class K8sClient:
             if e.status == 404:
                 return []
             self._unreachable("get_network_policy", e)
+            raise AssertionError("unreachable") from e
+
+    def list_horizontal_pod_autoscalers(self, namespace: str | None) -> list[dict[str, Any]]:
+        """HorizontalPodAutoscaler list in the standard kubernetes dict form
+        (``to_dict``) for one namespace, or across all namespaces when the
+        namespace is ``None`` (the ``list_secrets`` branch). No field
+        stripping — the view renders ``spec``/``status`` and the data page
+        the full object. A transport ApiException maps to
+        ``ClusterUnreachableError`` (502)."""
+        try:
+            resp = (
+                self._autoscaling.list_namespaced_horizontal_pod_autoscaler(namespace)
+                if namespace
+                else self._autoscaling.list_horizontal_pod_autoscaler_for_all_namespaces()
+            )
+        except ApiException as e:
+            self._unreachable("list_horizontal_pod_autoscalers", e)
+            raise AssertionError("unreachable") from e
+        return [h.to_dict() for h in resp.items]
+
+    def get_horizontal_pod_autoscaler(self, namespace: str, name: str) -> list[dict[str, Any]]:
+        """One HorizontalPodAutoscaler as a 0/1-item list; ``[]`` on 404.
+        Any other ApiException maps to ``ClusterUnreachableError`` (502),
+        matching ``get_network_policy``'s transport contract."""
+        try:
+            return [self._autoscaling.read_namespaced_horizontal_pod_autoscaler(name, namespace).to_dict()]
+        except ApiException as e:
+            if e.status == 404:
+                return []
+            self._unreachable("get_horizontal_pod_autoscaler", e)
             raise AssertionError("unreachable") from e
 
     def list_pod_disruption_budgets(self, namespace: str | None) -> list[dict[str, Any]]:
