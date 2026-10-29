@@ -4,17 +4,19 @@
 # deeper truth (see .skillgrid/specs/).
 
 pipeline:
-  # Pointer set 2026-10-27: the Postgres queue + revocation + OIDC state +
-  # SAR cache + active-active pgEdge change is sliced (ADR-0029/0030/0031).
-  # Sliced 2026-10-27: 7 tickets, 4 waves (W1 serial migration; W2 parallel
-  # pgqueue/fence/kvstore; W3 parallel wsgi/auth+rbac; W4 redis removal +
-  # pgEdge dev). High risk ~1400-1900 lines; user decided (2026-10-27) to
-  # keep all tickets on the `rebase` work branch (no PR chain). One-way
-  # checkpoints on TICKET-01 (migration) + TICKET-07 (redis removal +
-  # dev-default switch). Previous pointer 2026-10-24-tls-security-headers
-  # stays in flight at executing.
+  # Pointer set 2026-10-29: the Postgres queue + revocation + OIDC state +
+  # SAR cache + active-active pgEdge change is EXECUTED (ADR-0029/0030/0031).
+  # All 7 tickets Done (TASK-042..048), committed on the `rebase` work
+  # branch (no PR chain — user decision 2026-10-27; the branch is the
+  # deliverable + rollback unit). Both one-way gates passed live:
+  #   TICKET-01 migration (0e969d3c2e02: tasks/revoked_jtis/kv + fence) and
+  #   TICKET-07 (task dev-up two-node pgEdge, no redis, autoddl migration
+  #   n1->n2 verified live 2026-10-29). Next: skillgrid:qa (the quality
+  # gate) + skillgrid:requesting-code-review / parallel-code-review (the
+  # branch review) before ship. Previous pointer 2026-10-24-tls-security-
+  # headers stays in flight at executing.
   current_change: 2026-10-27-postgres-queue-revocation-active-active
-  current_phase: slicing
+  current_phase: executing
   # 2026-10-21-cluster-node (blueprint) and 2026-10-17/2026-10-19 changes
   # remain in flight at their own phases.
   specs_root: .skillgrid/specs
