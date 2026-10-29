@@ -3,10 +3,10 @@ id: TASK-047
 title: >-
   Build 4.1 ResourceQuota views at /other-resource/resource-quota (list + data,
   namespaced)
-status: In Progress
+status: Done
 assignee: []
 created_date: '2026-10-28 12:35'
-updated_date: '2026-10-28 12:49'
+updated_date: '2026-10-29 15:49'
 labels:
   - feature
 dependencies: []
@@ -29,22 +29,22 @@ The nav leaf 'Resource Quota -> /other-resource/resource-quota' (_nav.tsx:114) c
 
 ## Acceptance Criteria
 <!-- AC:BEGIN -->
-- [ ] #1 GET /api/v1/clusters/<id>/resources/resourcequotas?namespace=<ns> returns the quota list for that namespace, SAR-gated on list resourcequotas (core, group ''), 403 RBAC_DENIED on deny; without a namespace param the list spans all namespaces
-- [ ] #2 GET /api/v1/clusters/<id>/resources/resourcequotas?name=<name>&namespace=<ns> returns the single ResourceQuota via _GETTERS; 404 -> empty items
-- [ ] #3 frontend ResourceQuota.tsx renders the list with Name/Namespace/Requests/Limits/Created columns; Request and Limit cells show requests.cpu, requests.memory, limits.cpu, limits.memory as used/hard (missing -> em dash); card title exactly 'Resource Quota List'; name links to the data page
-- [ ] #4 frontend ResourceQuotaData.tsx renders detail at /other-resource/resource-quota/data?name=&namespace= via a single fetch; CTable Name/Created/Namespace/Scope/Labels/Annotations + Status table (Resource/Used/Hard Limit); NOT_FOUND is a first-class state; full-object JSON block (json hljs grammar)
-- [ ] #5 /other-resource/resource-quota removed from views/Stub/routes.ts; App.tsx wires both views; _nav.tsx leaf unchanged
-- [ ] #6 Backend tests: tests/services/test_k8s_client_resourcequotas.py (namespaced list, all-ns list, get hit/404/5xx) + test_resources.py extensions (200, namespace scoping, get-by-name, SAR deny, binding 404, singular kind rejected)
-- [ ] #7 Frontend tests: resource_quotas.test.tsx + resource_quota_data.test.tsx (mirror network_policies / priority_class_data patterns); Stub.test.tsx updated
+- [x] #1 GET /api/v1/clusters/<id>/resources/resourcequotas?namespace=<ns> returns the quota list for that namespace, SAR-gated on list resourcequotas (core, group ''), 403 RBAC_DENIED on deny; without a namespace param the list spans all namespaces
+- [x] #2 GET /api/v1/clusters/<id>/resources/resourcequotas?name=<name>&namespace=<ns> returns the single ResourceQuota via _GETTERS; 404 -> empty items
+- [x] #3 frontend ResourceQuota.tsx renders the list with Name/Namespace/Requests/Limits/Created columns; Request and Limit cells show requests.cpu, requests.memory, limits.cpu, limits.memory as used/hard (missing -> em dash); card title exactly 'Resource Quota List'; name links to the data page
+- [x] #4 frontend ResourceQuotaData.tsx renders detail at /other-resource/resource-quota/data?name=&namespace= via a single fetch; CTable Name/Created/Namespace/Scope/Labels/Annotations + Status table (Resource/Used/Hard Limit); NOT_FOUND is a first-class state; full-object JSON block (json hljs grammar)
+- [x] #5 /other-resource/resource-quota removed from views/Stub/routes.ts; App.tsx wires both views; _nav.tsx leaf unchanged
+- [x] #6 Backend tests: tests/services/test_k8s_client_resourcequotas.py (namespaced list, all-ns list, get hit/404/5xx) + test_resources.py extensions (200, namespace scoping, get-by-name, SAR deny, binding 404, singular kind rejected)
+- [x] #7 Frontend tests: resource_quotas.test.tsx + resource_quota_data.test.tsx (mirror network_policies / priority_class_data patterns); Stub.test.tsx updated
 <!-- AC:END -->
 
 ## Definition of Done
 <!-- DOD:BEGIN -->
-- [ ] #1 Tests pass
-- [ ] #2 Lint and formatting pass
-- [ ] #3 Edge cases covered
-- [ ] #4 No new warnings introduced
-- [ ] #5 Spec/docs updated if behavior changes
+- [x] #1 Tests pass
+- [x] #2 Lint and formatting pass
+- [x] #3 Edge cases covered
+- [x] #4 No new warnings introduced
+- [x] #5 Spec/docs updated if behavior changes
 <!-- DOD:END -->
 
 ## Implementation Plan
@@ -84,3 +84,31 @@ Key risks/pins: (1) _KINDS+_GETTERS rows are one behavior — 500 if a getter me
 
 Verification floor at end: the blueprint's 4 commands + git diff --stat shows only File-Structure files touched.
 <!-- SECTION:PLAN:END -->
+
+## Implementation Notes
+
+<!-- SECTION:NOTES:BEGIN -->
+T1 done (commit 783cff0a): service methods + _KINDS/_GETTERS rows + 12 tests green (6 service + 6 API); 3 kind-fixture E's are the known ScopeMismatch baseline. Kind-tier suite hangs at process exit (teardown dial) as warned — summary is the evidence.
+
+T2 done (commit 14d8af2b): ResourceQuotaItem + list view + 6 tests green; fe-build (tsc+lint+build) green. Fake needed the datatables.net-react slotRenderer contract (2-arg fn gets (data,row); Name uses data={null} whole-row like NetworkPolicy since the link needs the row's own namespace).
+
+T3 done (commit 3acac8dc): data view + 4 tests green; fe-build green. Deviation: JSON-block assertion polls container.textContent (highlighter splits tokens) — the proven priorityclass pattern, not pre.textContent per blueprint letter.
+
+Verification summary (2026-10-28): (AC1/AC2/AC6) backend targeted: uv run pytest tests/services/test_k8s_client_resourcequotas.py tests/api/test_resources.py -q → 74 passed + 3 known kind-fixture baseline errors (ScopeMismatch, pre-existing). (AC6) full unit: uv run pytest -m 'not integration' -q → 483 passed, 10 deselected, 0 failed (baseline was 471). (AC3/AC4/AC7) frontend targeted: pnpm vitest run resource_quotas + resource_quota_data + Stub → 15/15 passed. (AC5) full vitest: only baseline failures remain (users/groups/admin_permissions + node.node-detail-renders); fe-build (tsc --noEmit incl. test files + eslint + vite) green; fe-check air-gap green; git diff --stat vs cab0e37a: _nav.tsx absent, no file outside the blueprint File Structure (the other diff entries are unrelated sibling spec/backlog files, never staged).
+<!-- SECTION:NOTES:END -->
+
+## Comments
+
+<!-- COMMENTS:BEGIN -->
+author: orchestrator
+created: 2026-10-29 15:49
+---
+REVIEW FIX 2026-10-29 (batch review, REVIEW-PASS-WITH-FIXES): F1 fixed in 251e0c7b - LimitRangeData Created cell now uses formatTimestamp (was raw ISO; briefing R4 + all four sibling data views require it; dropped the dead 'N/A' fallback since formatTimestamp returns the em-dash certainty sentinel for absent values; no-raw-ISO-T test assertion added, RED->GREEN). F2 fixed in 98613f68 - VPA data bounds(): present-but-empty minAllowed/maxAllowed object now renders the em dash, N/A is reserved for absent bounds (RED->GREEN, absent case still N/A). Parked as follow-ups: F3 (two KubeDataTable Name-column conventions coexist in the batch - unify), F4 (PDB unhealthy_pod_eviction_policy typed as string, k8s >=1.29 is []string - spec/code normalization follow-up), F5 rides parked W008/W009 (e2e SMOKE_STUB_ROUTES still lists 4 of the 6 kinds + stale priorityclass entry).
+---
+<!-- COMMENTS:END -->
+
+## Final Summary
+
+<!-- SECTION:FINAL_SUMMARY:BEGIN -->
+4.1 ResourceQuota views shipped as a real, SAR-gated, read-only list + data pair under /other-resource/resource-quota. 4 commits on rebase, each independently revertable: T1 backend resourcequotas kind (core, namespaced, _KINDS+_GETTERS, 783cff0a); T2 list view ResourceQuota.tsx + ResourceQuotaItem (14d8af2b); T3 data view ResourceQuotaData.tsx (4.1 tables + JSON block) (d3d4067d); T4 App.tsx routes + stub removal (0b3b97bf). Verification floor: backend unit 483 passed / 0 failed; frontend targeted 15/15; full vitest at baseline; fe-build + fe-check green; _nav.tsx untouched. Deviations from blueprint (recorded, all in-favor): (a) KubeDataTable fake mirrors datatables.net-react's real slotRenderer contract (2-arg slot fn gets (data, row); Name column uses data={null} whole-row like NetworkPolicy, since the link needs the row's own namespace) — a blueprint clone of the network_policies fake would render an empty Name cell; (b) data-view JSON-block assertions poll container.textContent because the hljs highlighter splits tokens across spans (the proven priority_class_data pattern). Handoff: QA gate + code review are the orchestrator's; the change follows the secrets/networkpolicies namespaced-kind precedent end to end.
+<!-- SECTION:FINAL_SUMMARY:END -->

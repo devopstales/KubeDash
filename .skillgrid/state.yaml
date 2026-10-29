@@ -13,6 +13,17 @@ pipeline:
 
 # In-flight changes (besides pipeline.current_change).
 in_flight:
+  - change: 2026-10-29-session-object-navigation
+    phase: sliced
+    # Sliced 2026-10-29: session-based object navigation (no object identity
+    # in the URL; sessionStorage ref + form-POST deep link; one route per
+    # kind). 8 tickets in 5 waves (TASK-055..062, milestone m-2). ADR-0040
+    # proposed (.skillgrid/knowledge/decisions/04-adr-0040-session-object-
+    # navigation.md); the 2026-10-28 view specs' query-param navigation
+    # clause is superseded (NAVIGATION-SUPERSEDED.md per spec folder +
+    # adr.md addendum; statefulsets/daemonsets/replicasets executes to the
+    # new contract directly). Chain strategy pending (ask-on-risk).
+    tracker: [TASK-055, TASK-056, TASK-057, TASK-058, TASK-059, TASK-060, TASK-061, TASK-062]
   - change: 2026-10-26-ini-config-source
     phase: shipped
     # SHIPPED 2026-10-27: QA gate PASS (report.md in archive) + ship

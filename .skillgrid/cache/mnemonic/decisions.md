@@ -68,6 +68,10 @@ SA token auth: V1-prefixed models, AuthenticationV1Api, SAR user=USERNAME not to
 
 Decided SPA React migration architecture for KubeDash (decision)
 
+## architecture/vpa-views
+
+Executed vpa-views (TASK-049): VPA list+data views on the Cilium CRD seam (decision)
+
 ## backend/ca-based-local-user-kubeconfig
 
 Ported 4.1 CA-based local-user kubeconfig: CSR mint + CA download + CA manual commands (decision)

@@ -36,3 +36,7 @@ air-gap, read path) and follows an established, ratified in-repo pattern
   2026-10-28) is that the block is `JSON.stringify` of the `to_dict` item —
   JSON is a YAML subset, and the `json` grammar is the truthful classifier
   for the exact text rendered.
+
+## Navigation Superseded (2026-10-29)
+
+The query-param navigation clause in this ADR (Deviations; Decision Context) is **SUPERSEDED (2026-10-29)** by `2026-10-29-session-object-navigation` (ADR-0040, proposed): object identity lives in tab-private `sessionStorage`; list rows open the detail via `setObjectRef(...)` or a same-origin form POST; no `/data` route suffix; no object identity in the URL. See `NAVIGATION-SUPERSEDED.md` in this folder. The backend REST `?name=`/`?namespace=` filtering params are unchanged.

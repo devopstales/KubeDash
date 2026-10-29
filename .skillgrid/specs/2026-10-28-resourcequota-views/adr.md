@@ -51,3 +51,7 @@ pattern (Secrets / NetworkPolicies = the same namespaced-kind family, same
   `kubectl.kubernetes.io/last-applied-configuration` from the annotations
   table; 5.0 renders annotations verbatim (the kubectl noise is in the JSON
   block either way, and 5.0 has no trim helper).
+
+## Navigation Superseded (2026-10-29)
+
+The query-param navigation clause in this ADR (Deviations; Decision Context) is **SUPERSEDED (2026-10-29)** by `2026-10-29-session-object-navigation` (ADR-0040, proposed): object identity lives in tab-private `sessionStorage`; list rows open the detail via `setObjectRef(...)` or a same-origin form POST; no `/data` route suffix; no object identity in the URL. See `NAVIGATION-SUPERSEDED.md` in this folder. The backend REST `?name=`/`?namespace=` filtering params are unchanged.

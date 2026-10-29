@@ -7,7 +7,7 @@
 > frontmatter, **not** here. One decision per ADR file at
 > `.skillgrid/knowledge/decisions/04-adr-NNNN-slug.md`.
 
-**Highest sequence in use:** 0028
+**Highest sequence in use:** 0040
 
 ---
 
@@ -85,6 +85,7 @@ are kept, with `In force: no`. Never delete a row; flip it instead (IRON RULE).
 | ADR-0026 | TLS edge + security header layer (nginx edge with internal HTTPS; ProxyFix gated on KUBEDASH_TLS_EDGE; 4.1 header set restored with two recorded deviations) — superseded by ADR-0027 (the TLS edge is no longer the `dev-stack` default) | no | `knowledge/decisions/04-adr-0026-tls-edge-and-security-headers.md` |
 | ADR-0027 | Plain-HTTP dev-stack default (backend :8080, COOKIE_SECURE=false, no cert precondition, no host :443/:80 bind); the ADR-0026 TLS edge is the opt-in `task dev-stack-ssl` (backend :8443, COOKIE_SECURE=true, KUBEDASH_TLS_EDGE) | yes | `knowledge/decisions/04-adr-0027-plain-http-dev-stack-default.md` |
 | ADR-0028 | Configuration source: `kubedash.ini` (4.1 format, minus plugins) as the primary operator-facing config, env (`KUBEDASH_*`) as override, no hard-coded defaults for identities/credentials (fail fast at boot) — supersedes-in-part the env-driven bootstrap-admin delivery of ADR-0021 | yes | `knowledge/decisions/04-adr-0028-ini-config-source.md` |
+| ADR-0040 | SPA object navigation: tab-private `sessionStorage` object ref (`kd_object_refs` + `kd_object_active`, 15-min lazy self-expiry) + same-origin form-POST deep link; no object identity in the URL; one route per kind (no `/data` suffix) — supersedes the "`?name=` + `?namespace=` query-param navigation" deviations clause across the 2026-10-28 view specs (status: proposed, 2026-10-29) | no | `knowledge/decisions/04-adr-0040-session-object-navigation.md` |
 
 > **Note on ADR-0001..0013:** these are listed in `ARCHITECTURE.md` §12 as the
 > initial-architecture decisions "to be authored at brainstorming time." As of
