@@ -1,0 +1,226 @@
+import { render, screen } from '@testing-library/react'
+import { QueryClient, QueryClientProvider } from '@tanstack/react-query'
+import { MemoryRouter } from 'react-router-dom'
+import { http, HttpResponse } from 'msw'
+import type { ReactElement } from 'react'
+import { afterEach, expect, test, vi } from 'vitest'
+import { server } from '../msw'
+import LimitRangeView from '../../src/views/OtherResource/LimitRange'
+import { useClusterStore } from '../../src/store/cluster'
+
+// Same KubeDataTable fake as secrets.test.tsx: renders the real row
+// mapping (children-as-render-fns included) so cell assertions test the
+// view's `toRow` output, not DataTables' DOM. The factory is async: a
+// hoisted mock may not touch module-scope consts, so react is imported
+// inline (`vi.mock` calls are hoisted above the imports below).
+vi.mock('../../src/components/KubeDataTable', async () => {
+  const React = (await import('react')) as typeof import('react')
+  const Column = () => null
+  function KubeDataTable({
+    data,
+    children,
+  }: {
+    data: Record<string, unknown>[]
+    children: React.ReactNode
+  }) {
+    const cols = React.Children.toArray(children)
+      .filter(React.isValidElement)
+      .map(
+        (child) =>
+          (
+            child as React.ReactElement<{
+              title: string
+              data: string | null
+              children?: unknown
+            }>
+          ).props,
+      )
+    return (
+      <table>
+        <thead>
+          <tr>
+            {cols.map((col) => (
+              <th key={col.title}>{col.title}</th>
+            ))}
+          </tr>
+        </thead>
+        <tbody>
+          {data.map((row, i) => (
+            <tr key={i}>
+              {cols.map((col) => {
+                // `data={null}` hands the render fn the whole row (the
+                // datatables.net-react contract, see Namespaces.tsx).
+                const value = col.data === null ? row : row[col.data]
+                const node =
+                  typeof col.children === 'function'
+                    ? (col.children as (v: unknown) => React.ReactNode)(value)
+                    : (value as React.ReactNode)
+                return <td key={col.title}>{node ?? ''}</td>
+              })}
+            </tr>
+          ))}
+        </tbody>
+      </table>
+    )
+  }
+  return { default: KubeDataTable, Column }
+})
+
+const renderAt = (ui: ReactElement, path = '/other-resource/limit-range') => {
+  const qc = new QueryClient({ defaultOptions: { queries: { retry: false } } })
+  return render(
+    <QueryClientProvider client={qc}>
+      <MemoryRouter initialEntries={[path]}>{ui}</MemoryRouter>
+    </QueryClientProvider>,
+  )
+}
+
+afterEach(() => {
+  useClusterStore.setState({ selectedCluster: null, selectedNamespace: null })
+})
+
+const selectProd = () =>
+  useClusterStore.setState({
+    selectedCluster: { id: 1, name: 'prod' },
+    selectedNamespace: 'team-a',
+  })
+
+// kubernetes to_dict shape: snake_case. Namespaced (core group).
+const limits = {
+  apiVersion: 'v1',
+  kind: 'LimitRange',
+  metadata: {
+    name: 'default',
+    namespace: 'team-a',
+    creation_timestamp: '2026-01-02T03:04:05Z',
+    labels: { app: 'limits' },
+  },
+  spec: {
+    limits: [
+      {
+        type: 'Container',
+        max: { cpu: '2', memory: '4Gi' },
+        min: { cpu: '500m', memory: '1Gi' },
+        default: { cpu: '1', memory: '2Gi' },
+        defaultRequest: { cpu: '250m', memory: '512Mi' },
+        maxLimitRequestRatio: { cpu: '2', memory: '4' },
+      },
+    ],
+  },
+}
+
+// list-renders-limit-ranges
+test('list-renders-limit-ranges', async () => {
+  let requestedPath = ''
+  let requestedUrl = ''
+  server.use(
+    http.get('*/api/v1/clusters/1/resources/limitranges', ({ request }) => {
+      const u = new URL(request.url)
+      requestedPath = u.pathname
+      requestedUrl = u.href
+      return HttpResponse.json({ kind: 'limitranges', cluster: 'prod', items: [limits] })
+    }),
+  )
+  selectProd()
+  renderAt(<LimitRangeView />)
+
+  const link = await screen.findByRole('link', { name: 'default' })
+  // the name link is the SOLE producer of the data page's query strings.
+  expect(link.getAttribute('href')).toBe(
+    '/other-resource/limit-range/data?name=default&namespace=team-a',
+  )
+  // namespaced kind: the fetch URL is EXACTLY the kind URL + the selected
+  // namespace (the Secret/NetworkPolicy pattern).
+  expect(requestedPath).toBe('/api/v1/clusters/1/resources/limitranges')
+  expect(requestedUrl).toBe(
+    'http://localhost/api/v1/clusters/1/resources/limitranges?namespace=team-a',
+  )
+
+  // card title: EXACT string (the e2e smoke asserts it with exact: true).
+  // Pinned on the heading specifically: the breadcrumb renders the same
+  // text, and a card-title regression must not survive via the breadcrumb.
+  expect(screen.getByRole('heading', { name: 'Limit Ranges' })).toBeTruthy()
+  // breadcrumb: Other Resources → Limit Ranges.
+  expect(screen.getByText('Other Resources')).toBeTruthy()
+  // columns: name, namespace, created (4.1's exact list column set).
+  expect(screen.getAllByRole('columnheader').map((th) => th.textContent)).toEqual([
+    'Name',
+    'Namespace',
+    'Created',
+  ])
+  // row: the namespace cell, and the created cell rendered by
+  // formatTimestamp (no raw ISO 'T').
+  expect(screen.getByText('team-a')).toBeTruthy()
+  const nameCell = link.closest('tr')
+  expect(nameCell?.textContent).not.toContain('2026-01-02T03:04:05Z')
+  expect(nameCell?.textContent).toMatch(/2026/)
+})
+
+// list-namespace-falls-back-to-default
+test('list-namespace-falls-back-to-default', async () => {
+  let requestedUrl = ''
+  server.use(
+    http.get('*/api/v1/clusters/1/resources/limitranges', ({ request }) => {
+      requestedUrl = new URL(request.url).href
+      return HttpResponse.json({ kind: 'limitranges', cluster: 'prod', items: [] })
+    }),
+  )
+  useClusterStore.setState({
+    selectedCluster: { id: 1, name: 'prod' },
+    selectedNamespace: null,
+  })
+  renderAt(<LimitRangeView />)
+
+  await screen.findByText('No limit ranges found')
+  expect(requestedUrl).toBe('http://localhost/api/v1/clusters/1/resources/limitranges?namespace=default')
+})
+
+// list-no-cluster-state
+test('list-no-cluster-state', async () => {
+  useClusterStore.setState({ selectedCluster: null, selectedNamespace: null })
+  const seen: string[] = []
+  server.use(
+    http.get('*/api/v1/clusters/:id/resources/*', ({ request }) => {
+      seen.push(new URL(request.url).pathname)
+      return HttpResponse.json({ items: [] })
+    }),
+  )
+  renderAt(<LimitRangeView />)
+
+  expect(await screen.findByText('No cluster selected.')).toBeTruthy()
+  expect(seen).toHaveLength(0) // no resource fetch is made
+})
+
+// list-error-state
+test('list-error-state', async () => {
+  server.use(
+    http.get('*/api/v1/clusters/1/resources/limitranges', () =>
+      HttpResponse.json(
+        { error: { code: 'RBAC_DENIED', message: 'list on limitranges' } },
+        { status: 403 },
+      ),
+    ),
+  )
+  selectProd()
+  renderAt(<LimitRangeView />)
+
+  expect(
+    await screen.findByText(/Error loading limit ranges: RBAC_DENIED: list on limitranges/),
+  ).toBeTruthy()
+  // no blank table, no rows.
+  expect(screen.queryAllByRole('link', { name: 'default' })).toHaveLength(0)
+})
+
+// list-empty-state
+test('list-empty-state', async () => {
+  server.use(
+    http.get('*/api/v1/clusters/1/resources/limitranges', () =>
+      HttpResponse.json({ kind: 'limitranges', cluster: 'prod', items: [] }),
+    ),
+  )
+  selectProd()
+  renderAt(<LimitRangeView />)
+
+  // an empty list is a first-class state, not an error.
+  expect(await screen.findByText('No limit ranges found')).toBeTruthy()
+})

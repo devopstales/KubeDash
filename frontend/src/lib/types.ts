@@ -237,6 +237,30 @@ export interface HorizontalPodAutoscalerItem {
   [key: string]: unknown
 }
 
+/** One spec.limits[] entry of a LimitRange (kubernetes to_dict). */
+export interface LimitRangeLimitItem {
+  type?: string
+  min?: { cpu?: string; memory?: string }
+  max?: { cpu?: string; memory?: string }
+  default?: { cpu?: string; memory?: string }
+  default_request?: { cpu?: string; memory?: string }
+  max_limit_request_ratio?: { cpu?: string; memory?: string }
+  [key: string]: unknown
+}
+
+/** A LimitRange item as returned by /api/v1/clusters/<id>/resources/limitranges (kubernetes to_dict, snake_case; namespaced, core group). */
+export interface LimitRangeItem {
+  metadata?: {
+    name?: string
+    namespace?: string
+    creation_timestamp?: string
+    labels?: Record<string, string>
+    annotations?: Record<string, string>
+  }
+  spec?: { limits?: LimitRangeLimitItem[] }
+  [key: string]: unknown
+}
+
 /** A CiliumNetworkPolicy / CiliumClusterwideNetworkPolicy item (full CRD to_dict). */
 export interface CiliumPolicyItem {
   metadata?: {
