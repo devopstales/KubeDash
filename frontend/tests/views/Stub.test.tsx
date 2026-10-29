@@ -55,6 +55,11 @@ function expectedStubs() {
     // detail is /other-resource/resource-quota/data.
     '/other-resource/resource-quota',
     '/other-resource/resource-quota/data',
+    // Real view (2026-10-28-pdb-views, Task 4) — not a stub route.
+    // The nav leaf targets the list at /other-resource/pod-disruption-budget;
+    // the detail is /other-resource/pod-disruption-budget/data.
+    '/other-resource/pod-disruption-budget',
+    '/other-resource/pod-disruption-budget/data',
   ])
   const seen = new Map<string, string>()
   for (const isAdmin of [true, false]) {

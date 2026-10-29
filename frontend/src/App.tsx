@@ -50,6 +50,8 @@ const RuntimeClassView = React.lazy(() => import('./views/OtherResource/RuntimeC
 const RuntimeClassDataView = React.lazy(() => import('./views/OtherResource/RuntimeClassData'))
 const ResourceQuotaView = React.lazy(() => import('./views/OtherResource/ResourceQuota'))
 const ResourceQuotaDataView = React.lazy(() => import('./views/OtherResource/ResourceQuotaData'))
+const PodDisruptionBudgetView = React.lazy(() => import('./views/OtherResource/PodDisruptionBudget'))
+const PodDisruptionBudgetDataView = React.lazy(() => import('./views/OtherResource/PodDisruptionBudgetData'))
 const GroupsView = React.lazy(() => import('./views/Groups'))
 const GroupPrivilegesView = React.lazy(() => import('./views/Groups/GroupPrivileges'))
 const GroupPrivilegeEditView = React.lazy(() => import('./views/Groups/GroupPrivilegeEdit'))
@@ -412,6 +414,22 @@ const App = () => {
                       element={
                         <ProtectedRoute>
                           <ResourceQuotaDataView />
+                        </ProtectedRoute>
+                      }
+                    />
+                    <Route
+                      path="/other-resource/pod-disruption-budget"
+                      element={
+                        <ProtectedRoute>
+                          <PodDisruptionBudgetView />
+                        </ProtectedRoute>
+                      }
+                    />
+                    <Route
+                      path="/other-resource/pod-disruption-budget/data"
+                      element={
+                        <ProtectedRoute>
+                          <PodDisruptionBudgetDataView />
                         </ProtectedRoute>
                       }
                     />
