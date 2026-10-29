@@ -19,17 +19,28 @@ from app import create_app
 from app.core import ini_config
 
 
-def _make_fixture_home(tmp_path: pathlib.Path) -> pathlib.Path:
+def _make_fixture_home(tmp_path: pathlib.Path, bootstrap: bool = True) -> pathlib.Path:
     """ADR-0028 fixture home: a temp dir whose <home>/kubedash.ini carries the
-    values the api-tier tests need. Secrets/bootstrap stay env-sourced (the
-    override/env legs win); the INI exists so home_paths() has a real file."""
-    home = tmp_path / "home"
-    home.mkdir()
-    (home / "kubedash.ini").write_text(
+    values the api-tier tests need. Secrets stay env-sourced (the override/env
+    legs win); the INI exists so home_paths() has a real file.
+
+    ``bootstrap`` controls whether the INI sets the bootstrap-admin triple.
+    The primary app (bootstrap=True) keeps the INI line — the env triple
+    (setenv BEFORE create_app) wins on the precedence chain, so the two are
+    equivalent for it. The no-bootstrap app (bootstrap=False) OMISSIONS the
+    line: resolve() skips an ABSENT INI key (a present-but-empty value would
+    still fall through to the in-code 4.1-parity defaults, admin@kubedash.local
+    / changeme — TICKET-03), so local auth answers 403 LOCAL_AUTH_DISABLED."""
+    ini = (
         "[DEFAULT]\napp_mode = development\n"
         "[database]\nurl = sqlite://\n"
         "[deployment]\nadmin_kubeconfig = /test/admin.kubeconfig\n"
     )
+    if bootstrap:
+        ini += "[bootstrap]\nbootstrap_admin_email = admin@local\n"
+    home = tmp_path / "home"
+    home.mkdir()
+    (home / "kubedash.ini").write_text(ini)
     return home
 
 
@@ -93,11 +104,18 @@ def api_app_no_bootstrap(monkeypatch: pytest.MonkeyPatch, tmp_path: Path) -> Ite
 
     _oauth.app = None
     _oauth._clients.clear()
-    # ADR-0028: fixture home + reset; bootstrap env OFF (empty) for this app.
-    home = _make_fixture_home(tmp_path)
+    # ADR-0028: fixture home + reset; bootstrap OFF for this app. The INI
+    # OMITS the bootstrap line and the env vars are DELETED — but resolve()
+    # still falls through to the in-code 4.1-parity defaults (admin@kubedash.local
+    # / changeme, TICKET-03) when both legs are absent. The override leg wins
+    # over the in-code default, so pin an empty string via config_overrides:
+    # ``bool("" and "")`` is False, and the route's gate
+    # (``if not (s.bootstrap_admin_email and s.bootstrap_admin_password)``)
+    # fires 403 LOCAL_AUTH_DISABLED — the state these tests pin.
+    home = _make_fixture_home(tmp_path, bootstrap=False)
     monkeypatch.setenv("KUBEDASH_HOME", str(home))
-    monkeypatch.setenv("KUBEDASH_BOOTSTRAP_ADMIN_EMAIL", "")
-    monkeypatch.setenv("KUBEDASH_BOOTSTRAP_ADMIN_PASSWORD", "")
+    monkeypatch.delenv("KUBEDASH_BOOTSTRAP_ADMIN_EMAIL", raising=False)
+    monkeypatch.delenv("KUBEDASH_BOOTSTRAP_ADMIN_PASSWORD", raising=False)
     ini_config.reset()
     application = create_app({
         "TESTING": True,
@@ -106,6 +124,11 @@ def api_app_no_bootstrap(monkeypatch: pytest.MonkeyPatch, tmp_path: Path) -> Ite
         "KUBEDASH_SECRET_KEY": "test-enc-key-32-bytes-long!!!!",
         # ADR-0025: same http://localhost constraint as the primary app.
         "KUBEDASH_COOKIE_SECURE": False,
+        # Override leg (wins over the in-code 4.1-parity defaults): pin the
+        # bootstrap triple to empty so ``bool("" and "")`` is False and the
+        # route's gate fires 403 LOCAL_AUTH_DISABLED.
+        "KUBEDASH_BOOTSTRAP_ADMIN_EMAIL": "",
+        "KUBEDASH_BOOTSTRAP_ADMIN_PASSWORD": "",
     })
     with application.app_context():
         from app.extensions import db

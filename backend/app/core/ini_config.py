@@ -16,6 +16,7 @@ secrets may contain ``%``, which the default BasicInterpolation would reject.
 from __future__ import annotations
 
 import configparser
+import contextlib
 import os
 import pathlib
 from collections.abc import Mapping
@@ -145,6 +146,7 @@ def reset() -> None:
     import app.core.config as _c
 
     _c._settings = None
+    _c._proxy._test_stash.clear()
 
 
 def resolve_home() -> pathlib.Path:
@@ -285,6 +287,11 @@ class _SettingsProxy:
     ``__call__`` returns the real ``Settings`` for the test-call form
     (``settings()``). Because ``Settings()`` still runs every ``default_factory``
     eagerly, the constructed model resolves all fields — used only by tests.
+
+    Attribute assignment on the proxy (a test seam — e.g.
+    ``settings.kubedash_replica_id = "r1"``) is stashed in ``_test_stash``
+    and cleared by :func:`reset`, so it cannot leak across test modules the
+    way a plain instance attribute would.
     """
 
     def __getattr__(self, name: str):
@@ -292,8 +299,35 @@ class _SettingsProxy:
             raise AttributeError(name)
         if name not in _FIELDS:
             raise AttributeError(name)
+        stashed = object.__getattribute__(self, "_test_stash")
+        if name in stashed:
+            return stashed[name]
         _section, _key, _envs, _has_default, _default, is_bool = _FIELDS[name]
         return resolve_bool(name) if is_bool else resolve(name)
+
+    def __setattr__(self, name: str, value: object) -> None:
+        # The proxy is a singleton that outlives ``reset()``. A plain
+        # attribute assignment would stick on the instance and leak into
+        # later tests. Stash writes so ``reset()`` clears them, and mirror
+        # onto the constructed ``Settings`` (when it exists) for callers
+        # that read through ``settings()``.
+        if name.startswith("_"):
+            object.__setattr__(self, name, value)
+            return
+        if name not in _FIELDS:
+            raise AttributeError(name)
+        stashed = object.__getattribute__(self, "_test_stash")
+        stashed[name] = value
+        from app.core import config as _c
+
+        if _c._settings is not None:
+            # pydantic validation may reject the write; the stash still
+            # serves proxy reads until reset().
+            with contextlib.suppress(Exception):
+                setattr(_c._settings, name, value)
+
+    def __init__(self) -> None:
+        object.__setattr__(self, "_test_stash", {})
 
     def _construct(self):
         from app.core import config as _c

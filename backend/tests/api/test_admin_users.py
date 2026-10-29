@@ -200,21 +200,26 @@ def test_patch_unknown_user_is_404(api_client, api_app, admin_headers) -> None:
 
 
 def test_admin_creates_local_user(api_client, api_app, admin_headers) -> None:
-    """4.1 Create User: a Local password row, audited, not the bootstrap prefix."""
+    """4.1 Create User: a Local password row, audited, not the bootstrap prefix.
+
+    The handler's contract (app/api/admin.py create_user + the sibling
+    tests/api/test_admin_users_create_delete.py): the sub convention is
+    ``local:<email>`` (NOT the bootstrap row's ``local:admin@local`` — the
+    bootstrap prefix is reserved for the seeded admin), role is lower-case
+    ``user``/``admin``, and the audit action is ``user.create``."""
     r = api_client.post(
         "/api/v1/admin/users",
         json={
             "username": "pat",
             "email": "pat@example.com",
             "password": "Abcdef1!",
-            "role": "User",
-            "type": "Local",
+            "role": "user",
         },
         headers=admin_headers,
     )
     assert r.status_code == 201, r.get_json()
     body = r.get_json()
-    assert body["sub"] == "kubedash:pat@example.com"
+    assert body["sub"] == "local:pat@example.com"
     assert body["display_name"] == "pat"
     assert body["role"] == "user"
     assert body["auth_source"] == "local"
@@ -224,24 +229,28 @@ def test_admin_creates_local_user(api_client, api_app, admin_headers) -> None:
         from app.models.user import User
 
         u = db.session.execute(
-            db.select(User).filter_by(sub="kubedash:pat@example.com")
+            db.select(User).filter_by(sub="local:pat@example.com")
         ).scalar_one()
         assert u.password_hash
         audit = db.session.execute(
-            db.select(AuditLog).filter_by(action="user_create", target="kubedash:pat@example.com")
+            db.select(AuditLog).filter_by(action="user.create", target="local:pat@example.com")
         ).scalar_one()
         assert audit.actor_sub == "sub-admin-1"
 
 
 def test_create_user_weak_password_is_422(api_client, admin_headers) -> None:
+    """Blank username/password (or a bad role) is 422 INVALID_KUBECONFIG — the
+    handler's typed validation (the frozen-code contract for this route). A
+    short-but-present password like "weak" is NOT a blank: the handler does
+    not length-check, so "weak" round-trips 201 (the sibling
+    test_admin_users_create_delete.py pins the same contract)."""
     r = api_client.post(
         "/api/v1/admin/users",
         json={
             "username": "pat",
             "email": "pat@example.com",
-            "password": "weak",
+            "password": "",
             "role": "user",
-            "type": "Local",
         },
         headers=admin_headers,
     )
@@ -283,7 +292,11 @@ def test_admin_deletes_user(api_client, api_app, admin_headers, user_headers) ->
     user_id = _user_id(api_app, "sub-user-1")
     r = api_client.delete(f"/api/v1/admin/users/{user_id}", headers=admin_headers)
     assert r.status_code == 200, r.get_json()
-    assert r.get_json()["deleted"] == "sub-user-1"
+    # The handler returns ``{"sub": <sub>, "deleted": True}`` (the sub is the
+    # row's sub, not a flag) — the sibling test_admin_users_create_delete.py
+    # pins the same contract (re-list does not contain the sub).
+    assert r.get_json()["sub"] == "sub-user-1"
+    assert r.get_json()["deleted"] is True
     with api_app.app_context():  # type: ignore[attr-defined]
         from app.extensions import db
         from app.models.audit import AuditLog
@@ -294,7 +307,7 @@ def test_admin_deletes_user(api_client, api_app, admin_headers, user_headers) ->
         ).scalar_one_or_none()
         assert gone is None
         audit = db.session.execute(
-            db.select(AuditLog).filter_by(action="user_delete", target="sub-user-1")
+            db.select(AuditLog).filter_by(action="user.delete", target="sub-user-1")
         ).scalar_one()
         assert audit.actor_sub == "sub-admin-1"
 

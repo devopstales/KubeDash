@@ -16,7 +16,6 @@ from types import SimpleNamespace
 
 import pytest
 
-import app.core.config as _config
 from app.core.config import Settings
 from app.services import k8s_client as kc
 
@@ -246,20 +245,40 @@ def test_readyz_503_when_admin_kubeconfig_file_missing(app, monkeypatch, tmp_pat
     """KUBEDASH_ADMIN_KUBECONFIG → a missing file: /readyz is 503 naming
     admin-kubeconfig (the probe, I-NEW-6: an isfile check, not a re-resolver).
 
-    The ``app`` fixture resets ``_config._settings`` BEFORE ``create_app``;
-    setenv + reset AFTER the build still works because the readyz probe
-    resolves ``get_settings()`` lazily at request time (I4)."""
+    The ``app`` fixture sets a PRESENT file via config_overrides (the
+    override leg, which wins over env). To test the missing-file branch,
+    pin the override leg to a missing path via ``ini_config._overrides`` —
+    ``resolve()`` checks the override first, so this is the only leg the
+    readyz probe will see at request time."""
+    from app.core import ini_config
+
     missing = tmp_path / "missing-kubeconfig.yaml"
-    monkeypatch.setenv("KUBEDASH_ADMIN_KUBECONFIG", str(missing))
-    _config._settings = None
+    monkeypatch.setitem(ini_config._overrides, "admin_kubeconfig", str(missing))
     res = app.test_client().get("/readyz")
     assert res.status_code == 503
     assert "admin-kubeconfig" in res.get_data(as_text=True)
 
 
-def test_readyz_ok_when_admin_kubeconfig_empty(client) -> None:
-    """In-cluster mode (env empty): the admin-kubeconfig key is ABSENT from
-    the readyz JSON — there is no file dependency to probe (absent, not ok)."""
+def test_readyz_ok_when_admin_kubeconfig_empty(app, client, monkeypatch) -> None:
+    """In-cluster mode (admin_kubeconfig empty): the admin-kubeconfig key is
+    ABSENT from the readyz JSON — there is no file dependency to probe
+    (absent, not ok). The app fixture sets a present file via
+    KUBEDASH_ADMIN_KUBECONFIG; clear it so ``resolve_admin_source`` takes the
+    in-cluster branch. ``KUBECONFIG`` is also pinned to an absent file so a
+    host with a real ``~/.kube/config`` cannot resolve ``local-kubeconfig``
+    (the key stays absent either way, but the in-cluster branch is the one
+    under test)."""
+    from app.core import ini_config
+
+    # The app fixture sets KUBEDASH_ADMIN_KUBECONFIG via config_overrides
+    # (the override leg, which wins over env/INI). ``resolve()`` checks the
+    # override first, so clearing the env alone is not enough — pin the
+    # override leg to empty via ``ini_config._overrides`` so
+    # ``resolve_admin_source`` sees an empty admin_kubeconfig and takes the
+    # in-cluster branch. ``KUBECONFIG`` is also pinned to an absent file so a
+    # host with a real ``~/.kube/config`` cannot resolve ``local-kubeconfig``.
+    monkeypatch.setenv("KUBECONFIG", "/nonexistent/kubedash-test-kubeconfig")
+    monkeypatch.setitem(ini_config._overrides, "admin_kubeconfig", "")
     res = client.get("/readyz")
     body = res.get_json()
     assert "admin-kubeconfig" not in body

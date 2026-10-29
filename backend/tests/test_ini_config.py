@@ -114,6 +114,13 @@ def test_static_dir_from_home_paths(tmp_path: pathlib.Path, monkeypatch: pytest.
 def test_optional_and_behavior_knobs_keep_defaults(tmp_path: pathlib.Path, monkeypatch: pytest.MonkeyPatch) -> None:
     home = _write_ini(_home(tmp_path), "[DEFAULT]\napp_mode = production\n")
     monkeypatch.setenv("KUBEDASH_HOME", str(home))
+    # The defaults under test are only observable when no override/env leg is
+    # in play: reset clears prior tests' config_overrides, and the env vars
+    # are cleared because a host shell (or a Taskfile task) may export them
+    # (KUBEDASH_REPLICA_ID=local in the dev tasks; the override leg would win
+    # and mask the in-code default the assertion pins).
+    for v in ("KUBEDASH_ROLE", "KUBEDASH_REPLICA_ID", "KUBEDASH_COOKIE_SECURE"):
+        monkeypatch.delenv(v, raising=False)
     ini_config.reset()
     s = _config.get_settings()
     assert s.cookie_secure is True  # fail-closed default (ADR-0025/0027)

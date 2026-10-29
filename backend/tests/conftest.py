@@ -81,6 +81,13 @@ def app(pg_container, monkeypatch, tmp_path):
     home = tmp_path / "home"
     home.mkdir()
     (home / "kubedash.ini").write_text("[DEFAULT]\napp_mode = development\n")
+    # ADR-0021 I-NEW-6: /readyz probes the admin-kubeconfig FILE (isfile) when
+    # the source is kubeconfig-file — the path must EXIST or the probe reports
+    # "down" and /readyz 503s on hosts without a hand-made /test dir. A
+    # placeholder file is enough (the probe never loads it; the client pool
+    # builds admin clients lazily from the path only when id:0 is fetched).
+    kubeconfig = tmp_path / "admin.kubeconfig"
+    kubeconfig.write_text("apiVersion: v1\nkind: Config\nclusters: []\n")
     monkeypatch.setenv("KUBEDASH_HOME", str(home))
     monkeypatch.setenv("KUBEDASH_BOOTSTRAP_ADMIN_EMAIL", "admin@local")
     monkeypatch.setenv("KUBEDASH_BOOTSTRAP_ADMIN_PASSWORD", "correct-horse")
@@ -93,7 +100,7 @@ def app(pg_container, monkeypatch, tmp_path):
         # ADR-0025: the test client speaks http://localhost; a Secure cookie is
         # stored but never sent back, so the session would vanish between calls.
         "KUBEDASH_COOKIE_SECURE": False,
-        "KUBEDASH_ADMIN_KUBECONFIG": "/test/admin.kubeconfig",
+        "KUBEDASH_ADMIN_KUBECONFIG": str(kubeconfig),
     })
     with application.app_context():
         db.create_all()
