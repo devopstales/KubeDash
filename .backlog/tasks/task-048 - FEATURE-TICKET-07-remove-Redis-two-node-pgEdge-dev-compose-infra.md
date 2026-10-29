@@ -1,11 +1,11 @@
 ---
 id: TASK-048
 title: '[FEATURE] TICKET-07 remove Redis + two-node pgEdge dev compose (infra)'
-status: In Progress
+status: Done
 assignee:
   - opencode/qwen3.8-uncensored
 created_date: '2026-10-27 19:16'
-updated_date: '2026-10-29 08:43'
+updated_date: '2026-10-29 09:04'
 labels: []
 milestone: m-2
 dependencies:
