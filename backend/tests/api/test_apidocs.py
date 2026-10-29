@@ -98,7 +98,7 @@ def test_register_security_scheme_is_idempotent():
     from app import create_app
     from app.extensions import api
 
-    create_app({"DATABASE_URL": "sqlite://", "REDIS_URL": "redis://localhost:1/0"})
+    create_app({"DATABASE_URL": "sqlite://"})
     assert api.spec is not None  # init_app built it
     apidocs.register_security_scheme(api)  # factory already called it once
     apidocs.register_security_scheme(api)  # must be a no-op, not a raise

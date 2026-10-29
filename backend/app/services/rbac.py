@@ -43,7 +43,7 @@ def _cache_key(
 
 def _cache_get(engine: Engine, key: str) -> str | None:
     # A miss (absent OR expired) is None; ``kv`` stores text, so the
-    # redis-py bytes-decode branch is gone.
+    # redis-py bytes-decode branch is gone (ADR-0030).
     return kvstore.kv_get(engine, key)
 
 

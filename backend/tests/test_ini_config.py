@@ -41,9 +41,6 @@ admin_password = from-ini
 [database]
 url = sqlite://
 
-[remote_cache]
-url = redis://localhost:6390/0
-
 [bootstrap]
 bootstrap_admin_email = admin@local
 
@@ -126,7 +123,7 @@ def test_optional_and_behavior_knobs_keep_defaults(tmp_path: pathlib.Path, monke
 
 
 # ---------------------------------------------------------------------------
-# TICKET-02: full 4.1 schema mapping (database/remote_cache/sso/deployment)
+# TICKET-02: full 4.1 schema mapping (database/sso/deployment)
 # ---------------------------------------------------------------------------
 
 
@@ -159,20 +156,6 @@ def test_database_url_wins_over_split(tmp_path: pathlib.Path, monkeypatch: pytes
     monkeypatch.setenv("KUBEDASH_HOME", str(home))
     ini_config.reset()
     assert _config.get_settings().database_url == "postgresql://x:y@z/q"
-
-
-def test_remote_cache_split_or_url(tmp_path: pathlib.Path, monkeypatch: pytest.MonkeyPatch) -> None:
-    home = _write_ini(
-        _home(tmp_path),
-        "[remote_cache]\nredis_host = cache:6380\nredis_db = 2\n",
-    )
-    monkeypatch.setenv("KUBEDASH_HOME", str(home))
-    ini_config.reset()
-    assert _config.get_settings().redis_url == "redis://cache:6380/2"
-    # Rewrite the INI in the SAME home (url wins over split fields).
-    _write_ini(home, "[remote_cache]\nurl = redis://other:6379/9\nredis_host = cache\n")
-    ini_config.reset()
-    assert _config.get_settings().redis_url == "redis://other:6379/9"
 
 
 def test_sso_and_deployment_and_optional(tmp_path: pathlib.Path, monkeypatch: pytest.MonkeyPatch) -> None:

@@ -8,7 +8,7 @@ from app import models  # noqa: F401
 from app.api import register_apis
 from app.core import ini_config
 from app.core.config import get_settings
-from app.extensions import api, db, migrate, redis_client
+from app.extensions import api, db, migrate
 
 # `app.models` is imported for side effect only: it registers every table on
 # db.metadata so db.create_all() (conftest) and Alembic autogenerate see the
@@ -26,7 +26,7 @@ def create_app(config_overrides: Mapping[str, object] | None = None) -> Flask:
     overrides = config_overrides or {}
     app = Flask(__name__, static_folder=None, template_folder="templates")
     # The KUBEDASH_* names and the unprefixed ARCHITECTURE.md §3.8 names
-    # (DATABASE_URL, REDIS_URL) are both accepted; where both spellings are
+    # (DATABASE_URL) are both accepted; where both spellings are
     # given the KUBEDASH_* form wins, and when neither is, the Settings
     # default applies. app.config is the runtime source of truth.
     app.config["SECRET_KEY"] = str(
@@ -34,9 +34,6 @@ def create_app(config_overrides: Mapping[str, object] | None = None) -> Flask:
     )
     app.config["SQLALCHEMY_DATABASE_URI"] = str(
         overrides.get("KUBEDASH_DATABASE_URL", overrides.get("DATABASE_URL", settings.database_url))
-    )
-    app.config["KUBEDASH_REDIS_URL"] = str(
-        overrides.get("KUBEDASH_REDIS_URL", overrides.get("REDIS_URL", settings.redis_url))
     )
     app.config["TESTING"] = bool(overrides.get("TESTING", False))
     # ADR-0025: the auth routes read the cookie flags from app.config (not
@@ -87,11 +84,6 @@ def create_app(config_overrides: Mapping[str, object] | None = None) -> Flask:
     from app.core.security import init_oidc
 
     init_oidc(app)
-    # A fresh underlying client per app, bound to THIS app. Never use the
-    # module-global redis client with from_url in the factory: it would
-    # rebind the first app's client when a second create_app runs (conftest
-    # builds one app per test). flask-redis' init_app does exactly this.
-    redis_client.init_app(app)
 
     # Register domain APIs (later tasks add their Api classes there).
     # Imported at module top, NOT here: an in-function `from app.api import …`
@@ -210,11 +202,6 @@ def register_health(app: Flask) -> None:
                 checks["database"] = "ok"
             except Exception:
                 checks["database"] = "down"
-            try:
-                redis_client.ping()
-                checks["redis"] = "ok"
-            except Exception:
-                checks["redis"] = "down"
             # ADR-0021: the admin-kubeconfig PROBE (I-NEW-6): an isfile check
             # when the source is a file — NOT a re-resolver (it never
             # invalidates or touches the pooled client). In-cluster mode:

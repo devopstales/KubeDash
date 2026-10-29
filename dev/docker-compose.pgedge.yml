@@ -1,0 +1,54 @@
+# Two-node pgEdge active-active cluster (ADR-0031, TICKET-07).
+#
+# Replaces the single postgres + redis services in docker-compose.yml: the
+# app is Postgres-only now (ADR-0029/0030), and the dev default is the
+# active-active Spock cluster. Both nodes run the SAME db.json (autoddl +
+# the kubedash superuser + the pgedge internal_admin user); the node
+# hostnames in db.json match the compose service names (findings #5) so
+# `spock.node` shows n1/n2. n1 is the primary (5432); n2 is the replica
+# host (16433) that mirrors n1 via autoddl.
+services:
+  kdpg-n1:
+    image: pgedge/pgedge:pg17-latest
+    container_name: kdpg-n1
+    environment:
+      - NODE_NAME=n1
+      - PGDATA=/data/pgdata
+    volumes:
+      - ./pgedge/db.json:/home/pgedge/db.json
+      - kdpg-n1-data:/data
+    ports:
+      - "${POSTGRES_PORT:-5432}:5432"
+    healthcheck:
+      # The image's psql probes the kubedash service db (autoddl creates it).
+      # A TCP accept is not enough — the spock cluster must be initialized.
+      test: ["CMD-SHELL", "/opt/pgedge/pg17/bin/pg_isready -U kubedash -d kubedash"]
+      interval: 5s
+      timeout: 5s
+      retries: 12
+      start_period: 30s
+    restart: unless-stopped
+  kdpg-n2:
+    image: pgedge/pgedge:pg17-latest
+    container_name: kdpg-n2
+    environment:
+      - NODE_NAME=n2
+      - PGDATA=/data/pgdata
+    volumes:
+      - ./pgedge/db.json:/home/pgedge/db.json
+      - kdpg-n2-data:/data
+    ports:
+      - "16433:5432"
+    depends_on:
+      kdpg-n1:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD-SHELL", "/opt/pgedge/pg17/bin/pg_isready -U kubedash -d kubedash"]
+      interval: 5s
+      timeout: 5s
+      retries: 12
+      start_period: 30s
+    restart: unless-stopped
+volumes:
+  kdpg-n1-data:
+  kdpg-n2-data:

@@ -2,7 +2,7 @@
 
 Docker-free unit tier: the k8s path is a ``FakeK8s`` double injected through
 the pool's ``factory`` seam (same as test_clusters.py) and the SAR is the real
-``rbac.can`` reading the fake redis (``_cache_get``/``_cache_set`` are the
+``rbac.can`` reading the ``kv`` cache (``_cache_get``/``_cache_set`` are the
 module seams the unit tests patch). The kind integration tier (``@pytest.mark
 .integration``) runs the same endpoint against a real kind cluster —
 env-block where no Docker is available, deselected with ``-m "not

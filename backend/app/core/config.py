@@ -3,7 +3,7 @@
 Every field sources from ``ini_config.resolve`` / ``resolve_bool`` via
 ``default_factory`` — pydantic-settings no longer reads env directly
 (``env_prefix``/``AliasChoices``/``env_file`` are retired as value sources;
-the unprefixed ``DATABASE_URL``/``REDIS_URL`` aliases now live in
+the unprefixed ``DATABASE_URL`` alias now lives in
 ``ini_config._FIELDS``). The only in-code defaults are the optional/behavior
 knobs; identities/credentials are INI/env-resolved with no literal fallback.
 
@@ -28,8 +28,6 @@ class Settings(BaseSettings):
     flask_env: str = Field(default_factory=lambda: ini_config.resolve("flask_env"))
     # [database] -> database_url (split-or-url)
     database_url: str = Field(default_factory=lambda: ini_config.resolve("database_url"))
-    # [remote_cache] -> redis_url (split-or-url)
-    redis_url: str = Field(default_factory=lambda: ini_config.resolve("redis_url"))
     # [security] jwt_secret / secret_key (moved out of code defaults, ADR-0028)
     kubedash_jwt_secret: str = Field(
         default_factory=lambda: ini_config.resolve("kubedash_jwt_secret")

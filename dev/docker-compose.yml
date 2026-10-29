@@ -2,8 +2,9 @@
 #
 # Brings up the five backends the Flask backend and the query-only
 # observability layer (ARCHITECTURE.md §6) need for local work:
-#   - postgres / redis  -> the app's data stores (ports pinned to the app's
-#     defaults so KUBEDASH_DATABASE_URL / KUBEDASH_REDIS_URL need no change)
+#   - pgEdge (two-node active-active) / no redis -> the app's data store
+#     (ports pinned to the app's defaults so KUBEDASH_DATABASE_URL needs no
+#     change; ADR-0029/0030/0031)
 #   - prometheus        -> metrics backend
 #   - grafana           -> dashboards (auto-provisions datasources)
 #   - jaeger            -> traces backend (OTLP collector enabled)
@@ -12,39 +13,53 @@
 name: kubedash-dev
 
 services:
-  postgres:
-    image: postgres:16
+  # ADR-0029/0030/0031: the dev default is a two-node pgEdge active-active
+  # cluster (spock + autoddl), not postgres:16 + redis. The cluster definition
+  # lives in ./pgedge/db.json: it creates the `kubedash` superuser (service
+  # `kubedash` — the app connects as kubedash:kubedash@localhost:5432/kubedash,
+  # the creds are unchanged) and the `pgedge` internal_admin user that
+  # autoddl requires. n1 serves the dev port; n2 on a fixed alt port.
+  kdpg-n1:
+    image: pgedge/pgedge:pg17-latest
+    container_name: kdpg-n1
     environment:
-      POSTGRES_USER: ${KUBEDASH_DB_USER:-kubedash}
-      POSTGRES_PASSWORD: ${KUBEDASH_DB_PASSWORD:-kubedash}
-      POSTGRES_DB: ${KUBEDASH_DB_NAME:-kubedash}
+      - NODE_NAME=n1
+      - PGDATA=/data/pgdata
+    volumes:
+      - ./pgedge/db.json:/home/pgedge/db.json
+      - kdpg-n1-data:/data
     ports:
       - "${POSTGRES_PORT:-5432}:5432"
-    volumes:
-      - pgdata:/var/lib/postgresql/data
     healthcheck:
-      test: ["CMD-SHELL", "pg_isready -U ${KUBEDASH_DB_USER:-kubedash} -d ${KUBEDASH_DB_NAME:-kubedash}"]
+      test: ["CMD-SHELL", "pg_isready -U kubedash -d kubedash"]
       interval: 5s
       timeout: 3s
       retries: 10
-      start_period: 10s
+      start_period: 15s
     restart: unless-stopped
     stop_grace_period: 15s
 
-  redis:
-    image: redis:7
-    command: ["redis-server", "--save", "", "--appendonly", "no"]
-    ports:
-      - "${REDIS_PORT:-6379}:6379"
+  kdpg-n2:
+    image: pgedge/pgedge:pg17-latest
+    container_name: kdpg-n2
+    environment:
+      - NODE_NAME=n2
+      - PGDATA=/data/pgdata
     volumes:
-      - redisdata:/data
+      - ./pgedge/db.json:/home/pgedge/db.json
+      - kdpg-n2-data:/data
+    ports:
+      - "16433:5432"
+    depends_on:
+      - kdpg-n1
     healthcheck:
-      test: ["CMD", "redis-cli", "ping"]
+      test: ["CMD-SHELL", "pg_isready -U kubedash -d kubedash"]
       interval: 5s
       timeout: 3s
-      retries: 10
-      start_period: 5s
+      retries: 12
+      start_period: 30s
     restart: unless-stopped
+    stop_grace_period: 15s
 
   prometheus:
     image: prom/prometheus
@@ -178,7 +193,7 @@ services:
     restart: unless-stopped
 
 volumes:
-  pgdata:
-  redisdata:
+  kdpg-n1-data:
+  kdpg-n2-data:
   promdata:
   grafdata:

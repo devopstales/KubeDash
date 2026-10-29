@@ -24,10 +24,10 @@ from collections.abc import Mapping
 #
 # TICKET-01 carries the resolution core + the home-derivation + the
 # security/behavior/optional fields. TICKET-02 completes the table for the
-# remaining fields (database_url, redis_url, oidc_*, admin_kubeconfig,
+# remaining fields (database_url, oidc_*, admin_kubeconfig,
 # plugin_server, cors_origins, sso_bootstrap_users, bootstrap_admin_email,
 # tls_edge, first_paint_backstop, namespace_list_timeout) and adds the
-# [database]/[remote_cache] split-or-url resolvers.
+# [database] split-or-url resolver.
 _FIELDS: dict[str, tuple[str, str, tuple[str, ...], bool, str, bool]] = {
     "kubedash_jwt_secret": (
         "security", "jwt_secret",
@@ -56,10 +56,6 @@ _FIELDS: dict[str, tuple[str, str, tuple[str, ...], bool, str, bool]] = {
     "database_url": (
         "database", "url",
         ("KUBEDASH_DATABASE_URL", "DATABASE_URL"), True, "", False,
-    ),
-    "redis_url": (
-        "remote_cache", "url",
-        ("KUBEDASH_REDIS_URL", "REDIS_URL"), True, "", False,
     ),
     "oidc_client_id": (
         "sso_settings", "client_id", ("KUBEDASH_OIDC_CLIENT_ID",), True, "", False,
@@ -224,29 +220,6 @@ def _resolve_database() -> str:
     return f"postgresql://{auth}{host}/{name}"
 
 
-def _resolve_redis() -> str:
-    """[remote_cache]: a single ``url`` wins; else build ``redis://[pass@]host:port/db``
-    (port defaults to 6379, db to 0). The 4.1 ``redis_host`` may carry an
-    embedded ``:port`` (``cache:6380``); a separate ``redis_port`` wins when
-    both are present."""
-    url = _ini("remote_cache", "url")
-    if url:
-        return url
-    host = _ini("remote_cache", "redis_host")
-    if not host:
-        return ""
-    # 4.1 style: redis_host may be "host:port"; a separate redis_port wins.
-    if ":" in host:
-        host, embedded_port = host.rsplit(":", 1)
-    else:
-        embedded_port = ""
-    port = _ini("remote_cache", "redis_port") or embedded_port or "6379"
-    db = _ini("remote_cache", "redis_db") or "0"
-    password = _ini("remote_cache", "redis_password")
-    auth = f":{password}@" if password else ""
-    return f"redis://{auth}{host}:{port}/{db}"
-
-
 def _resolve_flask_env() -> str:
     """flask_env: read ``app_mode`` from the literal ``DEFAULT`` section; if
     absent, fall back to ``[deployment] app_mode``. A ``app_mode`` set under an
@@ -264,7 +237,6 @@ def _resolve_flask_env() -> str:
 # Fields whose INI value is composed from multiple section keys (TICKET-02).
 _SPECIAL_RESOLVERS = {
     "database_url": _resolve_database,
-    "redis_url": _resolve_redis,
     "flask_env": _resolve_flask_env,
 }
 
@@ -279,7 +251,7 @@ def resolve(field: str) -> str:
         ev = os.environ.get(env)
         if ev is not None and ev != "":
             return ev
-    # A composed field (database/redis split-or-url) reads its section keys
+    # A composed field (database split-or-url) reads its section keys
     # directly rather than a single section/key.
     if field in _SPECIAL_RESOLVERS:
         composed = _SPECIAL_RESOLVERS[field]()

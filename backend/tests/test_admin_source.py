@@ -165,8 +165,6 @@ def test_resources_zero_200_for_admin(app, client, monkeypatch) -> None:
     fake_pool = kc.K8sClientPool(admin_factory=FakeAdminK8s)
     monkeypatch.setitem(res.__dict__, "pool", fake_pool)
     monkeypatch.setitem(rb.__dict__, "pool", fake_pool)
-    monkeypatch.setattr(rb, "_cache_get", lambda k: None)
-    monkeypatch.setattr(rb, "_cache_set", lambda k, v: None)
     monkeypatch.setattr(rb, "_sar_allowed", lambda client, verb, resource, ns, name, group="": True)
     r = client.get(
         "/api/v1/clusters/0/resources/pods",

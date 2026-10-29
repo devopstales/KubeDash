@@ -82,9 +82,9 @@ tasks:
   # ---- Dev environment (docker-compose stack in ./dev) ---------------------
 
   dev-up:
-    desc: "Start the dev environment (postgres, redis, prometheus, grafana, jaeger)"
+    desc: "Start the dev environment (two-node pgEdge active-active, prometheus, grafana, jaeger)"
     cmds:
-      - "{{.COMPOSE}} up -d postgres redis prometheus grafana jaeger"
+      - "{{.COMPOSE}} up -d kdpg-n1 kdpg-n2 prometheus grafana jaeger"
 
   dev-tls-setup:
     desc: "Generate/verify dev TLS certs + hosts entry (ADR-0026, idempotent; hosts step needs sudo)"
@@ -222,7 +222,7 @@ tasks:
   db-shell:
     desc: "Open a Postgres shell (observe leader_lease: SELECT * FROM leader_lease)"
     cmds:
-      - "{{.COMPOSE}} exec postgres psql -U ${KUBEDASH_DB_USER:-kubedash} -d ${KUBEDASH_DB_NAME:-kubedash}"
+      - "{{.COMPOSE}} exec kdpg-n1 psql -U ${KUBEDASH_DB_USER:-kubedash} -d ${KUBEDASH_DB_NAME:-kubedash}"
 
   # ---- One-command local env (compose + schema + backend) -------------------
   #
@@ -240,10 +240,10 @@ tasks:
   dev-stack:
     desc: "Start the full local env: compose + schema + backend on plain HTTP :8080 (bootstrap admin, SSO, static wired)"
     cmds:
-      - "{{.COMPOSE}} up -d postgres redis prometheus grafana jaeger sso"
-      # Wait for Postgres to accept connections (compose 'healthy' covers the
-      # data store, but the app needs the TCP port answering).
-      - "{{.COMPOSE}} exec -T postgres pg_isready -U {{.DB_USER}} -d {{.DB_NAME}}"
+      - "{{.COMPOSE}} up -d kdpg-n1 kdpg-n2 prometheus grafana jaeger sso"
+      # Wait for the pgEdge cluster to accept connections (compose 'healthy'
+      # covers the data store, but the app needs the TCP port answering).
+      - "{{.COMPOSE}} exec -T kdpg-n1 pg_isready -U {{.DB_USER}} -d {{.DB_NAME}}"
       # Idempotent: free the dev backend ports from prior runs before rebind
       # (no-op if nothing is listening). 8080 is this task's plain-HTTP
       # backend; 8443 covers the dev-stack-ssl TLS backend (ADR-0026/0027);
@@ -290,9 +290,9 @@ tasks:
       # the CA the edge verifies against.
       - "test -f {{.TLS_CA}} && test -f {{.TASKFILE_DIR}}/dev/certs/backend.pem && test -f {{.TASKFILE_DIR}}/dev/certs/backend-key.pem || (echo 'run task dev-tls-setup first (dev/certs incomplete)' && exit 1)"
       - "{{.COMPOSE}} up -d"   # all services incl. the nginx TLS edge
-      # Wait for Postgres to accept connections (compose 'healthy' covers the
-      # data store, but the app needs the TCP port answering).
-      - "{{.COMPOSE}} exec -T postgres pg_isready -U {{.DB_USER}} -d {{.DB_NAME}}"
+      # Wait for the pgEdge cluster to accept connections (compose 'healthy'
+      # covers the data store, but the app needs the TCP port answering).
+      - "{{.COMPOSE}} exec -T kdpg-n1 pg_isready -U {{.DB_USER}} -d {{.DB_NAME}}"
       # Idempotent: free the dev backend ports from prior runs before rebind
       # (no-op if nothing is listening). pkill first + wait loop — see
       # dev-stack for the rationale.

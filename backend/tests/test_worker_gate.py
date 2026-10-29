@@ -48,7 +48,6 @@ _ini_config_home.mkdir(exist_ok=True)
     "[security]\njwt_secret = test-jwt\n"
     "secret_key = test-enc-key-32-bytes-long!!!!\nadmin_password = test-pw\n"
     "[database]\nurl = sqlite://\n"
-    "[remote_cache]\nurl = redis://localhost:6390/0\n"
     "[bootstrap]\nbootstrap_admin_email = admin@local\n"
     "[deployment]\nadmin_kubeconfig = /test/admin.kubeconfig\n"
 )
@@ -106,11 +105,10 @@ def _reload_wsgi(monkeypatch: pytest.MonkeyPatch, role: str) -> None:
     monkeypatch.setattr(_app_pkg, "_bootstrap_local_admin", lambda app: None)
     # ADR-0028: a prior module's KUBEDASH_HOME (e.g. conftest's session
     # home) wins on reload and the required [deployment]/[database] keys
-    # are missing — restore both the home and the env DB/redis URLs the
+    # are missing — restore both the home and the env DB URL the
     # module-level main() started with.
     monkeypatch.setenv("KUBEDASH_HOME", str(_ini_config_home))
     monkeypatch.setenv("KUBEDASH_DATABASE_URL", "sqlite://")
-    monkeypatch.setenv("KUBEDASH_REDIS_URL", "redis://localhost:6390/0")
     importlib.reload(wsgi)
     # ADR-0028: main() builds the app + starts the worker (the reload's
     # _start_worker_if_leader is now inside main). The role was faked above

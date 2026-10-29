@@ -9,26 +9,8 @@ Proves the pure parts of the OIDC spine without Testcontainers:
 """
 from urllib.parse import parse_qs, urlparse
 
-import app.extensions as ext
 from app import create_app
 from app.core.security import _oauth
-
-
-class _FakeRedis:
-    store: dict[str, str] = {}
-
-    def set(self, key, value, ex=None):
-        self.store[key] = value
-        return True
-
-    def get(self, key):
-        return self.store.get(key)
-
-    def delete(self, key):
-        return int(self.store.pop(key, None) is not None)
-
-    def flushall(self):
-        self.store.clear()
 
 
 def main() -> None:
@@ -37,12 +19,9 @@ def main() -> None:
     app = create_app({
         "TESTING": True,
         "DATABASE_URL": "sqlite://",
-        "REDIS_URL": "redis://localhost:6399/0",
         "KUBEDASH_KUBEDASH_JWT_SECRET": "smoke-jwt-secret-32-bytes-long!!!!!01",
         "KUBEDASH_SECRET_KEY": "test-enc-key-32-bytes-long!!!!",
     })
-    fake = _FakeRedis()
-    ext.redis_client = fake
 
     @app.route("/test/smoke-404")
     def not_found():

@@ -68,7 +68,7 @@ def test_can_allowed_and_cached(monkeypatch: pytest.MonkeyPatch) -> None:
 
 def test_cache_hit_is_a_hit(monkeypatch: pytest.MonkeyPatch) -> None:
     """A stored allow must count as allow (the ``kv`` seam returns text; the
-    redis-py bytes-decode branch is gone, ADR-0030)."""
+    Postgres-text decode branch is gone, ADR-0030)."""
     import app.services.rbac as rb
 
     monkeypatch.setattr(rb, "_cache_get", lambda e, k: "1")

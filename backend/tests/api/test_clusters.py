@@ -1,6 +1,6 @@
 """R3 — cluster registry API: encrypted kubeconfig, binding gate, pool seam.
 
-Docker-free: sqlite + fake redis (the app fixture in tests/api/conftest.py).
+Docker-free: sqlite (the app fixture in tests/api/conftest.py).
 The k8s call path is exercised through a ``FakeK8s`` double injected via the
 pool's ``factory`` kwarg — the same seam Task 5's pod listing uses.
 """

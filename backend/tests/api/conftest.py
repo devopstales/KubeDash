@@ -1,20 +1,20 @@
 """Docker-free test app + mock OIDC provider for the auth tests.
 
-The session-scoped Postgres/Redis containers in ``tests/conftest.py`` need a
+The session-scoped Postgres container in ``tests/conftest.py`` needs a
 container runtime. Where the runtime is absent (this host), the auth suite runs
-against a sqlite + monkeypatched-redis app instead — the full Testcontainers
-backstop remains CI.
+against a sqlite app instead — the full Testcontainers backstop remains CI.
+(Redis is gone, ADR-0029/0030: the kv/revocation consumers are Postgres.)
 """
 
 from __future__ import annotations
 
+import pathlib
 from collections.abc import Iterator
 from pathlib import Path
 from urllib.parse import parse_qs, urlparse
 
 import pytest
 
-import app.core.config as _config
 from app import create_app
 from app.core import ini_config
 
@@ -28,39 +28,13 @@ def _make_fixture_home(tmp_path: pathlib.Path) -> pathlib.Path:
     (home / "kubedash.ini").write_text(
         "[DEFAULT]\napp_mode = development\n"
         "[database]\nurl = sqlite://\n"
-        "[remote_cache]\nurl = redis://localhost:6390/0\n"
         "[deployment]\nadmin_kubeconfig = /test/admin.kubeconfig\n"
     )
     return home
 
 
-class _FakeRedis:
-    """Minimal in-memory redis for oidc_state / jti revocation keys.
-
-    ``delete`` returns the number of keys removed (redis semantics), which
-    ``consume_state`` relies on for the STATE_MISMATCH mapping.
-    """
-
-    def __init__(self) -> None:
-        self.store: dict[str, str] = {}
-
-    def set(self, key: str, value: str, ex: int | None = None) -> bool:
-        self.store[key] = value
-        return True
-
-    def get(self, key: str) -> str | None:
-        return self.store.get(key)
-
-    def delete(self, key: str) -> int:
-        return int(self.store.pop(key, None) is not None)
-
-    def flushall(self) -> None:
-        self.store.clear()
-
-
 @pytest.fixture()
 def api_app(monkeypatch: pytest.MonkeyPatch, tmp_path: Path) -> Iterator[object]:
-    import app.extensions as ext
     from app.core.security import _oauth
 
     # The authlib OAuth() registry keeps ONE bound app for its lifetime; a
@@ -89,18 +63,13 @@ def api_app(monkeypatch: pytest.MonkeyPatch, tmp_path: Path) -> Iterator[object]
     application = create_app({
         "TESTING": True,
         "DATABASE_URL": "sqlite://",
-        "REDIS_URL": "redis://localhost:6390/0",  # never dialed; client swapped
         "KUBEDASH_KUBEDASH_JWT_SECRET": "test-jwt-secret-32-bytes-long!!!!!01",
         "KUBEDASH_SECRET_KEY": "test-enc-key-32-bytes-long!!!!",
         # ADR-0025: http://localhost test client — Secure cookies are stored but
         # never sent back, so the session would vanish between calls.
         "KUBEDASH_COOKIE_SECURE": False,
     })
-    fake = _FakeRedis()
     with application.app_context():
-        import app.extensions as ext
-
-        monkeypatch.setattr(ext, "redis_client", fake)
         from app.extensions import db
 
         db.create_all()
@@ -120,7 +89,6 @@ def api_app_no_bootstrap(monkeypatch: pytest.MonkeyPatch, tmp_path: Path) -> Ite
     env vars empty — local login must answer 403 LOCAL_AUTH_DISABLED and the
     settings route must report local_enabled False. (The sqlite tier SKIPS the
     PG-dialect bootstrap hook, which lives in the root PG tier — C-NEW-1.)"""
-    import app.extensions as ext
     from app.core.security import _oauth
 
     _oauth.app = None
@@ -134,17 +102,12 @@ def api_app_no_bootstrap(monkeypatch: pytest.MonkeyPatch, tmp_path: Path) -> Ite
     application = create_app({
         "TESTING": True,
         "DATABASE_URL": "sqlite://",
-        "REDIS_URL": "redis://localhost:6390/0",
         "KUBEDASH_KUBEDASH_JWT_SECRET": "test-jwt-secret-32-bytes-long!!!!!01",
         "KUBEDASH_SECRET_KEY": "test-enc-key-32-bytes-long!!!!",
         # ADR-0025: same http://localhost constraint as the primary app.
         "KUBEDASH_COOKIE_SECURE": False,
     })
-    fake = _FakeRedis()
     with application.app_context():
-        import app.extensions as ext
-
-        monkeypatch.setattr(ext, "redis_client", fake)
         from app.extensions import db
 
         db.create_all()

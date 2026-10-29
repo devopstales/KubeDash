@@ -5,9 +5,7 @@ from pathlib import Path
 
 import pytest
 from testcontainers.postgres import PostgresContainer
-from testcontainers.redis import RedisContainer
 
-import app.core.config as _config
 from app import _bootstrap_local_admin, create_app
 from app.core import ini_config
 from app.extensions import db
@@ -49,9 +47,7 @@ def _session_config() -> None:
 # same assertions are proven by the runtime-free smoke in Task 1's report,
 # and CI (with Docker) is the green backstop.
 PostgresContainer.get_container_host = PostgresContainer.get_container_host_ip
-RedisContainer.get_container_host = RedisContainer.get_container_host_ip
 PostgresContainer.exposed_port = PostgresContainer.get_exposed_port
-RedisContainer.exposed_port = RedisContainer.get_exposed_port
 
 
 @pytest.fixture(scope="session")
@@ -66,18 +62,8 @@ def pg_container() -> Iterator[PostgresContainer]:
         pg.stop()
 
 
-@pytest.fixture(scope="session")
-def redis_container() -> Iterator[RedisContainer]:
-    r = RedisContainer("redis:7")
-    r.start()
-    try:
-        yield r
-    finally:
-        r.stop()
-
-
 @pytest.fixture()
-def app(pg_container, redis_container, monkeypatch, tmp_path):
+def app(pg_container, monkeypatch, tmp_path):
     # I-NEW-1 (ADR-0021, TICKET-14): bootstrap env ON for the PG-tier app —
     # the env triple: setenv BEFORE create_app (the Settings singleton caches
     # from ENV on first read; config_overrides alone never reach
@@ -102,7 +88,6 @@ def app(pg_container, redis_container, monkeypatch, tmp_path):
     application = create_app({
         "TESTING": True,
         "DATABASE_URL": pg_container.get_connection_url(driver="psycopg"),
-        "REDIS_URL": f"redis://{redis_container.get_container_host()}:{redis_container.exposed_port(6379)}",
         "KUBEDASH_JWT_SECRET": "test-jwt-secret",
         "KUBEDASH_SECRET_KEY": "test-enc-key-32-bytes-long!!!!",
         # ADR-0025: the test client speaks http://localhost; a Secure cookie is
