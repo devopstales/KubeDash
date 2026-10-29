@@ -65,6 +65,12 @@ function expectedStubs() {
     // the detail is /other-resource/vertical-pod-autoscaler/data.
     '/other-resource/vertical-pod-autoscaler',
     '/other-resource/vertical-pod-autoscaler/data',
+    // Real view (2026-10-28-hpa-views, Task 4) — not a stub route.
+    // The nav leaf targets the list at
+    // /other-resource/horizontal-pod-autoscaler; the detail is
+    // /other-resource/horizontal-pod-autoscaler/data.
+    '/other-resource/horizontal-pod-autoscaler',
+    '/other-resource/horizontal-pod-autoscaler/data',
   ])
   const seen = new Map<string, string>()
   for (const isAdmin of [true, false]) {

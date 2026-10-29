@@ -20,7 +20,6 @@ export const stubRoutes: StubRoute[] = [
   { path: '/storage/volumesnapshot', title: 'VolumeSnapshot', admin: false },
   { path: '/storage/storage-class', title: 'StorageClass', admin: false },
   { path: '/storage/snapshot-class', title: 'SnapshotClass', admin: false },
-  { path: '/other-resource/horizontal-pod-autoscaler', title: 'HPAs', admin: false },
   { path: '/other-resource/limit-range', title: 'Limit Range', admin: false },
   { path: '/settings/sso-config', title: 'Auth Provider', admin: true },
   { path: '/settings/cluster-status', title: 'HA Status', admin: true },
