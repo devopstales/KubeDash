@@ -69,6 +69,15 @@ _KINDS: dict[str, tuple[str, str, str]] = {
     # resolved by TASK-048 (list + data views; ADR-0022 placement). The 4.1
     # route name was singular; the API kind is the plural.
     "poddisruptionbudgets": ("list_pod_disruption_budgets", "poddisruptionbudgets", "policy"),
+    # VerticalPodAutoscaler (autoscaling.k8s.io, namespaced CRD) — the 4.1-parity
+    # nav leaf resolved by TASK-049 (list + data views; ADR-0022 placement).
+    # Full custom object (the Cilium CRD seam): the CRD's own served version is
+    # the authority, CRD absent -> [] (first-class empty state).
+    "verticalpodautoscalers": (
+        "list_vertical_pod_autoscalers",
+        "verticalpodautoscalers",
+        "autoscaling.k8s.io",
+    ),
 }
 
 #: kind → K8sClient method for a single-object ``?name=`` lookup
@@ -81,6 +90,7 @@ _GETTERS: dict[str, str] = {
     "runtimeclasses": "get_runtime_class",
     "resourcequotas": "get_resource_quota",
     "poddisruptionbudgets": "get_pod_disruption_budget",
+    "verticalpodautoscalers": "get_vertical_pod_autoscaler",
 }
 
 

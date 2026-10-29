@@ -444,6 +444,65 @@ class FakeK8s:
             return self.list_pod_disruption_budgets(namespace)
         return []
 
+    def list_vertical_pod_autoscalers(self, namespace: str | None) -> list[dict]:
+        # Namespaced CRD (autoscaling.k8s.io): the namespace is forwarded;
+        # the FULL custom object (spec + status) is returned (camelCase). The
+        # all-namespaces branch is DISTINCTLY named (team-b) so the API tests
+        # can tell the branches apart, mirroring list_network_policies.
+        self.vpa_ns_calls: list[str | None] = []
+        self.vpa_ns_calls.append(namespace)
+        if namespace is None:
+            return [
+                {
+                    "metadata": {"name": "web-vpa", "namespace": "team-b"},
+                    "spec": {"targetRef": {"kind": "Deployment", "name": "web"}},
+                    "status": {},
+                },
+            ]
+        return [
+            {
+                "metadata": {
+                    "name": "web-vpa",
+                    "namespace": namespace or "team-a",
+                    "creationTimestamp": "2026-01-02T03:04:05Z",
+                    "labels": {"team": "a"},
+                    "annotations": {"vpa.kubernetes.io/managed-by": "kubedash"},
+                },
+                "spec": {
+                    "targetRef": {"kind": "Deployment", "name": "web", "apiVersion": "apps/v1"},
+                    "updatePolicy": {"updateMode": "Auto"},
+                    "resourcePolicy": {
+                        "containerPolicies": [
+                            {
+                                "containerName": "app",
+                                "controlledValues": "RequestsLimits",
+                                "mode": "Auto",
+                                "minAllowed": {"memory": "128Mi"},
+                                "maxAllowed": {"memory": "1Gi"},
+                                "controlledResources": ["cpu", "memory"],
+                            }
+                        ]
+                    },
+                },
+                "status": {
+                    "conditions": [
+                        {
+                            "type": "RecommendationProvided",
+                            "status": "True",
+                            "lastTransitionTime": "2026-01-02T03:04:06Z",
+                            "reason": "RecommendationAvailable",
+                            "message": "recommendation available",
+                        }
+                    ]
+                },
+            }
+        ]
+
+    def get_vertical_pod_autoscaler(self, namespace: str, name: str) -> list[dict]:
+        if name == "web-vpa":
+            return self.list_vertical_pod_autoscalers(namespace)
+        return []
+
     def readyz(self) -> bool:
         return True
 
@@ -1766,6 +1825,119 @@ def test_poddisruptionbudget_kind_singular_rejected(api_client, auth_client) -> 
     h = {"Authorization": f"Bearer {auth_client.jwt}"}
     _register(api_client, h)
     r = api_client.get("/api/v1/clusters/1/resources/poddisruptionbudget", headers=h)
+    assert r.status_code == 404
+    assert r.get_json()["error"]["code"] == "RESOURCE_KIND_NOT_SUPPORTED"
+
+
+def test_list_verticalpodautoscalers_200_in_namespace(
+    api_client, auth_client, fake_k8s, monkeypatch
+) -> None:
+    """[verticalpodautoscalers-list-200-in-namespace] a bound user listing
+    verticalpodautoscalers?namespace=team-a gets the FULL custom objects
+    back (spec + status intact, camelCase), and the namespace is forwarded
+    to the client (namespaced autoscaling.k8s.io CRD)."""
+    auth_client.login()
+    h = {"Authorization": f"Bearer {auth_client.jwt}"}
+    _register(api_client, h)
+    _allow_sar(monkeypatch)
+    r = api_client.get(
+        "/api/v1/clusters/1/resources/verticalpodautoscalers?namespace=team-a", headers=h
+    )
+    assert r.status_code == 200
+    body = r.get_json()
+    assert body["kind"] == "verticalpodautoscalers"
+    assert body["cluster"] == "prod"
+    [item] = body["items"]
+    assert item["metadata"]["name"] == "web-vpa"
+    assert item["metadata"]["namespace"] == "team-a"
+    # full object: spec + status intact (camelCase wire form).
+    assert item["spec"]["targetRef"]["kind"] == "Deployment"
+    assert item["spec"]["updatePolicy"]["updateMode"] == "Auto"
+    assert item["status"]["conditions"][0]["type"] == "RecommendationProvided"
+    # the namespace was forwarded to the client.
+    assert fake_k8s.vpa_ns_calls == ["team-a"]
+
+
+def test_list_verticalpodautoscalers_all_namespaces_without_param(
+    api_client, auth_client, fake_k8s, monkeypatch
+) -> None:
+    """[verticalpodautoscalers-list-all-namespaces-without-param] no
+    namespace query hits the all-namespaces branch: the FakeK8s receives
+    None and the distinctly-named team-b item is present."""
+    auth_client.login()
+    h = {"Authorization": f"Bearer {auth_client.jwt}"}
+    _register(api_client, h)
+    _allow_sar(monkeypatch)
+    r = api_client.get("/api/v1/clusters/1/resources/verticalpodautoscalers", headers=h)
+    assert r.status_code == 200
+    body = r.get_json()
+    assert body["kind"] == "verticalpodautoscalers"
+    assert [item["metadata"]["namespace"] for item in body["items"]] == ["team-b"]
+    assert fake_k8s.vpa_ns_calls == [None]
+
+
+def test_list_verticalpodautoscalers_get_by_name(
+    api_client, auth_client, fake_k8s, monkeypatch
+) -> None:
+    """[verticalpodautoscalers-get-by-name] ?name= returns a 0/1-item list:
+    a hit returns the one full object in team-a, a miss returns [] (mirrors
+    get_secret)."""
+    auth_client.login()
+    h = {"Authorization": f"Bearer {auth_client.jwt}"}
+    _register(api_client, h)
+    _allow_sar(monkeypatch)
+    r = api_client.get(
+        "/api/v1/clusters/1/resources/verticalpodautoscalers?name=web-vpa&namespace=team-a",
+        headers=h,
+    )
+    assert r.status_code == 200
+    [item] = r.get_json()["items"]
+    assert item["metadata"]["name"] == "web-vpa"
+    assert item["metadata"]["namespace"] == "team-a"
+    assert item["spec"]["targetRef"]["name"] == "web"
+    r = api_client.get(
+        "/api/v1/clusters/1/resources/verticalpodautoscalers?name=ghost&namespace=team-a",
+        headers=h,
+    )
+    assert r.status_code == 200
+    assert r.get_json()["items"] == []
+
+
+def test_list_verticalpodautoscalers_sar_denied(api_client, auth_client, fake_k8s, monkeypatch) -> None:
+    """[verticalpodautoscalers-sar-denied] ADR-0004: the SAR is asked BEFORE
+    the read, with the autoscaling.k8s.io group and the query namespace — a
+    deny short-circuits to 403 RBAC_DENIED."""
+    auth_client.login()
+    h = {"Authorization": f"Bearer {auth_client.jwt}"}
+    _register(api_client, h)
+    asked = _record_sar(monkeypatch)  # denies every SAR and records calls
+    r = api_client.get(
+        "/api/v1/clusters/1/resources/verticalpodautoscalers?namespace=team-a", headers=h
+    )
+    assert r.status_code == 403
+    assert r.get_json()["error"]["code"] == "RBAC_DENIED"
+    assert ("list", "verticalpodautoscalers", "team-a", None, "autoscaling.k8s.io") in asked
+
+
+def test_verticalpodautoscalers_binding_404(api_client, auth_client) -> None:
+    """[verticalpodautoscalers-binding-404] an unbound user: the binding
+    gate fails before the SAR, CLUSTER_NOT_FOUND."""
+    auth_client.login()
+    h = {"Authorization": f"Bearer {auth_client.jwt}"}
+    r = api_client.get(
+        "/api/v1/clusters/999/resources/verticalpodautoscalers?namespace=team-a", headers=h
+    )
+    assert r.status_code == 404
+    assert r.get_json()["error"]["code"] == "CLUSTER_NOT_FOUND"
+
+
+def test_verticalpodautoscaler_kind_singular_rejected(api_client, auth_client) -> None:
+    """[verticalpodautoscaler-kind-singular-rejected] the 4.1 route name
+    (singular) is not a kind — RESOURCE_KIND_NOT_SUPPORTED."""
+    auth_client.login()
+    h = {"Authorization": f"Bearer {auth_client.jwt}"}
+    _register(api_client, h)
+    r = api_client.get("/api/v1/clusters/1/resources/verticalpodautoscaler", headers=h)
     assert r.status_code == 404
     assert r.get_json()["error"]["code"] == "RESOURCE_KIND_NOT_SUPPORTED"
 

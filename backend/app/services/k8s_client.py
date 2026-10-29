@@ -736,6 +736,67 @@ class K8sClient:
         item = self._crd_body(item)
         return [item.to_dict() if hasattr(item, "to_dict") else item]
 
+    # VerticalPodAutoscaler (autoscaling.k8s.io, namespaced CRD): same
+    # full-custom-object seam as the Cilium kinds — the CRD's own served
+    # version + scope is the authority; the VPA operator is optional, so
+    # CRD absent (None) degrades to [] as a first-class empty state.
+    _VPA_GROUP = "autoscaling.k8s.io"
+    _VPA_PLURAL = "verticalpodautoscalers"
+
+    def list_vertical_pod_autoscalers(self, namespace: str | None) -> list[dict[str, Any]]:
+        """VerticalPodAutoscaler items, FULL custom-object shape (spec + status
+        intact, camelCase — the wire form, like the Cilium CRDs). The VPA CRD's
+        OWN served version + scope is the authority (``get_crd_served``). CRD
+        absent (operator not installed) -> ``[]`` (the expected state, the
+        Cilium absence contract); any other read failure ->
+        ``ClusterUnreachableError`` (502). The VPA pages need
+        ``spec.resourcePolicy.containerPolicies`` and ``status.conditions``,
+        so this returns the raw object — NOT the lossy ``list_crd_instances``
+        projection."""
+        served = self.get_crd_served(self._VPA_GROUP, self._VPA_PLURAL)
+        if served is None:
+            return []
+        version, scope = served
+        custom = self._custom()
+        try:
+            resp = (
+                custom.list_namespaced_custom_object(
+                    self._VPA_GROUP, version, namespace, self._VPA_PLURAL
+                )
+                if namespace and scope == "Namespaced"
+                else custom.list_cluster_custom_object(
+                    self._VPA_GROUP, version, self._VPA_PLURAL
+                )
+            )
+        except ApiException as e:
+            self._unreachable("list_vertical_pod_autoscalers", e)
+            raise AssertionError("unreachable") from e
+        body = self._crd_body(resp)
+        items = body.get("items", [])
+        return [item.to_dict() if hasattr(item, "to_dict") else item for item in items]
+
+    def get_vertical_pod_autoscaler(self, namespace: str, name: str) -> list[dict[str, Any]]:
+        """One VerticalPodAutoscaler as a 0/1-item FULL custom object; ``[]``
+        on 404 or when the CRD is absent (operator not installed). Any other
+        ApiException maps to ``ClusterUnreachableError`` (502), matching
+        ``get_cilium_network_policy``."""
+        served = self.get_crd_served(self._VPA_GROUP, self._VPA_PLURAL)
+        if served is None:
+            return []
+        version, _scope = served
+        custom = self._custom()
+        try:
+            item = custom.get_namespaced_custom_object(
+                self._VPA_GROUP, version, namespace, self._VPA_PLURAL, name
+            )
+        except ApiException as e:
+            if e.status == 404:
+                return []
+            self._unreachable("get_vertical_pod_autoscaler", e)
+            raise AssertionError("unreachable") from e
+        item = self._crd_body(item)
+        return [item.to_dict() if hasattr(item, "to_dict") else item]
+
     def list_resource_quotas(self, namespace: str | None) -> list[dict[str, Any]]:
         """ResourceQuota list in the standard kubernetes dict form
         (``to_dict``) for one namespace, or across all namespaces when the
