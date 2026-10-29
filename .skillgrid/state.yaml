@@ -34,7 +34,7 @@ in_flight:
     # (qa-report.md in 2026-10-28-other-resource-views). Awaits review.
     tracker: [TASK-046]
   - change: 2026-10-28-resourcequota-views
-    phase: execution
+    phase: qa
     # Executed 2026-10-28 (TASK-047): 4 commits on `rebase` — backend
     # resourcequotas kind (core, namespaced, SAR-gated, 783cff0a), list
     # view (14d8af2b), data view (0d08d0a1), routes + stub removal
@@ -44,7 +44,7 @@ in_flight:
     # 2026-10-28-other-resource-views). Awaits review.
     tracker: [TASK-047]
   - change: 2026-10-28-pdb-views
-    phase: execution
+    phase: qa
     # Executed 2026-10-29 (TASK-048): 4 commits on `rebase` — backend
     # poddisruptionbudgets kind (policy, namespaced, SAR-gated, 5f1f9244),
     # list view (7a1ab3a5), data view (305a44c6), routes + stub removal
@@ -54,7 +54,7 @@ in_flight:
     # 2026-10-28-other-resource-views). Awaits review.
     tracker: [TASK-048]
   - change: 2026-10-28-vpa-views
-    phase: execution
+    phase: qa
     # Executed 2026-10-29 (TASK-049): 4 commits on `rebase` — backend
     # verticalpodautoscalers kind (autoscaling.k8s.io, namespaced CRD, full
     # custom object, SAR-gated, c0616fa4), list view (638acda3), data view
@@ -65,7 +65,7 @@ in_flight:
     # Awaits review.
     tracker: [TASK-049]
   - change: 2026-10-28-hpa-views
-    phase: execution
+    phase: qa
     # Executed 2026-10-29 (TASK-050): 4 commits on `rebase` — backend
     # horizontalpodautoscalers kind (autoscaling/v1, namespaced core kind,
     # snake_case to_dict, SAR-gated, 0178df05), list view (233e827c), data
@@ -76,7 +76,7 @@ in_flight:
     # Awaits review.
     tracker: [TASK-050]
   - change: 2026-10-28-limitrange-views
-    phase: execution
+    phase: qa
     # Executed 2026-10-29 (TASK-054): 4 commits on `rebase` — backend
     # limitranges kind (core, namespaced, SAR-gated, aadef0d5), list view
     # (38e16aaf), data view (fdb8ca33), routes + stub removal + e2e move
