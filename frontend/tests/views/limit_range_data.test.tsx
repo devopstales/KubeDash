@@ -110,6 +110,12 @@ test('data-renders-detail', async () => {
   expect(await inTable('default')).toBe(true)
   expect(await inTable('team-a')).toBe(true)
   expect(await inTable('LimitRange')).toBe(true)
+  // Created: rendered via formatTimestamp — no raw ISO 'T' in the table row
+  // (mirrors resource_quota_data.test.tsx; the JSON block keeps the raw
+  // timestamp but it is not a table cell).
+  const createdCells = (await screen.findAllByText(/2026/)).filter((el) => el.closest('table'))
+  expect(createdCells.length).toBeGreaterThanOrEqual(1)
+  expect(createdCells[0].textContent).not.toContain('T03:04:05Z')
   // labels sub-table: the `app` key and `limits` value render.
   expect(await inTable('app')).toBe(true)
   expect(await inTable('limits')).toBe(true)

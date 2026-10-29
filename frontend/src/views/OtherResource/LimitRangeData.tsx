@@ -14,6 +14,7 @@ import { Light as SyntaxHighlighter } from 'react-syntax-highlighter'
 import json from 'react-syntax-highlighter/dist/esm/languages/hljs/json'
 import anOldHope from 'react-syntax-highlighter/dist/esm/styles/hljs/an-old-hope'
 import { apiFetch } from '../../lib/api'
+import { formatTimestamp } from '../../lib/format'
 import type { LimitRangeItem, ResourceList } from '../../lib/types'
 import { useClusterStore } from '../../store/cluster'
 import TopMenu from '../../components/TopMenu'
@@ -137,7 +138,7 @@ const LimitRangeDataView = () => {
                 </tr>
                 <tr>
                   <th scope="row">Created:</th>
-                  <td>{item?.metadata?.creation_timestamp ?? 'N/A'}</td>
+                  <td>{formatTimestamp(item?.metadata?.creation_timestamp)}</td>
                 </tr>
                 <tr>
                   <th scope="row">Annotations:</th>
