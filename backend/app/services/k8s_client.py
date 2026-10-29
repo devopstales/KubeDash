@@ -971,6 +971,40 @@ class K8sClient:
             self._unreachable("get_runtime_class", e)
             raise AssertionError("unreachable") from e
 
+    # The blueprint's service-test seam is the namespace branch only
+    # (list_namespaced_limit_range); the all-namespaces branch matches the
+    # other namespaced kinds (list_secrets/list_network_policies) and is
+    # exercised by the API-tier FakeK8s, whose team-b item the
+    # all-namespaces test asserts.
+    def list_limit_ranges(self, namespace: str | None) -> list[dict[str, Any]]:
+        """LimitRange list in the standard kubernetes dict form (``to_dict``)
+        for one namespace, or across all namespaces when the namespace is
+        ``None`` (the ``list_secrets`` branch). No field stripping — the
+        view renders ``spec.limits`` and the data page the full object. A
+        transport ApiException maps to ``ClusterUnreachableError`` (502)."""
+        try:
+            resp = (
+                self._v1.list_namespaced_limit_range(namespace)
+                if namespace
+                else self._v1.list_limit_range_for_all_namespaces()
+            )
+        except ApiException as e:
+            self._unreachable("list_limit_ranges", e)
+            raise AssertionError("unreachable") from e
+        return [lr.to_dict() for lr in resp.items]
+
+    def get_limit_range(self, namespace: str, name: str) -> list[dict[str, Any]]:
+        """One LimitRange as a 0/1-item list; ``[]`` on 404. Any other
+        ApiException maps to ``ClusterUnreachableError`` (502), matching
+        ``get_network_policy``'s transport contract."""
+        try:
+            return [self._v1.read_namespaced_limit_range(name, namespace).to_dict()]
+        except ApiException as e:
+            if e.status == 404:
+                return []
+            self._unreachable("get_limit_range", e)
+            raise AssertionError("unreachable") from e
+
     def readyz(self) -> bool:
         """GET ``<host>/readyz`` with the kubeconfig's CA as ``verify=`` and a
         5 s timeout; ANY failure (including timeout) returns ``False`` — the

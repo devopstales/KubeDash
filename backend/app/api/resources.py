@@ -87,6 +87,10 @@ _KINDS: dict[str, tuple[str, str, str]] = {
         "horizontalpodautoscalers",
         "",
     ),
+    # LimitRange (core, namespaced) — the 4.1-parity nav leaf resolved by
+    # TASK-054 (list + data views; ADR-0022 placement). The 4.1 route name was
+    # singular; the API kind is the plural.
+    "limitranges": ("list_limit_ranges", "limitranges", ""),
 }
 
 #: kind → K8sClient method for a single-object ``?name=`` lookup
@@ -101,6 +105,7 @@ _GETTERS: dict[str, str] = {
     "poddisruptionbudgets": "get_pod_disruption_budget",
     "verticalpodautoscalers": "get_vertical_pod_autoscaler",
     "horizontalpodautoscalers": "get_horizontal_pod_autoscaler",
+    "limitranges": "get_limit_range",
 }
 
 
