@@ -69,6 +69,15 @@ in_flight:
     # green (unit suite green; vitest 17/17 targeted; fe-build + fe-check;
     # _nav.tsx untouched). Awaits QA gate + review (orchestrator).
     tracker: [TASK-050]
+  - change: 2026-10-28-limitrange-views
+    phase: execution
+    # Executed 2026-10-29 (TASK-054): 4 commits on `rebase` — backend
+    # limitranges kind (core, namespaced, SAR-gated, aadef0d5), list view
+    # (38e16aaf), data view (fdb8ca33), routes + stub removal + e2e move
+    # (2a6e478b). Verification floor green (unit 532 passed; vitest 16/16
+    # targeted; fe-build + fe-check; _nav.tsx untouched). Awaits QA gate +
+    # review (orchestrator).
+    tracker: [TASK-054]
 completed_changes:
   - 2026-10-17-kubedash-base-structure
   - 2026-10-17-swagger-ui-air-gap
