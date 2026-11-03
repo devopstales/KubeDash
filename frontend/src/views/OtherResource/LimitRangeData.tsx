@@ -1,5 +1,5 @@
 import React from 'react'
-import { Link, useSearchParams } from 'react-router-dom'
+import { Link } from 'react-router-dom'
 import {
   CBreadcrumb,
   CBreadcrumbItem,
@@ -43,11 +43,20 @@ type LimitPair = { cpu?: string; memory?: string } | undefined
  * LimitRanges is identical) and renders absent fields as `None` (4.1's
  * pinned copy).
  */
-const LimitRangeDataView = () => {
-  const [params] = useSearchParams()
-  const name = params.get('name') ?? ''
-  const selectedNamespace = useClusterStore((s) => s.selectedNamespace)
-  const namespace = params.get('namespace') || selectedNamespace || 'default'
+// ADR-0040: identity arrives as props from ObjectRoute (the active ref),
+// never from useSearchParams — the URL stays clean (R1). The namespace is
+// the ref's namespace (authoritative, R8): never the header's
+// selectedNamespace. The legacy /data route (TICKET-07 keeps it working
+// until the contract pass) passes the legacy ?name=/?namespace= through as
+// props (its own store/'default' fallback); this view no longer reads the
+// URL or the store.
+const LimitRangeDataView = ({
+  name,
+  namespace,
+}: {
+  name: string
+  namespace: string
+}) => {
   const cluster = useClusterStore((s) => s.selectedCluster)
 
   const query = useQuery<LimitRangeItem>({

@@ -1,5 +1,5 @@
 import React from 'react'
-import { Link } from 'react-router-dom'
+import { useNavigate } from 'react-router-dom'
 import {
   CBreadcrumb,
   CBreadcrumbItem,
@@ -11,10 +11,17 @@ import {
 import { useQuery } from '@tanstack/react-query'
 import { apiFetch } from '../../lib/api'
 import { formatTimestamp } from '../../lib/format'
+import { getActiveRef, openObject } from '../../lib/objectRef'
 import type { LimitRangeItem, ResourceList } from '../../lib/types'
 import { useClusterStore } from '../../store/cluster'
 import KubeDataTable, { Column } from '../../components/KubeDataTable'
+import ShareObjectButton from '../../components/ShareObjectButton'
 import TopMenu from '../../components/TopMenu'
+
+// ADR-0040: the registry kind (the API resource name) and the clean list
+// route this view renders (TICKET-06).
+const KIND = 'limitrange'
+const LIST_ROUTE = '/other-resource/limit-range'
 
 type LimitRangeRow = {
   name: string
@@ -32,17 +39,24 @@ const toRow = (item: LimitRangeItem, namespace: string): LimitRangeRow => ({
  * 4.1 `other-resources/limit_range.html.j2`: LimitRanges in the
  * header-selected namespace (the Secret/NetworkPolicy pattern for
  * namespaced kinds — the namespace comes from the 5.0 cluster store, not
- * 4.1's per-page `ns_select` form). A name opens the limit range data
- * page and is the SOLE producer of its `?name=`/`?namespace=` query
- * strings. The columns keep 4.1's Name / Namespace / Created set (the
- * limits table lives on the data page). The card title is EXACTLY "Limit
- * Ranges": the e2e smoke (ui-smoke.spec.ts) asserts that string with
- * exact: true. Placement under Other Resources is a ratified deviation
- * (ADR-0022, 2026-10-27): 4.1's API already lived in other-resources.
+ * 4.1's per-page `ns_select` form). A name opens the limit range data page
+ * via openObject (ADR-0040): the URL never carries object identity (R1)
+ * and the namespace rides in the ref, not the URL. The columns keep 4.1's
+ * Name / Namespace / Created set (the limits table lives on the data page).
+ * The card title is EXACTLY "Limit Ranges": the e2e smoke
+ * (ui-smoke.spec.ts) asserts that string with exact: true. Placement under
+ * Other Resources is a ratified deviation (ADR-0022, 2026-10-27): 4.1's API
+ * already lived in other-resources.
  */
 const LimitRangeView = () => {
   const cluster = useClusterStore((s) => s.selectedCluster)
   const namespace = useClusterStore((s) => s.selectedNamespace) ?? 'default'
+  const navigate = useNavigate()
+  const active = getActiveRef()
+  const selected =
+    active !== null && active.kind === KIND && active.namespace === namespace
+      ? active.name
+      : null
 
   const query = useQuery<LimitRangeRow[]>({
     queryKey: ['limitranges', cluster?.id, namespace],
@@ -56,13 +70,27 @@ const LimitRangeView = () => {
     },
   })
 
-  const nameLink = (name: string) =>
+  // ADR-0040: the name cell is a button (not a Link) — openObject writes
+  // the ref to sessionStorage and navigates to the clean list route; the
+  // URL never carries object identity (R1). The namespace is carried in the
+  // ref (the row's OWN namespace), not the URL. The bold is driven by the
+  // active ref (R9).
+  const nameCell = (name: string) =>
     name ? (
-      <Link
-        to={`/other-resource/limit-range/data?name=${encodeURIComponent(name)}&namespace=${encodeURIComponent(namespace)}`}
-      >
-        {name}
-      </Link>
+      <>
+        <button
+          type="button"
+          className={
+            'btn btn-link btn-sm p-0 text-primary text-decoration-underline' +
+            (name === selected ? ' fw-bold' : '')
+          }
+          aria-current={name === selected ? 'true' : undefined}
+          onClick={() => openObject(KIND, name, namespace, LIST_ROUTE, navigate)}
+        >
+          {name}
+        </button>{' '}
+        <ShareObjectButton kind={KIND} name={name} namespace={namespace} listRoute={LIST_ROUTE} />
+      </>
     ) : null
 
   return (
@@ -88,7 +116,7 @@ const LimitRangeView = () => {
         ) : (
           <KubeDataTable data={query.data ?? []}>
             <Column title="Name" data="name">
-              {nameLink}
+              {(name: unknown) => nameCell(name as string)}
             </Column>
             <Column title="Namespace" data="namespace" />
             <Column title="Created" data="created" />

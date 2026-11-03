@@ -1,20 +1,54 @@
 import { render, screen, waitFor } from '@testing-library/react'
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query'
-import { MemoryRouter } from 'react-router-dom'
+import { MemoryRouter, Route, Routes } from 'react-router-dom'
 import { http, HttpResponse, type AnyHandler } from 'msw'
 import type { ReactElement } from 'react'
 import { afterEach, expect, test } from 'vitest'
 import { server } from '../msw'
+import ObjectRoute from '../../src/components/ObjectRoute'
 import HorizontalPodAutoscalerDataView from '../../src/views/OtherResource/HorizontalPodAutoscalerData'
+import HorizontalPodAutoscalerView from '../../src/views/OtherResource/HorizontalPodAutoscaler'
 import { useClusterStore } from '../../src/store/cluster'
 
-const renderAt = (ui: ReactElement, path: string) => {
+// ADR-0040: render through ObjectRoute so the detail is ref-driven (the
+// identity comes from the active ref, never from the URL) and
+// window.location.search === '' (R1) is assertable.
+const renderAt = (_ui: ReactElement, path = '/other-resource/horizontal-pod-autoscaler') => {
   const qc = new QueryClient({ defaultOptions: { queries: { retry: false } } })
   return render(
     <QueryClientProvider client={qc}>
-      <MemoryRouter initialEntries={[path]}>{ui}</MemoryRouter>
+      <MemoryRouter initialEntries={[path]}>
+        <Routes>
+          <Route
+            path="/other-resource/horizontal-pod-autoscaler"
+            element={
+              <ObjectRoute
+                kind="horizontalpodautoscaler"
+                listRoute="/other-resource/horizontal-pod-autoscaler"
+                list={<HorizontalPodAutoscalerView />}
+                detail={(p) => (
+                  <HorizontalPodAutoscalerDataView name={p.name} namespace={p.namespace ?? ''} />
+                )}
+              />
+            }
+          />
+        </Routes>
+      </MemoryRouter>
     </QueryClientProvider>,
   )
+}
+
+// Seed an active ref for the detail to render (the data view's identity now
+// comes from ObjectRoute's ref, not the URL).
+const seedActiveRef = (name: string, namespace: string) => {
+  const token = 'testref1'
+  sessionStorage.setItem(
+    'kd_object_refs',
+    JSON.stringify({
+      [token]: { kind: 'horizontalpodautoscaler', name, namespace, ts: Date.now(), origin: 'click' },
+    }),
+  )
+  sessionStorage.setItem('kd_object_active', token)
 }
 
 afterEach(() => {
@@ -91,8 +125,6 @@ const noCondHpa = {
   status: { current_replicas: 3, desired_replicas: 3, current_cpu_utilization_percentage: 50 },
 }
 
-const dataPath = '/other-resource/horizontal-pod-autoscaler/data?name=web-hpa&namespace=team-a'
-
 const serveHpa = (items: unknown[]) =>
   server.use(
     http.get('*/api/v1/clusters/1/resources/horizontalpodautoscalers', () =>
@@ -110,7 +142,8 @@ test('data-renders-detail', async () => {
     }),
   )
   selectProd()
-  const { container } = renderAt(<HorizontalPodAutoscalerDataView />, dataPath)
+  seedActiveRef('web-hpa', 'team-a')
+  const { container } = renderAt(<HorizontalPodAutoscalerDataView name="web-hpa" namespace="team-a" />)
 
   // Wait for the fetch to land before reading what the view asked for. The
   // highlighter splits tokens across <code class="hljs-*"> spans, so
@@ -153,7 +186,8 @@ test('data-renders-detail', async () => {
 test('data-conditions-from-status', async () => {
   serveHpa([webHpa])
   selectProd()
-  const { container } = renderAt(<HorizontalPodAutoscalerDataView />, dataPath)
+  seedActiveRef('web-hpa', 'team-a')
+  const { container } = renderAt(<HorizontalPodAutoscalerDataView name="web-hpa" namespace="team-a" />)
 
   await waitFor(() => {
     expect(container.textContent).toContain('AbleToScale')
@@ -179,7 +213,8 @@ test('data-conditions-from-status', async () => {
 test('data-conditions-from-legacy-annotation', async () => {
   serveHpa([legacyCondHpa])
   selectProd()
-  const { container } = renderAt(<HorizontalPodAutoscalerDataView />, dataPath)
+  seedActiveRef('web-hpa', 'team-a')
+  const { container } = renderAt(<HorizontalPodAutoscalerDataView name="web-hpa" namespace="team-a" />)
 
   await waitFor(() => {
     expect(container.textContent).toContain('AbleToScale')
@@ -197,7 +232,8 @@ test('data-conditions-from-legacy-annotation', async () => {
 test('data-missing-conditions', async () => {
   serveHpa([noCondHpa])
   selectProd()
-  const { container } = renderAt(<HorizontalPodAutoscalerDataView />, dataPath)
+  seedActiveRef('web-hpa', 'team-a')
+  const { container } = renderAt(<HorizontalPodAutoscalerDataView name="web-hpa" namespace="team-a" />)
 
   await waitFor(() => {
     expect(container.textContent).toContain('"min_replicas"')
@@ -209,10 +245,8 @@ test('data-missing-conditions', async () => {
 test('data-not-found-state', async () => {
   serveHpa([])
   selectProd()
-  const { container } = renderAt(
-    <HorizontalPodAutoscalerDataView />,
-    '/other-resource/horizontal-pod-autoscaler/data?name=ghost&namespace=team-a',
-  )
+  seedActiveRef('ghost', 'team-a')
+  const { container } = renderAt(<HorizontalPodAutoscalerDataView name="web-hpa" namespace="team-a" />)
 
   // empty items upstream is a state, not an error: pinned copy, no error
   // styling.
@@ -230,7 +264,14 @@ test('data-missing-name', async () => {
     }),
   )
   selectProd()
-  renderAt(<HorizontalPodAutoscalerDataView />, '/other-resource/horizontal-pod-autoscaler/data')
+  const qc = new QueryClient({ defaultOptions: { queries: { retry: false } } })
+  render(
+    <QueryClientProvider client={qc}>
+      <MemoryRouter>
+        <HorizontalPodAutoscalerDataView name="" namespace="team-a" />
+      </MemoryRouter>
+    </QueryClientProvider>,
+  )
 
   expect(await screen.findByText('Error: horizontal pod autoscaler name not provided')).toBeTruthy()
   expect(seen).toHaveLength(0) // no fetch

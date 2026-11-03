@@ -1,11 +1,14 @@
 import { render, screen } from '@testing-library/react'
+import userEvent from '@testing-library/user-event'
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query'
-import { MemoryRouter } from 'react-router-dom'
+import { MemoryRouter, Route, Routes } from 'react-router-dom'
 import { http, HttpResponse } from 'msw'
 import type { ReactElement } from 'react'
 import { afterEach, expect, test, vi } from 'vitest'
 import { server } from '../msw'
+import ObjectRoute from '../../src/components/ObjectRoute'
 import ResourceQuotaView from '../../src/views/OtherResource/ResourceQuota'
+import ResourceQuotaDataView from '../../src/views/OtherResource/ResourceQuotaData'
 import { useClusterStore } from '../../src/store/cluster'
 
 // Same KubeDataTable fake as network_policies.test.tsx: renders the real row
@@ -69,11 +72,27 @@ vi.mock('../../src/components/KubeDataTable', async () => {
   return { default: KubeDataTable, Column }
 })
 
-const renderAt = (ui: ReactElement, path = '/other-resource/resource-quota') => {
+// ADR-0040: render through ObjectRoute so the click→detail flow is the real
+// one (the ref is the active pointer; the URL never carries identity).
+const renderAt = (_ui: ReactElement, path = '/other-resource/resource-quota') => {
   const qc = new QueryClient({ defaultOptions: { queries: { retry: false } } })
   return render(
     <QueryClientProvider client={qc}>
-      <MemoryRouter initialEntries={[path]}>{ui}</MemoryRouter>
+      <MemoryRouter initialEntries={[path]}>
+        <Routes>
+          <Route
+            path="/other-resource/resource-quota"
+            element={
+              <ObjectRoute
+                kind="resourcequota"
+                listRoute="/other-resource/resource-quota"
+                list={<ResourceQuotaView />}
+                detail={(p) => (<ResourceQuotaDataView name={p.name} namespace={p.namespace ?? ''} />)}
+              />
+            }
+          />
+        </Routes>
+      </MemoryRouter>
     </QueryClientProvider>,
   )
 }
@@ -146,6 +165,29 @@ const objects = {
 }
 
 // list-renders-rows-with-data-links
+
+// click-name-renders-detail-with-clean-url (R1)
+test('click-name-renders-detail-with-clean-url', async () => {
+  const user = userEvent.setup()
+  selectProd()
+  server.use(
+    http.get('*/api/v1/clusters/1/resources/resourcequotas', () =>
+      HttpResponse.json({ items: [compute] }),
+    ),
+  )
+  renderAt(<ResourceQuotaView />)
+
+  // Clicking the name button opens the detail via openObject; the URL
+  // never carries identity (R1).
+  const nameButton = await screen.findByRole('button', { name: 'compute' })
+  await user.click(nameButton)
+
+  // The detail renders (the active ref is kind-matched) and the URL is
+  // clean: no query string (R1).
+  expect(await screen.findByText('Resource Quota Data')).toBeTruthy()
+  expect(window.location.search).toBe('')
+})
+
 test('list-renders-resource-quotas-with-data-links', async () => {
   let requestedPath = ''
   let requestedNs = ''
@@ -164,11 +206,9 @@ test('list-renders-resource-quotas-with-data-links', async () => {
   selectProd()
   renderAt(<ResourceQuotaView />)
 
-  const link = await screen.findByRole('link', { name: 'compute' })
-  // the list view is the sole producer of the data page's query strings.
-  expect(link.getAttribute('href')).toBe(
-    '/other-resource/resource-quota/data?name=compute&namespace=team-a',
-  )
+  // ADR-0040: the name cell is a button (not a Link) — the URL never
+  // carries object identity (R1).
+  const nameButton = await screen.findByRole('button', { name: 'compute' })
   // the namespaced fetch EXACTLY: cluster path + the header's namespace.
   expect(requestedPath).toBe('/api/v1/clusters/1/resources/resourcequotas')
   expect(requestedNs).toBe('team-a')
@@ -184,7 +224,7 @@ test('list-renders-resource-quotas-with-data-links', async () => {
     'Limits',
     'Created',
   ])
-  const nameCell = link.closest('tr')
+  const nameCell = nameButton.closest('tr')
   // row: the namespace is shown (the namespaced kind).
   expect(nameCell?.textContent).toContain('team-a')
   // created: local time (no raw ISO 'T'), rendered by formatTimestamp.
@@ -202,7 +242,7 @@ test('list-request-limit-cells', async () => {
   selectProd()
   renderAt(<ResourceQuotaView />)
 
-  const nameCell = (await screen.findByRole('link', { name: 'compute' })).closest('tr')
+  const nameCell = (await screen.findByRole('button', { name: 'compute' })).closest('tr')
   // 4.1's badge pairs: `<key>: <used> / <hard>`, one line per dimension.
   expect(nameCell?.textContent).toContain('requests.cpu: 2 / 4')
   expect(nameCell?.textContent).toContain('requests.memory: 4Gi / 10Gi')
@@ -220,7 +260,7 @@ test('list-missing-status-keys', async () => {
   selectProd()
   renderAt(<ResourceQuotaView />)
 
-  const nameCell = (await screen.findByRole('link', { name: 'objects' })).closest('tr')
+  const nameCell = (await screen.findByRole('button', { name: 'objects' })).closest('tr')
   // certainty rule: a key missing from status.used or status.hard renders
   // "—" — 4.1 would KeyError the template; 5.0 never guesses.
   expect(nameCell?.textContent).toContain('limits.cpu: — / —')
@@ -261,7 +301,7 @@ test('list-error-state', async () => {
     await screen.findByText(/Error loading resource quotas: RBAC_DENIED: list on resourcequotas/),
   ).toBeTruthy()
   // no blank table, no rows.
-  expect(screen.queryAllByRole('link', { name: 'compute' })).toHaveLength(0)
+  expect(screen.queryAllByRole('button', { name: 'compute' })).toHaveLength(0)
 })
 
 // list-empty-state

@@ -1,5 +1,5 @@
 import React from 'react'
-import { Link, useSearchParams } from 'react-router-dom'
+import { Link } from 'react-router-dom'
 import {
   CBreadcrumb,
   CBreadcrumbItem,
@@ -46,10 +46,19 @@ const STATUS_DIMENSIONS = ['limits.cpu', 'limits.memory', 'requests.cpu', 'reque
  * collapsed into the single `Created` row. The list view's name links are
  * the sole producer of these query strings.
  */
-const ResourceQuotaDataView = () => {
-  const [params] = useSearchParams()
-  const name = params.get('name') ?? ''
-  const namespace = params.get('namespace') ?? ''
+// ADR-0040: identity arrives as props from ObjectRoute (the active ref),
+// never from useSearchParams — the URL stays clean (R1). The namespace is
+// the ref's namespace (authoritative, R8): never the header's
+// selectedNamespace. The legacy /data route (TICKET-07 keeps it working
+// until the contract pass) passes the legacy ?name=/?namespace= through as
+// props; this view no longer reads the URL.
+const ResourceQuotaDataView = ({
+  name,
+  namespace,
+}: {
+  name: string
+  namespace: string
+}) => {
   const cluster = useClusterStore((s) => s.selectedCluster)
 
   const query = useQuery<ResourceQuotaItem>({

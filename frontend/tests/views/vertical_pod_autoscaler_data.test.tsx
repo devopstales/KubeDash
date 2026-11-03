@@ -1,21 +1,54 @@
 import { render, screen, waitFor } from '@testing-library/react'
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query'
-import { MemoryRouter } from 'react-router-dom'
+import { MemoryRouter, Route, Routes } from 'react-router-dom'
 import { http, HttpResponse, type AnyHandler } from 'msw'
 import type { ReactElement } from 'react'
 import { afterEach, expect, test } from 'vitest'
 import { server } from '../msw'
+import ObjectRoute from '../../src/components/ObjectRoute'
 import VerticalPodAutoscalerDataView from '../../src/views/OtherResource/VerticalPodAutoscalerData'
+import VerticalPodAutoscalerView from '../../src/views/OtherResource/VerticalPodAutoscaler'
 import { useClusterStore } from '../../src/store/cluster'
 
-const renderAt = (ui: ReactElement, path: string) => {
+// ADR-0040: render through ObjectRoute so the detail is ref-driven (the
+// identity comes from the active ref, never from the URL) and
+// window.location.search === '' (R1) is assertable.
+const renderAt = (_ui: ReactElement, path = '/other-resource/vertical-pod-autoscaler') => {
   const qc = new QueryClient({ defaultOptions: { queries: { retry: false } } })
   return render(
     <QueryClientProvider client={qc}>
-      <MemoryRouter initialEntries={[path]}>{ui}</MemoryRouter>
+      <MemoryRouter initialEntries={[path]}>
+        <Routes>
+          <Route
+            path="/other-resource/vertical-pod-autoscaler"
+            element={
+              <ObjectRoute
+                kind="verticalpodautoscaler"
+                listRoute="/other-resource/vertical-pod-autoscaler"
+                list={<VerticalPodAutoscalerView />}
+                detail={(p) => (<VerticalPodAutoscalerDataView name={p.name} namespace={p.namespace ?? ''} />)}
+              />
+            }
+          />
+        </Routes>
+      </MemoryRouter>
     </QueryClientProvider>,
   )
 }
+
+// Seed an active ref for the detail to render (the data view's identity now
+// comes from ObjectRoute's ref, not the URL).
+const seedActiveRef = (name: string, namespace: string) => {
+  const token = 'testref1'
+  sessionStorage.setItem(
+    'kd_object_refs',
+    JSON.stringify({
+      [token]: { kind: 'verticalpodautoscaler', name, namespace, ts: Date.now(), origin: 'click' },
+    }),
+  )
+  sessionStorage.setItem('kd_object_active', token)
+}
+
 
 afterEach(() => {
   useClusterStore.setState({ selectedCluster: null, selectedNamespace: null })
@@ -67,8 +100,6 @@ const webVpa = {
   },
 }
 
-const dataPath = '/other-resource/vertical-pod-autoscaler/data?name=web-vpa&namespace=team-a'
-
 test('vpa-data-renders-detail', async () => {
   let searchParams = new URLSearchParams()
   server.use(
@@ -78,7 +109,8 @@ test('vpa-data-renders-detail', async () => {
     }),
   )
   selectProd()
-  const { container } = renderAt(<VerticalPodAutoscalerDataView />, dataPath)
+  seedActiveRef('web-vpa', 'team-a')
+  const { container } = renderAt(<VerticalPodAutoscalerDataView name="web-vpa" namespace="team-a" />)
 
   // Wait for the fetch to land before reading what the view asked for. The
   // highlighter splits tokens across <code class="hljs-*"> spans, so
@@ -123,7 +155,8 @@ test('vpa-data-conditions-from-status', async () => {
     ),
   )
   selectProd()
-  const { container } = renderAt(<VerticalPodAutoscalerDataView />, dataPath)
+  seedActiveRef('web-vpa', 'team-a')
+  const { container } = renderAt(<VerticalPodAutoscalerDataView name="web-vpa" namespace="team-a" />)
 
   await waitFor(() => {
     expect(container.textContent).toContain('RecommendationProvided')
@@ -149,7 +182,8 @@ test('vpa-data-container-policies', async () => {
     ),
   )
   selectProd()
-  renderAt(<VerticalPodAutoscalerDataView />, dataPath)
+  seedActiveRef('web-vpa', 'team-a')
+  renderAt(<VerticalPodAutoscalerDataView name="web-vpa" namespace="team-a" />)
 
   await screen.findByText('app', { selector: 'td' })
   // Min/Max Allowed render "resource: value" lines; Controlled Resources
@@ -187,7 +221,8 @@ test('vpa-data-empty-vs-absent-bounds', async () => {
     ),
   )
   selectProd()
-  const { container } = renderAt(<VerticalPodAutoscalerDataView />, dataPath)
+  seedActiveRef('web-vpa', 'team-a')
+  const { container } = renderAt(<VerticalPodAutoscalerDataView name="web-vpa" namespace="team-a" />)
 
   await waitFor(() => {
     expect(container.textContent).toContain('"targetRef"')
@@ -217,7 +252,8 @@ test('vpa-data-missing-policy', async () => {
     ),
   )
   selectProd()
-  const { container } = renderAt(<VerticalPodAutoscalerDataView />, dataPath)
+  seedActiveRef('web-vpa', 'team-a')
+  const { container } = renderAt(<VerticalPodAutoscalerDataView name="web-vpa" namespace="team-a" />)
 
   await waitFor(() => {
     expect(container.textContent).toContain('"targetRef"')
@@ -235,10 +271,8 @@ test('vpa-data-not-found-state', async () => {
     ),
   )
   selectProd()
-  const { container } = renderAt(
-    <VerticalPodAutoscalerDataView />,
-    '/other-resource/vertical-pod-autoscaler/data?name=ghost&namespace=team-a',
-  )
+  seedActiveRef('ghost', 'team-a')
+  const { container } = renderAt(<VerticalPodAutoscalerDataView name="web-vpa" namespace="team-a" />)
 
   // empty items upstream is a state, not an error: pinned copy, no
   // error styling (also the CRD-absent state — the backend returns []
@@ -256,7 +290,14 @@ test('vpa-data-missing-name', async () => {
     }),
   )
   selectProd()
-  renderAt(<VerticalPodAutoscalerDataView />, '/other-resource/vertical-pod-autoscaler/data')
+  const qc = new QueryClient({ defaultOptions: { queries: { retry: false } } })
+  render(
+    <QueryClientProvider client={qc}>
+      <MemoryRouter>
+        <VerticalPodAutoscalerDataView name="" namespace="team-a" />
+      </MemoryRouter>
+    </QueryClientProvider>,
+  )
 
   expect(await screen.findByText('Error: vertical pod autoscaler name not provided')).toBeTruthy()
   expect(seen).toHaveLength(0) // no fetch

@@ -1,5 +1,5 @@
 import React from 'react'
-import { Link, useSearchParams } from 'react-router-dom'
+import { Link } from 'react-router-dom'
 import {
   CBreadcrumb,
   CBreadcrumbItem,
@@ -67,10 +67,19 @@ const conditionsOf = (item: HorizontalPodAutoscalerItem | undefined) => {
  * STATE (pinned copy), not an error. Placement under Other Resources is a
  * ratified deviation (ADR-0022).
  */
-const HorizontalPodAutoscalerDataView = () => {
-  const [params] = useSearchParams()
-  const name = params.get('name') ?? ''
-  const namespace = params.get('namespace') ?? ''
+// ADR-0040: identity arrives as props from ObjectRoute (the active ref),
+// never from useSearchParams — the URL stays clean (R1). The namespace is
+// the ref's namespace (authoritative, R8): never the header's
+// selectedNamespace. The legacy /data route (TICKET-07 keeps it working
+// until the contract pass) passes the legacy ?name=/?namespace= through as
+// props; this view no longer reads the URL.
+const HorizontalPodAutoscalerDataView = ({
+  name,
+  namespace,
+}: {
+  name: string
+  namespace: string
+}) => {
   const cluster = useClusterStore((s) => s.selectedCluster)
 
   const query = useQuery<HorizontalPodAutoscalerItem>({

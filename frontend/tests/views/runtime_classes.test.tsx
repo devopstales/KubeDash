@@ -1,11 +1,14 @@
 import { render, screen } from '@testing-library/react'
+import userEvent from '@testing-library/user-event'
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query'
-import { MemoryRouter } from 'react-router-dom'
+import { MemoryRouter, Route, Routes } from 'react-router-dom'
 import { http, HttpResponse } from 'msw'
 import type { ReactElement } from 'react'
 import { afterEach, expect, test, vi } from 'vitest'
 import { server } from '../msw'
+import ObjectRoute from '../../src/components/ObjectRoute'
 import RuntimeClassView from '../../src/views/OtherResource/RuntimeClass'
+import RuntimeClassDataView from '../../src/views/OtherResource/RuntimeClassData'
 import { useClusterStore } from '../../src/store/cluster'
 
 // Same KubeDataTable fake as priority_classes.test.tsx: renders the real row
@@ -66,11 +69,27 @@ vi.mock('../../src/components/KubeDataTable', async () => {
   return { default: KubeDataTable, Column }
 })
 
-const renderAt = (ui: ReactElement, path = '/other-resource/runtimeclass') => {
+// ADR-0040: render through ObjectRoute so the click→detail flow is the real
+// one (the ref is the active pointer; the URL never carries identity).
+const renderAt = (_ui: ReactElement, path = '/other-resource/runtimeclass') => {
   const qc = new QueryClient({ defaultOptions: { queries: { retry: false } } })
   return render(
     <QueryClientProvider client={qc}>
-      <MemoryRouter initialEntries={[path]}>{ui}</MemoryRouter>
+      <MemoryRouter initialEntries={[path]}>
+        <Routes>
+          <Route
+            path="/other-resource/runtimeclass"
+            element={
+              <ObjectRoute
+                kind="runtimeclass"
+                listRoute="/other-resource/runtimeclass"
+                list={<RuntimeClassView />}
+                detail={(p) => (<RuntimeClassDataView name={p.name} />)}
+              />
+            }
+          />
+        </Routes>
+      </MemoryRouter>
     </QueryClientProvider>,
   )
 }
@@ -114,6 +133,29 @@ const gvisor = {
 }
 
 // runtimeclass-list-renders-rows-with-data-links
+
+// click-name-renders-detail-with-clean-url (R1)
+test('click-name-renders-detail-with-clean-url', async () => {
+  const user = userEvent.setup()
+  selectProd()
+  server.use(
+    http.get('*/api/v1/clusters/1/resources/runtimeclasses', () =>
+      HttpResponse.json({ items: [runc] }),
+    ),
+  )
+  renderAt(<RuntimeClassView />)
+
+  // Clicking the name button opens the detail via openObject; the URL
+  // never carries identity (R1).
+  const nameButton = await screen.findByRole('button', { name: 'runc' })
+  await user.click(nameButton)
+
+  // The detail renders (the active ref is kind-matched) and the URL is
+  // clean: no query string (R1).
+  expect(await screen.findByText('Runtime Class Data')).toBeTruthy()
+  expect(window.location.search).toBe('')
+})
+
 test('list-renders-runtime-classes', async () => {
   let requestedPath = ''
   let requestedUrl = ''
@@ -132,8 +174,9 @@ test('list-renders-runtime-classes', async () => {
   selectProd()
   renderAt(<RuntimeClassView />)
 
-  const link = await screen.findByRole('link', { name: 'runc' })
-  expect(link.getAttribute('href')).toBe('/other-resource/runtimeclass/data?name=runc')
+  // ADR-0040: the name cell is a button (not a Link) — the URL
+  // never carries object identity (R1).
+  const nameButton = await screen.findByRole('button', { name: 'runc' })
   // fetch path is EXACTLY the cluster-scoped kind URL, no namespace substring.
   expect(requestedPath).toBe('/api/v1/clusters/1/resources/runtimeclasses')
   expect(requestedUrl).not.toContain('namespace')
@@ -154,9 +197,9 @@ test('list-renders-runtime-classes', async () => {
   ])
   // row: handler, overwrite flag, overhead.
   expect(screen.getByText('false')).toBeTruthy()
-  expect(screen.getByText('100m / 128Mi')).toBeTruthy()
+  expect(await screen.findByText('100m / 128Mi')).toBeTruthy()
   // created: local time (no raw ISO 'T'), rendered by formatTimestamp.
-  const nameCell = link.closest('tr')
+  const nameCell = nameButton.closest('tr')
   expect(nameCell?.textContent).not.toContain('2026-01-02T03:04:05Z')
   expect(nameCell?.textContent).toMatch(/2026/)
 })
@@ -180,7 +223,7 @@ test('list-overhead-absent-state', async () => {
   expect(await screen.findByText('100m / 128Mi')).toBeTruthy()
   const dashCells = screen.getAllByText('—')
   expect(dashCells.length).toBeGreaterThanOrEqual(1)
-  const gvisorRow = screen.getByRole('link', { name: 'gvisor' }).closest('tr')
+  const gvisorRow = screen.getByRole('button', { name: 'gvisor' }).closest('tr')
   expect(gvisorRow?.textContent).toContain('—')
 })
 
@@ -217,7 +260,7 @@ test('list-error-state', async () => {
     await screen.findByText(/Error loading runtime classes: RBAC_DENIED: list on runtimeclasses/),
   ).toBeTruthy()
   // no blank table, no rows.
-  expect(screen.queryAllByRole('link', { name: 'runc' })).toHaveLength(0)
+  expect(screen.queryAllByRole('button', { name: 'runc' })).toHaveLength(0)
 })
 
 // runtimeclass-list-empty-state

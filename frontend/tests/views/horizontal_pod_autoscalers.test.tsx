@@ -1,11 +1,14 @@
 import { render, screen } from '@testing-library/react'
+import userEvent from '@testing-library/user-event'
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query'
-import { MemoryRouter } from 'react-router-dom'
+import { MemoryRouter, Route, Routes } from 'react-router-dom'
 import { http, HttpResponse } from 'msw'
 import type { ReactElement } from 'react'
 import { afterEach, expect, test, vi } from 'vitest'
 import { server } from '../msw'
+import ObjectRoute from '../../src/components/ObjectRoute'
 import HorizontalPodAutoscalerView from '../../src/views/OtherResource/HorizontalPodAutoscaler'
+import HorizontalPodAutoscalerDataView from '../../src/views/OtherResource/HorizontalPodAutoscalerData'
 import { useClusterStore } from '../../src/store/cluster'
 
 // Same KubeDataTable fake as network_policies.test.tsx: renders the real row
@@ -64,11 +67,29 @@ vi.mock('../../src/components/KubeDataTable', async () => {
   return { default: KubeDataTable, Column }
 })
 
-const renderAt = (ui: ReactElement, path = '/other-resource/horizontal-pod-autoscaler') => {
+// ADR-0040: render through ObjectRoute so the click→detail flow is the real
+// one (the ref is the active pointer; the URL never carries identity).
+const renderAt = (_ui: ReactElement, path = '/other-resource/horizontal-pod-autoscaler') => {
   const qc = new QueryClient({ defaultOptions: { queries: { retry: false } } })
   return render(
     <QueryClientProvider client={qc}>
-      <MemoryRouter initialEntries={[path]}>{ui}</MemoryRouter>
+      <MemoryRouter initialEntries={[path]}>
+        <Routes>
+          <Route
+            path="/other-resource/horizontal-pod-autoscaler"
+            element={
+              <ObjectRoute
+                kind="horizontalpodautoscaler"
+                listRoute="/other-resource/horizontal-pod-autoscaler"
+                list={<HorizontalPodAutoscalerView />}
+                detail={(p) => (
+                  <HorizontalPodAutoscalerDataView name={p.name} namespace={p.namespace ?? ''} />
+                )}
+              />
+            }
+          />
+        </Routes>
+      </MemoryRouter>
     </QueryClientProvider>,
   )
 }
@@ -146,11 +167,9 @@ test('list-renders-hpa-rows-with-data-links', async () => {
   selectProd()
   renderAt(<HorizontalPodAutoscalerView />)
 
-  const link = await screen.findByRole('link', { name: 'web-hpa' })
-  // the list view is the sole producer of the data page's query strings.
-  expect(link.getAttribute('href')).toBe(
-    '/other-resource/horizontal-pod-autoscaler/data?name=web-hpa&namespace=team-a',
-  )
+  // ADR-0040: the name cell is a button (not a Link) — openObject writes
+  // the ref and navigates; the URL stays clean (R1).
+  const nameButton = await screen.findByRole('button', { name: 'web-hpa' })
   // the namespaced fetch EXACTLY: cluster path + the header's namespace.
   expect(requestedPath).toBe('/api/v1/clusters/1/resources/horizontalpodautoscalers')
   expect(requestedNs).toBe('team-a')
@@ -168,9 +187,33 @@ test('list-renders-hpa-rows-with-data-links', async () => {
     'Max Replicas',
     'Replicas',
   ])
-  const nameCell = link.closest('tr')
+  const nameCell = nameButton.closest('tr')
   // row: the namespace is shown (the namespaced kind).
   expect(nameCell?.textContent).toContain('team-a')
+  // ADR-0040: the share button is in the name cell (row affordance).
+  expect(screen.getByRole('button', { name: 'Share web-hpa' })).toBeTruthy()
+})
+
+// click-name-renders-detail-with-clean-url (R1)
+test('click-name-renders-detail-with-clean-url', async () => {
+  const user = userEvent.setup()
+  selectProd()
+  server.use(
+    http.get('*/api/v1/clusters/1/resources/horizontalpodautoscalers', () =>
+      HttpResponse.json({ kind: 'horizontalpodautoscalers', cluster: 'prod', items: [webHpa] }),
+    ),
+  )
+  renderAt(<HorizontalPodAutoscalerView />)
+
+  // Clicking the name button opens the detail via openObject; the URL
+  // never carries identity (R1).
+  const nameButton = await screen.findByRole('button', { name: 'web-hpa' })
+  await user.click(nameButton)
+
+  // The detail renders (the active ref is kind-matched).
+  expect(await screen.findByText('Horizontal Pod Autoscaler Data')).toBeTruthy()
+  // The URL is clean: no query string (R1).
+  expect(window.location.search).toBe('')
 })
 
 // hpa-list-targets-and-replica-cells
@@ -183,9 +226,12 @@ test('list-targets-and-replica-cells', async () => {
   selectProd()
   renderAt(<HorizontalPodAutoscalerView />)
 
-  const webLink = await screen.findByRole('link', { name: 'web-hpa' })
-  expect(cells(webLink.closest('tr')).map((td) => td.textContent)).toEqual([
-    'web-hpa',
+  const webLink = await screen.findByRole('button', { name: 'web-hpa' })
+  // The Name cell also carries the ADR-0040 share button (row affordance);
+  // compare the name button's text, not the whole cell.
+  const nameTd = cells(webLink.closest('tr'))[0]
+  expect(nameTd.textContent).toContain('web-hpa')
+  expect(cells(webLink.closest('tr')).map((td) => td.textContent).slice(1)).toEqual([
     'team-a',
     'web', // Owner: scale_target_ref name, PLAIN TEXT (the 4.1 link is dropped)
     '50 / 80 %', // Targets: current / target CPU percent
@@ -208,7 +254,7 @@ test('list-unknown-cpu-target', async () => {
   selectProd()
   renderAt(<HorizontalPodAutoscalerView />)
 
-  const link = await screen.findByRole('link', { name: 'no-cpu-hpa' })
+  const link = await screen.findByRole('button', { name: 'no-cpu-hpa' })
   // 4.1's exact fallback for the absent legacy v1 CPU field: the UNKNOWN
   // literal (certainty rule: never guess).
   expect(cells(link.closest('tr')).map((td) => td.textContent)).toContain('UNKNOWN / 80 %')
@@ -247,7 +293,7 @@ test('list-error-state', async () => {
     await screen.findByText(/Error loading horizontal pod autoscalers: RBAC_DENIED: list on horizontalpodautoscalers/),
   ).toBeTruthy()
   // no blank table, no rows.
-  expect(screen.queryAllByRole('link', { name: 'web-hpa' })).toHaveLength(0)
+  expect(screen.queryAllByRole('button', { name: 'web-hpa' })).toHaveLength(0)
 })
 
 // hpa-list-empty-state

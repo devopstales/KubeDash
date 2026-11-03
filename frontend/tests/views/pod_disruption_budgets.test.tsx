@@ -1,11 +1,14 @@
 import { render, screen } from '@testing-library/react'
+import userEvent from '@testing-library/user-event'
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query'
-import { MemoryRouter } from 'react-router-dom'
+import { MemoryRouter, Route, Routes } from 'react-router-dom'
 import { http, HttpResponse } from 'msw'
 import type { ReactElement } from 'react'
 import { afterEach, expect, test, vi } from 'vitest'
 import { server } from '../msw'
+import ObjectRoute from '../../src/components/ObjectRoute'
 import PodDisruptionBudgetView from '../../src/views/OtherResource/PodDisruptionBudget'
+import PodDisruptionBudgetDataView from '../../src/views/OtherResource/PodDisruptionBudgetData'
 import { useClusterStore } from '../../src/store/cluster'
 
 // Same KubeDataTable fake as network_policies.test.tsx: renders the real row
@@ -64,11 +67,27 @@ vi.mock('../../src/components/KubeDataTable', async () => {
   return { default: KubeDataTable, Column }
 })
 
-const renderAt = (ui: ReactElement, path = '/other-resource/pod-disruption-budget') => {
+// ADR-0040: render through ObjectRoute so the click→detail flow is the real
+// one (the ref is the active pointer; the URL never carries identity).
+const renderAt = (_ui: ReactElement, path = '/other-resource/pod-disruption-budget') => {
   const qc = new QueryClient({ defaultOptions: { queries: { retry: false } } })
   return render(
     <QueryClientProvider client={qc}>
-      <MemoryRouter initialEntries={[path]}>{ui}</MemoryRouter>
+      <MemoryRouter initialEntries={[path]}>
+        <Routes>
+          <Route
+            path="/other-resource/pod-disruption-budget"
+            element={
+              <ObjectRoute
+                kind="poddisruptionbudget"
+                listRoute="/other-resource/pod-disruption-budget"
+                list={<PodDisruptionBudgetView />}
+                detail={(p) => (<PodDisruptionBudgetDataView name={p.name} namespace={p.namespace ?? ''} />)}
+              />
+            }
+          />
+        </Routes>
+      </MemoryRouter>
     </QueryClientProvider>,
   )
 }
@@ -129,6 +148,29 @@ const maxBudget = {
 const freshBudget = { ...web, status: undefined }
 
 // pdb-list-renders-rows-with-data-links
+
+// click-name-renders-detail-with-clean-url (R1)
+test('click-name-renders-detail-with-clean-url', async () => {
+  const user = userEvent.setup()
+  selectProd()
+  server.use(
+    http.get('*/api/v1/clusters/1/resources/poddisruptionbudgets', () =>
+      HttpResponse.json({ items: [web] }),
+    ),
+  )
+  renderAt(<PodDisruptionBudgetView />)
+
+  // Clicking the name button opens the detail via openObject; the URL
+  // never carries identity (R1).
+  const nameButton = await screen.findByRole('button', { name: 'web' })
+  await user.click(nameButton)
+
+  // The detail renders (the active ref is kind-matched) and the URL is
+  // clean: no query string (R1).
+  expect(await screen.findByText('Pod Disruption Budget Data')).toBeTruthy()
+  expect(window.location.search).toBe('')
+})
+
 test('list-renders-pdb-rows-with-data-links', async () => {
   let requestedPath = ''
   let requestedNs = ''
@@ -147,11 +189,9 @@ test('list-renders-pdb-rows-with-data-links', async () => {
   selectProd()
   renderAt(<PodDisruptionBudgetView />)
 
-  const link = await screen.findByRole('link', { name: 'web' })
-  // the list view is the sole producer of the data page's query strings.
-  expect(link.getAttribute('href')).toBe(
-    '/other-resource/pod-disruption-budget/data?name=web&namespace=team-a',
-  )
+  // ADR-0040: the name cell is a button (not a Link) — the URL never
+  // carries object identity (R1).
+  const nameButton = await screen.findByRole('button', { name: 'web' })
   // the namespaced fetch EXACTLY: cluster path + the header's namespace.
   expect(requestedPath).toBe('/api/v1/clusters/1/resources/poddisruptionbudgets')
   expect(requestedNs).toBe('team-a')
@@ -167,7 +207,7 @@ test('list-renders-pdb-rows-with-data-links', async () => {
     'Max Unavailable',
     'Allowed Disruptions',
   ])
-  const nameCell = link.closest('tr')
+  const nameCell = nameButton.closest('tr')
   // row: the namespace is shown (the namespaced kind).
   expect(nameCell?.textContent).toContain('team-a')
 })
@@ -190,18 +230,18 @@ test('list-min-max-cells', async () => {
   // absent one renders "—" (certainty rule: 4.1 rendered blank). Check the
   // exact Min Available / Max Unavailable cells.
   const cells = (tr: Element | null) => Array.from(tr?.querySelectorAll('td') ?? [])
-  const webRow = (await screen.findByRole('link', { name: 'web' })).closest('tr')
-  expect(cells(webRow).map((td) => td.textContent)).toEqual([
-    'web',
+  // The Name cell also carries the ADR-0040 share button (row affordance);
+  // compare the name button's text, not the whole cell.
+  const webRow = (await screen.findByRole('button', { name: 'web' })).closest('tr')
+  expect(cells(webRow).map((td) => td.textContent).slice(1)).toEqual([
     'team-a',
     '3', // Min Available
     '—', // Max Unavailable: absent
     '1', // Allowed Disruptions
   ])
 
-  const maxRow = (await screen.findByRole('link', { name: 'max-budget' })).closest('tr')
-  expect(cells(maxRow).map((td) => td.textContent)).toEqual([
-    'max-budget',
+  const maxRow = (await screen.findByRole('button', { name: 'max-budget' })).closest('tr')
+  expect(cells(maxRow).map((td) => td.textContent).slice(1)).toEqual([
     'team-a',
     '—', // Min Available: absent
     '1', // Max Unavailable
@@ -223,7 +263,7 @@ test('list-missing-status', async () => {
   selectProd()
   renderAt(<PodDisruptionBudgetView />)
 
-  const nameCell = (await screen.findByRole('link', { name: 'web' })).closest('tr')
+  const nameCell = (await screen.findByRole('button', { name: 'web' })).closest('tr')
   // certainty rule: a fresh PDB has no status; 4.1 would UndefinedError —
   // 5.0 renders "—", never guesses, never throws.
   expect(nameCell?.textContent).toContain('—')
@@ -263,7 +303,7 @@ test('list-error-state', async () => {
     await screen.findByText(/Error loading pod disruption budgets: RBAC_DENIED: list on poddisruptionbudgets/),
   ).toBeTruthy()
   // no blank table, no rows.
-  expect(screen.queryAllByRole('link', { name: 'web' })).toHaveLength(0)
+  expect(screen.queryAllByRole('button', { name: 'web' })).toHaveLength(0)
 })
 
 // pdb-list-empty-state

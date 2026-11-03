@@ -1,21 +1,52 @@
 import { render, screen, waitFor } from '@testing-library/react'
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query'
-import { MemoryRouter } from 'react-router-dom'
+import { MemoryRouter, Route, Routes } from 'react-router-dom'
 import { http, HttpResponse } from 'msw'
 import type { ReactElement } from 'react'
 import { afterEach, expect, test } from 'vitest'
 import { server } from '../msw'
+import ObjectRoute from '../../src/components/ObjectRoute'
 import RuntimeClassDataView from '../../src/views/OtherResource/RuntimeClassData'
+import RuntimeClassView from '../../src/views/OtherResource/RuntimeClass'
 import { useClusterStore } from '../../src/store/cluster'
 
-const renderAt = (ui: ReactElement, path: string) => {
+// ADR-0040: render through ObjectRoute so the detail is ref-driven (the
+// identity comes from the active ref, never from the URL) and
+// window.location.search === '' (R1) is assertable.
+const renderAt = (_ui: ReactElement, path = '/other-resource/runtimeclass') => {
   const qc = new QueryClient({ defaultOptions: { queries: { retry: false } } })
   return render(
     <QueryClientProvider client={qc}>
-      <MemoryRouter initialEntries={[path]}>{ui}</MemoryRouter>
+      <MemoryRouter initialEntries={[path]}>
+        <Routes>
+          <Route
+            path="/other-resource/runtimeclass"
+            element={
+              <ObjectRoute
+                kind="runtimeclass"
+                listRoute="/other-resource/runtimeclass"
+                list={<RuntimeClassView />}
+                detail={(p) => (<RuntimeClassDataView name={p.name} />)}
+              />
+            }
+          />
+        </Routes>
+      </MemoryRouter>
     </QueryClientProvider>,
   )
 }
+
+// Seed an active ref for the detail to render (the data view's identity now
+// comes from ObjectRoute's ref, not the URL). Cluster-scoped: no namespace.
+const seedActiveRef = (name: string) => {
+  const token = 'testref1'
+  sessionStorage.setItem(
+    'kd_object_refs',
+    JSON.stringify({ [token]: { kind: 'runtimeclass', name, ts: Date.now(), origin: 'click' } }),
+  )
+  sessionStorage.setItem('kd_object_active', token)
+}
+
 
 afterEach(() => {
   useClusterStore.setState({ selectedCluster: null, selectedNamespace: null })
@@ -56,10 +87,8 @@ test('data-renders-detail', async () => {
     }),
   )
   selectProd()
-  const { container } = renderAt(
-    <RuntimeClassDataView />,
-    '/other-resource/runtimeclass/data?name=runc',
-  )
+  seedActiveRef('runc')
+  const { container } = renderAt(<RuntimeClassDataView name="runc" />)
 
   // wait for the fetch to land before reading what the view asked for.
   // The highlighter splits tokens across <code class="hljs-*"> spans, so
@@ -105,10 +134,8 @@ test('data-not-found-state', async () => {
     ),
   )
   selectProd()
-  const { container } = renderAt(
-    <RuntimeClassDataView />,
-    '/other-resource/runtimeclass/data?name=ghost',
-  )
+  seedActiveRef('ghost')
+  const { container } = renderAt(<RuntimeClassDataView name="runc" />)
 
   // empty items upstream is a state, not an error: pinned copy, no fetch-error line.
   expect(await screen.findByText("No RuntimeClass 'ghost' found")).toBeTruthy()
@@ -125,7 +152,14 @@ test('data-missing-name', async () => {
     }),
   )
   selectProd()
-  renderAt(<RuntimeClassDataView />, '/other-resource/runtimeclass/data')
+  const qc = new QueryClient({ defaultOptions: { queries: { retry: false } } })
+  render(
+    <QueryClientProvider client={qc}>
+      <MemoryRouter>
+        <RuntimeClassDataView name="" />
+      </MemoryRouter>
+    </QueryClientProvider>,
+  )
 
   expect(await screen.findByText('Error: runtime class name not provided')).toBeTruthy()
   expect(seen).toHaveLength(0) // no fetch
@@ -140,7 +174,8 @@ test('data-no-cluster-state', async () => {
     }),
   )
   useClusterStore.setState({ selectedCluster: null, selectedNamespace: null })
-  renderAt(<RuntimeClassDataView />, '/other-resource/runtimeclass/data?name=runc')
+  seedActiveRef('runc')
+  renderAt(<RuntimeClassDataView name="runc" />)
 
   expect(await screen.findByText('No cluster selected.')).toBeTruthy()
   expect(seen).toHaveLength(0) // no resource fetch is made

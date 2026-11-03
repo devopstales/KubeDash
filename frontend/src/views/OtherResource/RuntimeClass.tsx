@@ -1,5 +1,5 @@
 import React from 'react'
-import { Link } from 'react-router-dom'
+import { useNavigate } from 'react-router-dom'
 import {
   CBreadcrumb,
   CBreadcrumbItem,
@@ -11,10 +11,17 @@ import {
 import { useQuery } from '@tanstack/react-query'
 import { apiFetch } from '../../lib/api'
 import { formatTimestamp } from '../../lib/format'
+import { openObject } from '../../lib/objectRef'
 import type { RuntimeClassItem, ResourceList } from '../../lib/types'
 import { useClusterStore } from '../../store/cluster'
 import KubeDataTable, { Column } from '../../components/KubeDataTable'
+import ShareObjectButton from '../../components/ShareObjectButton'
 import TopMenu from '../../components/TopMenu'
+
+// The kind is cluster-scoped (no namespace); the route follows the
+// priorityclass template kind (TICKET-02), migrated in TICKET-06.
+const KIND = 'runtimeclass'
+const LIST_ROUTE = '/other-resource/runtimeclass'
 
 type RuntimeClassRow = {
   name: string
@@ -52,6 +59,7 @@ const toRow = (item: RuntimeClassItem): RuntimeClassRow => ({
  */
 const RuntimeClassView = () => {
   const cluster = useClusterStore((s) => s.selectedCluster)
+  const navigate = useNavigate()
 
   const query = useQuery<RuntimeClassRow[]>({
     queryKey: ['runtimeclasses', cluster?.id],
@@ -65,11 +73,21 @@ const RuntimeClassView = () => {
     },
   })
 
-  const nameLink = (name: string) =>
+  // ADR-0040: the name cell is a button (not a Link) — openObject writes
+  // the ref to sessionStorage and navigates to the clean list route; the
+  // URL never carries object identity (R1). Cluster-scoped: no namespace.
+  const nameCell = (name: string) =>
     name ? (
-      <Link to={`/other-resource/runtimeclass/data?name=${encodeURIComponent(name)}`}>
-        {name}
-      </Link>
+      <>
+        <button
+          type="button"
+          className="btn btn-link btn-sm p-0 text-primary text-decoration-underline"
+          onClick={() => openObject(KIND, name, undefined, LIST_ROUTE, navigate)}
+        >
+          {name}
+        </button>{' '}
+        <ShareObjectButton kind={KIND} name={name} listRoute={LIST_ROUTE} />
+      </>
     ) : null
 
   return (
@@ -95,7 +113,7 @@ const RuntimeClassView = () => {
         ) : (
           <KubeDataTable data={query.data ?? []}>
             <Column title="Name" data="name">
-              {nameLink}
+              {(name: unknown) => nameCell(name as string)}
             </Column>
             <Column title="Handler" data="handler" />
             <Column title="Overwrite Node Sel No Toleration" data="overwriteNodeSelNoToleration" />

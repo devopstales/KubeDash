@@ -1,5 +1,5 @@
 import React from 'react'
-import { Link, useSearchParams } from 'react-router-dom'
+import { Link } from 'react-router-dom'
 import {
   CBreadcrumb,
   CBreadcrumbItem,
@@ -40,9 +40,11 @@ const NOT_FOUND = 'not found'
  * follows the ratified 5.0 PriorityClassData precedent (briefing.md ratified
  * deviation 1).
  */
-const RuntimeClassDataView = () => {
-  const [params] = useSearchParams()
-  const name = params.get('name') ?? ''
+// ADR-0040: identity arrives as props from ObjectRoute (the active ref),
+// never from useSearchParams — the URL stays clean (R1). The legacy /data
+// route (TICKET-07 keeps it working until the contract pass) passes the
+// legacy ?name= through as a prop; this view no longer reads the URL.
+const RuntimeClassDataView = ({ name }: { name: string }) => {
   const cluster = useClusterStore((s) => s.selectedCluster)
 
   const query = useQuery<RuntimeClassItem>({

@@ -1,21 +1,54 @@
 import { render, screen, waitFor } from '@testing-library/react'
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query'
-import { MemoryRouter } from 'react-router-dom'
+import { MemoryRouter, Route, Routes } from 'react-router-dom'
 import { http, HttpResponse, type AnyHandler } from 'msw'
 import type { ReactElement } from 'react'
 import { afterEach, expect, test } from 'vitest'
 import { server } from '../msw'
+import ObjectRoute from '../../src/components/ObjectRoute'
 import PodDisruptionBudgetDataView from '../../src/views/OtherResource/PodDisruptionBudgetData'
+import PodDisruptionBudgetView from '../../src/views/OtherResource/PodDisruptionBudget'
 import { useClusterStore } from '../../src/store/cluster'
 
-const renderAt = (ui: ReactElement, path: string) => {
+// ADR-0040: render through ObjectRoute so the detail is ref-driven (the
+// identity comes from the active ref, never from the URL) and
+// window.location.search === '' (R1) is assertable.
+const renderAt = (_ui: ReactElement, path = '/other-resource/pod-disruption-budget') => {
   const qc = new QueryClient({ defaultOptions: { queries: { retry: false } } })
   return render(
     <QueryClientProvider client={qc}>
-      <MemoryRouter initialEntries={[path]}>{ui}</MemoryRouter>
+      <MemoryRouter initialEntries={[path]}>
+        <Routes>
+          <Route
+            path="/other-resource/pod-disruption-budget"
+            element={
+              <ObjectRoute
+                kind="poddisruptionbudget"
+                listRoute="/other-resource/pod-disruption-budget"
+                list={<PodDisruptionBudgetView />}
+                detail={(p) => (<PodDisruptionBudgetDataView name={p.name} namespace={p.namespace ?? ''} />)}
+              />
+            }
+          />
+        </Routes>
+      </MemoryRouter>
     </QueryClientProvider>,
   )
 }
+
+// Seed an active ref for the detail to render (the data view's identity now
+// comes from ObjectRoute's ref, not the URL).
+const seedActiveRef = (name: string, namespace: string) => {
+  const token = 'testref1'
+  sessionStorage.setItem(
+    'kd_object_refs',
+    JSON.stringify({
+      [token]: { kind: 'poddisruptionbudget', name, namespace, ts: Date.now(), origin: 'click' },
+    }),
+  )
+  sessionStorage.setItem('kd_object_active', token)
+}
+
 
 afterEach(() => {
   useClusterStore.setState({ selectedCluster: null, selectedNamespace: null })
@@ -80,10 +113,8 @@ test('data-renders-detail', async () => {
   ]
   server.use(...handlers)
   selectProd()
-  const { container } = renderAt(
-    <PodDisruptionBudgetDataView />,
-    '/other-resource/pod-disruption-budget/data?name=web&namespace=team-a',
-  )
+  seedActiveRef('web', 'team-a')
+  const { container } = renderAt(<PodDisruptionBudgetDataView name="web" namespace="team-a" />)
 
   // Wait for the fetch to land (the highlighter splits tokens across spans,
   // so poll the DOM text instead of findByText on a token).
@@ -151,10 +182,8 @@ test('data-selector-and-eviction-policy', async () => {
   selectProd()
   // Wait for the data to land (the card title renders during loading too,
   // so wait for a value that only appears after the fetch).
-  const { container } = renderAt(
-    <PodDisruptionBudgetDataView />,
-    '/other-resource/pod-disruption-budget/data?name=web&namespace=team-a',
-  )
+  seedActiveRef('web', 'team-a')
+  const { container } = renderAt(<PodDisruptionBudgetDataView name="web" namespace="team-a" />)
   await waitFor(() => {
     expect(container.textContent).toContain('AlwaysAllow')
   })
@@ -180,10 +209,8 @@ test('data-missing-status', async () => {
     ),
   )
   selectProd()
-  const { container } = renderAt(
-    <PodDisruptionBudgetDataView />,
-    '/other-resource/pod-disruption-budget/data?name=web&namespace=team-a',
-  )
+  seedActiveRef('web', 'team-a')
+  const { container } = renderAt(<PodDisruptionBudgetDataView name="web" namespace="team-a" />)
 
   // Wait for the fetch to land.
   await waitFor(() => {
@@ -213,10 +240,8 @@ test('data-not-found-state', async () => {
     ),
   )
   selectProd()
-  const { container } = renderAt(
-    <PodDisruptionBudgetDataView />,
-    '/other-resource/pod-disruption-budget/data?name=ghost&namespace=team-a',
-  )
+  seedActiveRef('ghost', 'team-a')
+  const { container } = renderAt(<PodDisruptionBudgetDataView name="web" namespace="team-a" />)
 
   // empty items upstream is a STATE, not an error: pinned copy, no error
   // styling.
@@ -234,7 +259,14 @@ test('data-missing-name', async () => {
     }),
   )
   selectProd()
-  renderAt(<PodDisruptionBudgetDataView />, '/other-resource/pod-disruption-budget/data')
+  const qc = new QueryClient({ defaultOptions: { queries: { retry: false } } })
+  render(
+    <QueryClientProvider client={qc}>
+      <MemoryRouter>
+        <PodDisruptionBudgetDataView name="" namespace="team-a" />
+      </MemoryRouter>
+    </QueryClientProvider>,
+  )
 
   expect(await screen.findByText('Error: pod disruption budget name not provided')).toBeTruthy()
   expect(seen).toHaveLength(0) // no fetch

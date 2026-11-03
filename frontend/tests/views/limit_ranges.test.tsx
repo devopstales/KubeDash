@@ -1,11 +1,14 @@
 import { render, screen } from '@testing-library/react'
+import userEvent from '@testing-library/user-event'
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query'
-import { MemoryRouter } from 'react-router-dom'
+import { MemoryRouter, Route, Routes } from 'react-router-dom'
 import { http, HttpResponse } from 'msw'
 import type { ReactElement } from 'react'
 import { afterEach, expect, test, vi } from 'vitest'
 import { server } from '../msw'
+import ObjectRoute from '../../src/components/ObjectRoute'
 import LimitRangeView from '../../src/views/OtherResource/LimitRange'
+import LimitRangeDataView from '../../src/views/OtherResource/LimitRangeData'
 import { useClusterStore } from '../../src/store/cluster'
 
 // Same KubeDataTable fake as secrets.test.tsx: renders the real row
@@ -66,11 +69,27 @@ vi.mock('../../src/components/KubeDataTable', async () => {
   return { default: KubeDataTable, Column }
 })
 
-const renderAt = (ui: ReactElement, path = '/other-resource/limit-range') => {
+// ADR-0040: render through ObjectRoute so the click→detail flow is the real
+// one (the ref is the active pointer; the URL never carries identity).
+const renderAt = (_ui: ReactElement, path = '/other-resource/limit-range') => {
   const qc = new QueryClient({ defaultOptions: { queries: { retry: false } } })
   return render(
     <QueryClientProvider client={qc}>
-      <MemoryRouter initialEntries={[path]}>{ui}</MemoryRouter>
+      <MemoryRouter initialEntries={[path]}>
+        <Routes>
+          <Route
+            path="/other-resource/limit-range"
+            element={
+              <ObjectRoute
+                kind="limitrange"
+                listRoute="/other-resource/limit-range"
+                list={<LimitRangeView />}
+                detail={(p) => (<LimitRangeDataView name={p.name} namespace={p.namespace ?? ''} />)}
+              />
+            }
+          />
+        </Routes>
+      </MemoryRouter>
     </QueryClientProvider>,
   )
 }
@@ -110,6 +129,29 @@ const limits = {
 }
 
 // list-renders-limit-ranges
+
+// click-name-renders-detail-with-clean-url (R1)
+test('click-name-renders-detail-with-clean-url', async () => {
+  const user = userEvent.setup()
+  selectProd()
+  server.use(
+    http.get('*/api/v1/clusters/1/resources/limitranges', () =>
+      HttpResponse.json({ items: [limits] }),
+    ),
+  )
+  renderAt(<LimitRangeView />)
+
+  // Clicking the name button opens the detail via openObject; the URL
+  // never carries identity (R1).
+  const nameButton = await screen.findByRole('button', { name: 'default' })
+  await user.click(nameButton)
+
+  // The detail renders (the active ref is kind-matched) and the URL is
+  // clean: no query string (R1).
+  expect(await screen.findByText('Limit Range Data')).toBeTruthy()
+  expect(window.location.search).toBe('')
+})
+
 test('list-renders-limit-ranges', async () => {
   let requestedPath = ''
   let requestedUrl = ''
@@ -124,11 +166,9 @@ test('list-renders-limit-ranges', async () => {
   selectProd()
   renderAt(<LimitRangeView />)
 
-  const link = await screen.findByRole('link', { name: 'default' })
-  // the name link is the SOLE producer of the data page's query strings.
-  expect(link.getAttribute('href')).toBe(
-    '/other-resource/limit-range/data?name=default&namespace=team-a',
-  )
+  // ADR-0040: the name cell is a button (not a Link) — the URL never
+  // carries object identity (R1).
+  const nameButton = await screen.findByRole('button', { name: 'default' })
   // namespaced kind: the fetch URL is EXACTLY the kind URL + the selected
   // namespace (the Secret/NetworkPolicy pattern).
   expect(requestedPath).toBe('/api/v1/clusters/1/resources/limitranges')
@@ -151,7 +191,7 @@ test('list-renders-limit-ranges', async () => {
   // row: the namespace cell, and the created cell rendered by
   // formatTimestamp (no raw ISO 'T').
   expect(screen.getByText('team-a')).toBeTruthy()
-  const nameCell = link.closest('tr')
+  const nameCell = nameButton.closest('tr')
   expect(nameCell?.textContent).not.toContain('2026-01-02T03:04:05Z')
   expect(nameCell?.textContent).toMatch(/2026/)
 })
@@ -208,7 +248,7 @@ test('list-error-state', async () => {
     await screen.findByText(/Error loading limit ranges: RBAC_DENIED: list on limitranges/),
   ).toBeTruthy()
   // no blank table, no rows.
-  expect(screen.queryAllByRole('link', { name: 'default' })).toHaveLength(0)
+  expect(screen.queryAllByRole('button', { name: 'default' })).toHaveLength(0)
 })
 
 // list-empty-state

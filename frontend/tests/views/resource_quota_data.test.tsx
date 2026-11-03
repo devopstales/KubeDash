@@ -1,21 +1,54 @@
 import { render, screen, waitFor } from '@testing-library/react'
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query'
-import { MemoryRouter } from 'react-router-dom'
+import { MemoryRouter, Route, Routes } from 'react-router-dom'
 import { http, HttpResponse, type AnyHandler } from 'msw'
 import type { ReactElement } from 'react'
 import { afterEach, expect, test } from 'vitest'
 import { server } from '../msw'
+import ObjectRoute from '../../src/components/ObjectRoute'
 import ResourceQuotaDataView from '../../src/views/OtherResource/ResourceQuotaData'
+import ResourceQuotaView from '../../src/views/OtherResource/ResourceQuota'
 import { useClusterStore } from '../../src/store/cluster'
 
-const renderAt = (ui: ReactElement, path: string) => {
+// ADR-0040: render through ObjectRoute so the detail is ref-driven (the
+// identity comes from the active ref, never from the URL) and
+// window.location.search === '' (R1) is assertable.
+const renderAt = (_ui: ReactElement, path = '/other-resource/resource-quota') => {
   const qc = new QueryClient({ defaultOptions: { queries: { retry: false } } })
   return render(
     <QueryClientProvider client={qc}>
-      <MemoryRouter initialEntries={[path]}>{ui}</MemoryRouter>
+      <MemoryRouter initialEntries={[path]}>
+        <Routes>
+          <Route
+            path="/other-resource/resource-quota"
+            element={
+              <ObjectRoute
+                kind="resourcequota"
+                listRoute="/other-resource/resource-quota"
+                list={<ResourceQuotaView />}
+                detail={(p) => (<ResourceQuotaDataView name={p.name} namespace={p.namespace ?? ''} />)}
+              />
+            }
+          />
+        </Routes>
+      </MemoryRouter>
     </QueryClientProvider>,
   )
 }
+
+// Seed an active ref for the detail to render (the data view's identity now
+// comes from ObjectRoute's ref, not the URL).
+const seedActiveRef = (name: string, namespace: string) => {
+  const token = 'testref1'
+  sessionStorage.setItem(
+    'kd_object_refs',
+    JSON.stringify({
+      [token]: { kind: 'resourcequota', name, namespace, ts: Date.now(), origin: 'click' },
+    }),
+  )
+  sessionStorage.setItem('kd_object_active', token)
+}
+
 
 afterEach(() => {
   useClusterStore.setState({ selectedCluster: null, selectedNamespace: null })
@@ -94,10 +127,8 @@ test('data-renders-detail', async () => {
   ]
   server.use(...handlers)
   selectProd()
-  const { container } = renderAt(
-    <ResourceQuotaDataView />,
-    '/other-resource/resource-quota/data?name=compute&namespace=team-a',
-  )
+  seedActiveRef('compute', 'team-a')
+  const { container } = renderAt(<ResourceQuotaDataView name="compute" namespace="team-a" />)
 
   // Wait for the fetch to land (the highlighter splits tokens across spans,
   // so poll the DOM text instead of findByText on a token).
@@ -150,10 +181,8 @@ test('data-missing-status-keys', async () => {
     ),
   )
   selectProd()
-  const { container } = renderAt(
-    <ResourceQuotaDataView />,
-    '/other-resource/resource-quota/data?name=objects&namespace=team-a',
-  )
+  seedActiveRef('objects', 'team-a')
+  const { container } = renderAt(<ResourceQuotaDataView name="compute" namespace="team-a" />)
 
   await waitFor(() => {
     expect(container.textContent).toContain('Hard Limit')
@@ -180,10 +209,8 @@ test('data-not-found-state', async () => {
     ),
   )
   selectProd()
-  const { container } = renderAt(
-    <ResourceQuotaDataView />,
-    '/other-resource/resource-quota/data?name=ghost&namespace=team-a',
-  )
+  seedActiveRef('ghost', 'team-a')
+  const { container } = renderAt(<ResourceQuotaDataView name="compute" namespace="team-a" />)
 
   // empty items upstream is a STATE, not an error: pinned copy, no error
   // styling.
@@ -201,7 +228,14 @@ test('data-missing-name', async () => {
     }),
   )
   selectProd()
-  renderAt(<ResourceQuotaDataView />, '/other-resource/resource-quota/data')
+  const qc = new QueryClient({ defaultOptions: { queries: { retry: false } } })
+  render(
+    <QueryClientProvider client={qc}>
+      <MemoryRouter>
+        <ResourceQuotaDataView name="" namespace="team-a" />
+      </MemoryRouter>
+    </QueryClientProvider>,
+  )
 
   expect(await screen.findByText('Error: resource quota name not provided')).toBeTruthy()
   expect(seen).toHaveLength(0) // no fetch

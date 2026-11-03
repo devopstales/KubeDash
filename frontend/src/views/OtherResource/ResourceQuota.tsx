@@ -1,5 +1,5 @@
 import React from 'react'
-import { Link } from 'react-router-dom'
+import { useNavigate } from 'react-router-dom'
 import {
   CBreadcrumb,
   CBreadcrumbItem,
@@ -11,10 +11,17 @@ import {
 import { useQuery } from '@tanstack/react-query'
 import { apiFetch } from '../../lib/api'
 import { formatTimestamp } from '../../lib/format'
+import { getActiveRef, openObject } from '../../lib/objectRef'
 import type { ResourceList, ResourceQuotaItem } from '../../lib/types'
 import { useClusterStore } from '../../store/cluster'
 import KubeDataTable, { Column } from '../../components/KubeDataTable'
+import ShareObjectButton from '../../components/ShareObjectButton'
 import TopMenu from '../../components/TopMenu'
+
+// ADR-0040: the registry kind (the API resource name) and the clean list
+// route this view renders (TICKET-06).
+const KIND = 'resourcequota'
+const LIST_ROUTE = '/other-resource/resource-quota'
 
 type QuotaRow = {
   name: string
@@ -53,29 +60,54 @@ const dimensionCell = (cells: string[]) =>
     </React.Fragment>
   ))
 
-const nameLink = (row: QuotaRow) =>
+// ADR-0040: the name cell is a button (not a Link) — openObject writes the
+// ref to sessionStorage and navigates to the clean list route; the URL
+// never carries object identity (R1). Namespaced: the namespace is carried
+// in the ref, not the URL. The bold is driven by the active ref (R9).
+const nameCell = (row: QuotaRow, selected: string | null, navigate: (p: string) => void) =>
   row.name ? (
-    <Link
-      to={`/other-resource/resource-quota/data?name=${encodeURIComponent(row.name)}&namespace=${encodeURIComponent(row.namespace)}`}
-    >
-      {row.name}
-    </Link>
+    <>
+      <button
+        type="button"
+        className={
+          'btn btn-link btn-sm p-0 text-primary text-decoration-underline' +
+          (row.name === selected ? ' fw-bold' : '')
+        }
+        aria-current={row.name === selected ? 'true' : undefined}
+        onClick={() => openObject(KIND, row.name, row.namespace, LIST_ROUTE, navigate)}
+      >
+        {row.name}
+      </button>{' '}
+      <ShareObjectButton
+        kind={KIND}
+        name={row.name}
+        namespace={row.namespace}
+        listRoute={LIST_ROUTE}
+      />
+    </>
   ) : null
 
 /**
  * 4.1 `other-resources/resource-quota.html.j2`: ResourceQuotas in the
- * header-selected namespace (the NetworkPolicy pattern — the namespace comes
- * from the selected-namespace store, `?? 'default'`; 4.1's `session['ns_select']`
- * hidden form is the ratified `?name=&namespace=` delta, briefing.md). A name
- * opens the quota data page — this list view is the SOLE producer of those
- * `?name=&namespace=` query strings. The card title is EXACTLY "Resource
- * Quota List": the e2e smoke (ui-smoke.spec.ts) asserts that string with
- * exact: true. Request/Limit cells show the four 4.1 dimensions as
- * `used / hard`; a missing key renders "—" (certainty rule).
+ * header-selected namespace (the Secret pattern — the namespace comes
+ * from the selected-namespace store, `?? 'default'`; 4.1's
+ * `session['ns_select']` hidden form is the ratified ADR-0040 objectRef
+ * delta, briefing.md). A name opens the quota data page via openObject
+ * (ADR-0040): the URL never carries object identity (R1). The card title
+ * is EXACTLY "Resource Quota List": the e2e smoke (ui-smoke.spec.ts)
+ * asserts that string with exact: true. Request/Limit cells show the four
+ * 4.1 dimensions as `used / hard`; a missing key renders "—" (certainty
+ * rule).
  */
 const ResourceQuotaView = () => {
   const cluster = useClusterStore((s) => s.selectedCluster)
   const namespace = useClusterStore((s) => s.selectedNamespace) ?? 'default'
+  const navigate = useNavigate()
+  const active = getActiveRef()
+  const selected =
+    active !== null && active.kind === KIND && active.namespace === namespace
+      ? active.name
+      : null
 
   const query = useQuery<QuotaRow[]>({
     queryKey: ['resourcequotas', cluster?.id, namespace],
@@ -112,7 +144,7 @@ const ResourceQuotaView = () => {
         ) : (
           <KubeDataTable data={query.data ?? []}>
             <Column title="Name" data={null}>
-              {nameLink}
+              {(row: unknown) => nameCell(row as QuotaRow, selected, navigate)}
             </Column>
             <Column title="Namespace" data="namespace" />
             <Column title="Requests" data="requests">

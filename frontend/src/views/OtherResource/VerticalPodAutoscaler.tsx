@@ -1,5 +1,5 @@
 import React from 'react'
-import { Link } from 'react-router-dom'
+import { useNavigate } from 'react-router-dom'
 import {
   CBreadcrumb,
   CBreadcrumbItem,
@@ -11,10 +11,17 @@ import {
 import { useQuery } from '@tanstack/react-query'
 import { apiFetch } from '../../lib/api'
 import { formatTimestamp } from '../../lib/format'
+import { getActiveRef, openObject } from '../../lib/objectRef'
 import type { ResourceList, VerticalPodAutoscalerItem } from '../../lib/types'
 import { useClusterStore } from '../../store/cluster'
 import KubeDataTable, { Column } from '../../components/KubeDataTable'
+import ShareObjectButton from '../../components/ShareObjectButton'
 import TopMenu from '../../components/TopMenu'
+
+// ADR-0040: the registry kind (namespaced CRD, the API resource name) and
+// the clean list route this view renders (TICKET-06).
+const KIND = 'verticalpodautoscaler'
+const LIST_ROUTE = '/other-resource/vertical-pod-autoscaler'
 
 type VpaRow = {
   name: string
@@ -54,15 +61,31 @@ const toRow = (item: VerticalPodAutoscalerItem, namespace: string): VpaRow => ({
   created: formatTimestamp(item.metadata?.creationTimestamp),
 })
 
-const nameLink = (row: VpaRow) =>
+// ADR-0040: the name cell is a button (not a Link) — openObject writes the
+// ref to sessionStorage and navigates to the clean list route; the URL
+// never carries object identity (R1). Namespaced: the namespace is carried
+// in the ref, not the URL. The bold is driven by the active ref (R9).
+const nameCell = (row: VpaRow, selected: string | null, navigate: (p: string) => void) =>
   row.name ? (
-    <Link
-      to={`/other-resource/vertical-pod-autoscaler/data?name=${encodeURIComponent(row.name)}&namespace=${encodeURIComponent(
-        row.namespace,
-      )}`}
-    >
-      {row.name}
-    </Link>
+    <>
+      <button
+        type="button"
+        className={
+          'btn btn-link btn-sm p-0 text-primary text-decoration-underline' +
+          (row.name === selected ? ' fw-bold' : '')
+        }
+        aria-current={row.name === selected ? 'true' : undefined}
+        onClick={() => openObject(KIND, row.name, row.namespace, LIST_ROUTE, navigate)}
+      >
+        {row.name}
+      </button>{' '}
+      <ShareObjectButton
+        kind={KIND}
+        name={row.name}
+        namespace={row.namespace}
+        listRoute={LIST_ROUTE}
+      />
+    </>
   ) : null
 
 /**
@@ -71,16 +94,22 @@ const nameLink = (row: VpaRow) =>
  * (verticalpodautoscalers.autoscaling.k8s.io) read as a FULL custom object
  * (spec + status intact, camelCase — the Cilium precedent; the CRD's own
  * served version is the authority, CRD-absent degrades to the empty state
- * below). A name opens the data page with `?name=&namespace=` query params
- * (the 4.1 hidden-form POST is dropped); this view is the sole producer of
- * those query strings (the row's OWN namespace — an all-namespaces list
- * would carry mixed namespaces). The card title is EXACTLY "Vertical Pod
- * Autoscaler List": the e2e smoke asserts that string with exact: true.
- * Placement under Other Resources is a ratified deviation (ADR-0022).
+ * below). A name opens the data page via openObject (ADR-0040): the URL
+ * never carries object identity (R1) and the namespace rides in the ref
+ * (the row's OWN namespace — an all-namespaces list would carry mixed
+ * namespaces). The card title is EXACTLY "Vertical Pod Autoscaler List":
+ * the e2e smoke asserts that string with exact: true. Placement under Other
+ * Resources is a ratified deviation (ADR-0022).
  */
 const VerticalPodAutoscalerView = () => {
   const cluster = useClusterStore((s) => s.selectedCluster)
   const namespace = useClusterStore((s) => s.selectedNamespace) ?? 'default'
+  const navigate = useNavigate()
+  const active = getActiveRef()
+  const selected =
+    active !== null && active.kind === KIND && active.namespace === namespace
+      ? active.name
+      : null
 
   const query = useQuery<VpaRow[]>({
     queryKey: ['verticalpodautoscalers', cluster?.id, namespace],
@@ -121,7 +150,7 @@ const VerticalPodAutoscalerView = () => {
         ) : (
           <KubeDataTable data={query.data ?? []}>
             <Column title="Name" data={null}>
-              {(row: VpaRow) => nameLink(row)}
+              {(row: unknown) => nameCell(row as VpaRow, selected, navigate)}
             </Column>
             <Column title="Namespace" data="namespace" />
             <Column title="Target Kind" data="targetKind" />

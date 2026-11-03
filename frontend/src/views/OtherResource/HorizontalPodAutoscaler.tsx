@@ -1,5 +1,5 @@
 import React from 'react'
-import { Link } from 'react-router-dom'
+import { useNavigate } from 'react-router-dom'
 import {
   CBreadcrumb,
   CBreadcrumbItem,
@@ -10,10 +10,17 @@ import {
 } from '@coreui/react'
 import { useQuery } from '@tanstack/react-query'
 import { apiFetch } from '../../lib/api'
+import { getActiveRef, openObject } from '../../lib/objectRef'
 import type { HorizontalPodAutoscalerItem, ResourceList } from '../../lib/types'
 import { useClusterStore } from '../../store/cluster'
 import KubeDataTable, { Column } from '../../components/KubeDataTable'
+import ShareObjectButton from '../../components/ShareObjectButton'
 import TopMenu from '../../components/TopMenu'
+
+// ADR-0040: the registry kind (lowercase plural, the API resource name) and
+// the clean list route this view renders (TICKET-06).
+const KIND = 'horizontalpodautoscaler'
+const LIST_ROUTE = '/other-resource/horizontal-pod-autoscaler'
 
 type HpaRow = {
   name: string
@@ -47,36 +54,57 @@ const toRow = (item: HorizontalPodAutoscalerItem, namespace: string): HpaRow => 
   replicas: item.status?.current_replicas != null ? String(item.status.current_replicas) : '—',
 })
 
-const nameLink = (row: HpaRow) =>
+// ADR-0040: the name cell is a button (not a Link) — openObject writes the
+// ref to sessionStorage and navigates to the clean list route; the URL
+// never carries object identity (R1). Namespaced: the namespace is carried
+// in the ref, not the URL. The bold is driven by the active ref (R9).
+const nameCell = (row: HpaRow, selected: string | null, navigate: (p: string) => void) =>
   row.name ? (
-    <Link
-      to={`/other-resource/horizontal-pod-autoscaler/data?name=${encodeURIComponent(
-        row.name,
-      )}&namespace=${encodeURIComponent(row.namespace)}`}
-    >
-      {row.name}
-    </Link>
+    <>
+      <button
+        type="button"
+        className={
+          'btn btn-link btn-sm p-0 text-primary text-decoration-underline' +
+          (row.name === selected ? ' fw-bold' : '')
+        }
+        aria-current={row.name === selected ? 'true' : undefined}
+        onClick={() => openObject(KIND, row.name, row.namespace, LIST_ROUTE, navigate)}
+      >
+        {row.name}
+      </button>{' '}
+      <ShareObjectButton
+        kind={KIND}
+        name={row.name}
+        namespace={row.namespace}
+        listRoute={LIST_ROUTE}
+      />
+    </>
   ) : null
 
 /**
  * 4.1 `other-resources/hpa.html.j2` parity: HorizontalPodAutoscalers in the
- * header-selected namespace (the NetworkPolicy pattern — the namespace comes
- * from the selected-namespace store, `?? 'default'`; 4.1's
- * `session['ns_select']` hidden form is the ratified `?name=&namespace=`
- * delta, briefing.md). A name opens the data page — this list view is the
- * SOLE producer of those `?name=&namespace=` query strings. The card title
- * is EXACTLY "Horizontal Pod Autoscaler List": the e2e smoke asserts that
- * string with exact: true. 4.1 deviations (recorded in the change's
- * adr.md): the Min/Max header-cell swap is CORRECTED (each header shows its
- * matching value); Targets is the legacy v1 CPU field with the `UNKNOWN`
- * literal for an absent current; the Owner link to
- * `/workload/<kind-lower>s` is dropped (plain text — 5.0 has no workload
- * page yet). Placement under Other Resources is a ratified deviation
- * (ADR-0022).
+ * header-selected namespace (the Secret pattern — the namespace comes from
+ * the selected-namespace store, `?? 'default'`; 4.1's
+ * `session['ns_select']` hidden form is the ratified ADR-0040 objectRef
+ * delta, briefing.md). A name opens the data page via openObject (ADR-0040):
+ * the URL never carries object identity (R1). The card title is EXACTLY
+ * "Horizontal Pod Autoscaler List": the e2e smoke asserts that string with
+ * exact: true. 4.1 deviations (recorded in the change's adr.md): the
+ * Min/Max header-cell swap is CORRECTED (each header shows its matching
+ * value); Targets is the legacy v1 CPU field with the `UNKNOWN` literal for
+ * an absent current; the Owner link to `/workload/<kind-lower>s` is dropped
+ * (plain text — 5.0 has no workload page yet). Placement under Other
+ * Resources is a ratified deviation (ADR-0022).
  */
 const HorizontalPodAutoscalerView = () => {
   const cluster = useClusterStore((s) => s.selectedCluster)
   const namespace = useClusterStore((s) => s.selectedNamespace) ?? 'default'
+  const navigate = useNavigate()
+  const active = getActiveRef()
+  const selected =
+    active !== null && active.kind === KIND && active.namespace === namespace
+      ? active.name
+      : null
 
   const query = useQuery<HpaRow[]>({
     queryKey: ['horizontalpodautoscalers', cluster?.id, namespace],
@@ -117,7 +145,7 @@ const HorizontalPodAutoscalerView = () => {
         ) : (
           <KubeDataTable data={query.data ?? []}>
             <Column title="Name" data={null}>
-              {nameLink}
+              {(row: unknown) => nameCell(row as HpaRow, selected, navigate)}
             </Column>
             <Column title="Namespace" data="namespace" />
             <Column title="Owner" data="owner" />

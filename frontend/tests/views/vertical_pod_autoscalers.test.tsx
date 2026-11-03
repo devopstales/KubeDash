@@ -1,11 +1,14 @@
 import { render, screen } from '@testing-library/react'
+import userEvent from '@testing-library/user-event'
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query'
-import { MemoryRouter } from 'react-router-dom'
+import { MemoryRouter, Route, Routes } from 'react-router-dom'
 import { http, HttpResponse } from 'msw'
 import type { ReactElement } from 'react'
 import { afterEach, expect, test, vi } from 'vitest'
 import { server } from '../msw'
+import ObjectRoute from '../../src/components/ObjectRoute'
 import VerticalPodAutoscalerView from '../../src/views/OtherResource/VerticalPodAutoscaler'
+import VerticalPodAutoscalerDataView from '../../src/views/OtherResource/VerticalPodAutoscalerData'
 import { useClusterStore } from '../../src/store/cluster'
 
 // Same KubeDataTable fake as network_policies.test.tsx: renders the real row
@@ -66,11 +69,27 @@ vi.mock('../../src/components/KubeDataTable', async () => {
   return { default: KubeDataTable, Column }
 })
 
-const renderAt = (ui: ReactElement, path = '/other-resource/vertical-pod-autoscaler') => {
+// ADR-0040: render through ObjectRoute so the click→detail flow is the real
+// one (the ref is the active pointer; the URL never carries identity).
+const renderAt = (_ui: ReactElement, path = '/other-resource/vertical-pod-autoscaler') => {
   const qc = new QueryClient({ defaultOptions: { queries: { retry: false } } })
   return render(
     <QueryClientProvider client={qc}>
-      <MemoryRouter initialEntries={[path]}>{ui}</MemoryRouter>
+      <MemoryRouter initialEntries={[path]}>
+        <Routes>
+          <Route
+            path="/other-resource/vertical-pod-autoscaler"
+            element={
+              <ObjectRoute
+                kind="verticalpodautoscaler"
+                listRoute="/other-resource/vertical-pod-autoscaler"
+                list={<VerticalPodAutoscalerView />}
+                detail={(p) => (<VerticalPodAutoscalerDataView name={p.name} namespace={p.namespace ?? ''} />)}
+              />
+            }
+          />
+        </Routes>
+      </MemoryRouter>
     </QueryClientProvider>,
   )
 }
@@ -128,6 +147,29 @@ const webVpa = {
 const vpaListResponse = (items: unknown[]) =>
   HttpResponse.json({ kind: 'verticalpodautoscalers', cluster: 'prod', items })
 
+
+// click-name-renders-detail-with-clean-url (R1)
+test('click-name-renders-detail-with-clean-url', async () => {
+  const user = userEvent.setup()
+  selectProd()
+  server.use(
+    http.get('*/api/v1/clusters/1/resources/verticalpodautoscalers', () =>
+      HttpResponse.json({ items: [webVpa] }),
+    ),
+  )
+  renderAt(<VerticalPodAutoscalerView />)
+
+  // Clicking the name button opens the detail via openObject; the URL
+  // never carries identity (R1).
+  const nameButton = await screen.findByRole('button', { name: 'web-vpa' })
+  await user.click(nameButton)
+
+  // The detail renders (the active ref is kind-matched) and the URL is
+  // clean: no query string (R1).
+  expect(await screen.findByText('Vertical Pod Autoscaler Data')).toBeTruthy()
+  expect(window.location.search).toBe('')
+})
+
 test('vpa-list-renders-rows-with-data-links', async () => {
   let fetchedUrl = ''
   server.use(
@@ -139,11 +181,9 @@ test('vpa-list-renders-rows-with-data-links', async () => {
   selectProd()
   renderAt(<VerticalPodAutoscalerView />)
 
-  const link = await screen.findByRole('link', { name: 'web-vpa' })
-  // the list view is the sole producer of the data page's query strings.
-  expect(link.getAttribute('href')).toBe(
-    '/other-resource/vertical-pod-autoscaler/data?name=web-vpa&namespace=team-a',
-  )
+  // ADR-0040: the name cell is a button (not a Link) — the URL never
+  // carries object identity (R1).
+  const nameButton = await screen.findByRole('button', { name: 'web-vpa' })
   // fetch URL EXACTLY: the namespaced CRD kind with the header's namespace.
   expect(fetchedUrl).toBe('/api/v1/clusters/1/resources/verticalpodautoscalers?namespace=team-a')
   // card title EXACTLY (the e2e smoke asserts it with exact: true).
@@ -162,9 +202,11 @@ test('vpa-list-renders-rows-with-data-links', async () => {
     'Created',
   ])
   // created is rendered by formatTimestamp (no raw ISO 'T' in the row).
-  const row = link.closest('tr')
+  const row = nameButton.closest('tr')
   expect(row?.textContent).not.toContain('2026-01-02T03:04:05Z')
   expect(row?.textContent).toMatch(/2026/)
+  // ADR-0040: the share button is in the name cell (row affordance).
+  expect(screen.getByRole('button', { name: 'Share web-vpa' })).toBeTruthy()
 })
 
 test('vpa-list-target-and-memory-cells', async () => {
@@ -176,8 +218,8 @@ test('vpa-list-target-and-memory-cells', async () => {
   selectProd()
   renderAt(<VerticalPodAutoscalerView />)
 
-  await screen.findByRole('link', { name: 'web-vpa' })
-  const row = screen.getByRole('link', { name: 'web-vpa' }).closest('tr')
+  await screen.findByRole('button', { name: 'web-vpa' })
+  const row = screen.getByRole('button', { name: 'web-vpa' }).closest('tr')
   // Target Kind from spec.targetRef.kind; Update Mode from
   // spec.updatePolicy.updateMode; Min/Max Memory from the container policy.
   expect(row?.textContent).toContain('Deployment')
@@ -185,8 +227,8 @@ test('vpa-list-target-and-memory-cells', async () => {
   expect(row?.textContent).toContain('128Mi')
   expect(row?.textContent).toContain('1Gi')
   // Target Name (spec.targetRef.name) is PLAIN TEXT: 4.1 linked it to a
-  // workload page 5.0 does not have yet — only the VPA name is a link.
-  expect(row?.querySelectorAll('a')).toHaveLength(1)
+  // workload page 5.0 does not have yet — only the VPA name is clickable.
+  expect(row?.querySelectorAll('button')).toHaveLength(2)
   expect(screen.getByText('web')).not.toHaveAttribute('href')
 })
 
@@ -214,8 +256,8 @@ test('vpa-list-last-container-memory-semantics', async () => {
   selectProd()
   renderAt(<VerticalPodAutoscalerView />)
 
-  const link = await screen.findByRole('link', { name: 'two-vpa' })
-  const row = link.closest('tr')
+  const nameButton = await screen.findByRole('button', { name: 'two-vpa' })
+  const row = nameButton.closest('tr')
   expect(row?.textContent).toContain('256Mi')
   expect(row?.textContent).not.toContain('64Mi')
   expect(row?.textContent).toContain('512Mi')
@@ -238,8 +280,8 @@ test('vpa-list-missing-update-policy', async () => {
   selectProd()
   renderAt(<VerticalPodAutoscalerView />)
 
-  const link = await screen.findByRole('link', { name: 'no-upd' })
-  const row = link.closest('tr')
+  const nameButton = await screen.findByRole('button', { name: 'no-upd' })
+  const row = nameButton.closest('tr')
   // 4.1's literal for the absent value: N/A (certainty rule: never guess).
   expect(row?.textContent).toContain('N/A')
 })

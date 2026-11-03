@@ -250,6 +250,75 @@ const LegacyCrdData = () => {
   return <CrdDataView name={params.get('name') ?? ''} />
 }
 
+/**
+ * ADR-0040 TICKET-06: the legacy other-resource /data routes (kept for
+ * TICKET-07's contract pass) read the legacy ?name=/?namespace= params and
+ * hand them to the migrated data views, which no longer read
+ * useSearchParams themselves. The namespaced views' namespace falls back
+ * the way the old views did (header's selectedNamespace, then 'default') —
+ * only the legacy paths need it; the ObjectRoute path passes the ref's
+ * namespace (authoritative, R8).
+ */
+const LegacyRuntimeClassData = () => {
+  const [params] = useSearchParams()
+  return <RuntimeClassDataView name={params.get('name') ?? ''} />
+}
+
+const LegacyResourceQuotaData = () => {
+  const [params] = useSearchParams()
+  const selectedNamespace = useClusterStore((s) => s.selectedNamespace)
+  return (
+    <ResourceQuotaDataView
+      name={params.get('name') ?? ''}
+      namespace={params.get('namespace') || selectedNamespace || 'default'}
+    />
+  )
+}
+
+const LegacyPodDisruptionBudgetData = () => {
+  const [params] = useSearchParams()
+  const selectedNamespace = useClusterStore((s) => s.selectedNamespace)
+  return (
+    <PodDisruptionBudgetDataView
+      name={params.get('name') ?? ''}
+      namespace={params.get('namespace') || selectedNamespace || 'default'}
+    />
+  )
+}
+
+const LegacyVerticalPodAutoscalerData = () => {
+  const [params] = useSearchParams()
+  const selectedNamespace = useClusterStore((s) => s.selectedNamespace)
+  return (
+    <VerticalPodAutoscalerDataView
+      name={params.get('name') ?? ''}
+      namespace={params.get('namespace') || selectedNamespace || 'default'}
+    />
+  )
+}
+
+const LegacyHorizontalPodAutoscalerData = () => {
+  const [params] = useSearchParams()
+  const selectedNamespace = useClusterStore((s) => s.selectedNamespace)
+  return (
+    <HorizontalPodAutoscalerDataView
+      name={params.get('name') ?? ''}
+      namespace={params.get('namespace') || selectedNamespace || 'default'}
+    />
+  )
+}
+
+const LegacyLimitRangeData = () => {
+  const [params] = useSearchParams()
+  const selectedNamespace = useClusterStore((s) => s.selectedNamespace)
+  return (
+    <LimitRangeDataView
+      name={params.get('name') ?? ''}
+      namespace={params.get('namespace') || selectedNamespace || 'default'}
+    />
+  )
+}
+
 /** Old per-user privilege URL. The page now lives at /user/privilege. */
 const PrivilegeRedirect = () => {
   const { sub = '' } = useParams()
@@ -687,7 +756,17 @@ const App = () => {
                       path="/other-resource/runtimeclass"
                       element={
                         <ProtectedRoute>
-                          <RuntimeClassView />
+                          {/* ADR-0040 TICKET-06: ObjectRoute renders the
+                              list or the ref-matched detail on the clean
+                              route. The old /data route stays for
+                              TICKET-07's contract pass (expand, not
+                              contract). */}
+                          <ObjectRoute
+                            kind="runtimeclass"
+                            listRoute="/other-resource/runtimeclass"
+                            list={<RuntimeClassView />}
+                            detail={(p) => <RuntimeClassDataView name={p.name} />}
+                          />
                         </ProtectedRoute>
                       }
                     />
@@ -695,7 +774,11 @@ const App = () => {
                       path="/other-resource/runtimeclass/data"
                       element={
                         <ProtectedRoute>
-                          <RuntimeClassDataView />
+                          {/* Legacy /data route (TICKET-07 keeps it working
+                              until the contract pass): the view now reads
+                              its name from the active ref, so it falls back
+                              to the legacy ?name= param here. */}
+                          <LegacyRuntimeClassData />
                         </ProtectedRoute>
                       }
                     />
@@ -703,7 +786,19 @@ const App = () => {
                       path="/other-resource/resource-quota"
                       element={
                         <ProtectedRoute>
-                          <ResourceQuotaView />
+                          {/* ADR-0040 TICKET-06: ObjectRoute renders the
+                              list or the ref-matched detail on the clean
+                              route. The old /data route stays for
+                              TICKET-07's contract pass (expand, not
+                              contract). */}
+                          <ObjectRoute
+                            kind="resourcequota"
+                            listRoute="/other-resource/resource-quota"
+                            list={<ResourceQuotaView />}
+                            detail={(p) => (
+                              <ResourceQuotaDataView name={p.name} namespace={p.namespace ?? ''} />
+                            )}
+                          />
                         </ProtectedRoute>
                       }
                     />
@@ -711,7 +806,12 @@ const App = () => {
                       path="/other-resource/resource-quota/data"
                       element={
                         <ProtectedRoute>
-                          <ResourceQuotaDataView />
+                          {/* Legacy /data route (TICKET-07 keeps it working
+                              until the contract pass): the view now reads
+                              its identity from the active ref, so it falls
+                              back to the legacy ?name=/?namespace= params
+                              here. */}
+                          <LegacyResourceQuotaData />
                         </ProtectedRoute>
                       }
                     />
@@ -719,7 +819,19 @@ const App = () => {
                       path="/other-resource/pod-disruption-budget"
                       element={
                         <ProtectedRoute>
-                          <PodDisruptionBudgetView />
+                          {/* ADR-0040 TICKET-06: ObjectRoute renders the
+                              list or the ref-matched detail on the clean
+                              route. The old /data route stays for
+                              TICKET-07's contract pass (expand, not
+                              contract). */}
+                          <ObjectRoute
+                            kind="poddisruptionbudget"
+                            listRoute="/other-resource/pod-disruption-budget"
+                            list={<PodDisruptionBudgetView />}
+                            detail={(p) => (
+                              <PodDisruptionBudgetDataView name={p.name} namespace={p.namespace ?? ''} />
+                            )}
+                          />
                         </ProtectedRoute>
                       }
                     />
@@ -727,7 +839,12 @@ const App = () => {
                       path="/other-resource/pod-disruption-budget/data"
                       element={
                         <ProtectedRoute>
-                          <PodDisruptionBudgetDataView />
+                          {/* Legacy /data route (TICKET-07 keeps it working
+                              until the contract pass): the view now reads
+                              its identity from the active ref, so it falls
+                              back to the legacy ?name=/?namespace= params
+                              here. */}
+                          <LegacyPodDisruptionBudgetData />
                         </ProtectedRoute>
                       }
                     />
@@ -735,7 +852,22 @@ const App = () => {
                       path="/other-resource/vertical-pod-autoscaler"
                       element={
                         <ProtectedRoute>
-                          <VerticalPodAutoscalerView />
+                          {/* ADR-0040 TICKET-06: ObjectRoute renders the
+                              list or the ref-matched detail on the clean
+                              route. The old /data route stays for
+                              TICKET-07's contract pass (expand, not
+                              contract). */}
+                          <ObjectRoute
+                            kind="verticalpodautoscaler"
+                            listRoute="/other-resource/vertical-pod-autoscaler"
+                            list={<VerticalPodAutoscalerView />}
+                            detail={(p) => (
+                              <VerticalPodAutoscalerDataView
+                                name={p.name}
+                                namespace={p.namespace ?? ''}
+                              />
+                            )}
+                          />
                         </ProtectedRoute>
                       }
                     />
@@ -743,7 +875,12 @@ const App = () => {
                       path="/other-resource/vertical-pod-autoscaler/data"
                       element={
                         <ProtectedRoute>
-                          <VerticalPodAutoscalerDataView />
+                          {/* Legacy /data route (TICKET-07 keeps it working
+                              until the contract pass): the view now reads
+                              its identity from the active ref, so it falls
+                              back to the legacy ?name=/?namespace= params
+                              here. */}
+                          <LegacyVerticalPodAutoscalerData />
                         </ProtectedRoute>
                       }
                     />
@@ -751,7 +888,22 @@ const App = () => {
                       path="/other-resource/horizontal-pod-autoscaler"
                       element={
                         <ProtectedRoute>
-                          <HorizontalPodAutoscalerView />
+                          {/* ADR-0040 TICKET-06: ObjectRoute renders the
+                              list or the ref-matched detail on the clean
+                              route. The old /data route stays for
+                              TICKET-07's contract pass (expand, not
+                              contract). */}
+                          <ObjectRoute
+                            kind="horizontalpodautoscaler"
+                            listRoute="/other-resource/horizontal-pod-autoscaler"
+                            list={<HorizontalPodAutoscalerView />}
+                            detail={(p) => (
+                              <HorizontalPodAutoscalerDataView
+                                name={p.name}
+                                namespace={p.namespace ?? ''}
+                              />
+                            )}
+                          />
                         </ProtectedRoute>
                       }
                     />
@@ -759,7 +911,12 @@ const App = () => {
                       path="/other-resource/horizontal-pod-autoscaler/data"
                       element={
                         <ProtectedRoute>
-                          <HorizontalPodAutoscalerDataView />
+                          {/* Legacy /data route (TICKET-07 keeps it working
+                              until the contract pass): the view now reads
+                              its identity from the active ref, so it falls
+                              back to the legacy ?name=/?namespace= params
+                              here. */}
+                          <LegacyHorizontalPodAutoscalerData />
                         </ProtectedRoute>
                       }
                     />
@@ -767,7 +924,19 @@ const App = () => {
                       path="/other-resource/limit-range"
                       element={
                         <ProtectedRoute>
-                          <LimitRangeView />
+                          {/* ADR-0040 TICKET-06: ObjectRoute renders the
+                              list or the ref-matched detail on the clean
+                              route. The old /data route stays for
+                              TICKET-07's contract pass (expand, not
+                              contract). */}
+                          <ObjectRoute
+                            kind="limitrange"
+                            listRoute="/other-resource/limit-range"
+                            list={<LimitRangeView />}
+                            detail={(p) => (
+                              <LimitRangeDataView name={p.name} namespace={p.namespace ?? ''} />
+                            )}
+                          />
                         </ProtectedRoute>
                       }
                     />
@@ -775,7 +944,12 @@ const App = () => {
                       path="/other-resource/limit-range/data"
                       element={
                         <ProtectedRoute>
-                          <LimitRangeDataView />
+                          {/* Legacy /data route (TICKET-07 keeps it working
+                              until the contract pass): the view now reads
+                              its identity from the active ref, so it falls
+                              back to the legacy ?name=/?namespace= params
+                              here. */}
+                          <LegacyLimitRangeData />
                         </ProtectedRoute>
                       }
                     />
