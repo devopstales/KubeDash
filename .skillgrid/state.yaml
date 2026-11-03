@@ -6,9 +6,11 @@
 pipeline:
   # Pointer set 2026-10-24: the 4.1 TLS edge + security header layer is
   # restored per ADR-0026. 2026-10-26 changes are sliced/executed and
-  # tracked in in_flight below.
-  current_change: 2026-10-24-tls-security-headers
-  current_phase: executing
+  # tracked in in_flight below. 2026-11-03: the TLS security-header change
+  # shipped (QA PASS + review clean, 540/540); it moved to completed_changes
+  # and the pointer advances to the next active in-flight change.
+  current_change: 2026-10-29-session-object-navigation
+  current_phase: sliced
   specs_root: .skillgrid/specs
 
 # In-flight changes (besides pipeline.current_change).
@@ -115,6 +117,11 @@ completed_changes:
   # re-verified after the API-tier-502 fix, final two-axis review clean 6/6;
   # folder archived this commit):
   - 2026-10-26-network-policy
+  # Shipped 2026-11-03 (keep branch `rebase` as-is, user decision; QA PASS
+  # 540/540, three-axis Grade-A review clean after no-store-scoping + type-
+  # annotation fixes; folder archived c00cc010). Restores the 4.1
+  # security-header layer (CSP/HSTS/framing/no-store on /api/*) — ADR-0026.
+  - 2026-10-24-tls-security-headers
 
 # Onboarding state (2026-10-17): config.yaml + ASSUMPTIONS.md + state.yaml
 # created. Open items tracked in ASSUMPTIONS.md "Onboarding notes".
