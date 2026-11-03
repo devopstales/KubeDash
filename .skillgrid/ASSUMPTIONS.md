@@ -104,5 +104,6 @@ are kept, with `In force: no`. Never delete a row; flip it instead (IRON RULE).
   madr-minimal; **new** ADRs (and any backfill of 0001..0013) use madr-full.
 - `ticketing.type`: `backlogmd` (validated) — ADR-0014..0020 need
   `.backlog/decisions/decision-014..020` copies (open task).
-- `mnemonic.enabled`: true (validated) — code index is empty until the target
-  branch's code is indexed (open task).
+- `mnemonic.enabled`: true (validated) — code index was empty at onboarding;
+  verified built + fresh 2026-11-03 (`code_status`: 4239 chunks / 604 files,
+  FTS5 + graph + 768-dim embedder, `stale: false`).
