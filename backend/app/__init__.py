@@ -101,6 +101,12 @@ def create_app(config_overrides: Mapping[str, object] | None = None) -> Flask:
 
     register_health(app)
     register_errors(app)
+    # ADR-0026: the security-header layer. After register_errors so smorest
+    # 4xx/5xx envelopes get the headers; the hooks run on every response
+    # (API, static, health, error) because they attach to the app.
+    from app.core.security_headers import register_security_headers
+
+    register_security_headers(app)
     # Serve the Swagger UI assets from the vendored package on /api/docs/*
     # (air-gap, ADR-0020). MUST run before register_static so the SPA
     # catch-all never sees these paths.
