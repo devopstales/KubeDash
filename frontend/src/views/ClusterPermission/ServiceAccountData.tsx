@@ -1,5 +1,5 @@
 import React from 'react'
-import { Link, useSearchParams } from 'react-router-dom'
+import { Link, useNavigate } from 'react-router-dom'
 import {
   CBreadcrumb,
   CBreadcrumbItem,
@@ -11,11 +11,19 @@ import {
 } from '@coreui/react'
 import { useQuery } from '@tanstack/react-query'
 import { apiFetch } from '../../lib/api'
+import { openObject } from '../../lib/objectRef'
 import type { ResourceList, ServiceAccount } from '../../lib/types'
 import { useClusterStore } from '../../store/cluster'
+import ShareObjectButton from '../../components/ShareObjectButton'
 import TopMenu from '../../components/TopMenu'
 
 const LAST_APPLIED = 'kubectl.kubernetes.io/last-applied-configuration'
+
+// ADR-0040 TICKET-04: registry kind + clean list route (identity arrives as
+// props from ObjectRoute / the legacy /data route, never useSearchParams).
+const KIND = 'serviceaccount'
+const LIST_ROUTE = '/cluster-permission/service-account'
+const SECRET_ROUTE = '/security/secret'
 
 type SecretRef = { name: string }
 
@@ -52,14 +60,15 @@ const KeyValueTable = ({ entries, empty }: { entries: [string, string][]; empty:
 /**
  * End page for one ServiceAccount: name, namespace, created time,
  * annotations (without last-applied), labels, and every token / image
- * pull secret. Secrets open the Secret data page.
+ * pull secret. A secret opens the Secret kind's detail (openObject with
+ * the target kind — R9: no ?selected= producer).
+ *
+ * ADR-0040: identity arrives as props (ObjectRoute's ref, R8) — the view
+ * never reads useSearchParams; the URL stays clean (R1).
  */
-const ServiceAccountDataView = () => {
-  const [params] = useSearchParams()
-  const name = params.get('name') ?? ''
-  const selectedNamespace = useClusterStore((s) => s.selectedNamespace)
-  const namespace = params.get('namespace') || selectedNamespace || 'default'
+const ServiceAccountDataView = ({ name, namespace }: { name: string; namespace: string }) => {
   const cluster = useClusterStore((s) => s.selectedCluster)
+  const navigate = useNavigate()
 
   const query = useQuery<ServiceAccount>({
     queryKey: ['serviceaccounts', cluster?.id, namespace, name],
@@ -88,11 +97,13 @@ const ServiceAccountDataView = () => {
         {items.map((item, i) => (
           <span key={`${item}-${i}`}>
             {i > 0 ? <br /> : null}
-            <Link
-              to={`/security/secret/data?name=${encodeURIComponent(item)}&namespace=${encodeURIComponent(namespace)}`}
+            <button
+              type="button"
+              className="btn btn-link btn-sm p-0 text-primary text-decoration-underline"
+              onClick={() => openObject('secret', item, namespace, SECRET_ROUTE, navigate)}
             >
               {item}
-            </Link>
+            </button>
           </span>
         ))}
       </>
@@ -112,6 +123,7 @@ const ServiceAccountDataView = () => {
       </TopMenu>
       <CCardHeader className="py-3">
         <CCardTitle className="m-0 fw-bold text-primary fs-6">Service Account Data</CCardTitle>
+        <ShareObjectButton kind={KIND} name={name} namespace={namespace} listRoute={LIST_ROUTE} />
       </CCardHeader>
       <CCardBody>
         {!name ? (

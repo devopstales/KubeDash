@@ -1,5 +1,5 @@
 import React from 'react'
-import { Link } from 'react-router-dom'
+import { useNavigate } from 'react-router-dom'
 import {
   CBadge,
   CBreadcrumb,
@@ -11,13 +11,19 @@ import {
 } from '@coreui/react'
 import { useQuery } from '@tanstack/react-query'
 import { apiFetch } from '../../lib/api'
+import { openObject } from '../../lib/objectRef'
 import type { K8sRole, ResourceList } from '../../lib/types'
 import { useClusterStore } from '../../store/cluster'
 import KubeDataTable, { Column } from '../../components/KubeDataTable'
+import ShareObjectButton from '../../components/ShareObjectButton'
 import TopMenu from '../../components/TopMenu'
 
 /** 4.1 drops this annotation from the Roles list (`role.html.j2`). */
 const LAST_APPLIED = 'kubectl.kubernetes.io/last-applied-configuration'
+
+// ADR-0040 TICKET-04: the registry kind for Roles (namespaced).
+const KIND = 'role'
+const LIST_ROUTE = '/cluster-permission/role'
 
 type RoleRow = {
   name: string
@@ -49,12 +55,14 @@ const badges = (entries: [string, string][]) => {
 
 /**
  * 4.1 `cluster-permission/role.html.j2`: Roles in the header-selected
- * namespace. The name opens the rule list. Labels and annotations render
+ * namespace. A name opens the rule list via openObject (ADR-0040): the
+ * URL never carries object identity (R1). Labels and annotations render
  * as secondary badges; the last-applied annotation is omitted.
  */
 const RoleView = () => {
   const cluster = useClusterStore((s) => s.selectedCluster)
   const namespace = useClusterStore((s) => s.selectedNamespace) ?? 'default'
+  const navigate = useNavigate()
 
   const query = useQuery<RoleRow[]>({
     queryKey: ['roles', cluster?.id, namespace],
@@ -68,13 +76,22 @@ const RoleView = () => {
     },
   })
 
-  const nameLink = (name: string) =>
+  // ADR-0040: the name cell is a button (not a Link) — openObject writes the
+  // ref to sessionStorage and navigates to the clean list route; the URL
+  // never carries object identity (R1). Namespaced: the namespace is carried
+  // in the ref, not the URL.
+  const nameCell = (name: string) =>
     name ? (
-      <Link
-        to={`/cluster-permission/role/data?name=${encodeURIComponent(name)}&namespace=${encodeURIComponent(namespace)}`}
-      >
-        {name}
-      </Link>
+      <>
+        <button
+          type="button"
+          className="btn btn-link btn-sm p-0 text-primary text-decoration-underline"
+          onClick={() => openObject(KIND, name, namespace, LIST_ROUTE, navigate)}
+        >
+          {name}
+        </button>{' '}
+        <ShareObjectButton kind={KIND} name={name} namespace={namespace} listRoute={LIST_ROUTE} />
+      </>
     ) : null
 
   return (
@@ -100,7 +117,7 @@ const RoleView = () => {
         ) : (
           <KubeDataTable data={query.data ?? []}>
             <Column title="Name" data="name">
-              {nameLink}
+              {nameCell}
             </Column>
             <Column title="Labels" data="labels">
               {(labels: Record<string, string>) => badges(Object.entries(labels ?? {}))}

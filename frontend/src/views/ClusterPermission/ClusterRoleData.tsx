@@ -1,5 +1,5 @@
 import React from 'react'
-import { Link, useSearchParams } from 'react-router-dom'
+import { Link } from 'react-router-dom'
 import {
   CBreadcrumb,
   CBreadcrumbItem,
@@ -13,7 +13,13 @@ import { apiFetch } from '../../lib/api'
 import type { K8sClusterRole, PolicyRule, ResourceList } from '../../lib/types'
 import { useClusterStore } from '../../store/cluster'
 import KubeDataTable, { Column } from '../../components/KubeDataTable'
+import ShareObjectButton from '../../components/ShareObjectButton'
 import TopMenu from '../../components/TopMenu'
+
+// ADR-0040 TICKET-04: registry kind + clean list route for the header's
+// share button (identity arrives as props, never useSearchParams).
+const KIND = 'clusterrole'
+const LIST_ROUTE = '/cluster-permission/cluster-role'
 
 type RuleRow = {
   apiGroups: string[]
@@ -49,10 +55,12 @@ const lines = (value: string[] | undefined) => {
  * 4.1 `cluster-permission/cluster-role-data.html.j2`: the rules of one
  * ClusterRole. The "Non Resources" column shows resource names, matching
  * that page.
+ *
+ * ADR-0040 TICKET-04: identity arrives as props (ObjectRoute's ref, R8) —
+ * the view never reads useSearchParams; the URL stays clean (R1). The
+ * kind is cluster-scoped, so no namespace prop.
  */
-const ClusterRoleDataView = () => {
-  const [params] = useSearchParams()
-  const name = params.get('name') ?? ''
+const ClusterRoleDataView = ({ name }: { name: string }) => {
   const cluster = useClusterStore((s) => s.selectedCluster)
 
   const query = useQuery<RuleRow[]>({
@@ -82,6 +90,7 @@ const ClusterRoleDataView = () => {
       </TopMenu>
       <CCardHeader className="py-3">
         <CCardTitle className="m-0 fw-bold text-primary fs-6">Rule List</CCardTitle>
+        <ShareObjectButton kind={KIND} name={name} listRoute={LIST_ROUTE} />
       </CCardHeader>
       <CCardBody>
         {!name ? (

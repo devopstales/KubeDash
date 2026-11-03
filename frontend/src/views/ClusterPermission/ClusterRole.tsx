@@ -1,5 +1,5 @@
 import React from 'react'
-import { Link } from 'react-router-dom'
+import { useNavigate } from 'react-router-dom'
 import {
   CBadge,
   CBreadcrumb,
@@ -11,13 +11,20 @@ import {
 } from '@coreui/react'
 import { useQuery } from '@tanstack/react-query'
 import { apiFetch } from '../../lib/api'
+import { openObject } from '../../lib/objectRef'
 import type { K8sClusterRole, ResourceList } from '../../lib/types'
 import { useClusterStore } from '../../store/cluster'
 import KubeDataTable, { Column } from '../../components/KubeDataTable'
+import ShareObjectButton from '../../components/ShareObjectButton'
 import TopMenu from '../../components/TopMenu'
 
 /** 4.1 drops this annotation from the Cluster Role list (`cluster-role.html.j2`). */
 const LAST_APPLIED = 'kubectl.kubernetes.io/last-applied-configuration'
+
+// ADR-0040 TICKET-04: the registry kind for ClusterRoles (cluster-scoped —
+// no namespace).
+const KIND = 'clusterrole'
+const LIST_ROUTE = '/cluster-permission/cluster-role'
 
 type ClusterRoleRow = {
   name: string
@@ -49,13 +56,15 @@ const badges = (entries: [string, string][]) => {
 
 /**
  * 4.1 `cluster-permission/cluster-role.html.j2`: ClusterRoles on the
- * header-selected cluster. The name opens the rule list. Labels and
+ * header-selected cluster. A name opens the rule list via openObject
+ * (ADR-0040): the URL never carries object identity (R1). Labels and
  * annotations render as secondary badges; the last-applied annotation
  * is omitted. ClusterRoles are cluster-scoped, so the selected namespace
  * is not sent.
  */
 const ClusterRoleView = () => {
   const cluster = useClusterStore((s) => s.selectedCluster)
+  const navigate = useNavigate()
 
   const query = useQuery<ClusterRoleRow[]>({
     queryKey: ['clusterroles', cluster?.id],
@@ -69,11 +78,21 @@ const ClusterRoleView = () => {
     },
   })
 
-  const nameLink = (name: string) =>
+  // ADR-0040: the name cell is a button (not a Link) — openObject writes the
+  // ref to sessionStorage and navigates to the clean list route; the URL
+  // never carries object identity (R1). Cluster-scoped: no namespace.
+  const nameCell = (name: string) =>
     name ? (
-      <Link to={`/cluster-permission/cluster-role/data?name=${encodeURIComponent(name)}`}>
-        {name}
-      </Link>
+      <>
+        <button
+          type="button"
+          className="btn btn-link btn-sm p-0 text-primary text-decoration-underline"
+          onClick={() => openObject(KIND, name, undefined, LIST_ROUTE, navigate)}
+        >
+          {name}
+        </button>{' '}
+        <ShareObjectButton kind={KIND} name={name} listRoute={LIST_ROUTE} />
+      </>
     ) : null
 
   return (
@@ -99,7 +118,7 @@ const ClusterRoleView = () => {
         ) : (
           <KubeDataTable data={query.data ?? []}>
             <Column title="Name" data="name">
-              {nameLink}
+              {nameCell}
             </Column>
             <Column title="Labels" data="labels">
               {(labels: Record<string, string>) => badges(Object.entries(labels ?? {}))}

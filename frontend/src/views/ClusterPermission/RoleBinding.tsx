@@ -1,5 +1,5 @@
 import React from 'react'
-import { Link } from 'react-router-dom'
+import { useNavigate } from 'react-router-dom'
 import {
   CBreadcrumb,
   CBreadcrumbItem,
@@ -10,10 +10,18 @@ import {
 } from '@coreui/react'
 import { useQuery } from '@tanstack/react-query'
 import { apiFetch } from '../../lib/api'
+import { openObject } from '../../lib/objectRef'
 import type { K8sRoleBinding, ResourceList } from '../../lib/types'
 import { useClusterStore } from '../../store/cluster'
 import KubeDataTable, { Column } from '../../components/KubeDataTable'
 import TopMenu from '../../components/TopMenu'
+
+// ADR-0040 TICKET-04: registry kinds + clean list routes for the cross-kind
+// targets (role / clusterrole / serviceaccount). The binding's own row is a
+// plain column (the kind is list-only; only its targets are openable).
+const ROLE_ROUTE = '/cluster-permission/role'
+const CLUSTER_ROLE_ROUTE = '/cluster-permission/cluster-role'
+const SERVICE_ACCOUNT_ROUTE = '/cluster-permission/service-account'
 
 type RoleRef = { kind: string; name: string }
 type ServiceAccountSubject = { name: string; namespace: string }
@@ -65,21 +73,32 @@ const lines = (items: string[]) => {
   )
 }
 
-const roleLink = (role: RoleRef, namespace: string) => {
+/**
+ * ADR-0040 TICKET-04: a bound role opens the TARGET kind's detail via
+ * openObject (role → namespaced rule list; clusterrole → cluster rule
+ * list). The URL never carries object identity (R1).
+ */
+const roleCell = (role: RoleRef, namespace: string, navigate: (path: string) => void) => {
   if (role.kind === 'Role') {
     return (
-      <Link
-        to={`/cluster-permission/role/data?name=${encodeURIComponent(role.name)}&namespace=${encodeURIComponent(namespace)}`}
+      <button
+        type="button"
+        className="btn btn-link btn-sm p-0 text-primary text-decoration-underline"
+        onClick={() => openObject('role', role.name, namespace, ROLE_ROUTE, navigate)}
       >
         {role.name}
-      </Link>
+      </button>
     )
   }
   if (role.kind === 'ClusterRole') {
     return (
-      <Link to={`/cluster-permission/cluster-role/data?name=${encodeURIComponent(role.name)}`}>
+      <button
+        type="button"
+        className="btn btn-link btn-sm p-0 text-primary text-decoration-underline"
+        onClick={() => openObject('clusterrole', role.name, undefined, CLUSTER_ROLE_ROUTE, navigate)}
+      >
         {role.name}
-      </Link>
+      </button>
     )
   }
   return role.name
@@ -89,12 +108,14 @@ const roleLink = (role: RoleRef, namespace: string) => {
  * 4.1 `cluster-permission/role-binding.html.j2`: RoleBindings in the
  * header-selected namespace. A Role opens its rules, a ClusterRole opens
  * the cluster-role rule list, and a ServiceAccount opens that account
- * (switching the header namespace to the account's namespace).
+ * (switching the header namespace to the account's namespace) — all via
+ * openObject with the TARGET kind (ADR-0040).
  */
 const RoleBindingView = () => {
   const cluster = useClusterStore((s) => s.selectedCluster)
   const namespace = useClusterStore((s) => s.selectedNamespace) ?? 'default'
   const setSelectedNamespace = useClusterStore((s) => s.setSelectedNamespace)
+  const navigate = useNavigate()
 
   const query = useQuery<RoleBindingRow[]>({
     queryKey: ['rolebindings', cluster?.id, namespace],
@@ -108,14 +129,14 @@ const RoleBindingView = () => {
     },
   })
 
-  const roleCell = (roles: RoleRef[]) => {
+  const roleLinks = (roles: RoleRef[]) => {
     if (roles.length === 0) return ' '
     return (
       <>
         {roles.map((role, i) => (
           <span key={`${role.kind}-${role.name}-${i}`}>
             {i > 0 ? <br /> : null}
-            {roleLink(role, namespace)}
+            {roleCell(role, namespace, navigate)}
           </span>
         ))}
       </>
@@ -130,14 +151,18 @@ const RoleBindingView = () => {
         {items.map((account, i) => (
           <span key={`${account.namespace}-${account.name}-${i}`}>
             {i > 0 ? <br /> : null}
-            <Link
-              to={`/cluster-permission/service-account/data?name=${encodeURIComponent(account.name)}&namespace=${encodeURIComponent(account.namespace)}`}
+            <button
+              type="button"
+              className="btn btn-link btn-sm p-0 text-primary text-decoration-underline"
               onClick={() => {
+                // The header namespace follows the account's namespace (4.1
+                // behavior); the ref carries the account's namespace (R8).
                 if (account.namespace) setSelectedNamespace(account.namespace)
+                openObject('serviceaccount', account.name, account.namespace, SERVICE_ACCOUNT_ROUTE, navigate)
               }}
             >
               {account.name}
-            </Link>
+            </button>
           </span>
         ))}
       </>
@@ -168,7 +193,7 @@ const RoleBindingView = () => {
           <KubeDataTable data={query.data ?? []}>
             <Column title="Name" data="name" />
             <Column title="Role" data="roles">
-              {roleCell}
+              {roleLinks}
             </Column>
             <Column title="User" data="users">
               {lines}

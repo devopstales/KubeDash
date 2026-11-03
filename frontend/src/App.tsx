@@ -190,6 +190,42 @@ const NetworkPolicyRoute = () => {
   )
 }
 
+/**
+ * ADR-0040 TICKET-04: the legacy cluster-permission /data routes (kept for
+ * TICKET-07's contract pass) read the legacy ?name=/?namespace= params and
+ * hand them to the migrated data views, which no longer read
+ * useSearchParams themselves. The namespaced views' namespace falls back
+ * the way the old views did (header's selectedNamespace, then 'default') —
+ * only the legacy paths need it; the ObjectRoute path passes the ref's
+ * namespace (authoritative, R8).
+ */
+const LegacyServiceAccountData = () => {
+  const [params] = useSearchParams()
+  const selectedNamespace = useClusterStore((s) => s.selectedNamespace)
+  return (
+    <ServiceAccountDataView
+      name={params.get('name') ?? ''}
+      namespace={params.get('namespace') || selectedNamespace || 'default'}
+    />
+  )
+}
+
+const LegacyRoleData = () => {
+  const [params] = useSearchParams()
+  const selectedNamespace = useClusterStore((s) => s.selectedNamespace)
+  return (
+    <RoleDataView
+      name={params.get('name') ?? ''}
+      namespace={params.get('namespace') || selectedNamespace || 'default'}
+    />
+  )
+}
+
+const LegacyClusterRoleData = () => {
+  const [params] = useSearchParams()
+  return <ClusterRoleDataView name={params.get('name') ?? ''} />
+}
+
 /** Old per-user privilege URL. The page now lives at /user/privilege. */
 const PrivilegeRedirect = () => {
   const { sub = '' } = useParams()
@@ -346,7 +382,18 @@ const App = () => {
                       path="/cluster-permission/service-account"
                       element={
                         <ProtectedRoute>
-                          <ServiceAccountsView />
+                          {/* ADR-0040 TICKET-04: ObjectRoute renders the list
+                              or the ref-matched detail on the clean route.
+                              The old /data route stays for TICKET-07's
+                              contract pass (expand, not contract). */}
+                          <ObjectRoute
+                            kind="serviceaccount"
+                            listRoute="/cluster-permission/service-account"
+                            list={<ServiceAccountsView />}
+                            detail={(p) => (
+                              <ServiceAccountDataView name={p.name} namespace={p.namespace ?? ''} />
+                            )}
+                          />
                         </ProtectedRoute>
                       }
                     />
@@ -354,7 +401,11 @@ const App = () => {
                       path="/cluster-permission/service-account/data"
                       element={
                         <ProtectedRoute>
-                          <ServiceAccountDataView />
+                          {/* Legacy /data route (TICKET-07 keeps it working
+                              until the contract pass): the view now reads its
+                              identity from props, so it falls back to the
+                              legacy ?name=/?namespace= params here. */}
+                          <LegacyServiceAccountData />
                         </ProtectedRoute>
                       }
                     />
@@ -362,7 +413,16 @@ const App = () => {
                       path="/cluster-permission/role"
                       element={
                         <ProtectedRoute>
-                          <RoleView />
+                          {/* ADR-0040 TICKET-04: ObjectRoute renders the list
+                              or the ref-matched detail on the clean route.
+                              The old /data route stays for TICKET-07's
+                              contract pass (expand, not contract). */}
+                          <ObjectRoute
+                            kind="role"
+                            listRoute="/cluster-permission/role"
+                            list={<RoleView />}
+                            detail={(p) => <RoleDataView name={p.name} namespace={p.namespace ?? ''} />}
+                          />
                         </ProtectedRoute>
                       }
                     />
@@ -370,7 +430,11 @@ const App = () => {
                       path="/cluster-permission/role/data"
                       element={
                         <ProtectedRoute>
-                          <RoleDataView />
+                          {/* Legacy /data route (TICKET-07 keeps it working
+                              until the contract pass): the view now reads its
+                              identity from props, so it falls back to the
+                              legacy ?name=/?namespace= params here. */}
+                          <LegacyRoleData />
                         </ProtectedRoute>
                       }
                     />
@@ -378,7 +442,16 @@ const App = () => {
                       path="/cluster-permission/cluster-role"
                       element={
                         <ProtectedRoute>
-                          <ClusterRoleView />
+                          {/* ADR-0040 TICKET-04: ObjectRoute renders the list
+                              or the ref-matched detail on the clean route.
+                              The old /data route stays for TICKET-07's
+                              contract pass (expand, not contract). */}
+                          <ObjectRoute
+                            kind="clusterrole"
+                            listRoute="/cluster-permission/cluster-role"
+                            list={<ClusterRoleView />}
+                            detail={(p) => <ClusterRoleDataView name={p.name} />}
+                          />
                         </ProtectedRoute>
                       }
                     />
@@ -386,7 +459,11 @@ const App = () => {
                       path="/cluster-permission/cluster-role/data"
                       element={
                         <ProtectedRoute>
-                          <ClusterRoleDataView />
+                          {/* Legacy /data route (TICKET-07 keeps it working
+                              until the contract pass): the view now reads
+                              its name from the active ref, so it falls back
+                              to the legacy ?name= param here. */}
+                          <LegacyClusterRoleData />
                         </ProtectedRoute>
                       }
                     />

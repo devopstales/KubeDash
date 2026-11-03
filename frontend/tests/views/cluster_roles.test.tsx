@@ -1,10 +1,12 @@
 import { render, screen } from '@testing-library/react'
+import userEvent from '@testing-library/user-event'
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query'
-import { MemoryRouter } from 'react-router-dom'
+import { MemoryRouter, Route, Routes } from 'react-router-dom'
 import { http, HttpResponse } from 'msw'
 import type { ReactElement } from 'react'
 import { afterEach, expect, test, vi } from 'vitest'
 import { server } from '../msw'
+import ObjectRoute from '../../src/components/ObjectRoute'
 import ClusterRoleView from '../../src/views/ClusterPermission/ClusterRole'
 import ClusterRoleDataView from '../../src/views/ClusterPermission/ClusterRoleData'
 import { useClusterStore } from '../../src/store/cluster'
@@ -54,17 +56,48 @@ vi.mock('../../src/components/KubeDataTable', () => {
   return { default: KubeDataTable, Column }
 })
 
-const renderAt = (ui: ReactElement, path = '/') => {
+// ADR-0040: render through ObjectRoute so the click→detail flow is the real
+// one (the ref is the active pointer; the URL never carries identity).
+const renderAt = (_ui: ReactElement, path = '/cluster-permission/cluster-role') => {
   const qc = new QueryClient({ defaultOptions: { queries: { retry: false } } })
   return render(
     <QueryClientProvider client={qc}>
-      <MemoryRouter initialEntries={[path]}>{ui}</MemoryRouter>
+      <MemoryRouter initialEntries={[path]}>
+        <Routes>
+          <Route
+            path="/cluster-permission/cluster-role"
+            element={
+              <ObjectRoute
+                kind="clusterrole"
+                listRoute="/cluster-permission/cluster-role"
+                list={<ClusterRoleView />}
+                detail={(p) => <ClusterRoleDataView name={p.name} />}
+              />
+            }
+          />
+        </Routes>
+      </MemoryRouter>
+    </QueryClientProvider>,
+  )
+}
+
+// Render the data view directly (no ObjectRoute) for view-level state
+// assertions; the legacy /data route and the ObjectRoute detail both feed it
+// the same props.
+const renderDataAt = (name: string, path = '/cluster-permission/cluster-role/data') => {
+  const qc = new QueryClient({ defaultOptions: { queries: { retry: false } } })
+  return render(
+    <QueryClientProvider client={qc}>
+      <MemoryRouter initialEntries={[path]}>
+        <ClusterRoleDataView name={name} />
+      </MemoryRouter>
     </QueryClientProvider>,
   )
 }
 
 afterEach(() => {
   useClusterStore.setState({ selectedCluster: null, selectedNamespace: null })
+  sessionStorage.clear()
 })
 
 const editClusterRole = {
@@ -104,23 +137,26 @@ test('lists-cluster-roles-for-selected-cluster', async () => {
   })
   renderAt(<ClusterRoleView />)
 
-  expect(await screen.findByRole('link', { name: 'edit' })).toBeTruthy()
+  // ADR-0040: the name cell is a button (not a Link) — openObject writes the
+  // ref and navigates; the URL stays clean (R1).
+  const nameButton = await screen.findByRole('button', { name: 'edit' })
   expect(requested).toBe('')
   expect(screen.getByText('Cluster Role List')).toBeTruthy()
   expect(screen.getByText('Cluster Permissions')).toBeTruthy()
   expect(screen.getByText('Cluster Role')).toBeTruthy()
+  expect(window.location.search).toBe('')
   expect(screen.getAllByRole('columnheader').map((th) => th.textContent)).toEqual([
     'Name',
     'Labels',
     'Annotations',
   ])
-  expect(screen.getByRole('link', { name: 'edit' }).getAttribute('href')).toBe(
-    '/cluster-permission/cluster-role/data?name=edit',
-  )
+  expect(nameButton.closest('tr')?.textContent).not.toContain('/data?name=')
   expect(screen.getByText('app: web')).toBeTruthy()
   expect(screen.getByText('owner: platform')).toBeTruthy()
   expect(screen.queryByText(/last-applied-configuration/)).toBeNull()
-  expect(screen.getByRole('link', { name: 'view' })).toBeTruthy()
+  // the share button is in the name cell (row affordance).
+  expect(screen.getByRole('button', { name: 'Share edit' })).toBeTruthy()
+  expect(screen.getByRole('button', { name: 'view' })).toBeTruthy()
 })
 
 test('shows-empty-cluster-role-list', async () => {
@@ -158,6 +194,30 @@ test('shows-cluster-role-rbac-error', async () => {
   ).toBeTruthy()
 })
 
+test('click-name-renders-detail-with-clean-url', async () => {
+  const user = userEvent.setup()
+  server.use(
+    http.get('*/api/v1/clusters/1/resources/clusterroles', () =>
+      HttpResponse.json({ kind: 'clusterroles', cluster: 'prod', items: [editClusterRole] }),
+    ),
+  )
+  useClusterStore.setState({
+    selectedCluster: { id: 1, name: 'prod' },
+    selectedNamespace: 'team-a',
+  })
+  renderAt(<ClusterRoleView />)
+
+  // Clicking the name button opens the detail via openObject; the URL never
+  // carries identity (R1). Cluster-scoped: no namespace anywhere.
+  const nameButton = await screen.findByRole('button', { name: 'edit' })
+  await user.click(nameButton)
+
+  expect(await screen.findByText('Rule List')).toBeTruthy()
+  // R1: the URL stays clean — no identity params.
+  expect(window.location.search).toBe('')
+  expect(screen.getByText('pods')).toBeTruthy()
+})
+
 test('shows-cluster-role-rules', async () => {
   server.use(
     http.get('*/api/v1/clusters/1/resources/clusterroles', () =>
@@ -168,7 +228,7 @@ test('shows-cluster-role-rules', async () => {
     selectedCluster: { id: 1, name: 'prod' },
     selectedNamespace: 'team-a',
   })
-  renderAt(<ClusterRoleDataView />, '/cluster-permission/cluster-role/data?name=edit')
+  renderDataAt('edit')
 
   expect(await screen.findByText('pods')).toBeTruthy()
   expect(screen.getByText('Rule List')).toBeTruthy()
@@ -187,6 +247,8 @@ test('shows-cluster-role-rules', async () => {
   expect(screen.getByText('deployments')).toBeTruthy()
   expect(screen.getByText('get')).toBeTruthy()
   expect(screen.getByText('list')).toBeTruthy()
+  // R1: the URL stays clean on the data view (identity is props, R8).
+  expect(window.location.search).toBe('')
 })
 
 test('cluster-role-data-requires-a-name', async () => {
@@ -194,7 +256,7 @@ test('cluster-role-data-requires-a-name', async () => {
     selectedCluster: { id: 1, name: 'prod' },
     selectedNamespace: 'team-a',
   })
-  renderAt(<ClusterRoleDataView />, '/cluster-permission/cluster-role/data')
+  renderDataAt('')
 
   expect(await screen.findByText('Error: Cluster role name not provided')).toBeTruthy()
 })
