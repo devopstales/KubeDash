@@ -1,13 +1,13 @@
 import React from 'react'
-import { BrowserRouter, Navigate, Route, Routes, useNavigate, useParams, useSearchParams } from 'react-router-dom'
+import { BrowserRouter, Navigate, Route, Routes, useNavigate, useParams } from 'react-router-dom'
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query'
 import { CSpinner } from '@coreui/react'
 
 import DefaultLayout from './layout/DefaultLayout'
 import { AdminRoute, ProtectedRoute } from './routes'
 import ObjectRoute, { registerNavigate } from './components/ObjectRoute'
+import OldDataRedirect from './components/OldDataRedirect'
 import { clearActiveRef, getActiveRef, sweepRelay } from './lib/objectRef'
-import { useClusterStore } from './store/cluster'
 import StubView from './views/Stub'
 import { stubRoutes } from './views/Stub/routes'
 import './scss/style.scss'
@@ -87,58 +87,12 @@ const queryClient = new QueryClient({
 const Fallback = () => <CSpinner color="primary" />
 
 /**
- * ADR-0040 TICKET-02: the legacy /data route (kept for TICKET-07's contract
- * pass) reads the legacy ?name= param and hands it to the migrated data
- * view, which no longer reads useSearchParams itself.
- */
-const LegacyPriorityClassData = () => {
-  const [params] = useSearchParams()
-  return <PriorityClassDataView name={params.get('name') ?? ''} />
-}
-
-/**
- * ADR-0040 TICKET-03: the legacy /security/secret/data route (kept for
- * TICKET-07's contract pass) reads the legacy ?name=/?namespace= params and
- * hands them to the migrated data view, which no longer reads
- * useSearchParams itself. The namespace falls back the way the old view did
- * (header's selectedNamespace, then 'default') — only the legacy path needs
- * it; the ObjectRoute path passes the ref's namespace (authoritative, R8).
- */
-const LegacySecretData = () => {
-  const [params] = useSearchParams()
-  const selectedNamespace = useClusterStore((s) => s.selectedNamespace)
-  return (
-    <SecretDataView
-      name={params.get('name') ?? ''}
-      namespace={params.get('namespace') || selectedNamespace || 'default'}
-    />
-  )
-}
-
-/**
- * ADR-0040 TICKET-03: the legacy /security/network-policy/data route (kept
- * for TICKET-07's contract pass) reads the legacy ?name=/?kind=/?namespace=
- * params and hands them to the migrated data view. The cluster-scoped kind
- * carried no ?namespace= param before (the old view defaulted it to '').
- */
-const LegacyNetworkPolicyData = () => {
-  const [params] = useSearchParams()
-  return (
-    <NetworkPolicyDataView
-      name={params.get('name') ?? ''}
-      kind={params.get('kind') ?? ''}
-      namespace={params.get('namespace') ?? ''}
-    />
-  )
-}
-
-/**
  * ADR-0040 TICKET-03: the network-policy list route dispatches on the active
  * ref's API kind. The registry kind IS the policy's API kind, so one ObjectRoute
  * per kind is the clean mapping — but that would render three `list` nodes
  * (and register the navigate seam three times). This dispatcher holds the
  * single seam + ref read and hands the detail to the view with its kind; the
- * list renders once. The legacy /data route (TICKET-07) is unchanged.
+ * list renders once. The legacy /data route is an OldDataRedirect (R7).
  */
 const NetworkPolicyRoute = () => {
   const navigate = useNavigate()
@@ -187,135 +141,6 @@ const NetworkPolicyRoute = () => {
         namespace={ref!.namespace ?? ''}
       />
     </>
-  )
-}
-
-/**
- * ADR-0040 TICKET-04: the legacy cluster-permission /data routes (kept for
- * TICKET-07's contract pass) read the legacy ?name=/?namespace= params and
- * hand them to the migrated data views, which no longer read
- * useSearchParams themselves. The namespaced views' namespace falls back
- * the way the old views did (header's selectedNamespace, then 'default') —
- * only the legacy paths need it; the ObjectRoute path passes the ref's
- * namespace (authoritative, R8).
- */
-const LegacyServiceAccountData = () => {
-  const [params] = useSearchParams()
-  const selectedNamespace = useClusterStore((s) => s.selectedNamespace)
-  return (
-    <ServiceAccountDataView
-      name={params.get('name') ?? ''}
-      namespace={params.get('namespace') || selectedNamespace || 'default'}
-    />
-  )
-}
-
-const LegacyRoleData = () => {
-  const [params] = useSearchParams()
-  const selectedNamespace = useClusterStore((s) => s.selectedNamespace)
-  return (
-    <RoleDataView
-      name={params.get('name') ?? ''}
-      namespace={params.get('namespace') || selectedNamespace || 'default'}
-    />
-  )
-}
-
-const LegacyClusterRoleData = () => {
-  const [params] = useSearchParams()
-  return <ClusterRoleDataView name={params.get('name') ?? ''} />
-}
-
-/**
- * ADR-0040 TICKET-05: the legacy cluster /data routes (kept for TICKET-07's
- * contract pass) read the legacy ?name= param and hand it to the migrated
- * data views, which no longer read useSearchParams themselves. All three
- * kinds are cluster-scoped — the ref (and these params) carry no namespace.
- * LegacyNamespaceData keeps the 4.1 `?namespace=` bookmark fallback the old
- * view had — on the legacy path it is the last thing to work; TICKET-07's
- * R7 redirect is the migration off it.
- */
-const LegacyNamespaceData = () => {
-  const [params] = useSearchParams()
-  return <NamespaceDataView name={params.get('name') ?? params.get('namespace') ?? ''} />
-}
-
-const LegacyNodeData = () => {
-  const [params] = useSearchParams()
-  return <NodeDataView name={params.get('name') ?? ''} />
-}
-
-const LegacyCrdData = () => {
-  const [params] = useSearchParams()
-  return <CrdDataView name={params.get('name') ?? ''} />
-}
-
-/**
- * ADR-0040 TICKET-06: the legacy other-resource /data routes (kept for
- * TICKET-07's contract pass) read the legacy ?name=/?namespace= params and
- * hand them to the migrated data views, which no longer read
- * useSearchParams themselves. The namespaced views' namespace falls back
- * the way the old views did (header's selectedNamespace, then 'default') —
- * only the legacy paths need it; the ObjectRoute path passes the ref's
- * namespace (authoritative, R8).
- */
-const LegacyRuntimeClassData = () => {
-  const [params] = useSearchParams()
-  return <RuntimeClassDataView name={params.get('name') ?? ''} />
-}
-
-const LegacyResourceQuotaData = () => {
-  const [params] = useSearchParams()
-  const selectedNamespace = useClusterStore((s) => s.selectedNamespace)
-  return (
-    <ResourceQuotaDataView
-      name={params.get('name') ?? ''}
-      namespace={params.get('namespace') || selectedNamespace || 'default'}
-    />
-  )
-}
-
-const LegacyPodDisruptionBudgetData = () => {
-  const [params] = useSearchParams()
-  const selectedNamespace = useClusterStore((s) => s.selectedNamespace)
-  return (
-    <PodDisruptionBudgetDataView
-      name={params.get('name') ?? ''}
-      namespace={params.get('namespace') || selectedNamespace || 'default'}
-    />
-  )
-}
-
-const LegacyVerticalPodAutoscalerData = () => {
-  const [params] = useSearchParams()
-  const selectedNamespace = useClusterStore((s) => s.selectedNamespace)
-  return (
-    <VerticalPodAutoscalerDataView
-      name={params.get('name') ?? ''}
-      namespace={params.get('namespace') || selectedNamespace || 'default'}
-    />
-  )
-}
-
-const LegacyHorizontalPodAutoscalerData = () => {
-  const [params] = useSearchParams()
-  const selectedNamespace = useClusterStore((s) => s.selectedNamespace)
-  return (
-    <HorizontalPodAutoscalerDataView
-      name={params.get('name') ?? ''}
-      namespace={params.get('namespace') || selectedNamespace || 'default'}
-    />
-  )
-}
-
-const LegacyLimitRangeData = () => {
-  const [params] = useSearchParams()
-  const selectedNamespace = useClusterStore((s) => s.selectedNamespace)
-  return (
-    <LimitRangeDataView
-      name={params.get('name') ?? ''}
-      namespace={params.get('namespace') || selectedNamespace || 'default'}
-    />
   )
 }
 
@@ -476,9 +301,8 @@ const App = () => {
                       element={
                         <ProtectedRoute>
                           {/* ADR-0040 TICKET-04: ObjectRoute renders the list
-                              or the ref-matched detail on the clean route.
-                              The old /data route stays for TICKET-07's
-                              contract pass (expand, not contract). */}
+                              or the ref-matched detail on the clean route;
+                              the old /data URL is its R7 redirect (TICKET-07). */}
                           <ObjectRoute
                             kind="serviceaccount"
                             listRoute="/cluster-permission/service-account"
@@ -494,11 +318,14 @@ const App = () => {
                       path="/cluster-permission/service-account/data"
                       element={
                         <ProtectedRoute>
-                          {/* Legacy /data route (TICKET-07 keeps it working
-                              until the contract pass): the view now reads its
-                              identity from props, so it falls back to the
-                              legacy ?name=/?namespace= params here. */}
-                          <LegacyServiceAccountData />
+                          {/* ADR-0040 TICKET-07 (R7): the legacy /data URL is
+                              a redirect, not a primary route — it hydrates
+                              the ref from the legacy ?name=/?namespace= and
+                              lands on the clean route's detail. */}
+                          <OldDataRedirect
+                            kind="serviceaccount"
+                            listRoute="/cluster-permission/service-account"
+                          />
                         </ProtectedRoute>
                       }
                     />
@@ -507,9 +334,8 @@ const App = () => {
                       element={
                         <ProtectedRoute>
                           {/* ADR-0040 TICKET-04: ObjectRoute renders the list
-                              or the ref-matched detail on the clean route.
-                              The old /data route stays for TICKET-07's
-                              contract pass (expand, not contract). */}
+                              or the ref-matched detail on the clean route;
+                              the old /data URL is its R7 redirect (TICKET-07). */}
                           <ObjectRoute
                             kind="role"
                             listRoute="/cluster-permission/role"
@@ -523,11 +349,11 @@ const App = () => {
                       path="/cluster-permission/role/data"
                       element={
                         <ProtectedRoute>
-                          {/* Legacy /data route (TICKET-07 keeps it working
-                              until the contract pass): the view now reads its
-                              identity from props, so it falls back to the
-                              legacy ?name=/?namespace= params here. */}
-                          <LegacyRoleData />
+                          {/* ADR-0040 TICKET-07 (R7): the legacy /data URL is
+                              a redirect, not a primary route — it hydrates
+                              the ref from the legacy ?name=/?namespace= and
+                              lands on the clean route's detail. */}
+                          <OldDataRedirect kind="role" listRoute="/cluster-permission/role" />
                         </ProtectedRoute>
                       }
                     />
@@ -536,9 +362,8 @@ const App = () => {
                       element={
                         <ProtectedRoute>
                           {/* ADR-0040 TICKET-04: ObjectRoute renders the list
-                              or the ref-matched detail on the clean route.
-                              The old /data route stays for TICKET-07's
-                              contract pass (expand, not contract). */}
+                              or the ref-matched detail on the clean route;
+                              the old /data URL is its R7 redirect (TICKET-07). */}
                           <ObjectRoute
                             kind="clusterrole"
                             listRoute="/cluster-permission/cluster-role"
@@ -552,11 +377,16 @@ const App = () => {
                       path="/cluster-permission/cluster-role/data"
                       element={
                         <ProtectedRoute>
-                          {/* Legacy /data route (TICKET-07 keeps it working
-                              until the contract pass): the view now reads
-                              its name from the active ref, so it falls back
-                              to the legacy ?name= param here. */}
-                          <LegacyClusterRoleData />
+                          {/* ADR-0040 TICKET-07 (R7): the legacy /data URL is
+                              a redirect, not a primary route — it hydrates
+                              the ref from the legacy ?name= and lands on the
+                              clean route's detail. Cluster-scoped: no
+                              namespace. */}
+                          <OldDataRedirect
+                            kind="clusterrole"
+                            listRoute="/cluster-permission/cluster-role"
+                            clusterScoped
+                          />
                         </ProtectedRoute>
                       }
                     />
@@ -581,9 +411,8 @@ const App = () => {
                       element={
                         <ProtectedRoute>
                           {/* ADR-0040 TICKET-05: ObjectRoute renders the list
-                              or the ref-matched detail on the clean route.
-                              The old /data route stays for TICKET-07's
-                              contract pass (expand, not contract). */}
+                              or the ref-matched detail on the clean route;
+                              the old /data URL is its R7 redirect (TICKET-07). */}
                           <ObjectRoute
                             kind="namespace"
                             listRoute="/cluster/namespace"
@@ -597,11 +426,12 @@ const App = () => {
                       path="/cluster/namespace/data"
                       element={
                         <ProtectedRoute>
-                          {/* Legacy /data route (TICKET-07 keeps it working
-                              until the contract pass): the view now reads
-                              its name from the active ref, so it falls back
-                              to the legacy ?name= param here. */}
-                          <LegacyNamespaceData />
+                          {/* ADR-0040 TICKET-07 (R7): the legacy /data URL is
+                              a redirect, not a primary route — it hydrates
+                              the ref from the legacy ?name= and lands on the
+                              clean route's detail. Cluster-scoped: no
+                              namespace. */}
+                          <OldDataRedirect kind="namespace" listRoute="/cluster/namespace" clusterScoped />
                         </ProtectedRoute>
                       }
                     />
@@ -610,9 +440,8 @@ const App = () => {
                       element={
                         <ProtectedRoute>
                           {/* ADR-0040 TICKET-05: ObjectRoute renders the list
-                              or the ref-matched detail on the clean route.
-                              The old /data route stays for TICKET-07's
-                              contract pass (expand, not contract). */}
+                              or the ref-matched detail on the clean route;
+                              the old /data URL is its R7 redirect (TICKET-07). */}
                           <ObjectRoute
                             kind="node"
                             listRoute="/cluster/node"
@@ -626,11 +455,12 @@ const App = () => {
                       path="/cluster/node/data"
                       element={
                         <ProtectedRoute>
-                          {/* Legacy /data route (TICKET-07 keeps it working
-                              until the contract pass): the view now reads
-                              its name from the active ref, so it falls back
-                              to the legacy ?name= param here. */}
-                          <LegacyNodeData />
+                          {/* ADR-0040 TICKET-07 (R7): the legacy /data URL is
+                              a redirect, not a primary route — it hydrates
+                              the ref from the legacy ?name= and lands on the
+                              clean route's detail. Cluster-scoped: no
+                              namespace. */}
+                          <OldDataRedirect kind="node" listRoute="/cluster/node" clusterScoped />
                         </ProtectedRoute>
                       }
                     />
@@ -639,9 +469,8 @@ const App = () => {
                       element={
                         <ProtectedRoute>
                           {/* ADR-0040 TICKET-05: ObjectRoute renders the list
-                              or the ref-matched detail on the clean route.
-                              The old /data route stays for TICKET-07's
-                              contract pass (expand, not contract). */}
+                              or the ref-matched detail on the clean route;
+                              the old /data URL is its R7 redirect (TICKET-07). */}
                           <ObjectRoute
                             kind="crd"
                             listRoute="/cluster/crd"
@@ -655,11 +484,12 @@ const App = () => {
                       path="/cluster/crd/data"
                       element={
                         <ProtectedRoute>
-                          {/* Legacy /data route (TICKET-07 keeps it working
-                              until the contract pass): the view now reads
-                              its name from the active ref, so it falls back
-                              to the legacy ?name= param here. */}
-                          <LegacyCrdData />
+                          {/* ADR-0040 TICKET-07 (R7): the legacy /data URL is
+                              a redirect, not a primary route — it hydrates
+                              the ref from the legacy ?name= and lands on the
+                              clean route's detail. Cluster-scoped: no
+                              namespace. */}
+                          <OldDataRedirect kind="crd" listRoute="/cluster/crd" clusterScoped />
                         </ProtectedRoute>
                       }
                     />
@@ -668,9 +498,8 @@ const App = () => {
                       element={
                         <ProtectedRoute>
                           {/* ADR-0040 TICKET-03: ObjectRoute renders the list
-                              or the ref-matched detail on the clean route.
-                              The old /data route stays for TICKET-07's
-                              contract pass (expand, not contract). */}
+                              or the ref-matched detail on the clean route;
+                              the old /data URL is its R7 redirect (TICKET-07). */}
                           <ObjectRoute
                             kind="secret"
                             listRoute="/security/secret"
@@ -684,11 +513,11 @@ const App = () => {
                       path="/security/secret/data"
                       element={
                         <ProtectedRoute>
-                          {/* Legacy /data route (TICKET-07 keeps it working
-                              until the contract pass): the view now reads its
-                              identity from props, so it falls back to the
-                              legacy ?name=/?namespace= params here. */}
-                          <LegacySecretData />
+                          {/* ADR-0040 TICKET-07 (R7): the legacy /data URL is
+                              a redirect, not a primary route — it hydrates
+                              the ref from the legacy ?name=/?namespace= and
+                              lands on the clean route's detail. */}
+                          <OldDataRedirect kind="secret" listRoute="/security/secret" />
                         </ProtectedRoute>
                       }
                     />
@@ -704,8 +533,7 @@ const App = () => {
                               NetworkPolicyRoute dispatcher holds the single
                               seam + ref read and renders the list (no ref)
                               or the ref-matched detail (clean route). The
-                              old /data route stays for TICKET-07's contract
-                              pass (expand, not contract). */}
+                              old /data URL is its R7 redirect (TICKET-07). */}
                           <NetworkPolicyRoute />
                         </ProtectedRoute>
                       }
@@ -714,11 +542,18 @@ const App = () => {
                       path="/security/network-policy/data"
                       element={
                         <ProtectedRoute>
-                          {/* Legacy /data route (TICKET-07 keeps it working
-                              until the contract pass): the view now reads its
-                              identity from props, so it falls back to the
-                              legacy ?name=/?kind=/?namespace= params here. */}
-                          <LegacyNetworkPolicyData />
+                          {/* ADR-0040 TICKET-07 (R7): the legacy /data URL is
+                              a redirect, not a primary route — it hydrates
+                              the ref from the legacy ?name=/?kind=/?namespace=
+                              and lands on the clean route's detail. The
+                              registry kind IS the policy's API kind, so the
+                              ?kind= param names it (fallback: the route's
+                              default kind). */}
+                          <OldDataRedirect
+                            kind="NetworkPolicy"
+                            listRoute="/security/network-policy"
+                            kindFromParam
+                          />
                         </ProtectedRoute>
                       }
                     />
@@ -728,9 +563,8 @@ const App = () => {
                         <ProtectedRoute>
                           {/* ADR-0040 TICKET-02: template kind — ObjectRoute
                               renders the list or the ref-matched detail on
-                              the clean route. The old /data route stays for
-                              TICKET-07's contract pass (expand, not
-                              contract). */}
+                              the clean route; the old /data URL is its R7
+                              redirect (TICKET-07). */}
                           <ObjectRoute
                             kind="priorityclass"
                             listRoute="/other-resource/priorityclass"
@@ -744,11 +578,16 @@ const App = () => {
                       path="/other-resource/priorityclass/data"
                       element={
                         <ProtectedRoute>
-                          {/* Legacy /data route (TICKET-07 keeps it working
-                              until the contract pass): the view now reads
-                              its name from the active ref, so it falls back
-                              to the legacy ?name= param here. */}
-                          <LegacyPriorityClassData />
+                          {/* ADR-0040 TICKET-07 (R7): the legacy /data URL is
+                              a redirect, not a primary route — it hydrates
+                              the ref from the legacy ?name= and lands on the
+                              clean route's detail. Cluster-scoped: no
+                              namespace. */}
+                          <OldDataRedirect
+                            kind="priorityclass"
+                            listRoute="/other-resource/priorityclass"
+                            clusterScoped
+                          />
                         </ProtectedRoute>
                       }
                     />
@@ -758,9 +597,8 @@ const App = () => {
                         <ProtectedRoute>
                           {/* ADR-0040 TICKET-06: ObjectRoute renders the
                               list or the ref-matched detail on the clean
-                              route. The old /data route stays for
-                              TICKET-07's contract pass (expand, not
-                              contract). */}
+                              route; the old /data URL is its R7 redirect
+                              (TICKET-07). */}
                           <ObjectRoute
                             kind="runtimeclass"
                             listRoute="/other-resource/runtimeclass"
@@ -774,11 +612,16 @@ const App = () => {
                       path="/other-resource/runtimeclass/data"
                       element={
                         <ProtectedRoute>
-                          {/* Legacy /data route (TICKET-07 keeps it working
-                              until the contract pass): the view now reads
-                              its name from the active ref, so it falls back
-                              to the legacy ?name= param here. */}
-                          <LegacyRuntimeClassData />
+                          {/* ADR-0040 TICKET-07 (R7): the legacy /data URL is
+                              a redirect, not a primary route — it hydrates
+                              the ref from the legacy ?name= and lands on the
+                              clean route's detail. Cluster-scoped: no
+                              namespace. */}
+                          <OldDataRedirect
+                            kind="runtimeclass"
+                            listRoute="/other-resource/runtimeclass"
+                            clusterScoped
+                          />
                         </ProtectedRoute>
                       }
                     />
@@ -788,9 +631,8 @@ const App = () => {
                         <ProtectedRoute>
                           {/* ADR-0040 TICKET-06: ObjectRoute renders the
                               list or the ref-matched detail on the clean
-                              route. The old /data route stays for
-                              TICKET-07's contract pass (expand, not
-                              contract). */}
+                              route; the old /data URL is its R7 redirect
+                              (TICKET-07). */}
                           <ObjectRoute
                             kind="resourcequota"
                             listRoute="/other-resource/resource-quota"
@@ -806,12 +648,14 @@ const App = () => {
                       path="/other-resource/resource-quota/data"
                       element={
                         <ProtectedRoute>
-                          {/* Legacy /data route (TICKET-07 keeps it working
-                              until the contract pass): the view now reads
-                              its identity from the active ref, so it falls
-                              back to the legacy ?name=/?namespace= params
-                              here. */}
-                          <LegacyResourceQuotaData />
+                          {/* ADR-0040 TICKET-07 (R7): the legacy /data URL is
+                              a redirect, not a primary route — it hydrates
+                              the ref from the legacy ?name=/?namespace= and
+                              lands on the clean route's detail. */}
+                          <OldDataRedirect
+                            kind="resourcequota"
+                            listRoute="/other-resource/resource-quota"
+                          />
                         </ProtectedRoute>
                       }
                     />
@@ -821,9 +665,8 @@ const App = () => {
                         <ProtectedRoute>
                           {/* ADR-0040 TICKET-06: ObjectRoute renders the
                               list or the ref-matched detail on the clean
-                              route. The old /data route stays for
-                              TICKET-07's contract pass (expand, not
-                              contract). */}
+                              route; the old /data URL is its R7 redirect
+                              (TICKET-07). */}
                           <ObjectRoute
                             kind="poddisruptionbudget"
                             listRoute="/other-resource/pod-disruption-budget"
@@ -839,12 +682,14 @@ const App = () => {
                       path="/other-resource/pod-disruption-budget/data"
                       element={
                         <ProtectedRoute>
-                          {/* Legacy /data route (TICKET-07 keeps it working
-                              until the contract pass): the view now reads
-                              its identity from the active ref, so it falls
-                              back to the legacy ?name=/?namespace= params
-                              here. */}
-                          <LegacyPodDisruptionBudgetData />
+                          {/* ADR-0040 TICKET-07 (R7): the legacy /data URL is
+                              a redirect, not a primary route — it hydrates
+                              the ref from the legacy ?name=/?namespace= and
+                              lands on the clean route's detail. */}
+                          <OldDataRedirect
+                            kind="poddisruptionbudget"
+                            listRoute="/other-resource/pod-disruption-budget"
+                          />
                         </ProtectedRoute>
                       }
                     />
@@ -854,9 +699,8 @@ const App = () => {
                         <ProtectedRoute>
                           {/* ADR-0040 TICKET-06: ObjectRoute renders the
                               list or the ref-matched detail on the clean
-                              route. The old /data route stays for
-                              TICKET-07's contract pass (expand, not
-                              contract). */}
+                              route; the old /data URL is its R7 redirect
+                              (TICKET-07). */}
                           <ObjectRoute
                             kind="verticalpodautoscaler"
                             listRoute="/other-resource/vertical-pod-autoscaler"
@@ -875,12 +719,14 @@ const App = () => {
                       path="/other-resource/vertical-pod-autoscaler/data"
                       element={
                         <ProtectedRoute>
-                          {/* Legacy /data route (TICKET-07 keeps it working
-                              until the contract pass): the view now reads
-                              its identity from the active ref, so it falls
-                              back to the legacy ?name=/?namespace= params
-                              here. */}
-                          <LegacyVerticalPodAutoscalerData />
+                          {/* ADR-0040 TICKET-07 (R7): the legacy /data URL is
+                              a redirect, not a primary route — it hydrates
+                              the ref from the legacy ?name=/?namespace= and
+                              lands on the clean route's detail. */}
+                          <OldDataRedirect
+                            kind="verticalpodautoscaler"
+                            listRoute="/other-resource/vertical-pod-autoscaler"
+                          />
                         </ProtectedRoute>
                       }
                     />
@@ -890,9 +736,8 @@ const App = () => {
                         <ProtectedRoute>
                           {/* ADR-0040 TICKET-06: ObjectRoute renders the
                               list or the ref-matched detail on the clean
-                              route. The old /data route stays for
-                              TICKET-07's contract pass (expand, not
-                              contract). */}
+                              route; the old /data URL is its R7 redirect
+                              (TICKET-07). */}
                           <ObjectRoute
                             kind="horizontalpodautoscaler"
                             listRoute="/other-resource/horizontal-pod-autoscaler"
@@ -911,12 +756,14 @@ const App = () => {
                       path="/other-resource/horizontal-pod-autoscaler/data"
                       element={
                         <ProtectedRoute>
-                          {/* Legacy /data route (TICKET-07 keeps it working
-                              until the contract pass): the view now reads
-                              its identity from the active ref, so it falls
-                              back to the legacy ?name=/?namespace= params
-                              here. */}
-                          <LegacyHorizontalPodAutoscalerData />
+                          {/* ADR-0040 TICKET-07 (R7): the legacy /data URL is
+                              a redirect, not a primary route — it hydrates
+                              the ref from the legacy ?name=/?namespace= and
+                              lands on the clean route's detail. */}
+                          <OldDataRedirect
+                            kind="horizontalpodautoscaler"
+                            listRoute="/other-resource/horizontal-pod-autoscaler"
+                          />
                         </ProtectedRoute>
                       }
                     />
@@ -926,9 +773,8 @@ const App = () => {
                         <ProtectedRoute>
                           {/* ADR-0040 TICKET-06: ObjectRoute renders the
                               list or the ref-matched detail on the clean
-                              route. The old /data route stays for
-                              TICKET-07's contract pass (expand, not
-                              contract). */}
+                              route; the old /data URL is its R7 redirect
+                              (TICKET-07). */}
                           <ObjectRoute
                             kind="limitrange"
                             listRoute="/other-resource/limit-range"
@@ -944,12 +790,14 @@ const App = () => {
                       path="/other-resource/limit-range/data"
                       element={
                         <ProtectedRoute>
-                          {/* Legacy /data route (TICKET-07 keeps it working
-                              until the contract pass): the view now reads
-                              its identity from the active ref, so it falls
-                              back to the legacy ?name=/?namespace= params
-                              here. */}
-                          <LegacyLimitRangeData />
+                          {/* ADR-0040 TICKET-07 (R7): the legacy /data URL is
+                              a redirect, not a primary route — it hydrates
+                              the ref from the legacy ?name=/?namespace= and
+                              lands on the clean route's detail. */}
+                          <OldDataRedirect
+                            kind="limitrange"
+                            listRoute="/other-resource/limit-range"
+                          />
                         </ProtectedRoute>
                       }
                     />

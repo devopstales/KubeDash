@@ -302,6 +302,25 @@ test.describe.serial('KubeDash UI smoke (local admin)', () => {
     await expect(page.getByText('Bound clusters')).toBeVisible()
   })
 
+  // ADR-0040 TICKET-07 (R7): the legacy /.../data URL is a redirect, not a
+  // primary route — the old bookmark still works and lands on the clean
+  // route's ref-driven detail (the URL never carries identity, R1).
+  test('old URL redirect: /security/secret/data?name=... lands on the clean route', async ({
+    page,
+  }) => {
+    await loginAs(page)
+    // The legacy bookmark shape (?name=/?namespace=) still resolves.
+    await page.goto('/security/secret/data?name=db-creds&namespace=team-a')
+    // The redirect is replace: the final URL is the clean list route, with
+    // no query string (identity rides the session ref, not the URL).
+    await expect(page).toHaveURL('/security/secret', { timeout: 15_000 })
+    await expect(page).not.toHaveURL(/[?#]/)
+    // The shell (sidebar) survived the redirect.
+    await expect(page.locator('aside, nav, .sidebar, .c-sidebar').first()).toBeVisible({
+      timeout: 15_000,
+    })
+  })
+
   // ponytail: keep REAL_ROUTES referenced so the coverage map is auditable
   // against App.tsx; the per-route tests above are the executable version.
   test('coverage map: REAL_ROUTES matches the implemented route set', () => {

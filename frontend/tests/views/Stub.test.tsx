@@ -35,11 +35,13 @@ function expectedStubs() {
     '/security/secret',
     '/cluster/namespace',
     // Real view (cluster node route) — not a stub route. The nav leaf targets
-    // the list at /cluster/node; the detail is /cluster/node/data.
+    // the list at /cluster/node; the legacy /cluster/node/data URL is its
+    // R7 redirect (TICKET-07).
     '/cluster/node',
     '/cluster/node/data',
     // Real view (CRD endpoint + views) — not a stub route. The nav leaf
-    // targets the list at /cluster/crd; the detail is /cluster/crd/data.
+    // targets the list at /cluster/crd; the legacy /cluster/crd/data URL is
+    // its R7 redirect (TICKET-07).
     '/cluster/crd',
     '/cluster/crd/data',
     // Real view (2026-10-21-cluster-dashboard, Task 6) — not a stub route.
@@ -52,28 +54,28 @@ function expectedStubs() {
     '/other-resource/runtimeclass',
     // Real view (2026-10-28-resourcequota-views, Task 2) — not a stub route.
     // The nav leaf targets the list at /other-resource/resource-quota; the
-    // detail is /other-resource/resource-quota/data.
+    // legacy /data URL is its R7 redirect (TICKET-07).
     '/other-resource/resource-quota',
     '/other-resource/resource-quota/data',
     // Real view (2026-10-28-pdb-views, Task 4) — not a stub route.
     // The nav leaf targets the list at /other-resource/pod-disruption-budget;
-    // the detail is /other-resource/pod-disruption-budget/data.
+    // the legacy /data URL is its R7 redirect (TICKET-07).
     '/other-resource/pod-disruption-budget',
     '/other-resource/pod-disruption-budget/data',
     // Real view (2026-10-28-vpa-views, Task 4) — not a stub route.
     // The nav leaf targets the list at /other-resource/vertical-pod-autoscaler;
-    // the detail is /other-resource/vertical-pod-autoscaler/data.
+    // the legacy /data URL is its R7 redirect (TICKET-07).
     '/other-resource/vertical-pod-autoscaler',
     '/other-resource/vertical-pod-autoscaler/data',
     // Real view (2026-10-28-hpa-views, Task 4) — not a stub route.
     // The nav leaf targets the list at
-    // /other-resource/horizontal-pod-autoscaler; the detail is
-    // /other-resource/horizontal-pod-autoscaler/data.
+    // /other-resource/horizontal-pod-autoscaler; the legacy /data URL is its
+    // R7 redirect (TICKET-07).
     '/other-resource/horizontal-pod-autoscaler',
     '/other-resource/horizontal-pod-autoscaler/data',
     // Real view (2026-10-28-limitrange-views, Task 4) — not a stub route.
     // The nav leaf targets the list at /other-resource/limit-range; the
-    // detail is /other-resource/limit-range/data.
+    // legacy /data URL is its R7 redirect (TICKET-07).
     '/other-resource/limit-range',
     '/other-resource/limit-range/data',
   ])
