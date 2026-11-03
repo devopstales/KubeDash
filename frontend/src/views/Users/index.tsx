@@ -8,17 +8,12 @@ import {
   CCardTitle,
   CFormSelect,
 } from '@coreui/react'
-import DataTable, { Column } from 'datatables.net-react'
-import DtCore from 'datatables.net-dt'
-import 'datatables.net-dt/css'
 import { useQuery } from '@tanstack/react-query'
 import { apiFetch } from '../../lib/api'
 import type { AdminUser, GroupOut, RBACTemplate } from '../../lib/types'
 import { useCluster, type ClusterItem } from '../../hooks/useCluster'
 import BindModal from '../AdminPermissions/components/BindModal'
-
-// Assign DataTables core to the React component (datatables.net-react).
-DataTable.use(DtCore)
+import KubeDataTable, { Column } from '../../components/KubeDataTable'
 
 /**
  * Users — matches the main-branch Users page: a "User List" card with a
@@ -302,33 +297,22 @@ const UsersView = () => {
             <div>No users.</div>
           ) : (
             <div className="table-responsive">
-              <DataTable
-                data={users}
-                className="display"
-                options={{
-                  pageLength: 10,
-                  searching: true,
-                  ordering: true,
-                  lengthChange: true,
-                }}
-              >
-                <Column
-                  title="Username"
-                  data="id"
-                  render={(id: number, _type: string, row: AdminUser) => (
+              <KubeDataTable data={users}>
+                <Column title="Username" data="id">
+                  {(_id: number, _type: string, row: AdminUser) => (
                     <a href="#" onClick={(e) => { e.preventDefault(); openDetail(row) }} aria-label={`Open ${row.display_name ?? row.sub}`}>
                       {row.display_name ?? row.sub}
                     </a>
                   )}
-                />
-                <Column title="Email" data="email" render={(v: string | null) => v ?? '—'} />
+                </Column>
+                <Column title="Email" data="email">
+                  {(v: string | null) => v ?? '—'}
+                </Column>
                 <Column title="Permission" data="role" />
                 <Column title="Type" data="user_type" />
                 <Column title="Status" data="status" />
-                <Column
-                  title="Groups"
-                  data="groups"
-                  render={(groups: string[]) =>
+                <Column title="Groups" data="groups">
+                  {(groups: string[]) =>
                     groups.length === 0 ? (
                       '—'
                     ) : (
@@ -337,17 +321,13 @@ const UsersView = () => {
                       ))
                     )
                   }
-                />
+                </Column>
                 <Column title="Cluster bindings" data="cluster_count" />
-                <Column
-                  title="Last login"
-                  data="last_login_at"
-                  render={(v: string | null) => v ?? '—'}
-                />
-                <Column
-                  title="Action"
-                  data="id"
-                  render={(_id: number, _type: string, u: AdminUser) => (
+                <Column title="Last login" data="last_login_at">
+                  {(v: string | null) => v ?? '—'}
+                </Column>
+                <Column title="Action" data="id">
+                  {(_id: number, _type: string, u: AdminUser) => (
                     <span className="d-flex gap-1">
                       <CButton size="sm" color="secondary" onClick={() => openEdit(u)} aria-label={`Edit ${u.sub}`}>
                         Edit
@@ -362,8 +342,8 @@ const UsersView = () => {
                       </CButton>
                     </span>
                   )}
-                />
-              </DataTable>
+                </Column>
+              </KubeDataTable>
             </div>
           )}
         </CCardBody>

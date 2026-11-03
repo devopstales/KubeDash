@@ -130,7 +130,11 @@ def test_create_user_non_admin_is_403(api_client, user_headers) -> None:
 # --- DELETE /admin/users/<id> ----------------------------------------------
 
 def test_delete_user_200_cascades(api_client, api_app, admin_headers) -> None:
-    uid = _user_id(api_app, "sub-del") if _exists(api_app, "sub-del") else _seed_del(api_client, api_app)
+    uid = (
+        _user_id(api_app, "sub-del")
+        if _exists(api_app, "sub-del")
+        else _seed_del(api_client, api_app)
+    )
     r = api_client.delete(f"/api/v1/admin/users/{uid}", headers=admin_headers)
     assert r.status_code == 200, r.get_json()
     # Gone: a re-list does not contain the sub.

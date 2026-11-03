@@ -15,12 +15,12 @@ from flask import g, jsonify
 from flask_smorest import Api, Blueprint
 
 from app.api._authhook import apply_auth
+from app.core import security
 from app.core.errors import (
     ClusterAlreadyExistsError,
     InvalidKubeconfigError,
     ResourceKindNotSupportedError,
 )
-from app.core import security
 from app.core.security import require_admin
 from app.extensions import db
 from app.models.audit import AuditLog

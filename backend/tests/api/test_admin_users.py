@@ -74,7 +74,9 @@ def user_headers(api_client, api_app) -> dict[str, str]:
     return _seed(api_client, api_app, "sub-user-1", "user@local", "user")
 
 
-def test_admin_lists_users_with_cluster_count(api_client, api_app, admin_headers, user_headers) -> None:
+def test_admin_lists_users_with_cluster_count(
+    api_client, api_app, admin_headers, user_headers
+) -> None:
     """SATISFIES admin-lists-and-patches-a-user (list half).
 
     The admin sees EVERY user (sub, role, status, cluster_count). The
@@ -123,10 +125,14 @@ def test_non_admin_get_admin_users_is_403(api_client, user_headers) -> None:
     assert r.get_json()["error"]["code"] == "RBAC_DENIED"
 
 
-def test_admin_patches_user_role_and_audits(api_client, api_app, admin_headers, user_headers) -> None:
+def test_admin_patches_user_role_and_audits(
+    api_client, api_app, admin_headers, user_headers
+) -> None:
     """SATISFIES admin-lists-and-patches-a-user (patch + audit half)."""
     user_id = _user_id(api_app, "sub-user-1")
-    r = api_client.patch(f"/api/v1/admin/users/{user_id}", json={"role": "admin"}, headers=admin_headers)
+    r = api_client.patch(
+        f"/api/v1/admin/users/{user_id}", json={"role": "admin"}, headers=admin_headers
+    )
     assert r.status_code == 200, r.get_json()
     with api_app.app_context():  # type: ignore[attr-defined]
         from app.extensions import db
@@ -149,7 +155,9 @@ def test_admin_patches_user_status_disabled_next_call_401(
     """A disabled user's next authenticated call is 401 UNAUTHORIZED (Task 3
     gate at _load_user_for_claims)."""
     user_id = _user_id(api_app, "sub-user-1")
-    r = api_client.patch(f"/api/v1/admin/users/{user_id}", json={"status": "disabled"}, headers=admin_headers)
+    r = api_client.patch(
+        f"/api/v1/admin/users/{user_id}", json={"status": "disabled"}, headers=admin_headers
+    )
     assert r.status_code == 200, r.get_json()
     r2 = api_client.get("/api/v1/auth/me", headers=user_headers)
     assert r2.status_code == 401
@@ -166,7 +174,9 @@ def test_bootstrap_admin_role_change_is_409(api_client, api_app, admin_headers) 
     _seed_bootstrap_admin(api_client, api_app)  # the immutable bootstrap row
     bootstrap_sub = "local:admin@local"
     user_id = _user_id(api_app, bootstrap_sub)
-    r = api_client.patch(f"/api/v1/admin/users/{user_id}", json={"role": "user"}, headers=admin_headers)
+    r = api_client.patch(
+        f"/api/v1/admin/users/{user_id}", json={"role": "user"}, headers=admin_headers
+    )
     assert r.status_code == 409, r.get_json()
     assert r.get_json()["error"]["code"] == "CLUSTER_ALREADY_EXISTS"
     with api_app.app_context():  # type: ignore[attr-defined]
@@ -182,7 +192,9 @@ def test_bootstrap_admin_status_change_is_409(api_client, api_app, admin_headers
     _seed_bootstrap_admin(api_client, api_app)
     bootstrap_sub = "local:admin@local"
     user_id = _user_id(api_app, bootstrap_sub)
-    r = api_client.patch(f"/api/v1/admin/users/{user_id}", json={"status": "disabled"}, headers=admin_headers)
+    r = api_client.patch(
+        f"/api/v1/admin/users/{user_id}", json={"status": "disabled"}, headers=admin_headers
+    )
     assert r.status_code == 409, r.get_json()
     assert r.get_json()["error"]["code"] == "CLUSTER_ALREADY_EXISTS"
     with api_app.app_context():  # type: ignore[attr-defined]
@@ -327,9 +339,13 @@ def test_cannot_delete_self(api_client, api_app, admin_headers) -> None:
     assert "own account" in r.get_json()["error"]["message"]
 
 
-def test_patch_invalid_role_is_422(api_client, api_app, admin_headers, user_headers) -> None:
+def test_patch_invalid_role_is_422(
+    api_client, api_app, admin_headers, user_headers
+) -> None:
     user_id = _user_id(api_app, "sub-user-1")
-    r = api_client.patch(f"/api/v1/admin/users/{user_id}", json={"role": "boss"}, headers=admin_headers)
+    r = api_client.patch(
+        f"/api/v1/admin/users/{user_id}", json={"role": "boss"}, headers=admin_headers
+    )
     assert r.status_code == 422
     assert r.get_json()["error"]["code"] == "INVALID_KUBECONFIG"
 
