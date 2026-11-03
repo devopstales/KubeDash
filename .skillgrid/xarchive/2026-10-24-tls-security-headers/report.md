@@ -314,4 +314,123 @@ covered — so it is carried as a SUGGESTION, not a blocker, for this R3/R4 head
 
 ## Human Override
 
-**Human decision (fill in):** <accept / accept-with-open-items / reject> — <name> — <date>
+**Human decision (fill in):** accept-with-open-items — paladm — 2026-11-03 (user chose
+"keep `rebase` as-is" at ship; S1 301-leg e2e recorded as a follow-up, not a blocker)
+
+<!-- reflect completes this half at archive time -->
+
+## Final-State Facts
+
+**Shipped:** the R3/R4 security-header layer — `backend/app/core/security_headers.py`
+(per-request CSP nonce, HSTS gated on `request.is_secure`, six framing/cross-origin headers,
+`no-store` scoped to the matched `/api/` rule), wired into `create_app`
+(`backend/app/__init__.py` after `register_errors`), plus `backend/tests/test_security_headers.py`
+(8 tests). The R1/R2 TLS edge (ProxyFix, nginx, `:8443`, dev-stack) was already committed
+2026-10-24 (ed327c73…ca1fc2b0) and is re-verified, not re-attributed.
+**Base branch:** `rebase` · **Chain strategy:** keep-branch-as-is (repo VERIFIED assumption —
+ship does not merge `main` by default; user decision 2026-11-03).
+**Integration:** kept branch `rebase` — committed `c00cc010` (code + report/review) and
+`7401a3ab` (ship archive-move + state.yaml reconcile). No merge to `main`, no push.
+
+## Gates
+
+| Gate | Result |
+|------|--------|
+| Ship gate | ✅ success + `diff -r` empty (pre-move snapshot vs archived folder) |
+| QA gate | ✅ PASS (540/540 unit on the integrated `rebase` tree; no human override needed) |
+| Verdict gate (advisory) | accepted-with-open-items — recorded, not enforced |
+
+## Decisions
+
+**Every entry MUST cite a source** — a file:line, a commit, a ticket ID, or a scenario. No source = undiagnosed, not a learning.
+
+| Decision | Tradeoff | Why | Source |
+|----------|----------|-----|--------|
+| Restore the 4.1 header layer as plain Flask hooks, not Talisman | no new dep to keep honest under the air-gap; a little more hand-rolled hook code | 4.1 disabled Talisman's CSP anyway and hand-rolled the nonce; one less dependency (ADR-0020) | `security_headers.py` module docstring; ADR-0026 |
+| Per-request CSP nonce in `g` (not a startup-time nonce) | a nonce generated per request | a startup nonce would make every cached response share one stale nonce; 4.1 parity | `security_headers.py::_csp_nonce` (`before_request`); ADR-0026 rationale |
+| `no-store` scoped on `request.url_rule.rule` (the matched rule), not `request.path` | a more precise branch; relies on routing having matched | the raw-path `startswith("/api/")` mis-handles a literal `/api/`-prefixed path that matches a non-API rule (smorest routes are method-specific) | review.md Security finding (Medium); `test_security_headers.py::test_api_no_store_scoped_to_matched_rule_not_raw_path` |
+| HSTS gated on `request.is_secure` only | no HSTS over plain HTTP | HSTS is a promise about *future* requests — meaningless on a request that was not secure; ProxyFix makes `is_secure` honest behind the edge | `security_headers.py` HSTS branch; `test_hsts_present_over_tls` / `test_hsts_absent_over_plain_http` |
+| Register the hooks after `register_errors`, before `register_static` | ordering in `create_app` | smorest 4xx/5xx envelopes must get the headers; the app-level `after_request` then runs on API, static, health, and error alike | `backend/app/__init__.py:104-109`; `test_unauthenticated_error_response_carry_all_security_headers` |
+| Keep the `rebase` branch as-is (no merge to `main`) | the work stays on the work branch; `main` untouched | repo VERIFIED assumption + the 2026-10-26 ini-config-source precedent; the branch is the rollback unit | ship Return Envelope; AGENTS.md "Committing & branching" |
+
+## Lessons
+
+| Lesson | Root Cause | Do Differently | Source |
+|--------|-----------|----------------|--------|
+| Scope an API-surface cache invariant on the matched route, not the raw path | the implementer (and 4.1) reached for `request.path`, the literal (decoded) request path, not the routed resource | when a behavior is "on `/api/*`", key it on `request.url_rule.rule` (the registered pattern) so method-specific routing and path encodings can't slip past a `startswith` check | review.md Security finding (Medium, Confirmed); fix in `c00cc010` |
+| A `# type: ignore[no-untyped-def]` on a load-bearing handler is a papered-over gap, not a fix | the hook was written to make the test pass without annotating | annotate the real signature (`def _headers(resp: Response) -> Response`); the ignore becomes cargo-cult on the next mypy run | review.md Standards finding (Important); `security_headers.py:34` |
+| When QA and review run back-to-back, fix the review's in-scope findings *before* ship, not in reflect | the Medium/Important findings were fixable in minutes and each needed a regression test | run the `receiving-code-review` fix loop at the review gate so ship rests on a clean floor (this change did — 0 unfixed Important at ship) | review.md "Triage / fix loop" table; ship Gate "Unfixed Important count: 0" |
+
+## Patterns
+
+| Pattern | Reuse | Source |
+|---------|-------|--------|
+| Docker-free API-tier fixture with a real `static/` dir | any test that must assert ADR-0006 caching (assets immutable, index no-cache) without a container — build the fixture `KUBEDASH_HOME` with a `static/assets/<hashed>` file + a root favicon, so the static-caching scenario hits a real 200 not a 404 | `test_security_headers.py::_make_fixture_home` |
+| Positive/negative header-pair testing | any security-header or gating change — assert the header present on the true case AND absent on the false case in two tests (HSTS over-TLS/over-HTTP; no-store on-API/non-API) | `test_hsts_present_over_tls` + `test_hsts_absent_over_plain_http`; `test_api_no_store` + `test_api_no_store_scoped_to_matched_rule_not_raw_path` |
+| Recover a lost module from its orphaned `__pycache__/*.pyc` | when a `.py` is missing but a `.pyc` survives (the module was committed, then the source lost) — marshal-load the `.pyc` to read the original docstring/constants, or re-author against the blueprint's reference implementation | this change: `security_headers.cpython-312.pyc` existed with no `.py`; re-authored from blueprint Task 1 Step 3 |
+
+## Surprises
+
+| Surprise | Signal | Source |
+|----------|--------|--------|
+| `GET /api/v1/auth/local` matches the **SPA catch-all**, not the API route | the API routes are method-specific (POST); a GET to the same path falls through to `/<path:path_>`, so its `url_rule` is the catch-all, not `/api/*` | diagnosed via `test_request_context` during the no-store fix; `test_security_headers.py` uses POST for the API case |
+| The "percent-encoded `/api/` escapes the check" framing was imprecise | `request.path` is already decoded by Flask, so `/%61pi/...` decodes to `/api/...` and both old and new checks pass it; the *real* discriminator is a literal `/api/`-prefixed path matching a non-API rule | review.md Security finding + the session's `url_rule` diagnosis; the shipped regression test asserts the matched-rule invariant, not the percent-encoding |
+| An orphaned `.pyc` in `__pycache__/` (no matching `.py`) means the module was lost, not absent | `git ls-files` showed the `.py` untracked and `git log -- backend/app/core/security_headers.py` empty, yet a compiled `.pyc` existed — the source had been committed and then lost from the working tree | initial "is it done?" investigation: `ls backend/app/core/__pycache__/security_headers.cpython-312.pyc` |
+| A second session's `git commit` holds a live `.git/index.lock` mid-ship | `git add` failed with "Unable to create index.lock" while the other session was committing the AGENTS.md re-render; the lock was live, not stale | ship Step 5: waited on the lock, then staged only this change's 5 files |
+
+## Environment Retro
+
+> Written by `skillgrid:environment-retro` (a reflect sub-phase). Improvements to the *agent environment*, never the code. A finding appears only where its "Use when" fired; a clean session leaves this empty.
+
+| Category | Finding | Fix lands in | Source |
+|----------|---------|--------------|--------|
+| automated checks | `qa-gate.mjs` resolves sub-checks from a repo-local `.agents/` + `scripts/` that don't exist in this checkout (skills live in `~/.agents`), so state-drift/traceability/tdd-evidence report "script not found" rather than a result | the QA skill's script path resolution (or a repo-local `.agents` symlink) — flag, not a code fix | QA run 2026-11-03: `qa-gate.mjs` JSON `checks.*.lines = ["script not found"]` |
+| navigation | `pipeline.current_change` in `state.yaml` can point at an already-shipped change until a ship/reflect advances it — the "is it done?" question required reading the spec folder + git, not just the pointer | the ship skill's state.yaml reconcile (done here: pointer advanced to `2026-10-29-session-object-navigation`) | `.skillgrid/state.yaml` pre-ship: `current_change: 2026-10-24-tls-security-headers @ executing` |
+| tool economy | `uv run pytest` from the repo root fails ("Failed to spawn: pytest"); the backend venv is `backend/`-scoped | the Taskfile/AGENTS.md already document `cd backend`; no fix needed — noted for future sessions | QA/ship test runs: `cd backend && uv run pytest` |
+
+## Acceptance Verdict
+
+**Verdict:** accepted-with-open-items
+
+**Grounding:** the briefing goal — "restore the 4.1 security-header layer (CSP/HSTS/COOP/CORE/framing/nosniff, no-store on `/api/*`)" — is met for the R3/R4 header layer: the Goal-Backward Verification table shows all six R3/R4 truths VERIFIED by tests that ran and passed, and the Traceability Matrix is 9/10 (the R1 301-leg e2e backstop is the one UNTESTED, carried as SUGGESTION S1). The R1 edge-termination and R5 Secure-cookie truths are pre-existing (committed 2026-10-24) and e2e-covered by `auth-smoke.spec.ts`.
+
+**Reasoning:** the header layer this change owned is complete, verified, and reviewed clean; the open items are low-risk and named (the 301-leg e2e, the future-state swagger-asset re-pin), neither of which blocks the goal.
+
+## Open Items (→ next change)
+
+- **S1** — add a one-test e2e asserting the `http://kubedash.dev.local → :443` 301 (closes the last UNTESTED scenario, `tls-edge-serves-https-and-redirects-http`). `E2E_TLS_CA` is already wired in `frontend/playwright.config.ts`; a redirect assertion + the Secure-cookie companion completes the R1 backstop. Path: `frontend/e2e/` (new or extend `auth-smoke.spec.ts`).
+- **Swagger asset re-pin (Low)** — when the vendored swagger-ui bundle is re-pinned, either hash the filename in `SWAGGER_ASSETS` (match the `register_static` convention) or add a test pinning `no-store` on `/api/docs/*`. Path: `backend/app/core/apidocs.py:46-50`.
+- **Fixture JWT-secret spelling (FYI)** — confirm whether `test_security_headers.py` should use the double-prefixed `KUBEDASH_KUBEDASH_JWT_SECRET` (the INI-leg override form used in `tests/api/conftest.py`) or the single form. Path: next `conftest`/fixture touch.
+
+## Web-cache promotion candidates
+
+No web-cache promotion candidates — the web cache holds one entry (fetched 2026-10-06, expired) that predates this change's 2026-10-24→2026-11-03 span; none is attributable to this change's session.
+
+## Prior-Change Follow-Through
+
+| Prior open item (from previous archived change) | Addressed by this change? | Evidence |
+|--------------------------------------------------|---------------------------|----------|
+| `2026-10-26-ini-config-source` "Next: reflect (completes report.md retro half)" | no — that is its own change's close, not this one's | state.yaml in_flight (shipped, awaiting its own reflect) |
+| `2026-10-24-tls-security-headers` S3 (pre-existing AGENTS.md staged-deletion + `architecture.md` noise) | resolved in-tree, not by this change | the AGENTS.md re-render committed `80f3bd0f` (a separate session); the `architecture.md` cache change remains that session's |
+| `2026-10-26-network-policy` (no retro half in its archive `report.md`) | no — that archive's retro was never completed | `.skillgrid/xarchive/2026-10-26-network-policy/report.md` has no `## Final-State Facts` |
+
+## Move Evidence (from ship context)
+
+**From:** `.skillgrid/specs/2026-10-24-tls-security-headers/` → **To:** `.skillgrid/xarchive/2026-10-24-tls-security-headers/`
+**`diff -r` readback:** empty → PASS (ship, 2026-11-03; pre-move recursive snapshot vs archived folder)
+
+## Overrides / Waivers / Contradictions
+
+- None. (QA PASS, no waiver; review floor met-with-fixes with both Important findings fixed pre-ship; no ASSUMED blueprint — the blueprint is PROPOSED, no decision debt.)
+
+## Lineage (observation IDs)
+
+Every artifact read this close, for traceability:
+
+- briefing: `.skillgrid/xarchive/2026-10-24-tls-security-headers/briefing.md`
+- blueprint: `.skillgrid/xarchive/2026-10-24-tls-security-headers/blueprint.md`
+- tasks: none (pre-ticket-split change, sliced as TASK-032)
+- report (QA half): `.skillgrid/xarchive/2026-10-24-tls-security-headers/report.md` (this file, through `## Gate Decision`)
+- review: `.skillgrid/xarchive/2026-10-24-tls-security-headers/review.md` — floor **met-with-fixes**, all axes **Grade A**; pre-merge findings: Security Medium (no-store raw-path scope, FIXED) + Standards Important (`_headers` annotation, FIXED); 0 Critical.
+- ship: Mnemonic `skillgrid/2026-10-24-tls-security-headers/ship` (observation id 186)
+- research / findings / ADRs: ADR-0026 (`.skillgrid/knowledge/decisions/04-adr-0026-tls-edge-and-security-headers.md`), ADR manifest (`adr.md`)

@@ -121,6 +121,8 @@ completed_changes:
   # 540/540, three-axis Grade-A review clean after no-store-scoping + type-
   # annotation fixes; folder archived c00cc010). Restores the 4.1
   # security-header layer (CSP/HSTS/framing/no-store on /api/*) — ADR-0026.
+  # Terminal phase: complete (reflect 2026-11-03 — report.md retro half done,
+  # accepted-with-open-items; S1 301-leg e2e + swagger re-pin carried forward).
   - 2026-10-24-tls-security-headers
 
 # Onboarding state (2026-10-17): config.yaml + ASSUMPTIONS.md + state.yaml
