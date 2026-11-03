@@ -1,5 +1,5 @@
 import React from 'react'
-import { Link, useSearchParams } from 'react-router-dom'
+import { Link } from 'react-router-dom'
 import {
   CBadge,
   CBreadcrumb,
@@ -15,7 +15,12 @@ import { useQuery } from '@tanstack/react-query'
 import { apiFetch } from '../../lib/api'
 import type { K8sNode, ResourceList } from '../../lib/types'
 import { useClusterStore } from '../../store/cluster'
+import ShareObjectButton from '../../components/ShareObjectButton'
 import TopMenu from '../../components/TopMenu'
+
+// ADR-0040: cluster-scoped kind — the ref carries no namespace.
+const KIND = 'node'
+const LIST_ROUTE = '/cluster/node'
 
 // ponytail: parse a K8s quantity the way the backend does (CPU in millicores,
 // memory in bytes). The Metrics API reports used.cpu in NANOcores ("270808684n")
@@ -99,9 +104,11 @@ const UsedBar = ({ label, used, capacity, fmt }: {
   )
 }
 
-const NodeDataView = () => {
-  const [params] = useSearchParams()
-  const name = params.get('name') || ''
+// ADR-0040: identity arrives as props from ObjectRoute (the active ref),
+// never from useSearchParams — the URL stays clean (R1/R8). The legacy
+// /data route (TICKET-07's redirect layer) passes the legacy ?name= through
+// as a prop; this view no longer reads it.
+const NodeDataView = ({ name }: { name: string }) => {
   const cluster = useClusterStore((s) => s.selectedCluster)
 
   const list = useQuery<ResourceList<K8sNode>>({
@@ -399,7 +406,10 @@ const NodeDataView = () => {
           </CBreadcrumb>
         </TopMenu>
         <CCardHeader className="py-3">
-          <CCardTitle className="m-0 fw-bold text-primary fs-6">Node Data</CCardTitle>
+          <CCardTitle className="m-0 fw-bold text-primary fs-6 d-flex align-items-center gap-2">
+            Node Data
+            {name !== '' && <ShareObjectButton kind={KIND} name={name} listRoute={LIST_ROUTE} />}
+          </CCardTitle>
         </CCardHeader>
         <CCardBody>
           {!name ? (

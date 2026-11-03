@@ -1,5 +1,5 @@
 import React, { useState } from 'react'
-import { Link } from 'react-router-dom'
+import { useNavigate } from 'react-router-dom'
 import {
   CBadge,
   CBreadcrumb,
@@ -22,11 +22,17 @@ import CIcon from '@coreui/icons-react'
 import { cilPlus, cilTrash } from '@coreui/icons'
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import KubeDataTable, { Column } from '../../components/KubeDataTable'
+import ShareObjectButton from '../../components/ShareObjectButton'
 import TopMenu from '../../components/TopMenu'
 import { useCluster } from '../../hooks/useCluster'
 import { apiFetch } from '../../lib/api'
+import { openObject } from '../../lib/objectRef'
 import type { K8sNamespace, ResourceList } from '../../lib/types'
 import { useClusterStore } from '../../store/cluster'
+
+// ADR-0040: cluster-scoped kind — the ref carries no namespace.
+const KIND = 'namespace'
+const LIST_ROUTE = '/cluster/namespace'
 
 const PROTECTED = new Set(['default', 'kube-system', 'kube-public', 'kube-node-lease'])
 const NAME_RE = /^[a-z0-9](?:[-a-z0-9]{0,61}[a-z0-9])?$/
@@ -64,6 +70,7 @@ const toRow = (namespace: K8sNamespace): NamespaceRow => {
 
 const NamespacesView = () => {
   const cluster = useClusterStore((s) => s.selectedCluster)
+  const navigate = useNavigate()
   const selectedNamespace = useClusterStore((s) => s.selectedNamespace)
   const setSelectedNamespace = useClusterStore((s) => s.setSelectedNamespace)
   const { role } = useCluster()
@@ -128,9 +135,21 @@ const NamespacesView = () => {
   }
 
   const rows = (query.data ?? []).map(toRow)
-  const nameLink = (namespace: string) =>
-    namespace ? (
-      <Link to={`/cluster/namespace/data?name=${encodeURIComponent(namespace)}`}>{namespace}</Link>
+  // ADR-0040: the name cell is a button (not a Link) — openObject writes the
+  // ref to sessionStorage and navigates to the clean list route; the URL
+  // never carries object identity (R1). Cluster-scoped: no namespace.
+  const nameCell = (name: string) =>
+    name ? (
+      <>
+        <button
+          type="button"
+          className="btn btn-link btn-sm p-0 text-primary text-decoration-underline"
+          onClick={() => openObject(KIND, name, undefined, LIST_ROUTE, navigate)}
+        >
+          {name}
+        </button>{' '}
+        <ShareObjectButton kind={KIND} name={name} listRoute={LIST_ROUTE} />
+      </>
     ) : null
   const externalLink = (label: string) => (url: string | null) =>
     url ? (
@@ -182,7 +201,7 @@ const NamespacesView = () => {
                 )}
               </Column>
               <Column title="Namespace" data="name">
-                {nameLink}
+                {nameCell}
               </Column>
               <Column title="Repository" data="repository">
                 {externalLink('Repository')}

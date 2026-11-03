@@ -1,5 +1,5 @@
 import React from 'react'
-import { Link, useSearchParams } from 'react-router-dom'
+import { Link } from 'react-router-dom'
 import {
   CBadge,
   CBreadcrumb,
@@ -16,15 +16,20 @@ import TopMenu from '../../components/TopMenu'
 import { apiFetch } from '../../lib/api'
 import type { CrdInstance, K8sCrd, ResourceList } from '../../lib/types'
 import { useClusterStore } from '../../store/cluster'
+import ShareObjectButton from '../../components/ShareObjectButton'
+
+// ADR-0040: cluster-scoped kind — the ref carries no namespace.
+const KIND = 'crd'
+const LIST_ROUTE = '/cluster/crd'
 
 /**
  * 4.1 `cluster/crd-data.html.j2` (the CRD instance detail), rewritten for 5.0:
  * the served version + scope come from the CRD ITSELF (a `?name=` read on the
- * CRD), not 4.1's client-side namespaced→cluster fallback; the navigation is a
- * `?name=` query, not 4.1's sessionStorage + hidden form. Two API calls — the
- * CRD read (resolves group/version/scope/plural) and the instance list (SAR
- * `list` on the CRD + `list` on the instances, each 403 naming the denied
- * resource).
+ * CRD), not 4.1's client-side namespaced→cluster fallback. Two API calls —
+ * the CRD read (resolves group/version/scope/plural) and the instance list
+ * (SAR `list` on the CRD + `list` on the instances, each 403 naming the
+ * denied resource) — unchanged in shape by ADR-0040; only the identity
+ * source moved to the active ref (props), and the URL stays clean (R1/R8).
  */
 
 const fmtCreated = (ts: string | null | undefined): string => {
@@ -44,9 +49,7 @@ const statusBadge = (status: string) => {
   return <CBadge color={color}>{status || '\u2014'}</CBadge>
 }
 
-const CrdDataView = () => {
-  const [params] = useSearchParams()
-  const name = params.get('name') || ''
+const CrdDataView = ({ name }: { name: string }) => {
   const cluster = useClusterStore((s) => s.selectedCluster)
   const selectedNamespace = useClusterStore((s) => s.selectedNamespace)
 
@@ -106,8 +109,9 @@ const CrdDataView = () => {
         </CBreadcrumb>
       </TopMenu>
       <CCardHeader className="py-3">
-        <CCardTitle className="m-0 fw-bold text-primary fs-6">
+        <CCardTitle className="m-0 fw-bold text-primary fs-6 d-flex align-items-center gap-2">
           CRD Data — {spec?.names?.kind || name}
+          {name !== '' && <ShareObjectButton kind={KIND} name={name} listRoute={LIST_ROUTE} />}
         </CCardTitle>
       </CCardHeader>
       <CCardBody>

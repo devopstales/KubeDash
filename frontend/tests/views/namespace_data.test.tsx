@@ -27,7 +27,9 @@ const ITEMS = [
   },
 ]
 
-const renderAt = (ui: ReactElement, path = '/') => {
+// ADR-0040: identity arrives as a prop from ObjectRoute (the active ref),
+// never from the URL — render on the CLEAN list route (no query string).
+const renderAt = (ui: ReactElement, path = '/cluster/namespace') => {
   useClusterStore.setState({
     selectedCluster: { id: 1, name: 'prod' },
     selectedNamespace: null,
@@ -56,7 +58,7 @@ afterEach(() => {
 })
 
 test('shows-namespace-data-fields', async () => {
-  renderAt(<NamespaceDataView />, '/cluster/namespace/data?name=team-a')
+  renderAt(<NamespaceDataView name="team-a" />)
   expect(await screen.findByText('2026-10-20T10:00:00Z')).toBeTruthy()
   expect(screen.getByText('Namespace Data')).toBeTruthy()
   expect(screen.getByRole('link', { name: 'Namespaces' }).getAttribute('href')).toBe(
@@ -67,22 +69,28 @@ test('shows-namespace-data-fields', async () => {
   expect(screen.getByText('https://git.example/team-a')).toBeTruthy()
   expect(screen.getByText('team')).toBeTruthy()
   expect(screen.getByText('platform')).toBeTruthy()
+  // R1: the URL never carries identity — the clean list route.
+  expect(window.location.search).toBe('')
 })
 
-test('namespace-data-accepts-the-4.1-namespace-query', async () => {
-  renderAt(<NamespaceDataView />, '/cluster/namespace/data?namespace=default')
+test('shows-the-4.1-bookmark-namespace-via-props', async () => {
+  // The 4.1 `?namespace=` bookmark is dropped from the view (R7's redirect
+  // covers it); the identity is the prop, rendered on the clean route.
+  renderAt(<NamespaceDataView name="default" />)
   expect(await screen.findByText('2026-10-19T10:00:00Z')).toBeTruthy()
   expect(screen.getByText('Namespace Data')).toBeTruthy()
   expect(screen.getByText('No annotations')).toBeTruthy()
   expect(screen.getByText('No labels')).toBeTruthy()
+  // R1: clean URL — the bookmark query no longer exists on this path.
+  expect(window.location.search).toBe('')
 })
 
 test('namespace-data-reports-a-missing-name', () => {
-  renderAt(<NamespaceDataView />, '/cluster/namespace/data')
+  renderAt(<NamespaceDataView name="" />)
   expect(screen.getByText('Error: Namespace name not provided')).toBeTruthy()
 })
 
 test('namespace-data-reports-a-missing-namespace', async () => {
-  renderAt(<NamespaceDataView />, '/cluster/namespace/data?name=gone')
+  renderAt(<NamespaceDataView name="gone" />)
   expect(await screen.findByText(/Namespace 'gone' not found/)).toBeTruthy()
 })

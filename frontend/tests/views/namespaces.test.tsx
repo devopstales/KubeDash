@@ -2,11 +2,13 @@ import React from 'react'
 import { render, screen, waitFor } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query'
-import { MemoryRouter } from 'react-router-dom'
+import { MemoryRouter, Route, Routes } from 'react-router-dom'
 import { afterEach, beforeEach, expect, test, vi } from 'vitest'
 import { http, HttpResponse } from 'msw'
 import { server } from '../msw'
+import ObjectRoute from '../../src/components/ObjectRoute'
 import NamespacesView from '../../src/views/Cluster/Namespaces'
+import NamespaceDataView from '../../src/views/Cluster/NamespaceData'
 import { useClusterStore } from '../../src/store/cluster'
 
 vi.mock('../../src/components/KubeDataTable', () => {
@@ -100,12 +102,26 @@ const renderNamespaces = (
       HttpResponse.json({ items: ITEMS, kind: 'namespaces', cluster: 'prod' }),
     ),
   )
+  // ADR-0040: render through ObjectRoute so the click→detail flow is the
+  // real one (the ref is the active pointer; the URL never carries identity).
   return render(
     <QueryClientProvider
       client={new QueryClient({ defaultOptions: { queries: { retry: false } } })}
     >
-      <MemoryRouter>
-        <NamespacesView />
+      <MemoryRouter initialEntries={['/cluster/namespace']}>
+        <Routes>
+          <Route
+            path="/cluster/namespace"
+            element={
+              <ObjectRoute
+                kind="namespace"
+                listRoute="/cluster/namespace"
+                list={<NamespacesView />}
+                detail={(p) => <NamespaceDataView name={p.name} />}
+              />
+            }
+          />
+        </Routes>
       </MemoryRouter>
     </QueryClientProvider>,
   )
@@ -208,14 +224,18 @@ test('list-error-renders-inline', async () => {
   expect(await screen.findByText(/list denied/i, { selector: '.text-danger' })).toBeTruthy()
 })
 
-test('namespace-names-link-to-the-object-page', async () => {
+// ADR-0040: the name cell is a button (not a Link) — clicking it opens the
+// detail via openObject on the clean list route (R1).
+test('namespace-name-click-renders-the-object-detail', async () => {
+  const user = userEvent.setup()
   renderNamespaces('user')
-  expect((await screen.findByRole('link', { name: 'team-a' })).getAttribute('href')).toBe(
-    '/cluster/namespace/data?name=team-a',
-  )
-  expect(screen.getByRole('link', { name: 'default' }).getAttribute('href')).toBe(
-    '/cluster/namespace/data?name=default',
-  )
+  await user.click(await screen.findByRole('button', { name: 'team-a' }))
+  // "Namespace Data" appears only in the detail header — the list renders
+  // "Namespace List". The created-timestamp cell confirms team-a's row.
+  expect(await screen.findByText('Namespace Data')).toBeTruthy()
+  expect(screen.getByText('2026-10-20T10:00:00Z')).toBeTruthy()
+  // R1: the URL is clean — no query string.
+  expect(window.location.search).toBe('')
 })
 
 test('empty-list-renders-without-the-table', async () => {

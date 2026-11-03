@@ -1,5 +1,5 @@
 import React from 'react'
-import { Link } from 'react-router-dom'
+import { useNavigate } from 'react-router-dom'
 import {
   CBadge,
   CBreadcrumb,
@@ -12,10 +12,16 @@ import {
 } from '@coreui/react'
 import { useQuery } from '@tanstack/react-query'
 import KubeDataTable, { Column } from '../../components/KubeDataTable'
+import ShareObjectButton from '../../components/ShareObjectButton'
 import TopMenu from '../../components/TopMenu'
 import { apiFetch } from '../../lib/api'
+import { openObject } from '../../lib/objectRef'
 import type { K8sNode, ResourceList } from '../../lib/types'
 import { useClusterStore } from '../../store/cluster'
+
+// ADR-0040: cluster-scoped kind — the ref carries no namespace.
+const KIND = 'node'
+const LIST_ROUTE = '/cluster/node'
 
 // ponytail: KubeDataTable cell renderers receive row[data] (DataTables
 // dataGet), so rows must be FLAT objects whose keys match the Column data
@@ -183,6 +189,7 @@ const Tile = ({
 
 const NodesView = () => {
   const cluster = useClusterStore((s) => s.selectedCluster)
+  const navigate = useNavigate()
 
   const nodesQuery = useQuery<ResourceList<K8sNode>>({
     queryKey: ['nodes', cluster?.id],
@@ -265,9 +272,22 @@ const NodesView = () => {
   const statusCell = (tone: NodeRow['tone'], status: string) => (
     <CBadge color={tone}>{status}</CBadge>
   )
-  const nameCell = (name: string) => (
-    <Link to={`/cluster/node/data?name=${encodeURIComponent(name)}`}>{name}</Link>
-  )
+  // ADR-0040: the name cell is a button (not a Link) — openObject writes the
+  // ref to sessionStorage and navigates to the clean list route; the URL
+  // never carries object identity (R1). Cluster-scoped: no namespace.
+  const nameCell = (name: string) =>
+    name ? (
+      <>
+        <button
+          type="button"
+          className="btn btn-link btn-sm p-0 text-primary text-decoration-underline"
+          onClick={() => openObject(KIND, name, undefined, LIST_ROUTE, navigate)}
+        >
+          {name}
+        </button>{' '}
+        <ShareObjectButton kind={KIND} name={name} listRoute={LIST_ROUTE} />
+      </>
+    ) : null
 
   return (
     <CCard className="shadow mb-4">

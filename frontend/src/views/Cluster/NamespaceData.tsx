@@ -1,5 +1,5 @@
 import React from 'react'
-import { Link, useSearchParams } from 'react-router-dom'
+import { Link } from 'react-router-dom'
 import {
   CBadge,
   CBreadcrumb,
@@ -14,7 +14,12 @@ import { useQuery } from '@tanstack/react-query'
 import { apiFetch } from '../../lib/api'
 import type { K8sNamespace, ResourceList } from '../../lib/types'
 import { useClusterStore } from '../../store/cluster'
+import ShareObjectButton from '../../components/ShareObjectButton'
 import TopMenu from '../../components/TopMenu'
+
+// ADR-0040: cluster-scoped kind — the ref carries no namespace.
+const KIND = 'namespace'
+const LIST_ROUTE = '/cluster/namespace'
 
 const KeyValueTable = ({ entries, empty }: { entries: [string, string][]; empty: string }) =>
   entries.length === 0 ? (
@@ -40,12 +45,16 @@ const KeyValueTable = ({ entries, empty }: { entries: [string, string][]; empty:
 
 /**
  * 4.1 `cluster/namespace-data.html.j2`: one Namespace's status, name,
- * created time, annotations, and labels. `?name=` is the 5.0 object-page
- * query; `?namespace=` is accepted for 4.1 bookmarks.
+ * created time, annotations, and labels.
+ *
+ * ADR-0040: identity arrives as props from ObjectRoute (the active ref),
+ * never from useSearchParams — the URL stays clean (R1/R8). The 4.1
+ * `?namespace=` bookmark read moved off the view: the legacy /data route
+ * (TICKET-07's redirect layer) passes `?name= ?? ?namespace=` through as
+ * the prop, so existing 4.1 bookmarks keep working until the R7 redirect
+ * supersedes them.
  */
-const NamespaceDataView = () => {
-  const [params] = useSearchParams()
-  const name = params.get('name') || params.get('namespace') || ''
+const NamespaceDataView = ({ name }: { name: string }) => {
   const cluster = useClusterStore((s) => s.selectedCluster)
 
   const query = useQuery<K8sNamespace[]>({
@@ -77,7 +86,10 @@ const NamespaceDataView = () => {
         </CBreadcrumb>
       </TopMenu>
       <CCardHeader className="py-3">
-        <CCardTitle className="m-0 fw-bold text-primary fs-6">Namespace Data</CCardTitle>
+        <CCardTitle className="m-0 fw-bold text-primary fs-6 d-flex align-items-center gap-2">
+          Namespace Data
+          {name !== '' && <ShareObjectButton kind={KIND} name={name} listRoute={LIST_ROUTE} />}
+        </CCardTitle>
       </CCardHeader>
       <CCardBody>
         {!name ? (

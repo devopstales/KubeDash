@@ -80,15 +80,28 @@ Do not mount a second DataTables skin or a hand-rolled pager.
 | Responsive | on |
 
 Column order is status, name, the resource-specific fields, created, then Action.
-The name links to the object page.
-The link text is the object name.
+The name opens the object page via `openObject` (ADR-0040): the URL never
+carries object identity (R1). The button text is the object name; the share
+button (⧉) follows it in the cell.
 
 ```tsx
+// ADR-0040: the name cell is a button (not a Link) — openObject writes the
+// ref to sessionStorage and navigates to the clean list route.
+const KIND = 'namespace'
+const LIST_ROUTE = '/cluster/namespace'
+
 <Column title="Namespace" data="name">
   {(namespace: string) => (
-    <Link to={`/cluster/namespace/data?name=${encodeURIComponent(namespace)}`}>
-      {namespace}
-    </Link>
+    <>
+      <button
+        type="button"
+        className="btn btn-link btn-sm p-0 text-primary text-decoration-underline"
+        onClick={() => openObject(KIND, namespace, undefined, LIST_ROUTE, navigate)}
+      >
+        {namespace}
+      </button>{' '}
+      <ShareObjectButton kind={KIND} name={namespace} listRoute={LIST_ROUTE} />
+    </>
   )}
 </Column>
 ```

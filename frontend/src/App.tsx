@@ -226,6 +226,30 @@ const LegacyClusterRoleData = () => {
   return <ClusterRoleDataView name={params.get('name') ?? ''} />
 }
 
+/**
+ * ADR-0040 TICKET-05: the legacy cluster /data routes (kept for TICKET-07's
+ * contract pass) read the legacy ?name= param and hand it to the migrated
+ * data views, which no longer read useSearchParams themselves. All three
+ * kinds are cluster-scoped — the ref (and these params) carry no namespace.
+ * LegacyNamespaceData keeps the 4.1 `?namespace=` bookmark fallback the old
+ * view had — on the legacy path it is the last thing to work; TICKET-07's
+ * R7 redirect is the migration off it.
+ */
+const LegacyNamespaceData = () => {
+  const [params] = useSearchParams()
+  return <NamespaceDataView name={params.get('name') ?? params.get('namespace') ?? ''} />
+}
+
+const LegacyNodeData = () => {
+  const [params] = useSearchParams()
+  return <NodeDataView name={params.get('name') ?? ''} />
+}
+
+const LegacyCrdData = () => {
+  const [params] = useSearchParams()
+  return <CrdDataView name={params.get('name') ?? ''} />
+}
+
 /** Old per-user privilege URL. The page now lives at /user/privilege. */
 const PrivilegeRedirect = () => {
   const { sub = '' } = useParams()
@@ -487,7 +511,16 @@ const App = () => {
                       path="/cluster/namespace"
                       element={
                         <ProtectedRoute>
-                          <NamespacesView />
+                          {/* ADR-0040 TICKET-05: ObjectRoute renders the list
+                              or the ref-matched detail on the clean route.
+                              The old /data route stays for TICKET-07's
+                              contract pass (expand, not contract). */}
+                          <ObjectRoute
+                            kind="namespace"
+                            listRoute="/cluster/namespace"
+                            list={<NamespacesView />}
+                            detail={(p) => <NamespaceDataView name={p.name} />}
+                          />
                         </ProtectedRoute>
                       }
                     />
@@ -495,7 +528,11 @@ const App = () => {
                       path="/cluster/namespace/data"
                       element={
                         <ProtectedRoute>
-                          <NamespaceDataView />
+                          {/* Legacy /data route (TICKET-07 keeps it working
+                              until the contract pass): the view now reads
+                              its name from the active ref, so it falls back
+                              to the legacy ?name= param here. */}
+                          <LegacyNamespaceData />
                         </ProtectedRoute>
                       }
                     />
@@ -503,7 +540,16 @@ const App = () => {
                       path="/cluster/node"
                       element={
                         <ProtectedRoute>
-                          <NodesView />
+                          {/* ADR-0040 TICKET-05: ObjectRoute renders the list
+                              or the ref-matched detail on the clean route.
+                              The old /data route stays for TICKET-07's
+                              contract pass (expand, not contract). */}
+                          <ObjectRoute
+                            kind="node"
+                            listRoute="/cluster/node"
+                            list={<NodesView />}
+                            detail={(p) => <NodeDataView name={p.name} />}
+                          />
                         </ProtectedRoute>
                       }
                     />
@@ -511,7 +557,11 @@ const App = () => {
                       path="/cluster/node/data"
                       element={
                         <ProtectedRoute>
-                          <NodeDataView />
+                          {/* Legacy /data route (TICKET-07 keeps it working
+                              until the contract pass): the view now reads
+                              its name from the active ref, so it falls back
+                              to the legacy ?name= param here. */}
+                          <LegacyNodeData />
                         </ProtectedRoute>
                       }
                     />
@@ -519,7 +569,16 @@ const App = () => {
                       path="/cluster/crd"
                       element={
                         <ProtectedRoute>
-                          <CrdsView />
+                          {/* ADR-0040 TICKET-05: ObjectRoute renders the list
+                              or the ref-matched detail on the clean route.
+                              The old /data route stays for TICKET-07's
+                              contract pass (expand, not contract). */}
+                          <ObjectRoute
+                            kind="crd"
+                            listRoute="/cluster/crd"
+                            list={<CrdsView />}
+                            detail={(p) => <CrdDataView name={p.name} />}
+                          />
                         </ProtectedRoute>
                       }
                     />
@@ -527,7 +586,11 @@ const App = () => {
                       path="/cluster/crd/data"
                       element={
                         <ProtectedRoute>
-                          <CrdDataView />
+                          {/* Legacy /data route (TICKET-07 keeps it working
+                              until the contract pass): the view now reads
+                              its name from the active ref, so it falls back
+                              to the legacy ?name= param here. */}
+                          <LegacyCrdData />
                         </ProtectedRoute>
                       }
                     />

@@ -1,12 +1,18 @@
 import React from 'react'
-import { Link } from 'react-router-dom'
+import { useNavigate } from 'react-router-dom'
 import { CBadge, CBreadcrumb, CBreadcrumbItem, CCard, CCardBody, CCardHeader, CCardTitle } from '@coreui/react'
 import { useQuery } from '@tanstack/react-query'
 import KubeDataTable, { Column } from '../../components/KubeDataTable'
+import ShareObjectButton from '../../components/ShareObjectButton'
 import TopMenu from '../../components/TopMenu'
 import { apiFetch } from '../../lib/api'
+import { openObject } from '../../lib/objectRef'
 import type { K8sCrd, ResourceList } from '../../lib/types'
 import { useClusterStore } from '../../store/cluster'
+
+// ADR-0040: cluster-scoped kind — the ref carries no namespace.
+const KIND = 'crd'
+const LIST_ROUTE = '/cluster/crd'
 
 /**
  * 4.1 `cluster/crd.html.j2` (the Interface → Cluster → CRDs list), rewritten
@@ -64,9 +70,22 @@ const toRow = (crd: K8sCrd): CrdRow => {
   }
 }
 
-const kindLink = ({ kind, crdName }: CrdRow['kindLink']) =>
+const kindCell = ({ kind, crdName }: CrdRow['kindLink'], navigate: (path: string) => void) =>
   crdName ? (
-    <Link to={`/cluster/crd/data?name=${encodeURIComponent(crdName)}`}>{kind || '\u2014'}</Link>
+    <>
+      {/* ADR-0040: the kind cell is a button (not a Link) — openObject
+          writes the ref (the CRD's metadata.name) to sessionStorage and
+          navigates to the clean list route; the URL never carries object
+          identity (R1). Cluster-scoped: no namespace. */}
+      <button
+        type="button"
+        className="btn btn-link btn-sm p-0 text-primary text-decoration-underline"
+        onClick={() => openObject(KIND, crdName, undefined, LIST_ROUTE, navigate)}
+      >
+        {kind || '\u2014'}
+      </button>{' '}
+      <ShareObjectButton kind={KIND} name={crdName} listRoute={LIST_ROUTE} />
+    </>
   ) : (
     kind || '\u2014'
   )
@@ -91,6 +110,7 @@ const servedCell = (versions: ServedVersion[]) =>
 
 const CrdsView = () => {
   const cluster = useClusterStore((s) => s.selectedCluster)
+  const navigate = useNavigate()
 
   const query = useQuery<ResourceList<K8sCrd>['items']>({
     queryKey: ['crds', cluster?.id],
@@ -129,7 +149,7 @@ const CrdsView = () => {
         ) : (
           <KubeDataTable data={rows}>
             <Column title="Kind" data="kindLink">
-              {kindLink}
+              {(row) => kindCell(row as CrdRow['kindLink'], navigate)}
             </Column>
             <Column title="Group" data="group" />
             <Column title="Plural" data="plural" />

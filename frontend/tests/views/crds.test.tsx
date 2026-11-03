@@ -1,10 +1,11 @@
 import { render, screen } from '@testing-library/react'
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query'
-import { MemoryRouter } from 'react-router-dom'
-import { afterEach, beforeEach, expect, test } from 'vitest'
+import { MemoryRouter, Route, Routes } from 'react-router-dom'
+import { afterEach, beforeEach, expect, test, vi } from 'vitest'
 import { http, HttpResponse, type AnyHandler } from 'msw'
 import type { ReactElement } from 'react'
 import { server } from '../msw'
+import ObjectRoute from '../../src/components/ObjectRoute'
 import CrdsView from '../../src/views/Cluster/CRDs'
 import CrdDataView from '../../src/views/Cluster/CrdData'
 import { useClusterStore } from '../../src/store/cluster'
@@ -90,17 +91,43 @@ const INSTANCES = {
   ],
 }
 
-const renderAt = (ui: ReactElement, path: string, handlers: AnyHandler[]) => {
+// ADR-0040: `ui === null` renders the list through ObjectRoute (the real
+// click→detail flow); a data view is rendered directly on the CLEAN list
+// route with its identity as a prop — never a query param (R1/R8).
+const renderAt = (
+  ui: ReactElement | null,
+  path: string,
+  handlers: AnyHandler[],
+  initialEntries?: string[],
+) => {
   useClusterStore.setState({
     selectedCluster: { id: 1, name: 'prod' },
     selectedNamespace: 'team-a',
   })
   server.use(...handlers)
+  const element =
+    ui === null ? (
+      <Routes>
+        <Route
+          path="/cluster/crd"
+          element={
+            <ObjectRoute
+              kind="crd"
+              listRoute="/cluster/crd"
+              list={<CrdsView />}
+              detail={(p) => <CrdDataView name={p.name} />}
+            />
+          }
+        />
+      </Routes>
+    ) : (
+      ui
+    )
   return render(
     <QueryClientProvider
       client={new QueryClient({ defaultOptions: { queries: { retry: false } } })}
     >
-      <MemoryRouter initialEntries={[path]}>{ui}</MemoryRouter>
+      <MemoryRouter initialEntries={initialEntries ?? [path]}>{element}</MemoryRouter>
     </QueryClientProvider>,
   )
 }
@@ -116,7 +143,7 @@ afterEach(() => {
 
 test('crd-list-renders: 4.1 columns + served versions + kind link', async () => {
   renderAt(
-    <CrdsView />,
+    null,
     '/cluster/crd',
     [http.get('*/api/v1/clusters/1/resources/crds', () => HttpResponse.json(CRDS))],
   )
@@ -137,23 +164,35 @@ test('crd-list-renders: 4.1 columns + served versions + kind link', async () => 
   // The non-storage served version (v1) — a word boundary keeps the match
   // distinct from the v1alpha1 badge above.
   expect(screen.getByText(/^v1$/)).toBeTruthy()
-  // The kind links to the detail page with the CRD's metadata.name
-  // (`<plural>.<group>`), not the bare plural — the backend get_crd 404s on a
-  // bare plural.
-  const link = screen.getByRole('link', { name: 'Application' })
-  expect(link.getAttribute('href')).toBe('/cluster/crd/data?name=applications.argoproj.io')
+  // ADR-0040: the kind cell is a button (not a Link) — the ref carries the
+  // CRD's metadata.name (`<plural>.<group>`), not the bare plural; the URL
+  // stays clean (R1).
+  expect(screen.getByRole('button', { name: 'Application' })).toBeTruthy()
+  expect(window.location.search).toBe('')
 })
 
 test('crd-detail-renders: CRD identity + instance rows', async () => {
+  // ADR-0040: the identity is a prop from the active ref (rendered on the
+  // clean list route). The TWO calls are asserted by request URL: the CRD
+  // read and the instance list both carry the ref's name (not the bare
+  // plural), and the instance list additionally carries the topbar
+  // namespace for a Namespaced CRD.
+  let crdReadUrl = ''
+  let instancesUrl = ''
   renderAt(
-    <CrdDataView />,
-    '/cluster/crd/data?name=applications.argoproj.io',
+    <CrdDataView name="applications.argoproj.io" />,
+    '/cluster/crd/data',
     [
-      http.get('*/api/v1/clusters/1/resources/crds', () => HttpResponse.json(CRD_SINGLE)),
-      http.get('*/api/v1/clusters/1/resources/crds/instances', () =>
-        HttpResponse.json(INSTANCES),
-      ),
+      http.get('*/api/v1/clusters/1/resources/crds', ({ request }) => {
+        crdReadUrl = request.url
+        return HttpResponse.json(CRD_SINGLE)
+      }),
+      http.get('*/api/v1/clusters/1/resources/crds/instances', ({ request }) => {
+        instancesUrl = request.url
+        return HttpResponse.json(INSTANCES)
+      }),
     ],
+    ['/cluster/crd'],
   )
   // Two queries run sequentially (the instance list is gated on the CRD read
   // resolving) — wait for the instance row, not just the first table.
@@ -172,18 +211,29 @@ test('crd-detail-renders: CRD identity + instance rows', async () => {
   expect(screen.getByText('all good')).toBeTruthy()
   // The breadcrumb links back to the CRD list.
   expect(screen.getByRole('link', { name: 'CRDs' }).getAttribute('href')).toBe('/cluster/crd')
+  // R1: the URL is clean — identity is the prop, never the query string.
+  expect(window.location.search).toBe('')
+  // The two API calls both carry the ref's name (`<plural>.<group>`); the
+  // instance list (call 2) adds the topbar namespace (Namespaced CRD).
+  const crdRead = new URL(crdReadUrl)
+  expect(crdRead.searchParams.get('name')).toBe('applications.argoproj.io')
+  expect(crdRead.searchParams.get('namespace')).toBeNull()
+  const instances = new URL(instancesUrl)
+  expect(instances.searchParams.get('name')).toBe('applications.argoproj.io')
+  expect(instances.searchParams.get('namespace')).toBe('team-a')
 })
 
 test('crd-detail-empty: no instances → first-class empty state, not an error', async () => {
   renderAt(
-    <CrdDataView />,
-    '/cluster/crd/data?name=applications.argoproj.io',
+    <CrdDataView name="applications.argoproj.io" />,
+    '/cluster/crd/data',
     [
       http.get('*/api/v1/clusters/1/resources/crds', () => HttpResponse.json(CRD_SINGLE)),
       http.get('*/api/v1/clusters/1/resources/crds/instances', () =>
         HttpResponse.json({ kind: 'crds', cluster: 'prod', items: [] }),
       ),
     ],
+    ['/cluster/crd'],
   )
   await screen.findByText(/No Application instances found/)
   // The empty state names the namespace (the topbar selection is applied).
@@ -192,8 +242,8 @@ test('crd-detail-empty: no instances → first-class empty state, not an error',
 
 test('crd-detail-rbac-denied: 403 on the instance list surfaces the error', async () => {
   renderAt(
-    <CrdDataView />,
-    '/cluster/crd/data?name=applications.argoproj.io',
+    <CrdDataView name="applications.argoproj.io" />,
+    '/cluster/crd/data',
     [
       http.get('*/api/v1/clusters/1/resources/crds', () => HttpResponse.json(CRD_SINGLE)),
       http.get('*/api/v1/clusters/1/resources/crds/instances', () =>
@@ -203,14 +253,18 @@ test('crd-detail-rbac-denied: 403 on the instance list surfaces the error', asyn
         ),
       ),
     ],
+    ['/cluster/crd'],
   )
   await screen.findByText(/Error loading instances/)
   expect(screen.getByText(/RBAC_DENIED/)).toBeTruthy()
 })
 
-test('crd-detail-missing-name: no ?name= → error line', () => {
-  renderAt(<CrdDataView />, '/cluster/crd/data', [])
+test('crd-detail-missing-name: empty name prop → error line', () => {
+  // ADR-0040: the identity is the prop (the ref's name); an empty prop is
+  // the not-provided state — the URL never carries it (R1/R8).
+  renderAt(<CrdDataView name="" />, '/cluster/crd/data', [], ['/cluster/crd'])
   expect(screen.getByText('Error: CRD name not provided')).toBeTruthy()
+  expect(window.location.search).toBe('')
 })
 
 test('crd-list-rbac-denied: 403 on the CRD list surfaces the error', async () => {

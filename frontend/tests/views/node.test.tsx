@@ -1,10 +1,11 @@
 import React from 'react'
 import { render, screen } from '@testing-library/react'
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query'
-import { MemoryRouter } from 'react-router-dom'
+import { MemoryRouter, Route, Routes } from 'react-router-dom'
 import { afterEach, beforeEach, expect, test, vi } from 'vitest'
 import { http, HttpResponse } from 'msw'
 import { server } from '../msw'
+import ObjectRoute from '../../src/components/ObjectRoute'
 import NodesView from '../../src/views/Cluster/Nodes'
 import NodeDataView from '../../src/views/Cluster/NodeData'
 import { useClusterStore } from '../../src/store/cluster'
@@ -112,15 +113,40 @@ const USAGE_OK = {
   used_bytes: 4 * 2 ** 30,
 }
 
-const renderWith = (view: React.ReactElement, handlers: Parameters<typeof server.use>[0][]) => {
+// ADR-0040: `view === null` renders the list through ObjectRoute (the real
+// click→detail flow); a data view is rendered directly on the CLEAN list
+// route with its identity as a prop — never a query param (R1/R8).
+const renderWith = (
+  view: React.ReactElement | null,
+  handlers: Parameters<typeof server.use>[0][],
+  initialEntry = '/cluster/node',
+) => {
   useClusterStore.setState({ selectedCluster: { id: 1, name: 'prod' }, selectedNamespace: null })
   server.use(...handlers)
+  const element =
+    view === null ? (
+      <Routes>
+        <Route
+          path="/cluster/node"
+          element={
+            <ObjectRoute
+              kind="node"
+              listRoute="/cluster/node"
+              list={<NodesView />}
+              detail={(p) => <NodeDataView name={p.name} />}
+            />
+          }
+        />
+      </Routes>
+    ) : (
+      view
+    )
   return render(
     <QueryClientProvider
       client={new QueryClient({ defaultOptions: { queries: { retry: false } } })}
     >
-      <MemoryRouter initialEntries={['/cluster/node/data?name=worker-1']}>
-        {view}
+      <MemoryRouter initialEntries={[initialEntry]}>
+        {element}
       </MemoryRouter>
     </QueryClientProvider>,
   )
@@ -174,7 +200,7 @@ afterEach(() => {
 })
 
 test('node-list-renders: 4.1 columns (State/Name/Role/Version/IP/OS) + usage bars', async () => {
-  renderWith(<NodesView />, [nodesHandler(), metricsHandler()])
+  renderWith(null, [nodesHandler(), metricsHandler()])
   await screen.findByRole('table')
   // 4.1 column set is present.
   for (const header of ['State', 'Name', 'Role', 'Version', 'IP', 'OS', 'CPU Usage', 'Memory Usage']) {
@@ -191,13 +217,14 @@ test('node-list-renders: 4.1 columns (State/Name/Role/Version/IP/OS) + usage bar
   expect(screen.getAllByText('50%').length).toBeGreaterThanOrEqual(1)
   // notready-1 is absent from metrics → its used cells are "unknown", never 0%.
   expect(screen.getAllByText('unknown').length).toBeGreaterThanOrEqual(2)
-  // The node name links to the detail page.
-  const link = screen.getByRole('link', { name: 'worker-1' })
-  expect(link.getAttribute('href')).toBe('/cluster/node/data?name=worker-1')
+  // ADR-0040: the name cell is a button (not a Link) — openObject writes the
+  // ref and navigates; the URL stays clean (R1).
+  expect(screen.getByRole('button', { name: 'worker-1' })).toBeTruthy()
+  expect(window.location.search).toBe('')
 })
 
 test('node-tiles-renders: four cluster metric tiles (CPU/Memory/Pods/Storage)', async () => {
-  renderWith(<NodesView />, [nodesHandler(), metricsHandler()])
+  renderWith(null, [nodesHandler(), metricsHandler()])
   await screen.findByRole('table')
   // All four tile labels present (blueprint Task 4).
   for (const label of ['CPU usage', 'Memory usage', 'Pods', 'Storage']) {
@@ -214,7 +241,7 @@ test('node-tiles-renders: four cluster metric tiles (CPU/Memory/Pods/Storage)', 
 })
 
 test('node-tiles-unknown: metrics unavailable → CPU/Memory tiles unknown, never 0', async () => {
-  renderWith(<NodesView />, [
+  renderWith(null, [
     nodesHandler(),
     metricsHandler({ cluster: 'prod', metrics_available: false, source: 'metrics.k8s.io', items: [] }),
   ])
@@ -227,7 +254,7 @@ test('node-tiles-unknown: metrics unavailable → CPU/Memory tiles unknown, neve
 })
 
 test('node-list-metrics-unavailable: usage columns show unknown, table still renders', async () => {
-  renderWith(<NodesView />, [
+  renderWith(null, [
     nodesHandler(),
     metricsHandler({ cluster: 'prod', metrics_available: false, source: 'metrics.k8s.io', items: [] }),
   ])
@@ -239,12 +266,18 @@ test('node-list-metrics-unavailable: usage columns show unknown, table still ren
 })
 
 test('node-detail-renders: node metadata + used-vs-allocatable bars', async () => {
-  renderWith(<NodeDataView />, [nodesHandler(), usageHandler()])
-  await screen.findByText('Observed usage (metrics.k8s.io)')
+  renderWith(
+    <NodeDataView name="worker-1" />,
+    [nodesHandler(), usageHandler()],
+    '/cluster/node',
+  )
+  // The usage card renders immediately; the node LIST query (the metadata
+  // source) is still in flight — await a list-derived cell, not just the
+  // static card header (the query used to gate the whole render).
   // Declared/observed metadata. The name also appears in the breadcrumb, so
   // assert the metadata cell specifically.
+  expect(await screen.findByText('v1.31.0')).toBeTruthy()
   expect(screen.getAllByText('worker-1').length).toBeGreaterThanOrEqual(1)
-  expect(screen.getByText('v1.31.0')).toBeTruthy()
   // Addresses render as a two-column table (type | address), Info-style —
   // NOT a single joined string. So the type and value are separate cells.
   expect(screen.getByText('InternalIP')).toBeTruthy()
@@ -269,35 +302,59 @@ test('node-detail-renders: node metadata + used-vs-allocatable bars', async () =
   expect(screen.getByText('KubeletHasSufficientMemory')).toBeTruthy()
   // Used tier: the "used / allocatable" value sits in its own span (whitespace
   // around the slash is JSX formatting). 800m / 4 cores CPU; 4 GiB / 8 GiB mem.
-  expect(screen.getByText(/800m\s*\/\s*4 cores/)).toBeTruthy()
+  // The usage query is also in flight — await a usage-derived value.
+  expect(await screen.findByText(/800m\s*\/\s*4 cores/)).toBeTruthy()
   expect(screen.getByText(/4\.0 GiB\s*\/\s*8\.0 GiB/)).toBeTruthy()
 })
 
 test('node-detail-usage-unavailable: metrics 404 → unknown, never 0', async () => {
-  renderWith(<NodeDataView />, [
-    nodesHandler(),
-    usageHandler({ metrics_available: false, metrics_denied: false, used_millicores: null, used_bytes: null }),
-  ])
-  await screen.findByText(/no metrics-server/i)
+  renderWith(
+    <NodeDataView name="worker-1" />,
+    [
+      nodesHandler(),
+      usageHandler({
+        metrics_available: false,
+        metrics_denied: false,
+        used_millicores: null,
+        used_bytes: null,
+      }),
+    ],
+    '/cluster/node',
+  )
+  // The usage card renders immediately; await the usage-resolved state.
+  expect(await screen.findByText(/usage is unknown/i)).toBeTruthy()
   // The certainty rule: "unknown" says WHY (no metrics-server) and is never
   // rendered as a 0% bar or a healthy tone.
-  expect(screen.getByText(/usage is unknown/i)).toBeTruthy()
+  expect(screen.getByText(/no metrics-server/i)).toBeTruthy()
 })
 
 test('node-detail-usage-denied: metrics.k8s.io grant denied → "lack the grant", not "install metrics-server"', async () => {
-  renderWith(<NodeDataView />, [
-    nodesHandler(),
-    usageHandler({ metrics_available: false, metrics_denied: true, used_millicores: null, used_bytes: null }),
-  ])
-  await screen.findByText(/lack the metrics\.k8s\.io read grant/i)
+  renderWith(
+    <NodeDataView name="worker-1" />,
+    [
+      nodesHandler(),
+      usageHandler({ metrics_available: false, metrics_denied: true, used_millicores: null, used_bytes: null }),
+    ],
+    '/cluster/node',
+  )
+  // The usage card renders immediately; await the usage-resolved state.
+  expect(await screen.findByText(/usage is unknown/i)).toBeTruthy()
   // The distinct state (certainty rule): the two messages must not be conflated.
+  expect(screen.getByText(/lack the metrics\.k8s\.io read grant/i)).toBeTruthy()
   expect(screen.queryByText(/install metrics-server/i)).toBeNull()
 })
 
 test('node-detail-not-found: unknown node name → error line', async () => {
-  renderWith(<NodeDataView />, [nodesHandler()])
-  await screen.findByText(/Node 'ghost' not found|Loading/i)
-  // The detail page for a node absent from the list resolves to "not found"
-  // once the list query settles (the query is enabled for name=worker-1, so
-  // this asserts the loading path does not error out).
+  // Only the node LIST handler is registered; the usage query (enabled for
+  // name=ghost) 404s → the error line (the query is retry:false). The
+  // NOT-FOUND line requires the list query to settle first (the view looks
+  // up `ghost` in the list) — await it, not the static card header. The
+  // name is a separate JSX child (whitespace splits the text node), so the
+  // matcher must span elements.
+  renderWith(<NodeDataView name="ghost" />, [nodesHandler()], '/cluster/node')
+  expect(
+    await screen.findByText((content) => content?.includes('not found') ?? false),
+  ).toBeTruthy()
+  // R1: the URL never carries identity — the clean list route.
+  expect(window.location.search).toBe('')
 })
