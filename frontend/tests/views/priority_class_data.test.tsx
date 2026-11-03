@@ -1,20 +1,50 @@
 import { render, screen, waitFor } from '@testing-library/react'
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query'
-import { MemoryRouter } from 'react-router-dom'
+import { MemoryRouter, Route, Routes } from 'react-router-dom'
 import { http, HttpResponse } from 'msw'
 import type { ReactElement } from 'react'
 import { afterEach, expect, test } from 'vitest'
 import { server } from '../msw'
+import ObjectRoute from '../../src/components/ObjectRoute'
+import PriorityClassView from '../../src/views/OtherResource/PriorityClass'
 import PriorityClassDataView from '../../src/views/OtherResource/PriorityClassData'
 import { useClusterStore } from '../../src/store/cluster'
 
-const renderAt = (ui: ReactElement, path: string) => {
+// ADR-0040: render through ObjectRoute so the detail is ref-driven (the
+// name comes from the active ref, never from the URL) and
+// window.location.search === '' (R1) is assertable.
+const renderAt = (_ui: ReactElement, path: string, name?: string) => {
   const qc = new QueryClient({ defaultOptions: { queries: { retry: false } } })
   return render(
     <QueryClientProvider client={qc}>
-      <MemoryRouter initialEntries={[path]}>{ui}</MemoryRouter>
+      <MemoryRouter initialEntries={[path]}>
+        <Routes>
+          <Route
+            path="/other-resource/priorityclass"
+            element={
+              <ObjectRoute
+                kind="priorityclass"
+                listRoute="/other-resource/priorityclass"
+                list={<PriorityClassView />}
+                detail={(p) => <PriorityClassDataView name={p.name} />}
+              />
+            }
+          />
+        </Routes>
+      </MemoryRouter>
     </QueryClientProvider>,
   )
+}
+
+// Seed an active ref for the detail to render (the data view's name now
+// comes from ObjectRoute's ref, not the URL).
+const seedActiveRef = (name: string) => {
+  const token = 'testref1'
+  sessionStorage.setItem(
+    'kd_object_refs',
+    JSON.stringify({ [token]: { kind: 'priorityclass', name, ts: Date.now(), origin: 'click' } }),
+  )
+  sessionStorage.setItem('kd_object_active', token)
 }
 
 afterEach(() => {
@@ -60,8 +90,13 @@ test('detail-renders-priority-class-yaml', async () => {
     }),
   )
   selectProd()
-  const { container } = renderAt(<PriorityClassDataView />, '/other-resource/priorityclass/data?name=high')
+  // ADR-0040: the detail is ref-driven — seed the active ref, render at the
+  // clean route, and assert the URL stays clean (R1).
+  seedActiveRef('high')
+  const { container } = renderAt(<PriorityClassDataView name="high" />, '/other-resource/priorityclass')
 
+  // R1: the URL never carries identity.
+  expect(window.location.search).toBe('')
   // wait for the fetch to land before reading what the view asked for.
   // The highlighter splits tokens across <code class="hljs-*"> spans, so
   // `findByText` cannot match a whole token; poll the DOM text instead.
@@ -107,15 +142,21 @@ test('detail-not-found-state', async () => {
     ),
   )
   selectProd()
-  const { container } = renderAt(<PriorityClassDataView />, '/other-resource/priorityclass/data?name=ghost')
+  seedActiveRef('ghost')
+  const { container } = renderAt(<PriorityClassDataView name="ghost" />, '/other-resource/priorityclass')
 
+  // R1: the URL stays clean even for a not-found object.
+  expect(window.location.search).toBe('')
   // empty items upstream is a state, not an error: pinned copy, no fetch-error line.
   expect(await screen.findByText("No PriorityClass 'ghost' found")).toBeTruthy()
   expect(container.textContent).not.toContain('Error')
 })
 
-// detail-missing-name-client-error
-test('detail-missing-name-client-error', async () => {
+// ADR-0040: with no active ref, ObjectRoute renders the list (not the
+// detail), so the missing-name error state is unreachable through the route
+// (R6). The data view itself still guards an empty name for the legacy
+// /data route (TICKET-07 keeps it working until the contract pass).
+test('data-view-empty-name-client-error', async () => {
   const seen: string[] = []
   server.use(
     http.get('*/api/v1/clusters/:id/resources/:kind', ({ request }) => {
@@ -124,7 +165,14 @@ test('detail-missing-name-client-error', async () => {
     }),
   )
   selectProd()
-  renderAt(<PriorityClassDataView />, '/other-resource/priorityclass/data')
+  const qc = new QueryClient({ defaultOptions: { queries: { retry: false } } })
+  render(
+    <QueryClientProvider client={qc}>
+      <MemoryRouter>
+        <PriorityClassDataView name="" />
+      </MemoryRouter>
+    </QueryClientProvider>,
+  )
 
   expect(await screen.findByText('Error: priority class name not provided')).toBeTruthy()
   expect(seen).toHaveLength(0) // no fetch
@@ -139,7 +187,8 @@ test('detail-no-cluster-state', async () => {
     }),
   )
   useClusterStore.setState({ selectedCluster: null, selectedNamespace: null })
-  renderAt(<PriorityClassDataView />, '/other-resource/priorityclass/data?name=high')
+  seedActiveRef('high')
+  renderAt(<PriorityClassDataView name="high" />, '/other-resource/priorityclass')
 
   expect(await screen.findByText('No cluster selected.')).toBeTruthy()
   expect(seen).toHaveLength(0) // no resource fetch is made

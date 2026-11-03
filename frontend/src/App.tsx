@@ -1,10 +1,11 @@
 import React from 'react'
-import { BrowserRouter, Navigate, Route, Routes, useParams } from 'react-router-dom'
+import { BrowserRouter, Navigate, Route, Routes, useParams, useSearchParams } from 'react-router-dom'
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query'
 import { CSpinner } from '@coreui/react'
 
 import DefaultLayout from './layout/DefaultLayout'
 import { AdminRoute, ProtectedRoute } from './routes'
+import ObjectRoute from './components/ObjectRoute'
 import StubView from './views/Stub'
 import { stubRoutes } from './views/Stub/routes'
 import './scss/style.scss'
@@ -82,6 +83,16 @@ const queryClient = new QueryClient({
 })
 
 const Fallback = () => <CSpinner color="primary" />
+
+/**
+ * ADR-0040 TICKET-02: the legacy /data route (kept for TICKET-07's contract
+ * pass) reads the legacy ?name= param and hands it to the migrated data
+ * view, which no longer reads useSearchParams itself.
+ */
+const LegacyPriorityClassData = () => {
+  const [params] = useSearchParams()
+  return <PriorityClassDataView name={params.get('name') ?? ''} />
+}
 
 /** Old per-user privilege URL. The page now lives at /user/privilege. */
 const PrivilegeRedirect = () => {
@@ -383,7 +394,17 @@ const App = () => {
                       path="/other-resource/priorityclass"
                       element={
                         <ProtectedRoute>
-                          <PriorityClassView />
+                          {/* ADR-0040 TICKET-02: template kind — ObjectRoute
+                              renders the list or the ref-matched detail on
+                              the clean route. The old /data route stays for
+                              TICKET-07's contract pass (expand, not
+                              contract). */}
+                          <ObjectRoute
+                            kind="priorityclass"
+                            listRoute="/other-resource/priorityclass"
+                            list={<PriorityClassView />}
+                            detail={(p) => <PriorityClassDataView name={p.name} />}
+                          />
                         </ProtectedRoute>
                       }
                     />
@@ -391,7 +412,11 @@ const App = () => {
                       path="/other-resource/priorityclass/data"
                       element={
                         <ProtectedRoute>
-                          <PriorityClassDataView />
+                          {/* Legacy /data route (TICKET-07 keeps it working
+                              until the contract pass): the view now reads
+                              its name from the active ref, so it falls back
+                              to the legacy ?name= param here. */}
+                          <LegacyPriorityClassData />
                         </ProtectedRoute>
                       }
                     />

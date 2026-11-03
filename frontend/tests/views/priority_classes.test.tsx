@@ -1,11 +1,14 @@
 import { render, screen } from '@testing-library/react'
+import userEvent from '@testing-library/user-event'
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query'
-import { MemoryRouter } from 'react-router-dom'
+import { MemoryRouter, Route, Routes } from 'react-router-dom'
 import { http, HttpResponse } from 'msw'
 import type { ReactElement } from 'react'
 import { afterEach, expect, test, vi } from 'vitest'
 import { server } from '../msw'
+import ObjectRoute from '../../src/components/ObjectRoute'
 import PriorityClassView from '../../src/views/OtherResource/PriorityClass'
+import PriorityClassDataView from '../../src/views/OtherResource/PriorityClassData'
 import { useClusterStore } from '../../src/store/cluster'
 
 // Same KubeDataTable fake as secrets.test.tsx: renders the real row
@@ -66,11 +69,27 @@ vi.mock('../../src/components/KubeDataTable', async () => {
   return { default: KubeDataTable, Column }
 })
 
-const renderAt = (ui: ReactElement, path = '/other-resource/priorityclass') => {
+// ADR-0040: render through ObjectRoute so the click→detail flow is the real
+// one (the ref is the active pointer; the URL never carries identity).
+const renderAt = (_ui: ReactElement, path = '/other-resource/priorityclass') => {
   const qc = new QueryClient({ defaultOptions: { queries: { retry: false } } })
   return render(
     <QueryClientProvider client={qc}>
-      <MemoryRouter initialEntries={[path]}>{ui}</MemoryRouter>
+      <MemoryRouter initialEntries={[path]}>
+        <Routes>
+          <Route
+            path="/other-resource/priorityclass"
+            element={
+              <ObjectRoute
+                kind="priorityclass"
+                listRoute="/other-resource/priorityclass"
+                list={<PriorityClassView />}
+                detail={(p) => <PriorityClassDataView name={p.name} />}
+              />
+            }
+          />
+        </Routes>
+      </MemoryRouter>
     </QueryClientProvider>,
   )
 }
@@ -118,8 +137,9 @@ test('list-renders-priority-classes', async () => {
   selectProd()
   renderAt(<PriorityClassView />)
 
-  const link = await screen.findByRole('link', { name: 'high' })
-  expect(link.getAttribute('href')).toBe('/other-resource/priorityclass/data?name=high')
+  // ADR-0040: the name cell is a button (not a Link) — openObject writes
+  // the ref and navigates; the URL stays clean.
+  const nameButton = await screen.findByRole('button', { name: 'high' })
   // fetch path is EXACTLY the cluster-scoped kind URL, no namespace substring.
   expect(requestedPath).toBe('/api/v1/clusters/1/resources/priorityclasses')
   expect(requestedUrl).not.toContain('namespace')
@@ -145,9 +165,33 @@ test('list-renders-priority-classes', async () => {
   expect(screen.getByText('false')).toBeTruthy()
   expect(screen.getByText('High priority')).toBeTruthy()
   // created: local time (no raw ISO 'T'), rendered by formatTimestamp.
-  const nameCell = link.closest('tr')
+  const nameCell = nameButton.closest('tr')
   expect(nameCell?.textContent).not.toContain('2026-10-26T10:00:00Z')
   expect(nameCell?.textContent).toMatch(/2026/)
+  // ADR-0040: the share button is in the name cell (row affordance).
+  expect(screen.getByRole('button', { name: 'Share high' })).toBeTruthy()
+})
+
+// click-name-renders-detail-with-clean-url (R1)
+test('click-name-renders-detail-with-clean-url', async () => {
+  const user = userEvent.setup()
+  selectProd()
+  server.use(
+    http.get('*/api/v1/clusters/1/resources/priorityclasses', () =>
+      HttpResponse.json({ kind: 'priorityclasses', cluster: 'prod', items: [high] }),
+    ),
+  )
+  renderAt(<PriorityClassView />)
+
+  // Clicking the name button opens the detail via openObject; the URL
+  // never carries identity (R1).
+  const nameButton = await screen.findByRole('button', { name: 'high' })
+  await user.click(nameButton)
+
+  // The detail renders (the active ref is kind-matched).
+  expect(await screen.findByText('Priority Class Data')).toBeTruthy()
+  // The URL is clean: no query string (R1).
+  expect(window.location.search).toBe('')
 })
 
 // list-no-cluster-state
@@ -182,6 +226,7 @@ test('list-error-state', async () => {
   expect(
     await screen.findByText(/Error loading priority classes: RBAC_DENIED: list on priorityclasses/),
   ).toBeTruthy()
-  // no blank table, no rows.
-  expect(screen.queryAllByRole('link', { name: 'high' })).toHaveLength(0)
+  // no blank table, no rows (the name cell is a button, not a link, in the
+  // migrated view).
+  expect(screen.queryAllByRole('button', { name: 'high' })).toHaveLength(0)
 })

@@ -1,5 +1,5 @@
 import React from 'react'
-import { Link, useSearchParams } from 'react-router-dom'
+import { Link } from 'react-router-dom'
 import {
   CBreadcrumb,
   CBreadcrumbItem,
@@ -16,6 +16,7 @@ import anOldHope from 'react-syntax-highlighter/dist/esm/styles/hljs/an-old-hope
 import { apiFetch } from '../../lib/api'
 import type { PriorityClassItem, ResourceList } from '../../lib/types'
 import { useClusterStore } from '../../store/cluster'
+import ShareObjectButton from '../../components/ShareObjectButton'
 import TopMenu from '../../components/TopMenu'
 
 // Same pattern as SecretData.tsx / NetworkPolicyData.tsx: the hljs language
@@ -36,12 +37,14 @@ const NOT_FOUND = 'not found'
  * `json` highlighter). The read is a SINGLE `?name=` fetch (not 4.1's
  * list-then-filter); the kind is cluster-scoped, so the URL carries no
  * namespace param. Empty `items` is a not-found STATE (pinned copy), not an
- * error. The list view's name links are the sole producer of these query
- * strings.
+ * error.
+ *
+ * ADR-0040: identity arrives as props from ObjectRoute (the active ref),
+ * never from useSearchParams — the URL stays clean (R1/R8). The legacy
+ * /data route (TICKET-07's redirect layer) passes the legacy ?name=
+ * through as a prop when it keeps working; this view no longer reads it.
  */
-const PriorityClassDataView = () => {
-  const [params] = useSearchParams()
-  const name = params.get('name') ?? ''
+const PriorityClassDataView = ({ name }: { name: string }) => {
   const cluster = useClusterStore((s) => s.selectedCluster)
 
   const query = useQuery<PriorityClassItem>({
@@ -74,7 +77,16 @@ const PriorityClassDataView = () => {
         </CBreadcrumb>
       </TopMenu>
       <CCardHeader className="py-3">
-        <CCardTitle className="m-0 fw-bold text-primary fs-6">Priority Class Data</CCardTitle>
+        <CCardTitle className="m-0 fw-bold text-primary fs-6 d-flex align-items-center gap-2">
+          Priority Class Data
+          {name !== '' && (
+            <ShareObjectButton
+              kind="priorityclass"
+              name={name}
+              listRoute="/other-resource/priorityclass"
+            />
+          )}
+        </CCardTitle>
       </CCardHeader>
       <CCardBody>
         {!name ? (

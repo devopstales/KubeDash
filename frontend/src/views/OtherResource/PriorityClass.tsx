@@ -1,5 +1,5 @@
 import React from 'react'
-import { Link } from 'react-router-dom'
+import { useNavigate } from 'react-router-dom'
 import {
   CBreadcrumb,
   CBreadcrumbItem,
@@ -11,10 +11,17 @@ import {
 import { useQuery } from '@tanstack/react-query'
 import { apiFetch } from '../../lib/api'
 import { formatTimestamp } from '../../lib/format'
+import { openObject } from '../../lib/objectRef'
 import type { PriorityClassItem, ResourceList } from '../../lib/types'
 import { useClusterStore } from '../../store/cluster'
 import KubeDataTable, { Column } from '../../components/KubeDataTable'
+import ShareObjectButton from '../../components/ShareObjectButton'
 import TopMenu from '../../components/TopMenu'
+
+// The kind is cluster-scoped (no namespace); this route is the template kind
+// for ADR-0040 session object navigation (TICKET-02).
+const KIND = 'priorityclass'
+const LIST_ROUTE = '/other-resource/priorityclass'
 
 type PriorityClassRow = {
   name: string
@@ -45,6 +52,7 @@ const toRow = (item: PriorityClassItem): PriorityClassRow => ({
  */
 const PriorityClassView = () => {
   const cluster = useClusterStore((s) => s.selectedCluster)
+  const navigate = useNavigate()
 
   const query = useQuery<PriorityClassRow[]>({
     queryKey: ['priorityclasses', cluster?.id],
@@ -58,11 +66,21 @@ const PriorityClassView = () => {
     },
   })
 
-  const nameLink = (name: string) =>
+  // ADR-0040: the name cell is a button (not a Link) — openObject writes the
+  // ref to sessionStorage and navigates to the clean list route; the URL
+  // never carries object identity (R1). Cluster-scoped: no namespace.
+  const nameCell = (name: string) =>
     name ? (
-      <Link to={`/other-resource/priorityclass/data?name=${encodeURIComponent(name)}`}>
-        {name}
-      </Link>
+      <>
+        <button
+          type="button"
+          className="btn btn-link btn-sm p-0 text-primary text-decoration-underline"
+          onClick={() => openObject(KIND, name, undefined, LIST_ROUTE, navigate)}
+        >
+          {name}
+        </button>{' '}
+        <ShareObjectButton kind={KIND} name={name} listRoute={LIST_ROUTE} />
+      </>
     ) : null
 
   return (
@@ -88,7 +106,7 @@ const PriorityClassView = () => {
         ) : (
           <KubeDataTable data={query.data ?? []}>
             <Column title="Name" data="name">
-              {nameLink}
+              {nameCell}
             </Column>
             <Column title="Value" data="value" />
             <Column title="Preemption Policy" data="preemptionPolicy" />
