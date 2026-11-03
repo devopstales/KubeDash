@@ -65,8 +65,8 @@ carries three verified defects:
 | Testing section | `Definition of Done` (CI gates) + `Environment & Tooling` (local loops) | CI is the real DoD; local loops are tooling facts |
 | Committing & branching | `### Rules` (ship-branch, conventional commits) + `commits.md` reference line | the ship/branch rule is an operational rule (VERIFIED assumption) |
 | "Where to read before changing" | `Domain model` line + `Artifacts` table | that's what the sentinel block is for |
-| Backlog CRITICAL_INSTRUCTION block | tool-managed region after `<!-- skillgrid:end -->`, refreshed to 1.53.0 via `backlog agents --update-instructions`; trigger scoping lives in `### Rules` (see Decisions item 1) | the region is owned by the `backlog` CLI — hand-written content inside the markers is clobbered; the `### Issue Tracker` line and `backlogmd.md` carry conventions, the block only carries the tool nudge |
-| Mnemonic CRITICAL_INSTRUCTION block (memory + code index) | hand-written `<!-- mnemonic:start/end -->` region after `<!-- skillgrid:end -->`, before the Backlog block (Decisions item 0) | user-requested prominent behavioral layer; mounted-menu tools only (verified against the MCP menu); depth referenced, not inlined |
+| Backlog CRITICAL_INSTRUCTION block | folded into the single CRITICAL_INSTRUCTION as the `## Backlog.md Workflow` section (was: separate tool-managed region, 1.53.0 via `backlog agents --update-instructions`); trigger scoping lives in `### Rules` (see Decisions item 1) | user rule 2026-11-03: only one `<CRITICAL_INSTRUCTION>` per file, last wins — two tagged regions would kill the mnemonic one; the `backlog` CLI's wrapper + tag are removed after folding in its nudge text |
+| Mnemonic CRITICAL_INSTRUCTION block (memory + code index) | the file's **only** `<CRITICAL_INSTRUCTION>`, hand-written `<!-- mnemonic:start/end -->` region after `<!-- skillgrid:end -->` (Decisions item 0), now carrying the folded-in Backlog section too | user-requested prominent behavioral layer; mounted-menu tools only (verified against the MCP menu); depth referenced, not inlined |
 
 **Lean-block discipline applied** (onboarding SKILL.md): no getting-started
 section; reference-don't-write for shared standards (all four referenced rule files
@@ -291,9 +291,15 @@ Full convention (freshness semantics, intent router, CLI fallback):
 <!-- mnemonic:end -->
 ````
 
-*The Backlog managed region (`<!-- BACKLOG.MD GUIDELINES START/END -->`) is not
-hand-written — `backlog agents --update-instructions` injects it (see Decisions
-item 1); it lands after the mnemonic block.*
+*The draft above shows the pre-merge shape. Final form (2026-11-03, user
+rule: **only one `<CRITICAL_INSTRUCTION>` per file — if multiple exist, only
+the last one is honored**): the `backlog agents --update-instructions`
+injection (1.53.0) was folded into the mnemonic block — its
+`## Backlog.md Workflow` content became the block's last section, and the
+`BACKLOG.MD GUIDELINES` wrapper, version comment, and second tag were
+removed. The single block is what the onboarding skill's
+`templates/agents-mnemonic.md` now generates (verified byte-for-byte against
+the committed file).*
 
 ## Decisions & open items (defaults chosen; override on request)
 

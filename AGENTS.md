@@ -205,13 +205,6 @@ change" (import + test edges, depth-capped).
 Full convention (freshness semantics, intent router, CLI fallback):
 `~/.agents/skills/_shared/rules/mnemonic-code-indexing.md`.
 
-</CRITICAL_INSTRUCTION>
-<!-- mnemonic:end -->
-
-<!-- BACKLOG.MD GUIDELINES START -->
-<!-- backlog.md-instructions-version: 1.53.0 -->
-<CRITICAL_INSTRUCTION>
-
 ## Backlog.md Workflow
 
 This project uses Backlog.md for task and project management.
@@ -230,4 +223,4 @@ Use `backlog <command> --help` before running unfamiliar commands. Help shows op
 Do not edit Backlog task, draft, document, decision, or milestone markdown files directly. Use the `backlog` CLI so metadata, relationships, and history stay consistent.
 
 </CRITICAL_INSTRUCTION>
-<!-- BACKLOG.MD GUIDELINES END -->
+<!-- mnemonic:end -->
