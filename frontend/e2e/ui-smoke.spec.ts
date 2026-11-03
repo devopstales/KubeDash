@@ -1,6 +1,6 @@
 import { expect, test } from '@playwright/test'
 
-import { ADMIN_EMAIL, attachErrorWatcher, fatalErrors, loginAs } from './helpers'
+import { ADMIN_EMAIL, attachErrorWatcher, fatalErrors, loginAs, ORIGIN } from './helpers'
 
 /**
  * E2E UI smoke — every IMPLEMENTED WebUI route, logged in as the bootstrap
@@ -304,6 +304,18 @@ test.describe.serial('KubeDash UI smoke (local admin)', () => {
   // is a bus, not storage: it deletes itself on consumption.
   test('deep link: share in a new tab renders the object with a clean URL', async ({ page, context }) => {
     await loginAs(page)
+    // Precondition (acceptance Background): a bound cluster is selected in
+    // the header. A fresh context has an empty persisted kd-cluster-scope
+    // store, so seed it from the registry (idempotent).
+    const clBody = await (await page.request.get('/api/v1/clusters')).json()
+    const cluster = (clBody.items ?? clBody)[0]
+    await page.goto(`${ORIGIN}/login`)
+    await page.evaluate((c) => {
+      localStorage.setItem(
+        'kd-cluster-scope',
+        JSON.stringify({ state: { selectedCluster: c, selectedNamespace: null }, version: 0 }),
+      )
+    }, cluster)
     await page.goto('/cluster/crd')
     await expect(page.getByText('CRD List')).toBeVisible({ timeout: 20_000 })
 

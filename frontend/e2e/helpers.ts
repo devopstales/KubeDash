@@ -88,9 +88,14 @@ export async function loginAs(page: Page): Promise<void> {
     maxRedirects: 0,
   })
   const location = locationFromLocalLogin(resp)
+  // ADR-0025: the session rides the 302's HttpOnly cookies (kd_access +
+  // kd_refresh) — the pre-ADR-0025 parked-token URL (?token=…&refresh=…) is
+  // gone, so the Location is a plain '/'. The cookie set on this response
+  // authenticates the page context (page.request shares the cookie jar).
+  const setCookie = resp.headers()['set-cookie'] ?? ''
+  expect(setCookie, 'auth/local 302 without a kd_access cookie').toContain('kd_access')
   const token = tokenFromLocation(location)
   const refresh = new URL(location, ORIGIN).searchParams.get('refresh') ?? ''
-  expect(token, 'auth/local 302 without a token param').toBeTruthy()
   await page.goto(`${ORIGIN}/login`)
   await page.evaluate(
     ([t, r]) => {
