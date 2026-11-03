@@ -676,6 +676,10 @@ KubeDash Skillgrid onboarding — project context (architecture)
 
 Node list progress matched to 4.1 prototype: thin 4px bars + big stat value (architecture)
 
+## skillgrid/2026-10-24-tls-security-headers/ship
+
+ship — 2026-10-24-tls-security-headers (architecture)
+
 ## skillgrid/2026-10-26-ini-config-source/ship
 
 ship — 2026-10-26-ini-config-source (architecture)
