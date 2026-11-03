@@ -1,11 +1,13 @@
 import React from 'react'
-import { BrowserRouter, Navigate, Route, Routes, useParams, useSearchParams } from 'react-router-dom'
+import { BrowserRouter, Navigate, Route, Routes, useNavigate, useParams, useSearchParams } from 'react-router-dom'
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query'
 import { CSpinner } from '@coreui/react'
 
 import DefaultLayout from './layout/DefaultLayout'
 import { AdminRoute, ProtectedRoute } from './routes'
-import ObjectRoute from './components/ObjectRoute'
+import ObjectRoute, { registerNavigate } from './components/ObjectRoute'
+import { clearActiveRef, getActiveRef, sweepRelay } from './lib/objectRef'
+import { useClusterStore } from './store/cluster'
 import StubView from './views/Stub'
 import { stubRoutes } from './views/Stub/routes'
 import './scss/style.scss'
@@ -92,6 +94,100 @@ const Fallback = () => <CSpinner color="primary" />
 const LegacyPriorityClassData = () => {
   const [params] = useSearchParams()
   return <PriorityClassDataView name={params.get('name') ?? ''} />
+}
+
+/**
+ * ADR-0040 TICKET-03: the legacy /security/secret/data route (kept for
+ * TICKET-07's contract pass) reads the legacy ?name=/?namespace= params and
+ * hands them to the migrated data view, which no longer reads
+ * useSearchParams itself. The namespace falls back the way the old view did
+ * (header's selectedNamespace, then 'default') — only the legacy path needs
+ * it; the ObjectRoute path passes the ref's namespace (authoritative, R8).
+ */
+const LegacySecretData = () => {
+  const [params] = useSearchParams()
+  const selectedNamespace = useClusterStore((s) => s.selectedNamespace)
+  return (
+    <SecretDataView
+      name={params.get('name') ?? ''}
+      namespace={params.get('namespace') || selectedNamespace || 'default'}
+    />
+  )
+}
+
+/**
+ * ADR-0040 TICKET-03: the legacy /security/network-policy/data route (kept
+ * for TICKET-07's contract pass) reads the legacy ?name=/?kind=/?namespace=
+ * params and hands them to the migrated data view. The cluster-scoped kind
+ * carried no ?namespace= param before (the old view defaulted it to '').
+ */
+const LegacyNetworkPolicyData = () => {
+  const [params] = useSearchParams()
+  return (
+    <NetworkPolicyDataView
+      name={params.get('name') ?? ''}
+      kind={params.get('kind') ?? ''}
+      namespace={params.get('namespace') ?? ''}
+    />
+  )
+}
+
+/**
+ * ADR-0040 TICKET-03: the network-policy list route dispatches on the active
+ * ref's API kind. The registry kind IS the policy's API kind, so one ObjectRoute
+ * per kind is the clean mapping — but that would render three `list` nodes
+ * (and register the navigate seam three times). This dispatcher holds the
+ * single seam + ref read and hands the detail to the view with its kind; the
+ * list renders once. The legacy /data route (TICKET-07) is unchanged.
+ */
+const NetworkPolicyRoute = () => {
+  const navigate = useNavigate()
+  // Bumped by the registered navigate seam: openObject sets the active
+  // pointer then navigates to the SAME list route this component renders,
+  // so a plain location memo would not re-run. The seam bumps this state so
+  // the ref is re-read and the detail renders — the same seam ObjectRoute uses.
+  const [, bump] = React.useReducer((c: number) => c + 1, 0)
+  const ref = React.useMemo(
+    () => getActiveRef(),
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+    [bump],
+  )
+  const isPolicy =
+    ref !== null &&
+    (ref.kind === 'NetworkPolicy' ||
+      ref.kind === 'CiliumNetworkPolicy' ||
+      ref.kind === 'CiliumClusterwideNetworkPolicy')
+
+  const seamRef = React.useRef(navigate)
+  seamRef.current = navigate
+  React.useEffect(() => {
+    sweepRelay()
+    registerNavigate((path: string) => {
+      seamRef.current(path)
+      bump()
+    })
+  }, [])
+
+  if (!isPolicy) return <NetworkPolicyView />
+  return (
+    <>
+      <button
+        type="button"
+        className="btn btn-link btn-sm p-0 text-primary"
+        onClick={() => {
+          clearActiveRef()
+          window.history.back()
+        }}
+      >
+        &larr; back to list
+      </button>
+      <NetworkPolicyDataView
+        name={ref!.name}
+        kind={ref!.kind}
+        namespace={ref!.namespace ?? ''}
+      />
+    </>
+  )
 }
 
 /** Old per-user privilege URL. The page now lives at /user/privilege. */
@@ -362,7 +458,16 @@ const App = () => {
                       path="/security/secret"
                       element={
                         <ProtectedRoute>
-                          <SecretView />
+                          {/* ADR-0040 TICKET-03: ObjectRoute renders the list
+                              or the ref-matched detail on the clean route.
+                              The old /data route stays for TICKET-07's
+                              contract pass (expand, not contract). */}
+                          <ObjectRoute
+                            kind="secret"
+                            listRoute="/security/secret"
+                            list={<SecretView />}
+                            detail={(p) => <SecretDataView name={p.name} namespace={p.namespace ?? ''} />}
+                          />
                         </ProtectedRoute>
                       }
                     />
@@ -370,7 +475,11 @@ const App = () => {
                       path="/security/secret/data"
                       element={
                         <ProtectedRoute>
-                          <SecretDataView />
+                          {/* Legacy /data route (TICKET-07 keeps it working
+                              until the contract pass): the view now reads its
+                              identity from props, so it falls back to the
+                              legacy ?name=/?namespace= params here. */}
+                          <LegacySecretData />
                         </ProtectedRoute>
                       }
                     />
@@ -378,7 +487,17 @@ const App = () => {
                       path="/security/network-policy"
                       element={
                         <ProtectedRoute>
-                          <NetworkPolicyView />
+                          {/* ADR-0040 TICKET-03: the registry kind IS the
+                              policy's API kind (NetworkPolicy /
+                              CiliumNetworkPolicy /
+                              CiliumClusterwideNetworkPolicy), so the route
+                              dispatches on the active ref's kind — the
+                              NetworkPolicyRoute dispatcher holds the single
+                              seam + ref read and renders the list (no ref)
+                              or the ref-matched detail (clean route). The
+                              old /data route stays for TICKET-07's contract
+                              pass (expand, not contract). */}
+                          <NetworkPolicyRoute />
                         </ProtectedRoute>
                       }
                     />
@@ -386,7 +505,11 @@ const App = () => {
                       path="/security/network-policy/data"
                       element={
                         <ProtectedRoute>
-                          <NetworkPolicyDataView />
+                          {/* Legacy /data route (TICKET-07 keeps it working
+                              until the contract pass): the view now reads its
+                              identity from props, so it falls back to the
+                              legacy ?name=/?kind=/?namespace= params here. */}
+                          <LegacyNetworkPolicyData />
                         </ProtectedRoute>
                       }
                     />

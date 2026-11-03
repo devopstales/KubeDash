@@ -1,10 +1,14 @@
+import React from 'react'
 import { render, screen } from '@testing-library/react'
+import userEvent from '@testing-library/user-event'
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query'
-import { MemoryRouter } from 'react-router-dom'
+import { MemoryRouter, Route, Routes, useNavigate } from 'react-router-dom'
 import { http, HttpResponse } from 'msw'
 import type { ReactElement } from 'react'
 import { afterEach, expect, test, vi } from 'vitest'
 import { server } from '../msw'
+import { registerNavigate } from '../../src/components/ObjectRoute'
+import { getActiveRef } from '../../src/lib/objectRef'
 import NetworkPolicyView from '../../src/views/Security/NetworkPolicy'
 import { useClusterStore } from '../../src/store/cluster'
 
@@ -66,11 +70,31 @@ vi.mock('../../src/components/KubeDataTable', async () => {
   return { default: KubeDataTable, Column }
 })
 
-const renderAt = (ui: ReactElement, path = '/security/network-policy') => {
+// ADR-0040: mirror App.tsx's NetworkPolicyRoute seam registration so the
+// click→openObject flow runs through the same navigate seam the app uses. The
+// URL never carries identity — the list route is always clean (R1); the
+// click assertions read the active ref back from the registry.
+const NetworkPolicyRoute = () => {
+  const navigate = useNavigate()
+  const seamRef = React.useRef(navigate)
+  seamRef.current = navigate
+  React.useEffect(() => {
+    registerNavigate((path: string) => {
+      seamRef.current(path)
+    })
+  }, [])
+  return <NetworkPolicyView />
+}
+
+const renderAt = (_ui: ReactElement, path = '/security/network-policy') => {
   const qc = new QueryClient({ defaultOptions: { queries: { retry: false } } })
   return render(
     <QueryClientProvider client={qc}>
-      <MemoryRouter initialEntries={[path]}>{ui}</MemoryRouter>
+      <MemoryRouter initialEntries={[path]}>
+        <Routes>
+          <Route path="/security/network-policy" element={<NetworkPolicyRoute />} />
+        </Routes>
+      </MemoryRouter>
     </QueryClientProvider>,
   )
 }
@@ -174,10 +198,12 @@ test('list-renders-namespace-policies', async () => {
   selectTeamA()
   const { container } = renderAt(<NetworkPolicyView />)
 
-  const link = await screen.findByRole('link', { name: 'deny-all' })
-  expect(link.getAttribute('href')).toBe(
-    '/security/network-policy/data?name=deny-all&kind=NetworkPolicy&namespace=team-a',
-  )
+  // ADR-0040: the name cell is a button (not a Link) — openObject writes the
+  // ref and navigates; the URL stays clean.
+  const link = await screen.findByRole('button', { name: 'deny-all' })
+  // R1: the list route is clean — no identity, no `?selected=` (R9).
+  expect(window.location.search).toBe('')
+  expect(link.closest('tr')?.textContent).not.toContain('?selected=')
   expect(container.textContent).toBeTruthy()
   // kind strings byte-for-byte: the 4.1 route name is not a kind.
   expect(seen).toContain('/api/v1/clusters/1/resources/networkpolicies')
@@ -209,11 +235,10 @@ test('list-renders-namespace-policies', async () => {
   // created: local time (no raw ISO 'T'), rendered by formatTimestamp.
   expect(nameCell?.textContent).not.toContain('2026-10-26T10:00:00Z')
   expect(nameCell?.textContent).toMatch(/2026/)
+  // ADR-0040: the share button is in the name cell (row affordance).
+  expect(screen.getByRole('button', { name: 'Share deny-all' })).toBeTruthy()
   // a row with no spec degrades to —, not a crash.
-  const noSpec = screen.getByRole('link', { name: 'no-spec' })
-  expect(noSpec.getAttribute('href')).toBe(
-    '/security/network-policy/data?name=no-spec&kind=NetworkPolicy&namespace=team-a',
-  )
+  const noSpec = screen.getByRole('button', { name: 'no-spec' })
   expect(noSpec.closest('tr')?.textContent).toContain('—')
 })
 
@@ -236,15 +261,11 @@ test('list-cilium-section-shown-when-present', async () => {
   selectTeamA()
   renderAt(<NetworkPolicyView />)
 
-  await screen.findByRole('link', { name: 'deny-all' })
-  const cnpLink = await screen.findByRole('link', { name: 'cnp' })
-  expect(cnpLink.getAttribute('href')).toBe(
-    '/security/network-policy/data?name=cnp&kind=CiliumNetworkPolicy&namespace=team-a',
-  )
-  const ccnpLink = screen.getByRole('link', { name: 'ccnp' })
-  expect(ccnpLink.getAttribute('href')).toBe(
-    '/security/network-policy/data?name=ccnp&kind=CiliumClusterwideNetworkPolicy',
-  )
+  await screen.findByRole('button', { name: 'deny-all' })
+  const cnpLink = await screen.findByRole('button', { name: 'cnp' })
+  const ccnpLink = screen.getByRole('button', { name: 'ccnp' })
+  // ADR-0040: the URL is clean for all three kinds (R1) — identity is the ref.
+  expect(window.location.search).toBe('')
   // the CRD has no policy_types: the Cilium row shows —.
   expect(cnpLink.closest('tr')?.textContent).toContain('—')
 })
@@ -258,9 +279,9 @@ test('list-cilium-section-hidden-when-empty', async () => {
   selectTeamA()
   renderAt(<NetworkPolicyView />)
 
-  await screen.findByRole('link', { name: 'deny-all' })
-  expect(screen.queryAllByRole('link', { name: 'cnp' })).toHaveLength(0)
-  expect(screen.queryAllByRole('link', { name: 'ccnp' })).toHaveLength(0)
+  await screen.findByRole('button', { name: 'deny-all' })
+  expect(screen.queryAllByRole('button', { name: 'cnp' })).toHaveLength(0)
+  expect(screen.queryAllByRole('button', { name: 'ccnp' })).toHaveLength(0)
   // the section title is absent, not an empty table.
   const tables = document.querySelectorAll('table')
   expect(tables.length).toBe(1)
@@ -295,9 +316,9 @@ test('list-cilium-error-renders-when-rows-empty', async () => {
       /Error loading Cilium policies: CLUSTER_UNREACHABLE: cilium apiserver unreachable/,
     ),
   ).toBeTruthy()
-  // no rows, no links.
-  expect(screen.queryAllByRole('link', { name: 'cnp' })).toHaveLength(0)
-  expect(screen.queryAllByRole('link', { name: 'ccnp' })).toHaveLength(0)
+  // no rows, no name buttons.
+  expect(screen.queryAllByRole('button', { name: 'cnp' })).toHaveLength(0)
+  expect(screen.queryAllByRole('button', { name: 'ccnp' })).toHaveLength(0)
 })
 
 test('list-error-state', async () => {
@@ -315,6 +336,38 @@ test('list-error-state', async () => {
   expect(
     await screen.findByText(/Error loading network policies: RBAC_DENIED: list on networkpolicies/),
   ).toBeTruthy()
-  // no blank table, no rows.
-  expect(screen.queryAllByRole('link', { name: 'deny-all' })).toHaveLength(0)
+  // no blank table, no rows (the name cell is a button, not a link, in the
+  // migrated view).
+  expect(screen.queryAllByRole('button', { name: 'deny-all' })).toHaveLength(0)
+})
+
+// click-name-opens-the-ref-with-clean-url (R1 + registry-kind contract)
+test('click-name-opens-the-ref-with-clean-url', async () => {
+  const user = userEvent.setup()
+  server.use(
+    http.get('*/api/v1/clusters/1/resources/networkpolicies', () =>
+      HttpResponse.json({ kind: 'networkpolicies', cluster: 'prod', items: [denyAll] }),
+    ),
+    http.get('*/api/v1/clusters/1/resources/ciliumnetworkpolicies', () =>
+      HttpResponse.json({ kind: 'ciliumnetworkpolicies', cluster: 'prod', items: [] }),
+    ),
+    http.get('*/api/v1/clusters/1/resources/ciliumclusterwidenetworkpolicies', () =>
+      HttpResponse.json({ kind: 'ciliumclusterwidenetworkpolicies', cluster: 'prod', items: [] }),
+    ),
+  )
+  selectTeamA()
+  renderAt(<NetworkPolicyView />)
+
+  // Clicking the name button writes the active ref (kind = the API kind) and
+  // navigates to the clean list route — the URL never carries identity (R1).
+  const nameButton = await screen.findByRole('button', { name: 'deny-all' })
+  await user.click(nameButton)
+
+  expect(window.location.search).toBe('')
+  // the view wrote the active ref: kind = the API kind, name, and namespace
+  // (the registry-kind contract the dispatcher in App.tsx matches on).
+  const ref = getActiveRef()
+  expect(ref?.kind).toBe('NetworkPolicy')
+  expect(ref?.name).toBe('deny-all')
+  expect(ref?.namespace).toBe('team-a')
 })

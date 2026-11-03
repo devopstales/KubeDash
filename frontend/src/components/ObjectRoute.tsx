@@ -69,10 +69,10 @@ const ObjectRoute: React.FC<ObjectRouteProps> = ({ kind, listRoute, list, detail
   seamRef.current = navigate
   useEffect(() => {
     sweepRelay()
-    registeredNavigate = (path: string) => {
+    registerNavigate((path: string) => {
       seamRef.current(path)
       bump()
-    }
+    })
   }, [])
 
   if (!matches) {
@@ -104,6 +104,14 @@ let registeredNavigate: ((path: string) => void) | null = null
 
 export function getRegisteredNavigate(): ((path: string) => void) | null {
   return registeredNavigate
+}
+
+// The navigate seam's writer. ObjectRoute registers it on mount; the
+// network-policy dispatcher (App.tsx, TICKET-03) does the same because it
+// matches the active ref against THREE kinds in one component (a single
+// ObjectRoute renders one list, but its fixed `kind` could only match one).
+export function registerNavigate(fn: ((path: string) => void) | null): void {
+  registeredNavigate = fn
 }
 
 export { openObject }

@@ -2,17 +2,26 @@ import { render, screen, waitFor } from '@testing-library/react'
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query'
 import { MemoryRouter } from 'react-router-dom'
 import { http, HttpResponse } from 'msw'
-import type { ReactElement } from 'react'
 import { afterEach, expect, test } from 'vitest'
 import { server } from '../msw'
 import NetworkPolicyDataView from '../../src/views/Security/NetworkPolicyData'
 import { useClusterStore } from '../../src/store/cluster'
 
-const renderAt = (ui: ReactElement, path: string) => {
+// ADR-0040: identity arrives as props (the ref), never from the URL. Render
+// the data view directly with its identity props at the clean route — the
+// legacy /data route and the ObjectRoute detail both feed it the same props.
+const renderAt = (
+  name: string,
+  kind: string,
+  namespace: string,
+  path = '/security/network-policy',
+) => {
   const qc = new QueryClient({ defaultOptions: { queries: { retry: false } } })
   return render(
     <QueryClientProvider client={qc}>
-      <MemoryRouter initialEntries={[path]}>{ui}</MemoryRouter>
+      <MemoryRouter initialEntries={[path]}>
+        <NetworkPolicyDataView name={name} kind={kind} namespace={namespace} />
+      </MemoryRouter>
     </QueryClientProvider>,
   )
 }
@@ -74,11 +83,10 @@ test('detail-renders-policy-yaml', async () => {
     }),
   )
   selectTeamA()
-  const { container } = renderAt(
-    <NetworkPolicyDataView />,
-    '/security/network-policy/data?name=deny-all&kind=NetworkPolicy&namespace=team-a',
-  )
+  const { container } = renderAt('deny-all', 'NetworkPolicy', 'team-a')
 
+  // R1: the URL never carries identity — it's the clean route.
+  expect(window.location.search).toBe('')
   // wait for the fetch to land before reading what the view asked for.
   // The highlighter splits tokens across <code class="hljs-*"> spans, so
   // `findByText` cannot match a whole token; poll the DOM text instead.
@@ -111,11 +119,10 @@ test('detail-not-found-state', async () => {
     ),
   )
   selectTeamA()
-  const { container } = renderAt(
-    <NetworkPolicyDataView />,
-    '/security/network-policy/data?name=ghost&kind=NetworkPolicy&namespace=team-a',
-  )
+  const { container } = renderAt('ghost', 'NetworkPolicy', 'team-a')
 
+  // R1: the URL stays clean even for a not-found object.
+  expect(window.location.search).toBe('')
   // empty items upstream is a state, not an error: pinned copy, no fetch-error line.
   expect(await screen.findByText("No NetworkPolicy 'ghost' found")).toBeTruthy()
   expect(container.textContent).not.toContain('Error')
@@ -130,10 +137,7 @@ test('detail-bad-kind-client-error', async () => {
     }),
   )
   selectTeamA()
-  const { container } = renderAt(
-    <NetworkPolicyDataView />,
-    '/security/network-policy/data?name=deny-all&kind=Foo&namespace=team-a',
-  )
+  const { container } = renderAt('deny-all', 'Foo', 'team-a')
 
   // closed enum: caught before any fetch. The error line must name the
   // invalid kind, and no `<pre>` (no YAML block) may render.
@@ -155,10 +159,9 @@ test('detail-clusterwide-omits-namespace', async () => {
     }),
   )
   selectTeamA()
-  renderAt(
-    <NetworkPolicyDataView />,
-    '/security/network-policy/data?name=ccnp&kind=CiliumClusterwideNetworkPolicy',
-  )
+  // The clusterwide kind is cluster-scoped: no namespace (the ref carries
+  // undefined, which the route maps to '').
+  renderAt('ccnp', 'CiliumClusterwideNetworkPolicy', '')
 
   await screen.findByText('ccnp')
   // cluster-scoped kind: the fetched URL has no namespace param at all.
@@ -175,10 +178,7 @@ test('detail-empty-kind-client-error', async () => {
     }),
   )
   selectTeamA()
-  const { container } = renderAt(
-    <NetworkPolicyDataView />,
-    '/security/network-policy/data?name=deny-all&kind=&namespace=team-a',
-  )
+  const { container } = renderAt('deny-all', '', 'team-a')
 
   // valid name + empty kind: the enum check (NOT the name check) must
   // reject it — `detail-bad-kind-client-error` covers a bad kind only with
@@ -199,10 +199,7 @@ test('detail-missing-name-error', async () => {
     }),
   )
   selectTeamA()
-  renderAt(
-    <NetworkPolicyDataView />,
-    '/security/network-policy/data?kind=NetworkPolicy&namespace=team-a',
-  )
+  renderAt('', 'NetworkPolicy', 'team-a')
 
   expect(await screen.findByText('Error: policy name not provided')).toBeTruthy()
   expect(seen).toHaveLength(0)

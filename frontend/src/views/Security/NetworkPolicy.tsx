@@ -1,5 +1,5 @@
 import React from 'react'
-import { Link } from 'react-router-dom'
+import { useNavigate } from 'react-router-dom'
 import {
   CBreadcrumb,
   CBreadcrumbItem,
@@ -11,10 +11,18 @@ import {
 import { useQuery } from '@tanstack/react-query'
 import { apiFetch } from '../../lib/api'
 import { formatTimestamp } from '../../lib/format'
+import { openObject } from '../../lib/objectRef'
 import type { CiliumPolicyItem, NetworkPolicyItem, ResourceList } from '../../lib/types'
 import { useClusterStore } from '../../store/cluster'
 import KubeDataTable, { Column } from '../../components/KubeDataTable'
+import ShareObjectButton from '../../components/ShareObjectButton'
 import TopMenu from '../../components/TopMenu'
+
+// ADR-0040: the registry kind is the policy's API kind (NetworkPolicy,
+// CiliumNetworkPolicy, CiliumClusterwideNetworkPolicy) — the kind the detail
+// read needs to map to the right resource plural (policyUrl). The clusterwide
+// kind is cluster-scoped (namespace undefined).
+const LIST_ROUTE = '/security/network-policy'
 
 type PolicyRow = {
   name: string
@@ -42,17 +50,35 @@ const toRow = (item: AnyPolicyItem, kind: string, namespace: string): PolicyRow 
   created: formatTimestamp(item.metadata?.creation_timestamp),
 })
 
-const nameLink = (row: PolicyRow) =>
+// ADR-0040: the name cell is a button (not a Link) — openObject writes the
+// ref (kind = the API kind, so the detail read maps to the right resource
+// plural) and navigates to the clean list route; the URL never carries object
+// identity (R1). The clusterwide kind is cluster-scoped (namespace undefined).
+const nameCell = (row: PolicyRow, navigate: (path: string) => void) =>
   row.name ? (
-    <Link
-      to={`/security/network-policy/data?name=${encodeURIComponent(row.name)}&kind=${row.kind}${
-        row.kind === 'CiliumClusterwideNetworkPolicy'
-          ? ''
-          : `&namespace=${encodeURIComponent(row.namespace)}`
-      }`}
-    >
-      {row.name}
-    </Link>
+    <>
+      <button
+        type="button"
+        className="btn btn-link btn-sm p-0 text-primary text-decoration-underline"
+        onClick={() =>
+          openObject(
+            row.kind,
+            row.name,
+            row.kind === 'CiliumClusterwideNetworkPolicy' ? undefined : row.namespace,
+            LIST_ROUTE,
+            navigate,
+          )
+        }
+      >
+        {row.name}
+      </button>{' '}
+      <ShareObjectButton
+        kind={row.kind}
+        name={row.name}
+        namespace={row.kind === 'CiliumClusterwideNetworkPolicy' ? undefined : row.namespace}
+        listRoute={LIST_ROUTE}
+      />
+    </>
   ) : null
 
 /**
@@ -66,6 +92,7 @@ const nameLink = (row: PolicyRow) =>
 const NetworkPolicyView = () => {
   const cluster = useClusterStore((s) => s.selectedCluster)
   const namespace = useClusterStore((s) => s.selectedNamespace) ?? 'default'
+  const navigate = useNavigate()
 
   const vanillaQuery = useQuery<PolicyRow[]>({
     queryKey: ['network-policies', cluster?.id, namespace, 'networkpolicies'],
@@ -137,7 +164,7 @@ const NetworkPolicyView = () => {
             ) : (
               <KubeDataTable data={vanillaQuery.data ?? []}>
                 <Column title="Name" data={null}>
-                  {(row: PolicyRow) => nameLink(row)}
+                  {(row: PolicyRow) => nameCell(row, navigate)}
                 </Column>
                 <Column title="Policy Types" data="policyTypes" />
                 <Column title="Ingress" data="ingress" />
@@ -158,7 +185,7 @@ const NetworkPolicyView = () => {
                   ) : (
                     <KubeDataTable data={ciliumRows}>
                       <Column title="Name" data={null}>
-                        {(row: PolicyRow) => nameLink(row)}
+                        {(row: PolicyRow) => nameCell(row, navigate)}
                       </Column>
                       <Column title="Policy Types" data="policyTypes" />
                       <Column title="Ingress" data="ingress" />

@@ -1,5 +1,5 @@
 import React from 'react'
-import { Link, useSearchParams } from 'react-router-dom'
+import { useNavigate } from 'react-router-dom'
 import {
   CBreadcrumb,
   CBreadcrumbItem,
@@ -10,10 +10,17 @@ import {
 } from '@coreui/react'
 import { useQuery } from '@tanstack/react-query'
 import { apiFetch } from '../../lib/api'
+import { getActiveRef, openObject } from '../../lib/objectRef'
 import type { K8sSecret, ResourceList } from '../../lib/types'
 import { useClusterStore } from '../../store/cluster'
 import KubeDataTable, { Column } from '../../components/KubeDataTable'
+import ShareObjectButton from '../../components/ShareObjectButton'
 import TopMenu from '../../components/TopMenu'
+
+// The kind is namespaced (unlike the cluster-scoped priorityclass template);
+// this route is the ADR-0040 secret object kind (TICKET-03).
+const KIND = 'secret'
+const LIST_ROUTE = '/security/secret'
 
 type SecretRow = { name: string; type: string }
 
@@ -24,14 +31,19 @@ const toRow = (secret: K8sSecret): SecretRow => ({
 
 /**
  * 4.1 `security/secret.html.j2`: Secrets in the header-selected namespace.
- * The name opens the secret data page; `?selected=<name>` (the Service
- * Accounts links) bolds that secret's name.
+ * A name opens the secret data page via openObject (ADR-0040): the URL never
+ * carries object identity (R1). The previously-opened secret's name is
+ * bolded from the active ref (getActiveRef), not a `?selected=` param (R9).
  */
 const SecretView = () => {
-  const [params] = useSearchParams()
-  const selected = params.get('selected')
   const cluster = useClusterStore((s) => s.selectedCluster)
   const namespace = useClusterStore((s) => s.selectedNamespace) ?? 'default'
+  const navigate = useNavigate()
+  const active = getActiveRef()
+  const selected =
+    active !== null && active.kind === KIND && active.namespace === namespace
+      ? active.name
+      : null
 
   const query = useQuery<SecretRow[]>({
     queryKey: ['secrets', cluster?.id, namespace],
@@ -45,15 +57,26 @@ const SecretView = () => {
     },
   })
 
-  const nameLink = (name: string) =>
+  // ADR-0040: the name cell is a button (not a Link) — openObject writes the
+  // ref to sessionStorage and navigates to the clean list route; the URL
+  // never carries object identity (R1). Namespaced: the namespace is carried
+  // in the ref, not the URL. The bold is driven by the active ref (R9).
+  const nameCell = (name: string) =>
     name ? (
-      <Link
-        to={`/security/secret/data?name=${encodeURIComponent(name)}&namespace=${encodeURIComponent(namespace)}`}
-        className={name === selected ? 'fw-bold' : undefined}
-        aria-current={name === selected ? 'true' : undefined}
-      >
-        {name}
-      </Link>
+      <>
+        <button
+          type="button"
+          className={
+            'btn btn-link btn-sm p-0 text-primary text-decoration-underline' +
+            (name === selected ? ' fw-bold' : '')
+          }
+          aria-current={name === selected ? 'true' : undefined}
+          onClick={() => openObject(KIND, name, namespace, LIST_ROUTE, navigate)}
+        >
+          {name}
+        </button>{' '}
+        <ShareObjectButton kind={KIND} name={name} namespace={namespace} listRoute={LIST_ROUTE} />
+      </>
     ) : null
 
   return (
@@ -79,7 +102,7 @@ const SecretView = () => {
         ) : (
           <KubeDataTable data={query.data ?? []}>
             <Column title="Name" data="name">
-              {nameLink}
+              {nameCell}
             </Column>
             <Column title="Type" data="type" />
           </KubeDataTable>

@@ -1,5 +1,5 @@
 import React, { useState } from 'react'
-import { Link, useSearchParams } from 'react-router-dom'
+import { Link } from 'react-router-dom'
 import {
   CBreadcrumb,
   CBreadcrumbItem,
@@ -22,6 +22,7 @@ import anOldHope from 'react-syntax-highlighter/dist/esm/styles/hljs/an-old-hope
 import { apiFetch } from '../../lib/api'
 import type { K8sSecret, ResourceList } from '../../lib/types'
 import { useClusterStore } from '../../store/cluster'
+import ShareObjectButton from '../../components/ShareObjectButton'
 import TopMenu from '../../components/TopMenu'
 
 const LAST_APPLIED = 'kubectl.kubernetes.io/last-applied-configuration'
@@ -154,12 +155,15 @@ const SecretValue = ({ name, encoded }: { name: string; encoded: string }) => {
  * 4.1 `security/secret-data.html.j2`: one Secret's metadata, annotations
  * (without last-applied), labels, and its decoded data values, each hidden
  * until its eye button is pressed.
+ *
+ * ADR-0040: identity arrives as props from ObjectRoute (the active ref),
+ * never from useSearchParams — the URL stays clean (R1). The namespace is the
+ * ref's namespace (authoritative, R8): never the header's selectedNamespace.
+ * The legacy /data route (TICKET-07's redirect layer) passes the legacy
+ * ?name=/?namespace= through as props when it keeps working; this view no
+ * longer reads the URL.
  */
-const SecretDataView = () => {
-  const [params] = useSearchParams()
-  const name = params.get('name') ?? ''
-  const selectedNamespace = useClusterStore((s) => s.selectedNamespace)
-  const namespace = params.get('namespace') || selectedNamespace || 'default'
+const SecretDataView = ({ name, namespace }: { name: string; namespace: string }) => {
   const cluster = useClusterStore((s) => s.selectedCluster)
 
   const query = useQuery<K8sSecret>({
@@ -195,7 +199,17 @@ const SecretDataView = () => {
         </CBreadcrumb>
       </TopMenu>
       <CCardHeader className="py-3">
-        <CCardTitle className="m-0 fw-bold text-primary fs-6">Secret Data</CCardTitle>
+        <CCardTitle className="m-0 fw-bold text-primary fs-6 d-flex align-items-center gap-2">
+          Secret Data
+          {name !== '' && (
+            <ShareObjectButton
+              kind="secret"
+              name={name}
+              namespace={namespace}
+              listRoute="/security/secret"
+            />
+          )}
+        </CCardTitle>
       </CCardHeader>
       <CCardBody>
         {!name ? (

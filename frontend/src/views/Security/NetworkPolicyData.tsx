@@ -1,5 +1,5 @@
 import React from 'react'
-import { Link, useSearchParams } from 'react-router-dom'
+import { Link } from 'react-router-dom'
 import {
   CBreadcrumb,
   CBreadcrumbItem,
@@ -17,6 +17,7 @@ import { apiFetch } from '../../lib/api'
 import { policyUrl } from '../../lib/policyUrl'
 import type { CiliumPolicyItem, NetworkPolicyItem, ResourceList } from '../../lib/types'
 import { useClusterStore } from '../../store/cluster'
+import ShareObjectButton from '../../components/ShareObjectButton'
 import TopMenu from '../../components/TopMenu'
 
 // Same pattern as SecretData.tsx: the hljs language module is a singleton, so
@@ -36,11 +37,22 @@ type AnyPolicyItem = NetworkPolicyItem | CiliumPolicyItem
  * network. Empty `items` is a not-found STATE (pinned copy), not an error.
  * The list view's name links are the sole producer of these query strings.
  */
-const NetworkPolicyDataView = () => {
-  const [params] = useSearchParams()
-  const name = params.get('name') ?? ''
-  const kind = params.get('kind') ?? ''
-  const namespace = params.get('namespace') ?? ''
+// ADR-0040: identity arrives as props from ObjectRoute (the active ref),
+// never from useSearchParams — the URL stays clean (R1). `kind` is the
+// registry kind (the API kind the ref carries); `namespace` is the ref's
+// namespace (authoritative, R8 — undefined for the cluster-scoped kind).
+// The legacy /data route (TICKET-07's redirect layer) passes the legacy
+// ?name=/?kind=/?namespace= through as props when it keeps working; this
+// view no longer reads the URL.
+const NetworkPolicyDataView = ({
+  name,
+  kind,
+  namespace,
+}: {
+  name: string
+  kind: string
+  namespace: string
+}) => {
   const cluster = useClusterStore((s) => s.selectedCluster)
 
   const url = name !== '' && cluster ? policyUrl(kind, cluster.id, name, namespace) : null
@@ -73,7 +85,17 @@ const NetworkPolicyDataView = () => {
         </CBreadcrumb>
       </TopMenu>
       <CCardHeader className="py-3">
-        <CCardTitle className="m-0 fw-bold text-primary fs-6">Network Policy Data</CCardTitle>
+        <CCardTitle className="m-0 fw-bold text-primary fs-6 d-flex align-items-center gap-2">
+          Network Policy Data
+          {name !== '' && kind !== '' && (
+            <ShareObjectButton
+              kind={kind}
+              name={name}
+              namespace={namespace === '' ? undefined : namespace}
+              listRoute="/security/network-policy"
+            />
+          )}
+        </CCardTitle>
       </CCardHeader>
       <CCardBody>
         {invalidKind ? (
