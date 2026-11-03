@@ -3,9 +3,10 @@ id: TASK-060
 title: >-
   TICKET-06: migrate other-resource views (hpa, vpa, pdb, resource-quota,
   limit-range) + runtimeclass
-status: To Do
+status: Done
 assignee: []
 created_date: '2026-10-29 16:37'
+updated_date: '2026-11-03 12:41'
 labels: []
 milestone: m-2
 dependencies:
@@ -48,3 +49,15 @@ Session object navigation (2026-10-29-session-object-navigation, ADR-0040): migr
 <!-- SECTION:PLAN:BEGIN -->
 1: RED - re-point the 12 view test files. 2: migrate the 12 views per the proven template (TASK-056). 3: App.tsx additive ObjectRoute wraps.
 <!-- SECTION:PLAN:END -->
+
+## Implementation Notes
+
+<!-- SECTION:NOTES:BEGIN -->
+All 6 view pairs migrated to ObjectRoute. 12 test files re-pointed (72 tests pass). tsc clean, eslint clean, vite build green, git diff backend/ empty.
+<!-- SECTION:NOTES:END -->
+
+## Final Summary
+
+<!-- SECTION:FINAL_SUMMARY:BEGIN -->
+Migrated 6 other-resource view pairs (hpa, vpa, pdb, resource-quota, limit-range, runtimeclass) + App.tsx to the ADR-0040 ObjectRoute contract. List views: Link name cell -> button + ShareObjectButton, openObject(kind, name, ns, listRoute, navigate). Data views: useSearchParams removed, {name, namespace} received as props from ObjectRoute, || selectedNamespace || 'default' fallback deleted (R8). App.tsx: all 6 wrapped in ObjectRoute alongside existing /data routes (Legacy*Data wrappers preserve legacy ?name=/?namespace= for TICKET-07). 12 test files re-pointed: link assertions -> click -> detail-render, data-view tests assert window.location.search === '' (R1), data pages read namespace from the ref (R8). Acceptance: 12/12 test files pass (72 tests), tsc clean, eslint clean, vite build green, git diff backend/ empty.
+<!-- SECTION:FINAL_SUMMARY:END -->

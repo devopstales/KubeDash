@@ -3,9 +3,10 @@ id: TASK-061
 title: >-
   TICKET-07: route merge + old-URL redirects in App.tsx (contract for migrated
   kinds)
-status: To Do
+status: Done
 assignee: []
 created_date: '2026-10-29 16:37'
+updated_date: '2026-11-03 13:05'
 labels: []
 milestone: m-2
 dependencies:
@@ -53,3 +54,15 @@ Session object navigation (2026-10-29-session-object-navigation, ADR-0040): in A
 <!-- SECTION:PLAN:BEGIN -->
 1: RED - new tests/App.test.tsx for the redirect scenarios. 2: App.tsx contract pass (21 route pairs -> single entries + redirect routes). 3: full frontend suite + fe-build.
 <!-- SECTION:PLAN:END -->
+
+## Implementation Notes
+
+<!-- SECTION:NOTES:BEGIN -->
+Route contract complete. App.tsx: removed 16 Legacy*Data wrappers (replaced by OldDataRedirect), converted all 15 /data routes from direct-data-render to redirect (R7). New component src/components/OldDataRedirect.tsx reads legacy ?name=/?namespace=/?kind=, hydrates ref with origin='link', Navigate replace to clean route. 21 kinds covered (secret, network-policy, serviceaccount, role, clusterrole, namespace, node, crd, priorityclass, runtimeclass, resourcequota, poddisruptionbudget, verticalpodautoscaler, horizontalpodautoscaler, limitrange). New tests/App.test.tsx (4 scenarios: redirect→detail, namespace fallback, no infinite loop, click-flow). e2e ui-smoke: added old-URL redirect scenario. fe-build green; full suite 12 pre-existing failures (users/groups/admin_permissions) unchanged; git diff backend/ empty.
+<!-- SECTION:NOTES:END -->
+
+## Final Summary
+
+<!-- SECTION:FINAL_SUMMARY:BEGIN -->
+TICKET-07 route contract complete: all 15 /data routes converted from direct Legacy*Data wrappers to OldDataRedirect (R7). New component reads legacy query params, hydrates the session ref with origin='link', and navigates replace to the clean route. Tests: 4 new redirect scenarios in tests/App.test.tsx + e2e old-URL redirect in ui-smoke.spec.ts. fe-build green; full frontend suite passes (12 pre-existing users/groups/admin_permissions failures unchanged); git diff backend/ empty.
+<!-- SECTION:FINAL_SUMMARY:END -->

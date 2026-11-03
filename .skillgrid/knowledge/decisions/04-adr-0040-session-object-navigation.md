@@ -1,7 +1,7 @@
 # SPA object navigation: tab-private `sessionStorage` object ref + same-origin form-POST deep link; no object identity in the URL
 
 ---
-status: "proposed"
+status: "accepted"
 date: 2026-10-29
 supersedes: the "`?name=` + `?namespace=` query-param navigation" deviations clause ratified across the 2026-10-28 view specs (recorded per spec via `NAVIGATION-SUPERSEDED.md` in `.skillgrid/specs/`)
 ---

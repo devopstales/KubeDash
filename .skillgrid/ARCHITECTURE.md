@@ -653,8 +653,40 @@ backoff, namespaces `/logs` and `/events`.
 - **Server state** → TanStack Query (never in Redux/Zustand).
 - **UI state** (selected cluster, sidebar, theme, filters) → Zustand.
 - **Form state** → React hooks / react-hook-form per screen.
-- **Route state** → React Router `useSearchParams` (e.g., log time range,
-  DataTables page/sort).
+- **Route state** → React Router `useSearchParams` — **genuine filters
+  only** (e.g., `?tab=`, `?user=`, `?group=`, DataTables page/sort). K8s
+  object identity (kind/name/namespace) NEVER rides the URL (ADR-0040, R1).
+
+### 4.4.1 Object navigation (ADR-0040)
+
+Object selection in the SPA follows the session-ref contract — there is
+**one route per kind** (the `/.../data` suffix is gone) and the URL never
+carries object identity:
+
+- **Active ref (tab-private)** — the open object is a token-keyed entry in
+  `sessionStorage` (`kd_object_refs` registry + `kd_object_active` pointer,
+  15-min lazy self-expiry). `src/lib/objectRef.ts` owns the store
+  (router-free); `components/ObjectRoute.tsx` renders the LIST or the
+  ref-matched DETAIL on the single clean route (R6 — the detail renders
+  only for a ref of the route's registered kind).
+- **In-tab navigation** — list-row name links call `openObject(...)`:
+  mint a ref, set it active, navigate to the clean list route. No query
+  string.
+- **Cross-tab deep link** — the ⧉ share button
+  (`components/ShareObjectButton.tsx`) writes a token-scoped one-shot relay
+  into `localStorage` (`kd_ref_<token>` + `_exp`, 60 s, self-deleting on
+  consumption) and submits a hidden same-origin form **POST**
+  (`name="o"`, the opaque token only) to the clean route in a new tab;
+  `ObjectRoute` sweeps the relay on mount and adopts the ref. The URL in
+  the fresh tab is the clean route with `location.search === ''`.
+- **Legacy URLs** — the old `/.../data?name=...&namespace=...` routes are
+  one-shot redirects (`components/OldDataRedirect.tsx`): hydrate the ref
+  from the query params (`origin: 'link'`) and `Navigate` (replace) to the
+  clean route. Bookmark-compat only; nothing new links to `/data`.
+- **Views** read identity from the ref via `ObjectRoute` props — never
+  `useSearchParams` (R8). The backend REST query params (`?name=`,
+  `?namespace=` on `/api/v1/clusters/:id/resources/<kind>`) are GET
+  filtering, not navigation, and are unchanged.
 
 ### 4.5 Build → static serving
 

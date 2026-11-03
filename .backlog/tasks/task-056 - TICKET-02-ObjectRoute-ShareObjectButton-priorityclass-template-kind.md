@@ -1,9 +1,10 @@
 ---
 id: TASK-056
 title: 'TICKET-02: ObjectRoute + ShareObjectButton + priorityclass template kind'
-status: To Do
+status: Done
 assignee: []
 created_date: '2026-10-29 16:36'
+updated_date: '2026-11-03 10:57'
 labels: []
 milestone: m-2
 dependencies:
@@ -47,3 +48,15 @@ Session object navigation (2026-10-29-session-object-navigation, ADR-0040): impl
 <!-- SECTION:PLAN:BEGIN -->
 1: RED - re-point priority_class tests to assert location.search === '' + ref-driven render. 2: ObjectRoute + ShareObjectButton per blueprint sections 2-3. 3: migrate the priorityclass pair + additive App.tsx routes. 4: verify KubeDataTable click-cell assumption (small prop addition if needed - lands here).
 <!-- SECTION:PLAN:END -->
+
+## Implementation Notes
+
+<!-- SECTION:NOTES:BEGIN -->
+TICKET-02 implemented: ObjectRoute.tsx (kind-matched list/detail render, mount-time consumeIncoming + sweepRelay, navigate-seam registration with state bump for same-path navigation) + ShareObjectButton.tsx (⧉ icon → postObjectToTab). PriorityClass.tsx migrated (Link → openObject button + ShareObjectButton in name cell). PriorityClassData.tsx migrated (useSearchParams → name prop from ObjectRoute, ShareObjectButton in header). App.tsx: ObjectRoute wired at /other-resource/priorityclass ALONGSIDE existing /data route (LegacyPriorityClassData reads ?name= and passes as prop). Tests: object_route.test.tsx (8 tests: kind-match, mismatch R6, consumeIncoming R4, stale relay R5, navigate seam, sweepRelay, back-to-list), priority_classes.test.tsx re-pointed (link→button, added click-to-detail R1 test), priority_class_data.test.tsx re-pointed (ref-driven render, window.location.search === '' assertions, empty-name guard test). All 30 targeted tests pass. fe-build green (tsc + eslint + build). git diff backend/ empty. 13 pre-existing test failures in users/groups/node/admin_permissions (confirmed via git stash — not caused by this change).
+<!-- SECTION:NOTES:END -->
+
+## Final Summary
+
+<!-- SECTION:FINAL_SUMMARY:BEGIN -->
+TICKET-02 (TASK-056) complete: ObjectRoute + ShareObjectButton + priorityclass template kind migrated end-to-end per ADR-0040. ObjectRoute.tsx renders list/detail by kind-match, runs consumeIncoming+sweepRelay on mount, registers the navigate seam with a state bump for same-path navigation. ShareObjectButton.tsx is a ⧉ icon → postObjectToTab. PriorityClass.tsx: Link→openObject button + ShareObjectButton in name cell. PriorityClassData.tsx: useSearchParams→name prop, ShareObjectButton in header. App.tsx: ObjectRoute at /other-resource/priorityclass alongside legacy /data route (LegacyPriorityClassData wrapper). 30 targeted tests pass, fe-build green, backend diff empty.
+<!-- SECTION:FINAL_SUMMARY:END -->

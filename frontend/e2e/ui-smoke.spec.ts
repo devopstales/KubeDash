@@ -11,8 +11,11 @@ import { ADMIN_EMAIL, attachErrorWatcher, fatalErrors, loginAs } from './helpers
  *                  /settings/export, /user/list, /user/privilege, /user/group,
  *                  /user/group/privilege, /admin/permissions (+tabs),
  *                  /cluster-permission/* (SA, role, role-binding,
- *                  cluster-role, cluster-role-binding, data sub-views),
- *                  /cluster/namespace (+/data), /security/secret (+/data)
+ *                  cluster-role, cluster-role-binding),
+ *                  /cluster/namespace, /security/secret
+ *                  (ADR-0040: the legacy /.../data URLs are redirects —
+ *                  covered by the dedicated old-URL redirect and deep-link
+ *                  scenarios, not by the mount sweep)
  *   Stub views   — the 23 Beta rows from views/Stub/routes.ts, asserted
  *                  batched: each route must mount the SPA shell and render
  *                  its stub title without a JS crash.
@@ -70,21 +73,14 @@ const REAL_ROUTES = [
   '/admin/permissions?tab=templates',
   '/admin/permissions?tab=audit',
   '/cluster-permission/service-account',
-  '/cluster-permission/service-account/data',
   '/cluster-permission/role',
-  '/cluster-permission/role/data',
   '/cluster-permission/role-binding',
   '/cluster-permission/cluster-role',
-  '/cluster-permission/cluster-role/data',
   '/cluster-permission/cluster-role-binding',
-  '/cluster-permission/cluster-role-binding/data',
   '/cluster/namespace',
-  '/cluster/namespace/data',
   '/security/secret',
-  '/security/secret/data',
   // Limit Range (2026-10-28-limitrange-views): real views, not stubs.
   '/other-resource/limit-range',
-  '/other-resource/limit-range/data',
   // Cluster dashboard (2026-10-21-cluster-dashboard): without a selected
   // cluster it renders "No cluster selected." — the mount check below covers
   // both states (no JS crash either way).
@@ -210,7 +206,10 @@ test.describe.serial('KubeDash UI smoke (local admin)', () => {
     })
   })
 
-  test('cluster permissions: all six list + data routes mount', async ({ page }) => {
+  test('cluster permissions: all list routes mount', async ({ page }) => {
+    // ADR-0040 TICKET-07: the legacy /.../data URLs are redirects, not
+    // primary routes — the redirect coverage lives in the dedicated
+    // redirect tests below (old URL + deep link), not in the mount sweep.
     await loginAs(page)
     for (const path of [
       '/cluster-permission/service-account',
@@ -218,17 +217,6 @@ test.describe.serial('KubeDash UI smoke (local admin)', () => {
       '/cluster-permission/role-binding',
       '/cluster-permission/cluster-role',
       '/cluster-permission/cluster-role-binding',
-    ]) {
-      await page.goto(path)
-      await expect(page.locator('aside, nav, .sidebar, .c-sidebar').first()).toBeVisible({
-        timeout: 15_000,
-      })
-    }
-    // Data sub-views (the resource-detail pages).
-    for (const path of [
-      '/cluster-permission/service-account/data',
-      '/cluster-permission/role/data',
-      '/cluster-permission/cluster-role/data',
     ]) {
       await page.goto(path)
       await expect(page.locator('aside, nav, .sidebar, .c-sidebar').first()).toBeVisible({
@@ -261,18 +249,6 @@ test.describe.serial('KubeDash UI smoke (local admin)', () => {
 
     const fatal = fatalErrors(errors)
     expect(fatal, `uncaught page errors: ${fatal.join('\n')}`).toEqual([])
-  })
-
-  test('security: /security/secret + /security/secret/data mount', async ({ page }) => {
-    await loginAs(page)
-    await page.goto('/security/secret')
-    await expect(page.locator('aside, nav, .sidebar, .c-sidebar').first()).toBeVisible({
-      timeout: 15_000,
-    })
-    await page.goto('/security/secret/data')
-    await expect(page.locator('aside, nav, .sidebar, .c-sidebar').first()).toBeVisible({
-      timeout: 15_000,
-    })
   })
 
   test('stub routes: every Beta route mounts the shell and renders its title', async ({ page }) => {
@@ -319,6 +295,67 @@ test.describe.serial('KubeDash UI smoke (local admin)', () => {
     await expect(page.locator('aside, nav, .sidebar, .c-sidebar').first()).toBeVisible({
       timeout: 15_000,
     })
+  })
+
+  // ADR-0040 TICKET-07 (R4): the share deep link — the ⧉ button POSTs an
+  // opaque token (name="o") through the localStorage relay to a NEW tab; the
+  // fresh tab lands on the clean route's ref-driven detail, and the URL
+  // never carries the object identity (location.search === ''). The relay
+  // is a bus, not storage: it deletes itself on consumption.
+  test('deep link: share in a new tab renders the object with a clean URL', async ({ page, context }) => {
+    await loginAs(page)
+    await page.goto('/cluster/crd')
+    await expect(page.getByText('CRD List')).toBeVisible({ timeout: 20_000 })
+
+    // Seed the cross-tab relay the way ShareObjectButton does (postObjectToTab):
+    // localStorage is tab-private in this test's single context… no — it's
+    // shared across tabs of the same context, which is exactly what the relay
+    // relies on. Write it via the page, then drive the POST navigation
+    // directly (form submit from the button would race the new tab's load in
+    // the smoke's 60s budget; the relay + POST is the contract under test).
+    const token = 'e2e-deep-link'
+    await page.evaluate((t) => {
+      localStorage.setItem(`kd_ref_${t}`, JSON.stringify({
+        kind: 'crd',
+        name: 'configmaps.example.com',
+        ts: Date.now(),
+        origin: 'post',
+      }))
+      localStorage.setItem(`kd_ref_${t}_exp`, String(Date.now() + 60_000))
+    }, token)
+
+    // The POST navigation (form body `o=<token>` is opaque; the relay is the
+    // identity carrier).
+    const [popup] = await Promise.all([
+      context.waitForEvent('page'),
+      page.evaluate((t) => {
+        const form = document.createElement('form')
+        form.method = 'POST'
+        form.action = '/cluster/crd'
+        form.target = '_blank'
+        const input = document.createElement('input')
+        input.type = 'hidden'
+        input.name = 'o'
+        input.value = t
+        form.appendChild(input)
+        form.style.display = 'none'
+        document.body.appendChild(form)
+        form.submit()
+      }, token),
+    ])
+    await popup.waitForLoadState('networkidle')
+
+    // R1: the URL is the clean list route with NO query string — the ref,
+    // not the URL, carries the identity.
+    expect(popup.url(), 'deep-link URL must be the clean list route')
+      .toMatch(/^https?:\/\/[^/]+\/cluster\/crd$/)
+    expect(await popup.evaluate(() => location.search), 'deep-link location.search must be empty')
+      .toBe('')
+    // The new tab's ObjectRoute rendered the ref's detail (R6 kind match).
+    await expect(popup.getByText('CRD Data — configmaps.example.com')).toBeVisible({ timeout: 20_000 })
+    // The relay consumed itself (the bus, not storage).
+    expect(await popup.evaluate((t) => localStorage.getItem(`kd_ref_${t}`), token)).toBeNull()
+    await popup.close()
   })
 
   // ponytail: keep REAL_ROUTES referenced so the coverage map is auditable

@@ -1,9 +1,10 @@
 ---
 id: TASK-059
 title: 'TICKET-05: migrate cluster views (namespace, node, crd)'
-status: To Do
+status: Done
 assignee: []
 created_date: '2026-10-29 16:36'
+updated_date: '2026-11-03 11:58'
 labels: []
 milestone: m-2
 dependencies:
@@ -46,3 +47,17 @@ Session object navigation (2026-10-29-session-object-navigation, ADR-0040): migr
 <!-- SECTION:PLAN:BEGIN -->
 1: RED - re-point the 4 view test files. 2: migrate the 6 views (identity from ref; NamespaceData drops the 4.1-bookmark ?namespace= read). 3: App.tsx additive ObjectRoute wraps.
 <!-- SECTION:PLAN:END -->
+
+## Implementation Notes
+
+<!-- SECTION:NOTES:BEGIN -->
+Starting: read templates + all 6 Cluster views + tests. Migrating now.
+
+Migrated 6 Cluster views (Namespaces/NamespaceData/Nodes/NodeData/CRDs/CrdData) to ADR-0040 ObjectRoute: list names are buttons (openObject, cluster-scoped, no namespace) + ShareObjectButton; data views take {name} as props (useSearchParams gone, 4.1 ?namespace= bookmark fallback kept on the legacy /data wrapper in App.tsx); App.tsx wraps all three kinds in ObjectRoute alongside the legacy /data routes. Re-pointed 4 test files (26 tests): click→detail with location.search === '' (R1); CrdData test asserts its two calls (CRD read + instances read) carry the ref's name, instances adding the topbar namespace. STYLEGUIDE name-cell example updated. Verified: 4 test files pass, task fe-build green, git diff -- backend/ empty.
+<!-- SECTION:NOTES:END -->
+
+## Final Summary
+
+<!-- SECTION:FINAL_SUMMARY:BEGIN -->
+Cluster views (namespace/node/crd) migrated to the ADR-0040 ObjectRoute contract per the priorityclass/secret templates. List views: name cells are buttons calling openObject(kind, name, undefined, listRoute, navigate) with a ShareObjectButton beside each; the URL never carries identity (R1). Data views: useSearchParams deleted, identity arrives as a {name} prop from ObjectRoute's active ref (R8); NamespaceData's 4.1 ?namespace= bookmark read moved to the legacy /data wrapper (TICKET-07's R7 redirect supersedes it); CrdData's two-call read (CRD + instances) is unchanged in shape. App.tsx: /cluster/namespace, /cluster/node, /cluster/crd wrapped in ObjectRoute; the old /data routes stay (LegacyNamespaceData/LegacyNodeData/LegacyCrdData) for TICKET-07 — expand, not contract. Tests re-pointed: link assertions → click→detail-render with window.location.search === ''; CrdData test captures both request URLs and asserts the ref's name on both (instances additionally carries the topbar namespace). All acceptance criteria verified: 4 test files green (26 tests), task fe-build green, git diff -- backend/ empty.
+<!-- SECTION:FINAL_SUMMARY:END -->
