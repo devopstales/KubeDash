@@ -1,4 +1,4 @@
-import { describe, expect, test, vi } from 'vitest'
+import { afterEach, describe, expect, test, vi } from 'vitest'
 import {
   clearActiveRef,
   consumeIncoming,
@@ -25,6 +25,22 @@ function seedRelay(
   )
   localStorage.setItem(`kd_ref_${token}_exp`, String(Date.now() - ageMs + 60_000))
 }
+
+/** Seed the one-shot handoff meta the way the SPA fallback injects it into
+ *  the fresh document (bypassing the server; the meta contract is what
+ *  consumeIncoming validates). */
+function seedIncoming(token: string): void {
+  const meta = document.createElement('meta')
+  meta.name = 'kd-object-incoming'
+  meta.content = token
+  document.head.appendChild(meta)
+}
+
+// jsdom does not reset the DOM between tests: a failed consume leaves its
+// one-shot meta in place, which would hydrate the next test's mount.
+afterEach(() => {
+  document.head.querySelector('meta[name="kd-object-incoming"]')?.remove()
+})
 
 describe('registry', () => {
   test('round-trips a token-keyed entry through sessionStorage', () => {
@@ -111,11 +127,11 @@ describe('openObject', () => {
     expect(Object.keys(readRegistry()).length).toBeGreaterThanOrEqual(2)
   })
 
-  test('minted tokens are 8-char hex (32-bit)', () => {
+  test('minted tokens are 16-char hex (64-bit)', () => {
     const navigate = vi.fn()
     openObject('secret', 'a', 'team-a', '/security/secret', navigate)
     const [token] = Object.keys(readRegistry())
-    expect(token).toMatch(/^[0-9a-f]{8}$/)
+    expect(token).toMatch(/^[0-9a-f]{16}$/)
   })
 })
 
@@ -144,7 +160,7 @@ describe('postObjectToTab', () => {
       expect(form.target).toBe('_blank')
       expect(form.innerHTML).toContain('name="o"')
       const input = (form as HTMLFormElement).querySelector('input[name="o"]')
-      expect(input?.getAttribute('value')).toMatch(/^[0-9a-f]{8}$/)
+      expect(input?.getAttribute('value')).toMatch(/^[0-9a-f]{16}$/)
       // No identity in the form body — only the opaque token.
       expect(form.innerHTML).not.toContain('n1')
       expect(form.innerHTML).not.toContain('node')
@@ -165,37 +181,40 @@ describe('postObjectToTab', () => {
 describe('consumeIncoming', () => {
   test('hydrates the relay into the registry + active pointer and self-deletes both keys', () => {
     seedRelay('tok1', { kind: 'secret', name: 'db-creds', namespace: 'team-a' })
-    window.history.replaceState(null, '', '/security/secret?o=tok1')
+    seedIncoming('tok1')
     const ref = consumeIncoming()
     expect(ref).toMatchObject({ kind: 'secret', name: 'db-creds', namespace: 'team-a', origin: 'post' })
     // Relay consumed: no kd_ref_ key survives the handoff.
     expect(Object.keys(localStorage).filter((k) => k.startsWith('kd_ref_'))).toHaveLength(0)
     // Hydrated in-tab: the active ref resolves.
     expect(getActiveRef()?.name).toBe('db-creds')
-    // R1: the ?o= param is stripped from the address bar.
+    // One-shot: the handoff meta is removed from the document, and the URL
+    // is never touched (R1 — nothing to strip).
+    expect(document.querySelector('meta[name="kd-object-incoming"]')).toBeNull()
     expect(window.location.search).toBe('')
   })
 
   test('expired relay (age > 60s) → null, relay keys swept, no hydration', () => {
     seedRelay('tok2', { kind: 'secret', name: 's' }, 90_000)
-    window.history.replaceState(null, '', '/security/secret?o=tok2')
+    seedIncoming('tok2')
     expect(consumeIncoming()).toBeNull()
     expect(Object.keys(localStorage).filter((k) => k.startsWith('kd_ref_'))).toHaveLength(0)
     expect(getActiveRef()).toBeNull()
+    expect(document.querySelector('meta[name="kd-object-incoming"]')).toBeNull()
   })
 
   test('absent relay for a guessed token → null (a miss renders the list, never a wrong object)', () => {
-    window.history.replaceState(null, '', '/security/secret?o=deadbeef0001')
+    seedIncoming('deadbeef0001')
     expect(consumeIncoming()).toBeNull()
     expect(getActiveRef()).toBeNull()
+    expect(document.querySelector('meta[name="kd-object-incoming"]')).toBeNull()
   })
 
-  test('no ?o= param (plain GET) → null and no relay keys are ever consumed', () => {
+  test('no handoff meta (plain document) → null and no relay keys are ever consumed', () => {
     seedRelay('tok3', { kind: 'secret', name: 's' })
-    window.history.replaceState(null, '', '/security/secret')
     expect(consumeIncoming()).toBeNull()
-    // The GET left the relay untouched — only sweepRelay removes it, or a
-    // future POST with the same token would have consumed it.
+    // The plain document left the relay untouched — only sweepRelay removes
+    // it, or a future POST with the same token would have consumed it.
     expect(localStorage.getItem('kd_ref_tok3')).not.toBeNull()
   })
 })

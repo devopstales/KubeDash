@@ -7,7 +7,10 @@
  * one-shot, token-scoped **localStorage relay** (`kd_ref_<token>` +
  * `kd_ref_<token>_exp`, 60 s, self-deleting on consumption) that a hidden
  * same-origin form POST (`name="o"`, the opaque token only) hands to the
- * fresh tab. The relay is a bus, not storage: nothing persists.
+ * server. The server bounces the POST as a 303 to the same path and returns
+ * the token to the fresh tab as a one-shot `<meta name="kd-object-incoming">`
+ * injected into the document (server session state, 60 s) — the token never
+ * appears in a URL. The relay is a bus, not storage: nothing persists.
  *
  * This module is router-free: the navigate fn is registered once by the
  * caller (`openObject`), which keeps it unit-testable without jsdom
@@ -50,10 +53,10 @@ export function writeRegistry(reg: Record<string, ObjectRef>): void {
 
 // ---- Token ----------------------------------------------------------------
 
-/** 32-bit hex via crypto.getRandomValues — the only thing the form body
- *  and the URL may carry. */
+/** 64-bit hex via crypto.getRandomValues — the only thing the form body and
+ *  the server's one-shot meta may carry. */
 export function mintToken(): string {
-  const bytes = new Uint8Array(4)
+  const bytes = new Uint8Array(8)
   crypto.getRandomValues(bytes)
   return Array.from(bytes, (b) => b.toString(16).padStart(2, '0')).join('')
 }
@@ -156,46 +159,44 @@ export function postObjectToTab(
 
 // ---- New-tab mount consumption -------------------------------------------------
 
+/** Name of the one-shot `<meta>` the SPA fallback injects when this
+ *  session's server-side handoff stash is fresh (ADR-0040 R4). */
+export const INCOMING_META = 'kd-object-incoming'
+
 /**
- * Resolve `?o=` on the current document, read + validate + self-delete the
- * relay, hydrate the tab's registry, strip the param. A plain GET (no
- * `?o=`) returns null and never consumes a relay key. An expired or absent
- * relay is a miss — the list renders, never a wrong object.
+ * Resolve the server-injected handoff token on the current document, read +
+ * validate + self-delete the relay, hydrate the tab's registry, and remove
+ * the meta. A plain document (no meta — the common case) returns null and
+ * never consumes a relay key. An expired or absent relay is a miss — the
+ * list renders, never a wrong object.
  */
 export function consumeIncoming(): ObjectRef | null {
-  const params = new URLSearchParams(window.location.search)
-  const token = params.get('o')
-  if (!token) return null
-
-  const stripParam = (): void => {
-    params.delete('o')
-    const qs = params.toString()
-    window.history.replaceState(window.history.state, '', qs ? `?${qs}` : window.location.pathname)
-  }
+  const meta = document.querySelector<HTMLMetaElement>(
+    `meta[name="${INCOMING_META}"]`,
+  )
+  const token = meta?.content ?? null
+  if (!meta || !token) return null
 
   const body = localStorage.getItem(`${RELAY_PREFIX}${token}`)
   const expRaw = localStorage.getItem(`${RELAY_PREFIX}${token}_exp`)
   const expired = expRaw === null || Date.now() > Number(expRaw)
-  // Self-delete either way: the handoff window is over for this token.
+  // Self-delete either way: the handoff window is over for this token, and
+  // the meta is one-shot — the document carries it exactly once.
   localStorage.removeItem(`${RELAY_PREFIX}${token}`)
   localStorage.removeItem(`${RELAY_PREFIX}${token}_exp`)
+  meta.remove()
 
-  if (!body || expired) {
-    stripParam()
-    return null
-  }
+  if (!body || expired) return null
   let ref: ObjectRef
   try {
     ref = JSON.parse(body) as ObjectRef
   } catch {
-    stripParam()
     return null
   }
   const reg = readRegistry()
   reg[token] = ref
   writeRegistry(reg)
   setActiveRef(token)
-  stripParam()
   return ref
 }
 

@@ -21,6 +21,9 @@ const renderAt = (
 
 afterEach(() => {
   window.history.replaceState(null, '', '/other-resource/priorityclass')
+  // jsdom does not reset the DOM between tests: a failed consume leaves its
+  // one-shot meta in place, which would hydrate the next test's mount.
+  document.head.querySelector('meta[name="kd-object-incoming"]')?.remove()
   vi.restoreAllMocks()
 })
 
@@ -60,46 +63,58 @@ describe('ObjectRoute', () => {
     expect(screen.queryByText(/Detail: /)).toBeNull()
   })
 
-  test('consumeIncoming on mount: a matching ?o= deep link renders the detail immediately (R4)', () => {
-    const token = 'abcd1234'
+  test('consumeIncoming on mount: a matching server-injected deep link renders the detail immediately (R4)', () => {
+    const token = 'abcd1234abcd1234'
     localStorage.setItem(
       `kd_ref_${token}`,
       JSON.stringify({ kind: 'priorityclass', name: 'high', ts: Date.now(), origin: 'post' }),
     )
     localStorage.setItem(`kd_ref_${token}_exp`, String(Date.now() + 60_000))
+    // The SPA fallback's one-shot meta, as the fresh document carries it.
+    const meta = document.createElement('meta')
+    meta.name = 'kd-object-incoming'
+    meta.content = token
+    document.head.appendChild(meta)
 
     renderAt(
       <ObjectRoute kind="priorityclass" listRoute="/other-resource/priorityclass" list={list} detail={detail} />,
-      `/other-resource/priorityclass?o=${token}`,
+      '/other-resource/priorityclass',
     )
 
     // The relay is consumed on mount and the detail renders on the first
     // commit.
     expect(screen.getByText('Detail: high')).toBeTruthy()
-    // The ?o= param is stripped (URL stays clean, R4).
+    // The URL is clean (the token never rides it, R4) and the one-shot meta
+    // is consumed from the document.
     expect(window.location.search).toBe('')
+    expect(document.querySelector('meta[name="kd-object-incoming"]')).toBeNull()
     // The relay self-deletes.
     expect(localStorage.getItem(`kd_ref_${token}`)).toBeNull()
     expect(localStorage.getItem(`kd_ref_${token}_exp`)).toBeNull()
   })
 
   test('consumeIncoming on mount: a stale (expired) relay renders the list, not the detail (R5)', () => {
-    const token = 'deadbeef'
+    const token = 'deadbeefdeadbeef'
     localStorage.setItem(
       `kd_ref_${token}`,
       JSON.stringify({ kind: 'priorityclass', name: 'high', ts: Date.now() - 120_000, origin: 'post' }),
     )
     localStorage.setItem(`kd_ref_${token}_exp`, String(Date.now() - 1))
+    const meta = document.createElement('meta')
+    meta.name = 'kd-object-incoming'
+    meta.content = token
+    document.head.appendChild(meta)
 
     renderAt(
       <ObjectRoute kind="priorityclass" listRoute="/other-resource/priorityclass" list={list} detail={detail} />,
-      `/other-resource/priorityclass?o=${token}`,
+      '/other-resource/priorityclass',
     )
 
     expect(screen.getByText('List view')).toBeTruthy()
     expect(screen.queryByText(/Detail: /)).toBeNull()
     // The stale relay is self-deleted.
     expect(localStorage.getItem(`kd_ref_${token}`)).toBeNull()
+    expect(document.querySelector('meta[name="kd-object-incoming"]')).toBeNull()
   })
 
   test('registers the navigate seam on mount (openObject seam)', () => {

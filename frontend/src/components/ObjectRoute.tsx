@@ -24,10 +24,10 @@ export interface ObjectRouteProps {
  * One wrapper per kind (ADR-0040): renders the LIST when the active ref is
  * absent or its kind mismatches; renders the DETAIL when it matches (R6).
  *
- * - mount: `consumeIncoming()` resolves a cross-tab `?o=` handoff (R4 deep
- *   link — the relay self-deletes on consumption) and `sweepRelay()` drops
- *   expired relay pairs; a matching incoming ref makes the detail render on
- *   the first commit.
+ * - mount: `consumeIncoming()` resolves a cross-tab server-injected handoff
+ *   (R4 deep link — the one-shot meta + relay self-delete on consumption)
+ *   and `sweepRelay()` drops expired relay pairs; a matching incoming ref
+ *   makes the detail render on the first commit.
  * - the active ref's namespace is authoritative for the detail (R8):
  *   `detail` receives `{ name, namespace }` from the ref, never from the URL.
  * - history: list→detail is `openObject`'s navigate(listRoute) push;
@@ -42,10 +42,10 @@ const ObjectRoute: React.FC<ObjectRouteProps> = ({ kind, listRoute, list, detail
   const navigate = useNavigate()
   const location = useLocation()
 
-  // The ?o= relay self-deletes on consumption, so consumeIncoming() must run
-  // exactly once per mount (the first useMemo pass); the incoming ref (if
-  // any) is cached in instance state so a later re-read (post-navigation)
-  // does not re-consume (and re-strip) the relay.
+  // The incoming relay self-deletes on consumption, so consumeIncoming()
+  // must run exactly once per mount (the first useState pass); the incoming
+  // ref (if any) is cached in instance state so a later re-read
+  // (post-navigation) does not re-consume (and re-strip) the relay.
   const [incoming] = useState<ObjectRef | null>(() => consumeIncoming())
   // Bumped by the registered navigate seam: openObject sets the active
   // pointer then navigates to the list route (the SAME path the wrapper
@@ -53,10 +53,10 @@ const ObjectRoute: React.FC<ObjectRouteProps> = ({ kind, listRoute, list, detail
   // bumps this state so the ref is re-read and the detail renders.
   const [, bump] = useReducer((c: number) => c + 1, 0)
 
-  // Resolve the active ref: the cached incoming ref (cross-tab ?o= handoff)
-  // or the tab-private active pointer, re-read on every navigation (location
-  // change or seam bump) so a list→detail openObject renders the detail on
-  // the next commit.
+  // Resolve the active ref: the cached incoming ref (cross-tab server
+  // handoff) or the tab-private active pointer, re-read on every navigation
+  // (location change or seam bump) so a list→detail openObject renders the
+  // detail on the next commit.
   const ref = useMemo(
     () => incoming ?? getActiveRef(),
     // eslint-disable-next-line react-hooks/exhaustive-deps
