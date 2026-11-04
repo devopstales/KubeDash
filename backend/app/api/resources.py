@@ -109,6 +109,16 @@ _KINDS: dict[str, tuple[str, str, str]] = {
         "volumesnapshotclasses",
         "snapshot.storage.k8s.io",
     ),
+    # VolumeSnapshot (snapshot.storage.k8s.io, namespaced CRD) — the 4.1-parity
+    # nav leaf resolved by TASK-053 (list + data views; ADR-0022 placement).
+    # Full custom object (the Cilium CRD seam): the CRD's own served version is
+    # the authority, CRD absent -> [] (first-class empty state). Namespaced:
+    # the namespace is honored (a fix for 4.1's all-namespaces read).
+    "volumesnapshots": (
+        "list_volume_snapshots",
+        "volumesnapshots",
+        "snapshot.storage.k8s.io",
+    ),
 }
 
 #: kind → K8sClient method for a single-object ``?name=`` lookup
@@ -127,6 +137,7 @@ _GETTERS: dict[str, str] = {
     "limitranges": "get_limit_range",
     "configmaps": "get_configmap",
     "volumesnapshotclasses": "get_volume_snapshot_class",
+    "volumesnapshots": "get_volume_snapshot",
 }
 
 

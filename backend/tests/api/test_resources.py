@@ -43,6 +43,9 @@ class FakeK8s:
         # True the Cilium list methods raise ClusterUnreachableError like the
         # real K8sClient does against an unreachable apiserver.
         self.cilium_unreachable = False
+        # Namespaces forwarded to list_volume_snapshots (the SAR-denied test
+        # asserts it stays empty — the client call was never made).
+        self.vs_ns_calls: list[str | None] = []
 
     def create_namespace(self, name: str) -> dict:
         self.created_namespaces.append(name)
@@ -708,6 +711,45 @@ class FakeK8s:
         return [
             sc for sc in self.list_volume_snapshot_classes(None) if sc["metadata"]["name"] == name
         ]
+
+    def list_volume_snapshots(self, namespace: str | None) -> list[dict]:
+        # Namespaced CRD (snapshot.storage.k8s.io): the namespace is honored;
+        # the FULL custom object (spec + status) is returned (camelCase). The
+        # all-namespaces branch is DISTINCTLY named (team-b) so the API tests
+        # can tell the branches apart, mirroring list_vertical_pod_autoscalers.
+        self.vs_ns_calls.append(namespace)
+        if namespace is None:
+            return [
+                {
+                    "metadata": {"name": "snap-a", "namespace": "team-b"},
+                    "spec": {"source": {"persistentVolumeClaimName": "pvc-snap-a"}},
+                    "status": {},
+                },
+            ]
+        return [
+            {
+                "metadata": {
+                    "name": "snap-a",
+                    "namespace": namespace or "team-a",
+                    "creationTimestamp": "2026-01-02T03:04:05Z",
+                    "labels": {"team": "a"},
+                },
+                "spec": {
+                    "source": {"persistentVolumeClaimName": "pvc-snap-a"},
+                    "volumeSnapshotClassName": "csi-snap",
+                },
+                "status": {
+                    "readyToUse": True,
+                    "restoreSize": "1Gi",
+                    "boundVolumeSnapshotContentName": "content-snap-a",
+                },
+            }
+        ]
+
+    def get_volume_snapshot(self, namespace: str, name: str) -> list[dict]:
+        if name == "snap-a":
+            return self.list_volume_snapshots(namespace)
+        return []
 
     def readyz(self) -> bool:
         return True
@@ -2673,6 +2715,147 @@ def test_volumesnapshotclass_kind_singular_rejected(api_client, auth_client) -> 
     h = {"Authorization": f"Bearer {auth_client.jwt}"}
     _register(api_client, h)
     r = api_client.get("/api/v1/clusters/1/resources/volumesnapshotclass", headers=h)
+    assert r.status_code == 404
+    assert r.get_json()["error"]["code"] == "RESOURCE_KIND_NOT_SUPPORTED"
+
+
+def test_list_volumesnapshots_200_in_namespace(
+    api_client, auth_client, fake_k8s, monkeypatch
+) -> None:
+    """[volumesnapshots-list-200-in-namespace] a bound user listing
+    volumesnapshots?namespace=team-a gets the FULL custom objects back
+    (spec + status intact, camelCase — the namespaced snapshot.storage.k8s.io
+    CRD)."""
+    auth_client.login()
+    h = {"Authorization": f"Bearer {auth_client.jwt}"}
+    _register(api_client, h)
+    _allow_sar(monkeypatch)
+    r = api_client.get(
+        "/api/v1/clusters/1/resources/volumesnapshots?namespace=team-a", headers=h
+    )
+    assert r.status_code == 200
+    body = r.get_json()
+    assert body["kind"] == "volumesnapshots"
+    assert body["cluster"] == "prod"
+    [item] = body["items"]
+    assert item["metadata"]["name"] == "snap-a"
+    assert item["metadata"]["namespace"] == "team-a"
+    # full object: spec + status intact (camelCase wire form).
+    assert item["spec"]["source"]["persistentVolumeClaimName"] == "pvc-snap-a"
+    assert item["spec"]["volumeSnapshotClassName"] == "csi-snap"
+    assert item["status"]["readyToUse"] is True
+    assert item["status"]["boundVolumeSnapshotContentName"] == "content-snap-a"
+
+
+def test_list_volumesnapshots_honors_namespace(
+    api_client, auth_client, fake_k8s, monkeypatch
+) -> None:
+    """[volumesnapshots-list-honors-namespace] the query namespace is
+    forwarded to the client (the namespaced branch was taken — a fix for
+    4.1's hardcoded all-namespaces read)."""
+    auth_client.login()
+    h = {"Authorization": f"Bearer {auth_client.jwt}"}
+    _register(api_client, h)
+    _allow_sar(monkeypatch)
+    r = api_client.get(
+        "/api/v1/clusters/1/resources/volumesnapshots?namespace=team-a", headers=h
+    )
+    assert r.status_code == 200
+    assert fake_k8s.vs_ns_calls == ["team-a"]
+
+
+def test_list_volumesnapshots_all_namespaces_without_param(
+    api_client, auth_client, fake_k8s, monkeypatch
+) -> None:
+    """[volumesnapshots-list-all-namespaces-without-param] no
+    namespace query hits the all-namespaces branch: the FakeK8s receives
+    None and the distinctly-named team-b item is present."""
+    auth_client.login()
+    h = {"Authorization": f"Bearer {auth_client.jwt}"}
+    _register(api_client, h)
+    _allow_sar(monkeypatch)
+    r = api_client.get("/api/v1/clusters/1/resources/volumesnapshots", headers=h)
+    assert r.status_code == 200
+    body = r.get_json()
+    assert body["kind"] == "volumesnapshots"
+    assert [item["metadata"]["namespace"] for item in body["items"]] == ["team-b"]
+    assert fake_k8s.vs_ns_calls == [None]
+
+
+def test_list_volumesnapshots_get_by_name(
+    api_client, auth_client, fake_k8s, monkeypatch
+) -> None:
+    """[volumesnapshots-get-by-name] ?name= returns a 0/1-item list: a hit
+    returns the one FULL object in team-a, a miss returns [] (mirrors
+    get_secret)."""
+    auth_client.login()
+    h = {"Authorization": f"Bearer {auth_client.jwt}"}
+    _register(api_client, h)
+    # Record AND allow (a deny would 403 before the read).
+    import app.services.rbac as rb
+
+    asked: list[tuple] = []
+
+    def record_and_allow(client, verb, resource, ns, name, group=""):
+        asked.append((verb, resource, ns, name, group))
+        return True
+
+    monkeypatch.setattr(rb, "_cache_get", lambda k: None)
+    monkeypatch.setattr(rb, "_cache_set", lambda k, v: None)
+    monkeypatch.setattr(rb, "_sar_allowed", record_and_allow)
+    r = api_client.get(
+        "/api/v1/clusters/1/resources/volumesnapshots?name=snap-a&namespace=team-a",
+        headers=h,
+    )
+    assert r.status_code == 200
+    [item] = r.get_json()["items"]
+    assert item["metadata"]["name"] == "snap-a"
+    assert item["metadata"]["namespace"] == "team-a"
+    assert item["spec"]["source"]["persistentVolumeClaimName"] == "pvc-snap-a"  # full object
+    r = api_client.get(
+        "/api/v1/clusters/1/resources/volumesnapshots?name=ghost&namespace=team-a",
+        headers=h,
+    )
+    assert r.status_code == 200
+    assert r.get_json()["items"] == []
+    assert ("get", "volumesnapshots", "team-a", "snap-a", "snapshot.storage.k8s.io") in asked
+
+
+def test_list_volumesnapshots_sar_denied(api_client, auth_client, fake_k8s, monkeypatch) -> None:
+    """[volumesnapshots-sar-denied] ADR-0004: the SAR is asked BEFORE the
+    read, with the snapshot.storage.k8s.io group and namespace None (the
+    all-namespaces SAR cache key) — a deny short-circuits to 403
+    RBAC_DENIED and the client call is never made."""
+    auth_client.login()
+    h = {"Authorization": f"Bearer {auth_client.jwt}"}
+    _register(api_client, h)
+    asked = _record_sar(monkeypatch)  # denies every SAR and records calls
+    r = api_client.get("/api/v1/clusters/1/resources/volumesnapshots", headers=h)
+    assert r.status_code == 403
+    assert r.get_json()["error"]["code"] == "RBAC_DENIED"
+    assert ("list", "volumesnapshots", None, None, "snapshot.storage.k8s.io") in asked
+    assert fake_k8s.vs_ns_calls == []  # the client call was never made
+
+
+def test_volumesnapshots_binding_404(api_client, auth_client) -> None:
+    """[volumesnapshots-binding-404] an unbound user: the binding gate
+    fails before the SAR, CLUSTER_NOT_FOUND."""
+    auth_client.login()
+    h = {"Authorization": f"Bearer {auth_client.jwt}"}
+    r = api_client.get(
+        "/api/v1/clusters/999/resources/volumesnapshots?namespace=team-a", headers=h
+    )
+    assert r.status_code == 404
+    assert r.get_json()["error"]["code"] == "CLUSTER_NOT_FOUND"
+
+
+def test_volumesnapshot_kind_singular_rejected(api_client, auth_client) -> None:
+    """[volumesnapshot-kind-singular-rejected] the singular volumesnapshot is
+    not a kind — RESOURCE_KIND_NOT_SUPPORTED (the API kind is the plural)."""
+    auth_client.login()
+    h = {"Authorization": f"Bearer {auth_client.jwt}"}
+    _register(api_client, h)
+    r = api_client.get("/api/v1/clusters/1/resources/volumesnapshot", headers=h)
     assert r.status_code == 404
     assert r.get_json()["error"]["code"] == "RESOURCE_KIND_NOT_SUPPORTED"
 

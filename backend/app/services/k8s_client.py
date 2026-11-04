@@ -883,6 +883,79 @@ class K8sClient:
         item = self._crd_body(item)
         return [item.to_dict() if hasattr(item, "to_dict") else item]
 
+    # VolumeSnapshot (snapshot.storage.k8s.io, namespaced CRD): the same
+    # full-custom-object seam as the Cilium / VPA kinds — the CRD's OWN
+    # served version + scope is the authority (``get_crd_served``); the
+    # snapshot operator is optional, so CRD absent (None) degrades to [] as
+    # a first-class empty state. Unlike 4.1 (a hardcoded all-namespaces
+    # ``list_cluster_custom_object`` read that ignored the selected
+    # namespace), the namespaced read honors the namespace;
+    # ``namespace=None`` spans all namespaces (the all-namespaces branch,
+    # kept for the API).
+    _SNAPSHOT_GROUP = "snapshot.storage.k8s.io"
+    _SNAPSHOT_PLURAL = "volumesnapshots"
+
+    def list_volume_snapshots(self, namespace: str | None) -> list[dict[str, Any]]:
+        """VolumeSnapshot items, FULL custom-object shape (spec + status
+        intact, camelCase — the wire form, like the Cilium CRDs). The CRD's
+        OWN served version + scope is the authority (``get_crd_served``);
+        the namespaced read honors the namespace (a fix for 4.1's hardcoded
+        all-namespaces ``list_cluster_custom_object`` read), and
+        ``namespace=None`` spans all namespaces (the all-namespaces branch,
+        kept for the API). CRD absent (snapshot operator not installed) ->
+        ``[]`` (the expected state, the Cilium absence contract); any other
+        read failure -> ``ClusterUnreachableError`` (502). The pages need
+        ``spec.source`` / ``spec.volumeSnapshotClassName`` / ``status``
+        intact, so this returns the raw object — NOT the lossy
+        ``list_crd_instances`` projection (and no deep-indexing: 4.1's
+        KeyError-500 on a SourceMode-less snapshot is fixed in the view via
+        ``—``)."""
+        served = self.get_crd_served(self._SNAPSHOT_GROUP, self._SNAPSHOT_PLURAL)
+        if served is None:
+            return []
+        version, scope = served
+        custom = self._custom()
+        try:
+            resp = (
+                custom.list_namespaced_custom_object(
+                    self._SNAPSHOT_GROUP, version, namespace, self._SNAPSHOT_PLURAL
+                )
+                if namespace and scope == "Namespaced"
+                else custom.list_cluster_custom_object(
+                    self._SNAPSHOT_GROUP, version, self._SNAPSHOT_PLURAL
+                )
+            )
+        except ApiException as e:
+            self._unreachable("list_volume_snapshots", e)
+            raise AssertionError("unreachable") from e
+        body = self._crd_body(resp)
+        items = body.get("items", [])
+        return [item.to_dict() if hasattr(item, "to_dict") else item for item in items]
+
+    def get_volume_snapshot(self, namespace: str, name: str) -> list[dict[str, Any]]:
+        """One VolumeSnapshot as a 0/1-item FULL custom object; ``[]`` on 404
+        or when the CRD is absent (snapshot operator not installed). Any
+        other ApiException maps to ``ClusterUnreachableError`` (502), matching
+        ``get_cilium_network_policy``. The namespace is the one the data page
+        was linked with (the ``?name=`` branch of the generic route falls
+        back to ``"default"`` when absent — the data page always sends it)."""
+        served = self.get_crd_served(self._SNAPSHOT_GROUP, self._SNAPSHOT_PLURAL)
+        if served is None:
+            return []
+        version, _scope = served
+        custom = self._custom()
+        try:
+            item = custom.get_namespaced_custom_object(
+                self._SNAPSHOT_GROUP, version, namespace, self._SNAPSHOT_PLURAL, name
+            )
+        except ApiException as e:
+            if e.status == 404:
+                return []
+            self._unreachable("get_volume_snapshot", e)
+            raise AssertionError("unreachable") from e
+        item = self._crd_body(item)
+        return [item.to_dict() if hasattr(item, "to_dict") else item]
+
     def list_resource_quotas(self, namespace: str | None) -> list[dict[str, Any]]:
         """ResourceQuota list in the standard kubernetes dict form
         (``to_dict``) for one namespace, or across all namespaces when the
