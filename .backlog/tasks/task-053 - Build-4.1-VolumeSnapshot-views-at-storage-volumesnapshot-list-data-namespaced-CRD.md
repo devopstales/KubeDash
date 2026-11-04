@@ -3,10 +3,10 @@ id: TASK-053
 title: >-
   Build 4.1 VolumeSnapshot views at /storage/volumesnapshot (list + data,
   namespaced CRD)
-status: In Progress
+status: Done
 assignee: []
 created_date: '2026-10-28 15:09'
-updated_date: '2026-10-28 15:10'
+updated_date: '2026-11-04 18:20'
 labels: []
 dependencies: []
 references:
@@ -34,23 +34,23 @@ The nav leaf VolumeSnapshot -> /storage/volumesnapshot (_nav.tsx:102) currently 
 
 ## Acceptance Criteria
 <!-- AC:BEGIN -->
-- [ ] #1 GET /api/v1/clusters/<id>/resources/volumesnapshots?namespace=<ns> returns the full custom-object list (camelCase, spec/status intact) via list_namespaced_custom_object with the CRD served version (get_crd_served, NOT hardcoded v1), SAR-gated on list volumesnapshots (snapshot.storage.k8s.io), 403 RBAC_DENIED on deny
-- [ ] #2 No ?namespace= -> list_cluster_custom_object (all-namespaces branch); CRD absent (404) -> 200 with empty items (first-class empty state, not an error)
-- [ ] #3 GET .../volumesnapshots?name=<name>&namespace=<ns> returns the single full object via _GETTERS; 404 and CRD-absent -> empty items
-- [ ] #4 frontend VolumeSnapshot.tsx renders the list with Name/Usable/SnapshotClass/VolumeClaim/Restore Size columns; card title exactly "Volume Snapshot List"; ALWAYS sends ?namespace= (header-selected, a fix for 4.1 all-namespaces); Usable = readyToUse badge; deep-index fields em-dash when absent; name links to the data page with ?name=&namespace=
-- [ ] #5 frontend VolumeSnapshotData.tsx (NEW in 5.0 — 4.1 had no data page) renders detail at /storage/volumesnapshot/data?name=&namespace= via a single fetch; CTable + deep-index fields; NOT_FOUND is a first-class state (also CRD-absent); full-object JSON block (json hljs grammar)
-- [ ] #6 /storage/volumesnapshot removed from views/Stub/routes.ts; App.tsx wires both views; _nav.tsx leaf unchanged
-- [ ] #7 Backend tests: new tests/services/test_k8s_client_volumesnapshots.py (served-version-namespaced, all-namespaces-branch, crd-absent-empty, 5xx-unreachable, get hit/404/crd-absent) + test_resources.py extensions (namespaced 200, all-namespaces, crd-absent, SAR deny w/ group + namespace, binding 404, singular kind rejected, get-by-name hit/miss)
-- [ ] #8 Frontend tests: volume_snapshots.test.tsx + volume_snapshot_data.test.tsx (mirror network_policies + snapshot_class_data tests); Stub.test.tsx viewPaths updated for the removed route
+- [x] #1 GET /api/v1/clusters/<id>/resources/volumesnapshots?namespace=<ns> returns the full custom-object list (camelCase, spec/status intact) via list_namespaced_custom_object with the CRD served version (get_crd_served, NOT hardcoded v1), SAR-gated on list volumesnapshots (snapshot.storage.k8s.io), 403 RBAC_DENIED on deny
+- [x] #2 No ?namespace= -> list_cluster_custom_object (all-namespaces branch); CRD absent (404) -> 200 with empty items (first-class empty state, not an error)
+- [x] #3 GET .../volumesnapshots?name=<name>&namespace=<ns> returns the single full object via _GETTERS; 404 and CRD-absent -> empty items
+- [x] #4 frontend VolumeSnapshot.tsx renders the list with Name/Usable/SnapshotClass/VolumeClaim/Restore Size columns; card title exactly "Volume Snapshot List"; ALWAYS sends ?namespace= (header-selected, a fix for 4.1 all-namespaces); Usable = readyToUse badge; deep-index fields em-dash when absent; name links to the data page with ?name=&namespace=
+- [x] #5 frontend VolumeSnapshotData.tsx (NEW in 5.0 — 4.1 had no data page) renders detail at /storage/volumesnapshot/data?name=&namespace= via a single fetch; CTable + deep-index fields; NOT_FOUND is a first-class state (also CRD-absent); full-object JSON block (json hljs grammar)
+- [x] #6 /storage/volumesnapshot removed from views/Stub/routes.ts; App.tsx wires both views; _nav.tsx leaf unchanged
+- [x] #7 Backend tests: new tests/services/test_k8s_client_volumesnapshots.py (served-version-namespaced, all-namespaces-branch, crd-absent-empty, 5xx-unreachable, get hit/404/crd-absent) + test_resources.py extensions (namespaced 200, all-namespaces, crd-absent, SAR deny w/ group + namespace, binding 404, singular kind rejected, get-by-name hit/miss)
+- [x] #8 Frontend tests: volume_snapshots.test.tsx + volume_snapshot_data.test.tsx (mirror network_policies + snapshot_class_data tests); Stub.test.tsx viewPaths updated for the removed route
 <!-- AC:END -->
 
 ## Definition of Done
 <!-- DOD:BEGIN -->
-- [ ] #1 Tests pass
-- [ ] #2 Lint and formatting pass
-- [ ] #3 Edge cases covered
-- [ ] #4 No new warnings introduced
-- [ ] #5 Spec/docs updated if behavior changes
+- [x] #1 Tests pass
+- [x] #2 Lint and formatting pass
+- [x] #3 Edge cases covered
+- [x] #4 No new warnings introduced
+- [x] #5 Spec/docs updated if behavior changes
 <!-- DOD:END -->
 
 ## Implementation Plan
@@ -91,4 +91,26 @@ Tracer thread, 4 commits, each independently revertable:
 Key risks/pins: (1) _KINDS+_GETTERS rows are one behavior — 500 if a getter method is missing; (2) CRD version via get_crd_served (NOT 4.1's hardcoded v1) — CRD 404 -> [] WITHOUT calling list/get custom-object (Cilium absence contract); (3) namespaced — namespace None -> list_cluster_custom_object, else list_namespaced_custom_object; get uses get_custom_object(namespace=...); (4) camelCase (raw custom object) — type + cell readers use camelCase keys; (5) deep-index — (the 4.1 KeyError-500 fix); (6) data page is NEW in 5.0 — 4.1 had no data page (dead commented-out link); (7) list ALWAYS sends ?namespace= (header-selected, a fix for 4.1 all-namespaces list); (8) card title verbatim (e2e-smoke contract); (9) fe-build typechecks tests.
 
 Verification floor at end: the blueprint's 4 commands + git diff --stat shows only File-Structure files touched.
+
+RE-BASELINE (2026-11-04, executed on rebase): the plan above predates the ADR-0040 session-object-navigation contract (superseded 2026-10-29, QA PASS 2026-11-04). Execute per the shipped contract: (1) list route /storage/volumesnapshot carries ObjectRoute kind=volumesnapshot; name cells are buttons calling openObject(KIND, name, namespace, LIST_ROUTE, navigate) (namespaced CRD: namespace from the row/store); (2) the data view is a separate component receiving name + namespace PROPS from ObjectRoute (ref namespace authoritative, R8) with a single ?name=&namespace= fetch; (3) App.tsx: NO /data route and NO OldDataRedirect (the /data URL never shipped — the kind was a stub); (4) clone the ResourceQuota pair (namespaced sibling) for list/data shapes, keeping the full-custom-object camelCase readers; (5) T4 adds ui-smoke REAL_ROUTES entry + dev/scripts/demo-data.sh fixtures (volumesnapshots.snapshot.storage.k8s.io CRD + one VolumeSnapshot with status.readyToUse).
 <!-- SECTION:PLAN:END -->
+
+## Implementation Notes
+
+<!-- SECTION:NOTES:BEGIN -->
+T1 done (2138db40): backend volumesnapshots kind (CRD namespaced, full object, SAR-gated). Service tests RED->GREEN (7), API tests +7, full backend suite 603 passed / 10 deselected (baseline 589 + 14 new).
+
+T2 in progress: VolumeSnapshotItem type + VolumeSnapshot.tsx list view (ConfigMap namespaced+Storage pattern, ADR-0040 ref nav). List tests RED->GREEN (8), tsc --noEmit clean.
+
+T3 done: VolumeSnapshotData.tsx (ConfigMapData namespaced data pattern; CTable 4.1 list cols + labels/annotations + JSON block; NOT_FOUND-as-state; deep-index — fix; single ?name=&namespace= fetch). Data tests RED->GREEN (4), tsc clean.
+
+T4 done (9af5180a): App.tsx ObjectRoute (kind=volumesnapshot, list+detail, namespaced R8, no /data route, no R7 redirect); stub row dropped; Stub.test viewPaths + ui-smoke (SMOKE_STUB->REAL_ROUTES) + demo-data (Namespaced CRD volumesnapshots.snapshot.storage.k8s.io + demo-snap fixture). FLOOR: fe-build built OK; fe-check air-gap pass; fe-sync synced; frontend vitest 343 passed / 12 pre-existing failures (users/groups/admin_permissions — none in my files, my 12 new tests all pass); backend pytest 603 passed / 10 deselected (baseline 589 + 14 new); git diff --stat 2365cff8..HEAD = exactly 14 files (File Structure + ui-smoke/demo-data re-baseline), _nav.tsx UNTOUCHED.
+
+Closeout (320e2b4b): same CRD annotation fix as TASK-051 — the VolumeSnapshotClass fixture lacked the protected `api-approved` annotation, so the CRD never went Ready/Established and the dev list rendered empty. The fixture now applies the annotated CRDs in a dedicated first pass.
+<!-- SECTION:NOTES:END -->
+
+## Final Summary
+
+<!-- SECTION:FINAL_SUMMARY:BEGIN -->
+Built 4.1 VolumeSnapshot list+data views at /storage/volumesnapshot (namespaced snapshot.storage.k8s.io CRD) per the re-baselined ADR-0040 session-object-navigation contract. 4 commits (each independently revertable): T1 2138db40 backend kind (list_volume_snapshots/get_volume_snapshot via get_crd_served served-version+scope authority, CRD-absent->[], namespaced read, full camelCase object, SAR-gated, _KINDS+_GETTERS); T2 bb393690 list view (ConfigMap namespaced+Storage pattern, card title 'Volume Snapshot List', Usable readyToUse badge, deep-index fields — when absent, openObject ref nav); T3 443adbdf data view (NEW in 5.0 — 4.1 had none; single ?name=&namespace= fetch, CTable 4.1 cols + labels/annotations + JSON block, NOT_FOUND-as-state); T4 9af5180a routing (ObjectRoute kind=volumesnapshot, no /data route, no R7 redirect) + stub removal + demo fixture (Namespaced CRD + demo-snap). Verified: backend pytest 603 passed/10 deselected (baseline 589 + 14 new: 7 service + 7 API, TDD RED->GREEN each task); frontend vitest 343 passed/12 pre-existing failures (users/groups/admin_permissions; my 12 new tests all green); fe-build built OK; fe-check air-gap pass; fe-sync synced; git diff --stat 2365cff8..HEAD = exactly 14 files (File Structure + ui-smoke/demo-data re-baseline), _nav.tsx UNTOUCHED. Deltas from pre-rebaseline AC text: (1) list/data nav is ADR-0040 ref-based (openObject + ObjectRoute props), not ?name=&namespace= URLs — the /data URL never shipped (was a stub); (2) service test file is test_k8s_client_volume_snapshots.py (per task; AC said volumesnapshots) — CRD-absent verified at service level per the VPA/snapshotclass sibling pattern; (3) list adds a Created column (formatTimestamp) matching the sibling list templates.
+<!-- SECTION:FINAL_SUMMARY:END -->

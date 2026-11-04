@@ -3,10 +3,10 @@ id: TASK-051
 title: >-
   Build 4.1 SnapshotClass views at /storage/snapshot-class (list + data,
   cluster-scoped CRD)
-status: In Progress
+status: Done
 assignee: []
 created_date: '2026-10-28 14:31'
-updated_date: '2026-10-28 14:32'
+updated_date: '2026-11-04 17:35'
 labels: []
 dependencies: []
 references:
@@ -30,24 +30,24 @@ The nav leaf 'SnapshotClass -> /storage/snapshot-class' (_nav.tsx:104) currently
 
 ## Acceptance Criteria
 <!-- AC:BEGIN -->
-- [ ] #1 GET /api/v1/clusters/<id>/resources/volumesnapshotclasses returns the SnapshotClass list as full custom objects (driver+deletionPolicy+parameters intact, camelCase), SAR-gated on list volumesnapshotclasses (snapshot.storage.k8s.io), 403 RBAC_DENIED on deny
-- [ ] #2 GET .../volumesnapshotclasses?name=<name> returns the single full SnapshotClass via _GETTERS; 404/CRD-absent -> empty items
-- [ ] #3 CRD absent (snapshot operator not installed) -> items == [] 200 (a state, not an error) - the get_crd_served None -> [] contract
-- [ ] #4 Cluster-scoped: ?namespace= is accepted and ignored (list_cluster_custom_object / get_cluster_custom_object)
-- [ ] #5 frontend SnapshotClass.tsx renders the list with Name/Default/Deletion Policy/Driver columns (cluster-scoped, no namespace); card title exactly "Snapshot Classes List"; Default = is-default-class annotation; name links to the data page with ?name= only
-- [ ] #6 frontend SnapshotClassData.tsx renders detail at /storage/snapshot-class/data?name= via a single fetch; CTable + Parameters table; NOT_FOUND is a first-class state; full-object JSON block (json hljs grammar)
-- [ ] #7 /storage/snapshot-class removed from views/Stub/routes.ts; App.tsx wires both views; _nav.tsx leaf unchanged
-- [ ] #8 Backend tests: new tests/services/test_k8s_client_volume_snapshot_classes.py (list ignores-namespace full-object, CRD-absent empty, get hit/404/5xx/ignores-namespace) + test_resources.py extensions (200 full-object, ignores-namespace, get-by-name hit/miss, SAR deny w/ group snapshot.storage.k8s.io + namespace None, binding 404, singular kind rejected)
-- [ ] #9 Frontend tests: snapshot_classes.test.tsx + snapshot_class_data.test.tsx (mirror priority_classes/priority_class_data tests; cluster-scoped no namespace); Stub.test.tsx viewPaths updated for the removed route
+- [x] #1 GET /api/v1/clusters/<id>/resources/volumesnapshotclasses returns the SnapshotClass list as full custom objects (driver+deletionPolicy+parameters intact, camelCase), SAR-gated on list volumesnapshotclasses (snapshot.storage.k8s.io), 403 RBAC_DENIED on deny
+- [x] #2 GET .../volumesnapshotclasses?name=<name> returns the single full SnapshotClass via _GETTERS; 404/CRD-absent -> empty items
+- [x] #3 CRD absent (snapshot operator not installed) -> items == [] 200 (a state, not an error) - the get_crd_served None -> [] contract
+- [x] #4 Cluster-scoped: ?namespace= is accepted and ignored (list_cluster_custom_object / get_cluster_custom_object)
+- [x] #5 frontend SnapshotClass.tsx renders the list with Name/Default/Deletion Policy/Driver columns (cluster-scoped, no namespace); card title exactly "Snapshot Classes List"; Default = is-default-class annotation; name links to the data page with ?name= only
+- [x] #6 frontend SnapshotClassData.tsx renders detail at /storage/snapshot-class/data?name= via a single fetch; CTable + Parameters table; NOT_FOUND is a first-class state; full-object JSON block (json hljs grammar)
+- [x] #7 /storage/snapshot-class removed from views/Stub/routes.ts; App.tsx wires both views; _nav.tsx leaf unchanged
+- [x] #8 Backend tests: new tests/services/test_k8s_client_volume_snapshot_classes.py (list ignores-namespace full-object, CRD-absent empty, get hit/404/5xx/ignores-namespace) + test_resources.py extensions (200 full-object, ignores-namespace, get-by-name hit/miss, SAR deny w/ group snapshot.storage.k8s.io + namespace None, binding 404, singular kind rejected)
+- [x] #9 Frontend tests: snapshot_classes.test.tsx + snapshot_class_data.test.tsx (mirror priority_classes/priority_class_data tests; cluster-scoped no namespace); Stub.test.tsx viewPaths updated for the removed route
 <!-- AC:END -->
 
 ## Definition of Done
 <!-- DOD:BEGIN -->
-- [ ] #1 Tests pass
-- [ ] #2 Lint and formatting pass
-- [ ] #3 Edge cases covered
-- [ ] #4 No new warnings introduced
-- [ ] #5 Spec/docs updated if behavior changes
+- [x] #1 Tests pass
+- [x] #2 Lint and formatting pass
+- [x] #3 Edge cases covered
+- [x] #4 No new warnings introduced
+- [x] #5 Spec/docs updated if behavior changes
 <!-- DOD:END -->
 
 ## Implementation Plan
@@ -88,4 +88,26 @@ Tracer thread, 4 commits, each independently revertable:
 Key risks/pins: (1) _KINDS+_GETTERS rows are one behavior — 500 if a getter method is missing; (2) MUST call get_crd_served first and return [] when None — forgetting it is a 500 on any cluster without the snapshot operator; (3) full custom object camelCase (not snake_case) — type + cell readers use camelCase keys; (4) cluster-scoped — namespace accepted-and-ignored, get_cluster_custom_object (NOT namespaced); (5) data view treats items:[] as not-found state (miss OR CRD-absent), not error; (6) Default column = is-default-class annotation (— when absent); (7) card title verbatim (e2e-smoke contract); (8) fe-build typechecks tests.
 
 Verification floor at end: the blueprint's 4 commands + git diff --stat shows only File-Structure files touched.
+
+RE-BASELINE (2026-11-04, executed on rebase): the plan above predates the ADR-0040 session-object-navigation contract (superseded 2026-10-29, QA PASS 2026-11-04). Execute per the shipped contract: (1) list route /storage/snapshot-class carries ObjectRoute kind=snapshotclass; name cells are buttons calling openObject(KIND, name, undefined, LIST_ROUTE, navigate) (cluster-scoped CRD: no namespace); (2) the data view is a separate component receiving name as a PROP from ObjectRoute (not useSearchParams) with a single ?name= fetch; (3) App.tsx: NO /data route and NO OldDataRedirect (the /data URL never shipped — the kind was a stub); (4) clone the RuntimeClass pair (cluster-scoped sibling) for list/data shapes, keeping the full-custom-object camelCase readers; (5) T4 adds ui-smoke REAL_ROUTES entry + dev/scripts/demo-data.sh fixtures (volumesnapshotclasses.snapshot.storage.k8s.io CRD + one SnapshotClass, minimal x-kubernetes-preserve-unknown-fields schema).
 <!-- SECTION:PLAN:END -->
+
+## Implementation Notes
+
+<!-- SECTION:NOTES:BEGIN -->
+T1 DONE (commit 7279d411): backend volumesnapshotclasses kind. RED=6 service tests AttributeError; GREEN=6 passed. resources.py _KINDS+_GETTERS rows. Full suite 589 passed,10 deselected (baseline 577+12). Delta: get_crd_served returns (version,scope) not (group,version) — unpacked version,_scope and passed _SNAPSHOT_CLASS_GROUP explicitly (code wins over the plan's '(group,version)=served').
+
+T2 DONE (commit 3f739884): SnapshotClass list view + VolumeSnapshotClassItem type (camelCase, next to CiliumPolicyItem) + 6 list tests (RED=import failure, GREEN=6 passed, tsc clean). Columns Name/Default/Deletion Policy/Driver/Created; card title 'Snapshot Classes List' verbatim.
+
+T3 DONE (commit c413d085): SnapshotClassData view (single ?name= fetch, name prop from ObjectRoute, CTable + Parameters + JSON block) + 5 data tests (RED=import failure, GREEN=5 passed, tsc clean).
+
+T4 DONE (commit 2365cff8): App.tsx ObjectRoute wiring (kind=snapshotclass, first build — no /data route, no R7 redirect, cluster-scoped), stub route dropped, Stub.test.tsx viewPaths + ui-smoke REAL_ROUTES moved, demo-data.sh CRD+csi-default fixture. FLOOR: fe-build (tsc+eslint+build) PASS; fe-check (air-gap) PASS; fe-sync synced; vitest 331 passed / 12 failed (12 pre-existing in groups/users/admin_permissions — none in changed files; baseline 320+11 new passes); pytest 589 passed, 10 deselected (baseline 577+12 new); git diff --stat = exactly the file-list files, _nav.tsx untouched. Warnings verified pre-existing (testcontainers.postgres + PyJWT InsecureKeyLengthWarning). Ruff: new code clean (12 pre-existing E501 in test_resources.py, none new).
+
+Closeout (320e2b4b): live dev-cluster verification found the snapshot CRDs never went Ready/Established — the apiextensions group protects the `api-approved` annotation, which the fixture lacked, so the dev list rendered empty. The fixture now applies the annotated CRDs in a dedicated first pass.
+<!-- SECTION:NOTES:END -->
+
+## Final Summary
+
+<!-- SECTION:FINAL_SUMMARY:BEGIN -->
+Built 4.1 SnapshotClass list+data views at /storage/snapshot-class (cluster-scoped CRD volumesnapshotclasses.snapshot.storage.k8s.io), per the ADR-0040 re-baselined contract. 4 commits: 7279d411 (backend kind: get_crd_served-authoritative full-custom-object seam, cluster-scoped, CRD-absent->[], SAR-gated), 3f739884 (list view, card title 'Snapshot Classes List' verbatim, Name/Default/Deletion Policy/Driver/Created, openObject nav), c413d085 (data view, single ?name= fetch, CTable+Parameters+JSON block, not-found state), 2365cff8 (ObjectRoute wiring, stub removal, ui-smoke REAL_ROUTES, demo-data CRD+csi-default fixture). Verified: TDD RED->GREEN per task; backend pytest 589 passed/10 deselected (baseline 577+12 new); frontend vitest 331 passed/12 failed (12 pre-existing in groups/users/admin_permissions, none in changed files; baseline 320+11 new); fe-build (tsc+eslint+build) PASS; fe-check air-gap PASS; fe-sync synced; ruff new code clean; git diff --stat = exactly the 14 file-list files, _nav.tsx untouched. Deltas noted: get_crd_served returns (version,scope) not (group,version).
+<!-- SECTION:FINAL_SUMMARY:END -->
