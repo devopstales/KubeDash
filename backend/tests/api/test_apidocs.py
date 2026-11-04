@@ -6,6 +6,7 @@ from __future__ import annotations
 
 import importlib.resources
 import json
+import re
 
 from app.core import apidocs
 
@@ -38,6 +39,24 @@ def test_docs_page_uses_local_asset_routes(api_client):
     assert "cdn.jsdelivr.net" not in html
     assert "https://" not in html
     assert "http://" not in html
+
+
+def test_docs_page_inline_script_carrys_response_nonce(api_client):
+    # ADR-0026: every response is served under a per-request CSP
+    # (script-src 'self' 'nonce-…', no unsafe-inline). The swagger config
+    # script is the only inline script the app serves — it must carry the
+    # SAME nonce the response header admits, or the browser blocks it and
+    # the page renders an empty #swagger-ui-container.
+    resp = api_client.get("/api/docs")
+    html = resp.get_data(as_text=True)
+    m = re.search(r'<script nonce="([^"]*)">', html)
+    assert m, "the inline swagger config script must carry a CSP nonce attribute"
+    nonce_attr = m.group(1)
+    m_csp = re.search(r"'nonce-([^']+)'", resp.headers.get("Content-Security-Policy", ""))
+    assert m_csp, "the docs page must be served under the nonce CSP"
+    assert nonce_attr == m_csp.group(1), (
+        "the script's nonce must equal the nonce the response CSP admits"
+    )
 
 
 def test_asset_routes_serve_real_files(api_client):

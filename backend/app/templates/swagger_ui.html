@@ -8,7 +8,7 @@
     <div id="swagger-ui-container"></div>
     <script src="/api/docs/swagger-ui-standalone-preset.js"></script>
     <script src="/api/docs/swagger-ui-bundle.js"></script>
-    <script>
+    <script nonce="{{ g.csp_nonce }}">
       config = {
         url: "{{ spec_url }}",
         dom_id: '#swagger-ui-container'
