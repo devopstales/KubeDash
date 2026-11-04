@@ -119,6 +119,10 @@ _KINDS: dict[str, tuple[str, str, str]] = {
         "volumesnapshots",
         "snapshot.storage.k8s.io",
     ),
+    # PVC (core, namespaced) — the 4.1-parity nav leaf resolved by the
+    # pvc-views change (list + data views; ADR-0022 placement). The 4.1
+    # route name was "pvc"; the API kind is the plural.
+    "persistentvolumeclaims": ("list_persistent_volume_claims", "persistentvolumeclaims", ""),
 }
 
 #: kind → K8sClient method for a single-object ``?name=`` lookup
@@ -138,6 +142,7 @@ _GETTERS: dict[str, str] = {
     "configmaps": "get_configmap",
     "volumesnapshotclasses": "get_volume_snapshot_class",
     "volumesnapshots": "get_volume_snapshot",
+    "persistentvolumeclaims": "get_persistent_volume_claim",
 }
 
 

@@ -974,6 +974,24 @@ class K8sClient:
             raise AssertionError("unreachable") from e
         return [q.to_dict() for q in resp.items]
 
+    def list_persistent_volume_claims(self, namespace: str | None) -> list[dict[str, Any]]:
+        """PersistentVolumeClaim list in the standard kubernetes dict form
+        (``to_dict``) for one namespace, or across all namespaces when the
+        namespace is ``None`` (the ``list_secrets`` branch). No field
+        stripping — the view renders ``spec``/``status`` and the data page
+        the full object. A transport ApiException maps to
+        ``ClusterUnreachableError`` (502)."""
+        try:
+            resp = (
+                self._v1.list_namespaced_persistent_volume_claim(namespace)
+                if namespace
+                else self._v1.list_persistent_volume_claim_for_all_namespaces()
+            )
+        except ApiException as e:
+            self._unreachable("list_persistent_volume_claims", e)
+            raise AssertionError("unreachable") from e
+        return [pvc.to_dict() for pvc in resp.items]
+
     def list_secrets(self, namespace: str | None) -> list[dict[str, Any]]:
         """Secret list in the standard kubernetes dict form (``to_dict``)
         without ``data``/``string_data``: values are read one secret at a
@@ -1044,6 +1062,18 @@ class K8sClient:
             if e.status == 404:
                 return []
             self._unreachable("get_resource_quota", e)
+            raise AssertionError("unreachable") from e
+
+    def get_persistent_volume_claim(self, namespace: str, name: str) -> list[dict[str, Any]]:
+        """One PVC as a 0/1-item list; ``[]`` on 404. Any other ApiException
+        maps to ``ClusterUnreachableError`` (502), matching
+        ``get_resource_quota``'s transport contract."""
+        try:
+            return [self._v1.read_namespaced_persistent_volume_claim(name, namespace).to_dict()]
+        except ApiException as e:
+            if e.status == 404:
+                return []
+            self._unreachable("get_persistent_volume_claim", e)
             raise AssertionError("unreachable") from e
 
     def list_network_policies(self, namespace: str | None) -> list[dict[str, Any]]:
