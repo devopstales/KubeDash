@@ -21,6 +21,10 @@
 #   - configmaps.example.com: CRD fixture for the e2e deep-link scenario
 #     (ui-smoke.spec.ts); without it the scenario is red for setup
 #     reasons, not behavior (QA W012).
+#   - volumesnapshotclasses.snapshot.storage.k8s.io + csi-default: the
+#     SnapshotClass CRD (cluster-scoped) + one fixture, so the SnapshotClass
+#     list + data views render real data (the CRD's presence is what makes
+#     the read non-empty — absent -> []).
 #
 # The VPA OPERATOR (recommender + updater + admission-controller, kube-
 # system) is installed first — marker-checked on the VPA CRD so re-runs
@@ -295,9 +299,45 @@ spec:
           x-kubernetes-preserve-unknown-fields: true
 YAML
 
+# 10. SnapshotClass CRD + fixture — the SnapshotClass list/data views read
+#     volumesnapshotclasses.snapshot.storage.k8s.io (a CLUSTER-SCOPED CRD).
+#     The CRD's presence is what turns the read non-empty (CRD absent -> []).
+#     csi-default uses driver "rancher.local-path" (kind's default provisioner)
+#     + deletionPolicy Delete.
+k apply -f - <<'YAML'
+apiVersion: apiextensions.k8s.io/v1
+kind: CustomResourceDefinition
+metadata:
+  name: volumesnapshotclasses.snapshot.storage.k8s.io
+spec:
+  group: snapshot.storage.k8s.io
+  names:
+    kind: VolumeSnapshotClass
+    listKind: VolumeSnapshotClassList
+    plural: volumesnapshotclasses
+    singular: volumesnapshotclass
+  scope: Cluster
+  versions:
+    - name: v1
+      served: true
+      storage: true
+      schema:
+        openAPIV3Schema:
+          type: object
+          x-kubernetes-preserve-unknown-fields: true
+---
+apiVersion: snapshot.storage.k8s.io/v1
+kind: VolumeSnapshotClass
+metadata:
+  name: csi-default
+driver: rancher.local-path
+deletionPolicy: Delete
+YAML
+
 echo "demo data ready: ns=$NS"
 echo "  pods: demo-app x1 (healthy, HPA/VPA/PDB target) + demo-broken x1 (crashlooping, events)"
 echo "  fixtures: Secret, ConfigMap, LimitRange, ResourceQuota, PDB, HPA, VPA (Off mode), NetworkPolicy"
 echo "  cluster-scoped: RuntimeClass demo-runc, StorageClass demo-gp2, CRD configmaps.example.com (e2e deep-link target)"
+echo "  cluster-scoped: CRD volumesnapshotclasses.snapshot.storage.k8s.io + csi-default (SnapshotClass view)"
 echo "  VPA recommendations land in the demo-vpa status within a few minutes"
 echo "  kubectl --context $CTX get pods,hpa,vpa,pdb,netpol -n $NS -w"

@@ -86,6 +86,10 @@ function expectedStubs() {
     // The kind was a stub until this change: the /data URL never shipped,
     // so there is no R7 redirect — the single clean route only.
     '/storage/configmap',
+    // Real view (2026-10-28-snapshotclass-views, Task 4) — not a stub route.
+    // The kind was a stub until this change: the /data URL never shipped,
+    // so there is no R7 redirect — the single clean route only.
+    '/storage/snapshot-class',
   ])
   const seen = new Map<string, string>()
   for (const isAdmin of [true, false]) {

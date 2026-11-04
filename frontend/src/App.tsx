@@ -69,6 +69,8 @@ const StorageClassView = React.lazy(() => import('./views/Storage/StorageClass')
 const StorageClassDataView = React.lazy(() => import('./views/Storage/StorageClassData'))
 const ConfigMapView = React.lazy(() => import('./views/Storage/ConfigMap'))
 const ConfigMapDataView = React.lazy(() => import('./views/Storage/ConfigMapData'))
+const SnapshotClassView = React.lazy(() => import('./views/Storage/SnapshotClass'))
+const SnapshotClassDataView = React.lazy(() => import('./views/Storage/SnapshotClassData'))
 const GroupsView = React.lazy(() => import('./views/Groups'))
 const GroupPrivilegesView = React.lazy(() => import('./views/Groups/GroupPrivileges'))
 const GroupPrivilegeEditView = React.lazy(() => import('./views/Groups/GroupPrivilegeEdit'))
@@ -828,6 +830,24 @@ const App = () => {
                             detail={(p) => (
                               <ConfigMapDataView name={p.name} namespace={p.namespace ?? ''} />
                             )}
+                          />
+                        </ProtectedRoute>
+                      }
+                    />
+                    <Route
+                      path="/storage/snapshot-class"
+                      element={
+                        <ProtectedRoute>
+                          {/* ADR-0040: ObjectRoute renders the list or the
+                              ref-matched detail on the clean route. First
+                              build of this kind (it was a stub; the /data
+                              URL never shipped) — NO legacy /data route, no
+                              R7 redirect. Cluster-scoped: no namespace. */}
+                          <ObjectRoute
+                            kind="snapshotclass"
+                            listRoute="/storage/snapshot-class"
+                            list={<SnapshotClassView />}
+                            detail={(p) => <SnapshotClassDataView name={p.name} />}
                           />
                         </ProtectedRoute>
                       }

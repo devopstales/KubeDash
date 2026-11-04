@@ -17,7 +17,6 @@ export const stubRoutes: StubRoute[] = [
   { path: '/storage/pv', title: 'Volumes', admin: false },
   { path: '/storage/pvc', title: 'VolumeClaims', admin: false },
   { path: '/storage/volumesnapshot', title: 'VolumeSnapshot', admin: false },
-  { path: '/storage/snapshot-class', title: 'SnapshotClass', admin: false },
   { path: '/settings/sso-config', title: 'Auth Provider', admin: true },
   { path: '/settings/cluster-status', title: 'HA Status', admin: true },
 ]
