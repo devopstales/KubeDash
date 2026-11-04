@@ -294,6 +294,20 @@ export interface CiliumPolicyItem {
   [key: string]: unknown
 }
 
+/** A VolumeSnapshotClass custom object as returned by /api/v1/clusters/<id>/resources/volumesnapshotclasses (snapshot.storage.k8s.io CRD, camelCase wire form; cluster-scoped). */
+export interface VolumeSnapshotClassItem {
+  metadata?: {
+    name?: string
+    creationTimestamp?: string
+    labels?: Record<string, string>
+    annotations?: Record<string, string>
+  }
+  driver?: string
+  deletionPolicy?: string
+  parameters?: Record<string, string>
+  [key: string]: unknown
+}
+
 /** A PriorityClass item as returned by /api/v1/clusters/<id>/resources/priorityclasses (kubernetes to_dict, snake_case; cluster-scoped). */
 export interface PriorityClassItem {
   metadata?: {
