@@ -80,7 +80,11 @@ const trimmedAnnotations = (item: HorizontalPodAutoscalerItem | undefined): [str
  * Key/Value table — `kubectl.kubernetes.io/last-applied-configuration`
  * (the giant apply blob) and
  * `autoscaling.alpha.kubernetes.io/conditions` (already surfaced by the
- * Conditions table). Empty `items` is a not-found
+ * Conditions table). The Labels/Annotations Key/Value tables match 4.1's
+ * markup (2026-11-04 user request): 50/50 columns, plain whitespace
+ * wrapping (no `text-break` — 4.1's `{{ value }}` td wraps at whitespace,
+ * not mid-token) in a responsive wrapper that scrolls only when a token
+ * outgrows the column. Empty `items` is a not-found
  * STATE (pinned copy), not an error. Placement under Other Resources is a
  * ratified deviation (ADR-0022).
  */
@@ -204,18 +208,20 @@ const HorizontalPodAutoscalerDataView = ({
                     {labels.length === 0 ? (
                       'No labels'
                     ) : (
-                      <CTable bordered small className="mb-0">
+                      // Same 4.1 parity as the annotations table (the 4.1
+                      // labelsTable is identical markup).
+                      <CTable bordered small responsive className="mb-0">
                         <thead>
                           <tr>
-                            <th>Key</th>
-                            <th>Value</th>
+                            <th style={{ width: '50%' }}>Key</th>
+                            <th style={{ width: '50%' }}>Value</th>
                           </tr>
                         </thead>
                         <tbody>
                           {labels.map(([key, value]) => (
                             <tr key={key}>
                               <td>{key}</td>
-                              <td className="text-break">{value}</td>
+                              <td>{value}</td>
                             </tr>
                           ))}
                         </tbody>
@@ -229,18 +235,24 @@ const HorizontalPodAutoscalerDataView = ({
                     {annotations.length === 0 ? (
                       'No annotations'
                     ) : (
-                      <CTable bordered small className="mb-0">
+                      // 4.1 parity (2026-11-04 user request): 50/50 Key/Value
+                      // columns, plain wrapping (no text-break) so values wrap
+                      // at whitespace like 4.1's `{{ value }}` td instead of
+                      // breaking mid-token; the responsive wrapper scrolls
+                      // only when a token outgrows the column (4.1's
+                      // .table-responsive behavior).
+                      <CTable bordered small responsive className="mb-0">
                         <thead>
                           <tr>
-                            <th>Key</th>
-                            <th>Value</th>
+                            <th style={{ width: '50%' }}>Key</th>
+                            <th style={{ width: '50%' }}>Value</th>
                           </tr>
                         </thead>
                         <tbody>
                           {annotations.map(([key, value]) => (
                             <tr key={key}>
                               <td>{key}</td>
-                              <td className="text-break">{value}</td>
+                              <td>{value}</td>
                             </tr>
                           ))}
                         </tbody>

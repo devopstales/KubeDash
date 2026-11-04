@@ -263,6 +263,24 @@ test('data-annotations-trimmed', async () => {
   expect(inAnyTable('kubectl.kubernetes.io/last-applied-configuration')).toBe(false)
   expect(inAnyTable('autoscaling.alpha.kubernetes.io/conditions')).toBe(false)
   expect(screen.queryByText('No annotations')).toBeNull()
+
+  // 4.1-parity layout (2026-11-04 user request): responsive wrapper +
+  // 50/50 columns + no text-break, so values wrap at whitespace like
+  // 4.1's `{{ value }}` td instead of breaking mid-token. (Direct rows
+  // only — querySelectorAll('tr') recurses into the nested tables, and
+  // the outer metadata table would match via them.)
+  const annTable = Array.from(container.querySelectorAll('table')).find((t) => {
+    const rows = Array.from(t.querySelectorAll(':scope > thead > tr, :scope > tbody > tr'))
+    return rows.some((tr) =>
+      Array.from(tr.children).some((td) => td.textContent === 'team.example.com/note'),
+    )
+  })
+  expect(annTable).toBeDefined()
+  expect(annTable!.closest('.table-responsive')).not.toBeNull()
+  const heads = annTable!.querySelectorAll('thead th') as NodeListOf<HTMLElement>
+  expect(heads[0]?.style.width).toBe('50%')
+  expect(heads[1]?.style.width).toBe('50%')
+  expect(annTable!.querySelectorAll('td.text-break')).toHaveLength(0)
 })
 
 // hpa-data-missing-conditions
