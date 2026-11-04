@@ -99,6 +99,16 @@ _KINDS: dict[str, tuple[str, str, str]] = {
     # TASK-064 (list + data views; ADR-0022 placement). The 4.1 route name was
     # singular; the API kind is the plural.
     "configmaps": ("list_configmaps", "configmaps", ""),
+    # VolumeSnapshotClass (snapshot.storage.k8s.io, cluster-scoped CRD) — the
+    # 4.1-parity nav leaf resolved by TASK-051 (list + data views; ADR-0022
+    # placement). Full custom object (the Cilium CRD seam): the CRD's own
+    # served version is the authority, CRD absent -> [] (first-class empty
+    # state).
+    "volumesnapshotclasses": (
+        "list_volume_snapshot_classes",
+        "volumesnapshotclasses",
+        "snapshot.storage.k8s.io",
+    ),
 }
 
 #: kind → K8sClient method for a single-object ``?name=`` lookup
@@ -116,6 +126,7 @@ _GETTERS: dict[str, str] = {
     "horizontalpodautoscalers": "get_horizontal_pod_autoscaler",
     "limitranges": "get_limit_range",
     "configmaps": "get_configmap",
+    "volumesnapshotclasses": "get_volume_snapshot_class",
 }
 
 

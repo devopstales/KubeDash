@@ -760,6 +760,68 @@ class K8sClient:
         item = self._crd_body(item)
         return [item.to_dict() if hasattr(item, "to_dict") else item]
 
+    # VolumeSnapshotClass (snapshot.storage.k8s.io, cluster-scoped CRD): the
+    # same full-custom-object seam as the Cilium kinds — the CRD's OWN served
+    # version is the authority (``get_crd_served`` — an improvement over
+    # 4.1's hardcoded ``v1``); the snapshot operator is optional, so CRD
+    # absent (None) degrades to [] as a first-class empty state. The read is
+    # cluster-scoped (``list_cluster_custom_object`` /
+    # ``get_cluster_custom_object``): the namespace argument is accepted and
+    # ignored (mirrors ``list_crds`` / ``get_crd``).
+    _SNAPSHOT_CLASS_GROUP = "snapshot.storage.k8s.io"
+    _SNAPSHOT_CLASS_PLURAL = "volumesnapshotclasses"
+
+    def list_volume_snapshot_classes(self, _namespace: str | None) -> list[dict[str, Any]]:
+        """VolumeSnapshotClass items, FULL custom-object shape (driver /
+        deletionPolicy / parameters / metadata intact, camelCase — the wire
+        form, like the Cilium CRDs). The CRD's OWN served version is the
+        authority (``get_crd_served``). CRD absent (snapshot operator not
+        installed) -> ``[]`` (the expected state, the Cilium absence
+        contract); any other read failure -> ``ClusterUnreachableError``
+        (502). Cluster-scoped: the namespace argument is accepted-and-ignored
+        (mirrors ``list_crds``). The pages need ``driver`` /
+        ``deletionPolicy`` / ``parameters``, so this returns the raw object —
+        NOT the lossy ``list_crd_instances`` projection."""
+        served = self.get_crd_served(self._SNAPSHOT_CLASS_GROUP, self._SNAPSHOT_CLASS_PLURAL)
+        if served is None:
+            return []
+        version, _scope = served
+        custom = self._custom()
+        try:
+            resp = custom.list_cluster_custom_object(
+                self._SNAPSHOT_CLASS_GROUP, version, self._SNAPSHOT_CLASS_PLURAL
+            )
+        except ApiException as e:
+            self._unreachable("list_volume_snapshot_classes", e)
+            raise AssertionError("unreachable") from e
+        body = self._crd_body(resp)
+        items = body.get("items", [])
+        return [item.to_dict() if hasattr(item, "to_dict") else item for item in items]
+
+    def get_volume_snapshot_class(self, _namespace: str, name: str) -> list[dict[str, Any]]:
+        """One VolumeSnapshotClass as a 0/1-item FULL custom object; ``[]`` on
+        404 or when the CRD is absent (snapshot operator not installed). Any
+        other ApiException maps to ``ClusterUnreachableError`` (502), matching
+        ``get_cilium_network_policy``. Cluster-scoped: ``_namespace`` is
+        accepted for the ``_GETTERS`` call convention but ignored (the
+        ``get_crd`` cluster-scoped pattern)."""
+        served = self.get_crd_served(self._SNAPSHOT_CLASS_GROUP, self._SNAPSHOT_CLASS_PLURAL)
+        if served is None:
+            return []
+        version, _scope = served
+        custom = self._custom()
+        try:
+            item = custom.get_cluster_custom_object(
+                self._SNAPSHOT_CLASS_GROUP, version, self._SNAPSHOT_CLASS_PLURAL, name
+            )
+        except ApiException as e:
+            if e.status == 404:
+                return []
+            self._unreachable("get_volume_snapshot_class", e)
+            raise AssertionError("unreachable") from e
+        item = self._crd_body(item)
+        return [item.to_dict() if hasattr(item, "to_dict") else item]
+
     # VerticalPodAutoscaler (autoscaling.k8s.io, namespaced CRD): same
     # full-custom-object seam as the Cilium kinds — the CRD's own served
     # version + scope is the authority; the VPA operator is optional, so

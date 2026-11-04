@@ -676,6 +676,39 @@ class FakeK8s:
     def get_configmap(self, namespace: str, name: str) -> list[dict]:
         return [cm for cm in self.list_configmaps(namespace) if cm["metadata"]["name"] == name]
 
+    def list_volume_snapshot_classes(self, _namespace: str | None) -> list[dict]:
+        # Cluster-scoped CRD (snapshot.storage.k8s.io): the namespace is
+        # accepted-and-ignored (mirrors the real
+        # K8sClient.list_volume_snapshot_classes). FULL custom object,
+        # camelCase (driver / deletionPolicy / parameters intact). The route
+        # forwards the raw query value; the recording is the "the
+        # cluster-scoped call was used" evidence for the ignores-namespace
+        # test.
+        self.snapshotclass_ns_calls: list[str | None] = []
+        self.snapshotclass_ns_calls.append(_namespace)
+        return [
+            {
+                "apiVersion": "snapshot.storage.k8s.io/v1",
+                "kind": "VolumeSnapshotClass",
+                "metadata": {
+                    "name": "csi-default",
+                    "creationTimestamp": "2026-01-02T03:04:05Z",
+                    "annotations": {
+                        "snapshot.storage.kubernetes.io/is-default-class": "true",
+                    },
+                    "labels": {"team": "a"},
+                },
+                "driver": "csi-driver.example.com",
+                "deletionPolicy": "Delete",
+                "parameters": {"blockVolume": "true", "fstype": "ext4"},
+            }
+        ]
+
+    def get_volume_snapshot_class(self, _namespace: str, name: str) -> list[dict]:
+        return [
+            sc for sc in self.list_volume_snapshot_classes(None) if sc["metadata"]["name"] == name
+        ]
+
     def readyz(self) -> bool:
         return True
 
@@ -2534,6 +2567,112 @@ def test_configmap_kind_singular_rejected(api_client, auth_client) -> None:
     h = {"Authorization": f"Bearer {auth_client.jwt}"}
     _register(api_client, h)
     r = api_client.get("/api/v1/clusters/1/resources/configmap", headers=h)
+    assert r.status_code == 404
+    assert r.get_json()["error"]["code"] == "RESOURCE_KIND_NOT_SUPPORTED"
+
+
+def test_list_volumesnapshotclasses_200(api_client, auth_client, fake_k8s, monkeypatch) -> None:
+    """[volumesnapshotclasses-list-200] a bound user listing
+    volumesnapshotclasses gets the FULL custom objects back (CRD, camelCase —
+    driver / deletionPolicy / parameters intact, NOT the lossy CRD
+    projection)."""
+    auth_client.login()
+    h = {"Authorization": f"Bearer {auth_client.jwt}"}
+    _register(api_client, h)
+    _allow_sar(monkeypatch)
+    r = api_client.get("/api/v1/clusters/1/resources/volumesnapshotclasses", headers=h)
+    assert r.status_code == 200
+    body = r.get_json()
+    assert body["kind"] == "volumesnapshotclasses"
+    [item] = body["items"]
+    assert item["metadata"]["name"] == "csi-default"
+    assert item["driver"] == "csi-driver.example.com"
+    assert item["deletionPolicy"] == "Delete"
+    assert item["parameters"] == {"blockVolume": "true", "fstype": "ext4"}
+
+
+def test_list_volumesnapshotclasses_ignores_namespace(
+    api_client, auth_client, fake_k8s, monkeypatch
+) -> None:
+    """[volumesnapshotclasses-list-ignores-namespace] the kind is
+    cluster-scoped: ?namespace=team-a is accepted and ignored — the same
+    "csi-default" item comes back. The route forwards the raw query value to
+    the client; the cluster-scoped method ignores it (the list_crds pattern)
+    — the recorded call + the cluster-scoped fixture are the evidence the
+    cluster-scoped list call was used."""
+    auth_client.login()
+    h = {"Authorization": f"Bearer {auth_client.jwt}"}
+    _register(api_client, h)
+    _allow_sar(monkeypatch)
+    r = api_client.get(
+        "/api/v1/clusters/1/resources/volumesnapshotclasses?namespace=team-a", headers=h
+    )
+    assert r.status_code == 200
+    body = r.get_json()
+    [item] = body["items"]
+    assert item["metadata"]["name"] == "csi-default"
+    assert "namespace" not in item["metadata"]
+    assert fake_k8s.snapshotclass_ns_calls == ["team-a"]  # query value forwarded, client ignores
+
+
+def test_list_volumesnapshotclasses_get_by_name(
+    api_client, auth_client, fake_k8s, monkeypatch
+) -> None:
+    """[volumesnapshotclasses-get-by-name] ?name= returns a 0/1-item list: a
+    hit returns the one FULL object, a miss returns [] (mirrors
+    get_storage_class)."""
+    auth_client.login()
+    h = {"Authorization": f"Bearer {auth_client.jwt}"}
+    _register(api_client, h)
+    _allow_sar(monkeypatch)
+    r = api_client.get(
+        "/api/v1/clusters/1/resources/volumesnapshotclasses?name=csi-default", headers=h
+    )
+    assert r.status_code == 200
+    [item] = r.get_json()["items"]
+    assert item["metadata"]["name"] == "csi-default"
+    assert item["driver"] == "csi-driver.example.com"  # full object
+    r = api_client.get(
+        "/api/v1/clusters/1/resources/volumesnapshotclasses?name=ghost", headers=h
+    )
+    assert r.status_code == 200
+    assert r.get_json()["items"] == []
+
+
+def test_list_volumesnapshotclasses_sar_denied(
+    api_client, auth_client, fake_k8s, monkeypatch
+) -> None:
+    """[volumesnapshotclasses-sar-denied] ADR-0004: the SAR is asked BEFORE
+    the read, with the CRD group (snapshot.storage.k8s.io) and namespace None
+    (the cluster-scoped SAR cache key) — a deny short-circuits to 403
+    RBAC_DENIED."""
+    auth_client.login()
+    h = {"Authorization": f"Bearer {auth_client.jwt}"}
+    _register(api_client, h)
+    asked = _record_sar(monkeypatch)  # denies every SAR and records calls
+    r = api_client.get("/api/v1/clusters/1/resources/volumesnapshotclasses", headers=h)
+    assert r.status_code == 403
+    assert r.get_json()["error"]["code"] == "RBAC_DENIED"
+    assert ("list", "volumesnapshotclasses", None, None, "snapshot.storage.k8s.io") in asked
+
+
+def test_volumesnapshotclasses_binding_404(api_client, auth_client) -> None:
+    """[volumesnapshotclasses-binding-404] an unbound user: the binding gate
+    fails before the SAR, CLUSTER_NOT_FOUND."""
+    auth_client.login()
+    h = {"Authorization": f"Bearer {auth_client.jwt}"}
+    r = api_client.get("/api/v1/clusters/999/resources/volumesnapshotclasses", headers=h)
+    assert r.status_code == 404
+    assert r.get_json()["error"]["code"] == "CLUSTER_NOT_FOUND"
+
+
+def test_volumesnapshotclass_kind_singular_rejected(api_client, auth_client) -> None:
+    """[volumesnapshotclass-kind-singular-rejected] the singular
+    volumesnapshotclass is not a kind — RESOURCE_KIND_NOT_SUPPORTED."""
+    auth_client.login()
+    h = {"Authorization": f"Bearer {auth_client.jwt}"}
+    _register(api_client, h)
+    r = api_client.get("/api/v1/clusters/1/resources/volumesnapshotclass", headers=h)
     assert r.status_code == 404
     assert r.get_json()["error"]["code"] == "RESOURCE_KIND_NOT_SUPPORTED"
 
