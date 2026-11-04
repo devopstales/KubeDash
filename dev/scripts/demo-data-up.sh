@@ -4,8 +4,10 @@
 # Skips (with a notice) when kind/kubectl are absent so the plain-HTTP loop
 # still works on a machine without the K8s toolchain. Each step is idempotent:
 #   1. kind cluster (created only if absent) + metrics-server + Cilium/Traefik
-#   2. demo namespace: busy pods (metrics render) + 1 broken pod (events panel
-#      has recent entries — k8s events expire ~1h)
+#   2. demo namespace: 1 healthy pod (HPA/VPA/PDB target) + 1 broken pod
+#      (events panel has recent entries — k8s events expire ~1h) + one
+#      fixture per kind (Secret, LimitRange, Quota, PDB, HPA, VPA,
+#      NetworkPolicy) + the VPA operator (kube-system) + RuntimeClass
 #
 # Cluster REGISTRATION is deliberately NOT here: it needs the backend's API
 # (POST /api/v1/clusters), and this script runs BEFORE the backend (so the app

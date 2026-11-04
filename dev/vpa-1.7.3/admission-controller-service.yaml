@@ -1,0 +1,14 @@
+# Vendored from kubernetes/autoscaler @ vertical-pod-autoscaler/v1.7.3
+# (vertical-pod-autoscaler/deploy/admission-controller-service.yaml) — pinned for the dev-stack VPA demo;
+# the 1.7 line is the K8s 1.35-1.37 compatible release (kind dev cluster).
+apiVersion: v1
+kind: Service
+metadata:
+  name: vpa-webhook
+  namespace: kube-system
+spec:
+  ports:
+    - port: 443
+      targetPort: 8000
+  selector:
+    app: vpa-admission-controller

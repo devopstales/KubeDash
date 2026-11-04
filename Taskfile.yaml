@@ -166,7 +166,10 @@ tasks:
 
   # Internal: dev-stack kind + demo pods (BEFORE the backend). Brings up the
   # kind cluster + metrics-server + Cilium/Traefik and seeds the demo
-  # namespace (busy pods + one broken pod). Skipped (with a notice) when
+  # namespace (1 healthy HPA/VPA/PDB target pod + one broken pod + one
+  # fixture per kind: Secret, LimitRange, Quota, PDB, HPA, VPA,
+  # NetworkPolicy, RuntimeClass; the VPA operator goes to kube-system).
+  # Skipped (with a notice) when
   # kind/kubectl are absent so the plain-HTTP loop still works on a machine
   # without the K8s toolchain. Each step is idempotent.
   #
