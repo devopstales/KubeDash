@@ -232,3 +232,41 @@ def test_pvc_usage_all_nodes_unhealthy_is_empty() -> None:
     available, items = client.pvc_usage("team-a")
     assert available is False
     assert items == []
+
+
+def test_pvc_usage_parses_client_repr_body() -> None:
+    """The kubernetes client's ``str``-typed node-proxy return hands back the
+    stats body as ``str(dict)`` — a PYTHON REPR (single quotes, ``True``/
+    ``None``), not JSON. 4.1 ``eval()``ed it; 5.0 must parse it without
+    ``eval`` (the live adapter returns this exact shape)."""
+    stats = str(
+        {
+            "node": {"nodeName": "n1"},
+            "pods": [
+                {
+                    "volume": [
+                        {
+                            "pvcRef": {"name": "data-pvc", "namespace": "team-a"},
+                            "capacityBytes": "1000",
+                            "usedBytes": "250",
+                            "availableBytes": "750",
+                        }
+                    ]
+                }
+            ],
+        }
+    )
+    # Sanity: this is NOT valid JSON (single quotes) — the bug the floor caught.
+    with pytest.raises(ValueError):
+        json.loads(stats)
+    available, items = _stats_client({"n1": stats}).pvc_usage("team-a")
+    assert available is True
+    assert items == [
+        {
+            "name": "data-pvc",
+            "capacity_bytes": 1000,
+            "used_bytes": 250,
+            "available_bytes": 750,
+            "percentage_used": 25.0,
+        }
+    ]

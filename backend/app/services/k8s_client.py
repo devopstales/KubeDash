@@ -19,6 +19,7 @@ tests inject a ``FakeK8s`` double, integration (Task 5) uses the default
 real-kubernetes factory.
 """
 
+import ast
 import base64
 import contextlib
 import hashlib
@@ -140,6 +141,29 @@ def resolve_admin_source(s: Settings) -> AdminSource:
     if os.path.isfile(os.environ.get("KUBECONFIG", os.path.expanduser("~/.kube/config"))):
         return "local-kubeconfig"
     return "in-cluster"
+
+
+def _parse_stats_body(raw: Any) -> dict[str, Any]:
+    """Parse a kubelet ``/stats/summary`` body as the kubernetes client hands
+    it back. For the ``str``-typed node-proxy return, the client deserializes
+    the JSON response to a dict and then ``str()``s it — a PYTHON REPR
+    (single quotes, ``True``/``None``), not JSON. 4.1 ``eval()``ed exactly
+    this body; we keep the behavior with a safe parser: strict JSON first,
+    then ``ast.literal_eval`` (literals only — no code execution) for the
+    repr form. A dict (client versions that return the deserialized object)
+    passes through. Raises ``ValueError``/``SyntaxError``/``TypeError`` on
+    an unparseable body — the caller treats that as a skipped node
+    (ADR-0003 degrade)."""
+    if isinstance(raw, dict):
+        return raw
+    text = raw.decode("utf-8") if isinstance(raw, (bytes, bytearray)) else str(raw)
+    try:
+        parsed = json.loads(text)
+    except ValueError:
+        parsed = ast.literal_eval(text)
+    if not isinstance(parsed, dict):
+        raise ValueError("stats/summary body is not an object")
+    return parsed
 
 
 class K8sClient:
@@ -473,8 +497,8 @@ class K8sClient:
                 raw = self._v1.connect_get_node_proxy_with_path(
                     name, path="stats/summary", _request_timeout=2
                 )
-                body = json.loads(raw)
-            except (ApiException, json.JSONDecodeError, UnicodeDecodeError):
+                body = _parse_stats_body(raw)
+            except (ApiException, ValueError, SyntaxError, TypeError, UnicodeDecodeError):
                 # A per-node stats failure is the EXPECTED state (kubelet
                 # absent/down/stats API off) — skip, never raise (ADR-0003).
                 continue
