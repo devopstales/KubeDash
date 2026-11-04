@@ -474,6 +474,47 @@ export interface VolumeSnapshotItem {
   [key: string]: unknown
 }
 
+/** A PVC item as returned by /api/v1/clusters/<id>/resources/persistentvolumeclaims (kubernetes to_dict, snake_case; namespaced, core v1). */
+export interface PvcItem {
+  metadata?: {
+    name?: string
+    namespace?: string
+    creation_timestamp?: string
+    labels?: Record<string, string>
+    annotations?: Record<string, string>
+  }
+  spec?: {
+    access_modes?: string[]
+    volume_mode?: string
+    storage_class_name?: string
+    volume_name?: string
+  }
+  status?: {
+    phase?: string
+    capacity?: { storage?: string }
+  }
+  [key: string]: unknown
+}
+
+/** One PVC-usage entry from /api/v1/clusters/<id>/metrics/pvcs (kubelet stats/summary). */
+export interface PvcUsage {
+  name: string
+  capacity_bytes: number
+  used_bytes: number
+  available_bytes: number
+  percentage_used: number
+}
+
+/** The metrics/pvcs response (ADR-0003 two-tier: unavailable/denied are 200 flags, not errors). */
+export interface PvcUsageResponse {
+  cluster: string
+  namespace: string
+  source: string
+  metrics_available: boolean
+  metrics_denied: boolean
+  items: PvcUsage[]
+}
+
 /** Closed set for the detail page's ?kind= param (4.1 parity). */
 export const POLICY_KINDS = ['NetworkPolicy', 'CiliumNetworkPolicy', 'CiliumClusterwideNetworkPolicy'] as const
 export type PolicyKind = (typeof POLICY_KINDS)[number]
