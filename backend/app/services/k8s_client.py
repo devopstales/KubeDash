@@ -656,12 +656,15 @@ class K8sClient:
         """(served_version, scope) for a CRD, or None when the CRD is absent.
 
         The CRD's OWN spec is the version+scope authority (reuses
-        ``_crd_served``). A 404 on the CRD read means the API group/CRD is
-        not installed (e.g. Cilium absent) — the EXPECTED state, so it
-        resolves to ``None`` instead of an error. Any other ApiException is
-        a transport failure -> ``ClusterUnreachableError``.
+        ``_crd_served``). The CRD object is read by its FULLY-QUALIFIED name
+        (``plural.group``) — ``get_crd`` takes the object name verbatim, and
+        a bare plural 404s into the "absent" path. A 404 on the CRD read
+        means the API group/CRD is not installed (e.g. Cilium absent) — the
+        EXPECTED state, so it resolves to ``None`` instead of an error. Any
+        other ApiException is a transport failure ->
+        ``ClusterUnreachableError``.
         """
-        crds = self.get_crd(None, plural)
+        crds = self.get_crd(None, f"{plural}.{group}")
         if not crds:
             return None
         served = self._crd_served(crds[0])

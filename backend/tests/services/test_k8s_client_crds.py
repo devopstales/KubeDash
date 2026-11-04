@@ -130,6 +130,32 @@ def test_get_crd_maps_transport_error_to_unreachable() -> None:
         client.get_crd(None, "applications.argoproj.io")
 
 
+def test_get_crd_served_reads_crd_by_fully_qualified_name() -> None:
+    """[crd-served-full-name] get_crd_served reads the CRD object by its
+    fully-qualified name (``plural.group``). A bare plural 404s into the
+    "absent" path — the VPA/Cilium list seams then report ``[]`` on a live
+    cluster that HAS the CRD installed (their unit tests stub
+    get_crd_served, so this seam was the untested name form)."""
+    client, fake = _client(_CRD_SINGLE)
+    served = client.get_crd_served("argoproj.io", "applications")
+    assert served == ("v1alpha1", "Namespaced")  # first served version + scope
+    assert fake.paths == [
+        {
+            "group": "apiextensions.k8s.io",
+            "version": "v1",
+            "plural": "customresourcedefinitions",
+            "name": "applications.argoproj.io",
+        }
+    ]
+
+
+def test_get_crd_served_crd_absent_returns_none() -> None:
+    """[crd-served-absent] a 404 on the CRD read is the expected "operator
+    not installed" state -> None (the callers degrade to ``[]``)."""
+    client, _ = _client(None, raises=ApiException(status=404))
+    assert client.get_crd_served("autoscaling.k8s.io", "verticalpodautoscalers") is None
+
+
 def test_list_crd_instances_cluster_scoped_ignores_namespace() -> None:
     client, fake = _client({"items": [{"metadata": {"name": "a1"}}]})
     items = client.list_crd_instances("argoproj.io", "v1", "applications", None)
