@@ -14,7 +14,6 @@ import { useQuery } from '@tanstack/react-query'
 import { apiFetch } from '../../lib/api'
 import type { K8sNamespace, ResourceList } from '../../lib/types'
 import { useClusterStore } from '../../store/cluster'
-import ShareObjectButton from '../../components/ShareObjectButton'
 import TopMenu from '../../components/TopMenu'
 
 // ADR-0040: cluster-scoped kind — the ref carries no namespace.
@@ -88,7 +87,6 @@ const NamespaceDataView = ({ name }: { name: string }) => {
       <CCardHeader className="py-3">
         <CCardTitle className="m-0 fw-bold text-primary fs-6 d-flex align-items-center gap-2">
           Namespace Data
-          {name !== '' && <ShareObjectButton kind={KIND} name={name} listRoute={LIST_ROUTE} />}
         </CCardTitle>
       </CCardHeader>
       <CCardBody>

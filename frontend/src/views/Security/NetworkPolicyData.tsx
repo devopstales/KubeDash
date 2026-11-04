@@ -17,7 +17,6 @@ import { apiFetch } from '../../lib/api'
 import { policyUrl } from '../../lib/policyUrl'
 import type { CiliumPolicyItem, NetworkPolicyItem, ResourceList } from '../../lib/types'
 import { useClusterStore } from '../../store/cluster'
-import ShareObjectButton from '../../components/ShareObjectButton'
 import TopMenu from '../../components/TopMenu'
 
 // Same pattern as SecretData.tsx: the hljs language module is a singleton, so
@@ -87,14 +86,6 @@ const NetworkPolicyDataView = ({
       <CCardHeader className="py-3">
         <CCardTitle className="m-0 fw-bold text-primary fs-6 d-flex align-items-center gap-2">
           Network Policy Data
-          {name !== '' && kind !== '' && (
-            <ShareObjectButton
-              kind={kind}
-              name={name}
-              namespace={namespace === '' ? undefined : namespace}
-              listRoute="/security/network-policy"
-            />
-          )}
         </CCardTitle>
       </CCardHeader>
       <CCardBody>

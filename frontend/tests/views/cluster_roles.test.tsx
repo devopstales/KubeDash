@@ -154,8 +154,6 @@ test('lists-cluster-roles-for-selected-cluster', async () => {
   expect(screen.getByText('app: web')).toBeTruthy()
   expect(screen.getByText('owner: platform')).toBeTruthy()
   expect(screen.queryByText(/last-applied-configuration/)).toBeNull()
-  // the share button is in the name cell (row affordance).
-  expect(screen.getByRole('button', { name: 'Share edit' })).toBeTruthy()
   expect(screen.getByRole('button', { name: 'view' })).toBeTruthy()
 })
 

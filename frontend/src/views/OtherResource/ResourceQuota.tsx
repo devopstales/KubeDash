@@ -15,7 +15,6 @@ import { getActiveRef, openObject } from '../../lib/objectRef'
 import type { ResourceList, ResourceQuotaItem } from '../../lib/types'
 import { useClusterStore } from '../../store/cluster'
 import KubeDataTable, { Column } from '../../components/KubeDataTable'
-import ShareObjectButton from '../../components/ShareObjectButton'
 import TopMenu from '../../components/TopMenu'
 
 // ADR-0040: the registry kind (the API resource name) and the clean list
@@ -77,13 +76,7 @@ const nameCell = (row: QuotaRow, selected: string | null, navigate: (p: string) 
         onClick={() => openObject(KIND, row.name, row.namespace, LIST_ROUTE, navigate)}
       >
         {row.name}
-      </button>{' '}
-      <ShareObjectButton
-        kind={KIND}
-        name={row.name}
-        namespace={row.namespace}
-        listRoute={LIST_ROUTE}
-      />
+      </button>
     </>
   ) : null
 

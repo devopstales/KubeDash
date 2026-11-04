@@ -15,7 +15,6 @@ import { openObject } from '../../lib/objectRef'
 import type { CiliumPolicyItem, NetworkPolicyItem, ResourceList } from '../../lib/types'
 import { useClusterStore } from '../../store/cluster'
 import KubeDataTable, { Column } from '../../components/KubeDataTable'
-import ShareObjectButton from '../../components/ShareObjectButton'
 import TopMenu from '../../components/TopMenu'
 
 // ADR-0040: the registry kind is the policy's API kind (NetworkPolicy,
@@ -71,13 +70,7 @@ const nameCell = (row: PolicyRow, navigate: (path: string) => void) =>
         }
       >
         {row.name}
-      </button>{' '}
-      <ShareObjectButton
-        kind={row.kind}
-        name={row.name}
-        namespace={row.kind === 'CiliumClusterwideNetworkPolicy' ? undefined : row.namespace}
-        listRoute={LIST_ROUTE}
-      />
+      </button>
     </>
   ) : null
 

@@ -172,8 +172,6 @@ test('lists-service-accounts-in-selected-namespace', async () => {
   // the cross-kind secret cells are buttons (openObject with the secret kind)
   expect(screen.getByRole('button', { name: 'builder-token' })).toBeTruthy()
   expect(screen.getByRole('button', { name: 'registry-cred' })).toBeTruthy()
-  // the share button is in the name cell (row affordance).
-  expect(screen.getByRole('button', { name: 'Share builder' })).toBeTruthy()
   expect(screen.getByText('default')).toBeTruthy()
 })
 
@@ -311,8 +309,9 @@ test('secret-cell-opens-the-secret-detail', async () => {
   const secretButton = await screen.findByRole('button', { name: 'builder-token' })
   await user.click(secretButton)
 
-  // the secret's name renders in the secret data page header breadcrumb.
-  expect(await screen.findByRole('button', { name: 'Share builder-token' })).toBeTruthy()
+  // the secret's detail renders (cross-kind: the SECRET kind's detail, not
+  // the serviceaccount's), on the secret kind's clean list route.
+  expect(await screen.findByText('Secret Data', { selector: 'h5' })).toBeTruthy()
   expect(window.location.search).toBe('')
 })
 

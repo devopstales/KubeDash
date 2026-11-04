@@ -3,7 +3,6 @@ import { useNavigate } from 'react-router-dom'
 import { CBadge, CBreadcrumb, CBreadcrumbItem, CCard, CCardBody, CCardHeader, CCardTitle } from '@coreui/react'
 import { useQuery } from '@tanstack/react-query'
 import KubeDataTable, { Column } from '../../components/KubeDataTable'
-import ShareObjectButton from '../../components/ShareObjectButton'
 import TopMenu from '../../components/TopMenu'
 import { apiFetch } from '../../lib/api'
 import { openObject } from '../../lib/objectRef'
@@ -83,8 +82,7 @@ const kindCell = ({ kind, crdName }: CrdRow['kindLink'], navigate: (path: string
         onClick={() => openObject(KIND, crdName, undefined, LIST_ROUTE, navigate)}
       >
         {kind || '\u2014'}
-      </button>{' '}
-      <ShareObjectButton kind={KIND} name={crdName} listRoute={LIST_ROUTE} />
+      </button>
     </>
   ) : (
     kind || '\u2014'

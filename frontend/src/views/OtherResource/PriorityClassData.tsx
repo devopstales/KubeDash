@@ -16,7 +16,6 @@ import anOldHope from 'react-syntax-highlighter/dist/esm/styles/hljs/an-old-hope
 import { apiFetch } from '../../lib/api'
 import type { PriorityClassItem, ResourceList } from '../../lib/types'
 import { useClusterStore } from '../../store/cluster'
-import ShareObjectButton from '../../components/ShareObjectButton'
 import TopMenu from '../../components/TopMenu'
 
 // Same pattern as SecretData.tsx / NetworkPolicyData.tsx: the hljs language
@@ -79,13 +78,6 @@ const PriorityClassDataView = ({ name }: { name: string }) => {
       <CCardHeader className="py-3">
         <CCardTitle className="m-0 fw-bold text-primary fs-6 d-flex align-items-center gap-2">
           Priority Class Data
-          {name !== '' && (
-            <ShareObjectButton
-              kind="priorityclass"
-              name={name}
-              listRoute="/other-resource/priorityclass"
-            />
-          )}
         </CCardTitle>
       </CCardHeader>
       <CCardBody>

@@ -13,7 +13,6 @@ import { apiFetch } from '../../lib/api'
 import type { K8sRole, PolicyRule, ResourceList } from '../../lib/types'
 import { useClusterStore } from '../../store/cluster'
 import KubeDataTable, { Column } from '../../components/KubeDataTable'
-import ShareObjectButton from '../../components/ShareObjectButton'
 import TopMenu from '../../components/TopMenu'
 
 // ADR-0040 TICKET-04: registry kind + clean list route for the header's
@@ -88,7 +87,6 @@ const RoleDataView = ({ name, namespace }: { name: string; namespace: string }) 
       </TopMenu>
       <CCardHeader className="py-3">
         <CCardTitle className="m-0 fw-bold text-primary fs-6">Rule List</CCardTitle>
-        <ShareObjectButton kind={KIND} name={name} namespace={namespace} listRoute={LIST_ROUTE} />
       </CCardHeader>
       <CCardBody>
         {!name ? (

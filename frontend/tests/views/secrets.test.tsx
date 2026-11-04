@@ -164,8 +164,6 @@ test('lists-secrets-in-selected-namespace', async () => {
   expect(nameButton.closest('tr')?.textContent).not.toContain('?selected=')
   expect(screen.getByText('Opaque')).toBeTruthy()
   expect(screen.getByText('N/A')).toBeTruthy()
-  // ADR-0040: the share button is in the name cell (row affordance).
-  expect(screen.getByRole('button', { name: 'Share db-cred' })).toBeTruthy()
   // the decoded value stays out of the list.
   expect(screen.queryByText('s3cr3t')).toBeNull()
 })

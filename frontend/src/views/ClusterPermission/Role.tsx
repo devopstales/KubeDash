@@ -15,7 +15,6 @@ import { openObject } from '../../lib/objectRef'
 import type { K8sRole, ResourceList } from '../../lib/types'
 import { useClusterStore } from '../../store/cluster'
 import KubeDataTable, { Column } from '../../components/KubeDataTable'
-import ShareObjectButton from '../../components/ShareObjectButton'
 import TopMenu from '../../components/TopMenu'
 
 /** 4.1 drops this annotation from the Roles list (`role.html.j2`). */
@@ -89,8 +88,7 @@ const RoleView = () => {
           onClick={() => openObject(KIND, name, namespace, LIST_ROUTE, navigate)}
         >
           {name}
-        </button>{' '}
-        <ShareObjectButton kind={KIND} name={name} namespace={namespace} listRoute={LIST_ROUTE} />
+        </button>
       </>
     ) : null
 

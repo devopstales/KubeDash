@@ -106,8 +106,7 @@ const renderApp = (initialEntry: string) => {
 }
 
 // The detail's card title is <h5>Secret Data</h5>; the list's is
-// <h5>Secret List</h5>. (The "Secret Data" string also appears in the
-// detail's ShareObjectButton aria-label, so scope the query to the title.)
+// <h5>Secret List</h5> — scope the query to the title.
 const detailTitle = () => screen.queryByText('Secret Data', { selector: 'h5' })
 
 beforeEach(() => {

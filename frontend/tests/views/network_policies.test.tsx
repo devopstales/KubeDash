@@ -235,8 +235,6 @@ test('list-renders-namespace-policies', async () => {
   // created: local time (no raw ISO 'T'), rendered by formatTimestamp.
   expect(nameCell?.textContent).not.toContain('2026-10-26T10:00:00Z')
   expect(nameCell?.textContent).toMatch(/2026/)
-  // ADR-0040: the share button is in the name cell (row affordance).
-  expect(screen.getByRole('button', { name: 'Share deny-all' })).toBeTruthy()
   // a row with no spec degrades to —, not a crash.
   const noSpec = screen.getByRole('button', { name: 'no-spec' })
   expect(noSpec.closest('tr')?.textContent).toContain('—')

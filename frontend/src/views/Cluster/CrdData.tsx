@@ -16,7 +16,6 @@ import TopMenu from '../../components/TopMenu'
 import { apiFetch } from '../../lib/api'
 import type { CrdInstance, K8sCrd, ResourceList } from '../../lib/types'
 import { useClusterStore } from '../../store/cluster'
-import ShareObjectButton from '../../components/ShareObjectButton'
 
 // ADR-0040: cluster-scoped kind — the ref carries no namespace.
 const KIND = 'crd'
@@ -111,7 +110,6 @@ const CrdDataView = ({ name }: { name: string }) => {
       <CCardHeader className="py-3">
         <CCardTitle className="m-0 fw-bold text-primary fs-6 d-flex align-items-center gap-2">
           CRD Data — {spec?.names?.kind || name}
-          {name !== '' && <ShareObjectButton kind={KIND} name={name} listRoute={LIST_ROUTE} />}
         </CCardTitle>
       </CCardHeader>
       <CCardBody>

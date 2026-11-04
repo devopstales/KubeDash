@@ -190,8 +190,6 @@ test('list-renders-hpa-rows-with-data-links', async () => {
   const nameCell = nameButton.closest('tr')
   // row: the namespace is shown (the namespaced kind).
   expect(nameCell?.textContent).toContain('team-a')
-  // ADR-0040: the share button is in the name cell (row affordance).
-  expect(screen.getByRole('button', { name: 'Share web-hpa' })).toBeTruthy()
 })
 
 // click-name-renders-detail-with-clean-url (R1)

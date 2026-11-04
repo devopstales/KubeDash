@@ -22,7 +22,6 @@ import CIcon from '@coreui/icons-react'
 import { cilPlus, cilTrash } from '@coreui/icons'
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import KubeDataTable, { Column } from '../../components/KubeDataTable'
-import ShareObjectButton from '../../components/ShareObjectButton'
 import TopMenu from '../../components/TopMenu'
 import { useCluster } from '../../hooks/useCluster'
 import { apiFetch } from '../../lib/api'
@@ -147,8 +146,7 @@ const NamespacesView = () => {
           onClick={() => openObject(KIND, name, undefined, LIST_ROUTE, navigate)}
         >
           {name}
-        </button>{' '}
-        <ShareObjectButton kind={KIND} name={name} listRoute={LIST_ROUTE} />
+        </button>
       </>
     ) : null
   const externalLink = (label: string) => (url: string | null) =>

@@ -14,7 +14,6 @@ import { getActiveRef, openObject } from '../../lib/objectRef'
 import type { ResourceList, ServiceAccount } from '../../lib/types'
 import { useClusterStore } from '../../store/cluster'
 import KubeDataTable, { Column } from '../../components/KubeDataTable'
-import ShareObjectButton from '../../components/ShareObjectButton'
 import TopMenu from '../../components/TopMenu'
 
 // ADR-0040 TICKET-04: the registry kind for service accounts (namespaced);
@@ -80,8 +79,7 @@ const ServiceAccountsView = () => {
           onClick={() => openObject(KIND, name, namespace, LIST_ROUTE, navigate)}
         >
           {name}
-        </button>{' '}
-        <ShareObjectButton kind={KIND} name={name} namespace={namespace} listRoute={LIST_ROUTE} />
+        </button>
       </>
     ) : null
 

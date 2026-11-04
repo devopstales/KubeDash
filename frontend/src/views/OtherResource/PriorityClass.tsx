@@ -15,7 +15,6 @@ import { openObject } from '../../lib/objectRef'
 import type { PriorityClassItem, ResourceList } from '../../lib/types'
 import { useClusterStore } from '../../store/cluster'
 import KubeDataTable, { Column } from '../../components/KubeDataTable'
-import ShareObjectButton from '../../components/ShareObjectButton'
 import TopMenu from '../../components/TopMenu'
 
 // The kind is cluster-scoped (no namespace); this route is the template kind
@@ -78,8 +77,7 @@ const PriorityClassView = () => {
           onClick={() => openObject(KIND, name, undefined, LIST_ROUTE, navigate)}
         >
           {name}
-        </button>{' '}
-        <ShareObjectButton kind={KIND} name={name} listRoute={LIST_ROUTE} />
+        </button>
       </>
     ) : null
 

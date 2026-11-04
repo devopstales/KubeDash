@@ -22,7 +22,6 @@ import anOldHope from 'react-syntax-highlighter/dist/esm/styles/hljs/an-old-hope
 import { apiFetch } from '../../lib/api'
 import type { K8sSecret, ResourceList } from '../../lib/types'
 import { useClusterStore } from '../../store/cluster'
-import ShareObjectButton from '../../components/ShareObjectButton'
 import TopMenu from '../../components/TopMenu'
 
 const LAST_APPLIED = 'kubectl.kubernetes.io/last-applied-configuration'
@@ -201,14 +200,6 @@ const SecretDataView = ({ name, namespace }: { name: string; namespace: string }
       <CCardHeader className="py-3">
         <CCardTitle className="m-0 fw-bold text-primary fs-6 d-flex align-items-center gap-2">
           Secret Data
-          {name !== '' && (
-            <ShareObjectButton
-              kind="secret"
-              name={name}
-              namespace={namespace}
-              listRoute="/security/secret"
-            />
-          )}
         </CCardTitle>
       </CCardHeader>
       <CCardBody>

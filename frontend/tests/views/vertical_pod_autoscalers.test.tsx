@@ -205,8 +205,6 @@ test('vpa-list-renders-rows-with-data-links', async () => {
   const row = nameButton.closest('tr')
   expect(row?.textContent).not.toContain('2026-01-02T03:04:05Z')
   expect(row?.textContent).toMatch(/2026/)
-  // ADR-0040: the share button is in the name cell (row affordance).
-  expect(screen.getByRole('button', { name: 'Share web-vpa' })).toBeTruthy()
 })
 
 test('vpa-list-target-and-memory-cells', async () => {
@@ -227,8 +225,9 @@ test('vpa-list-target-and-memory-cells', async () => {
   expect(row?.textContent).toContain('128Mi')
   expect(row?.textContent).toContain('1Gi')
   // Target Name (spec.targetRef.name) is PLAIN TEXT: 4.1 linked it to a
-  // workload page 5.0 does not have yet — only the VPA name is clickable.
-  expect(row?.querySelectorAll('button')).toHaveLength(2)
+  // workload page 5.0 does not have yet — only the VPA name is clickable
+  // (the row's single button).
+  expect(row?.querySelectorAll('button')).toHaveLength(1)
   expect(screen.getByText('web')).not.toHaveAttribute('href')
 })
 

@@ -14,7 +14,6 @@ import { getActiveRef, openObject } from '../../lib/objectRef'
 import type { K8sSecret, ResourceList } from '../../lib/types'
 import { useClusterStore } from '../../store/cluster'
 import KubeDataTable, { Column } from '../../components/KubeDataTable'
-import ShareObjectButton from '../../components/ShareObjectButton'
 import TopMenu from '../../components/TopMenu'
 
 // The kind is namespaced (unlike the cluster-scoped priorityclass template);
@@ -74,8 +73,7 @@ const SecretView = () => {
           onClick={() => openObject(KIND, name, namespace, LIST_ROUTE, navigate)}
         >
           {name}
-        </button>{' '}
-        <ShareObjectButton kind={KIND} name={name} namespace={namespace} listRoute={LIST_ROUTE} />
+        </button>
       </>
     ) : null
 

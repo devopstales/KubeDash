@@ -12,7 +12,6 @@ import {
 } from '@coreui/react'
 import { useQuery } from '@tanstack/react-query'
 import KubeDataTable, { Column } from '../../components/KubeDataTable'
-import ShareObjectButton from '../../components/ShareObjectButton'
 import TopMenu from '../../components/TopMenu'
 import { apiFetch } from '../../lib/api'
 import { openObject } from '../../lib/objectRef'
@@ -284,8 +283,7 @@ const NodesView = () => {
           onClick={() => openObject(KIND, name, undefined, LIST_ROUTE, navigate)}
         >
           {name}
-        </button>{' '}
-        <ShareObjectButton kind={KIND} name={name} listRoute={LIST_ROUTE} />
+        </button>
       </>
     ) : null
 

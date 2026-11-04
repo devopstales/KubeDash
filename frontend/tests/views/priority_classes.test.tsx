@@ -168,12 +168,6 @@ test('list-renders-priority-classes', async () => {
   const nameCell = nameButton.closest('tr')
   expect(nameCell?.textContent).not.toContain('2026-10-26T10:00:00Z')
   expect(nameCell?.textContent).toMatch(/2026/)
-  // ADR-0040: the share button is in the name cell (row affordance).
-  const shareButton = screen.getByRole('button', { name: 'Share high' })
-  expect(shareButton).toBeTruthy()
-  // The icon is the ⧉ glyph — an invalid character reference (e.g. a
-  // mangled "&G;") would render as literal text and break this.
-  expect(shareButton.textContent).toBe('⧉')
 })
 
 // click-name-renders-detail-with-clean-url (R1)

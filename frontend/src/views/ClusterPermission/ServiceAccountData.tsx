@@ -14,7 +14,6 @@ import { apiFetch } from '../../lib/api'
 import { openObject } from '../../lib/objectRef'
 import type { ResourceList, ServiceAccount } from '../../lib/types'
 import { useClusterStore } from '../../store/cluster'
-import ShareObjectButton from '../../components/ShareObjectButton'
 import TopMenu from '../../components/TopMenu'
 
 const LAST_APPLIED = 'kubectl.kubernetes.io/last-applied-configuration'
@@ -123,7 +122,6 @@ const ServiceAccountDataView = ({ name, namespace }: { name: string; namespace: 
       </TopMenu>
       <CCardHeader className="py-3">
         <CCardTitle className="m-0 fw-bold text-primary fs-6">Service Account Data</CCardTitle>
-        <ShareObjectButton kind={KIND} name={name} namespace={namespace} listRoute={LIST_ROUTE} />
       </CCardHeader>
       <CCardBody>
         {!name ? (
