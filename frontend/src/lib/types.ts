@@ -310,6 +310,22 @@ export interface RuntimeClassItem {
   [key: string]: unknown
 }
 
+/** A StorageClass item as returned by /api/v1/clusters/<id>/resources/storageclasses (kubernetes to_dict, snake_case; cluster-scoped, storage/v1). */
+export interface StorageClassItem {
+  metadata?: {
+    name?: string
+    creation_timestamp?: string
+    labels?: Record<string, string>
+    annotations?: Record<string, string>
+  }
+  provisioner?: string
+  reclaim_policy?: string
+  volume_binding_mode?: string
+  allow_volume_expansion?: boolean
+  parameters?: Record<string, string>
+  [key: string]: unknown
+}
+
 /** A ResourceQuota item as returned by /api/v1/clusters/<id>/resources/resourcequotas (kubernetes to_dict, snake_case; namespaced, core group). */
 export interface ResourceQuotaItem {
   metadata?: {
