@@ -89,10 +89,14 @@ test.describe('KubeDash auth smoke (local password)', () => {
       })
       .toBe(true)
 
-    // ADR-0026 backstop: over the TLS edge the access cookie must carry the
-    // Secure attribute (KUBEDASH_COOKIE_SECURE=true in the dev stack).
+    // The Secure attribute mirrors the transport (ADR-0027): the plain-HTTP
+    // leg (task e2e, :8080) runs cookie_secure=false — the honest flag for
+    // plain HTTP; the TLS-edge leg (task e2e-ssl, :443) runs
+    // KUBEDASH_COOKIE_SECURE=true. Assert the honest flag for whichever leg
+    // is running.
     const cookies = await page.context().cookies()
-    expect(cookies.find((c) => c.name === 'kd_access')?.secure).toBe(true)
+    const secureExpected = new URL(page.url()).protocol === 'https:'
+    expect(cookies.find((c) => c.name === 'kd_access')?.secure).toBe(secureExpected)
 
     // --- 4. Profile renders the identity card ---
     // Scope to the profile card: the email also appears in the header user

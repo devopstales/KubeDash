@@ -325,7 +325,9 @@ test.describe.serial('KubeDash UI smoke (local admin)', () => {
     // relies on. Write it via the page, then drive the POST navigation
     // directly (form submit from the button would race the new tab's load in
     // the smoke's 60s budget; the relay + POST is the contract under test).
-    const token = 'e2e-deep-link'
+    // Contract-valid token: the server stashes only 8–16 hex chars (R1
+    // token shape) and reflects only those back in the one-shot meta.
+    const token = 'a1b2c3d4e5f6a001'
     await page.evaluate((t) => {
       localStorage.setItem(`kd_ref_${t}`, JSON.stringify({
         kind: 'crd',
@@ -364,7 +366,9 @@ test.describe.serial('KubeDash UI smoke (local admin)', () => {
     expect(await popup.evaluate(() => location.search), 'deep-link location.search must be empty')
       .toBe('')
     // The new tab's ObjectRoute rendered the ref's detail (R6 kind match).
-    await expect(popup.getByText('CRD Data — configmaps.example.com')).toBeVisible({ timeout: 20_000 })
+    // CrdData titles the detail "CRD Data — {spec.names.kind}" (kind over
+    // name), so the rendered title is the CRD's kind, not its resource name.
+    await expect(popup.getByText('CRD Data — ConfigMap')).toBeVisible({ timeout: 20_000 })
     // The relay consumed itself (the bus, not storage).
     expect(await popup.evaluate((t) => localStorage.getItem(`kd_ref_${t}`), token)).toBeNull()
     await popup.close()

@@ -2,7 +2,7 @@ import { expect } from '@playwright/test'
 import type { APIRequestContext, Page } from '@playwright/test'
 
 /** The dev-stack origin the suites run against (playwright.config baseURL). */
-const ORIGIN = process.env.E2E_BASE_URL ?? 'http://localhost:8080'
+export const ORIGIN = process.env.E2E_BASE_URL ?? 'http://localhost:8080'
 
 /**
  * Shared e2e helpers for the api-smoke + ui-smoke specs.

@@ -62,5 +62,32 @@ spec:
           command: ["/bin/true"]
 YAML
 
+# 4. CRD fixture — the e2e deep-link scenario (ui-smoke.spec.ts) opens the
+#    CRD named `configmaps.example.com`; without it the scenario is red for
+#    setup reasons, not behavior (QA W012).
+k apply -f - <<'YAML'
+apiVersion: apiextensions.k8s.io/v1
+kind: CustomResourceDefinition
+metadata:
+  name: configmaps.example.com
+spec:
+  group: example.com
+  names:
+    kind: ConfigMap
+    listKind: ConfigMapList
+    plural: configmaps
+    singular: configmap
+  scope: Namespaced
+  versions:
+    - name: v1
+      served: true
+      storage: true
+      schema:
+        openAPIV3Schema:
+          type: object
+          x-kubernetes-preserve-unknown-fields: true
+YAML
+
 echo "demo data ready: ns=$NS  pods: demo-busy x3 (running) + demo-broken x1 (crashlooping)"
+echo "  CRD fixture: configmaps.example.com (e2e deep-link target)"
 echo "  kubectl --context $CTX get pods -n $NS -w"

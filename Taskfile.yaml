@@ -454,10 +454,10 @@ tasks:
   #   task e2e                         # terminal 2
 
   e2e:
-    desc: "Run the Playwright auth-smoke e2e against the plain-HTTP backend (task dev-stack / backend-run on :8080; the TLS edge is e2e-ssl)"
+    desc: "Run the Playwright auth-smoke + ui-smoke e2e against the plain-HTTP backend (task dev-stack / backend-run on :8080; the TLS edge is e2e-ssl). ui-smoke needs the demo-data CRD fixture (task dev-stack / kind-up run it)."
     dir: frontend
     cmds:
-      - "corepack pnpm exec playwright test e2e/auth-smoke.spec.ts"
+      - "corepack pnpm exec playwright test e2e/auth-smoke.spec.ts e2e/ui-smoke.spec.ts"
 
   e2e-ssl:
     desc: "Run the Playwright auth-smoke e2e against https://kubedash.dev.local:443 (needs task dev-stack-ssl; ADR-0026/0027 backstop)"
