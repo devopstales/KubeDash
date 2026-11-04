@@ -16,6 +16,8 @@
 #     data views render real data.
 #   - demo-runc: cluster-scoped RuntimeClass (handler "runc" = kind's
 #     containerd runtime).
+#   - demo-gp2: cluster-scoped StorageClass (provisioner
+#     "rancher.local-path" = kind's default provisioner).
 #   - configmaps.example.com: CRD fixture for the e2e deep-link scenario
 #     (ui-smoke.spec.ts); without it the scenario is red for setup
 #     reasons, not behavior (QA W012).
@@ -236,7 +238,25 @@ metadata:
 handler: runc
 YAML
 
-# 8. CRD fixture — the e2e deep-link scenario (ui-smoke.spec.ts) opens the
+# 8. StorageClass — cluster-scoped. provisioner "rancher.local-path" is
+#    kind's default provisioner, so the object is valid on the dev cluster
+#    without extra CSI setup. No is-default-class annotation: the
+#    cluster's "standard" class already demonstrates the true case, and
+#    this row renders the "—" Default cell.
+k apply -f - <<'YAML'
+apiVersion: storage.k8s.io/v1
+kind: StorageClass
+metadata:
+  name: demo-gp2
+provisioner: rancher.local-path
+reclaimPolicy: Delete
+allowVolumeExpansion: true
+volumeBindingMode: WaitForFirstConsumer
+parameters:
+  pool: demo
+YAML
+
+# 9. CRD fixture — the e2e deep-link scenario (ui-smoke.spec.ts) opens the
 #    CRD named `configmaps.example.com`; without it the scenario is red for
 #    setup reasons, not behavior (QA W012).
 k apply -f - <<'YAML'
@@ -265,6 +285,6 @@ YAML
 echo "demo data ready: ns=$NS"
 echo "  pods: demo-app x1 (healthy, HPA/VPA/PDB target) + demo-broken x1 (crashlooping, events)"
 echo "  fixtures: Secret, LimitRange, ResourceQuota, PDB, HPA, VPA (Off mode), NetworkPolicy"
-echo "  cluster-scoped: RuntimeClass demo-runc, CRD configmaps.example.com (e2e deep-link target)"
+echo "  cluster-scoped: RuntimeClass demo-runc, StorageClass demo-gp2, CRD configmaps.example.com (e2e deep-link target)"
 echo "  VPA recommendations land in the demo-vpa status within a few minutes"
 echo "  kubectl --context $CTX get pods,hpa,vpa,pdb,netpol -n $NS -w"

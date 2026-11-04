@@ -65,6 +65,8 @@ const HorizontalPodAutoscalerDataView = React.lazy(
 )
 const LimitRangeView = React.lazy(() => import('./views/OtherResource/LimitRange'))
 const LimitRangeDataView = React.lazy(() => import('./views/OtherResource/LimitRangeData'))
+const StorageClassView = React.lazy(() => import('./views/Storage/StorageClass'))
+const StorageClassDataView = React.lazy(() => import('./views/Storage/StorageClassData'))
 const GroupsView = React.lazy(() => import('./views/Groups'))
 const GroupPrivilegesView = React.lazy(() => import('./views/Groups/GroupPrivileges'))
 const GroupPrivilegeEditView = React.lazy(() => import('./views/Groups/GroupPrivilegeEdit'))
@@ -785,6 +787,24 @@ const App = () => {
                           <OldDataRedirect
                             kind="limitrange"
                             listRoute="/other-resource/limit-range"
+                          />
+                        </ProtectedRoute>
+                      }
+                    />
+                    <Route
+                      path="/storage/storage-class"
+                      element={
+                        <ProtectedRoute>
+                          {/* ADR-0040: ObjectRoute renders the list or the
+                              ref-matched detail on the clean route. First
+                              build of this kind (it was a stub; the /data
+                              URL never shipped) — NO legacy /data route, no
+                              R7 redirect. Cluster-scoped: no namespace. */}
+                          <ObjectRoute
+                            kind="storageclass"
+                            listRoute="/storage/storage-class"
+                            list={<StorageClassView />}
+                            detail={(p) => <StorageClassDataView name={p.name} />}
                           />
                         </ProtectedRoute>
                       }

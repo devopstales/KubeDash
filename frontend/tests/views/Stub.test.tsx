@@ -78,6 +78,10 @@ function expectedStubs() {
     // legacy /data URL is its R7 redirect (TICKET-07).
     '/other-resource/limit-range',
     '/other-resource/limit-range/data',
+    // Real view (2026-10-28-storageclass-views, Task 4) — not a stub route.
+    // The kind was a stub until this change: the /data URL never shipped,
+    // so there is no R7 redirect — the single clean route only.
+    '/storage/storage-class',
   ])
   const seen = new Map<string, string>()
   for (const isAdmin of [true, false]) {
