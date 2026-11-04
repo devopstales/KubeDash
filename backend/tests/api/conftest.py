@@ -54,6 +54,11 @@ class _FakeRedis:
     def delete(self, key: str) -> int:
         return int(self.store.pop(key, None) is not None)
 
+    def getdel(self, key: str) -> str | None:
+        """Atomic one-shot pop (redis GETDEL, 6.2+): the object handoff's
+        stash is consumed by exactly one GET."""
+        return self.store.pop(key, None)
+
     def flushall(self) -> None:
         self.store.clear()
 

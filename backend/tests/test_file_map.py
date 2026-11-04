@@ -13,6 +13,7 @@ import pytest
 EXPECTED = [
     "app/__init__.py", "app/extensions.py",
     "app/core/config.py", "app/core/security.py", "app/core/leader.py", "app/core/errors.py",
+    "app/core/object_handoff.py",
     "app/api/__init__.py", "app/api/auth.py", "app/api/clusters.py", "app/api/resources.py",
     "app/api/logs.py", "app/api/metrics.py", "app/api/traces.py", "app/api/audit.py",
     "app/api/permissions.py", "app/api/namespaces.py", "app/api/access.py",

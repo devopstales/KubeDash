@@ -285,6 +285,8 @@ def register_static(app: Flask) -> None:
         return
     app.config["_STATIC_REGISTERED"] = True
     from flask import abort, send_from_directory
+
+    from app.core import object_handoff
     # ADR-0028: the static dir is derived from KUBEDASH_HOME, not an env var.
     static_dir = ini_config.home_paths()["static"]
 
@@ -296,7 +298,7 @@ def register_static(app: Flask) -> None:
 
     @app.get("/")
     def index() -> Response:
-        return spa("")
+        return object_handoff.render_index(static_dir)
 
     # Root-level static files (favicon.ico, manifest.json) live at the static
     # dir root, not under /assets/. The custom converter matches ONLY a file
@@ -311,10 +313,15 @@ def register_static(app: Flask) -> None:
         resp.headers["Cache-Control"] = "immutable, max-age=31536000"
         return resp
 
-    @app.get("/<path:path_>")
+    # ADR-0040 R4: the catch-all also accepts the share form's POST (the SPA
+    # deep-link bounce) — see app.core.object_handoff. GET is the one-shot
+    # meta-injecting render; the token never appears in a URL.
+    @app.route("/<path:path_>", methods=["GET", "POST"])
     def spa(path_: str) -> Response:
+        from flask import request
+
         if path_.startswith(("api/", "ws/")):
             abort(404)
-        resp = send_from_directory(str(static_dir), "index.html")
-        resp.headers["Cache-Control"] = "no-cache"
-        return resp
+        if request.method == "POST":
+            return object_handoff.post_bounce(f"/{path_}")
+        return object_handoff.render_index(static_dir)
