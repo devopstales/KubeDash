@@ -228,6 +228,43 @@ test('data-conditions-from-legacy-annotation', async () => {
   expect(screen.queryByText('No conditions')).toBeNull()
 })
 
+// hpa-data-annotations-trimmed
+test('data-annotations-trimmed', async () => {
+  // 4.1's trimAnnotations: the two machine-managed keys are dropped from
+  // the annotations table; everything else renders.
+  const trimmedHpa = {
+    ...webHpa,
+    metadata: {
+      ...webHpa.metadata,
+      annotations: {
+        'kubectl.kubernetes.io/last-applied-configuration':
+          '{"apiVersion":"autoscaling/v1","kind":"HorizontalPodAutoscaler","metadata":{}}',
+        'autoscaling.alpha.kubernetes.io/conditions': '[{"type":"AbleToScale","status":"True"}]',
+        'team.example.com/note': 'kept',
+      },
+    },
+  }
+  serveHpa([trimmedHpa])
+  selectProd()
+  seedActiveRef('web-hpa', 'team-a')
+  const { container } = renderAt(<HorizontalPodAutoscalerDataView name="web-hpa" namespace="team-a" />)
+
+  await waitFor(() => {
+    expect(container.textContent).toContain('"min_replicas"')
+  })
+  // Table cells (the Key/Value sub-tables) — scoped to <table> so the JSON
+  // block below (which keeps the full object, annotations included) is not
+  // a false positive; the highlighter splits tokens across spans, so match
+  // on the tables' textContent instead of per-node text.
+  const inAnyTable = (text: string) =>
+    Array.from(container.querySelectorAll('table')).some((t) => (t.textContent ?? '').includes(text))
+  expect(inAnyTable('team.example.com/note')).toBe(true)
+  expect(inAnyTable('kept')).toBe(true)
+  expect(inAnyTable('kubectl.kubernetes.io/last-applied-configuration')).toBe(false)
+  expect(inAnyTable('autoscaling.alpha.kubernetes.io/conditions')).toBe(false)
+  expect(screen.queryByText('No annotations')).toBeNull()
+})
+
 // hpa-data-missing-conditions
 test('data-missing-conditions', async () => {
   serveHpa([noCondHpa])

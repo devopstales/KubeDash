@@ -48,6 +48,17 @@ const conditionsOf = (item: HorizontalPodAutoscalerItem | undefined) => {
   }
 }
 
+// 4.1's trimAnnotations (lib/helper_functions.py): the two machine-managed
+// keys are dropped from the rendered annotations — the giant
+// last-applied-configuration blob and the legacy conditions JSON (already
+// surfaced by the Conditions table). Replicated on 2026-11-04 per user
+// request (overrides the 2026-10-28 "render verbatim" ratified deviation).
+const LAST_APPLIED = 'kubectl.kubernetes.io/last-applied-configuration'
+const trimmedAnnotations = (item: HorizontalPodAutoscalerItem | undefined): [string, string][] =>
+  Object.entries(item?.metadata?.annotations ?? {}).filter(
+    ([key]) => key !== LAST_APPLIED && key !== LEGACY_CONDITIONS,
+  )
+
 /**
  * 4.1 `other-resources/hpa-data.html.j2` port: one HorizontalPodAutoscaler's
  * metadata plus the 4.1 Conditions table and the full object as a
@@ -63,8 +74,13 @@ const conditionsOf = (item: HorizontalPodAutoscalerItem | undefined) => {
  * Reason / Message` shape (ratified deviation). The Metrics row keeps 4.1's
  * legacy v1 CPU target (`UNKNOWN` literal for an absent current). The Owner
  * link (4.1's `/workload/<kind-lower>s`) is dropped — plain text; the full
- * `scale_target_ref` is in the JSON block. `trimAnnotations` is not
- * replicated — annotations render verbatim. Empty `items` is a not-found
+ * `scale_target_ref` is in the JSON block. `trimAnnotations` IS replicated
+ * (2026-11-04 user request — overrides the 2026-10-28 ratified
+ * deviation): the two machine-managed keys 4.1 hid are dropped from the
+ * Key/Value table — `kubectl.kubernetes.io/last-applied-configuration`
+ * (the giant apply blob) and
+ * `autoscaling.alpha.kubernetes.io/conditions` (already surfaced by the
+ * Conditions table). Empty `items` is a not-found
  * STATE (pinned copy), not an error. Placement under Other Resources is a
  * ratified deviation (ADR-0022).
  */
@@ -99,7 +115,7 @@ const HorizontalPodAutoscalerDataView = ({
 
   const item = query.data
   const labels = Object.entries(item?.metadata?.labels ?? {})
-  const annotations = Object.entries(item?.metadata?.annotations ?? {})
+  const annotations = trimmedAnnotations(item)
   const conditions = conditionsOf(item)
 
   return (
