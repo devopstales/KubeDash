@@ -25,6 +25,10 @@
 #     SnapshotClass CRD (cluster-scoped) + one fixture, so the SnapshotClass
 #     list + data views render real data (the CRD's presence is what makes
 #     the read non-empty — absent -> []).
+#   - volumesnapshots.snapshot.storage.k8s.io + demo-snap: the
+#     VolumeSnapshot CRD (namespaced) + one fixture, so the VolumeSnapshot
+#     list + data views render real data (the CRD's presence is what makes
+#     the read non-empty — absent -> []).
 #
 # The VPA OPERATOR (recommender + updater + admission-controller, kube-
 # system) is installed first — marker-checked on the VPA CRD so re-runs
@@ -334,10 +338,53 @@ driver: rancher.local-path
 deletionPolicy: Delete
 YAML
 
+# 11. VolumeSnapshot CRD + fixture — the VolumeSnapshot list/data views read
+#     volumesnapshots.snapshot.storage.k8s.io (a NAMESPACE-SCOPED CRD, unlike
+#     the cluster-scoped VolumeSnapshotClass). The CRD's presence is what
+#     turns the read non-empty (CRD absent -> []). NO status subresource: the
+#     fixture carries status via a plain apply. demo-snap targets demo-pvc via
+#     csi-default and is readyToUse (the 4.1 Usable success-badge tier).
+k apply -f - <<'YAML'
+apiVersion: apiextensions.k8s.io/v1
+kind: CustomResourceDefinition
+metadata:
+  name: volumesnapshots.snapshot.storage.k8s.io
+spec:
+  group: snapshot.storage.k8s.io
+  names:
+    kind: VolumeSnapshot
+    listKind: VolumeSnapshotList
+    plural: volumesnapshots
+    singular: volumesnapshot
+  scope: Namespaced
+  versions:
+    - name: v1
+      served: true
+      storage: true
+      schema:
+        openAPIV3Schema:
+          type: object
+          x-kubernetes-preserve-unknown-fields: true
+---
+apiVersion: snapshot.storage.k8s.io/v1
+kind: VolumeSnapshot
+metadata:
+  name: demo-snap
+  namespace: kubedash-demo
+spec:
+  source:
+    persistentVolumeClaimName: demo-pvc
+  volumeSnapshotClassName: csi-default
+status:
+  readyToUse: true
+  restoreSize: 100Mi
+YAML
+
 echo "demo data ready: ns=$NS"
 echo "  pods: demo-app x1 (healthy, HPA/VPA/PDB target) + demo-broken x1 (crashlooping, events)"
 echo "  fixtures: Secret, ConfigMap, LimitRange, ResourceQuota, PDB, HPA, VPA (Off mode), NetworkPolicy"
 echo "  cluster-scoped: RuntimeClass demo-runc, StorageClass demo-gp2, CRD configmaps.example.com (e2e deep-link target)"
 echo "  cluster-scoped: CRD volumesnapshotclasses.snapshot.storage.k8s.io + csi-default (SnapshotClass view)"
+echo "  namespaced: CRD volumesnapshots.snapshot.storage.k8s.io + demo-snap (VolumeSnapshot view)"
 echo "  VPA recommendations land in the demo-vpa status within a few minutes"
 echo "  kubectl --context $CTX get pods,hpa,vpa,pdb,netpol -n $NS -w"

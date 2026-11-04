@@ -71,6 +71,8 @@ const ConfigMapView = React.lazy(() => import('./views/Storage/ConfigMap'))
 const ConfigMapDataView = React.lazy(() => import('./views/Storage/ConfigMapData'))
 const SnapshotClassView = React.lazy(() => import('./views/Storage/SnapshotClass'))
 const SnapshotClassDataView = React.lazy(() => import('./views/Storage/SnapshotClassData'))
+const VolumeSnapshotView = React.lazy(() => import('./views/Storage/VolumeSnapshot'))
+const VolumeSnapshotDataView = React.lazy(() => import('./views/Storage/VolumeSnapshotData'))
 const GroupsView = React.lazy(() => import('./views/Groups'))
 const GroupPrivilegesView = React.lazy(() => import('./views/Groups/GroupPrivileges'))
 const GroupPrivilegeEditView = React.lazy(() => import('./views/Groups/GroupPrivilegeEdit'))
@@ -848,6 +850,27 @@ const App = () => {
                             listRoute="/storage/snapshot-class"
                             list={<SnapshotClassView />}
                             detail={(p) => <SnapshotClassDataView name={p.name} />}
+                          />
+                        </ProtectedRoute>
+                      }
+                    />
+                    <Route
+                      path="/storage/volumesnapshot"
+                      element={
+                        <ProtectedRoute>
+                          {/* ADR-0040: ObjectRoute renders the list or the
+                              ref-matched detail on the clean route. First
+                              build of this kind (it was a stub; the /data
+                              URL never shipped) — NO legacy /data route, no
+                              R7 redirect. Namespaced: the namespace rides
+                              in the ref (R8). */}
+                          <ObjectRoute
+                            kind="volumesnapshot"
+                            listRoute="/storage/volumesnapshot"
+                            list={<VolumeSnapshotView />}
+                            detail={(p) => (
+                              <VolumeSnapshotDataView name={p.name} namespace={p.namespace ?? ''} />
+                            )}
                           />
                         </ProtectedRoute>
                       }
