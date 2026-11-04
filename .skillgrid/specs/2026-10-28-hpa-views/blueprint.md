@@ -709,8 +709,8 @@ dependency add; the kind table is additive).
     (`status.conditions` else the legacy `autoscaling.alpha.kubernetes.io/
     conditions` annotation — 4.1's source), NOT_FOUND as a pinned STATE, the
     `json` hljs grammar as the truthful classifier (ratified 2026-10-28), the
-    4.1 deviations (min/max swap corrected list-only, no trimAnnotations,
-    typed Conditions).
+    4.1 deviations (min/max swap corrected list-only, trimAnnotations
+    replicated per the 2026-11-04 override, typed Conditions).
   - `SyntaxHighlighter.registerLanguage('json', json)` (harmless
     re-register — the module is a singleton).
   - read both params: `const name = params.get('name') ?? ''`,

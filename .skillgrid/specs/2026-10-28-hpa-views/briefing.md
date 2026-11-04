@@ -184,3 +184,8 @@ network-policy/data).
    no workload-page destination yet; the owner renders as plain text.
 6. `trimAnnotations` is NOT replicated — annotations render verbatim; the
    JSON block is the same, and 5.0 has no 4.1 trim helper.
+   **OVERRIDDEN (2026-11-04):** the data view now applies 4.1's trim
+   (user-requested format fix, commit `46929a10`) — the two machine-managed
+   keys (`kubectl.kubernetes.io/last-applied-configuration`,
+   `autoscaling.alpha.kubernetes.io/conditions`) are dropped from the
+   annotations table; the JSON block still carries the full object.

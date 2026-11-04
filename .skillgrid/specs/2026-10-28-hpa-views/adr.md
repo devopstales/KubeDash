@@ -73,6 +73,11 @@ pair).
   `kubectl.kubernetes.io/last-applied-configuration` from the annotations
   table; 5.0 renders annotations verbatim (the kubectl noise is in the JSON
   block either way, and 5.0 has no trim helper).
+  **OVERRIDDEN (2026-11-04):** the data view now applies 4.1's trim
+  (user-requested format fix, commit `46929a10`) —
+  `kubectl.kubernetes.io/last-applied-configuration` AND
+  `autoscaling.alpha.kubernetes.io/conditions` are dropped from the
+  annotations table; the JSON block still carries the full object.
 
 ## Navigation Superseded (2026-10-29)
 
