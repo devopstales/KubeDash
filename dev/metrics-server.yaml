@@ -112,7 +112,44 @@ subjects:
   - kind: ServiceAccount
     name: metrics-server
     namespace: kube-system
-# (No PodSecurityPolicy — removed in K8s 1.25+; the kind dev cluster is 1.31.)
+---
+# The deployment passes no --requestheader-client-ca-file, so the apiserver
+# fallback reads the extension-apiserver-authentication ConfigMap — without
+# this Role + binding the container panics at startup (crash-loop:
+# "configmaps extension-apiserver-authentication is forbidden"). Own Role
+# (not the built-in extension-apiserver-authentication-reader): a Role
+# binding's roleRef is immutable, so binding to the built-in Role breaks
+# re-apply on clusters seeded by the earlier vendored manifest, whose
+# binding already points at a Role of this name.
+apiVersion: rbac.authorization.k8s.io/v1
+kind: Role
+metadata:
+  name: metrics-server-auth-reader
+  namespace: kube-system
+rules:
+  - apiGroups: [""]
+    resourceNames: ["extension-apiserver-authentication"]
+    resources: ["configmaps"]
+    # get loads the CA at boot; list+watch feed the CA-bundle informer —
+    # without them the pool stays empty and every apiserver request 403s
+    # (client certs unverified). Same verbs as the built-in
+    # extension-apiserver-authentication-reader Role.
+    verbs: ["get", "list", "watch"]
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: RoleBinding
+metadata:
+  name: metrics-server-auth-reader
+  namespace: kube-system
+roleRef:
+  apiGroup: rbac.authorization.k8s.io
+  kind: Role
+  name: metrics-server-auth-reader
+subjects:
+  - kind: ServiceAccount
+    name: metrics-server
+    namespace: kube-system
+# (No PodSecurityPolicy — removed in K8s 1.25+; the kind dev cluster is 1.35.)
 ---
 apiVersion: apps/v1
 kind: Deployment
