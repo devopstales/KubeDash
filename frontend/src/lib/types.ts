@@ -188,6 +188,23 @@ export interface K8sSecret {
   [key: string]: unknown
 }
 
+/** A ConfigMap item as returned by /api/v1/clusters/<id>/resources/configmaps (kubernetes to_dict, snake_case; namespaced, core v1). ``data`` is present (NOT stripped, unlike secrets — it is public config, and the list view's Data Keys column counts its keys). */
+export interface ConfigMapItem {
+  metadata?: {
+    name?: string
+    namespace?: string
+    creation_timestamp?: string | null
+    resource_version?: string | null
+    labels?: Record<string, string> | null
+    annotations?: Record<string, string> | null
+  }
+  /** Plain-string config values (public, NOT base64). */
+  data?: Record<string, string> | null
+  /** Base64-encoded binary values (camelCase — the kubernetes client preserves the API casing for non-metadata fields). */
+  binaryData?: Record<string, string> | null
+  [key: string]: unknown
+}
+
 /** A NetworkPolicy item as returned by /api/v1/clusters/<id>/resources/networkpolicies (kubernetes to_dict, snake_case). */
 export interface NetworkPolicyItem {
   metadata?: {
