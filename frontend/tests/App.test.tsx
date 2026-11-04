@@ -218,20 +218,18 @@ describe('OldDataRedirect (R7): legacy /data URL → clean route detail', () => 
     renderApp('/security/secret/data?name=db-creds&namespace=team-a')
     // The redirect hydrated the ref; the detail renders from it.
     expect(await waitFor(() => detailTitle())).toBeTruthy()
-    // The detail's "back to list" breadcrumb: clears the ref + history.back()
-    // (async in jsdom — wrap in act so the navigation settles), so the route
-    // re-renders the LIST — the R6 dispatch that keeps a re-entry from
-    // looping (the redirect only fires on the /data path).
-    const backBtn = screen.getByRole('button', { name: /back to list/i })
+    // The detail's back breadcrumb: clears the ref + navigates to the
+    // clean route (same path), so the R6 dispatch re-renders the LIST —
+    // the guard against a re-entry loop (the redirect only fires on the
+    // /data path).
     act(() => {
-      backBtn.click()
+      screen.getByRole('link', { name: 'Secrets' }).click()
     })
 
-    // The active pointer was dropped by the breadcrumb — the next navigation
-    // (history.back() in a real browser) renders the list via the R6
-    // dispatch. (jsdom's history is a no-op proxy, so the list re-render
-    // itself is not observable here; the pointer-clear is the contract.)
+    // The active pointer was dropped by the breadcrumb and the route
+    // re-rendered the list (the list's title is the positive proof).
     expect(sessionStorage.getItem('kd_object_active')).toBeNull()
+    expect(await waitFor(() => screen.queryByText('Secret List', { selector: 'h5' }))).toBeTruthy()
   })
 
   test('list → click row → detail → back (the clean contract the redirect must not break)', async () => {
@@ -266,13 +264,13 @@ describe('OldDataRedirect (R7): legacy /data URL → clean route detail', () => 
     expect(ref.name).toBe('db-creds')
     expect(ref.namespace).toBe('team-a')
 
-    // Back (the in-app breadcrumb) drops the active pointer; the next
-    // navigation (history.back() in a real browser) renders the list via the
-    // R6 dispatch. (jsdom's history is a no-op proxy, so the list re-render
-    // itself is not observable here; the pointer-clear is the contract.)
+    // Back (the in-app breadcrumb) drops the active pointer; the
+    // same-path navigation re-reads the (now-null) ref and the R6
+    // dispatch renders the list.
     act(() => {
-      screen.getByRole('button', { name: /back to list/i }).click()
+      screen.getByRole('link', { name: 'Secrets' }).click()
     })
     expect(sessionStorage.getItem('kd_object_active')).toBeNull()
+    expect(await waitFor(() => screen.queryByText('Secret List', { selector: 'h5' }))).toBeTruthy()
   })
 })

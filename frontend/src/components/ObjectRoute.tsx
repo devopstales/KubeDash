@@ -1,12 +1,6 @@
 import React, { useEffect, useMemo, useReducer, useRef, useState } from 'react'
 import { useLocation, useNavigate } from 'react-router-dom'
-import {
-  clearActiveRef,
-  consumeIncoming,
-  getActiveRef,
-  openObject,
-  sweepRelay,
-} from '../lib/objectRef'
+import { consumeIncoming, getActiveRef, openObject, sweepRelay } from '../lib/objectRef'
 import type { ObjectRef } from '../lib/objectRef'
 
 export interface ObjectRouteProps {
@@ -31,8 +25,8 @@ export interface ObjectRouteProps {
  * - the active ref's namespace is authoritative for the detail (R8):
  *   `detail` receives `{ name, namespace }` from the ref, never from the URL.
  * - history: list→detail is `openObject`'s navigate(listRoute) push;
- *   detail→list is `history.back()` + `clearActiveRef()` (the back
- *   breadcrumb and the browser back button both leave the URL clean).
+ *   detail→list is the data view's breadcrumb list item (it clears the
+ *   active ref; the URL is already the clean list route).
  * - on mount, registers the router's navigate fn (openObject's seam — the
  *   lib stays router-free); list views call `openObject(kind, name, ns,
  *   listRoute, navigate)` with their own `useNavigate()` (same seam).
@@ -79,21 +73,7 @@ const ObjectRoute: React.FC<ObjectRouteProps> = ({ kind, listRoute, list, detail
     return <>{list}</>
   }
 
-  return (
-    <>
-      <button
-        type="button"
-        className="btn btn-link btn-sm p-0 text-primary"
-        onClick={() => {
-          clearActiveRef()
-          window.history.back()
-        }}
-      >
-        &larr; back to list
-      </button>
-      {detail({ name: ref.name, namespace: ref.namespace })}
-    </>
-  )
+  return detail({ name: ref.name, namespace: ref.namespace })
 }
 
 // The router's navigate fn, registered by the mounted ObjectRoute (openObject's

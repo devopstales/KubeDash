@@ -7,7 +7,7 @@ import DefaultLayout from './layout/DefaultLayout'
 import { AdminRoute, ProtectedRoute } from './routes'
 import ObjectRoute, { registerNavigate } from './components/ObjectRoute'
 import OldDataRedirect from './components/OldDataRedirect'
-import { clearActiveRef, getActiveRef, sweepRelay } from './lib/objectRef'
+import { getActiveRef, sweepRelay } from './lib/objectRef'
 import StubView from './views/Stub'
 import { stubRoutes } from './views/Stub/routes'
 import './scss/style.scss'
@@ -124,23 +124,11 @@ const NetworkPolicyRoute = () => {
 
   if (!isPolicy) return <NetworkPolicyView />
   return (
-    <>
-      <button
-        type="button"
-        className="btn btn-link btn-sm p-0 text-primary"
-        onClick={() => {
-          clearActiveRef()
-          window.history.back()
-        }}
-      >
-        &larr; back to list
-      </button>
-      <NetworkPolicyDataView
-        name={ref!.name}
-        kind={ref!.kind}
-        namespace={ref!.namespace ?? ''}
-      />
-    </>
+    <NetworkPolicyDataView
+      name={ref!.name}
+      kind={ref!.kind}
+      namespace={ref!.namespace ?? ''}
+    />
   )
 }
 

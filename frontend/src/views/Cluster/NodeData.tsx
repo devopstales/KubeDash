@@ -13,6 +13,7 @@ import {
 } from '@coreui/react'
 import { useQuery } from '@tanstack/react-query'
 import { apiFetch } from '../../lib/api'
+import { clearActiveRef } from '../../lib/objectRef'
 import type { K8sNode, ResourceList } from '../../lib/types'
 import { useClusterStore } from '../../store/cluster'
 import TopMenu from '../../components/TopMenu'
@@ -399,7 +400,7 @@ const NodeDataView = ({ name }: { name: string }) => {
           <CBreadcrumb className="my-0" aria-label="breadcrumb">
             <CBreadcrumbItem>Cluster</CBreadcrumbItem>
             <CBreadcrumbItem>
-              <Link to="/cluster/node">Nodes</Link>
+              <Link to="/cluster/node" onClick={clearActiveRef}>Nodes</Link>
             </CBreadcrumbItem>
             <CBreadcrumbItem active>{name || 'Error'}</CBreadcrumbItem>
           </CBreadcrumb>

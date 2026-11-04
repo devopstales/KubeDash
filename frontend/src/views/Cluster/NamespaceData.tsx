@@ -12,6 +12,7 @@ import {
 } from '@coreui/react'
 import { useQuery } from '@tanstack/react-query'
 import { apiFetch } from '../../lib/api'
+import { clearActiveRef } from '../../lib/objectRef'
 import type { K8sNamespace, ResourceList } from '../../lib/types'
 import { useClusterStore } from '../../store/cluster'
 import TopMenu from '../../components/TopMenu'
@@ -79,7 +80,7 @@ const NamespaceDataView = ({ name }: { name: string }) => {
         <CBreadcrumb className="my-0" aria-label="breadcrumb">
           <CBreadcrumbItem>Cluster</CBreadcrumbItem>
           <CBreadcrumbItem>
-            <Link to="/cluster/namespace">Namespaces</Link>
+            <Link to="/cluster/namespace" onClick={clearActiveRef}>Namespaces</Link>
           </CBreadcrumbItem>
           <CBreadcrumbItem active>{name || 'Error'}</CBreadcrumbItem>
         </CBreadcrumb>

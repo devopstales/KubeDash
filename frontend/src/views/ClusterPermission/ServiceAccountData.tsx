@@ -11,7 +11,7 @@ import {
 } from '@coreui/react'
 import { useQuery } from '@tanstack/react-query'
 import { apiFetch } from '../../lib/api'
-import { openObject } from '../../lib/objectRef'
+import { clearActiveRef, openObject } from '../../lib/objectRef'
 import type { ResourceList, ServiceAccount } from '../../lib/types'
 import { useClusterStore } from '../../store/cluster'
 import TopMenu from '../../components/TopMenu'
@@ -115,7 +115,9 @@ const ServiceAccountDataView = ({ name, namespace }: { name: string; namespace: 
         <CBreadcrumb className="my-0" aria-label="breadcrumb">
           <CBreadcrumbItem>Cluster Permissions</CBreadcrumbItem>
           <CBreadcrumbItem>
-            <Link to="/cluster-permission/service-account">Service Accounts</Link>
+            <Link to="/cluster-permission/service-account" onClick={clearActiveRef}>
+              Service Accounts
+            </Link>
           </CBreadcrumbItem>
           <CBreadcrumbItem active>{name || 'Error'}</CBreadcrumbItem>
         </CBreadcrumb>

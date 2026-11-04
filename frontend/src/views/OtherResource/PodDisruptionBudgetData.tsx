@@ -14,6 +14,7 @@ import { Light as SyntaxHighlighter } from 'react-syntax-highlighter'
 import json from 'react-syntax-highlighter/dist/esm/languages/hljs/json'
 import anOldHope from 'react-syntax-highlighter/dist/esm/styles/hljs/an-old-hope'
 import { apiFetch } from '../../lib/api'
+import { clearActiveRef } from '../../lib/objectRef'
 import { formatTimestamp } from '../../lib/format'
 import type { PodDisruptionBudgetItem, ResourceList } from '../../lib/types'
 import { useClusterStore } from '../../store/cluster'
@@ -94,7 +95,9 @@ const PodDisruptionBudgetDataView = ({
         <CBreadcrumb className="my-0" aria-label="breadcrumb">
           <CBreadcrumbItem>Other Resources</CBreadcrumbItem>
           <CBreadcrumbItem>
-            <Link to="/other-resource/pod-disruption-budget">Pod Disruption Budget List</Link>
+            <Link to="/other-resource/pod-disruption-budget" onClick={clearActiveRef}>
+              Pod Disruption Budget List
+            </Link>
           </CBreadcrumbItem>
           <CBreadcrumbItem active>{name || 'Error'}</CBreadcrumbItem>
         </CBreadcrumb>

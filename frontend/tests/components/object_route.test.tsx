@@ -1,9 +1,9 @@
 import React from 'react'
-import { render, screen } from '@testing-library/react'
-import { MemoryRouter } from 'react-router-dom'
+import { act, render, screen } from '@testing-library/react'
+import { Link, MemoryRouter } from 'react-router-dom'
 import { afterEach, describe, expect, test, vi } from 'vitest'
 import ObjectRoute, { getRegisteredNavigate } from '../../src/components/ObjectRoute'
-import { writeRegistry, setActiveRef } from '../../src/lib/objectRef'
+import { clearActiveRef, writeRegistry, setActiveRef } from '../../src/lib/objectRef'
 
 const list = <div>List view</div>
 const detail = (p: { name: string; namespace?: string }) => (
@@ -145,20 +145,37 @@ describe('ObjectRoute', () => {
     expect(localStorage.getItem('kd_ref_fresh')).not.toBeNull()
   })
 
-  test('back to list clears the active ref', () => {
+  test('detail→list: clearing the ref + same-path navigation renders the list (breadcrumb back)', () => {
     writeRegistry({ t1: { kind: 'priorityclass', name: 'high', ts: Date.now(), origin: 'click' } })
     setActiveRef('t1')
 
+    // The data views' breadcrumb IS the back affordance: clearActiveRef()
+    // + a Link to the list route (the same path the wrapper renders).
+    const detailWithBack = (p: { name: string; namespace?: string }) => (
+      <div>
+        <span>Detail: {p.name}</span>
+        <Link to="/other-resource/priorityclass" onClick={clearActiveRef}>
+          Priority Classes
+        </Link>
+      </div>
+    )
+
     renderAt(
-      <ObjectRoute kind="priorityclass" listRoute="/other-resource/priorityclass" list={list} detail={detail} />,
+      <ObjectRoute kind="priorityclass" listRoute="/other-resource/priorityclass" list={list} detail={detailWithBack} />,
     )
 
     expect(screen.getByText('Detail: high')).toBeTruthy()
-    const back = screen.getByRole('button', { name: /back to list/i })
-    back.click()
+    // act(): the Link's navigate() is a MemoryRouter state update — a
+    // bare native .click() leaves it unflushed in the act environment.
+    act(() => {
+      screen.getByRole('link', { name: 'Priority Classes' }).click()
+    })
 
-    // The active pointer is dropped (the ref is cleared for the next
-    // mount / navigation to the list).
+    // The active pointer is dropped and the location change re-reads the
+    // (now-null) ref → the R6 dispatch renders the list.
+    expect(screen.getByText('List view')).toBeTruthy()
     expect(sessionStorage.getItem('kd_object_active')).toBeNull()
+    // The old wrapper-level back button no longer renders.
+    expect(screen.queryByRole('button', { name: /back to list/i })).toBeNull()
   })
 })

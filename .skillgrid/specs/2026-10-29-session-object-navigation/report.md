@@ -415,6 +415,33 @@ renders **PASS**.
   entity fails the floor. Verified in a real browser (button textContent
   `⧉`); bundle rebuilt + re-synced.
 
+## User Request Addendum (2026-11-04, post-QA design change)
+
+Two user requests were applied to the delivered UI after the QA re-run
+(user: "I don't like the current design"):
+
+1. **Share button (⧉) removed from everywhere** — deleted
+   `ShareObjectButton.tsx` and its usage in 24 view files (15 list name
+   cells now render the name `<button>` only; 9 data-view titles are
+   title-only). The R4 deep-link *mechanism* is unchanged: the form-POST
+   handoff (`object_handoff.py`, one-shot meta, `consumeIncoming`) is the
+   contract and is still exercised — e2e drives the POST directly rather
+   than through a UI button.
+2. **`← back to list` button removed from detail pages** — the breadcrumb
+   list-item link is now the back affordance: every data view's breadcrumb
+   `Link` carries `onClick={clearActiveRef}` (clears the sessionStorage
+   ref, then same-path navigation makes `ObjectRoute` re-read → list).
+   This was mandatory, not cosmetic: with the button gone, the breadcrumb
+   was the only exit from detail state.
+
+Verified live in a real browser against the dev stack (2026-11-04): list
+row = name button only (no ⧉); detail = no back button, title-only
+header; breadcrumb click returns to the list with the ref cleared. Test
+rework: `object_route.test.tsx` back test now exercises the breadcrumb
+path; `App.test.tsx` clicks the real breadcrumb link; 9 view test files
+dropped share-button assertions. `task fe-build` + `task fe-sync` +
+`task fe-check` green.
+
 ## Gate Decision
 
 **Verdict:** PASS (re-verified 2026-11-04, after the C1 fix)

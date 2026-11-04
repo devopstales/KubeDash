@@ -14,6 +14,7 @@ import { Light as SyntaxHighlighter } from 'react-syntax-highlighter'
 import yaml from 'react-syntax-highlighter/dist/esm/languages/hljs/yaml'
 import anOldHope from 'react-syntax-highlighter/dist/esm/styles/hljs/an-old-hope'
 import { apiFetch } from '../../lib/api'
+import { clearActiveRef } from '../../lib/objectRef'
 import { policyUrl } from '../../lib/policyUrl'
 import type { CiliumPolicyItem, NetworkPolicyItem, ResourceList } from '../../lib/types'
 import { useClusterStore } from '../../store/cluster'
@@ -78,7 +79,7 @@ const NetworkPolicyDataView = ({
         <CBreadcrumb className="my-0" aria-label="breadcrumb">
           <CBreadcrumbItem>Security</CBreadcrumbItem>
           <CBreadcrumbItem>
-            <Link to="/security/network-policy">Network Policies</Link>
+            <Link to="/security/network-policy" onClick={clearActiveRef}>Network Policies</Link>
           </CBreadcrumbItem>
           <CBreadcrumbItem active>{name || 'Error'}</CBreadcrumbItem>
         </CBreadcrumb>

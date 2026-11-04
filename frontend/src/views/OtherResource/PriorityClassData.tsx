@@ -14,6 +14,7 @@ import { Light as SyntaxHighlighter } from 'react-syntax-highlighter'
 import json from 'react-syntax-highlighter/dist/esm/languages/hljs/json'
 import anOldHope from 'react-syntax-highlighter/dist/esm/styles/hljs/an-old-hope'
 import { apiFetch } from '../../lib/api'
+import { clearActiveRef } from '../../lib/objectRef'
 import type { PriorityClassItem, ResourceList } from '../../lib/types'
 import { useClusterStore } from '../../store/cluster'
 import TopMenu from '../../components/TopMenu'
@@ -70,7 +71,9 @@ const PriorityClassDataView = ({ name }: { name: string }) => {
         <CBreadcrumb className="my-0" aria-label="breadcrumb">
           <CBreadcrumbItem>Other Resources</CBreadcrumbItem>
           <CBreadcrumbItem>
-            <Link to="/other-resource/priorityclass">Priority Classes</Link>
+            <Link to="/other-resource/priorityclass" onClick={clearActiveRef}>
+              Priority Classes
+            </Link>
           </CBreadcrumbItem>
           <CBreadcrumbItem active>{name || 'Error'}</CBreadcrumbItem>
         </CBreadcrumb>

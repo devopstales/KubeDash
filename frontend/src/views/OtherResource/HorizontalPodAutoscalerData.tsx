@@ -14,6 +14,7 @@ import { Light as SyntaxHighlighter } from 'react-syntax-highlighter'
 import json from 'react-syntax-highlighter/dist/esm/languages/hljs/json'
 import anOldHope from 'react-syntax-highlighter/dist/esm/styles/hljs/an-old-hope'
 import { apiFetch } from '../../lib/api'
+import { clearActiveRef } from '../../lib/objectRef'
 import { formatTimestamp } from '../../lib/format'
 import type { HorizontalPodAutoscalerItem, ResourceList } from '../../lib/types'
 import { useClusterStore } from '../../store/cluster'
@@ -107,7 +108,7 @@ const HorizontalPodAutoscalerDataView = ({
         <CBreadcrumb className="my-0" aria-label="breadcrumb">
           <CBreadcrumbItem>Other Resources</CBreadcrumbItem>
           <CBreadcrumbItem>
-            <Link to="/other-resource/horizontal-pod-autoscaler">
+            <Link to="/other-resource/horizontal-pod-autoscaler" onClick={clearActiveRef}>
               Horizontal Pod Autoscaler List
             </Link>
           </CBreadcrumbItem>

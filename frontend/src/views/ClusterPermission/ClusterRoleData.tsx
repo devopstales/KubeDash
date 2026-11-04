@@ -10,6 +10,7 @@ import {
 } from '@coreui/react'
 import { useQuery } from '@tanstack/react-query'
 import { apiFetch } from '../../lib/api'
+import { clearActiveRef } from '../../lib/objectRef'
 import type { K8sClusterRole, PolicyRule, ResourceList } from '../../lib/types'
 import { useClusterStore } from '../../store/cluster'
 import KubeDataTable, { Column } from '../../components/KubeDataTable'
@@ -82,7 +83,9 @@ const ClusterRoleDataView = ({ name }: { name: string }) => {
         <CBreadcrumb className="my-0" aria-label="breadcrumb">
           <CBreadcrumbItem>Cluster Permissions</CBreadcrumbItem>
           <CBreadcrumbItem>
-            <Link to="/cluster-permission/cluster-role">Cluster Role</Link>
+            <Link to="/cluster-permission/cluster-role" onClick={clearActiveRef}>
+              Cluster Role
+            </Link>
           </CBreadcrumbItem>
           <CBreadcrumbItem active>{name || 'Error'}</CBreadcrumbItem>
         </CBreadcrumb>

@@ -14,6 +14,7 @@ import { useQuery } from '@tanstack/react-query'
 import KubeDataTable, { Column } from '../../components/KubeDataTable'
 import TopMenu from '../../components/TopMenu'
 import { apiFetch } from '../../lib/api'
+import { clearActiveRef } from '../../lib/objectRef'
 import type { CrdInstance, K8sCrd, ResourceList } from '../../lib/types'
 import { useClusterStore } from '../../store/cluster'
 
@@ -102,7 +103,7 @@ const CrdDataView = ({ name }: { name: string }) => {
         <CBreadcrumb className="my-0" aria-label="breadcrumb">
           <CBreadcrumbItem>Cluster</CBreadcrumbItem>
           <CBreadcrumbItem>
-            <Link to="/cluster/crd">CRDs</Link>
+            <Link to="/cluster/crd" onClick={clearActiveRef}>CRDs</Link>
           </CBreadcrumbItem>
           <CBreadcrumbItem active>{spec?.names?.kind || name || 'Error'}</CBreadcrumbItem>
         </CBreadcrumb>

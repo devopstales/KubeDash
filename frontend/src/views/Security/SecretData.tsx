@@ -20,6 +20,7 @@ import xml from 'react-syntax-highlighter/dist/esm/languages/hljs/xml'
 import javascript from 'react-syntax-highlighter/dist/esm/languages/hljs/javascript'
 import anOldHope from 'react-syntax-highlighter/dist/esm/styles/hljs/an-old-hope'
 import { apiFetch } from '../../lib/api'
+import { clearActiveRef } from '../../lib/objectRef'
 import type { K8sSecret, ResourceList } from '../../lib/types'
 import { useClusterStore } from '../../store/cluster'
 import TopMenu from '../../components/TopMenu'
@@ -192,7 +193,7 @@ const SecretDataView = ({ name, namespace }: { name: string; namespace: string }
         <CBreadcrumb className="my-0" aria-label="breadcrumb">
           <CBreadcrumbItem>Security</CBreadcrumbItem>
           <CBreadcrumbItem>
-            <Link to="/security/secret">Secrets</Link>
+            <Link to="/security/secret" onClick={clearActiveRef}>Secrets</Link>
           </CBreadcrumbItem>
           <CBreadcrumbItem active>{name || 'Error'}</CBreadcrumbItem>
         </CBreadcrumb>
