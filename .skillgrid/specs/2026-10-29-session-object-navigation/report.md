@@ -1,8 +1,9 @@
 # Report — Session Object Navigation
 
 > Change: `.skillgrid/specs/2026-10-29-session-object-navigation/` (moves to `.skillgrid/xarchive/…` at ship)
-> Generated: 2026-11-03 (qa)
-> Gate: **FAIL** (1 CRITICAL — R4 cross-tab deep link does not hydrate in a real browser)
+> Generated: 2026-11-03 (qa) · Re-verified: 2026-11-04 (post C1 fix)
+> Gate: **PASS** (re-verified 2026-11-04 — C1 fixed via the ADR-0040-amended
+> server-session handoff; `task e2e` 19/19 incl. the R4 deep link)
 >
 > Two phases, one file: **qa** writes the QA half (through `## Gate Decision` +
 > `## Human Override`). **ship** reads the `## Gate Decision` verdict PRE-MOVE,
@@ -36,7 +37,7 @@ once and the merged route must dispatch list/detail on the ref.
 
 | # | Risk / Behavior | Seam | Layer | Test / Scenario | Priority | Cadence | Status |
 |---|-----------------|------|-------|-----------------|----------|---------|--------|
-| 1 | Cross-tab share deep link hydrates the new tab | form POST → new document → `consumeIncoming` | e2e | `ui-smoke.spec.ts::deep link: share in a new tab renders the object with a clean URL` | P0 | pr | **FAILING** (see Findings C1) |
+| 1 | Cross-tab share deep link hydrates the new tab | form POST → 303 bounce → one-shot meta → `consumeIncoming` | e2e | `ui-smoke.spec.ts::deep link: share in a new tab renders the object with a clean URL` | P0 | pr | covered (C1 fixed; e2e 19/19 at 2026-11-04 re-run) |
 | 2 | Old `/.../data?name=…` URL redirects to clean route, ref origin `link` | `OldDataRedirect` | unit + e2e | `App.test.tsx::old URL with ?name=/?namespace= lands on the clean route, ref origin link` + `ui-smoke.spec.ts::old URL redirect` | P0 | pr | covered |
 | 3 | No identity in the URL after opening an object (R1) | list row click → `openObject` | unit | `priority_classes.test.tsx::click-name-renders-detail-with-clean-url` + 26 view test files asserting `location.search === ''` | P0 | pr | covered |
 | 4 | Ref's namespace is authoritative (R8) | `ObjectRoute` detail props | unit | `secrets.test.tsx::secret-data-reads-the-ref-namespace-not-the-header` (captures the real API request's `namespace` param) | P0 | pr | covered |
@@ -45,7 +46,7 @@ once and the merged route must dispatch list/detail on the ref.
 | 7 | One route per kind; mismatched ref renders the list (R6) | `ObjectRoute` dispatch | unit | `object_route.test.tsx::renders the list when the active ref kind mismatches (R6)` + route-table audit (15 `/data` entries, all `OldDataRedirect`) | P0 | pr | covered |
 | 8 | Back from detail returns to the list (R6) | browser history + ref clear | e2e | QA probe (throwaway, run at this gate): click → detail → `page.goBack()` → list renders — **passed** | P1 | pr | covered (probe) |
 | 9 | `?selected=` hint replaced by the active ref (R9) | `Secret` list bolding | unit | `secrets.test.tsx::bolds-the-opened-secret-from-the-active-ref` (positive + negative row) | P1 | pr | covered |
-| 10 | No backend change (R10) | diff | diff | `git diff 98613f68..80f3bd0f -- backend/ cli/ charts/` = 0 files | P0 | pr | covered |
+| 10 | No new endpoint/migration/dependency (R10 as amended) | diff | diff | `git diff 98613f68..tip -- backend/` = exactly the SPA-fallback handoff plumbing (`app/core/object_handoff.py`, `app/__init__.py` catch-all, `tests/api/test_object_handoff.py`); cli/charts: 0 files | P0 | pr | covered |
 
 ### Edge-Case Matrix
 
@@ -84,16 +85,16 @@ opens the object in a new tab via a same-origin form-POST deep link.
 | Truth | R1 — no identity in any produced URL | 26 view test files assert `location.search === ''` after open; `grep -rn 'data?name=' frontend/src` = 0; e2e deep-link popup `location.search === ''` passed | VERIFIED |
 | Truth | R2 — ref in sessionStorage only, no server store | `objectRef.test.ts::round-trips a token-keyed entry through sessionStorage` + `::no localStorage identity outside the kd_ref_ relay keys` + backend diff empty (no endpoint) | VERIFIED |
 | Truth | R3 — refresh survives; 15-min lazy expiry | render-from-persistent-sessionStorage tests (`object_route.test.tsx::renders the detail when the active ref kind matches`) + `objectRef.test.ts::backdated > 15 min` | VERIFIED |
-| Truth | **R4 — new tab hydrates the ref on mount and renders the object** | e2e `ui-smoke.spec.ts::deep link` at tip: popup URL clean ✔, popup renders the object ✗ — the new document never carries `?o=` (form POST bodies do not enter the URL) and `POST /cluster/crd` is **405** on the Flask dev server (curl-verified); in chart nginx the SPA index serves with no `?o=` → list. `consumeIncoming()` returns null without `?o=` in `location.search` | **UNVERIFIED (FAILING)** |
-| Truth | R5 — one-shot handoff; GET never consumes | unit: plain-GET/stale/expired relay tests all pass; relay self-delete asserted in unit + would be asserted e2e once the popup hydrates | VERIFIED (unit) / PRESENT_BEHAVIOR_UNVERIFIED (e2e leg blocked by C1) |
+| Truth | **R4 — new tab hydrates the ref on mount and renders the object** | FIXED 2026-11-04 (ADR-0040 amendment, user decision): the SPA fallback accepts the share form's POST (`app/core/object_handoff.py`), 303s to the same clean path (token stays out of URLs — R1), stashes the token server-side under `obj_incoming:<sub>` (Redis, 60 s), and injects it as a one-shot `<meta name="kd-object-incoming">` into the fresh tab's document; `consumeIncoming()` reads the meta and resolves the relay. Evidence: e2e `ui-smoke.spec.ts::deep link` passed at re-run (popup URL clean, detail rendered, relay self-deleted); curl trace on the live stack: login 302 → POST 303 → GET injects meta → second GET plain | VERIFIED (re-run 2026-11-04) |
+| Truth | R5 — one-shot handoff; GET never consumes | unit: plain-GET/stale/expired relay tests all pass; relay self-delete asserted in unit + e2e (popup relay read back null after hydration). Server side: 9 tests in `tests/api/test_object_handoff.py` pin the one-shot stash (set-on-POST, pop-on-GET, no double-inject, bogus-token never stashed, anonymous never stashed) | VERIFIED (unit + e2e at re-run) |
 | Truth | R6 — one route per kind; back/forward moves list↔detail | route-table audit (no `/data` primary entries; 15 redirect entries) + kind-mismatch unit + e2e browser-back probe passed (list re-renders after `page.goBack()`) | VERIFIED |
 | Truth | R7 — one-shot redirect, origin `link`, final URL clean | `App.test.tsx` redirect suite (registry entry asserted with `origin: 'link'`) + e2e `old URL redirect` passed at tip | VERIFIED |
 | Truth | R8 — ref namespace authoritative | `secrets.test.tsx::secret-data-reads-the-ref-namespace-not-the-header` captures the real request's `namespace=team-a` with the header on `default` | VERIFIED |
 | Truth | R9 — filters stay, `?selected=` goes | bolding-from-ref test; `grep` of real `useSearchParams` calls in migrated views = 0 (only comment mentions; live calls remain in AdminPermissions/Groups — genuine `?tab=`-style filters, out of this change's scope) | VERIFIED |
-| Truth | R10 — no backend change | `git diff 98613f68..80f3bd0f -- backend/ cli/ charts/` = 0 files | VERIFIED |
+| Truth | R10 — no new endpoint/migration/dependency (as amended) | `git diff 98613f68..tip -- backend/` = exactly 3 files, all handoff plumbing (`app/core/object_handoff.py`, `app/__init__.py` catch-all, `tests/api/test_object_handoff.py`); no API endpoint, no migration, no log, no dependency; `cli/` + `charts/`: 0 files | VERIFIED |
 | Artifact | `lib/objectRef.ts`, `components/{ObjectRoute,OldDataRedirect,ShareObjectButton}.tsx` exist, substantive, wired | all four read in full; `App.tsx` has 31 `ObjectRoute` references + 17 `OldDataRedirect` entries; 22 lib tests + 8 component tests run them | VERIFIED |
 | Key Link | list row → `openObject` → ref → `ObjectRoute` detail render | `secrets.test.tsx::click-name-renders-detail-with-clean-url` + `App.test.tsx::list → click row → detail` end-to-end through the exact route wiring | VERIFIED |
-| Data Flow | real data moves: detail fetches the ref's object | MSW-captured requests assert `name`/`namespace` of the ref in 26 view files; e2e redirect leg renders the secret's labels | VERIFIED (the cross-tab leg's data flow is the C1 failure) |
+| Data Flow | real data moves: detail fetches the ref's object | MSW-captured requests assert `name`/`namespace` of the ref in 26 view files; e2e redirect leg renders the secret's labels; cross-tab leg proven at re-run (new tab renders the CRD detail of the relayed ref) | VERIFIED |
 
 **Note:** the R4 unit tests are green because they seed `?o=<token>` into
 jsdom's URL directly (`renderAt(…, \`?o=${token}\`)`) — the browser never does
@@ -111,7 +112,7 @@ Scenario names from `acceptance.feature` (16 scenarios, deterministic count).
 | the open object ref lives in sessionStorage only | `objectRef.test.ts::round-trips…` + `::no localStorage identity outside the kd_ref_ relay keys` + R10 diff | yes | pass |
 | refreshing the tab keeps the open object | `object_route.test.tsx::renders the detail when the active ref kind matches` (render from persisted sessionStorage) + e2e deep-link new-document render | yes | pass |
 | an expired ref renders the list | `objectRef.test.ts::backdated > 15 min…` + `object_route.test.tsx::stale relay renders the list` | yes | pass |
-| **the share action opens the object in a new tab with a clean URL** | `ui-smoke.spec.ts::deep link…` | yes | **fail** (popup: URL clean, object not rendered, ref not hydrated — C1) |
+| **the share action opens the object in a new tab with a clean URL** | `ui-smoke.spec.ts::deep link…` | yes | **pass** (re-run 2026-11-04: popup URL clean, detail rendered, relay self-deleted — C1 FIXED) |
 | the POST body and the relay carry no readable identity in the URL | `objectRef.test.ts::hidden form: POST to the list route, target _blank, single hidden input "o" = token` (+ negative asserts) + e2e popup URL asserts | yes | pass |
 | a stale relay key is not consumed by a plain GET | `objectRef.test.ts::no ?o= param (plain GET) → null…` + `object_route.test.tsx::stale (expired) relay renders the list` | yes | pass |
 | the relay self-deletes after consumption | `objectRef.test.ts::hydrates the relay into the registry + active pointer and self-deletes both keys` | yes | pass |
@@ -121,10 +122,11 @@ Scenario names from `acceptance.feature` (16 scenarios, deterministic count).
 | the ref's namespace wins over the header selector | `secrets.test.tsx::secret-data-reads-the-ref-namespace-not-the-header` | yes | pass |
 | the selected bolding hint is replaced by the active ref | `secrets.test.tsx::bolds-the-opened-secret-from-the-active-ref` | yes | pass |
 | a genuine filter param may remain a query param | none — permissive (MAY) scenario; the pods list it names is not implemented (in-flight `2026-10-28-pods-deployments-views`) | no | UNTESTED (permissive) |
-| no new endpoint serves the object selection | `git diff … -- backend/ cli/ charts/` = 0 files | yes (diff) | pass |
+| no new endpoint serves the object selection | `git diff … -- backend/` = 3 handoff-plumbing files, no API endpoint (R10 as amended); `cli/ charts/` = 0 files | yes (diff) | pass |
 
-**Coverage:** 15/16 scenarios covered by a test that ran and passed; 1
-FAILING (R4 deep link); 1 UNTESTED-permissive (R9 filter, forward spec).
+**Coverage:** 15/16 scenarios covered by a test that ran and passed (the R4
+deep link passed at the 2026-11-04 re-run); 1 UNTESTED-permissive (R9
+filter, forward spec).
 
 ## Verification-Gap Audit
 
@@ -134,6 +136,13 @@ FAILING (R4 deep link); 1 UNTESTED-permissive (R9 filter, forward spec).
 | `ui-smoke.spec.ts` (carries this change's R4/R7 e2e scenarios) is wired to no runner | `Taskfile.yaml` `e2e:` runs only `auth-smoke.spec.ts`; `.github/workflows/e2e.yaml` runs only `smoke.spec.ts` | missing-adoption | `grep -rn 'ui-smoke' Taskfile.yaml .github/workflows/` → 0 matches | The R4/R7 e2e scenarios regress (or break, as this run's stale-loginAs proved) with no CI signal |
 | e2e login helper was stale against ADR-0025 before this run | `frontend/e2e/helpers.ts:93` asserted a `?token=` parked URL; the 302 carries HttpOnly cookies + bare `/` since ADR-0025 | broken-verification (latent) | first e2e run: 1 passed, every `loginAs` test failed with "auth/local 302 without a token param" | any future `loginAs`-based spec fails on boot; fixed this run (`helpers.ts:91-96`), `loginToken` (api-smoke) still stale |
 | Deep-link e2e hardcodes a CRD fixture no script creates + omitted the selected-cluster precondition | `ui-smoke.spec.ts::deep link` expects `configmaps.example.com`; `dev/scripts/demo-data.sh` creates only ns+deployments; no cluster auto-select exists (store is `kd-cluster-scope` persisted, empty in a fresh context) | missing-adoption (test setup) | this run: CRD created manually + precondition patch required before the popup leg could be evaluated | the scenario is environment-fragile: green on one machine, red elsewhere, for setup reasons, not behavior |
+
+**Re-verification (2026-11-04):** all four gaps closed — (1) the token now
+reaches the new document via the server-session one-shot meta (C1 fix,
+e2e-proven); (2) `ui-smoke` is wired into `task e2e` (19/19 green) — the CI
+leg is tracked as W-5; (3) `loginAs` asserts the ADR-0025 cookie (previous
+gate); (4) the CRD fixture is created by `dev/scripts/demo-data.sh` (§4) and
+the selected-cluster precondition is seeded registry-driven in the test.
 
 ## TDD Evidence Audit
 
@@ -232,25 +241,26 @@ there.
 | Changed-file coverage | not configured | 80 (default) | n/a | N/A |
 | Mutation | not configured | 80 (default) | N/A | N/A |
 | Lint (frontend) | `tsc --noEmit` + `eslint src` + `vite build` | errors only | 0 errors, built 11.5 s | PASS |
-| Lint (backend) | `ruff check .` | errors only | 102 errors — **pre-existing** (0 backend files changed in range; test files + groups/ini/wsgi, in-flight work) | PASS for this change (branch debt → W-3) |
-| Typecheck (backend) | `mypy app` | errors only | 78 errors / 16 files — same provenance | PASS for this change (branch debt → W-3) |
-| P0 pass rate | test-plan P0 rows | 100 | 5/6 (R4 deep link FAILING) | **FAIL** |
+| Lint (backend) | `ruff check .` | errors only | 102 errors — **pre-existing** (this change's files clean after fixing 1 E501 in `test_object_handoff.py`; debt is test files + groups/ini/wsgi, in-flight work) | PASS for this change (branch debt → W-3) |
+| Typecheck (backend) | `mypy app` | errors only | 78 errors / 16 files — this change's `object_handoff.py` clean after fixing 2 (untyped re-export import, werkzeug/flask Response) | PASS for this change (branch debt → W-3) |
+| P0 pass rate | test-plan P0 rows | 100 | 6/6 (R4 deep link passed at re-run) | PASS |
 | P1 pass rate | test-plan P1 rows | 95 | 100% | PASS |
 | Trivy | not configured | report only | N/A | N/A |
 | Duplication (jscpd) | not configured | report only | N/A | N/A |
 
 **Quality config status:** not configured — using defaults.
 
-### Fresh verification floor (this run, at tip, 2026-11-03)
+### Fresh verification floor (re-run, at working tip, 2026-11-04)
 
 | Check | Result |
 |---|---|
-| `uv run pytest -m "not integration" -q` | **540 passed, 10 deselected, 0 failed** (165 s) |
-| `corepack pnpm test` (full) | **295 passed / 12 failed (307)** — the 12 are exactly the W007 baseline files (`users` 7, `groups` 4, `admin_permissions` 1); the prior baseline's `node-detail-renders` now passes; nothing new |
-| `tsc --noEmit` + `eslint src` + `vite build` | green (build 11.5 s) |
+| `uv run pytest -m "not integration" -q` | **550 passed, 10 deselected, 0 failed** (133 s; +10 vs the 2026-11-03 run = in-flight users/groups work landed on the branch since) |
+| `corepack pnpm test` (full) | **295 passed / 12 failed (307)** — the 12 are exactly the W007 baseline files (`users` 7, `groups` 4, `admin_permissions` 1); nothing new |
+| `tsc --noEmit` + `eslint src` + `vite build` | green (build 11.3 s; first pass caught 3 real tsc errors in this change's files — meta typing/narrowing + a missing `ORIGIN` export — all fixed, re-run green) |
 | `task fe-check` (air-gap, ADR-0020) | exit 0 |
-| `playwright test e2e/ui-smoke.spec.ts e2e/tmp-qa-back.spec.ts` | 15 passed / 2 failed pre-patch; **14 passed / 1 failed post-patch** (deep link — C1); browser-back probe passed |
-| `git diff 98613f68..80f3bd0f -- backend/ cli/ charts/` | 0 files (R10) |
+| `task e2e` (auth-smoke 3 + ui-smoke 16, wired 2026-11-04) | **19 passed / 0 failed** (31 s) — includes the R4 deep link; the auth-smoke Secure-cookie assertion was stale against ADR-0027 (TLS-era) and is now transport-conditional (fixed this re-run) |
+| curl handoff trace (live stack, real session cookie) | login 302 → `POST /cluster/crd` 303 → GET injects `<meta name="kd-object-incoming">` → second GET plain (one-shot consumed) |
+| `git diff 98613f68..tip -- backend/ cli/ charts/` | 3 backend files, all handoff plumbing (R10 as amended); cli/charts 0 |
 | `git diff … -- frontend/package.json pnpm-lock.yaml uv.lock` | 0 lines (ADR-0020) |
 | `grep -rn 'data?name=' frontend/src` | 0 matches |
 | real `useSearchParams` identity reads in migrated views | 0 (live calls only in AdminPermissions/Groups — out of scope) |
@@ -303,73 +313,84 @@ touch no file this change owns — re-verified by the in-range diffs above).
 
 | Dimension | Verdict |
 |---|---|
-| Goal-backward verification (weakest truth) | **UNVERIFIED** (R4 cross-tab hydration) |
-| Traceability (weakest scenario) | **FAILING** (share-in-new-tab) — 1 UNTESTED-permissive |
-| Verification-gap audit | CRITICAL (the `?o=` delivery gap) |
+| Goal-backward verification (weakest truth) | PASS (all truths VERIFIED; R4 proven e2e at re-run) |
+| Traceability (weakest scenario) | PASS (15/16 pass; 1 UNTESTED-permissive) |
+| Verification-gap audit | PASS (C1 mechanism + runner + fixture gaps all closed; residuals are tracked W/S) |
 | TDD evidence (weakest ticket) | OK (8/8) |
 | Assertion quality audit (weakest finding) | SUGGESTION |
 | Changed-file coverage (weakest file) | N/A |
-| Test quality audit | WARNING (deep-link test-claimed-path, exposed by C1) |
-| Code-quality gates (weakest gate) | **FAIL** (P0 pass rate 5/6) |
-| Security audit | PASS (1 SUGGESTION) |
+| Test quality audit | PASS (the deep-link test's claimed path now holds — e2e green) |
+| Code-quality gates (weakest gate) | PASS (P0 6/6; branch lint/type debt pre-existing, 0 in this change's files → W-3) |
+| Security audit | PASS (S-1 closed by the fix — 64-bit token) |
 | Verification scope (composite) | COMPLETE |
 
-**FLOOR:** the R4 dimension — UNVERIFIED truth + FAILING scenario + P0 below
-threshold. The gate can never render higher than this.
+**FLOOR:** every dimension PASS/COMPLETE at the 2026-11-04 re-run. The gate
+renders **PASS**.
 
 ## Findings
 
 ### CRITICAL (must fix before merge)
 
-- **C1 — R4 cross-tab deep link does not hydrate the new tab.**
-  `consumeIncoming()` resolves the token only from `?o=` in
-  `window.location.search`; a form POST's body (`o=<token>`) never enters the
-  new document's URL, and no server rewrites the POST to a `?o=` URL:
-  `POST /cluster/crd` → **405** on the Flask dev server (curl-verified) and
-  the chart's nginx `try_files` serves the SPA index without `?o=` (→ list).
-  The unit tests are green because they seed `?o=` into jsdom's URL directly,
-  and the e2e scenario — which would have caught this — was wired to no
-  runner until this gate. Evidence: `ui-smoke.spec.ts::deep link` at tip
-  (popup URL clean ✔, object not rendered ✗); `objectRef.ts`
-  `consumeIncoming` (token source); curl 405. Fix paths (human decision —
-  both extend ADR-0040's R5 mechanism, and path (a) touches R10's
-  "backend diff empty" checkable): **(a)** server-side POST→`?o=` bridge in
-  the SPA fallback (Flask static catch-all + chart nginx: accept POST, 302 to
-  the same path with `?o=<token>`; the client already strips the param and
-  self-deletes the relay) — then wire `ui-smoke` to a runner and re-run;
-  **(b)** re-scope R4: the share lands the new tab on the list (the
-  briefing's accepted "honest boundary"), the deep link is documented as
-  dev-unverified, and the relay/token machinery is simplified.
+- **C1 — R4 cross-tab deep link does not hydrate the new tab.** — **FIXED
+  2026-11-04.** Originally: `consumeIncoming()` resolved the token only from
+  `?o=` in `window.location.search`; a form POST's body never enters the new
+  document's URL and `POST /cluster/crd` was **405** (curl-verified). Fixed
+  per the ADR-0040 amendment (user decision, 2026-11-04) — a refinement of
+  original path (a) that keeps R1's "token never in a URL": the SPA fallback
+  (`app/core/object_handoff.py`, wired in `app/__init__.py`) accepts the
+  share POST, validates the token (`^[0-9a-f]{8,16}$`), stashes it in Redis
+  under `obj_incoming:<sub>` (60 s, the client relay window), 303s to the
+  same clean path, and injects a one-shot
+  `<meta name="kd-object-incoming">` into the next same-session GET;
+  `consumeIncoming()` reads the meta and resolves the localStorage relay.
+  Every miss path renders the list, never a wrong object (anonymous, bogus
+  token, expired relay, second GET). Verified: 9 backend tests
+  (`tests/api/test_object_handoff.py`); live curl trace (302 login → 303
+  bounce → meta-injected GET → plain second GET); e2e deep link green in a
+  real browser (new tab: clean URL, rendered detail, relay self-deleted).
+  Test-side contract fixes found while re-running: the scenario's synthetic
+  token was not hex (server rejects non-`[0-9a-f]` — now
+  `a1b2c3d4e5f6a001`), and the detail title expectation used the resource
+  name where `CrdData` titles by `spec.names.kind` ("CRD Data — ConfigMap").
 
 ### WARNING (should fix before archive)
 
-- **W-1 — `ui-smoke.spec.ts` has no runner.** `task e2e` runs
-  `auth-smoke.spec.ts` only; CI `e2e.yaml` runs `smoke.spec.ts` only. This
-  change's R4/R7 e2e scenarios (and the pre-existing mount sweep) never ran
-  until this gate. Wire it (extend `task e2e` / add to CI) so the C1 fix is
-  regression-proof.
+- **W-1 — `ui-smoke.spec.ts` has no runner.** — **CLOSED 2026-11-04 (dev
+  loop).** `task e2e` now runs `auth-smoke.spec.ts e2e/ui-smoke.spec.ts`
+  (19/19 green). The CI leg (`.github/workflows/e2e.yaml` runs `smoke.spec.ts`
+  only, mock-OIDC install with no bootstrap local admin and no CRD fixture)
+  is tracked as **W-5**.
 - **W-2 — e2e login helper was stale against ADR-0025.** `helpers.ts
   loginAs` asserted a `?token=` parked URL; the 302 now carries HttpOnly
   cookies + bare `/`. Fixed this run (`helpers.ts:91-96` — asserts the
   `kd_access` cookie, which authenticates the shared context). `loginToken`
   (api-smoke) is still stale — same one-line class of fix.
 - **W-3 — pre-existing backend lint debt.** `ruff check .` → 102 errors,
-  `mypy app` → 78 errors / 16 files; 0 backend files changed in this range
-  (provenance: in-flight users/groups/ini-config work — same ownership as
-  W007). The branch would fail the CI lint floor; not owned by this change.
-- **W-4 — deep-link e2e setup gaps (fixed this run).** The scenario
-  hardcoded the `configmaps.example.com` CRD (created manually for this run —
-  no script creates it; `demo-data.sh` makes only ns+deployments) and omitted
-  the acceptance-Background precondition "a bound cluster is selected in the
-  header" (no auto-select exists; `kd-cluster-scope` is empty in a fresh
-  context). Precondition patch applied to `ui-smoke.spec.ts` (registry-driven
-  `kd-cluster-scope` seed). Add the CRD to `dev/scripts/demo-data.sh`.
+  `mypy app` → 78 errors / 16 files; **0 in this change's files** (its 3
+  backend files are clean after this re-run's fixes; debt provenance:
+  in-flight users/groups/ini-config work — same ownership as W007). The
+  branch would fail the CI lint floor; not owned by this change.
+- **W-4 — deep-link e2e setup gaps.** — **CLOSED 2026-11-04.** The scenario
+  hardcoded the `configmaps.example.com` CRD and omitted the
+  acceptance-Background precondition "a bound cluster is selected in the
+  header". Both closed: `dev/scripts/demo-data.sh` §4 now applies the CRD
+  fixture (idempotent), and `ui-smoke.spec.ts` seeds the registry-driven
+  `kd-cluster-scope` precondition.
+- **W-5 — CI e2e leg for `ui-smoke` (opened 2026-11-04).**
+  `.github/workflows/e2e.yaml` (push-to-main) runs `smoke.spec.ts` only
+  against a mock-OIDC install with no bootstrap local admin and no CRD
+  fixture. Wiring `ui-smoke` there needs: `--set` bootstrap-admin values in
+  the helm install, the CRD fixture applied post-install (kubectl), and the
+  playwright command extended — a CI-environment change only verifiable by
+  running the job. Non-blocking: the dev loop (`task e2e`) is green and
+  regression-safe for the C1 fix.
 
 ### SUGGESTION (nice to have)
 
-- **S-1** — 32-bit relay token: guessable within the 60 s window (a hit
-  renders the object; API RBAC still gates the fetch). 64-bit is a one-line
-  change.
+- **S-1** — 32-bit relay token. — **CLOSED 2026-11-04:** the client now
+  generates 64-bit hex tokens (`crypto.getRandomValues(8)` —
+  `objectRef.ts:56-60`), the server accepts `^[0-9a-f]{8,16}$` (32-bit
+  legacy + 64-bit current), and ADR-0040 was amended to record it.
 - **S-2** — no execution ledger for this change (`.skillgrid/sdd/…`): RED
   exit codes unpersisted; TDD evidence rests on the co-commit shape + plan +
   green re-run (matches the shipped-batch precedent).
@@ -388,22 +409,31 @@ threshold. The gate can never render higher than this.
 
 ## Gate Decision
 
-**Verdict:** FAIL
+**Verdict:** PASS (re-verified 2026-11-04, after the C1 fix)
 
-**Reasoning:** 9 of 10 briefing truths are VERIFIED and 15/16 scenarios pass
-at the tip (unit 540 green, frontend suite green modulo the carried W007
-baseline, e2e redirect + back-navigation proven in a real browser), but the
-one truth that is the change's headline capability — R4, "a share action
-opens the object in a NEW tab" — is FAILING at the only layer that can prove
-it: the form POST never delivers the token to the new document's URL, so the
-new tab shows a 405 (dev) or the list (prod), not the object. A P0 at 5/6
-cannot render PASS.
+**Reasoning:** all 10 briefing truths are VERIFIED — R4, the headline
+capability the 2026-11-03 gate failed, is now proven at the only layer that
+can prove it: a real browser's new tab receives a clean-URL document with a
+one-shot server-injected meta, hydrates the relay, and renders the object
+(e2e green; live curl trace of the 302→303→inject→plain sequence). 15/16
+scenarios pass (1 UNTESTED-permissive, forward spec). Floors at re-run:
+backend 550/550, frontend green modulo the carried W007 baseline,
+`task e2e` 19/19 (now the wired runner for both smoke suites), air-gap
+check exit 0, R10-as-amended diff holds (3 handoff-plumbing files, no
+endpoint/migration/dependency). This change's own lint/type surface is
+clean (its earlier 1 ruff + 2 mypy findings fixed in the re-run).
 
-**Open items (FAIL → fix loop, cap 3 rounds then escalate):**
-- Fix C1 via a named path (human decision — it extends ADR-0040's R5
-  mechanism; path (a) also amends R10's literal checkable for the static
-  fallback), then re-run the e2e deep-link scenario with `ui-smoke` wired to
-  a runner (W-1).
+**Open items (advisory, non-blocking):**
+- W-3 — branch-level ruff/mypy debt (102/78), pre-existing, 0 in this
+  change's files; owned by the in-flight users/groups work.
+- W-5 — CI e2e leg for `ui-smoke` (bootstrap-admin values + CRD fixture +
+  command extension in `.github/workflows/e2e.yaml`); fix before archive if
+  the CI e2e job is to cover the deep link.
+- W-2 (residual) — `loginToken` (api-smoke) still asserts the retired
+  `?token=` shape; api-smoke is wired to no runner.
+- S-2…S-6 — ledger persistence, seam-test call-through, render-time registry
+  mutation, dev metrics-server crash-loop, R9 permissive scenario (forward
+  spec).
 
 ## Human Override
 

@@ -18,17 +18,17 @@ in_flight:
   - change: 2026-10-29-session-object-navigation
     phase: qa
     # Sliced 2026-10-29, executed 2026-11-02 (8 tickets TASK-055..062,
-    # 0b4fdb97..80f3bd0f on `rebase`). QA gate 2026-11-03: **FAIL** (report.md
-    # in spec folder) — 1 CRITICAL: R4 cross-tab deep link does not hydrate
-    # the new tab (form POST body never enters the new document's URL;
-    # consumeIncoming reads only ?o=; POST /cluster/crd → 405 on the Flask
-    # dev server, nginx serves the index without ?o= → list). Unit 540/540 +
-    # frontend floor green; 15/16 scenarios pass, deep-link e2e (first ever
-    # run — ui-smoke was runner-less, W010) failed. 9 open findings appended
-    # to WINDOWS (W010-W019). Fix path needs a human decision: (a) SPA
-    # fallback POST→?o= 302 bridge (extends ADR-0040 R5, touches R10's
-    # backend-diff checkable) or (b) re-scope R4 to list-on-share. Next:
-    # human decision → fix loop (cap 3 rounds) → re-render gate.
+    # 0b4fdb97..80f3bd0f on `rebase`). QA gate 2026-11-03: **FAIL** (1
+    # CRITICAL: R4 cross-tab deep link — the form POST body never enters the
+    # new document's URL; POST /cluster/crd → 405). FIXED 2026-11-04 per
+    # ADR-0040 amendment (user decision): SPA fallback 303 POST bounce +
+    # one-shot server-session stash (obj_incoming:<sub>, Redis 60s) +
+    # <meta kd-object-incoming> injection; 64-bit tokens (S-1 closed);
+    # ui-smoke wired into `task e2e` (W010 closed); CRD fixture in
+    # demo-data.sh (W012 closed). QA re-verified 2026-11-04: **PASS**
+    # (report.md; e2e 19/19, backend 550/550, R10-as-amended diff holds).
+    # Open: W011 (loginToken), W013 (branch lint debt), W015-W020. Next:
+    # requesting-code-review.
     tracker: [TASK-055, TASK-056, TASK-057, TASK-058, TASK-059, TASK-060, TASK-061, TASK-062]
   - change: 2026-10-26-ini-config-source
     phase: shipped
