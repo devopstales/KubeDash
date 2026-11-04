@@ -341,6 +341,34 @@ class FakeK8s:
             return self.list_runtime_classes(None)
         return []
 
+    def list_storage_classes(self, _namespace: str | None) -> list[dict]:
+        # Cluster-scoped (storage/v1): the namespace is accepted-and-ignored
+        # (mirrors the real K8sClient.list_storage_classes). The route
+        # forwards the raw query value; the recording is the "the
+        # cluster-scoped call was used" evidence for the ignores-namespace
+        # test (the returned fixture is the cluster-scoped item).
+        self.storageclass_ns_calls: list[str | None] = []
+        self.storageclass_ns_calls.append(_namespace)
+        return [
+            {
+                "metadata": {
+                    "name": "csi-fast",
+                    "creation_timestamp": "2026-01-02T03:04:05Z",
+                    "annotations": {"storageclass.kubernetes.io/is-default-class": "true"},
+                    "labels": {"team": "a"},
+                },
+                "provisioner": "csi.example.com",
+                "reclaim_policy": "Delete",
+                "volume_binding_mode": "WaitForFirstConsumer",
+                "parameters": {"type": "standard"},
+            }
+        ]
+
+    def get_storage_class(self, _namespace: str, name: str) -> list[dict]:
+        if name == "csi-fast":
+            return self.list_storage_classes(None)
+        return []
+
     def list_resource_quotas(self, namespace: str | None) -> list[dict]:
         # Namespaced kind (core): the namespace is forwarded (the real
         # K8sClient.list_resource_quotas pattern). The all-namespaces branch is
@@ -1708,6 +1736,104 @@ def test_runtimeclass_kind_singular_rejected(api_client, auth_client) -> None:
     h = {"Authorization": f"Bearer {auth_client.jwt}"}
     _register(api_client, h)
     r = api_client.get("/api/v1/clusters/1/resources/runtimeclass", headers=h)
+    assert r.status_code == 404
+    assert r.get_json()["error"]["code"] == "RESOURCE_KIND_NOT_SUPPORTED"
+
+
+def test_list_storageclasses_200(api_client, auth_client, fake_k8s, monkeypatch) -> None:
+    """[storageclasses-list-200] a bound user listing storageclasses gets
+    the to_dict items back, spec fields (provisioner, reclaim_policy,
+    volume_binding_mode, parameters) intact."""
+    auth_client.login()
+    h = {"Authorization": f"Bearer {auth_client.jwt}"}
+    _register(api_client, h)
+    _allow_sar(monkeypatch)
+    r = api_client.get("/api/v1/clusters/1/resources/storageclasses", headers=h)
+    assert r.status_code == 200
+    body = r.get_json()
+    assert body["kind"] == "storageclasses"
+    [item] = body["items"]
+    assert item["metadata"]["name"] == "csi-fast"
+    assert item["provisioner"] == "csi.example.com"
+    assert item["reclaim_policy"] == "Delete"
+    assert item["volume_binding_mode"] == "WaitForFirstConsumer"
+    assert item["parameters"] == {"type": "standard"}
+
+
+def test_list_storageclasses_ignores_namespace(
+    api_client, auth_client, fake_k8s, monkeypatch
+) -> None:
+    """[storageclasses-list-ignores-namespace] the kind is cluster-scoped:
+    ?namespace=team-a is accepted and ignored — the same "csi-fast" item
+    comes back. The route forwards the raw query value to the client; the
+    cluster-scoped method ignores it (the list_nodes pattern) — the
+    recorded call + the cluster-scoped fixture are the evidence the
+    cluster-scoped list call was used."""
+    auth_client.login()
+    h = {"Authorization": f"Bearer {auth_client.jwt}"}
+    _register(api_client, h)
+    _allow_sar(monkeypatch)
+    r = api_client.get(
+        "/api/v1/clusters/1/resources/storageclasses?namespace=team-a", headers=h
+    )
+    assert r.status_code == 200
+    body = r.get_json()
+    [item] = body["items"]
+    assert item["metadata"]["name"] == "csi-fast"
+    assert "namespace" not in item["metadata"]
+    assert fake_k8s.storageclass_ns_calls == ["team-a"]  # query value forwarded, client ignores
+
+
+def test_list_storageclasses_get_by_name(
+    api_client, auth_client, fake_k8s, monkeypatch
+) -> None:
+    """[storageclasses-get-by-name] ?name= returns a 0/1-item list: a hit
+    returns the one item, a miss returns [] (mirrors get_priority_class)."""
+    auth_client.login()
+    h = {"Authorization": f"Bearer {auth_client.jwt}"}
+    _register(api_client, h)
+    _allow_sar(monkeypatch)
+    r = api_client.get("/api/v1/clusters/1/resources/storageclasses?name=csi-fast", headers=h)
+    assert r.status_code == 200
+    [item] = r.get_json()["items"]
+    assert item["metadata"]["name"] == "csi-fast"
+    r = api_client.get("/api/v1/clusters/1/resources/storageclasses?name=ghost", headers=h)
+    assert r.status_code == 200
+    assert r.get_json()["items"] == []
+
+
+def test_list_storageclasses_sar_denied(api_client, auth_client, fake_k8s, monkeypatch) -> None:
+    """[storageclasses-sar-denied] ADR-0004: the SAR is asked BEFORE the
+    read, with the core group (empty string) and namespace None (the
+    cluster-scoped SAR cache key) — a deny short-circuits to 403
+    RBAC_DENIED."""
+    auth_client.login()
+    h = {"Authorization": f"Bearer {auth_client.jwt}"}
+    _register(api_client, h)
+    asked = _record_sar(monkeypatch)  # denies every SAR and records calls
+    r = api_client.get("/api/v1/clusters/1/resources/storageclasses", headers=h)
+    assert r.status_code == 403
+    assert r.get_json()["error"]["code"] == "RBAC_DENIED"
+    assert ("list", "storageclasses", None, None, "") in asked
+
+
+def test_storageclasses_binding_404(api_client, auth_client) -> None:
+    """[storageclasses-binding-404] an unbound user: the binding gate
+    fails before the SAR, CLUSTER_NOT_FOUND."""
+    auth_client.login()
+    h = {"Authorization": f"Bearer {auth_client.jwt}"}
+    r = api_client.get("/api/v1/clusters/999/resources/storageclasses", headers=h)
+    assert r.status_code == 404
+    assert r.get_json()["error"]["code"] == "CLUSTER_NOT_FOUND"
+
+
+def test_storageclass_kind_singular_rejected(api_client, auth_client) -> None:
+    """[storageclass-kind-singular-rejected] the 4.1 route name
+    (singular) is not a kind — RESOURCE_KIND_NOT_SUPPORTED."""
+    auth_client.login()
+    h = {"Authorization": f"Bearer {auth_client.jwt}"}
+    _register(api_client, h)
+    r = api_client.get("/api/v1/clusters/1/resources/storageclass", headers=h)
     assert r.status_code == 404
     assert r.get_json()["error"]["code"] == "RESOURCE_KIND_NOT_SUPPORTED"
 

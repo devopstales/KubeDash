@@ -61,6 +61,10 @@ _KINDS: dict[str, tuple[str, str, str]] = {
     # RuntimeClass (node.k8s.io, cluster-scoped) — the 4.1-parity nav leaf
     # resolved by TASK-046 (list + data views; ADR-0022 placement).
     "runtimeclasses": ("list_runtime_classes", "runtimeclasses", "node.k8s.io"),
+    # StorageClass (storage/v1, cluster-scoped) — the 4.1-parity nav leaf
+    # resolved by TASK-052 (list + data views; ADR-0022 placement). The 4.1
+    # route name was singular; the API kind is the plural.
+    "storageclasses": ("list_storage_classes", "storageclasses", ""),
     # ResourceQuota (core, namespaced) — the 4.1-parity nav leaf resolved by
     # TASK-047 (list + data views; ADR-0022 placement). The 4.1 route name was
     # singular; the API kind is the plural.
@@ -101,6 +105,7 @@ _GETTERS: dict[str, str] = {
     "ciliumnetworkpolicies": "get_cilium_network_policy",
     "priorityclasses": "get_priority_class",
     "runtimeclasses": "get_runtime_class",
+    "storageclasses": "get_storage_class",
     "resourcequotas": "get_resource_quota",
     "poddisruptionbudgets": "get_pod_disruption_budget",
     "verticalpodautoscalers": "get_vertical_pod_autoscaler",
