@@ -14,10 +14,13 @@
 #   - demo-secret / demo-config / demo-limitrange / demo-quota / demo-pdb /
 #     demo-hpa / demo-vpa / demo-netpol: one instance of each kind so the
 #     list + data views render real data.
-#   - demo-pvc: a 100Mi RWO claim on the "standard" StorageClass (kind's
-#     default provisioner), so it BINDS (the PVC list's Bound status badge +
-#     Capacity cell, and the data view's bound volume, render real data); it
-#     is also the demo-snap VolumeSnapshot's source claim.
+#   - demo-pvc + demo-pvc-consumer: a 100Mi RWO claim on the "standard"
+#     StorageClass (kind's default provisioner) + a busybox pod that mounts
+#     it. The claim is WaitForFirstConsumer, so it only BINDS once the
+#     consumer pod is scheduled — and the mounted volume is what the kubelet
+#     /stats/summary reports as a pvcRef entry (the data /metrics/pvcs
+#     aggregates — the list's Usage column). It is also the demo-snap
+#     VolumeSnapshot's source claim.
 #   - demo-runc: cluster-scoped RuntimeClass (handler "runc" = kind's
 #     containerd runtime).
 #   - demo-gp2: cluster-scoped StorageClass (provisioner
@@ -263,6 +266,28 @@ spec:
   resources:
     requests:
       storage: 100Mi
+---
+# demo-pvc consumer: the "standard" class is WaitForFirstConsumer, so the
+# claim only binds once a scheduled pod mounts it — and the mounted volume
+# is what the kubelet's /stats/summary reports as a pvcRef entry (the data
+# /metrics/pvcs aggregates — the list view's Usage column).
+apiVersion: v1
+kind: Pod
+metadata:
+  name: demo-pvc-consumer
+  labels: {app: demo-pvc-consumer}
+spec:
+  containers:
+    - name: consumer
+      image: busybox:1.36
+      command: ["sh", "-c", "echo demo > /data/consumer.txt && sleep 3600"]
+      volumeMounts:
+        - name: data
+          mountPath: /data
+  volumes:
+    - name: data
+      persistentVolumeClaim:
+        claimName: demo-pvc
 YAML
 
 # 7. RuntimeClass — cluster-scoped (handler "runc" is kind's runtime).
@@ -322,12 +347,17 @@ YAML
 #     volumesnapshotclasses.snapshot.storage.k8s.io (a CLUSTER-SCOPED CRD).
 #     The CRD's presence is what turns the read non-empty (CRD absent -> []).
 #     csi-default uses driver "rancher.local-path" (kind's default provisioner)
-#     + deletionPolicy Delete.
+#     + deletionPolicy Delete. Two applies: snapshot.storage.k8s.io is a
+#     PROTECTED group (K8s >= 1.35) — the CRD needs the api-approved
+#     annotation, and the object's client-side mapping is not resolvable in
+#     the same invocation that creates its CRD.
 k apply -f - <<'YAML'
 apiVersion: apiextensions.k8s.io/v1
 kind: CustomResourceDefinition
 metadata:
   name: volumesnapshotclasses.snapshot.storage.k8s.io
+  annotations:
+    api-approved.kubernetes.io: "https://github.com/kubernetes/kubernetes/pull/82592"
 spec:
   group: snapshot.storage.k8s.io
   names:
@@ -344,7 +374,9 @@ spec:
         openAPIV3Schema:
           type: object
           x-kubernetes-preserve-unknown-fields: true
----
+YAML
+k wait --for=condition=Established crd/volumesnapshotclasses.snapshot.storage.k8s.io --timeout=30s >/dev/null
+k apply -f - <<'YAML'
 apiVersion: snapshot.storage.k8s.io/v1
 kind: VolumeSnapshotClass
 metadata:
@@ -359,11 +391,15 @@ YAML
 #     turns the read non-empty (CRD absent -> []). NO status subresource: the
 #     fixture carries status via a plain apply. demo-snap targets demo-pvc via
 #     csi-default and is readyToUse (the 4.1 Usable success-badge tier).
+#     Two applies + api-approved annotation: same protected-group reason as
+#     section 10.
 k apply -f - <<'YAML'
 apiVersion: apiextensions.k8s.io/v1
 kind: CustomResourceDefinition
 metadata:
   name: volumesnapshots.snapshot.storage.k8s.io
+  annotations:
+    api-approved.kubernetes.io: "https://github.com/kubernetes/kubernetes/pull/82592"
 spec:
   group: snapshot.storage.k8s.io
   names:
@@ -380,7 +416,9 @@ spec:
         openAPIV3Schema:
           type: object
           x-kubernetes-preserve-unknown-fields: true
----
+YAML
+k wait --for=condition=Established crd/volumesnapshots.snapshot.storage.k8s.io --timeout=30s >/dev/null
+k apply -f - <<'YAML'
 apiVersion: snapshot.storage.k8s.io/v1
 kind: VolumeSnapshot
 metadata:
