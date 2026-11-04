@@ -449,6 +449,31 @@ export interface VerticalPodAutoscalerItem {
   [key: string]: unknown
 }
 
+/** A VolumeSnapshot custom object as returned by /api/v1/clusters/<id>/resources/volumesnapshots (snapshot.storage.k8s.io CRD, namespaced, camelCase wire form — the raw custom object, NOT the generated-model snake_case). */
+export interface VolumeSnapshotItem {
+  metadata?: {
+    name?: string
+    namespace?: string
+    creationTimestamp?: string
+    labels?: Record<string, string>
+    annotations?: Record<string, string>
+  }
+  spec?: {
+    source?: {
+      persistentVolumeClaimName?: string
+      volume?: string
+    }
+    volumeSnapshotClassName?: string
+  }
+  status?: {
+    readyToUse?: boolean
+    restoreSize?: string
+    boundVolumeSnapshotContentName?: string
+    creationTime?: string
+  }
+  [key: string]: unknown
+}
+
 /** Closed set for the detail page's ?kind= param (4.1 parity). */
 export const POLICY_KINDS = ['NetworkPolicy', 'CiliumNetworkPolicy', 'CiliumClusterwideNetworkPolicy'] as const
 export type PolicyKind = (typeof POLICY_KINDS)[number]
