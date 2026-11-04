@@ -14,7 +14,6 @@ export const stubRoutes: StubRoute[] = [
   { path: '/workload/replicasets', title: 'ReplicaSets', admin: false },
   { path: '/network/service', title: 'Services', admin: false },
   { path: '/network/ingress', title: 'Ingress', admin: false },
-  { path: '/storage/configmap', title: 'ConfigMaps', admin: false },
   { path: '/storage/pv', title: 'Volumes', admin: false },
   { path: '/storage/pvc', title: 'VolumeClaims', admin: false },
   { path: '/storage/volumesnapshot', title: 'VolumeSnapshot', admin: false },

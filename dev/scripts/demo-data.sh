@@ -11,9 +11,9 @@
 #     Warning events (BackOff / ImagePullBackOff) so the Events panel
 #     always has recent entries (k8s events expire after ~1h, so a stale
 #     cluster shows "No events found" without the churn).
-#   - demo-secret / demo-limitrange / demo-quota / demo-pdb / demo-hpa /
-#     demo-vpa / demo-netpol: one instance of each kind so the list +
-#     data views render real data.
+#   - demo-secret / demo-config / demo-limitrange / demo-quota / demo-pdb /
+#     demo-hpa / demo-vpa / demo-netpol: one instance of each kind so the
+#     list + data views render real data.
 #   - demo-runc: cluster-scoped RuntimeClass (handler "runc" = kind's
 #     containerd runtime).
 #   - demo-gp2: cluster-scoped StorageClass (provisioner
@@ -163,6 +163,19 @@ stringData:
   api_token: kubedash-demo-token
 ---
 apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: demo-config
+data:
+  log-level: info
+  feature-flags: '{"beta": true}'
+  app-config: |
+    # multi-line value — exercises the data page's <pre><code> wrapping
+    mode: demo
+    workers: 2
+    timeout_seconds: 30
+---
+apiVersion: v1
 kind: LimitRange
 metadata:
   name: demo-limitrange
@@ -284,7 +297,7 @@ YAML
 
 echo "demo data ready: ns=$NS"
 echo "  pods: demo-app x1 (healthy, HPA/VPA/PDB target) + demo-broken x1 (crashlooping, events)"
-echo "  fixtures: Secret, LimitRange, ResourceQuota, PDB, HPA, VPA (Off mode), NetworkPolicy"
+echo "  fixtures: Secret, ConfigMap, LimitRange, ResourceQuota, PDB, HPA, VPA (Off mode), NetworkPolicy"
 echo "  cluster-scoped: RuntimeClass demo-runc, StorageClass demo-gp2, CRD configmaps.example.com (e2e deep-link target)"
 echo "  VPA recommendations land in the demo-vpa status within a few minutes"
 echo "  kubectl --context $CTX get pods,hpa,vpa,pdb,netpol -n $NS -w"

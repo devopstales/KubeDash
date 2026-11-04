@@ -67,6 +67,8 @@ const LimitRangeView = React.lazy(() => import('./views/OtherResource/LimitRange
 const LimitRangeDataView = React.lazy(() => import('./views/OtherResource/LimitRangeData'))
 const StorageClassView = React.lazy(() => import('./views/Storage/StorageClass'))
 const StorageClassDataView = React.lazy(() => import('./views/Storage/StorageClassData'))
+const ConfigMapView = React.lazy(() => import('./views/Storage/ConfigMap'))
+const ConfigMapDataView = React.lazy(() => import('./views/Storage/ConfigMapData'))
 const GroupsView = React.lazy(() => import('./views/Groups'))
 const GroupPrivilegesView = React.lazy(() => import('./views/Groups/GroupPrivileges'))
 const GroupPrivilegeEditView = React.lazy(() => import('./views/Groups/GroupPrivilegeEdit'))
@@ -805,6 +807,27 @@ const App = () => {
                             listRoute="/storage/storage-class"
                             list={<StorageClassView />}
                             detail={(p) => <StorageClassDataView name={p.name} />}
+                          />
+                        </ProtectedRoute>
+                      }
+                    />
+                    <Route
+                      path="/storage/configmap"
+                      element={
+                        <ProtectedRoute>
+                          {/* ADR-0040: ObjectRoute renders the list or the
+                              ref-matched detail on the clean route. First
+                              build of this kind (it was a stub; the /data
+                              URL never shipped) — NO legacy /data route, no
+                              R7 redirect. Namespaced: the namespace rides
+                              in the ref (R8). */}
+                          <ObjectRoute
+                            kind="configmap"
+                            listRoute="/storage/configmap"
+                            list={<ConfigMapView />}
+                            detail={(p) => (
+                              <ConfigMapDataView name={p.name} namespace={p.namespace ?? ''} />
+                            )}
                           />
                         </ProtectedRoute>
                       }

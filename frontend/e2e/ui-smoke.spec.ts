@@ -39,7 +39,6 @@ const SMOKE_STUB_ROUTES: Array<{ path: string; title: string }> = [
   { path: '/workload/replicasets', title: 'ReplicaSets' },
   { path: '/network/service', title: 'Services' },
   { path: '/network/ingress', title: 'Ingress' },
-  { path: '/storage/configmap', title: 'ConfigMaps' },
   { path: '/storage/pv', title: 'Volumes' },
   { path: '/storage/pvc', title: 'VolumeClaims' },
   { path: '/storage/volumesnapshot', title: 'VolumeSnapshot' },
@@ -80,6 +79,8 @@ const REAL_ROUTES = [
   '/security/secret',
   // StorageClass (2026-10-28-storageclass-views): real views, not stubs.
   '/storage/storage-class',
+  // ConfigMaps (2026-10-28-configmap-views): real views, not stubs.
+  '/storage/configmap',
   // Limit Range (2026-10-28-limitrange-views): real views, not stubs.
   '/other-resource/limit-range',
   // Cluster dashboard (2026-10-21-cluster-dashboard): without a selected
