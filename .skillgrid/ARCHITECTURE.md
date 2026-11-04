@@ -107,7 +107,8 @@ KubeDash/
 │   │   │   ├── config.py        ← env-driven settings (dev/stage/prod)
 │   │   │   ├── security.py      ← OIDC, JWT issue/verify, RBAC proxy
 │   │   │   ├── leader.py        ← leader election (PG advisory lock + lease)
-│   │   │   └── errors.py        ← Smorest HttpError subclasses + handlers
+│   │   │   ├── errors.py        ← Smorest HttpError subclasses + handlers
+│   │   │   └── object_handoff.py ← SPA deep-link handoff (ADR-0040 R4/R5): 303 POST bounce + one-shot meta injection
 │   │   ├── api/                 ← one Api (flask_smorest) per domain
 │   │   │   ├── auth.py
 │   │   │   ├── clusters.py

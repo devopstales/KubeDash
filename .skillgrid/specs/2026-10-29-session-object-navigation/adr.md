@@ -11,9 +11,10 @@ survives in-tab via `sessionStorage` (15-min lazy self-expiry), and a
 share action opens the object in a new tab by POSTing an opaque token —
 the identity itself rides a 60-second self-deleting `localStorage` relay.
 One route per kind (the `/data` suffix is dropped); old `/.../data?name=`
-URLs redirect one-shot to the clean route. No backend change, no migration,
-no new dependency. **ADR-0040** (proposed 2026-10-29) is the full decision
-record.
+URLs redirect one-shot to the clean route. No new API endpoint, no
+migration, no new dependency (R10, amended 2026-11-04 — see Amendments
+below). **ADR-0040** (proposed 2026-10-29, amended 2026-11-04) is the full
+decision record.
 
 ## Decision Context
 
@@ -76,3 +77,23 @@ record.
    is same-origin; another machine/fresh profile lands on the list.
    Cross-machine object links would require path-param routes (a separate
    decision).
+
+## Amendments
+
+- **2026-11-04 — token delivery via the server session (user decision after
+  the QA gate FAIL).** The original cross-tab design delivered the token to
+  the fresh tab via `?o=` in the document URL. The QA gate (2026-11-03,
+  FAIL) proved this non-functional in a real browser (a form POST body
+  never enters the new document's URL; the Flask dev server 405s the POST;
+  a static nginx fallback serves the index without `?o=`). Approved
+  mechanism: the SPA fallback accepts the POST, stashes the token in Redis
+  under `obj_incoming:<sub>` (the `kd_access` JWT subject; TTL 60 s = the
+  relay window), bounces 303 to the same path, and the first subsequent GET
+  injects the token as a one-shot `<meta name="kd-object-incoming">`
+  (GETDEL; injected document no-store). `consumeIncoming()` reads the meta
+  instead of the URL. No new cookie, no URL change, no new API endpoint —
+  R10's checkable is carved to "no new API endpoint / migration / cookie;
+  the backend diff is the SPA-fallback handoff plumbing"
+  (`app/core/object_handoff.py` + the catch-all methods). Token entropy
+  raised 32 → 64 bits (QA finding S-1). Deviations item 3 (form POST body =
+  opaque token) is unchanged; only the token's delivery channel moved.

@@ -3,6 +3,7 @@
 ---
 status: "accepted"
 date: 2026-10-29
+amended: 2026-11-04
 supersedes: the "`?name=` + `?namespace=` query-param navigation" deviations clause ratified across the 2026-10-28 view specs (recorded per spec via `NAVIGATION-SUPERSEDED.md` in `.skillgrid/specs/`)
 ---
 
@@ -44,7 +45,10 @@ still land on the object — the identity travels as a same-origin form
   hint-not-credential pattern applies: a forged/stale ref renders a list or
   a 404, never a privilege escalation — the read stays SAR-gated at the
   API, ADR-0004).
-- No backend change (R10): no endpoint, no migration, no Redis key.
+- No backend change (R10, as amended 2026-11-04): no new API endpoint, no
+  migration, no new cookie — the token handoff rides the existing SPA
+  fallback (static plumbing) + a 60 s Redis stash keyed by the session's
+  JWT subject (see Amendments).
 - No new dependency (ADR-0020 air-gap): `sessionStorage` + a hidden form
   are platform APIs.
 - Migration must not break existing bookmarks or in-flight e2e (one-shot
@@ -62,7 +66,11 @@ still land on the object — the identity travels as a same-origin form
    Rejected by user requirement ("use session for storage instead of
    server-side with TTL"): adds an endpoint + a key for pure UI state, and
    re-introduces server round-trips the 2026-10-28 contract was chosen to
-   avoid.
+   avoid. *Revisited 2026-11-04 (Amendments): the QA gate proved the
+   pure-client token delivery non-functional; the user chose this option's
+   mechanism WITHOUT its endpoint — the SPA fallback itself carries the
+   handoff (303 bounce + `obj_incoming:<sub>` Redis TTL stash + one-shot
+   meta injection).*
 4. **`sessionStorage` object ref + form-POST deep link (CHOSEN).**
    Identity lives in tab-private `sessionStorage`; refresh survives in-tab;
    cross-tab deep links deliver the identity as a POST body to the object's
@@ -77,20 +85,27 @@ The contract (requirements R1–R10 in `briefing.md`):
 - **Registry shape.** `sessionStorage` key `kd_object_refs` holds a
   token-keyed map `{ <token>: { kind, name, namespace?, ts, origin } }`;
   key `kd_object_active` holds the active token. Tokens are
-  `crypto.getRandomValues` 32-bit hex. Entries self-expire at 15 minutes
+  `crypto.getRandomValues` 64-bit hex (raised from 32 bits, 2026-11-04).
+  Entries self-expire at 15 minutes
   of age (checked lazily on render — no timer); an expired active ref
   renders the list and clears the pointer.
 - **In-tab navigation.** List rows call `setObjectRef(kind, name,
   ns?)` → the route (one per kind, `/data` suffix dropped) renders the
   detail when the active ref's kind matches, the list otherwise. Back/
   forward moves list↔detail via normal history entries.
-- **Cross-tab deep link.** The share affordance submits a hidden same-origin
-  form (`method="POST"`, `action="<route>"`, hidden input `name="o"`
-  carrying the JSON ref) with `target="_blank"`. The new document's SPA
-  mount consumes a one-shot `sessionStorage` handoff key
-  (`kd_object_incoming` + monotonic counter, R5), hydrates its own
-  registry, renders the object; `history.replaceState` guarantees
-  `location.search === ''` (R1).
+- **Cross-tab deep link (amended 2026-11-04).** The share affordance
+  submits a hidden same-origin form (`method="POST"`, `action="<route>"`,
+  hidden input `name="o"` carrying the token only) with
+  `target="_blank"`. The identity payload rides a token-scoped, 60 s
+  self-deleting `localStorage` relay (`kd_ref_<token>` + `_exp`). The SPA
+  fallback bounces the POST as a 303 to the same path and stashes the
+  token in Redis under `obj_incoming:<sub>` (the `kd_access` JWT subject;
+  TTL 60 s); the fresh tab's document load gets it back as a one-shot
+  `<meta name="kd-object-incoming">` injected into index.html (GETDEL —
+  consumed by exactly one load; the injected document is no-store). The
+  SPA mount consumes the meta, hydrates its registry from the relay, and
+  renders the object; `location.search === ''` (R1) — the token never
+  appears in a URL.
 - **Namespace authority (R8).** The detail view reads the namespace from
   the ref, authoritatively; the `|| selectedNamespace || 'default'`
   fallback is deleted. The header selector drives list views only.
@@ -155,7 +170,10 @@ The contract (requirements R1–R10 in `briefing.md`):
   the object with `location.search === ''`; old-URL redirect scenario:
   `/security/secret/data?name=...&namespace=...` lands clean on the data
   page.
-- `task fe-build` + `task fe-check` green; `git diff backend/` empty.
+- `task fe-build` + `task fe-check` green; backend diff limited to the
+  SPA-fallback handoff plumbing (R10 carve-out, amended 2026-11-04).
+- `backend/tests/api/test_object_handoff.py` — the POST bounce, the
+  one-shot meta injection, and every miss path (9 tests, unit tier).
 
 #### Implementation Notes
 
@@ -169,3 +187,28 @@ The contract (requirements R1–R10 in `briefing.md`):
   not navigation).
 - Wide refactor sequencing (expand → migrate batches → contract) per
   `tasks.md`.
+
+#### Amendments
+
+- **2026-11-04 — token delivery channel (user decision).** The 2026-10-29
+  execution delivered the token to the fresh tab via `?o=` in the document
+  URL (`consumeIncoming` read `location.search`). The QA gate (2026-11-03,
+  FAIL) proved this non-functional in a real browser: a form POST's body
+  never enters the new document's URL, and no SPA fallback rewrites the
+  POST — `POST /cluster/crd` is 405 on the Flask dev server, and a static
+  nginx `try_files` serves the index without `?o=` (fresh tab: 405 page in
+  dev, the list in prod). The unit suite stayed green because it seeded
+  `?o=` into jsdom directly; the e2e scenario that would have caught it was
+  runner-less until that gate. The user chose delivery through the
+  **server session**, not the URL: the SPA fallback bounces the POST as a
+  303, stashes the token in Redis under `obj_incoming:<sub>` (TTL 60 s =
+  the relay window), and the first subsequent GET injects it as a one-shot
+  `<meta name="kd-object-incoming">` (GETDEL; injected document no-store).
+  R10 is carved as recorded in Decision Drivers: the backend diff is the
+  static-fallback plumbing (`app/core/object_handoff.py` + the catch-all
+  methods) — no new API endpoint, no migration, no new cookie (ADR-0025
+  transport untouched). Token entropy raised 32 → 64 bits in the same seam
+  (QA finding S-1). Every miss path (anonymous session, malformed token,
+  expired relay, second GET) renders the list, never a wrong object.
+  Record: `.skillgrid/specs/2026-10-29-session-object-navigation/`
+  (`report.md` C1, `adr.md` amendment, `blueprint.md` R5 note).

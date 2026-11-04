@@ -75,18 +75,18 @@ export function postObjectToTab(kind, name, namespace?, routePath: string): void
 
 // New-tab mount consumption (called once by ObjectRoute on mount):
 export function consumeIncoming(): ObjectRef | null
-//   1. token = new URLSearchParams(window.location.search).get('o')
-//      — after the SPA fallback serves the POST, the token arrives as a
-//      query param on the new document ONLY in dev/prod SPA-fallback; the
-//      primary path is: the POST's action is the route and the token rides
-//      `document.referrer === ''` + a one-shot `kd_object_incoming`
-//      sessionStorage key the SPA writes before re-mounting. See step 5
-//      below.
+//   1. token = the one-shot <meta name="kd-object-incoming"> injected into
+//      the document by the SPA fallback (server session state — see the
+//      Handoff mechanism below, amended 2026-11-04). No meta → null.
 //   2. relay read: localStorage.getItem(`kd_ref_${token}`); expiry check
 //      against `_exp`; if stale/absent → null
 //   3. hydrate: registry write + setActiveRef(token)
-//   4. self-delete: both relay keys removed
-//   5. history.replaceState → strip `?o=` (R1)
+//   4. self-delete: both relay keys removed + the meta removed from the
+//      document (one-shot)
+//
+//   (Superseded 2026-11-04: the original design resolved the token from
+//   `?o=` on the document URL — proven non-functional in a real browser by
+//   the QA gate: a form POST body never enters the new document's URL.)
 
 // Sweep: expired relay keys (called on App mount, idempotent):
 export function sweepRelay(): void
@@ -98,13 +98,32 @@ export function sweepRelay(): void
 therefore uses `localStorage` (shared per-origin) under a **token-scoped**
 key with a **60-second expiry** and **self-delete on consumption** — it is a
 relay bus, not storage: nothing persists, and the form body / URL carry
-only the opaque token. The new tab's `ObjectRoute` mount calls
-`consumeIncoming()`: resolves the token (from the POST-derived location or
-the `kd_object_incoming` one-shot key), reads + validates + deletes the
-relay, hydrates its own `sessionStorage` registry. A plain GET never calls
-the POST path, so it never consumes a relay key — and even if a token were
-guessed, a miss is a list render, never a wrong object (the registry is
-token-keyed).
+only the opaque token.
+
+**Token delivery (amended 2026-11-04 — user decision after the QA gate
+FAIL).** The 2026-10-29 design delivered the token to the fresh document
+via `?o=` in the URL; the QA gate (2026-11-03) proved this cannot work in a
+real browser — a form POST's body never enters the new document's URL, and
+neither the Flask dev server (405 on POST) nor a static nginx fallback
+rewrites the POST to a `?o=` URL (fresh tab showed a 405 page / the list).
+The approved mechanism delivers the token through the **server session**:
+
+1. The SPA fallback accepts the POST (`app/core/object_handoff.py`),
+   stashes the token in Redis under `obj_incoming:<sub>` (the
+   `kd_access` JWT subject; TTL 60 s = the relay window), and bounces
+   303 to the exact same path.
+2. The fresh tab's document load (same session cookie) is served with the
+   token injected as `<meta name="kd-object-incoming" content="<token>">`
+   (one-shot GETDEL — a second load or another session gets the plain
+   document); the injected document is `no-store`.
+3. `consumeIncoming()` reads the meta, reads + validates + self-deletes the
+   relay, hydrates its own `sessionStorage` registry, and removes the meta.
+
+No new cookie (ADR-0025 transport untouched), no URL change (R1), no new
+API endpoint (R10 carve-out: static-fallback plumbing only). Miss paths —
+anonymous/bogus session, malformed token, expired relay, second GET — all
+render the list, never a wrong object (the registry is token-keyed and the
+relay is the payload channel; the stash carries only the key).
 
 ### 2. `frontend/src/components/ObjectRoute.tsx` (new, ~80 LOC)
 

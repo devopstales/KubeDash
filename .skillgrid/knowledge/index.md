@@ -20,6 +20,7 @@
 | [ADR-0024 — Secret syntax highlight](decisions/04-adr-0024-secret-syntax-highlight.md) | Secret values use react-syntax-highlighter (an-old-hope theme) | accepted |
 | [ADR-0025 — HttpOnly session cookie](decisions/04-adr-0025-http-only-session-cookie.md) | Session in HttpOnly cookies; Bearer retained for the kubectl plugin | accepted |
 | [ADR-0026 — TLS edge + security headers](decisions/04-adr-0026-tls-edge-and-security-headers.md) | nginx TLS edge; ProxyFix gated on KUBEDASH_TLS_EDGE; 4.1 header set restored | accepted |
+| [ADR-0040 — SPA object navigation](decisions/04-adr-0040-session-object-navigation.md) | Tab-private sessionStorage object ref + form-POST deep link; token delivered via the server session (one-shot meta, amended 2026-11-04); no object identity in the URL | accepted |
 
 > ADR-0001..0013: index rows exist in `ASSUMPTIONS.md` § LOCKED; their files
 > are not yet authored (open task).
