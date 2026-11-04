@@ -53,6 +53,37 @@ class NodeMetricsOut(Schema):
     items = fields.List(fields.Nested(NodeMetricOut))
 
 
+class PvcUsageItem(Schema):
+    """One row of ``GET /clusters/<id>/metrics/pvcs`` — the PVC storage
+    usage aggregated from the kubelet /stats/summary (4.1's
+    ``k8sPVCMetric`` read). Bytes are raw (not KB); ``percentage_used`` is
+    used / capacity * 100, ``0.0`` when capacity is zero (the 4.1
+    division-by-zero guard)."""
+
+    name = fields.String()
+    capacity_bytes = fields.Integer()
+    used_bytes = fields.Integer()
+    available_bytes = fields.Integer()
+    percentage_used = fields.Float()
+
+
+class PvcUsageOut(Schema):
+    """``GET /clusters/<id>/metrics/pvcs`` — the PVC-usage observed tier for
+    the /storage/pvc list's Usage column. KUBELET stats/summary, NOT
+    metrics.k8s.io (the ``source`` says which observed tier is missing).
+    ``metrics_available`` says whether any node yielded stats (ADR-0003
+    query-only: unavailable is 200 + false, never 500); ``metrics_denied``
+    says whether the caller lacks the ``get nodes`` grant (distinct: the UI
+    must not tell a denied user "install metrics-server")."""
+
+    cluster = fields.String()
+    namespace = fields.String()
+    source = fields.String()
+    metrics_available = fields.Boolean()
+    metrics_denied = fields.Boolean()
+    items = fields.List(fields.Nested(PvcUsageItem))
+
+
 class NodeUsageOut(Schema):
     """``GET /clusters/<id>/nodes/<name>/usage`` — a single node's observed
     (used) tier. ``metrics_available`` says whether the Metrics API answered;

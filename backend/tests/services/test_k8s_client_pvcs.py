@@ -1,3 +1,4 @@
+import json
 from types import SimpleNamespace
 
 import pytest
@@ -97,3 +98,137 @@ def test_get_pvc_other_api_error_maps_to_unreachable() -> None:
         ).get_persistent_volume_claim("team-a", "data-pvc")
 
 
+# --- pvc_usage: the kubelet /stats/summary aggregation (4.1 k8sPVCMetric) ---
+
+_STATS_A = json.dumps(
+    {
+        "pods": [
+            {
+                "volume": [
+                    {
+                        "pvcRef": {"name": "data-pvc", "namespace": "team-a"},
+                        "capacityBytes": "1000",
+                        "usedBytes": "400",
+                        "availableBytes": "600",
+                    },
+                    {
+                        "pvcRef": {"name": "data-pvc", "namespace": "team-a"},
+                        "capacityBytes": "1000",
+                        "usedBytes": "100",
+                        "availableBytes": "900",
+                    },
+                ]
+            },
+            {
+                "volume": [
+                    {
+                        "pvcRef": {"name": "other-ns-pvc", "namespace": "kube-system"},
+                        "capacityBytes": "500",
+                        "usedBytes": "1",
+                        "availableBytes": "499",
+                    }
+                ]
+            },
+        ]
+    }
+)
+
+
+def _stats_client(stats_by_node: dict[str, object]) -> K8sClient:
+    def proxy(name, path=None, **kwargs):
+        return stats_by_node[name]
+
+    client = object.__new__(K8sClient)
+    client._v1 = SimpleNamespace(
+        list_node=lambda: SimpleNamespace(
+            items=[
+                SimpleNamespace(to_dict=lambda n=n: {"metadata": {"name": n}})
+                for n in stats_by_node
+            ]
+        ),
+        connect_get_node_proxy_with_path=proxy,
+    )
+    return client
+
+
+def test_pvc_usage_aggregates_per_pvc_in_namespace() -> None:
+    """[pvc-usage-happy-path] entries are summed PER PVC per namespace;
+    other namespaces are excluded; percentage = used/capacity*100."""
+    available, items = _stats_client({"n1": _STATS_A}).pvc_usage("team-a")
+    assert available is True
+    assert items == [
+        {
+            "name": "data-pvc",
+            "capacity_bytes": 2000,
+            "used_bytes": 500,
+            "available_bytes": 1500,
+            "percentage_used": 25.0,
+        }
+    ]
+
+
+def test_pvc_usage_zero_capacity_is_zero_percent() -> None:
+    """4.1's ``usedBytes / capacityBytes`` would divide by zero; 5.0
+    reports 0.0 (the guard)."""
+    stats = json.dumps(
+        {
+            "pods": [
+                {
+                    "volume": [
+                        {
+                            "pvcRef": {"name": "empty-pvc", "namespace": "team-a"},
+                            "capacityBytes": "0",
+                            "usedBytes": "0",
+                            "availableBytes": "0",
+                        }
+                    ]
+                }
+            ]
+        }
+    )
+    available, items = _stats_client({"n1": stats}).pvc_usage("team-a")
+    assert available is True
+    assert items[0]["percentage_used"] == 0.0
+
+
+def test_pvc_usage_skips_unhealthy_nodes() -> None:
+    """[pvc-usage-partial-nodes] a node whose stats call raises is
+    skipped; the healthy subset is returned, ``available`` stays True."""
+
+    def raise_500(name, path=None, **kwargs):
+        raise ApiException(status=500)
+
+    client = object.__new__(K8sClient)
+    client._v1 = SimpleNamespace(
+        list_node=lambda: SimpleNamespace(
+            items=[
+                SimpleNamespace(to_dict=lambda: {"metadata": {"name": "n1"}}),
+                SimpleNamespace(to_dict=lambda: {"metadata": {"name": "bad"}}),
+            ]
+        ),
+        connect_get_node_proxy_with_path=lambda name, path=None, **kw: (
+            _STATS_A if name == "n1" else raise_500(name, path)
+        ),
+    )
+    available, items = client.pvc_usage("team-a")
+    assert available is True
+    assert items[0]["name"] == "data-pvc"
+
+
+def test_pvc_usage_all_nodes_unhealthy_is_empty() -> None:
+    """[pvc-usage-kubelet-degrade] zero healthy nodes → ``(False, [])`` —
+    the ADR-0003 query-only degrade, never an exception."""
+
+    def raise_404(name, path=None, **kwargs):
+        raise ApiException(status=404)
+
+    client = object.__new__(K8sClient)
+    client._v1 = SimpleNamespace(
+        list_node=lambda: SimpleNamespace(
+            items=[SimpleNamespace(to_dict=lambda: {"metadata": {"name": "bad"}})]
+        ),
+        connect_get_node_proxy_with_path=raise_404,
+    )
+    available, items = client.pvc_usage("team-a")
+    assert available is False
+    assert items == []

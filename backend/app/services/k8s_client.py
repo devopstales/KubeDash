@@ -440,6 +440,71 @@ class K8sClient:
             )
         return True, series
 
+    def pvc_usage(self, namespace: str) -> tuple[bool, list[dict[str, Any]]]:
+        """PVC storage usage per namespace from the KUBELET /stats/summary
+        endpoint (4.1's ``k8sPVCMetric`` read, re-implemented): for every
+        node, ``connect_get_node_proxy_with_path(name,
+        path="stats/summary")``, then aggregate each pod's
+        ``volume[].pvcRef`` entries for ``namespace``.
+
+        Returns ``(available, items)`` — ``items`` is one entry per PVC:
+        ``{name, capacity_bytes, used_bytes, available_bytes,
+        percentage_used}`` (bytes summed across all pods using the PVC;
+        ``percentage_used`` = used / capacity * 100, ``0.0`` when capacity
+        is zero — the 4.1 division-by-zero guard). The ADR-0003 query-only
+        degrade: a node whose stats call fails (404/5xx/timeout — no
+        kubelet, stats unavailable) is SKIPPED, never raised; zero healthy
+        nodes → ``(False, [])``. The body is parsed with ``json.loads``
+        (4.1's ``eval`` is not replicated).
+        """
+        try:
+            nodes = self.list_nodes(None)
+        except Exception:
+            # The node list is a separate read; if it fails there are no
+            # stats to aggregate (the ``node_metrics`` degrade pattern).
+            return False, []
+        aggregated: dict[str, dict[str, int]] = {}
+        healthy = 0
+        for node in nodes:
+            name = (node.get("metadata") or {}).get("name")
+            if not name:
+                continue
+            try:
+                raw = self._v1.connect_get_node_proxy_with_path(
+                    name, path="stats/summary", _request_timeout=2
+                )
+                body = json.loads(raw)
+            except (ApiException, json.JSONDecodeError, UnicodeDecodeError):
+                # A per-node stats failure is the EXPECTED state (kubelet
+                # absent/down/stats API off) — skip, never raise (ADR-0003).
+                continue
+            healthy += 1
+            for pod in body.get("pods") or []:
+                for vol in pod.get("volume") or []:
+                    ref = vol.get("pvcRef")
+                    if not ref or ref.get("namespace") != namespace:
+                        continue
+                    entry = aggregated.setdefault(
+                        ref["name"],
+                        {"capacity_bytes": 0, "used_bytes": 0, "available_bytes": 0},
+                    )
+                    entry["capacity_bytes"] += int(vol.get("capacityBytes") or 0)
+                    entry["used_bytes"] += int(vol.get("usedBytes") or 0)
+                    entry["available_bytes"] += int(vol.get("availableBytes") or 0)
+        items = [
+            {
+                **entry,
+                "percentage_used": (
+                    round(entry["used_bytes"] / entry["capacity_bytes"] * 100, 1)
+                    if entry["capacity_bytes"]
+                    else 0.0
+                ),
+                "name": name,
+            }
+            for name, entry in aggregated.items()
+        ]
+        return healthy > 0, items
+
     @staticmethod
     def _parse_cpu(qty: str | None) -> int:
         """K8s CPU quantity → millicores (``"800m"`` → 800, ``"1"`` → 1000).

@@ -26,13 +26,18 @@ an error — ``node_usage`` answers ``(False, {})`` and the endpoint answers 200
 with ``metrics_available: false`` and null used. Never 500, never 0.
 """
 
-from flask import g
+from flask import g, request
 from flask_smorest import Api, Blueprint
 
 from app.api._authhook import apply_auth
 from app.api._cluster import cluster_for as _cluster_for
 from app.core.errors import NotImplementedError_, RbacDeniedError
-from app.schemas.metrics import MetricsSummaryOut, NodeMetricsOut, NodeUsageOut
+from app.schemas.metrics import (
+    MetricsSummaryOut,
+    NodeMetricsOut,
+    NodeUsageOut,
+    PvcUsageOut,
+)
 from app.services import rbac
 from app.services.cluster_allocation import compute_summary
 from app.services.k8s_client import pool
@@ -129,6 +134,61 @@ class MetricsApi(Api):
             "cluster": cluster.name,
             "metrics_available": available,
             "source": "metrics.k8s.io",
+            "items": items,
+        }
+
+    @blp.route("/clusters/<int:cluster_id>/metrics/pvcs", methods=["GET"])
+    @blp.response(200, PvcUsageOut)
+    @blp.doc(
+        responses={
+            404: "CLUSTER_NOT_FOUND (binding gate)",
+            502: "CLUSTER_UNREACHABLE",
+        }
+    )
+    def pvc_usage(self, cluster_id: int) -> dict[str, object]:
+        """PVC storage usage (the /storage/pvc list's Usage column).
+
+        KUBELET stats/summary, NOT metrics.k8s.io (4.1's ``k8sPVCMetric``
+        read the kubelet per node). The ADR-0004 gate is ``get`` on ``nodes``
+        (the stats proxy goes through the node API): denied -> 200 with
+        ``metrics_denied: true`` and empty ``items`` (the two-tier pattern —
+        the observed tier degrades to unknown, never 403, so the declared
+        PVC list still renders). The ADR-0003 degrade lives in
+        ``K8sClient.pvc_usage``: unavailable kubelet stats are 200
+        ``metrics_available: false`` + empty items, never 500. ``namespace``
+        selects which ``pvcRef.namespace`` entries are aggregated (4.1's
+        contract); absent -> 200 with ``metrics_available: false`` + empty
+        items (the page always passes a namespace; 4.1 had no
+        all-namespace branch for this read).
+        """
+        cluster = _cluster_for(g.current_user, cluster_id)
+        namespace = request.args.get("namespace")
+        if not namespace:
+            return {
+                "cluster": cluster.name,
+                "namespace": "",
+                "source": "kubelet stats/summary",
+                "metrics_available": False,
+                "metrics_denied": False,
+                "items": [],
+            }
+        metrics_allowed = rbac.can(g.current_user, cluster, "get", "nodes", None, None, "")
+        if not metrics_allowed:
+            return {
+                "cluster": cluster.name,
+                "namespace": namespace,
+                "source": "kubelet stats/summary",
+                "metrics_available": False,
+                "metrics_denied": True,
+                "items": [],
+            }
+        available, items = pool.get(cluster).pvc_usage(namespace)
+        return {
+            "cluster": cluster.name,
+            "namespace": namespace,
+            "source": "kubelet stats/summary",
+            "metrics_available": available,
+            "metrics_denied": False,
             "items": items,
         }
 
