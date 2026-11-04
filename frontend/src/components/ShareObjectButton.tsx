@@ -28,7 +28,7 @@ const ShareObjectButton: React.FC<ShareObjectButtonProps> = ({ kind, name, names
     aria-label={`Share ${name}`}
     onClick={() => postObjectToTab(kind, name, namespace, listRoute)}
   >
-    &G;
+    ⧉
   </button>
 )
 

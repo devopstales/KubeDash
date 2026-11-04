@@ -406,6 +406,14 @@ renders **PASS**.
 - **S-6** — the R9 permissive filter scenario (pods `?labelSelector=`) is
   untestable until `2026-10-28-pods-deployments-views` lands — its executor
   should carry the scenario.
+- **S-7** — the share button rendered a literal `&G;` instead of the ⧉
+  glyph. — **CLOSED 2026-11-04 (user-reported during QA):** the JSX text
+  child `&G;` (TICKET-02, `ea3dd004`) is not a valid character reference, so
+  the compiler keeps it as literal text. Replaced with the ⧉ glyph (per the
+  blueprint's icon spec + the component's own doc comment);
+  `priority_classes.test.tsx` now pins `textContent === '⧉'` so a mangled
+  entity fails the floor. Verified in a real browser (button textContent
+  `⧉`); bundle rebuilt + re-synced.
 
 ## Gate Decision
 
