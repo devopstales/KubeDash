@@ -95,6 +95,10 @@ _KINDS: dict[str, tuple[str, str, str]] = {
     # TASK-054 (list + data views; ADR-0022 placement). The 4.1 route name was
     # singular; the API kind is the plural.
     "limitranges": ("list_limit_ranges", "limitranges", ""),
+    # ConfigMap (core, namespaced) — the 4.1-parity nav leaf resolved by
+    # TASK-064 (list + data views; ADR-0022 placement). The 4.1 route name was
+    # singular; the API kind is the plural.
+    "configmaps": ("list_configmaps", "configmaps", ""),
 }
 
 #: kind → K8sClient method for a single-object ``?name=`` lookup
@@ -111,6 +115,7 @@ _GETTERS: dict[str, str] = {
     "verticalpodautoscalers": "get_vertical_pod_autoscaler",
     "horizontalpodautoscalers": "get_horizontal_pod_autoscaler",
     "limitranges": "get_limit_range",
+    "configmaps": "get_configmap",
 }
 
 

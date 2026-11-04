@@ -856,6 +856,26 @@ class K8sClient:
             items.append(item)
         return items
 
+    def list_configmaps(self, namespace: str | None) -> list[dict[str, Any]]:
+        """ConfigMap list in the standard kubernetes dict form (``to_dict``)
+        for one namespace, or across all namespaces when the namespace is
+        ``None`` (the ``list_secrets`` branch). UNLIKE ``list_secrets`` this
+        does NOT pop ``data``/``binaryData``: a ConfigMap's ``data`` is
+        public config (not a credential), and the list view's Data Keys
+        column is computed from it — stripping it here would silently break
+        that column. A transport ApiException maps to
+        ``ClusterUnreachableError`` (502)."""
+        try:
+            resp = (
+                self._v1.list_namespaced_config_map(namespace)
+                if namespace
+                else self._v1.list_config_map_for_all_namespaces()
+            )
+        except ApiException as e:
+            self._unreachable("list_configmaps", e)
+            raise AssertionError("unreachable") from e
+        return [cm.to_dict() for cm in resp.items]
+
     def get_secret(self, namespace: str, name: str) -> list[dict[str, Any]]:
         """One Secret (``data`` base64-encoded) as a 0/1-item list; ``[]`` on 404."""
         try:
@@ -864,6 +884,20 @@ class K8sClient:
             if e.status == 404:
                 return []
             raise
+
+    def get_configmap(self, namespace: str, name: str) -> list[dict[str, Any]]:
+        """One ConfigMap (``data`` plain strings, ``binaryData`` base64) as a
+        0/1-item list; ``[]`` on 404. No field stripping (a ConfigMap's
+        ``data`` is public config — see ``list_configmaps``). Any other
+        ApiException maps to ``ClusterUnreachableError`` (502), matching
+        ``get_resource_quota``'s transport contract."""
+        try:
+            return [self._v1.read_namespaced_config_map(name, namespace).to_dict()]
+        except ApiException as e:
+            if e.status == 404:
+                return []
+            self._unreachable("get_configmap", e)
+            raise AssertionError("unreachable") from e
 
     def get_resource_quota(self, namespace: str, name: str) -> list[dict[str, Any]]:
         """One ResourceQuota as a 0/1-item list; ``[]`` on 404. Any other
