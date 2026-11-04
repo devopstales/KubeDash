@@ -14,6 +14,10 @@
 #   - demo-secret / demo-config / demo-limitrange / demo-quota / demo-pdb /
 #     demo-hpa / demo-vpa / demo-netpol: one instance of each kind so the
 #     list + data views render real data.
+#   - demo-pvc: a 100Mi RWO claim on the "standard" StorageClass (kind's
+#     default provisioner), so it BINDS (the PVC list's Bound status badge +
+#     Capacity cell, and the data view's bound volume, render real data); it
+#     is also the demo-snap VolumeSnapshot's source claim.
 #   - demo-runc: cluster-scoped RuntimeClass (handler "runc" = kind's
 #     containerd runtime).
 #   - demo-gp2: cluster-scoped StorageClass (provisioner
@@ -248,6 +252,17 @@ spec:
   ingress:
     - from:
         - podSelector: {}
+---
+apiVersion: v1
+kind: PersistentVolumeClaim
+metadata:
+  name: demo-pvc
+spec:
+  storageClassName: standard  # kind's default provisioner — the claim binds
+  accessModes: [ReadWriteOnce]
+  resources:
+    requests:
+      storage: 100Mi
 YAML
 
 # 7. RuntimeClass — cluster-scoped (handler "runc" is kind's runtime).
@@ -382,7 +397,7 @@ YAML
 
 echo "demo data ready: ns=$NS"
 echo "  pods: demo-app x1 (healthy, HPA/VPA/PDB target) + demo-broken x1 (crashlooping, events)"
-echo "  fixtures: Secret, ConfigMap, LimitRange, ResourceQuota, PDB, HPA, VPA (Off mode), NetworkPolicy"
+echo "  fixtures: Secret, ConfigMap, LimitRange, ResourceQuota, PDB, HPA, VPA (Off mode), NetworkPolicy, PVC (demo-pvc, bound)"
 echo "  cluster-scoped: RuntimeClass demo-runc, StorageClass demo-gp2, CRD configmaps.example.com (e2e deep-link target)"
 echo "  cluster-scoped: CRD volumesnapshotclasses.snapshot.storage.k8s.io + csi-default (SnapshotClass view)"
 echo "  namespaced: CRD volumesnapshots.snapshot.storage.k8s.io + demo-snap (VolumeSnapshot view)"

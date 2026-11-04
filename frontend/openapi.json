@@ -548,6 +548,47 @@
         }
       ]
     },
+    "/api/v1/clusters/{cluster_id}/metrics/pvcs": {
+      "get": {
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/PvcUsageOut"
+                }
+              }
+            }
+          },
+          "default": {
+            "$ref": "#/components/responses/DEFAULT_ERROR"
+          },
+          "404": {
+            "$ref": "#/components/responses/CLUSTER_NOT_FOUND (binding gate)"
+          },
+          "502": {
+            "$ref": "#/components/responses/CLUSTER_UNREACHABLE"
+          }
+        },
+        "summary": "PVC storage usage (the /storage/pvc list's Usage column).",
+        "description": "KUBELET stats/summary, NOT metrics.k8s.io (4.1's ``k8sPVCMetric``\nread the kubelet per node). The ADR-0004 gate is ``get`` on ``nodes``\n(the stats proxy goes through the node API): denied -> 200 with\n``metrics_denied: true`` and empty ``items`` (the two-tier pattern —\nthe observed tier degrades to unknown, never 403, so the declared\nPVC list still renders). The ADR-0003 degrade lives in\n``K8sClient.pvc_usage``: unavailable kubelet stats are 200\n``metrics_available: false`` + empty items, never 500. ``namespace``\nselects which ``pvcRef.namespace`` entries are aggregated (4.1's\ncontract); absent -> 200 with ``metrics_available: false`` + empty\nitems (the page always passes a namespace; 4.1 had no\nall-namespace branch for this read).",
+        "tags": [
+          "api.metrics"
+        ]
+      },
+      "parameters": [
+        {
+          "in": "path",
+          "name": "cluster_id",
+          "required": true,
+          "schema": {
+            "type": "integer",
+            "minimum": 0
+          }
+        }
+      ]
+    },
     "/api/v1/clusters/{cluster_id}/events": {
       "get": {
         "responses": {
@@ -1937,6 +1978,54 @@
           },
           "pods": {
             "$ref": "#/components/schemas/PodSummary"
+          }
+        },
+        "additionalProperties": false
+      },
+      "PvcUsageItem": {
+        "type": "object",
+        "properties": {
+          "name": {
+            "type": "string"
+          },
+          "capacity_bytes": {
+            "type": "integer"
+          },
+          "used_bytes": {
+            "type": "integer"
+          },
+          "available_bytes": {
+            "type": "integer"
+          },
+          "percentage_used": {
+            "type": "number"
+          }
+        },
+        "additionalProperties": false
+      },
+      "PvcUsageOut": {
+        "type": "object",
+        "properties": {
+          "cluster": {
+            "type": "string"
+          },
+          "namespace": {
+            "type": "string"
+          },
+          "source": {
+            "type": "string"
+          },
+          "metrics_available": {
+            "type": "boolean"
+          },
+          "metrics_denied": {
+            "type": "boolean"
+          },
+          "items": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/PvcUsageItem"
+            }
           }
         },
         "additionalProperties": false

@@ -94,6 +94,10 @@ function expectedStubs() {
     // The kind was a stub until this change: the /data URL never shipped,
     // so there is no R7 redirect — the single clean route only.
     '/storage/volumesnapshot',
+    // Real view (2026-10-28-pvc-views, Task 5) — not a stub route.
+    // The kind was a stub until this change: the /data URL never shipped,
+    // so there is no R7 redirect — the single clean route only.
+    '/storage/pvc',
   ])
   const seen = new Map<string, string>()
   for (const isAdmin of [true, false]) {
@@ -137,7 +141,7 @@ test('every-stub-entry-has-a-page', () => {
   for (const route of stubRoutes) {
     expect(route.admin).toBe(route.path.startsWith('/settings/'))
   }
-  for (const title of ['Workload', 'Ingress', 'VolumeClaims']) {
+  for (const title of ['Workload', 'Ingress']) {
     expect(stubRoutes.some((route) => route.title === title)).toBe(true)
   }
 })
