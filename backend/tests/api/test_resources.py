@@ -3397,6 +3397,23 @@ def test_list_networkpolicies_on_kind(kind_admin_api_client, kind_kubeconfig) ->
     api_client = kind_admin_api_client
     h = {"Authorization": f"Bearer {_kind_admin_jwt(api_client)}"}
     cid = _register_kind_cluster(api_client, h, kind_kubeconfig)
+    # Pre-clean: a run interrupted between apply and the finally-cleanup
+    # leaks the deny-all into the dev cluster (observed 2026-11-05: a stale
+    # fixture blocked all default-ns pod egress for ~21h).
+    subprocess.run(
+        [
+            "kubectl",
+            "--context=kind-kubedash-test",
+            "delete",
+            "networkpolicy",
+            "kubedash-deny-all",
+            "-n",
+            "default",
+            "--ignore-not-found",
+        ],
+        capture_output=True,
+        text=True,
+    )
     applied = subprocess.run(
         ["kubectl", "--context=kind-kubedash-test", "apply", "-f", "-"],
         input=_DENY_ALL_NP,
