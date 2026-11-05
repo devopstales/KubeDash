@@ -83,7 +83,8 @@ def test_get_persistent_volume_404_returns_empty_list() -> None:
     def read(_name: str) -> None:
         raise ApiException(status=404)
 
-    assert _client(SimpleNamespace(read_persistent_volume=read)).get_persistent_volume(None, "gone") == []
+    client = _client(SimpleNamespace(read_persistent_volume=read))
+    assert client.get_persistent_volume(None, "gone") == []
 
 
 def test_get_persistent_volume_ignores_namespace() -> None:

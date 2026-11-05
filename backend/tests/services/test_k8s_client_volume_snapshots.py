@@ -55,7 +55,8 @@ def test_list_volume_snapshots_honors_namespace() -> None:
     )
     result = _client(custom).list_volume_snapshots("team-a")
     assert result[0]["metadata"]["name"] == "snap-a"
-    assert result[0]["spec"]["source"]["persistentVolumeClaimName"] == "pvc-snap-a"  # full object intact
+    # full object intact
+    assert result[0]["spec"]["source"]["persistentVolumeClaimName"] == "pvc-snap-a"
     assert result[0]["status"]["readyToUse"] is True
     assert (
         result[0]["status"]["boundVolumeSnapshotContentName"] == "content-snap-a"

@@ -844,7 +844,9 @@ class FakeK8s:
 
     def get_persistent_volume(self, _namespace: str, name: str) -> list[dict]:
         if name in ("pv-a", "pv-free"):
-            return [pv for pv in self.list_persistent_volumes(None) if pv["metadata"]["name"] == name]
+            return [
+                pv for pv in self.list_persistent_volumes(None) if pv["metadata"]["name"] == name
+            ]
         return []
 
     def readyz(self) -> bool:

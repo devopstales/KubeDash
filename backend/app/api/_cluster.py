@@ -8,10 +8,11 @@ synthetic local cluster (id 0, ADR-0021) comes from the clusters domain's
 pure-Python) keeps the imports same-package with no cross-domain cycle.
 """
 
+from app.models.cluster import Cluster
 from app.services.k8s_client import LOCAL_CLUSTER_ID, bound_cluster_or_404
 
 
-def cluster_for(user: object, cluster_id: int) -> object:
+def cluster_for(user: object, cluster_id: int) -> Cluster:
     """Resolve ``cluster_id`` for a cluster-scoped read.
 
     Id 0 → the synthetic local cluster (no ``clusters`` row, so the binding
