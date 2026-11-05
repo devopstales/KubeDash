@@ -3,7 +3,9 @@ import { QueryClient, QueryClientProvider } from '@tanstack/react-query'
 import { MemoryRouter, Route, Routes } from 'react-router-dom'
 import { http, HttpResponse } from 'msw'
 import { afterEach, beforeEach, describe, expect, test, vi } from 'vitest'
+import { Suspense } from 'react'
 import { server } from './msw'
+import { NetworkPolicyRoute } from '../src/App'
 import ObjectRoute from '../src/components/ObjectRoute'
 import OldDataRedirect from '../src/components/OldDataRedirect'
 import SecretView from '../src/views/Security/Secret'
@@ -272,5 +274,85 @@ describe('OldDataRedirect (R7): legacy /data URL → clean route detail', () => 
     })
     expect(sessionStorage.getItem('kd_object_active')).toBeNull()
     expect(await waitFor(() => screen.queryByText('Secret List', { selector: 'h5' }))).toBeTruthy()
+  })
+})
+
+// ADR-0040 TICKET-03 dispatcher: one clean path renders list OR detail from
+// the active ref. The regression below pins the same-route dispatch:
+// openObject navigates to the SAME path, so the only re-render signal is
+// the router's location object (a fresh instance per navigation). The
+// window.location global has a stable identity — if `location` in the memo
+// deps is that global (i.e. useLocation was forgotten), the memo stays
+// inert and only a full page reload renders the detail.
+
+const renderDispatcher = (initialEntry: string) => {
+  const qc = new QueryClient({ defaultOptions: { queries: { retry: false } } })
+  return render(
+    <QueryClientProvider client={qc}>
+      <MemoryRouter initialEntries={[initialEntry]}>
+        <Suspense fallback={null}>
+          <Routes>
+            <Route path="/security/network-policy" element={<NetworkPolicyRoute />} />
+          </Routes>
+        </Suspense>
+      </MemoryRouter>
+    </QueryClientProvider>,
+  )
+}
+
+const demoNetpol = {
+  metadata: { name: 'demo-netpol', namespace: 'team-a', creation_timestamp: '2026-10-01T10:00:00Z' },
+  spec: {
+    policy_types: ['Ingress'],
+    ingress: [{ from: [{ pod_selector: {} }] }],
+    pod_selector: { match_labels: { app: 'demo-app' } },
+  },
+}
+
+describe('NetworkPolicyRoute (TICKET-03): list → click row → detail on the same clean route', () => {
+  test('clicking the name button renders the detail without a page reload', async () => {
+    server.use(
+      http.get('*/api/v1/clusters/1/resources/networkpolicies', () =>
+        HttpResponse.json({ kind: 'networkpolicies', cluster: 'prod', items: [demoNetpol] }),
+      ),
+      http.get('*/api/v1/clusters/1/resources/ciliumnetworkpolicies', () =>
+        HttpResponse.json({ kind: 'ciliumnetworkpolicies', cluster: 'prod', items: [] }),
+      ),
+      http.get('*/api/v1/clusters/1/resources/ciliumclusterwidenetworkpolicies', () =>
+        HttpResponse.json({ kind: 'ciliumclusterwidenetworkpolicies', cluster: 'prod', items: [] }),
+      ),
+    )
+
+    renderDispatcher('/security/network-policy')
+
+    // No active ref: the dispatcher renders the list; the name cell is the
+    // openObject button.
+    const rowButton = await screen.findByRole('button', { name: 'demo-netpol' })
+    expect(screen.queryByText('Network Policy Data', { selector: 'h5' })).toBeNull()
+
+    // openObject writes the ref (origin 'click') then navigates to the SAME
+    // path — the router's location change must re-read the ref.
+    act(() => {
+      rowButton.click()
+    })
+    // findBy* (NOT waitFor-with-queryByText, which resolves on the first
+    // falsy check): the detail is React.lazy inside App.tsx, so its first
+    // import is async and the synchronous first check must retry.
+    await screen.findByText('Network Policy Data', { selector: 'h5' }, { timeout: 8000 })
+
+    const reg = readRegistry()
+    const ref = reg![sessionStorage.getItem('kd_object_active')!]
+    expect(ref.origin).toBe('click')
+    expect(ref.kind).toBe('NetworkPolicy')
+    expect(ref.name).toBe('demo-netpol')
+    expect(ref.namespace).toBe('team-a')
+
+    // The breadcrumb back-link drops the active pointer; the same-path
+    // navigation re-reads the (now-null) ref and renders the list again.
+    act(() => {
+      screen.getByRole('link', { name: 'Network Policies' }).click()
+    })
+    expect(sessionStorage.getItem('kd_object_active')).toBeNull()
+    await screen.findByText('Network Policies', { selector: 'h5' }, { timeout: 4000 })
   })
 })

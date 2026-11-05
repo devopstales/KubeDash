@@ -122,12 +122,16 @@ const Fallback = () => <CSpinner color="primary" />
  * single seam + ref read and hands the detail to the view with its kind; the
  * list renders once. The legacy /data route is an OldDataRedirect (R7).
  */
-const NetworkPolicyRoute = () => {
+export const NetworkPolicyRoute = () => {
   const navigate = useNavigate()
-  // Bumped by the registered navigate seam: openObject sets the active
-  // pointer then navigates to the SAME list route this component renders,
-  // so a plain location memo would not re-run. The seam bumps this state so
-  // the ref is re-read and the detail renders — the same seam ObjectRoute uses.
+  // useLocation (NOT the global window.location, which has a stable
+  // identity and would make the memo dep inert): openObject sets the
+  // active pointer then navigates to the SAME list route this component
+  // renders — the router's location object is a fresh instance per
+  // navigation, so the memo re-runs, the ref is re-read and the detail
+  // renders. Mirrors ObjectRoute. The seam bump is the same backup
+  // ObjectRoute uses for a navigate that leaves the location unchanged.
+  const location = useLocation()
   const [, bump] = React.useReducer((c: number) => c + 1, 0)
   const ref = React.useMemo(
     () => getActiveRef(),
