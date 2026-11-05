@@ -14,13 +14,21 @@
 #   - demo-secret / demo-config / demo-limitrange / demo-quota / demo-pdb /
 #     demo-hpa / demo-vpa / demo-netpol: one instance of each kind so the
 #     list + data views render real data.
-#   - demo-pvc + demo-pvc-consumer: a 100Mi RWO claim on the "standard"
-#     StorageClass (kind's default provisioner) + a busybox pod that mounts
-#     it. The claim is WaitForFirstConsumer, so it only BINDS once the
-#     consumer pod is scheduled — and the mounted volume is what the kubelet
-#     /stats/summary reports as a pvcRef entry (the data /metrics/pvcs
-#     aggregates — the list's Usage column). It is also the demo-snap
-#     VolumeSnapshot's source claim.
+#   - demo-pvc + demo-pvc-consumer: a 100Mi RWO claim on the csi-hostpath
+#     StorageClass (dev/csi-hostpath.yaml — the kubernetes-csi csi-hostpath
+#     test driver, installed by the Taskfile's _kind-apps) + a busybox pod
+#     that mounts it. WHY a CSI driver and not kind's default "standard"
+#     class (local-path provisioner): those PVs are hostPath, and the
+#     kubelet's hostPath volume plugin has NO GetStats on the kind dev
+#     cluster (K8s 1.35) — the mounted volume never reaches the node's
+#     /stats/summary, so the pvcRef stats backing the PVC/PV lists' Usage
+#     column (/metrics/pvcs) are empty and it renders the honest '—'. The
+#     csi-hostpath driver implements NodeGetVolumeStats (statfs), so the
+#     claim's mounted volume IS reported with its pvcRef and the Usage
+#     column shows real data. csi-hostpath's statfs measures the BACKING
+#     filesystem (the node's root disk), not the 100Mi claim, so the Usage
+#     figure tracks the node's disk usage, not the 8Mi seed. It is also
+#     the demo-snap VolumeSnapshot's source claim.
 #   - demo-runc: cluster-scoped RuntimeClass (handler "runc" = kind's
 #     containerd runtime).
 #   - demo-gp2: cluster-scoped StorageClass (provisioner
@@ -168,6 +176,24 @@ YAML
 # 6. One instance of each remaining kind — the list + data views' fixtures.
 #    Limits/quota headroom is generous so the HPA (max 3) can never be
 #    admission-blocked by the demo-quota.
+#
+#    6a. demo-pvc migration (one-time): pre-CSI dev clusters carry a
+#    local-path hostPath PV (claimRef demo-pvc), which the CSI driver cannot
+#    serve. Detected by the PVC's storageClassName, so post-migration re-runs
+#    are no-ops. The apply below recreates the claim on csi-hostpath.
+if [ "$(k -n "$NS" get pvc demo-pvc -o jsonpath='{.spec.storageClassName}' 2>/dev/null || true)" != "csi-hostpath" ]; then
+  k -n "$NS" delete pod demo-pvc-consumer --ignore-not-found >/dev/null
+  # The PVC goes FIRST: deleting the bound PV before its claim is gone waits
+  # on the PV's kubernetes.io/pv-protection finalizer, which kubectl delete
+  # (no default timeout) blocks on forever. The PVC's deletion releases that
+  # finalizer, and the PV's reclaimPolicy Delete makes the local-path
+  # provisioner retire the hostPath PV itself.
+  k -n "$NS" delete pvc demo-pvc --ignore-not-found --timeout=60s >/dev/null
+  OLD_PV="$(k get pv -o jsonpath='{range .items[*]}{.metadata.name}{"\t"}{.spec.claimRef.name}{"\n"}{end}' | awk -F'\t' '$2=="demo-pvc"{print $1}')"
+  if [ -n "$OLD_PV" ]; then
+    k delete pv "$OLD_PV" --ignore-not-found --timeout=60s >/dev/null
+  fi
+fi
 k -n "$NS" apply -f - <<'YAML'
 apiVersion: v1
 kind: Secret
@@ -261,16 +287,22 @@ kind: PersistentVolumeClaim
 metadata:
   name: demo-pvc
 spec:
-  storageClassName: standard  # kind's default provisioner — the claim binds
+  # csi-hostpath (dev/csi-hostpath.yaml): provisioned dynamically by the
+  # driver's csi-provisioner sidecar — WaitForFirstConsumer, so the PV is
+  # created for the consumer pod's node. A CSI volume: unlike local-path's
+  # hostPath PVs, the driver answers the kubelet's GetVolumeStats, so the
+  # claim's volume reaches /stats/summary as a pvcRef entry.
+  storageClassName: csi-hostpath
   accessModes: [ReadWriteOnce]
   resources:
     requests:
       storage: 100Mi
 ---
-# demo-pvc consumer: the "standard" class is WaitForFirstConsumer, so the
-# claim only binds once a scheduled pod mounts it — and the mounted volume
-# is what the kubelet's /stats/summary reports as a pvcRef entry (the data
-# /metrics/pvcs aggregates — the list view's Usage column).
+# demo-pvc consumer: mounts the CSI-backed claim and seeds 8Mi of data on
+# start. The mounted volume is what the kubelet's /stats/summary reports as
+# a pvcRef entry (the data /metrics/pvcs aggregates — the list view's Usage
+# column; csi-hostpath's statfs reports the backing-disk usage, so the
+# figure is the dev node's disk percentage, see header).
 apiVersion: v1
 kind: Pod
 metadata:
@@ -280,7 +312,7 @@ spec:
   containers:
     - name: consumer
       image: busybox:1.36
-      command: ["sh", "-c", "echo demo > /data/consumer.txt && sleep 3600"]
+      command: ["sh", "-c", "echo demo > /data/consumer.txt; dd if=/dev/zero of=/data/usage-seed bs=1M count=8 2>/dev/null; sleep 3600"]
       volumeMounts:
         - name: data
           mountPath: /data
@@ -289,6 +321,13 @@ spec:
       persistentVolumeClaim:
         claimName: demo-pvc
 YAML
+
+# The csi-provisioner creates the PV only after the consumer pod is scheduled
+# (WaitForFirstConsumer), and the kubelet's CSI mount retries until the driver
+# answers — wait on both so a driver failure fails the dev-stack loudly, not
+# as a volume that silently never mounts.
+k -n "$NS" wait --for=condition=Bound pvc/demo-pvc --timeout=120s >/dev/null
+k -n "$NS" wait --for=condition=Ready pod/demo-pvc-consumer --timeout=180s >/dev/null
 
 # 7. RuntimeClass — cluster-scoped (handler "runc" is kind's runtime).
 k apply -f - <<'YAML'
@@ -435,7 +474,7 @@ YAML
 
 echo "demo data ready: ns=$NS"
 echo "  pods: demo-app x1 (healthy, HPA/VPA/PDB target) + demo-broken x1 (crashlooping, events)"
-echo "  fixtures: Secret, ConfigMap, LimitRange, ResourceQuota, PDB, HPA, VPA (Off mode), NetworkPolicy, PVC (demo-pvc, bound)"
+echo "  fixtures: Secret, ConfigMap, LimitRange, ResourceQuota, PDB, HPA, VPA (Off mode), NetworkPolicy, PVC (demo-pvc, csi-hostpath, bound; Usage = backing-disk statfs)"
 echo "  cluster-scoped: RuntimeClass demo-runc, StorageClass demo-gp2, CRD configmaps.example.com (e2e deep-link target)"
 echo "  cluster-scoped: CRD volumesnapshotclasses.snapshot.storage.k8s.io + csi-default (SnapshotClass view)"
 echo "  namespaced: CRD volumesnapshots.snapshot.storage.k8s.io + demo-snap (VolumeSnapshot view)"

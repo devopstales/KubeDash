@@ -65,3 +65,15 @@ in the affected specs' adr.md files, not a new ADR.
   the list. It reuses the `pvc-usage` TanStack Query key, so the cache is
   shared with the PVC list view (no duplicate kubelet scan when both are
   viewed in one session).
+- **Dev-cluster demo PV is now CSI-backed (2026-11-05, user decision).**
+  The Usage column's data source (KUBELET `/stats/summary` pvcRef join) is
+  4.1 parity, but kind's default local-path provisioner makes hostPath PVs,
+  whose kubelet plugin has no `GetStats` on K8s 1.35 — so the dev cluster's
+  `demo-pvc` never reported usage (an honest "—", which 4.1 would have
+  shown too; 4.1's dev was a real cluster with Ceph RBD CSI). To let the
+  dev cluster demonstrate the column, the dev stack now installs the
+  kubernetes-csi **csi-hostpath** test driver (`dev/csi-hostpath.yaml`,
+  upstream kubernetes-distributed manifest, `_kind-apps`), and `demo-pvc`
+  moves to its `csi-hostpath` StorageClass (one-time migration in
+  `demo-data.sh`; driver implements `NodeGetVolumeStats`, so the claim
+  reports real usage). Dev environment only — no app code, no ADR impact.

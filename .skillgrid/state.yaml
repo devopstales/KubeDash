@@ -173,9 +173,18 @@ in_flight:
     # missing"): the list gained the Usage column — the PVC list's
     # observed tier (/metrics/pvcs joined by claim name; free PVs +
     # every ADR-0003 degrade render "—"), pv tests 12/12, floor
-    # re-run green (e2e 19/19; live: column renders, honest "—" on kind
-    # 1.35 — hostPath PVs emit no pvcRef stats, same as the PVC list).
-    # Next: qa.
+    # re-run green (e2e 19/19). 2026-11-05 (usage data): demo-pvc
+    # migrated to a real CSI driver (dev/csi-hostpath.yaml, applied by
+    # Taskfile _kind-apps) — kind's local-path hostPath PVs emit no
+    # pvcRef stats on K8s 1.35, so the Usage cell was the honest "—".
+    # csi-hostpath implements NodeGetVolumeStats (statfs of the
+    # backing disk), so the PVC/PV Usage columns show real data on the
+    # dev cluster (live: demo-pvc 26.0% — backing-disk semantics, see
+    # demo-data.sh header). Root-caused the provisioning stall: a
+    # leaked kubedash-deny-all NetworkPolicy (test_list_networkpolicies_
+    # on_kind fixture, run interrupted 21h earlier) deny-all'd every
+    # default-ns pod and broke the csi provisioner's API egress —
+    # deleted, test pre-clean added. Next: qa.
     tracker: [TASK-066]
 completed_changes:
   - 2026-10-17-kubedash-base-structure
