@@ -154,6 +154,23 @@ in_flight:
     # BINDS; hostPath PVs emit no pvcRef stats on kind 1.35 → Usage cell
     # honestly shows — on the dev cluster). Next: qa.
     tracker: [TASK-065]
+  # --- PV views, executed 2026-11-05 (spec-zone artifacts authored this
+  # session; backlog-driven, ADR-0040 contract) ---
+  - change: 2026-11-05-pv-views
+    phase: executed
+    # Executed 2026-11-05 (TASK-066): 7 commits on `rebase` (6c8c6946 spec;
+    # fa6b1e27 backend persistentvolumes kind (core, cluster-scoped,
+    # claim-ns filtered, SAR-gated); ab9b2e18 Pv list; f7c8223d T2 trim;
+    # f3759ab7 docs; 6de151f5 PvData; 9c733235 wiring + stub removal).
+    # Companion T2 (2026-11-05 user decision): the five storage data views
+    # now trim machine-managed annotations (4.1 trimAnnotations; HPA
+    # 46929a10 precedent) — overrides the 2026-10-28 verbatim recorded
+    # deviation; adr.md override notes in the five specs. Verification
+    # floor green: unit 640/640, targeted vitest 41/41, fe-build +
+    # fe-check + fe-sync, e2e 19/19 (ui-smoke /storage/pv as REAL route),
+    # live cluster list+data+trim checks, ruff/mypy flat vs baseline
+    # (105/81 both sides). Next: qa.
+    tracker: [TASK-066]
 completed_changes:
   - 2026-10-17-kubedash-base-structure
   - 2026-10-17-swagger-ui-air-gap
