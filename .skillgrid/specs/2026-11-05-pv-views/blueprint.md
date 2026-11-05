@@ -124,9 +124,13 @@ adr.md deviation bullet gets a 2026-11-05 override note (docs commit).
   cluster-scoped: no namespace in the ref), **StorageClass**
   (`openObject('storageclass', scName, undefined,
   '/storage/storage-class', navigate)` — cross-kind; `—` when absent),
-  **VolumeClaim** (`openObject('persistentvolumeclaim', claimName,
+  **VolumeClaim** (`openObject('pvc', claimName,
   claimNs, '/storage/pvc', navigate)` — the claim ref carries the claim's
-  own namespace, R8; `—` when free), **Capacity**
+  own namespace, R8; the ref kind is the TARGET route's registry kind —
+  `pvc`, not the k8s resource name: `ObjectRoute` matches
+  `ref.kind === kind` verbatim (fixed at the 2026-11-05 three-axis review;
+  the original `'persistentvolumeclaim'` matched no route and fell
+  through to the PVC list); `—` when free), **Capacity**
   (`spec.capacity.storage`, `—` when absent), **Usage** (5.0 addition,
   2026-11-05 user request — "PV usage data is missing"; 4.1's PV view had
   no usage): the PVC list's observed tier verbatim — a second parallel
@@ -193,7 +197,7 @@ breadcrumb `Storage > PV > <name>`; syntax-highlighted JSON block —
 | Annotations | trimmed key/value table | 4.1 `trimAnnotations` (Task 2 pattern) |
 | Labels | key/value table | |
 | StorageClass | `spec.storage_class_name` | link → `openObject('storageclass', ...)` |
-| Persistent Volume Claim | `spec.claim_ref.name` | link → `openObject('persistentvolumeclaim', name, claim_ref.namespace, '/storage/pvc')`; label corrected to `Persistent Volume Claim` (4.1's template typo `Clame` is NOT carried over) |
+| Persistent Volume Claim | `spec.claim_ref.name` | link → `openObject('pvc', name, claim_ref.namespace, '/storage/pvc')` — the target route's registry kind (see Task 2's VolumeClaim note); label corrected to `Persistent Volume Claim` (4.1's template typo `Clame` is NOT carried over) |
 | PVC Namespace | `spec.claim_ref.namespace` | |
 | Access Mode | `spec.access_modes` joined | |
 | Volume Mode | `spec.volume_mode` | |

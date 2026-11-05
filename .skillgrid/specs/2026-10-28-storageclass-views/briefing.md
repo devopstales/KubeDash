@@ -18,10 +18,12 @@ placeholder stub (`views/Stub/routes.ts:21`). **4.1 has real templates for
 this kind**: `storage/storage-class.html.j2` (list: Name / Default / Reclaim
 Policy / Volume Binding Mode) and `storage-class-data.html.j2` (data: Name /
 Created / Annotations / Labels / Reclaim Policy / Binding Mode / Provisioner /
-a Parameters card). Unlike SnapshotClass, **StorageClass is a core API**
-(`storageclasses`, core group, **cluster-scoped**); the 4.1 read is
+a Parameters card). Unlike SnapshotClass, **StorageClass has a typed
+(generated) API** (storage.k8s.io `storageclasses`, **cluster-scoped** —
+2026-11-05 review fix: the original "core API / core group" wording was a
+group error); the 4.1 read is
 `k8sStorageClassListGet` (`4.1:src/kubedash/lib/k8s/storage.py:15`):
-`StorageV1Api().list_storage_class` — a generated core-API model, so the
+`StorageV1Api().list_storage_class` — a generated API model, so the
 `to_dict` form is snake_case. The data page is the 4.1 list-then-filter by
 name.
 
@@ -36,7 +38,8 @@ Port the 4.1 shape to 5.0 with the ratified deltas:
   grammar (the truthful-classifier rule ratified for PriorityClassData, final
   review 2026-10-28).
 - **Gating:** SAR per ADR-0004 on the existing generic `/resources` route —
-  `list`/`get` on `storageclasses`, core group (`""`), namespace `None`
+  `list`/`get` on `storageclasses`, group `storage.k8s.io` (2026-11-05
+  review fix: originally `""` core — wrong group), namespace `None`
   (cluster-scoped).
 - **Rendering stack:** CoreUI + `KubeDataTable` + TanStack Query + MSW (the
   5.0 view stack), 4.1's DataTables-JS + Jinja dropped.
@@ -53,8 +56,9 @@ so the nav leaf resolves to first-class views.
 StorageClass list (`kind: "storageclasses"`, items in kubernetes `to_dict`
 snake_case form). The kind is **cluster-scoped**: a `namespace` param is
 accepted and ignored (the `list_nodes` / `list_priority_classes` pattern).
-The read is SAR-gated per ADR-0004: `list` on `storageclasses`, core group
-(`""`), namespace `None`; on deny the response is 403 `RBAC_DENIED` naming the
+The read is SAR-gated per ADR-0004: `list` on `storageclasses`, group
+`storage.k8s.io` (2026-11-05 review fix: originally `""` core), namespace
+`None`; on deny the response is 403 `RBAC_DENIED` naming the
 resource, and the SAR is asked BEFORE any K8s client call. An unbound user is
 404 from the binding gate. The kind identifier is the plural
 `storageclasses`; the singular `storageclass` is rejected with

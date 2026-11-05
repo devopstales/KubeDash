@@ -27,7 +27,7 @@ ratified 5.0 deltas.
 (`backend/app/api/resources.py` `list_resources`) already implements binding
 gate → SAR → client call for list AND `?name=`. This change adds ONE kind:
 `K8sClient.list_storage_classes` / `get_storage_class` (kubernetes
-`StorageV1Api`, core group, **cluster-scoped**) + two dict rows (`_KINDS` /
+`StorageV1Api`, storage.k8s.io group, **cluster-scoped**) + two dict rows (`_KINDS` /
 `_GETTERS`) + one new `self._storage` attribute in `__init__`. Frontend: two
 views (list cloned from PriorityClass.tsx for the cluster-scoped layout, data
 cloned from PriorityClassData.tsx for the CTable+JSON block),
@@ -165,8 +165,10 @@ dependency add; the kind table is additive).
   imported by PriorityClassData/SecretData; the `json` grammar is already
   registered there (registering again is harmless — the module is a
   singleton).
-- Cluster-scoped kind (core group, v1): the list URL and the data URL carry
-  NO `namespace=` param; SAR group = `""`, namespace = `None`; the client
+- Cluster-scoped kind (storage.k8s.io group, v1): the list URL and the data
+  URL carry NO `namespace=` param; SAR group = `"storage.k8s.io"`,
+  namespace = `None` (2026-11-05 review fix: the original `""` core group
+  never matches a storage.k8s.io grant); the client
   methods use `list_storage_class` / `read_storage_class` (the
   `list_nodes` / `get_priority_class` cluster-scoped pattern).
 - The `to_dict` form is snake_case (a generated core-API model) — the type and
@@ -379,9 +381,10 @@ dependency add; the kind table is additive).
 - [ ] **Step 4: Wire the kind + write the failing API tests** —
   `backend/app/api/resources.py`:
   ```python
-  "storageclasses": ("list_storage_classes", "storageclasses", ""),
+  "storageclasses": ("list_storage_classes", "storageclasses", "storage.k8s.io"),
   ```
-  in `_KINDS` (after the priorityclasses row; core group = `""`), and
+  in `_KINDS` (after the priorityclasses row; group = `"storage.k8s.io"` —
+  the 2026-11-05 review fix; the original `""` core group was wrong), and
   ```python
   "storageclasses": "get_storage_class",
   ```
@@ -423,8 +426,9 @@ dependency add; the kind table is additive).
     - `test_list_storageclasses_get_by_name` — `?name=csi-fast` → 1 item;
       `?name=ghost` → `items == []`.
     - `test_list_storageclasses_sar_denied` — SAR denies; 403; assert
-      `("list", "storageclasses", None, None, "")` in `asked` (namespace
-      `None`, core group `""` — the load-bearing assertions).
+      `("list", "storageclasses", None, None, "storage.k8s.io")` in `asked`
+      (namespace `None`, group `storage.k8s.io` — the load-bearing
+      assertions; 2026-11-05 review fix).
     - `test_storageclasses_binding_404` — cluster 999, unbound user → 404.
     - `test_storageclass_kind_singular_rejected` —
       `/resources/storageclass` → 404 `RESOURCE_KIND_NOT_SUPPORTED`.

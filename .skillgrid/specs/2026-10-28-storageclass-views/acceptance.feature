@@ -28,7 +28,9 @@ Feature: StorageClass views (list + data, cluster-scoped)
 
   Scenario: storageclasses-sar-denied
     # failure — R1 (ADR-0004: SAR before the client call)
-    Given the SAR check for list on storageclasses (core) denies
+    Given the SAR check for list on storageclasses (storage.k8s.io) denies
+    # (2026-11-05 review fix: the original "(core)" was a group error —
+    # a core-group SAR never matches a storage.k8s.io grant)
     When a bound user requests GET /api/v1/clusters/1/resources/storageclasses
     Then the response is 403 RBAC_DENIED naming the storageclasses resource
     And the K8s client list call was never made
