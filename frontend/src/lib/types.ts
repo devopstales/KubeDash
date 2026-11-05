@@ -496,6 +496,29 @@ export interface PvcItem {
   [key: string]: unknown
 }
 
+/** One PersistentVolume (cluster-scoped core v1) from the generic resources route. */
+export interface PersistentVolumeItem {
+  metadata?: {
+    name?: string
+    creation_timestamp?: string
+    deletion_timestamp?: string
+    labels?: Record<string, string>
+    annotations?: Record<string, string>
+  }
+  spec?: {
+    capacity?: { storage?: string }
+    access_modes?: string[]
+    persistent_volume_reclaim_policy?: string
+    volume_mode?: string
+    storage_class_name?: string
+    claim_ref?: { name?: string; namespace?: string }
+    csi?: { driver?: string; fs_type?: string; volume_attributes?: Record<string, string> }
+    host_path?: { path?: string }
+  }
+  status?: { phase?: string; message?: string }
+  [key: string]: unknown
+}
+
 /** One PVC-usage entry from /api/v1/clusters/<id>/metrics/pvcs (kubelet stats/summary). */
 export interface PvcUsage {
   name: string
