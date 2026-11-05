@@ -107,12 +107,12 @@ in_flight:
   # session-object-navigation contract: one route per kind, no /data
   # route — the kinds were stubs, so no R7 redirect) ---
   - change: 2026-10-28-storageclass-views
-    phase: executed
+    phase: qa
     # Executed 2026-11-04 (TASK-052): 4 commits on `rebase`
     # (1d5bb5ba..08e37b50) — backend storageclasses kind (core,
     # cluster-scoped, SAR-gated), list view, data view (parameters table +
     # JSON block), ObjectRoute wiring + stub removal. Verification floor
-    # green (unit suite; fe-build + fe-check; _nav.tsx untouched). Next: qa.
+    # green (unit suite; fe-build + fe-check; _nav.tsx untouched). QA 2026-11-05 (storage batch of 5): PASS (qa-report.md in 2026-11-05-pv-views — F1 demo-data.sh PVC wait + F2 lint debt fixed at the gate, ce6d0b19/6368cc8b; floor re-run: unit 648/648, targeted vitest 85/85, e2e 19/19, ruff flat 102, mypy 73<78, dev-stack exit 0). Awaits review.
     tracker: [TASK-052]
   - change: 2026-10-28-configmap-views
     phase: executed
@@ -123,25 +123,25 @@ in_flight:
     # floor green. Next: qa.
     tracker: [TASK-064]
   - change: 2026-10-28-snapshotclass-views
-    phase: executed
+    phase: qa
     # Executed 2026-11-04 (TASK-051): 4 commits on `rebase`
     # (7279d411..2365cff8) — backend snapshotclasses kind (CRD,
     # cluster-scoped, full object, SAR-gated), list view, data view
     # (parameters table + JSON block), ObjectRoute wiring (first ADR-0040
     # contract build) + stub removal. Fix 320e2b4b: dev fixture CRDs needed
     # the protected api-approved annotation (Establishment/Ready were stuck
-    # False). Next: qa.
+    # False). QA 2026-11-05 (storage batch of 5): PASS (qa-report.md in 2026-11-05-pv-views — F1 demo-data.sh PVC wait + F2 lint debt fixed at the gate, ce6d0b19/6368cc8b; floor re-run: unit 648/648, targeted vitest 85/85, e2e 19/19, ruff flat 102, mypy 73<78, dev-stack exit 0). Awaits review.
     tracker: [TASK-051]
   - change: 2026-10-28-volumesnapshot-views
-    phase: executed
+    phase: qa
     # Executed 2026-11-04 (TASK-053): 4 commits on `rebase`
     # (2138db40..9af5180a) — backend volumesnapshots kind (CRD, namespaced,
     # full object, SAR-gated), list view, data view (4.1 columns + JSON
     # block), ObjectRoute wiring + stub removal. Fix 320e2b4b: dev fixture
-    # CRD needed the api-approved annotation. Next: qa.
+    # CRD needed the api-approved annotation. QA 2026-11-05 (storage batch of 5): PASS (qa-report.md in 2026-11-05-pv-views — F1 demo-data.sh PVC wait + F2 lint debt fixed at the gate, ce6d0b19/6368cc8b; floor re-run: unit 648/648, targeted vitest 85/85, e2e 19/19, ruff flat 102, mypy 73<78, dev-stack exit 0). Awaits review.
     tracker: [TASK-053]
   - change: 2026-10-28-pvc-views
-    phase: executed
+    phase: qa
     # Executed 2026-11-04 (TASK-065): 5 commits on `rebase`
     # (43f7e6a8..1e453d31) — backend persistentvolumeclaims kind (core,
     # namespaced, SAR-gated), metrics/pvcs usage route (kubelet
@@ -152,12 +152,12 @@ in_flight:
     # degraded everything; now json-first + ast.literal_eval fallback,
     # repr regression test) + 320e2b4b (demo-pvc consumer pod so the claim
     # BINDS; hostPath PVs emit no pvcRef stats on kind 1.35 → Usage cell
-    # honestly shows — on the dev cluster). Next: qa.
+    # honestly shows — on the dev cluster). QA 2026-11-05 (storage batch of 5): PASS (qa-report.md in 2026-11-05-pv-views — F1 demo-data.sh PVC wait + F2 lint debt fixed at the gate, ce6d0b19/6368cc8b; floor re-run: unit 648/648, targeted vitest 85/85, e2e 19/19, ruff flat 102, mypy 73<78, dev-stack exit 0). Awaits review.
     tracker: [TASK-065]
   # --- PV views, executed 2026-11-05 (spec-zone artifacts authored this
   # session; backlog-driven, ADR-0040 contract) ---
   - change: 2026-11-05-pv-views
-    phase: executed
+    phase: qa
     # Executed 2026-11-05 (TASK-066): 7 commits on `rebase` (6c8c6946 spec;
     # fa6b1e27 backend persistentvolumes kind (core, cluster-scoped,
     # claim-ns filtered, SAR-gated); ab9b2e18 Pv list; f7c8223d T2 trim;
@@ -184,7 +184,7 @@ in_flight:
     # leaked kubedash-deny-all NetworkPolicy (test_list_networkpolicies_
     # on_kind fixture, run interrupted 21h earlier) deny-all'd every
     # default-ns pod and broke the csi provisioner's API egress —
-    # deleted, test pre-clean added. Next: qa.
+    # deleted, test pre-clean added. QA 2026-11-05 (storage batch of 5): PASS (qa-report.md in 2026-11-05-pv-views — F1 demo-data.sh PVC wait + F2 lint debt fixed at the gate, ce6d0b19/6368cc8b; floor re-run: unit 648/648, targeted vitest 85/85, e2e 19/19, ruff flat 102, mypy 73<78, dev-stack exit 0). Awaits review.
     tracker: [TASK-066]
 completed_changes:
   - 2026-10-17-kubedash-base-structure
