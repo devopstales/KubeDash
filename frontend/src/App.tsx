@@ -1,5 +1,13 @@
 import React from 'react'
-import { BrowserRouter, Navigate, Route, Routes, useNavigate, useParams } from 'react-router-dom'
+import {
+  BrowserRouter,
+  Navigate,
+  Route,
+  Routes,
+  useLocation,
+  useNavigate,
+  useParams,
+} from 'react-router-dom'
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query'
 import { CSpinner } from '@coreui/react'
 
@@ -53,10 +61,18 @@ const RuntimeClassView = React.lazy(() => import('./views/OtherResource/RuntimeC
 const RuntimeClassDataView = React.lazy(() => import('./views/OtherResource/RuntimeClassData'))
 const ResourceQuotaView = React.lazy(() => import('./views/OtherResource/ResourceQuota'))
 const ResourceQuotaDataView = React.lazy(() => import('./views/OtherResource/ResourceQuotaData'))
-const PodDisruptionBudgetView = React.lazy(() => import('./views/OtherResource/PodDisruptionBudget'))
-const PodDisruptionBudgetDataView = React.lazy(() => import('./views/OtherResource/PodDisruptionBudgetData'))
-const VerticalPodAutoscalerView = React.lazy(() => import('./views/OtherResource/VerticalPodAutoscaler'))
-const VerticalPodAutoscalerDataView = React.lazy(() => import('./views/OtherResource/VerticalPodAutoscalerData'))
+const PodDisruptionBudgetView = React.lazy(
+  () => import('./views/OtherResource/PodDisruptionBudget'),
+)
+const PodDisruptionBudgetDataView = React.lazy(
+  () => import('./views/OtherResource/PodDisruptionBudgetData'),
+)
+const VerticalPodAutoscalerView = React.lazy(
+  () => import('./views/OtherResource/VerticalPodAutoscaler'),
+)
+const VerticalPodAutoscalerDataView = React.lazy(
+  () => import('./views/OtherResource/VerticalPodAutoscalerData'),
+)
 const HorizontalPodAutoscalerView = React.lazy(
   () => import('./views/OtherResource/HorizontalPodAutoscaler'),
 )
@@ -116,7 +132,7 @@ const NetworkPolicyRoute = () => {
   const ref = React.useMemo(
     () => getActiveRef(),
     // eslint-disable-next-line react-hooks/exhaustive-deps
-    [bump],
+    [location, bump],
   )
   const isPolicy =
     ref !== null &&
@@ -136,11 +152,7 @@ const NetworkPolicyRoute = () => {
 
   if (!isPolicy) return <NetworkPolicyView />
   return (
-    <NetworkPolicyDataView
-      name={ref!.name}
-      kind={ref!.kind}
-      namespace={ref!.namespace ?? ''}
-    />
+    <NetworkPolicyDataView name={ref!.name} kind={ref!.kind} namespace={ref!.namespace ?? ''} />
   )
 }
 
@@ -340,7 +352,9 @@ const App = () => {
                             kind="role"
                             listRoute="/cluster-permission/role"
                             list={<RoleView />}
-                            detail={(p) => <RoleDataView name={p.name} namespace={p.namespace ?? ''} />}
+                            detail={(p) => (
+                              <RoleDataView name={p.name} namespace={p.namespace ?? ''} />
+                            )}
                           />
                         </ProtectedRoute>
                       }
@@ -431,7 +445,11 @@ const App = () => {
                               the ref from the legacy ?name= and lands on the
                               clean route's detail. Cluster-scoped: no
                               namespace. */}
-                          <OldDataRedirect kind="namespace" listRoute="/cluster/namespace" clusterScoped />
+                          <OldDataRedirect
+                            kind="namespace"
+                            listRoute="/cluster/namespace"
+                            clusterScoped
+                          />
                         </ProtectedRoute>
                       }
                     />
@@ -504,7 +522,9 @@ const App = () => {
                             kind="secret"
                             listRoute="/security/secret"
                             list={<SecretView />}
-                            detail={(p) => <SecretDataView name={p.name} namespace={p.namespace ?? ''} />}
+                            detail={(p) => (
+                              <SecretDataView name={p.name} namespace={p.namespace ?? ''} />
+                            )}
                           />
                         </ProtectedRoute>
                       }
@@ -672,7 +692,10 @@ const App = () => {
                             listRoute="/other-resource/pod-disruption-budget"
                             list={<PodDisruptionBudgetView />}
                             detail={(p) => (
-                              <PodDisruptionBudgetDataView name={p.name} namespace={p.namespace ?? ''} />
+                              <PodDisruptionBudgetDataView
+                                name={p.name}
+                                namespace={p.namespace ?? ''}
+                              />
                             )}
                           />
                         </ProtectedRoute>
