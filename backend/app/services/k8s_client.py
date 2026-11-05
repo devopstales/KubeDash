@@ -1414,6 +1414,7 @@ class K8sClient:
             self._unreachable("get_ingress", e)
             raise AssertionError("unreachable") from e
 
+    def get_configmap(self, namespace: str, name: str) -> list[dict[str, Any]]:
         """One ConfigMap (``data`` plain strings, ``binaryData`` base64) as a
         0/1-item list; ``[]`` on 404. No field stripping (a ConfigMap's
         ``data`` is public config — see ``list_configmaps``). Any other
