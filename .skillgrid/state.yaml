@@ -169,7 +169,13 @@ in_flight:
     # floor green: unit 640/640, targeted vitest 41/41, fe-build +
     # fe-check + fe-sync, e2e 19/19 (ui-smoke /storage/pv as REAL route),
     # live cluster list+data+trim checks, ruff/mypy flat vs baseline
-    # (105/81 both sides). Next: qa.
+    # (105/81 both sides). 2026-11-05 (user request "PV usage data is
+    # missing"): the list gained the Usage column — the PVC list's
+    # observed tier (/metrics/pvcs joined by claim name; free PVs +
+    # every ADR-0003 degrade render "—"), pv tests 12/12, floor
+    # re-run green (e2e 19/19; live: column renders, honest "—" on kind
+    # 1.35 — hostPath PVs emit no pvcRef stats, same as the PVC list).
+    # Next: qa.
     tracker: [TASK-066]
 completed_changes:
   - 2026-10-17-kubedash-base-structure

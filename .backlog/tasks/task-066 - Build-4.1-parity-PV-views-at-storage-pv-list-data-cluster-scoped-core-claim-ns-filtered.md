@@ -6,7 +6,7 @@ title: >-
 status: Done
 assignee: []
 created_date: '2026-11-05 07:36'
-updated_date: '2026-11-05 08:21'
+updated_date: '2026-11-05 08:58'
 labels:
   - feature
 dependencies: []
@@ -54,6 +54,8 @@ Execute .skillgrid/specs/2026-11-05-pv-views/blueprint.md end-to-end under the A
 
 <!-- SECTION:NOTES:BEGIN -->
 Verification floor (2026-11-05, all on rebase): backend uv run pytest -m 'not integration' 640 passed (incl. new test_k8s_pvs.py 8 service + 6 API, RED->GREEN); targeted vitest 41/41 (pvs 8, pv_data 5, five trimmed data views 23, Stub); full vitest: 12 pre-existing failures in groups/users/admin_permissions (datatables.net window.alert in jsdom; files last touched 9113ce16/ddeb51ef, pre-dating this change); task fe-build + fe-check (air gap) + fe-sync green; task e2e 19/19 (ui-smoke /storage/pv as REAL route, auth-smoke); ruff/mypy flat vs baseline (105/81 both sides - no new lint debt). Live dev cluster (kind kubedash-test, cluster id 7): /storage/pv list under ns=kubedash-demo renders pvc-3fe50822 (Bound, standard, demo-pvc, 100Mi; hidden under ns=default per claim-ns filter); data view renders the full 4.1 row set + trimmed annotations table + JSON block; URL stays clean /storage/pv (ADR-0040, identity in the session ref). Commits: 6c8c6946 spec, fa6b1e27 T1, ab9b2e18 T3, f7c8223d T2, f3759ab7 docs, 6de151f5 T4, 9c733235 T5.
+
+2026-11-05 (user: 'Persistent Volume usage data is missing'): the PV list gained a Usage column — 5.0 addition (4.1's PV view had no usage). Reuses the PVC list's observed tier verbatim: second parallel /metrics/pvcs fetch (shared pvc-usage query key) joined by claim name (the claim-ns filter makes the join sound); free PVs + ADR-0003 degrades render '—'. 4 new tests (join/unavailable/denied/fetch-fail), free-pv dash count 2->3, column assertion +Usage: pvs 12/12. Floor re-run: fe-build + fe-check + fe-sync green, e2e 19/19, live: column renders with honest '—' on kind 1.35 (hostPath PVs emit no pvcRef stats — same as the PVC list; metrics_available true, items []).
 <!-- SECTION:NOTES:END -->
 
 ## Final Summary
