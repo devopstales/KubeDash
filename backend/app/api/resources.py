@@ -57,6 +57,15 @@ _KINDS: dict[str, tuple[str, str, str]] = {
         "ciliumclusterwidenetworkpolicies",
         "cilium.io",
     ),
+    # IngressClass (networking.k8s.io, cluster-scoped core) — the
+    # ingressclass-gatewayclass-views change (list + data views; ADR-0022
+    # placement).
+    "ingressclasses": ("list_ingress_classes", "ingressclasses", "networking.k8s.io"),
+
+    # Ingress (networking.k8s.io, namespaced core) — the
+    # ingress-gateway-api-views change (list + data views; ADR-0022 placement).
+    "ingresses": ("list_ingresses", "ingresses", "networking.k8s.io"),
+
     "priorityclasses": ("list_priority_classes", "priorityclasses", "scheduling.k8s.io"),
     # RuntimeClass (node.k8s.io, cluster-scoped) — the 4.1-parity nav leaf
     # resolved by TASK-046 (list + data views; ADR-0022 placement).
@@ -77,6 +86,14 @@ _KINDS: dict[str, tuple[str, str, str]] = {
     # nav leaf resolved by TASK-049 (list + data views; ADR-0022 placement).
     # Full custom object (the Cilium CRD seam): the CRD's own served version is
     # the authority, CRD absent -> [] (first-class empty state).
+
+    # GatewayClass (gateway.networking.k8s.io, cluster-scoped CRD) — the
+    # ingressclass-gatewayclass-views change (list + data views; ADR-0022
+    # placement). Full custom object (the VPA/CRD seam): the CRD's own served
+    # version + scope is the authority, CRD absent -> [] (first-class empty
+    # state).
+    "gatewayclasses": ("list_gateway_classes", "gatewayclasses", "gateway.networking.k8s.io"),
+
     "verticalpodautoscalers": (
         "list_vertical_pod_autoscalers",
         "verticalpodautoscalers",
@@ -136,6 +153,16 @@ _GETTERS: dict[str, str] = {
     "crds": "get_crd",
     "networkpolicies": "get_network_policy",
     "ciliumnetworkpolicies": "get_cilium_network_policy",
+    # IngressClass (networking.k8s.io, cluster-scoped core) — the
+    # ingressclass-gatewayclass-views change (list + data views; ADR-0022
+    # placement).
+    "ingressclasses": "get_ingress_class",
+    # GatewayClass (gateway.networking.k8s.io, cluster-scoped CRD) — the
+    # ingressclass-gatewayclass-views change (list + data views; ADR-0022
+    # placement).
+    "gatewayclasses": "get_gateway_class",
+    "ingresses": "get_ingress",
+
     "priorityclasses": "get_priority_class",
     "runtimeclasses": "get_runtime_class",
     "storageclasses": "get_storage_class",

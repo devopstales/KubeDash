@@ -788,6 +788,58 @@ class K8sClient:
             raise ClusterUnreachableError(f"CRD '{plural}' has no served version")
         return served
 
+    # GatewayClass (gateway.networking.k8s.io, cluster-scoped CRD): the VPA
+    # CRD seam (the CRD's own served version + scope is the authority; the
+    # Gateway API CRDs are optional, so CRD absent -> [] as the first-class
+    # empty state).
+
+    _GATEWAY_API_GROUP = "gateway.networking.k8s.io"
+    _GATEWAY_CLASS_PLURAL = "gatewayclasses"
+
+    def list_gateway_classes(self, _namespace: str | None) -> list[dict[str, Any]]:
+        """GatewayClass items, FULL custom-object shape (spec + status intact,
+        camelCase — the wire form, like the Cilium CRDs). Cluster-scoped: the
+        namespace argument is accepted and ignored. The CRD read is ``None``
+        (absent) -> ``[]`` (the expected state); any other read failure ->
+        ``ClusterUnreachableError`` (502)."""
+        served = self.get_crd_served(self._GATEWAY_API_GROUP, self._GATEWAY_CLASS_PLURAL)
+        if served is None:
+            return []
+        version, scope = served
+        custom = self._custom()
+        try:
+            resp = custom.list_cluster_custom_object(
+                self._GATEWAY_API_GROUP, version, self._GATEWAY_CLASS_PLURAL
+            )
+        except ApiException as e:
+            self._unreachable("list_gateway_classes", e)
+            raise AssertionError("unreachable") from e
+        body = self._crd_body(resp)
+        items = body.get("items", [])
+        return [item.to_dict() if hasattr(item, "to_dict") else item for item in items]
+
+    def get_gateway_class(self, _namespace: str, name: str) -> list[dict[str, Any]]:
+        """One GatewayClass as a 0/1-item FULL custom object; ``[]`` on 404 or
+        when the CRD is absent (the optional-Gateway-API state). Any other
+        ApiException maps to ``ClusterUnreachableError`` (502), matching the
+        VPA getter."""
+        served = self.get_crd_served(self._GATEWAY_API_GROUP, self._GATEWAY_CLASS_PLURAL)
+        if served is None:
+            return []
+        version, _scope = served
+        custom = self._custom()
+        try:
+            item = custom.get_cluster_custom_object(
+                self._GATEWAY_API_GROUP, version, self._GATEWAY_CLASS_PLURAL, name
+            )
+        except ApiException as e:
+            if e.status == 404:
+                return []
+            self._unreachable("get_gateway_class", e)
+            raise AssertionError("unreachable") from e
+        item = self._crd_body(item)
+        return [item.to_dict() if hasattr(item, "to_dict") else item]
+
     def list_cilium_network_policies(self, namespace: str | None) -> list[dict[str, Any]]:
         """CiliumNetworkPolicy items, full to_dict() shape (spec intact).
         CRD absent -> [] (expected state); other failures -> 502 via
@@ -1157,7 +1209,42 @@ class K8sClient:
                 return []
             raise
 
-    def get_configmap(self, namespace: str, name: str) -> list[dict[str, Any]]:
+    # Ingress (networking.k8s.io, namespaced core): the full ``to_dict`` form
+    # (NO field stripping — the data page's Rules table + the converter read
+    # ``spec``/``status``; stripping would break both). A transport
+    # ApiException maps to ``ClusterUnreachableError`` (502).
+
+    def list_ingresses(self, namespace: str | None) -> list[dict[str, Any]]:
+        """Ingress list in the standard kubernetes dict form (``to_dict``) for
+        one namespace, or across all namespaces when the namespace is ``None``
+        (the ``list_secrets`` branch). UNLIKE ``list_secrets`` this does NOT strip
+        any field: an Ingress's ``spec`` (rules, tls, ingress_class_name) and
+        ``status`` (load_balancer) are public, and the data page's Rules table +
+        the converter read them — stripping would break both. A transport
+        ApiException maps to ``ClusterUnreachableError`` (502)."""
+        try:
+            resp = (
+                self._networking.list_namespaced_ingress(namespace)
+                if namespace
+                else self._networking.list_ingress_for_all_namespaces()
+            )
+        except ApiException as e:
+            self._unreachable("list_ingresses", e)
+            raise AssertionError("unreachable") from e
+        return [i.to_dict() for i in resp.items]
+
+    def get_ingress(self, namespace: str, name: str) -> list[dict[str, Any]]:
+        """One Ingress (full ``spec``/``status`` intact) as a 0/1-item list;
+        ``[]`` on 404. Any other ApiException maps to ``ClusterUnreachableError``
+        (502), matching ``get_secret``'s contract."""
+        try:
+            return [self._networking.read_namespaced_ingress(name, namespace).to_dict()]
+        except ApiException as e:
+            if e.status == 404:
+                return []
+            self._unreachable("get_ingress", e)
+            raise AssertionError("unreachable") from e
+
         """One ConfigMap (``data`` plain strings, ``binaryData`` base64) as a
         0/1-item list; ``[]`` on 404. No field stripping (a ConfigMap's
         ``data`` is public config — see ``list_configmaps``). Any other
@@ -1233,6 +1320,32 @@ class K8sClient:
             if e.status == 404:
                 return []
             self._unreachable("get_network_policy", e)
+            raise AssertionError("unreachable") from e
+
+    # IngressClass (networking.k8s.io, cluster-scoped core): the
+    # ``list_runtime_classes``/``get_runtime_class`` cluster-scoped pattern —
+    # the namespace is accepted and ignored.
+    def list_ingress_classes(self, namespace: str | None) -> list[dict[str, Any]]:
+        """IngressClass list in the standard kubernetes dict form (``to_dict``).
+        Cluster-scoped: the namespace argument is accepted and ignored. A
+        transport ApiException maps to ``ClusterUnreachableError`` (502)."""
+        try:
+            resp = self._networking.list_ingress_class()
+        except ApiException as e:
+            self._unreachable("list_ingress_classes", e)
+            raise AssertionError("unreachable") from e
+        return [i.to_dict() for i in resp.items]
+
+    def get_ingress_class(self, namespace: str, name: str) -> list[dict[str, Any]]:
+        """One IngressClass as a 0/1-item list; ``[]`` on 404. Any other
+        ApiException maps to ``ClusterUnreachableError`` (502), matching
+        ``get_runtime_class``'s contract."""
+        try:
+            return [self._networking.read_ingress_class(name).to_dict()]
+        except ApiException as e:
+            if e.status == 404:
+                return []
+            self._unreachable("get_ingress_class", e)
             raise AssertionError("unreachable") from e
 
     def list_horizontal_pod_autoscalers(self, namespace: str | None) -> list[dict[str, Any]]:
