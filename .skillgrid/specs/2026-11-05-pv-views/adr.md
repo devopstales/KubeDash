@@ -53,3 +53,15 @@ in the affected specs' adr.md files, not a new ADR.
   `autoscaling.alpha.kubernetes.io/conditions` (4.1's exact
   `trimAnnotations`), per the 2026-11-05 user request. The raw JSON block
   still contains the full object.
+- **The Usage column is a 5.0 addition (2026-11-05 user request — "PV
+  usage data is missing").** 4.1's PV view had no usage (only its PVC view
+  did). The list reuses the PVC list's observed tier verbatim: a second
+  parallel fetch on `GET /api/v1/clusters/{id}/metrics/pvcs?namespace=
+  <selected>` (KUBELET `/stats/summary`, NOT metrics.k8s.io), joined by
+  claim name. The claim-namespace filter guarantees every bound PV shown
+  is bound to a claim IN the selected namespace, so the join is sound. A
+  free PV (no `claim_ref`) and every ADR-0003 degrade (unavailable /
+  denied / failed fetch) render "—"; the usage query's error never fails
+  the list. It reuses the `pvc-usage` TanStack Query key, so the cache is
+  shared with the PVC list view (no duplicate kubelet scan when both are
+  viewed in one session).

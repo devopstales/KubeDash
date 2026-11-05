@@ -127,7 +127,15 @@ adr.md deviation bullet gets a 2026-11-05 override note (docs commit).
   **VolumeClaim** (`openObject('persistentvolumeclaim', claimName,
   claimNs, '/storage/pvc', navigate)` — the claim ref carries the claim's
   own namespace, R8; `—` when free), **Capacity**
-  (`spec.capacity.storage`, `—` when absent).
+  (`spec.capacity.storage`, `—` when absent), **Usage** (5.0 addition,
+  2026-11-05 user request — "PV usage data is missing"; 4.1's PV view had
+  no usage): the PVC list's observed tier verbatim — a second parallel
+  `useQuery(['pvc-usage', cluster?.id, namespace])` (shared key: the cache
+  is shared with PvcView) on
+  `/api/v1/clusters/{id}/metrics/pvcs?namespace=...`, joined by claim
+  name (the claim-ns filter makes the join sound); free PVs + every
+  ADR-0003 degrade (unavailable/denied/failed fetch) render `—`, and the
+  usage query's error never fails the list.
 - `toRow(item)` computes `status` with the Terminating override; row shape
   `{ name, status, storageClass, volumeClaim, volumeClaimNamespace,
   capacity }`.
