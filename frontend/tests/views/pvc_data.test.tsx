@@ -146,11 +146,12 @@ test('data-renders-detail', async () => {
   const statusCell = await rowCell('Status')
   expect(statusCell?.textContent).toBe('Bound')
   expect(statusCell?.querySelector('.badge')?.className).toContain('bg-success')
-  // Labels / Annotations sub-tables render the key/value pairs (verbatim —
-  // 4.1's trimAnnotations is NOT replicated).
+  // Labels / Annotations sub-tables render the key/value pairs; the
+  // machine-managed kubectl key is trimmed from the table (2026-11-05
+  // trimAnnotations replication, user decision).
   expect(await screen.findByText('team')).toBeTruthy()
   expect(await screen.findByText('a')).toBeTruthy()
-  expect(await screen.findByText('kubectl.kubernetes.io/last-applied-configuration')).toBeTruthy()
+  expect(screen.queryByText('kubectl.kubernetes.io/last-applied-configuration')).toBeNull()
   // Created: rendered via formatTimestamp — no raw ISO 'T' in the table row.
   const created = await rowValue('Created')
   expect(created).toMatch(/2026/)

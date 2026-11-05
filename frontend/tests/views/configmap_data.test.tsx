@@ -131,9 +131,12 @@ test('data-renders-detail', async () => {
   expect(await inTable('4242')).toBe(true)
   expect(await inTable('app')).toBe(true)
   expect(await inTable('web')).toBe(true)
-  // annotations render VERBATIM: BOTH the kubectl noise AND owner
-  // (trimAnnotations is NOT replicated — unlike the Secret view).
-  expect(await inTable('kubectl.kubernetes.io/last-applied-configuration')).toBe(true)
+  // Annotations: the machine-managed kubectl key is trimmed from the table
+  // (2026-11-05 trimAnnotations replication, user decision — overrides the
+  // recorded "render verbatim" deviation); real annotations still render.
+  // (queryByText: the key no longer renders unquoted anywhere — the JSON
+  // block's token spans carry quotes, so no exact-text match exists.)
+  expect(screen.queryByText('kubectl.kubernetes.io/last-applied-configuration')).toBeNull()
   expect(await inTable('owner')).toBe(true)
   expect(await inTable('platform')).toBe(true)
   // Data table: one row per data entry, the key as the row label (rendered

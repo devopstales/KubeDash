@@ -65,7 +65,16 @@ const SnapshotClassDataView = ({ name }: { name: string }) => {
 
   const item = query.data
   const labels = Object.entries(item?.metadata?.labels ?? {})
-  const annotations = Object.entries(item?.metadata?.annotations ?? {})
+  // 4.1's trimAnnotations (lib/helper_functions.py): the two machine-managed
+  // keys are dropped from the rendered annotations. Replicated 2026-11-05 per
+  // user request (overrides the 2026-10-28 "render verbatim" recorded
+  // deviation; the HPA view already trims — 46929a10). The JSON block still
+  // renders the full object.
+  const annotations = Object.entries(item?.metadata?.annotations ?? {}).filter(
+    ([key]) =>
+      key !== 'kubectl.kubernetes.io/last-applied-configuration'
+      && key !== 'autoscaling.alpha.kubernetes.io/conditions',
+  )
   // 4.1's dynamic-key Parameters card, one row per entry.
   const parameters = Object.entries(item?.parameters ?? {})
 
