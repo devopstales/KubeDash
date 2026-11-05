@@ -10,14 +10,21 @@ import ObjectRoute from '../../src/components/ObjectRoute'
 import PvcView from '../../src/views/Storage/Pvc'
 import { useClusterStore } from '../../src/store/cluster'
 
-// Same KubeDataTable fake as volume_snapshots.test.tsx: renders the real row
-// mapping (children-as-render-fns included) so cell assertions test the
-// view's `toRow` output, not DataTables' DOM. The factory is async: a
-// hoisted mock may not touch module-scope consts, so react is imported
-// inline (`vi.mock` calls are hoisted above the imports below).
+// KubeDataTable fake — faithful to the datatables.net-react quirk that
+// bit the Usage column: the real wrapper binds Column render fns to the
+// table instance only at INITIALISATION and re-renders cells only when
+// the data prop changes. A render fn closing over a second query's data
+// goes stale when that query resolves after the list (cell stuck at "—"
+// until a remount). The fake therefore captures the column definitions
+// on first render and renders the CURRENT data with the CAPTURED render
+// fns — join-in-the-row (pure render fns) is the only way cells update,
+// exactly like the real component. The factory is async: a hoisted mock
+// may not touch module-scope consts, so react is imported inline
+// (`vi.mock` calls are hoisted above the imports below).
 vi.mock('../../src/components/KubeDataTable', async () => {
   const React = (await import('react')) as typeof import('react')
   const Column = () => null
+  type ColProps = { title: string; data: string | null; children?: unknown }
   function KubeDataTable({
     data,
     children,
@@ -25,18 +32,15 @@ vi.mock('../../src/components/KubeDataTable', async () => {
     data: Record<string, unknown>[]
     children: React.ReactNode
   }) {
-    const cols = React.Children.toArray(children)
-      .filter(React.isValidElement)
-      .map(
-        (child) =>
-          (
-            child as React.ReactElement<{
-              title: string
-              data: string | null
-              children?: unknown
-            }>
-          ).props,
-      )
+    // The real wrapper captures the column definitions at table init and
+    // never re-reads them — replicate that here.
+    const colsRef = React.useRef<ColProps[] | null>(null)
+    if (colsRef.current === null) {
+      colsRef.current = React.Children.toArray(children)
+        .filter(React.isValidElement)
+        .map((child) => (child as React.ReactElement<ColProps>).props)
+    }
+    const cols = colsRef.current
     return (
       <table>
         <thead>
@@ -352,6 +356,44 @@ test('list-usage-join', async () => {
   // unbound-pvc is ABSENT from the usage items (no pods using it): "—".
   expect(await screen.findByRole('button', { name: 'unbound-pvc' })).toBeTruthy()
   expect(cellOf('unbound-pvc', 5)).toBe('—')
+})
+
+// pv-list-usage-late-resolution — the observed bug: the usage fetch
+// (kubelet fan-out) resolves AFTER the list (informer cache). The
+// faithful fake above reproduces datatables.net-react's init-time
+// capture, so a render fn closing over the usage query would leave the
+// cell stuck at "—" until a remount. The join in the rows (pure render
+// fns) must update the cell IN PLACE.
+test('list-usage-late-resolution-updates-in-place', async () => {
+  let resolveUsage: (v: unknown) => void = () => {}
+  const usageGate = new Promise((r) => {
+    resolveUsage = r
+  })
+  server.use(
+    http.get('*/api/v1/clusters/1/resources/persistentvolumeclaims', () =>
+      HttpResponse.json({
+        kind: 'persistentvolumeclaims',
+        items: [boundPvc, unboundPvc],
+      }),
+    ),
+    http.get(
+      '*/api/v1/clusters/1/metrics/pvcs',
+      () => usageGate.then(() => HttpResponse.json(usageResponse())),
+    ),
+  )
+  selectProd()
+  renderAt(<PvcView />)
+
+  // The rows render before the usage resolves: Usage degrades to "—".
+  expect(await screen.findByRole('button', { name: 'data-pvc' })).toBeTruthy()
+  expect(cellOf('data-pvc', 5)).toBe('—')
+  expect(cellOf('unbound-pvc', 5)).toBe('—')
+
+  // The usage resolves late: the cell updates in place (no remount).
+  resolveUsage(undefined)
+  await screen.findAllByText('42.3 %')
+  expect(cellOf('data-pvc', 5)).toBe('42.3 %')
+  expect(cellOf('unbound-pvc', 5)).toBe('—') // still absent from the items
 })
 
 // pvc-list-usage-degrades-to-em-dash — the observed tier never fails the

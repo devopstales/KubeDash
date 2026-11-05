@@ -13,7 +13,6 @@ import { useQuery } from '@tanstack/react-query'
 import { apiFetch } from '../../lib/api'
 import { openObject } from '../../lib/objectRef'
 import type { PersistentVolumeItem, PvcUsage, PvcUsageResponse, ResourceList } from '../../lib/types'
-import { useMemo } from 'react'
 import { useClusterStore } from '../../store/cluster'
 import KubeDataTable, { Column } from '../../components/KubeDataTable'
 import TopMenu from '../../components/TopMenu'
@@ -34,6 +33,15 @@ type PvRow = {
   volumeClaimNamespace: string
   capacity: string
 }
+
+// The table row = the base row + the observed-tier join. The join lives in
+// the ROW, not in a render closure: datatables.net-react binds Column
+// render fns only at table initialisation and re-renders cells only when
+// the data prop changes, so a closure over usageQuery.data would go stale
+// when the usage fetch resolves after the list (cell stuck at "—" until a
+// remount). A freshly joined array per render changes the data prop (the
+// wrapper's redraw), and the render fn stays a pure function of the row.
+type PvTableRow = PvRow & { usage: string | null }
 
 const toRow = (item: PersistentVolumeItem): PvRow => {
   const deleting = Boolean(item.metadata?.deletion_timestamp)
@@ -115,14 +123,19 @@ const PvView = () => {
 
   // The observed tier degrades to unknown, never to a row error (ADR-0003
   // two-tier, client-side): a failed/absent/denied/unavailable usage
-  // response means every Usage cell renders "—".
-  const usageByPvc = useMemo(() => {
-    const map = new Map<string, PvcUsage>()
-    if (usageQuery.data?.metrics_available && !usageQuery.data.metrics_denied) {
-      for (const u of usageQuery.data.items) map.set(u.name, u)
-    }
-    return map
-  }, [usageQuery.data])
+  // response means every Usage cell renders "—". The usage is joined into
+  // the rows on every render (the Nodes.tsx pattern); the fresh array per
+  // render is what changes the data prop and triggers the wrapper's
+  // redraw (see PvTableRow).
+  const usageByPvc = new Map<string, PvcUsage>(
+    usageQuery.data?.metrics_available && !usageQuery.data.metrics_denied
+      ? usageQuery.data.items.map((u) => [u.name, u])
+      : [],
+  )
+  const rows: PvTableRow[] = (query.data ?? []).map((row) => {
+    const u = row.volumeClaim ? usageByPvc.get(row.volumeClaim) : undefined
+    return { ...row, usage: u ? `${u.percentage_used} %` : null }
+  })
 
   // ADR-0040: the cells are buttons (not Links) — openObject writes the
   // ref to sessionStorage and navigates to the target list route; the URL
@@ -198,7 +211,7 @@ const PvView = () => {
         ) : (query.data ?? []).length === 0 ? (
           <div className="text-center text-muted">No persistent volumes found</div>
         ) : (
-          <KubeDataTable data={query.data ?? []}>
+          <KubeDataTable data={rows}>
             <Column title="Status" data="status">
               {(status: unknown) => statusCell(status as string)}
             </Column>
@@ -217,14 +230,11 @@ const PvView = () => {
             <Column title="Capacity" data="capacity">
               {(capacity: unknown) => (capacity ? (capacity as string) : '—')}
             </Column>
-            {/* data={null}: the join needs the claim name (and only bound
-                PVs have one — free PVs render "—", same as the absent-tier). */}
-            <Column title="Usage" data={null}>
-              {(row: unknown) => {
-                const pv = row as PvRow
-                const u = pv.volumeClaim ? usageByPvc.get(pv.volumeClaim) : undefined
-                return u ? `${u.percentage_used} %` : '—'
-              }}
+            {/* The join is in the row (PvTableRow.usage): only bound PVs
+                have a claim to join, so free PVs carry usage: null and
+                render "—", same as the absent-tier. */}
+            <Column title="Usage" data="usage">
+              {(usage: unknown) => (usage ? usage as string : '—')}
             </Column>
           </KubeDataTable>
         )}

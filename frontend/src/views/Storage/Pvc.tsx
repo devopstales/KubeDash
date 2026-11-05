@@ -10,7 +10,6 @@ import {
   CCardTitle,
 } from '@coreui/react'
 import { useQuery } from '@tanstack/react-query'
-import { useMemo } from 'react'
 import { apiFetch } from '../../lib/api'
 import { formatTimestamp } from '../../lib/format'
 import { getActiveRef, openObject } from '../../lib/objectRef'
@@ -33,6 +32,16 @@ type PvcRow = {
   capacity: string
   created: string
 }
+
+// The table row = the base row + the observed-tier/active-ref joins. The
+// join lives in the ROW, not in a render closure, because
+// datatables.net-react binds Column render fns only at table
+// initialisation and re-renders cells only when the data prop changes —
+// a closure over usageQuery.data/selected would go stale the moment the
+// usage fetch resolves after the list (cell stuck at "—" until a remount).
+// A freshly joined array per render changes the data prop (the wrapper's
+// redraw), and the render fns stay pure functions of the row.
+type PvcTableRow = PvcRow & { usage: string | null; selected: boolean }
 
 const toRow = (item: PvcItem, namespace: string): PvcRow => ({
   name: item.metadata?.name ?? '',
@@ -61,16 +70,16 @@ const statusCell = (phase: string) => {
 // ref to sessionStorage and navigates to the clean list route; the URL
 // never carries object identity (R1). Namespaced: the namespace is carried
 // in the ref, not the URL. The bold is driven by the active ref (R9).
-const nameCell = (row: PvcRow, selected: string | null, navigate: (p: string) => void) =>
+const nameCell = (row: PvcTableRow, navigate: (p: string) => void) =>
   row.name ? (
     <>
       <button
         type="button"
         className={
           'btn btn-link btn-sm p-0 text-primary text-decoration-underline' +
-          (row.name === selected ? ' fw-bold' : '')
+          (row.selected ? ' fw-bold' : '')
         }
-        aria-current={row.name === selected ? 'true' : undefined}
+        aria-current={row.selected ? 'true' : undefined}
         onClick={() => openObject(KIND, row.name, row.namespace, LIST_ROUTE, navigate)}
       >
         {row.name}
@@ -132,14 +141,19 @@ const PvcView = () => {
 
   // The observed tier degrades to unknown, never to a row error (ADR-0003
   // two-tier, client-side): a failed/absent/denied/unavailable usage
-  // response means every Usage cell renders "—".
-  const usageByPvc = useMemo(() => {
-    const map = new Map<string, PvcUsage>()
-    if (usageQuery.data?.metrics_available && !usageQuery.data.metrics_denied) {
-      for (const u of usageQuery.data.items) map.set(u.name, u)
-    }
-    return map
-  }, [usageQuery.data])
+  // response means every Usage cell renders "—". usage + selected are
+  // joined into the rows on every render (the Nodes.tsx pattern); the
+  // fresh array per render is what changes the data prop and triggers
+  // the wrapper's redraw (see PvcTableRow).
+  const usageByPvc = new Map<string, PvcUsage>(
+    usageQuery.data?.metrics_available && !usageQuery.data.metrics_denied
+      ? usageQuery.data.items.map((u) => [u.name, u])
+      : [],
+  )
+  const rows: PvcTableRow[] = (query.data ?? []).map((row) => {
+    const u = usageByPvc.get(row.name)
+    return { ...row, usage: u ? `${u.percentage_used} %` : null, selected: row.name === selected }
+  })
 
   return (
     <CCard className="shadow mb-4">
@@ -164,21 +178,18 @@ const PvcView = () => {
         ) : (query.data ?? []).length === 0 ? (
           <div className="text-center text-muted">No persistent volume claims found</div>
         ) : (
-          <KubeDataTable data={query.data ?? []}>
+          <KubeDataTable data={rows}>
             <Column title="Status" data="phase">
               {(phase: string) => statusCell(phase)}
             </Column>
             <Column title="Name" data={null}>
-              {(row: unknown) => nameCell(row as PvcRow, selected, navigate)}
+              {(row: unknown) => nameCell(row as PvcTableRow, navigate)}
             </Column>
             <Column title="StorageClass" data="storageClass" />
             <Column title="Volume" data="volume" />
             <Column title="Capacity" data="capacity" />
-            <Column title="Usage" data="name">
-              {(name: unknown) => {
-                const u = usageByPvc.get(String(name))
-                return u ? `${u.percentage_used} %` : '—'
-              }}
+            <Column title="Usage" data="usage">
+              {(usage: unknown) => (usage ? usage as string : '—')}
             </Column>
             <Column title="Created" data="created" />
           </KubeDataTable>
