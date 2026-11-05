@@ -40,6 +40,7 @@ from app.core.errors import (
     ClusterNotFoundError,
     ClusterUnreachableError,
 )
+from app.models.cluster import Cluster
 
 # OD-2 frozen form: version byte (cipher/key generation marker), then the
 # 96-bit nonce, then the AES-256-GCM ciphertext (includes the 16-byte tag).
@@ -87,7 +88,7 @@ def decrypt_kubeconfig(enc: bytes) -> bytes:
         raise ValueError("kubeconfig decryption failed") from e
 
 
-def bound_cluster_or_404(user: Any, cluster_id: int) -> Any:
+def bound_cluster_or_404(user: Any, cluster_id: int) -> Cluster:
     """Binding gate shared by the clusters/resources APIs (Task 5 consumes it
     by name).
 
@@ -98,7 +99,6 @@ def bound_cluster_or_404(user: Any, cluster_id: int) -> Any:
     """
     from app.extensions import db
     from app.models.binding import ClusterBinding
-    from app.models.cluster import Cluster
 
     bound = db.session.execute(
         db.select(ClusterBinding)

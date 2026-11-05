@@ -325,8 +325,10 @@ YAML
 # The csi-provisioner creates the PV only after the consumer pod is scheduled
 # (WaitForFirstConsumer), and the kubelet's CSI mount retries until the driver
 # answers — wait on both so a driver failure fails the dev-stack loudly, not
-# as a volume that silently never mounts.
-k -n "$NS" wait --for=condition=Bound pvc/demo-pvc --timeout=120s >/dev/null
+# as a volume that silently never mounts. PVC "Bound" is a PHASE
+# (.status.phase), not a condition — a plain bound PVC has an empty
+# .status.conditions, so --for=condition=Bound would time out forever.
+k -n "$NS" wait --for=jsonpath='{.status.phase}'=Bound pvc/demo-pvc --timeout=120s >/dev/null
 k -n "$NS" wait --for=condition=Ready pod/demo-pvc-consumer --timeout=180s >/dev/null
 
 # 7. RuntimeClass — cluster-scoped (handler "runc" is kind's runtime).
