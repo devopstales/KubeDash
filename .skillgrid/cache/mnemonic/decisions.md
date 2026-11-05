@@ -108,6 +108,10 @@ Fixed Flask-SocketIO test client namespace dispatch for /exec (bugfix)
 
 Fixed ccc index Ollama connection failure (bugfix)
 
+## config/omp-flint-model
+
+Flint model config + VSCode tool set in omp (config)
+
 ## config/poetry-pins-and-test-invocation
 
 Fix stale Poetry pins + src-layout test invocation (discovery)
@@ -627,6 +631,14 @@ trivy_operator.md (discovery)
 ## kubedash-5.0/spec-layout
 
 Split KubeDash 5.0 blueprint into per-phase spec folders (decision)
+
+## kubedash-adr0040-c1-server-session-handoff
+
+kubedash-adr0040-c1-server-session-handoff (decision)
+
+## kubedash-swagger-csp-nonce
+
+kubedash-swagger-csp-nonce (decision)
 
 ## learning/code-intel-tool-comparison
 
