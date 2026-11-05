@@ -76,6 +76,9 @@ def main() -> int:
         for sample in samples:
             if sample["labels"]["severity"] == "_total":
                 sample["value"] = len(vulns)
+        print(f"trivy: {len(vulns)} finding(s) — "
+              + ", ".join(f"{s.lower()}={by_sev[s]}" for s in SEVERITIES if by_sev[s])
+              or "none")
 
     tmp = "/tmp/kubedash-security-results.json"
     with open(tmp, "w", encoding="utf-8") as fh:

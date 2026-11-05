@@ -153,9 +153,11 @@ tasks:
 
   # Internal: install the dev apps into the kind cluster (metrics-server for
   # the dashboard's allocation rollup + metrics degrade path, then Cilium +
-  # Traefik for the e2e ingress). Both are idempotent; each waits for its own
-  # readiness. metrics-server runs first — the dashboard reads metrics.k8s.io
-  # and Cilium/Traefik is independent of it.
+  # Traefik for the e2e ingress, then the csi-hostpath CSI driver so the
+  # demo-pvc reports real usage stats — the local-path hostPath PVs' kubelet
+  # has no GetStats, see dev/csi-hostpath.yaml). All idempotent; each waits
+  # for its own readiness. metrics-server runs first — the dashboard reads
+  # metrics.k8s.io; Cilium/Traefik and csi-hostpath are independent of it.
   _kind-apps:
     internal: true
     cmds:
@@ -163,6 +165,8 @@ tasks:
       - kubectl --context kind-{{.KIND_CLUSTER}} -n kube-system rollout status deploy/metrics-server --timeout=120s
       - kubectl --context kind-{{.KIND_CLUSTER}} wait --for=condition=available apiservice/v1beta1.metrics.k8s.io --timeout=120s
       - bash {{.TASKFILE_DIR}}/dev/cilium-traefik-up.sh
+      - kubectl --context kind-{{.KIND_CLUSTER}} apply --server-side -f {{.TASKFILE_DIR}}/dev/csi-hostpath.yaml
+      - kubectl --context kind-{{.KIND_CLUSTER}} -n default rollout status daemonset/csi-hostpathplugin --timeout=120s
 
   # Internal: dev-stack kind + demo pods (BEFORE the backend). Brings up the
   # kind cluster + metrics-server + Cilium/Traefik and seeds the demo
@@ -479,6 +483,28 @@ tasks:
       E2E_BROWSER_CHANNEL: "chrome"
     cmds:
       - "corepack pnpm exec playwright test e2e/auth-smoke.spec.ts"
+
+  # ---- Security (spec 2026-10-17-test-observability-pipeline R7/R8) ----------
+
+  test-security:
+    desc: "Static security scan: Trivy over the repo (IMAGE=kubedash:ci to scan the built image) + Prometheus push; advisory (CI gates on CRITICAL)"
+    env:
+      SECURITY_IMAGE: ""
+      PROMETHEUS_PUSHGATEWAY_URL: "http://localhost:9091"
+    cmds:
+      - |
+        if [ -n "{{.SECURITY_IMAGE}}" ]; then
+          python3 scripts/collect-security.py --image "{{.SECURITY_IMAGE}}"
+        else
+          python3 scripts/collect-security.py
+        fi
+
+  test-dast:
+    desc: "DAST: authenticated Wapiti scan of the running API (needs task dev-stack); artifact tmp/testing/security-wapiti.json; skipped if the stack or wapiti is missing"
+    env:
+      PROMETHEUS_PUSHGATEWAY_URL: "http://localhost:9091"
+    cmds:
+      - "python3 dev/testing/wapiti-login.py"
 
   # ---- Frontend (offline dev loop, ADR-0020 air-gap) -------------------------
   #
