@@ -50,6 +50,9 @@ class FakeK8s:
         # SAR-denied test asserts it stays empty — the client call was
         # never made).
         self.pvc_ns_calls: list[str | None] = []
+        # Namespaces forwarded to list_persistent_volumes (the claim-ns
+        # filter test asserts the query value was forwarded to the client).
+        self.pv_ns_calls: list[str | None] = []
 
     def create_namespace(self, name: str) -> dict:
         self.created_namespaces.append(name)
@@ -790,6 +793,58 @@ class FakeK8s:
     def get_persistent_volume_claim(self, namespace: str, name: str) -> list[dict]:
         if name == "data-pvc":
             return self.list_persistent_volume_claims(namespace)
+        return []
+
+    def list_persistent_volumes(self, namespace: str | None) -> list[dict]:
+        # Cluster-scoped kind (core v1) with the 4.1 claim-namespace filter
+        # (the real K8sClient.list_persistent_volumes pattern): bound PVs
+        # only for their claim's namespace, free PVs (no claim_ref) always.
+        # The query value is forwarded and recorded (the SAR-denied test
+        # asserts it stays empty — the client call was never made).
+        self.pv_ns_calls.append(namespace)
+        items = [
+            {
+                "metadata": {"name": "pv-a", "creation_timestamp": "2026-01-02T03:04:05Z"},
+                "spec": {
+                    "capacity": {"storage": "10Gi"},
+                    "claim_ref": {"name": "data-pvc", "namespace": "team-a"},
+                    "storage_class_name": "csi-fast",
+                    "access_modes": ["ReadWriteOnce"],
+                    "persistent_volume_reclaim_policy": "Delete",
+                    "volume_mode": "Filesystem",
+                    "csi": {"driver": "csi.example.com", "fs_type": "ext4"},
+                },
+                "status": {"phase": "Bound"},
+            },
+            {
+                "metadata": {"name": "pv-b"},
+                "spec": {
+                    "capacity": {"storage": "5Gi"},
+                    "claim_ref": {"name": "other-pvc", "namespace": "team-b"},
+                },
+                "status": {"phase": "Bound"},
+            },
+            {
+                "metadata": {"name": "pv-free"},
+                "spec": {
+                    "capacity": {"storage": "1Gi"},
+                    "storage_class_name": "csi-fast",
+                    "host_path": {"path": "/var/local-path/pv-free"},
+                },
+                "status": {"phase": "Available"},
+            },
+        ]
+        if namespace is None:
+            return items
+        return [
+            pv
+            for pv in items
+            if (pv["spec"].get("claim_ref") or {}).get("namespace") in (None, namespace)
+        ]
+
+    def get_persistent_volume(self, _namespace: str, name: str) -> list[dict]:
+        if name in ("pv-a", "pv-free"):
+            return [pv for pv in self.list_persistent_volumes(None) if pv["metadata"]["name"] == name]
         return []
 
     def readyz(self) -> bool:
@@ -2001,6 +2056,101 @@ def test_storageclass_kind_singular_rejected(api_client, auth_client) -> None:
     h = {"Authorization": f"Bearer {auth_client.jwt}"}
     _register(api_client, h)
     r = api_client.get("/api/v1/clusters/1/resources/storageclass", headers=h)
+    assert r.status_code == 404
+    assert r.get_json()["error"]["code"] == "RESOURCE_KIND_NOT_SUPPORTED"
+
+
+def test_list_persistentvolumes_200(api_client, auth_client, fake_k8s, monkeypatch) -> None:
+    """[persistentvolumes-list-200] a bound user listing persistentvolumes
+    gets the to_dict items back — the full cluster list (no ?namespace →
+    unfiltered), spec fields (capacity, claim_ref, csi, host_path) intact."""
+    auth_client.login()
+    h = {"Authorization": f"Bearer {auth_client.jwt}"}
+    _register(api_client, h)
+    _allow_sar(monkeypatch)
+    r = api_client.get("/api/v1/clusters/1/resources/persistentvolumes", headers=h)
+    assert r.status_code == 200
+    body = r.get_json()
+    assert body["kind"] == "persistentvolumes"
+    assert [item["metadata"]["name"] for item in body["items"]] == ["pv-a", "pv-b", "pv-free"]
+    [pv_a] = [i for i in body["items"] if i["metadata"]["name"] == "pv-a"]
+    assert pv_a["spec"]["capacity"]["storage"] == "10Gi"
+    assert pv_a["spec"]["claim_ref"] == {"name": "data-pvc", "namespace": "team-a"}
+    assert pv_a["spec"]["csi"]["driver"] == "csi.example.com"
+    assert fake_k8s.pv_ns_calls == [None]  # no query param → None forwarded
+
+
+def test_list_persistentvolumes_claim_namespace_filter(
+    api_client, auth_client, fake_k8s, monkeypatch
+) -> None:
+    """[persistentvolumes-claim-ns-filter] 4.1 parity (bug fixed):
+    ?namespace=team-a keeps the team-a-bound PV and the FREE PV (no
+    claim_ref — 4.1 crashed here and returned a partial list), drops the
+    team-b-bound PV. The query value is forwarded to the client."""
+    auth_client.login()
+    h = {"Authorization": f"Bearer {auth_client.jwt}"}
+    _register(api_client, h)
+    _allow_sar(monkeypatch)
+    r = api_client.get(
+        "/api/v1/clusters/1/resources/persistentvolumes?namespace=team-a", headers=h
+    )
+    assert r.status_code == 200
+    assert [item["metadata"]["name"] for item in r.get_json()["items"]] == ["pv-a", "pv-free"]
+    assert fake_k8s.pv_ns_calls == ["team-a"]
+
+
+def test_list_persistentvolumes_get_by_name(
+    api_client, auth_client, fake_k8s, monkeypatch
+) -> None:
+    """[persistentvolumes-get-by-name] ?name= returns a 0/1-item list
+    (a single read — not 4.1's list-then-filter; the kind is
+    cluster-scoped, so the ?name= namespace default is ignored)."""
+    auth_client.login()
+    h = {"Authorization": f"Bearer {auth_client.jwt}"}
+    _register(api_client, h)
+    _allow_sar(monkeypatch)
+    r = api_client.get("/api/v1/clusters/1/resources/persistentvolumes?name=pv-a", headers=h)
+    assert r.status_code == 200
+    [item] = r.get_json()["items"]
+    assert item["metadata"]["name"] == "pv-a"
+    r = api_client.get("/api/v1/clusters/1/resources/persistentvolumes?name=ghost", headers=h)
+    assert r.status_code == 200
+    assert r.get_json()["items"] == []
+
+
+def test_list_persistentvolumes_sar_denied(api_client, auth_client, fake_k8s, monkeypatch) -> None:
+    """[persistentvolumes-sar-denied] ADR-0004: the SAR is asked BEFORE
+    the read, with the core group (empty string) and namespace None (the
+    cluster-scoped SAR cache key) — a deny short-circuits to 403 and the
+    client call is never made."""
+    auth_client.login()
+    h = {"Authorization": f"Bearer {auth_client.jwt}"}
+    _register(api_client, h)
+    asked = _record_sar(monkeypatch)  # denies every SAR and records calls
+    r = api_client.get("/api/v1/clusters/1/resources/persistentvolumes", headers=h)
+    assert r.status_code == 403
+    assert r.get_json()["error"]["code"] == "RBAC_DENIED"
+    assert ("list", "persistentvolumes", None, None, "") in asked
+    assert fake_k8s.pv_ns_calls == []  # the client call was never made
+
+
+def test_persistentvolumes_binding_404(api_client, auth_client) -> None:
+    """[persistentvolumes-binding-404] an unbound user: the binding gate
+    fails before the SAR, CLUSTER_NOT_FOUND."""
+    auth_client.login()
+    h = {"Authorization": f"Bearer {auth_client.jwt}"}
+    r = api_client.get("/api/v1/clusters/999/resources/persistentvolumes", headers=h)
+    assert r.status_code == 404
+    assert r.get_json()["error"]["code"] == "CLUSTER_NOT_FOUND"
+
+
+def test_persistentvolume_kind_singular_rejected(api_client, auth_client) -> None:
+    """[persistentvolume-kind-singular-rejected] the 4.1 route name
+    (singular) is not a kind — RESOURCE_KIND_NOT_SUPPORTED."""
+    auth_client.login()
+    h = {"Authorization": f"Bearer {auth_client.jwt}"}
+    _register(api_client, h)
+    r = api_client.get("/api/v1/clusters/1/resources/persistentvolume", headers=h)
     assert r.status_code == 404
     assert r.get_json()["error"]["code"] == "RESOURCE_KIND_NOT_SUPPORTED"
 

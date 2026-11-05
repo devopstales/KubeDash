@@ -123,6 +123,11 @@ _KINDS: dict[str, tuple[str, str, str]] = {
     # pvc-views change (list + data views; ADR-0022 placement). The 4.1
     # route name was "pvc"; the API kind is the plural.
     "persistentvolumeclaims": ("list_persistent_volume_claims", "persistentvolumeclaims", ""),
+    # PV (core, cluster-scoped) — the 4.1-parity nav leaf resolved by
+    # 2026-11-05-pv-views (list + data views; ADR-0022 placement). The list
+    # is the cluster list filtered to the selected namespace via claim_ref
+    # (free PVs always visible); 4.1's route name was "pv".
+    "persistentvolumes": ("list_persistent_volumes", "persistentvolumes", ""),
 }
 
 #: kind → K8sClient method for a single-object ``?name=`` lookup
@@ -143,6 +148,7 @@ _GETTERS: dict[str, str] = {
     "volumesnapshotclasses": "get_volume_snapshot_class",
     "volumesnapshots": "get_volume_snapshot",
     "persistentvolumeclaims": "get_persistent_volume_claim",
+    "persistentvolumes": "get_persistent_volume",
 }
 
 

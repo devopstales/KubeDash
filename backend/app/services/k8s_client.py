@@ -166,6 +166,14 @@ def _parse_stats_body(raw: Any) -> dict[str, Any]:
     return parsed
 
 
+def _pv_claim_namespace(pv: dict[str, Any]) -> str | None:
+    """The PV's bound-claim namespace from a ``to_dict`` item, or ``None``
+    for a free PV (no ``spec`` or no ``spec.claim_ref``)."""
+    spec = pv.get("spec") or {}
+    claim_ref = spec.get("claim_ref") or {}
+    return claim_ref.get("namespace")
+
+
 class K8sClient:
     """Per-cluster kubernetes client.
 
@@ -1081,6 +1089,28 @@ class K8sClient:
             raise AssertionError("unreachable") from e
         return [pvc.to_dict() for pvc in resp.items]
 
+    def list_persistent_volumes(self, namespace: str | None) -> list[dict[str, Any]]:
+        """PersistentVolume list in the standard kubernetes dict form
+        (``to_dict``) for the WHOLE cluster (the kind is cluster-scoped),
+        then 4.1's claim-namespace filter: when ``namespace`` is given, a
+        bound PV shows only for its claim's namespace, and a FREE PV
+        (``claim_ref`` None) shows for every namespace. Two recorded 4.1
+        bug fixes (briefing.md): 4.1 crashed on free PVs (the
+        ``claim_ref.namespace`` AttributeError was swallowed by the generic
+        handler, returning a PARTIAL list) and silently skipped hostPath PVs
+        (a stray ``continue``). ``namespace`` None (no query param) returns
+        all PVs unfiltered. A transport ApiException maps to
+        ``ClusterUnreachableError`` (502)."""
+        try:
+            resp = self._v1.list_persistent_volume()
+        except ApiException as e:
+            self._unreachable("list_persistent_volumes", e)
+            raise AssertionError("unreachable") from e
+        items = [pv.to_dict() for pv in resp.items]
+        if namespace is None:
+            return items
+        return [pv for pv in items if _pv_claim_namespace(pv) in (None, namespace)]
+
     def list_secrets(self, namespace: str | None) -> list[dict[str, Any]]:
         """Secret list in the standard kubernetes dict form (``to_dict``)
         without ``data``/``string_data``: values are read one secret at a
@@ -1163,6 +1193,19 @@ class K8sClient:
             if e.status == 404:
                 return []
             self._unreachable("get_persistent_volume_claim", e)
+            raise AssertionError("unreachable") from e
+
+    def get_persistent_volume(self, _namespace: str, name: str) -> list[dict[str, Any]]:
+        """One PersistentVolume as a 0/1-item list; ``[]`` on 404. Any other
+        ApiException maps to ``ClusterUnreachableError`` (502), matching
+        ``get_storage_class``'s transport contract. The kind is
+        cluster-scoped: the namespace is accepted and ignored."""
+        try:
+            return [self._v1.read_persistent_volume(name).to_dict()]
+        except ApiException as e:
+            if e.status == 404:
+                return []
+            self._unreachable("get_persistent_volume", e)
             raise AssertionError("unreachable") from e
 
     def list_network_policies(self, namespace: str | None) -> list[dict[str, Any]]:
