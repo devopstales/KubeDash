@@ -75,6 +75,8 @@ const VolumeSnapshotView = React.lazy(() => import('./views/Storage/VolumeSnapsh
 const VolumeSnapshotDataView = React.lazy(() => import('./views/Storage/VolumeSnapshotData'))
 const PvcView = React.lazy(() => import('./views/Storage/Pvc'))
 const PvcDataView = React.lazy(() => import('./views/Storage/PvcData'))
+const PvView = React.lazy(() => import('./views/Storage/Pv'))
+const PvDataView = React.lazy(() => import('./views/Storage/PvData'))
 const GroupsView = React.lazy(() => import('./views/Groups'))
 const GroupPrivilegesView = React.lazy(() => import('./views/Groups/GroupPrivileges'))
 const GroupPrivilegeEditView = React.lazy(() => import('./views/Groups/GroupPrivilegeEdit'))
@@ -894,6 +896,24 @@ const App = () => {
                             detail={(p) => (
                               <PvcDataView name={p.name} namespace={p.namespace ?? ''} />
                             )}
+                          />
+                        </ProtectedRoute>
+                      }
+                    />
+                    <Route
+                      path="/storage/pv"
+                      element={
+                        <ProtectedRoute>
+                          {/* ADR-0040: ObjectRoute renders the list or the
+                              ref-matched detail on the clean route. First
+                              build of this kind (it was a stub; the /data
+                              URL never shipped) — NO legacy /data route, no
+                              R7 redirect. Cluster-scoped: no namespace. */}
+                          <ObjectRoute
+                            kind="persistentvolume"
+                            listRoute="/storage/pv"
+                            list={<PvView />}
+                            detail={(p) => <PvDataView name={p.name} />}
                           />
                         </ProtectedRoute>
                       }

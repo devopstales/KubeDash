@@ -39,7 +39,6 @@ const SMOKE_STUB_ROUTES: Array<{ path: string; title: string }> = [
   { path: '/workload/replicasets', title: 'ReplicaSets' },
   { path: '/network/service', title: 'Services' },
   { path: '/network/ingress', title: 'Ingress' },
-  { path: '/storage/pv', title: 'Volumes' },
   { path: '/security/network-policy', title: 'Network Policies' },
   { path: '/other-resource/horizontal-pod-autoscaler', title: 'HPAs' },
   { path: '/other-resource/vertical-pod-autoscaler', title: 'VPAs' },
@@ -84,6 +83,8 @@ const REAL_ROUTES = [
   '/storage/volumesnapshot',
   // VolumeClaims (2026-10-28-pvc-views): real views, not stubs.
   '/storage/pvc',
+  // PersistentVolumes (2026-11-05-pv-views): real views, not stubs.
+  '/storage/pv',
   // Limit Range (2026-10-28-limitrange-views): real views, not stubs.
   '/other-resource/limit-range',
   // Cluster dashboard (2026-10-21-cluster-dashboard): without a selected
