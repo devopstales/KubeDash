@@ -70,6 +70,10 @@ REST fetch rather than a server-side join — was ratified with the user on
   `kubectl.kubernetes.io/last-applied-configuration` from the annotations
   table; 5.0 renders annotations verbatim (the kubectl noise is in the JSON
   block either way, and 5.0 has no trim helper).
+  **OVERRIDE 2026-11-05 (user decision):** the trim is now replicated — the
+  two machine-managed keys are dropped from the annotations table (the
+  2026-11-04 HPA override shape, 46929a10; 2026-11-05-pv-views companion
+  fix).
 
 ## Navigation Superseded (2026-10-29)
 

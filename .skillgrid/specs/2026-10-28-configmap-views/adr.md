@@ -72,6 +72,10 @@ payload read.
   last-applied-configuration) — ConfigMap data is lower-sensitivity than a
   Secret, and the brief's certainty rule is "render verbatim, the JSON block
   has the full object."
+  **OVERRIDE 2026-11-05 (user decision):** the trim is now replicated — the
+  two machine-managed keys are dropped from the annotations table (the
+  2026-11-04 HPA override shape, 46929a10; 2026-11-05-pv-views companion
+  fix).
 - **The data page's "Lables" typo is not replicated** — 4.1's
   `configmap-data.html.j2` line 70 says `Lables:`; 5.0 renders `Labels`.
 
