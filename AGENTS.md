@@ -157,7 +157,7 @@ This project uses Mnemonic persistent memory (per-project SQLite store). Memory
 supplements the repo — when a memory and a committed artifact disagree, **the
 committed artifact wins** (repo is the source of truth).
 
-**Session protocol (every session):**
+**At the beginning of each conversation in this project (every session):**
 
 1. `mem_session_start` once, before first project work.
 2. **Recall before you work:** `mem_context(limit: 5)` for recent session
