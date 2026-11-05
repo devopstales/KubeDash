@@ -127,6 +127,33 @@ const pvDel = {
   status: { phase: 'Terminating' },
 }
 
+// /metrics/pvcs response (the PVC list's observed tier — the PV Usage
+// column joins this by claim name).
+const usageResponse = (overrides: Record<string, unknown> = {}) => ({
+  cluster: 'prod',
+  namespace: 'team-a',
+  source: 'kubelet stats/summary',
+  metrics_available: true,
+  metrics_denied: false,
+  items: [
+    {
+      name: 'data-pvc',
+      capacity_bytes: 10737418240,
+      used_bytes: 4543730954,
+      available_bytes: 6193687286,
+      percentage_used: 42.3,
+    },
+  ],
+  ...overrides,
+})
+
+// Columns: Status(0) / Name(1) / StorageClass(2) / VolumeClaim(3) /
+// Capacity(4) / Usage(5) — same shape as pvcs.test.tsx's cellOf.
+const cellOf = (name: string, idx: number): string | null => {
+  const row = screen.queryByRole('button', { name })?.closest('tr')
+  return row?.children[idx]?.textContent ?? null
+}
+
 test('click-name-renders-detail-with-clean-url', async () => {
   const user = userEvent.setup()
   selectProd()
@@ -165,13 +192,15 @@ test('list-renders-pvs-with-claim-ns-param', async () => {
   )
   // card title: EXACT string (the e2e smoke asserts it with exact: true).
   expect(screen.getByRole('heading', { name: 'Persistent Volume List' })).toBeTruthy()
-  // columns: 4.1's order (Status, Name, StorageClass, VolumeClaim, Capacity).
+  // columns: 4.1's order (Status, Name, StorageClass, VolumeClaim,
+  // Capacity) + the 5.0 Usage addition (the PVC list's observed tier).
   expect(screen.getAllByRole('columnheader').map((th) => th.textContent)).toEqual([
     'Status',
     'Name',
     'StorageClass',
     'VolumeClaim',
     'Capacity',
+    'Usage',
   ])
   // row pv-a: Bound success badge, linked storage class + claim, capacity.
   expect(screen.getByText('Bound')).toBeTruthy()
@@ -208,10 +237,12 @@ test('list-free-pv-dashes', async () => {
   renderAt(<PvView />)
 
   // A free PV (no claim_ref, no storage_class_name) renders — in both
-  // linked cells (certainty rule: never guess); capacity still renders.
+  // linked cells AND the Usage cell (free PVs have no claim to join the
+  // observed tier against — certainty rule: never guess); capacity still
+  // renders.
   const freeRow = (await screen.findByRole('button', { name: 'pv-free' })).closest('tr')
   const dashes = freeRow ? (freeRow.textContent?.match(/—/g) ?? []).length : 0
-  expect(dashes).toBe(2)
+  expect(dashes).toBe(3)
   expect(freeRow?.textContent).toContain('1Gi')
 })
 
@@ -271,4 +302,84 @@ test('list-empty-state', async () => {
   selectProd()
   renderAt(<PvView />)
   expect(await screen.findByText('No persistent volumes found')).toBeTruthy()
+})
+
+// pv-list-usage-join — the Usage column joins /metrics/pvcs by claim name
+// (the claim-ns filter means every bound PV shown is bound in the
+// selected namespace); a free PV renders "—".
+test('list-usage-join', async () => {
+  server.use(
+    http.get('*/api/v1/clusters/1/resources/persistentvolumes', () =>
+      HttpResponse.json({ kind: 'persistentvolumes', cluster: 'prod', items: [pvA, pvFree] }),
+    ),
+    http.get('*/api/v1/clusters/1/metrics/pvcs', ({ request }) => {
+      const u = new URL(request.url)
+      // The usage fetch carries the SAME namespace as the claim filter —
+      // the join is per-ns (the PVC list's contract, mirrored).
+      expect(u.searchParams.get('namespace')).toBe('team-a')
+      return HttpResponse.json(usageResponse())
+    }),
+  )
+  selectProd()
+  renderAt(<PvView />)
+
+  // pv-a is bound to data-pvc, which is in the usage items: one decimal + " %".
+  expect(await screen.findByRole('button', { name: 'pv-a' })).toBeTruthy()
+  expect(cellOf('pv-a', 5)).toBe('42.3 %')
+  // pv-free has no claim_ref: "—".
+  expect(await screen.findByRole('button', { name: 'pv-free' })).toBeTruthy()
+  expect(cellOf('pv-free', 5)).toBe('—')
+})
+
+// pv-list-usage-degrades-to-em-dash — the observed tier never fails the
+// list: unavailable, denied, or a failed fetch all render "—".
+test('list-usage-unavailable-degrades-to-em-dash', async () => {
+  server.use(
+    http.get('*/api/v1/clusters/1/resources/persistentvolumes', () =>
+      HttpResponse.json({ kind: 'persistentvolumes', items: [pvA] }),
+    ),
+    http.get('*/api/v1/clusters/1/metrics/pvcs', () =>
+      HttpResponse.json(usageResponse({ metrics_available: false, items: [] })),
+    ),
+  )
+  selectProd()
+  renderAt(<PvView />)
+
+  expect(await screen.findByRole('button', { name: 'pv-a' })).toBeTruthy()
+  expect(cellOf('pv-a', 5)).toBe('—')
+})
+
+test('list-usage-denied-degrades-to-em-dash', async () => {
+  server.use(
+    http.get('*/api/v1/clusters/1/resources/persistentvolumes', () =>
+      HttpResponse.json({ kind: 'persistentvolumes', items: [pvA] }),
+    ),
+    http.get('*/api/v1/clusters/1/metrics/pvcs', () =>
+      HttpResponse.json(usageResponse({ metrics_denied: true, items: [] })),
+    ),
+  )
+  selectProd()
+  renderAt(<PvView />)
+
+  expect(await screen.findByRole('button', { name: 'pv-a' })).toBeTruthy()
+  expect(cellOf('pv-a', 5)).toBe('—')
+})
+
+test('list-usage-fetch-fail-degrades-column-not-list', async () => {
+  server.use(
+    http.get('*/api/v1/clusters/1/resources/persistentvolumes', () =>
+      HttpResponse.json({ kind: 'persistentvolumes', items: [pvA] }),
+    ),
+    http.get('*/api/v1/clusters/1/metrics/pvcs', () =>
+      HttpResponse.json({ error: { code: 'CLUSTER_UNREACHABLE', message: 'stats down' } }, { status: 502 }),
+    ),
+  )
+  selectProd()
+  renderAt(<PvView />)
+
+  // The list STILL renders its row; the Usage column degrades to "—"
+  // (the usage query's error never surfaces as a list error).
+  expect(await screen.findByRole('button', { name: 'pv-a' })).toBeTruthy()
+  expect(cellOf('pv-a', 5)).toBe('—')
+  expect(screen.queryByText(/Error loading persistent volumes/)).toBeNull()
 })

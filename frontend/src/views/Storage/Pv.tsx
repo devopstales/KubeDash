@@ -12,7 +12,8 @@ import {
 import { useQuery } from '@tanstack/react-query'
 import { apiFetch } from '../../lib/api'
 import { openObject } from '../../lib/objectRef'
-import type { PersistentVolumeItem, ResourceList } from '../../lib/types'
+import type { PersistentVolumeItem, PvcUsage, PvcUsageResponse, ResourceList } from '../../lib/types'
+import { useMemo } from 'react'
 import { useClusterStore } from '../../store/cluster'
 import KubeDataTable, { Column } from '../../components/KubeDataTable'
 import TopMenu from '../../components/TopMenu'
@@ -65,9 +66,14 @@ const statusCell = (phase: string) => {
  * is EXACTLY "Persistent Volume List": the e2e smoke (ui-smoke.spec.ts)
  * asserts that string with exact: true. The StorageClass/VolumeClaim cells
  * are ADR-0040 object refs (cross-kind opens; the claim ref carries the
- * claim's own namespace, R8). Placement under Storage is a ratified
- * deviation (ADR-0022, 4.1's own template lived in storage/); 4.1's
- * hidden-form + session navigation is the ratified deviation (briefing.md).
+ * claim's own namespace, R8). The Usage column is a 5.0 addition (4.1's PV
+ * view had no usage): the PVC list's observed tier — a second parallel
+ * fetch on /metrics/pvcs joined by claim name (the claim-ns filter means
+ * every bound PV shown is bound in the selected namespace); free PVs and
+ * every ADR-0003 degrade render "—". Placement under Storage is a
+ * ratified deviation (ADR-0022, 4.1's own template lived in storage/);
+ * 4.1's hidden-form + session navigation is the ratified deviation
+ * (briefing.md).
  */
 const PvView = () => {
   const cluster = useClusterStore((s) => s.selectedCluster)
@@ -87,6 +93,36 @@ const PvView = () => {
       return (r.data?.items ?? []).map(toRow)
     },
   })
+
+  // The Usage column's second fetch: the SAME observed tier as the PVC
+  // list — KUBELET stats/summary via /metrics/pvcs (not metrics.k8s.io).
+  // The list's claim-namespace filter means every bound PV shown here is
+  // bound to a claim IN the selected namespace, so the PVC usage map
+  // answers the join (by claim name). Same query key as PvcView: the
+  // cache is shared, so navigating pvc → pv reuses the scan. Its
+  // error/loading state NEVER surfaces as a list error (ADR-0003).
+  const usageQuery = useQuery<PvcUsageResponse>({
+    queryKey: ['pvc-usage', cluster?.id, namespace],
+    enabled: cluster != null,
+    queryFn: async () => {
+      const r = await apiFetch<PvcUsageResponse>(
+        `/api/v1/clusters/${cluster!.id}/metrics/pvcs?namespace=${encodeURIComponent(namespace)}`,
+      )
+      if (r.error) throw new Error(`${r.error.code}: ${r.error.message}`)
+      return r.data as PvcUsageResponse
+    },
+  })
+
+  // The observed tier degrades to unknown, never to a row error (ADR-0003
+  // two-tier, client-side): a failed/absent/denied/unavailable usage
+  // response means every Usage cell renders "—".
+  const usageByPvc = useMemo(() => {
+    const map = new Map<string, PvcUsage>()
+    if (usageQuery.data?.metrics_available && !usageQuery.data.metrics_denied) {
+      for (const u of usageQuery.data.items) map.set(u.name, u)
+    }
+    return map
+  }, [usageQuery.data])
 
   // ADR-0040: the cells are buttons (not Links) — openObject writes the
   // ref to sessionStorage and navigates to the target list route; the URL
@@ -178,6 +214,15 @@ const PvView = () => {
             </Column>
             <Column title="Capacity" data="capacity">
               {(capacity: unknown) => (capacity ? (capacity as string) : '—')}
+            </Column>
+            {/* data={null}: the join needs the claim name (and only bound
+                PVs have one — free PVs render "—", same as the absent-tier). */}
+            <Column title="Usage" data={null}>
+              {(row: unknown) => {
+                const pv = row as PvRow
+                const u = pv.volumeClaim ? usageByPvc.get(pv.volumeClaim) : undefined
+                return u ? `${u.percentage_used} %` : '—'
+              }}
             </Column>
           </KubeDataTable>
         )}
