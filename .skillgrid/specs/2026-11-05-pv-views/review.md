@@ -215,3 +215,35 @@ remain the pre-review record):
   in-flight gateway-api commits).
 - `task e2e` (auth-smoke + ui-smoke vs the dev stack): **19/19**, now
   including the `/storage/pv` exact-title assertion.
+
+## Post-review bug fix (2026-11-05, user-reported, pre-ship)
+
+**Symptom:** PVC list (and PV list) Usage column stuck at "—" on first
+visit; populated only after navigating away and back (remount).
+
+**Root cause:** `datatables.net-react` binds Column render fns to the
+table instance only at initialisation and re-renders cells only when
+the `data` prop changes. The Usage cell's render fn closed over
+`usageQuery.data`'s Map — captured empty at table init. When the usage
+fetch (kubelet fan-out) resolved after the list (informer cache),
+`query.data`'s reference never changed → no redraw → "—" until
+remount. The vitest fake KubeDataTable masked it: it re-rendered cells
+from the CURRENT children, not the captured render fns.
+
+**Fix:** `500e13e4` — join usage (PVC: the active-ref selected bold
+too) into the rows on every render (the Nodes.tsx pattern); render fns
+are pure functions of the row. The pvcs/pvs fakes now replicate the
+init-time capture; new
+`list-usage-late-resolution-updates-in-place` regression tests in both
+files fail against the old code, pass against the fix.
+
+**Floor (post-fix):** storage test files 27/27; vitest full — same
+377+/12 as the W007 baseline above (no new failures); `task fe-build`
++ `task fe-sync` green; `task e2e` 19/19; verified live in the browser
+(fresh load, no cache: demo-pvc Usage 26.1% on `/storage/pvc` and
+`/storage/pv`).
+
+Related pre-ship fix: `8822c410` — sidebar nav clicks clear the active
+object ref (a nav click to a list route while a detail was open
+re-rendered the detail instead of the list); regression test in
+`tests/nav.test.tsx`.
