@@ -2038,7 +2038,9 @@ def test_list_storageclasses_sar_denied(api_client, auth_client, fake_k8s, monke
     r = api_client.get("/api/v1/clusters/1/resources/storageclasses", headers=h)
     assert r.status_code == 403
     assert r.get_json()["error"]["code"] == "RBAC_DENIED"
-    assert ("list", "storageclasses", None, None, "") in asked
+    # StorageClass is storage.k8s.io (NOT core "") — a core-group SAR never
+    # matches a storage.k8s.io grant (2026-11-05 three-axis review fix).
+    assert ("list", "storageclasses", None, None, "storage.k8s.io") in asked
 
 
 def test_storageclasses_binding_404(api_client, auth_client) -> None:
@@ -2118,6 +2120,25 @@ def test_list_persistentvolumes_get_by_name(
     r = api_client.get("/api/v1/clusters/1/resources/persistentvolumes?name=ghost", headers=h)
     assert r.status_code == 200
     assert r.get_json()["items"] == []
+
+
+def test_list_persistentvolumes_get_by_name_sar_denied(
+    api_client, auth_client, fake_k8s, monkeypatch
+) -> None:
+    """[persistentvolumes-get-by-name] ADR-0004 (scenario block 3): a GET
+    on ?name= asks the ``get`` SAR (core group; cluster-scoped, so the
+    namespace default is "default") BEFORE the read — a deny short-
+    circuits to a 403 naming the persistentvolumes resource and the client
+    call is never made."""
+    auth_client.login()
+    h = {"Authorization": f"Bearer {auth_client.jwt}"}
+    _register(api_client, h)
+    asked = _record_sar(monkeypatch)  # denies every SAR and records calls
+    r = api_client.get("/api/v1/clusters/1/resources/persistentvolumes?name=pv-a", headers=h)
+    assert r.status_code == 403
+    assert r.get_json()["error"]["code"] == "RBAC_DENIED"
+    assert ("get", "persistentvolumes", "default", "pv-a", "") in asked
+    assert fake_k8s.pv_ns_calls == []  # the client call was never made
 
 
 def test_list_persistentvolumes_sar_denied(api_client, auth_client, fake_k8s, monkeypatch) -> None:

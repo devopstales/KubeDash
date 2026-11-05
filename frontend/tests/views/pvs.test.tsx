@@ -9,6 +9,8 @@ import { server } from '../msw'
 import { getActiveRef } from '../../src/lib/objectRef'
 import ObjectRoute from '../../src/components/ObjectRoute'
 import PvView from '../../src/views/Storage/Pv'
+import PvcView from '../../src/views/Storage/Pvc'
+import PvcDataView from '../../src/views/Storage/PvcData'
 import { useClusterStore } from '../../src/store/cluster'
 
 // Same KubeDataTable fake as storage_classes.test.tsx: renders the real row
@@ -125,6 +127,23 @@ const pvDel = {
   ...pvA,
   metadata: { name: 'pv-del', deletion_timestamp: '2026-01-03T04:05:06Z' },
   status: { phase: 'Terminating' },
+}
+
+// The claim the pvA row points at (the consumer-side test's detail fetch).
+const pvcData = {
+  metadata: {
+    name: 'data-pvc',
+    namespace: 'team-a',
+    creation_timestamp: '2026-01-02T03:04:05Z',
+  },
+  spec: {
+    access_modes: ['ReadWriteOnce'],
+    volume_mode: 'Filesystem',
+    storage_class_name: 'csi-fast',
+    volume_name: 'pv-a',
+    resources: { requests: { storage: '10Gi' } },
+  },
+  status: { phase: 'Bound', capacity: { storage: '10Gi' } },
 }
 
 // /metrics/pvcs response (the PVC list's observed tier — the PV Usage
@@ -274,9 +293,70 @@ test('volumeclaim-cell-opens-pvc-ref-with-claim-ns', async () => {
   )
   renderAt(<PvView />)
   await user.click(await screen.findByRole('button', { name: 'data-pvc' }))
-  expect(getActiveRef()?.kind).toBe('persistentvolumeclaim')
+  // The ref kind is the TARGET route's registry kind ('pvc' — App.tsx
+  // ObjectRoute kind="pvc"), not the k8s resource name: ObjectRoute
+  // matches ref.kind === kind verbatim (R6).
+  expect(getActiveRef()?.kind).toBe('pvc')
   expect(getActiveRef()?.name).toBe('data-pvc')
   expect(getActiveRef()?.namespace).toBe('team-a')
+})
+
+// The consumer side of the PV→PVC cross-kind contract (the emit-side test
+// above pins only the ref the cell writes): with BOTH routes wired as in
+// App.tsx, clicking the claim cell navigates to /storage/pvc and the PVC
+// route's ObjectRoute (kind="pvc") renders the claim's DETAIL — not the
+// PVC list (R6).
+test('volumeclaim-cell-opens-pvc-detail', async () => {
+  const user = userEvent.setup()
+  selectProd()
+  server.use(
+    http.get('*/api/v1/clusters/1/resources/persistentvolumes*', () =>
+      HttpResponse.json({ items: [pvA] }),
+    ),
+    http.get(
+      '*/api/v1/clusters/1/resources/persistentvolumeclaims?name=data-pvc&namespace=team-a',
+      () => HttpResponse.json({ items: [pvcData] }),
+    ),
+  )
+  const qc = new QueryClient({ defaultOptions: { queries: { retry: false } } })
+  render(
+    <QueryClientProvider client={qc}>
+      <MemoryRouter initialEntries={['/storage/pv']}>
+        <Routes>
+          <Route
+            path="/storage/pv"
+            element={
+              <ObjectRoute
+                kind="persistentvolume"
+                listRoute="/storage/pv"
+                list={<PvView />}
+                detail={(p) => (<div>pv-detail:{p.name}</div>)}
+              />
+            }
+          />
+          <Route
+            path="/storage/pvc"
+            element={
+              <ObjectRoute
+                kind="pvc"
+                listRoute="/storage/pvc"
+                list={<PvcView />}
+                detail={(p) => (<PvcDataView name={p.name} namespace={p.namespace ?? ''} />)}
+              />
+            }
+          />
+        </Routes>
+      </MemoryRouter>
+    </QueryClientProvider>,
+  )
+  await user.click(await screen.findByRole('button', { name: 'data-pvc' }))
+  // The detail renders: the card title is detail-only, and the 'Status:'
+  // row label (with colon) is the detail CTable's — the list's table
+  // header is 'Status' (no colon), so neither appears when the list
+  // renders. Before the kind fix, the kind mismatch fell through to the
+  // list and the detail title never appeared.
+  await screen.findByText('Persistent Volume Claim Data')
+  expect(screen.getByText('Status:')).toBeTruthy()
 })
 
 test('list-no-cluster-state', async () => {

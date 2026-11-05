@@ -215,6 +215,32 @@ def test_pvc_usage_skips_unhealthy_nodes() -> None:
     assert items[0]["name"] == "data-pvc"
 
 
+def test_pvc_usage_malformed_body_skips_node() -> None:
+    """[pvc-usage-partial-nodes] a node whose stats BODY does not aggregate
+    (non-numeric ``capacityBytes``) is skipped the same way a failed stats
+    CALL is — never raised (the observed tier declares only 404/502,
+    ADR-0003); the healthy nodes still aggregate."""
+    bad = json.dumps(
+        {
+            "pods": [
+                {
+                    "volume": [
+                        {
+                            "pvcRef": {"name": "bad-pvc", "namespace": "team-a"},
+                            "capacityBytes": "not-a-number",
+                            "usedBytes": "1",
+                            "availableBytes": "1",
+                        }
+                    ]
+                }
+            ]
+        }
+    )
+    available, items = _stats_client({"n1": _STATS_A, "bad": bad}).pvc_usage("team-a")
+    assert available is True
+    assert [item["name"] for item in items] == ["data-pvc"]
+
+
 def test_pvc_usage_all_nodes_unhealthy_is_empty() -> None:
     """[pvc-usage-kubelet-degrade] zero healthy nodes → ``(False, [])`` —
     the ADR-0003 query-only degrade, never an exception."""

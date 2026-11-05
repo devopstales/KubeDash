@@ -251,6 +251,26 @@ test.describe.serial('KubeDash UI smoke (local admin)', () => {
       await expect(page.locator('aside, nav, .sidebar, .c-sidebar').first()).toBeVisible({
         timeout: 15_000,
       })
+      if (path === '/storage/pv') {
+        // pv-stub-removed-real-route: the real view's card title EXACT —
+        // 'Persistent Volume List' (the stub's title was different; the
+        // blueprint verification floor pins this title). The list renders
+        // a no-cluster state without a selected cluster, so seed the
+        // persisted kd-cluster-scope store from the registry (idempotent)
+        // and reload — the store hydrates on page load.
+        const clBody = await (await page.request.get('/api/v1/clusters')).json()
+        const cluster = (clBody.items ?? clBody)[0]
+        await page.evaluate((c) => {
+          localStorage.setItem(
+            'kd-cluster-scope',
+            JSON.stringify({ state: { selectedCluster: c, selectedNamespace: null }, version: 0 }),
+          )
+        }, cluster)
+        await page.goto(path)
+        await expect(
+          page.getByRole('heading', { name: 'Persistent Volume List', exact: true }).first(),
+        ).toBeVisible({ timeout: 20_000 })
+      }
     }
 
     const fatal = fatalErrors(errors)
