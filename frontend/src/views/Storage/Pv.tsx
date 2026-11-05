@@ -161,7 +161,9 @@ const PvView = () => {
         className="btn btn-link btn-sm p-0 text-primary text-decoration-underline"
         onClick={() =>
           openObject(
-            'persistentvolumeclaim',
+            // The target route's registry kind (App.tsx: ObjectRoute
+            // kind="pvc") — ObjectRoute matches ref.kind === kind verbatim.
+            'pvc',
             row.volumeClaim,
             row.volumeClaimNamespace,
             '/storage/pvc',

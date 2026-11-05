@@ -48,8 +48,10 @@ const statusCell = (phase?: string) => {
  * `?name=&namespace=` fetch (not 4.1's list-then-filter); empty `items` is
  * a not-found STATE (pinned copy), not an error. 4.1 deviations (recorded
  * in the change's adr.md): the full-object block is JSON (truthful
- * classifier), 4.1's "Lables" typo is NOT replicated, and
- * `trimAnnotations` is NOT replicated (annotations render verbatim).
+ * classifier), 4.1's "Lables" typo is NOT replicated. `trimAnnotations`
+ * IS replicated (2026-11-05 user request, overriding the 2026-10-28
+ * "render verbatim" deviation — the override note is in the change's
+ * adr.md).
  */
 // ADR-0040: identity arrives as props from ObjectRoute (the active ref),
 // never from useSearchParams — the URL stays clean (R1). The namespace is

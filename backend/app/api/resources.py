@@ -70,10 +70,12 @@ _KINDS: dict[str, tuple[str, str, str]] = {
     # RuntimeClass (node.k8s.io, cluster-scoped) — the 4.1-parity nav leaf
     # resolved by TASK-046 (list + data views; ADR-0022 placement).
     "runtimeclasses": ("list_runtime_classes", "runtimeclasses", "node.k8s.io"),
-    # StorageClass (storage/v1, cluster-scoped) — the 4.1-parity nav leaf
-    # resolved by TASK-052 (list + data views; ADR-0022 placement). The 4.1
-    # route name was singular; the API kind is the plural.
-    "storageclasses": ("list_storage_classes", "storageclasses", ""),
+    # StorageClass (storage.k8s.io/v1, cluster-scoped) — the 4.1-parity nav
+    # leaf resolved by TASK-052 (list + data views; ADR-0022 placement).
+    # The 4.1 route name was singular; the API kind is the plural. The SAR
+    # group is storage.k8s.io (NOT core ""): a core-group SAR never matches
+    # a storage.k8s.io grant (2026-11-05 three-axis review fix).
+    "storageclasses": ("list_storage_classes", "storageclasses", "storage.k8s.io"),
     # ResourceQuota (core, namespaced) — the 4.1-parity nav leaf resolved by
     # TASK-047 (list + data views; ADR-0022 placement). The 4.1 route name was
     # singular; the API kind is the plural.

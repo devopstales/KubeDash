@@ -55,7 +55,9 @@ const readyCell = (ready: boolean | undefined) =>
  * deviations (briefing.md): the full-object block is JSON (truthful
  * classifier), NOT a YAML dump; the deep-index fields (Source /
  * SnapshotClass / Restore Size) render "—" when absent (4.1's KeyError-500
- * fix); trimAnnotations is NOT replicated (annotations render verbatim).
+ * fix); trimAnnotations IS replicated (2026-11-05 user request,
+ * overriding the 2026-10-28 "render verbatim" deviation — the override
+ * note is in the change's adr.md).
  */
 // ADR-0040: identity arrives as props from ObjectRoute (the active ref),
 // never from useSearchParams — the URL stays clean (R1). The namespace is

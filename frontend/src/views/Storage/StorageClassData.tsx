@@ -41,7 +41,9 @@ const NOT_FOUND = 'not found'
  * namespace param. Empty `items` is a not-found STATE (pinned copy), not
  * an error. 4.1 deviations (briefing.md): the "Binding Mode" label renders
  * as `Volume Binding Mode` (the 4.1 list header, kept verbatim);
- * trimAnnotations is not replicated (annotations render verbatim).
+ * trimAnnotations IS replicated (2026-11-05 user request, overriding the
+ * 2026-10-28 "render verbatim" deviation — the override note is in the
+ * change's adr.md).
  */
 // ADR-0040: identity arrives as props from ObjectRoute (the active ref),
 // never from useSearchParams — the URL stays clean (R1). This kind was a

@@ -39,8 +39,9 @@ const NOT_FOUND = 'not found'
  * (not 4.1's list-then-filter); the kind is cluster-scoped, so the URL
  * carries no namespace param. Empty `items` is a not-found STATE (pinned
  * copy — this is ALSO the CRD-absent state), not an error. 4.1 deviations
- * (briefing.md): trimAnnotations is not replicated (annotations render
- * verbatim).
+ * (briefing.md): trimAnnotations IS replicated (2026-11-05 user request,
+ * overriding the 2026-10-28 "render verbatim" deviation — the override
+ * note is in the change's adr.md).
  */
 // ADR-0040: identity arrives as props from ObjectRoute (the active ref),
 // never from useSearchParams — the URL stays clean (R1). This kind was a
