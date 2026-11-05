@@ -94,6 +94,18 @@ _KINDS: dict[str, tuple[str, str, str]] = {
     # state).
     "gatewayclasses": ("list_gateway_classes", "gatewayclasses", "gateway.networking.k8s.io"),
 
+    # Gateways (gateway.networking.k8s.io, namespaced CRD) — the
+    # ingress-gateway-api-views change (list + data views; ADR-0022 placement).
+    "gateways": ("list_gateways", "gateways", "gateway.networking.k8s.io"),
+
+    # HTTPRoutes (gateway.networking.k8s.io, namespaced CRD) — the
+    # ingress-gateway-api-views change (list + data views; ADR-0022 placement).
+    "httproutes": ("list_http_routes", "httproutes", "gateway.networking.k8s.io"),
+
+    # ReferenceGrants (gateway.networking.k8s.io, cluster-scoped CRD) — the
+    # ingress-gateway-api-views change (list + data views; ADR-0022 placement).
+    "referencegrants": ("list_reference_grants", "referencegrants", "gateway.networking.k8s.io"),
+
     "verticalpodautoscalers": (
         "list_vertical_pod_autoscalers",
         "verticalpodautoscalers",
@@ -161,6 +173,9 @@ _GETTERS: dict[str, str] = {
     # ingressclass-gatewayclass-views change (list + data views; ADR-0022
     # placement).
     "gatewayclasses": "get_gateway_class",
+    "gateways": "get_gateway",
+    "httproutes": "get_http_route",
+    "referencegrants": "get_reference_grant",
     "ingresses": "get_ingress",
 
     "priorityclasses": "get_priority_class",

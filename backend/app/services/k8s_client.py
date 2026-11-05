@@ -840,6 +840,159 @@ class K8sClient:
         item = self._crd_body(item)
         return [item.to_dict() if hasattr(item, "to_dict") else item]
 
+    def list_gateways(self, namespace: str | None) -> list[dict[str, Any]]:
+        """Gateway items, FULL custom-object shape (spec + status intact,
+        camelCase — the wire form). Namespaced: the namespace is honored
+        (``None`` spans all namespaces, the all-namespaces branch); a
+        cluster-scoped kind ignores it. The CRD read is ``None`` (absent) ->
+        ``[]`` (the expected state); any other read failure ->
+        ``ClusterUnreachableError`` (502)."""
+        served = self.get_crd_served(self._GATEWAY_API_GROUP, "gateways")
+        if served is None:
+            return []
+        version, scope = served
+        custom = self._custom()
+        try:
+            resp = (
+                custom.list_namespaced_custom_object(
+                    self._GATEWAY_API_GROUP, version, namespace, "gateways"
+                )
+                if namespace and scope == "Namespaced"
+                else custom.list_cluster_custom_object(
+                    self._GATEWAY_API_GROUP, version, "gateways"
+                )
+            )
+        except ApiException as e:
+            self._unreachable("list_gateways", e)
+            raise AssertionError("unreachable") from e
+        body = self._crd_body(resp)
+        items = body.get("items", [])
+        return [item.to_dict() if hasattr(item, "to_dict") else item for item in items]
+
+    def get_gateway(self, namespace: str, name: str) -> list[dict[str, Any]]:
+        """One Gateway as a 0/1-item FULL custom object; ``[]`` on 404 or when
+        the CRD is absent (the optional-Gateway-API state). Any other ApiException
+        maps to ``ClusterUnreachableError`` (502), matching ``get_gateway_class``."""
+        served = self.get_crd_served(self._GATEWAY_API_GROUP, "gateways")
+        if served is None:
+            return []
+        version, _scope = served
+        custom = self._custom()
+        try:
+            item = (
+                custom.get_namespaced_custom_object(
+                    self._GATEWAY_API_GROUP, version, namespace, "gateways", name
+                )
+                if namespace
+                else custom.get_cluster_custom_object(
+                    self._GATEWAY_API_GROUP, version, "gateways", name
+                )
+            )
+        except ApiException as e:
+            if e.status == 404:
+                return []
+            self._unreachable("get_gateway", e)
+            raise AssertionError("unreachable") from e
+        item = self._crd_body(item)
+        return [item.to_dict() if hasattr(item, "to_dict") else item]
+
+    def list_http_routes(self, namespace: str | None) -> list[dict[str, Any]]:
+        """HTTPRoute items, FULL custom-object shape (spec + status intact,
+        camelCase). Namespaced: the namespace is honored; CRD absent -> ``[]``
+        (the expected state); other failures -> ``ClusterUnreachableError``
+        (502)."""
+        served = self.get_crd_served(self._GATEWAY_API_GROUP, "httproutes")
+        if served is None:
+            return []
+        version, scope = served
+        custom = self._custom()
+        try:
+            resp = (
+                custom.list_namespaced_custom_object(
+                    self._GATEWAY_API_GROUP, version, namespace, "httproutes"
+                )
+                if namespace and scope == "Namespaced"
+                else custom.list_cluster_custom_object(
+                    self._GATEWAY_API_GROUP, version, "httproutes"
+                )
+            )
+        except ApiException as e:
+            self._unreachable("list_http_routes", e)
+            raise AssertionError("unreachable") from e
+        body = self._crd_body(resp)
+        items = body.get("items", [])
+        return [item.to_dict() if hasattr(item, "to_dict") else item for item in items]
+
+    def get_http_route(self, namespace: str, name: str) -> list[dict[str, Any]]:
+        """One HTTPRoute as a 0/1-item FULL custom object; ``[]`` on 404 or when
+        the CRD is absent. Any other ApiException maps to
+        ``ClusterUnreachableError`` (502), matching ``get_gateway``."""
+        served = self.get_crd_served(self._GATEWAY_API_GROUP, "httproutes")
+        if served is None:
+            return []
+        version, _scope = served
+        custom = self._custom()
+        try:
+            item = (
+                custom.get_namespaced_custom_object(
+                    self._GATEWAY_API_GROUP, version, namespace, "httproutes", name
+                )
+                if namespace
+                else custom.get_cluster_custom_object(
+                    self._GATEWAY_API_GROUP, version, "httproutes", name
+                )
+            )
+        except ApiException as e:
+            if e.status == 404:
+                return []
+            self._unreachable("get_http_route", e)
+            raise AssertionError("unreachable") from e
+        item = self._crd_body(item)
+        return [item.to_dict() if hasattr(item, "to_dict") else item]
+
+    def list_reference_grants(self, namespace: str | None) -> list[dict[str, Any]]:
+        """ReferenceGrant items, FULL custom-object shape (spec intact,
+        camelCase). Cluster-scoped: the namespace argument is accepted and
+        ignored; CRD absent -> ``[]`` (the expected state); other failures ->
+        ``ClusterUnreachableError`` (502)."""
+        served = self.get_crd_served(self._GATEWAY_API_GROUP, "referencegrants")
+        if served is None:
+            return []
+        version, _scope = served
+        custom = self._custom()
+        try:
+            resp = custom.list_cluster_custom_object(
+                self._GATEWAY_API_GROUP, version, "referencegrants"
+            )
+        except ApiException as e:
+            self._unreachable("list_reference_grants", e)
+            raise AssertionError("unreachable") from e
+        body = self._crd_body(resp)
+        items = body.get("items", [])
+        return [item.to_dict() if hasattr(item, "to_dict") else item for item in items]
+
+    def get_reference_grant(self, namespace: str, name: str) -> list[dict[str, Any]]:
+        """One ReferenceGrant as a 0/1-item FULL custom object; ``[]`` on 404 or
+        when the CRD is absent. Any other ApiException maps to
+        ``ClusterUnreachableError`` (502), matching ``get_gateway``."""
+        served = self.get_crd_served(self._GATEWAY_API_GROUP, "referencegrants")
+        if served is None:
+            return []
+        version, _scope = served
+        custom = self._custom()
+        try:
+            item = custom.get_cluster_custom_object(
+                self._GATEWAY_API_GROUP, version, "referencegrants", name
+            )
+        except ApiException as e:
+            if e.status == 404:
+                return []
+            self._unreachable("get_reference_grant", e)
+            raise AssertionError("unreachable") from e
+        item = self._crd_body(item)
+        return [item.to_dict() if hasattr(item, "to_dict") else item]
+
+
     def list_cilium_network_policies(self, namespace: str | None) -> list[dict[str, Any]]:
         """CiliumNetworkPolicy items, full to_dict() shape (spec intact).
         CRD absent -> [] (expected state); other failures -> 502 via
