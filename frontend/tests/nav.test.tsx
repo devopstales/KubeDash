@@ -1,7 +1,8 @@
 import { render, screen } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query'
-import { MemoryRouter } from 'react-router-dom'
+import { MemoryRouter, Route, Routes, useLocation, useNavigate } from 'react-router-dom'
+import { useEffect, useMemo, useReducer, useRef } from 'react'
 import { http, HttpResponse } from 'msw'
 import { beforeEach, describe, expect, test } from 'vitest'
 import { server } from './msw'
@@ -10,6 +11,11 @@ import { useClusterStore } from '../src/store/cluster'
 import { useSidebarStore } from '../src/store/sidebar'
 import AppHeader from '../src/components/AppHeader'
 import AppSidebar from '../src/components/AppSidebar'
+import { AppSidebarNav } from '../src/components/AppSidebarNav'
+import NetworkPolicyView from '../src/views/Security/NetworkPolicy'
+import NetworkPolicyDataView from '../src/views/Security/NetworkPolicyData'
+import { registerNavigate } from '../src/components/ObjectRoute'
+import { getActiveRef, readRegistry, setActiveRef, writeRegistry } from '../src/lib/objectRef'
 
 function flat(items: NavItem[]): { name: string; to?: string }[] {
   return items.flatMap((item) =>
@@ -82,6 +88,32 @@ const banned = [
   'Trivy Operator',
   'Applications',
 ]
+
+// Mirrors App.tsx's NetworkPolicyRoute dispatcher (ADR-0040 TICKET-03): the
+// clean list route renders the list, or the ref-matched object detail.
+const NavPolicyRoute = () => {
+  const location = useLocation()
+  const navigate = useNavigate()
+  const [, bump] = useReducer((c: number) => c + 1, 0)
+  const ref = useMemo(() => getActiveRef(), [location, bump])
+  const isPolicy =
+    ref !== null &&
+    (ref.kind === 'NetworkPolicy' ||
+      ref.kind === 'CiliumNetworkPolicy' ||
+      ref.kind === 'CiliumClusterwideNetworkPolicy')
+  const seamRef = useRef(navigate)
+  seamRef.current = navigate
+  useEffect(() => {
+    registerNavigate((path: string) => {
+      seamRef.current(path)
+      bump()
+    })
+  }, [])
+  if (!isPolicy) return <NetworkPolicyView />
+  return (
+    <NetworkPolicyDataView name={ref!.name} kind={ref!.kind} namespace={ref!.namespace ?? ''} />
+  )
+}
 
 describe('navigation contract', () => {
   test('menu-matches-4-1-without-plugins', () => {
@@ -201,6 +233,77 @@ describe('rendered sidebar', () => {
     expect(await screen.findByText('Beta')).toBeTruthy()
     expect(screen.getByRole('link', { name: /Cluster Metrics/ })).toBeTruthy()
     expect(screen.queryByText('Beta', { selector: 'a[href="/clusters"] *' })).toBeNull()
+  })
+
+  test('nav-click-to-list-route-clears-open-ref-and-renders-list', async () => {
+    // Regression (2026-11-05): a sidebar nav click must land on the target
+    // list. The nav handler clears the open-object ref before the router
+    // navigates; the clean list route then re-reads the (now-null) ref and
+    // renders the list instead of re-rendering the open object detail.
+    const denyAll = {
+      apiVersion: 'networking.k8s.io/v1',
+      kind: 'NetworkPolicy',
+      metadata: {
+        name: 'deny-all',
+        namespace: 'team-a',
+        creation_timestamp: '2026-10-26T10:00:00Z',
+        labels: { app: 'web' },
+      },
+      spec: {
+        pod_selector: { match_labels: { app: 'web' } },
+        policy_types: ['Ingress', 'Egress'],
+        ingress: [{ from: [] }],
+        egress: [],
+      },
+    }
+    server.use(
+      http.get('*/api/v1/clusters/1/resources/networkpolicies', () =>
+        HttpResponse.json({ kind: 'networkpolicies', cluster: 'prod', items: [denyAll] }),
+      ),
+      http.get('*/api/v1/clusters/1/resources/ciliumnetworkpolicies', () =>
+        HttpResponse.json({ kind: 'ciliumnetworkpolicies', cluster: 'prod', items: [] }),
+      ),
+      http.get('*/api/v1/clusters/1/resources/ciliumclusterwidenetworkpolicies', () =>
+        HttpResponse.json({ kind: 'ciliumclusterwidenetworkpolicies', cluster: 'prod', items: [] }),
+      ),
+    )
+    const token = 'nav-list-clear-token'
+    writeRegistry({
+      [token]: {
+        kind: 'NetworkPolicy',
+        name: 'deny-all',
+        namespace: 'team-a',
+        ts: Date.now(),
+        origin: 'click',
+      },
+    })
+    setActiveRef(token)
+    useClusterStore.setState({
+      selectedCluster: { id: 1, name: 'prod' },
+      selectedNamespace: 'team-a',
+    })
+
+    const qc = new QueryClient({ defaultOptions: { queries: { retry: false } } })
+    const user = userEvent.setup()
+    render(
+      <QueryClientProvider client={qc}>
+        <MemoryRouter initialEntries={['/security/network-policy']}>
+          <AppSidebarNav items={navigation({ clusterId: 1, isAdmin: true })} />
+          <Routes>
+            <Route path="/security/network-policy" element={<NavPolicyRoute />} />
+          </Routes>
+        </MemoryRouter>
+      </QueryClientProvider>,
+    )
+
+    expect(await screen.findByText('Network Policy Data', { selector: 'h5' })).toBeTruthy()
+    const navLink = screen
+      .getAllByRole('link', { name: 'Network Policies' })
+      .find((l) => l.getAttribute('href') === '/security/network-policy')
+    expect(navLink).toBeTruthy()
+    await user.click(navLink!)
+    expect(sessionStorage.getItem('kd_object_active')).toBeNull()
+    expect(await screen.findByText('Network Policies', { selector: 'h5' })).toBeTruthy()
   })
 
   test('settings-is-in-the-sidebar', async () => {

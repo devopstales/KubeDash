@@ -6,6 +6,8 @@ import SimpleBar from 'simplebar-react'
 import 'simplebar-react/dist/simplebar.min.css'
 
 import { CBadge, CNavLink, CSidebarNav } from '@coreui/react'
+import CIcon from '@coreui/icons-react'
+import { clearActiveRef } from '../lib/objectRef'
 
 export const AppSidebarNav = ({ items }) => {
   const navLink = (name, icon, badge, indent = false) => {
@@ -31,6 +33,12 @@ export const AppSidebarNav = ({ items }) => {
   const navItem = (item, index, indent = false) => {
     const { component, name, badge, icon, ...rest } = item
     const Component = component
+    // Internal nav clicks are list navigation (ADR-0022/ADR-0040): clear the
+    // open-object ref so the target list renders. Mirrors the detail views'
+    // back affordance (breadcrumb list item) — without this, a client-side
+    // navigate to the same clean list route re-reads the still-active ref and
+    // re-renders the object detail instead of the list.
+    const clearOnNavigate = Boolean(rest.to)
     return (
       <Component as="div" key={index}>
         {rest.to || rest.href ? (
@@ -38,6 +46,7 @@ export const AppSidebarNav = ({ items }) => {
             {...(rest.to && { as: NavLink })}
             {...(rest.href && { target: '_blank', rel: 'noopener noreferrer' })}
             {...rest}
+            onClick={clearOnNavigate ? clearActiveRef : undefined}
           >
             {navLink(name, icon, badge, indent)}
           </CNavLink>
