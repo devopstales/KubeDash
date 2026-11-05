@@ -21,6 +21,7 @@ def register_apis(app: Flask, api: Api) -> None:
     from app.api.auth import AuthApi
     from app.api.clusters import ClusterApi
     from app.api.events import EventsApi
+    from app.api.gateway_api import GatewayApi
     from app.api.groups import GroupsApi
     from app.api.kubeconfig import KubeconfigApi
     from app.api.kubectl_auth import KubectlAuthApi
@@ -44,6 +45,7 @@ def register_apis(app: Flask, api: Api) -> None:
         LogsApi,
         MetricsApi,
         EventsApi,
+        GatewayApi,
         TracesApi,
         AuditApi,
         PermissionsApi,
@@ -75,7 +77,7 @@ def register_apis(app: Flask, api: Api) -> None:
         # The upgrade path is smorest's Api.register (when it ships).
         for endpoint, view_func in list(app.view_functions.items()):
             if endpoint.startswith(f"{name}.") and not hasattr(view_func, "__self__"):
-                method_name = endpoint[len(name) + 1:]
+                method_name = endpoint[len(name) + 1 :]
                 bound = getattr(instance, method_name, None)
                 if bound is not None:
                     app.view_functions[endpoint] = bound

@@ -486,8 +486,9 @@ class K8sClient:
         is zero — the 4.1 division-by-zero guard). The ADR-0003 query-only
         degrade: a node whose stats call fails (404/5xx/timeout — no
         kubelet, stats unavailable) is SKIPPED, never raised; zero healthy
-        nodes → ``(False, [])``. The body is parsed with ``json.loads``
-        (4.1's ``eval`` is not replicated).
+        nodes → ``(False, [])``. The body is parsed by ``_parse_stats_body``
+        (strict JSON first, then the kubernetes client's ``str(dict)`` repr
+        via ``ast.literal_eval`` — 4.1's ``eval`` is not replicated).
         """
         try:
             nodes = self.list_nodes(None)
@@ -506,23 +507,38 @@ class K8sClient:
                     name, path="stats/summary", _request_timeout=2
                 )
                 body = _parse_stats_body(raw)
+                for pod in body.get("pods") or []:
+                    for vol in pod.get("volume") or []:
+                        ref = vol.get("pvcRef")
+                        # A pvcRef without a name cannot join to a PVC (the
+                        # name is the join key) — skip the entry, never raise.
+                        if (
+                            not ref
+                            or not ref.get("name")
+                            or ref.get("namespace") != namespace
+                        ):
+                            continue
+                        # Convert before the merge: a non-numeric byte count
+                        # raises while the node is still unmerged, so the
+                        # skip leaves no partial entry behind.
+                        capacity = int(vol.get("capacityBytes") or 0)
+                        used = int(vol.get("usedBytes") or 0)
+                        available = int(vol.get("availableBytes") or 0)
+                        entry = aggregated.setdefault(
+                            ref["name"],
+                            {"capacity_bytes": 0, "used_bytes": 0, "available_bytes": 0},
+                        )
+                        entry["capacity_bytes"] += capacity
+                        entry["used_bytes"] += used
+                        entry["available_bytes"] += available
             except (ApiException, ValueError, SyntaxError, TypeError, UnicodeDecodeError):
                 # A per-node stats failure is the EXPECTED state (kubelet
                 # absent/down/stats API off) — skip, never raise (ADR-0003).
+                # A malformed body (unparseable, or a non-numeric byte
+                # count) degrades the node the same way: skipped, and not
+                # counted healthy.
                 continue
             healthy += 1
-            for pod in body.get("pods") or []:
-                for vol in pod.get("volume") or []:
-                    ref = vol.get("pvcRef")
-                    if not ref or ref.get("namespace") != namespace:
-                        continue
-                    entry = aggregated.setdefault(
-                        ref["name"],
-                        {"capacity_bytes": 0, "used_bytes": 0, "available_bytes": 0},
-                    )
-                    entry["capacity_bytes"] += int(vol.get("capacityBytes") or 0)
-                    entry["used_bytes"] += int(vol.get("usedBytes") or 0)
-                    entry["available_bytes"] += int(vol.get("availableBytes") or 0)
         items = [
             {
                 **entry,
@@ -1773,6 +1789,54 @@ class K8sClient:
             subjects=[k8s_client.RbacV1Subject(kind=subject_kind, name=subject_user, api_group="")],
         )
         self._apply("cluster_role_binding", name, None, body)
+
+    def apply_objects(self, namespace: str, objects: list[dict[str, Any]]) -> list[dict[str, Any]]:
+        """Generic apply: ONE per-object result list (create / 409 → patch).
+
+        Idempotent get-or-create per object through the CustomObjectsApi
+        (create / 409 → patch). Returns the ``applied`` entries
+        (``created`` / ``unchanged``); a per-object ApiException is collected
+        into ``errors`` (partial failure → the caller returns 200 with the
+        errors array).
+        """
+        applied: list[dict[str, Any]] = []
+        errors: list[dict[str, Any]] = []
+        for obj in objects:
+            kind = str(obj.get("kind") or "")
+            api_version = str(obj.get("apiVersion") or "")
+            meta = obj.get("metadata") or {}
+            name = str(meta.get("name") or "")
+            obj_ns = str(meta.get("namespace") or namespace or "default")
+            group, _, version = api_version.partition("/")
+            spec = obj.get("spec") or {}
+            plural = {
+                "GatewayClass": "gatewayclasses",
+                "Gateway": "gateways",
+                "HTTPRoute": "httproutes",
+                "ReferenceGrant": "referencegrants",
+            }.get(kind, kind.lower())
+            cluster_scoped = kind in ("GatewayClass", "ReferenceGrant")
+            custom = self._custom()
+            try:
+                if cluster_scoped:
+                    custom.create_cluster_custom_object(group, version, plural, spec)()
+                else:
+                    custom.create_namespaced_custom_object(group, version, obj_ns, plural, spec)()
+                status = "created"
+                applied.append({"kind": kind, "name": name, "namespace": obj_ns, "status": status})
+            except ApiException as e:
+                if e.status != 409:
+                    errors.append({"kind": kind, "name": name, "message": str(e)})
+                    continue
+                if cluster_scoped:
+                    custom.patch_cluster_custom_object(group, version, plural, name, spec)()
+                else:
+                    custom.patch_namespaced_custom_object(
+                        group, version, obj_ns, plural, name, spec
+                    )()
+                status = "unchanged"
+                applied.append({"kind": kind, "name": name, "namespace": obj_ns, "status": status})
+        return applied
 
     def delete_role_binding(self, namespace: str, name: str) -> None:
         self._delete(
