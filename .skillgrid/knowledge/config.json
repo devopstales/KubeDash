@@ -1,0 +1,14 @@
+{
+  "anchor_engine": "",
+  "page_types": [
+    "decisions",
+    "invariants",
+    "workflows",
+    "architecture",
+    "gotchas",
+    "glossary"
+  ],
+  "project": "kubedash_4",
+  "schema_version": 1,
+  "strict": false
+}
