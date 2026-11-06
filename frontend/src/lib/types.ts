@@ -571,6 +571,37 @@ export interface GatewayClassItem {
   [key: string]: unknown
 }
 
+/** An Ingress item (kubernetes to_dict, snake_case; namespaced, networking.k8s.io/v1). */
+export interface IngressItem {
+  metadata?: {
+    name?: string
+    namespace?: string
+    creation_timestamp?: string
+    labels?: Record<string, string>
+    annotations?: Record<string, string>
+  }
+  spec?: {
+    ingress_class_name?: string
+    tls?: { secret_name?: string; hosts?: string[] }[]
+    rules?: {
+      host?: string
+      http?: {
+        paths?: {
+          path?: string
+          path_type?: string
+          backend?: {
+            service?: {
+              name?: string
+              port?: { number?: number; name?: string }
+            }
+          }
+        }[]
+      }
+    }[]
+  }
+  [key: string]: unknown
+}
+
 /** Closed set for the detail page's ?kind= param (4.1 parity). */
 export const POLICY_KINDS = ['NetworkPolicy', 'CiliumNetworkPolicy', 'CiliumClusterwideNetworkPolicy'] as const
 export type PolicyKind = (typeof POLICY_KINDS)[number]
