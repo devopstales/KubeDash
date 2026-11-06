@@ -195,6 +195,12 @@ in_flight:
     phase: research
   - change: 2026-11-06-change-timeline
     phase: research
+  # 4.1-base workload map + radar-informed connections/network-policy
+  # overlay (user request 2026-11-06; sources: networkpolicy.io editor
+  # example, oslabs-beta/navigate, alfiyansys/scope). findings.md +
+  # briefing.md written; next: blueprint (renderer ADR first).
+  - change: 2026-11-06-workload-map
+    phase: spec
 completed_changes:
   - 2026-10-17-kubedash-base-structure
   - 2026-10-17-swagger-ui-air-gap
