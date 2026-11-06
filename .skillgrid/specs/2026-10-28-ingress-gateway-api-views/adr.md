@@ -74,9 +74,38 @@ cluster state).
   (the `01-install-*`, `02-install-*`, verify script, cleanup).
 - **`trimAnnotations` is NOT replicated** — annotations render verbatim (the
   JSON block has the full object, and 5.0 has no trim helper).
+  **OVERRIDE 2026-11-05 (user decision, the storage-batch T2):** the trim IS
+  now replicated — the two machine-managed keys
+  (`kubectl.kubernetes.io/last-applied-configuration`,
+  `autoscaling.alpha.kubernetes.io/conditions`) are dropped from the rendered
+  annotations tables (the HPA view already trims, 46929a10; the JSON block
+  still renders the full object).
 - **No per-request `_request_timeout=1`.** 4.1 passed a 1-second timeout to
   `list_namespaced_ingress`; 5.0's client uses the pool's configured timeout.
 
 ## Navigation Superseded (2026-10-29)
 
 The query-param navigation clause in this ADR (Deviations; Decision Context) is **SUPERSEDED (2026-10-29)** by `2026-10-29-session-object-navigation` (ADR-0040, proposed): object identity lives in tab-private `sessionStorage`; list rows open the detail via `setObjectRef(...)` or a same-origin form POST; no `/data` route suffix; no object identity in the URL. See `NAVIGATION-SUPERSEDED.md` in this folder. The backend REST `?name=`/`?namespace=` filtering params are unchanged.
+
+## Execution Notes (2026-11-06)
+
+The frontend executed per the 2026-10-29 session-object-navigation contract
+(the blueprint's `/.../data?name=&namespace=&kind=` route shape is not
+built):
+
+- ONE clean route per kind — `/network/ingress` (an `ObjectRoute`, registry
+  kind `ingress`) and `/network/gateway-api` (a multi-kind dispatcher in the
+  `NetworkPolicyRoute` pattern, registry kinds `gateway` / `httproute` /
+  `referencegrant`, rendered as a four-tab page with the GatewayClasses tab
+  linking to the standalone `/network/gateway-class` route). NO `/.../data`
+  routes, NO `OldDataRedirect`: `/network/ingress` was a stub (the `/data`
+  URL never shipped) and `/network/gateway-api` is new, so there is no
+  legacy route to redirect.
+- The data views trim machine-managed annotations (the 2026-11-05 T2
+  override recorded in Recorded deviations), not the 2026-10-28 "render
+  verbatim" deviation.
+- The `POST /resources/apply` route (blueprint Task 6) landed with this
+  execution; the `K8sClient.apply_objects` service method (committed
+  earlier, untested) now returns `(applied, errors)` per the blueprint
+  response shape and sends the FULL object (not `spec` alone) to the
+  apiserver.

@@ -91,6 +91,12 @@ PriorityClassData, final review 2026-10-28).
    spec's Gateway Classes tab uses the same); the full timestamp is in the
    data page + JSON block.
 6. **`trimAnnotations` is NOT replicated** — annotations render verbatim.
+   **OVERRIDE 2026-11-05 (user decision, the storage-batch T2):** the trim IS
+   now replicated — the two machine-managed keys
+   (`kubectl.kubernetes.io/last-applied-configuration`,
+   `autoscaling.alpha.kubernetes.io/conditions`) are dropped from the
+   rendered annotations table (the HPA view already trims, 46929a10; the
+   JSON block still renders the full object).
 7. **The 4.1 "Lables" typo is not replicated** — 5.0 renders "Labels".
 8. **The Parameters table renders the `LocalObjectReference` fields
    explicitly** (Kind / Name / API Version), not 4.1's raw dict-key
@@ -108,3 +114,29 @@ PriorityClassData, final review 2026-10-28).
 - The `Ingress` ↔ `IngressClass` deep-link (the companion
   `ingress-gateway-api-views` spec's Ingress list owns that link; this spec
   is the destination).
+
+## Navigation Superseded (2026-10-29)
+
+The query-param navigation clause in this ADR (Deviations #1) is
+**SUPERSEDED (2026-10-29)** by `2026-10-29-session-object-navigation`
+(ADR-0040): object identity lives in tab-private `sessionStorage` (the
+`kd_object_refs` registry + `kd_object_active` pointer); list name cells open
+the detail via `openObject(...)`; the URL never carries object identity. The
+backend REST `?name=` filtering param on
+`/api/v1/clusters/:id/resources/<kind>` is unchanged (GET filtering, not
+navigation).
+
+## Execution Notes (2026-11-06)
+
+The frontend executed per the 2026-10-29 session-object-navigation contract
+(the blueprint's `/.../data?name=` route shape is not built):
+
+- ONE clean route per kind — `/network/ingress-class` and
+  `/network/gateway-class` — each an `ObjectRoute` (list when no active ref,
+  detail when the ref's registry kind matches: `ingressclass` /
+  `gatewayclass`). NO `/.../data` route, NO `OldDataRedirect`: both kinds
+  were unshipped (no 4.1-parity URL and no 5.0 stub ever served a `/data`
+  URL), so there is no legacy route to redirect.
+- The data views trim machine-managed annotations (the 2026-11-05 T2
+  override recorded in Deviations #6), not the 2026-10-28 "render verbatim"
+  deviation.
