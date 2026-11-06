@@ -186,6 +186,15 @@ in_flight:
     # default-ns pod and broke the csi provisioner's API egress —
     # deleted, test pre-clean added. QA 2026-11-05 (storage batch of 5): PASS (qa-report.md in 2026-11-05-pv-views — F1 demo-data.sh PVC wait + F2 lint debt fixed at the gate, ce6d0b19/6368cc8b; floor re-run: unit 648/648, targeted vitest 85/85, e2e 19/19, ruff flat 102, mypy 73<78, dev-stack exit 0). Review 2026-11-05 (three-axis, review.md in this folder): PASS after fixes — 1 CRITICAL (PV→PVC cross-kind ref emitted 'persistentvolumeclaim', the route registry kind is 'pvc'; fixed both call sites + consumer-side regression test + blueprint amended) + 2 spec PARTIALs (PV get-SAR-denial test, e2e exact-title) fixed at the gate; W023 (pvcs fan-out) + W022 (HPA group, cross-change) parked. Awaits ship.
     tracker: [TASK-066]
+  # --- Radar research, 2026-11-06: research-only spec folders (findings.md
+  # written; no briefing yet). Primary sources: skyhook-io/radar README +
+  # docs/mcp.md (per-folder Source Appendix). Next: brainstorming. ---
+  - change: 2026-11-06-mcp-server
+    phase: research
+  - change: 2026-11-06-ai-investigations
+    phase: research
+  - change: 2026-11-06-change-timeline
+    phase: research
 completed_changes:
   - 2026-10-17-kubedash-base-structure
   - 2026-10-17-swagger-ui-air-gap
