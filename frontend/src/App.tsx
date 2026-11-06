@@ -97,6 +97,8 @@ const IngressClassView = React.lazy(() => import('./views/Network/IngressClass')
 const IngressClassDataView = React.lazy(() => import('./views/Network/IngressClassData'))
 const GatewayClassView = React.lazy(() => import('./views/Network/GatewayClass'))
 const GatewayClassDataView = React.lazy(() => import('./views/Network/GatewayClassData'))
+const GatewayApiView = React.lazy(() => import('./views/Network/GatewayApi'))
+const GatewayApiDataView = React.lazy(() => import('./views/Network/GatewayApiData'))
 const GroupsView = React.lazy(() => import('./views/Groups'))
 const GroupPrivilegesView = React.lazy(() => import('./views/Groups/GroupPrivileges'))
 const GroupPrivilegeEditView = React.lazy(() => import('./views/Groups/GroupPrivilegeEdit'))
@@ -161,6 +163,55 @@ export const NetworkPolicyRoute = () => {
   if (!isPolicy) return <NetworkPolicyView />
   return (
     <NetworkPolicyDataView name={ref!.name} kind={ref!.kind} namespace={ref!.namespace ?? ''} />
+  )
+}
+
+/**
+ * ADR-0040 (2026-10-28-ingress-gateway-api-views): the gateway-api list
+ * route dispatches on the active ref's registry kind (gateway / httproute /
+ * referencegrant). One ObjectRoute per kind would render the tabbed list
+ * three times (and register the navigate seam three times), so the
+ * dispatcher holds the single seam + ref read and hands the detail to the
+ * view with its kind; the list renders once. First build of these kinds —
+ * the /data URL never shipped, so there is no R7 redirect (no
+ * OldDataRedirect route).
+ */
+export const GatewayApiRoute = () => {
+  const navigate = useNavigate()
+  // useLocation (NOT the global window.location, which has a stable
+  // identity and would make the memo dep inert): openObject sets the
+  // active pointer then navigates to the SAME list route this component
+  // renders — the router's location object is a fresh instance per
+  // navigation, so the memo re-runs, the ref is re-read and the detail
+  // renders. Mirrors ObjectRoute/NetworkPolicyRoute. The seam bump is the
+  // same backup for a navigate that leaves the location unchanged.
+  const location = useLocation()
+  const [, bump] = React.useReducer((c: number) => c + 1, 0)
+  const ref = React.useMemo(
+    () => getActiveRef(),
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+    [location, bump],
+  )
+  const isGatewayApiKind =
+    ref !== null && (ref.kind === 'gateway' || ref.kind === 'httproute' || ref.kind === 'referencegrant')
+
+  const seamRef = React.useRef(navigate)
+  seamRef.current = navigate
+  React.useEffect(() => {
+    sweepRelay()
+    registerNavigate((path: string) => {
+      seamRef.current(path)
+      bump()
+    })
+  }, [])
+
+  if (!isGatewayApiKind) return <GatewayApiView />
+  return (
+    <GatewayApiDataView
+      name={ref!.name}
+      kind={ref!.kind}
+      namespace={ref!.namespace ?? ''}
+    />
   )
 }
 
@@ -985,6 +1036,22 @@ const App = () => {
                             list={<GatewayClassView />}
                             detail={(p) => <GatewayClassDataView name={p.name} />}
                           />
+                        </ProtectedRoute>
+                      }
+                    />
+                    <Route
+                      path="/network/gateway-api"
+                      element={
+                        <ProtectedRoute>
+                          {/* ADR-0040: the dispatcher (mirrors
+                              NetworkPolicyRoute) renders the tabbed list or
+                              the ref-matched detail for the three Gateway
+                              API kinds (gateway / httproute / referencegrant)
+                              on the clean route. First build of these kinds
+                              — the /data URL never shipped, so there is no
+                              R7 redirect. The GatewayClasses tab dedupes to
+                              the standalone /network/gateway-class view. */}
+                          <GatewayApiRoute />
                         </ProtectedRoute>
                       }
                     />

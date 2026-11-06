@@ -602,6 +602,58 @@ export interface IngressItem {
   [key: string]: unknown
 }
 
+/** A Gateway item (FULL custom object, camelCase; namespaced CRD, gateway.networking.k8s.io/v1). */
+export interface GatewayItem {
+  metadata?: {
+    name?: string
+    namespace?: string
+    creationTimestamp?: string
+    labels?: Record<string, string>
+    annotations?: Record<string, string>
+  }
+  spec?: {
+    gatewayClassName?: string
+    listeners?: { name?: string; protocol?: string; port?: number; hostname?: string }[]
+    addresses?: { type?: string; value?: string }[]
+  }
+  status?: {
+    conditions?: { type?: string; status?: string; reason?: string; message?: string }[]
+  }
+  [key: string]: unknown
+}
+
+/** An HTTPRoute item (FULL custom object, camelCase; namespaced CRD, gateway.networking.k8s.io/v1). */
+export interface HTTPRouteItem {
+  metadata?: {
+    name?: string
+    namespace?: string
+    creationTimestamp?: string
+    labels?: Record<string, string>
+    annotations?: Record<string, string>
+  }
+  spec?: {
+    hostnames?: string[]
+    parentRefs?: { name?: string; namespace?: string; kind?: string; group?: string }[]
+    rules?: unknown[]
+  }
+  [key: string]: unknown
+}
+
+/** A ReferenceGrant item (FULL custom object, camelCase; CLUSTER-scoped CRD, gateway.networking.k8s.io/v1). */
+export interface ReferenceGrantItem {
+  metadata?: {
+    name?: string
+    creationTimestamp?: string
+    labels?: Record<string, string>
+    annotations?: Record<string, string>
+  }
+  spec?: {
+    from?: { group?: string; kind?: string; namespace?: string }[]
+    to?: { group?: string; kind?: string }[]
+  }
+  [key: string]: unknown
+}
+
 /** Closed set for the detail page's ?kind= param (4.1 parity). */
 export const POLICY_KINDS = ['NetworkPolicy', 'CiliumNetworkPolicy', 'CiliumClusterwideNetworkPolicy'] as const
 export type PolicyKind = (typeof POLICY_KINDS)[number]
