@@ -1791,14 +1791,17 @@ class K8sClient:
         )
         self._apply("cluster_role_binding", name, None, body)
 
-    def apply_objects(self, namespace: str, objects: list[dict[str, Any]]) -> list[dict[str, Any]]:
-        """Generic apply: ONE per-object result list (create / 409 → patch).
+    def apply_objects(
+        self, namespace: str, objects: list[dict[str, Any]]
+    ) -> tuple[list[dict[str, Any]], list[dict[str, Any]]]:
+        """Generic apply: per-object results as ``(applied, errors)`` lists
+        (create / 409 → patch).
 
         Idempotent get-or-create per object through the CustomObjectsApi
         (create / 409 → patch). Returns the ``applied`` entries
         (``created`` / ``unchanged``); a per-object ApiException is collected
-        into ``errors`` (partial failure → the caller returns 200 with the
-        errors array).
+        into ``errors`` (partial failure → the route returns 200 with the
+        errors array, not a 500).
         """
         applied: list[dict[str, Any]] = []
         errors: list[dict[str, Any]] = []
@@ -1809,7 +1812,6 @@ class K8sClient:
             name = str(meta.get("name") or "")
             obj_ns = str(meta.get("namespace") or namespace or "default")
             group, _, version = api_version.partition("/")
-            spec = obj.get("spec") or {}
             plural = {
                 "GatewayClass": "gatewayclasses",
                 "Gateway": "gateways",
@@ -1820,9 +1822,12 @@ class K8sClient:
             custom = self._custom()
             try:
                 if cluster_scoped:
-                    custom.create_cluster_custom_object(group, version, plural, spec)()
+                    # WHY full object (not ``spec`` alone): the apiserver
+                    # needs metadata.name (and derives kind/apiVersion from
+                    # the body) on create — a bare spec is rejected.
+                    custom.create_cluster_custom_object(group, version, plural, obj)()
                 else:
-                    custom.create_namespaced_custom_object(group, version, obj_ns, plural, spec)()
+                    custom.create_namespaced_custom_object(group, version, obj_ns, plural, obj)()
                 status = "created"
                 applied.append({"kind": kind, "name": name, "namespace": obj_ns, "status": status})
             except ApiException as e:
@@ -1830,14 +1835,14 @@ class K8sClient:
                     errors.append({"kind": kind, "name": name, "message": str(e)})
                     continue
                 if cluster_scoped:
-                    custom.patch_cluster_custom_object(group, version, plural, name, spec)()
+                    custom.patch_cluster_custom_object(group, version, plural, name, obj)()
                 else:
                     custom.patch_namespaced_custom_object(
-                        group, version, obj_ns, plural, name, spec
+                        group, version, obj_ns, plural, name, obj
                     )()
                 status = "unchanged"
                 applied.append({"kind": kind, "name": name, "namespace": obj_ns, "status": status})
-        return applied
+        return applied, errors
 
     def delete_role_binding(self, namespace: str, name: str) -> None:
         self._delete(

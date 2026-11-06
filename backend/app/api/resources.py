@@ -12,6 +12,7 @@ CLUSTER_NOT_FOUND, which does not distinguish missing cluster from missing
 binding).
 """
 import re
+from typing import cast
 
 from flask import g, request
 from flask_smorest import Api, Blueprint
@@ -27,7 +28,13 @@ from app.core.errors import (
     ResourceKindNotSupportedError,
 )
 from app.core.security import require_admin
-from app.schemas.resource import NamespaceIn, NamespaceMutationOut, ResourceListOut
+from app.schemas.resource import (
+    ApplyIn,
+    ApplyOut,
+    NamespaceIn,
+    NamespaceMutationOut,
+    ResourceListOut,
+)
 from app.services import rbac
 from app.services.k8s_client import pool
 
@@ -35,6 +42,18 @@ _NAMESPACE_NAME = re.compile(r"^[a-z0-9](?:[-a-z0-9]{0,61}[a-z0-9])?$")
 _PROTECTED_NAMESPACES = frozenset(
     {"default", "kube-system", "kube-public", "kube-node-lease"}
 )
+
+# The generic apply's SAR-plural map (R8): the Gateway API kinds the
+# converter emits, pluralized for the ``create`` SAR. Anything else falls
+# back to ``kind.lower()`` (the converter emits no other kind today).
+_APPLY_PLURALS: dict[str, str] = {
+    "GatewayClass": "gatewayclasses",
+    "Gateway": "gateways",
+    "HTTPRoute": "httproutes",
+    "ReferenceGrant": "referencegrants",
+}
+# Cluster-scoped applied kinds gate their SAR on namespace ``None``.
+_APPLY_CLUSTER_SCOPED: frozenset[str] = frozenset({"GatewayClass", "ReferenceGrant"})
 
 #: kind → (K8sClient method, kubernetes resource name, API group)
 _RBAC_GROUP = "rbac.authorization.k8s.io"
@@ -238,6 +257,55 @@ class ResourceApi(Api):
             raise RbacDeniedError(f"list on {api_resource}")
         items = getattr(pool.get(cluster), method)(namespace)
         return {"items": items, "kind": kind, "cluster": cluster.name}
+
+    @blp.route("/clusters/<int:cluster_id>/resources/apply", methods=["POST"])
+    @blp.arguments(ApplyIn)
+    @blp.response(200, ApplyOut)
+    @blp.doc(
+        responses={
+            403: "RBAC_DENIED (create on any object, asked before any apply)",
+            404: "CLUSTER_NOT_FOUND (binding gate)",
+            502: "CLUSTER_UNREACHABLE",
+        }
+    )
+    def apply_objects(self, args: dict[str, object], cluster_id: int) -> dict[str, object]:
+        """Generic apply (R8, the Gateway API converter's Apply button).
+
+        The first generic mutation endpoint (a one-way door — the API was
+        read-only before). Idempotent get-or-create per object.
+
+        ALL-or-NOTHING in the SAR phase (ADR-0004 EXTENDED): a ``create`` SAR
+        is asked for EVERY object BEFORE any object is applied; the first
+        deny 403s ``RBAC_DENIED`` naming the resource, and
+        ``apply_objects`` is never called. After the SAR phase, failure is
+        per-object: the response is 200 with an ``errors`` array (partial
+        failure is NOT a 500 — the UI shows which resources applied).
+        """
+        cluster = _cluster_for(g.current_user, cluster_id)
+        namespace = str(args["namespace"])
+        # Smoarest loads the nested objects as plain dicts (the cast is the
+        # permissions.py pattern for smorest args).
+        objects = cast("list[dict[str, object]]", args["objects"])
+        # Ask every create SAR up front (R8: the apply phase must not start
+        # until ALL objects are authorized — the 403 names the denied
+        # resource so the view can say which grant is missing).
+        for obj in objects:
+            kind = str(obj.get("kind") or "")
+            api_version = str(obj.get("apiVersion") or "")
+            group = api_version.partition("/")[0]
+            resource = _APPLY_PLURALS.get(kind, kind.lower())
+            metadata = cast("dict[str, object] | None", obj.get("metadata")) or {}
+            # Cluster-scoped kinds gate on namespace None (their CRD scope is
+            # the authority); namespaced ones fall back to the request
+            # namespace when the object omits its own.
+            if kind in _APPLY_CLUSTER_SCOPED:
+                ns: str | None = None
+            else:
+                ns = str(metadata.get("namespace") or namespace)
+            if not rbac.can(g.current_user, cluster, "create", resource, ns, None, group):
+                raise RbacDeniedError(f"create on {resource}")
+        applied, errors = pool.get(cluster).apply_objects(namespace, objects)
+        return {"applied": applied, "errors": errors}
 
     @blp.route("/clusters/<int:cluster_id>/resources/crds/instances", methods=["GET"])
     @blp.response(200, ResourceListOut)

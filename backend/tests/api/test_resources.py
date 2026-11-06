@@ -53,6 +53,12 @@ class FakeK8s:
         # Namespaces forwarded to list_persistent_volumes (the claim-ns
         # filter test asserts the query value was forwarded to the client).
         self.pv_ns_calls: list[str | None] = []
+        # Generic apply (POST /resources/apply) state: ``applied_names``
+        # models the get-or-create idempotency (a second apply of the same
+        # name is ``unchanged``); ``apply_fail_names`` models a per-object
+        # transport failure (the partial-failure-200 scenario).
+        self.applied_names: set[str] = set()
+        self.apply_fail_names: set[str] = set()
 
     def create_namespace(self, name: str) -> dict:
         self.created_namespaces.append(name)
@@ -60,6 +66,33 @@ class FakeK8s:
 
     def delete_namespace(self, name: str) -> None:
         self.deleted_namespaces.append(name)
+
+    def apply_objects(
+        self, namespace: str, objects: list[dict]
+    ) -> tuple[list[dict], list[dict]]:
+        """Models the get-or-create: first apply of a name is ``created``,
+        a re-apply is ``unchanged``; a name in ``apply_fail_names`` lands in
+        ``errors`` (the partial-failure scenario)."""
+        applied: list[dict] = []
+        errors: list[dict] = []
+        for obj in objects:
+            kind = obj.get("kind", "")
+            meta = obj.get("metadata") or {}
+            name = meta.get("name", "")
+            if name in self.apply_fail_names:
+                errors.append({"kind": kind, "name": name, "message": f"boom: {name}"})
+                continue
+            status = "unchanged" if name in self.applied_names else "created"
+            self.applied_names.add(name)
+            applied.append(
+                {
+                    "kind": kind,
+                    "name": name,
+                    "namespace": meta.get("namespace") or namespace,
+                    "status": status,
+                }
+            )
+        return applied, errors
 
     def list_namespaces(self, namespace: str | None) -> list[dict]:
         return [
@@ -1310,6 +1343,188 @@ def test_invalid_namespace_name_is_422(
     assert r.status_code == 422
     assert r.get_json()["error"]["code"] == "INVALID_KUBECONFIG"
     assert fake_k8s.created_namespaces == []
+
+
+# --- Generic apply (POST /clusters/<id>/resources/apply) --------------------
+#
+# R8 (the converter's Apply button): the first generic mutation endpoint.
+# ALL-or-NOTHING in the SAR phase (create per object, asked before anything
+# is applied), per-object in the apply phase (partial failure = 200 with an
+# errors array, not a 500).
+
+
+def _apply_objects_body(
+    objects: list[dict[str, object]], namespace: str = "team-a"
+) -> dict[str, object]:
+    return {"namespace": namespace, "objects": objects}
+
+
+def _gateway_object(kind: str, name: str, namespace: str | None = None) -> dict[str, object]:
+    meta: dict[str, object] = {"name": name}
+    if namespace is not None:
+        meta["namespace"] = namespace
+    return {
+        "kind": kind,
+        "apiVersion": "gateway.networking.k8s.io/v1",
+        "metadata": meta,
+        "spec": {},
+    }
+
+
+def _record_allowed_sar(monkeypatch: pytest.MonkeyPatch) -> list[tuple]:
+    """Allow every SAR and record what was asked (the _record_sar twin)."""
+    import app.services.rbac as rb
+
+    asked: list[tuple] = []
+    monkeypatch.setattr(rb, "_cache_get", lambda k: None)
+    monkeypatch.setattr(rb, "_cache_set", lambda k, v: None)
+
+    def allow(client, verb, resource, ns, name, group=""):
+        asked.append((verb, resource, ns, name, group))
+        return True
+
+    monkeypatch.setattr(rb, "_sar_allowed", allow)
+    return asked
+
+
+def test_apply_objects_200_created(api_client, auth_client, fake_k8s, monkeypatch) -> None:
+    """[apply-happy-path] all objects apply -> 200 {applied, errors: []};
+    a create SAR is asked per object (cluster-scoped kinds gate on namespace
+    None) BEFORE any apply."""
+    auth_client.login()
+    h = {"Authorization": f"Bearer {auth_client.jwt}"}
+    _register(api_client, h)
+    asked = _record_allowed_sar(monkeypatch)
+    r = api_client.post(
+        "/api/v1/clusters/1/resources/apply",
+        json=_apply_objects_body(
+            [
+                _gateway_object("GatewayClass", "eg"),
+                _gateway_object("Gateway", "web", "team-a"),
+                _gateway_object("HTTPRoute", "web-route", "team-a"),
+                _gateway_object("ReferenceGrant", "eg-rg"),
+            ]
+        ),
+        headers=h,
+    )
+    assert r.status_code == 200
+    body = r.get_json()
+    assert body["errors"] == []
+    assert [a["name"] for a in body["applied"]] == ["eg", "web", "web-route", "eg-rg"]
+    assert all(a["status"] == "created" for a in body["applied"])
+    assert asked == [
+        ("create", "gatewayclasses", None, None, "gateway.networking.k8s.io"),
+        ("create", "gateways", "team-a", None, "gateway.networking.k8s.io"),
+        ("create", "httproutes", "team-a", None, "gateway.networking.k8s.io"),
+        ("create", "referencegrants", None, None, "gateway.networking.k8s.io"),
+    ]
+
+
+def test_apply_idempotent_second_call_unchanged(
+    api_client, auth_client, fake_k8s, monkeypatch
+) -> None:
+    """[apply-idempotent] re-applying the same objects is a no-op: the
+    second call reports ``unchanged`` (get-or-create)."""
+    auth_client.login()
+    h = {"Authorization": f"Bearer {auth_client.jwt}"}
+    _register(api_client, h)
+    _allow_sar(monkeypatch)
+    body = _apply_objects_body(
+        [
+            _gateway_object("Gateway", "web", "team-a"),
+            _gateway_object("HTTPRoute", "web-route", "team-a"),
+        ]
+    )
+    r1 = api_client.post("/api/v1/clusters/1/resources/apply", json=body, headers=h)
+    assert r1.status_code == 200
+    assert all(a["status"] == "created" for a in r1.get_json()["applied"])
+    r2 = api_client.post("/api/v1/clusters/1/resources/apply", json=body, headers=h)
+    assert r2.status_code == 200
+    assert r2.get_json()["errors"] == []
+    assert all(a["status"] == "unchanged" for a in r2.get_json()["applied"])
+
+
+def test_apply_sar_denied_is_atomic_before_apply(
+    api_client, auth_client, fake_k8s, monkeypatch
+) -> None:
+    """[apply-sar-denied-atomic] ANY object's create deny -> 403 naming the
+    resource, and ``apply_objects`` is NEVER called (nothing applied)."""
+    auth_client.login()
+    h = {"Authorization": f"Bearer {auth_client.jwt}"}
+    _register(api_client, h)
+    import app.services.rbac as rb
+
+    asked: list[tuple] = []
+
+    def deny_gateways(client, verb, resource, ns, name, group=""):
+        asked.append((verb, resource, ns, name, group))
+        return resource != "gateways"
+
+    monkeypatch.setattr(rb, "_cache_get", lambda k: None)
+    monkeypatch.setattr(rb, "_cache_set", lambda k, v: None)
+    monkeypatch.setattr(rb, "_sar_allowed", deny_gateways)
+    r = api_client.post(
+        "/api/v1/clusters/1/resources/apply",
+        json=_apply_objects_body(
+            [_gateway_object("GatewayClass", "eg"), _gateway_object("Gateway", "web", "team-a")]
+        ),
+        headers=h,
+    )
+    assert r.status_code == 403
+    assert r.get_json()["error"]["code"] == "RBAC_DENIED"
+    assert "gateways" in r.get_json()["error"]["message"]
+    # Both SARs were asked (all-or-nothing), and the apply phase never ran.
+    assert asked == [
+        ("create", "gatewayclasses", None, None, "gateway.networking.k8s.io"),
+        ("create", "gateways", "team-a", None, "gateway.networking.k8s.io"),
+    ]
+    assert fake_k8s.applied_names == set()
+
+
+def test_apply_partial_failure_is_200_with_errors(
+    api_client, auth_client, fake_k8s, monkeypatch
+) -> None:
+    """[apply-partial-failure] one object's transport failure -> 200 with
+    the errors array populated (NOT a 500): the UI shows which resources
+    applied and which failed."""
+    auth_client.login()
+    h = {"Authorization": f"Bearer {auth_client.jwt}"}
+    _register(api_client, h)
+    _allow_sar(monkeypatch)
+    fake_k8s.apply_fail_names.add("bad-route")
+    r = api_client.post(
+        "/api/v1/clusters/1/resources/apply",
+        json=_apply_objects_body(
+            [
+                _gateway_object("Gateway", "web", "team-a"),
+                _gateway_object("HTTPRoute", "bad-route", "team-a"),
+            ]
+        ),
+        headers=h,
+    )
+    assert r.status_code == 200
+    body = r.get_json()
+    assert [a["name"] for a in body["applied"]] == ["web"]
+    assert body["errors"] == [
+        {"kind": "HTTPRoute", "name": "bad-route", "message": "boom: bad-route"}
+    ]
+
+
+def test_apply_unknown_cluster_404(api_client, auth_client, fake_k8s, monkeypatch) -> None:
+    """The binding gate: an unbound/unknown cluster is 404 before any SAR
+    or apply."""
+    auth_client.login()
+    h = {"Authorization": f"Bearer {auth_client.jwt}"}
+    _register(api_client, h)
+    _allow_sar(monkeypatch)
+    r = api_client.post(
+        "/api/v1/clusters/99/resources/apply",
+        json=_apply_objects_body([_gateway_object("Gateway", "web", "team-a")]),
+        headers=h,
+    )
+    assert r.status_code == 404
+    assert r.get_json()["error"]["code"] == "CLUSTER_NOT_FOUND"
+    assert fake_k8s.applied_names == set()
 
 
 def test_list_crds_200_cluster_scoped(api_client, auth_client, fake_k8s, monkeypatch) -> None:
