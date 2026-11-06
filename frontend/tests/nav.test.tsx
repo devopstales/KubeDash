@@ -55,6 +55,8 @@ const adminLabels = [
   'Network',
   'Services',
   'Ingress',
+  'Ingress Class',
+  'Gateway Class',
   'Storage',
   'ConfigMaps',
   'Volumes',

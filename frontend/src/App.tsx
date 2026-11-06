@@ -93,6 +93,10 @@ const PvcView = React.lazy(() => import('./views/Storage/Pvc'))
 const PvcDataView = React.lazy(() => import('./views/Storage/PvcData'))
 const PvView = React.lazy(() => import('./views/Storage/Pv'))
 const PvDataView = React.lazy(() => import('./views/Storage/PvData'))
+const IngressClassView = React.lazy(() => import('./views/Network/IngressClass'))
+const IngressClassDataView = React.lazy(() => import('./views/Network/IngressClassData'))
+const GatewayClassView = React.lazy(() => import('./views/Network/GatewayClass'))
+const GatewayClassDataView = React.lazy(() => import('./views/Network/GatewayClassData'))
 const GroupsView = React.lazy(() => import('./views/Groups'))
 const GroupPrivilegesView = React.lazy(() => import('./views/Groups/GroupPrivileges'))
 const GroupPrivilegeEditView = React.lazy(() => import('./views/Groups/GroupPrivilegeEdit'))
@@ -941,6 +945,45 @@ const App = () => {
                             listRoute="/storage/pv"
                             list={<PvView />}
                             detail={(p) => <PvDataView name={p.name} />}
+                          />
+                        </ProtectedRoute>
+                      }
+                    />
+                    <Route
+                      path="/network/ingress-class"
+                      element={
+                        <ProtectedRoute>
+                          {/* ADR-0040: ObjectRoute renders the list or the
+                              ref-matched detail on the clean route. First
+                              build of this kind (the 2026-10-28
+                              ingressclass-gatewayclass-views spec) — the
+                              /data URL never shipped, so there is no R7
+                              redirect. Cluster-scoped: no namespace. */}
+                          <ObjectRoute
+                            kind="ingressclass"
+                            listRoute="/network/ingress-class"
+                            list={<IngressClassView />}
+                            detail={(p) => <IngressClassDataView name={p.name} />}
+                          />
+                        </ProtectedRoute>
+                      }
+                    />
+                    <Route
+                      path="/network/gateway-class"
+                      element={
+                        <ProtectedRoute>
+                          {/* ADR-0040: ObjectRoute renders the list or the
+                              ref-matched detail on the clean route. First
+                              build of this kind (the 2026-10-28
+                              ingressclass-gatewayclass-views spec) — the
+                              /data URL never shipped, so there is no R7
+                              redirect. Cluster-scoped CRD (VPA seam): no
+                              namespace. */}
+                          <ObjectRoute
+                            kind="gatewayclass"
+                            listRoute="/network/gateway-class"
+                            list={<GatewayClassView />}
+                            detail={(p) => <GatewayClassDataView name={p.name} />}
                           />
                         </ProtectedRoute>
                       }

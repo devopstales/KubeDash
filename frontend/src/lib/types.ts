@@ -538,6 +538,39 @@ export interface PvcUsageResponse {
   items: PvcUsage[]
 }
 
+// --- Network (2026-10-28-ingressclass-gatewayclass-views) — shapes mirror the wire contract ---
+
+/** An IngressClass item (kubernetes to_dict, snake_case; cluster-scoped, networking.k8s.io/v1). */
+export interface IngressClassItem {
+  metadata?: {
+    name?: string
+    creation_timestamp?: string
+    labels?: Record<string, string>
+    annotations?: Record<string, string>
+  }
+  spec?: {
+    controller?: string
+    /** LocalObjectReference — the 4.1 data page's Parameters table. */
+    parameters?: { api_version?: string; kind?: string; name?: string }
+  }
+  [key: string]: unknown
+}
+
+/** A GatewayClass item (FULL custom object, camelCase; cluster-scoped CRD, gateway.networking.k8s.io/v1). */
+export interface GatewayClassItem {
+  metadata?: {
+    name?: string
+    creationTimestamp?: string
+    labels?: Record<string, string>
+    annotations?: Record<string, string>
+  }
+  spec?: { controllerName?: string }
+  status?: {
+    conditions?: { type?: string; status?: string; reason?: string; message?: string }[]
+  }
+  [key: string]: unknown
+}
+
 /** Closed set for the detail page's ?kind= param (4.1 parity). */
 export const POLICY_KINDS = ['NetworkPolicy', 'CiliumNetworkPolicy', 'CiliumClusterwideNetworkPolicy'] as const
 export type PolicyKind = (typeof POLICY_KINDS)[number]

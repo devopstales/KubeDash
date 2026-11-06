@@ -94,6 +94,8 @@ export function navigation(input: { clusterId: number | null; isAdmin: boolean }
     group('Network', cilLan, [
       leaf('Services', '/network/service'),
       leaf('Ingress', '/network/ingress'),
+      leaf('Ingress Class', '/network/ingress-class'),
+      leaf('Gateway Class', '/network/gateway-class'),
     ]),
     group('Storage', cilStorage, [
       leaf('ConfigMaps', '/storage/configmap'),
