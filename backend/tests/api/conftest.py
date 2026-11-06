@@ -214,10 +214,11 @@ def _jwt_of(api_client) -> str:
     """Replay the login flow and return the access JWT from the callback's
     HttpOnly cookie (ADR-0025 — no credential in the redirect URL)."""
     r1 = api_client.post("/api/v1/auth/login")
-    cb = r1.headers["Location"]
-    q = parse_qs(urlparse(cb).query)
-    state = q["state"][0]
-    r2 = api_client.get(f"{cb}&code={MockOIDC.CODE}&state={state}")
+    # login's 302 goes straight to the IdP authorize URL; the mock records
+    # the state in its query. The IdP then replies to OUR callback with
+    # code+state — that hop is built explicitly.
+    state = parse_qs(urlparse(r1.headers["Location"]).query)["state"][0]
+    r2 = api_client.get(f"/api/v1/auth/callback?code={MockOIDC.CODE}&state={state}")
     assert r2.status_code == 302
     cookie = api_client.get_cookie("kd_access")
     assert cookie is not None
@@ -232,9 +233,10 @@ def auth_client(api_client, mock_oidc):
     def login() -> None:
         r1 = api_client.post("/api/v1/auth/login")
         assert r1.status_code == 302
-        cb = r1.headers["Location"]
-        state = parse_qs(urlparse(cb).query)["state"][0]
-        r2 = api_client.get(f"{cb}&code={mock_oidc.CODE}&state={state}")
+        # The 302 target is the IdP authorize URL (state in its query); the
+        # IdP→callback hop is built explicitly with the mock's fixed code.
+        state = parse_qs(urlparse(r1.headers["Location"]).query)["state"][0]
+        r2 = api_client.get(f"/api/v1/auth/callback?code={mock_oidc.CODE}&state={state}")
         assert r2.status_code == 302
         # ADR-0025 door check: the redirect carries no credential, and the
         # cookie jar holds the issued pair. The local route mirrors this.

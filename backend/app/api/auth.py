@@ -109,12 +109,21 @@ class AuthApi(Api):
         # skips /api/v1/auth/*, so auth needs no opt-out flag here.
         pass
 
-    @blp.route("/auth/login", methods=["POST"])
-    @blp.doc(description="Start OIDC login: 302 to /v1/auth/callback?state=<s>&next=<idp>")
+    # GET is the browser path: the login page's SSO button is a full document
+    # navigation (window.location.assign) and the 302 IS the response. POST is
+    # kept for programmatic clients. The SPA catch-all (GET+POST) only ever
+    # sees this path when it falls off the API — a GET-only registration made
+    # the catch-all answer 404 to the button's navigation.
+    @blp.route("/auth/login", methods=["GET", "POST"])
+    @blp.doc(description="Start OIDC login: 302 to the IdP authorize URL (opaque state)")
     def login(self) -> object:
+        # Straight to the IdP: the authorize URL carries only the opaque
+        # state, and the IdP answers by redirecting back to /auth/callback
+        # (its redirect_uri). The old `callback?state&next=<idp>` hop sent
+        # the browser to the callback WITHOUT a code → 400, so the flow died
+        # on the first hop.
         state = new_state()
-        idp_url = security.oidc_authorize_url(state)
-        return redirect(f"/api/v1/auth/callback?state={state}&next={idp_url}")
+        return redirect(security.oidc_authorize_url(state))
 
     @blp.route("/auth/callback", methods=["GET"])
     @blp.doc(responses={

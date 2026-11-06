@@ -27,7 +27,7 @@ from typing import Any
 
 import jwt
 from authlib.integrations.flask_client import OAuth
-from flask import Response, current_app, g, request
+from flask import Response, current_app, g, request, url_for
 
 from app.core.config import get_settings
 from app.core.errors import RbacDeniedError, StateMismatchError, UnauthorizedError
@@ -77,14 +77,35 @@ def init_oidc(app: object) -> None:
 
 
 def oidc_authorize_url(state: str) -> str:
-    """Real adapter: the IdP authorize URL carrying our opaque ``state``."""
-    app = _oidc_client.authorize_redirect(state=state)
-    return str(app.get("url") or f"{get_settings().oidc_issuer}/authorize?state={state}")
+    """Real adapter: the IdP authorize URL carrying our opaque ``state``.
+
+    authlib's Flask integration answers ``authorize_redirect`` with a
+    redirect *Response* (the authorize URL is its ``Location``) — not a dict
+    with a ``url`` key. Reading ``resp.headers["Location"]`` is the seam
+    contract; the mock tier patches this whole function."""
+    # redirect_uri is the callback's ABSOLUTE url derived from the request's
+    # Host — a static value would break whichever hostname the browser used
+    # (kubedash.dev.local vs localhost). The IdP (and the dev mock) replies
+    # to exactly this URI.
+    resp = _oidc_client.authorize_redirect(
+        state=state, redirect_uri=url_for("api.auth.callback", _external=True)
+    )
+    return str(
+        resp.headers.get("Location")
+        or f"{get_settings().oidc_issuer}/authorize?state={state}"
+    )
 
 
 def oidc_exchange(code: str) -> dict[str, Any]:
-    """Real adapter: code → token → userinfo. Returns {sub, email, name, groups}."""
-    token = _oidc_client.authorize_access_token(code=code)
+    """Real adapter: code → token → userinfo. Returns {sub, email, name, groups}.
+
+    authlib's ``authorize_access_token`` reads ``code`` from the callback's
+    query string itself and restores the authorization request's
+    ``redirect_uri`` from the session state data saved by
+    ``authorize_redirect`` — passing EITHER as a kwarg collides (TypeError:
+    multiple values for that keyword). ``code`` stays in the seam signature
+    for the mock tier."""
+    token = _oidc_client.authorize_access_token()
     userinfo = token.get("userinfo") or _oidc_client.parse_id_token(token["id_token"])
     return {
         "sub": userinfo["sub"],

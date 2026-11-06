@@ -15,12 +15,13 @@ Endpoints:
   GET  /authorize                         — redirect to /login or issue code
   GET  /login                             — HTML form (pick a user)
   POST /login                             — issue code + redirect to callback
-  GET  /token                             — code → access_token + id_token
+  GET|POST /token                         — code → access_token + id_token
   GET  /userinfo                          — access_token → claims
 """
 
 from __future__ import annotations
 
+import base64
 import hashlib
 import hmac
 import json
@@ -66,8 +67,8 @@ _user_extra_groups: dict[str, list[str]] = {
     "admin-ss@local": ["team-platform"],
 }
 
-# In-memory code store: {code: (user, redirect_uri, state, expires)}
-_codes: dict[str, tuple[dict, str, str, float]] = {}
+# In-memory code store: {code: (user, redirect_uri, state, nonce, expires)}
+_codes: dict[str, tuple[dict, str, str, str, float]] = {}
 
 app = Flask(__name__)
 
@@ -76,8 +77,12 @@ def _now() -> int:
     return int(time.time())
 
 
-def _make_id_token(user: dict) -> str:
-    """Sign a JWT id_token with HS256 (dev only — no verification by client)."""
+def _make_id_token(user: dict, nonce: str = "") -> str:
+    """Sign a JWT id_token with HS256 (dev only — no verification by client).
+
+    The nonce echoes the authorization request's nonce: authlib's OIDC claim
+    validation makes the claim ESSENTIAL when a nonce was sent in the request
+    (MissingClaimError otherwise)."""
     now = _now()
     payload = {
         "iss": ISSUER,
@@ -89,6 +94,8 @@ def _make_id_token(user: dict) -> str:
         "name": user["name"],
         "groups": _groups_for(user),
     }
+    if nonce:
+        payload["nonce"] = nonce
     return jwt.encode(payload, SSO_SECRET, algorithm="HS256")
 
 
@@ -131,8 +138,11 @@ def discovery():
 
 @app.get("/jwks")
 def jwks():
-    # HS256 has no JWKS — return empty keys (Authlib handles HS256 via secret).
-    return jsonify({"keys": []})
+    # HS256 is symmetric: the JWKS carries the shared secret as an oct key,
+    # which is how joserfc (authlib's id_token verifier) finds the HS256
+    # signing key. Empty keys raised MissingKeyError on every callback.
+    key = base64.urlsafe_b64encode(SSO_SECRET.encode()).rstrip(b"=").decode()
+    return jsonify({"keys": [{"kty": "oct", "k": key, "alg": "HS256", "use": "sig"}]})
 
 
 _LOGIN_PAGE = """<!doctype html>
@@ -151,6 +161,7 @@ _LOGIN_PAGE = """<!doctype html>
 <form method="POST" action="/login">
   <input type="hidden" name="redirect_uri" value="{{redirect_uri}}">
   <input type="hidden" name="state" value="{{state}}">
+  <input type="hidden" name="nonce" value="{{nonce}}">
   {% for u in users %}
   <button type="submit" name="sub" value="{{u.sub}}">
     {{u.name}} <span class="role">({{u.role}})</span>
@@ -164,17 +175,18 @@ _LOGIN_PAGE = """<!doctype html>
 def authorize():
     redirect_uri = request.args.get("redirect_uri", "")
     state = request.args.get("state", "")
+    nonce = request.args.get("nonce", "")
     # If no SSO users configured, auto-approve with a default user
     if not SSO_USERS:
         user = {"sub": "dev@local", "email": "dev@local", "name": "Dev", "role": "user"}
         code = secrets.token_urlsafe(32)
-        _codes[code] = (user, redirect_uri, state, time.time() + 300)
+        _codes[code] = (user, redirect_uri, state, nonce, time.time() + 300)
         params = {"code": code, "state": state}
         return redirect(f"{redirect_uri}?{urlencode(params)}")
     # Render the login page
     from jinja2 import Template
     html = Template(_LOGIN_PAGE).render(
-        users=SSO_USERS, redirect_uri=redirect_uri, state=state
+        users=SSO_USERS, redirect_uri=redirect_uri, state=state, nonce=nonce
     )
     return Response(html, content_type="text/html")
 
@@ -184,30 +196,32 @@ def login():
     sub = request.form.get("sub", "")
     redirect_uri = request.form.get("redirect_uri", "")
     state = request.form.get("state", "")
+    nonce = request.form.get("nonce", "")
     user = next((u for u in SSO_USERS if u["sub"] == sub), None)
     if user is None:
         abort(401, description="unknown user")
     code = secrets.token_urlsafe(32)
-    _codes[code] = (user, redirect_uri, state, time.time() + 300)
+    _codes[code] = (user, redirect_uri, state, nonce, time.time() + 300)
     params = {"code": code, "state": state}
     return redirect(f"{redirect_uri}?{urlencode(params)}")
 
 
-@app.get("/token")
+@app.route("/token", methods=["GET", "POST"])
 def token():
-    # Accept both GET (for simplicity in dev) and POST
+    # GET for curl convenience; authlib's token exchange is a POST
+    # (grant_type=authorization_code) and 405ed against GET-only.
     code = request.args.get("code") or request.form.get("code", "")
     entry = _codes.pop(code, None)
     if entry is None:
         abort(400, description="invalid or expired code")
-    user, _, _, expires = entry
+    user, _, _, nonce, expires = entry
     if time.time() > expires:
         abort(400, description="code expired")
     return jsonify({
         "access_token": _make_access_token(user),
         "token_type": "Bearer",
         "expires_in": 300,
-        "id_token": _make_id_token(user),
+        "id_token": _make_id_token(user, nonce),
         "scope": "openid email profile groups",
     })
 

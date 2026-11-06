@@ -37,6 +37,47 @@ def test_me_shape_growth_me_out_fields(api_client, auth_client, api_app):
         assert u.last_login_at is not None
 
 
+def test_login_get_starts_oidc_flow(api_client, mock_oidc):
+    """The SSO button is a full document navigation (GET), not a POST. A
+    POST-only registration made the SPA catch-all (GET+POST) answer the
+    button's navigation with a 404 before the API ever saw it."""
+    r = api_client.get("/api/v1/auth/login")
+    assert r.status_code == 302
+    loc = r.headers["Location"]
+    # The 302 goes straight to the IdP authorize URL (not the callback),
+    # carrying the opaque state the callback will verify.
+    assert loc.startswith("http://mock-oidc.test/authorize?")
+    state = parse_qs(urlparse(loc).query)["state"][0]
+    assert state
+    assert mock_oidc.last_state == state
+
+
+def test_oidc_authorize_url_reads_location_from_redirect_response(api_app, monkeypatch):
+    """The unit tier patches ``oidc_authorize_url``; this exercises the real
+    adapter body. authlib's ``authorize_redirect`` answers a redirect
+    Response (the authorize URL is its Location header) — treating it as a
+    dict with a ``url`` key raised AttributeError → 500 on every real SSO
+    login. redirect_uri must be the callback's absolute URL."""
+    from flask import redirect as flask_redirect
+
+    import app.core.security as sec
+
+    class _StubClient:
+        def authorize_redirect(self, redirect_uri: str | None = None, **kwargs):
+            return flask_redirect(
+                f"http://idp.test/authorize?client_id=x&state={kwargs.get('state')}"
+                f"&redirect_uri={redirect_uri}"
+            )
+
+    monkeypatch.setattr(sec, "_oidc_client", _StubClient())
+    with api_app.test_request_context("/api/v1/auth/login", method="GET"):
+        url = sec.oidc_authorize_url("st-1")
+    assert url == (
+        "http://idp.test/authorize?client_id=x&state=st-1"
+        "&redirect_uri=http://localhost/api/v1/auth/callback"
+    )
+
+
 def test_callback_redirect_sets_cookies_not_url_tokens(api_client, mock_oidc):
     """ADR-0025 door check: the OIDC callback's 302 Location is a bare ``/``
     and the issued pair rides in HttpOnly cookies — nothing in the URL, so
@@ -45,9 +86,8 @@ def test_callback_redirect_sets_cookies_not_url_tokens(api_client, mock_oidc):
     from app.core.security import verify_jwt
 
     r1 = api_client.post("/api/v1/auth/login")
-    cb = r1.headers["Location"]
-    state = parse_qs(urlparse(cb).query)["state"][0]
-    r2 = api_client.get(f"{cb}&code={mock_oidc.CODE}&state={state}")
+    state = parse_qs(urlparse(r1.headers["Location"]).query)["state"][0]
+    r2 = api_client.get(f"/api/v1/auth/callback?code={mock_oidc.CODE}&state={state}")
     assert r2.status_code == 302
     assert r2.headers["Location"] == "/"
     assert "token" not in r2.headers["Location"]
@@ -90,8 +130,7 @@ def test_refresh_reads_the_cookie_and_rotates(api_client, auth_client):
 
 def test_state_mismatch_rejected(api_client, mock_oidc):
     r1 = api_client.post("/api/v1/auth/login")
-    cb = r1.headers["Location"]
-    state = parse_qs(urlparse(cb).query)["state"][0]
+    state = parse_qs(urlparse(r1.headers["Location"]).query)["state"][0]
     # wrong state on the way back — the callback's state key never existed
     # (build the URL explicitly; the mock authorize URL embeds the same
     # state value, so a second `state=` would not be "wrong")
@@ -103,19 +142,19 @@ def test_state_mismatch_rejected(api_client, mock_oidc):
 def test_state_single_use(api_client, mock_oidc):
     """A consumed state key is deleted: replaying the same callback URL 400s."""
     r1 = api_client.post("/api/v1/auth/login")
-    cb = r1.headers["Location"]
-    state = parse_qs(urlparse(cb).query)["state"][0]
-    r2 = api_client.get(f"{cb}&code={mock_oidc.CODE}&state={state}")
+    state = parse_qs(urlparse(r1.headers["Location"]).query)["state"][0]
+    cb = f"/api/v1/auth/callback?code={mock_oidc.CODE}&state={state}"
+    r2 = api_client.get(cb)
     assert r2.status_code == 302
-    r3 = api_client.get(f"{cb}&code={mock_oidc.CODE}&state={state}")
+    r3 = api_client.get(cb)
     assert r3.status_code == 400
     assert r3.get_json()["error"]["code"] == "STATE_MISMATCH"
 
 
 def test_callback_missing_code_is_400_envelope(api_client, mock_oidc):
     r1 = api_client.post("/api/v1/auth/login")
-    cb = r1.headers["Location"]
-    r2 = api_client.get(cb)  # no code= param
+    state = parse_qs(urlparse(r1.headers["Location"]).query)["state"][0]
+    r2 = api_client.get(f"/api/v1/auth/callback?state={state}")  # no code= param
     assert r2.status_code == 400
     assert set(r2.get_json()["error"]) >= {"code", "message"}
 
