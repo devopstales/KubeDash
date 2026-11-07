@@ -6,7 +6,9 @@ import type { ReactElement } from 'react'
 import { afterEach, expect, test } from 'vitest'
 import { server } from '../msw'
 import ObjectRoute from '../../src/components/ObjectRoute'
-import GatewayClassView from '../../src/views/Network/GatewayClass'
+// 2026-11-07 menu merge: the list route is the tabbed Ingress Class page
+// (/network/ingress-class) — GatewayClasses is its second tab.
+import IngressClassView from '../../src/views/Network/IngressClass'
 import GatewayClassDataView from '../../src/views/Network/GatewayClassData'
 import { useClusterStore } from '../../src/store/cluster'
 
@@ -20,12 +22,12 @@ const renderAt = (_ui: ReactElement, path: string) => {
       <MemoryRouter initialEntries={[path]}>
         <Routes>
           <Route
-            path="/network/gateway-class"
+            path="/network/ingress-class"
             element={
               <ObjectRoute
                 kind="gatewayclass"
-                listRoute="/network/gateway-class"
-                list={<GatewayClassView />}
+                listRoute="/network/ingress-class"
+                list={<IngressClassView />}
                 detail={(p) => <GatewayClassDataView name={p.name} />}
               />
             }
@@ -94,7 +96,7 @@ test('detail-renders-gateway-class-json', async () => {
   // ADR-0040: the detail is ref-driven — seed the active ref, render at the
   // clean route, and assert the URL stays clean (R1).
   seedActiveRef('traefik')
-  const { container } = renderAt(<GatewayClassDataView name="traefik" />, '/network/gateway-class')
+  const { container } = renderAt(<GatewayClassDataView name="traefik" />, '/network/ingress-class')
 
   // R1: the URL never carries identity.
   expect(window.location.search).toBe('')
@@ -111,8 +113,9 @@ test('detail-renders-gateway-class-json', async () => {
   expect(searchParams.get('namespace')).toBeNull()
   // breadcrumb: Network → GatewayClass List → name.
   expect(screen.getByText('Network')).toBeTruthy()
-  const listLink = screen.getByRole('link', { name: 'GatewayClass List' })
-  expect(listLink.getAttribute('href')).toBe('/network/gateway-class')
+  // back-link to the merged tabbed list (label = the page title).
+  const listLink = screen.getByRole('link', { name: 'IngressClass List' })
+  expect(listLink.getAttribute('href')).toBe('/network/ingress-class')
   // metadata table: the item's spec fields and metadata are shown. The same
   // values repeat in the JSON block below, so scope to a table.
   const inTable = async (text: string) =>
@@ -142,7 +145,7 @@ test('detail-not-found-state', async () => {
   )
   selectProd()
   seedActiveRef('ghost')
-  const { container } = renderAt(<GatewayClassDataView name="ghost" />, '/network/gateway-class')
+  const { container } = renderAt(<GatewayClassDataView name="ghost" />, '/network/ingress-class')
 
   // R1: the URL stays clean even for a not-found object.
   expect(window.location.search).toBe('')
@@ -187,7 +190,7 @@ test('detail-no-cluster-state', async () => {
   )
   useClusterStore.setState({ selectedCluster: null, selectedNamespace: null })
   seedActiveRef('traefik')
-  renderAt(<GatewayClassDataView name="traefik" />, '/network/gateway-class')
+  renderAt(<GatewayClassDataView name="traefik" />, '/network/ingress-class')
 
   expect(await screen.findByText('No cluster selected.')).toBeTruthy()
   expect(seen).toHaveLength(0) // no resource fetch is made

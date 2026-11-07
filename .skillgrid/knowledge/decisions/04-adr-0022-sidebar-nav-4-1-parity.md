@@ -76,7 +76,8 @@ mapping):
 | **Interface** Workloads | DaemonSets | `/workload/daemonsets` | stub | stub |
 | **Interface** Workloads | ReplicaSets | `/workload/replicasets` | stub | stub |
 | **Interface** Network | Services | `/network/service` | stub | stub |
-| **Interface** Network | Ingress | `/network/ingress` | stub | stub |
+| **Interface** Network | Ingress | `/network/ingress` | `/network/ingress` | implemented (feature) — tabbed page: Ingresses \| Gateways \| HTTPRoutes \| ReferenceGrants (2026-10-28 spec; the Gateway API kinds merged in as tabs 2026-11-07, see Amendments) |
+| **Interface** Network | Ingress Class | *(5.0-only — 4.1 had no menu entry; the classes lived in the Ingress page's tabs)* | `/network/ingress-class` | implemented (feature) — tabbed page: IngressClasses \| GatewayClasses (2026-10-28 spec; GatewayClasses merged in as a tab 2026-11-07, see Amendments) |
 | **Interface** Storage | ConfigMaps | `/storage/configmap` | stub | stub |
 | **Interface** Storage | Volumes | `/storage/pv` | stub | stub |
 | **Interface** Storage | VolumeClaims | `/storage/pvc` | stub | stub |
@@ -124,6 +125,29 @@ self-service kubeconfig surface (ADR-0013) and has no 4.1 equivalent.
 order, admin gating of the Settings group); no nav entry points at a 4.1-only route
 that has no 5.0 counterpart; the air-gap check (`task fe-check`) stays green (no new
 external URLs introduced).
+
+#### Amendments
+
+- **2026-11-07 — menu merge: the Network group is consolidated to three
+  leaves (owner decision).** The 2026-10-28 specs had grown the Network group
+  to five leaves (Services, Ingress, Ingress Class, Gateway Class, Gateway
+  API). The owner consolidated the standalone Gateway API and Gateway Class
+  leaves back into 4.1's tab pattern
+  (`network/ingress.html.j2` / `network/ingress-class.html.j2`): the Gateway
+  API kinds (Gateway, HTTPRoute, ReferenceGrant) are now TABS of the Ingress
+  page, and GatewayClasses is a tab of the Ingress Class page. The Network
+  group is now exactly Services, Ingress, Ingress Class. The old URLs
+  `/network/gateway-api` and `/network/gateway-class` one-shot redirect to
+  their merged pages (the ADR-0040 redirect pattern); an active ref of those
+  kinds survives the redirect because the ref is session-scoped, not
+  URL-bound. The Plugins-group consequence above is unchanged: 4.1's
+  plugin-gated "Gateway API" entry remains absent from the menu — the kinds
+  exist as tabs, not as a leaf (hence `Gateway API` is again banned in
+  `frontend/tests/nav.test.tsx`). Confirmation: `frontend/src/_nav.tsx`
+  (three Network leaves), `frontend/tests/nav.test.tsx` (labels + ban),
+  `frontend/tests/App.test.tsx` (the dispatchers: a gateway row renders the
+  gateway detail on `/network/ingress`; a gatewayclass row renders the
+  gatewayclass detail on `/network/ingress-class`).
 
 #### Pros and Cons of the Options
 

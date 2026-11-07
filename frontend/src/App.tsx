@@ -95,9 +95,7 @@ const PvView = React.lazy(() => import('./views/Storage/Pv'))
 const PvDataView = React.lazy(() => import('./views/Storage/PvData'))
 const IngressClassView = React.lazy(() => import('./views/Network/IngressClass'))
 const IngressClassDataView = React.lazy(() => import('./views/Network/IngressClassData'))
-const GatewayClassView = React.lazy(() => import('./views/Network/GatewayClass'))
 const GatewayClassDataView = React.lazy(() => import('./views/Network/GatewayClassData'))
-const GatewayApiView = React.lazy(() => import('./views/Network/GatewayApi'))
 const GatewayApiDataView = React.lazy(() => import('./views/Network/GatewayApiData'))
 const IngressView = React.lazy(() => import('./views/Network/Ingress'))
 const IngressDataView = React.lazy(() => import('./views/Network/IngressData'))
@@ -169,16 +167,16 @@ export const NetworkPolicyRoute = () => {
 }
 
 /**
- * ADR-0040 (2026-10-28-ingress-gateway-api-views): the gateway-api list
- * route dispatches on the active ref's registry kind (gateway / httproute /
- * referencegrant). One ObjectRoute per kind would render the tabbed list
- * three times (and register the navigate seam three times), so the
- * dispatcher holds the single seam + ref read and hands the detail to the
- * view with its kind; the list renders once. First build of these kinds —
- * the /data URL never shipped, so there is no R7 redirect (no
- * OldDataRedirect route).
+ * ADR-0040 (2026-11-07 menu merge, owner decision): the /network/ingress
+ * list route dispatches on the active ref's registry kind (ingress /
+ * gateway / httproute / referencegrant) — the four kinds are the tabs of
+ * the ONE tabbed list (4.1 `network/ingress.html.j2` pattern; the old
+ * /network/gateway-api URL redirects here). One ObjectRoute per kind would
+ * render the list four times (and register the navigate seam four times),
+ * so the dispatcher holds the single seam + ref read and hands the detail
+ * to the view with its kind; the list renders once.
  */
-export const GatewayApiRoute = () => {
+export const IngressRoute = () => {
   const navigate = useNavigate()
   // useLocation (NOT the global window.location, which has a stable
   // identity and would make the memo dep inert): openObject sets the
@@ -194,8 +192,12 @@ export const GatewayApiRoute = () => {
     // eslint-disable-next-line react-hooks/exhaustive-deps
     [location, bump],
   )
-  const isGatewayApiKind =
-    ref !== null && (ref.kind === 'gateway' || ref.kind === 'httproute' || ref.kind === 'referencegrant')
+  const isPageKind =
+    ref !== null &&
+    (ref.kind === 'ingress' ||
+      ref.kind === 'gateway' ||
+      ref.kind === 'httproute' ||
+      ref.kind === 'referencegrant')
 
   const seamRef = React.useRef(navigate)
   seamRef.current = navigate
@@ -207,14 +209,48 @@ export const GatewayApiRoute = () => {
     })
   }, [])
 
-  if (!isGatewayApiKind) return <GatewayApiView />
+  if (!isPageKind) return <IngressView />
+  if (ref!.kind === 'ingress') {
+    return <IngressDataView name={ref!.name} namespace={ref!.namespace ?? ''} />
+  }
   return (
-    <GatewayApiDataView
-      name={ref!.name}
-      kind={ref!.kind}
-      namespace={ref!.namespace ?? ''}
-    />
+    <GatewayApiDataView name={ref!.name} kind={ref!.kind} namespace={ref!.namespace ?? ''} />
   )
+}
+
+/**
+ * ADR-0040 (2026-11-07 menu merge, owner decision): the /network/ingress-class
+ * list route dispatches on the active ref's registry kind (ingressclass /
+ * gatewayclass) — the two kinds are the tabs of the ONE tabbed list (4.1
+ * `network/ingress-class.html.j2` pattern; the old /network/gateway-class
+ * URL redirects here). Same single-seam rationale as IngressRoute.
+ */
+export const IngressClassRoute = () => {
+  const navigate = useNavigate()
+  const location = useLocation()
+  const [, bump] = React.useReducer((c: number) => c + 1, 0)
+  const ref = React.useMemo(
+    () => getActiveRef(),
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+    [location, bump],
+  )
+  const isPageKind = ref !== null && (ref.kind === 'ingressclass' || ref.kind === 'gatewayclass')
+
+  const seamRef = React.useRef(navigate)
+  seamRef.current = navigate
+  React.useEffect(() => {
+    sweepRelay()
+    registerNavigate((path: string) => {
+      seamRef.current(path)
+      bump()
+    })
+  }, [])
+
+  if (!isPageKind) return <IngressClassView />
+  if (ref!.kind === 'ingressclass') {
+    return <IngressClassDataView name={ref!.name} />
+  }
+  return <GatewayClassDataView name={ref!.name} />
 }
 
 /** Old per-user privilege URL. The page now lives at /user/privilege. */
@@ -1006,21 +1042,15 @@ const App = () => {
                       path="/network/ingress"
                       element={
                         <ProtectedRoute>
-                          {/* ADR-0040: ObjectRoute renders the list or the
-                              ref-matched detail on the clean route. This
-                              kind WAS a stub (the 4.1-parity port, 2026-10-28
-                              ingress-gateway-api-views) — the /data URL
-                              never shipped, so NO legacy /data route, no R7
-                              redirect. Namespaced: the namespace rides in
-                              the ref (R8). */}
-                          <ObjectRoute
-                            kind="ingress"
-                            listRoute="/network/ingress"
-                            list={<IngressView />}
-                            detail={(p) => (
-                              <IngressDataView name={p.name} namespace={p.namespace ?? ''} />
-                            )}
-                          />
+                          {/* ADR-0040 + 2026-11-07 menu merge: the tabbed
+                              page (Ingresses | Gateways | HTTPRoutes |
+                              ReferenceGrants, 4.1 pattern) renders the list
+                              or the ref-matched detail for ANY of the four
+                              kinds on the clean route (IngressRoute
+                              dispatcher). Namespaced kinds ride the
+                              namespace in the ref (R8). The old
+                              /network/gateway-api URL redirects here. */}
+                          <IngressRoute />
                         </ProtectedRoute>
                       }
                     />
@@ -1028,38 +1058,28 @@ const App = () => {
                       path="/network/ingress-class"
                       element={
                         <ProtectedRoute>
-                          {/* ADR-0040: ObjectRoute renders the list or the
-                              ref-matched detail on the clean route. First
-                              build of this kind (the 2026-10-28
-                              ingressclass-gatewayclass-views spec) — the
-                              /data URL never shipped, so there is no R7
-                              redirect. Cluster-scoped: no namespace. */}
-                          <ObjectRoute
-                            kind="ingressclass"
-                            listRoute="/network/ingress-class"
-                            list={<IngressClassView />}
-                            detail={(p) => <IngressClassDataView name={p.name} />}
-                          />
+                          {/* ADR-0040 + 2026-11-07 menu merge: the tabbed
+                              page (IngressClasses | GatewayClasses, 4.1
+                              pattern) renders the list or the ref-matched
+                              detail for either kind on the clean route
+                              (IngressClassRoute dispatcher). Both kinds are
+                              cluster-scoped: no namespace. The old
+                              /network/gateway-class URL redirects here. */}
+                          <IngressClassRoute />
                         </ProtectedRoute>
                       }
                     />
+                    {/* 2026-11-07 menu merge (owner decision): the standalone
+                        leaves were consolidated into the tabbed pages — the
+                        old URLs redirect one-shot (the PrivilegeRedirect
+                        pattern). Any active ref of these kinds is
+                        session-scoped (ADR-0040), so a detail that was open
+                        survives the redirect on the merged route. */}
                     <Route
                       path="/network/gateway-class"
                       element={
                         <ProtectedRoute>
-                          {/* ADR-0040: ObjectRoute renders the list or the
-                              ref-matched detail on the clean route. First
-                              build of this kind (the 2026-10-28
-                              ingressclass-gatewayclass-views spec) — the
-                              /data URL never shipped, so there is no R7
-                              redirect. Cluster-scoped CRD (VPA seam): no
-                              namespace. */}
-                          <ObjectRoute
-                            kind="gatewayclass"
-                            listRoute="/network/gateway-class"
-                            list={<GatewayClassView />}
-                            detail={(p) => <GatewayClassDataView name={p.name} />}
-                          />
+                          <Navigate to="/network/ingress-class" replace />
                         </ProtectedRoute>
                       }
                     />
@@ -1067,15 +1087,7 @@ const App = () => {
                       path="/network/gateway-api"
                       element={
                         <ProtectedRoute>
-                          {/* ADR-0040: the dispatcher (mirrors
-                              NetworkPolicyRoute) renders the tabbed list or
-                              the ref-matched detail for the three Gateway
-                              API kinds (gateway / httproute / referencegrant)
-                              on the clean route. First build of these kinds
-                              — the /data URL never shipped, so there is no
-                              R7 redirect. The GatewayClasses tab dedupes to
-                              the standalone /network/gateway-class view. */}
-                          <GatewayApiRoute />
+                          <Navigate to="/network/ingress" replace />
                         </ProtectedRoute>
                       }
                     />

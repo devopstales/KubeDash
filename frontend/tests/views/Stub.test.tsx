@@ -103,16 +103,22 @@ function expectedStubs() {
     // so there is no R7 redirect — the single clean route only.
     '/storage/pv',
     // Real view (2026-10-28-ingressclass-gatewayclass-views, Task 4) — not
-    // a stub route. New nav leaves with real views: the /data URL never
-    // shipped, so there is no R7 redirect — the single clean route only.
+    // a stub route. Nav leaf with a real view (the tabbed
+    // IngressClasses | GatewayClasses page); the /data URL never shipped,
+    // so there is no R7 redirect — the single clean route only.
     '/network/ingress-class',
+    // 2026-11-07 menu merge: not a nav leaf anymore — the URL redirects
+    // one-shot to /network/ingress-class (App.tsx). Guarded here so a
+    // re-added nav leaf to the merged path is not stubified.
     '/network/gateway-class',
     // Real view (2026-10-28-ingress-gateway-api-views) — the stub route is
     // removed (promoted to the real view); the /data URL never shipped, so
-    // there is no R7 redirect — the single clean route only.
+    // there is no R7 redirect — the single clean route only. Nav leaf to
+    // the tabbed page (Ingresses | Gateways | HTTPRoutes | ReferenceGrants).
     '/network/ingress',
-    // Real view (2026-10-28-ingress-gateway-api-views, the tabbed page +
-    // multi-kind dispatcher) — new nav leaf, not a stub route.
+    // 2026-11-07 menu merge: not a nav leaf anymore — the URL redirects
+    // one-shot to /network/ingress (App.tsx). Guarded here so a re-added
+    // nav leaf to the merged path is not stubified.
     '/network/gateway-api',
   ])
   const seen = new Map<string, string>()

@@ -104,3 +104,23 @@
   instead (each literal above appears in its anchor file). If the
   engine's anchor resolver is ever wired for this project, re-run
   `kb validate` on the three new pages to confirm.
+
+## 2026-11-07 — decisions/04-adr-0022-sidebar-nav-4-1-parity.md amended
+
+- **ADR-0022 amendment (menu merge, owner decision):** the Network
+  sidebar group is consolidated to three leaves (Services, Ingress,
+  Ingress Class). The standalone Gateway API and Gateway Class leaves
+  (added by the 2026-10-28 specs) are absorbed into the 4.1 tab
+  pattern: the Gateway API kinds (Gateway, HTTPRoute, ReferenceGrant)
+  are tabs of the Ingress page, GatewayClasses is a tab of the Ingress
+  Class page. The old URLs `/network/gateway-api` and
+  `/network/gateway-class` one-shot redirect to their merged pages
+  (ADR-0040 pattern; an active ref survives the redirect — the ref is
+  session-scoped, not URL-bound). The ADR table Network rows are
+  updated (Ingress + Ingress Class now implemented, tabbed). The
+  `.backlog/decisions/decision-022` copy is regenerated from the ADR
+  (same edit). Confirming tests: `nav.test.tsx` (labels, `Gateway API`
+  banned again), `App.test.tsx` (dispatchers: gateway row → gateway
+  detail on `/network/ingress`; gatewayclass row → gatewayclass detail
+  on `/network/ingress-class`), ported list tests in
+  `ingress.test.tsx` / `gatewayclasses.test.tsx`.

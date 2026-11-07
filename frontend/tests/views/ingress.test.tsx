@@ -161,6 +161,82 @@ const plainIngress = {
   },
 }
 
+// FULL custom objects (camelCase — the CRD seam), ported from the
+// 2026-10-28 gateway-api page tests (2026-11-07 menu merge). ~3 days old
+// so the Age column is a stable '3d'.
+const webGateway = {
+  apiVersion: 'gateway.networking.k8s.io/v1',
+  kind: 'Gateway',
+  metadata: {
+    name: 'web-gateway',
+    namespace: 'team-a',
+    creationTimestamp: '2026-10-26T10:00:00Z',
+  },
+  spec: {
+    gatewayClassName: 'envoy',
+    listeners: [{ name: 'web', protocol: 'HTTP', port: 8080 }],
+  },
+}
+const webRoute = {
+  apiVersion: 'gateway.networking.k8s.io/v1',
+  kind: 'HTTPRoute',
+  metadata: {
+    name: 'web-route',
+    namespace: 'team-a',
+    creationTimestamp: '2026-10-26T10:00:00Z',
+  },
+  spec: {
+    hostnames: ['a.example.com', 'b.example.com'],
+    parentRefs: [{ name: 'web-gateway', namespace: 'team-a' }, { name: 'other' }],
+  },
+}
+const allowGrant = {
+  apiVersion: 'gateway.networking.k8s.io/v1',
+  kind: 'ReferenceGrant',
+  metadata: { name: 'allow', creationTimestamp: '2026-10-26T10:00:00Z' },
+  spec: {
+    from: [{ group: 'gateway.networking.k8s.io', kind: 'Gateway', namespace: 'team-a' }],
+    to: [{ group: '', kind: 'Service' }],
+  },
+}
+
+// The tabbed page mounts EVERY panel (CTabPanel), so every test that
+// renders the page also serves the three gateway-kind endpoints — without
+// handlers those fetches fall through to onUnhandledRequest bypass and
+// the tabs would sit in error state.
+const gatewayTabHandlers = (
+  gateways: unknown[] = [],
+  httpRoutes: unknown[] = [],
+  referenceGrants: unknown[] = [],
+) => [
+  http.get('*/api/v1/clusters/1/resources/gateways', () =>
+    HttpResponse.json({ kind: 'gateways', cluster: 'prod', items: gateways }),
+  ),
+  http.get('*/api/v1/clusters/1/resources/httproutes', () =>
+    HttpResponse.json({ kind: 'httproutes', cluster: 'prod', items: httpRoutes }),
+  ),
+  http.get('*/api/v1/clusters/1/resources/referencegrants', () =>
+    HttpResponse.json({ kind: 'referencegrants', cluster: 'prod', items: referenceGrants }),
+  ),
+]
+
+// The merged page's column set, in tab order (CTabPanel mounts all four,
+// so the DOM order is the tab order).
+const MERGED_COLUMNS = [
+  'Name',
+  'IngressClass',
+  'Hostname',
+  'Name',
+  'GatewayClass',
+  'Listeners',
+  'Name',
+  'Hostnames',
+  'ParentRefs',
+  'Name',
+  'From',
+  'To',
+]
+
 // list-renders-ingresses
 test('list-renders-ingresses', async () => {
   let requestedPath = ''
@@ -176,6 +252,7 @@ test('list-renders-ingresses', async () => {
         items: [webIngress, plainIngress],
       })
     }),
+    ...gatewayTabHandlers(),
   )
   selectProd()
   renderAt(<IngressView />)
@@ -193,7 +270,10 @@ test('list-renders-ingresses', async () => {
   expect(screen.getByRole('heading', { name: 'Ingress List' })).toBeTruthy()
   // breadcrumb: Network → Ingress List.
   expect(screen.getByText('Network')).toBeTruthy()
-  // columns: name, ingressclass, hostname.
+  // columns: name, ingressclass, hostname. The other three tabs are EMPTY
+  // here (gatewayTabHandlers default), so their tables don't render — only
+  // the Ingresses tab's table is in the DOM. The full merged column set is
+  // asserted in list-renders-gateway-tabs (all four tabs with data).
   expect(screen.getAllByRole('columnheader').map((th) => th.textContent)).toEqual([
     'Name',
     'IngressClass',
@@ -207,6 +287,92 @@ test('list-renders-ingresses', async () => {
   expect(plainRow?.textContent).toBe('plain——')
 })
 
+// list-renders-gateway-tabs (ported from gateway-api-renders-four-tabs,
+// 2026-11-07 menu merge): the three Gateway API kinds are tabs of this
+// page; the gateway-kind query keys keep the 'gateway-api' prefix (the
+// converter's invalidation seam).
+test('list-renders-gateway-tabs', async () => {
+  const fetchLog: { path: string; namespace: string | null }[] = []
+  const logFetch = (request: Request) => {
+    const u = new URL(request.url)
+    fetchLog.push({ path: u.pathname, namespace: u.searchParams.get('namespace') })
+  }
+  server.use(
+    http.get('*/api/v1/clusters/1/resources/ingresses', ({ request }) => {
+      logFetch(request)
+      return HttpResponse.json({ kind: 'ingresses', cluster: 'prod', items: [webIngress] })
+    }),
+    http.get('*/api/v1/clusters/1/resources/gateways', ({ request }) => {
+      logFetch(request)
+      return HttpResponse.json({ kind: 'gateways', cluster: 'prod', items: [webGateway] })
+    }),
+    http.get('*/api/v1/clusters/1/resources/httproutes', ({ request }) => {
+      logFetch(request)
+      return HttpResponse.json({ kind: 'httproutes', cluster: 'prod', items: [webRoute] })
+    }),
+    http.get('*/api/v1/clusters/1/resources/referencegrants', ({ request }) => {
+      logFetch(request)
+      return HttpResponse.json({ kind: 'referencegrants', cluster: 'prod', items: [allowGrant] })
+    }),
+  )
+  selectProd()
+  renderAt(<IngressView />)
+
+  // the four tabs (CoreUI CTab = button[role=tab]); the Ingresses tab is
+  // the default active one.
+  expect(screen.getByRole('tab', { name: 'Ingresses' })).toBeTruthy()
+  expect(screen.getByRole('tab', { name: 'Gateways' })).toBeTruthy()
+  expect(screen.getByRole('tab', { name: 'HTTPRoutes' })).toBeTruthy()
+  expect(screen.getByRole('tab', { name: 'ReferenceGrants' })).toBeTruthy()
+  expect(screen.getByRole('heading', { name: 'Ingress List' })).toBeTruthy()
+
+  // all four fetch on mount (CTabPanel keeps panels mounted). The
+  // namespaced kinds ride the selected namespace; the cluster-scoped
+  // ReferenceGrants tab carries NO namespace.
+  await screen.findByRole('button', { name: 'web-gateway' })
+  const byPath = Object.fromEntries(fetchLog.map((e) => [e.path, e.namespace]))
+  expect(byPath['/api/v1/clusters/1/resources/ingresses']).toBe('team-a')
+  expect(byPath['/api/v1/clusters/1/resources/gateways']).toBe('team-a')
+  expect(byPath['/api/v1/clusters/1/resources/httproutes']).toBe('team-a')
+  expect(byPath['/api/v1/clusters/1/resources/referencegrants']).toBeNull()
+
+  // columns per tab (all four tables mounted; header order is the tab
+  // order).
+  expect(screen.getAllByRole('columnheader').map((th) => th.textContent)).toEqual(MERGED_COLUMNS)
+
+  // row values: the camelCase CRD field mappings.
+  // The Gateway row carries spec.gatewayClassName ('envoy') — scope to the
+  // row (the Ingresses tab may render an 'nginx' cell of its own).
+  const gatewayRow = screen.getByRole('button', { name: 'web-gateway' }).closest('tr')
+  expect(gatewayRow?.textContent).toBe('web-gatewayenvoyweb:HTTP:8080')
+  expect(screen.getByText('a.example.com, b.example.com')).toBeTruthy()
+  expect(screen.getByText('web-gateway/team-a, other')).toBeTruthy()
+  // ReferenceGrant row: the group:kind summaries (the core group "" is
+  // dropped — the 'Service' summary stands alone).
+  expect(screen.getByText('gateway.networking.k8s.io:Gateway')).toBeTruthy()
+  expect(screen.getByText('Service')).toBeTruthy()
+})
+
+// list-empty-all-tabs (ported from gateway-api-empty-tabs-pinned-copy):
+// every tab in its pinned empty state, no tables.
+test('list-empty-all-tabs', async () => {
+  server.use(
+    http.get('*/api/v1/clusters/1/resources/ingresses', () =>
+      HttpResponse.json({ kind: 'ingresses', cluster: 'prod', items: [] }),
+    ),
+    ...gatewayTabHandlers(),
+  )
+  selectProd()
+  renderAt(<IngressView />)
+
+  expect(await screen.findByText('No ingresses found')).toBeTruthy()
+  expect(screen.getByText('No gateways found')).toBeTruthy()
+  expect(screen.getByText('No http routes found')).toBeTruthy()
+  expect(screen.getByText('No reference grants found')).toBeTruthy()
+  // no tables (every tab is in its empty state).
+  expect(screen.queryAllByRole('columnheader')).toHaveLength(0)
+})
+
 // click-name-renders-detail-with-clean-url (R1)
 test('click-name-renders-detail-with-clean-url', async () => {
   const user = userEvent.setup()
@@ -215,6 +381,7 @@ test('click-name-renders-detail-with-clean-url', async () => {
     http.get('*/api/v1/clusters/1/resources/ingresses', () =>
       HttpResponse.json({ kind: 'ingresses', cluster: 'prod', items: [webIngress] }),
     ),
+    ...gatewayTabHandlers(),
   )
   renderAt(<IngressView />)
 
@@ -252,6 +419,7 @@ test('list-error-state', async () => {
         { status: 403 },
       ),
     ),
+    ...gatewayTabHandlers(),
   )
   selectProd()
   renderAt(<IngressView />)
@@ -270,6 +438,7 @@ test('list-empty-state', async () => {
     http.get('*/api/v1/clusters/1/resources/ingresses', () =>
       HttpResponse.json({ kind: 'ingresses', cluster: 'prod', items: [] }),
     ),
+    ...gatewayTabHandlers(),
   )
   selectProd()
   renderAt(<IngressView />)

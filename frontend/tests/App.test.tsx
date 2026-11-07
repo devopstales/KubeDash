@@ -3,9 +3,9 @@ import { QueryClient, QueryClientProvider } from '@tanstack/react-query'
 import { MemoryRouter, Route, Routes } from 'react-router-dom'
 import { http, HttpResponse } from 'msw'
 import { afterEach, beforeEach, describe, expect, test, vi } from 'vitest'
-import { Suspense } from 'react'
+import { Suspense, type ReactElement } from 'react'
 import { server } from './msw'
-import { NetworkPolicyRoute } from '../src/App'
+import { IngressClassRoute, IngressRoute, NetworkPolicyRoute } from '../src/App'
 import ObjectRoute from '../src/components/ObjectRoute'
 import OldDataRedirect from '../src/components/OldDataRedirect'
 import SecretView from '../src/views/Security/Secret'
@@ -354,5 +354,130 @@ describe('NetworkPolicyRoute (TICKET-03): list → click row → detail on the s
     })
     expect(sessionStorage.getItem('kd_object_active')).toBeNull()
     await screen.findByText('Network Policies', { selector: 'h5' }, { timeout: 4000 })
+  })
+})
+
+// 2026-11-07 menu merge (ADR-0022 amendment): the Gateway API kinds share
+// the ONE /network/ingress clean route with ingress rows, and gatewayclass
+// rows share /network/ingress-class with ingressclass rows. The dispatchers
+// must pick the detail view from the active ref's REGISTRY kind (the row's
+// tab, not the URL) — the same same-route seam contract as the test above.
+
+const renderNetworkRoute = (path: string, element: ReactElement) => {
+  const qc = new QueryClient({ defaultOptions: { queries: { retry: false } } })
+  return render(
+    <QueryClientProvider client={qc}>
+      <MemoryRouter initialEntries={[path]}>
+        <Suspense fallback={null}>
+          <Routes>
+            <Route path={path} element={element} />
+          </Routes>
+        </Suspense>
+      </MemoryRouter>
+    </QueryClientProvider>,
+  )
+}
+
+const demoGateway = {
+  apiVersion: 'gateway.networking.k8s.io/v1',
+  kind: 'Gateway',
+  metadata: { name: 'demo-gateway', namespace: 'team-a', creationTimestamp: '2026-10-01T10:00:00Z' },
+  spec: {
+    gatewayClassName: 'envoy',
+    listeners: [{ name: 'web', protocol: 'HTTP', port: 8080 }],
+  },
+}
+
+const demoGatewayClass = {
+  apiVersion: 'gateway.networking.k8s.io/v1',
+  kind: 'GatewayClass',
+  metadata: { name: 'demo-gatewayclass', creationTimestamp: '2026-10-01T10:00:00Z' },
+  spec: { controllerName: 'demo.io/gatewayclass' },
+}
+
+describe('IngressRoute (menu merge): gateway row → GatewayApiData on /network/ingress', () => {
+  test('clicking a gateway name button renders the gateway detail without a page reload', async () => {
+    server.use(
+      http.get('*/api/v1/clusters/1/resources/ingresses', () =>
+        HttpResponse.json({ kind: 'ingresses', cluster: 'prod', items: [] }),
+      ),
+      http.get('*/api/v1/clusters/1/resources/gateways', () =>
+        HttpResponse.json({ kind: 'gateways', cluster: 'prod', items: [demoGateway] }),
+      ),
+      http.get('*/api/v1/clusters/1/resources/httproutes', () =>
+        HttpResponse.json({ kind: 'httproutes', cluster: 'prod', items: [] }),
+      ),
+      http.get('*/api/v1/clusters/1/resources/referencegrants', () =>
+        HttpResponse.json({ kind: 'referencegrants', cluster: 'prod', items: [] }),
+      ),
+    )
+
+    renderNetworkRoute('/network/ingress', <IngressRoute />)
+
+    // No active ref: the dispatcher renders the tabbed list; the name cell
+    // is the openObject button (the gateway row sits in a mounted tab).
+    const rowButton = await screen.findByRole('button', { name: 'demo-gateway' })
+    expect(screen.queryByText('Gateway Data', { selector: 'h5' })).toBeNull()
+
+    // openObject writes the ref (origin 'click', kind 'gateway') then
+    // navigates to the SAME path — the dispatcher must re-read the ref.
+    act(() => {
+      rowButton.click()
+    })
+    // findBy*: the detail is React.lazy inside App.tsx (async first import).
+    await screen.findByText('Gateway Data', { selector: 'h5' }, { timeout: 8000 })
+
+    const reg = readRegistry()
+    const ref = reg![sessionStorage.getItem('kd_object_active')!]
+    expect(ref.origin).toBe('click')
+    expect(ref.kind).toBe('gateway')
+    expect(ref.name).toBe('demo-gateway')
+    expect(ref.namespace).toBe('team-a')
+
+    // The breadcrumb back-link drops the active pointer; the same-path
+    // navigation re-reads the (now-null) ref and renders the list again.
+    act(() => {
+      screen.getByRole('link', { name: 'Ingress List' }).click()
+    })
+    expect(sessionStorage.getItem('kd_object_active')).toBeNull()
+    await screen.findByText('Ingress List', { selector: 'h5' }, { timeout: 4000 })
+  })
+})
+
+describe('IngressClassRoute (menu merge): gatewayclass row → GatewayClassData on /network/ingress-class', () => {
+  test('clicking a gatewayclass name button renders the gatewayclass detail without a page reload', async () => {
+    server.use(
+      http.get('*/api/v1/clusters/1/resources/ingressclasses', () =>
+        HttpResponse.json({ kind: 'ingressclasses', cluster: 'prod', items: [] }),
+      ),
+      http.get('*/api/v1/clusters/1/resources/gatewayclasses', () =>
+        HttpResponse.json({ kind: 'gatewayclasses', cluster: 'prod', items: [demoGatewayClass] }),
+      ),
+    )
+
+    renderNetworkRoute('/network/ingress-class', <IngressClassRoute />)
+
+    // No active ref: the dispatcher renders the tabbed list.
+    const rowButton = await screen.findByRole('button', { name: 'demo-gatewayclass' })
+    expect(screen.queryByText('GatewayClass Data', { selector: 'h5' })).toBeNull()
+
+    act(() => {
+      rowButton.click()
+    })
+    await screen.findByText('GatewayClass Data', { selector: 'h5' }, { timeout: 8000 })
+
+    const reg = readRegistry()
+    const ref = reg![sessionStorage.getItem('kd_object_active')!]
+    expect(ref.origin).toBe('click')
+    expect(ref.kind).toBe('gatewayclass')
+    expect(ref.name).toBe('demo-gatewayclass')
+    // cluster-scoped kind: no namespace in the ref.
+    expect(ref.namespace).toBeUndefined()
+
+    act(() => {
+      screen.getByRole('link', { name: 'IngressClass List' }).click()
+    })
+    expect(sessionStorage.getItem('kd_object_active')).toBeNull()
+    await screen.findByText('IngressClass List', { selector: 'h5' }, { timeout: 4000 })
   })
 })

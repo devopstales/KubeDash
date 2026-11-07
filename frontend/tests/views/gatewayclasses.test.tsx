@@ -7,9 +7,15 @@ import type { ReactElement } from 'react'
 import { afterEach, expect, test, vi } from 'vitest'
 import { server } from '../msw'
 import ObjectRoute from '../../src/components/ObjectRoute'
-import GatewayClassView from '../../src/views/Network/GatewayClass'
+import IngressClassView from '../../src/views/Network/IngressClass'
 import GatewayClassDataView from '../../src/views/Network/GatewayClassData'
 import { useClusterStore } from '../../src/store/cluster'
+
+// 2026-11-07 menu merge (ADR-0022 amendment): the standalone GatewayClass
+// page is gone — GatewayClasses is a TAB of the tabbed Ingress Class page
+// (IngressClasses | GatewayClasses). This file tests the tabbed page with
+// the focus on the GatewayClasses tab; the old /network/gateway-class URL
+// redirects to /network/ingress-class (App.tsx).
 
 // Same KubeDataTable fake as priority_classes.test.tsx: renders the real row
 // mapping (children-as-render-fns included) so cell assertions test the
@@ -71,19 +77,19 @@ vi.mock('../../src/components/KubeDataTable', async () => {
 
 // ADR-0040: render through ObjectRoute so the click→detail flow is the real
 // one (the ref is the active pointer; the URL never carries identity).
-const renderAt = (_ui: ReactElement, path = '/network/gateway-class') => {
+const renderAt = (_ui: ReactElement, path = '/network/ingress-class') => {
   const qc = new QueryClient({ defaultOptions: { queries: { retry: false } } })
   return render(
     <QueryClientProvider client={qc}>
       <MemoryRouter initialEntries={[path]}>
         <Routes>
           <Route
-            path="/network/gateway-class"
+            path="/network/ingress-class"
             element={
               <ObjectRoute
                 kind="gatewayclass"
-                listRoute="/network/gateway-class"
-                list={<GatewayClassView />}
+                listRoute="/network/ingress-class"
+                list={<IngressClassView />}
                 detail={(p) => <GatewayClassDataView name={p.name} />}
               />
             }
@@ -119,7 +125,24 @@ const traefikClass = {
   },
 }
 
-// list-renders-gateway-classes
+// FULL kubernetes object (snake_case — the API seam) for the IngressClasses
+// tab. A populated item makes the tab's table render (the KubeDataTable
+// mock mounts no table for empty tabs).
+const nginxClass = {
+  apiVersion: 'networking.k8s.io/v1',
+  kind: 'IngressClass',
+  metadata: { name: 'nginx', creation_timestamp: '2026-10-26T10:00:00Z' },
+  spec: { controller: 'k8s.io/ingress-nginx' },
+}
+
+// CTabPanel mounts both tabs, so every page-level test also serves the
+// IngressClasses endpoint (unhandled → bypass → the other tab in error).
+const ingressClassesHandler = (items: unknown[] = [nginxClass]) =>
+  http.get('*/api/v1/clusters/1/resources/ingressclasses', () =>
+    HttpResponse.json({ kind: 'ingressclasses', cluster: 'prod', items }),
+  )
+
+// list-renders-gateway-classes (the GatewayClasses tab of the merged page)
 test('list-renders-gateway-classes', async () => {
   let requestedPath = ''
   let requestedUrl = ''
@@ -134,9 +157,10 @@ test('list-renders-gateway-classes', async () => {
         items: [traefikClass],
       })
     }),
+    ingressClassesHandler(),
   )
   selectProd()
-  renderAt(<GatewayClassView />)
+  renderAt(<IngressClassView />)
 
   // ADR-0040: the name cell is a button (not a Link) — openObject writes
   // the ref and navigates; the URL stays clean.
@@ -145,14 +169,20 @@ test('list-renders-gateway-classes', async () => {
   expect(requestedPath).toBe('/api/v1/clusters/1/resources/gatewayclasses')
   expect(requestedUrl).not.toContain('namespace')
 
-  // card title: EXACT string (the 5.0 `<Kind> List` convention).
-  // Pinned on the heading specifically: the breadcrumb renders the same
-  // text, and a card-title regression must not survive via the breadcrumb.
-  expect(screen.getByRole('heading', { name: 'GatewayClass List' })).toBeTruthy()
-  // breadcrumb: Network → GatewayClass List.
+  // The merged page: card title 'IngressClass List' (the 5.0 `<Kind> List`
+  // convention) + both tabs (CTab = button[role=tab]).
+  expect(screen.getByRole('heading', { name: 'IngressClass List' })).toBeTruthy()
+  expect(screen.getByRole('tab', { name: 'IngressClasses' })).toBeTruthy()
+  expect(screen.getByRole('tab', { name: 'GatewayClasses' })).toBeTruthy()
+  // breadcrumb: Network → IngressClass List.
   expect(screen.getByText('Network')).toBeTruthy()
-  // columns: name, controller, age.
+  // columns, in tab order (both tables mounted): the IngressClasses tab
+  // (Name/Controller/Created) then the GatewayClasses tab (Name/Controller/
+  // Age).
   expect(screen.getAllByRole('columnheader').map((th) => th.textContent)).toEqual([
+    'Name',
+    'Controller',
+    'Created',
     'Name',
     'Controller',
     'Age',
@@ -173,8 +203,9 @@ test('click-name-renders-detail-with-clean-url', async () => {
     http.get('*/api/v1/clusters/1/resources/gatewayclasses', () =>
       HttpResponse.json({ kind: 'gatewayclasses', cluster: 'prod', items: [traefikClass] }),
     ),
+    ingressClassesHandler(),
   )
-  renderAt(<GatewayClassView />)
+  renderAt(<IngressClassView />)
 
   // Clicking the name button opens the detail via openObject; the URL
   // never carries identity (R1).
@@ -197,7 +228,7 @@ test('list-no-cluster-state', async () => {
       return HttpResponse.json({ items: [] })
     }),
   )
-  renderAt(<GatewayClassView />)
+  renderAt(<IngressClassView />)
 
   expect(await screen.findByText('No cluster selected.')).toBeTruthy()
   expect(seen).toHaveLength(0) // no resource fetch is made
@@ -212,9 +243,10 @@ test('list-error-state', async () => {
         { status: 403 },
       ),
     ),
+    ingressClassesHandler(),
   )
   selectProd()
-  renderAt(<GatewayClassView />)
+  renderAt(<IngressClassView />)
 
   expect(
     await screen.findByText(/Error loading gateway classes: RBAC_DENIED: list on gatewayclasses/),
@@ -231,9 +263,10 @@ test('list-crd-absent-empty-state', async () => {
     http.get('*/api/v1/clusters/1/resources/gatewayclasses', () =>
       HttpResponse.json({ kind: 'gatewayclasses', cluster: 'prod', items: [] }),
     ),
+    ingressClassesHandler(),
   )
   selectProd()
-  renderAt(<GatewayClassView />)
+  renderAt(<IngressClassView />)
 
   expect(await screen.findByText('No gateway classes found')).toBeTruthy()
 })

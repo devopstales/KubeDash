@@ -28,7 +28,7 @@
 | [ADR-0019 — Ingress Auth Integration](decisions/04-adr-0019-ingress-auth-integration.md) | `/auth/verify` for NGINX/Traefik/Istio/Gateway API | accepted |
 | [ADR-0020 — Air-Gap Deployment](decisions/04-adr-0020-air-gap-deployment.md) | Zero outbound calls at runtime; air-gap ≠ no-IdP (superseded-in-part by ADR-0021) | accepted |
 | [ADR-0021 — Local Admin Auth](decisions/04-adr-0021-local-admin-auth.md) | Bootstrap password mode; admin kubeconfig source; SSO stays primary | accepted |
-| [ADR-0022 — Sidebar navigation](decisions/04-adr-0022-sidebar-nav-4-1-parity.md) | 4.1 information-parity menu structure; Plugins group dropped | accepted |
+| [ADR-0022 — Sidebar navigation](decisions/04-adr-0022-sidebar-nav-4-1-parity.md) | 4.1 information-parity menu structure; Plugins group dropped; 2026-11-07 amendment: Network group consolidated to Services / Ingress / Ingress Class (Gateway API kinds + GatewayClasses merged in as tabs, old URLs redirect) | accepted |
 | [ADR-0023 — DataTables React](decisions/04-adr-0023-datatables-react.md) | User-management lists use DataTables React with the Bootstrap 5 skin | accepted |
 | [ADR-0024 — Secret syntax highlight](decisions/04-adr-0024-secret-syntax-highlight.md) | Secret values use react-syntax-highlighter (an-old-hope theme) | accepted |
 | [ADR-0025 — HttpOnly session cookie](decisions/04-adr-0025-http-only-session-cookie.md) | Session in HttpOnly cookies; Bearer retained for the kubectl plugin | accepted |

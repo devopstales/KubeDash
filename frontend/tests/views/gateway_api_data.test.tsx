@@ -6,7 +6,9 @@ import { MemoryRouter, Route, Routes, useLocation, useNavigate } from 'react-rou
 import { http, HttpResponse } from 'msw'
 import { afterEach, expect, test } from 'vitest'
 import { server } from '../msw'
-import GatewayApiView from '../../src/views/Network/GatewayApi'
+// 2026-11-07 menu merge: the list route is the tabbed Ingress page
+// (/network/ingress) — the Gateway API kinds are its tabs.
+import IngressView from '../../src/views/Network/Ingress'
 import GatewayApiDataView from '../../src/views/Network/GatewayApiData'
 import { getActiveRef } from '../../src/lib/objectRef'
 import { registerNavigate } from '../../src/components/ObjectRoute'
@@ -34,7 +36,7 @@ const GatewayApiTestRoute = () => {
       bump()
     })
   }, [])
-  if (!isKind) return <GatewayApiView />
+  if (!isKind) return <IngressView />
   return <GatewayApiDataView name={ref!.name} kind={ref!.kind} namespace={ref!.namespace ?? ''} />
 }
 
@@ -45,9 +47,9 @@ const renderAt = () => {
   const qc = new QueryClient({ defaultOptions: { queries: { retry: false } } })
   return render(
     <QueryClientProvider client={qc}>
-      <MemoryRouter initialEntries={['/network/gateway-api']}>
+      <MemoryRouter initialEntries={['/network/ingress']}>
         <Routes>
-          <Route path="/network/gateway-api" element={<GatewayApiTestRoute />} />
+          <Route path="/network/ingress" element={<GatewayApiTestRoute />} />
         </Routes>
       </MemoryRouter>
     </QueryClientProvider>,
@@ -152,8 +154,9 @@ test('gateway-detail-renders-json', async () => {
   expect(searchParams.get('namespace')).toBe('team-a')
   expect(screen.getByRole('heading', { name: 'Gateway Data' })).toBeTruthy()
   expect(screen.getByText('Network')).toBeTruthy()
-  const listLink = screen.getByRole('link', { name: 'Gateway API' })
-  expect(listLink.getAttribute('href')).toBe('/network/gateway-api')
+  // back-link to the merged tabbed list (label = the page title).
+  const listLink = screen.getByRole('link', { name: 'Ingress List' })
+  expect(listLink.getAttribute('href')).toBe('/network/ingress')
   // the kind's field rows (the same field set as the list tab).
   expect(await inTable('envoy')).toBe(true)
   expect(await inTable('web:HTTP:8080')).toBe(true)

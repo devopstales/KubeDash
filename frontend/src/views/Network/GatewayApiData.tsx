@@ -121,8 +121,8 @@ const GatewayApiDataView = ({
           <CBreadcrumb className="my-0" aria-label="breadcrumb">
             <CBreadcrumbItem>Network</CBreadcrumbItem>
             <CBreadcrumbItem>
-              <Link to="/network/gateway-api" onClick={clearActiveRef}>
-                Gateway API
+              <Link to="/network/ingress" onClick={clearActiveRef}>
+                Ingress List
               </Link>
             </CBreadcrumbItem>
             <CBreadcrumbItem active>{name || 'Error'}</CBreadcrumbItem>
@@ -207,8 +207,8 @@ const GatewayApiDataView = ({
         <CBreadcrumb className="my-0" aria-label="breadcrumb">
           <CBreadcrumbItem>Network</CBreadcrumbItem>
           <CBreadcrumbItem>
-            <Link to="/network/gateway-api" onClick={clearActiveRef}>
-              Gateway API
+            <Link to="/network/ingress" onClick={clearActiveRef}>
+              Ingress List
             </Link>
           </CBreadcrumbItem>
           <CBreadcrumbItem active>{name || 'Error'}</CBreadcrumbItem>

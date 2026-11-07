@@ -93,14 +93,13 @@ export function navigation(input: { clusterId: number | null; isAdmin: boolean }
     ]),
     group('Network', cilLan, [
       leaf('Services', '/network/service'),
+      // 2026-11-07 menu merge (owner decision, 4.1 tab pattern): the Gateway
+      // API kinds (gateway / httproute / referencegrant) are TABS of the
+      // Ingress page, and GatewayClasses is a TAB of the Ingress Class page
+      // — no standalone leaves (ADR-0022 amendment). The old
+      // /network/gateway-api + /network/gateway-class URLs redirect.
       leaf('Ingress', '/network/ingress'),
       leaf('Ingress Class', '/network/ingress-class'),
-      leaf('Gateway Class', '/network/gateway-class'),
-      // NEW in 5.0 (4.1 had no Gateway API) — the 2026-10-28
-      // ingress-gateway-api-views spec adds the leaf (a nav change, not a
-      // stub removal). The tabbed page dedupes its GatewayClasses tab to the
-      // standalone /network/gateway-class view.
-      leaf('Gateway API', '/network/gateway-api'),
     ]),
     group('Storage', cilStorage, [
       leaf('ConfigMaps', '/storage/configmap'),

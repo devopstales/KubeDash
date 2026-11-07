@@ -78,8 +78,8 @@ const GatewayClassDataView = ({ name }: { name: string }) => {
         <CBreadcrumb className="my-0" aria-label="breadcrumb">
           <CBreadcrumbItem>Network</CBreadcrumbItem>
           <CBreadcrumbItem>
-            <Link to="/network/gateway-class" onClick={clearActiveRef}>
-              GatewayClass List
+            <Link to="/network/ingress-class" onClick={clearActiveRef}>
+              IngressClass List
             </Link>
           </CBreadcrumbItem>
           <CBreadcrumbItem active>{name || 'Error'}</CBreadcrumbItem>
