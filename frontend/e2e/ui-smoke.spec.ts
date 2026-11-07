@@ -38,7 +38,14 @@ const SMOKE_STUB_ROUTES: Array<{ path: string; title: string }> = [
   { path: '/workload/daemonsets', title: 'DaemonSets' },
   { path: '/workload/replicasets', title: 'ReplicaSets' },
   { path: '/network/service', title: 'Services' },
-  { path: '/network/ingress', title: 'Ingress' },
+  // 2026-11-07 menu merge (ADR-0022 amendment): /network/ingress is the
+  // tabbed page (Ingresses | Gateways | HTTPRoutes | ReferenceGrants) —
+  // the pinned title is the page heading, not the stub's card title.
+  { path: '/network/ingress', title: 'Ingress List' },
+  // The merged Ingress Class page (IngressClasses | GatewayClasses) — real
+  // view, kept in this sweep for the title assertion (same rationale as the
+  // stale-real-view entries below).
+  { path: '/network/ingress-class', title: 'IngressClass List' },
   { path: '/security/network-policy', title: 'Network Policies' },
   { path: '/other-resource/horizontal-pod-autoscaler', title: 'HPAs' },
   { path: '/other-resource/vertical-pod-autoscaler', title: 'VPAs' },
@@ -318,6 +325,24 @@ test.describe.serial('KubeDash UI smoke (local admin)', () => {
     await expect(page).toHaveURL('/security/secret', { timeout: 15_000 })
     await expect(page).not.toHaveURL(/[?#]/)
     // The shell (sidebar) survived the redirect.
+    await expect(page.locator('aside, nav, .sidebar, .c-sidebar').first()).toBeVisible({
+      timeout: 15_000,
+    })
+  })
+
+  // 2026-11-07 menu merge (ADR-0022 amendment): the standalone Gateway API /
+  // Gateway Class pages are gone — their old URLs one-shot redirect to the
+  // merged tabbed pages (the kinds are tabs now; the leaves were dropped).
+  test('menu merge: old gateway URLs redirect to the merged pages', async ({ page }) => {
+    await loginAs(page)
+    await page.goto('/network/gateway-api')
+    await expect(page).toHaveURL('/network/ingress', { timeout: 15_000 })
+    await expect(page).not.toHaveURL(/[?#]/)
+    await expect(page.locator('aside, nav, .sidebar, .c-sidebar').first()).toBeVisible()
+
+    await page.goto('/network/gateway-class')
+    await expect(page).toHaveURL('/network/ingress-class', { timeout: 15_000 })
+    await expect(page).not.toHaveURL(/[?#]/)
     await expect(page.locator('aside, nav, .sidebar, .c-sidebar').first()).toBeVisible({
       timeout: 15_000,
     })
