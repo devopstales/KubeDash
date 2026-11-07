@@ -55,6 +55,8 @@ const adminLabels = [
   'Network',
   'Services',
   'Ingress',
+  'Cert-Manager',
+  'External Load Balancer',
   'Ingress Class',
   'Storage',
   'ConfigMaps',
@@ -82,12 +84,14 @@ const adminLabels = [
 ]
 
 // The 4.1 plugin-gated labels that 5.0 must NOT render (ADR-0022: the
-// Plugins group is dropped; no 5.0 plugin system). 'Gateway API' is
-// banned again as of the 2026-11-07 menu merge: the kinds live as TABS of
+// Plugins group is dropped; no 5.0 plugin system). 'Cert-Manager' +
+// 'External Load Balancer' are legitimate Network leaves as of the
+// 2026-10-29 certmanager-external-loadbalancer-views spec (promoted from
+// the dropped Plugins group — the group itself stays banned). 'Gateway API'
+// is banned again as of the 2026-11-07 menu merge: the kinds live as TABS of
 // the Ingress / Ingress Class pages, not as a leaf (ADR-0022 amendment).
 const banned = [
   'Plugins',
-  'Cert-Manager',
   'LoadBalancers',
   'Trivy Operator',
   'Applications',
@@ -195,6 +199,9 @@ describe('rendered sidebar', () => {
     useSidebarStore.setState({ visible: true })
   })
 
+  // The full sidebar + header render with three authed fetches + userEvent
+  // interactions — the default 5s is too tight under full-suite parallel
+  // load (the test passes standalone but flakes in the 75-file run).
   test('header-uses-namespace-and-4-1-links', async () => {
     server.use(
       http.get('*/api/v1/clusters/:id/resources/namespaces', () =>
@@ -217,7 +224,7 @@ describe('rendered sidebar', () => {
     await user.selectOptions(namespace, 'team-a')
     await user.click(screen.getByRole('button', { name: 'Submit' }))
     expect(useClusterStore.getState().selectedNamespace).toBe('team-a')
-  })
+  }, 15000)
 
   test('sidebar-omits-cluster-details-and-my-access', async () => {
     renderShell('admin')
@@ -235,7 +242,12 @@ describe('rendered sidebar', () => {
     const user = userEvent.setup()
     renderShell('user')
     await user.click(await screen.findByText('Dashboard'))
-    expect(await screen.findByText('Beta')).toBeTruthy()
+    // Scoped to the workload link: the Network group also carries Beta
+    // leaves (Cert-Manager / External Load Balancer, 2026-10-29 spec), so a
+    // bare text query would match more than one badge.
+    expect(
+      await screen.findByText('Beta', { selector: 'a[href="/dashboard/workload-map"] *' }),
+    ).toBeTruthy()
     expect(screen.getByRole('link', { name: /Cluster Metrics/ })).toBeTruthy()
     expect(screen.queryByText('Beta', { selector: 'a[href="/clusters"] *' })).toBeNull()
   })

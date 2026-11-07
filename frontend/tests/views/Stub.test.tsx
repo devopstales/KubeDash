@@ -120,6 +120,21 @@ function expectedStubs() {
     // one-shot to /network/ingress (App.tsx). Guarded here so a re-added
     // nav leaf to the merged path is not stubified.
     '/network/gateway-api',
+    // Real view (2026-10-28-service-views) — the stub route is removed
+    // (promoted to the real view); the /data URL is its TICKET-07 R7
+    // redirect (hydrates the ref from ?name=/?namespace=).
+    '/network/service',
+    '/network/service/data',
+    // Real view (2026-10-29-certmanager-external-loadbalancer-views) — the
+    // 4.1 plugin view promoted to a Network leaf (no Plugins group); the
+    // /data URL is its TICKET-07 R7 redirect (?kind= names the registry
+    // kind).
+    '/network/cert-manager',
+    '/network/cert-manager/data',
+    // Real view (2026-10-29-certmanager-external-loadbalancer-views) —
+    // same promotion + R7 redirect shape as cert-manager.
+    '/network/external-loadbalancer',
+    '/network/external-loadbalancer/data',
   ])
   const seen = new Map<string, string>()
   for (const isAdmin of [true, false]) {

@@ -99,6 +99,16 @@ const GatewayClassDataView = React.lazy(() => import('./views/Network/GatewayCla
 const GatewayApiDataView = React.lazy(() => import('./views/Network/GatewayApiData'))
 const IngressView = React.lazy(() => import('./views/Network/Ingress'))
 const IngressDataView = React.lazy(() => import('./views/Network/IngressData'))
+const ServiceView = React.lazy(() => import('./views/Network/Service'))
+const ServiceDataView = React.lazy(() => import('./views/Network/ServiceData'))
+const CertManagerView = React.lazy(() => import('./views/Network/CertManager'))
+const CertManagerDataView = React.lazy(() => import('./views/Network/CertManagerData'))
+const ExternalLoadBalancerView = React.lazy(
+  () => import('./views/Network/ExternalLoadBalancer'),
+)
+const ExternalLoadBalancerDataView = React.lazy(
+  () => import('./views/Network/ExternalLoadBalancerData'),
+)
 const GroupsView = React.lazy(() => import('./views/Groups'))
 const GroupPrivilegesView = React.lazy(() => import('./views/Groups/GroupPrivileges'))
 const GroupPrivilegeEditView = React.lazy(() => import('./views/Groups/GroupPrivilegeEdit'))
@@ -251,6 +261,96 @@ export const IngressClassRoute = () => {
     return <IngressClassDataView name={ref!.name} />
   }
   return <GatewayClassDataView name={ref!.name} />
+}
+
+/**
+ * ADR-0040 (2026-10-29-certmanager-external-loadbalancer-views): the
+ * /network/cert-manager list route dispatches on the active ref's registry
+ * kind (clusterissuer / issuer / certificaterequest / certificate) — the
+ * four cert-manager.io CRDs are the tabs of the ONE tabbed list (4.1
+ * `plugins/cert_manager` pattern, moved to /network/). Same single-seam
+ * rationale as IngressRoute. clusterissuer is cluster-scoped (the ref
+ * carries no namespace); the other three ride the ref's namespace (R8).
+ */
+export const CertManagerRoute = () => {
+  const navigate = useNavigate()
+  const location = useLocation()
+  const [, bump] = React.useReducer((c: number) => c + 1, 0)
+  const ref = React.useMemo(
+    () => getActiveRef(),
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+    [location, bump],
+  )
+  const isPageKind =
+    ref !== null &&
+    (ref.kind === 'clusterissuer' ||
+      ref.kind === 'issuer' ||
+      ref.kind === 'certificaterequest' ||
+      ref.kind === 'certificate')
+
+  const seamRef = React.useRef(navigate)
+  seamRef.current = navigate
+  React.useEffect(() => {
+    sweepRelay()
+    registerNavigate((path: string) => {
+      seamRef.current(path)
+      bump()
+    })
+  }, [])
+
+  if (!isPageKind) return <CertManagerView />
+  return (
+    <CertManagerDataView
+      name={ref!.name}
+      kind={ref!.kind}
+      namespace={ref!.namespace ?? ''}
+    />
+  )
+}
+
+/**
+ * ADR-0040 (2026-10-29-certmanager-external-loadbalancer-views): the
+ * /network/external-loadbalancer list route dispatches on the active ref's
+ * registry kind (ipaddresspool / l2advertisement / bgppeers /
+ * bgpadvertisement) — the four MetalLB/Cilium LB CRDs are the tabs of the
+ * ONE tabbed list (4.1 `plugins/external_loadbalancer` pattern, moved to
+ * /network/). All four ride the ref's namespace (R8) — the provider
+ * detection is server-side.
+ */
+export const ExternalLoadBalancerRoute = () => {
+  const navigate = useNavigate()
+  const location = useLocation()
+  const [, bump] = React.useReducer((c: number) => c + 1, 0)
+  const ref = React.useMemo(
+    () => getActiveRef(),
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+    [location, bump],
+  )
+  const isPageKind =
+    ref !== null &&
+    (ref.kind === 'ipaddresspool' ||
+      ref.kind === 'l2advertisement' ||
+      ref.kind === 'bgppeers' ||
+      ref.kind === 'bgpadvertisement')
+
+  const seamRef = React.useRef(navigate)
+  seamRef.current = navigate
+  React.useEffect(() => {
+    sweepRelay()
+    registerNavigate((path: string) => {
+      seamRef.current(path)
+      bump()
+    })
+  }, [])
+
+  if (!isPageKind) return <ExternalLoadBalancerView />
+  return (
+    <ExternalLoadBalancerDataView
+      name={ref!.name}
+      kind={ref!.kind}
+      namespace={ref!.namespace ?? ''}
+    />
+  )
 }
 
 /** Old per-user privilege URL. The page now lives at /user/privilege. */
@@ -1066,6 +1166,84 @@ const App = () => {
                               cluster-scoped: no namespace. The old
                               /network/gateway-class URL redirects here. */}
                           <IngressClassRoute />
+                        </ProtectedRoute>
+                      }
+                    />
+                    {/* ADR-0040 (2026-10-28-service-views): ObjectRoute
+                        renders the list or the ref-matched ServiceData on
+                        the clean route; the /data URL is its redirect (it
+                        hydrates the ref from ?name=/?namespace=). */}
+                    <Route
+                      path="/network/service"
+                      element={
+                        <ProtectedRoute>
+                          <ObjectRoute
+                            kind="service"
+                            listRoute="/network/service"
+                            list={<ServiceView />}
+                            detail={(p) => (
+                              <ServiceDataView name={p.name} namespace={p.namespace ?? ''} />
+                            )}
+                          />
+                        </ProtectedRoute>
+                      }
+                    />
+                    <Route
+                      path="/network/service/data"
+                      element={
+                        <ProtectedRoute>
+                          <OldDataRedirect kind="service" listRoute="/network/service" />
+                        </ProtectedRoute>
+                      }
+                    />
+                    {/* ADR-0040 (2026-10-29-certmanager-external-
+                        loadbalancer-views): the tabbed cert-manager page
+                        (Cluster Issuer | Issuer | Certificate Request |
+                        Certificates, 4.1 plugin pattern) renders the list or
+                        the ref-matched detail for ANY of the four kinds on
+                        the clean route (CertManagerRoute dispatcher).
+                        clusterissuer is cluster-scoped; the other three ride
+                        the ref's namespace (R8). */}
+                    <Route
+                      path="/network/cert-manager"
+                      element={
+                        <ProtectedRoute>
+                          <CertManagerRoute />
+                        </ProtectedRoute>
+                      }
+                    />
+                    <Route
+                      path="/network/cert-manager/data"
+                      element={
+                        <ProtectedRoute>
+                          {/* Four registry kinds: ?kind= names the kind
+                              (fallback: the default kind); ?name=/?namespace=
+                              hydrate the ref (TICKET-07's R7 redirect). */}
+                          <OldDataRedirect
+                            kind="clusterissuer"
+                            listRoute="/network/cert-manager"
+                            kindFromParam
+                          />
+                        </ProtectedRoute>
+                      }
+                    />
+                    <Route
+                      path="/network/external-loadbalancer"
+                      element={
+                        <ProtectedRoute>
+                          <ExternalLoadBalancerRoute />
+                        </ProtectedRoute>
+                      }
+                    />
+                    <Route
+                      path="/network/external-loadbalancer/data"
+                      element={
+                        <ProtectedRoute>
+                          <OldDataRedirect
+                            kind="ipaddresspool"
+                            listRoute="/network/external-loadbalancer"
+                            kindFromParam
+                          />
                         </ProtectedRoute>
                       }
                     />

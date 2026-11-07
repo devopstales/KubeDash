@@ -52,10 +52,22 @@ export interface Pod {
   metadata?: {
     name?: string
     namespace?: string
+    /** kubernetes to_dict, snake_case — the Service data page's Pods tab
+     *  renders the first entry as `kind.lower() + "/" + name`. */
+    owner_references?: { kind?: string; name?: string }[]
+    [key: string]: unknown
+  }
+  spec?: {
+    /** kubernetes to_dict, snake_case — the pod's assigned node (absent
+     *  when unscheduled). */
+    node_name?: string
     [key: string]: unknown
   }
   status?: {
     phase?: string
+    /** kubernetes to_dict, snake_case — the pod IP (absent when not yet
+     *  assigned). */
+    pod_ip?: string
     [key: string]: unknown
   }
   [key: string]: unknown
@@ -185,6 +197,37 @@ export interface K8sSecret {
   }
   type?: string | null
   data?: Record<string, string> | null
+  [key: string]: unknown
+}
+
+/** A Service port entry (kubernetes to_dict, snake_case). */
+export interface ServicePort {
+  name?: string
+  port?: number
+  protocol?: string
+  target_port?: number | string
+  node_port?: number
+}
+
+/** A Service item as returned by /api/v1/clusters/<id>/resources/services (kubernetes to_dict, snake_case; namespaced, core v1). ``spec``/``status`` are present (NOT stripped, unlike secrets — the data page's Ports/Pods tabs and the list's External IP cell read them). */
+export interface ServiceItem {
+  metadata?: {
+    name?: string
+    namespace?: string
+    creation_timestamp?: string | null
+    resource_version?: string | null
+    labels?: Record<string, string> | null
+    annotations?: Record<string, string> | null
+  }
+  spec?: {
+    type?: string
+    cluster_ip?: string
+    selector?: Record<string, string>
+    ports?: ServicePort[]
+  }
+  status?: {
+    load_balancer?: { ingress?: { ip?: string; hostname?: string }[] }
+  }
   [key: string]: unknown
 }
 
@@ -650,6 +693,298 @@ export interface ReferenceGrantItem {
   spec?: {
     from?: { group?: string; kind?: string; namespace?: string }[]
     to?: { group?: string; kind?: string }[]
+  }
+  [key: string]: unknown
+}
+
+// ---- cert-manager.io/v1 CRDs (full custom objects, camelCase wire form) ----
+
+/** A cert-manager status condition (full custom object, camelCase). The list
+ *  views' Status badge renders the LAST condition's `reason` (green when its
+ *  `status === "True"`, red otherwise — the 4.1 mapping). */
+export interface CertManagerCondition {
+  type?: string
+  status?: string
+  reason?: string
+  message?: string
+}
+
+/** An ownerReference on a custom object's metadata (camelCase wire form). */
+export interface OwnerReference {
+  apiVersion?: string
+  kind?: string
+  name?: string
+  uid?: string
+  controller?: boolean
+  blockOwnerDeletion?: boolean
+}
+
+/** A cert-manager ACME solver (full custom object, camelCase). */
+export interface AcmeSolver {
+  http01?: Record<string, unknown>
+  dns01?: Record<string, unknown>
+  [key: string]: unknown
+}
+
+/** A cert-manager issuer ACME spec (full custom object, camelCase). */
+export interface AcmeSpec {
+  email?: string
+  server?: string
+  solvers?: AcmeSolver[]
+  privateKeySecretRef?: { name?: string }
+  [key: string]: unknown
+}
+
+/** A cert-manager issuer Vault spec (full custom object, camelCase). */
+export interface VaultSpec {
+  path?: string
+  server?: string
+  authMethod?: string
+  secretName?: string
+  auth?: {
+    appRole?: { roleId?: string; secretRef?: { name?: string } }
+    tokenSecretRef?: { name?: string }
+    kubernetes?: { role?: string; serviceAccountRef?: { name?: string } }
+  }
+  [key: string]: unknown
+}
+
+/** The spec shared by ClusterIssuer and Issuer (full custom object, camelCase). The 4.1 type classification reads spec.selfSigned / spec.ca / spec.acme / spec.vault (a later-present key wins; 5.0 renders `Self Signed` — 4.1's "Sel Signed" typo fixed). */
+export interface IssuerSpec {
+  selfSigned?: Record<string, unknown>
+  ca?: { secretName?: string; [key: string]: unknown }
+  acme?: AcmeSpec
+  vault?: VaultSpec
+  [key: string]: unknown
+}
+
+/** A ClusterIssuer (cert-manager.io/v1 CRD, CLUSTER-scoped; full custom object, camelCase — the raw object, NOT a projection). */
+export interface ClusterIssuerItem {
+  metadata?: {
+    name?: string
+    creationTimestamp?: string
+    labels?: Record<string, string>
+    annotations?: Record<string, string>
+    ownerReferences?: OwnerReference[]
+  }
+  spec?: IssuerSpec
+  status?: {
+    conditions?: CertManagerCondition[]
+    [key: string]: unknown
+  }
+  [key: string]: unknown
+}
+
+/** An Issuer (cert-manager.io/v1 CRD, namespaced; full custom object, camelCase). */
+export interface IssuerItem {
+  metadata?: {
+    name?: string
+    namespace?: string
+    creationTimestamp?: string
+    labels?: Record<string, string>
+    annotations?: Record<string, string>
+    ownerReferences?: OwnerReference[]
+  }
+  spec?: IssuerSpec
+  status?: {
+    conditions?: CertManagerCondition[]
+    [key: string]: unknown
+  }
+  [key: string]: unknown
+}
+
+/** A CertificateRequest (cert-manager.io/v1 CRD, namespaced; full custom object, camelCase). */
+export interface CertificateRequestItem {
+  metadata?: {
+    name?: string
+    namespace?: string
+    creationTimestamp?: string
+    labels?: Record<string, string>
+    annotations?: Record<string, string>
+    ownerReferences?: OwnerReference[]
+  }
+  spec?: {
+    request?: string
+    issuerRef?: { name?: string; kind?: string }
+    [key: string]: unknown
+  }
+  status?: {
+    conditions?: CertManagerCondition[]
+    certificate?: string
+    [key: string]: unknown
+  }
+  [key: string]: unknown
+}
+
+/** A Certificate (cert-manager.io/v1 CRD, namespaced; full custom object, camelCase). */
+export interface CertificateItem {
+  metadata?: {
+    name?: string
+    namespace?: string
+    creationTimestamp?: string
+    labels?: Record<string, string>
+    annotations?: Record<string, string>
+    ownerReferences?: OwnerReference[]
+  }
+  spec?: {
+    secretName?: string
+    issuerRef?: { name?: string; kind?: string }
+    dnsNames?: string[]
+    [key: string]: unknown
+  }
+  status?: {
+    conditions?: CertManagerCondition[]
+    notAfter?: string
+    renewalTime?: string
+    [key: string]: unknown
+  }
+  [key: string]: unknown
+}
+
+// ---- MetalLB / Cilium external-LB CRDs (full custom objects, camelCase) ----
+
+/** A k8s LabelSelector (camelCase wire form). */
+export interface LabelSelector {
+  matchLabels?: Record<string, string>
+  matchExpressions?: { key?: string; operator?: string; values?: string[] }[]
+}
+
+/**
+ * An IP Address Pool — provider-detected (MetalLB `ipaddresspools`,
+ * namespaced, primary; Cilium `ciliumloadbalancerippools`, cluster-scoped,
+ * fallback). Full custom object (camelCase) tagged with a top-level
+ * `provider` field (`"metallb"` / `"cilium"`) — the list view's Type column.
+ */
+export interface IpAddressPoolItem {
+  provider?: string
+  metadata?: {
+    name?: string
+    namespace?: string
+    creationTimestamp?: string
+    labels?: Record<string, string>
+    annotations?: Record<string, string>
+  }
+  spec?: {
+    // MetalLB
+    addresses?: string[]
+    autoAssign?: boolean
+    avoidBuggyIPs?: boolean
+    serviceAllocation?: {
+      priority?: number
+      namespaces?: string[]
+      namespaceSelectors?: LabelSelector[]
+      podSelector?: LabelSelector
+      serviceSelectors?: LabelSelector[]
+    }
+    // Cilium
+    cidrs?: string[]
+    allowFirstLastIPs?: boolean
+    disabled?: boolean
+    ipFamilyPolicy?: string
+    ipFamilies?: string[]
+    [key: string]: unknown
+  }
+  [key: string]: unknown
+}
+
+/**
+ * An L2 Advertisement — provider-detected (MetalLB `l2advertisements`,
+ * namespaced, primary; Cilium `ciliuml2announcementpolicies`, cluster-scoped,
+ * fallback). Full custom object (camelCase) + the `provider` tag.
+ */
+export interface L2AdvertisementItem {
+  provider?: string
+  metadata?: {
+    name?: string
+    namespace?: string
+    creationTimestamp?: string
+    labels?: Record<string, string>
+    annotations?: Record<string, string>
+  }
+  spec?: {
+    // MetalLB
+    ipAddressPools?: string[]
+    interfaces?: string[]
+    ipAddressPoolSelectors?: LabelSelector[]
+    nodeSelectors?: LabelSelector[]
+    // Cilium
+    serviceSelector?: LabelSelector
+    nodeSelector?: LabelSelector
+    externalIPs?: string[]
+    loadBalancerIPs?: string[]
+    [key: string]: unknown
+  }
+  [key: string]: unknown
+}
+
+/**
+ * A BGP Peer — provider-detected (MetalLB `bgppeers`, namespaced, primary;
+ * Cilium `ciliumbgppeeringpolicies`, cluster-scoped, fallback). Full custom
+ * object (camelCase) + the `provider` tag.
+ */
+export interface BgpPeerItem {
+  provider?: string
+  metadata?: {
+    name?: string
+    namespace?: string
+    creationTimestamp?: string
+    labels?: Record<string, string>
+    annotations?: Record<string, string>
+  }
+  spec?: {
+    // MetalLB
+    myASN?: number
+    peerASN?: number
+    peerAddress?: string
+    sourceAddress?: string
+    peerPort?: number
+    holdTime?: number
+    keepaliveTime?: number
+    connectTime?: number
+    routerID?: string
+    nodeSelectors?: LabelSelector[]
+    passwordSecret?: { name?: string }
+    bfdProfile?: string
+    ebgpMultiHop?: number
+    vrf?: string
+    disableMP?: boolean
+    // Cilium
+    nodeSelector?: LabelSelector
+    virtualRouters?: {
+      localASN?: number
+      exportPodCIDR?: boolean
+      neighbors?: { peerAddress?: string; peerASN?: number }[]
+      [key: string]: unknown
+    }[]
+    [key: string]: unknown
+  }
+  [key: string]: unknown
+}
+
+/**
+ * A BGP Advertisement — MetalLB `bgpadvertisements` ONLY (no Cilium
+ * fallback — no Cilium equivalent). Full custom object (camelCase) + the
+ * `provider` tag (always `"metallb"`).
+ */
+export interface BgpAdvertisementItem {
+  provider?: string
+  metadata?: {
+    name?: string
+    namespace?: string
+    creationTimestamp?: string
+    labels?: Record<string, string>
+    annotations?: Record<string, string>
+  }
+  spec?: {
+    aggregationLength?: number
+    aggregationLengthV6?: number
+    localPref?: number
+    communities?: string[]
+    ipAddressPools?: string[]
+    ipAddressPoolSelectors?: LabelSelector[]
+    nodeSelectors?: LabelSelector[]
+    peers?: string[]
+    [key: string]: unknown
   }
   [key: string]: unknown
 }

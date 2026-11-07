@@ -99,6 +99,22 @@ export function navigation(input: { clusterId: number | null; isAdmin: boolean }
       // — no standalone leaves (ADR-0022 amendment). The old
       // /network/gateway-api + /network/gateway-class URLs redirect.
       leaf('Ingress', '/network/ingress'),
+      // 2026-10-29 (certmanager-external-loadbalancer-views): the two 4.1
+      // plugin views are promoted to Network leaves (the /plugins/ ->
+      // /network/ move — NO Plugins group revived, ADR-0022 "minus Plugins"
+      // stays intact). The 4.1 `Beta` badge is kept.
+      {
+        component: CNavItem,
+        name: 'Cert-Manager',
+        to: '/network/cert-manager',
+        badge: { color: 'warning', text: 'Beta' },
+      },
+      {
+        component: CNavItem,
+        name: 'External Load Balancer',
+        to: '/network/external-loadbalancer',
+        badge: { color: 'warning', text: 'Beta' },
+      },
       leaf('Ingress Class', '/network/ingress-class'),
     ]),
     group('Storage', cilStorage, [
