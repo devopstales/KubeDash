@@ -5,8 +5,7 @@ date: '2026-10-21'
 status: accepted
 ---
 
-Source: `.skillgrid/artifacts/04-adr-0022-sidebar-nav-4-1-parity.md`
-
+Source: `.skillgrid/knowledge/decisions/04-adr-0022-sidebar-nav-4-1-parity.md`
 # Sidebar navigation: 4.1 information-parity structure, Plugins group dropped
 
 ---
@@ -85,7 +84,8 @@ mapping):
 | **Interface** Workloads | DaemonSets | `/workload/daemonsets` | stub | stub |
 | **Interface** Workloads | ReplicaSets | `/workload/replicasets` | stub | stub |
 | **Interface** Network | Services | `/network/service` | stub | stub |
-| **Interface** Network | Ingress | `/network/ingress` | stub | stub |
+| **Interface** Network | Ingress | `/network/ingress` | `/network/ingress` | implemented (feature) — tabbed page: Ingresses \| Gateways \| HTTPRoutes \| ReferenceGrants (2026-10-28 spec; the Gateway API kinds merged in as tabs 2026-11-07, see Amendments) |
+| **Interface** Network | Ingress Class | *(5.0-only — 4.1 had no menu entry; the classes lived in the Ingress page's tabs)* | `/network/ingress-class` | implemented (feature) — tabbed page: IngressClasses \| GatewayClasses (2026-10-28 spec; GatewayClasses merged in as a tab 2026-11-07, see Amendments) |
 | **Interface** Storage | ConfigMaps | `/storage/configmap` | stub | stub |
 | **Interface** Storage | Volumes | `/storage/pv` | stub | stub |
 | **Interface** Storage | VolumeClaims | `/storage/pvc` | stub | stub |
@@ -93,8 +93,8 @@ mapping):
 | **Interface** Storage | StorageClass | `/storage/storage-class` | stub | stub |
 | **Interface** Storage | SnapshotClass | `/storage/snapshot-class` | stub | stub |
 | **Interface** Security | Secrets | `/security/secret` | stub | stub |
-| **Interface** Security | Network Policies | `/security/network-policy` | stub | stub |
-| **Interface** Security | Priority Classes | `/security/priorityclass` | stub | stub |
+| **Interface** Security | Network Policies | `/security/network-policy` | `/security/network-policy` (+ `/data` detail) | implemented (feature) — 4.1 parity list + detail on three R4 kinds (networkpolicies, ciliumnetworkpolicies, ciliumclusterwidenetworkpolicies), SAR-gated (2026-10-28) |
+| **Interface** Security | Priority Classes | `/security/priorityclass` | `/other-resource/priorityclass` | implemented (feature) — 5.0 group: Other Resources (ratified deviation, 2026-10-27: 4.1's API already lived in other-resources; first real page in the group) |
 | **Interface** Other Resources | HPAs | `/other-resource/horizontal-pod-autoscaler` | stub | stub |
 | **Interface** Other Resources | VPAs | `/other-resource/vertical-pod-autoscaler` | stub | stub |
 | **Interface** Other Resources | Pod Disruption Budget | `/other-resource/pod-disruption-budget` | stub | stub |
@@ -133,6 +133,29 @@ self-service kubeconfig surface (ADR-0013) and has no 4.1 equivalent.
 order, admin gating of the Settings group); no nav entry points at a 4.1-only route
 that has no 5.0 counterpart; the air-gap check (`task fe-check`) stays green (no new
 external URLs introduced).
+
+#### Amendments
+
+- **2026-11-07 — menu merge: the Network group is consolidated to three
+  leaves (owner decision).** The 2026-10-28 specs had grown the Network group
+  to five leaves (Services, Ingress, Ingress Class, Gateway Class, Gateway
+  API). The owner consolidated the standalone Gateway API and Gateway Class
+  leaves back into 4.1's tab pattern
+  (`network/ingress.html.j2` / `network/ingress-class.html.j2`): the Gateway
+  API kinds (Gateway, HTTPRoute, ReferenceGrant) are now TABS of the Ingress
+  page, and GatewayClasses is a tab of the Ingress Class page. The Network
+  group is now exactly Services, Ingress, Ingress Class. The old URLs
+  `/network/gateway-api` and `/network/gateway-class` one-shot redirect to
+  their merged pages (the ADR-0040 redirect pattern); an active ref of those
+  kinds survives the redirect because the ref is session-scoped, not
+  URL-bound. The Plugins-group consequence above is unchanged: 4.1's
+  plugin-gated "Gateway API" entry remains absent from the menu — the kinds
+  exist as tabs, not as a leaf (hence `Gateway API` is again banned in
+  `frontend/tests/nav.test.tsx`). Confirmation: `frontend/src/_nav.tsx`
+  (three Network leaves), `frontend/tests/nav.test.tsx` (labels + ban),
+  `frontend/tests/App.test.tsx` (the dispatchers: a gateway row renders the
+  gateway detail on `/network/ingress`; a gatewayclass row renders the
+  gatewayclass detail on `/network/ingress-class`).
 
 #### Pros and Cons of the Options
 
