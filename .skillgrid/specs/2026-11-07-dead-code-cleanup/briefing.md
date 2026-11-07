@@ -70,3 +70,9 @@ Test-only exports (`resetRefreshForTests`, `setLoginRedirectForTests`,
 
 - Any behaviour change. Refactors of live code. The 23 backend files
   (verification only). Backend architecture (change A).
+
+## Fast-Track Waiver
+- Class: small
+- Skips: none exercised — full pipeline ran (blueprint + critics authored 2026-11-07)
+- Reason: pure deletions + import cleanup, no behaviour change, L1 verification floor
+- Approved by: user (2026-11-07)

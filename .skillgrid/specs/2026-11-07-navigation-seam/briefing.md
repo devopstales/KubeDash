@@ -54,3 +54,9 @@
 
 - Backend (A), the registry/route generation (B), dead-code chore (D).
 - URL changes. New navigation features. Relay protocol changes.
+
+## Fast-Track Waiver
+- Class: small
+- Skips: none exercised — full pipeline ran (blueprint + critics authored 2026-11-07)
+- Reason: L1 verification floor change, no new capability
+- Approved by: user (2026-11-07)

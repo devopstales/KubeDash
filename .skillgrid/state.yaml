@@ -204,14 +204,20 @@ in_flight:
   # Architecture review 2026-11-07 (jscpd health 32/E): declared-kinds
   # per ADR-0041 — interview settled 16 decisions (mnemonic
   # interview/kind-arch-20261107). Four changes, order D -> A -> B -> C.
+  # Sliced 2026-11-07 (23 tickets TASK-073..095, milestones m-3..m-6);
+  # all four High review-risk (chained PRs, ask-on-risk, chain pending).
   - change: 2026-11-07-dead-code-cleanup
-    phase: blueprint
+    phase: slicing
+    tracker: [TASK-089, TASK-090, TASK-091, TASK-092, TASK-093, TASK-094, TASK-095]
   - change: 2026-11-07-kind-catalog
-    phase: blueprint
+    phase: slicing
+    tracker: [TASK-073, TASK-074, TASK-075, TASK-076, TASK-077, TASK-078, TASK-079]
   - change: 2026-11-07-frontend-kind-registry
-    phase: blueprint
+    phase: slicing
+    tracker: [TASK-080, TASK-081, TASK-082, TASK-083, TASK-084]
   - change: 2026-11-07-navigation-seam
-    phase: blueprint
+    phase: slicing
+    tracker: [TASK-085, TASK-086, TASK-087, TASK-088]
 completed_changes:
   - 2026-10-17-kubedash-base-structure
   - 2026-10-17-swagger-ui-air-gap
