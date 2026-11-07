@@ -107,6 +107,13 @@ function expectedStubs() {
     // shipped, so there is no R7 redirect — the single clean route only.
     '/network/ingress-class',
     '/network/gateway-class',
+    // Real view (2026-10-28-ingress-gateway-api-views) — the stub route is
+    // removed (promoted to the real view); the /data URL never shipped, so
+    // there is no R7 redirect — the single clean route only.
+    '/network/ingress',
+    // Real view (2026-10-28-ingress-gateway-api-views, the tabbed page +
+    // multi-kind dispatcher) — new nav leaf, not a stub route.
+    '/network/gateway-api',
   ])
   const seen = new Map<string, string>()
   for (const isAdmin of [true, false]) {
@@ -150,7 +157,8 @@ test('every-stub-entry-has-a-page', () => {
   for (const route of stubRoutes) {
     expect(route.admin).toBe(route.path.startsWith('/settings/'))
   }
-  for (const title of ['Workload', 'Ingress']) {
+  // 'Ingress' left this list when /network/ingress got its real view.
+  for (const title of ['Workload']) {
     expect(stubRoutes.some((route) => route.title === title)).toBe(true)
   }
 })

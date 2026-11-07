@@ -57,6 +57,9 @@ const adminLabels = [
   'Ingress',
   'Ingress Class',
   'Gateway Class',
+  // The 2026-10-28 ingress-gateway-api-views spec adds the leaf (5.0-only —
+  // 4.1 had no Gateway API); it moves out of `banned` below with it.
+  'Gateway API',
   'Storage',
   'ConfigMaps',
   'Volumes',
@@ -82,11 +85,14 @@ const adminLabels = [
   'Audit Log',
 ]
 
+// The 4.1 plugin-gated labels that 5.0 must NOT render (ADR-0022: the
+// Plugins group is dropped; no 5.0 plugin system). 'Gateway API' is no
+// longer banned: the 2026-10-28 ingress-gateway-api-views spec ships it as
+// a first-class leaf (2026-11-07).
 const banned = [
   'Plugins',
   'Cert-Manager',
   'LoadBalancers',
-  'Gateway API',
   'Trivy Operator',
   'Applications',
 ]

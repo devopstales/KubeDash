@@ -99,6 +99,8 @@ const GatewayClassView = React.lazy(() => import('./views/Network/GatewayClass')
 const GatewayClassDataView = React.lazy(() => import('./views/Network/GatewayClassData'))
 const GatewayApiView = React.lazy(() => import('./views/Network/GatewayApi'))
 const GatewayApiDataView = React.lazy(() => import('./views/Network/GatewayApiData'))
+const IngressView = React.lazy(() => import('./views/Network/Ingress'))
+const IngressDataView = React.lazy(() => import('./views/Network/IngressData'))
 const GroupsView = React.lazy(() => import('./views/Groups'))
 const GroupPrivilegesView = React.lazy(() => import('./views/Groups/GroupPrivileges'))
 const GroupPrivilegeEditView = React.lazy(() => import('./views/Groups/GroupPrivilegeEdit'))
@@ -996,6 +998,28 @@ const App = () => {
                             listRoute="/storage/pv"
                             list={<PvView />}
                             detail={(p) => <PvDataView name={p.name} />}
+                          />
+                        </ProtectedRoute>
+                      }
+                    />
+                    <Route
+                      path="/network/ingress"
+                      element={
+                        <ProtectedRoute>
+                          {/* ADR-0040: ObjectRoute renders the list or the
+                              ref-matched detail on the clean route. This
+                              kind WAS a stub (the 4.1-parity port, 2026-10-28
+                              ingress-gateway-api-views) — the /data URL
+                              never shipped, so NO legacy /data route, no R7
+                              redirect. Namespaced: the namespace rides in
+                              the ref (R8). */}
+                          <ObjectRoute
+                            kind="ingress"
+                            listRoute="/network/ingress"
+                            list={<IngressView />}
+                            detail={(p) => (
+                              <IngressDataView name={p.name} namespace={p.namespace ?? ''} />
+                            )}
                           />
                         </ProtectedRoute>
                       }
