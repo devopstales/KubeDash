@@ -1278,6 +1278,289 @@ class K8sClient:
         item = self._crd_body(item)
         return [item.to_dict() if hasattr(item, "to_dict") else item]
 
+    # MetalLB / Cilium external-LB CRDs — the 4.1 external-loadbalancer
+    # plugin, moved to /network/ by the
+    # certmanager-external-loadbalancer-views change. Provider detection
+    # (ratified 2026-10-29): MetalLB primary (namespaced, metallb.io),
+    # Cilium fallback (cluster-scoped, cilium.io); bgpadvertisements is
+    # MetalLB-ONLY (no Cilium branch). Both absent -> []. Each item is
+    # tagged with a top-level ``provider`` field ("metallb" / "cilium")
+    # for the view's Type column. (``_CILIUM_GROUP`` is the existing
+    # Cilium-kinds constant.)
+    _METALLB_GROUP = "metallb.io"
+
+    def list_ipaddresspools(self, namespace: str | None) -> list[dict[str, Any]]:
+        """IP Address Pools — provider-detected (MetalLB primary, Cilium
+        fallback, ratified 2026-10-29): MetalLB ipaddresspools (namespaced,
+        metallb.io) if present; else Cilium ciliumloadbalancerippools
+        (cluster-scoped, cilium.io); both absent -> []. Each item is tagged
+        with a ``provider`` field (metallb / cilium) for the view's Type
+        column."""
+        served_ml = self.get_crd_served(self._METALLB_GROUP, "ipaddresspools")
+        if served_ml is not None:
+            version, _scope = served_ml
+            custom = self._custom()
+            try:
+                resp = custom.list_namespaced_custom_object(
+                    self._METALLB_GROUP, version, namespace, "ipaddresspools"
+                )
+            except ApiException as e:
+                self._unreachable("list_ipaddresspools", e)
+                raise AssertionError("unreachable") from e
+            items = self._crd_body(resp).get("items", [])
+            return [
+                {**i, "provider": "metallb"}
+                for i in (x.to_dict() if hasattr(x, "to_dict") else x for x in items)
+            ]
+        served_cil = self.get_crd_served(self._CILIUM_GROUP, "ciliumloadbalancerippools")
+        if served_cil is not None:
+            version, _scope = served_cil
+            custom = self._custom()
+            try:
+                resp = custom.list_cluster_custom_object(
+                    self._CILIUM_GROUP, version, "ciliumloadbalancerippools"
+                )
+            except ApiException as e:
+                self._unreachable("list_ipaddresspools", e)
+                raise AssertionError("unreachable") from e
+            items = self._crd_body(resp).get("items", [])
+            return [
+                {**i, "provider": "cilium"}
+                for i in (x.to_dict() if hasattr(x, "to_dict") else x for x in items)
+            ]
+        return []
+
+    def get_ipaddresspool(self, namespace: str, name: str) -> list[dict[str, Any]]:
+        """One IP Address Pool as a 0/1-item full custom object tagged with
+        the detected ``provider``; [] on 404 or when both providers are
+        absent. MetalLB primary (namespaced read), Cilium fallback
+        (cluster-scoped read)."""
+        served_ml = self.get_crd_served(self._METALLB_GROUP, "ipaddresspools")
+        if served_ml is not None:
+            version, _scope = served_ml
+            custom = self._custom()
+            try:
+                item = custom.get_namespaced_custom_object(
+                    self._METALLB_GROUP, version, namespace, "ipaddresspools", name
+                )
+            except ApiException as e:
+                if e.status == 404:
+                    return []
+                self._unreachable("get_ipaddresspool", e)
+                raise AssertionError("unreachable") from e
+            item = self._crd_body(item)
+            return [{**item, "provider": "metallb"}]
+        served_cil = self.get_crd_served(self._CILIUM_GROUP, "ciliumloadbalancerippools")
+        if served_cil is not None:
+            version, _scope = served_cil
+            custom = self._custom()
+            try:
+                item = custom.get_cluster_custom_object(
+                    self._CILIUM_GROUP, version, "ciliumloadbalancerippools", name
+                )
+            except ApiException as e:
+                if e.status == 404:
+                    return []
+                self._unreachable("get_ipaddresspool", e)
+                raise AssertionError("unreachable") from e
+            item = self._crd_body(item)
+            return [{**item, "provider": "cilium"}]
+        return []
+
+    def list_l2advertisements(self, namespace: str | None) -> list[dict[str, Any]]:
+        """L2 Advertisements — provider-detected: MetalLB l2advertisements
+        (namespaced, metallb.io) if present; else Cilium
+        ciliuml2announcementpolicies (cluster-scoped, cilium.io); both
+        absent -> []. Items tagged with the detected ``provider``."""
+        served_ml = self.get_crd_served(self._METALLB_GROUP, "l2advertisements")
+        if served_ml is not None:
+            version, _scope = served_ml
+            custom = self._custom()
+            try:
+                resp = custom.list_namespaced_custom_object(
+                    self._METALLB_GROUP, version, namespace, "l2advertisements"
+                )
+            except ApiException as e:
+                self._unreachable("list_l2advertisements", e)
+                raise AssertionError("unreachable") from e
+            items = self._crd_body(resp).get("items", [])
+            return [
+                {**i, "provider": "metallb"}
+                for i in (x.to_dict() if hasattr(x, "to_dict") else x for x in items)
+            ]
+        served_cil = self.get_crd_served(self._CILIUM_GROUP, "ciliuml2announcementpolicies")
+        if served_cil is not None:
+            version, _scope = served_cil
+            custom = self._custom()
+            try:
+                resp = custom.list_cluster_custom_object(
+                    self._CILIUM_GROUP, version, "ciliuml2announcementpolicies"
+                )
+            except ApiException as e:
+                self._unreachable("list_l2advertisements", e)
+                raise AssertionError("unreachable") from e
+            items = self._crd_body(resp).get("items", [])
+            return [
+                {**i, "provider": "cilium"}
+                for i in (x.to_dict() if hasattr(x, "to_dict") else x for x in items)
+            ]
+        return []
+
+    def get_l2advertisement(self, namespace: str, name: str) -> list[dict[str, Any]]:
+        """One L2 Advertisement as a 0/1-item full custom object tagged
+        with the detected ``provider``; [] on 404 or when both providers
+        are absent. MetalLB primary, Cilium fallback."""
+        served_ml = self.get_crd_served(self._METALLB_GROUP, "l2advertisements")
+        if served_ml is not None:
+            version, _scope = served_ml
+            custom = self._custom()
+            try:
+                item = custom.get_namespaced_custom_object(
+                    self._METALLB_GROUP, version, namespace, "l2advertisements", name
+                )
+            except ApiException as e:
+                if e.status == 404:
+                    return []
+                self._unreachable("get_l2advertisement", e)
+                raise AssertionError("unreachable") from e
+            item = self._crd_body(item)
+            return [{**item, "provider": "metallb"}]
+        served_cil = self.get_crd_served(self._CILIUM_GROUP, "ciliuml2announcementpolicies")
+        if served_cil is not None:
+            version, _scope = served_cil
+            custom = self._custom()
+            try:
+                item = custom.get_cluster_custom_object(
+                    self._CILIUM_GROUP, version, "ciliuml2announcementpolicies", name
+                )
+            except ApiException as e:
+                if e.status == 404:
+                    return []
+                self._unreachable("get_l2advertisement", e)
+                raise AssertionError("unreachable") from e
+            item = self._crd_body(item)
+            return [{**item, "provider": "cilium"}]
+        return []
+
+    def list_bgppeers(self, namespace: str | None) -> list[dict[str, Any]]:
+        """BGP Peers — provider-detected: MetalLB bgppeers (namespaced,
+        metallb.io) if present; else Cilium ciliumbgppeeringpolicies
+        (cluster-scoped, cilium.io); both absent -> []. Items tagged with
+        the detected ``provider``."""
+        served_ml = self.get_crd_served(self._METALLB_GROUP, "bgppeers")
+        if served_ml is not None:
+            version, _scope = served_ml
+            custom = self._custom()
+            try:
+                resp = custom.list_namespaced_custom_object(
+                    self._METALLB_GROUP, version, namespace, "bgppeers"
+                )
+            except ApiException as e:
+                self._unreachable("list_bgppeers", e)
+                raise AssertionError("unreachable") from e
+            items = self._crd_body(resp).get("items", [])
+            return [
+                {**i, "provider": "metallb"}
+                for i in (x.to_dict() if hasattr(x, "to_dict") else x for x in items)
+            ]
+        served_cil = self.get_crd_served(self._CILIUM_GROUP, "ciliumbgppeeringpolicies")
+        if served_cil is not None:
+            version, _scope = served_cil
+            custom = self._custom()
+            try:
+                resp = custom.list_cluster_custom_object(
+                    self._CILIUM_GROUP, version, "ciliumbgppeeringpolicies"
+                )
+            except ApiException as e:
+                self._unreachable("list_bgppeers", e)
+                raise AssertionError("unreachable") from e
+            items = self._crd_body(resp).get("items", [])
+            return [
+                {**i, "provider": "cilium"}
+                for i in (x.to_dict() if hasattr(x, "to_dict") else x for x in items)
+            ]
+        return []
+
+    def get_bgppeer(self, namespace: str, name: str) -> list[dict[str, Any]]:
+        """One BGP Peer as a 0/1-item full custom object tagged with the
+        detected ``provider``; [] on 404 or when both providers are absent.
+        MetalLB primary, Cilium fallback."""
+        served_ml = self.get_crd_served(self._METALLB_GROUP, "bgppeers")
+        if served_ml is not None:
+            version, _scope = served_ml
+            custom = self._custom()
+            try:
+                item = custom.get_namespaced_custom_object(
+                    self._METALLB_GROUP, version, namespace, "bgppeers", name
+                )
+            except ApiException as e:
+                if e.status == 404:
+                    return []
+                self._unreachable("get_bgppeer", e)
+                raise AssertionError("unreachable") from e
+            item = self._crd_body(item)
+            return [{**item, "provider": "metallb"}]
+        served_cil = self.get_crd_served(self._CILIUM_GROUP, "ciliumbgppeeringpolicies")
+        if served_cil is not None:
+            version, _scope = served_cil
+            custom = self._custom()
+            try:
+                item = custom.get_cluster_custom_object(
+                    self._CILIUM_GROUP, version, "ciliumbgppeeringpolicies", name
+                )
+            except ApiException as e:
+                if e.status == 404:
+                    return []
+                self._unreachable("get_bgppeer", e)
+                raise AssertionError("unreachable") from e
+            item = self._crd_body(item)
+            return [{**item, "provider": "cilium"}]
+        return []
+
+    def list_bgpadvertisements(self, namespace: str | None) -> list[dict[str, Any]]:
+        """BGP Advertisements — MetalLB-ONLY (NO Cilium branch, ratified
+        2026-10-29): MetalLB bgpadvertisements (namespaced, metallb.io) if
+        present; MetalLB absent -> [] (Cilium has no equivalent). Items
+        tagged ``provider: "metallb"``."""
+        served_ml = self.get_crd_served(self._METALLB_GROUP, "bgpadvertisements")
+        if served_ml is not None:
+            version, _scope = served_ml
+            custom = self._custom()
+            try:
+                resp = custom.list_namespaced_custom_object(
+                    self._METALLB_GROUP, version, namespace, "bgpadvertisements"
+                )
+            except ApiException as e:
+                self._unreachable("list_bgpadvertisements", e)
+                raise AssertionError("unreachable") from e
+            items = self._crd_body(resp).get("items", [])
+            return [
+                {**i, "provider": "metallb"}
+                for i in (x.to_dict() if hasattr(x, "to_dict") else x for x in items)
+            ]
+        return []
+
+    def get_bgpadvertisement(self, namespace: str, name: str) -> list[dict[str, Any]]:
+        """One BGP Advertisement as a 0/1-item full custom object tagged
+        ``provider: "metallb"``; [] on 404 or when MetalLB is absent
+        (MetalLB-ONLY kind — no Cilium branch)."""
+        served_ml = self.get_crd_served(self._METALLB_GROUP, "bgpadvertisements")
+        if served_ml is not None:
+            version, _scope = served_ml
+            custom = self._custom()
+            try:
+                item = custom.get_namespaced_custom_object(
+                    self._METALLB_GROUP, version, namespace, "bgpadvertisements", name
+                )
+            except ApiException as e:
+                if e.status == 404:
+                    return []
+                self._unreachable("get_bgpadvertisement", e)
+                raise AssertionError("unreachable") from e
+            item = self._crd_body(item)
+            return [{**item, "provider": "metallb"}]
+        return []
+
     # VolumeSnapshotClass (snapshot.storage.k8s.io, cluster-scoped CRD): the
     # same full-custom-object seam as the Cilium kinds — the CRD's OWN served
     # version is the authority (``get_crd_served`` — an improvement over

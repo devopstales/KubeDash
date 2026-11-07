@@ -277,11 +277,22 @@ class FakeK8s:
     # the cilium-absent pattern). The FULL custom object (camelCase,
     # spec/status intact) is returned — the view reads it.
     def get_crd_served(self, group: str, plural: str) -> tuple[str, str] | None:
-        if group != "cert-manager.io":
-            return None
-        if plural == "clusterissuers":
-            return ("v1", "Cluster")
-        return ("v1", "Namespaced")
+        if group == "cert-manager.io":
+            if plural == "clusterissuers":
+                return ("v1", "Cluster")
+            return ("v1", "Namespaced")
+        # external-LB: MetalLB PRESENT by default (the Cilium-fallback /
+        # both-absent cases are tested by overriding get_crd_served on the
+        # instance, the cilium-absent pattern).
+        if group == "metallb.io":
+            return ("v1beta1", "Cluster")
+        if group == "cilium.io" and plural in (
+            "ciliumloadbalancerippools",
+            "ciliuml2announcementpolicies",
+            "ciliumbgppeeringpolicies",
+        ):
+            return ("v2", "Cluster")
+        return None
 
     def list_clusterissuers(self, _namespace: str | None) -> list[dict]:
         if self.get_crd_served("cert-manager.io", "clusterissuers") is None:
@@ -386,6 +397,114 @@ class FakeK8s:
 
     def get_certificate(self, namespace: str, name: str) -> list[dict]:
         return [i for i in self.list_certificates(namespace) if i["metadata"]["name"] == name]
+
+    # MetalLB / Cilium external-LB: provider detection mirrors the real
+    # K8sClient (MetalLB primary, Cilium fallback, bgpadvertisements
+    # MetalLB-ONLY); items carry the ``provider`` tag (the view's Type
+    # column reads it).
+    def list_ipaddresspools(self, _namespace: str | None) -> list[dict]:
+        if self.get_crd_served("metallb.io", "ipaddresspools") is not None:
+            return [
+                {
+                    "apiVersion": "metallb.io/v1beta1",
+                    "kind": "IPAddressPool",
+                    "metadata": {
+                        "name": "team-a-pool",
+                        "creationTimestamp": "2026-01-02T03:04:05Z",
+                    },
+                    "spec": {"addresses": ["192.168.100.10-192.168.100.20"]},
+                    "provider": "metallb",
+                }
+            ]
+        if self.get_crd_served("cilium.io", "ciliumloadbalancerippools") is not None:
+            return [
+                {
+                    "apiVersion": "cilium.io/v2",
+                    "kind": "CiliumLoadBalancerIPPool",
+                    "metadata": {
+                        "name": "cilium-pool",
+                        "creationTimestamp": "2026-01-02T03:04:05Z",
+                    },
+                    "spec": {"cidr": "192.168.100.10/29"},
+                    "provider": "cilium",
+                }
+            ]
+        return []
+
+    def get_ipaddresspool(self, _namespace: str, name: str) -> list[dict]:
+        return [i for i in self.list_ipaddresspools(None) if i["metadata"]["name"] == name]
+
+    def list_l2advertisements(self, _namespace: str | None) -> list[dict]:
+        if self.get_crd_served("metallb.io", "l2advertisements") is not None:
+            return [
+                {
+                    "apiVersion": "metallb.io/v1beta1",
+                    "kind": "L2Advertisement",
+                    "metadata": {"name": "team-a-l2", "creationTimestamp": "2026-01-02T03:04:05Z"},
+                    "spec": {"interfaces": [{"name": "eth1"}]},
+                    "provider": "metallb",
+                }
+            ]
+        if self.get_crd_served("cilium.io", "ciliuml2announcementpolicies") is not None:
+            return [
+                {
+                    "apiVersion": "cilium.io/v2",
+                    "kind": "CiliumL2AnnouncementPolicy",
+                    "metadata": {"name": "cilium-l2", "creationTimestamp": "2026-01-02T03:04:05Z"},
+                    "spec": {"interfaces": ["eth1"]},
+                    "provider": "cilium",
+                }
+            ]
+        return []
+
+    def get_l2advertisement(self, _namespace: str, name: str) -> list[dict]:
+        return [i for i in self.list_l2advertisements(None) if i["metadata"]["name"] == name]
+
+    def list_bgppeers(self, _namespace: str | None) -> list[dict]:
+        if self.get_crd_served("metallb.io", "bgppeers") is not None:
+            return [
+                {
+                    "apiVersion": "metallb.io/v1beta1",
+                    "kind": "BGPPeer",
+                    "metadata": {
+                        "name": "team-a-peer",
+                        "creationTimestamp": "2026-01-02T03:04:05Z",
+                    },
+                    "spec": {"myASN": 65000, "peerASN": 65001, "peerAddress": "10.0.0.1"},
+                    "provider": "metallb",
+                }
+            ]
+        if self.get_crd_served("cilium.io", "ciliumbgppeeringpolicies") is not None:
+            return [
+                {
+                    "apiVersion": "cilium.io/v2",
+                    "kind": "CiliumBGPPeeringPolicy",
+                    "metadata": {"name": "cilium-bgp", "creationTimestamp": "2026-01-02T03:04:05Z"},
+                    "spec": {"nodeSelection": {}, "virtualRouters": []},
+                    "provider": "cilium",
+                }
+            ]
+        return []
+
+    def get_bgppeer(self, _namespace: str, name: str) -> list[dict]:
+        return [i for i in self.list_bgppeers(None) if i["metadata"]["name"] == name]
+
+    def list_bgpadvertisements(self, _namespace: str | None) -> list[dict]:
+        # MetalLB-ONLY: no Cilium branch (the real method has none either).
+        if self.get_crd_served("metallb.io", "bgpadvertisements") is None:
+            return []
+        return [
+            {
+                "apiVersion": "metallb.io/v1beta2",
+                "kind": "BGPAdvertisement",
+                "metadata": {"name": "team-a-adv", "creationTimestamp": "2026-01-02T03:04:05Z"},
+                "spec": {"aggregationBit": 2, "clusterIPs": []},
+                "provider": "metallb",
+            }
+        ]
+
+    def get_bgpadvertisement(self, _namespace: str, name: str) -> list[dict]:
+        return [i for i in self.list_bgpadvertisements(None) if i["metadata"]["name"] == name]
 
     def list_crds(self, _namespace: str | None) -> list[dict]:
         # Cluster-scoped: the namespace argument is ignored (mirrors the real
@@ -3625,6 +3744,320 @@ def test_list_certificates_sar_denied(api_client, auth_client, fake_k8s, monkeyp
     assert r.status_code == 403
     assert r.get_json()["error"]["code"] == "RBAC_DENIED"
     assert ("list", "certificates", "team-a", None, "cert-manager.io") in asked
+
+
+def test_list_ipaddresspools_200(api_client, auth_client, fake_k8s, monkeypatch) -> None:
+    """[exlb-ipaddresspools-list-200-provider-detect] MetalLB present (the
+    fake default) -> the full custom object tagged
+    ``provider: "metallb"`` (the view's Type column reads it)."""
+    auth_client.login()
+    h = {"Authorization": f"Bearer {auth_client.jwt}"}
+    _register(api_client, h)
+    _allow_sar(monkeypatch)
+    r = api_client.get(
+        "/api/v1/clusters/1/resources/ipaddresspools?namespace=team-a", headers=h
+    )
+    assert r.status_code == 200
+    body = r.get_json()
+    assert body["kind"] == "ipaddresspools"
+    [item] = body["items"]
+    assert item["metadata"]["name"] == "team-a-pool"
+    assert item["spec"]["addresses"] == ["192.168.100.10-192.168.100.20"]
+    assert item["provider"] == "metallb"
+
+
+def test_list_ipaddresspools_cilium_fallback(
+    api_client, auth_client, fake_k8s, monkeypatch
+) -> None:
+    """[exlb-provider-fallback-cilium] MetalLB absent + Cilium present ->
+    the Cilium item tagged ``provider: "cilium"``."""
+    auth_client.login()
+    h = {"Authorization": f"Bearer {auth_client.jwt}"}
+    _register(api_client, h)
+    _allow_sar(monkeypatch)
+    fake_k8s.get_crd_served = lambda group, plural: (
+        ("v2", "Cluster")
+        if (group, plural) == ("cilium.io", "ciliumloadbalancerippools")
+        else None
+    )
+    r = api_client.get(
+        "/api/v1/clusters/1/resources/ipaddresspools?namespace=team-a", headers=h
+    )
+    assert r.status_code == 200
+    [item] = r.get_json()["items"]
+    assert item["metadata"]["name"] == "cilium-pool"
+    assert item["provider"] == "cilium"
+
+
+def test_list_ipaddresspools_get_by_name(api_client, auth_client, fake_k8s, monkeypatch) -> None:
+    """[exlb-get-by-name] ?name= returns a 0/1-item list tagged with the
+    provider: a hit returns the one full object, a miss returns []
+    (mirrors get_secret)."""
+    auth_client.login()
+    h = {"Authorization": f"Bearer {auth_client.jwt}"}
+    _register(api_client, h)
+    _allow_sar(monkeypatch)
+    r = api_client.get(
+        "/api/v1/clusters/1/resources/ipaddresspools?name=team-a-pool&namespace=team-a",
+        headers=h,
+    )
+    assert r.status_code == 200
+    [item] = r.get_json()["items"]
+    assert item["metadata"]["name"] == "team-a-pool"
+    assert item["provider"] == "metallb"
+    r = api_client.get(
+        "/api/v1/clusters/1/resources/ipaddresspools?name=ghost&namespace=team-a", headers=h
+    )
+    assert r.status_code == 200
+    assert r.get_json()["items"] == []
+
+
+def test_list_ipaddresspools_sar_denied(api_client, auth_client, fake_k8s, monkeypatch) -> None:
+    """[exlb-ipaddresspools-sar-denied] ADR-0004: the SAR is asked BEFORE
+    the read, on the metallb.io group (the primary; the Cilium fallback
+    is inside the method, not the SAR group) with the query namespace — a
+    deny short-circuits to 403 RBAC_DENIED."""
+    auth_client.login()
+    h = {"Authorization": f"Bearer {auth_client.jwt}"}
+    _register(api_client, h)
+    asked = _record_sar(monkeypatch)  # denies every SAR and records calls
+    r = api_client.get(
+        "/api/v1/clusters/1/resources/ipaddresspools?namespace=team-a", headers=h
+    )
+    assert r.status_code == 403
+    assert r.get_json()["error"]["code"] == "RBAC_DENIED"
+    assert ("list", "ipaddresspools", "team-a", None, "metallb.io") in asked
+
+
+def test_list_l2advertisements_200(api_client, auth_client, fake_k8s, monkeypatch) -> None:
+    """[exlb-l2advertisements-list-200-provider-detect] MetalLB present ->
+    the full custom object tagged ``provider: "metallb"``."""
+    auth_client.login()
+    h = {"Authorization": f"Bearer {auth_client.jwt}"}
+    _register(api_client, h)
+    _allow_sar(monkeypatch)
+    r = api_client.get(
+        "/api/v1/clusters/1/resources/l2advertisements?namespace=team-a", headers=h
+    )
+    assert r.status_code == 200
+    body = r.get_json()
+    assert body["kind"] == "l2advertisements"
+    [item] = body["items"]
+    assert item["metadata"]["name"] == "team-a-l2"
+    assert item["spec"]["interfaces"] == [{"name": "eth1"}]
+    assert item["provider"] == "metallb"
+
+
+def test_list_l2advertisements_cilium_fallback(
+    api_client, auth_client, fake_k8s, monkeypatch
+) -> None:
+    """[exlb-provider-fallback-cilium] MetalLB absent + Cilium present ->
+    the CiliumL2AnnouncementPolicy item tagged ``provider: "cilium"``."""
+    auth_client.login()
+    h = {"Authorization": f"Bearer {auth_client.jwt}"}
+    _register(api_client, h)
+    _allow_sar(monkeypatch)
+    fake_k8s.get_crd_served = lambda group, plural: (
+        ("v2", "Cluster")
+        if (group, plural) == ("cilium.io", "ciliuml2announcementpolicies")
+        else None
+    )
+    r = api_client.get(
+        "/api/v1/clusters/1/resources/l2advertisements?namespace=team-a", headers=h
+    )
+    assert r.status_code == 200
+    [item] = r.get_json()["items"]
+    assert item["metadata"]["name"] == "cilium-l2"
+    assert item["provider"] == "cilium"
+
+
+def test_list_l2advertisements_get_by_name(api_client, auth_client, fake_k8s, monkeypatch) -> None:
+    """[exlb-get-by-name] ?name= on l2advertisements: a hit returns the one
+    full object (provider tagged), a miss returns []."""
+    auth_client.login()
+    h = {"Authorization": f"Bearer {auth_client.jwt}"}
+    _register(api_client, h)
+    _allow_sar(monkeypatch)
+    r = api_client.get(
+        "/api/v1/clusters/1/resources/l2advertisements?name=team-a-l2&namespace=team-a",
+        headers=h,
+    )
+    assert r.status_code == 200
+    [item] = r.get_json()["items"]
+    assert item["metadata"]["name"] == "team-a-l2"
+    assert item["provider"] == "metallb"
+    r = api_client.get(
+        "/api/v1/clusters/1/resources/l2advertisements?name=ghost&namespace=team-a",
+        headers=h,
+    )
+    assert r.status_code == 200
+    assert r.get_json()["items"] == []
+
+
+def test_list_l2advertisements_sar_denied(api_client, auth_client, fake_k8s, monkeypatch) -> None:
+    """[exlb-l2advertisements-sar-denied] the SAR is asked BEFORE the read,
+    on the metallb.io group with the query namespace — a deny
+    short-circuits to 403 RBAC_DENIED."""
+    auth_client.login()
+    h = {"Authorization": f"Bearer {auth_client.jwt}"}
+    _register(api_client, h)
+    asked = _record_sar(monkeypatch)  # denies every SAR and records calls
+    r = api_client.get(
+        "/api/v1/clusters/1/resources/l2advertisements?namespace=team-a", headers=h
+    )
+    assert r.status_code == 403
+    assert r.get_json()["error"]["code"] == "RBAC_DENIED"
+    assert ("list", "l2advertisements", "team-a", None, "metallb.io") in asked
+
+
+def test_list_bgppeers_200(api_client, auth_client, fake_k8s, monkeypatch) -> None:
+    """[exlb-bgppeers-list-200-provider-detect] MetalLB present -> the full
+    custom object tagged ``provider: "metallb"``."""
+    auth_client.login()
+    h = {"Authorization": f"Bearer {auth_client.jwt}"}
+    _register(api_client, h)
+    _allow_sar(monkeypatch)
+    r = api_client.get("/api/v1/clusters/1/resources/bgppeers?namespace=team-a", headers=h)
+    assert r.status_code == 200
+    body = r.get_json()
+    assert body["kind"] == "bgppeers"
+    [item] = body["items"]
+    assert item["metadata"]["name"] == "team-a-peer"
+    assert item["spec"]["peerASN"] == 65001
+    assert item["provider"] == "metallb"
+
+
+def test_list_bgppeers_cilium_fallback(api_client, auth_client, fake_k8s, monkeypatch) -> None:
+    """[exlb-provider-fallback-cilium] MetalLB absent + Cilium present ->
+    the CiliumBGPPeeringPolicy item tagged ``provider: "cilium"``."""
+    auth_client.login()
+    h = {"Authorization": f"Bearer {auth_client.jwt}"}
+    _register(api_client, h)
+    _allow_sar(monkeypatch)
+    fake_k8s.get_crd_served = lambda group, plural: (
+        ("v2", "Cluster")
+        if (group, plural) == ("cilium.io", "ciliumbgppeeringpolicies")
+        else None
+    )
+    r = api_client.get("/api/v1/clusters/1/resources/bgppeers?namespace=team-a", headers=h)
+    assert r.status_code == 200
+    [item] = r.get_json()["items"]
+    assert item["metadata"]["name"] == "cilium-bgp"
+    assert item["provider"] == "cilium"
+
+
+def test_list_bgppeers_get_by_name(api_client, auth_client, fake_k8s, monkeypatch) -> None:
+    """[exlb-get-by-name] ?name= on bgppeers: a hit returns the one full
+    object (provider tagged), a miss returns []."""
+    auth_client.login()
+    h = {"Authorization": f"Bearer {auth_client.jwt}"}
+    _register(api_client, h)
+    _allow_sar(monkeypatch)
+    r = api_client.get(
+        "/api/v1/clusters/1/resources/bgppeers?name=team-a-peer&namespace=team-a", headers=h
+    )
+    assert r.status_code == 200
+    [item] = r.get_json()["items"]
+    assert item["metadata"]["name"] == "team-a-peer"
+    assert item["provider"] == "metallb"
+    r = api_client.get(
+        "/api/v1/clusters/1/resources/bgppeers?name=ghost&namespace=team-a", headers=h
+    )
+    assert r.status_code == 200
+    assert r.get_json()["items"] == []
+
+
+def test_list_bgppeers_sar_denied(api_client, auth_client, fake_k8s, monkeypatch) -> None:
+    """[exlb-bgppeers-sar-denied] the SAR is asked BEFORE the read, on the
+    metallb.io group with the query namespace — a deny short-circuits to
+    403 RBAC_DENIED."""
+    auth_client.login()
+    h = {"Authorization": f"Bearer {auth_client.jwt}"}
+    _register(api_client, h)
+    asked = _record_sar(monkeypatch)  # denies every SAR and records calls
+    r = api_client.get("/api/v1/clusters/1/resources/bgppeers?namespace=team-a", headers=h)
+    assert r.status_code == 403
+    assert r.get_json()["error"]["code"] == "RBAC_DENIED"
+    assert ("list", "bgppeers", "team-a", None, "metallb.io") in asked
+
+
+def test_list_bgpadvertisements_200(api_client, auth_client, fake_k8s, monkeypatch) -> None:
+    """[exlb-bgpadvertisements-list-200-provider-detect] MetalLB present ->
+    the full custom object tagged ``provider: "metallb"`` (MetalLB-ONLY
+    kind)."""
+    auth_client.login()
+    h = {"Authorization": f"Bearer {auth_client.jwt}"}
+    _register(api_client, h)
+    _allow_sar(monkeypatch)
+    r = api_client.get(
+        "/api/v1/clusters/1/resources/bgpadvertisements?namespace=team-a", headers=h
+    )
+    assert r.status_code == 200
+    body = r.get_json()
+    assert body["kind"] == "bgpadvertisements"
+    [item] = body["items"]
+    assert item["metadata"]["name"] == "team-a-adv"
+    assert item["spec"]["aggregationBit"] == 2
+    assert item["provider"] == "metallb"
+
+
+def test_list_bgpadvertisements_provider_absent_empty(
+    api_client, auth_client, fake_k8s, monkeypatch
+) -> None:
+    """[exlb-bgpadvertisements-metallb-only] MetalLB absent -> 200 with
+    zero items (NO Cilium branch for this kind — never a cilium item)."""
+    auth_client.login()
+    h = {"Authorization": f"Bearer {auth_client.jwt}"}
+    _register(api_client, h)
+    _allow_sar(monkeypatch)
+    fake_k8s.get_crd_served = lambda group, plural: None
+    r = api_client.get(
+        "/api/v1/clusters/1/resources/bgpadvertisements?namespace=team-a", headers=h
+    )
+    assert r.status_code == 200
+    assert r.get_json()["items"] == []
+    assert r.get_json()["kind"] == "bgpadvertisements"
+
+
+def test_list_bgpadvertisements_get_by_name(
+    api_client, auth_client, fake_k8s, monkeypatch
+) -> None:
+    """[exlb-get-by-name] ?name= on bgpadvertisements: a hit returns the
+    one full object (provider tagged), a miss returns []."""
+    auth_client.login()
+    h = {"Authorization": f"Bearer {auth_client.jwt}"}
+    _register(api_client, h)
+    _allow_sar(monkeypatch)
+    r = api_client.get(
+        "/api/v1/clusters/1/resources/bgpadvertisements?name=team-a-adv&namespace=team-a",
+        headers=h,
+    )
+    assert r.status_code == 200
+    [item] = r.get_json()["items"]
+    assert item["metadata"]["name"] == "team-a-adv"
+    assert item["provider"] == "metallb"
+    r = api_client.get(
+        "/api/v1/clusters/1/resources/bgpadvertisements?name=ghost&namespace=team-a",
+        headers=h,
+    )
+    assert r.status_code == 200
+    assert r.get_json()["items"] == []
+
+
+def test_list_bgpadvertisements_sar_denied(api_client, auth_client, fake_k8s, monkeypatch) -> None:
+    """[exlb-bgpadvertisements-sar-denied] the SAR is asked BEFORE the
+    read, on the metallb.io group with the query namespace — a deny
+    short-circuits to 403 RBAC_DENIED."""
+    auth_client.login()
+    h = {"Authorization": f"Bearer {auth_client.jwt}"}
+    _register(api_client, h)
+    asked = _record_sar(monkeypatch)  # denies every SAR and records calls
+    r = api_client.get(
+        "/api/v1/clusters/1/resources/bgpadvertisements?namespace=team-a", headers=h
+    )
+    assert r.status_code == 403
+    assert r.get_json()["error"]["code"] == "RBAC_DENIED"
+    assert ("list", "bgpadvertisements", "team-a", None, "metallb.io") in asked
 
 
 def test_list_volumesnapshotclasses_200(api_client, auth_client, fake_k8s, monkeypatch) -> None:

@@ -192,6 +192,15 @@ _KINDS: dict[str, tuple[str, str, str]] = {
     "issuers": ("list_issuers", "issuers", "cert-manager.io"),
     "certificaterequests": ("list_certificaterequests", "certificaterequests", "cert-manager.io"),
     "certificates": ("list_certificates", "certificates", "cert-manager.io"),
+    # MetalLB / Cilium external-LB CRDs (the 4.1 external-loadbalancer
+    # plugin, moved to /network/ by the
+    # certmanager-external-loadbalancer-views change; provider-detected:
+    # MetalLB primary, Cilium fallback — the detection lives INSIDE the
+    # service method; the SAR group is metallb.io, the primary).
+    "ipaddresspools": ("list_ipaddresspools", "ipaddresspools", "metallb.io"),
+    "l2advertisements": ("list_l2advertisements", "l2advertisements", "metallb.io"),
+    "bgppeers": ("list_bgppeers", "bgppeers", "metallb.io"),
+    "bgpadvertisements": ("list_bgpadvertisements", "bgpadvertisements", "metallb.io"),
 }
 
 #: kind → K8sClient method for a single-object ``?name=`` lookup
@@ -232,6 +241,12 @@ _GETTERS: dict[str, str] = {
     "issuers": "get_issuer",
     "certificaterequests": "get_certificaterequest",
     "certificates": "get_certificate",
+    # MetalLB / Cilium external-LB (the certmanager-external-loadbalancer-views
+    # change; provider detection inside the service method).
+    "ipaddresspools": "get_ipaddresspool",
+    "l2advertisements": "get_l2advertisement",
+    "bgppeers": "get_bgppeer",
+    "bgpadvertisements": "get_bgpadvertisement",
 }
 
 
