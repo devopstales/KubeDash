@@ -1,4 +1,4 @@
-import { render, screen, waitFor } from '@testing-library/react'
+import { fireEvent, render, screen, waitFor } from '@testing-library/react'
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query'
 import { MemoryRouter, Route, Routes } from 'react-router-dom'
 import { http, HttpResponse } from 'msw'
@@ -241,4 +241,29 @@ test('detail-no-cluster-state', async () => {
 
   expect(await screen.findByText('No cluster selected.')).toBeTruthy()
   expect(seen).toHaveLength(0) // no resource fetch is made
+})
+
+// detail-convert-button-opens-converter-panel (R4 entry point)
+test('detail-convert-button-opens-converter-panel', async () => {
+  server.use(
+    http.get('*/api/v1/clusters/1/resources/ingresses', () =>
+      HttpResponse.json({
+        kind: 'ingresses',
+        cluster: 'prod',
+        items: [webIngress],
+      }),
+    ),
+  )
+  selectProd()
+  seedActiveRef('web', 'team-a')
+  renderAt(<IngressDataView name="web" namespace="team-a" />, '/network/ingress')
+
+  // The button appears once the item is loaded; the panel is closed.
+  const button = await screen.findByRole('button', { name: 'Convert to Gateway API' })
+  expect(screen.queryByRole('button', { name: 'Convert' })).toBeNull()
+  fireEvent.click(button)
+  // The panel opens: its card title + the Convert action.
+  expect(screen.getByText('Convert to Gateway API')).toBeTruthy()
+  expect(screen.getByRole('button', { name: 'Convert' })).toBeTruthy()
+  expect(screen.getByRole('combobox', { name: 'Gateway API provider' })).toBeTruthy()
 })

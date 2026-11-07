@@ -654,6 +654,32 @@ export interface ReferenceGrantItem {
   [key: string]: unknown
 }
 
+/** One generated resource from the Ingress -> Gateway API converter (the
+ *  converter's dict output — the same shape the apply endpoint consumes). */
+export interface ConvertedResource {
+  kind: string
+  apiVersion: string
+  metadata: { name: string; namespace?: string }
+  spec?: Record<string, unknown>
+}
+
+/** The POST /clusters/<id>/gateway-api/convert response (GatewayConvertOut). */
+export interface GatewayConvertResult {
+  cluster: string
+  namespace: string
+  source: string
+  gatewayClassName: string
+  resources: ConvertedResource[]
+  warnings: string[]
+}
+
+/** One per-object apply result (AppliedOut / ApplyErrorOut). A partial
+ *  failure is a 200 with `errors` populated, not an error envelope. */
+export interface ApplyResult {
+  applied: { kind: string; name: string; namespace: string | null; status: 'created' | 'unchanged' }[]
+  errors: { kind: string; name: string; message: string }[]
+}
+
 /** Closed set for the detail page's ?kind= param (4.1 parity). */
 export const POLICY_KINDS = ['NetworkPolicy', 'CiliumNetworkPolicy', 'CiliumClusterwideNetworkPolicy'] as const
 export type PolicyKind = (typeof POLICY_KINDS)[number]

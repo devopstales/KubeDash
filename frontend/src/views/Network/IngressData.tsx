@@ -1,8 +1,9 @@
-import React from 'react'
+import React, { useState } from 'react'
 import { Link } from 'react-router-dom'
 import {
   CBreadcrumb,
   CBreadcrumbItem,
+  CButton,
   CCard,
   CCardBody,
   CCardHeader,
@@ -19,6 +20,7 @@ import { formatTimestamp } from '../../lib/format'
 import type { IngressItem, ResourceList } from '../../lib/types'
 import { useClusterStore } from '../../store/cluster'
 import TopMenu from '../../components/TopMenu'
+import GatewayConverter from './GatewayConverter'
 
 // Same pattern as the sibling data views: the hljs language module is a
 // singleton, so a second registration is harmless. Register `json` — the
@@ -60,6 +62,9 @@ type RuleRow = {
 // (no R7 redirect) to pass the name through.
 const IngressDataView = ({ name, namespace }: { name: string; namespace: string }) => {
   const cluster = useClusterStore((s) => s.selectedCluster)
+  // The converter entry point (R4): the button opens the sub-panel below the
+  // CTable; the panel is unmounted when closed (its state is disposable).
+  const [showConverter, setShowConverter] = useState(false)
 
   const query = useQuery<IngressItem>({
     queryKey: ['ingress-data', cluster?.id, name, namespace],
@@ -115,7 +120,17 @@ const IngressDataView = ({ name, namespace }: { name: string; namespace: string 
         </CBreadcrumb>
       </TopMenu>
       <CCardHeader className="py-3">
-        <CCardTitle className="m-0 fw-bold text-primary fs-6">Ingress Data</CCardTitle>
+        <div className="d-flex align-items-center">
+          <CCardTitle className="m-0 fw-bold text-primary fs-6">Ingress Data</CCardTitle>
+          <CButton
+            color="primary"
+            size="sm"
+            className="ms-auto"
+            onClick={() => setShowConverter((v) => !v)}
+          >
+            {showConverter ? 'Hide Converter' : 'Convert to Gateway API'}
+          </CButton>
+        </div>
       </CCardHeader>
       <CCardBody>
         {!name ? (
@@ -198,6 +213,11 @@ const IngressDataView = ({ name, namespace }: { name: string; namespace: string 
                 </tr>
               </tbody>
             </CTable>
+            {showConverter && (
+              <div className="mt-3 mb-3">
+                <GatewayConverter name={name} namespace={namespace} />
+              </div>
+            )}
             <CCard className="mb-3">
               <CCardHeader className="py-2">
                 <CCardTitle className="m-0 fw-bold text-primary fs-6">Rules</CCardTitle>
