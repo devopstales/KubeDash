@@ -68,6 +68,10 @@ export const server = setupServer(
       },
     ]),
   ),
+  // Group-aware permission read (2026-10-26 admin group/permission work) —
+  // the Users/Groups/AdminPermissions views query it on mount; default to
+  // the empty list so those tests render without per-test stubs.
+  http.get('*/api/v1/permissions/my-access', () => HttpResponse.json([])),
 )
 
 beforeAll(() => {

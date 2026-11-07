@@ -1,4 +1,4 @@
-import { render, screen } from '@testing-library/react'
+import { render, screen, within } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query'
 import { MemoryRouter, Routes, Route } from 'react-router-dom'
@@ -11,9 +11,11 @@ import { AdminRoute } from '../../src/routes'
 // ponytail: the default MSW server already serves role:admin for /auth/me;
 // the non-admin redirect test swaps it via server.use.
 
+// Backend GroupOut shape (backend/app/schemas/groups.py) — the list route
+// returns the full row, not just {group, member_count}.
 const GROUPS = [
-  { group: 'dev', member_count: 2 },
-  { group: 'platform', member_count: 1 },
+  { id: 1, name: 'dev', display_name: 'dev', source: 'oidc', member_count: 2, created_at: '2026-01-01T00:00:00Z' },
+  { id: 2, name: 'platform', display_name: 'platform', source: 'oidc', member_count: 1, created_at: '2026-01-02T00:00:00Z' },
 ]
 
 const USERS = [
@@ -96,23 +98,20 @@ describe('GroupsView', () => {
     renderGroups()
     expect(await screen.findByText('dev')).toBeTruthy()
     expect(screen.getByText('platform')).toBeTruthy()
-    // member counts render in the table
-    expect(screen.getByText('2')).toBeTruthy()
-    expect(screen.getByText('1')).toBeTruthy()
+    // member counts render in the table (scoped to the table — the
+    // DataTables pagination control also renders a "1" page button)
+    const table = screen.getByRole('table')
+    expect(within(table).getByText('2')).toBeTruthy()
+    expect(within(table).getByText('1')).toBeTruthy()
   })
 
-  test('clicking-a-group-shows-its-members', async () => {
-    const user = userEvent.setup()
+  // The row Name cell is a Link to the group's privileges page (the
+  // e36cf42d admin-managed-groups rewrite replaced the old inline
+  // members panel with the row link + the /user/group/privilege route).
+  test('group-name-links-to-its-privileges-page', async () => {
     renderGroups()
-    await screen.findByText('dev')
-    await user.click(screen.getByText('dev'))
-    expect(await screen.findByText('Members of dev')).toBeTruthy()
-    // both u1 and oidc-alice carry the dev group
-    expect(screen.getByText('Dev')).toBeTruthy()
-    expect(screen.getByText('Alice')).toBeTruthy()
-    // clicking again collapses the panel
-    await user.click(screen.getByText('dev'))
-    expect(screen.queryByText('Members of dev')).toBeNull()
+    const link = await screen.findByRole('link', { name: 'dev' })
+    expect(link.getAttribute('href')).toBe('/user/group/privilege?group=dev')
   })
 
   test('empty-groups-renders-empty-state', async () => {
@@ -150,13 +149,19 @@ describe('GroupsView', () => {
         return HttpResponse.json({ id: 9, name: 'sre', member_count: 0 }, { status: 201 })
       }),
       http.get('*/api/v1/admin/groups', () =>
-        HttpResponse.json([...GROUPS, { group: 'sre', member_count: 0 }]),
+        HttpResponse.json([
+          ...GROUPS,
+          { id: 9, name: 'sre', display_name: 'sre', source: 'local', member_count: 0, created_at: '2026-01-03T00:00:00Z' },
+        ]),
       ),
     )
     renderGroups()
     await screen.findByText('dev')
-    await user.type(screen.getByLabelText('New group name'), 'sre')
-    await user.click(screen.getByRole('button', { name: 'Add group' }))
+    // The create form is a CModal behind the header toggle.
+    await user.click(screen.getByRole('button', { name: 'Add Group' }))
+    await user.type(screen.getByPlaceholderText('Type the group name'), 'sre')
+    // The dialog's submit is the second 'Add Group' button — scope to it.
+    await user.click(within(screen.getByRole('dialog')).getByRole('button', { name: 'Add Group' }))
     expect(posted).toBe(true)
     expect(await screen.findByText('sre')).toBeTruthy()
   })
@@ -173,8 +178,9 @@ describe('GroupsView', () => {
     )
     renderGroups()
     await screen.findByText('dev')
-    await user.type(screen.getByLabelText('New group name'), 'dev')
-    await user.click(screen.getByRole('button', { name: 'Add group' }))
+    await user.click(screen.getByRole('button', { name: 'Add Group' }))
+    await user.type(screen.getByPlaceholderText('Type the group name'), 'dev')
+    await user.click(within(screen.getByRole('dialog')).getByRole('button', { name: 'Add Group' }))
     expect(await screen.findByText(/CLUSTER_ALREADY_EXISTS/)).toBeTruthy()
   })
 })

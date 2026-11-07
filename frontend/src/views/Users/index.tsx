@@ -175,6 +175,9 @@ const UsersView = () => {
   }
 
   const openEdit = (u: AdminUser) => {
+    // The edit form renders inside the detail panel, so opening edit must
+    // open that panel too (same as the Bind action button).
+    setSelectedUser(u)
     setEdit({ role: u.role, status: u.status })
     setEditError(null)
     setEditOpen(true)
@@ -312,42 +315,47 @@ const UsersView = () => {
                   lengthChange: true,
                 }}
               >
-                <Column
-                  title="Username"
-                  data="id"
-                  render={(id: number, _type: string, row: AdminUser) => (
+                {/* datatables.net-react 2.0.0: the `render` PROP is passed raw to
+                    the DataTables core (a React-element return stringifies to
+                    "[object Object]"); only the CHILDREN path is React-aware
+                    (slotRenderer). Cells are therefore children, matching
+                    KubeDataTable's views. */}
+                <Column title="Username" data="id">
+                  {(_id: number, _type: string, row: AdminUser) => (
                     <a href="#" onClick={(e) => { e.preventDefault(); openDetail(row) }} aria-label={`Open ${row.display_name ?? row.sub}`}>
                       {row.display_name ?? row.sub}
                     </a>
                   )}
-                />
-                <Column title="Email" data="email" render={(v: string | null) => v ?? '—'} />
+                </Column>
+                <Column title="Email" data="email">
+                  {(v: string | null) => v ?? '—'}
+                </Column>
                 <Column title="Permission" data="role" />
                 <Column title="Type" data="user_type" />
                 <Column title="Status" data="status" />
-                <Column
-                  title="Groups"
-                  data="groups"
-                  render={(groups: string[]) =>
+                <Column title="Groups" data="groups">
+                  {/* Must return a single element (Fragment), not the raw
+                      .map() array: slotCache only renderJsx's a
+                      React.isValidElement result, so an array falls
+                      through and stringifies to "[object Object]". */}
+                  {(groups: string[]) =>
                     groups.length === 0 ? (
                       '—'
                     ) : (
-                      groups.map((gn) => (
-                        <CBadge color="secondary" className="me-1" key={gn}>{gn}</CBadge>
-                      ))
+                      <>
+                        {groups.map((gn) => (
+                          <CBadge color="secondary" className="me-1" key={gn}>{gn}</CBadge>
+                        ))}
+                      </>
                     )
                   }
-                />
+                </Column>
                 <Column title="Cluster bindings" data="cluster_count" />
-                <Column
-                  title="Last login"
-                  data="last_login_at"
-                  render={(v: string | null) => v ?? '—'}
-                />
-                <Column
-                  title="Action"
-                  data="id"
-                  render={(_id: number, _type: string, u: AdminUser) => (
+                <Column title="Last login" data="last_login_at">
+                  {(v: string | null) => v ?? '—'}
+                </Column>
+                <Column title="Action" data="id">
+                  {(_id: number, _type: string, u: AdminUser) => (
                     <span className="d-flex gap-1">
                       <CButton size="sm" color="secondary" onClick={() => openEdit(u)} aria-label={`Edit ${u.sub}`}>
                         Edit
@@ -362,7 +370,7 @@ const UsersView = () => {
                       </CButton>
                     </span>
                   )}
-                />
+                </Column>
               </DataTable>
             </div>
           )}

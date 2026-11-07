@@ -133,9 +133,10 @@ describe('UsersView (main-branch layout + DataTables)', () => {
     expect(await screen.findByText('Alice')).toBeTruthy()
     expect(screen.getByText('Dev')).toBeTruthy()
     expect(screen.getByText('Admin')).toBeTruthy()
-    // The Type column shows Local for the bootstrap admin, OIDC for SSO.
+    // The Type column shows Local for the bootstrap admin, OIDC for SSO
+    // (two SSO users here, so OIDC is not unique).
     expect(screen.getByText('Local')).toBeTruthy()
-    expect(screen.getByText('OIDC')).toBeTruthy()
+    expect(screen.getAllByText('OIDC').length).toBeGreaterThan(0)
     // The User List card header + breadcrumb are present.
     expect(screen.getByText('User List')).toBeTruthy()
     expect(screen.getByText('User Management')).toBeTruthy()

@@ -40,9 +40,13 @@ const PrivilegesView = () => {
           ? '/api/v1/permissions/my-access'
           : `/api/v1/admin/permissions/users/${encodeURIComponent(user)}/bindings`
       const r = await apiFetch<MyAccessBinding[]>(url)
-      if (r.error) throw new Error(`${r.error.code}: ${r.error.message}`)
+        if (r.error) throw new Error(`${r.error.code}: ${r.error.message}`)
       return r.data ?? []
     },
+    // The route choice reads me.sub, so the query must wait for identity to
+    // load — without the gate it fires on mount with me undefined and takes
+    // the admin route (wrong for the caller's own page, R5).
+    enabled: !!me?.sub,
   })
 
   const bindings = (bindingsQuery.data ?? []).filter(
