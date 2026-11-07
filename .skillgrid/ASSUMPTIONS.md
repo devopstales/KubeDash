@@ -7,7 +7,7 @@
 > frontmatter, **not** here. One decision per ADR file at
 > `.skillgrid/knowledge/decisions/04-adr-NNNN-slug.md`.
 
-**Highest sequence in use:** 0040
+**Highest sequence in use:** 0041
 
 ---
 
@@ -86,14 +86,18 @@ are kept, with `In force: no`. Never delete a row; flip it instead (IRON RULE).
 | ADR-0027 | Plain-HTTP dev-stack default (backend :8080, COOKIE_SECURE=false, no cert precondition, no host :443/:80 bind); the ADR-0026 TLS edge is the opt-in `task dev-stack-ssl` (backend :8443, COOKIE_SECURE=true, KUBEDASH_TLS_EDGE) | yes | `knowledge/decisions/04-adr-0027-plain-http-dev-stack-default.md` |
 | ADR-0028 | Configuration source: `kubedash.ini` (4.1 format, minus plugins) as the primary operator-facing config, env (`KUBEDASH_*`) as override, no hard-coded defaults for identities/credentials (fail fast at boot) — supersedes-in-part the env-driven bootstrap-admin delivery of ADR-0021 | yes | `knowledge/decisions/04-adr-0028-ini-config-source.md` |
 | ADR-0040 | SPA object navigation: tab-private `sessionStorage` object ref (`kd_object_refs` + `kd_object_active`, 15-min lazy self-expiry) + same-origin form-POST deep link; no object identity in the URL; one route per kind (no `/data` suffix) — supersedes the "`?name=` + `?namespace=` query-param navigation" deviations clause across the 2026-10-28 view specs (status: accepted, 2026-10-29) | yes | `knowledge/decisions/04-adr-0040-session-object-navigation.md` |
+| ADR-0041 | Resource kinds are declared in a typed catalog (backend kind catalog + frontend `lib/kinds.ts` registry); generic `list/get` engine at the existing factory seam; per-kind methods only as named overrides; test doubles become fixture data | yes | `knowledge/decisions/04-adr-0041-kind-catalog.md` |
 
-> **Note on ADR-0001..0013:** these are listed in `ARCHITECTURE.md` §12 as the
-> initial-architecture decisions "to be authored at brainstorming time." As of
-> this onboarding their **files do not yet exist** on disk — only the index
-> rows (carried forward from ARCHITECTURE.md) and the ADR-0014..0020 files.
-> The rows are marked in-force to reflect the architecture they describe.
-> Authoring the 0001..0013 files is an open task (see the onboarding notes
-> below).
+> **Note on ADR-0001..0013:** these are listed in `ARCHITECTURE.md` §12
+> as the initial-architecture decisions "to be authored at brainstorming
+> time." As of the 2026-10-17 onboarding their **files did not yet exist
+> on disk** — only the index rows (carried forward from
+> ARCHITECTURE.md) and the ADR-0014..0020 files. The rows are marked
+> in-force to reflect the architecture they describe. **Resolved
+> 2026-11-06:** the 0001..0013 files were backfilled from
+> ARCHITECTURE.md §12 + current source (each status block carries
+> `backfilled: 2026-11-06`), with tracker copies
+> `decision-001..013`.
 
 ---
 

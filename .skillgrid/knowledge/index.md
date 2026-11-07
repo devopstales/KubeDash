@@ -36,6 +36,7 @@
 | [ADR-0027 — Plain-HTTP dev-stack default](decisions/04-adr-0027-plain-http-dev-stack-default.md) | Dev stack is plain HTTP :8080; the ADR-0026 TLS edge is the opt-in `task dev-stack-ssl` | accepted |
 | [ADR-0028 — INI config source](decisions/04-adr-0028-ini-config-source.md) | `kubedash.ini` primary, `KUBEDASH_*` env override, fail fast at boot (no silent defaults) | accepted |
 | [ADR-0040 — SPA object navigation](decisions/04-adr-0040-session-object-navigation.md) | Tab-private sessionStorage object ref + form-POST deep link; token delivered via the server session (one-shot meta, amended 2026-11-04); no object identity in the URL | accepted |
+| [ADR-0041 — Kind catalog](decisions/04-adr-0041-kind-catalog.md) | Resource kinds are declared in a typed catalog (backend kind catalog + frontend `lib/kinds.ts` registry); generic `list/get` engine at the existing factory seam; per-kind methods only as named overrides; doubles become fixture data | accepted |
 
 ## glossary/
 

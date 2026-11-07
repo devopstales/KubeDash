@@ -201,6 +201,17 @@ in_flight:
   # briefing.md written; next: blueprint (renderer ADR first).
   - change: 2026-11-06-workload-map
     phase: spec
+  # Architecture review 2026-11-07 (jscpd health 32/E): declared-kinds
+  # per ADR-0041 — interview settled 16 decisions (mnemonic
+  # interview/kind-arch-20261107). Four changes, order D -> A -> B -> C.
+  - change: 2026-11-07-dead-code-cleanup
+    phase: blueprint
+  - change: 2026-11-07-kind-catalog
+    phase: blueprint
+  - change: 2026-11-07-frontend-kind-registry
+    phase: blueprint
+  - change: 2026-11-07-navigation-seam
+    phase: blueprint
 completed_changes:
   - 2026-10-17-kubedash-base-structure
   - 2026-10-17-swagger-ui-air-gap

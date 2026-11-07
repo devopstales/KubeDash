@@ -3,6 +3,24 @@
 > Journal of knowledge-base writes, newest last. Every write appends here in
 > the same edit as the concept + `index.md`.
 
+## 2026-11-07 — decisions/04-adr-0041-kind-catalog.md added; glossary +3 terms
+
+- ADR-0041 accepted (user decision, architecture review 2026-11-07):
+  resource kinds are declared in a typed catalog — backend kind catalog +
+  generic `list(kind, ns)`/`get(kind, ns, name)` engine on `K8sClient` at
+  the existing `K8sClientPool.factory` seam, `ResourceApi` dispatch
+  derived from the registry (`_KINDS`/`_GETTERS` deleted), per-kind
+  methods only as named overrides, one shared `FakeK8s` + fixture module
+  replacing the 8 doubles; frontend `lib/kinds.ts` registry drives shared
+  list/data View modules + the generated App.tsx route table. Kind-by-kind
+  cutover, no facade.
+- `glossary/02-technical-terms.md`: +**Kind**, +**Kind catalog**,
+  +**Registry kind** — the three naming spaces (API plural / registry
+  kind / route path) named once.
+- `index.md`: ADR-0041 row added. (Rows for ADR-0029..0039 remain open —
+  pre-existing gap, not backfilled here.)
+- `.backlog/decisions/decision-041` copy created.
+
 ## 2026-10-26
 
 - Bundle restructured: `.skillgrid/artifacts/` → `.skillgrid/knowledge/`.
