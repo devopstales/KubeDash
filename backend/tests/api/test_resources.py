@@ -272,6 +272,121 @@ class FakeK8s:
             svc for svc in self.list_services(namespace) if svc["metadata"]["name"] == name
         ]
 
+    # cert-manager.io: the fake models cert-manager PRESENT by default (the
+    # absent case is tested by overriding get_crd_served on the instance,
+    # the cilium-absent pattern). The FULL custom object (camelCase,
+    # spec/status intact) is returned — the view reads it.
+    def get_crd_served(self, group: str, plural: str) -> tuple[str, str] | None:
+        if group != "cert-manager.io":
+            return None
+        if plural == "clusterissuers":
+            return ("v1", "Cluster")
+        return ("v1", "Namespaced")
+
+    def list_clusterissuers(self, _namespace: str | None) -> list[dict]:
+        if self.get_crd_served("cert-manager.io", "clusterissuers") is None:
+            return []
+        return [
+            {
+                "apiVersion": "cert-manager.io/v1",
+                "kind": "ClusterIssuer",
+                "metadata": {
+                    "name": "letsencrypt-prod",
+                    "creationTimestamp": "2026-01-02T03:04:05Z",
+                },
+                "spec": {
+                    "acme": {
+                        "server": "https://acme-v02.api.letsencrypt.org/directory",
+                        "privateKeySecretRef": {"name": "letsencrypt-prod-key"},
+                        "solvers": [{"http01": {"ingress": {"class": "nginx"}}}],
+                    }
+                },
+                "status": {"conditions": [{"type": "Ready", "status": "True"}]},
+            }
+        ]
+
+    def get_clusterissuer(self, _namespace: str, name: str) -> list[dict]:
+        return [i for i in self.list_clusterissuers(None) if i["metadata"]["name"] == name]
+
+    def list_issuers(self, namespace: str | None) -> list[dict]:
+        if self.get_crd_served("cert-manager.io", "issuers") is None:
+            return []
+        return [
+            {
+                "apiVersion": "cert-manager.io/v1",
+                "kind": "Issuer",
+                "metadata": {
+                    "name": "letsencrypt-team",
+                    "namespace": namespace or "team-a",
+                    "creationTimestamp": "2026-01-02T03:04:05Z",
+                },
+                "spec": {
+                    "acme": {
+                        "server": "https://acme-staging-v02.api.letsencrypt.org/directory",
+                        "privateKeySecretRef": {"name": "letsencrypt-team-key"},
+                        "solvers": [{"http01": {"ingress": {"class": "nginx"}}}],
+                    }
+                },
+                "status": {"conditions": [{"type": "Ready", "status": "True"}]},
+            }
+        ]
+
+    def get_issuer(self, namespace: str, name: str) -> list[dict]:
+        return [i for i in self.list_issuers(namespace) if i["metadata"]["name"] == name]
+
+    def list_certificaterequests(self, namespace: str | None) -> list[dict]:
+        if self.get_crd_served("cert-manager.io", "certificaterequests") is None:
+            return []
+        return [
+            {
+                "apiVersion": "cert-manager.io/v1",
+                "kind": "CertificateRequest",
+                "metadata": {
+                    "name": "tls-cert-req",
+                    "namespace": namespace or "team-a",
+                    "creationTimestamp": "2026-01-02T03:04:05Z",
+                },
+                "spec": {"request": "LS0tLS1CRUdJTiBDRVJUSUZJQ0FURS1SRVFVRVNULS0tLS0="},
+                "status": {
+                    "conditions": [{"type": "Ready", "status": "True", "reason": "Approved"}],
+                    "certificate": "LS0tLS1CRUdJTiBDRVJUSUZJQ0FURS0tLS0t",
+                },
+            }
+        ]
+
+    def get_certificaterequest(self, namespace: str, name: str) -> list[dict]:
+        return [
+            i for i in self.list_certificaterequests(namespace) if i["metadata"]["name"] == name
+        ]
+
+    def list_certificates(self, namespace: str | None) -> list[dict]:
+        if self.get_crd_served("cert-manager.io", "certificates") is None:
+            return []
+        return [
+            {
+                "apiVersion": "cert-manager.io/v1",
+                "kind": "Certificate",
+                "metadata": {
+                    "name": "tls-cert",
+                    "namespace": namespace or "team-a",
+                    "creationTimestamp": "2026-01-02T03:04:05Z",
+                },
+                "spec": {
+                    "secretName": "tls-cert-tls",
+                    "issuerRef": {"name": "letsencrypt-team", "kind": "Issuer"},
+                    "dnsNames": ["app.example.com"],
+                },
+                "status": {
+                    "conditions": [{"type": "Ready", "status": "True"}],
+                    "notAfter": "2026-07-02T03:04:05Z",
+                    "renewalTime": "2026-06-02T03:04:05Z",
+                },
+            }
+        ]
+
+    def get_certificate(self, namespace: str, name: str) -> list[dict]:
+        return [i for i in self.list_certificates(namespace) if i["metadata"]["name"] == name]
+
     def list_crds(self, _namespace: str | None) -> list[dict]:
         # Cluster-scoped: the namespace argument is ignored (mirrors the real
         # K8sClient.list_crds). The shape mirrors a real CRD to_dict — the
@@ -3226,6 +3341,290 @@ def test_service_kind_singular_rejected(api_client, auth_client) -> None:
     r = api_client.get("/api/v1/clusters/1/resources/service", headers=h)
     assert r.status_code == 404
     assert r.get_json()["error"]["code"] == "RESOURCE_KIND_NOT_SUPPORTED"
+
+
+def test_list_clusterissuers_200(api_client, auth_client, fake_k8s, monkeypatch) -> None:
+    """[certmanager-clusterissuers-list-200] a bound user listing
+    clusterissuers (no namespace — cluster-scoped kind) gets the FULL
+    custom objects back (spec + status intact, camelCase)."""
+    auth_client.login()
+    h = {"Authorization": f"Bearer {auth_client.jwt}"}
+    _register(api_client, h)
+    _allow_sar(monkeypatch)
+    r = api_client.get("/api/v1/clusters/1/resources/clusterissuers", headers=h)
+    assert r.status_code == 200
+    body = r.get_json()
+    assert body["kind"] == "clusterissuers"
+    [item] = body["items"]
+    assert item["metadata"]["name"] == "letsencrypt-prod"
+    assert item["spec"]["acme"]["server"] == "https://acme-v02.api.letsencrypt.org/directory"
+    assert item["status"]["conditions"][0]["type"] == "Ready"
+
+
+def test_list_clusterissuers_crd_absent_empty(
+    api_client, auth_client, fake_k8s, monkeypatch
+) -> None:
+    """[certmanager-crd-absent-empty] cert-manager not installed (CRD read
+    None) = expected state: 200 with zero items, never an error."""
+    auth_client.login()
+    h = {"Authorization": f"Bearer {auth_client.jwt}"}
+    _register(api_client, h)
+    _allow_sar(monkeypatch)
+    fake_k8s.get_crd_served = lambda group, plural: None
+    r = api_client.get("/api/v1/clusters/1/resources/clusterissuers", headers=h)
+    assert r.status_code == 200
+    assert r.get_json()["items"] == []
+    assert r.get_json()["kind"] == "clusterissuers"
+
+
+def test_list_clusterissuers_get_by_name(api_client, auth_client, fake_k8s, monkeypatch) -> None:
+    """[certmanager-get-by-name] ?name= returns a 0/1-item list: a hit
+    returns the one full object, a miss returns [] (mirrors get_secret)."""
+    auth_client.login()
+    h = {"Authorization": f"Bearer {auth_client.jwt}"}
+    _register(api_client, h)
+    _allow_sar(monkeypatch)
+    r = api_client.get(
+        "/api/v1/clusters/1/resources/clusterissuers?name=letsencrypt-prod", headers=h
+    )
+    assert r.status_code == 200
+    [item] = r.get_json()["items"]
+    assert item["metadata"]["name"] == "letsencrypt-prod"
+    assert item["spec"]["acme"]["privateKeySecretRef"]["name"] == "letsencrypt-prod-key"
+    r = api_client.get("/api/v1/clusters/1/resources/clusterissuers?name=ghost", headers=h)
+    assert r.status_code == 200
+    assert r.get_json()["items"] == []
+
+
+def test_list_clusterissuers_sar_denied(api_client, auth_client, fake_k8s, monkeypatch) -> None:
+    """[certmanager-clusterissuers-sar-denied] ADR-0004: the SAR is asked
+    BEFORE the read, on the cert-manager.io group with namespace None
+    (cluster-scoped kind, no ?namespace= query) — a deny short-circuits
+    to 403 RBAC_DENIED."""
+    auth_client.login()
+    h = {"Authorization": f"Bearer {auth_client.jwt}"}
+    _register(api_client, h)
+    asked = _record_sar(monkeypatch)  # denies every SAR and records calls
+    r = api_client.get("/api/v1/clusters/1/resources/clusterissuers", headers=h)
+    assert r.status_code == 403
+    assert r.get_json()["error"]["code"] == "RBAC_DENIED"
+    # group + namespace None are the load-bearing assertions:
+    assert ("list", "clusterissuers", None, None, "cert-manager.io") in asked
+
+
+def test_list_issuers_200(api_client, auth_client, fake_k8s, monkeypatch) -> None:
+    """[certmanager-issuers-list-200] ?namespace=team-a gets the FULL
+    custom objects back (spec + status intact, camelCase)."""
+    auth_client.login()
+    h = {"Authorization": f"Bearer {auth_client.jwt}"}
+    _register(api_client, h)
+    _allow_sar(monkeypatch)
+    r = api_client.get("/api/v1/clusters/1/resources/issuers?namespace=team-a", headers=h)
+    assert r.status_code == 200
+    body = r.get_json()
+    assert body["kind"] == "issuers"
+    [item] = body["items"]
+    assert item["metadata"]["name"] == "letsencrypt-team"
+    assert item["metadata"]["namespace"] == "team-a"
+    assert item["spec"]["acme"]["privateKeySecretRef"]["name"] == "letsencrypt-team-key"
+    assert item["status"]["conditions"][0]["type"] == "Ready"
+
+
+def test_list_issuers_crd_absent_empty(api_client, auth_client, fake_k8s, monkeypatch) -> None:
+    """[certmanager-crd-absent-empty] CRD absent (cert-manager not
+    installed) -> 200 with zero items for the namespaced kind too."""
+    auth_client.login()
+    h = {"Authorization": f"Bearer {auth_client.jwt}"}
+    _register(api_client, h)
+    _allow_sar(monkeypatch)
+    fake_k8s.get_crd_served = lambda group, plural: None
+    r = api_client.get("/api/v1/clusters/1/resources/issuers?namespace=team-a", headers=h)
+    assert r.status_code == 200
+    assert r.get_json()["items"] == []
+    assert r.get_json()["kind"] == "issuers"
+
+
+def test_list_issuers_get_by_name(api_client, auth_client, fake_k8s, monkeypatch) -> None:
+    """[certmanager-get-by-name] ?name= on the namespaced kind: a hit
+    returns the one full object in team-a, a miss returns [] (mirrors
+    get_secret)."""
+    auth_client.login()
+    h = {"Authorization": f"Bearer {auth_client.jwt}"}
+    _register(api_client, h)
+    _allow_sar(monkeypatch)
+    r = api_client.get(
+        "/api/v1/clusters/1/resources/issuers?name=letsencrypt-team&namespace=team-a", headers=h
+    )
+    assert r.status_code == 200
+    [item] = r.get_json()["items"]
+    assert item["metadata"]["name"] == "letsencrypt-team"
+    assert item["metadata"]["namespace"] == "team-a"
+    r = api_client.get(
+        "/api/v1/clusters/1/resources/issuers?name=ghost&namespace=team-a", headers=h
+    )
+    assert r.status_code == 200
+    assert r.get_json()["items"] == []
+
+
+def test_list_issuers_sar_denied(api_client, auth_client, fake_k8s, monkeypatch) -> None:
+    """[certmanager-issuers-sar-denied] ADR-0004: the SAR is asked BEFORE
+    the read, on the cert-manager.io group with the query namespace — a
+    deny short-circuits to 403 RBAC_DENIED."""
+    auth_client.login()
+    h = {"Authorization": f"Bearer {auth_client.jwt}"}
+    _register(api_client, h)
+    asked = _record_sar(monkeypatch)  # denies every SAR and records calls
+    r = api_client.get("/api/v1/clusters/1/resources/issuers?namespace=team-a", headers=h)
+    assert r.status_code == 403
+    assert r.get_json()["error"]["code"] == "RBAC_DENIED"
+    assert ("list", "issuers", "team-a", None, "cert-manager.io") in asked
+
+
+def test_list_certificaterequests_200(api_client, auth_client, fake_k8s, monkeypatch) -> None:
+    """[certmanager-certificaterequests-list-200] the namespaced list,
+    FULL custom object (spec.request + status.certificate intact)."""
+    auth_client.login()
+    h = {"Authorization": f"Bearer {auth_client.jwt}"}
+    _register(api_client, h)
+    _allow_sar(monkeypatch)
+    r = api_client.get(
+        "/api/v1/clusters/1/resources/certificaterequests?namespace=team-a", headers=h
+    )
+    assert r.status_code == 200
+    body = r.get_json()
+    assert body["kind"] == "certificaterequests"
+    [item] = body["items"]
+    assert item["metadata"]["name"] == "tls-cert-req"
+    assert item["metadata"]["namespace"] == "team-a"
+    assert item["status"]["conditions"][0]["reason"] == "Approved"
+
+
+def test_list_certificaterequests_crd_absent_empty(
+    api_client, auth_client, fake_k8s, monkeypatch
+) -> None:
+    """[certmanager-crd-absent-empty] CRD absent -> 200 with zero items."""
+    auth_client.login()
+    h = {"Authorization": f"Bearer {auth_client.jwt}"}
+    _register(api_client, h)
+    _allow_sar(monkeypatch)
+    fake_k8s.get_crd_served = lambda group, plural: None
+    r = api_client.get(
+        "/api/v1/clusters/1/resources/certificaterequests?namespace=team-a", headers=h
+    )
+    assert r.status_code == 200
+    assert r.get_json()["items"] == []
+    assert r.get_json()["kind"] == "certificaterequests"
+
+
+def test_list_certificaterequests_get_by_name(
+    api_client, auth_client, fake_k8s, monkeypatch
+) -> None:
+    """[certmanager-get-by-name] ?name= on the namespaced kind: a hit
+    returns the one full object, a miss returns [] (mirrors get_secret)."""
+    auth_client.login()
+    h = {"Authorization": f"Bearer {auth_client.jwt}"}
+    _register(api_client, h)
+    _allow_sar(monkeypatch)
+    r = api_client.get(
+        "/api/v1/clusters/1/resources/certificaterequests?name=tls-cert-req&namespace=team-a",
+        headers=h,
+    )
+    assert r.status_code == 200
+    [item] = r.get_json()["items"]
+    assert item["metadata"]["name"] == "tls-cert-req"
+    assert item["spec"]["request"].startswith("LS0tLS1CRUdJTi")
+    r = api_client.get(
+        "/api/v1/clusters/1/resources/certificaterequests?name=ghost&namespace=team-a",
+        headers=h,
+    )
+    assert r.status_code == 200
+    assert r.get_json()["items"] == []
+
+
+def test_list_certificaterequests_sar_denied(
+    api_client, auth_client, fake_k8s, monkeypatch
+) -> None:
+    """[certmanager-certificaterequests-sar-denied] ADR-0004: the SAR is
+    asked BEFORE the read, on the cert-manager.io group with the query
+    namespace — a deny short-circuits to 403 RBAC_DENIED."""
+    auth_client.login()
+    h = {"Authorization": f"Bearer {auth_client.jwt}"}
+    _register(api_client, h)
+    asked = _record_sar(monkeypatch)  # denies every SAR and records calls
+    r = api_client.get(
+        "/api/v1/clusters/1/resources/certificaterequests?namespace=team-a", headers=h
+    )
+    assert r.status_code == 403
+    assert r.get_json()["error"]["code"] == "RBAC_DENIED"
+    assert ("list", "certificaterequests", "team-a", None, "cert-manager.io") in asked
+
+
+def test_list_certificates_200(api_client, auth_client, fake_k8s, monkeypatch) -> None:
+    """[certmanager-certificates-list-200] the namespaced list, FULL
+    custom object (spec.dnsNames + status notAfter intact)."""
+    auth_client.login()
+    h = {"Authorization": f"Bearer {auth_client.jwt}"}
+    _register(api_client, h)
+    _allow_sar(monkeypatch)
+    r = api_client.get("/api/v1/clusters/1/resources/certificates?namespace=team-a", headers=h)
+    assert r.status_code == 200
+    body = r.get_json()
+    assert body["kind"] == "certificates"
+    [item] = body["items"]
+    assert item["metadata"]["name"] == "tls-cert"
+    assert item["metadata"]["namespace"] == "team-a"
+    assert item["spec"]["dnsNames"] == ["app.example.com"]
+    assert item["status"]["notAfter"] == "2026-07-02T03:04:05Z"
+
+
+def test_list_certificates_crd_absent_empty(
+    api_client, auth_client, fake_k8s, monkeypatch
+) -> None:
+    """[certmanager-crd-absent-empty] CRD absent -> 200 with zero items."""
+    auth_client.login()
+    h = {"Authorization": f"Bearer {auth_client.jwt}"}
+    _register(api_client, h)
+    _allow_sar(monkeypatch)
+    fake_k8s.get_crd_served = lambda group, plural: None
+    r = api_client.get("/api/v1/clusters/1/resources/certificates?namespace=team-a", headers=h)
+    assert r.status_code == 200
+    assert r.get_json()["items"] == []
+    assert r.get_json()["kind"] == "certificates"
+
+
+def test_list_certificates_get_by_name(api_client, auth_client, fake_k8s, monkeypatch) -> None:
+    """[certmanager-get-by-name] ?name= on the namespaced kind: a hit
+    returns the one full object, a miss returns [] (mirrors get_secret)."""
+    auth_client.login()
+    h = {"Authorization": f"Bearer {auth_client.jwt}"}
+    _register(api_client, h)
+    _allow_sar(monkeypatch)
+    r = api_client.get(
+        "/api/v1/clusters/1/resources/certificates?name=tls-cert&namespace=team-a", headers=h
+    )
+    assert r.status_code == 200
+    [item] = r.get_json()["items"]
+    assert item["metadata"]["name"] == "tls-cert"
+    assert item["spec"]["dnsNames"] == ["app.example.com"]
+    r = api_client.get(
+        "/api/v1/clusters/1/resources/certificates?name=ghost&namespace=team-a", headers=h
+    )
+    assert r.status_code == 200
+    assert r.get_json()["items"] == []
+
+
+def test_list_certificates_sar_denied(api_client, auth_client, fake_k8s, monkeypatch) -> None:
+    """[certmanager-certificates-sar-denied] ADR-0004: the SAR is asked
+    BEFORE the read, on the cert-manager.io group with the query
+    namespace — a deny short-circuits to 403 RBAC_DENIED."""
+    auth_client.login()
+    h = {"Authorization": f"Bearer {auth_client.jwt}"}
+    _register(api_client, h)
+    asked = _record_sar(monkeypatch)  # denies every SAR and records calls
+    r = api_client.get("/api/v1/clusters/1/resources/certificates?namespace=team-a", headers=h)
+    assert r.status_code == 403
+    assert r.get_json()["error"]["code"] == "RBAC_DENIED"
+    assert ("list", "certificates", "team-a", None, "cert-manager.io") in asked
 
 
 def test_list_volumesnapshotclasses_200(api_client, auth_client, fake_k8s, monkeypatch) -> None:

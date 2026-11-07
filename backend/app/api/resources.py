@@ -182,6 +182,16 @@ _KINDS: dict[str, tuple[str, str, str]] = {
     # is the cluster list filtered to the selected namespace via claim_ref
     # (free PVs always visible); 4.1's route name was "pv".
     "persistentvolumes": ("list_persistent_volumes", "persistentvolumes", ""),
+    # cert-manager.io CRDs (the 4.1 cert-manager plugin, moved to /network/
+    # by the certmanager-external-loadbalancer-views change; ADR-0022 minus
+    # Plugins stays intact — the view is a Network leaf, not a Plugins
+    # group). Full custom object (the CRD seam): the CRD's own served
+    # version is the authority, CRD absent -> [] (first-class empty state).
+    # clusterissuers is cluster-scoped; the other three are namespaced.
+    "clusterissuers": ("list_clusterissuers", "clusterissuers", "cert-manager.io"),
+    "issuers": ("list_issuers", "issuers", "cert-manager.io"),
+    "certificaterequests": ("list_certificaterequests", "certificaterequests", "cert-manager.io"),
+    "certificates": ("list_certificates", "certificates", "cert-manager.io"),
 }
 
 #: kind → K8sClient method for a single-object ``?name=`` lookup
@@ -217,6 +227,11 @@ _GETTERS: dict[str, str] = {
     "volumesnapshots": "get_volume_snapshot",
     "persistentvolumeclaims": "get_persistent_volume_claim",
     "persistentvolumes": "get_persistent_volume",
+    # cert-manager.io (the certmanager-external-loadbalancer-views change).
+    "clusterissuers": "get_clusterissuer",
+    "issuers": "get_issuer",
+    "certificaterequests": "get_certificaterequest",
+    "certificates": "get_certificate",
 }
 
 

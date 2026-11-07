@@ -1087,6 +1087,197 @@ class K8sClient:
         item = self._crd_body(item)
         return [item.to_dict() if hasattr(item, "to_dict") else item]
 
+    # cert-manager.io CRDs — the 4.1 cert-manager plugin (list + per-type
+    # data views), moved to /network/ by the
+    # certmanager-external-loadbalancer-views change. The same CRD seam as
+    # the Cilium kinds: the CRD's OWN served version is the authority
+    # (``get_crd_served``); cert-manager is optional, so CRD absent -> []
+    # (first-class empty state). Full custom objects (camelCase, spec /
+    # status intact). clusterissuers is CLUSTER-scoped; the other three
+    # kinds are namespaced (the ``list_cilium_network_policies`` dispatch).
+    _CERT_MANAGER_GROUP = "cert-manager.io"
+
+    def list_clusterissuers(self, _namespace: str | None) -> list[dict[str, Any]]:
+        """ClusterIssuer items (cert-manager.io, CLUSTER-scoped), full
+        custom-object shape. CRD absent (cert-manager not installed) -> []
+        (expected); other failures -> ClusterUnreachableError (502)."""
+        served = self.get_crd_served(self._CERT_MANAGER_GROUP, "clusterissuers")
+        if served is None:
+            return []
+        version, _scope = served
+        custom = self._custom()
+        try:
+            resp = custom.list_cluster_custom_object(
+                self._CERT_MANAGER_GROUP, version, "clusterissuers"
+            )
+        except ApiException as e:
+            self._unreachable("list_clusterissuers", e)
+            raise AssertionError("unreachable") from e
+        body = self._crd_body(resp)
+        items = body.get("items", [])
+        return [item.to_dict() if hasattr(item, "to_dict") else item for item in items]
+
+    def get_clusterissuer(self, _namespace: str, name: str) -> list[dict[str, Any]]:
+        """One ClusterIssuer as a 0/1-item full custom object; [] on 404 or
+        CRD-absent. Cluster-scoped (``get_cluster_custom_object``)."""
+        served = self.get_crd_served(self._CERT_MANAGER_GROUP, "clusterissuers")
+        if served is None:
+            return []
+        version, _scope = served
+        custom = self._custom()
+        try:
+            item = custom.get_cluster_custom_object(
+                self._CERT_MANAGER_GROUP, version, "clusterissuers", name
+            )
+        except ApiException as e:
+            if e.status == 404:
+                return []
+            self._unreachable("get_clusterissuer", e)
+            raise AssertionError("unreachable") from e
+        item = self._crd_body(item)
+        return [item.to_dict() if hasattr(item, "to_dict") else item]
+
+    def list_issuers(self, namespace: str | None) -> list[dict[str, Any]]:
+        """Issuer items (cert-manager.io, namespaced), full custom-object
+        shape. CRD absent -> []; other failures -> ClusterUnreachableError
+        (502). The scope dispatch mirrors ``list_cilium_network_policies``."""
+        served = self.get_crd_served(self._CERT_MANAGER_GROUP, "issuers")
+        if served is None:
+            return []
+        version, scope = served
+        custom = self._custom()
+        try:
+            resp = (
+                custom.list_namespaced_custom_object(
+                    self._CERT_MANAGER_GROUP, version, namespace, "issuers"
+                )
+                if namespace and scope == "Namespaced"
+                else custom.list_cluster_custom_object(
+                    self._CERT_MANAGER_GROUP, version, "issuers"
+                )
+            )
+        except ApiException as e:
+            self._unreachable("list_issuers", e)
+            raise AssertionError("unreachable") from e
+        body = self._crd_body(resp)
+        items = body.get("items", [])
+        return [item.to_dict() if hasattr(item, "to_dict") else item for item in items]
+
+    def get_issuer(self, namespace: str, name: str) -> list[dict[str, Any]]:
+        """One Issuer as a 0/1-item full custom object; [] on 404 or
+        CRD-absent (cert-manager not installed). Any other ApiException maps
+        to ClusterUnreachableError (502), matching get_secret."""
+        served = self.get_crd_served(self._CERT_MANAGER_GROUP, "issuers")
+        if served is None:
+            return []
+        version, _scope = served
+        custom = self._custom()
+        try:
+            item = custom.get_namespaced_custom_object(
+                self._CERT_MANAGER_GROUP, version, namespace, "issuers", name
+            )
+        except ApiException as e:
+            if e.status == 404:
+                return []
+            self._unreachable("get_issuer", e)
+            raise AssertionError("unreachable") from e
+        item = self._crd_body(item)
+        return [item.to_dict() if hasattr(item, "to_dict") else item]
+
+    def list_certificaterequests(self, namespace: str | None) -> list[dict[str, Any]]:
+        """CertificateRequest items (cert-manager.io, namespaced), full
+        custom-object shape (spec.request + status.certificate intact).
+        CRD absent -> []; other failures -> ClusterUnreachableError (502)."""
+        served = self.get_crd_served(self._CERT_MANAGER_GROUP, "certificaterequests")
+        if served is None:
+            return []
+        version, scope = served
+        custom = self._custom()
+        try:
+            resp = (
+                custom.list_namespaced_custom_object(
+                    self._CERT_MANAGER_GROUP, version, namespace, "certificaterequests"
+                )
+                if namespace and scope == "Namespaced"
+                else custom.list_cluster_custom_object(
+                    self._CERT_MANAGER_GROUP, version, "certificaterequests"
+                )
+            )
+        except ApiException as e:
+            self._unreachable("list_certificaterequests", e)
+            raise AssertionError("unreachable") from e
+        body = self._crd_body(resp)
+        items = body.get("items", [])
+        return [item.to_dict() if hasattr(item, "to_dict") else item for item in items]
+
+    def get_certificaterequest(self, namespace: str, name: str) -> list[dict[str, Any]]:
+        """One CertificateRequest as a 0/1-item full custom object; [] on
+        404 or CRD-absent. Any other ApiException maps to
+        ClusterUnreachableError (502), matching get_secret."""
+        served = self.get_crd_served(self._CERT_MANAGER_GROUP, "certificaterequests")
+        if served is None:
+            return []
+        version, _scope = served
+        custom = self._custom()
+        try:
+            item = custom.get_namespaced_custom_object(
+                self._CERT_MANAGER_GROUP, version, namespace, "certificaterequests", name
+            )
+        except ApiException as e:
+            if e.status == 404:
+                return []
+            self._unreachable("get_certificaterequest", e)
+            raise AssertionError("unreachable") from e
+        item = self._crd_body(item)
+        return [item.to_dict() if hasattr(item, "to_dict") else item]
+
+    def list_certificates(self, namespace: str | None) -> list[dict[str, Any]]:
+        """Certificate items (cert-manager.io, namespaced), full custom-
+        object shape (spec.dnsNames + status conditions/notAfter intact).
+        CRD absent -> []; other failures -> ClusterUnreachableError (502)."""
+        served = self.get_crd_served(self._CERT_MANAGER_GROUP, "certificates")
+        if served is None:
+            return []
+        version, scope = served
+        custom = self._custom()
+        try:
+            resp = (
+                custom.list_namespaced_custom_object(
+                    self._CERT_MANAGER_GROUP, version, namespace, "certificates"
+                )
+                if namespace and scope == "Namespaced"
+                else custom.list_cluster_custom_object(
+                    self._CERT_MANAGER_GROUP, version, "certificates"
+                )
+            )
+        except ApiException as e:
+            self._unreachable("list_certificates", e)
+            raise AssertionError("unreachable") from e
+        body = self._crd_body(resp)
+        items = body.get("items", [])
+        return [item.to_dict() if hasattr(item, "to_dict") else item for item in items]
+
+    def get_certificate(self, namespace: str, name: str) -> list[dict[str, Any]]:
+        """One Certificate as a 0/1-item full custom object; [] on 404 or
+        CRD-absent (cert-manager not installed). Any other ApiException maps
+        to ClusterUnreachableError (502), matching get_secret."""
+        served = self.get_crd_served(self._CERT_MANAGER_GROUP, "certificates")
+        if served is None:
+            return []
+        version, _scope = served
+        custom = self._custom()
+        try:
+            item = custom.get_namespaced_custom_object(
+                self._CERT_MANAGER_GROUP, version, namespace, "certificates", name
+            )
+        except ApiException as e:
+            if e.status == 404:
+                return []
+            self._unreachable("get_certificate", e)
+            raise AssertionError("unreachable") from e
+        item = self._crd_body(item)
+        return [item.to_dict() if hasattr(item, "to_dict") else item]
+
     # VolumeSnapshotClass (snapshot.storage.k8s.io, cluster-scoped CRD): the
     # same full-custom-object seam as the Cilium kinds — the CRD's OWN served
     # version is the authority (``get_crd_served`` — an improvement over
