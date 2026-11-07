@@ -30,7 +30,10 @@ class FakeAdminK8s:
     def __init__(self, *_args: object) -> None:
         pass
 
-    def list_pods(self, namespace: str | None) -> list[dict]:
+    def list_pods(self, namespace: str | None, label_selector: str | None = None) -> list[dict]:
+        # The service-views change extended K8sClient.list_pods with the
+        # optional label_selector pass-through; the route forwards it
+        # positionally, so the double must accept it.
         return [{"metadata": {"name": "admin-pod", "namespace": "default"}}]
 
     def readyz(self) -> bool:

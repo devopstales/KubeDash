@@ -100,7 +100,10 @@ class FakeK8s:
             {"metadata": {"name": "team-a"}},
         ]
 
-    def list_pods(self, namespace: str | None) -> list[dict]:
+    def list_pods(self, namespace: str | None, label_selector: str | None = None) -> list[dict]:
+        # The ?labelSelector= query (the service-views change) is recorded:
+        # the pods-labelselector tests assert the pass-through value.
+        self.last_pod_label_selector: str | None = label_selector
         if namespace is None:
             return [
                 {"metadata": {"name": "kubedash-pod", "namespace": "default"}},
@@ -211,6 +214,62 @@ class FakeK8s:
                 "type": "kubernetes.io/service-account-token",
                 "data": {"token": "dG9rZW4="},
             },
+        ]
+
+    def list_services(self, namespace: str | None) -> list[dict]:
+        # Namespaced (core v1): None -> all-namespaces branch (mirrors the
+        # real K8sClient.list_services). Full spec/status present (NOT
+        # stripped) — the data page's Ports/Pods tabs + the list's External
+        # IP cell read them.
+        self.last_service_namespace: str | None = namespace
+        return [
+            {
+                "metadata": {
+                    "name": "web-svc",
+                    "namespace": "team-a",
+                    "creation_timestamp": "2026-01-02T03:04:05Z",
+                    "resource_version": "4242",
+                    "labels": {"app": "web"},
+                    "annotations": {
+                        "kubectl.kubernetes.io/last-applied-configuration": "{}",
+                        "owner": "platform",
+                    },
+                },
+                "spec": {
+                    "type": "ClusterIP",
+                    "cluster_ip": "10.0.0.1",
+                    "selector": {"app": "web"},
+                    "ports": [
+                        {"name": "http", "port": 80, "target_port": 8080, "protocol": "TCP"}
+                    ],
+                },
+            },
+            {
+                "metadata": {
+                    "name": "lb-svc",
+                    "namespace": "team-a",
+                    "creation_timestamp": "2026-01-03T00:00:00Z",
+                },
+                "spec": {
+                    "type": "LoadBalancer",
+                    "cluster_ip": "10.0.0.2",
+                    "selector": {"app": "lb"},
+                },
+                "status": {"load_balancer": {"ingress": [{"ip": "203.0.113.9"}]}},
+            },
+            {
+                "metadata": {
+                    "name": "headless-svc",
+                    "namespace": "team-a",
+                    "creation_timestamp": "2026-01-04T00:00:00Z",
+                },
+                "spec": {"type": "ClusterIP", "cluster_ip": "None", "selector": {}},
+            },
+        ]
+
+    def get_service(self, namespace: str, name: str) -> list[dict]:
+        return [
+            svc for svc in self.list_services(namespace) if svc["metadata"]["name"] == name
         ]
 
     def list_crds(self, _namespace: str | None) -> list[dict]:
@@ -997,6 +1056,35 @@ def test_list_pods_200_with_items(api_client, auth_client, fake_k8s, monkeypatch
     assert body["cluster"] == "prod"
     names = [p["metadata"]["name"] for p in body["items"]]
     assert "kubedash-pod" in names
+
+
+def test_pods_labelselector_forwarded(api_client, auth_client, fake_k8s, monkeypatch) -> None:
+    """[pods-labelselector-filters] ?labelSelector= is forwarded to the
+    client as ``label_selector`` (the pass-through; 4.1's
+    ``k8sPodSelectorListGet`` behavior)."""
+    auth_client.login()
+    h = {"Authorization": f"Bearer {auth_client.jwt}"}
+    _register(api_client, h)
+    _allow_sar(monkeypatch)
+    r = api_client.get(
+        "/api/v1/clusters/1/resources/pods?namespace=team-a&labelSelector=app=web", headers=h
+    )
+    assert r.status_code == 200
+    assert r.get_json()["kind"] == "pods"
+    # the pass-through value is the load-bearing assertion:
+    assert fake_k8s.last_pod_label_selector == "app=web"
+
+
+def test_pods_no_labelselector_unchanged(api_client, auth_client, fake_k8s, monkeypatch) -> None:
+    """[pods-labelselector-absent-unchanged] without ?labelSelector= the
+    client call is the existing unfiltered list (``label_selector=None``)."""
+    auth_client.login()
+    h = {"Authorization": f"Bearer {auth_client.jwt}"}
+    _register(api_client, h)
+    _allow_sar(monkeypatch)
+    r = api_client.get("/api/v1/clusters/1/resources/pods?namespace=team-a", headers=h)
+    assert r.status_code == 200
+    assert fake_k8s.last_pod_label_selector is None
 
 
 def test_list_namespaces_200(api_client, auth_client, fake_k8s, monkeypatch) -> None:
@@ -3038,6 +3126,104 @@ def test_configmap_kind_singular_rejected(api_client, auth_client) -> None:
     h = {"Authorization": f"Bearer {auth_client.jwt}"}
     _register(api_client, h)
     r = api_client.get("/api/v1/clusters/1/resources/configmap", headers=h)
+    assert r.status_code == 404
+    assert r.get_json()["error"]["code"] == "RESOURCE_KIND_NOT_SUPPORTED"
+
+
+def test_list_services_200(api_client, auth_client, fake_k8s, monkeypatch) -> None:
+    """[services-list-200] a bound user listing services?namespace=team-a
+    gets the full to_dict items back — ``spec`` (cluster_ip, ports) and
+    ``status`` (load_balancer) present (NOT stripped, unlike secrets —
+    the data page's Ports/Pods tabs + the list's External IP cell read
+    them), and the namespace is forwarded to the client."""
+    auth_client.login()
+    h = {"Authorization": f"Bearer {auth_client.jwt}"}
+    _register(api_client, h)
+    _allow_sar(monkeypatch)
+    r = api_client.get("/api/v1/clusters/1/resources/services?namespace=team-a", headers=h)
+    assert r.status_code == 200
+    body = r.get_json()
+    assert body["kind"] == "services"
+    assert body["cluster"] == "prod"
+    by_name = {i["metadata"]["name"]: i for i in body["items"]}
+    assert set(by_name) == {"web-svc", "lb-svc", "headless-svc"}
+    # spec intact (NOT stripped):
+    assert by_name["web-svc"]["spec"]["cluster_ip"] == "10.0.0.1"
+    assert by_name["web-svc"]["spec"]["ports"][0]["name"] == "http"
+    # status intact (the list's External IP cell reads it):
+    assert by_name["lb-svc"]["status"]["load_balancer"]["ingress"][0]["ip"] == "203.0.113.9"
+    assert fake_k8s.last_service_namespace == "team-a"  # the namespace is forwarded
+
+
+def test_list_services_all_namespaces(api_client, auth_client, fake_k8s, monkeypatch) -> None:
+    """[services-list-all-namespaces] no namespace query hits the
+    all-namespaces branch: the FakeK8s receives None (the
+    ``list_service_for_all_namespaces`` branch)."""
+    auth_client.login()
+    h = {"Authorization": f"Bearer {auth_client.jwt}"}
+    _register(api_client, h)
+    _allow_sar(monkeypatch)
+    r = api_client.get("/api/v1/clusters/1/resources/services", headers=h)
+    assert r.status_code == 200
+    assert r.get_json()["kind"] == "services"
+    assert fake_k8s.last_service_namespace is None
+
+
+def test_list_services_get_by_name(api_client, auth_client, fake_k8s, monkeypatch) -> None:
+    """[services-get-by-name] ?name= returns a 0/1-item list: a hit
+    returns the one full object in team-a (spec intact), a miss returns
+    [] (mirrors get_secret)."""
+    auth_client.login()
+    h = {"Authorization": f"Bearer {auth_client.jwt}"}
+    _register(api_client, h)
+    _allow_sar(monkeypatch)
+    r = api_client.get(
+        "/api/v1/clusters/1/resources/services?name=web-svc&namespace=team-a", headers=h
+    )
+    assert r.status_code == 200
+    [item] = r.get_json()["items"]
+    assert item["metadata"]["name"] == "web-svc"
+    assert item["metadata"]["namespace"] == "team-a"
+    assert item["spec"]["cluster_ip"] == "10.0.0.1"
+    r = api_client.get(
+        "/api/v1/clusters/1/resources/services?name=ghost&namespace=team-a", headers=h
+    )
+    assert r.status_code == 200
+    assert r.get_json()["items"] == []
+
+
+def test_list_services_sar_denied(api_client, auth_client, fake_k8s, monkeypatch) -> None:
+    """[services-sar-denied] ADR-0004: the SAR is asked BEFORE the read,
+    on the CORE group ("") with the query namespace (namespaced kind) — a
+    deny short-circuits to 403 RBAC_DENIED."""
+    auth_client.login()
+    h = {"Authorization": f"Bearer {auth_client.jwt}"}
+    _register(api_client, h)
+    asked = _record_sar(monkeypatch)  # denies every SAR and records calls
+    r = api_client.get("/api/v1/clusters/1/resources/services?namespace=team-a", headers=h)
+    assert r.status_code == 403
+    assert r.get_json()["error"]["code"] == "RBAC_DENIED"
+    # core group + the namespace are the load-bearing assertions:
+    assert ("list", "services", "team-a", None, "") in asked
+
+
+def test_services_binding_404(api_client, auth_client) -> None:
+    """[services-binding-404] an unbound user: the binding gate fails
+    before the SAR, CLUSTER_NOT_FOUND."""
+    auth_client.login()
+    h = {"Authorization": f"Bearer {auth_client.jwt}"}
+    r = api_client.get("/api/v1/clusters/999/resources/services?namespace=team-a", headers=h)
+    assert r.status_code == 404
+    assert r.get_json()["error"]["code"] == "CLUSTER_NOT_FOUND"
+
+
+def test_service_kind_singular_rejected(api_client, auth_client) -> None:
+    """[service-kind-singular-rejected] the 4.1 route name (singular) is
+    not a kind — RESOURCE_KIND_NOT_SUPPORTED."""
+    auth_client.login()
+    h = {"Authorization": f"Bearer {auth_client.jwt}"}
+    _register(api_client, h)
+    r = api_client.get("/api/v1/clusters/1/resources/service", headers=h)
     assert r.status_code == 404
     assert r.get_json()["error"]["code"] == "RESOURCE_KIND_NOT_SUPPORTED"
 

@@ -286,10 +286,19 @@ class K8sClient:
             f.write(ca_pem)
         return path
 
-    def list_pods(self, namespace: str | None) -> list[dict[str, Any]]:
-        """Pod list in the standard kubernetes dict form (``to_dict``)."""
+    def list_pods(
+        self, namespace: str | None, label_selector: str | None = None
+    ) -> list[dict[str, Any]]:
+        """Pod list in the standard kubernetes dict form (``to_dict``).
+        ``label_selector`` (optional) is a comma-separated ``key=value``
+        equality expression passed through to ``list_namespaced_pod``'s
+        ``label_selector`` kwarg (4.1's ``k8sPodSelectorListGet`` behavior) —
+        it applies to the namespaced branch only; a ``label_selector`` without
+        a ``namespace`` is ignored (the all-namespaces branch is unchanged).
+        The route does NOT parse or validate the selector (the kubernetes API
+        server is the authority on selector syntax)."""
         resp = (
-            self._v1.list_namespaced_pod(namespace)
+            self._v1.list_namespaced_pod(namespace, label_selector=label_selector)
             if namespace
             else self._v1.list_pod_for_all_namespaces()
         )
@@ -1349,6 +1358,26 @@ class K8sClient:
             items.append(item)
         return items
 
+    def list_services(self, namespace: str | None) -> list[dict[str, Any]]:
+        """Service list in the standard kubernetes dict form (``to_dict``)
+        for one namespace, or across all namespaces when the namespace is
+        ``None`` (the ``list_secrets`` branch). UNLIKE ``list_secrets`` this
+        does NOT strip any field: a Service's ``spec`` (type, cluster_ip,
+        ports, selector) and ``status`` (load_balancer) are public, and the
+        data page's Ports/Pods tabs + the list's External IP cell read them —
+        stripping would silently break all three. A transport ApiException
+        maps to ``ClusterUnreachableError`` (502)."""
+        try:
+            resp = (
+                self._v1.list_namespaced_service(namespace)
+                if namespace
+                else self._v1.list_service_for_all_namespaces()
+            )
+        except ApiException as e:
+            self._unreachable("list_services", e)
+            raise AssertionError("unreachable") from e
+        return [svc.to_dict() for svc in resp.items]
+
     def list_configmaps(self, namespace: str | None) -> list[dict[str, Any]]:
         """ConfigMap list in the standard kubernetes dict form (``to_dict``)
         for one namespace, or across all namespaces when the namespace is
@@ -1377,6 +1406,19 @@ class K8sClient:
             if e.status == 404:
                 return []
             raise
+
+    def get_service(self, namespace: str, name: str) -> list[dict[str, Any]]:
+        """One Service (full ``spec``/``status`` intact) as a 0/1-item list;
+        ``[]`` on 404. Any other ApiException maps to
+        ``ClusterUnreachableError`` (502), matching ``get_secret``'s transport
+        contract."""
+        try:
+            return [self._v1.read_namespaced_service(name, namespace).to_dict()]
+        except ApiException as e:
+            if e.status == 404:
+                return []
+            self._unreachable("get_service", e)
+            raise AssertionError("unreachable") from e
 
     # Ingress (networking.k8s.io, namespaced core): the full ``to_dict`` form
     # (NO field stripping — the data page's Rules table + the converter read

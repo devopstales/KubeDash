@@ -99,6 +99,10 @@ _KINDS: dict[str, tuple[str, str, str]] = {
     # TASK-047 (list + data views; ADR-0022 placement). The 4.1 route name was
     # singular; the API kind is the plural.
     "resourcequotas": ("list_resource_quotas", "resourcequotas", ""),
+    # Service (core, namespaced) — the 4.1-parity nav leaf resolved by the
+    # service-views change (list + three-tab data views; ADR-0022 placement).
+    # The 4.1 route name was "service"; the API kind is the plural.
+    "services": ("list_services", "services", ""),
     # PodDisruptionBudget (policy, namespaced) — the 4.1-parity nav leaf
     # resolved by TASK-048 (list + data views; ADR-0022 placement). The 4.1
     # route name was singular; the API kind is the plural.
@@ -183,6 +187,7 @@ _KINDS: dict[str, tuple[str, str, str]] = {
 #: kind → K8sClient method for a single-object ``?name=`` lookup
 _GETTERS: dict[str, str] = {
     "secrets": "get_secret",
+    "services": "get_service",
     "crds": "get_crd",
     "networkpolicies": "get_network_policy",
     "ciliumnetworkpolicies": "get_cilium_network_policy",
@@ -255,7 +260,15 @@ class ResourceApi(Api):
             return {"items": items, "kind": kind, "cluster": cluster.name}
         if not rbac.can(g.current_user, cluster, "list", api_resource, namespace, None, api_group):
             raise RbacDeniedError(f"list on {api_resource}")
-        items = getattr(pool.get(cluster), method)(namespace)
+        # The ?labelSelector= query (the service-views change) is forwarded to
+        # list_pods only: the other kinds' list_* methods take a single
+        # namespace arg and are unchanged.
+        if kind == "pods":
+            items = getattr(pool.get(cluster), method)(
+                namespace, request.args.get("labelSelector")
+            )
+        else:
+            items = getattr(pool.get(cluster), method)(namespace)
         return {"items": items, "kind": kind, "cluster": cluster.name}
 
     @blp.route("/clusters/<int:cluster_id>/resources/apply", methods=["POST"])
