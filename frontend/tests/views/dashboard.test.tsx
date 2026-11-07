@@ -12,9 +12,9 @@ import { useClusterStore } from '../../src/store/cluster'
 // not chart pixels — so ConcentricDonut is stubbed to render its `used`
 // prop (null → "unknown") as DOM text. The donut's own canvas behavior
 // (rings, center text, overflow bar, themes) stays covered in
-// tests/components/ConcentricDonut.test.tsx. KubeDataTable is mocked to a
-// plain table so row-order assertions are stable; the real DataTables init
-// (CoreUI, ADR-0023) is out of scope here.
+// tests/components/ConcentricDonut.test.tsx. KubeDataTable is faked by the
+// fleet's shared fake (below) so row-order assertions are stable; the real
+// DataTables init (CoreUI, ADR-0023) is out of scope here.
 vi.mock('../../src/components/ConcentricDonut', () => ({
   default: ({
     used,
@@ -32,40 +32,12 @@ vi.mock('../../src/components/ConcentricDonut', () => ({
   ),
 }))
 
-vi.mock('../../src/components/KubeDataTable', () => {
-  const Column = () => null
-  function KubeDataTable({
-    data,
-    children,
-  }: {
-    data: Record<string, unknown>[]
-    children: React.ReactNode
-  }) {
-    const columns = React.Children.toArray(children)
-      .filter(React.isValidElement)
-      .map((child) => (child as React.ReactElement<{ title: string; data?: string | null }>).props)
-    return (
-      <table>
-        <thead>
-          <tr>
-            {columns.map((column) => (
-              <th key={column.title}>{column.title}</th>
-            ))}
-          </tr>
-        </thead>
-        <tbody>
-          {data.map((row, index) => (
-            <tr key={index}>
-              {columns.map((column) => (
-                <td key={column.title}>{row[column.data!] as React.ReactNode}</td>
-              ))}
-            </tr>
-          ))}
-        </tbody>
-      </table>
-    )
-  }
-  return { default: KubeDataTable, Column }
+// KubeDataTable is faked in ../components/kube-data-table.test-utils.tsx —
+// the fleet's shared fake (the factory is async: a hoisted mock may not
+// touch module-scope consts, so the shared module is imported inside it).
+vi.mock('../../src/components/KubeDataTable', async () => {
+  const utils = await import('../components/kube-data-table.test-utils')
+  return { default: utils.KubeDataTable, Column: utils.Column }
 })
 
 const SUMMARY_OK = {

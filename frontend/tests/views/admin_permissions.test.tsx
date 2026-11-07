@@ -12,54 +12,12 @@ import TemplateEditor from '../../src/views/AdminPermissions/components/Template
 import { AdminRoute } from '../../src/routes'
 import { useClusterStore } from '../../src/store/cluster'
 
-vi.mock('../../src/components/KubeDataTable', () => {
-  const React = require('react') as typeof import('react')
-  const Column = () => null
-  function KubeDataTable({
-    data,
-    children,
-  }: {
-    data: Record<string, unknown>[]
-    children: React.ReactNode
-  }) {
-    const cols = React.Children.toArray(children)
-      .filter(React.isValidElement)
-      .map(
-        (child) =>
-          (child as React.ReactElement<{ title: string; data?: string | null; children?: unknown }>)
-            .props,
-      )
-    return (
-      <table className="table table-bordered">
-        <thead>
-          <tr>
-            {cols.map((col) => (
-              <th key={col.title}>{col.title}</th>
-            ))}
-          </tr>
-        </thead>
-        <tbody>
-          {data.map((row, i) => (
-            <tr key={i}>
-              {cols.map((col) => {
-                const value = col.data == null ? row : row[col.data]
-                const node =
-                  typeof col.children === 'function'
-                    ? (col.children as (v: unknown, t: string, r: unknown) => React.ReactNode)(
-                        value,
-                        'display',
-                        col.data == null ? value : row,
-                      )
-                    : (value as React.ReactNode)
-                return <td key={col.title}>{node ?? ''}</td>
-              })}
-            </tr>
-          ))}
-        </tbody>
-      </table>
-    )
-  }
-  return { default: KubeDataTable, Column }
+// KubeDataTable is faked in ../components/kube-data-table.test-utils.tsx —
+// the fleet's shared fake (the factory is async: a hoisted mock may not
+// touch module-scope consts, so the shared module is imported inside it).
+vi.mock('../../src/components/KubeDataTable', async () => {
+  const utils = await import('../components/kube-data-table.test-utils')
+  return { default: utils.KubeDataTable, Column: utils.Column }
 })
 
 // ponytail: the default MSW server already serves role:admin for /auth/me;

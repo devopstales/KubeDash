@@ -11,49 +11,12 @@ import NamespacesView from '../../src/views/Cluster/Namespaces'
 import NamespaceDataView from '../../src/views/Cluster/NamespaceData'
 import { useClusterStore } from '../../src/store/cluster'
 
-vi.mock('../../src/components/KubeDataTable', () => {
-  const Column = () => null
-  function KubeDataTable({
-    data,
-    children,
-  }: {
-    data: Record<string, unknown>[]
-    children: React.ReactNode
-  }) {
-    const columns = React.Children.toArray(children)
-      .filter(React.isValidElement)
-      .map(
-        (child) =>
-          (child as React.ReactElement<{ title: string; data?: string | null; children?: unknown }>)
-            .props,
-      )
-    return (
-      <table>
-        <thead>
-          <tr>
-            {columns.map((column) => (
-              <th key={column.title}>{column.title}</th>
-            ))}
-          </tr>
-        </thead>
-        <tbody>
-          {data.map((row, index) => (
-            <tr key={index}>
-              {columns.map((column) => {
-                const value = column.data == null ? row : row[column.data]
-                const node =
-                  typeof column.children === 'function'
-                    ? (column.children as (value: unknown) => React.ReactNode)(value)
-                    : (value as React.ReactNode)
-                return <td key={column.title}>{node ?? ''}</td>
-              })}
-            </tr>
-          ))}
-        </tbody>
-      </table>
-    )
-  }
-  return { default: KubeDataTable, Column }
+// KubeDataTable is faked in ../components/kube-data-table.test-utils.tsx —
+// the fleet's shared fake (the factory is async: a hoisted mock may not
+// touch module-scope consts, so the shared module is imported inside it).
+vi.mock('../../src/components/KubeDataTable', async () => {
+  const utils = await import('../components/kube-data-table.test-utils')
+  return { default: utils.KubeDataTable, Column: utils.Column }
 })
 
 const ITEMS = [

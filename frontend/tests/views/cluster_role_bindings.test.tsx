@@ -15,49 +15,12 @@ import ServiceAccountsView from '../../src/views/ClusterPermission/ServiceAccoun
 import ServiceAccountDataView from '../../src/views/ClusterPermission/ServiceAccountData'
 import { useClusterStore } from '../../src/store/cluster'
 
-vi.mock('../../src/components/KubeDataTable', () => {
-  const React = require('react') as typeof import('react')
-  const Column = () => null
-  function KubeDataTable({
-    data,
-    children,
-  }: {
-    data: Record<string, unknown>[]
-    children: React.ReactNode
-  }) {
-    const cols = React.Children.toArray(children)
-      .filter(React.isValidElement)
-      .map(
-        (child) =>
-          (child as React.ReactElement<{ title: string; data: string; children?: unknown }>).props,
-      )
-    return (
-      <table>
-        <thead>
-          <tr>
-            {cols.map((col) => (
-              <th key={col.title}>{col.title}</th>
-            ))}
-          </tr>
-        </thead>
-        <tbody>
-          {data.map((row, i) => (
-            <tr key={i}>
-              {cols.map((col) => {
-                const value = row[col.data]
-                const node =
-                  typeof col.children === 'function'
-                    ? (col.children as (v: unknown) => React.ReactNode)(value)
-                    : (value as React.ReactNode)
-                return <td key={col.title}>{node ?? ''}</td>
-              })}
-            </tr>
-          ))}
-        </tbody>
-      </table>
-    )
-  }
-  return { default: KubeDataTable, Column }
+// KubeDataTable is faked in ../components/kube-data-table.test-utils.tsx —
+// the fleet's shared fake (the factory is async: a hoisted mock may not
+// touch module-scope consts, so the shared module is imported inside it).
+vi.mock('../../src/components/KubeDataTable', async () => {
+  const utils = await import('../components/kube-data-table.test-utils')
+  return { default: utils.KubeDataTable, Column: utils.Column }
 })
 
 // ADR-0040: the binding list renders on its own route; its cross-kind

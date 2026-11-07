@@ -10,48 +10,12 @@ import CrdsView from '../../src/views/Cluster/CRDs'
 import CrdDataView from '../../src/views/Cluster/CrdData'
 import { useClusterStore } from '../../src/store/cluster'
 
-// ponytail: KubeDataTable is mocked to a plain table so row/cell assertions
-// are stable (same pattern as the node test); the real DataTables init is out
-// of scope here.
+// KubeDataTable is faked in ../components/kube-data-table.test-utils.tsx —
+// the fleet's shared fake (the factory is async: a hoisted mock may not
+// touch module-scope consts, so the shared module is imported inside it).
 vi.mock('../../src/components/KubeDataTable', async () => {
-  const React = await import('react')
-  const Column = () => null
-  function KubeDataTable({ data, children }: { data: Record<string, unknown>[]; children: React.ReactNode }) {
-    type RenderFn = (data: unknown, type: string, row: Record<string, unknown>) => React.ReactNode
-    const columns = React.Children.toArray(children)
-      .filter(React.isValidElement)
-      .map((child) => {
-        const el = child as React.ReactElement<{ title: string; data?: string | null; children?: RenderFn | React.ReactNode }>
-        return { title: el.props.title, data: el.props.data, render: el.props.children as RenderFn | React.ReactNode }
-      })
-    const cellValue = (row: Record<string, unknown>, col: { data?: string | null; render?: RenderFn | React.ReactNode }) => {
-      if (typeof col.render === 'function')
-        return col.render(col.data != null ? row[col.data] : undefined, 'display', row)
-      if (col.data != null) return row[col.data] as React.ReactNode
-      return null
-    }
-    return (
-      <table>
-        <thead>
-          <tr>
-            {columns.map((column) => (
-              <th key={column.title}>{column.title}</th>
-            ))}
-          </tr>
-        </thead>
-        <tbody>
-          {data.map((row, index) => (
-            <tr key={index}>
-              {columns.map((column) => (
-                <td key={column.title}>{cellValue(row, column)}</td>
-              ))}
-            </tr>
-          ))}
-        </tbody>
-      </table>
-    )
-  }
-  return { default: KubeDataTable, Column }
+  const utils = await import('../components/kube-data-table.test-utils')
+  return { default: utils.KubeDataTable, Column: utils.Column }
 })
 
 const CRDS = {

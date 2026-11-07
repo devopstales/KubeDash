@@ -14,59 +14,12 @@ import CertManagerView from '../../src/views/Network/CertManager'
 import CertManagerDataView from '../../src/views/Network/CertManagerData'
 import { useClusterStore } from '../../src/store/cluster'
 
-// Same KubeDataTable fake as services.test.tsx: renders the real row mapping
-// (children-as-render-fns included) so cell assertions test the view's
-// `toRow` output, not DataTables' DOM. The factory is async: a hoisted mock
-// may not touch module-scope consts, so react is imported inline.
+// KubeDataTable is faked in ../components/kube-data-table.test-utils.tsx —
+// the fleet's shared fake (the factory is async: a hoisted mock may not
+// touch module-scope consts, so the shared module is imported inside it).
 vi.mock('../../src/components/KubeDataTable', async () => {
-  const React = (await import('react')) as typeof import('react')
-  const Column = () => null
-  function KubeDataTable({
-    data,
-    children,
-  }: {
-    data: Record<string, unknown>[]
-    children: React.ReactNode
-  }) {
-    const cols = React.Children.toArray(children)
-      .filter(React.isValidElement)
-      .map(
-        (child) =>
-          (
-            child as React.ReactElement<{
-              title: string
-              data: string | null
-              children?: unknown
-            }>
-          ).props,
-      )
-    return (
-      <table>
-        <thead>
-          <tr>
-            {cols.map((col) => (
-              <th key={col.title}>{col.title}</th>
-            ))}
-          </tr>
-        </thead>
-        <tbody>
-          {data.map((row, i) => (
-            <tr key={i}>
-              {cols.map((col) => {
-                const value = col.data === null ? row : row[col.data]
-                const node =
-                  typeof col.children === 'function'
-                    ? (col.children as (v: unknown) => React.ReactNode)(value)
-                    : (value as React.ReactNode)
-                return <td key={col.title}>{node ?? ''}</td>
-              })}
-            </tr>
-          ))}
-        </tbody>
-      </table>
-    )
-  }
-  return { default: KubeDataTable, Column }
+  const utils = await import('../components/kube-data-table.test-utils')
+  return { default: utils.KubeDataTable, Column: utils.Column }
 })
 
 // Mirrors App.tsx's CertManagerRoute dispatcher (the test does not import
