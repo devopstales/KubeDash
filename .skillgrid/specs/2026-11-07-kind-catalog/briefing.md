@@ -51,16 +51,18 @@ suite is green at every commit.
   keeps client construction + engine + mutations + `readyz` + pool. The
   factory seam is unchanged.
 - **R8.** Behaviour preserved: `uv run pytest -m "not integration"` green
-  per commit; `ruff` + `mypy` clean; no REST shape change.
+  per commit; `ruff` + `mypy` clean; no REST shape change (one documented
+  exception: transport failures on the 10 legacy 500-paths become 502
+  `CLUSTER_UNREACHABLE` — user decision 2026-11-07).
 
 ## Success
 
 - Adding a Kind = one catalog row + one fixture entry (no new methods, no
   `resources.py` table row).
 - The CRD-absent degrade rule has one home (the engine).
-- `k8s_client.py` < ~600 lines; no per-method complexity above the engine.
+- `k8s_client.py` < ~900 lines; no per-method complexity above the engine.
 - The ADR-0010 informer-cache adapter later faces a handful of methods, not
-  ~88.
+  ~73.
 
 ## Out of scope
 

@@ -10,7 +10,7 @@
 
 ## What
 
-Delete the confirmed dead code, pure deletions only:
+Delete the confirmed dead code (pure deletions) + one test-hygiene migration (pure test-file edits):
 
 - **Frontend CoreUI template demo files** (58 files, 12,571 lines):
   `views/components/**` demo pages (Tables, Cards, Widgets, Modals,
@@ -28,6 +28,12 @@ Delete the confirmed dead code, pure deletions only:
   `wsgi.py` `_rq_worker_main`/`_build_worker_app` (only after the leader-RQ
   path is verified not to reference them), the migration's `_has_unique`,
   `scripts/prometheus-push.py` `_METRIC_RE`.
+- **KubeDataTable test-fake fleet migration** (moved from change B, user
+  decision 2026-11-07): the ~20 view tests that fake `KubeDataTable`
+  inline get one shared fake (`tests/components/kube-data-table.test-utils.tsx`
+  — the faithful init-time-capture variant the PV/PVC usage-join tests
+  depend on); tests keep their canned data; any behaviour change is a
+  stop-and-report, not a silent adaptation.
 - **The 23 backend "unused files"** (`app/aggregated/*`, `app/models/*`
   request/SCIM models, `app/services/*` access/grafana/loki/prometheus/tempo/
   scim/…, `app/sockets/*`, `app/tasks/*`) are **verification-only** in this
@@ -50,6 +56,9 @@ Test-only exports (`resetRefreshForTests`, `setLoginRedirectForTests`,
   import-cleanup lines.
 - **R4.** The 23 backend files get a verification note (dynamic-wiring
   verdict per file) in the tracker; deletions only when grep-proven.
+- **R5.** The fleet fake migration changes no test behaviour: the shared
+  fake is the faithful variant; `corepack pnpm test` green with the test
+  expectations unedited.
 
 ## Success
 

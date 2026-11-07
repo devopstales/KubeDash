@@ -22,7 +22,13 @@
   (`registerNavigate(kinds, fn)` / `getNavigateFor(kind)`) — a route registers
   for its own kinds; `OldDataRedirect` looks up by the ref's kind.
   Last-write-wins becomes per-kind (safe: the registry's routes are unique
-  per kind), cross-kind stomping is impossible.
+  per kind — asserted by a kind-disjointness test), cross-kind stomping is
+  impossible. The two out-of-scope dispatchers (`CertManagerRoute`,
+  `ExternalLoadBalancerRoute` — the B decision keeps their routes hand-written)
+  migrate their seam registrations too (the breaking API leaves no stragglers)
+  but keep their hand-rolled components. One documented additive delta:
+  deep links to the three converted routes now consume the relay on mount
+  (parity with single-kind routes; none of the dispatchers did before).
 - The relay TTL pair is pinned by tests on **both** sides (frontend
   `RELAY_TTL_MS === 60_000`, backend `STASH_TTL_SECONDS === 60`) with each
   test naming the other side — the cross-boundary invariant stops being a
@@ -31,14 +37,11 @@
 ## Requirements
 
 - **R1.** `ObjectRoute`: `kinds: string[]`; `detail: (params: { name: string; namespace?: string; kind: string }) => ReactNode`. All call sites migrated in the same change (breaking prop, no compat alias).
-- **R2.** Kind-keyed navigate registry in `lib/objectRef.ts`; the single-slot
-  `registeredNavigate` global in `ObjectRoute.tsx` is deleted; `OldDataRedirect`
-  resolves via `getNavigateFor(kind)`.
+- **R2.** Kind-keyed navigate registry in `lib/objectRef.ts`; the single-slot `registeredNavigate` global in `ObjectRoute.tsx` is deleted; `OldDataRedirect` needs no seam (it `<Navigate>`s directly — verified 2026-11-07: it does not read the navigate registry; `getNavigateFor` exists for the future redirect-path seam + test observability).
 - **R3.** The three dispatcher components are deleted; their routes render
   one `ObjectRoute` with the kind array + kind-switching `detail`.
 - **R4.** Pinned TTL tests both sides, each naming the counterpart constant.
-- **R5.** No behaviour change: object navigation (ADR-0040) identical —
-  ref-driven detail, relay consumption, legacy redirects; e2e green.
+- **R5.** Behaviour unchanged except one documented additive delta: deep links to the three **converted** multi-kind routes now consume the relay on mount (parity with single-kind routes; none of the dispatchers did before). Ref-driven detail, relay consumption elsewhere, legacy redirects: identical (ADR-0040); e2e green.
 
 ## Success
 

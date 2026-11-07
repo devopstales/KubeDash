@@ -2,20 +2,20 @@
 
 **Status:** PROPOSED
 **Tier:** T2
-**Build shape:** Tracer thread — the open risk is engine expressiveness (can one generic engine express all 41 kinds without per-kind branching?); the tracer proves it on two kinds (one typed cluster-scoped, one typed namespaced with a projector) before any batch is cut.
+**Build shape:** Tracer thread — the open risk is engine expressiveness (can one generic engine express all 41 kinds without per-kind branching?); the tracer proves it on three kinds — a typed cluster-scoped (`ingressclasses`), a typed namespaced with a projector (`secrets`), and a CRD cluster-scoped (`gatewayclasses`, so the served-version branch is exercised at the door, not in Task 3) — before any batch is cut.
 **Classification:** standard (L2 verification floor: full unit suite + build)
-**Goal:** Replace the ~88 per-kind `list_X`/`get_X` methods + `_KINDS`/`_GETTERS` string tables + 8 drifting test doubles with a typed kind catalog, one generic read engine at the existing factory seam, and one catalog-driven `FakeK8s` with fixture data — behaviour unchanged.
-**Architecture:** `app/services/kinds.py` declares every registry kind as a `KindSpec` (API plural, group, version, scope, CRD flag, projector, named-override method). `K8sClient.list(kind, ns, label_selector)` / `get(kind, ns, name)` are the engine: one behaviour home for the namespace branch, `?name=` 404 → `[]`, CRD-absent → `[]` (glossary: *CRD-absent degrade*), transport failure → `ClusterUnreachableError` → 502. Typed kinds read through the typed clients (model deserialization + `to_dict()` → snake_case, the wire shape today); CRD kinds read through `CustomObjectsApi` at the CRD's served version (wire form, camelCase — also today's shape). `ResourceApi` dispatches and asks SAR from the same registry; `_KINDS`/`_GETTERS` are deleted. Cutover is kind-by-kind: each row flips from `method="list_X"` (legacy dispatch) to `method=None` (engine), the method is deleted, and the suite is green before the next batch.
+**Goal:** Replace the ~73 per-kind `list_X`/`get_X` methods + `_KINDS`/`_GETTERS` string tables + 9 drifting test doubles with a typed kind catalog, one generic read engine at the existing factory seam, and one catalog-driven `FakeK8s` with fixture data — behaviour unchanged except the one documented transport-mapping normalization (Must-Haves).
+**Architecture:** `app/services/kinds.py` declares every registry kind as a `KindSpec` (API plural, group, version, scope, CRD flag, projector, named-override method). `K8sClient.list(kind, ns, label_selector)` / `get(kind, ns, name)` are the engine: one behaviour home for the namespace branch, `?name=` 404 → `[]`, CRD-absent → `[]` (glossary: *CRD-absent degrade*), transport failure → `ClusterUnreachableError` → 502. Error mapping: the get branch maps 404 → `[]` and every other `ApiException` → 502; the list branch maps every `ApiException` → 502 (the CRD-absent `[]` is resolved before the read). Projectors apply to the list path only — `get` returns the object as read (`get_secret` returns `data` intact today; the API test pins it). Named-override (`method`) rows dispatch inside `client.list`/`get` via `getattr(self, spec.method)(namespace)` before the typed/CRD branch — the route stays override-agnostic. `crds.served_version(api_client, group, plural)` returns `(version, scope)`, `None` on CRD-404 (absent), and raises `ClusterUnreachableError` on transport failure **or** mis-registration (CRD exists but declares no served version). Error mapping: the get branch maps 404 → `[]` and every other `ApiException` → 502; the list branch maps every `ApiException` → 502 (the CRD-absent `[]` is resolved before the read). Projectors apply to the list path only — `get` returns the object as read (`get_secret` returns `data` intact today; the API test pins it). Named-override (`method`) rows dispatch inside `client.list`/`get` via `getattr(self, spec.method)(namespace)` before the typed/CRD branch — the route stays override-agnostic. `crds.served_version(api_client, group, plural)` returns `(version, scope)`, `None` on CRD-404 (absent), and raises `ClusterUnreachableError` on transport failure **or** mis-registration (CRD exists but declares no served version). Typed kinds read through the typed clients (model deserialization + `to_dict()` → snake_case, the wire shape today); CRD kinds read through `CustomObjectsApi` at the CRD's served version (wire form, camelCase — also today's shape). `ResourceApi` dispatches and asks SAR from the same registry; `_KINDS`/`_GETTERS` are deleted. Cutover is kind-by-kind: each row flips from `method="list_X"` (legacy dispatch) to `method=None` (engine), the method is deleted, and the suite is green before the next batch.
 **Tech Stack:** Python 3.12, Flask 3 + Smorest, kubernetes python client (backend venv), pytest, ruff + mypy.
 **Spec:** `./briefing.md`
-**Critic:** pending
+**Critic:** criticA (reviewer) 2026-11-07: **SOUND-WITH-FIXES** — 8 MAJOR + 9 MINOR, all findings folded in per user decision (500→502 normalization accepted as an intentional fix; `gatewayclasses` added as the 3rd door tracer; the `cluster_allocation.py` parser dedup dropped as beyond R1–R8; all cutover-bookkeeping + interface clarifications accepted as specified)
 
 ## Hypothesis
 
 **Claim:** A catalog row + one generic engine expresses the read behaviour of all 41 kinds with no special case beyond the four declared exceptions (pods `labelSelector` pass-through, PV claim-namespace filter, secrets data-strip, external-LB provider detection).
-**Right condition:** all 41 rows wired (`method=None`, except the 4 declared overrides); the ~76 per-kind list/get methods deleted; the parametrized suite green for every catalog kind; REST response shapes byte-identical to the legacy path (snake_case typed / camelCase CRD wire form).
+**Right condition:** all 41 rows wired (`method=None`, except the 4 declared overrides); the 65 per-kind list/get methods deleted; the parametrized suite green for every catalog kind; REST response shapes byte-identical to the legacy path (snake_case typed / camelCase CRD wire form).
 **Wrong condition:** the door check (Task 1) finds a kind whose behaviour needs per-kind branching *inside* the engine, or a deserialization shape (snake_case vs wire) drifts, or SAR attributes differ from today's `_KINDS` values.
-**Thinnest MVP:** `ingressclasses` + `secrets` migrated end-to-end (catalog rows, engine, `FakeK8s` data, tests green, methods deleted).
+**Thinnest MVP:** `ingressclasses` + `secrets` + `gatewayclasses` migrated end-to-end (catalog rows, engine incl. the CRD branch, `FakeK8s` data, tests green, 6 methods deleted).
 **Door check:** Task 1 — if it fails, stop; the blueprint is invalidated and the user decides.
 
 ## Terms
@@ -31,7 +31,8 @@
 - Typed kinds return `to_dict()` snake_case shape; CRD kinds return wire-form (camelCase) shape — no REST shape change for any kind
 - `?name=` on a gettable kind: missing object → 200 `items: []`; present → `items: [obj]`; on a non-gettable kind → 404 `RESOURCE_KIND_NOT_SUPPORTED` (as today)
 - Cluster-scoped kinds ignore the `namespace` query; CRD kinds branch on the **served** scope (CRD metadata is the authority, glossary)
-- CRD-absent kind list → 200 `items: []`; CRD present but read 404 → `[]`; any transport failure → `ClusterUnreachableError` → 502
+- CRD-absent kind list → 200 `items: []` (`served_version` → `None`); get branch: 404 → `[]`, any other `ApiException` → 502; list branch: every `ApiException` → 502; mis-registered CRD (exists, no served version) → 502
+- [normalization, user decision 2026-11-07] the 10 legacy read paths that surfaced raw transport `ApiException` as 500 `INTERNAL_ERROR` (`list_pods`, `list_namespaces`, `list_nodes`, `list_serviceaccounts`, `list_roles`, `list_rolebindings`, `list_cluster_roles`, `list_cluster_role_bindings`, `list_secrets`, `get_secret` non-404) now return 502 `CLUSTER_UNREACHABLE` — the engine's single transport mapping, matching the 32 methods that already map via `_unreachable`
 - `?labelSelector=` on `pods` forwards to the namespaced list call only (ignored without a namespace — the `list_pods` docstring contract); other kinds ignore it
 - `list_secrets` items have no `data`/`string_data` keys
 - `persistentvolumes` list is the cluster list filtered to the selected namespace via `claim_ref` (free/unbound PVs always visible)
@@ -45,7 +46,7 @@
 - `backend/app/services/k8s_metrics.py` — node/PV metrics + the shared k8s quantity parser
 - `backend/app/services/kubeconfig_crypto.py` — AES-256-GCM kubeconfig encrypt/decrypt (`KUBEDASH_SECRET_KEY` one-way door untouched)
 - `backend/app/services/kubeconfig_binding.py` — `bound_cluster_or_404` + `resolve_admin_source`
-- `backend/app/services/k8s_client.py` — client construction + typed-reader table + engine + mutations + `readyz` + `K8sClientPool` (slimmed)
+- `backend/app/services/k8s_client.py` — client construction + typed-reader table + engine + mutations + `readyz` + `K8sClientPool` (slimmed) + kept non-catalog reads (`list_events`, `list_crd_instances`) + `get_crd_served` delegate + thin metrics delegates + kept non-catalog reads (`list_events`, `list_crd_instances`) + `get_crd_served` delegate + thin metrics delegates
 - `backend/tests/fakes/fake_k8s.py` — the single shared, catalog-driven double
 - `backend/tests/fixtures/k8s_data.py` — per-kind fixture data
 - `backend/tests/api/test_resources.py` — parametrized kind tests; no local `FakeK8s`
@@ -55,7 +56,7 @@
 - The engine's `crd=True` path calls `crds.served_version(...)`; the `crds` kind row is the one CRD-path kind with a **fixed** version (`apiextensions.k8s.io/v1`, no served resolution)
 - `FakeK8s.list`/`get` read the same `KINDS` keys as `resources.py` dispatch — a kind-name typo fails the test that references it
 - The Task 4 parametrized test iterates `KINDS` — a future new row automatically gets its API-tier test
-- The quantity parser that today is duplicated between `cluster_allocation.py` and `k8s_client.py` (jscpd clone pair) has one home after the split
+- The three production call-sites outside the resource route cut over in Task 2: `gateway_api.py:45` (`get_ingress` → `client.get("ingresses", ns, name)`), `metrics.py:86-87` (`list_nodes`/`list_pods` → `client.list(…)`), `resources.py:382/402` (`get_crd` → `client.get("crds", None, name)`; `list_crd_instances` stays a named client method)
 
 **One-way-door decisions:** None — no migration, no public API shape change (REST behaviour preserved), no new dependency, no config key. The `KUBEDASH_SECRET_KEY` one-way door is touched only by moving the code that reads it, not by changing it.
 
@@ -64,18 +65,18 @@
 - Python 3.12; **no new third-party dependencies**
 - `app/services/` stays pure Python (no Flask imports) — testable via `K8sClientPool.factory` injection (ADR-0006/0007/0008 shape unchanged)
 - `uv run ruff check . && uv run mypy app` clean; `uv run pytest -m "not integration"` green at **every** commit
-- REST behaviour preserved: same paths, status codes, error codes, response shapes; SAR gate before every read (ADR-0004); object navigation unchanged (ADR-0040); no hard-coded identity/credential defaults (ADR-0028)
+- REST behaviour preserved: same paths, response shapes, and error codes — with one documented normalization (user decision 2026-11-07): transport failures on read paths → 502 `CLUSTER_UNREACHABLE` everywhere (the 10 legacy 500-paths become 502); SAR gate before every read (ADR-0004); object navigation unchanged (ADR-0040); no hard-coded identity/credential defaults (ADR-0028)
 - Conventional commits; this blueprint commits (spec zone) before any code-zone commit
-- The named-override set is closed: pods `labelSelector` (engine kwarg, no method), PV claim filter + secrets strip (projectors), the 4 external-LB provider-detect methods. Anything else the batches surface is a door-check failure, not a fifth override
+- The named-override set is closed: pods `labelSelector` (engine kwarg, no method), PV claim filter + secrets strip (projectors), the 4 external-LB provider-detect methods are a known member of this closed set (dual-CRD detection, ratified 2026-10-29) — not a door-check discovery. Anything else the batches surface is a door-check failure, not a fifth override
 
 ## File Structure
 
 - `backend/app/services/kinds.py` — `KindSpec` + `KINDS`: the typed catalog. No behaviour; data + the two projectors.
 - `backend/app/services/crds.py` — `served_version(api_client, group, plural) -> (version, scope) | None`, `custom(api_client) -> CustomObjectsApi`, `crd_body(resp) -> dict` — extracted verbatim from `k8s_client.py` (`_crd_served`, `get_crd_served`, `_custom`, `_crd_body`).
-- `backend/app/services/k8s_metrics.py` — `node_metrics`, `node_usage`, `pvc_usage`, `_node_metrics`, `_parse_stats_body`, `_parse_cpu`, `_parse_bytes` (quantity parser — the shared home).
-- `backend/app/services/kubeconfig_crypto.py` — `_key`, `encrypt_kubeconfig`, `decrypt_kubeconfig`.
+- `backend/app/services/k8s_metrics.py` — `node_metrics`, `node_usage`, `pvc_usage`, `_node_metrics`, `_parse_stats_body`, `_parse_cpu`, `_parse_bytes` (quantity parser, moved verbatim — `cluster_allocation.py` keeps its deliberate private copy, out of scope per user decision 2026-11-07).
+- `backend/app/services/kubeconfig_crypto.py` — `key()` (the no-arg lazy cache, moved verbatim from `_key`), `encrypt_kubeconfig`, `decrypt_kubeconfig`.
 - `backend/app/services/kubeconfig_binding.py` — `bound_cluster_or_404`, `resolve_admin_source`.
-- `backend/app/services/k8s_client.py` — `K8sClient.__init__` (API objects + `_typed` reader table), `list(kind, namespace, label_selector)` / `get(kind, namespace, name)` engine, non-catalog reads (`list_events`), mutations (`create_namespace`, `delete_namespace`, `apply_*`, `delete_*`), `readyz`, `K8sClientPool`, `build_admin_client`, `admin_client_ok`.
+- `backend/app/services/k8s_client.py` — `K8sClient.__init__` (API objects + `_typed` reader table), `list(kind, namespace, label_selector)` / `get(kind, namespace, name)` engine, `get_crd_served` delegate (crds-backed), non-catalog reads (`list_events`, `list_crd_instances`), thin metrics delegates, mutations (`create_namespace`, `delete_namespace`, `apply_*`, `delete_*`), `readyz`, `K8sClientPool`, `build_admin_client`, `admin_client_ok`.
 - `backend/app/api/resources.py` — catalog-derived dispatch + SAR; `_KINDS`/`_GETTERS` deleted; `_APPLY_PLURALS`/`_APPLY_CLUSTER_SCOPED` (apply path) untouched.
 - `backend/tests/fakes/fake_k8s.py` — `FakeK8s`: `list`/`get` driven by `KINDS` + fixture data, `crd_absent` toggle, call recording (`last_pod_label_selector` etc.), plus the mutation/metrics methods the suites need.
 - `backend/tests/fixtures/k8s_data.py` — `FIXTURES: dict[str, list[dict]]` — per-kind items, ported 1:1 from the current `FakeK8s` method bodies.
@@ -124,10 +125,10 @@
 | issuers | `cert-manager.io` | no | yes | yes | `None` | — |
 | certificaterequests | `cert-manager.io` | no | yes | yes | `None` | — |
 | certificates | `cert-manager.io` | no | yes | yes | `None` | — |
-| ipaddresspools | `metallb.io` | yes | yes | yes | `list_ipaddresspools` | — |
+| ipaddresspools | `metallb.io` | no | yes | yes | `list_ipaddresspools` | — |
 | l2advertisements | `metallb.io` | no | yes | yes | `list_l2advertisements` | — |
-| bgppeers | `metallb.io` | yes | yes | yes | `list_bgppeers` | — |
-| bgpadvertisements | `metallb.io` | yes | yes | yes | `list_bgpadvertisements` | — |
+| bgppeers | `metallb.io` | no | yes | yes | `list_bgppeers` | — |
+| bgpadvertisements | `metallb.io` | no | yes | yes | `list_bgpadvertisements` | — |
 
 Typed reader table (engine, typed kinds only — one line per kind, built in `K8sClient.__init__` from the existing API objects): kind → `(list_all, list_ns, get_all, get_ns)`, e.g. `pods → (v1.list_pod_for_all_namespaces, v1.list_namespaced_pod, —, —)`, `ingresses → (networking.list_ingress_for_all_namespaces, networking.list_namespaced_ingress, —, networking.read_namespaced_ingress)`. `get_ns` generated methods take `(name, namespace)`; `get_all` take `(name)`. Cluster-scoped kinds have no `list_ns`/`get_ns`.
 
@@ -136,34 +137,34 @@ Typed reader table (engine, typed kinds only — one line per kind, built in `K8
 ### Task 1: Door check — catalog schema, engine, tracer kinds (ingressclasses + secrets)
 
 **Files:**
-- Create: `backend/app/services/kinds.py`, `backend/app/services/crds.py`, `backend/tests/fixtures/k8s_data.py`
-- Modify: `backend/app/services/k8s_client.py` (engine + `_typed` entries for the two kinds; `_crd_served`/`get_crd_served`/`_custom`/`_crd_body` delegate to `crds.py`), `backend/app/api/resources.py` (registry dispatch), `backend/tests/api/test_resources.py` (FakeK8s `list`/`get` for the two kinds)
+- Create: `backend/app/services/kinds.py`, `backend/app/services/crds.py`, `backend/tests/fixtures/k8s_data.py`, `backend/tests/fakes/fake_k8s.py` (the `FakeK8s` home — moved out of `test_resources.py` here so later batches reuse it)
+- Modify: `backend/app/services/k8s_client.py` (engine + `_typed` entries for the three tracer kinds + `build_typed_readers(...)` helper; `_crd_served`/`_custom`/`_crd_body` move to `crds.py`, `get_crd_served` delegates), `backend/app/api/resources.py` (registry dispatch), `backend/tests/api/test_resources.py` (imports the shared fake)
 - Test: `backend/tests/api/test_resources.py`
 
 **Interfaces:**
-- Produces: `KindSpec` dataclass `(plural: str, group: str, cluster_scoped: bool = False, crd: bool = False, version: str | None = None, gettable: bool = False, method: str | None = "list_<snake>", projector: Callable[[list[dict[str, Any]], str | None], list[dict[str, Any]]] | None = None)`; `KINDS: dict[str, KindSpec]` (all 41 rows seeded — `method` names ported from `_KINDS`, `gettable` from `_GETTERS`, `crd`/`cluster_scoped`/`version` from the method bodies); `K8sClient.list(kind: str, namespace: str | None = None, label_selector: str | None = None) -> list[dict[str, Any]]`; `K8sClient.get(kind: str, namespace: str | None, name: str) -> list[dict[str, Any]]`; `crds.served_version(api_client, group, plural) -> tuple[str, str] | None`
+- Produces: `KindSpec` dataclass `(plural: str, group: str, cluster_scoped: bool = False, crd: bool = False, version: str | None = None, gettable: bool = False, method: str | None = None (every row sets `method` explicitly — the field is data, not a template), projector: Callable[[list[dict[str, Any]], str | None], list[dict[str, Any]]] | None = None)`; `KINDS: dict[str, KindSpec]` (all 41 rows seeded — `method` names ported from `_KINDS`, `gettable` from `_GETTERS`, `crd`/`cluster_scoped`/`version` from the method bodies); `K8sClient.list(kind: str, namespace: str | None = None, label_selector: str | None = None) -> list[dict[str, Any]]`; `K8sClient.get(kind: str, namespace: str | None, name: str) -> list[dict[str, Any]]`; `crds.served_version(api_client, group, plural) -> tuple[str, str] | None`
 - Seam: `K8sClientPool.factory` — the engine is reached through the same factory-injected client the route uses; `FakeK8s` satisfies `list`/`get` identically
-- Deletion test: deleting the engine re-creates ~10 lines of try/except + namespace branch + 404/CRD-absent handling per kind across 76 call sites (the `resources.py` route + every future adapter, ADR-0010)
+- Deletion test: deleting the engine re-creates ~10 lines of try/except + namespace branch + 404/CRD-absent handling per kind across 73 call sites (the `resources.py` route + every future adapter, ADR-0010)
 - Adapters: 2 at the seam — real `K8sClient` + `FakeK8s`
 
 **SATISFIES:** `tracer-kinds-catalog`
 
-- [ ] **Step 1: Write the failing tests.** In `test_resources.py`: (a) `test_ingressclasses_via_catalog` — route `GET .../resources/ingressclasses` returns the fixture items from `k8s_data.FIXTURES["ingressclasses"]`, SAR asked with `("list", "ingressclasses", <ns>, None, "networking.k8s.io")`; (b) `test_ingressclasses_get_missing_returns_empty` — `?name=absent` → 200 `items: []`; (c) `test_secrets_strip_data` — fixture secrets with `data`/`string_data` come back stripped; (d) engine unit tests on `K8sClient` with a stub `ApiException`: transport failure → `ClusterUnreachableError`; (e) **shape assertions**: typed item keys snake_case (`creation_timestamp`), CRD-path item keys wire camelCase (`creationTimestamp`) — pin the two deserialization regimes now. Run: `uv run pytest tests/api/test_resources.py -k "via_catalog or get_missing or strip_data" -v`. Expected: FAIL (`KINDS`/`list`/`get` not defined).
+- [ ] **Step 1: Write the failing tests.** In `test_resources.py`: (a) `test_ingressclasses_via_catalog` — route `GET .../resources/ingressclasses` returns the fixture items from `k8s_data.FIXTURES["ingressclasses"]`, SAR asked with `("list", "ingressclasses", <ns>, None, "networking.k8s.io")`; (b) `test_ingressclasses_get_missing_returns_empty` — `?name=absent` → 200 `items: []`; (c) `test_secrets_strip_data` — fixture secrets with `data`/`string_data` come back stripped; (d) engine unit tests on `K8sClient` with a stub `ApiException`: transport failure → `ClusterUnreachableError`; a mis-registered CRD (exists, no served version) → `ClusterUnreachableError` (the raise survives the move to `crds.py`); (e) **shape assertions**: typed item keys snake_case (`creation_timestamp` — `ingressclasses`/`secrets`), CRD-path item keys wire camelCase (`creationTimestamp` — `gatewayclasses`) — pin the two deserialization regimes at the door; the 502 pin is the documented normalization for these kinds (`secrets` was a legacy 500-path). Run: `uv run pytest tests/api/test_resources.py -k "via_catalog or get_missing or strip_data" -v`. Expected: FAIL (`KINDS`/`list`/`get` not defined).
 - [ ] **Step 2: Implement `kinds.py`** — `KindSpec` + all 41 rows (source: `_KINDS`/`_GETTERS` tables + per-method bodies, transcribed row by row) + `strip_secret_data`/`pv_claim_filter` projectors.
 - [ ] **Step 3: Implement `crds.py`** — move `_crd_served`, `get_crd_served` logic (read CRD by fully-qualified `plural.group` name, 404 → `None`, other ApiException → `ClusterUnreachableError`), `_custom`, `_crd_body` to module functions taking `api_client`; `k8s_client.py` delegates (same behaviour, same docstrings).
-- [ ] **Step 4: Implement the engine** in `k8s_client.py` — `list`/`get` per the Architecture section: `spec = KINDS[kind]`; `spec.method is not None` → `getattr(self, spec.method)(namespace, label_selector=label_selector) if kind == "pods" else ...` — **no**: engine only handles `method is None` rows; the route does the method branch (see Step 5). Typed branch: `_typed[kind]` reader; CRD branch: `crds.served_version` (absent → `[]`), `CustomObjectsApi` at served version/scope, wire items. `label_selector` forwarded on the namespaced typed branch only (all namespaced generated methods accept it; cluster-scoped branches never pass it).
+- [ ] **Step 4: Implement the engine** in `k8s_client.py` — `list`/`get` per the Architecture section: `spec = KINDS[kind]`; **method rows first**: `spec.method is not None` → `return getattr(self, spec.method)(namespace)` (the four LB methods take one arg — no `label_selector`); otherwise the typed branch (`_typed[kind]` reader) or the CRD branch (`crds.served_version` — `None` → `[]` — then `CustomObjectsApi` at the served version/scope, wire items). `label_selector` is forwarded on the namespaced typed branch only when provided (cluster-scoped branches never pass it). `_typed` is built by a module-level `build_typed_readers(v1, rbac, networking, scheduling, storage, node, policy, autoscaling) -> dict[str, _Reader]` that `__init__` calls — so the `object.__new__(K8sClient)` service-test tier can populate it the same way.
 - [ ] **Step 5: Rework `resources.py` dispatch** — `spec = KINDS.get(kind)` (missing → `ResourceKindNotSupportedError`); SAR from `spec.group`/`spec.plural` with today's argument order (`rbac.can(user, cluster, verb, api_resource, namespace, name, api_group)`); `name` path: `spec.gettable` gate (else `RESOURCE_KIND_NOT_SUPPORTED`), `namespace = namespace or "default"`, then `client.get(kind, namespace, name)`; list path: `client.list(kind, namespace, label_selector=request.args.get("labelSelector"))` **only when `kind == "pods"`** otherwise `client.list(kind, namespace)`; `method` rows dispatch via `getattr(client, spec.method)` inside `client.list`/`get` (the client routes its own overrides — `resources.py` stays override-agnostic). Delete `_KINDS`/`_GETTERS`; keep `_APPLY_PLURALS`/`_APPLY_CLUSTER_SCOPED`.
-- [ ] **Step 6: FakeK8s `list`/`get`** — catalog-driven: `list(kind, ns, label_selector=None)` reads `FIXTURES[kind]`, filters by `metadata.namespace` for namespaced rows when `ns` given, returns `[]` for `crd_absent` rows, records `last_pod_label_selector`; `get(kind, ns, name)` filters by name → `[]` when missing. Seed `FIXTURES["ingressclasses"]` (wire form) + `FIXTURES["secrets"]` (with `data`/`string_data`) from the current fake bodies.
-- [ ] **Step 7: Flip the two rows** (`method=None`) and delete `list_ingress_classes`, `get_ingress_class`, `list_secrets`, `get_secret` from `k8s_client.py` (and the matching `FakeK8s` methods).
-- [ ] **Step 8: Run + door-check verdict.** `uv run pytest -m "not integration"`. Green → door check PASSED; record it in the commit body. Any per-kind branching needed inside the engine beyond {namespace branch, 404, CRD-absent, transport, projector, `label_selector`} → **stop, report, user decides** (door check FAILED).
-- [ ] **Step 9: Commit.** `refactor: kind catalog + generic read engine; cutover ingressclasses, secrets (door check passed)`
+- [ ] **Step 6: `FakeK8s` to `tests/fakes/fake_k8s.py` + catalog `list`/`get`** — the fake moves there (test_resources imports it); `list(kind, ns, label_selector=None)` reads `FIXTURES[kind]`, filters by `metadata.namespace` for namespaced rows when `ns` given, returns `[]` for `crd_absent` rows, **applies `spec.projector`** (`get` does not), records `last_pod_label_selector`; `get(kind, ns, name)` filters by name → `[]` when missing. Seed `FIXTURES`: `ingressclasses` (typed → snake_case `to_dict` form, new data — no fake body exists to port), `secrets` (with `data`/`string_data`, from the current fake body), `gatewayclasses` (CRD → wire camelCase form, new data).
+- [ ] **Step 7: Flip the three rows** (`method=None`) and delete `list_ingress_classes`, `get_ingress_class`, `list_secrets`, `get_secret`, `list_gateway_classes`, `get_gateway_class` from `k8s_client.py` (and the matching fake methods).
+- [ ] **Step 8: Run + door-check verdict.** `uv run pytest -m "not integration"`. Green → door check PASSED (typed + CRD branches both proven end-to-end); record it in the commit body. Any per-kind branching needed inside the engine beyond {namespace branch, 404, CRD-absent, transport, projector, `label_selector`} → **stop, report, user decides** (door check FAILED).
+- [ ] **Step 9: Commit.** `refactor: kind catalog + generic read engine; cutover ingressclasses, secrets, gatewayclasses (door check passed)`
 
 ### Task 2: Typed batch — core, rbac, node, storage, scheduling, policy, autoscaling, networking, apiextensions
 
-**Kinds (21):** namespaces, nodes, serviceaccounts, pods, roles, rolebindings, clusterroles, clusterrolebindings, networkpolicies, ingresses, priorityclasses, runtimeclasses, storageclasses, resourcequotas, services, poddisruptionbudgets, horizontalpodautoscalers, limitranges, configmaps, persistentvolumeclaims, persistentvolumes, crds (22 rows).
+**Kinds (22):** namespaces, nodes, serviceaccounts, pods, roles, rolebindings, clusterroles, clusterrolebindings, networkpolicies, ingresses, priorityclasses, runtimeclasses, storageclasses, resourcequotas, services, poddisruptionbudgets, horizontalpodautoscalers, limitranges, configmaps, persistentvolumeclaims, persistentvolumes, crds.
 
 **Files:**
-- Modify: `backend/app/services/k8s_client.py` (`_typed` entries for the batch; delete the batch's methods), `backend/tests/fixtures/k8s_data.py` (fixture entries ported 1:1 from the current `FakeK8s` bodies + test assertions in `test_resources.py`), `backend/tests/api/test_resources.py` (delete the batch's fake methods)
+- Modify: `backend/app/services/k8s_client.py` (`_typed` entries for the batch; delete the batch's methods), `backend/app/api/gateway_api.py` (`get_ingress` → `client.get("ingresses", ns, name)`), `backend/app/api/metrics.py` (`list_nodes`/`list_pods` → `client.list("nodes", None)` / `client.list("pods", None)`), `backend/app/api/resources.py` (the `crds/instances` route: `get_crd(None, name)` → `client.get("crds", None, name)`; `list_crd_instances` stays), `backend/tests/fixtures/k8s_data.py` (fixture entries ported 1:1 from the current fake bodies + test assertions in `test_resources.py`; `ingresses` is new data in snake_case form — no fake body exists), the batch's service tests `backend/tests/services/test_k8s_client_*.py` (rewrite the deleted method calls to `client.list`/`client.get`; populate `_typed` via `build_typed_readers`), `backend/tests/api/test_gateway_api.py` + `test_metrics_summary.py` (the route fakes gain the shared catalog `list`/`get`), `backend/tests/api/test_resources.py` (delete the batch's fake methods)
 - Test: `backend/tests/api/test_resources.py` (existing per-kind tests are the behaviour backstop)
 
 **Interfaces:**
@@ -176,12 +177,12 @@ Typed reader table (engine, typed kinds only — one line per kind, built in `K8
 - [ ] **Step 2: Add `_typed` reader entries** in `K8sClient.__init__` for the batch (bound method references per the Catalog section's reader table).
 - [ ] **Step 3: Run the suite** — `uv run pytest -m "not integration"`. The existing per-kind route tests now exercise the engine path for the un-flipped rows only after the flip; run first to confirm the fixture data matches existing assertions (fix fixtures, never test expectations, on mismatch).
 - [ ] **Step 4: Flip the 22 rows** (`method=None`) in `kinds.py`.
-- [ ] **Step 5: Delete the batch's per-kind methods** from `k8s_client.py` (`list_namespaces`, `list_nodes`, …, `get_persistent_volume`, `list_crds`, `get_crd` — including the `pods` method; `label_selector` is now an engine kwarg) and the matching `FakeK8s` methods.
-- [ ] **Step 6: Run + commit.** `uv run pytest -m "not integration"` green → `refactor: cutover typed kind batch to catalog engine (22 kinds)`
+- [ ] **Step 5: Delete the batch's per-kind methods** from `k8s_client.py` (`list_namespaces`, `list_nodes`, …, `get_persistent_volume`, `list_crds`, `get_crd` — including the `pods` method; `label_selector` is now an engine kwarg) and the matching fake methods; migrate the three production call-sites + the two route fakes + the batch's service tests in the same commit.
+- [ ] **Step 6: Run + commit.** `uv run pytest -m "not integration"` green → `refactor: cutover typed kind batch to catalog engine (22 kinds) + orphaned call-sites migrated`
 
 ### Task 3: CRD batch — served-version `CustomObjectsApi` kinds
 
-**Kinds (13):** ciliumnetworkpolicies, ciliumclusterwidenetworkpolicies, verticalpodautoscalers, gatewayclasses, gateways, httproutes, referencegrants, volumesnapshotclasses, volumesnapshots, clusterissuers, issuers, certificaterequests, certificates. (The 4 external-LB kinds stay named overrides — closed set.)
+**Kinds (12):** ciliumnetworkpolicies, ciliumclusterwidenetworkpolicies (no getter), verticalpodautoscalers, gateways, httproutes, referencegrants, volumesnapshotclasses, volumesnapshots, clusterissuers, issuers, certificaterequests, certificates. (`gatewayclasses` already cut over in Task 1's door check. The 4 external-LB kinds stay named overrides — closed set.)
 
 **Files:**
 - Modify: `backend/tests/fixtures/k8s_data.py` (wire-form fixture entries for the 13), `backend/app/services/k8s_client.py` (delete the batch's methods), `backend/tests/api/test_resources.py` (delete the batch's fake methods; add per-kind CRD-absent assertions)
@@ -192,10 +193,10 @@ Typed reader table (engine, typed kinds only — one line per kind, built in `K8
 
 **SATISFIES:** `crd-kinds-catalog`
 
-- [ ] **Step 1: Fixtures + `crd_absent` wiring.** `FIXTURES` entries for the 13 (wire form — the named source: the current `FakeK8s` method bodies, e.g. `list_gateway_classes` returns wire dicts); `FakeK8s` gains `crd_absent: frozenset[str]` (default empty) → `list` returns `[]` for rows in it.
-- [ ] **Step 2: CRD-absent tests.** For each of the 13: `test_<kind>_crd_absent_returns_empty` — fake with `crd_absent={kind}`, route → 200 `items: []`. Plus one negative control: a transport failure (fake raising) → 502 `CLUSTER_UNREACHABLE`.
-- [ ] **Step 3: Flip the 13 rows** (`method=None`); delete `list_cilium_network_policies`, `get_gateway_class`, `list_http_routes`, … (the 13 pairs) from `k8s_client.py` and the matching fake methods.
-- [ ] **Step 4: Run + commit.** `uv run pytest -m "not integration"` green → `refactor: cutover CRD kind batch to served-version engine (13 kinds)`
+- [ ] **Step 1: Fixtures.** `FIXTURES` entries for the 12 — all new wire-form (camelCase) data (the fake drifted: none of these has a fake body to port; shape reference: the real methods' wire dicts + the API-tier test assertions). The `crd_absent` toggle + the `gatewayclasses` wire fixture already landed in Task 1.
+- [ ] **Step 2: CRD-absent tests.** For each of the 12: `test_<kind>_crd_absent_returns_empty` — fake with `crd_absent={kind}`, route → 200 `items: []`. Plus one negative control: a transport failure (fake raising) → 502 `CLUSTER_UNREACHABLE`.
+- [ ] **Step 3: Flip the 12 rows** (`method=None`); delete the 12 list methods + 11 get methods (`list_cilium_network_policies`, `get_gateway`, `list_http_routes`, …) from `k8s_client.py` and the matching fake methods; rewrite the batch's `test_k8s_client_*.py` service tests against the engine (same pattern as Task 2).
+- [ ] **Step 4: Run + commit.** `uv run pytest -m "not integration"` green → `refactor: cutover CRD kind batch to served-version engine (12 kinds)`
 
 ### Task 4: Coverage recovery — parametrized API-tier tests for every catalog kind
 
@@ -209,7 +210,7 @@ Typed reader table (engine, typed kinds only — one line per kind, built in `K8
 
 **SATISFIES:** `every-kind-covered`
 
-- [ ] **Step 1: Parametrized suite.** `@pytest.mark.parametrize("spec", KINDS.values(), ids=lambda s: <registry kind>)` (the registry dict keys as ids): (a) list 200 + items == `FIXTURES[kind]` (namespaced rows also assert a `namespace=` filter case); (b) cluster-scoped rows: `namespace=kube-system` is ignored; (c) gettable rows: `?name=<fixture item>` → 1 item; `?name=absent` → `[]`; non-gettable rows: `?name=` → 404 `RESOURCE_KIND_NOT_SUPPORTED`; (d) SAR attribute assertion per row: `(verb, spec.plural, ns, name, spec.group)` recorded on the fake; (e) `crd` rows additionally the CRD-absent case (reuses Task 3's fake toggle).
+- [ ] **Step 1: Parametrized suite.** `@pytest.mark.parametrize("spec", KINDS.values(), ids=lambda s: <registry kind>)` (the registry dict keys as ids): (a) list 200 + items == `expected(kind, ns)`, where `expected` applies `spec.projector` when set (secrets stripped, PV claim-filter with `ns`) — method rows (the 4 LB overrides) are covered by Step 3's provider tests, not (a)/(b); (b) cluster-scoped rows: `namespace=kube-system` is ignored (method rows excluded); (c) gettable rows: `?name=<fixture item>` → 1 item; `?name=absent` → `[]`; non-gettable rows: `?name=` → 404 `RESOURCE_KIND_NOT_SUPPORTED`; (d) SAR attribute assertion per row: `(verb, spec.plural, ns, name, spec.group)` recorded on the fake; (e) `crd` rows additionally the CRD-absent case (reuses Task 3's fake toggle).
 - [ ] **Step 2: Meta test.** `test_every_catalog_row_has_fixture_data` — every `KINDS` key has a non-empty `FIXTURES` entry (the external-LB overrides are exempt: their data comes from provider detection; assert they at least appear in `FIXTURES` as an empty-list sentinel + a `provider` marker).
 - [ ] **Step 3: Provider-detection tests** for the 4 external-LB overrides (MetalLB-present wins, MetalLB-absent → Cilium fallback, both absent → `[]`) — ported from the existing `test_gateway_api`/resource tests.
 - [ ] **Step 4: Run + commit.** Full `uv run pytest -m "not integration"` → `test: parametrized API-tier coverage for all 41 catalog kinds`
@@ -218,26 +219,26 @@ Typed reader table (engine, typed kinds only — one line per kind, built in `K8
 
 **Files:**
 - Create: `backend/app/services/k8s_metrics.py`, `backend/app/services/kubeconfig_crypto.py`, `backend/app/services/kubeconfig_binding.py`
-- Modify: `backend/app/services/k8s_client.py` (move the three concepts out), `backend/app/services/cluster_allocation.py` (use the shared quantity parser)
+- Modify: `backend/app/services/k8s_client.py` (move the three concepts out; the metrics methods stay as thin delegates so `metrics.py`'s method calls and the metric fakes keep working unchanged)
 - Modify: every importer of the moved names — find with `grep -rln "from app.services.k8s_client import" app/ tests/`; update each import list (import-only edits)
-- Test: `backend/tests/services/test_k8s_client.py` (and any test importing the moved names — same grep)
+- Test: the `backend/tests/services/test_k8s_client_*.py` tier + `test_metrics_summary.py` + `test_metrics_pvcs.py` (and any test importing the moved names — same grep)
 
 **Interfaces:**
-- Produces: `k8s_metrics.node_metrics(client, ...)`, `k8s_metrics.pvc_usage(client, ...)`, `k8s_metrics.parse_bytes(s) -> int` (the quantity parser — the single home, replacing the jscpd-clone pair in `cluster_allocation.py`), `kubeconfig_crypto.encrypt_kubeconfig` / `decrypt_kubeconfig` / `key_from_secret(secret)`, `kubeconfig_binding.bound_cluster_or_404(user, cluster_id)` / `resolve_admin_source(user, cluster_id)`
+- Produces: `k8s_metrics.node_metrics(client, ...)`, `k8s_metrics.pvc_usage(client, ...)`, `k8s_metrics.parse_bytes(s) -> int` (moved verbatim; `cluster_allocation.py` keeps its deliberate private copy — out of scope per user decision), `kubeconfig_crypto.encrypt_kubeconfig` / `decrypt_kubeconfig` / `key()`, `kubeconfig_binding.bound_cluster_or_404(user, cluster_id)` / `resolve_admin_source(user, cluster_id)`
 - Seam: unchanged (`K8sClientPool` stays in `k8s_client.py` — it is the seam owner; `wsgi.py` and the API layer import paths for the pool are untouched)
 - Deletion test: n/a — this is a move; behaviour identical, verified by the suite
 
 **SATISFIES:** `concepts-split`
 
-- [ ] **Step 1: `git mv`-style extraction.** Move the functions verbatim (docstrings included) into the three modules; `k8s_client.py` re-imports nothing from them except what it calls internally (`bound_cluster_or_404` stays called where it's called — the *API layer* calls it, not `k8s_client`).
-- [ ] **Step 2: Update all imports** from Step 1's grep; `cluster_allocation.py` switches to `k8s_metrics.parse_bytes`.
-- [ ] **Step 3: Run + commit.** `uv run pytest -m "not integration" && uv run ruff check . && uv run mypy app` green → `refactor: split k8s_client into crypto/metrics/binding modules`. Post-check: `wc -l app/services/k8s_client.py` < ~900 (engine + mutations + pool).
+- [ ] **Step 1: `git mv`-style extraction.** Move the functions verbatim (docstrings included) into the three modules; `k8s_client.py`'s `node_metrics`/`node_usage`/`pvc_usage` become one-line delegates to `k8s_metrics` (callers and fakes unchanged); `bound_cluster_or_404` stays called where it's called — the *API layer* calls it, not `k8s_client`.
+- [ ] **Step 2: Update all imports** from Step 1's grep (import-only edits).
+- [ ] **Step 3: Run + commit.** `uv run pytest -m "not integration" && uv run ruff check . && uv run mypy app` green → `refactor: split k8s_client into crypto/metrics/binding modules`. Post-check: `wc -l app/services/k8s_client.py` < ~900 (engine + mutations + delegates + pool).
 
 ### Task 6: Collapse the eight test doubles onto one shared `FakeK8s`
 
 **Files:**
 - Create: `backend/tests/fakes/fake_k8s.py` (the current `test_resources.py` `FakeK8s`, now catalog-driven for reads, moves here)
-- Modify: `backend/tests/api/test_resources.py`, `backend/tests/api/test_clusters.py`, `backend/tests/api/test_events.py`, `backend/tests/api/test_permissions.py`, `backend/tests/services/test_permission.py` (or the actual locations — `grep -rln "class FakeK8s" tests/` is the authoritative list; expected 8), each keeping only its own test-specific behaviour (subclass or fixture data) and importing the shared fake
+- Modify: `backend/tests/api/test_resources.py`, `backend/tests/api/test_clusters.py`, `backend/tests/api/test_events.py`, `backend/tests/api/test_permissions.py`, `backend/tests/services/test_permission.py` — `grep -rln "class _?Fake.*K8s" tests/` is the authoritative list (expected: seven `FakeK8s`-named + `test_gateway_api.py`'s `_FakeK8s`; `test_admin_source.py`'s `FakeAdminK8s` may also surface — fold it in if so), each keeping only its own test-specific behaviour (subclass or fixture data) and importing the shared fake
 
 **Interfaces:**
 - Consumes: `KINDS` + `FIXTURES`
@@ -246,21 +247,21 @@ Typed reader table (engine, typed kinds only — one line per kind, built in `K8
 
 **SATISFIES:** `one-double`
 
-- [ ] **Step 1: Move + generalize.** The shared `FakeK8s` = Tasks 1–4's catalog fake + the mutation/metrics/`readyz` methods the other suites call (each ported 1:1 from the private fakes; conflicting canned values resolved per-suite via constructor data, not branches).
+- [ ] **Step 1: Move + generalize.** The shared `FakeK8s` (already at `tests/fakes/fake_k8s.py` since Task 1) absorbs the private fakes — one constructor `(kubeconfig, data=None, readyz_result=True, available=True, raise_unreachable=False, crd_absent=frozenset())` covering all five private signatures — plus the mutation/metrics/`readyz` methods the other suites call (each ported 1:1 from the private fakes; conflicting canned values resolved per-suite via constructor data, not branches) and the union of the recording hooks (`last_pod_label_selector`, `pvc_usage_calls`, `node_usage_calls`, `calls`, `crd_instance_calls`, `last_rules`/`last_labels`).
 - [ ] **Step 2: Swap the imports**, delete the 7 private fakes.
 - [ ] **Step 3: Run + commit.** `uv run pytest -m "not integration"` green → `refactor: single shared FakeK8s (8 doubles → 1)`
 
 ### Task 7: Green, measured, documented
 
 **Files:**
-- Modify: `ARCHITECTURE.md` (the `k8s_client.py` / read-path section: catalog + engine + the five concepts; the "adding a kind" procedure is now one row + one fixture entry)
+- Modify: `.skillgrid/ARCHITECTURE.md` — **add** a read-path section (the as-built catalog + engine + the five concepts; ADR-0010's informer cache noted as the planned replacement) + the kind-addition procedure (one row + one fixture entry). No read-path section exists yet — the current `k8s_client` section (`:347-360`) describes the unimplemented ADR-0010 cache.
 
 **Interfaces:** none
 
 **SATISFIES:** `green-and-measured`
 
 - [ ] **Step 1: Full floor.** `uv run pytest -m "not integration"` + `uv run ruff check .` + `uv run mypy app`.
-- [ ] **Step 2: Prove the interface shrank.** `grep -c "    def list_\|    def get_" app/services/k8s_client.py` → only the 4 external-LB override pairs + `list_events` remain; `wc -l` recorded; `npx jscpd --health --reporters ai .` re-run — record the new health score + `k8s_client.py`/`test_resources.py` complexity vs the 2026-11-07 baseline (health 32/E; `k8s_client` cx 393/2,487L; `test_resources` cx 307/3,938L).
+- [ ] **Step 2: Prove the interface shrank.** `grep -c "    def list_\|    def get_" app/services/k8s_client.py` → only the 4 external-LB override pairs + `list_events` remain; `wc -l` recorded; `npx jscpd --health --reporters ai .` re-run (verification add — the change's stated motivation is the 32/E baseline) — record the new health score + `k8s_client.py`/`test_resources.py` complexity vs the 2026-11-07 baseline (health 32/E; `k8s_client` cx 393/2,487L; `test_resources` cx 307/3,938L).
 - [ ] **Step 3: Update `ARCHITECTURE.md`** read-path section + the kind-addition procedure.
 - [ ] **Step 4: Commit.** `docs: kind catalog read path in ARCHITECTURE (ADR-0041 landed)` with the measurement numbers in the body.
 
@@ -271,3 +272,4 @@ Typed reader table (engine, typed kinds only — one line per kind, built in `K8
 3. **One-way-door completeness:** none — no migration, no public shape change; nothing to tag.
 4. **Placeholder scan:** the only dynamic lists (importer grep, private-fake grep) are named *steps* with the exact command, not TBD values; the 21/13/4 kind lists are exhaustive and closed.
 5. **Type consistency:** `KindSpec` fields, `list`/`get` signatures, `crds.served_version` return, `FIXTURES`/`FakeK8s` interfaces used identically in Tasks 1–7.
+6. **Critic fold-in (2026-11-07):** all 17 criticA findings resolved per user decision — call-site migrations (gateway_api/metrics/instances) + service-test rewrites in Task 2; the 500→502 normalization declared in Must-Haves + Global Constraints; the CRD branch door-checked via `gatewayclasses`; dispatch location fixed (client-level, Step 4); the LB scope flags corrected; the `served_version` contract stated; fake projector semantics + fixture regimes specified; counts corrected (73 methods / 65 deleted); the `cluster_allocation` dedup dropped; the ARCHITECTURE edit is an add, not a modify.
