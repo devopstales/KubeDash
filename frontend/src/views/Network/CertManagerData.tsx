@@ -1,3 +1,4 @@
+import { Fragment } from 'react'
 import { Link } from 'react-router-dom'
 import {
   CBreadcrumb,
@@ -280,10 +281,10 @@ const CertManagerDataView = ({
           value: c.spec?.dnsNames && c.spec.dnsNames.length > 0 ? (
             // 4.1 rendered one hostname per line.
             c.spec.dnsNames.map((h) => (
-              <React.Fragment key={h}>
+              <Fragment key={h}>
                 {h}
                 <br />
-              </React.Fragment>
+              </Fragment>
             ))
           ) : (
             '—'
