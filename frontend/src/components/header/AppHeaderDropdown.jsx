@@ -1,3 +1,4 @@
+import CIcon from '@coreui/icons-react'
 import {
   CAvatar,
   CBadge,

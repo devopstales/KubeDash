@@ -78,10 +78,6 @@ def upgrade() -> None:
         op.create_index('ix_group_members_user_id', 'group_members', ['user_id'])
         op.create_index('ix_group_members_group_id', 'group_members', ['group_id'])
 
-    # A guarded re-apply on a hand-built (create_all) DB where the table
-    # exists WITHOUT its unique name constraint: the index above covers it —
-    # a unique index IS a unique constraint for our purposes.
-
 
 def downgrade() -> None:
     op.drop_index('ix_group_members_group_id', table_name='group_members')
