@@ -5,7 +5,7 @@ date: '2026-10-21'
 status: accepted
 ---
 
-Source: `.skillgrid/artifacts/04-adr-0023-datatables-react.md`
+Source: `.skillgrid/knowledge/04-adr-0023-datatables-react.md`
 
 # User-management tables: DataTables React with the Bootstrap 5 skin
 

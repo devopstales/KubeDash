@@ -5,7 +5,7 @@ date: '2026-10-17'
 status: accepted
 ---
 
-Source: `.skillgrid/artifacts/04-adr-0021-local-admin-auth.md`
+Source: `.skillgrid/knowledge/04-adr-0021-local-admin-auth.md`
 
 # Local Admin Auth (bootstrap password mode)
 

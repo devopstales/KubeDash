@@ -5,7 +5,7 @@ date: '2026-10-17'
 status: accepted
 ---
 
-Source: `.skillgrid/artifacts/04-adr-0020-air-gap-deployment.md`
+Source: `.skillgrid/knowledge/04-adr-0020-air-gap-deployment.md`
 
 # Air-Gap Deployment
 

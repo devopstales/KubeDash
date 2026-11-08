@@ -5,7 +5,7 @@ date: '2026-10-23'
 status: accepted
 ---
 
-Source: `.skillgrid/artifacts/04-adr-0025-http-only-session-cookie.md`
+Source: `.skillgrid/knowledge/04-adr-0025-http-only-session-cookie.md`
 
 # Browser session transport: HttpOnly cookies, Bearer retained for the kubectl plugin
 

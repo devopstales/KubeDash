@@ -5,7 +5,7 @@ date: '2026-10-17'
 status: accepted
 ---
 
-Source: `.skillgrid/artifacts/04-adr-0014-session-revocation-propagation.md`
+Source: `.skillgrid/knowledge/04-adr-0014-session-revocation-propagation.md`
 
 # Session revocation propagation
 

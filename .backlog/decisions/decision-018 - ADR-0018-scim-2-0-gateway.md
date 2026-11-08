@@ -5,7 +5,7 @@ date: '2026-10-17'
 status: accepted
 ---
 
-Source: `.skillgrid/artifacts/04-adr-0018-scim-2-0-gateway.md`
+Source: `.skillgrid/knowledge/04-adr-0018-scim-2-0-gateway.md`
 
 # SCIM 2.0 Gateway
 

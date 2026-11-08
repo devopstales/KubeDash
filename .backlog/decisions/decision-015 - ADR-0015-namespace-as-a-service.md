@@ -5,7 +5,7 @@ date: '2026-10-17'
 status: accepted
 ---
 
-Source: `.skillgrid/artifacts/04-adr-0015-namespace-as-a-service.md`
+Source: `.skillgrid/knowledge/04-adr-0015-namespace-as-a-service.md`
 
 # Namespace-as-a-Service (NaaS)
 
