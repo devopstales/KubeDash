@@ -275,6 +275,18 @@ completed_changes:
   # imports + verified symbols; jscpd dead-code 16.6% -> 0.56%. Open: W024
   # (TASK-096), W025 (TASK-097), W026/W027 (TASK-099).
   - 2026-11-07-dead-code-cleanup
+  # Archived 2026-11-08 (delivered but never registered in state.yaml —
+  # tracking gap closed on a spec-zone audit; code-verified in tree):
+  # - service-views: Service.tsx committed + in nav
+  # - ingress-gateway-api-views: GatewayApiData.tsx committed; MENU-MERGED (tab of Ingress)
+  # - ingressclass-gatewayclass-views: GatewayClassData.tsx committed; MENU-MERGED
+  # - certmanager-external-loadbalancer-views: CertManager/ExternalLoadBalancer committed + in nav
+  # - agents-md-rewrite: the live AGENTS.md IS the rewrite (briefing "not yet applied" header stale)
+  - 2026-10-28-service-views
+  - 2026-10-28-ingress-gateway-api-views
+  - 2026-10-28-ingressclass-gatewayclass-views
+  - 2026-10-29-certmanager-external-loadbalancer-views
+  - 2026-11-03-agents-md-rewrite
 
 # Onboarding state (2026-10-17): config.yaml + ASSUMPTIONS.md + state.yaml
 # created. Open items tracked in ASSUMPTIONS.md "Onboarding notes".
