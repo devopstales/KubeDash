@@ -151,20 +151,22 @@ tasks:
     cmds:
       - "kind get kubeconfig --name {{.KIND_CLUSTER}} > {{.ADMIN_KUBECONFIG}}"
 
-  # Internal: install the dev apps into the kind cluster (metrics-server for
-  # the dashboard's allocation rollup + metrics degrade path, then Cilium +
-  # Traefik for the e2e ingress, then the csi-hostpath CSI driver so the
-  # demo-pvc reports real usage stats — the local-path hostPath PVs' kubelet
-  # has no GetStats, see dev/csi-hostpath.yaml). All idempotent; each waits
-  # for its own readiness. metrics-server runs first — the dashboard reads
-  # metrics.k8s.io; Cilium/Traefik and csi-hostpath are independent of it.
+  # Internal: install the dev apps into the kind cluster. Cilium + Traefik
+  # FIRST: dev/kind-config.yaml sets disableDefaultCNI, so a fresh node stays
+  # NotReady ("cni plugin not initialized") until the CNI is installed and
+  # the metrics-server rollout below can never pass without it (a cold
+  # kind-up failed at that gate, leaving a NodeReady-less cluster). Then
+  # metrics-server for the dashboard's allocation rollup + metrics degrade
+  # path, then the csi-hostpath CSI driver so the demo-pvc reports real
+  # usage stats — the local-path hostPath PVs' kubelet has no GetStats, see
+  # dev/csi-hostpath.yaml. All idempotent; each waits for its own readiness.
   _kind-apps:
     internal: true
     cmds:
+      - bash {{.TASKFILE_DIR}}/dev/cilium-traefik-up.sh
       - kubectl --context kind-{{.KIND_CLUSTER}} apply --server-side -f {{.TASKFILE_DIR}}/dev/metrics-server.yaml
       - kubectl --context kind-{{.KIND_CLUSTER}} -n kube-system rollout status deploy/metrics-server --timeout=120s
       - kubectl --context kind-{{.KIND_CLUSTER}} wait --for=condition=available apiservice/v1beta1.metrics.k8s.io --timeout=120s
-      - bash {{.TASKFILE_DIR}}/dev/cilium-traefik-up.sh
       - kubectl --context kind-{{.KIND_CLUSTER}} apply --server-side -f {{.TASKFILE_DIR}}/dev/csi-hostpath.yaml
       - kubectl --context kind-{{.KIND_CLUSTER}} -n default rollout status daemonset/csi-hostpathplugin --timeout=120s
 
