@@ -14,7 +14,6 @@ from urllib.parse import parse_qs, urlparse
 
 import pytest
 
-import app.core.config as _config
 from app import create_app
 from app.core import ini_config
 

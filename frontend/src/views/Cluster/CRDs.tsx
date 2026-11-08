@@ -1,4 +1,3 @@
-import React from 'react'
 import { useNavigate } from 'react-router-dom'
 import { CBadge, CBreadcrumb, CBreadcrumbItem, CCard, CCardBody, CCardHeader, CCardTitle } from '@coreui/react'
 import { useQuery } from '@tanstack/react-query'

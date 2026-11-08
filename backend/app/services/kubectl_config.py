@@ -23,7 +23,6 @@ from cryptography.hazmat.primitives import hashes, serialization
 from cryptography.hazmat.primitives.asymmetric import rsa
 from cryptography.x509.oid import NameOID
 
-from app.extensions import db
 from app.models.kubectl_config import KubectlConfig
 from app.services import k8s_client
 

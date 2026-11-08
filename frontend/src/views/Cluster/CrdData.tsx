@@ -1,4 +1,3 @@
-import React from 'react'
 import { Link } from 'react-router-dom'
 import {
   CBadge,
@@ -18,9 +17,6 @@ import { clearActiveRef } from '../../lib/objectRef'
 import type { CrdInstance, K8sCrd, ResourceList } from '../../lib/types'
 import { useClusterStore } from '../../store/cluster'
 
-// ADR-0040: cluster-scoped kind — the ref carries no namespace.
-const KIND = 'crd'
-const LIST_ROUTE = '/cluster/crd'
 
 /**
  * 4.1 `cluster/crd-data.html.j2` (the CRD instance detail), rewritten for 5.0:

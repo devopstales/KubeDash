@@ -1,4 +1,3 @@
-import React from 'react'
 import { NavLink } from 'react-router-dom'
 import PropTypes from 'prop-types'
 
@@ -6,7 +5,6 @@ import SimpleBar from 'simplebar-react'
 import 'simplebar-react/dist/simplebar.min.css'
 
 import { CBadge, CNavLink, CSidebarNav } from '@coreui/react'
-import CIcon from '@coreui/icons-react'
 import { clearActiveRef } from '../lib/objectRef'
 
 export const AppSidebarNav = ({ items }) => {

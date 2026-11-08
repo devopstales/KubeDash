@@ -6,7 +6,6 @@ the kubernetes loader. The real ``CustomObjectsApi`` is used, bound to a fake
 ``_call_with_legacy_options`` contract (the same seam ``node_usage`` relies on
 for metrics.k8s.io).
 """
-from types import SimpleNamespace
 
 import pytest
 from kubernetes.client.exceptions import ApiException

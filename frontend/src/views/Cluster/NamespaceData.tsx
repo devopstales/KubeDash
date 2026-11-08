@@ -1,4 +1,3 @@
-import React from 'react'
 import { Link } from 'react-router-dom'
 import {
   CBadge,
@@ -16,10 +15,6 @@ import { clearActiveRef } from '../../lib/objectRef'
 import type { K8sNamespace, ResourceList } from '../../lib/types'
 import { useClusterStore } from '../../store/cluster'
 import TopMenu from '../../components/TopMenu'
-
-// ADR-0040: cluster-scoped kind — the ref carries no namespace.
-const KIND = 'namespace'
-const LIST_ROUTE = '/cluster/namespace'
 
 const KeyValueTable = ({ entries, empty }: { entries: [string, string][]; empty: string }) =>
   entries.length === 0 ? (

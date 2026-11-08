@@ -185,7 +185,6 @@ def test_database_sqlite_type_warns(tmp_path: pathlib.Path, monkeypatch: pytest.
     )
     monkeypatch.setenv("KUBEDASH_HOME", str(home))
     ini_config.reset()
-    import logging
 
     with pytest.warns(UserWarning, match="sqlite"):
         _config.get_settings().database_url

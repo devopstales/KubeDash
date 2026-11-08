@@ -5,7 +5,6 @@
  * links, copyright, and the CoreUI docs link.
  */
 
-import React from 'react'
 import { CFooter } from '@coreui/react'
 
 const AppFooter = () => {

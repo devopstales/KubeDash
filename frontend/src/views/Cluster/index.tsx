@@ -1,4 +1,4 @@
-import React, { useEffect } from 'react'
+import { useEffect } from 'react'
 import { useParams, useNavigate } from 'react-router-dom'
 import { useQuery } from '@tanstack/react-query'
 import { CCard, CCardBody, CCardHeader, CCardTitle, CCol, CRow, CTable } from '@coreui/react'

@@ -21,7 +21,6 @@ from flask_smorest import Api, Blueprint
 from app.api._authhook import apply_auth
 from app.api._cluster import cluster_for as _cluster_for
 from app.core.errors import RbacDeniedError
-from app.schemas.events import EventOut  # noqa: F401 — docs-only OpenAPI contract
 from app.services import rbac
 from app.services.k8s_client import pool
 

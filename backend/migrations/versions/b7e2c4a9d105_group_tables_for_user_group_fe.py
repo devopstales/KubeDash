@@ -83,10 +83,6 @@ def upgrade() -> None:
     # a unique index IS a unique constraint for our purposes.
 
 
-def _has_unique(inspector: sa.Inspector, table: str, columns: list[str]) -> bool:
-    return any(set(columns) <= set(c['column_names']) for c in inspector.get_unique_constraints(table))
-
-
 def downgrade() -> None:
     op.drop_index('ix_group_members_group_id', table_name='group_members')
     op.drop_index('ix_group_members_user_id', table_name='group_members')

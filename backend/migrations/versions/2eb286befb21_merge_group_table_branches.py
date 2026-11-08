@@ -17,7 +17,6 @@ once (a table created by the branch applied first is skipped by the other).
 guarded no-op is acceptable because no ORM model maps ``user_groups``
 anymore, so it is only (re)created on DBs that never had the TASK-026 branch.
 """
-from alembic import op
 
 # revision identifiers, used by Alembic.
 revision = '2eb286befb21'

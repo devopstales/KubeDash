@@ -1,4 +1,3 @@
-import React from 'react'
 import { Link } from 'react-router-dom'
 import {
   CBreadcrumb,
@@ -16,10 +15,6 @@ import { useClusterStore } from '../../store/cluster'
 import KubeDataTable, { Column } from '../../components/KubeDataTable'
 import TopMenu from '../../components/TopMenu'
 
-// ADR-0040 TICKET-04: registry kind + clean list route for the header's
-// share button (identity arrives as props, never useSearchParams).
-const KIND = 'clusterrole'
-const LIST_ROUTE = '/cluster-permission/cluster-role'
 
 type RuleRow = {
   apiGroups: string[]

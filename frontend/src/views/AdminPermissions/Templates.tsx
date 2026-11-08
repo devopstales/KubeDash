@@ -1,4 +1,3 @@
-import React from 'react'
 import { CCard, CCardBody, CCardHeader, CCardTitle } from '@coreui/react'
 import TemplateEditor from './components/TemplateEditor'
 

@@ -30,8 +30,3 @@ export interface GroupBinding {
   template: string | null
   created_at: string
 }
-
-/** POST /api/v1/admin/groups/sync result. */
-export interface GroupSyncResult {
-  created_members: number
-}

@@ -16,7 +16,6 @@ from typing import Any
 GATEWAY_API_VERSION = "v1"
 GATEWAY_API_GROUP = "gateway.networking.k8s.io"
 
-PROVIDERS = ("envoy", "traefik")
 
 GATEWAY_CLASS_NAME: dict[str, str] = {"envoy": "eg", "traefik": "traefik"}
 GATEWAY_CLASS_CONTROLLER_NAME: dict[str, str] = {
@@ -43,8 +42,6 @@ SUPPORTED_ANNOTATION_PREFIXES: tuple[str, ...] = (
     "nginx.ingress.kubernetes.io/ssl-redirect",
     "nginx.ingress.kubernetes.io/proxy-read-timeout",
 )
-
-_REGEX_CHARS = ("(", ")", "[", "]", "{", "}")
 
 
 def _annotations(ingress: dict[str, Any]) -> dict[str, str]:
@@ -149,16 +146,6 @@ def gateway(ingress: dict[str, Any], provider: str, tls_secrets: list[str]) -> d
             "listeners": listeners,
         },
     }
-
-
-def _tls_secret_by_host(ingress: dict[str, Any], tls_secrets: list[str]) -> dict[str, str]:
-    mapping: dict[str, str] = {}
-    for tls in (ingress.get("spec") or {}).get("tls") or []:
-        secret = tls.get("secret_name") or ""
-        for host in tls.get("hosts") or []:
-            if host and host not in mapping:
-                mapping[host] = secret
-    return mapping
 
 
 def _csv(value: Any) -> list[str]:

@@ -1,4 +1,4 @@
-import React, { useState } from 'react'
+import { useState } from 'react'
 import { CButton, CCard, CCardBody, CCardHeader, CCardTitle, CCol, CRow } from '@coreui/react'
 import KubeDataTable, { Column } from '../../components/KubeDataTable'
 import { useQuery } from '@tanstack/react-query'

@@ -38,8 +38,6 @@ import sys
 import urllib.parse
 import urllib.request
 
-_METRIC_RE = re.compile(r"[a-zA-Z_:][a-zA-Z0-9_:]*")
-
 
 def _safe_metric(name: str) -> str:
     """Metric names must match [a-zA-Z_:][a-zA-Z0-9_:]*; replace the rest."""

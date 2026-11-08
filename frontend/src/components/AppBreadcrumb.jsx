@@ -4,7 +4,6 @@
  * Breadcrumb for the KubeDash SPA shell: / → Clusters → <cluster name>.
  */
 
-import React from 'react'
 import { useLocation } from 'react-router-dom'
 
 import { useCluster } from '../hooks/useCluster'

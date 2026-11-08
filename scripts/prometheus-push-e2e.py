@@ -24,7 +24,6 @@ import argparse
 import json
 import os
 import sys
-import time
 from typing import Any
 
 METRIC_PREFIX = "kubedash_test_"

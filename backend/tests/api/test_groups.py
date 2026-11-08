@@ -7,7 +7,6 @@ permissions FakeK8s (subject_kind="Group" applies a k8s Group subject).
 """
 from __future__ import annotations
 
-from typing import Any
 
 import pytest
 
@@ -16,7 +15,6 @@ from tests.api.test_permissions import (
     FakeK8s,
     _cluster_name,
     _register_cluster,
-    _seed,
     _seed_template,
 )
 

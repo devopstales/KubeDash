@@ -1,4 +1,3 @@
-import React from 'react'
 import { CCard, CCardBody, CCardHeader, CCardTitle } from '@coreui/react'
 import { useQuery } from '@tanstack/react-query'
 import { apiFetch } from '../../lib/api'

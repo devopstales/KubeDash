@@ -4,9 +4,6 @@
  * `pnpm exec openapi-typescript openapi.json` generated the raw schema,
  * these are the view-facing extracts of its components).
  */
-export interface ErrorEnvelope {
-  error: { code: string; message: string }
-}
 
 export interface Me {
   sub: string
@@ -1109,10 +1106,6 @@ export interface ClusterEvent {
   last_timestamp: string | null
 }
 
-export interface RefreshPair {
-  access: string
-  refresh?: string
-}
 
 /** A row of GET /api/v1/permissions/my-access — the caller's own bindings. */
 export interface MyAccessBinding {

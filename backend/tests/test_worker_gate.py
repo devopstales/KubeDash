@@ -17,7 +17,6 @@ from pathlib import Path
 import pytest
 
 from app.core import ini_config
-from app.core.leader import Leader
 
 # wsgi.py lives at backend/wsgi.py (next to the app package), NOT at
 # backend/app/wsgi.py — so `import app.wsgi` does not work. Load it by

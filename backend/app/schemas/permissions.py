@@ -5,7 +5,7 @@ classes, docs-only where the response is a bare list (smorest dumps handler
 returns THROUGH the response schema — see the ponytail note in
 ``app/api/clusters.py``).
 """
-from marshmallow import EXCLUDE, Schema, fields, validate
+from marshmallow import EXCLUDE, Schema, fields
 
 
 class UserOut(Schema):

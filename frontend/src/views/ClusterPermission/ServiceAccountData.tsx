@@ -1,4 +1,3 @@
-import React from 'react'
 import { Link, useNavigate } from 'react-router-dom'
 import {
   CBreadcrumb,
@@ -18,13 +17,7 @@ import TopMenu from '../../components/TopMenu'
 
 const LAST_APPLIED = 'kubectl.kubernetes.io/last-applied-configuration'
 
-// ADR-0040 TICKET-04: registry kind + clean list route (identity arrives as
-// props from ObjectRoute / the legacy /data route, never useSearchParams).
-const KIND = 'serviceaccount'
-const LIST_ROUTE = '/cluster-permission/service-account'
 const SECRET_ROUTE = '/security/secret'
-
-type SecretRef = { name: string }
 
 // ponytail: the ServiceAccount wire type carries `{ name?: string }` refs
 // (types.ts) while `names` wants the SecretRef alias — the same shape, so

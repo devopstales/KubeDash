@@ -17,7 +17,6 @@ from pathlib import Path
 
 import pytest
 
-import app.core.config as _config
 from app import create_app
 from app.core import ini_config
 

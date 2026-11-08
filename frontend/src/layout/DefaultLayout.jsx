@@ -14,7 +14,6 @@
  * <Route path="/*" element={<DefaultLayout><Routes>...</Routes></DefaultLayout>} />
  */
 
-import React from 'react'
 import { AppSidebar, AppFooter, AppHeader } from '../components/index'
 
 const DefaultLayout = ({ children }) => {

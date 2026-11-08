@@ -1,4 +1,3 @@
-import React from 'react'
 import { Link } from 'react-router-dom'
 import {
   CBadge,
@@ -18,9 +17,6 @@ import type { K8sNode, ResourceList } from '../../lib/types'
 import { useClusterStore } from '../../store/cluster'
 import TopMenu from '../../components/TopMenu'
 
-// ADR-0040: cluster-scoped kind — the ref carries no namespace.
-const KIND = 'node'
-const LIST_ROUTE = '/cluster/node'
 
 // ponytail: parse a K8s quantity the way the backend does (CPU in millicores,
 // memory in bytes). The Metrics API reports used.cpu in NANOcores ("270808684n")
@@ -69,7 +65,6 @@ const fmtCpu = (m: number | null): string => {
   return m >= 1000 ? `${(m / 1000).toFixed(m % 1000 === 0 ? 0 : 2)} cores` : `${m}m`
 }
 
-const PROBE_CONDITIONS = ['Ready', 'MemoryPressure', 'DiskPressure', 'PIDPressure']
 
 // ponytail: taints render as "key=value:effect" badges (4.1's format).
 const taintsOf = (node: K8sNode): string[] =>
