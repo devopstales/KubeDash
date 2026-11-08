@@ -7,10 +7,12 @@ project: kubedash
 # 2026-10-26: knowledge root moved .skillgrid/artifacts/ -> .skillgrid/knowledge/
 # (OKF v0.2 bundle: decisions/, glossary/, invariants/, workflows/, reference/
 # + index.md / log.md / reverse-index.md).
+# 2026-11-08: archive root moved .skillgrid/archive/ -> .skillgrid/xarchive/
+# (xarchive is the only archive convention; archive/ folded into it).
 conventions:
   artifacts: .skillgrid/knowledge
   specs_root: .skillgrid/specs
-  archive_root: .skillgrid/archive
+  archive_root: .skillgrid/xarchive
   state_file: .skillgrid/state.yaml
 
 # ADR body shape (validated choice). The 7 existing ADRs (0014-0020) were

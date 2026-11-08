@@ -182,5 +182,5 @@
   test_file_map.py string pins — 23 backend files kept). Plus tooling note:
   `tsc --noEmit` is blind to .jsx without checkJs.
 - `index.md`: reference/ row added.
-- Source: `.skillgrid/archive/2026-11-07-dead-code-cleanup/report.md`
+- Source: `.skillgrid/xarchive/2026-11-07-dead-code-cleanup/report.md`
   (Surprises/Lessons), whole-branch review ReviewBranchD, per-task reviews.
