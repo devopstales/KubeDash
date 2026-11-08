@@ -242,8 +242,8 @@ test('list-issuer-tab-switch', async () => {
   // The Issuer cell renders once the certificate-requests query settles.
   await user.click(await screen.findByRole('button', { name: 'Issuer/web-issuer' }))
 
-  // The tab switched to Issuer; the target row's name cell is bolded (the
-  // issuers query settles in the same window — poll for the name cell).
+  // The tab switched to Issuer; the target row's name cell is NOT re-bolded
+  // (stale-closure quirk, TASK-096) — poll for the name cell.
   expect(screen.getByRole('tab', { name: 'Issuer' })).toHaveAttribute('aria-selected', 'true')
   expect(screen.getByRole('tab', { name: 'Certificate Request' })).toHaveAttribute(
     'aria-selected',
