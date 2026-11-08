@@ -146,6 +146,18 @@ Persistent memory is active (Mnemonic). Use `mem_save` for decisions, `mem_searc
 `brainstorming` → `writing-blueprints` → `slicing` → `ticketing` → execution (`subagent-execution` or `simple-execution`) → `qa` → `requesting-code-review` → `receiving-code-review` → `ship` → `reflect`
 
 Run `skillgrid:onboarding` to update config after stack changes.
+<!-- knowledge-base:start -->
+### KnowledgeBase
+
+This project uses the skillgrid knowledge base (KB): an OKF vault at `.skillgrid/knowledge/` + a derived FTS index, served by the `kb` engine — `mnemonic kb ...` CLI and the `kb_*` MCP tools (the shared KbHandler — CLI and MCP never diverge).
+
+- **Read**: `kb_query` (stage-1 ranked retrieval) → `kb_read` (full page / `##` section + pin-check state) → `kb_search` (raw FTS power path).
+- **Save**: `kb_generate` — the KB's proactive save (run it after significant `mem_save`; incremental by default, `--full` re-derives).
+- **Verify**: grounded pages pin live code (working-tree-relative anchors); `kb validate --strict` is the CI gate (drift → exit 1).
+- **Maintain**: `kb lint [--fix]` · `kb index` (incremental) / `kb reindex` (full) · `kb status` · `kb rebuild-meta` · `kb cite-source`.
+- Vault files are truth (KB-INV-1); `index/**` + the `kb_*` rows are derived — never hand-edit (KB-INV-3).
+<!-- knowledge-base:end -->
+
 <!-- skillgrid:end -->
 
 <!-- mnemonic:start -->
@@ -224,3 +236,20 @@ Do not edit Backlog task, draft, document, decision, or milestone markdown files
 
 </CRITICAL_INSTRUCTION>
 <!-- mnemonic:end -->
+
+<!-- OPENWIKI:START -->
+
+## OpenWiki
+
+This repository has a generated `openwiki/` evidence index. It is optional just-in-time context, not required startup reading.
+
+- Do not enumerate, preload, or search wikis at task start. Use retrieval when the user asks for it, when unfamiliar architecture or dependency behavior materially affects the task, or when source inspection leaves an important uncertainty. Stop once the question is grounded.
+- When those conditions apply and OpenWiki retrieval tools are available, use `openwiki_search` for just-in-time context and `openwiki_read` for the relevant complete sections. If search returns `workspace_required`, ask which listed workspace to use and retry with its ID.
+- Use `openwiki_list_workspaces` or `openwiki_list_wikis` when workspace membership itself needs to be discovered.
+- If the retrieval tools are unavailable, read `openwiki/quickstart.md` and follow its links to the relevant pages.
+- Treat source code and tests as authoritative. A brief's unknowns and review items are verification gaps, not automatic requirements.
+- Prefer the narrowest quiet validation that proves the changed behavior. Preserve complete failure output.
+
+Use the repository's documented maintenance process to refresh generated pages after source changes. Check its configuration and completed runs before relying on automatic updates. Do not hand-edit generated OpenWiki pages unless explicitly asked; prefer updating source code/docs and letting OpenWiki regenerate.
+
+<!-- OPENWIKI:END -->

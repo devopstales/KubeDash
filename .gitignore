@@ -34,3 +34,5 @@ cli/dist
 .task/
 .gitleaks-report.json
 .skip_gitleaks
+openwiki/
+report/
