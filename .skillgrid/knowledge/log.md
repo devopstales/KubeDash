@@ -142,3 +142,18 @@
   detail on `/network/ingress`; gatewayclass row → gatewayclass detail
   on `/network/ingress-class`), ported list tests in
   `ingress.test.tsx` / `gatewayclasses.test.tsx`.
+
+## 2026-11-08 — reference/06-research-findings.md added (change D close-out)
+
+- New durable-findings concept (append-only, cross-change): jscpd dead-code
+  detection characteristics from the 2026-11-07-dead-code-cleanup sweep —
+  (1) false positives in JSX value/member position (2/187 findings;
+  repairs 7a55bde3 Fragment, 17425c2f CIcon), (2) `index.*` entry-point
+  heuristic blind spot masking barrel-only chains (views/icons barrel
+  c40d4c49; components/header/ still open, TASK-099), (3) string-based
+  wiring invisible to import analysis (wsgi spawn string, scheduler,
+  test_file_map.py string pins — 23 backend files kept). Plus tooling note:
+  `tsc --noEmit` is blind to .jsx without checkJs.
+- `index.md`: reference/ row added.
+- Source: `.skillgrid/archive/2026-11-07-dead-code-cleanup/report.md`
+  (Surprises/Lessons), whole-branch review ReviewBranchD, per-task reviews.

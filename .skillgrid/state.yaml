@@ -207,7 +207,7 @@ in_flight:
   # Sliced 2026-11-07 (23 tickets TASK-073..095, milestones m-3..m-6);
   # all four High review-risk (chained PRs, ask-on-risk, chain pending).
   - change: 2026-11-07-dead-code-cleanup
-    phase: shipped
+    phase: complete
     # SHIPPED 2026-11-08: QA PASS (report.md: 7/7 scenarios, 0 CRITICAL) +
     # whole-branch review SHIPPABLE (0C/0I/3M - all minors deferred: TASK-099
     # docs residue W027, measure-commit wording + scope label documented, no
@@ -218,7 +218,9 @@ in_flight:
     # 55/C, dead-code 16.6%/187 -> 0.56%/36. W024-W027 opened (TASK-096/097/
     # 099 + docs residue); lint debt = W013 pre-existing (TASK-098).
     # Integration: kept branch `rebase` (VERIFIED assumption: ship does not
-    # merge main). Next: reflect (report.md retro half + session close).
+    # merge main). COMPLETE 2026-11-08 (reflect: report.md retro half in
+    # archive, durable jscpd findings lifted to
+    # knowledge/reference/06-research-findings.md, session closed).
     tracker: [TASK-089, TASK-090, TASK-091, TASK-092, TASK-093, TASK-094, TASK-095]
   - change: 2026-11-07-kind-catalog
     phase: slicing

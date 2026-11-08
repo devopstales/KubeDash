@@ -316,48 +316,73 @@ PASS with W013 open; 2026-11-05 storage batch PASS with lint debt noted).
 
 **Human decision (fill in):** — (no override; machine PASS stands)
 
-<!-- reflect completes this half at archive time -->
 
-## Final-State Facts
+**Shipped:** 60 CoreUI template demo files deleted (12,967 lines: 39 bulk @
+`b9156319`, 20 tail + 1 icons-barrel addendum @ `f724c5d4`/`c40d4c49`), 79
+unused imports + verified unused symbols removed (`35469827`), 23 backend
+files verdict-noted with zero deletions (`5654e914`), ~32 inline
+KubeDataTable test fakes migrated to one shared faithful fake
+(`1802d456`/`fad8f44e`/`c336ad03`). jscpd: health 32/E → 55/C, dead-code
+16.6%/187 findings → 0.56%/36 (measured at `f717f685`, controller
+re-verified). 11 commits on `rebase`, `866bae7f..f717f685`.
 
-**Shipped:** <what actually shipped>
-**Base branch:** <base-branch> · **Chain strategy:** <strategy>
-**Integration:** <merged @ <commit> | PR <url> | kept branch <name>> (from ship context)
+**Base branch:** `main` (not merged — see Integration) · **Chain strategy:**
+keep-branch (ADR-0041 change set order D → A → B → C; D is first and lands
+before the kind-catalog work so the registry change doesn't touch template
+files)
+
+**Integration:** kept branch `rebase` @ `3c09ceef` (ship commit) — repo
+VERIFIED assumption (2026-10-18): ship does not merge main; the work branch
+is the deliverable + rollback unit.
 
 ## Gates
 
 | Gate | Result |
 |------|--------|
-| Ship gate | ✅ success + `diff -r` empty (or: blocked — {reason}) |
-| QA gate | ✅ PASS |
-| Verdict gate (advisory) | {accepted \| accepted-with-open-items \| rejected} — recorded, not enforced |
+| Ship gate | ✅ success + `diff -r` empty (vs pre-move snapshot `/tmp/spec-d-premove`; source gone confirmed) |
+| QA gate | ✅ PASS (0 CRITICAL; W024-W027 open windows, all tracked) |
+| Verdict gate (advisory) | accepted-with-open-items — recorded, not enforced |
+| Whole-branch review (advisory) | ✅ SHIPPABLE — 0 Critical / 0 Important / 3 Minor (all deferred with replies, see Lessons) |
 
 ## Decisions
 
-**Every entry MUST cite a source** — a file:line, a commit, a ticket ID, or a scenario
-name. No source = undiagnosed, not a learning.
+**Every entry MUST cite a source** — a file:line, a commit, a ticket ID, or a scenario name. No source = undiagnosed, not a learning.
 
 | Decision | Tradeoff | Why | Source |
 |----------|----------|-----|--------|
-| <choice made> | <what was given up> | <why it won> | <source> |
+| Grep by import specifier or module path, never bare basename, for the deletion verification | slower verification (58 files) | basename hits collide with real identifiers (e.g. `store.js` vs zustand store) — a false exclusion would delete a live file | task-01-report.md §1.1; scenario deletion-list-verified |
+| Split the 20-file T03 deletion out of the implementer's commit when it swept a parallel session's staged work (`2dc4b841` → `7a55bde3` + `f724c5d4`) | two extra commits, one fix-first ordering | the Fragment fix (T04's regression) and the T03 deletions are different concerns; keeping them split preserves atomic revertability of each batch | progress.md 2026-11-08; commits 7a55bde3/f724c5d4 |
+| Re-scope the certmanager tab-switch test to the real datatables.net-react stale-closure behaviour instead of mocking the quirk away | test pins the quirky behaviour (fw-bold NOT applied); the view fix will need a re-pin | the fake fleet's whole point is faithfulness — a mock that hides the real component's capture model defeats the migration's purpose; view fix tracked separately | fad8f44e; TASK-096; scenario test-fake-fleet-migrated |
+| Keep `wsgi.py::_rq_worker_main`/`_build_worker_app` (live-dynamic via the spawn string) and all 23 backend files | dead-code metric doesn't reach ~0% | string-based wiring (spawn, scheduler, test_file_map.py string pins) is invisible to jscpd's import analysis — deleting would break the leader-RQ path | task-06-report.md; 5654e914 note; scenario backend-files-verified |
+| Defer all 3 branch-review minors (no hash rewrites) | one commit-body wording inaccuracy stays in history | `f717f685`/`17425c2f` hashes are self-cited in task-07-report.md and the ledger; rewriting breaks the lineage record; impact documented as negligible (8-line delta) | progress.md 2026-11-08 review-triage; report.md Verification Scope |
 
 ## Lessons
 
 | Lesson | Root Cause | Do Differently | Source |
 |--------|-----------|----------------|--------|
-| <what to do differently> | <why it went wrong — root, not symptom> | <the concrete change> | <source> |
+| jscpd's dead-code pass is a *candidate generator*, not a proof: it produced two false positives in this branch (React default import used as `React.Fragment`; CIcon used in a barrel-orphaned .jsx) | jscpd's unused-import heuristic doesn't resolve JSX member/value-position uses or barrel-mediated reachability | every jscpd finding gets an independent import-specifier grep + a build/tsc gate before deletion; two false positives in 187 findings ≈ 1% — budget for a fix round in any jscpd-driven deletion change | 7a55bde3 (Fragment), 17425c2f (CIcon); ReviewD04/ReviewD05 |
+| jscpd's `index.*` entry-point heuristic creates a blind spot: files imported only from a barrel are never flagged unused | the heuristic treats `index.js` as an entry point, so its re-exports count as imported | for template/template-derived code, grep external refs of the *barrel itself* (zero external refs ⇒ the whole chain is dead), then delete chain-first | views/icons/index.js (c40d4c49); components/header/ (TASK-099); W026 |
+| Parallel implementers sharing one working tree can sweep each other's staged files into a commit | git staging is global to the worktree, not per-session | when dispatching parallel code tasks on one tree, have each implementer commit immediately after its gate (or serialize commits); the controller split `2dc4b841` post-hoc | 2dc4b841 → 7a55bde3 + f724c5d4 |
+| An empty measure commit's body should name the tree it measured, not an idealized "final tree" | the floor ran while one fix commit was still in flight | record the exact HEAD at run time; if a later commit lands, re-run the measure or annotate the delta (the controller's independent re-run made the 8-line delta provable — do the re-run) | f717f685 body vs c40d4c49/17425c2f (review minor 2) |
+| `tsc --noEmit` does not type-check `.jsx` files (checkJs off), so a deleted import in a .jsx is invisible to the build until runtime/eslint | CoreUI leftovers were .jsx while KubeDash views are .tsx | in template-residue sweeps, run eslint (react/jsx-no-undef) over .jsx too, or add checkJs for the sweep window | AppHeaderDropdown.jsx CIcon (ReviewD04 Important) |
 
 ## Patterns
 
 | Pattern | Reuse | Source |
 |---------|-------|--------|
-| <named reusable approach / convention> | <when a future change should apply it> | <source> |
+| **Verify-then-delete with a recorded per-file proof table** (file, grep command, zero-hit result, exceptions annotated) landed in the first deletion commit's body + report — makes every deletion individually auditable and revertable | any future dead-code sweep (the kind-catalog change deletes `_KINDS`/`_GETTERS` — use the same table) | task-01-report.md; b9156319 body |
+| **Deletion-chore TDD evidence model**: no RED phase; evidence = static verification + verification floor green at each commit + per-task report (co-commit-shape precedent W015/W021) | other pure-deletion / pure-test-refactor changes | report.md TDD Evidence Audit |
+| **Stop-and-report on any test whose behaviour changes under a shared fake** — one delta (certmanager) surfaced, got tracked (TASK-096), and was re-scoped deliberately instead of silently adapted | any test-fake extraction or mock replacement | 1802d456 + fad8f44e; scenario test-fake-fleet-migrated |
+| **Controller re-measure of headline numbers** — the QA/ship gate re-ran the jscpd measurement independently and matched (to an 8-line, fully-explained tree delta) | any change whose acceptance criterion is a measured number | f717f685 vs controller re-run |
 
 ## Surprises
 
 | Surprise | Signal | Source |
 |----------|--------|--------|
-| <non-obvious gotcha / edge case / behaviour> | <what the evidence shows> | <source> |
+| The "dead" `React` default-import deletions included one *live* use — `React.Fragment` in JSX value position, which jscpd (and tsc, post `react-jsx`) missed until the build turned red | pnpm test: 2 errors + tsc RED at 35469827 | 7a55bde3; ReviewD05 |
+| A 5-line orphaned *barrel* (views/icons/index.js) survived the 59-file sweep because its three re-exported icon pages were in the deletion set but the barrel itself hit jscpd's entry-point heuristic | ReviewD03 minor → controller grep: 0 external hits, 3 dangling refs | c40d4c49; progress.md 2026-11-08 |
+| The whole `components/header/` chain (~90 lines) is dead and was never flagged — jscpd's entry-point heuristic on its index.js masks every re-export; the CIcon import T04 deleted (then restored) inside it is a latent landmine for the next sweep | ReviewD04 Important; grep: 9 CIcon uses, zero external refs | TASK-099; W026 |
+| The `task fe-build` content cache reports "UP-TO-DATE" on trees whose *reachable* content is unchanged even when unreachable files changed — legitimate here (orphaned .jsx outside the module graph) but easy to misread as a skipped build | T07 floor item 2 "UP-TO-DATE" | task-07-report.md; f717f685 body |
 
 ## Environment Retro
 
@@ -365,19 +390,40 @@ name. No source = undiagnosed, not a learning.
 
 | Category | Finding | Fix lands in | Source |
 |----------|---------|--------------|--------|
-| — | — | — | — |
+| automated checks | jscpd dead-code findings need an independent grep + build gate before deletion (2/187 false positives in this change, both caught by gates at cost of fix rounds) — consider a sweep playbook note in the `codebase-refactoring` skill's dead-code step | `~/.agents/skills/codebase-refactoring/SKILL.md` (dead-code step: add "verify each finding by import specifier + build gate") | 7a55bde3; 17425c2f |
+| automated checks | `tsc --noEmit` is blind to .jsx without checkJs — template-residue sweeps need eslint (react/jsx-no-undef) over .jsx in the same gate | `frontend/` eslint config or sweep checklist (frontend/STYLEGUIDE.md) | ReviewD04 Important (AppHeaderDropdown.jsx) |
+| tool economy | parallel implementers on one worktree swept each other's staged files once (2dc4b841 incident) — add "commit immediately after your gate" to the parallel-dispatch convention | `~/.agents/skills/subagent-execution/` dispatch template (parallel tasks section) | 2dc4b841 → 7a55bde3/f724c5d4 split |
+| information access | `task fe-build`'s content cache "UP-TO-DATE" output is ambiguous (reachable-unchanged vs skipped) — a one-word distinction in the task output would prevent misreads | root `Taskfile.yaml` (fe-build target message) | T07 floor item 2 |
 
 ## Acceptance Verdict
 
-**Verdict:** <accepted | accepted-with-open-items | rejected>
+**Verdict:** accepted-with-open-items
 
-**Grounding:** <goal from briefing.md + evidence>
+**Grounding:** The briefing's goal — delete the confirmed dead code (pure
+deletions), record the 23 backend verdicts, migrate the KubeDataTable fake
+fleet, zero behaviour change, and measure the dead-code % down from 16.6% —
+is met: Goal-Backward Verification shows R1–R5 VERIFIED, the Traceability
+Matrix is 7/7, the floor was green at every commit, and the measured outcome
+landed at 0.56% (target ~1%).
 
-**Reasoning:** <what drove the verdict>
+**Reasoning:** Every acceptance scenario passed with per-ticket evidence and
+independent re-measure; the only behavioural deltas are the documented
+certmanager re-scope (tracked) and the two in-branch false-positive repairs.
+Open items are all pre-existing debt or named follow-ups, none blocking.
 
 ## Open Items (→ next change)
 
-- <item + path to resolution> (or "None")
+- TASK-096 (W024): certmanager stale-closure highlight — fix the view, then
+  re-pin the re-scoped test (`fad8f44e`) to fw-bold.
+- TASK-097 (W025): users.test.tsx relatedTarget flake — pin or fix the
+  relatedTarget path so the unhandled error can't mask regressions.
+- TASK-098 (W013): backend lint debt (93 ruff / 76 mypy at D base) — triage
+  so the CI lint floor goes green.
+- TASK-099 (W026/W027): delete the dead `components/header/` chain + clean
+  the template prose residue in frontend/ARCHITECTURE.md, DEVELOPMENT.md,
+  README.md (store.js/WidgetsDropdown/Redux references).
+- kind-catalog change (next in the ADR-0041 order D→A→B→C) can now start
+  against a template-free frontend tree.
 
 ## Web-cache promotion candidates
 
@@ -387,22 +433,26 @@ No web-cache promotion candidates — web cache disabled/empty.
 
 | Prior open item (from previous archived change) | Addressed by this change? | Evidence |
 |--------------------------------------------------|---------------------------|----------|
-| <item> | yes / no / partially | <commit / file:line / scenario, or "still open"> |
+| W013 (2026-10-29-session-object-navigation): pre-existing backend lint debt (ruff 102 / mypy 78) | partially — T04 removed 10 F401s (now 93/76), 0 new; debt remains open, re-tracked as TASK-098 | 35469827; report.md Code Quality Gate |
+| W015 (execution ledger / TDD evidence co-commit shape) | addressed as precedent — this change's ledger + deletion-chore evidence model follows and extends it (W021 precedent) | .skillgrid/meta/.sdd/2026-11-07-dead-code-cleanup/progress.md |
+| W018 (dev metrics-server crash-loop blocked dev-stack) | not addressed — still open (different surface) | still open |
 
 ## Move Evidence (from ship context)
 
 **From:** `.skillgrid/specs/2026-11-07-dead-code-cleanup/` → **To:** `.skillgrid/archive/2026-11-07-dead-code-cleanup/`
-**`diff -r` readback:** <empty → PASS | verbatim output → FAIL>
+**`diff -r` readback:** empty → PASS (vs pre-move snapshot; source path confirmed gone)
 
 ## Overrides / Waivers / Contradictions
 
-- None recorded by qa.
+- None.
 
 ## Lineage (observation IDs)
 
-- briefing: <id>
-- blueprint: <id>
-- tasks: <id>
-- ship: <id>
-- report (QA half): <id>
-- research / findings / ADRs: none
+- briefing: in-repo `.skillgrid/archive/2026-11-07-dead-code-cleanup/briefing.md` (no mnemonic copy — pre-session-start)
+- blueprint: in-repo `blueprint.md` (Tier T0)
+- tasks: in-repo `tasks.md` (7 tickets TASK-089..095)
+- ship: `kubedash-20261108-ship-change-d` session, topic_key `skillgrid/2026-11-07-dead-code-cleanup/ship`
+- report (QA half): commit 70953c56
+- ledger: `.skillgrid/meta/.sdd/2026-11-07-dead-code-cleanup/progress.md` + task-01..07 reports (gitignored scratch)
+- reviews: per-task ReviewD01..D06 + whole-branch ReviewBranchD (SHIPPABLE 0C/0I/3M)
+- research / findings / ADRs: none (ADR-0041 is the parent architecture decision, in .skillgrid/knowledge/decisions/)

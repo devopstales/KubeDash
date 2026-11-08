@@ -81,3 +81,4 @@
 |---|---|
 | [Live architecture document](reference/live-architecture.md) | Pointer to `.skillgrid/ARCHITECTURE.md` with the document-division-of-labor table and its known-staleness notes |
 | [Feature roadmap + open/deferred](reference/feature-roadmap.md) | Pointer to ARCHITECTURE.md §7A (roadmap) / §11 (open-deferred); roadmap items are not constraints; 2026-11-06 research findings (mcp-server, ai-investigations, change-timeline, workload-map) captured in the spec zone |
+| [Research findings — durable](reference/06-research-findings.md) | Cross-change findings that outlive their source change; append-only. Currently: jscpd dead-code detection characteristics (false positives, entry-point blind spot, string wiring) from 2026-11-07-dead-code-cleanup |
