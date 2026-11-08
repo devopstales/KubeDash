@@ -255,7 +255,7 @@ def test_admin_pod_list_via_local_cluster(api_client, api_app, kind_cluster) -> 
         _config._settings = None
 
         orig_get, orig_set = rb._cache_get, rb._cache_set
-        rb._cache_get, rb._cache_set = (lambda k: None, lambda k, v: None)
+        rb._cache_get, rb._cache_set = (lambda e, k: None, lambda e, k, v: None)
         try:
             r = api_client.get("/api/v1/clusters/0/resources/pods", headers=h_admin)
         finally:

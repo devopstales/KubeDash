@@ -8,17 +8,12 @@ import {
   CCardTitle,
   CFormSelect,
 } from '@coreui/react'
-import DataTable, { Column } from 'datatables.net-react'
-import DtCore from 'datatables.net-dt'
-import 'datatables.net-dt/css'
 import { useQuery } from '@tanstack/react-query'
 import { apiFetch } from '../../lib/api'
 import type { AdminUser, GroupOut, RBACTemplate } from '../../lib/types'
 import { useCluster, type ClusterItem } from '../../hooks/useCluster'
 import BindModal from '../AdminPermissions/components/BindModal'
-
-// Assign DataTables core to the React component (datatables.net-react).
-DataTable.use(DtCore)
+import KubeDataTable, { Column } from '../../components/KubeDataTable'
 
 /**
  * Users — matches the main-branch Users page: a "User List" card with a
@@ -305,21 +300,7 @@ const UsersView = () => {
             <div>No users.</div>
           ) : (
             <div className="table-responsive">
-              <DataTable
-                data={users}
-                className="display"
-                options={{
-                  pageLength: 10,
-                  searching: true,
-                  ordering: true,
-                  lengthChange: true,
-                }}
-              >
-                {/* datatables.net-react 2.0.0: the `render` PROP is passed raw to
-                    the DataTables core (a React-element return stringifies to
-                    "[object Object]"); only the CHILDREN path is React-aware
-                    (slotRenderer). Cells are therefore children, matching
-                    KubeDataTable's views. */}
+              <KubeDataTable data={users}>
                 <Column title="Username" data="id">
                   {(_id: number, _type: string, row: AdminUser) => (
                     <a href="#" onClick={(e) => { e.preventDefault(); openDetail(row) }} aria-label={`Open ${row.display_name ?? row.sub}`}>
@@ -334,10 +315,6 @@ const UsersView = () => {
                 <Column title="Type" data="user_type" />
                 <Column title="Status" data="status" />
                 <Column title="Groups" data="groups">
-                  {/* Must return a single element (Fragment), not the raw
-                      .map() array: slotCache only renderJsx's a
-                      React.isValidElement result, so an array falls
-                      through and stringifies to "[object Object]". */}
                   {(groups: string[]) =>
                     groups.length === 0 ? (
                       '—'
@@ -371,7 +348,7 @@ const UsersView = () => {
                     </span>
                   )}
                 </Column>
-              </DataTable>
+              </KubeDataTable>
             </div>
           )}
         </CCardBody>

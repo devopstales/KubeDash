@@ -42,6 +42,18 @@ in_flight:
     # (AGENTS.md KUBEDASH_HOME row, glossary terms). Next: reflect
     # (completes report.md retro half in the archive + session close).
     tracker: [TASK-033, TASK-034, TASK-035, TASK-036, TASK-037]
+  - change: 2026-10-27-postgres-queue-revocation-active-active
+    phase: executed
+    # Merged from origin/rebase (executed 2026-10-29, ADR-0029/0030/0031):
+    # pgqueue SKIP LOCKED + leader-gated reaper replace RQ (ADR-0029);
+    # session revocation deny-list + OIDC state + SAR cache on the
+    # Postgres kv store (ADR-0030); two-node pgEdge/Spock dev stack,
+    # Redis removed from the whole stack (ADR-0031). All 7 tickets Done
+    # (TASK-042..048); both one-way gates passed live: TICKET-01
+    # migration (0e969d3c2e02: tasks/revoked_jtis/kv + leader_lease.fence)
+    # and TICKET-07 (two-node pgEdge, no redis, autoddl n1->n2). Next:
+    # skillgrid:qa + requesting-code-review before ship.
+    tracker: [TASK-042, TASK-043, TASK-044, TASK-045, TASK-046, TASK-047, TASK-048]
   - change: 2026-10-28-runtimeclass-views
     phase: qa
     # Executed 2026-10-28 (TASK-046): 4 commits on `rebase` — backend

@@ -1,6 +1,6 @@
 """Docker-free fixtures for the task unit tier (Task 7).
 
-The session-scoped Postgres/Redis containers in ``tests/conftest.py`` need a
+The session-scoped Postgres container in ``tests/conftest.py`` needs a
 container runtime. Where the runtime is absent (this host), the task unit tier
 runs against a sqlite app + monkeypatched ``K8sClientPool`` instead — the
 Testcontainers ``app`` fixture (parent conftest) remains the CI backstop for
@@ -31,7 +31,6 @@ def tasks_app(monkeypatch: pytest.MonkeyPatch) -> Iterator[object]:
     application = create_app({
         "TESTING": True,
         "DATABASE_URL": "sqlite://",
-        "REDIS_URL": "redis://localhost:6390/0",  # never dialed
         "KUBEDASH_KUBEDASH_JWT_SECRET": "test-jwt-secret-32-bytes-long!!!!!01",
         "KUBEDASH_SECRET_KEY": "test-enc-key-32-bytes-long!!!!",
     })

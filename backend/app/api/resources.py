@@ -28,6 +28,7 @@ from app.core.errors import (
     ResourceKindNotSupportedError,
 )
 from app.core.security import require_admin
+from app.extensions import db
 from app.schemas.resource import (
     ApplyIn,
     ApplyOut,
@@ -282,13 +283,17 @@ class ResourceApi(Api):
                 raise ResourceKindNotSupportedError(f"name lookup on kind '{kind}' not supported")
             namespace = namespace or "default"
             allowed = rbac.can(
-                g.current_user, cluster, "get", api_resource, namespace, name, api_group
+                g.current_user, cluster, "get", api_resource, namespace, name, api_group,
+                engine=db.engine,
             )
             if not allowed:
                 raise RbacDeniedError(f"get on {api_resource}")
             items = getattr(pool.get(cluster), _GETTERS[kind])(namespace, name)
             return {"items": items, "kind": kind, "cluster": cluster.name}
-        if not rbac.can(g.current_user, cluster, "list", api_resource, namespace, None, api_group):
+        if not rbac.can(
+            g.current_user, cluster, "list", api_resource, namespace, None, api_group,
+            engine=db.engine,
+        ):
             raise RbacDeniedError(f"list on {api_resource}")
         # The ?labelSelector= query (the service-views change) is forwarded to
         # list_pods only: the other kinds' list_* methods take a single
@@ -377,7 +382,10 @@ class ResourceApi(Api):
             raise ResourceKindNotSupportedError("instances lookup on kind 'crds' needs ?name=")
         cluster = _cluster_for(g.current_user, cluster_id)
         client = pool.get(cluster)
-        if not rbac.can(g.current_user, cluster, "list", "customresourcedefinitions", None, name, _CRD_GROUP):
+        if not rbac.can(
+            g.current_user, cluster, "list", "customresourcedefinitions", None, name, _CRD_GROUP,
+            engine=db.engine,
+        ):
             raise RbacDeniedError("list on customresourcedefinitions")
         crds = client.get_crd(None, name)
         if not crds:
@@ -397,7 +405,10 @@ class ResourceApi(Api):
         plural = ((spec.get("names") or {}).get("plural")) or name
         scope_namespaced = spec.get("scope") == "Namespaced"
         namespace = request.args.get("namespace") if scope_namespaced else None
-        if not rbac.can(g.current_user, cluster, "list", plural, namespace, None, group):
+        if not rbac.can(
+            g.current_user, cluster, "list", plural, namespace, None, group,
+            engine=db.engine,
+        ):
             raise RbacDeniedError(f"list on {plural}")
         items = client.list_crd_instances(group, served["name"], plural, namespace)
         return {"items": items, "kind": "crds", "cluster": cluster.name}
@@ -422,7 +433,9 @@ class ResourceApi(Api):
         if not _NAMESPACE_NAME.fullmatch(name):
             raise InvalidKubeconfigError("invalid Kubernetes namespace name")
         cluster = _cluster_for(g.current_user, cluster_id)
-        if not rbac.can(g.current_user, cluster, "create", "namespaces", None, None, ""):
+        if not rbac.can(
+            g.current_user, cluster, "create", "namespaces", None, None, "", engine=db.engine
+        ):
             raise RbacDeniedError("create on namespaces")
         pool.get(cluster).create_namespace(name)
         return {"name": name}, 201
@@ -445,7 +458,9 @@ class ResourceApi(Api):
         if name in _PROTECTED_NAMESPACES:
             raise ClusterAlreadyExistsError(f"namespace '{name}' is protected")
         cluster = _cluster_for(g.current_user, cluster_id)
-        if not rbac.can(g.current_user, cluster, "delete", "namespaces", None, name, ""):
+        if not rbac.can(
+            g.current_user, cluster, "delete", "namespaces", None, name, "", engine=db.engine
+        ):
             raise RbacDeniedError("delete on namespaces")
         pool.get(cluster).delete_namespace(name)
         return {"name": name}, 200

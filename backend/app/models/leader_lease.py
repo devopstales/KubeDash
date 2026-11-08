@@ -17,6 +17,9 @@ class LeaderLease(db.Model):
     token = db.Column(db.Uuid, nullable=False, default=uuid.uuid4)
     acquired_at = db.Column(db.DateTime(timezone=True), nullable=False)
     heartbeat_at = db.Column(db.DateTime(timezone=True), nullable=False)
+    # Strict fence (ADR-0031): monotonic LWW tiebreaker across active-active
+    # nodes; a stale leader's write with an old fence affects zero rows.
+    fence = db.Column(db.Integer, nullable=False, server_default="0")
 
     def __repr__(self) -> str:  # pragma: no cover
         return f"<LeaderLease replica={self.replica_id!r}>"

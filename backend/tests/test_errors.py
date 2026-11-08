@@ -1,13 +1,10 @@
 """OD-1: the frozen v1 error envelope and stable codes."""
 import pytest
 
-from tests.api.conftest import _FakeRedis
-
 
 @pytest.fixture()
 def _local_app(monkeypatch):
     """Docker-free app (the session `app` fixture needs containers)."""
-    import app.extensions as ext
     from app import create_app
     from app.core.security import _oauth
 
@@ -16,13 +13,10 @@ def _local_app(monkeypatch):
     application = create_app({
         "TESTING": True,
         "DATABASE_URL": "sqlite://",
-        "REDIS_URL": "redis://localhost:6392/0",
         "KUBEDASH_KUBEDASH_JWT_SECRET": "test-jwt-secret-32-bytes-long!!!!!01",
         "KUBEDASH_SECRET_KEY": "test-enc-key-32-bytes-long!!!!",
     })
-    fake = _FakeRedis()
     with application.app_context():
-        monkeypatch.setattr(ext, "redis_client", fake)
         from app.extensions import db
 
         db.create_all()

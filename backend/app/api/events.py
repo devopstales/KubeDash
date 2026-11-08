@@ -21,6 +21,7 @@ from flask_smorest import Api, Blueprint
 from app.api._authhook import apply_auth
 from app.api._cluster import cluster_for as _cluster_for
 from app.core.errors import RbacDeniedError
+from app.extensions import db
 from app.services import rbac
 from app.services.k8s_client import pool
 
@@ -78,7 +79,9 @@ class EventsApi(Api):
         cluster = _cluster_for(g.current_user, cluster_id)
         # ADR-0004: cluster-wide list events gate, asked BEFORE any data
         # fetch — a denied user must not trigger a cluster call.
-        if not rbac.can(g.current_user, cluster, "list", "events", None, None, ""):
+        if not rbac.can(
+            g.current_user, cluster, "list", "events", None, None, "", engine=db.engine
+        ):
             raise RbacDeniedError("list on events")
         items = pool.get(cluster).list_events(None)
 

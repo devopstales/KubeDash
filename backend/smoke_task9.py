@@ -21,10 +21,8 @@ dist = Path(tempfile.mkdtemp(prefix="kd-dist-"))
 app = create_app({
     "TESTING": True,
     "DATABASE_URL": "sqlite://",
-    "REDIS_URL": "redis://localhost:6399/0",
     "KUBEDASH_JWT_SECRET": "test-jwt-secret",
     "KUBEDASH_SECRET_KEY": "test-enc-key-32-bytes-long!!!!",
-    "KUBEDASH_STATIC_DIR": str(dist),
 })
 c = app.test_client()
 
@@ -55,7 +53,7 @@ assert r5.status_code == 200 and r5.get_json() == {"status": "ok"}, (r5.status_c
 print("PASS 5: /healthz -> 200", r5.get_json())
 
 r6 = c.get("/readyz")
-assert r6.status_code in (200, 503), r6.status_code  # 503 here: no live pg/redis
+assert r6.status_code in (200, 503), r6.status_code  # 503 here: no live pg
 print("PASS 6: /readyz ->", r6.status_code, r6.get_json())
 
 # guard: api/, ws/, static-ext paths fall through to 404, never index.html

@@ -4,7 +4,7 @@ import pytest
 
 
 @pytest.fixture()
-def static_app(pg_container, redis_container, tmp_path, monkeypatch):
+def static_app(pg_container, tmp_path, monkeypatch):
     from app.core import ini_config
 
     home = tmp_path / "home"
@@ -19,7 +19,6 @@ def static_app(pg_container, redis_container, tmp_path, monkeypatch):
     application = create_app({
         "TESTING": True,
         "DATABASE_URL": pg_container.get_connection_url(),
-        "REDIS_URL": f"redis://{redis_container.get_container_host()}:{redis_container.exposed_port(6379)}",
         "KUBEDASH_JWT_SECRET": "test-jwt-secret",
         "KUBEDASH_SECRET_KEY": "test-enc-key-32-bytes-long!!!!",
         "KUBEDASH_ADMIN_KUBECONFIG": "/test/admin.kubeconfig",

@@ -16,6 +16,7 @@ secrets may contain ``%``, which the default BasicInterpolation would reject.
 from __future__ import annotations
 
 import configparser
+import contextlib
 import os
 import pathlib
 import warnings
@@ -25,10 +26,10 @@ from collections.abc import Mapping
 #
 # TICKET-01 carries the resolution core + the home-derivation + the
 # security/behavior/optional fields. TICKET-02 completes the table for the
-# remaining fields (database_url, redis_url, oidc_*, admin_kubeconfig,
+# remaining fields (database_url, oidc_*, admin_kubeconfig,
 # plugin_server, cors_origins, sso_bootstrap_users, bootstrap_admin_email,
 # tls_edge, first_paint_backstop, namespace_list_timeout) and adds the
-# [database]/[remote_cache] split-or-url resolvers.
+# [database] split-or-url resolver.
 _FIELDS: dict[str, tuple[str, str, tuple[str, ...], bool, str, bool]] = {
     "kubedash_jwt_secret": (
         "security", "jwt_secret",
@@ -57,10 +58,6 @@ _FIELDS: dict[str, tuple[str, str, tuple[str, ...], bool, str, bool]] = {
     "database_url": (
         "database", "url",
         ("KUBEDASH_DATABASE_URL", "DATABASE_URL"), True, "", False,
-    ),
-    "redis_url": (
-        "remote_cache", "url",
-        ("KUBEDASH_REDIS_URL", "REDIS_URL"), True, "", False,
     ),
     "oidc_client_id": (
         "sso_settings", "client_id", ("KUBEDASH_OIDC_CLIENT_ID",), True, "", False,
@@ -161,6 +158,7 @@ def reset() -> None:
     import app.core.config as _c
 
     _c._settings = None
+    _c._proxy._test_stash.clear()
 
 
 def resolve_home() -> pathlib.Path:
@@ -262,31 +260,6 @@ def _resolve_database() -> str:
     return f"postgresql://{auth}{host}/{name}"
 
 
-def _resolve_redis() -> str:
-    """[remote_cache]: a single ``url`` wins; else build ``redis://[pass@]host:port/db``
-    (port defaults to 6379, db to 0). The 4.1 ``redis_host`` may carry an
-    embedded ``:port`` (``cache:6380``); a separate ``redis_port`` wins when
-    both are present. The password is ``quote_plus``-ed (parity with
-    ``_resolve_database``) so an ``@``/``:`` in it cannot mis-parse the URL."""
-    from urllib.parse import quote_plus
-
-    url = _ini("remote_cache", "url")
-    if url:
-        return url
-    host = _ini("remote_cache", "redis_host")
-    if not host:
-        return ""
-    # 4.1 style: redis_host may be "host:port"; a separate redis_port wins.
-    if ":" in host:
-        host, embedded_port = host.rsplit(":", 1)
-    else:
-        embedded_port = ""
-    port = _ini("remote_cache", "redis_port") or embedded_port or "6379"
-    db = _ini("remote_cache", "redis_db") or "0"
-    password = quote_plus(_ini("remote_cache", "redis_password"))
-    auth = f":{password}@" if password else ""
-    return f"redis://{auth}{host}:{port}/{db}"
-
 
 def _resolve_flask_env() -> str:
     """flask_env: read ``app_mode`` from the literal ``DEFAULT`` section; if
@@ -305,7 +278,6 @@ def _resolve_flask_env() -> str:
 # Fields whose INI value is composed from multiple section keys (TICKET-02).
 _SPECIAL_RESOLVERS = {
     "database_url": _resolve_database,
-    "redis_url": _resolve_redis,
     "flask_env": _resolve_flask_env,
 }
 
@@ -324,7 +296,7 @@ def resolve(field: str) -> str:
     ev = _env_value(field)
     if ev is not None:
         return ev
-    # A composed field (database/redis split-or-url) reads its section keys
+    # A composed field (database split-or-url) reads its section keys
     # directly rather than a single section/key.
     if field in _SPECIAL_RESOLVERS:
         composed = _SPECIAL_RESOLVERS[field]()
@@ -358,6 +330,11 @@ class _SettingsProxy:
     ``__call__`` returns the real ``Settings`` for the test-call form
     (``settings()``). Because ``Settings()`` still runs every ``default_factory``
     eagerly, the constructed model resolves all fields — used only by tests.
+
+    Attribute assignment on the proxy (a test seam — e.g.
+    ``settings.kubedash_replica_id = "r1"``) is stashed in ``_test_stash``
+    and cleared by :func:`reset`, so it cannot leak across test modules the
+    way a plain instance attribute would.
     """
 
     def __getattr__(self, name: str):
@@ -365,8 +342,35 @@ class _SettingsProxy:
             raise AttributeError(name)
         if name not in _FIELDS:
             raise AttributeError(name)
+        stashed = object.__getattribute__(self, "_test_stash")
+        if name in stashed:
+            return stashed[name]
         _section, _key, _envs, _has_default, _default, is_bool = _FIELDS[name]
         return resolve_bool(name) if is_bool else resolve(name)
+
+    def __setattr__(self, name: str, value: object) -> None:
+        # The proxy is a singleton that outlives ``reset()``. A plain
+        # attribute assignment would stick on the instance and leak into
+        # later tests. Stash writes so ``reset()`` clears them, and mirror
+        # onto the constructed ``Settings`` (when it exists) for callers
+        # that read through ``settings()``.
+        if name.startswith("_"):
+            object.__setattr__(self, name, value)
+            return
+        if name not in _FIELDS:
+            raise AttributeError(name)
+        stashed = object.__getattribute__(self, "_test_stash")
+        stashed[name] = value
+        from app.core import config as _c
+
+        if _c._settings is not None:
+            # pydantic validation may reject the write; the stash still
+            # serves proxy reads until reset().
+            with contextlib.suppress(Exception):
+                setattr(_c._settings, name, value)
+
+    def __init__(self) -> None:
+        object.__setattr__(self, "_test_stash", {})
 
     def _construct(self):
         from app.core import config as _c

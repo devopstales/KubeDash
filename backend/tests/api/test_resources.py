@@ -2,7 +2,7 @@
 
 Docker-free unit tier: the k8s path is a ``FakeK8s`` double injected through
 the pool's ``factory`` seam (same as test_clusters.py) and the SAR is the real
-``rbac.can`` reading the fake redis (``_cache_get``/``_cache_set`` are the
+``rbac.can`` reading the ``kv`` cache (``_cache_get``/``_cache_set`` are the
 module seams the unit tests patch). The kind integration tier (``@pytest.mark
 .integration``) runs the same endpoint against a real kind cluster —
 env-block where no Docker is available, deselected with ``-m "not
@@ -1204,8 +1204,8 @@ def _allow_sar(monkeypatch: pytest.MonkeyPatch) -> None:
     """Let every SAR through (the unit tier does not model cluster RBAC)."""
     import app.services.rbac as rb
 
-    monkeypatch.setattr(rb, "_cache_get", lambda k: None)
-    monkeypatch.setattr(rb, "_cache_set", lambda k, v: None)
+    monkeypatch.setattr(rb, "_cache_get", lambda e, k: None)
+    monkeypatch.setattr(rb, "_cache_set", lambda e, k, v: None)
     monkeypatch.setattr(rb, "_sar_allowed", lambda client, verb, resource, ns, name, group="": True)
 
 
@@ -1490,8 +1490,8 @@ def _record_sar(monkeypatch: pytest.MonkeyPatch) -> list[tuple]:
     import app.services.rbac as rb
 
     asked: list[tuple] = []
-    monkeypatch.setattr(rb, "_cache_get", lambda k: None)
-    monkeypatch.setattr(rb, "_cache_set", lambda k, v: None)
+    monkeypatch.setattr(rb, "_cache_get", lambda e, k: None)
+    monkeypatch.setattr(rb, "_cache_set", lambda e, k, v: None)
 
     def deny(client, verb, resource, ns, name, group=""):
         asked.append((verb, resource, ns, name, group))
@@ -1544,8 +1544,8 @@ def test_rbac_denied_403(api_client, auth_client, fake_k8s, monkeypatch) -> None
     _register(api_client, h)
     import app.services.rbac as rb
 
-    monkeypatch.setattr(rb, "_cache_get", lambda k: None)
-    monkeypatch.setattr(rb, "_cache_set", lambda k, v: None)
+    monkeypatch.setattr(rb, "_cache_get", lambda e, k: None)
+    monkeypatch.setattr(rb, "_cache_set", lambda e, k, v: None)
     monkeypatch.setattr(rb, "_sar_allowed", lambda api_client, verb, resource, ns, name, group="": False)
     r = api_client.get("/api/v1/clusters/1/resources/pods", headers=h)
     assert r.status_code == 403
@@ -1698,8 +1698,8 @@ def _record_allowed_sar(monkeypatch: pytest.MonkeyPatch) -> list[tuple]:
     import app.services.rbac as rb
 
     asked: list[tuple] = []
-    monkeypatch.setattr(rb, "_cache_get", lambda k: None)
-    monkeypatch.setattr(rb, "_cache_set", lambda k, v: None)
+    monkeypatch.setattr(rb, "_cache_get", lambda e, k: None)
+    monkeypatch.setattr(rb, "_cache_set", lambda e, k, v: None)
 
     def allow(client, verb, resource, ns, name, group=""):
         asked.append((verb, resource, ns, name, group))
@@ -1782,8 +1782,8 @@ def test_apply_sar_denied_is_atomic_before_apply(
         asked.append((verb, resource, ns, name, group))
         return resource != "gateways"
 
-    monkeypatch.setattr(rb, "_cache_get", lambda k: None)
-    monkeypatch.setattr(rb, "_cache_set", lambda k, v: None)
+    monkeypatch.setattr(rb, "_cache_get", lambda e, k: None)
+    monkeypatch.setattr(rb, "_cache_set", lambda e, k, v: None)
     monkeypatch.setattr(rb, "_sar_allowed", deny_gateways)
     r = api_client.post(
         "/api/v1/clusters/1/resources/apply",
@@ -1998,8 +1998,8 @@ def test_list_crd_instances_second_sar_denied(
         # Allow the CRD read, deny the instance list.
         return resource == "customresourcedefinitions"
 
-    monkeypatch.setattr(rb, "_cache_get", lambda k: None)
-    monkeypatch.setattr(rb, "_cache_set", lambda k, v: None)
+    monkeypatch.setattr(rb, "_cache_get", lambda e, k: None)
+    monkeypatch.setattr(rb, "_cache_set", lambda e, k, v: None)
     monkeypatch.setattr(rb, "_sar_allowed", selective)
     r = api_client.get(
         "/api/v1/clusters/1/resources/crds/instances?name=applications.argoproj.io&namespace=team-a",
@@ -4247,8 +4247,8 @@ def test_list_volumesnapshots_get_by_name(
         asked.append((verb, resource, ns, name, group))
         return True
 
-    monkeypatch.setattr(rb, "_cache_get", lambda k: None)
-    monkeypatch.setattr(rb, "_cache_set", lambda k, v: None)
+    monkeypatch.setattr(rb, "_cache_get", lambda e, k: None)
+    monkeypatch.setattr(rb, "_cache_set", lambda e, k, v: None)
     monkeypatch.setattr(rb, "_sar_allowed", record_and_allow)
     r = api_client.get(
         "/api/v1/clusters/1/resources/volumesnapshots?name=snap-a&namespace=team-a",
@@ -4603,8 +4603,8 @@ def kind_admin_api_client(api_app, monkeypatch) -> object:
     from app import _bootstrap_local_admin
 
     _bootstrap_local_admin(api_app)
-    monkeypatch.setattr(rb, "_cache_get", lambda k: None)
-    monkeypatch.setattr(rb, "_cache_set", lambda k, v: None)
+    monkeypatch.setattr(rb, "_cache_get", lambda e, k: None)
+    monkeypatch.setattr(rb, "_cache_set", lambda e, k, v: None)
     return api_app.test_client()
 
 

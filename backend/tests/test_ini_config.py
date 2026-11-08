@@ -41,9 +41,6 @@ admin_password = from-ini
 [database]
 url = sqlite://
 
-[remote_cache]
-url = redis://localhost:6390/0
-
 [bootstrap]
 bootstrap_admin_email = admin@local
 
@@ -117,6 +114,13 @@ def test_static_dir_from_home_paths(tmp_path: pathlib.Path, monkeypatch: pytest.
 def test_optional_and_behavior_knobs_keep_defaults(tmp_path: pathlib.Path, monkeypatch: pytest.MonkeyPatch) -> None:
     home = _write_ini(_home(tmp_path), "[DEFAULT]\napp_mode = production\n")
     monkeypatch.setenv("KUBEDASH_HOME", str(home))
+    # The defaults under test are only observable when no override/env leg is
+    # in play: reset clears prior tests' config_overrides, and the env vars
+    # are cleared because a host shell (or a Taskfile task) may export them
+    # (KUBEDASH_REPLICA_ID=local in the dev tasks; the override leg would win
+    # and mask the in-code default the assertion pins).
+    for v in ("KUBEDASH_ROLE", "KUBEDASH_REPLICA_ID", "KUBEDASH_COOKIE_SECURE"):
+        monkeypatch.delenv(v, raising=False)
     ini_config.reset()
     s = _config.get_settings()
     assert s.cookie_secure is True  # fail-closed default (ADR-0025/0027)
@@ -126,7 +130,7 @@ def test_optional_and_behavior_knobs_keep_defaults(tmp_path: pathlib.Path, monke
 
 
 # ---------------------------------------------------------------------------
-# TICKET-02: full 4.1 schema mapping (database/remote_cache/sso/deployment)
+# TICKET-02: full 4.1 schema mapping (database/sso/deployment)
 # ---------------------------------------------------------------------------
 
 
@@ -161,20 +165,6 @@ def test_database_url_wins_over_split(tmp_path: pathlib.Path, monkeypatch: pytes
     assert _config.get_settings().database_url == "postgresql://x:y@z/q"
 
 
-def test_remote_cache_split_or_url(tmp_path: pathlib.Path, monkeypatch: pytest.MonkeyPatch) -> None:
-    home = _write_ini(
-        _home(tmp_path),
-        "[remote_cache]\nredis_host = cache:6380\nredis_db = 2\n",
-    )
-    monkeypatch.setenv("KUBEDASH_HOME", str(home))
-    ini_config.reset()
-    assert _config.get_settings().redis_url == "redis://cache:6380/2"
-    # Rewrite the INI in the SAME home (url wins over split fields).
-    _write_ini(home, "[remote_cache]\nurl = redis://other:6379/9\nredis_host = cache\n")
-    ini_config.reset()
-    assert _config.get_settings().redis_url == "redis://other:6379/9"
-
-
 def test_database_sqlite_type_warns(tmp_path: pathlib.Path, monkeypatch: pytest.MonkeyPatch) -> None:
     # The 4.1 file's [database] type = sqlite3 is not a 5.0 driver — it must
     # be warned (documented in _resolve_database + kubedash.ini.example), not
@@ -188,19 +178,6 @@ def test_database_sqlite_type_warns(tmp_path: pathlib.Path, monkeypatch: pytest.
 
     with pytest.warns(UserWarning, match="sqlite"):
         _config.get_settings().database_url
-
-
-def test_remote_cache_password_is_quoted(tmp_path: pathlib.Path, monkeypatch: pytest.MonkeyPatch) -> None:
-    # Parity with _resolve_database: an @ or : in redis_password must be
-    # percent-encoded or the redis:// URL mis-parses (p@ss -> host "ss").
-    home = _write_ini(
-        _home(tmp_path),
-        "[remote_cache]\nredis_host = cache\nredis_password = p@ss:wd\n",
-    )
-    monkeypatch.setenv("KUBEDASH_HOME", str(home))
-    ini_config.reset()
-    assert _config.get_settings().redis_url == "redis://:p%40ss%3Awd@cache:6379/0"
-
 
 def test_sso_and_deployment_and_optional(tmp_path: pathlib.Path, monkeypatch: pytest.MonkeyPatch) -> None:
     home = _write_ini(

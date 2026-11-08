@@ -2,18 +2,15 @@
 from urllib.parse import parse_qs, urlparse
 
 import app.core.security as sec
-import app.extensions as ext
 from app import create_app
-from tests.api.conftest import MockOIDC, _FakeRedis
+from tests.api.conftest import MockOIDC
 
 app = create_app({
     "TESTING": True,
     "DATABASE_URL": "sqlite://",
-    "REDIS_URL": "redis://localhost:6390/0",
     "KUBEDASH_KUBEDASH_JWT_SECRET": "test-jwt-secret-32-bytes-long!!!!!01",
     "KUBEDASH_SECRET_KEY": "test-enc-key-32-bytes-long!!!!",
 })
-ext.redis_client = _FakeRedis()
 sec.oidc_exchange = MockOIDC().exchange
 sec.oidc_authorize_url = MockOIDC().authorize_url
 

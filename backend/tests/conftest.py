@@ -5,9 +5,7 @@ from pathlib import Path
 
 import pytest
 from testcontainers.postgres import PostgresContainer
-from testcontainers.redis import RedisContainer
 
-import app.core.config as _config
 from app import _bootstrap_local_admin, create_app
 from app.core import ini_config
 from app.extensions import db
@@ -49,9 +47,7 @@ def _session_config() -> None:
 # same assertions are proven by the runtime-free smoke in Task 1's report,
 # and CI (with Docker) is the green backstop.
 PostgresContainer.get_container_host = PostgresContainer.get_container_host_ip
-RedisContainer.get_container_host = RedisContainer.get_container_host_ip
 PostgresContainer.exposed_port = PostgresContainer.get_exposed_port
-RedisContainer.exposed_port = RedisContainer.get_exposed_port
 
 
 @pytest.fixture(scope="session")
@@ -66,18 +62,8 @@ def pg_container() -> Iterator[PostgresContainer]:
         pg.stop()
 
 
-@pytest.fixture(scope="session")
-def redis_container() -> Iterator[RedisContainer]:
-    r = RedisContainer("redis:7")
-    r.start()
-    try:
-        yield r
-    finally:
-        r.stop()
-
-
 @pytest.fixture()
-def app(pg_container, redis_container, monkeypatch, tmp_path):
+def app(pg_container, monkeypatch, tmp_path):
     # I-NEW-1 (ADR-0021, TICKET-14): bootstrap env ON for the PG-tier app —
     # the env triple: setenv BEFORE create_app (the Settings singleton caches
     # from ENV on first read; config_overrides alone never reach
@@ -95,6 +81,13 @@ def app(pg_container, redis_container, monkeypatch, tmp_path):
     home = tmp_path / "home"
     home.mkdir()
     (home / "kubedash.ini").write_text("[DEFAULT]\napp_mode = development\n")
+    # ADR-0021 I-NEW-6: /readyz probes the admin-kubeconfig FILE (isfile) when
+    # the source is kubeconfig-file — the path must EXIST or the probe reports
+    # "down" and /readyz 503s on hosts without a hand-made /test dir. A
+    # placeholder file is enough (the probe never loads it; the client pool
+    # builds admin clients lazily from the path only when id:0 is fetched).
+    kubeconfig = tmp_path / "admin.kubeconfig"
+    kubeconfig.write_text("apiVersion: v1\nkind: Config\nclusters: []\n")
     monkeypatch.setenv("KUBEDASH_HOME", str(home))
     monkeypatch.setenv("KUBEDASH_BOOTSTRAP_ADMIN_EMAIL", "admin@local")
     monkeypatch.setenv("KUBEDASH_BOOTSTRAP_ADMIN_PASSWORD", "correct-horse")
@@ -103,24 +96,13 @@ def app(pg_container, redis_container, monkeypatch, tmp_path):
     application = create_app({
         "TESTING": True,
         "DATABASE_URL": pg_container.get_connection_url(driver="psycopg"),
-        "REDIS_URL": f"redis://{redis_container.get_container_host()}:{redis_container.exposed_port(6379)}",
         "KUBEDASH_JWT_SECRET": "test-jwt-secret",
         "KUBEDASH_SECRET_KEY": "test-enc-key-32-bytes-long!!!!",
         # ADR-0025: the test client speaks http://localhost; a Secure cookie is
         # stored but never sent back, so the session would vanish between calls.
         "KUBEDASH_COOKIE_SECURE": False,
-        # In-cluster mode (empty): the readyz admin-kubeconfig probe is
-        # ABSENT (no file to check). Tests that need a file path set
-        # KUBEDASH_ADMIN_KUBECONFIG explicitly.
+        "KUBEDASH_ADMIN_KUBECONFIG": str(kubeconfig),
     })
-    # ADR-0028: re-clear the Settings singleton AFTER create_app. The wsgi
-    # module (imported by test_worker_gate at collection time) reads
-    # get_settings() at import time — before KUBEDASH_HOME is set — and the
-    # cached Settings would then carry the REAL dev INI's admin_kubeconfig
-    # (backend/kubedash.ini, gitignored) into every PG-tier test. The readyz
-    # probe re-resolves lazily on the FIRST request (after create_all), so
-    # clearing here is safe and pins the probe to this fixture's config.
-    _config._settings = None
     with application.app_context():
         db.create_all()
         _bootstrap_local_admin(application)

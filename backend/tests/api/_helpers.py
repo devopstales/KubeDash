@@ -55,8 +55,10 @@ def sar(
     ``allow`` (None = allow everything), record every call in ``record``."""
     import app.services.rbac as rb
 
-    monkeypatch.setattr(rb, "_cache_get", lambda k: None)
-    monkeypatch.setattr(rb, "_cache_set", lambda k, v: None)
+    # ADR-0030: the SAR cache is the Postgres ``kv`` table; the storage seam
+    # is ``_cache_get(engine, key)`` / ``_cache_set(engine, key, value)``.
+    monkeypatch.setattr(rb, "_cache_get", lambda e, k: None)
+    monkeypatch.setattr(rb, "_cache_set", lambda e, k, v: None)
 
     def sar_allowed(client, verb, resource, ns, name, group=""):
         key = (verb, resource, group)

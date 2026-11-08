@@ -1,16 +1,16 @@
 """ADR-0040 R4/R5 — the cross-tab deep-link handoff at the server seam.
 
 The share form POSTs ``o=<token>`` to the list route. The SPA fallback
-bounces the POST as a 303 to the same path and stashes the token in
-Redis keyed by the authenticated user's JWT ``sub`` (``obj_incoming:<sub>``,
-TTL 60 s = the client relay window). The first subsequent GET pops the
-stash and injects it into ``index.html`` as
-``<meta name="kd-object-incoming" content="<token>">``. The token never
+bounces the POST as a 303 to the same path and stashes the token in the
+kv table (ADR-0030, the Redis removal) keyed by the authenticated user's
+JWT ``sub`` (``obj_incoming:<sub>``, TTL 60 s = the client relay window).
+The first subsequent GET pops the stash and injects it into ``index.html``
+as ``<meta name="kd-object-incoming" content="<token>">``. The token never
 appears in a URL (R1); the ref payload still crosses tabs through the
 localStorage relay the client wrote before the POST (R5).
 
 Same docker-free pattern as the rest of this directory: the api-tier app
-with the monkeypatched ``_FakeRedis`` standing in for Redis.
+with the stash in the fixture app's kv table (sqlite).
 """
 
 from __future__ import annotations
@@ -37,10 +37,17 @@ def _write_index() -> None:
     (static / "index.html").write_text(INDEX_HTML, encoding="utf-8")
 
 
-def _fake_redis():
+def _kv_rows(client) -> dict[str, str]:
+    """The fixture app's kv-table rows (key -> value): the stash's home
+    after the Redis removal (ADR-0030). ``client`` is the test client —
+    ``.application`` supplies the app context ``db.engine`` needs."""
+    from sqlalchemy import text
+
     import app.extensions as ext
 
-    return ext.redis_client
+    with client.application.app_context(), ext.db.engine.connect() as conn:
+        rows = conn.execute(text("SELECT key, value FROM kv")).all()
+    return {r[0]: r[1] for r in rows if r[1] is not None}
 
 
 def test_post_bounces_303_to_the_same_path_and_stashes_the_token(auth_client) -> None:
@@ -52,7 +59,7 @@ def test_post_bounces_303_to_the_same_path_and_stashes_the_token(auth_client) ->
     r = auth_client.post("/cluster/crd", data={"o": "abcd1234abcd1234"})
     assert r.status_code == 303
     assert r.headers["Location"] == "/cluster/crd"
-    assert _fake_redis().store.get("obj_incoming:sub-oidc-1") == "abcd1234abcd1234"
+    assert _kv_rows(auth_client).get("obj_incoming:sub-oidc-1") == "abcd1234abcd1234"
 
 
 def test_get_after_bounce_injects_the_meta_and_pops_the_stash(auth_client) -> None:
@@ -67,7 +74,7 @@ def test_get_after_bounce_injects_the_meta_and_pops_the_stash(auth_client) -> No
     body = r.get_data(as_text=True)
     assert '<meta name="kd-object-incoming" content="abcd1234abcd1234" />' in body
     # One-shot: the stash is gone after the first GET.
-    assert "obj_incoming:sub-oidc-1" not in _fake_redis().store
+    assert "obj_incoming:sub-oidc-1" not in _kv_rows(auth_client)
     r2 = auth_client.get("/cluster/crd")
     assert "kd-object-incoming" not in r2.get_data(as_text=True)
 
@@ -98,7 +105,7 @@ def test_post_without_a_valid_session_bounces_but_does_not_stash(api_client) -> 
     _write_index()
     r = api_client.post("/cluster/crd", data={"o": "abcd1234abcd1234"})
     assert r.status_code == 303
-    assert _fake_redis().store == {}
+    assert _kv_rows(api_client) == {}
 
 
 def test_post_with_malformed_token_is_not_stashed(auth_client) -> None:
@@ -107,7 +114,7 @@ def test_post_with_malformed_token_is_not_stashed(auth_client) -> None:
     for bad in ("XYZ", "", "g" * 20, "abcd1234abcd1234abcd1234abcd1234"):
         r = auth_client.post("/cluster/crd", data={"o": bad})
         assert r.status_code == 303
-    assert _fake_redis().store == {}
+    assert _kv_rows(auth_client) == {}
 
 
 def test_post_without_an_o_field_bounces_and_does_not_stash(auth_client) -> None:
@@ -115,7 +122,7 @@ def test_post_without_an_o_field_bounces_and_does_not_stash(auth_client) -> None
     _write_index()
     r = auth_client.post("/cluster/crd")
     assert r.status_code == 303
-    assert _fake_redis().store == {}
+    assert _kv_rows(auth_client) == {}
 
 
 def test_post_to_an_api_path_is_404_not_a_bounce(auth_client) -> None:
@@ -124,7 +131,7 @@ def test_post_to_an_api_path_is_404_not_a_bounce(auth_client) -> None:
     r = auth_client.post("/api/v1/definitely-not-a-route", data={"o": "abcd1234abcd1234"})
     assert r.status_code == 404
     assert r.headers.get("Location") is None
-    assert _fake_redis().store == {}
+    assert _kv_rows(auth_client) == {}
 
 
 def test_root_get_consumes_a_stash(auth_client) -> None:
@@ -132,9 +139,13 @@ def test_root_get_consumes_a_stash(auth_client) -> None:
     consumed by the first GET on / as well (uniform one-shot semantics)."""
     auth_client.login()
     _write_index()
-    _fake_redis().set("obj_incoming:sub-oidc-1", "abcd1234abcd1234", ex=60)
+    import app.extensions as ext
+    from app.core import kvstore
+
+    with auth_client.application.app_context():
+        kvstore.kv_set(ext.db.engine, "obj_incoming:sub-oidc-1", "abcd1234abcd1234", 60)
     r = auth_client.get("/")
     assert r.status_code == 200
     html = r.get_data(as_text=True)
     assert '<meta name="kd-object-incoming" content="abcd1234abcd1234" />' in html
-    assert "obj_incoming:sub-oidc-1" not in _fake_redis().store
+    assert "obj_incoming:sub-oidc-1" not in _kv_rows(auth_client)

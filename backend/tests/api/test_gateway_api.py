@@ -76,8 +76,8 @@ def fake_k8s(api_app, monkeypatch) -> _FakeK8s:
 
 
 def _allow_sar(monkeypatch: pytest.MonkeyPatch) -> None:
-    monkeypatch.setattr(rbac_service, "_cache_get", lambda k: None)
-    monkeypatch.setattr(rbac_service, "_cache_set", lambda k, v: None)
+    monkeypatch.setattr(rbac_service, "_cache_get", lambda e, k: None)
+    monkeypatch.setattr(rbac_service, "_cache_set", lambda e, k, v: None)
     monkeypatch.setattr(rbac_service, "_sar_allowed", lambda *a, **k: True)
 
 
@@ -134,8 +134,8 @@ def test_convert_sar_denied_403(api_client, auth_client, fake_k8s, monkeypatch) 
     auth_client.login()
     h = {"Authorization": f"Bearer {auth_client.jwt}"}
     _register(api_client, h)
-    monkeypatch.setattr(rbac_service, "_cache_get", lambda k: None)
-    monkeypatch.setattr(rbac_service, "_cache_set", lambda k, v: None)
+    monkeypatch.setattr(rbac_service, "_cache_get", lambda e, k: None)
+    monkeypatch.setattr(rbac_service, "_cache_set", lambda e, k, v: None)
     monkeypatch.setattr(rbac_service, "_sar_allowed", lambda *a, **k: False)
 
     r = api_client.post(

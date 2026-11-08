@@ -1,7 +1,8 @@
 """R3/R4 unit suite for the ADR-0026 security-header layer.
 
 Docker-free: the ``_app`` fixture mirrors ``tests/api/conftest.py``'s
-``api_app`` (sqlite + a fake redis swapped onto ``app.extensions``) but builds
+``api_app`` (sqlite; oidc_state/jti revocation run on the sqlite kv/
+revocation tables after the Redis removal, ADR-0029/0030) but builds
 a fixture ``KUBEDASH_HOME`` that also carries a ``static/`` dir with a
 hashed ``assets/`` file and a root ``favicon.ico`` — so the ADR-0006
 caching-preserved scenarios exercise a real static response, not a 404.
@@ -21,26 +22,6 @@ from app import create_app
 from app.core import ini_config
 
 
-class _FakeRedis:
-    """Minimal in-memory redis for oidc_state / jti revocation keys."""
-
-    def __init__(self) -> None:
-        self.store: dict[str, str] = {}
-
-    def set(self, key: str, value: str, ex: int | None = None) -> bool:
-        self.store[key] = value
-        return True
-
-    def get(self, key: str) -> str | None:
-        return self.store.get(key)
-
-    def delete(self, key: str) -> int:
-        return int(self.store.pop(key, None) is not None)
-
-    def flushall(self) -> None:
-        self.store.clear()
-
-
 def _make_fixture_home(tmp_path: Path) -> Path:
     """Fixture home: the INI the api-tier app needs, plus a ``static/`` dir
     carrying a hashed asset and a root favicon so the static-caching
@@ -50,7 +31,6 @@ def _make_fixture_home(tmp_path: Path) -> Path:
     (home / "kubedash.ini").write_text(
         "[DEFAULT]\napp_mode = development\n"
         "[database]\nurl = sqlite://\n"
-        "[remote_cache]\nurl = redis://localhost:6390/0\n"
         "[deployment]\nadmin_kubeconfig = /test/admin.kubeconfig\n"
     )
     (home / "static").mkdir()
@@ -63,7 +43,6 @@ def _make_fixture_home(tmp_path: Path) -> Path:
 
 @pytest.fixture()
 def _app(monkeypatch: pytest.MonkeyPatch, tmp_path: Path) -> Iterator[object]:
-    import app.extensions as ext
     from app.core.security import _oauth
 
     # The authlib OAuth() registry keeps ONE bound app for its lifetime; a
@@ -82,16 +61,13 @@ def _app(monkeypatch: pytest.MonkeyPatch, tmp_path: Path) -> Iterator[object]:
     application = create_app({
         "TESTING": True,
         "DATABASE_URL": "sqlite://",
-        "REDIS_URL": "redis://localhost:6390/0",  # never dialed; client swapped
         "KUBEDASH_JWT_SECRET": "test-jwt-secret-32-bytes-long!!!!!01",
         "KUBEDASH_SECRET_KEY": "test-enc-key-32-bytes-long!!!!",
         # ADR-0025: http://localhost test client — Secure cookies are stored
         # but never sent back, so the session would vanish between calls.
         "KUBEDASH_COOKIE_SECURE": False,
     })
-    fake = _FakeRedis()
     with application.app_context():
-        monkeypatch.setattr(ext, "redis_client", fake)
         from app.extensions import db
 
         db.create_all()

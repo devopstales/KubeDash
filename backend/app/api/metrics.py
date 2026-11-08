@@ -32,6 +32,7 @@ from flask_smorest import Api, Blueprint
 from app.api._authhook import apply_auth
 from app.api._cluster import cluster_for as _cluster_for
 from app.core.errors import NotImplementedError_, RbacDeniedError
+from app.extensions import db
 from app.schemas.metrics import (
     MetricsSummaryOut,
     NodeMetricsOut,
@@ -78,9 +79,9 @@ class MetricsApi(Api):
         # Tier 1 — the rollup is derived from BOTH lists, so both cluster-wide
         # grants are required (ADR-0004). Ask BEFORE any data fetch: on deny
         # no count of either kind may be computed.
-        if not rbac.can(user, cluster, "list", "pods", None, None, ""):
+        if not rbac.can(user, cluster, "list", "pods", None, None, "", engine=db.engine):
             raise RbacDeniedError("list on pods")
-        if not rbac.can(user, cluster, "list", "nodes", None, None, ""):
+        if not rbac.can(user, cluster, "list", "nodes", None, None, "", engine=db.engine):
             raise RbacDeniedError("list on nodes")
         client = pool.get(cluster)
         nodes = client.list_nodes(None)
@@ -91,7 +92,9 @@ class MetricsApi(Api):
         # ``metrics_denied`` is the SAR verdict for this tier; it is reported
         # separately from the Metrics API's health so the UI can say "you lack
         # the grant" instead of "install metrics-server" (see module docstring).
-        metrics_allowed = rbac.can(user, cluster, "get", "nodes", None, None, "metrics.k8s.io")
+        metrics_allowed = rbac.can(
+            user, cluster, "get", "nodes", None, None, "metrics.k8s.io", engine=db.engine
+        )
         if metrics_allowed:
             available, usage = client.node_usage()
         else:
@@ -120,7 +123,7 @@ class MetricsApi(Api):
         """
         cluster = _cluster_for(g.current_user, cluster_id)
         metrics_allowed = rbac.can(
-            g.current_user, cluster, "get", "nodes", None, None, "metrics.k8s.io"
+            g.current_user, cluster, "get", "nodes", None, None, "metrics.k8s.io", engine=db.engine
         )
         if not metrics_allowed:
             return {
@@ -213,7 +216,7 @@ class MetricsApi(Api):
         """
         cluster = _cluster_for(g.current_user, cluster_id)
         metrics_allowed = rbac.can(
-            g.current_user, cluster, "get", "nodes", None, None, "metrics.k8s.io"
+            g.current_user, cluster, "get", "nodes", None, None, "metrics.k8s.io", engine=db.engine
         )
         if not metrics_allowed:
             return {

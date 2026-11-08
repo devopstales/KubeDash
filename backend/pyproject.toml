@@ -15,14 +15,11 @@ dependencies = [
   "pydantic-settings>=2.1",
   "sqlalchemy>=2.0",
   "psycopg[binary]>=3.1",
-  "redis>=5.0",
-  "rq>=1.16",
   "kubernetes>=29.0",
   "httpx>=0.26",
   "authlib>=1.3",
   "pyjwt>=2.8",
   "gunicorn>=21.2",
-  "flask-redis>=0.4,<1.0",
   "cryptography>=42",
   "pyyaml>=6.0",
   "types-pyyaml>=6.0.12.20260906",
@@ -38,7 +35,6 @@ dev = [
   "testcontainers>=4.0",
   "ruff>=0.4",
   "mypy>=1.9",
-  "types-redis",
   # Test-result metrics: pushes run-level pass/fail/total/duration gauges to the
   # dev Pushgateway (PROMETHEUS_PUSHGATEWAY_URL). Only active when that env var
   # is set — the docker-free loop (task test-unit) runs without it.
@@ -62,9 +58,9 @@ strict = true
 python_version = "3.12"
 
 [[tool.mypy.overrides]]
-# flask_migrate, flask_redis, flask_smorest, authlib ship no stubs or py.typed
+# flask_migrate, flask_smorest, authlib ship no stubs or py.typed
 # marker. jwt (pyjwt) ships inline types, no override needed.
-module = ["flask_migrate", "flask_redis", "flask_smorest.*", "authlib.*"]
+module = ["flask_migrate", "flask_smorest.*", "authlib.*"]
 ignore_missing_imports = true
 
 [[tool.mypy.overrides]]
@@ -118,10 +114,10 @@ testpaths = ["tests"]
 # Make the `app` package importable when pytest runs with rootdir=backend/
 # (pytest only puts test-file dirs on sys.path; the app package lives at the top).
 pythonpath = ["."]
-# testcontainers 4.x emits a DeprecationWarning from testcontainers.postgres/redis
+# testcontainers 4.x emits a DeprecationWarning from testcontainers.postgres
 # pointing at testcontainers.community.*; the community modules are thin re-exports
 # of the same classes, so the brief's import path stays. Hide only that warning.
-filterwarnings = ["ignore:.*testcontainers\\.(postgres|redis) is deprecated.*:DeprecationWarning"]
+filterwarnings = ["ignore:.*testcontainers\\.postgres is deprecated.*:DeprecationWarning"]
 markers = [
-  "integration: requires a kind cluster or Testcontainers (Postgres + Redis); deselect with -m 'not integration'",
+  "integration: requires a kind cluster or Testcontainers (Postgres); deselect with -m 'not integration'",
 ]

@@ -17,7 +17,7 @@ def test_openapi_routes_registered_without_deps():
     """
     from app import create_app
 
-    application = create_app({"DATABASE_URL": "sqlite://", "REDIS_URL": "redis://localhost:1/0"})
+    application = create_app({"DATABASE_URL": "sqlite://"})
     rules = {rule.rule: rule.endpoint for rule in application.url_map.iter_rules()}
     assert rules["/api/openapi.json"] == "api-docs.openapi_json"
     assert rules["/api/docs"] == "api-docs.openapi_swagger_ui"

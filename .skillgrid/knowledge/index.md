@@ -20,7 +20,7 @@
 | [ADR-0011 — kubectl credential plugin](decisions/04-adr-0011-kubectl-credential-plugin.md) | Server-managed SSO config (kubeconfig carries only server + cluster name); PKCE; ExecCredential | accepted |
 | [ADR-0012 — Aggregated API](decisions/04-adr-0012-aggregated-api.md) | kube-aggregator pattern: Project + SSOUser + SSOGroup, read-only, mTLS, no data in etcd | accepted |
 | [ADR-0013 — Permission management](decisions/04-adr-0013-permission-management.md) | Postgres role templates + self-service kubeconfig + drift detection (drift task still a stub) | accepted |
-| [ADR-0014 — Session revocation propagation](decisions/04-adr-0014-session-revocation-propagation.md) | Web logout kills the kubectl session (revocation must reach the CLI) | accepted |
+| [ADR-0014 — Session revocation propagation](decisions/04-adr-0014-session-revocation-propagation.md) | Web logout kills the kubectl session (revocation must reach the CLI) | superseded (by ADR-0030) |
 | [ADR-0015 — Namespace-as-a-Service](decisions/04-adr-0015-namespace-as-a-service.md) | Self-service namespace onboarding + TTL'd grants | accepted |
 | [ADR-0016 — Privileged Access Management](decisions/04-adr-0016-privileged-access-management.md) | Additive elevation + auto-revert + break-glass | accepted |
 | [ADR-0017 — Just-In-Time login provisioning](decisions/04-adr-0017-jit-login-provisioning.md) | Helm-declared builtin pipeline provisions users on first login | accepted |
@@ -35,8 +35,14 @@
 | [ADR-0026 — TLS edge + security headers](decisions/04-adr-0026-tls-edge-and-security-headers.md) | nginx TLS edge; ProxyFix gated on KUBEDASH_TLS_EDGE; 4.1 header set restored (superseded by ADR-0027) | accepted |
 | [ADR-0027 — Plain-HTTP dev-stack default](decisions/04-adr-0027-plain-http-dev-stack-default.md) | Dev stack is plain HTTP :8080; the ADR-0026 TLS edge is the opt-in `task dev-stack-ssl` | accepted |
 | [ADR-0028 — INI config source](decisions/04-adr-0028-ini-config-source.md) | `kubedash.ini` primary, `KUBEDASH_*` env override, fail fast at boot (no silent defaults) | accepted |
+| [ADR-0029 — Queue on Postgres](decisions/04-adr-0029-queue-on-postgres.md) | `tasks` table + `SKIP LOCKED` poll worker (reaper + 3× backoff retry), replacing RQ/Redis; supersedes ADR-0007 | accepted |
+| [ADR-0030 — Session revocation on Postgres](decisions/04-adr-0030-session-revocation-on-postgres.md) | `revoked_jtis` deny-list table (PK hot-path lookup + leader reaper), replacing the Redis `jti` set; supersedes ADR-0014 | accepted |
+| [ADR-0031 — Active-active pgEdge/Spock + fencing](decisions/04-adr-0031-active-active-pgedge-spock.md) | pgEdge/Spock active-active Postgres (no Bitnami, no operator, no image build) + strict `fence` token on `leader_lease`; supersedes ADR-0008 | accepted |
 | [ADR-0040 — SPA object navigation](decisions/04-adr-0040-session-object-navigation.md) | Tab-private sessionStorage object ref + form-POST deep link; token delivered via the server session (one-shot meta, amended 2026-11-04); no object identity in the URL | accepted |
 | [ADR-0041 — Kind catalog](decisions/04-adr-0041-kind-catalog.md) | Resource kinds are declared in a typed catalog (backend kind catalog + frontend `lib/kinds.ts` registry); generic `list/get` engine at the existing factory seam; per-kind methods only as named overrides; doubles become fixture data | accepted |
+
+> ADR-0007 / ADR-0008 were index-only (no body file); ADR-0029 / ADR-0031 are
+> the first files to carry those decisions.
 
 ## glossary/
 

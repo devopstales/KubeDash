@@ -117,7 +117,7 @@ def test_sso_collision_keeps_oidc_and_freezes_hash(app, db_sess, monkeypatch):
 
 
 @pytest.fixture()
-def app_no_bootstrap(pg_container, redis_container, monkeypatch):
+def app_no_bootstrap(pg_container, monkeypatch):
     """A PG app with BOTH bootstrap env vars EMPTY and NO hook invocation —
     the env-unset no-op is observable: zero users rows after create_all.
     (The root-tier ``app`` fixture sets the vars to non-empty values, so
@@ -132,7 +132,6 @@ def app_no_bootstrap(pg_container, redis_container, monkeypatch):
     application = create_app({
         "TESTING": True,
         "DATABASE_URL": pg_container.get_connection_url(driver="psycopg"),
-        "REDIS_URL": f"redis://{redis_container.get_container_host()}:{redis_container.exposed_port(6379)}",
         "KUBEDASH_JWT_SECRET": "test-jwt-secret",
         "KUBEDASH_SECRET_KEY": "test-enc-key-32-bytes-long!!!!",
     })

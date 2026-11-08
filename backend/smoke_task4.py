@@ -12,7 +12,6 @@ Proves the cluster registry spine without Testcontainers:
 """
 from urllib.parse import parse_qs, urlparse
 
-import app.extensions as ext
 from app import create_app
 from app.core.security import _oauth
 
@@ -35,23 +34,6 @@ KUBECONFIG = (
 )
 
 
-class _FakeRedis:
-    store: dict[str, str] = {}
-
-    def set(self, key, value, ex=None):
-        self.store[key] = value
-        return True
-
-    def get(self, key):
-        return self.store.get(key)
-
-    def delete(self, key):
-        return int(self.store.pop(key, None) is not None)
-
-    def flushall(self):
-        self.store.clear()
-
-
 class FakeK8s:
     def __init__(self, kubeconfig: bytes, readyz_result: bool = False) -> None:
         self.kubeconfig = kubeconfig
@@ -71,12 +53,9 @@ def main() -> None:
     app = create_app({
         "TESTING": True,
         "DATABASE_URL": "sqlite://",
-        "REDIS_URL": "redis://localhost:6399/0",
         "KUBEDASH_KUBEDASH_JWT_SECRET": "smoke-jwt-secret-32-bytes-long!!!!!01",
         "KUBEDASH_SECRET_KEY": "test-enc-key-32-bytes-long!!!!",
     })
-    ext.redis_client = _FakeRedis()
-
     import app.core.security as sec
 
     sec.oidc_authorize_url = lambda state: f"http://mock.test/authorize?state={state}"
