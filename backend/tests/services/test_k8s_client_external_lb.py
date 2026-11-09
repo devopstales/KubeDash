@@ -163,12 +163,22 @@ def test_list_ipaddresspools_metallb_500_maps_to_unreachable() -> None:
 
 
 def test_get_ipaddresspool_metallb_hit() -> None:
+    """The kind is CLUSTER-scoped: the name get is the cluster-path read
+    (the namespace param is accepted-and-ignored — a namespaced GET URL
+    404s on a cluster-scoped kind -> a silent empty detail view)."""
     served = {("metallb.io", "ipaddresspools"): (_METALLB_VERSION, "Cluster")}
+    seen: list[object] = []
     pool = _mlb_ip_pool("team-a-pool")
-    custom = SimpleNamespace(get_namespaced_custom_object=lambda *a, **k: pool)
+    custom = SimpleNamespace(
+        get_cluster_custom_object=lambda group, version, plural, name: (
+            seen.append((group, version, plural, name)),
+            pool,
+        )[1]
+    )
     [item] = _client(served, custom).get_ipaddresspool("team-a", "team-a-pool")
     assert item["provider"] == "metallb"
     assert item["spec"]["addresses"] == ["192.168.100.10-192.168.100.20"]
+    assert seen == [("metallb.io", _METALLB_VERSION, "ipaddresspools", "team-a-pool")]
 
 
 def test_get_ipaddresspool_cilium_fallback_hit() -> None:
@@ -186,10 +196,10 @@ def test_get_ipaddresspool_cilium_fallback_hit() -> None:
 def test_get_ipaddresspool_404_returns_empty_list() -> None:
     served = {("metallb.io", "ipaddresspools"): (_METALLB_VERSION, "Cluster")}
 
-    def get(group, version, namespace, plural, name):
+    def get(group, version, plural, name):
         raise ApiException(status=404)
 
-    custom = SimpleNamespace(get_namespaced_custom_object=get)
+    custom = SimpleNamespace(get_cluster_custom_object=get)
     assert _client(served, custom).get_ipaddresspool("team-a", "ghost") == []
 
 
@@ -248,10 +258,10 @@ def test_list_l2advertisements_both_absent_empty() -> None:
 def test_get_l2advertisement_404_returns_empty_list() -> None:
     served = {("metallb.io", "l2advertisements"): (_METALLB_VERSION, "Cluster")}
 
-    def get(group, version, namespace, plural, name):
+    def get(group, version, plural, name):
         raise ApiException(status=404)
 
-    custom = SimpleNamespace(get_namespaced_custom_object=get)
+    custom = SimpleNamespace(get_cluster_custom_object=get)
     assert _client(served, custom).get_l2advertisement("team-a", "ghost") == []
 
 
@@ -310,10 +320,10 @@ def test_list_bgppeers_both_absent_empty() -> None:
 def test_get_bgppeer_404_returns_empty_list() -> None:
     served = {("metallb.io", "bgppeers"): (_METALLB_VERSION, "Cluster")}
 
-    def get(group, version, namespace, plural, name):
+    def get(group, version, plural, name):
         raise ApiException(status=404)
 
-    custom = SimpleNamespace(get_namespaced_custom_object=get)
+    custom = SimpleNamespace(get_cluster_custom_object=get)
     assert _client(served, custom).get_bgppeer("team-a", "ghost") == []
 
 
@@ -354,19 +364,28 @@ def test_list_bgpadvertisements_metallb_absent_empty() -> None:
 
 
 def test_get_bgpadvertisement_metallb_hit() -> None:
+    """The kind is CLUSTER-scoped: the name get is the cluster-path read
+    (the namespace param is accepted-and-ignored)."""
     served = {("metallb.io", "bgpadvertisements"): (_METALLB_VERSION, "Cluster")}
+    seen: list[object] = []
     adv = _mlb_bgp_adv("team-a-adv")
-    custom = SimpleNamespace(get_namespaced_custom_object=lambda *a, **k: adv)
+    custom = SimpleNamespace(
+        get_cluster_custom_object=lambda group, version, plural, name: (
+            seen.append((group, version, plural, name)),
+            adv,
+        )[1]
+    )
     [item] = _client(served, custom).get_bgpadvertisement("team-a", "team-a-adv")
     assert item["provider"] == "metallb"
     assert item["spec"]["aggregationBit"] == 2
+    assert seen == [("metallb.io", _METALLB_VERSION, "bgpadvertisements", "team-a-adv")]
 
 
 def test_get_bgpadvertisement_404_returns_empty_list() -> None:
     served = {("metallb.io", "bgpadvertisements"): (_METALLB_VERSION, "Cluster")}
 
-    def get(group, version, namespace, plural, name):
+    def get(group, version, plural, name):
         raise ApiException(status=404)
 
-    custom = SimpleNamespace(get_namespaced_custom_object=get)
+    custom = SimpleNamespace(get_cluster_custom_object=get)
     assert _client(served, custom).get_bgpadvertisement("team-a", "ghost") == []

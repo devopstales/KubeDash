@@ -1289,8 +1289,9 @@ class K8sClient:
     # plugin, moved to /network/ by the
     # certmanager-external-loadbalancer-views change. Provider detection
     # (ratified 2026-10-29): MetalLB primary (CLUSTER-scoped, metallb.io —
-    # the four kinds' lists are cluster-path reads; see
-    # list_ipaddresspools), Cilium fallback (cluster-scoped, cilium.io);
+    # the four kinds' lists AND name gets are cluster-path reads; see
+    # list_ipaddresspools / get_ipaddresspool), Cilium fallback
+    # (cluster-scoped, cilium.io);
     # bgpadvertisements is MetalLB-ONLY (no Cilium branch). Both absent ->
     # []. Each item is tagged with a top-level ``provider`` field
     # ("metallb" / "cilium") for the view's Type column.
@@ -1347,18 +1348,19 @@ class K8sClient:
             ]
         return []
 
-    def get_ipaddresspool(self, namespace: str, name: str) -> list[dict[str, Any]]:
+    def get_ipaddresspool(self, _namespace: str, name: str) -> list[dict[str, Any]]:
         """One IP Address Pool as a 0/1-item full custom object tagged with
         the detected ``provider``; [] on 404 or when both providers are
-        absent. MetalLB primary (namespaced read), Cilium fallback
-        (cluster-scoped read)."""
+        absent. MetalLB primary (CLUSTER-scoped read — the kind is
+        Cluster-scoped, so the namespace param is accepted-and-ignored; see
+        ``list_ipaddresspools``), Cilium fallback (cluster-scoped read)."""
         served_ml = self.get_crd_served(self._METALLB_GROUP, "ipaddresspools")
         if served_ml is not None:
             version, _scope = served_ml
             custom = self._custom()
             try:
-                item = custom.get_namespaced_custom_object(
-                    self._METALLB_GROUP, version, namespace, "ipaddresspools", name
+                item = custom.get_cluster_custom_object(
+                    self._METALLB_GROUP, version, "ipaddresspools", name
                 )
             except ApiException as e:
                 if e.status == 404:
@@ -1425,17 +1427,19 @@ class K8sClient:
             ]
         return []
 
-    def get_l2advertisement(self, namespace: str, name: str) -> list[dict[str, Any]]:
+    def get_l2advertisement(self, _namespace: str, name: str) -> list[dict[str, Any]]:
         """One L2 Advertisement as a 0/1-item full custom object tagged
         with the detected ``provider``; [] on 404 or when both providers
-        are absent. MetalLB primary, Cilium fallback."""
+        are absent. MetalLB primary (CLUSTER-scoped read — the namespace
+        param is accepted-and-ignored; see ``list_l2advertisements``),
+        Cilium fallback (cluster-scoped read)."""
         served_ml = self.get_crd_served(self._METALLB_GROUP, "l2advertisements")
         if served_ml is not None:
             version, _scope = served_ml
             custom = self._custom()
             try:
-                item = custom.get_namespaced_custom_object(
-                    self._METALLB_GROUP, version, namespace, "l2advertisements", name
+                item = custom.get_cluster_custom_object(
+                    self._METALLB_GROUP, version, "l2advertisements", name
                 )
             except ApiException as e:
                 if e.status == 404:
@@ -1502,17 +1506,19 @@ class K8sClient:
             ]
         return []
 
-    def get_bgppeer(self, namespace: str, name: str) -> list[dict[str, Any]]:
+    def get_bgppeer(self, _namespace: str, name: str) -> list[dict[str, Any]]:
         """One BGP Peer as a 0/1-item full custom object tagged with the
         detected ``provider``; [] on 404 or when both providers are absent.
-        MetalLB primary, Cilium fallback."""
+        MetalLB primary (CLUSTER-scoped read — the namespace param is
+        accepted-and-ignored; see ``list_bgppeers``), Cilium fallback
+        (cluster-scoped read)."""
         served_ml = self.get_crd_served(self._METALLB_GROUP, "bgppeers")
         if served_ml is not None:
             version, _scope = served_ml
             custom = self._custom()
             try:
-                item = custom.get_namespaced_custom_object(
-                    self._METALLB_GROUP, version, namespace, "bgppeers", name
+                item = custom.get_cluster_custom_object(
+                    self._METALLB_GROUP, version, "bgppeers", name
                 )
             except ApiException as e:
                 if e.status == 404:
@@ -1563,17 +1569,19 @@ class K8sClient:
             ]
         return []
 
-    def get_bgpadvertisement(self, namespace: str, name: str) -> list[dict[str, Any]]:
+    def get_bgpadvertisement(self, _namespace: str, name: str) -> list[dict[str, Any]]:
         """One BGP Advertisement as a 0/1-item full custom object tagged
         ``provider: "metallb"``; [] on 404 or when MetalLB is absent
-        (MetalLB-ONLY kind — no Cilium branch)."""
+        (MetalLB-ONLY kind — no Cilium branch). CLUSTER-scoped read — the
+        namespace param is accepted-and-ignored (see
+        ``list_bgpadvertisements``)."""
         served_ml = self.get_crd_served(self._METALLB_GROUP, "bgpadvertisements")
         if served_ml is not None:
             version, _scope = served_ml
             custom = self._custom()
             try:
-                item = custom.get_namespaced_custom_object(
-                    self._METALLB_GROUP, version, namespace, "bgpadvertisements", name
+                item = custom.get_cluster_custom_object(
+                    self._METALLB_GROUP, version, "bgpadvertisements", name
                 )
             except ApiException as e:
                 if e.status == 404:
