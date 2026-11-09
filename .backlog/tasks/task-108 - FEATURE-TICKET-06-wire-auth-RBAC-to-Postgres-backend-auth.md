@@ -1,14 +1,14 @@
 ---
-id: TASK-047
+id: TASK-108
 title: '[FEATURE] TICKET-06 wire auth + RBAC to Postgres (backend-auth)'
 status: Done
 assignee: []
 created_date: '2026-10-27 19:16'
-updated_date: '2026-10-28 19:53'
+updated_date: '2026-11-09 11:12'
 labels: []
 milestone: m-2
 dependencies:
-  - TASK-046
+  - TASK-107
 references:
   - >-
     .skillgrid/specs/2026-10-27-postgres-queue-revocation-active-active/briefing.md

@@ -78,7 +78,7 @@ Chain strategy: single-branch on `rebase`
 
 ### TICKET-04 — `kvstore` + `revocation` (OIDC state, `jti` deny-list, SAR cache backend)
 
-- **Tracker ID:** TASK-046
+- **Tracker ID:** TASK-107 (renumbered from TASK-046 by `backlog doctor` 2026-11-09 — duplicate-ID repair)
 - **Scope:** `app/core/kvstore.py` — `kv_set`/`kv_get`/`kv_delete`/`kv_reap` (generic TTL kv; `kv_get` returns None if absent **or** expired; `kv_delete` one-shot). `app/services/revocation.py` — `revoke_jti`/`is_revoked`/`reap_expired` (pure; no Flask). Both bind the key/`jti` as a **parameter** — no function in the WHERE clause (findings #1).
 - **Acceptance:** `kv_set`→`kv_get`→`kv_delete` round-trips; an expired key reads as absent; `kv_reap` deletes only expired rows; `revoke_jti`→`is_revoked` is True, a different jti is False; `reap_expired` deletes only passed jtis. The revocation lookup plans as a PK Index Scan (one probe on `revoked_jtis_pkey`; the `expires_at > now()` predicate requires a heap recheck, so an Index Only Scan is unplanable — recorded 2026-10-28, Task 4 ruling).
 - **SATISFIES:** `oidc-state-is-stored-and-consumed-once` (kv half — one-shot delete), `revoked-jti-is-rejected-on-the-verify-hook` (deny-list half — the PK lookup)
@@ -89,7 +89,7 @@ Chain strategy: single-branch on `rebase`
 
 ### TICKET-05 — `wsgi.py`: `pgqueue` poll worker + leader-gated reaper (replace RQ)
 
-- **Tracker ID:** TASK-045
+- **Tracker ID:** TASK-106 (renumbered from TASK-045 by `backlog doctor` 2026-11-09 — duplicate-ID repair)
 - **Scope:** the tracer-thread end. Replace the RQ scheduler/worker child in `wsgi.py` with a poll loop: `_run_once` enqueues due tasks via `pgqueue.enqueue` only while `leader.is_leader()` (preserve `INTERVALS` + the role gate); `_worker_loop` `pgqueue.claim`s every 5 s, runs the task, `complete`/`fail`s; a leader-gated reaper sweeps `pgqueue.reap` + `revocation.reap_expired` + `kvstore.kv_reap`. Update `tests/test_worker_gate.py`: keep the `_FakeLeader` + role-gate tests, point the scheduler's `_Queue` seam at a `pgqueue`-shaped fake (`enqueue(path, engine)`), and re-point the `integration` job-runs test to the `pgqueue` claim path (no Redis).
 - **Acceptance:** the scheduler enqueues due tasks only when leading (the existing `test_schedule_if_leader_*` shape, now against a `pgqueue`-shaped seam); the leader role still spawns the `kubedash-worker` daemon thread (no RQ child); a job enqueued while leading executes via the `pgqueue` claim (integration).
 - **SATISFIES:** `crashed-claim-is-requeued-by-the-time-based-reaper` (wiring half — the reaper runs leader-gated)
@@ -102,7 +102,7 @@ Chain strategy: single-branch on `rebase`
 
 ### TICKET-06 — Wire auth + RBAC to Postgres (`verify_jwt`, OIDC state, logout, SAR cache)
 
-- **Tracker ID:** TASK-047
+- **Tracker ID:** TASK-108 (renumbered from TASK-047 by `backlog doctor` 2026-11-09 — duplicate-ID repair)
 - **Scope:** swap the four Redis call sites. `security.py` — `verify_jwt` → `revocation.is_revoked(db.engine, jti)`; `new_state`/`consume_state` → `kvstore` (one-shot). `api/auth.py` — `logout` → `revocation.revoke_jti(db.engine, _current_jti(), ACCESS_TTL_SECONDS)` (keep refresh-token revocation; add the `_current_jti()` helper in `security.py`). `rbac.py` — `_cache_get`/`_cache_set` → `kvstore` (drop the `redis_client` import + bytes-decode branch).
 - **Acceptance:** a logged-out token's jti, replayed → 401 `token revoked` before expiry; `verify_jwt` raises on a `revoked_jtis` hit; `consume_state` is one-shot (second consume → `StateMismatchError`); `rbac.can` on a cached key serves from `kv` and never re-asks the cluster (a throwing `pool.get` is never called on a hit).
 - **SATISFIES:** `logout-revokes-the-access-token-jti`, `revoked-jti-is-rejected-on-the-verify-hook`, `oidc-state-is-stored-and-consumed-once`, `sar-cache-hit-never-reasks-the-cluster`
@@ -113,7 +113,7 @@ Chain strategy: single-branch on `rebase`
 
 ### TICKET-07 — Remove Redis from the stack + two-node pgEdge dev compose
 
-- **Tracker ID:** TASK-048
+- **Tracker ID:** TASK-109 (renumbered from TASK-048 by `backlog doctor` 2026-11-09 — duplicate-ID repair)
 - **Scope:** the contract step. Remove `FlaskRedis`/`redis_client` from `extensions.py`; the import + `init_app` + `/readyz` redis ping from `__init__.py`; `redis_url` from `config.py` + the field/`_resolve_redis` from `ini_config.py`; `flask-redis` (+ `rq` if unused) from `pyproject.toml`. Add `dev/docker-compose.pgedge.yml` + `dev/pgedge/db.json` (two `pgedge/pgedge:pg17-latest` nodes, `autoddl`, the `pgedge` internal_admin user, hostnames matching the compose service names — findings #5); replace `postgres`+`redis` in `dev/docker-compose.yml` with the pgEdge include and drop `redisdata`; re-point `Taskfile.yaml` `dev-up`/`dev-ps`/`db-shell` at n1.
 - **Acceptance:** no module in `backend/app` references `redis_client` or `flask_redis`; `flask-redis` is not in `pyproject.toml`; `task dev-up` brings up two pgEdge nodes (both in `spock.node`) with **no** redis container; the backend passes its health check against n1; a migration applied on n1 is present on n2 (`autoddl`).
 - **SATISFIES:** `no-module-imports-redis-client`, `dev-up-brings-two-pgedge-nodes-with-no-redis`, `migration-run-on-one-node-propagates-to-the-other`

@@ -1,5 +1,5 @@
 ---
-id: TASK-044
+id: TASK-105
 title: 'E2E tests: delete e2e-smoke* cluster rows after test run completes'
 status: Done
 assignee: []

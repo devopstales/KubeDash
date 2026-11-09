@@ -6,7 +6,7 @@
 
 **Status:** COMPLETE (2026-10-28) — all Task 1 steps done. Steps 1–2, 6, 7
 committed (`8ba2ef62`); steps 3–5 executed in the browser on 2026-10-28
-(TASK-042; dev stack + fe-dev on :3000; two-cluster matrix with the
+(TASK-103; dev stack + fe-dev on :3000; two-cluster matrix with the
 `kubedash-test` kind cluster).
 
 **Tier:** T1 (from `briefing.md`).
@@ -160,7 +160,7 @@ default pattern; no unproven contract.
 | Frontend typecheck + lint + build | `task fe-build` | green |
 | Full frontend suite | `cd frontend && corepack pnpm test` | green |
 | Air-gap bundle | `task fe-check` | no `https?://` or `//cdn.` refs |
-| Manual reload matrix | `task fe-dev` + browser | acceptance 1–5 in `briefing.md` — all 5 PASS (2026-10-28, TASK-042; two-cluster matrix) |
+| Manual reload matrix | `task fe-dev` + browser | acceptance 1–5 in `briefing.md` — all 5 PASS (2026-10-28, TASK-103; two-cluster matrix) |
 
 **Not verified here (and why):** cross-device persistence (deferred —
 briefing.md Intent 1); server-side per-user defaults (Option B, deferred);

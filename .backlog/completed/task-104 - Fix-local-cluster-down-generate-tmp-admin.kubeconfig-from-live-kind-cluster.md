@@ -1,5 +1,5 @@
 ---
-id: TASK-043
+id: TASK-104
 title: >-
   Fix local cluster 'down': generate /tmp/admin.kubeconfig from live kind
   cluster
@@ -45,7 +45,7 @@ The INI at backend/kubedash.ini points admin_kubeconfig at /tmp/admin.kubeconfig
 1. Add a `dev-kubeconfig` task to Taskfile.yaml that runs `kind get kubeconfig --name kubedash-test > /tmp/admin.kubeconfig` (with error handling if the cluster doesn't exist yet).
 2. Add a call to `dev-kubeconfig` in `dev-stack` and `dev-stack-ssl` after the kind cluster is up (or make it idempotent/conditional).
 3. Verify: kind cluster is up → run task → /tmp/admin.kubeconfig exists → backend local cluster reports up.
-4. Also delete the stale e2e-smoke rows from the DB (separate TASK-044).
+4. Also delete the stale e2e-smoke rows from the DB (separate TASK-105).
 <!-- SECTION:PLAN:END -->
 
 ## Implementation Notes

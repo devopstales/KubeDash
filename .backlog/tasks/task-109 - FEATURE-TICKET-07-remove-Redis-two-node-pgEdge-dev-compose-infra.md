@@ -1,16 +1,16 @@
 ---
-id: TASK-048
+id: TASK-109
 title: '[FEATURE] TICKET-07 remove Redis + two-node pgEdge dev compose (infra)'
 status: Done
 assignee:
   - opencode/qwen3.8-uncensored
 created_date: '2026-10-27 19:16'
-updated_date: '2026-10-29 10:00'
+updated_date: '2026-11-09 11:12'
 labels: []
 milestone: m-2
 dependencies:
-  - TASK-045
-  - TASK-047
+  - TASK-106
+  - TASK-108
 references:
   - >-
     .skillgrid/specs/2026-10-27-postgres-queue-revocation-active-active/briefing.md
@@ -79,7 +79,7 @@ Implementation is already in the working tree (31 modified + 3 new files). This 
 - Update .skillgrid/ARCHITECTURE.md + AGENTS.md references to Redis (KUBEDASH_REDIS_URL table row, dev stack section) and the redis marker in pyproject.toml is already handled.
 
 ### Commit
-- One conventional commit for the TICKET-07 working tree once tests are green: `refactor(dev): remove Redis, pgEdge two-node dev default (ADR-0029/0030/0031)`. Then docs(tracker) commit flipping TASK-048 to Done.
+- One conventional commit for the TICKET-07 working tree once tests are green: `refactor(dev): remove Redis, pgEdge two-node dev default (ADR-0029/0030/0031)`. Then docs(tracker) commit flipping TASK-109 to Done.
 <!-- SECTION:PLAN:END -->
 
 ## Implementation Notes
