@@ -1,3 +1,4 @@
+import { Fragment } from 'react'
 import { Link } from 'react-router-dom'
 import {
   CBreadcrumb,
@@ -6,9 +7,6 @@ import {
   CCardBody,
   CCardHeader,
   CCardTitle,
-  CTabs,
-  CTab,
-  CTabPanel,
   CTable,
 } from '@coreui/react'
 import { useQuery } from '@tanstack/react-query'
@@ -20,6 +18,7 @@ import { clearActiveRef } from '../../lib/objectRef'
 import { formatTimestamp } from '../../lib/format'
 import type { Pod, ResourceList, ServiceItem } from '../../lib/types'
 import { useClusterStore } from '../../store/cluster'
+import ObjectTabs from '../../components/ObjectTabs'
 import TopMenu from '../../components/TopMenu'
 
 // Same pattern as the sibling data views: the hljs language module is a
@@ -44,9 +43,10 @@ const externalIp = (item: ServiceItem): string => {
 // The 4.1 `k8sPodSelectorListGet` labelSelector format: a comma-separated
 // key=value equality expression built from spec.selector (the view has the
 // dict; the route forwards the plain string, unvalidated).
-const selectorToLabelSelector = (
-  selector: Record<string, string> | undefined,
-): string => Object.entries(selector ?? {}).map(([k, v]) => `${k}=${v}`).join(',')
+const selectorToLabelSelector = (selector: Record<string, string> | undefined): string =>
+  Object.entries(selector ?? {})
+    .map(([k, v]) => `${k}=${v}`)
+    .join(',')
 
 // 4.1's four-tier pod phase badge (the 5.0 CoreUI badge classes):
 // Running -> success, Pending -> warning, Succeeded -> secondary, else info.
@@ -89,10 +89,11 @@ const KeyValueTable = ({ entries, empty }: { entries: [string, string][]; empty:
 
 /**
  * 4.1 `network/service-data.html.j2` port: one Service as a THREE-tab page
- * (Service / Ports / Pods — CoreUI `CTabs`/`CTab`/`CTabPanel`, NOT 4.1's
- * Bootstrap-JS `data-bs-toggle` tabs). The Service tab is a CTable (the
- * 4.1 row set, "Lables" typo fixed) + the full-object JSON block (a 5.0
- * addition). The Ports tab is one CTable row per `spec.ports` entry. The
+ * (Service / Ports / Pods — ObjectTabs, the CoreUI Bootstrap navs-tabs
+ * button bar, NOT 4.1's Bootstrap-JS `data-bs-toggle` tabs). The Service
+ * tab is a CTable (the 4.1 row set, "Lables" typo fixed) + the full-object
+ * JSON block (a 5.0 addition). The Ports tab is one CTable row per
+ * `spec.ports` entry. The
  * Pods tab is fed by a SECOND query on the pods route with `?labelSelector=`
  * (built from `spec.selector`; fired ONLY when the selector is non-empty —
  * a headless/ExternalName Service must not fetch pods).
@@ -108,7 +109,13 @@ const KeyValueTable = ({ entries, empty }: { entries: [string, string][]; empty:
  * plain text (no pod-data destination yet; the node link is a non-goal);
  * the pod owner format is fixed; the External IP deep-index 500 is fixed.
  */
-const ServiceDataView = ({ name, namespace: namespaceProp }: { name: string; namespace: string }) => {
+const ServiceDataView = ({
+  name,
+  namespace: namespaceProp,
+}: {
+  name: string
+  namespace: string
+}) => {
   const cluster = useClusterStore((s) => s.selectedCluster)
   const storeNamespace = useClusterStore((s) => s.selectedNamespace)
   // The ref's namespace is authoritative (R8); a missing one falls back to
@@ -154,8 +161,7 @@ const ServiceDataView = ({ name, namespace: namespaceProp }: { name: string; nam
   const annotations = Object.entries(service?.metadata?.annotations ?? {})
   const ports = service?.spec?.ports ?? []
   const pods = podsQuery.data?.items ?? []
-  const podsEnabled =
-    cluster != null && name !== '' && service != null && labelSelector !== ''
+  const podsEnabled = cluster != null && name !== '' && service != null && labelSelector !== ''
 
   return (
     <CCard className="shadow mb-4">
@@ -187,9 +193,15 @@ const ServiceDataView = ({ name, namespace: namespaceProp }: { name: string; nam
             <div className="text-danger">Error loading service: {query.error.message}</div>
           )
         ) : (
-          <CTabs defaultActiveItemKey="service">
-            <CTab itemKey="service">Service</CTab>
-            <CTabPanel itemKey="service">
+          <ObjectTabs
+            defaultActiveKey="service"
+            tabs={[
+              { key: 'service', label: 'Service' },
+              { key: 'ports', label: 'Ports' },
+              { key: 'pods', label: 'Pods' },
+            ]}
+          >
+            <Fragment>
               <CTable bordered>
                 <tbody>
                   <tr>
@@ -242,93 +254,83 @@ const ServiceDataView = ({ name, namespace: namespaceProp }: { name: string; nam
                   </SyntaxHighlighter>
                 </CCardBody>
               </CCard>
-            </CTabPanel>
+            </Fragment>
 
-            <CTab itemKey="ports">Ports</CTab>
-            <CTabPanel itemKey="ports">
-              {ports.length === 0 ? (
-                <div>No ports</div>
-              ) : (
-                <CTable bordered>
-                  <thead>
-                    <tr>
-                      <th>Name</th>
-                      <th>Port</th>
-                      <th>Protocol</th>
-                      <th>Target</th>
-                      <th>Node Port</th>
+            {ports.length === 0 ? (
+              <div>No ports</div>
+            ) : (
+              <CTable bordered>
+                <thead>
+                  <tr>
+                    <th>Name</th>
+                    <th>Port</th>
+                    <th>Protocol</th>
+                    <th>Target</th>
+                    <th>Node Port</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {ports.map((port, i) => (
+                    <tr key={port.name ?? i}>
+                      <td>{port.name ?? '—'}</td>
+                      <td>{port.port ?? '—'}</td>
+                      <td>{port.protocol ?? '—'}</td>
+                      <td>{port.target_port ?? '—'}</td>
+                      <td>{port.node_port ?? '—'}</td>
                     </tr>
-                  </thead>
-                  <tbody>
-                    {ports.map((port, i) => (
-                      <tr key={port.name ?? i}>
-                        <td>{port.name ?? '—'}</td>
-                        <td>{port.port ?? '—'}</td>
-                        <td>{port.protocol ?? '—'}</td>
-                        <td>{port.target_port ?? '—'}</td>
-                        <td>{port.node_port ?? '—'}</td>
-                      </tr>
-                    ))}
-                  </tbody>
-                </CTable>
-              )}
-            </CTabPanel>
+                  ))}
+                </tbody>
+              </CTable>
+            )}
 
-            <CTab itemKey="pods">Pods</CTab>
-            <CTabPanel itemKey="pods">
-              {!podsEnabled ? (
-                // No selector (headless/ExternalName) — no fetch, first-class
-                // empty state (muted, NOT an error).
-                <div className="text-muted">No pods match this service's selector</div>
-              ) : podsQuery.isLoading ? (
-                <div>Loading pods...</div>
-              ) : podsQuery.error ? (
-                <div className="text-danger">
-                  Error loading pods: {podsQuery.error.message}
-                </div>
-              ) : pods.length === 0 ? (
-                // The selector matched nothing — the SAME muted empty state
-                // (the 4.1 page rendered the table with no rows; 5.0 states
-                // it).
-                <div className="text-muted">No pods match this service's selector</div>
-              ) : (
-                <CTable bordered>
-                  <thead>
-                    <tr>
-                      <th>Status</th>
-                      <th>Name</th>
-                      <th>IP</th>
-                      <th>Node</th>
-                      <th>Owner</th>
+            {!podsEnabled ? (
+              // No selector (headless/ExternalName) — no fetch, first-class
+              // empty state (muted, NOT an error).
+              <div className="text-muted">No pods match this service's selector</div>
+            ) : podsQuery.isLoading ? (
+              <div>Loading pods...</div>
+            ) : podsQuery.error ? (
+              <div className="text-danger">Error loading pods: {podsQuery.error.message}</div>
+            ) : pods.length === 0 ? (
+              // The selector matched nothing — the SAME muted empty state
+              // (the 4.1 page rendered the table with no rows; 5.0 states
+              // it).
+              <div className="text-muted">No pods match this service's selector</div>
+            ) : (
+              <CTable bordered>
+                <thead>
+                  <tr>
+                    <th>Status</th>
+                    <th>Name</th>
+                    <th>IP</th>
+                    <th>Node</th>
+                    <th>Owner</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {pods.map((pod, i) => (
+                    <tr key={pod.metadata?.name ?? i}>
+                      <td>
+                        {pod.status?.phase ? (
+                          <span
+                            className={`badge ${PHASE_BADGE[pod.status.phase] ?? 'badge-info'}`}
+                          >
+                            {pod.status.phase}
+                          </span>
+                        ) : (
+                          '—'
+                        )}
+                      </td>
+                      <td>{pod.metadata?.name ?? '—'}</td>
+                      <td>{pod.status?.pod_ip ?? '—'}</td>
+                      <td>{pod.spec?.node_name ?? '—'}</td>
+                      <td>{podOwner(pod)}</td>
                     </tr>
-                  </thead>
-                  <tbody>
-                    {pods.map((pod, i) => (
-                      <tr key={pod.metadata?.name ?? i}>
-                        <td>
-                          {pod.status?.phase ? (
-                            <span
-                              className={`badge ${
-                                PHASE_BADGE[pod.status.phase] ?? 'badge-info'
-                              }`}
-                            >
-                              {pod.status.phase}
-                            </span>
-                          ) : (
-                            '—'
-                          )}
-                        </td>
-                        <td>{pod.metadata?.name ?? '—'}</td>
-                        <td>{pod.status?.pod_ip ?? '—'}</td>
-                        <td>{pod.spec?.node_name ?? '—'}</td>
-                        <td>{podOwner(pod)}</td>
-                      </tr>
-                    ))}
-                  </tbody>
-                </CTable>
-              )}
-            </CTabPanel>
-          </CTabs>
+                  ))}
+                </tbody>
+              </CTable>
+            )}
+          </ObjectTabs>
         )}
       </CCardBody>
     </CCard>

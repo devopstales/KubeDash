@@ -88,6 +88,17 @@ const ciliumPool = {
   provider: 'cilium',
   spec: { cidrs: ['10.96.0.0/16'] },
 }
+// The cluster's pinned Cilium 1.19.10 pool shape — `spec.blocks` (a
+// start/stop range), NOT `cidrs`: the real-data rendering path.
+const ciliumPoolBlocks = {
+  metadata: { name: 'pool-c', creation_timestamp: '2026-01-07T00:00:00Z' },
+  provider: 'cilium',
+  spec: {
+    blocks: [{ start: '10.200.100.100', stop: '10.200.100.110' }],
+    allowFirstLastIPs: false,
+    disabled: false,
+  },
+}
 
 const metalLbL2 = {
   metadata: { name: 'l2-a', creation_timestamp: '2026-01-03T00:00:00Z' },
@@ -146,7 +157,7 @@ const serve = (items: Record<string, unknown[]>) => {
 }
 
 const allItems = () => ({
-  ipaddresspools: [metalLbPool, ciliumPool],
+  ipaddresspools: [metalLbPool, ciliumPool, ciliumPoolBlocks],
   l2advertisements: [metalLbL2, ciliumL2],
   bgppeers: [metalLbPeer, ciliumPeer],
   bgpadvertisements: [bgpAdv],
@@ -154,7 +165,7 @@ const allItems = () => ({
 
 // list-renders-4tabs: the card title is EXACTLY "LoadBalancer Objects"; the
 // four 4.1 tabs (IP Address Pools / L2 Advertisements / BGP Peers / BGP
-// Advertisements); ALL four fetch on mount (CTabPanel keeps every panel
+// Advertisements); ALL four fetch on mount (ObjectTabs keeps every panel
 // mounted); every fetch carries the selected namespace.
 test('list-renders-4tabs', async () => {
   const { requests, handlers } = serve(allItems())
@@ -207,6 +218,9 @@ test('list-kind-specific-columns', async () => {
   expect(within(poolARow).getByText('192.168.10.0/24')).toBeTruthy()
   const poolBRow = screen.getByRole('button', { name: 'pool-b' }).closest('tr')!
   expect(within(poolBRow).getByText('10.96.0.0/16')).toBeTruthy()
+  // pool-c: Cilium 1.19 `spec.blocks` start/stop range → "start-stop".
+  const poolCRow = screen.getByRole('button', { name: 'pool-c' }).closest('tr')!
+  expect(within(poolCRow).getByText('10.200.100.100-10.200.100.110')).toBeTruthy()
 
   // L2 Advertisements.
   const l2ARow = screen.getByRole('button', { name: 'l2-a' }).closest('tr')!

@@ -85,7 +85,7 @@ const nginxClass = {
   spec: { controller: 'k8s.io/ingress-nginx' },
 }
 
-// CTabPanel mounts both tabs, so every page-level test also serves the
+// ObjectTabs mounts both tabs, so every page-level test also serves the
 // IngressClasses endpoint (unhandled → bypass → the other tab in error).
 const ingressClassesHandler = (items: unknown[] = [nginxClass]) =>
   http.get('*/api/v1/clusters/1/resources/ingressclasses', () =>
@@ -120,7 +120,7 @@ test('list-renders-gateway-classes', async () => {
   expect(requestedUrl).not.toContain('namespace')
 
   // The merged page: card title 'IngressClass List' (the 5.0 `<Kind> List`
-  // convention) + both tabs (CTab = button[role=tab]).
+  // convention) + both tabs (ObjectTabs = button[role=tab]).
   expect(screen.getByRole('heading', { name: 'IngressClass List' })).toBeTruthy()
   expect(screen.getByRole('tab', { name: 'IngressClasses' })).toBeTruthy()
   expect(screen.getByRole('tab', { name: 'GatewayClasses' })).toBeTruthy()

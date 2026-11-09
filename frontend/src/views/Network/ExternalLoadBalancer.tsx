@@ -6,9 +6,6 @@ import {
   CCardBody,
   CCardHeader,
   CCardTitle,
-  CTabs,
-  CTab,
-  CTabPanel,
 } from '@coreui/react'
 import { useQuery } from '@tanstack/react-query'
 import { apiFetch } from '../../lib/api'
@@ -23,6 +20,7 @@ import type {
 } from '../../lib/types'
 import { useClusterStore } from '../../store/cluster'
 import KubeDataTable, { Column } from '../../components/KubeDataTable'
+import ObjectTabs from '../../components/ObjectTabs'
 import TopMenu from '../../components/TopMenu'
 
 // ADR-0040 (2026-10-29-certmanager-external-loadbalancer-views): the four
@@ -55,11 +53,20 @@ const selectorText = (sel: LabelSelector | undefined): string => {
 }
 
 // The provider-specific address-range field (the SAME column for both
-// providers — 4.1's column contract): MetalLB `spec.addresses` / Cilium
-// `spec.cidrs`.
+// providers — 4.1's column contract): MetalLB `spec.addresses`, Cilium
+// `spec.cidrs` / `spec.blocks` (1.19 — each block is a CIDR or start/stop).
 const addressesText = (spec: IpAddressPoolItem['spec']): string => {
   const list = spec?.addresses ?? spec?.cidrs
-  return list && list.length > 0 ? list.join(', ') : '—'
+  if (list && list.length > 0) return list.join(', ')
+  const blocks = spec?.blocks
+  if (blocks && blocks.length > 0) {
+    return blocks
+      .map((b) =>
+        b.cidr ? b.cidr : b.start && b.stop ? `${b.start}-${b.stop}` : b.start ?? '—'
+      )
+      .join(', ')
+  }
+  return '—'
 }
 
 // The provider-specific "what this L2 policy applies to" field: MetalLB
@@ -90,13 +97,15 @@ const poolsText = (pools: string[] | undefined): string =>
 
 /**
  * 4.1 `plugins/external_loadbalancer/templates/external-loadbalancer.html.j2`
- * parity: the MetalLB / Cilium LB CRDs as CoreUI tabs (IP Address Pools /
- * L2 Advertisements / BGP Peers / BGP Advertisements — the 4.1 order). The
- * card title stays EXACTLY "LoadBalancer Objects" (the e2e-smoke contract).
- * CTabPanel keeps every panel mounted, so all four fetch on mount.
- * ADR-0040: the Name cells are buttons (openObject), never Links — the URL
- * stays clean (R1). Both-providers-absent renders the same first-class
- * empty state (the CRD-seam contract: absent -> []).
+ * parity: the MetalLB / Cilium LB CRDs as object-type tabs (IP Address
+ * Pools / L2 Advertisements / BGP Peers / BGP Advertisements — the 4.1
+ * order) rendered with ObjectTabs (the CoreUI Bootstrap navs-tabs button
+ * bar, 4.1's /workload/pods/data pattern). The card title stays EXACTLY
+ * "LoadBalancer Objects" (the e2e-smoke contract). ObjectTabs keeps every
+ * panel mounted, so all four fetch on mount. ADR-0040: the Name cells are
+ * buttons (openObject), never Links — the URL stays clean (R1).
+ * Both-providers-absent renders the same first-class empty state (the
+ * CRD-seam contract: absent -> []).
  */
 const ExternalLoadBalancerView = () => {
   const cluster = useClusterStore((s) => s.selectedCluster)
@@ -223,75 +232,75 @@ const ExternalLoadBalancerView = () => {
         {!cluster ? (
           <div>No cluster selected.</div>
         ) : (
-          <CTabs defaultActiveItemKey="ipaddresspools">
-            <CTab itemKey="ipaddresspools">IP Address Pools</CTab>
-            <CTabPanel itemKey="ipaddresspools">
-              {tabState(ipAddressPoolsQuery, {
-                ...loadState,
-                ...errState,
-                empty: 'No IP address pools found',
-              }) ?? (
-                <KubeDataTable data={ipAddressPoolsQuery.data ?? []}>
-                  <Column title="Type" data="type" />
-                  <Column title="Name" data="name">
-                    {(name: unknown) => nameButton(name, 'ipaddresspool')}
-                  </Column>
-                  <Column title="Addresses" data="addresses" />
-                </KubeDataTable>
-              )}
-            </CTabPanel>
+          <ObjectTabs
+            defaultActiveKey="ipaddresspools"
+            tabs={[
+              { key: 'ipaddresspools', label: 'IP Address Pools' },
+              { key: 'l2advertisements', label: 'L2 Advertisements' },
+              { key: 'bgppeers', label: 'BGP Peers' },
+              { key: 'bgpadvertisements', label: 'BGP Advertisements' },
+            ]}
+          >
+            {/* IP Address Pools */}
+            {tabState(ipAddressPoolsQuery, {
+              ...loadState,
+              ...errState,
+              empty: 'No IP address pools found',
+            }) ?? (
+              <KubeDataTable data={ipAddressPoolsQuery.data ?? []}>
+                <Column title="Type" data="type" />
+                <Column title="Name" data="name">
+                  {(name: unknown) => nameButton(name, 'ipaddresspool')}
+                </Column>
+                <Column title="Addresses" data="addresses" />
+              </KubeDataTable>
+            )}
 
-            <CTab itemKey="l2advertisements">L2 Advertisements</CTab>
-            <CTabPanel itemKey="l2advertisements">
-              {tabState(l2AdvertisementsQuery, {
-                ...loadState,
-                ...errState,
-                empty: 'No L2 advertisements found',
-              }) ?? (
-                <KubeDataTable data={l2AdvertisementsQuery.data ?? []}>
-                  <Column title="Type" data="type" />
-                  <Column title="Name" data="name">
-                    {(name: unknown) => nameButton(name, 'l2advertisement')}
-                  </Column>
-                  <Column title="Pools" data="pools" />
-                </KubeDataTable>
-              )}
-            </CTabPanel>
+            {/* L2 Advertisements */}
+            {tabState(l2AdvertisementsQuery, {
+              ...loadState,
+              ...errState,
+              empty: 'No L2 advertisements found',
+            }) ?? (
+              <KubeDataTable data={l2AdvertisementsQuery.data ?? []}>
+                <Column title="Type" data="type" />
+                <Column title="Name" data="name">
+                  {(name: unknown) => nameButton(name, 'l2advertisement')}
+                </Column>
+                <Column title="Pools" data="pools" />
+              </KubeDataTable>
+            )}
 
-            <CTab itemKey="bgppeers">BGP Peers</CTab>
-            <CTabPanel itemKey="bgppeers">
-              {tabState(bgpPeersQuery, {
-                ...loadState,
-                ...errState,
-                empty: 'No BGP peers found',
-              }) ?? (
-                <KubeDataTable data={bgpPeersQuery.data ?? []}>
-                  <Column title="Type" data="type" />
-                  <Column title="Name" data="name">
-                    {(name: unknown) => nameButton(name, 'bgppeers')}
-                  </Column>
-                  <Column title="Peer" data="peer" />
-                </KubeDataTable>
-              )}
-            </CTabPanel>
+            {/* BGP Peers */}
+            {tabState(bgpPeersQuery, {
+              ...loadState,
+              ...errState,
+              empty: 'No BGP peers found',
+            }) ?? (
+              <KubeDataTable data={bgpPeersQuery.data ?? []}>
+                <Column title="Type" data="type" />
+                <Column title="Name" data="name">
+                  {(name: unknown) => nameButton(name, 'bgppeers')}
+                </Column>
+                <Column title="Peer" data="peer" />
+              </KubeDataTable>
+            )}
 
-            <CTab itemKey="bgpadvertisements">BGP Advertisements</CTab>
-            <CTabPanel itemKey="bgpadvertisements">
-              {tabState(bgpAdvertisementsQuery, {
-                ...loadState,
-                ...errState,
-                empty: 'No BGP advertisements found',
-              }) ?? (
-                <KubeDataTable data={bgpAdvertisementsQuery.data ?? []}>
-                  <Column title="Type" data="type" />
-                  <Column title="Name" data="name">
-                    {(name: unknown) => nameButton(name, 'bgpadvertisement')}
-                  </Column>
-                  <Column title="Pools" data="pools" />
-                </KubeDataTable>
-              )}
-            </CTabPanel>
-          </CTabs>
+            {/* BGP Advertisements */}
+            {tabState(bgpAdvertisementsQuery, {
+              ...loadState,
+              ...errState,
+              empty: 'No BGP advertisements found',
+            }) ?? (
+              <KubeDataTable data={bgpAdvertisementsQuery.data ?? []}>
+                <Column title="Type" data="type" />
+                <Column title="Name" data="name">
+                  {(name: unknown) => nameButton(name, 'bgpadvertisement')}
+                </Column>
+                <Column title="Pools" data="pools" />
+              </KubeDataTable>
+            )}
+          </ObjectTabs>
         )}
       </CCardBody>
     </CCard>

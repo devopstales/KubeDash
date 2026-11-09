@@ -1,15 +1,5 @@
-import React, { useState } from 'react'
-import {
-  CButton,
-  CCard,
-  CCardBody,
-  CCardHeader,
-  CCardTitle,
-  CFormSelect,
-  CTab,
-  CTabPanel,
-  CTabs,
-} from '@coreui/react'
+import { useState } from 'react'
+import { CButton, CCard, CCardBody, CCardHeader, CCardTitle, CFormSelect } from '@coreui/react'
 import { useQueryClient } from '@tanstack/react-query'
 import { Light as SyntaxHighlighter } from 'react-syntax-highlighter'
 import yaml from 'react-syntax-highlighter/dist/esm/languages/hljs/yaml'
@@ -18,6 +8,7 @@ import { apiFetch } from '../../lib/api'
 import { toYaml } from '../../lib/yaml'
 import type { ApplyResult, GatewayConvertResult } from '../../lib/types'
 import { useClusterStore } from '../../store/cluster'
+import ObjectTabs from '../../components/ObjectTabs'
 
 // The converter's display serializer is part of this module's surface: the
 // preview tests import toYaml from here (the apply path sends raw dicts).
@@ -84,14 +75,11 @@ const GatewayConverter = ({ name, namespace }: GatewayConverterProps) => {
     if (!cluster || !result) return
     setApplying(true)
     setApplyError(null)
-    const r = await apiFetch<ApplyResult>(
-      `/api/v1/clusters/${cluster.id}/resources/apply`,
-      {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ namespace, objects: result.resources }),
-      },
-    )
+    const r = await apiFetch<ApplyResult>(`/api/v1/clusters/${cluster.id}/resources/apply`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ namespace, objects: result.resources }),
+    })
     setApplying(false)
     if (r.error) {
       // 403 (RBAC_DENIED) means the all-or-nothing SAR phase denied before
@@ -145,30 +133,28 @@ const GatewayConverter = ({ name, namespace }: GatewayConverterProps) => {
                 ))}
               </>
             )}
-            <CTabs
-              className="mt-3"
-              defaultActiveItemKey={`${result.resources[0].kind}-${result.resources[0].metadata.name}`}
-            >
-              {result.resources.map((res) => {
-                const itemKey = `${res.kind}-${res.metadata.name}`
-                return (
-                  <React.Fragment key={itemKey}>
-                    <CTab itemKey={itemKey}>{`${res.kind} ${res.metadata.name}`}</CTab>
-                    <CTabPanel itemKey={itemKey}>
-                      <SyntaxHighlighter
-                        language="yaml"
-                        style={anOldHope}
-                        wrapLongLines
-                        customStyle={{ margin: 0 }}
-                        codeTagProps={{ style: { whiteSpace: 'pre-wrap', wordBreak: 'break-word' } }}
-                      >
-                        {toYaml(res)}
-                      </SyntaxHighlighter>
-                    </CTabPanel>
-                  </React.Fragment>
-                )
-              })}
-            </CTabs>
+            <div className="mt-3">
+              <ObjectTabs
+                defaultActiveKey={`${result.resources[0].kind}-${result.resources[0].metadata.name}`}
+                tabs={result.resources.map((res) => ({
+                  key: `${res.kind}-${res.metadata.name}`,
+                  label: `${res.kind} ${res.metadata.name}`,
+                }))}
+              >
+                {result.resources.map((res) => (
+                  <SyntaxHighlighter
+                    key={`${res.kind}-${res.metadata.name}`}
+                    language="yaml"
+                    style={anOldHope}
+                    wrapLongLines
+                    customStyle={{ margin: 0 }}
+                    codeTagProps={{ style: { whiteSpace: 'pre-wrap', wordBreak: 'break-word' } }}
+                  >
+                    {toYaml(res)}
+                  </SyntaxHighlighter>
+                ))}
+              </ObjectTabs>
+            </div>
             <CButton
               color="success"
               size="sm"

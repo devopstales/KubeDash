@@ -150,7 +150,7 @@ const allowGrant = {
   },
 }
 
-// The tabbed page mounts EVERY panel (CTabPanel), so every test that
+// The tabbed page mounts EVERY panel (ObjectTabs), so every test that
 // renders the page also serves the three gateway-kind endpoints — without
 // handlers those fetches fall through to onUnhandledRequest bypass and
 // the tabs would sit in error state.
@@ -170,7 +170,7 @@ const gatewayTabHandlers = (
   ),
 ]
 
-// The merged page's column set, in tab order (CTabPanel mounts all four,
+// The merged page's column set, in tab order (ObjectTabs mounts all four,
 // so the DOM order is the tab order).
 const MERGED_COLUMNS = [
   'Name',
@@ -268,7 +268,7 @@ test('list-renders-gateway-tabs', async () => {
   selectProd()
   renderAt(<IngressView />)
 
-  // the four tabs (CoreUI CTab = button[role=tab]); the Ingresses tab is
+  // the four tabs (ObjectTabs = button[role=tab]); the Ingresses tab is
   // the default active one.
   expect(screen.getByRole('tab', { name: 'Ingresses' })).toBeTruthy()
   expect(screen.getByRole('tab', { name: 'Gateways' })).toBeTruthy()
@@ -276,7 +276,7 @@ test('list-renders-gateway-tabs', async () => {
   expect(screen.getByRole('tab', { name: 'ReferenceGrants' })).toBeTruthy()
   expect(screen.getByRole('heading', { name: 'Ingress List' })).toBeTruthy()
 
-  // all four fetch on mount (CTabPanel keeps panels mounted). The
+  // all four fetch on mount (ObjectTabs keeps panels mounted). The
   // namespaced kinds ride the selected namespace; the cluster-scoped
   // ReferenceGrants tab carries NO namespace.
   await screen.findByRole('button', { name: 'web-gateway' })

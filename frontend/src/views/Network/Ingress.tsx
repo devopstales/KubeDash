@@ -6,9 +6,6 @@ import {
   CCardBody,
   CCardHeader,
   CCardTitle,
-  CTabs,
-  CTab,
-  CTabPanel,
 } from '@coreui/react'
 import { useQuery } from '@tanstack/react-query'
 import { apiFetch } from '../../lib/api'
@@ -22,6 +19,7 @@ import type {
 } from '../../lib/types'
 import { useClusterStore } from '../../store/cluster'
 import KubeDataTable, { Column } from '../../components/KubeDataTable'
+import ObjectTabs from '../../components/ObjectTabs'
 import TopMenu from '../../components/TopMenu'
 
 // ADR-0040: the registry kinds (API resource names) and the ONE clean list
@@ -51,11 +49,12 @@ const listenersText = (spec: GatewayItem['spec']): string => {
 
 /**
  * 4.1 `network/ingress.html.j2` parity, merged (2026-11-07 owner decision):
- * tabs Ingresses | Gateways | HTTPRoutes | ReferenceGrants (CoreUI CTabs —
- * 4.1's bootstrap tab pattern). The card title stays EXACTLY "Ingress List"
- * (the spec's pinned title). CTabPanel keeps every panel mounted, so all
- * four fetch on mount. ADR-0040: name cells are buttons (openObject), never
- * Links — the URL stays clean (R1).
+ * tabs Ingresses | Gateways | HTTPRoutes | ReferenceGrants (ObjectTabs —
+ * the CoreUI Bootstrap navs-tabs button bar, 4.1's bootstrap tab pattern).
+ * The card title stays EXACTLY "Ingress List" (the spec's pinned title).
+ * ObjectTabs keeps every panel mounted, so all four fetch on mount.
+ * ADR-0040: name cells are buttons (openObject), never Links — the URL
+ * stays clean (R1).
  */
 const IngressView = () => {
   const cluster = useClusterStore((s) => s.selectedCluster)
@@ -132,9 +131,7 @@ const IngressView = () => {
       )
       if (r.error) throw new Error(`${r.error.code}: ${r.error.message}`)
       return (r.data?.items ?? []).map((item) => {
-        const from = (item.spec?.from ?? []).map((f) =>
-          [f.group, f.kind].filter(Boolean).join(':'),
-        )
+        const from = (item.spec?.from ?? []).map((f) => [f.group, f.kind].filter(Boolean).join(':'))
         const to = (item.spec?.to ?? []).map((t) => [t.group, t.kind].filter(Boolean).join(':'))
         return {
           name: item.metadata?.name ?? '',
@@ -189,75 +186,75 @@ const IngressView = () => {
         {!cluster ? (
           <div>No cluster selected.</div>
         ) : (
-          <CTabs defaultActiveItemKey="ingresses">
-            <CTab itemKey="ingresses">Ingresses</CTab>
-            <CTabPanel itemKey="ingresses">
-              {tabState(ingressesQuery, {
-                loading: 'Loading ingresses...',
-                empty: 'No ingresses found',
-                errorPrefix: 'Error loading ingresses',
-              }) ?? (
-                <KubeDataTable data={ingressesQuery.data ?? []}>
-                  <Column title="Name" data="name">
-                    {(name: unknown) => nameButton(name, 'ingress', namespace)}
-                  </Column>
-                  <Column title="IngressClass" data="ingressClass" />
-                  <Column title="Hostname" data="hostname" />
-                </KubeDataTable>
-              )}
-            </CTabPanel>
+          <ObjectTabs
+            defaultActiveKey="ingresses"
+            tabs={[
+              { key: 'ingresses', label: 'Ingresses' },
+              { key: 'gateways', label: 'Gateways' },
+              { key: 'httproutes', label: 'HTTPRoutes' },
+              { key: 'referencegrants', label: 'ReferenceGrants' },
+            ]}
+          >
+            {/* Ingresses */}
+            {tabState(ingressesQuery, {
+              loading: 'Loading ingresses...',
+              empty: 'No ingresses found',
+              errorPrefix: 'Error loading ingresses',
+            }) ?? (
+              <KubeDataTable data={ingressesQuery.data ?? []}>
+                <Column title="Name" data="name">
+                  {(name: unknown) => nameButton(name, 'ingress', namespace)}
+                </Column>
+                <Column title="IngressClass" data="ingressClass" />
+                <Column title="Hostname" data="hostname" />
+              </KubeDataTable>
+            )}
 
-            <CTab itemKey="gateways">Gateways</CTab>
-            <CTabPanel itemKey="gateways">
-              {tabState(gatewaysQuery, {
-                loading: 'Loading gateways...',
-                empty: 'No gateways found',
-                errorPrefix: 'Error loading gateways',
-              }) ?? (
-                <KubeDataTable data={gatewaysQuery.data ?? []}>
-                  <Column title="Name" data="name">
-                    {(name: unknown) => nameButton(name, 'gateway', namespace)}
-                  </Column>
-                  <Column title="GatewayClass" data="gatewayClass" />
-                  <Column title="Listeners" data="listeners" />
-                </KubeDataTable>
-              )}
-            </CTabPanel>
+            {/* Gateways */}
+            {tabState(gatewaysQuery, {
+              loading: 'Loading gateways...',
+              empty: 'No gateways found',
+              errorPrefix: 'Error loading gateways',
+            }) ?? (
+              <KubeDataTable data={gatewaysQuery.data ?? []}>
+                <Column title="Name" data="name">
+                  {(name: unknown) => nameButton(name, 'gateway', namespace)}
+                </Column>
+                <Column title="GatewayClass" data="gatewayClass" />
+                <Column title="Listeners" data="listeners" />
+              </KubeDataTable>
+            )}
 
-            <CTab itemKey="httproutes">HTTPRoutes</CTab>
-            <CTabPanel itemKey="httproutes">
-              {tabState(httpRoutesQuery, {
-                loading: 'Loading http routes...',
-                empty: 'No http routes found',
-                errorPrefix: 'Error loading http routes',
-              }) ?? (
-                <KubeDataTable data={httpRoutesQuery.data ?? []}>
-                  <Column title="Name" data="name">
-                    {(name: unknown) => nameButton(name, 'httproute', namespace)}
-                  </Column>
-                  <Column title="Hostnames" data="hostnames" />
-                  <Column title="ParentRefs" data="parentRefs" />
-                </KubeDataTable>
-              )}
-            </CTabPanel>
+            {/* HTTPRoutes */}
+            {tabState(httpRoutesQuery, {
+              loading: 'Loading http routes...',
+              empty: 'No http routes found',
+              errorPrefix: 'Error loading http routes',
+            }) ?? (
+              <KubeDataTable data={httpRoutesQuery.data ?? []}>
+                <Column title="Name" data="name">
+                  {(name: unknown) => nameButton(name, 'httproute', namespace)}
+                </Column>
+                <Column title="Hostnames" data="hostnames" />
+                <Column title="ParentRefs" data="parentRefs" />
+              </KubeDataTable>
+            )}
 
-            <CTab itemKey="referencegrants">ReferenceGrants</CTab>
-            <CTabPanel itemKey="referencegrants">
-              {tabState(referenceGrantsQuery, {
-                loading: 'Loading reference grants...',
-                empty: 'No reference grants found',
-                errorPrefix: 'Error loading reference grants',
-              }) ?? (
-                <KubeDataTable data={referenceGrantsQuery.data ?? []}>
-                  <Column title="Name" data="name">
-                    {(name: unknown) => nameButton(name, 'referencegrant', undefined)}
-                  </Column>
-                  <Column title="From" data="from" />
-                  <Column title="To" data="to" />
-                </KubeDataTable>
-              )}
-            </CTabPanel>
-          </CTabs>
+            {/* ReferenceGrants */}
+            {tabState(referenceGrantsQuery, {
+              loading: 'Loading reference grants...',
+              empty: 'No reference grants found',
+              errorPrefix: 'Error loading reference grants',
+            }) ?? (
+              <KubeDataTable data={referenceGrantsQuery.data ?? []}>
+                <Column title="Name" data="name">
+                  {(name: unknown) => nameButton(name, 'referencegrant', undefined)}
+                </Column>
+                <Column title="From" data="from" />
+                <Column title="To" data="to" />
+              </KubeDataTable>
+            )}
+          </ObjectTabs>
         )}
       </CCardBody>
     </CCard>

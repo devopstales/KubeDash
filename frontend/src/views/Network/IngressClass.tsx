@@ -6,9 +6,6 @@ import {
   CCardBody,
   CCardHeader,
   CCardTitle,
-  CTabs,
-  CTab,
-  CTabPanel,
 } from '@coreui/react'
 import { useQuery } from '@tanstack/react-query'
 import { apiFetch } from '../../lib/api'
@@ -17,6 +14,7 @@ import { openObject } from '../../lib/objectRef'
 import type { GatewayClassItem, IngressClassItem, ResourceList } from '../../lib/types'
 import { useClusterStore } from '../../store/cluster'
 import KubeDataTable, { Column } from '../../components/KubeDataTable'
+import ObjectTabs from '../../components/ObjectTabs'
 import TopMenu from '../../components/TopMenu'
 
 // ADR-0040: the ONE clean list route this page renders. 4.1
@@ -37,11 +35,12 @@ type Row = Record<string, unknown>
 
 /**
  * 4.1 `network/ingress-class.html.j2` parity, merged (2026-11-07 owner
- * decision): tabs IngressClasses | GatewayClasses (CoreUI CTabs — 4.1's
- * bootstrap tab pattern). The card title stays EXACTLY "IngressClass List"
- * (4.1's title verbatim). CTabPanel keeps both panels mounted, so both
- * fetch on mount. ADR-0040: name cells are buttons (openObject), never
- * Links — the URL stays clean (R1).
+ * decision): tabs IngressClasses | GatewayClasses (ObjectTabs — the CoreUI
+ * Bootstrap navs-tabs button bar, 4.1's bootstrap tab pattern). The card
+ * title stays EXACTLY "IngressClass List" (4.1's title verbatim).
+ * ObjectTabs keeps both panels mounted, so both fetch on mount. ADR-0040:
+ * name cells are buttons (openObject), never Links — the URL stays clean
+ * (R1).
  */
 const IngressClassView = () => {
   const cluster = useClusterStore((s) => s.selectedCluster)
@@ -125,41 +124,43 @@ const IngressClassView = () => {
         {!cluster ? (
           <div>No cluster selected.</div>
         ) : (
-          <CTabs defaultActiveItemKey="ingressclasses">
-            <CTab itemKey="ingressclasses">IngressClasses</CTab>
-            <CTabPanel itemKey="ingressclasses">
-              {tabState(ingressClassesQuery, {
-                loading: 'Loading ingress classes...',
-                empty: 'No ingress classes found',
-                errorPrefix: 'Error loading ingress classes',
-              }) ?? (
-                <KubeDataTable data={ingressClassesQuery.data ?? []}>
-                  <Column title="Name" data="name">
-                    {(name: unknown) => nameButton(name, 'ingressclass')}
-                  </Column>
-                  <Column title="Controller" data="controller" />
-                  <Column title="Created" data="created" />
-                </KubeDataTable>
-              )}
-            </CTabPanel>
+          <ObjectTabs
+            defaultActiveKey="ingressclasses"
+            tabs={[
+              { key: 'ingressclasses', label: 'IngressClasses' },
+              { key: 'gatewayclasses', label: 'GatewayClasses' },
+            ]}
+          >
+            {/* IngressClasses */}
+            {tabState(ingressClassesQuery, {
+              loading: 'Loading ingress classes...',
+              empty: 'No ingress classes found',
+              errorPrefix: 'Error loading ingress classes',
+            }) ?? (
+              <KubeDataTable data={ingressClassesQuery.data ?? []}>
+                <Column title="Name" data="name">
+                  {(name: unknown) => nameButton(name, 'ingressclass')}
+                </Column>
+                <Column title="Controller" data="controller" />
+                <Column title="Created" data="created" />
+              </KubeDataTable>
+            )}
 
-            <CTab itemKey="gatewayclasses">GatewayClasses</CTab>
-            <CTabPanel itemKey="gatewayclasses">
-              {tabState(gatewayClassesQuery, {
-                loading: 'Loading gateway classes...',
-                empty: 'No gateway classes found',
-                errorPrefix: 'Error loading gateway classes',
-              }) ?? (
-                <KubeDataTable data={gatewayClassesQuery.data ?? []}>
-                  <Column title="Name" data="name">
-                    {(name: unknown) => nameButton(name, 'gatewayclass')}
-                  </Column>
-                  <Column title="Controller" data="controller" />
-                  <Column title="Age" data="age" />
-                </KubeDataTable>
-              )}
-            </CTabPanel>
-          </CTabs>
+            {/* GatewayClasses */}
+            {tabState(gatewayClassesQuery, {
+              loading: 'Loading gateway classes...',
+              empty: 'No gateway classes found',
+              errorPrefix: 'Error loading gateway classes',
+            }) ?? (
+              <KubeDataTable data={gatewayClassesQuery.data ?? []}>
+                <Column title="Name" data="name">
+                  {(name: unknown) => nameButton(name, 'gatewayclass')}
+                </Column>
+                <Column title="Controller" data="controller" />
+                <Column title="Age" data="age" />
+              </KubeDataTable>
+            )}
+          </ObjectTabs>
         )}
       </CCardBody>
     </CCard>

@@ -155,7 +155,7 @@ const allItems = () => ({
 
 // list-renders-4tabs: the card title is EXACTLY "Cert-Manager Objects"; the
 // four 4.1 tabs (Cluster Issuer / Issuer / Certificate Request /
-// Certificates); ALL four fetch on mount (CTabPanel keeps every panel
+// Certificates); ALL four fetch on mount (ObjectTabs keeps every panel
 // mounted); the cluster-scoped clusterissuers fetch carries NO namespace
 // param, the three namespaced kinds carry the selected namespace.
 test('list-renders-4tabs', async () => {

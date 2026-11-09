@@ -875,6 +875,9 @@ export interface IpAddressPoolItem {
     }
     // Cilium
     cidrs?: string[]
+    // Cilium 1.19 real field — an address block is a CIDR or a start/stop
+    // range (the cluster's pinned Cilium 1.19.10 uses this, not `cidrs`).
+    blocks?: { cidr?: string; start?: string; stop?: string }[]
     allowFirstLastIPs?: boolean
     disabled?: boolean
     ipFamilyPolicy?: string

@@ -94,7 +94,7 @@ const serveService = (item: unknown) =>
     HttpResponse.json({ kind: 'services', items: item ? [item] : [] }),
   )
 
-// data-renders-three-tabs: the page renders the Service/Ports/Pods CTabs
+// data-renders-three-tabs: the page renders the Service/Ports/Pods tabs
 // (Service default active) and fetches the Service ONCE with ?name= AND
 // ?namespace= (the single-fetch contract — not 4.1's list-then-filter).
 test('data-renders-three-tabs', async () => {
@@ -110,7 +110,7 @@ test('data-renders-three-tabs', async () => {
   renderDataAt('web-svc', 'team-a')
 
   expect(await screen.findByText('Service Data')).toBeTruthy()
-  // The three tabs (CoreUI CTabs — the 4.1 Bootstrap-JS tabs, re-implemented
+  // The three tabs (ObjectTabs — the 4.1 Bootstrap-JS tabs, re-implemented
   // as React tabs). They render once the service query settles, so poll.
   const serviceTab = await screen.findByRole('tab', { name: 'Service' })
   expect(screen.getByRole('tab', { name: 'Ports' })).toBeTruthy()
