@@ -130,6 +130,47 @@ def test_convert_missing_ingress_404(api_client, auth_client, fake_k8s, monkeypa
     assert r.get_json()["error"]["code"] == "RESOURCE_KIND_NOT_SUPPORTED"
 
 
+def test_convert_sar_resolves_default_namespace_before_read(
+    api_client, auth_client, fake_k8s, monkeypatch
+) -> None:
+    """[gateway-api-sar-default-namespace] ADR-0004 addendum: an omitted
+    namespace resolves to "default" ONCE — the SAR is asked NAMESPACED on
+    "default" (NOT cluster-wide None: for a namespaced kind a cluster-wide
+    SAR denies users holding only a namespaced grant) and the read rides
+    the SAME resolved namespace."""
+    auth_client.login()
+    h = {"Authorization": f"Bearer {auth_client.jwt}"}
+    _register(api_client, h)
+    asked: list[tuple] = []
+    monkeypatch.setattr(rbac_service, "_cache_get", lambda e, k: None)
+    monkeypatch.setattr(rbac_service, "_cache_set", lambda e, k, v: None)
+
+    # A namespaced-only grant on "default": the SAR passes ONLY when it is
+    # asked with namespace "default" (cluster-wide None is denied).
+    def allow(client, verb, resource, ns, name, group=""):
+        asked.append((verb, resource, ns, name, group))
+        return ns == "default"
+
+    monkeypatch.setattr(rbac_service, "_sar_allowed", allow)
+    ingress = {
+        **INGRESS,
+        "metadata": {**INGRESS["metadata"], "namespace": "default"},
+    }
+    fake_k8s.ingress = ingress
+    r = api_client.post(
+        "/api/v1/clusters/1/gateway-api/convert",
+        json={"ingressName": "web"},
+        headers=h,
+    )
+    assert r.status_code == 200
+    body = r.get_json()
+    assert body["namespace"] == "default"
+    # the SAR was asked namespaced on "default" (not cluster-wide):
+    assert asked == [("get", "ingresses", "default", "web", "networking.k8s.io")]
+    # and the read rode the same resolved namespace:
+    assert fake_k8s.get_calls == [("default", "web")]
+
+
 def test_convert_sar_denied_403(api_client, auth_client, fake_k8s, monkeypatch) -> None:
     auth_client.login()
     h = {"Authorization": f"Bearer {auth_client.jwt}"}
