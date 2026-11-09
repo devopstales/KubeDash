@@ -55,7 +55,7 @@ new, template, reason, optional TTL). A row is created in
 labelling the RBAC objects `kubedash.io/template`), runs the JIT provisioning
 pipeline (§ 5E), records a `cluster_bindings` row, and — if a TTL was
 requested — sets `expires_at`. Optional TTL'd grants are auto-revoked by the
-`access_expiry` RQ task (leader-only, 1 min).
+`access_expiry` pgqueue task (enqueue leader-gated, 1 min).
 
 ##### Consequences
 

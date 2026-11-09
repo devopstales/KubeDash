@@ -49,15 +49,16 @@ ask the cluster?
 - **SubjectAccessReview proxy (CHOSEN).** Every mutating (and gated
   read) request runs `rbac.can(user, verb, resource, name, namespace)`
   via a SAR issued with the registry's credentials on the target
-  cluster; the verdict is cached briefly in Redis.
+  cluster; the verdict is cached briefly (30 s TTL).
 
 #### Decision Outcome
 
 **Chosen option: SAR proxy with a TTL'd verdict cache.**
 
 - `backend/app/services/rbac.py` — `can(...)` builds a
-  `SubjectAccessReview` against the cluster; verdicts cached in Redis for
-  `SAR_TTL` seconds.
+  `SubjectAccessReview` against the cluster; verdicts cached in the Postgres
+  `kv` table for `SAR_TTL` seconds (moved off Redis with the Redis removal,
+  ADR-0029/0030).
 - Denial returns 403 with the stable code `RBAC_DENIED` (the error-shape
   contract, ARCHITECTURE.md §10).
 - The UI calls `/auth/me/permissions` on mount and hides verbs the user
@@ -78,6 +79,11 @@ ask the cluster?
   (empty segment = unset, `backend/app/services/rbac.py:36`). The API
   lists with the registry's credentials, so the SAR is the only gate —
   a verdict for one namespace or object must never answer for another.
+- **2026-10-28 — verdict cache store moved off Redis.** The cache backend
+  moved from Redis to the Postgres `kv` table (the Redis removal,
+  ADR-0029/0030) under the SAME key and 30 s TTL; the cache contract (key
+  shape, fail-closed) is unchanged. Verified against
+  `backend/app/services/rbac.py` + `app/core/kvstore.py` (2026-11-09).
 
 #### Linking Decisions and Constraints
 

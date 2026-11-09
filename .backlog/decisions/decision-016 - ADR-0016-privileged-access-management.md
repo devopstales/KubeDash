@@ -61,7 +61,7 @@ namespace, baseline auto-detected, elevation template, bounded TTL, required
 reason). On approval KubeDash creates a **second** RoleBinding labelled
 `kubedash.io/elevation=<id>` pointing at the elevation Role; the baseline
 binding is untouched. Effective permission is the union (standard K8s RBAC).
-The `access_expiry` RQ task (leader-only, 1 min) deletes the elevation
+The `access_expiry` pgqueue task (enqueue leader-gated, 1 min) deletes the elevation
 binding when `expires_at` passes, marks the request `expired`, and audits the
 RBAC delta. A **break-glass** path lets a `cluster-admin` self-approve their
 own elevation under a short TTL cap (`pam.breakGlassTTLHours`, default 1 h),

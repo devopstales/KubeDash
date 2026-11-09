@@ -33,8 +33,9 @@ an extra failure mode, image, and cache layer.
   a service.
 - **One image, one upgrade unit.** The Helm chart deploys N replicas of
   a single Deployment; there is no separate UI workload to version.
-- **The RQ worker must live with the app** (in-process, leader-gated —
-  ADR-0007/0008), so a "backend container" already does two jobs.
+- **The task worker must live with the app** (in-process — ADR-0029/0031;
+  ADR-0007/0008 superseded), so a "backend container" already does two
+  jobs.
 - **No nginx inside the image.** TLS termination is an optional edge in
   front (ADR-0026/0027), not part of the container.
 
@@ -57,8 +58,10 @@ an extra failure mode, image, and cache layer.
   `dist/` → `static/`, runs non-root (`USER 10001`), and starts
   `gunicorn -w "$GUNICORN_WORKERS" --threads "$GUNICORN_THREADS"
   -b 0.0.0.0:8080 wsgi:wsgi`.
-- The in-process RQ worker spawns from `wsgi.py` at startup, gated on
-  `kubedash_role == "leader"` (ADR-0007/0008).
+- The in-process pgqueue worker thread starts in the Gunicorn master from
+  `wsgi.py`; every replica claims tasks from the Postgres `tasks` table,
+  only enqueue/scheduling (and the reaper) is leader-gated
+  (ADR-0029/0031; supersedes ADR-0007/0008).
 - Static caching: hashed assets served `Cache-Control: immutable`,
   `index.html` `no-cache` (SPA fallback); `/api/*` responses are
   `no-store` (ADR-0026/0027 header layer).
@@ -66,7 +69,8 @@ an extra failure mode, image, and cache layer.
 ##### Consequences
 
 - Good: one image/upgrade unit; no CORS (same origin for UI + API);
-  trivial to run (`docker run` + PG + Redis).
+  trivial to run (`docker run` + PG — the sole stateful dependency,
+  ADR-0029/0030/0031).
 - Bad: Gunicorn is the file server — asset serving and API share worker
   threads (mitigated by immutable asset caching); SSE must stay
   load-balancer-friendly (ADR-0009).
@@ -75,8 +79,8 @@ an extra failure mode, image, and cache layer.
 
 #### Linking Decisions and Constraints
 
-- ADR-0007 / ADR-0008 — the in-process, leader-gated RQ worker lives in
-  this container.
+- ADR-0029 / ADR-0031 — the in-process pgqueue worker thread lives in this
+  container (supersedes ADR-0007 / ADR-0008).
 - ADR-0025 — same-origin cookies make single-container the natural
   session shape.
 - ADR-0027 — plain-HTTP dev-stack default vs. TLS edge opt-in.

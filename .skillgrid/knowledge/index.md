@@ -12,9 +12,9 @@
 | [ADR-0003 — Observability query-only](decisions/04-adr-0003-observability-query-only.md) | Query + display over user-supplied Prometheus/Loki/Tempo; no ingest, degrade don't fail | accepted |
 | [ADR-0004 — RBAC via SubjectAccessReview](decisions/04-adr-0004-rbac-proxy-sar.md) | SAR proxy (not local role mapping); verdict cache key carries every SAR attribute (amended 2026-10-21) | accepted |
 | [ADR-0005 — CoreUI React template](decisions/04-adr-0005-coreui-react.md) | Free CoreUI admin template over shadcn/ui/Tailwind; SCSS-only, view folders | accepted |
-| [ADR-0006 — Single container](decisions/04-adr-0006-single-container.md) | Gunicorn serves API + static SPA; in-process leader-gated RQ worker | accepted |
-| [ADR-0007 — RQ over Celery](decisions/04-adr-0007-rq-over-celery.md) | Redis Queue, in-process worker; Celery is the recorded exit if fan-out appears | accepted |
-| [ADR-0008 — Leader election](decisions/04-adr-0008-leader-election.md) | PG advisory lock + leader_lease row; 5 s heartbeat / 10 s stale; failover < 15 s | accepted |
+| [ADR-0006 — Single container](decisions/04-adr-0006-single-container.md) | Gunicorn serves API + static SPA; in-process pgqueue worker (claims on every replica; enqueue leader-gated) | accepted |
+| [ADR-0007 — RQ over Celery](decisions/04-adr-0007-rq-over-celery.md) | Redis Queue, in-process worker; Celery is the recorded exit if fan-out appears | superseded (by ADR-0029) |
+| [ADR-0008 — Leader election](decisions/04-adr-0008-leader-election.md) | PG advisory lock + leader_lease row; 5 s heartbeat / 10 s stale; failover < 15 s | superseded (by ADR-0031) |
 | [ADR-0009 — SSE over WebSocket](decisions/04-adr-0009-sse-over-websocket.md) | SSE primary push; WebSocket only for bidirectional exec | accepted |
 | [ADR-0010 — Informer cache](decisions/04-adr-0010-informer-cache.md) | Per-cluster watch-maintained read cache (target pattern; base change deferred it — seam in k8s_client.py) | accepted |
 | [ADR-0011 — kubectl credential plugin](decisions/04-adr-0011-kubectl-credential-plugin.md) | Server-managed SSO config (kubeconfig carries only server + cluster name); PKCE; ExecCredential | accepted |
@@ -56,10 +56,10 @@
 | Concept | One-line summary |
 |---|---|
 | [Browser sessions ride HttpOnly cookies](invariants/session-cookie-transport.md) | `kd_access`/`kd_refresh` HttpOnly (hint `kd_session` grants nothing); Bearer only for the kubectl plugin; no credential in URL/localStorage (ADR-0025) |
-| [RQ worker runs only on the leader](invariants/leader-only-rq-worker.md) | `pg_try_advisory_lock` + `leader_lease` arbitrate; wsgi spawns the worker only when role == "leader" (ADR-0006/0007/0008) |
+| [Task enqueue/reap run only on the leader](invariants/leader-only-rq-worker.md) | `pg_try_advisory_lock` + `leader_lease` arbitrate; `kubedash-worker` thread on every candidate, enqueue + reaper leader-gated, claims via `FOR UPDATE SKIP LOCKED` (ADR-0029/0031) |
 | [Configuration fails fast at boot](invariants/config-fail-fast.md) | INI > env, no in-code default for identities/credentials; missing key raises `ConfigError` (ADR-0028) |
 | [app/services is Flask-free](invariants/services-integration-boundary.md) | No module-level Flask imports in services; one documented function-local carve-out (K8sClientPool admin branch) |
-| [SAR verdict cache key carries every attribute](invariants/sar-verdict-cache-key.md) | `sar:<cluster>:<sub>:<verb>:<resource>:<group>:<namespace>:<name>`, Redis TTL 30 s; one verdict never answers for another (ADR-0004) |
+| [SAR verdict cache key carries every attribute](invariants/sar-verdict-cache-key.md) | `sar:<cluster>:<sub>:<verb>:<resource>:<group>:<namespace>:<name>`, `kv`-table TTL 30 s; one verdict never answers for another (ADR-0004) |
 | [Air-gapped bundle](invariants/air-gap-bundle.md) | `task fe-check` fails the build on any external reference; Swagger UI served from the vendored package (ADR-0020) |
 | [No object identity in any SPA URL](invariants/object-nav-no-url-identity.md) | sessionStorage ref (15-min) + form-POST/303/one-shot-meta deep link; URL stays the clean route (ADR-0040) |
 | [Security-header layer](invariants/security-header-layer.md) | 4.1 header set on every response; `/api/*` no-store via url_rule; HSTS only over TLS (ADR-0026/0027) |
@@ -78,7 +78,7 @@
 |---|---|
 | [OIDC login → session → API access](workflows/oidc-login-session.md) | Login 302 → cookie issue → per-request JWT verify + SAR → single in-flight refresh → logout revocation |
 | [Object deep link](workflows/object-deep-link.md) | In-tab open via the ref; cross-tab share via form POST → 303 → `obj_incoming` stash → one-shot meta → relay adoption |
-| [Leader election → task execution → failover](workflows/leader-task-execution.md) | Candidate replicas, advisory-lock acquisition, 5 s/10 s heartbeat/stale, INTERVALS enqueue, worker, failover bound |
+| [Leader election → task execution → failover](workflows/leader-task-execution.md) | Candidate replicas, advisory-lock acquisition, 5 s/10 s heartbeat/stale, leader-gated INTERVALS enqueue, every-replica SKIP LOCKED claim, failover bound |
 | [Frontend build → sync → serve](workflows/frontend-build-serve.md) | fe-build (tsc+eslint+vite) → fe-check air-gap gate → fe-sync sha256 stamp → Gunicorn-served static; image copies dist |
 
 ## reference/

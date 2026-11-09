@@ -195,3 +195,53 @@
   (`.skillgrid/xarchive/2026-10-28-{service-views,ingress-gateway-api-views,ingressclass-gatewayclass-views}/`
   + `2026-10-29-certmanager-external-loadbalancer-views`).
 - `index.md`: unchanged (in-place amendment, no new concept row).
+
+## 2026-11-09 — Redis removal: ADRs + corpus aligned on Postgres as the sole stateful dependency
+
+- Continues TASK-109's docs work (DoD#5): the code carries no live Redis
+  references (ADR-0029/0030/0031), but the ADR corpus still described Redis
+  as the live mechanism in six in-force ADRs + five concept files.
+- ADR bodies updated (in-force ADRs amended in place; superseded bodies
+  retained per IRON RULE):
+  - **ADR-0004** — SAR verdict cache: "cached in Redis" → Postgres `kv`
+    table; new 2026-10-28 amendment (store moved off Redis; same key/TTL).
+  - **ADR-0006** — RQ worker wording → pgqueue worker thread (claims on
+    every replica, enqueue leader-gated); "docker run + PG + Redis" → PG
+    sole stateful dependency; linking re-pointed to ADR-0029/0031.
+  - **ADR-0019** — `/auth/verify` checks the Postgres `revoked_jtis`
+    deny-list (ADR-0030; formerly a Redis set per ADR-0014).
+  - **ADR-0025** — decision driver: session state now Postgres (`kv` +
+    `revoked_jtis`) after the Redis removal.
+  - **ADR-0028** — `[remote_cache]` mapping row: `redis_url` no longer in
+    Settings; section not parsed (inert, retained for 4.1 format parity).
+  - **ADR-0040** — object-handoff stash: Redis → Postgres `kv` table
+    (three mechanism mentions).
+- Not deleted, flipped/annotated (IRON RULE): ADR-0007 (superseded by
+  ADR-0029) and ADR-0014 (superseded by ADR-0030) bodies retained as
+  history; `index.md` status column now reads `superseded (by ADR-0029)` /
+  `superseded (by ADR-0031)` for 0007/0008, matching `ASSUMPTIONS.md` § LOCKED.
+- Concept files: `glossary/02-technical-terms.md` (RQ, Leader, Follower,
+  Drift detection, Session revocation propagation, Deep link, Object
+  handoff), `invariants/sar-verdict-cache-key.md`,
+  `invariants/object-nav-no-url-identity.md`, `workflows/object-deep-link.md`.
+- `ARCHITECTURE.md`: container diagram redrawn (no Redis box; single PG box
+  carrying tasks queue + `kv` + `revoked_jtis`), worker bullet, external
+  dependencies, service lines (timeline/audit/tls), §3.8 env table
+  (`REDIS_URL` row dropped; `KUBEDASH_ROLE` semantics corrected), §3.9
+  `/readyz` (database probe only), §5B.1 revocation (deny-list + leader
+  reaper; ADR pointer → ADR-0030), §7.1/§7.2 (pgqueue worker; no redis
+  subchart), §6.1 ingress revocation row, air-gap bundle (3 lines), §10
+  security table (rate limiting), test tiers (Testcontainers PG only), §11
+  Celery exit note.
+- `.backlog/decisions/decision-004/-006/-019/-025/-028/-040` copies
+  mirrored (same edit).
+- Verified: `grep -ri redis .skillgrid` — remaining mentions are historical
+  only (superseded ADR bodies 0007/0014, rejected options, "replacing
+  RQ/Redis" phrasing, this log's history).
+- Same sweep: `invariants/leader-only-rq-worker.md` +
+  `workflows/leader-task-execution.md` rewritten (the leader-only-RQ-worker
+  model → pgqueue: thread on every candidate, enqueue + reaper
+  leader-gated, claims on every replica via SKIP LOCKED; anchors
+  re-pinned to current code, verified 2026-11-09);
+  `invariants/services-integration-boundary.md`, ADR-0013/0015/0016 task
+  refs, `reference/feature-roadmap.md` + `reference/live-architecture.md`.

@@ -38,7 +38,7 @@ stale sections; the decisions in `decisions/` and the pins in
 `invariants/` are the authoritative record.
 
 **Sections worth routing to directly.** §3 Backend (app factory,
-services seam, data model, auth flow, SSE/WS, RQ + leader, config) ·
+services seam, data model, auth flow, SSE/WS, pgqueue + leader, config) ·
 §4 Frontend (stack, view folders, API client, object navigation §4.4.1)
 · §5 Multi-cluster · §5A–5F Permission layer (aggregated API,
 permission management, NaaS, PAM, JIT, SCIM) · §6 Observability ·

@@ -29,20 +29,21 @@ traces).
 │                    KubeDash (single container)               │
 │                                                              │
 │  ┌────────────────────┐        ┌──────────────────────────┐  │
-│  │  Gunicorn (WSGI)   │        │  RQ Worker (in-process)  │  │
-│  │  Flask + Smorest   │        │  gated by KUBEDASH_ROLE  │  │
-│  │  serves:           │        │  =leader (one replica)   │  │
-│  │  • /api/v1/*       │        │  • cluster_sync          │  │
-│  │  • /ws/* (SocketIO)│        │  • health_probe          │  │
-│  │  • /static/* (SPA) │        │  • alerts.evaluate       │  │
+│  │  Gunicorn (WSGI)   │        │  pgqueue worker          │  │
+│  │  Flask + Smorest   │        │  (daemon thread; every   │  │
+│  │  serves:           │        │  replica claims + runs;  │  │
+│  │  • /api/v1/*       │        │  enqueue + reap are      │  │
+│  │  • /ws/* (SocketIO)│        │  leader-gated)           │  │
+│  │  • /static/* (SPA) │        │  • cluster_sync          │  │
 │  └─────────┬──────────┘        └────────────┬─────────────┘  │
 │            │                                │                │
 │            ▼                                ▼                │
-│  ┌─────────────────┐              ┌─────────────────┐        │
-│  │  PostgreSQL     │              │  Redis          │        │
-│  │  (SQLAlchemy)   │              │  (cache + RQ    │        │
-│  └─────────────────┘              │   broker)       │        │
-│                                   └─────────────────┘        │
+│  ┌──────────────────────────────────────────────────┐        │
+│  │  PostgreSQL (SQLAlchemy) — sole stateful dep:    │        │
+│  │  tasks queue (FOR UPDATE SKIP LOCKED) + kv cache │        │
+│  │  + revoked_jtis (jti deny-list); active-active   │        │
+│  │  pgEdge (ADR-0029/0030/0031)                     │        │
+│  └──────────────────────────────────────────────────┘        │
 └──────────────────────────────────────────────────────────────┘
             │
             ▼
@@ -59,19 +60,24 @@ traces).
    file server for the built React SPA. No separate frontend container.
    The SPA is built at image-build time (multi-stage Dockerfile) and
    mounted read-only at `/app/static`.
-2. **RQ worker** — in-process async task handling (Redis Queue),
-   **enabled only on the leader replica** (gated by `KUBEDASH_ROLE=leader`).
-   Followers skip the worker to avoid duplicate background jobs.
+2. **pgqueue worker** — in-process async task handling: a daemon thread in
+   the Gunicorn master that polls the Postgres `tasks` table
+   (`SELECT ... FOR UPDATE SKIP LOCKED` claim). **Every replica claims and
+   runs tasks**; only enqueue/scheduling and the reaper are
+   **leader-gated** (`leader_lease`, ADR-0029/0031).
 
-**External dependencies:** PostgreSQL (metadata, audit, users) and Redis
-(cache, rate-limit counters, RQ broker). Both are separate StatefulSets /
-managed services — they are *not* bundled in the KubeDash container.
+**External dependencies:** PostgreSQL (metadata, audit, users, task queue,
+verdict/state cache, `jti` revocation deny-list) — the **sole stateful
+dependency** (Redis removed by ADR-0029/0030; active-active pgEdge,
+ADR-0031). A separate StatefulSet / managed service — *not* bundled in the
+KubeDash container.
 
 **Replicas + leader election:** the Helm chart deploys N replicas of the
 `kubedash` Deployment. A leader election module (PostgreSQL advisory lock
 + a `leader_lease` table with heartbeat) elects exactly one replica as
-**leader**; only the leader runs the RQ worker + periodic tasks. All
-replicas serve HTTP + WebSocket identically. If the leader dies, a follower
+**leader**; every replica runs the pgqueue claim loop, but only the leader
+enqueues (schedules) periodic tasks. All replicas serve HTTP + WebSocket
+identically. If the leader dies, a follower
 acquires the lease within the heartbeat interval (default 10 s). The
 election is re-checked on every request via a lightweight in-memory
 flag refreshed by a background thread.
@@ -102,7 +108,7 @@ KubeDash/
 ├── backend/
 │   ├── app/
 │   │   ├── __init__.py          ← create_app factory
-│   │   ├── extensions.py        ← Smorest, SQLAlchemy, JWT, SocketIO, RQ, limiter, migrate
+│   │   ├── extensions.py        ← Smorest, SQLAlchemy, JWT, SocketIO, limiter, migrate
 │   │   ├── core/
 │   │   │   ├── config.py        ← env-driven settings (dev/stage/prod)
 │   │   │   ├── security.py      ← OIDC, JWT issue/verify, RBAC proxy
@@ -154,7 +160,7 @@ KubeDash/
 │   │   │   ├── loki.py
 │   │   │   ├── tempo.py
 │   │   │   └── grafana.py
-│   │   ├── tasks/               ← RQ tasks (run on leader only)
+│   │   ├── tasks/               ← pgqueue tasks (claims on every replica; enqueue leader-gated)
 │   │   │   ├── cluster_sync.py
 │   │   │   ├── health.py
 │   │   │   ├── alerts.py
@@ -177,7 +183,7 @@ KubeDash/
 │   │   ├── api/
 │   │   ├── services/
 │   │   └── tasks/
-│   ├── wsgi.py                  ← Gunicorn entrypoint (Flask + RQ worker)
+│   ├── wsgi.py                  ← Gunicorn entrypoint (Flask + pgqueue worker thread)
 │   ├── pyproject.toml           ← uv-managed deps
 │   └── Dockerfile               ← multi-stage: build SPA → runtime
 ├── frontend/                    ← scaffolded from coreui-free-react-admin-template
@@ -374,17 +380,18 @@ the integration boundary:
   Deployment → Pod, Ingress → Service, PVC → Pod) from the informer cache.
   Pure function; no extra API calls.
 - **`timeline.py`** — watches K8s `Event` objects + diffs resource changes
-  (informer compare). Stores in `audit_log` (Postgres) with a 24 h ring
-  buffer in Redis.
+  (informer compare). Stores in `audit_log` (Postgres); the 24 h retention
+  window is pruned by the leader reaper (off Redis — ADR-0029/0030).
 - **`helm.py`** — shells out to `helm` (bundled in the image) for release
   list / get / upgrade / rollback / uninstall. Write ops gated by RBAC +
   `features.helmWrite`.
 - **`gitops.py`** — reads ArgoCD + FluxCD CRDs via the dynamic client.
   Drift detection, diagnosis pipeline, lifecycle awareness.
 - **`audit.py`** — 44+ best-practices checks as pure functions over the
-  informer cache. Runs as RQ task (leader, 5 min) + on-demand.
-- **`tls.py`** — parses TLS secrets, computes expiry. RQ task (leader,
-  daily) + on-demand.
+  informer cache. Runs as a pgqueue task (enqueue leader-gated, 5 min) +
+  on-demand.
+- **`tls.py`** — parses TLS secrets, computes expiry. pgqueue task (enqueue
+  leader-gated, daily) + on-demand.
 - **`cost.py`** — PromQL queries for OpenCost / Kubecost metrics.
   Auto-detects the metric family.
 - **`network_path.py`** — hop-ordered reachability diagnosis over the
@@ -564,12 +571,11 @@ Key env vars:
 
 | Var | Purpose |
 |---|---|
-| `KUBEDASH_ROLE` | `leader` (runs RQ worker) or `follower` (HTTP only) |
+| `KUBEDASH_ROLE` | replica role label (default `worker`); task enqueue/scheduling + the reaper are gated by the `leader_lease` leader, not this var |
 | `KUBEDASH_REPLICA_ID` | unique id for this replica (set by K8s Downward API) |
 | `KUBEDASH_SECRET_KEY` | AES-256-GCM key for kubeconfig encryption |
 | `KUBEDASH_JWT_SECRET` | HS256 signing key for JWTs |
 | `DATABASE_URL` | PostgreSQL connection string |
-| `REDIS_URL` | Redis connection string (cache + RQ broker) |
 | `CORS_ORIGINS` | comma-separated allowed origins (UI) |
 | `OIDC_CLIENT_ID` / `OIDC_CLIENT_SECRET` / `OIDC_ISSUER` | OIDC SSO config |
 
@@ -577,10 +583,10 @@ Key env vars:
 
 - **OTel** — Flask + SQLAlchemy + httpx instrumented, OTLP → Tempo/Jaeger.
 - **Prometheus** — `/metrics` on the API (request duration, in-flight,
-  cluster-watch lag, RQ task duration, leader-election status).
+  cluster-watch lag, task duration, leader-election status).
 - **Structured logs** — JSON to stdout (Loki ingests).
-- **Health endpoints** — `/healthz` (liveness), `/readyz` (DB + Redis + one
-  cluster reachable + leader status).
+- **Health endpoints** — `/healthz` (liveness), `/readyz` (database probe —
+  Postgres-only since the Redis removal, ADR-0029/0030).
 
 ---
 
@@ -839,7 +845,7 @@ class RBACTemplate(db.Model):
 User requests: "bind template 'developer' to user 'jdoe' in namespace 'production'"
     │
     ▼
-KubeDash controller (RQ task, leader-only)
+KubeDash controller (pgqueue task, enqueue leader-gated)
     │
     ├── 1. Create/patch a Role "kubedash-developer" in namespace "production"
     │      (rules = template.rules, labels: kubedash.io/template=developer)
@@ -862,7 +868,7 @@ KubeDash controller (RQ task, leader-only)
 - **Idempotent:** re-applying the same template to the same user + namespace
   is a no-op (the Role/RoleBinding already exist with the right rules).
 - **Drift detection:** if someone edits a `kubedash.io/template` Role
-  directly (via kubectl), the next RQ sync detects the drift and either
+  directly (via kubectl), the next drift-check task detects the drift and either
   re-applies the template (if `rbac.driftPolicy: enforce`) or flags it
   (if `rbac.driftPolicy: warn`).
 - **Deletion:** removing a binding deletes the RoleBinding. The Role is
@@ -996,7 +1002,7 @@ def generate_kubeconfig(*, user_sub: str, db_session, settings) -> str:
 # user detail shows bindings only.
 ```
 
-### Drift detection (RQ task) — not implemented
+### Drift detection (pgqueue task) — not implemented
 
 > Design only. The user-management change (ADR-0013 core) ships templates,
 > bind/unbind and self-service kubeconfig; the `rbac_drift_check` task below
@@ -1060,27 +1066,29 @@ becomes unusable **immediately**, not at its natural expiry.
 
 | Credential path | Revocation mechanism |
 |---|---|
-| Web session (JWT) | Logout deletes the row from `refresh_tokens`, adds the `jti` to a Redis revocation set checked by the JWT verify hook, and clears the session cookies. The 15-min JWT is short enough that the revocation set only needs to live `TTL(JWT)` (15 min). |
-| kubectl plugin (OIDC ID token) | Logout triggers **OIDC RP-initiated logout** (`end_session_endpoint`, `post_logout_redirect_uri`), so the IdP revokes the refresh token. The plugin's next `get-token` refresh fails → browser re-auth. For clusters where the K8s API server accepts a *KubeDash-issued* token (not the raw IdP token), the same `jti` revocation set is checked on the `/kubectl/auth/v1/token` endpoint. |
+| Web session (JWT) | Logout deletes the row from `refresh_tokens`, adds the `jti` to the Postgres `revoked_jtis` deny-list checked by the JWT verify hook, and clears the session cookies. The 15-min JWT is short enough that the deny-list row only needs to live `TTL(JWT)` (15 min). |
+| kubectl plugin (OIDC ID token) | Logout triggers **OIDC RP-initiated logout** (`end_session_endpoint`, `post_logout_redirect_uri`), so the IdP revokes the refresh token. The plugin's next `get-token` refresh fails → browser re-auth. For clusters where the K8s API server accepts a *KubeDash-issued* token (not the raw IdP token), the same `jti` deny-list is checked on the `/kubectl/auth/v1/token` endpoint. |
 | Cert-based access (CSR) | Logout calls `revoke_user_csr(user)` — the KubeDash-serving certificate (signer `kubernetes.io/kubedash-apiserver-client`) is revoked in the cluster's certificate authority. The cert remains valid in TLS terms but is rejected by the K8s API server's client CA check once revoked (CRL / OCSP, or the cert is removed from the CA bundle KubeDash publishes). |
 
 **Key design choice:** revocation is **additive** (a deny-list), not
-stateful per-token. The deny-list is Redis (fast, shared across replicas)
-with a TTL equal to the JWT lifetime, so it self-cleans. No DB migration
-beyond the existing `refresh_tokens` table.
+stateful per-token. The deny-list is the Postgres `revoked_jtis` table
+(shared across replicas/nodes; a primary-key lookup on the verify-hook hot
+path) with `expires_at` = the JWT expiry; a leader reaper prunes expired
+rows (replaces Redis TTL self-cleaning; the store moved from Redis per
+ADR-0030).
 
 **Endpoints:**
 
 ```
 POST /auth/logout
   1. Delete the user's refresh_token row
-  2. Add jti to the Redis revocation set (TTL = JWT expiry)
+  2. Add jti to the revoked_jtis deny-list (expires_at = JWT expiry)
   3. Call OIDC end_session (if the IdP advertises one)
   4. Revoke the user's KubeDash-serving CSR (cert path)
   5. Audit: action="logout", cluster=all-bound
 ```
 
-**ADR:** ADR-0014.
+**ADR:** ADR-0030 (supersedes ADR-0014).
 
 ---
 
@@ -1163,7 +1171,7 @@ class NamespaceRequest(db.Model):
 
 ### Auto-expiry (TTL'd grants)
 
-The `access_expiry` RQ task (leader-only, every 1 min, § 3.7) scans
+The `access_expiry` pgqueue task (enqueue leader-gated, every 1 min, § 3.7) scans
 `namespace_requests` and `access_requests` for `status=active` rows whose
 `expires_at <= now()`, then:
 
@@ -1261,7 +1269,7 @@ POST /api/v1/access/requests/<id>/approve
 
 ### Auto-revert
 
-The same `access_expiry` RQ task (leader-only, every 1 min) handles PAM
+The same `access_expiry` pgqueue task (enqueue leader-gated, every 1 min) handles PAM
 expiries:
 
 1. Find `access_requests` with `status=active` and `expires_at <= now()`.
@@ -1987,15 +1995,17 @@ cluster has its own Prometheus).
 - **Gunicorn:** 4 workers × 2 threads (tunable via `GUNICORN_WORKERS` /
   `GUNICORN_THREADS` env). `eventlet` or `gevent` worker class for
   WebSocket support.
-- **RQ worker:** spawned as a background thread in `wsgi.py` at startup,
-  gated by `KUBEDASH_ROLE=leader`. No separate worker container.
+- **pgqueue worker:** a daemon thread in the Gunicorn master (started from
+  `wsgi.py`); every replica claims from the Postgres `tasks` table, only
+  enqueue/scheduling is leader-gated (ADR-0029/0031). No separate worker
+  container.
 
 ### 7.2 Helm chart
 
 `charts/kubedash/` — one chart, **one Deployment** (N replicas) +
-Service + Ingress + ConfigMap + Secret. Optional subcharts:
-`postgresql` (bitnami), `redis` (bitnami) for all-in-one dev; in prod,
-external PG + Redis via `values.yaml`.
+Service + Ingress + ConfigMap + Secret. Optional subchart:
+`postgresql` (bitnami) for all-in-one dev; in prod, external PG via
+`values.yaml` (Redis is not part of the stack — ADR-0029/0030).
 
 Key `values.yaml`:
 
@@ -2035,8 +2045,6 @@ mcp:
   trustedOrigins: []         # extra origins allowed to call /mcp
 postgresql:
   enabled: true            # set false in prod (external PG)
-redis:
-  enabled: true            # set false in prod (external Redis)
 ```
 
 ### 7.3 CI/CD (GitHub Actions)
@@ -2057,8 +2065,8 @@ configured via `values.yaml` (`auth.oidc.issuer`, `auth.oidc.clientId`,
 
 Each replica gets a unique `KUBEDASH_REPLICA_ID` via the K8s Downward API
 (`metadata.name` of the Pod). All replicas are `KUBEDASH_ROLE=leader`
-(candidates); the leader election module decides which one actually runs
-the RQ worker.
+(candidates); the leader election module decides which one enqueues
+periodic tasks and reaps (claims run on every replica).
 
 ### 7.5 Tuning for slow / high-latency clusters
 
@@ -2144,7 +2152,7 @@ ingress asks, and the apps receive the forwarded identity.
 | Ingress → KubeDash (verify call) | mTLS, or a shared `X-Auth-Request-Auth` token (Helm secret). Not open to clients. |
 | Client → ingress | TLS (cert-manager / external). The client presents a KubeDash JWT or session cookie. |
 | Header forgery | Backends re-verify the JWT where possible; `X-Auth-Signature` (HMAC) for backends that rely on headers only. The ingress is the only party that may set `X-Remote-*`. |
-| Revocation | The verify endpoint checks the same Redis `jti` revocation set as the main API (§ 5B.1), so logout is honoured at the ingress too. |
+| Revocation | The verify endpoint checks the same Postgres `revoked_jtis` deny-list as the main API (§ 5B.1), so logout is honoured at the ingress too. |
 | Rate limiting | The verify endpoint is rate-limited (it is on the hot path of every request to protected apps). |
 
 **Helm values:**
@@ -2424,7 +2432,7 @@ no phoning home, no IdP round-trip per request, no image pulls, no telemetry.
 3. **Images pre-loaded.** The Helm chart uses `imagePullPolicy: IfNotPresent`
    and the operator loads images into the cluster's registry (or as
    `docker save`/`kind load` artifacts) **before** the air gap. No runtime
-   pulls. The KubeDash image, PG, Redis, and any optional subcharts are all
+   pulls. The KubeDash image, PG, and any optional subcharts are all
    in the air-gap image bundle.
 4. **CLI / kubectl plugin offline.** The `kubectl kubedash` binary is
    distributed as a file (not via Krew's network fetch); `kubectl kubedash
@@ -2441,7 +2449,7 @@ no phoning home, no IdP round-trip per request, no image pulls, no telemetry.
 
 ```
 1. (online staging) Build the air-gap bundle:
-   - KubeDash image + PG + Redis + (optional) observability images → .tar
+   - KubeDash image + PG + (optional) observability images → .tar
    - Helm chart + subcharts → .tgz
    - kubectl kubedash binary (5 OS/arch) → .tar.gz
    - IdP metadata + JWKS snapshot (if not on internal net) → .json
@@ -2453,7 +2461,7 @@ no phoning home, no IdP round-trip per request, no image pulls, no telemetry.
        --set auth.oidc.issuer=https://sso.internal.example  # internal IdP
        --set auth.oidc.jwksFile=/etc/kubedash/jwks.json      # cached JWKS
 4. (air-gap) Verify:
-   - /readyz shows DB + Redis + one cluster reachable + leader
+   - /readyz shows DB (Postgres-only) + one cluster reachable + leader
    - login via the internal IdP works
    - kubectl kubedash get-token works (browser → internal IdP → token)
 ```
@@ -2524,7 +2532,8 @@ multi-cluster, Python/Flask, web-first architecture.
    why, what changed" value prop.
    - Backend: `services/timeline.py` — watches K8s `Event` objects (via
      informer) + diffs resource changes (informer compare). Stores in
-     `audit_log` (Postgres) with a ring-buffer in Redis for the last 24 h.
+     `audit_log` (Postgres); the 24 h retention window is pruned by the
+     leader reaper (off Redis — ADR-0029/0030).
    - Pluggable storage: **memory** (dev, last 10k events) → **Postgres**
      (prod, pruned at 90 d). Config: `timeline.storage: memory|postgres`.
    - Frontend: `src/views/Timeline/` — virtualised list (react-window),
@@ -2594,7 +2603,7 @@ multi-cluster, Python/Flask, web-first architecture.
      per-resource opt-out via annotation
      (`kubedash.io/ignore-checks: check1,check2`).
    - Backend: `services/audit.py` — pure functions over the informer cache.
-     Runs as an RQ task (leader-only, every 5 min) + on-demand.
+     Runs as a pgqueue task (enqueue leader-gated, every 5 min) + on-demand.
    - New Smorest `Api`: `audit` → `/clusters/<id>/audit`.
    - New view: `src/views/Audit/` — check-grouped remediation queue,
      DataTables with severity/category/framework filters, expand for
@@ -2619,7 +2628,8 @@ multi-cluster, Python/Flask, web-first architecture.
    subject, issuer, validity period. Dashboard-level expiry overview
    (7 d / 30 d / 90 d buckets). Alert before outage.
    - Backend: `services/tls.py` — parses `tls.crt` / `tls.key` from
-     `kubernetes.io/tls` secrets. Runs as RQ task (leader, daily) +
+     `kubernetes.io/tls` secrets. Runs as a pgqueue task (enqueue
+     leader-gated, daily) +
      on-demand.
    - New Smorest `Api`: part of `audit` or standalone `tls` →
      `/clusters/<id>/tls/certificates`.
@@ -2753,7 +2763,7 @@ These are not new features — they change **how** existing components work.
 | Injection            | Pydantic validation on all inputs; SQLAlchemy parameterised; no raw SQL |
 | CSRF                 | Session cookies are `SameSite=Lax` (access) / `Strict` (path-scoped refresh), JSON-only state-changing endpoints, no state-changing GETs (ADR-0025) |
 | CORS                 | Locked to the UI origin (env `CORS_ORIGINS`)               |
-| Rate limiting        | Flask-Limiter, per-IP + per-user (storage backend to be re-pointed off Redis at implementation — ADR-0029/0030 remove Redis as a stateful dep) |
+| Rate limiting        | Flask-Limiter, per-IP + per-user (storage off Redis — Redis removed from the stack by ADR-0029/0030) |
 | Audit                | Every mutating request → `audit_log` (who/what/when/diff)  |
 | Dependencies         | `pip-audit` + `npm audit` in CI; Dependabot enabled         |
 | Images               | Slim base, non-root, SCANNED (Trivy) in CI                  |
@@ -2766,14 +2776,14 @@ These are not new features — they change **how** existing components work.
 | Layer        | Tooling                              | Coverage target |
 |--------------|--------------------------------------|-----------------|
 | Unit         | pytest + pytest-asyncio              | ≥ 80 % services |
-| API          | pytest + Flask test client + Testcontainers (PG, Redis, kind) | ≥ 90 % Smorest `Api` classes |
+| API          | pytest + Flask test client + Testcontainers (PG, kind) | ≥ 90 % Smorest `Api` classes |
 | Integration  | kind cluster + real K8s objects      | core CRUD + RBAC + logs + metrics |
 | E2E          | Playwright + Helm + kind             | 5 golden user journeys |
 | Performance  | k6 (load) — 500 concurrent users on `/clusters` list | p95 < 500 ms |
 | Security     | Trivy (images + deps), bandit (Py), eslint-plugin-security (TS) | 0 criticals |
 | Leader elect | pytest — kill leader, verify failover < 15 s, no duplicate tasks | 100 % scenarios |
 
-**Testcontainers** is the default for DB + Redis fixtures. A shared
+**Testcontainers** is the default for the DB (Postgres) fixture. A shared
 `kind` cluster fixture (via `kind.load_docker_image`) is used for
 integration tests; it is torn down per-test-file, not per-test, for speed.
 
@@ -2833,8 +2843,9 @@ These are **not** decisions yet. They will become ADRs when they are.
   *Superseded-in-part (ADR-0021): the bootstrap-admin local mode is now
   implemented; the multi-user no-IdP mode remains deferred (ADR-0013).*
 - **Celery migration** — if task volume grows beyond 4 periodic tasks or
-  requires fan-out / priorities, migrate RQ → Celery (broker is already
-  Redis; task modules are framework-agnostic).
+  requires fan-out / priorities, migrate the Postgres `tasks` queue →
+  Celery (task modules are framework-agnostic; a Celery broker would be a
+  new dependency). Recorded exit from ADR-0007, carried by ADR-0029.
 
 ---
 
@@ -2975,14 +2986,14 @@ Canonical terms used in this file (details in the terms files):
 - **Self-service kubeconfig** — a generated multi-cluster kubeconfig that
   references the KubeDash credential plugin (not an embedded token).
   Downloaded from the UI after login.
-- **Drift detection** — the `rbac_drift_check` RQ task that compares
+- **Drift detection** — the `rbac_drift_check` pgqueue task that compares
   cluster RBAC objects (labelled `kubedash.io/template`) against the
   templates in Postgres, and enforces or warns on divergence.
 - **Tracer** — a distributed trace (Tempo/Jaeger).
 - **Session revocation propagation** — the property that ending a KubeDash
   web session (logout) immediately invalidates all credentials derived from
-  it, via a Redis `jti` revocation set + OIDC RP-initiated logout + CSR
-  revocation. (ADR-0014.)
+  it, via the Postgres `revoked_jtis` deny-list (off Redis, ADR-0030) +
+  OIDC RP-initiated logout + CSR revocation. (ADR-0030, supersedes ADR-0014.)
 - **NaaS (Namespace-as-a-Service)** — self-service namespace onboarding: a
   user requests access to (or a new) namespace, an approver approves, and
   KubeDash provisions it. Optional TTL'd grants are auto-revoked.

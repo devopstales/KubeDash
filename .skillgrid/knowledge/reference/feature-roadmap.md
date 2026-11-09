@@ -27,7 +27,7 @@ Two pointer sections of `.skillgrid/ARCHITECTURE.md`:
   Kerberos/SPNEGO (OIDC-federated at the IdP edge, not native), custom
   provisioning task types, full SCIM filter grammar, no-IdP multi-user
   mode (superseded-in-part by ADR-0021's bootstrap admin), and the
-  RQ → Celery migration trigger (fan-out / priorities beyond ~4
+  pgqueue → Celery migration trigger (fan-out / priorities beyond ~4
   periodic tasks).
 
 **Roadmap research already in flight (2026-11-06).** Four roadmap

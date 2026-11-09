@@ -57,9 +57,9 @@ session cookie and, on success, returns `200` + `X-Remote-User`,
 `X-Remote-Groups`, `X-Remote-Cluster` headers; on failure, `401`. The ingress
 calls it via `auth_request`/`forwardauth`/`ext_authz` and forwards the headers
 to the backend. The ingress→KubeDash call is protected by mTLS or a shared
-`X-Auth-Request-Auth` token (not open to clients). The endpoint checks the
-same Redis `jti` revocation set as the main API (ADR-0014), so logout is
-honoured at the edge. For backends that trust only the forwarded headers
+`X-Auth-Request-Auth` token (not open to clients). The endpoint checks the same
+Postgres `revoked_jtis` deny-list as the main API (ADR-0030; formerly a
+Redis set per ADR-0014), so logout is honoured at the edge. For backends that trust only the forwarded headers
 (can't verify KubeDash JWTs), KubeDash signs them with an HMAC
 (`X-Auth-Signature`) so a compromised ingress cannot forge them.
 
@@ -123,5 +123,6 @@ Auth only via the mesh's `ext_authz`.
 
 - OpenUnison's ingress integrations (NGINX/Traefik/F5/Istio/Gateway API) are
   the reference pattern.
-- Related: ADR-0014 (the verify endpoint reuses the `jti` revocation set),
-  ADR-0020 (air-gap: the verify endpoint is an internal call).
+- Related: ADR-0030 (the verify endpoint reuses the `jti` deny-list;
+  supersedes ADR-0014), ADR-0020 (air-gap: the verify endpoint is an
+  internal call).

@@ -1,7 +1,7 @@
 ---
 type: InvariantContract
 title: "The SAR verdict cache key carries every SAR attribute"
-description: "SubjectAccessReview verdicts are cached in Redis under sar:<cluster>:<sub>:<verb>:<resource>:<group>:<namespace>:<name> (empty segment = unset), TTL 30 s; a verdict for one namespace or object never answers for another. (ADR-0004, amended 2026-10-21.)"
+description: "SubjectAccessReview verdicts are cached in the Postgres `kv` table under sar:<cluster>:<sub>:<verb>:<resource>:<group>:<namespace>:<name> (empty segment = unset), TTL 30 s; a verdict for one namespace or object never answers for another. (ADR-0004, amended 2026-10-21; store moved off Redis 2026-10-28, ADR-0029/0030.)"
 tags: [rbac, sar, cache, adr-0004]
 status: stable
 generated: { by: skillgrid/knowledge-init, at: 2026-11-06T00:00:00Z }
@@ -29,12 +29,12 @@ it answered.
 **The contract.**
 
 - `rbac.can(user, cluster, verb, resource, group, namespace, name)`
-  checks the Redis cache first; the key is
+  checks the `kv` cache first; the key is
   `sar:<cluster.id>:<user.sub>:<verb>:<resource>:<group>:<namespace>:<name>`
   with an **empty segment for unset** namespace/name
   (`backend/app/services/rbac.py:36`).
-- Verdicts are stored as `"1"`/`"0"` with `ex=SAR_TTL` (30 s,
-  `rbac.py:24`).
+- Verdicts are stored as `"1"`/`"0"` with `ttl=SAR_TTL` (30 s, `rbac.py`
+  `SAR_TTL = 30`).
 - A verdict for one namespace or object must never answer for another —
   if any attribute drops out of the key, the invariant is broken.
 - Denial surfaces as 403 with the stable code `RBAC_DENIED`

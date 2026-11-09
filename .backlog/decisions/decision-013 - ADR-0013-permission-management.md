@@ -64,7 +64,7 @@ layer, extended to N clusters + SSO?
   downloaded from the UI after login
   (`backend/app/services/kubeconfig_render.py`,
   `backend/app/services/permission.py`).
-- **Drift detection** — the `rbac_drift` RQ task (leader, 10 min cadence
+- **Drift detection** — the `rbac_drift` pgqueue task (enqueue leader-gated, 10 min cadence
   target) compares template-labelled cluster objects against Postgres
   and enforces or warns. **Not in the base change:** as of the
   2026-11-06 backfill `backend/app/tasks/rbac_drift.py` is a stub

@@ -22,7 +22,7 @@ claims:
 # app/services is Flask-free (one documented carve-out)
 
 `backend/app/services/` is the integration boundary: pure Python modules
-that the Smorest `Api` layer (and the RQ tasks) call with explicit
+that the Smorest `Api` layer (and the pgqueue tasks) call with explicit
 arguments. No service module imports Flask at module level, so services
 are testable without an app and reusable from the worker process.
 

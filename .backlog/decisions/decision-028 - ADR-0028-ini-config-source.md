@@ -123,7 +123,7 @@ INI schema (4.1 parity, minus the dropped plugin system):
 | `[DEFAULT]` | `app_mode` → `flask_env` | `development` \| `production` |
 | `[security]` | `admin_password` → bootstrap admin password; new `jwt_secret`, `secret_key` | JWT + kubeconfig-encryption keys move out of code defaults into the file |
 | `[database]` | `type/host/name/user/password` (or `url`) → `database_url` | 5.0 is Postgres-only; `type=postgres`, sqlite dropped |
-| `[remote_cache]` | redis host/port/db/password → `redis_url` | cache-time keys dropped (5.0 has no short/long cache) |
+| `[remote_cache]` | redis host/port/db/password → `redis_url` | cache-time keys dropped (5.0 has no short/long cache); after the Redis removal (ADR-0029/0030) `redis_url` no longer exists in Settings and the section is not parsed — inert, retained for 4.1 format parity |
 | `[sso_settings]` | `issuer_url/callback_url/scope/client_id/secret` → OIDC fields | 4.1 `secret` → `oidc_client_secret` |
 | `[monitoring]` | `jaeger_enabled`, `jaeger_http_endpoint` | new 5.0 section (observability, ADR-0003) |
 | `[k8s]` | **not 1:1** — see Consequences | 4.1 = one static cluster; 5.0 = multi-cluster registry (ADR-0002) |

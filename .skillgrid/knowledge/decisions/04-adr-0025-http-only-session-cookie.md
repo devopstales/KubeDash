@@ -47,7 +47,8 @@ there is no Flask session cookie and `flask_login` is not a dependency.
   must keep a header-based credential (ADR-0011).
 - The air-gapped, single-container deployment (ADR-0006, ADR-0020) rules out
   an external session service; Redis is already present for OIDC state and
-  the revocation deny-list (ADR-0014).
+  the revocation deny-list (ADR-0014) — now Postgres (the `kv` table +
+  `revoked_jtis`; the Redis removal, ADR-0029/0030).
 - Multi-replica consistency (ADR-0008) favours a stateless access token with
   a database-backed refresh row over a sticky per-replica session.
 

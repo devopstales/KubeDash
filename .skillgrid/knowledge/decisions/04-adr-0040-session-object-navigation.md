@@ -47,8 +47,8 @@ still land on the object — the identity travels as a same-origin form
   API, ADR-0004).
 - No backend change (R10, as amended 2026-11-04): no new API endpoint, no
   migration, no new cookie — the token handoff rides the existing SPA
-  fallback (static plumbing) + a 60 s Redis stash keyed by the session's
-  JWT subject (see Amendments).
+  fallback (static plumbing) + a 60 s Postgres `kv`-table stash keyed by
+  the session's JWT subject (see Amendments).
 - No new dependency (ADR-0020 air-gap): `sessionStorage` + a hidden form
   are platform APIs.
 - Migration must not break existing bookmarks or in-flight e2e (one-shot
@@ -69,7 +69,7 @@ still land on the object — the identity travels as a same-origin form
    avoid. *Revisited 2026-11-04 (Amendments): the QA gate proved the
    pure-client token delivery non-functional; the user chose this option's
    mechanism WITHOUT its endpoint — the SPA fallback itself carries the
-   handoff (303 bounce + `obj_incoming:<sub>` Redis TTL stash + one-shot
+   handoff (303 bounce + `obj_incoming:<sub>` `kv`-table TTL stash + one-shot
    meta injection).*
 4. **`sessionStorage` object ref + form-POST deep link (CHOSEN).**
    Identity lives in tab-private `sessionStorage`; refresh survives in-tab;
@@ -99,8 +99,10 @@ The contract (requirements R1–R10 in `briefing.md`):
   `target="_blank"`. The identity payload rides a token-scoped, 60 s
   self-deleting `localStorage` relay (`kd_ref_<token>` + `_exp`). The SPA
   fallback bounces the POST as a 303 to the same path and stashes the
-  token in Redis under `obj_incoming:<sub>` (the `kd_access` JWT subject;
-  TTL 60 s); the fresh tab's document load gets it back as a one-shot
+  token in the Postgres `kv` table under `obj_incoming:<sub>` (the
+  `kd_access` JWT subject; TTL 60 s — the Redis stash moved to `kv` with
+  the Redis removal, ADR-0030); the fresh tab's document load gets it back
+  as a one-shot
   `<meta name="kd-object-incoming">` injected into index.html (GETDEL —
   consumed by exactly one load; the injected document is no-store). The
   SPA mount consumes the meta, hydrates its registry from the relay, and
@@ -201,8 +203,10 @@ The contract (requirements R1–R10 in `briefing.md`):
   `?o=` into jsdom directly; the e2e scenario that would have caught it was
   runner-less until that gate. The user chose delivery through the
   **server session**, not the URL: the SPA fallback bounces the POST as a
-  303, stashes the token in Redis under `obj_incoming:<sub>` (TTL 60 s =
-  the relay window), and the first subsequent GET injects it as a one-shot
+  303, stashes the token in the Postgres `kv` table under
+  `obj_incoming:<sub>` (TTL 60 s = the relay window; off Redis per
+  ADR-0030, 2026-10-28), and the first subsequent GET injects it as a
+  one-shot
   `<meta name="kd-object-incoming">` (GETDEL; injected document no-store).
   R10 is carved as recorded in Decision Drivers: the backend diff is the
   static-fallback plumbing (`app/core/object_handoff.py` + the catch-all

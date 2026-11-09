@@ -1,7 +1,7 @@
 ---
 type: InvariantContract
 title: "No object identity in any SPA URL (session-ref navigation)"
-description: "The open object is a token-keyed sessionStorage ref (kd_object_refs + kd_object_active, 15-min lazy expiry); cross-tab deep links ride a form-POST + 303 bounce + one-shot meta (obj_incoming:<sub>, Redis TTL 60 s); the URL stays the clean route. (ADR-0040.)"
+description: "The open object is a token-keyed sessionStorage ref (kd_object_refs + kd_object_active, 15-min lazy expiry); cross-tab deep links ride a form-POST + 303 bounce + one-shot meta (obj_incoming:<sub>, `kv`-table TTL 60 s); the URL stays the clean route. (ADR-0040.)"
 tags: [object-navigation, deep-link, session-storage, adr-0040]
 status: stable
 generated: { by: skillgrid/knowledge-init, at: 2026-11-06T00:00:00Z }
@@ -45,7 +45,8 @@ paths only. (ADR-0040; supersedes the 2026-10-28 `?name=` +
 - **Cross-tab deep link:** the share affordance submits a hidden
   same-origin form **POST** (`name="o"`, token only) to the clean route
   in a new tab; the SPA fallback bounces the POST as a **303**, stashes
-  the token in Redis under `obj_incoming:<sub>` (TTL 60 s), and the
+  the token in the Postgres `kv` table under `obj_incoming:<sub>` (TTL 60
+  s), and the
   fresh tab's document load receives it as a one-shot
   `<meta name="kd-object-incoming">` (GETDEL — consumed by exactly one
   load; the injected document is `no-store`). The identity payload rides

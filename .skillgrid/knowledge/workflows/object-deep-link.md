@@ -1,7 +1,7 @@
 ---
 type: BusinessWorkflow
 title: "Object deep link: in-tab open and cross-tab share (form-POST + 303 + one-shot meta)"
-description: "How a K8s object is opened in the SPA (sessionStorage ref) and shared across tabs (hidden form POST, SPA-fallback 303 bounce, obj_incoming Redis stash, one-shot kd-object-incoming meta, localStorage relay adoption) with the URL staying clean. (ADR-0040.)"
+description: "How a K8s object is opened in the SPA (sessionStorage ref) and shared across tabs (hidden form POST, SPA-fallback 303 bounce, obj_incoming `kv`-table stash, one-shot kd-object-incoming meta, localStorage relay adoption) with the URL staying clean. (ADR-0040.)"
 tags: [object-navigation, deep-link, workflow, adr-0040]
 status: stable
 generated: { by: skillgrid/knowledge-init, at: 2026-11-06T00:00:00Z }
@@ -42,8 +42,8 @@ gets opened and shared under that constraint.
    to the clean route with `target="_blank"`.
 2. **Server** (`backend/app/core/object_handoff.py`): the SPA fallback
    bounces the POST as **303** to the same path and stashes the token in
-   Redis under `obj_incoming:<sub>` (the `kd_access` JWT subject; TTL
-   60 s = the relay window).
+   the Postgres `kv` table under `obj_incoming:<sub>` (the `kd_access` JWT
+   subject; TTL 60 s = the relay window).
 3. **Fresh tab**: its first document GET gets the token back as a
    one-shot `<meta name="kd-object-incoming">` injected before
    `</head>` (`GETDEL` — exactly one load consumes it; the injected
