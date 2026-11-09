@@ -112,7 +112,7 @@ Feature: IngressClass + GatewayClass Views (List + Data)
   @ingressclasses-api
   Scenario: The singular IngressClass kind is rejected
     When I send GET /api/v1/clusters/prod/resources/ingressclass
-    Then the response status is 400
+    Then the response status is 404
     And the error code is "RESOURCE_KIND_NOT_SUPPORTED"
 
   # ── GatewayClass list ────────────────────────────────────────────────────
@@ -225,7 +225,7 @@ Feature: IngressClass + GatewayClass Views (List + Data)
   @gatewayclasses-api
   Scenario: The singular GatewayClass kind is rejected
     When I send GET /api/v1/clusters/prod/resources/gatewayclass
-    Then the response status is 400
+    Then the response status is 404
     And the error code is "RESOURCE_KIND_NOT_SUPPORTED"
 
   # ── Routing and nav ──────────────────────────────────────────────────────

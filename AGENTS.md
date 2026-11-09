@@ -2,9 +2,10 @@
 
 KubeDash is a multi-cluster Kubernetes dashboard with OIDC auth and
 observability (logs, metrics, traces). One container: Gunicorn (Flask 3 +
-Smorest) serves the REST API **and** the built React SPA; an in-process RQ
-worker runs only on the leader replica (PG advisory lock + `leader_lease`
-table). Python 3.12 / React 19 + TS + Vite / Go 1.22 CLI.
+Smorest) serves the REST API **and** the built React SPA; an in-process pgqueue worker thread
+claims tasks from the Postgres `tasks` queue on every replica; only
+enqueue/scheduling is leader-gated (PG advisory lock + `leader_lease` table)
+— ADR-0029/0031. Python 3.12 / React 19 + TS + Vite / Go 1.22 CLI.
 
 <!-- skillgrid-preamble:start -->
 # Standards
@@ -20,14 +21,14 @@ table). Python 3.12 / React 19 + TS + Vite / Go 1.22 CLI.
 - **Format**: `uv run ruff format` (`backend/`); `corepack pnpm lint --fix` (eslint + prettier, `frontend/`); `gofmt -w .` (`cli/`)
 - **Build (dev)**: `task fe-build` (tsc + eslint + vite → `frontend/dist`); `task build` (CLI, version injected via `-X`; `task cross` for 5 targets)
 - **Run (dev)**: `task dev-stack` (compose + Alembic head + leader backend, plain HTTP :8080 — ADR-0027); `task fe-dev` (vite dev, API proxied to :8080)
-- **Docker (dev deps)**: `task dev-up` (Postgres, Redis, Prometheus, Grafana, Jaeger, SSO); `task kind-up` (local kind + metrics-server, idempotent)
+- **Docker (dev deps)**: `task dev-up` (two-node pgEdge active-active, Prometheus, Grafana, Jaeger — SSO starts with `task dev-stack`); `task kind-up` (local kind + metrics-server, idempotent)
 - **Security scan**: CI Trivy gates the image on CRITICAL (`exit-code: 1`); local `trivy fs . --scanners vuln` is advisory
 
 ## Key Directories
 
 | Dir | What |
 |---|---|
-| `backend/` | Flask 3 + Smorest app factory — `app/{core,api,models,services,tasks}`, `migrations/` (Alembic), `tests/` (pytest), `wsgi.py` (Gunicorn + leader-gated RQ), `Dockerfile` (3-stage), `kubedash.ini` (primary config, ADR-0028), `static/` (the served SPA bundle) |
+| `backend/` | Flask 3 + Smorest app factory — `app/{core,api,models,services,tasks}`, `migrations/` (Alembic), `tests/` (pytest), `wsgi.py` (Gunicorn + pgqueue worker), `Dockerfile` (3-stage), `kubedash.ini` (primary config, ADR-0028), `static/` (the served SPA bundle) |
 | `frontend/` | React 19 + TS + Vite (CoreUI template) — `src/views/` (one folder per route), `tests/` (Vitest + RTL), `e2e/` (Playwright), `STYLEGUIDE.md` (UI pieces) |
 | `cli/` | Go kubectl credential plugin (cobra) |
 | `charts/kubedash/` | Helm chart (N replicas, leader election) — the deployment artifact |
@@ -38,9 +39,9 @@ table). Python 3.12 / React 19 + TS + Vite / Go 1.22 CLI.
 ## Engineering Standards
 
 - **Backend layering:** `app/api/<domain>.py` is one Smorest `Api` per domain (≤ ~300 lines, Pydantic schemas, no cross-domain imports). `app/services/` is pure Python with **no Flask imports** — the integration boundary. `app/models/` is SQLAlchemy 2.0.
-- **Read path:** UI and read services read from the **informer cache**, not per-request K8s API calls (ADR-0010). Mutations go through the API; the cache updates on watch events.
+- **Read path (target):** UI and read services should read from the **informer cache**, not per-request K8s API calls (ADR-0010 — the current spine uses direct per-request reads; see the ADR's deferral note). Mutations go through the API.
 - **Push:** SSE is the primary server→client channel; WebSocket only for bidirectional exec (ADR-0009).
-- **Tasks:** RQ tasks in `app/tasks/` run **only on the leader** (PG advisory lock, ADR-0008).
+- **Tasks:** tasks in `app/tasks/` are claimed from the Postgres queue by any replica; enqueue/scheduling is leader-gated (ADR-0029/0031 — supersedes ADR-0008).
 - **Frontend:** view-folder layout (one folder per route, CoreUI convention). Server state → TanStack Query; UI state → Zustand. No Tailwind — CoreUI SCSS. UI pieces follow `frontend/STYLEGUIDE.md`.
 - **Object navigation:** no object identity in the URL (ADR-0040) — session-scoped object ref + same-origin form-POST deep link; one route per kind (no `/data` suffix).
 
@@ -59,7 +60,7 @@ table). Python 3.12 / React 19 + TS + Vite / Go 1.22 CLI.
 
 ## Architecture Constraints
 
-- **Single container (ADR-0006):** Gunicorn serves the REST API + the built SPA; the RQ worker is in-process and leader-only (ADR-0007/0008).
+- **Single container (ADR-0006):** Gunicorn serves the REST API + the built SPA; the pgqueue worker is in-process on every replica with leader-gated enqueue (ADR-0029/0031; ADR-0007/0008 superseded).
 - **Dev DB is migration-managed:** Alembic is the schema source of truth — never hand-edit the dev DB's schema; `task dev-stack` applies the same head path prod uses.
 - **Chart is the deployment artifact:** `helm lint` + `helm template` must stay green; CI e2e installs the chart into kind against a mock OIDC.
 
@@ -123,7 +124,7 @@ State: `.skillgrid/state.yaml` (dynamic) — where the project is right now (pha
 *Operational rules only — the real source of truth is this section (edit here). Design decisions do not live here; they are ADRs in `.skillgrid/ASSUMPTIONS.md` § LOCKED → `.skillgrid/knowledge/decisions/04-adr-NNNN-slug.md`.*
 
 - **Ship keeps the work branch** — the `ship` phase does NOT merge into `main`. The work branch (`rebase`) is the deliverable and the rollback unit; merging into `main` is a separate, explicit act (VERIFIED assumption, 2026-10-18).
-- **ADR gate** — check `.skillgrid/ASSUMPTIONS.md` § LOCKED before touching an ADR-gated domain (Dependency Policies). New ADRs: madr-full, 4-digit monotonic, never reused (next: 0041); each also gets a `.backlog/decisions/decision-NNN` copy.
+- **ADR gate** — check `.skillgrid/ASSUMPTIONS.md` § LOCKED before touching an ADR-gated domain (Dependency Policies). New ADRs: madr-full, 4-digit monotonic, never reused (next: 0042); each also gets a `.backlog/decisions/decision-NNN` copy.
 - **Conventional commits** only; work units atomic and independently revertable.
 - **Tracker is pipeline-driven** — SDD tickets are created by the `ticketing` skill and phase-lifecycle tracker updates follow `~/.agents/skills/_shared/rules/ticketing/backlogmd.md`. The Backlog nudge's conversation-start `backlog instructions overview` read applies to conversations doing tracker work (create/execute/finalize/lookup); for pipeline work the entry is `.skillgrid/state.yaml` + the in-flight spec, not the tracker. The versioned guides (`task-creation` / `task-execution` / `task-finalization`) stay mandatory before their lifecycle actions.
 - **Spec zone commits before code zone** — spec artifacts land before the change that implements them.

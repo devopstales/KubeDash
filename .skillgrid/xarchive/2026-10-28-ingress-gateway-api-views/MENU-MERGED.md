@@ -17,4 +17,5 @@ re-render.
 Where this spec's artifacts name the standalone route, the tabbed standalone
 page, or the `Gateway API` nav leaf, treat them as describing the pre-merge
 shape; the merged layout follows ADR-0022 (amendment 2026-11-07) and
-`frontend/src/_nav.tsx` (Network group: Services, Ingress, Ingress Class).
+(`frontend/src/_nav.tsx` (Network group: Services, Ingress, Ingress Class,
+plus the two Beta leaves Cert-Manager / Load Balancer from the 2026-10-29 spec).

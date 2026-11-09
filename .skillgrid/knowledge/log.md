@@ -184,3 +184,14 @@
 - `index.md`: reference/ row added.
 - Source: `.skillgrid/xarchive/2026-11-07-dead-code-cleanup/report.md`
   (Surprises/Lessons), whole-branch review ReviewBranchD, per-task reviews.
+
+## 2026-11-09 — 04-adr-0022 amendment corrected (network views review)
+- In-place amendment fix: the 2026-11-07 menu-merge amendment said the
+  Network group is "exactly Services, Ingress, Ingress Class" — factually
+  wrong, the delivered nav also carries the two certmanager-external-
+  loadbalancer Beta leaves (Cert-Manager, Load Balancer). Reworded to
+  scope the "exactly" to the 4.1-parity leaves. Review fix from the
+  three-axis review of the four archived network-view changes
+  (`.skillgrid/xarchive/2026-10-28-{service-views,ingress-gateway-api-views,ingressclass-gatewayclass-views}/`
+  + `2026-10-29-certmanager-external-loadbalancer-views`).
+- `index.md`: unchanged (in-place amendment, no new concept row).

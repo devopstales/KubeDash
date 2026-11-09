@@ -136,7 +136,11 @@ external URLs introduced).
   (`network/ingress.html.j2` / `network/ingress-class.html.j2`): the Gateway
   API kinds (Gateway, HTTPRoute, ReferenceGrant) are now TABS of the Ingress
   page, and GatewayClasses is a tab of the Ingress Class page. The Network
-  group is now exactly Services, Ingress, Ingress Class. The old URLs
+  group's 4.1-parity leaves are now exactly Services, Ingress, Ingress
+  Class (the two certmanager-external-loadbalancer Beta leaves —
+  Cert-Manager, Load Balancer — stay; the 2026-10-29 spec added them and
+  they are outside this merge's scope — 2026-11-09 review correction).
+  The old URLs
   `/network/gateway-api` and `/network/gateway-class` one-shot redirect to
   their merged pages (the ADR-0040 redirect pattern); an active ref of those
   kinds survives the redirect because the ref is session-scoped, not

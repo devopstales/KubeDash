@@ -628,8 +628,10 @@ doors).
     filter (`ReplaceFullPath`).
   - an Ingress with `canary: true` + `canary-weight: 30` → the backendRef
     has `weight: 30`.
-  - an Ingress with `enable-cors: true` + the cors-* annotations → a `CORS`
-    filter (allowOrigins/allowMethods/allowHeaders/allowCredentials/maxAge).
+  - an Ingress with `enable-cors: true` + the cors-* annotations → NO
+    filter: the Gateway API v1 CRD has no CORS filter (verified against
+    the live v1 schema, 2026-11-09 review) — the cors-* keys land in the
+    `warnings` list instead (2026-11-09 review amendment).
   - an Ingress with `force-ssl-redirect: true` + a TLS secret → TWO
     HTTPRoutes (the `<name>-redirect` with `RequestRedirect` on
     `sectionName: http` + the backend route on `sectionName: https-0`).
