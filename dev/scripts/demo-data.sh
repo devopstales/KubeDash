@@ -44,6 +44,26 @@
 #     VolumeSnapshot CRD (namespaced) + one fixture, so the VolumeSnapshot
 #     list + data views render real data (the CRD's presence is what makes
 #     the read non-empty — absent -> []).
+#   - cert-manager.io/v1 (clusterissuers Cluster-scoped + issuers /
+#     certificaterequests / certificates Namespaced) + four fixtures
+#     (demo-cluster-issuer ACME, demo-issuer selfSigned, demo-cert ->
+#     demo-cert-tls secret, demo-cert-request): the Cert-Manager view's four
+#     tabs render real data (CRDs only, NO operator — fixtures carry their
+#     own Ready status, which is the view's green badge tier).
+#   - metallb.io/v1beta2 (ipaddresspools / l2advertisements / bgppeers /
+#     bgpadvertisements, ALL Namespaced to match the backend's namespaced
+#     read — a deliberate deviation from upstream cluster-scoped MetalLB) +
+#     four fixtures (demo-pool, demo-l2, demo-bgp-peer, demo-bgp-adv): the
+#     LoadBalancer view's four tabs render real data, tagged provider=metallb
+#     by the server-side provider detection (CRDs only, NO operator).
+#   - cilium.io (CiliumLoadBalancerIPPool / CiliumL2AnnouncementPolicy /
+#     CiliumBGPPeeringPolicy, all Cluster-scoped) + three fixtures
+#     (demo-cilium-pool, demo-cilium-l2, demo-cilium-bgp): the LoadBalancer
+#     view's FALLBACK provider — invisible while the metallb.io CRDs are
+#     present (MetalLB is primary); delete the four metallb.io CRDs to see
+#     the view flip to these, tagged provider=cilium (CRDs only, NO
+#     operator; the pinned Cilium 1.19.10 ships ippools+l2 CRDs, the BGP
+#     peering CRD is applied if absent).
 #
 # The VPA OPERATOR (recommender + updater + admission-controller, kube-
 # system) is installed first — marker-checked on the VPA CRD so re-runs
@@ -474,11 +494,502 @@ status:
   restoreSize: 100Mi
 YAML
 
+# 12. cert-manager CRDs + fixtures — the Cert-Manager view (4 tabs) reads the
+#     cert-manager.io/v1 registry kinds (list + per-kind data views). The CRD's
+#     presence is what turns the read non-empty (CRD absent -> []). Minimal
+#     schemas (x-kubernetes-preserve-unknown-fields) so the FULL spec/status is
+#     preserved intact for the full-custom-object read path. NO operator is
+#     installed: each fixture carries its own status (a Ready condition — the
+#     view's green Success badge tier). clusterissuers is CLUSTER-scoped; the
+#     other three are namespaced (matches real cert-manager AND the backend's
+#     scope-respecting dispatch: namespaced kinds are read via the selected
+#     namespace). One coherent story: an ACME ClusterIssuer, a selfSigned
+#     Issuer, a Certificate (uses the ClusterIssuer, lands in demo-cert-tls),
+#     and a CertificateRequest (owned by that Certificate, issued by the
+#     namespaced Issuer — the Certificates/Request tabs' Issuer + Owner cells
+#     and the in-page goToTab switch all have real targets).
+k apply -f - <<'YAML'
+apiVersion: apiextensions.k8s.io/v1
+kind: CustomResourceDefinition
+metadata:
+  name: clusterissuers.cert-manager.io
+spec:
+  group: cert-manager.io
+  names:
+    kind: ClusterIssuer
+    listKind: ClusterIssuerList
+    plural: clusterissuers
+    singular: clusterissuer
+  scope: Cluster
+  versions:
+    - name: v1
+      served: true
+      storage: true
+      schema:
+        openAPIV3Schema:
+          type: object
+          x-kubernetes-preserve-unknown-fields: true
+---
+apiVersion: apiextensions.k8s.io/v1
+kind: CustomResourceDefinition
+metadata:
+  name: issuers.cert-manager.io
+spec:
+  group: cert-manager.io
+  names:
+    kind: Issuer
+    listKind: IssuerList
+    plural: issuers
+    singular: issuer
+  scope: Namespaced
+  versions:
+    - name: v1
+      served: true
+      storage: true
+      schema:
+        openAPIV3Schema:
+          type: object
+          x-kubernetes-preserve-unknown-fields: true
+---
+apiVersion: apiextensions.k8s.io/v1
+kind: CustomResourceDefinition
+metadata:
+  name: certificaterequests.cert-manager.io
+spec:
+  group: cert-manager.io
+  names:
+    kind: CertificateRequest
+    listKind: CertificateRequestList
+    plural: certificaterequests
+    singular: certificaterequest
+  scope: Namespaced
+  versions:
+    - name: v1
+      served: true
+      storage: true
+      schema:
+        openAPIV3Schema:
+          type: object
+          x-kubernetes-preserve-unknown-fields: true
+---
+apiVersion: apiextensions.k8s.io/v1
+kind: CustomResourceDefinition
+metadata:
+  name: certificates.cert-manager.io
+spec:
+  group: cert-manager.io
+  names:
+    kind: Certificate
+    listKind: CertificateList
+    plural: certificates
+    singular: certificate
+  scope: Namespaced
+  versions:
+    - name: v1
+      served: true
+      storage: true
+      schema:
+        openAPIV3Schema:
+          type: object
+          x-kubernetes-preserve-unknown-fields: true
+YAML
+k wait --for=condition=Established \
+  crd/clusterissuers.cert-manager.io \
+  crd/issuers.cert-manager.io \
+  crd/certificaterequests.cert-manager.io \
+  crd/certificates.cert-manager.io --timeout=30s >/dev/null
+k -n "$NS" apply -f - <<'YAML'
+apiVersion: cert-manager.io/v1
+kind: ClusterIssuer
+metadata:
+  name: demo-cluster-issuer
+spec:
+  acme:
+    email: demo@example.com
+    server: https://acme-v02.api.letsencrypt.org/directory
+    privateKeySecretRef:
+      name: demo-cluster-issuer-key
+    solvers:
+      - http01:
+          ingress:
+            className: traefik
+status:
+  conditions:
+    - type: Ready
+      status: "True"
+      reason: Ready
+      message: issuer is ready
+---
+apiVersion: cert-manager.io/v1
+kind: Issuer
+metadata:
+  name: demo-issuer
+spec:
+  selfSigned: {}
+status:
+  conditions:
+    - type: Ready
+      status: "True"
+      reason: Ready
+      message: issuer is ready
+---
+apiVersion: cert-manager.io/v1
+kind: Certificate
+metadata:
+  name: demo-cert
+spec:
+  secretName: demo-cert-tls
+  issuerRef:
+    name: demo-cluster-issuer
+    kind: ClusterIssuer
+  commonName: demo.local
+  dnsNames:
+    - demo.local
+    - www.demo.local
+status:
+  conditions:
+    - type: Ready
+      status: "True"
+      reason: Ready
+      message: Certificate is up to date and has not expired
+  notAfter: "2027-02-05T00:00:00Z"
+  renewalTime: "2026-12-31T00:00:00Z"
+  revision: 1
+YAML
+# 12a. demo-cert-tls — the landed Secret of the Certificate: the Certificates
+#     tab's Secret cell deep-links to /security/secret/data?name=demo-cert-tls,
+#     so the target must exist for the link to land on real data. A
+#     kubernetes.io/tls secret carries base64 PEM, so a real self-signed
+#     keypair is generated (the VPA section's openssl procedure; no trap — the
+#     temp dir is removed explicitly so it never clobbers the VPA trap).
+#     Marker-checked on the secret (re-runs are no-ops).
+if ! k -n "$NS" get secret demo-cert-tls >/dev/null 2>&1; then
+  TLSCERTS="$(mktemp -d)"
+  openssl req -x509 -newkey rsa:2048 -nodes -days 100000 \
+    -keyout "$TLSCERTS/tls.key" -out "$TLSCERTS/tls.crt" \
+    -subj "/CN=demo.local/O=kubedash-demo" \
+    -addext "subjectAltName = DNS:demo.local,DNS:www.demo.local" >/dev/null 2>&1
+  k -n "$NS" create secret tls demo-cert-tls \
+    --cert="$TLSCERTS/tls.crt" --key="$TLSCERTS/tls.key"
+  rm -rf "$TLSCERTS"
+fi
+# 12b. demo-cert-request — owned by demo-cert (the Request tab's Owner cell
+#     renders it; the Issuer cell's goToTab switch targets demo-issuer). Its
+#     controller ownerReference MUST carry demo-cert's REAL uid: a made-up uid
+#     makes GC treat the request as an orphan of a missing controller owner
+#     and cascade-delete it within seconds of creation. Applied SEPARATELY
+#     (after the Certificate in the batch above) so the uid can be fetched;
+#     the unquoted heredoc is what expands $CERT_UID (no other $ in the doc).
+CERT_UID="$(k -n "$NS" get certificate demo-cert -o jsonpath='{.metadata.uid}')"
+k -n "$NS" apply -f - <<YAML
+apiVersion: cert-manager.io/v1
+kind: CertificateRequest
+metadata:
+  name: demo-cert-request
+  ownerReferences:
+    - apiVersion: cert-manager.io/v1
+      kind: Certificate
+      name: demo-cert
+      uid: $CERT_UID
+      controller: true
+      blockOwnerDeletion: true
+spec:
+  # base64 PEM CSR (dummy — the list view never decodes it; the data view
+  # shows it verbatim).
+  request: "TUlJRHdBTUJBREFOQkJNUUV3RHdZRFZRUUtFd3hWYjNKcmFXSmhZbTlvWm1VeElUQWVGQXhNQ0lHQXc9PQ=="
+  duration: 720h
+  renewBefore: 360h
+  isCA: false
+  usages: [server auth, client auth]
+  issuerRef:
+    name: demo-issuer
+    kind: Issuer
+status:
+  conditions:
+    - type: Ready
+      status: "True"
+      reason: Ready
+      message: request is ready
+  certificate: "TUlJQ3p6V0RBREFOQkJNUUV3RHdZRFZRUUtFd3hWYjNKcmFXSmhZbTlvWm1VeElUQWVGQXhNQ0lHQXc9PQ=="
+YAML
+
+# 13. MetalLB CRDs + fixtures — the LoadBalancer view (4 tabs) reads the
+#     metallb.io/v1beta2 registry kinds. Provider detection is server-side
+#     (MetalLB primary, Cilium fallback); the MetalLB CRDs' presence turns the
+#     read non-empty AND tags each item provider=metallb (the view's Type
+#     column). NO operator installed: the fixtures carry their spec only (these
+#     kinds have no status the view renders).
+#     ALL FOUR CRDs are NAMESPACED — the backend reads every MetalLB kind via
+#     the namespaced endpoint (list_namespaced_custom_object), so a cluster-
+#     scoped CRD would 404 on that read. This deliberately deviates from
+#     upstream MetalLB (IPAddressPool/BGPPeer/BGPAdvertisement are cluster-
+#     scoped there) to match THIS codebase's namespaced read path. Minimal
+#     schemas preserve the full spec for the full-custom-object read.
+k apply -f - <<'YAML'
+apiVersion: apiextensions.k8s.io/v1
+kind: CustomResourceDefinition
+metadata:
+  name: ipaddresspools.metallb.io
+spec:
+  group: metallb.io
+  names:
+    kind: IPAddressPool
+    listKind: IPAddressPoolList
+    plural: ipaddresspools
+    singular: ipaddresspool
+  scope: Namespaced
+  versions:
+    - name: v1beta2
+      served: true
+      storage: true
+      schema:
+        openAPIV3Schema:
+          type: object
+          x-kubernetes-preserve-unknown-fields: true
+---
+apiVersion: apiextensions.k8s.io/v1
+kind: CustomResourceDefinition
+metadata:
+  name: l2advertisements.metallb.io
+spec:
+  group: metallb.io
+  names:
+    kind: L2Advertisement
+    listKind: L2AdvertisementList
+    plural: l2advertisements
+    singular: l2advertisement
+  scope: Namespaced
+  versions:
+    - name: v1beta2
+      served: true
+      storage: true
+      schema:
+        openAPIV3Schema:
+          type: object
+          x-kubernetes-preserve-unknown-fields: true
+---
+apiVersion: apiextensions.k8s.io/v1
+kind: CustomResourceDefinition
+metadata:
+  name: bgppeers.metallb.io
+spec:
+  group: metallb.io
+  names:
+    kind: BGPPeer
+    listKind: BGPPeerList
+    plural: bgppeers
+    singular: bgppeer
+  scope: Namespaced
+  versions:
+    - name: v1beta2
+      served: true
+      storage: true
+      schema:
+        openAPIV3Schema:
+          type: object
+          x-kubernetes-preserve-unknown-fields: true
+---
+apiVersion: apiextensions.k8s.io/v1
+kind: CustomResourceDefinition
+metadata:
+  name: bgpadvertisements.metallb.io
+spec:
+  group: metallb.io
+  names:
+    kind: BGPAdvertisement
+    listKind: BGPAdvertisementList
+    plural: bgpadvertisements
+    singular: bgpadvertisement
+  scope: Namespaced
+  versions:
+    - name: v1beta2
+      served: true
+      storage: true
+      schema:
+        openAPIV3Schema:
+          type: object
+          x-kubernetes-preserve-unknown-fields: true
+YAML
+k wait --for=condition=Established \
+  crd/ipaddresspools.metallb.io \
+  crd/l2advertisements.metallb.io \
+  crd/bgppeers.metallb.io \
+  crd/bgpadvertisements.metallb.io --timeout=30s >/dev/null
+k -n "$NS" apply -f - <<'YAML'
+apiVersion: metallb.io/v1beta2
+kind: IPAddressPool
+metadata:
+  name: demo-pool
+spec:
+  addresses:
+    - 192.168.100.100-192.168.100.110
+  autoAssign: true
+---
+apiVersion: metallb.io/v1beta2
+kind: L2Advertisement
+metadata:
+  name: demo-l2
+spec:
+  ipAddressPools:
+    - demo-pool
+  interfaces:
+    - eth0
+---
+apiVersion: metallb.io/v1beta2
+kind: BGPPeer
+metadata:
+  name: demo-bgp-peer
+spec:
+  peerAddress: 192.168.100.1
+  myASN: 64512
+  peerASN: 64500
+  holdTime: 90
+  keepaliveTime: 30
+---
+apiVersion: metallb.io/v1beta2
+kind: BGPAdvertisement
+metadata:
+  name: demo-bgp-adv
+spec:
+  ipAddressPools:
+    - demo-pool
+  localPref: 100
+  communities:
+    - "64512:100"
+YAML
+
+# 14. Cilium LB fixtures — the LoadBalancer view's FALLBACK provider.
+#     MetalLB is primary: with the section-13 metallb.io CRDs present the
+#     backend reads MetalLB and these are invisible. Delete the four
+#     metallb.io CRDs to see the view flip to these (tagged
+#     provider=cilium) — the certified 5.0 provider-detection deviation.
+#
+#     The pinned Cilium 1.19.10 (dev/cilium-traefik-up.sh) ships the
+#     ippools + l2announcementpolicies CRDs but NOT ciliumbgppeeringpolicies
+#     (Gateway-API BGP is a gated feature there), and its ippools schema
+#     uses spec.blocks (start/stop), not the newer spec.cidrs — the demo
+#     pool below matches that shape. Each CRD is applied ONLY when absent:
+#     when Cilium provides one, its real Helm-managed schema wins (no
+#     clobber); the apply-if-absent keeps the demo working across Cilium
+#     versions.
+apply_cilium_crd() { # <name.cilium.io> <Kind> <singular> (single v2alpha1 version)
+  local name="$1" kind="$2" singular="$3"
+  if k get crd "$name" >/dev/null 2>&1; then
+    echo "  cilium CRD $name: present (Cilium-provided) — skipping."
+    return
+  fi
+  k apply -f - <<YAML
+apiVersion: apiextensions.k8s.io/v1
+kind: CustomResourceDefinition
+metadata:
+  name: $name
+spec:
+  group: cilium.io
+  names:
+    kind: $kind
+    listKind: ${kind}List
+    plural: ${name%.cilium.io}
+    singular: $singular
+  scope: Cluster
+  versions:
+    - name: v2alpha1
+      served: true
+      storage: true
+      schema:
+        openAPIV3Schema:
+          type: object
+          x-kubernetes-preserve-unknown-fields: true
+YAML
+  echo "  cilium CRD $name: applied (minimal, cluster-scoped)."
+}
+# ippools is special: the pinned Cilium 1.19.10 serves v2 (storage) +
+# v2alpha1 (deprecated) and its schema is strict (spec.allowFirstLastIPs
+# is a "Yes"/"No" STRING, not a bool). The demo pool targets v2 — so the
+# minimal fallback CRD defines BOTH versions and lists v2 first, keeping
+# the fixture's apiVersion valid with or without a real Cilium install.
+if k get crd ciliumloadbalancerippools.cilium.io >/dev/null 2>&1; then
+  echo "  cilium CRD ciliumloadbalancerippools.cilium.io: present (Cilium-provided) — skipping."
+else
+  k apply -f - <<'YAML'
+apiVersion: apiextensions.k8s.io/v1
+kind: CustomResourceDefinition
+metadata:
+  name: ciliumloadbalancerippools.cilium.io
+spec:
+  group: cilium.io
+  names:
+    kind: CiliumLoadBalancerIPPool
+    listKind: CiliumLoadBalancerIPPoolList
+    plural: ciliumloadbalancerippools
+    singular: ciliumloadbalancerippool
+  scope: Cluster
+  versions:
+    - name: v2
+      served: true
+      storage: true
+      schema:
+        openAPIV3Schema:
+          type: object
+          x-kubernetes-preserve-unknown-fields: true
+    - name: v2alpha1
+      served: true
+      storage: false
+      schema:
+        openAPIV3Schema:
+          type: object
+          x-kubernetes-preserve-unknown-fields: true
+YAML
+  echo "  cilium CRD ciliumloadbalancerippools.cilium.io: applied (minimal, cluster-scoped)."
+fi
+apply_cilium_crd ciliuml2announcementpolicies.cilium.io CiliumL2AnnouncementPolicy ciliuml2announcementpolicy
+apply_cilium_crd ciliumbgppeeringpolicies.cilium.io CiliumBGPPeeringPolicy ciliumbgppeeringpolicy
+k wait --for=condition=Established \
+  crd/ciliumloadbalancerippools.cilium.io \
+  crd/ciliuml2announcementpolicies.cilium.io \
+  crd/ciliumbgppeeringpolicies.cilium.io --timeout=30s >/dev/null
+
+# The Cilium LB objects are Cluster-scoped (the backend reads them via
+# list_cluster_custom_object) — no -n "$NS", unlike the MetalLB fixtures.
+k apply -f - <<'YAML'
+apiVersion: cilium.io/v2
+kind: CiliumLoadBalancerIPPool
+metadata:
+  name: demo-cilium-pool
+spec:
+  blocks:
+    - start: 10.200.100.100
+      stop: 10.200.100.110
+  disabled: false
+---
+apiVersion: cilium.io/v2alpha1
+kind: CiliumL2AnnouncementPolicy
+metadata:
+  name: demo-cilium-l2
+spec:
+  serviceSelector:
+    matchLabels:
+      app: demo-app
+---
+apiVersion: cilium.io/v2alpha1
+kind: CiliumBGPPeeringPolicy
+metadata:
+  name: demo-cilium-bgp
+spec:
+  virtualRouters:
+    - localASN: 64512
+      neighbors:
+        - peerAddress: 10.200.100.1
+          peerASN: 64500
+YAML
+
 echo "demo data ready: ns=$NS"
 echo "  pods: demo-app x1 (healthy, HPA/VPA/PDB target) + demo-broken x1 (crashlooping, events)"
 echo "  fixtures: Secret, ConfigMap, LimitRange, ResourceQuota, PDB, HPA, VPA (Off mode), NetworkPolicy, PVC (demo-pvc, csi-hostpath, bound; Usage = backing-disk statfs)"
 echo "  cluster-scoped: RuntimeClass demo-runc, StorageClass demo-gp2, CRD configmaps.example.com (e2e deep-link target)"
 echo "  cluster-scoped: CRD volumesnapshotclasses.snapshot.storage.k8s.io + csi-default (SnapshotClass view)"
 echo "  namespaced: CRD volumesnapshots.snapshot.storage.k8s.io + demo-snap (VolumeSnapshot view)"
+echo "  cert-manager: 4x CRD (cert-manager.io/v1) + demo-cluster-issuer (ACME), demo-issuer (selfSigned), demo-cert (+demo-cert-tls secret), demo-cert-request (Cert-Manager view)"
+echo "  load-balancer: 4x CRD (metallb.io/v1beta2, namespaced) + demo-pool, demo-l2, demo-bgp-peer, demo-bgp-adv (LoadBalancer view)"
+echo "  load-balancer (fallback): Cilium objects (cluster-scoped) demo-cilium-pool, demo-cilium-l2, demo-cilium-bgp — hidden while the metallb.io CRDs are present (MetalLB is primary); delete the 4x metallb.io CRDs to flip the view to Cilium"
 echo "  VPA recommendations land in the demo-vpa status within a few minutes"
 echo "  kubectl --context $CTX get pods,hpa,vpa,pdb,netpol -n $NS -w"
