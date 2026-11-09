@@ -55,9 +55,10 @@ const adminLabels = [
   'Network',
   'Services',
   'Ingress',
-  'Cert-Manager',
-  'External Load Balancer',
+  // 2026-11-08 (owner decision): Ingress Class sits directly under Ingress.
   'Ingress Class',
+  'Cert-Manager',
+  'Load Balancer',
   'Storage',
   'ConfigMaps',
   'Volumes',
@@ -85,7 +86,7 @@ const adminLabels = [
 
 // The 4.1 plugin-gated labels that 5.0 must NOT render (ADR-0022: the
 // Plugins group is dropped; no 5.0 plugin system). 'Cert-Manager' +
-// 'External Load Balancer' are legitimate Network leaves as of the
+// 'Load Balancer' are legitimate Network leaves as of the
 // 2026-10-29 certmanager-external-loadbalancer-views spec (promoted from
 // the dropped Plugins group — the group itself stays banned). 'Gateway API'
 // is banned again as of the 2026-11-07 menu merge: the kinds live as TABS of
@@ -243,7 +244,7 @@ describe('rendered sidebar', () => {
     renderShell('user')
     await user.click(await screen.findByText('Dashboard'))
     // Scoped to the workload link: the Network group also carries Beta
-    // leaves (Cert-Manager / External Load Balancer, 2026-10-29 spec), so a
+    // leaves (Cert-Manager / Load Balancer, 2026-10-29 spec), so a
     // bare text query would match more than one badge.
     expect(
       await screen.findByText('Beta', { selector: 'a[href="/dashboard/workload-map"] *' }),

@@ -99,6 +99,9 @@ export function navigation(input: { clusterId: number | null; isAdmin: boolean }
       // — no standalone leaves (ADR-0022 amendment). The old
       // /network/gateway-api + /network/gateway-class URLs redirect.
       leaf('Ingress', '/network/ingress'),
+      // 2026-11-08 (owner decision): Ingress Class sits directly under
+      // Ingress — the class list is the natural companion to the ingress list.
+      leaf('Ingress Class', '/network/ingress-class'),
       // 2026-10-29 (certmanager-external-loadbalancer-views): the two 4.1
       // plugin views are promoted to Network leaves (the /plugins/ ->
       // /network/ move — NO Plugins group revived, ADR-0022 "minus Plugins"
@@ -111,11 +114,10 @@ export function navigation(input: { clusterId: number | null; isAdmin: boolean }
       },
       {
         component: CNavItem,
-        name: 'External Load Balancer',
+        name: 'Load Balancer',
         to: '/network/external-loadbalancer',
         badge: { color: 'warning', text: 'Beta' },
       },
-      leaf('Ingress Class', '/network/ingress-class'),
     ]),
     group('Storage', cilStorage, [
       leaf('ConfigMaps', '/storage/configmap'),
