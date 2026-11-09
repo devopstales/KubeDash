@@ -350,7 +350,9 @@ class ResourceApi(Api):
                 ns: str | None = None
             else:
                 ns = str(metadata.get("namespace") or namespace)
-            if not rbac.can(g.current_user, cluster, "create", resource, ns, None, group):
+            if not rbac.can(
+                g.current_user, cluster, "create", resource, ns, None, group, engine=db.engine
+            ):
                 raise RbacDeniedError(f"create on {resource}")
         applied, errors = pool.get(cluster).apply_objects(namespace, objects)
         return {"applied": applied, "errors": errors}

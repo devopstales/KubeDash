@@ -175,7 +175,9 @@ class MetricsApi(Api):
                 "metrics_denied": False,
                 "items": [],
             }
-        metrics_allowed = rbac.can(g.current_user, cluster, "get", "nodes", None, None, "")
+        metrics_allowed = rbac.can(
+            g.current_user, cluster, "get", "nodes", None, None, "", engine=db.engine
+        )
         if not metrics_allowed:
             return {
                 "cluster": cluster.name,
