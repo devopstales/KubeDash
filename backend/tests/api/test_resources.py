@@ -53,6 +53,12 @@ class FakeK8s:
         # Namespaces forwarded to list_persistent_volumes (the claim-ns
         # filter test asserts the query value was forwarded to the client).
         self.pv_ns_calls: list[str | None] = []
+        # Namespaces forwarded to the Ingress/IngressClass list methods
+        # (the SAR-denied tests assert they stay empty — the client call
+        # was never made).
+        self.ingressclass_ns_calls: list[str | None] = []
+        self.gatewayclass_ns_calls: list[str | None] = []
+        self.ingress_ns_calls: list[str | None] = []
         # Generic apply (POST /resources/apply) state: ``applied_names``
         # models the get-or-create idempotency (a second apply of the same
         # name is ``unchanged``); ``apply_fail_names`` models a per-object
@@ -281,6 +287,14 @@ class FakeK8s:
             if plural == "clusterissuers":
                 return ("v1", "Cluster")
             return ("v1", "Namespaced")
+        # Gateway API (v1): PRESENT by default (the CRD-absent cases are
+        # tested by overriding get_crd_served on the instance, the
+        # certmanager pattern). gatewayclasses + referencegrants are
+        # cluster-scoped; gateways + httproutes are namespaced.
+        if group == "gateway.networking.k8s.io":
+            if plural in ("gatewayclasses", "referencegrants"):
+                return ("v1", "Cluster")
+            return ("v1", "Namespaced")
         # external-LB: MetalLB PRESENT by default (the Cilium-fallback /
         # both-absent cases are tested by overriding get_crd_served on the
         # instance, the cilium-absent pattern).
@@ -397,6 +411,124 @@ class FakeK8s:
 
     def get_certificate(self, namespace: str, name: str) -> list[dict]:
         return [i for i in self.list_certificates(namespace) if i["metadata"]["name"] == name]
+
+    # IngressClass (networking.k8s.io, cluster-scoped core): the namespace
+    # argument is accepted-and-ignored (mirrors the real
+    # K8sClient.list_ingress_classes).
+    def list_ingress_classes(self, namespace: str | None) -> list[dict]:
+        self.ingressclass_ns_calls.append(namespace)
+        return [
+            {
+                "metadata": {
+                    "name": "nginx",
+                    "creation_timestamp": "2026-01-02T03:04:05Z",
+                },
+                "spec": {"controller": "k8s.io/ingress-nginx"},
+            }
+        ]
+
+    def get_ingress_class(self, _namespace: str, name: str) -> list[dict]:
+        return [i for i in self.list_ingress_classes(None) if i["metadata"]["name"] == name]
+
+    # Ingress (networking.k8s.io, namespaced core): None -> the
+    # all-namespaces branch (DISTINCTLY named namespaces so the API tests
+    # can tell the branches apart, the list_pods pattern).
+    def list_ingresses(self, namespace: str | None) -> list[dict]:
+        self.ingress_ns_calls.append(namespace)
+        if namespace is None:
+            return [
+                {
+                    "metadata": {"name": "web", "namespace": "default"},
+                    "spec": {"ingress_class_name": "nginx"},
+                },
+                {
+                    "metadata": {"name": "web", "namespace": "team-a"},
+                    "spec": {"ingress_class_name": "nginx"},
+                },
+            ]
+        return [
+            {
+                "metadata": {"name": "web", "namespace": namespace},
+                "spec": {"ingress_class_name": "nginx"},
+            }
+        ]
+
+    def get_ingress(self, namespace: str, name: str) -> list[dict]:
+        return [i for i in self.list_ingresses(namespace) if i["metadata"]["name"] == name]
+
+    # Gateway API (v1, CRD seam): the CRD's own served version is the
+    # authority; CRD absent (get_crd_served None) -> [] (the
+    # certmanager-fake pattern). gatewayclasses + referencegrants are
+    # cluster-scoped (namespace accepted-and-ignored); gateways +
+    # httproutes are namespaced.
+    def list_gateway_classes(self, namespace: str | None) -> list[dict]:
+        self.gatewayclass_ns_calls.append(namespace)
+        if self.get_crd_served("gateway.networking.k8s.io", "gatewayclasses") is None:
+            return []
+        return [
+            {
+                "apiVersion": "gateway.networking.k8s.io/v1",
+                "kind": "GatewayClass",
+                "metadata": {"name": "eg", "creationTimestamp": "2026-01-02T03:04:05Z"},
+                "spec": {"controllerName": "gateway.envoyproxy.io/gatewayclass-controller"},
+            }
+        ]
+
+    def get_gateway_class(self, _namespace: str, name: str) -> list[dict]:
+        return [i for i in self.list_gateway_classes(None) if i["metadata"]["name"] == name]
+
+    def list_gateways(self, namespace: str | None) -> list[dict]:
+        if self.get_crd_served("gateway.networking.k8s.io", "gateways") is None:
+            return []
+        return [
+            {
+                "apiVersion": "gateway.networking.k8s.io/v1",
+                "kind": "Gateway",
+                "metadata": {
+                    "name": "web",
+                    "namespace": namespace or "team-a",
+                    "creationTimestamp": "2026-01-02T03:04:05Z",
+                },
+                "spec": {"gatewayClassName": "eg", "listeners": []},
+            }
+        ]
+
+    def get_gateway(self, namespace: str, name: str) -> list[dict]:
+        return [i for i in self.list_gateways(namespace) if i["metadata"]["name"] == name]
+
+    def list_http_routes(self, namespace: str | None) -> list[dict]:
+        if self.get_crd_served("gateway.networking.k8s.io", "httproutes") is None:
+            return []
+        return [
+            {
+                "apiVersion": "gateway.networking.k8s.io/v1",
+                "kind": "HTTPRoute",
+                "metadata": {
+                    "name": "web-0",
+                    "namespace": namespace or "team-a",
+                    "creationTimestamp": "2026-01-02T03:04:05Z",
+                },
+                "spec": {"parentRefs": [{"name": "web"}], "rules": []},
+            }
+        ]
+
+    def get_http_route(self, namespace: str, name: str) -> list[dict]:
+        return [i for i in self.list_http_routes(namespace) if i["metadata"]["name"] == name]
+
+    def list_reference_grants(self, _namespace: str | None) -> list[dict]:
+        if self.get_crd_served("gateway.networking.k8s.io", "referencegrants") is None:
+            return []
+        return [
+            {
+                "apiVersion": "gateway.networking.k8s.io/v1",
+                "kind": "ReferenceGrant",
+                "metadata": {"name": "web-grant", "creationTimestamp": "2026-01-02T03:04:05Z"},
+                "spec": {"from": [{"group": "", "kind": "Service", "namespace": "team-a"}]},
+            }
+        ]
+
+    def get_reference_grant(self, _namespace: str, name: str) -> list[dict]:
+        return [i for i in self.list_reference_grants(None) if i["metadata"]["name"] == name]
 
     # MetalLB / Cilium external-LB: provider detection mirrors the real
     # K8sClient (MetalLB primary, Cilium fallback, bgpadvertisements
@@ -4424,6 +4556,557 @@ def test_pvc_kind_41_name_rejected(api_client, auth_client) -> None:
     r = api_client.get("/api/v1/clusters/1/resources/pvc", headers=h)
     assert r.status_code == 404
     assert r.get_json()["error"]["code"] == "RESOURCE_KIND_NOT_SUPPORTED"
+
+
+# --- IngressClass (networking.k8s.io, cluster-scoped core) ----------------
+# The 4.1-parity ingressclass view (list + data). The SAR group is
+# networking.k8s.io (NOT core ""); the kind is cluster-scoped, so
+# ?namespace= is accepted-and-ignored.
+#
+# --- Gateway API kinds (gateway.networking.k8s.io, CRD seam) --------------
+# The 4.1-parity gatewayclass/gateway/httproute/referencegrant views.
+# Full custom object (CRD's served version is the authority), CRD absent
+# -> [] (first-class empty state).
+
+
+def test_list_ingressclasses_200(api_client, auth_client, fake_k8s, monkeypatch) -> None:
+    """[ingressclasses-list-200] a bound user listing ingressclasses gets
+    the to_dict items back, and the SAR is asked on the networking.k8s.io
+    group (the load-bearing group assertion — a core-group SAR never
+    matches an IngressClass grant)."""
+    auth_client.login()
+    h = {"Authorization": f"Bearer {auth_client.jwt}"}
+    _register(api_client, h)
+    asked = _record_allowed_sar(monkeypatch)
+    r = api_client.get("/api/v1/clusters/1/resources/ingressclasses", headers=h)
+    assert r.status_code == 200
+    body = r.get_json()
+    assert body["kind"] == "ingressclasses"
+    [item] = body["items"]
+    assert item["metadata"]["name"] == "nginx"
+    assert item["spec"]["controller"] == "k8s.io/ingress-nginx"
+    # the SAR was asked on the networking.k8s.io group:
+    assert ("list", "ingressclasses", None, None, "networking.k8s.io") in asked
+
+
+def test_list_ingressclasses_ignores_namespace(
+    api_client, auth_client, fake_k8s, monkeypatch
+) -> None:
+    """[ingressclasses-list-ignores-namespace] the kind is cluster-scoped:
+    ?namespace=team-a is accepted and ignored — the same "nginx" item
+    comes back (the namespace reaches the client, which ignores it)."""
+    auth_client.login()
+    h = {"Authorization": f"Bearer {auth_client.jwt}"}
+    _register(api_client, h)
+    _allow_sar(monkeypatch)
+    r = api_client.get(
+        "/api/v1/clusters/1/resources/ingressclasses?namespace=team-a", headers=h
+    )
+    assert r.status_code == 200
+    [item] = r.get_json()["items"]
+    assert item["metadata"]["name"] == "nginx"
+    assert "namespace" not in item["metadata"]
+
+
+def test_get_ingressclass_by_name(api_client, auth_client, fake_k8s, monkeypatch) -> None:
+    """[ingressclasses-get-by-name] ?name= returns a 0/1-item list: a hit
+    returns the one object, a miss returns [] (mirrors get_secret)."""
+    auth_client.login()
+    h = {"Authorization": f"Bearer {auth_client.jwt}"}
+    _register(api_client, h)
+    _allow_sar(monkeypatch)
+    r = api_client.get("/api/v1/clusters/1/resources/ingressclasses?name=nginx", headers=h)
+    assert r.status_code == 200
+    [item] = r.get_json()["items"]
+    assert item["metadata"]["name"] == "nginx"
+    r = api_client.get("/api/v1/clusters/1/resources/ingressclasses?name=ghost", headers=h)
+    assert r.status_code == 200
+    assert r.get_json()["items"] == []
+
+
+def test_list_ingressclasses_sar_denied(api_client, auth_client, fake_k8s, monkeypatch) -> None:
+    """[ingressclasses-sar-denied] ADR-0004: the SAR is asked BEFORE the
+    read, on the networking.k8s.io group — a deny short-circuits to 403
+    RBAC_DENIED and the client call is never made."""
+    auth_client.login()
+    h = {"Authorization": f"Bearer {auth_client.jwt}"}
+    _register(api_client, h)
+    asked = _record_sar(monkeypatch)  # denies every SAR and records calls
+    r = api_client.get("/api/v1/clusters/1/resources/ingressclasses", headers=h)
+    assert r.status_code == 403
+    assert r.get_json()["error"]["code"] == "RBAC_DENIED"
+    assert ("list", "ingressclasses", None, None, "networking.k8s.io") in asked
+    assert fake_k8s.ingressclass_ns_calls == []  # the client call was never made
+
+
+def test_ingressclasses_binding_404(api_client, auth_client) -> None:
+    """[ingressclasses-binding-404] an unbound user: the binding gate
+    fails before the SAR, CLUSTER_NOT_FOUND."""
+    auth_client.login()
+    h = {"Authorization": f"Bearer {auth_client.jwt}"}
+    r = api_client.get("/api/v1/clusters/999/resources/ingressclasses", headers=h)
+    assert r.status_code == 404
+    assert r.get_json()["error"]["code"] == "CLUSTER_NOT_FOUND"
+
+
+def test_ingressclass_kind_singular_rejected(api_client, auth_client) -> None:
+    """[ingressclass-kind-singular-rejected] the 4.1 route name (singular)
+    is not a kind — RESOURCE_KIND_NOT_SUPPORTED."""
+    auth_client.login()
+    h = {"Authorization": f"Bearer {auth_client.jwt}"}
+    _register(api_client, h)
+    r = api_client.get("/api/v1/clusters/1/resources/ingressclass", headers=h)
+    assert r.status_code == 404
+    assert r.get_json()["error"]["code"] == "RESOURCE_KIND_NOT_SUPPORTED"
+
+
+def test_list_gatewayclasses_200(api_client, auth_client, fake_k8s, monkeypatch) -> None:
+    """[gatewayclasses-list-200] a bound user listing gatewayclasses gets
+    the FULL custom object back (spec intact, camelCase), and the SAR is
+    asked on the gateway.networking.k8s.io group."""
+    auth_client.login()
+    h = {"Authorization": f"Bearer {auth_client.jwt}"}
+    _register(api_client, h)
+    asked = _record_allowed_sar(monkeypatch)
+    r = api_client.get("/api/v1/clusters/1/resources/gatewayclasses", headers=h)
+    assert r.status_code == 200
+    body = r.get_json()
+    assert body["kind"] == "gatewayclasses"
+    [item] = body["items"]
+    assert item["metadata"]["name"] == "eg"
+    assert item["spec"]["controllerName"] == "gateway.envoyproxy.io/gatewayclass-controller"
+    # the SAR was asked on the gateway.networking.k8s.io group:
+    assert ("list", "gatewayclasses", None, None, "gateway.networking.k8s.io") in asked
+
+
+def test_list_gatewayclasses_ignores_namespace(
+    api_client, auth_client, fake_k8s, monkeypatch
+) -> None:
+    """[gatewayclasses-list-ignores-namespace] the kind is cluster-scoped:
+    ?namespace=team-a is accepted and ignored — the same "eg" item comes
+    back."""
+    auth_client.login()
+    h = {"Authorization": f"Bearer {auth_client.jwt}"}
+    _register(api_client, h)
+    _allow_sar(monkeypatch)
+    r = api_client.get(
+        "/api/v1/clusters/1/resources/gatewayclasses?namespace=team-a", headers=h
+    )
+    assert r.status_code == 200
+    [item] = r.get_json()["items"]
+    assert item["metadata"]["name"] == "eg"
+    assert "namespace" not in item["metadata"]
+
+
+def test_get_gatewayclass_by_name(api_client, auth_client, fake_k8s, monkeypatch) -> None:
+    """[gatewayclasses-get-by-name] ?name= returns a 0/1-item list: a hit
+    returns the one full object, a miss returns [] (mirrors get_secret)."""
+    auth_client.login()
+    h = {"Authorization": f"Bearer {auth_client.jwt}"}
+    _register(api_client, h)
+    _allow_sar(monkeypatch)
+    r = api_client.get("/api/v1/clusters/1/resources/gatewayclasses?name=eg", headers=h)
+    assert r.status_code == 200
+    [item] = r.get_json()["items"]
+    assert item["metadata"]["name"] == "eg"
+    r = api_client.get("/api/v1/clusters/1/resources/gatewayclasses?name=ghost", headers=h)
+    assert r.status_code == 200
+    assert r.get_json()["items"] == []
+
+
+def test_list_gatewayclasses_sar_denied(api_client, auth_client, fake_k8s, monkeypatch) -> None:
+    """[gatewayclasses-sar-denied] ADR-0004: the SAR is asked BEFORE the
+    read, on the gateway.networking.k8s.io group — a deny short-circuits to
+    403 RBAC_DENIED and the client call is never made."""
+    auth_client.login()
+    h = {"Authorization": f"Bearer {auth_client.jwt}"}
+    _register(api_client, h)
+    asked = _record_sar(monkeypatch)  # denies every SAR and records calls
+    r = api_client.get("/api/v1/clusters/1/resources/gatewayclasses", headers=h)
+    assert r.status_code == 403
+    assert r.get_json()["error"]["code"] == "RBAC_DENIED"
+    assert ("list", "gatewayclasses", None, None, "gateway.networking.k8s.io") in asked
+    assert fake_k8s.gatewayclass_ns_calls == []  # the client call was never made
+
+
+def test_gatewayclasses_binding_404(api_client, auth_client) -> None:
+    """[gatewayclasses-binding-404] an unbound user: the binding gate
+    fails before the SAR, CLUSTER_NOT_FOUND."""
+    auth_client.login()
+    h = {"Authorization": f"Bearer {auth_client.jwt}"}
+    r = api_client.get("/api/v1/clusters/999/resources/gatewayclasses", headers=h)
+    assert r.status_code == 404
+    assert r.get_json()["error"]["code"] == "CLUSTER_NOT_FOUND"
+
+
+def test_gatewayclass_kind_singular_rejected(api_client, auth_client) -> None:
+    """[gatewayclass-kind-singular-rejected] the 4.1 route name (singular)
+    is not a kind — RESOURCE_KIND_NOT_SUPPORTED."""
+    auth_client.login()
+    h = {"Authorization": f"Bearer {auth_client.jwt}"}
+    _register(api_client, h)
+    r = api_client.get("/api/v1/clusters/1/resources/gatewayclass", headers=h)
+    assert r.status_code == 404
+    assert r.get_json()["error"]["code"] == "RESOURCE_KIND_NOT_SUPPORTED"
+
+
+def test_list_gatewayclasses_crd_absent_empty(
+    api_client, auth_client, fake_k8s, monkeypatch
+) -> None:
+    """[gatewayclasses-crd-absent-empty] Gateway API not installed (CRD
+    read None) = expected state: 200 with zero items, never an error."""
+    auth_client.login()
+    h = {"Authorization": f"Bearer {auth_client.jwt}"}
+    _register(api_client, h)
+    _allow_sar(monkeypatch)
+    fake_k8s.get_crd_served = lambda group, plural: None
+    r = api_client.get("/api/v1/clusters/1/resources/gatewayclasses", headers=h)
+    assert r.status_code == 200
+    assert r.get_json()["items"] == []
+    assert r.get_json()["kind"] == "gatewayclasses"
+
+
+def test_list_ingresses_200(api_client, auth_client, fake_k8s, monkeypatch) -> None:
+    """[ingresses-list-200] ?namespace=team-a gets the to_dict items back
+    (spec intact — the data page's Rules table reads it), and the SAR is
+    asked on the networking.k8s.io group with the query namespace
+    (namespaced kind)."""
+    auth_client.login()
+    h = {"Authorization": f"Bearer {auth_client.jwt}"}
+    _register(api_client, h)
+    asked = _record_allowed_sar(monkeypatch)
+    r = api_client.get("/api/v1/clusters/1/resources/ingresses?namespace=team-a", headers=h)
+    assert r.status_code == 200
+    body = r.get_json()
+    assert body["kind"] == "ingresses"
+    [item] = body["items"]
+    assert item["metadata"]["name"] == "web"
+    assert item["metadata"]["namespace"] == "team-a"
+    assert item["spec"]["ingress_class_name"] == "nginx"
+    # namespaced kind: the SAR carries the query namespace:
+    assert ("list", "ingresses", "team-a", None, "networking.k8s.io") in asked
+
+
+def test_list_ingresses_all_namespaces(api_client, auth_client, fake_k8s, monkeypatch) -> None:
+    """[ingresses-list-all-namespaces] no namespace query hits the
+    all-namespaces branch: the FakeK8s receives None and items from
+    multiple namespaces come back."""
+    auth_client.login()
+    h = {"Authorization": f"Bearer {auth_client.jwt}"}
+    _register(api_client, h)
+    _allow_sar(monkeypatch)
+    r = api_client.get("/api/v1/clusters/1/resources/ingresses", headers=h)
+    assert r.status_code == 200
+    items = r.get_json()["items"]
+    assert {i["metadata"]["namespace"] for i in items} == {"default", "team-a"}
+    assert fake_k8s.ingress_ns_calls == [None]
+
+
+def test_get_ingress_by_name(api_client, auth_client, fake_k8s, monkeypatch) -> None:
+    """[ingresses-get-by-name] ?name= returns a 0/1-item list: a hit
+    returns the one object in the query namespace, a miss returns []
+    (mirrors get_secret)."""
+    auth_client.login()
+    h = {"Authorization": f"Bearer {auth_client.jwt}"}
+    _register(api_client, h)
+    _allow_sar(monkeypatch)
+    r = api_client.get(
+        "/api/v1/clusters/1/resources/ingresses?name=web&namespace=team-a", headers=h
+    )
+    assert r.status_code == 200
+    [item] = r.get_json()["items"]
+    assert item["metadata"]["name"] == "web"
+    assert item["metadata"]["namespace"] == "team-a"
+    r = api_client.get(
+        "/api/v1/clusters/1/resources/ingresses?name=ghost&namespace=team-a", headers=h
+    )
+    assert r.status_code == 200
+    assert r.get_json()["items"] == []
+
+
+def test_list_ingresses_sar_denied(api_client, auth_client, fake_k8s, monkeypatch) -> None:
+    """[ingresses-sar-denied] ADR-0004: the SAR is asked BEFORE the read,
+    on the networking.k8s.io group with the query namespace — a deny
+    short-circuits to 403 RBAC_DENIED and the client call is never made."""
+    auth_client.login()
+    h = {"Authorization": f"Bearer {auth_client.jwt}"}
+    _register(api_client, h)
+    asked = _record_sar(monkeypatch)  # denies every SAR and records calls
+    r = api_client.get("/api/v1/clusters/1/resources/ingresses?namespace=team-a", headers=h)
+    assert r.status_code == 403
+    assert r.get_json()["error"]["code"] == "RBAC_DENIED"
+    assert ("list", "ingresses", "team-a", None, "networking.k8s.io") in asked
+    assert fake_k8s.ingress_ns_calls == []  # the client call was never made
+
+
+def test_ingresses_binding_404(api_client, auth_client) -> None:
+    """[ingresses-binding-404] an unbound user: the binding gate fails
+    before the SAR, CLUSTER_NOT_FOUND."""
+    auth_client.login()
+    h = {"Authorization": f"Bearer {auth_client.jwt}"}
+    r = api_client.get("/api/v1/clusters/999/resources/ingresses?namespace=team-a", headers=h)
+    assert r.status_code == 404
+    assert r.get_json()["error"]["code"] == "CLUSTER_NOT_FOUND"
+
+
+def test_ingress_kind_singular_rejected(api_client, auth_client) -> None:
+    """[ingress-kind-singular-rejected] the 4.1 route name (singular) is
+    not a kind — RESOURCE_KIND_NOT_SUPPORTED."""
+    auth_client.login()
+    h = {"Authorization": f"Bearer {auth_client.jwt}"}
+    _register(api_client, h)
+    r = api_client.get("/api/v1/clusters/1/resources/ingress", headers=h)
+    assert r.status_code == 404
+    assert r.get_json()["error"]["code"] == "RESOURCE_KIND_NOT_SUPPORTED"
+
+
+def test_list_gateways_200(api_client, auth_client, fake_k8s, monkeypatch) -> None:
+    """[gateways-list-200] ?namespace=team-a gets the FULL custom object
+    back (spec intact, camelCase), and the SAR is asked on the
+    gateway.networking.k8s.io group with the query namespace."""
+    auth_client.login()
+    h = {"Authorization": f"Bearer {auth_client.jwt}"}
+    _register(api_client, h)
+    asked = _record_allowed_sar(monkeypatch)
+    r = api_client.get("/api/v1/clusters/1/resources/gateways?namespace=team-a", headers=h)
+    assert r.status_code == 200
+    body = r.get_json()
+    assert body["kind"] == "gateways"
+    [item] = body["items"]
+    assert item["metadata"]["name"] == "web"
+    assert item["spec"]["gatewayClassName"] == "eg"
+    assert ("list", "gateways", "team-a", None, "gateway.networking.k8s.io") in asked
+
+
+def test_list_gateways_crd_absent_empty(api_client, auth_client, fake_k8s, monkeypatch) -> None:
+    """[gateways-crd-absent-empty] Gateway API not installed (CRD read
+    None) = expected state: 200 with zero items, never an error."""
+    auth_client.login()
+    h = {"Authorization": f"Bearer {auth_client.jwt}"}
+    _register(api_client, h)
+    _allow_sar(monkeypatch)
+    fake_k8s.get_crd_served = lambda group, plural: None
+    r = api_client.get(
+        "/api/v1/clusters/1/resources/gateways?namespace=team-a", headers=h
+    )
+    assert r.status_code == 200
+    assert r.get_json()["items"] == []
+    assert r.get_json()["kind"] == "gateways"
+
+
+def test_list_gateways_sar_denied(api_client, auth_client, fake_k8s, monkeypatch) -> None:
+    """[gateways-sar-denied] ADR-0004: the SAR is asked on the
+    gateway.networking.k8s.io group — a deny short-circuits to 403
+    RBAC_DENIED."""
+    auth_client.login()
+    h = {"Authorization": f"Bearer {auth_client.jwt}"}
+    _register(api_client, h)
+    asked = _record_sar(monkeypatch)  # denies every SAR and records calls
+    r = api_client.get("/api/v1/clusters/1/resources/gateways?namespace=team-a", headers=h)
+    assert r.status_code == 403
+    assert r.get_json()["error"]["code"] == "RBAC_DENIED"
+    assert ("list", "gateways", "team-a", None, "gateway.networking.k8s.io") in asked
+
+
+def test_list_httproutes_200(api_client, auth_client, fake_k8s, monkeypatch) -> None:
+    """[httproutes-list-200] ?namespace=team-a gets the FULL custom object
+    back (spec.parentRefs intact, camelCase), and the SAR is asked on the
+    gateway.networking.k8s.io group with the query namespace."""
+    auth_client.login()
+    h = {"Authorization": f"Bearer {auth_client.jwt}"}
+    _register(api_client, h)
+    asked = _record_allowed_sar(monkeypatch)
+    r = api_client.get("/api/v1/clusters/1/resources/httproutes?namespace=team-a", headers=h)
+    assert r.status_code == 200
+    body = r.get_json()
+    assert body["kind"] == "httproutes"
+    [item] = body["items"]
+    assert item["metadata"]["name"] == "web-0"
+    assert item["spec"]["parentRefs"] == [{"name": "web"}]
+    assert ("list", "httproutes", "team-a", None, "gateway.networking.k8s.io") in asked
+
+
+def test_list_httproutes_crd_absent_empty(api_client, auth_client, fake_k8s, monkeypatch) -> None:
+    """[httproutes-crd-absent-empty] Gateway API not installed (CRD read
+    None) = expected state: 200 with zero items, never an error."""
+    auth_client.login()
+    h = {"Authorization": f"Bearer {auth_client.jwt}"}
+    _register(api_client, h)
+    _allow_sar(monkeypatch)
+    fake_k8s.get_crd_served = lambda group, plural: None
+    r = api_client.get(
+        "/api/v1/clusters/1/resources/httproutes?namespace=team-a", headers=h
+    )
+    assert r.status_code == 200
+    assert r.get_json()["items"] == []
+    assert r.get_json()["kind"] == "httproutes"
+
+
+def test_list_httproutes_sar_denied(api_client, auth_client, fake_k8s, monkeypatch) -> None:
+    """[httproutes-sar-denied] ADR-0004: the SAR is asked on the
+    gateway.networking.k8s.io group — a deny short-circuits to 403
+    RBAC_DENIED."""
+    auth_client.login()
+    h = {"Authorization": f"Bearer {auth_client.jwt}"}
+    _register(api_client, h)
+    asked = _record_sar(monkeypatch)  # denies every SAR and records calls
+    r = api_client.get("/api/v1/clusters/1/resources/httproutes?namespace=team-a", headers=h)
+    assert r.status_code == 403
+    assert r.get_json()["error"]["code"] == "RBAC_DENIED"
+    assert ("list", "httproutes", "team-a", None, "gateway.networking.k8s.io") in asked
+
+
+def test_list_referencegrants_200(api_client, auth_client, fake_k8s, monkeypatch) -> None:
+    """[referencegrants-list-200] a bound user listing referencegrants
+    (cluster-scoped) gets the FULL custom object back (spec.from intact),
+    and the SAR is asked on the gateway.networking.k8s.io group."""
+    auth_client.login()
+    h = {"Authorization": f"Bearer {auth_client.jwt}"}
+    _register(api_client, h)
+    asked = _record_allowed_sar(monkeypatch)
+    r = api_client.get("/api/v1/clusters/1/resources/referencegrants", headers=h)
+    assert r.status_code == 200
+    body = r.get_json()
+    assert body["kind"] == "referencegrants"
+    [item] = body["items"]
+    assert item["metadata"]["name"] == "web-grant"
+    assert item["spec"]["from"] == [{"group": "", "kind": "Service", "namespace": "team-a"}]
+    assert ("list", "referencegrants", None, None, "gateway.networking.k8s.io") in asked
+
+
+def test_list_referencegrants_crd_absent_empty(
+    api_client, auth_client, fake_k8s, monkeypatch
+) -> None:
+    """[referencegrants-crd-absent-empty] Gateway API not installed (CRD
+    read None) = expected state: 200 with zero items, never an error."""
+    auth_client.login()
+    h = {"Authorization": f"Bearer {auth_client.jwt}"}
+    _register(api_client, h)
+    _allow_sar(monkeypatch)
+    fake_k8s.get_crd_served = lambda group, plural: None
+    r = api_client.get("/api/v1/clusters/1/resources/referencegrants", headers=h)
+    assert r.status_code == 200
+    assert r.get_json()["items"] == []
+    assert r.get_json()["kind"] == "referencegrants"
+
+
+def test_list_referencegrants_sar_denied(api_client, auth_client, fake_k8s, monkeypatch) -> None:
+    """[referencegrants-sar-denied] ADR-0004: the SAR is asked on the
+    gateway.networking.k8s.io group — a deny short-circuits to 403
+    RBAC_DENIED."""
+    auth_client.login()
+    h = {"Authorization": f"Bearer {auth_client.jwt}"}
+    _register(api_client, h)
+    asked = _record_sar(monkeypatch)  # denies every SAR and records calls
+    r = api_client.get("/api/v1/clusters/1/resources/referencegrants", headers=h)
+    assert r.status_code == 403
+    assert r.get_json()["error"]["code"] == "RBAC_DENIED"
+    assert ("list", "referencegrants", None, None, "gateway.networking.k8s.io") in asked
+
+
+def test_clusterissuer_kind_singular_rejected(api_client, auth_client) -> None:
+    """[clusterissuer-kind-singular-rejected] the 4.1 route name (singular)
+    is not a kind — RESOURCE_KIND_NOT_SUPPORTED."""
+    auth_client.login()
+    h = {"Authorization": f"Bearer {auth_client.jwt}"}
+    _register(api_client, h)
+    r = api_client.get("/api/v1/clusters/1/resources/clusterissuer", headers=h)
+    assert r.status_code == 404
+    assert r.get_json()["error"]["code"] == "RESOURCE_KIND_NOT_SUPPORTED"
+
+
+def test_ipaddresspool_kind_singular_rejected(api_client, auth_client) -> None:
+    """[ipaddresspool-kind-singular-rejected] the 4.1 route name (singular)
+    is not a kind — RESOURCE_KIND_NOT_SUPPORTED."""
+    auth_client.login()
+    h = {"Authorization": f"Bearer {auth_client.jwt}"}
+    _register(api_client, h)
+    r = api_client.get("/api/v1/clusters/1/resources/ipaddresspool", headers=h)
+    assert r.status_code == 404
+    assert r.get_json()["error"]["code"] == "RESOURCE_KIND_NOT_SUPPORTED"
+
+
+def test_list_ipaddresspools_both_providers_absent_empty(
+    api_client, auth_client, fake_k8s, monkeypatch
+) -> None:
+    """[exlb-both-providers-absent-empty] MetalLB AND Cilium CRDs absent
+    (no external-LB provider installed) = expected state: 200 with zero
+    items, never an error."""
+    auth_client.login()
+    h = {"Authorization": f"Bearer {auth_client.jwt}"}
+    _register(api_client, h)
+    _allow_sar(monkeypatch)
+    fake_k8s.get_crd_served = lambda group, plural: None
+    r = api_client.get(
+        "/api/v1/clusters/1/resources/ipaddresspools?namespace=team-a", headers=h
+    )
+    assert r.status_code == 200
+    assert r.get_json()["items"] == []
+    assert r.get_json()["kind"] == "ipaddresspools"
+
+
+def test_clusterissuers_binding_404(api_client, auth_client) -> None:
+    """[certmanager-clusterissuers-binding-404] an unbound user: the
+    binding gate fails before the SAR, CLUSTER_NOT_FOUND."""
+    auth_client.login()
+    h = {"Authorization": f"Bearer {auth_client.jwt}"}
+    r = api_client.get("/api/v1/clusters/999/resources/clusterissuers", headers=h)
+    assert r.status_code == 404
+    assert r.get_json()["error"]["code"] == "CLUSTER_NOT_FOUND"
+
+
+def test_list_pods_malformed_labelselector_502(
+    api_client, auth_client, fake_k8s, monkeypatch
+) -> None:
+    """[pods-labelselector-malformed-502] a MALFORMED ?labelSelector=
+    garbage is a 400 from the apiserver — the real K8sClient.list_pods
+    maps it to ClusterUnreachableError (502, mirroring list_services), so
+    the API tier returns 502 CLUSTER_UNREACHABLE, NOT 500 INTERNAL_ERROR.
+    The fake models the fixed service contract (the 400 is already mapped
+    at the service tier; a raw ApiException here would 500)."""
+    auth_client.login()
+    h = {"Authorization": f"Bearer {auth_client.jwt}"}
+    _register(api_client, h)
+    _allow_sar(monkeypatch)
+    # Model the apiserver's 400 on the malformed selector, as the FIXED
+    # K8sClient.list_pods surfaces it (ClusterUnreachableError).
+    real_list_pods = fake_k8s.list_pods
+
+    def list_pods(namespace, label_selector=None):
+        if label_selector == "garbage":
+            raise ClusterUnreachableError("cluster unreachable (list_pods)")
+        return real_list_pods(namespace, label_selector)
+
+    fake_k8s.list_pods = list_pods
+    r = api_client.get(
+        "/api/v1/clusters/1/resources/pods?namespace=team-a&labelSelector=garbage", headers=h
+    )
+    assert r.status_code == 502
+    assert r.get_json()["error"]["code"] == "CLUSTER_UNREACHABLE"
+
+
+def test_list_ipaddresspools_no_namespace_metallb_cluster_list(
+    api_client, auth_client, fake_k8s, monkeypatch
+) -> None:
+    """[exlb-ipaddresspools-no-namespace-cluster-list] no ?namespace= (the
+    all-namespaces request) with MetalLB present -> 200 via the
+    CLUSTER-scoped list: the kind is cluster-scoped, so the MetalLB branch
+    uses the cluster list and the namespace param is accepted-and-ignored
+    (the old namespaced read with namespace=None rendered the literal
+    "None" into the URL -> 404 -> 502). The fake models the cluster-scoped
+    read (it ignores the namespace, mirroring the fixed
+    K8sClient.list_ipaddresspools)."""
+    auth_client.login()
+    h = {"Authorization": f"Bearer {auth_client.jwt}"}
+    _register(api_client, h)
+    _allow_sar(monkeypatch)
+    r = api_client.get("/api/v1/clusters/1/resources/ipaddresspools", headers=h)
+    assert r.status_code == 200
+    body = r.get_json()
+    assert body["kind"] == "ipaddresspools"
+    [item] = body["items"]
+    assert item["metadata"]["name"] == "team-a-pool"
+    assert item["provider"] == "metallb"
 
 
 @pytest.mark.integration

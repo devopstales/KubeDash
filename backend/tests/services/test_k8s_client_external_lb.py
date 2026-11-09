@@ -1,9 +1,11 @@
 """External-LB CRD kinds (MetalLB primary / Cilium fallback) —
-service-tier provider-detection tests: MetalLB present -> the namespaced
-metallb.io read tagged ``provider: "metallb"``; MetalLB absent + Cilium
-present -> the cluster-scoped cilium.io read tagged ``provider: "cilium"``;
-both absent -> ``[]`` (and bgpadvertisements is MetalLB-ONLY — no Cilium
-branch). Getter 404 -> ``[]``; full custom-object shape."""
+service-tier provider-detection tests: MetalLB present -> the CLUSTER-scoped
+metallb.io read tagged ``provider: "metallb"`` (the four MetalLB kinds are
+Cluster-scoped — the namespace param is accepted-and-ignored); MetalLB
+absent + Cilium present -> the cluster-scoped cilium.io read tagged
+``provider: "cilium"``; both absent -> ``[]`` (and bgpadvertisements is
+MetalLB-ONLY — no Cilium branch). Getter 404 -> ``[]``; full
+custom-object shape."""
 from types import SimpleNamespace
 
 import pytest
@@ -88,14 +90,16 @@ def _mlb_bgp_adv(name: str) -> dict:
 
 def test_list_ipaddresspools_metallb_present() -> None:
     """[exlb-ipaddresspools-list-200-provider-detect] MetalLB present -> the
-    namespaced metallb.io read with the CRD's own served version, and every
-    item is tagged ``provider: "metallb"``."""
+    CLUSTER-scoped metallb.io read (the kind is Cluster-scoped — the
+    namespaced list URL 404s, so the namespace param is accepted-and-ignored)
+    with the CRD's own served version, and every item is tagged
+    ``provider: "metallb"``."""
     served = {("metallb.io", "ipaddresspools"): (_METALLB_VERSION, "Cluster")}
     seen: list[object] = []
     pool = _mlb_ip_pool("team-a-pool")
     custom = SimpleNamespace(
-        list_namespaced_custom_object=lambda group, version, namespace, plural: (
-            seen.append((group, version, namespace, plural)),
+        list_cluster_custom_object=lambda group, version, plural: (
+            seen.append((group, version, plural)),
             {"items": [pool]},
         )[1]
     )
@@ -104,7 +108,7 @@ def test_list_ipaddresspools_metallb_present() -> None:
     assert item["metadata"]["name"] == "team-a-pool"
     assert item["spec"]["addresses"] == ["192.168.100.10-192.168.100.20"]
     assert item["provider"] == "metallb"
-    assert seen == [("metallb.io", _METALLB_VERSION, "team-a", "ipaddresspools")]
+    assert seen == [("metallb.io", _METALLB_VERSION, "ipaddresspools")]
 
 
 def test_list_ipaddresspools_cilium_fallback() -> None:
@@ -150,10 +154,10 @@ def test_list_ipaddresspools_both_absent_empty() -> None:
 def test_list_ipaddresspools_metallb_500_maps_to_unreachable() -> None:
     served = {("metallb.io", "ipaddresspools"): (_METALLB_VERSION, "Cluster")}
 
-    def list_ns(group, version, namespace, plural) -> None:
+    def list_cluster(group, version, plural) -> None:
         raise ApiException(status=500)
 
-    custom = SimpleNamespace(list_namespaced_custom_object=list_ns)
+    custom = SimpleNamespace(list_cluster_custom_object=list_cluster)
     with pytest.raises(ClusterUnreachableError):
         _client(served, custom).list_ipaddresspools("team-a")
 
@@ -190,12 +194,14 @@ def test_get_ipaddresspool_404_returns_empty_list() -> None:
 
 
 def test_list_l2advertisements_metallb_present() -> None:
+    """The kind is CLUSTER-scoped: the namespace param (the SPA always
+    sends one) is accepted-and-ignored — the cluster read is used."""
     served = {("metallb.io", "l2advertisements"): (_METALLB_VERSION, "Cluster")}
     seen: list[object] = []
     l2 = _mlb_l2("team-a-l2")
     custom = SimpleNamespace(
-        list_namespaced_custom_object=lambda group, version, namespace, plural: (
-            seen.append((group, version, namespace, plural)),
+        list_cluster_custom_object=lambda group, version, plural: (
+            seen.append((group, version, plural)),
             {"items": [l2]},
         )[1]
     )
@@ -203,7 +209,7 @@ def test_list_l2advertisements_metallb_present() -> None:
     [item] = result
     assert item["provider"] == "metallb"
     assert item["spec"]["interfaces"] == [{"name": "eth1"}]
-    assert seen == [("metallb.io", _METALLB_VERSION, "team-a", "l2advertisements")]
+    assert seen == [("metallb.io", _METALLB_VERSION, "l2advertisements")]
 
 
 def test_list_l2advertisements_cilium_fallback() -> None:
@@ -250,12 +256,14 @@ def test_get_l2advertisement_404_returns_empty_list() -> None:
 
 
 def test_list_bgppeers_metallb_present() -> None:
+    """The kind is CLUSTER-scoped: the namespace param is
+    accepted-and-ignored — the cluster read is used."""
     served = {("metallb.io", "bgppeers"): (_METALLB_VERSION, "Cluster")}
     seen: list[object] = []
     bgp = _mlb_bgp("team-a-peer")
     custom = SimpleNamespace(
-        list_namespaced_custom_object=lambda group, version, namespace, plural: (
-            seen.append((group, version, namespace, plural)),
+        list_cluster_custom_object=lambda group, version, plural: (
+            seen.append((group, version, plural)),
             {"items": [bgp]},
         )[1]
     )
@@ -263,7 +271,7 @@ def test_list_bgppeers_metallb_present() -> None:
     [item] = result
     assert item["provider"] == "metallb"
     assert item["spec"]["peerASN"] == 65001
-    assert seen == [("metallb.io", _METALLB_VERSION, "team-a", "bgppeers")]
+    assert seen == [("metallb.io", _METALLB_VERSION, "bgppeers")]
 
 
 def test_list_bgppeers_cilium_fallback() -> None:
@@ -310,12 +318,14 @@ def test_get_bgppeer_404_returns_empty_list() -> None:
 
 
 def test_list_bgpadvertisements_metallb_present() -> None:
+    """The kind is CLUSTER-scoped: the namespace param is
+    accepted-and-ignored — the cluster read is used."""
     served = {("metallb.io", "bgpadvertisements"): (_METALLB_VERSION, "Cluster")}
     seen: list[object] = []
     adv = _mlb_bgp_adv("team-a-adv")
     custom = SimpleNamespace(
-        list_namespaced_custom_object=lambda group, version, namespace, plural: (
-            seen.append((group, version, namespace, plural)),
+        list_cluster_custom_object=lambda group, version, plural: (
+            seen.append((group, version, plural)),
             {"items": [adv]},
         )[1]
     )
@@ -323,7 +333,7 @@ def test_list_bgpadvertisements_metallb_present() -> None:
     [item] = result
     assert item["provider"] == "metallb"
     assert item["spec"]["aggregationBit"] == 2
-    assert seen == [("metallb.io", _METALLB_VERSION, "team-a", "bgpadvertisements")]
+    assert seen == [("metallb.io", _METALLB_VERSION, "bgpadvertisements")]
 
 
 def test_list_bgpadvertisements_metallb_absent_empty() -> None:

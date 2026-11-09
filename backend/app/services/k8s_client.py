@@ -296,12 +296,19 @@ class K8sClient:
         it applies to the namespaced branch only; a ``label_selector`` without
         a ``namespace`` is ignored (the all-namespaces branch is unchanged).
         The route does NOT parse or validate the selector (the kubernetes API
-        server is the authority on selector syntax)."""
-        resp = (
-            self._v1.list_namespaced_pod(namespace, label_selector=label_selector)
-            if namespace
-            else self._v1.list_pod_for_all_namespaces()
-        )
+        server is the authority on selector syntax) — a MALFORMED selector is
+        a 400 from the apiserver, which (like every ApiException here) maps
+        to ``ClusterUnreachableError`` (502), mirroring ``list_services``
+        (a raw ApiException would surface as 500 INTERNAL_ERROR)."""
+        try:
+            resp = (
+                self._v1.list_namespaced_pod(namespace, label_selector=label_selector)
+                if namespace
+                else self._v1.list_pod_for_all_namespaces()
+            )
+        except ApiException as e:
+            self._unreachable("list_pods", e)
+            raise AssertionError("unreachable") from e
         return [p.to_dict() for p in resp.items]
 
     def list_namespaces(self, _namespace: str | None) -> list[dict[str, Any]]:
@@ -1281,28 +1288,38 @@ class K8sClient:
     # MetalLB / Cilium external-LB CRDs — the 4.1 external-loadbalancer
     # plugin, moved to /network/ by the
     # certmanager-external-loadbalancer-views change. Provider detection
-    # (ratified 2026-10-29): MetalLB primary (namespaced, metallb.io),
-    # Cilium fallback (cluster-scoped, cilium.io); bgpadvertisements is
-    # MetalLB-ONLY (no Cilium branch). Both absent -> []. Each item is
-    # tagged with a top-level ``provider`` field ("metallb" / "cilium")
-    # for the view's Type column. (``_CILIUM_GROUP`` is the existing
-    # Cilium-kinds constant.)
+    # (ratified 2026-10-29): MetalLB primary (CLUSTER-scoped, metallb.io —
+    # the four kinds' lists are cluster-path reads; see
+    # list_ipaddresspools), Cilium fallback (cluster-scoped, cilium.io);
+    # bgpadvertisements is MetalLB-ONLY (no Cilium branch). Both absent ->
+    # []. Each item is tagged with a top-level ``provider`` field
+    # ("metallb" / "cilium") for the view's Type column.
+    # (``_CILIUM_GROUP`` is the existing Cilium-kinds constant.)
     _METALLB_GROUP = "metallb.io"
 
-    def list_ipaddresspools(self, namespace: str | None) -> list[dict[str, Any]]:
+    def list_ipaddresspools(self, _namespace: str | None) -> list[dict[str, Any]]:
         """IP Address Pools — provider-detected (MetalLB primary, Cilium
-        fallback, ratified 2026-10-29): MetalLB ipaddresspools (namespaced,
-        metallb.io) if present; else Cilium ciliumloadbalancerippools
-        (cluster-scoped, cilium.io); both absent -> []. Each item is tagged
-        with a ``provider`` field (metallb / cilium) for the view's Type
-        column."""
+        fallback, ratified 2026-10-29): MetalLB ipaddresspools (metallb.io)
+        if present; else Cilium ciliumloadbalancerippools (cluster-scoped,
+        cilium.io); both absent -> []. Each item is tagged with a
+        ``provider`` field (metallb / cilium) for the view's Type column.
+
+        MetalLB's kind is CLUSTER-scoped (the CRD's own scope — verified
+        against the dev kind cluster's live CRD): a namespaced list URL
+        404s even with a real namespace, and ``namespace=None`` renders the
+        literal "None" into the URL. So the MetalLB branch is ALWAYS the
+        cluster list (``list_cluster_custom_object``) and the namespace
+        param is accepted-and-ignored — the delivered SPA always sends
+        ``?namespace=`` (the selected-namespace default), and the list is
+        identical for every namespace on a cluster-scoped kind
+        (the ``list_gateway_classes`` pattern)."""
         served_ml = self.get_crd_served(self._METALLB_GROUP, "ipaddresspools")
         if served_ml is not None:
             version, _scope = served_ml
             custom = self._custom()
             try:
-                resp = custom.list_namespaced_custom_object(
-                    self._METALLB_GROUP, version, namespace, "ipaddresspools"
+                resp = custom.list_cluster_custom_object(
+                    self._METALLB_GROUP, version, "ipaddresspools"
                 )
             except ApiException as e:
                 self._unreachable("list_ipaddresspools", e)
@@ -1367,18 +1384,20 @@ class K8sClient:
             return [{**item, "provider": "cilium"}]
         return []
 
-    def list_l2advertisements(self, namespace: str | None) -> list[dict[str, Any]]:
+    def list_l2advertisements(self, _namespace: str | None) -> list[dict[str, Any]]:
         """L2 Advertisements — provider-detected: MetalLB l2advertisements
-        (namespaced, metallb.io) if present; else Cilium
-        ciliuml2announcementpolicies (cluster-scoped, cilium.io); both
-        absent -> []. Items tagged with the detected ``provider``."""
+        (metallb.io) if present; else Cilium ciliuml2announcementpolicies
+        (cluster-scoped, cilium.io); both absent -> []. Items tagged with
+        the detected ``provider``. The MetalLB branch is ALWAYS the
+        cluster list — the kind is CLUSTER-scoped (the namespace param is
+        accepted-and-ignored; see ``list_ipaddresspools``)."""
         served_ml = self.get_crd_served(self._METALLB_GROUP, "l2advertisements")
         if served_ml is not None:
             version, _scope = served_ml
             custom = self._custom()
             try:
-                resp = custom.list_namespaced_custom_object(
-                    self._METALLB_GROUP, version, namespace, "l2advertisements"
+                resp = custom.list_cluster_custom_object(
+                    self._METALLB_GROUP, version, "l2advertisements"
                 )
             except ApiException as e:
                 self._unreachable("list_l2advertisements", e)
@@ -1442,18 +1461,20 @@ class K8sClient:
             return [{**item, "provider": "cilium"}]
         return []
 
-    def list_bgppeers(self, namespace: str | None) -> list[dict[str, Any]]:
-        """BGP Peers — provider-detected: MetalLB bgppeers (namespaced,
-        metallb.io) if present; else Cilium ciliumbgppeeringpolicies
-        (cluster-scoped, cilium.io); both absent -> []. Items tagged with
-        the detected ``provider``."""
+    def list_bgppeers(self, _namespace: str | None) -> list[dict[str, Any]]:
+        """BGP Peers — provider-detected: MetalLB bgppeers (metallb.io) if
+        present; else Cilium ciliumbgppeeringpolicies (cluster-scoped,
+        cilium.io); both absent -> []. Items tagged with the detected
+        ``provider``. The MetalLB branch is ALWAYS the cluster list — the
+        kind is CLUSTER-scoped (the namespace param is accepted-and-ignored;
+        see ``list_ipaddresspools``)."""
         served_ml = self.get_crd_served(self._METALLB_GROUP, "bgppeers")
         if served_ml is not None:
             version, _scope = served_ml
             custom = self._custom()
             try:
-                resp = custom.list_namespaced_custom_object(
-                    self._METALLB_GROUP, version, namespace, "bgppeers"
+                resp = custom.list_cluster_custom_object(
+                    self._METALLB_GROUP, version, "bgppeers"
                 )
             except ApiException as e:
                 self._unreachable("list_bgppeers", e)
@@ -1517,18 +1538,20 @@ class K8sClient:
             return [{**item, "provider": "cilium"}]
         return []
 
-    def list_bgpadvertisements(self, namespace: str | None) -> list[dict[str, Any]]:
+    def list_bgpadvertisements(self, _namespace: str | None) -> list[dict[str, Any]]:
         """BGP Advertisements — MetalLB-ONLY (NO Cilium branch, ratified
-        2026-10-29): MetalLB bgpadvertisements (namespaced, metallb.io) if
-        present; MetalLB absent -> [] (Cilium has no equivalent). Items
-        tagged ``provider: "metallb"``."""
+        2026-10-29): MetalLB bgpadvertisements (metallb.io) if present;
+        MetalLB absent -> [] (Cilium has no equivalent). Items tagged
+        ``provider: "metallb"``. The MetalLB branch is ALWAYS the cluster
+        list — the kind is CLUSTER-scoped (the namespace param is
+        accepted-and-ignored; see ``list_ipaddresspools``)."""
         served_ml = self.get_crd_served(self._METALLB_GROUP, "bgpadvertisements")
         if served_ml is not None:
             version, _scope = served_ml
             custom = self._custom()
             try:
-                resp = custom.list_namespaced_custom_object(
-                    self._METALLB_GROUP, version, namespace, "bgpadvertisements"
+                resp = custom.list_cluster_custom_object(
+                    self._METALLB_GROUP, version, "bgpadvertisements"
                 )
             except ApiException as e:
                 self._unreachable("list_bgpadvertisements", e)
