@@ -282,6 +282,17 @@ completed_changes:
   # - ingressclass-gatewayclass-views: GatewayClassData.tsx committed; MENU-MERGED
   # - certmanager-external-loadbalancer-views: CertManager/ExternalLoadBalancer committed + in nav
   # - agents-md-rewrite: the live AGENTS.md IS the rewrite (briefing "not yet applied" header stale)
+  # Review gate 2026-11-09 (three-axis T2, review.md in
+  # 2026-10-29-certmanager-external-loadbalancer-views/): Floor
+  # met-with-fixes — 1 Critical (converter emitted v1-CRD-invalid
+  # Gateway/HTTPRoute; 7 shapes, CRD-validated) + 22 API-tier scenarios
+  # missing mandated tests + 2 Low (labelSelector 500, MetalLB namespaced
+  # reads) all fixed at the gate (2035efb3/d088e843/b886ce99/59f0c71a,
+  # floor 843/843); spec-zone amendments 03292612 (feature 400->404,
+  # blueprint CORS, ADR-0022 leaf count, AGENTS.md post-0029/0031
+  # staleness). Parked: TASK-100 (secret deep-links, Important — in-flight
+  # WIP), TASK-101 (bgppeers kind, Minor — same), TASK-102 (apply audit
+  # row, Low — precedent design call).
   - 2026-10-28-service-views
   - 2026-10-28-ingress-gateway-api-views
   - 2026-10-28-ingressclass-gatewayclass-views
