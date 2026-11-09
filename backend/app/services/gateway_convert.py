@@ -2,7 +2,8 @@
 
 NO kubernetes import here — the converter takes a parsed Ingress dict (the
 ``to_dict`` snake_case form produced by ``K8sClient.get_ingress``) plus a
-provider and returns Gateway API resource dicts. The endpoint
+provider and returns ``(resources, warnings)`` — the Gateway API v1
+resource dicts + the dropped-annotation warnings. The endpoint
 (``POST /api/v1/clusters/<id>/gateway-api/convert``) owns the Ingress read
 via the ``get_ingress`` ``_GETTERS`` contract; the mapping itself is pure and
 unit-testable without a cluster.
@@ -119,10 +120,12 @@ def gateway_class(provider: str) -> dict[str, Any]:
 
 def gateway(ingress: dict[str, Any], provider: str, tls_secrets: list[str]) -> dict[str, Any]:
     gateway_name = _ingress_name(ingress)
+    # Gateway API v1: GatewayListener.port is an int32 (the Ingress-shaped
+    # {"number": N} dict is not a field — the apiserver prunes it).
     listeners: list[dict[str, Any]] = [
         {
             "name": HTTP_LISTENER_NAME,
-            "port": {"number": 80},
+            "port": 80,
             "protocol": "HTTP",
             "allowedRoutes": {"namespaces": {"from": "All"}},
         },
@@ -131,7 +134,7 @@ def gateway(ingress: dict[str, Any], provider: str, tls_secrets: list[str]) -> d
         listeners.append(
             {
                 "name": f"{HTTPS_LISTENER_PREFIX}{i}",
-                "port": {"number": 443},
+                "port": 443,
                 "protocol": "TLS",
                 "tls": {"mode": "Terminate", "certificateRefs": [{"name": secret}]},
                 "allowedRoutes": {"namespaces": {"from": "All"}},
@@ -146,16 +149,6 @@ def gateway(ingress: dict[str, Any], provider: str, tls_secrets: list[str]) -> d
             "listeners": listeners,
         },
     }
-
-
-def _csv(value: Any) -> list[str]:
-    if not value:
-        return []
-    return [v for v in str(value).split(",") if v.strip()]
-
-
-def _bool(value: Any) -> bool:
-    return str(value).lower() in ("true", "1", "yes")
 
 
 def _int(value: Any, default: int = 0) -> int:
@@ -176,7 +169,26 @@ def _path_match_type(path: str, path_type: str, annotations: dict[str, str]) -> 
     return "PathPrefix"
 
 
-def _backend_filters(annotations: dict[str, str]) -> list[dict[str, Any]]:
+# The CORS annotation family (the nginx ingress controller's CORS plugin).
+# The Gateway API v1 HTTPRouteFilter enum has NO CORS filter — these
+# annotations are DROPPED (reported in the warnings) instead of converted.
+_CORS_ANNOTATION_PREFIXES: tuple[str, ...] = (
+    "nginx.ingress.kubernetes.io/enable-cors",
+    "nginx.ingress.kubernetes.io/cors-",
+)
+
+
+def _backend_filters(annotations: dict[str, str]) -> tuple[list[dict[str, Any]], list[str]]:
+    """(v1 HTTPRouteFilters, dropped-CORS-annotation-keys).
+
+    URLRewrite is the only convertible filter: v1 ``HTTPURLRewriteFilter``
+    has no ``replacePrefixWith`` field — the target is
+    ``path.replaceFullPath`` (a ReplaceFullPath HTTPPathModifier) or the
+    apiserver prunes the whole filter, leaving the required ``path`` absent.
+    The CORS family is NOT in the v1 filter enum: the sorted keys present on
+    the ingress come back as ``dropped_cors_keys`` (the warnings) — at least
+    the ``enable-cors`` key when CORS was requested.
+    """
     filters: list[dict[str, Any]] = []
     if any(k.startswith("nginx.ingress.kubernetes.io/rewrite-target") for k in annotations):
         rewrite = next(
@@ -188,40 +200,30 @@ def _backend_filters(annotations: dict[str, str]) -> list[dict[str, Any]]:
             None,
         )
         if rewrite:
-            filters.append({"type": "URLRewrite", "urlRewrite": {"replacePrefixWith": rewrite}})
-    if any(k.startswith("nginx.ingress.kubernetes.io/enable-cors") for k in annotations):
-        filters.append(
-            {
-                "type": "CORS",
-                "cors": {
-                    "allowOrigin": _csv(
-                        annotations.get("nginx.ingress.kubernetes.io/cors-allow-origin")
-                    ),
-                    "allowMethods": _csv(
-                        annotations.get("nginx.ingress.kubernetes.io/cors-allow-methods")
-                    )
-                    or ["GET", "POST", "PUT", "DELETE", "PATCH", "OPTIONS"],
-                    "allowHeaders": _csv(
-                        annotations.get("nginx.ingress.kubernetes.io/cors-allow-headers")
-                    ),
-                    "allowCredentials": _bool(
-                        annotations.get("nginx.ingress.kubernetes.io/cors-allow-credentials")
-                    ),
-                    "exposeHeaders": _csv(
-                        annotations.get("nginx.ingress.kubernetes.io/cors-expose-headers")
-                    ),
-                    "maxAge": _int(annotations.get("nginx.ingress.kubernetes.io/cors-max-age")),
-                },
-            }
-        )
-    return filters
+            filters.append(
+                {
+                    "type": "URLRewrite",
+                    "urlRewrite": {"path": {"type": "ReplaceFullPath", "replaceFullPath": rewrite}},
+                }
+            )
+    dropped_cors_keys = sorted(
+        k for k in annotations if k.startswith(_CORS_ANNOTATION_PREFIXES)
+    )
+    return filters, dropped_cors_keys
 
 
-def convert_ingress(ingress: dict[str, Any], provider: str = "envoy") -> list[dict[str, Any]]:
-    """Pure: Ingress dict → [GatewayClass, Gateway, *HTTPRoutes].
+def convert_ingress(
+    ingress: dict[str, Any], provider: str = "envoy"
+) -> tuple[list[dict[str, Any]], list[str]]:
+    """Pure: Ingress dict → (resources, warnings).
 
-    Emits ONE GatewayClass, ONE Gateway, and ONE HTTPRoute per ingress rule
-    path (plus a redirect-only HTTPRoute when SSL redirect is forced).
+    ``resources`` is [GatewayClass, Gateway, *HTTPRoutes]: ONE GatewayClass,
+    ONE Gateway, and ONE HTTPRoute per ingress rule path (plus a
+    redirect-only HTTPRoute when SSL redirect is forced) — all in Gateway
+    API **v1** shapes (verified against the live v1 CRDs). ``warnings`` is
+    the dropped-annotation list: the unsupported ``nginx`` annotations
+    (``unsupported_annotations``) + the dropped CORS keys (the v1 filter
+    enum has no CORS filter).
     """
     ingress_name = _ingress_name(ingress)
     namespace = _ingress_namespace(ingress)
@@ -246,14 +248,16 @@ def convert_ingress(ingress: dict[str, Any], provider: str = "envoy") -> list[di
 
     paths = _ingress_paths(ingress)
     annotations = _annotations(ingress)
-    backend_filters = _backend_filters(annotations)
+    backend_filters, dropped_cors_keys = _backend_filters(annotations)
 
     routes: list[dict[str, Any]] = []
     for idx, p in enumerate(paths):
+        # Gateway API v1 HTTPBackendRef: FLAT {"name", "port"} (port is an
+        # int) — the Ingress-shaped {"backend": {"service": {...}}} nesting
+        # is not a v1 field.
         ref: dict[str, Any] = {
-            "backend": {
-                "service": {"name": p["service_name"], "port": {"number": p["service_port"]}}
-            }
+            "name": p["service_name"],
+            "port": p["service_port"],
         }
         if any(k.startswith("nginx.ingress.kubernetes.io/canary-weight") for k in annotations):
             ref["weight"] = _int(annotations.get("nginx.ingress.kubernetes.io/canary-weight"))
@@ -279,27 +283,32 @@ def convert_ingress(ingress: dict[str, Any], provider: str = "envoy") -> list[di
                 headers.append({"type": "Header", "name": header_name, "value": value or "*"})
             if headers:
                 rule["matches"][0]["headers"] = headers
+        # Gateway API v1: there is NO spec-level "sectionName" on
+        # HTTPRouteSpec — the listener binding goes on the parentRef
+        # (sectionName, minLength 1 — the key is omitted entirely when the
+        # host has no TLS secret; only the http listener applies).
+        parent_ref: dict[str, Any] = {
+            "name": gateway_name,
+            "namespace": namespace,
+            "kind": "Gateway",
+        }
+        if p["host"] in tls_index_by_host:
+            parent_ref["sectionName"] = f"https-{tls_index_by_host[p['host']]}"
         route: dict[str, Any] = {
             "kind": "HTTPRoute",
             "apiVersion": f"{GATEWAY_API_GROUP}/{GATEWAY_API_VERSION}",
             "metadata": {"name": f"{ingress_name}-{idx}", "namespace": namespace},
             "spec": {
-                "parentRefs": [{"name": gateway_name, "namespace": namespace, "kind": "Gateway"}],
+                "parentRefs": [parent_ref],
                 "hostnames": _ingress_hosts(ingress),
-                "sectionName": f"https-{tls_index_by_host[p['host']]}"
-                if p["host"] in tls_index_by_host
-                else "",
                 "rules": [rule],
             },
         }
         if any(k.startswith("nginx.ingress.kubernetes.io/proxy-read-timeout") for k in annotations):
-            route["spec"]["timeouts"] = {
-                "backendRequest": {
-                    "timeout": _int(
-                        annotations.get("nginx.ingress.kubernetes.io/proxy-read-timeout")
-                    )
-                }
-            }
+            # v1 HTTPRouteSpec.timeouts.backendRequest is a Duration STRING
+            # (pattern ^([0-9]{1,5}(h|m|s|ms)){1,4}$), not a numeric timeout.
+            timeout_s = _int(annotations.get("nginx.ingress.kubernetes.io/proxy-read-timeout"))
+            route["spec"]["timeouts"] = {"backendRequest": f"{timeout_s}s"}
         routes.append(route)
     resources.extend(routes)
     if any(
@@ -313,10 +322,17 @@ def convert_ingress(ingress: dict[str, Any], provider: str = "envoy") -> list[di
                 "apiVersion": f"{GATEWAY_API_GROUP}/{GATEWAY_API_VERSION}",
                 "metadata": {"name": f"{ingress_name}-redirect", "namespace": namespace},
                 "spec": {
+                    # The http→https redirect rides the PLAIN HTTP listener:
+                    # the binding is the parentRef's sectionName ("http" —
+                    # minLength 1, so the key is always present here).
                     "parentRefs": [
-                        {"name": gateway_name, "namespace": namespace, "kind": "Gateway"}
+                        {
+                            "name": gateway_name,
+                            "namespace": namespace,
+                            "kind": "Gateway",
+                            "sectionName": HTTP_LISTENER_NAME,
+                        }
                     ],
-                    "sectionName": "http",
                     "hostnames": _ingress_hosts(ingress),
                     "rules": [
                         {
@@ -324,8 +340,14 @@ def convert_ingress(ingress: dict[str, Any], provider: str = "envoy") -> list[di
                             "backendRefs": [],
                             "filters": [
                                 {
-                                    "type": "Redirect",
-                                    "redirect": {"scheme": "https", "statusCode": 301},
+                                    # The v1 HTTPRouteFilter enum has NO
+                                    # "Redirect" — the redirect filter is
+                                    # "RequestRedirect" / requestRedirect.
+                                    "type": "RequestRedirect",
+                                    "requestRedirect": {
+                                        "scheme": "https",
+                                        "statusCode": 301,
+                                    },
                                 }
                             ],
                         }
@@ -333,7 +355,11 @@ def convert_ingress(ingress: dict[str, Any], provider: str = "envoy") -> list[di
                 },
             }
         )
-    return resources
+    # The v1 CRD has no CORS filter: the dropped CORS keys join the
+    # unsupported-annotation warnings (no overlap — the CORS keys are in
+    # SUPPORTED_ANNOTATION_PREFIXES, so they never appear in both lists).
+    warnings: list[str] = _unsupported_annotations(ingress) + dropped_cors_keys
+    return resources, warnings
 
 
 def unsupported_annotations(ingress: dict[str, Any]) -> list[str]:

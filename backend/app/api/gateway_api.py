@@ -6,9 +6,10 @@ from flask_smorest import Api, Blueprint
 from app.api._authhook import apply_auth
 from app.api._cluster import cluster_for as _cluster_for
 from app.core.errors import RbacDeniedError, ResourceKindNotSupportedError
+from app.extensions import db
 from app.schemas.gateway_api import GatewayConvertOut
 from app.services import rbac
-from app.services.gateway_convert import convert_ingress, unsupported_annotations
+from app.services.gateway_convert import convert_ingress
 from app.services.k8s_client import pool
 
 _INGRESS_RBAC_GROUP = "networking.k8s.io"
@@ -40,18 +41,19 @@ class GatewayApi(Api):
             namespace or None,
             ingress_name,
             _INGRESS_RBAC_GROUP,
+            engine=db.engine,
         ):
             raise RbacDeniedError("get on ingresses")
         items = pool.get(cluster).get_ingress(namespace or "default", ingress_name)
         if not items:
             raise ResourceKindNotSupportedError(f"Ingress '{ingress_name}' not found")
         ingress = items[0]
-        resources = convert_ingress(ingress, provider=provider)
+        resources, warnings = convert_ingress(ingress, provider=provider)
         return {
             "cluster": cluster.name,
             "namespace": namespace or "default",
             "source": "ingress",
             "gatewayClassName": ((resources[0].get("metadata") or {}).get("name") or ""),
             "resources": resources,
-            "warnings": unsupported_annotations(ingress),
+            "warnings": warnings,
         }
