@@ -53,36 +53,6 @@ in_flight:
     # (AGENTS.md KUBEDASH_HOME row, glossary terms). Next: reflect
     # (completes report.md retro half in the archive + session close).
     tracker: [TASK-033, TASK-034, TASK-035, TASK-036, TASK-037]
-  - change: 2026-10-27-postgres-queue-revocation-active-active
-    phase: review
-    # Merged from origin/rebase (executed 2026-10-29, ADR-0029/0030/0031):
-    # pgqueue SKIP LOCKED + leader-gated reaper replace RQ (ADR-0029);
-    # session revocation deny-list + OIDC state + SAR cache on the
-    # Postgres kv store (ADR-0030); two-node pgEdge/Spock dev stack,
-    # Redis removed from the whole stack (ADR-0031). All 7 tickets Done
-    # (TASK-042/043/044 + TASK-106..109 — the last four renumbered by
-    # backlog doctor 2026-11-09, duplicate-ID repair); both one-way gates
-    # passed live: TICKET-01
-    # migration (0e969d3c2e02: tasks/revoked_jtis/kv + leader_lease.fence)
-    # and TICKET-07 (two-node pgEdge, no redis, autoddl n1->n2). QA gate
-    # 2026-11-10: **CONCERNS** (report.md) — unit floor 847 passed, change
-    # tests 51 passed, live pgEdge re-verified (n1/n2 healthy, autoddl to
-    # n2, no redis); 0 CRITICAL. 2 acceptance scenarios are manual-only
-    # (W028), blueprint `test_pgqueue_crash.py` never created (W029), no
-    # TDD ledger (W030), dev-only pgEdge credential committed (W031), plus
-    # W032/W033/W034 suggestions. Closed in-gate: added the logout->deny-list
-    # test + fixed the 3 lint/type errors this change introduced. Review
-    # 2026-11-10 (review.md, three axes side by side, **Grade C** — inline,
-    # no subagent dispatch: diagnostic only, an independent pass is still
-    # owed): Standards met-with-fixes (fence read-then-bind fixed to an
-    # in-upsert increment; the duplicated Bearer/cookie precedence collapsed
-    # into _request_token + g.current_jti; the false "reaper bounds the
-    # table" docstring corrected), Spec met-with-fixes (W028/W029/W030
-    # parked), Security secure. New windows: W035 `tasks` has no retention
-    # for done rows (ADR-0029 amendment needed — ADR-gated), W036 index gaps
-    # for claim/reap + revoked_jtis.expires_at. Next: an independent review
-    # (Grade A) then ship.
-    tracker: [TASK-042, TASK-043, TASK-044, TASK-106, TASK-107, TASK-108, TASK-109]
   - change: 2026-10-28-runtimeclass-views
     phase: qa
     # Executed 2026-10-28 (TASK-046): 4 commits on `rebase` — backend
@@ -327,6 +297,11 @@ completed_changes:
   - 2026-10-28-ingressclass-gatewayclass-views
   - 2026-10-29-certmanager-external-loadbalancer-views
   - 2026-11-03-agents-md-rewrite
+  # Shipped 2026-11-10 (ship: keep branch `rebase` as-is — the branch is the
+  # deliverable and rollback unit, ADR-0027/0029; QA CONCERNS overridden by
+  # the human, review Grade C — independent pass still owed). Folder in
+  # .skillgrid/xarchive/:
+  - 2026-10-27-postgres-queue-revocation-active-active
 
 # Onboarding state (2026-10-17): config.yaml + ASSUMPTIONS.md + state.yaml
 # created. Open items tracked in ASSUMPTIONS.md "Onboarding notes".
