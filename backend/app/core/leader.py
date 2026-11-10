@@ -169,7 +169,8 @@ class Leader:
                 next_fence = (current + 1) if current is not None else 1
                 row = conn.execute(
                     text(
-                        "INSERT INTO leader_lease (id, replica_id, token, acquired_at, heartbeat_at, fence) "
+                        "INSERT INTO leader_lease "
+                        "(id, replica_id, token, acquired_at, heartbeat_at, fence) "
                         "VALUES (1, :rid, :tok, now(), now(), :nf) "
                         "ON CONFLICT (id) DO UPDATE SET replica_id = :rid, token = :tok, "
                         "acquired_at = now(), heartbeat_at = now(), fence = :nf "
@@ -203,7 +204,7 @@ class Leader:
             # not drop the fence condition.)
             if r.rowcount == 0 and self._is_leader:
                 self._is_leader = False
-            return r.rowcount
+            return int(r.rowcount)
 
     def _release(self) -> None:
         # pg_advisory_unlock must run on the SAME session that holds the lock
