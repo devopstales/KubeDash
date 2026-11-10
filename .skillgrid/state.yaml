@@ -15,6 +15,17 @@ pipeline:
 
 # In-flight changes (besides pipeline.current_change).
 in_flight:
+  - change: 2026-11-10-ha-status-page
+    phase: blueprint
+    # Planned 2026-11-10 (briefing + blueprint + findings + acceptance,
+    # PROPOSED): admin-only GET /api/v1/admin/ha-status — pgEdge
+    # active-active health (both replication directions via per-node
+    # probes of the spock.node_interface DSNs, leader_lease, tasks queue,
+    # derived healthy/degraded/down + reasons) + a real /settings/ha-status
+    # view (replaces the stub; route renamed from /settings/cluster-status —
+    # rename landed, frontend 75 files / 491 tests green). Optional
+    # [ha] node_dsn_overrides INI key for the host-run dev backend (F8:
+    # compose service names don't resolve on the host). Next: slicing.
   - change: 2026-10-29-session-object-navigation
     phase: qa
     # Sliced 2026-10-29, executed 2026-11-02 (8 tickets TASK-055..062,
