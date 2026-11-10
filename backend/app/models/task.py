@@ -3,7 +3,9 @@
 Replaces the RQ job in Redis; Task 2 claims it with
 ``FOR UPDATE SKIP LOCKED``. The index on ``enqueued_at`` is plain, not a
 partial ``WHERE available_at > now()`` — ``now()`` is STABLE, not IMMUTABLE,
-so the partial form is invalid (findings #2); the reaper bounds the table.
+so the partial form is invalid (findings #2); the reaper bounds the
+``processing`` rows, but ``done`` rows are never pruned — the table grows
+with every completed run (W035: retention is an open ADR-0029 question).
 """
 from app.extensions import db
 

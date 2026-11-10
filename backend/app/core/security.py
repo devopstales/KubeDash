@@ -301,12 +301,14 @@ def _load_user_for_claims(claims: dict[str, Any]) -> None:
     g.current_user = user
 
 
-def _auth_check() -> None:
-    """Verify the request credential and bind g.current_user.
+def _request_token() -> str:
+    """The request's access credential under the ONE precedence rule.
 
     Bearer is checked first: an explicit header wins over the ambient cookie,
     which keeps the kubectl plugin unambiguous when a browser happens to send
-    both. The cookie is the SPA's path (ADR-0025). Raises UnauthorizedError.
+    both. The cookie is the SPA's path (ADR-0025). Both ``_auth_check`` and
+    ``_current_jti`` read the credential through here — a second copy of this
+    precedence would let the two drift (ADR-0025 is a one-way door).
     """
     header = request.headers.get("Authorization", "")
     token = (
@@ -316,7 +318,17 @@ def _auth_check() -> None:
     )
     if not token:
         raise UnauthorizedError("missing or invalid token")
-    claims = verify_jwt(token)
+    return token
+
+
+def _auth_check() -> None:
+    """Verify the request credential and bind g.current_user / g.current_jti.
+
+    The ``jti`` rides along from the verified claims so ``_current_jti`` never
+    re-decodes (logout would otherwise verify twice). Raises UnauthorizedError.
+    """
+    claims = verify_jwt(_request_token())
+    g.current_jti = UUID(claims["jti"])
     _load_user_for_claims(claims)
 
 
@@ -329,16 +341,16 @@ def _current_jti() -> UUID:
     verified + deny-list-checked), and a second PK probe per logout is
     wasted work. A request without a credential raises UnauthorizedError —
     the same 401, not a 500."""
-    header = request.headers.get("Authorization", "")
-    token = (
-        header[len("Bearer "):]
-        if header.startswith("Bearer ")
-        else request.cookies.get(ACCESS_COOKIE)
-    )
-    if not token:
-        raise UnauthorizedError("missing or invalid token")
+    # ``_auth_check`` already decoded the verified claims; reuse the jti it
+    # bound. The fallback keeps direct callers (tests, a future pre-hook
+    # caller) working without a second precedence rule.
+    authn_jti: UUID | None = getattr(g, "current_jti", None)
+    if authn_jti is not None:
+        return authn_jti
     try:
-        claims = jwt.decode(token, get_settings().kubedash_jwt_secret, algorithms=["HS256"])
+        claims = jwt.decode(
+            _request_token(), get_settings().kubedash_jwt_secret, algorithms=["HS256"]
+        )
         return UUID(claims["jti"])
     except (jwt.PyJWTError, ValueError, KeyError) as e:
         raise UnauthorizedError("missing or invalid token") from e

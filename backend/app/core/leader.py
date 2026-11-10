@@ -153,30 +153,26 @@ class Leader:
                 # session-local (NOT a cross-node mutex), so this is the
                 # cross-node LWW tiebreaker.
                 #
-                # Both the INSERT VALUES and the DO UPDATE SET side cannot
-                # reference the target column unqualified (Postgres: the
-                # column is "not visible" from the insert side, and a bare
-                # `fence` on the update side is ambiguous between the excluded
-                # row and the target). Postgres' excluded table is only
-                # readable, so `excluded.fence + 1` does not work either.
-                # Read the current fence in a first statement (same
-                # transaction — the following upsert takes the row lock, so
-                # the read + upsert are atomic against other upserts on this
-                # single row) and bind the next value explicitly.
-                current = conn.execute(
-                    text("SELECT fence FROM leader_lease WHERE id = 1")
-                ).scalar()
-                next_fence = (current + 1) if current is not None else 1
+                # The increment MUST happen inside the upsert, not in a
+                # separate SELECT-then-bind: two peers acquiring between that
+                # read and this write would both bind the same value and hold
+                # the SAME fence — the exact tie ADR-0031 exists to break.
+                # On the DO UPDATE side the target column must be qualified
+                # (`leader_lease.fence`); `excluded.fence` is the row we tried
+                # to insert (1), not the live value. The INSERT side cannot
+                # reference the target column at all, so the initial value is
+                # the literal 1.
                 row = conn.execute(
                     text(
                         "INSERT INTO leader_lease "
                         "(id, replica_id, token, acquired_at, heartbeat_at, fence) "
-                        "VALUES (1, :rid, :tok, now(), now(), :nf) "
+                        "VALUES (1, :rid, :tok, now(), now(), 1) "
                         "ON CONFLICT (id) DO UPDATE SET replica_id = :rid, token = :tok, "
-                        "acquired_at = now(), heartbeat_at = now(), fence = :nf "
+                        "acquired_at = now(), heartbeat_at = now(), "
+                        "fence = leader_lease.fence + 1 "
                         "RETURNING fence"
                     ),
-                    {**self._binds(), "tok": str(self._token), "nf": next_fence},
+                    {**self._binds(), "tok": str(self._token)},
                 ).first()
                 self._fence = row.fence
                 conn.commit()
