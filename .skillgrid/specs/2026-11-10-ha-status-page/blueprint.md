@@ -10,7 +10,7 @@
 
 **Goal:** An admin-only `GET /api/v1/admin/ha-status` endpoint that reports the pgEdge active-active cluster's health (both replication directions, per-node reachability/lag/apply-workers/conflicts, leader lease, task queue, derived status + reasons) and a real `/settings/ha-status` page that renders it.
 
-**Architecture:** A Flask-free `app/services/ha_status.py` with one seam — `probe_node(dsn) -> NodeProbe` — that opens a short-lived read-only SQLAlchemy engine per node DSN and runs a fixed set of spock read-only queries. The endpoint (`app/api/admin.py`) reads the cluster catalog from the app's engine, merges the optional INI DSN overrides, probes every node, assembles the report, and derives the overall status. The frontend gets a view folder (`src/views/HaStatus/`) with a TanStack Query 5 s poll; the route moves out of the Stub router.
+**Architecture:** A Flask-free `app/services/ha_status.py` with one seam — `probe_node(dsn) -> NodeProbe` — that opens a short-lived read-only SQLAlchemy engine per node DSN and runs a fixed set of read-only queries: the spock per-node state (subscription status, receive lag, apply workers, channel totals, exceptions) **plus the leader's advisory-lock check on that node** (`pg_locks` × `pg_stat_activity` matched on `hashtext(leader replica_id)::oid`, F12/F13). The endpoint (`app/api/admin.py`) reads the cluster catalog + `leader_lease` + `tasks` from the app's engine, merges the optional INI DSN overrides, probes every node, aggregates the per-node lock sightings into one verdict, best-effort reads the candidate count from the KubeDash Deployment (admin client, owner-refs chain, nullable), assembles the report, and derives the overall status. The frontend gets a view folder (`src/views/HaStatus/`) with a TanStack Query 5 s poll; the route moves out of the Stub router.
 
 **Tech Stack:** Flask 3 + Smorest, SQLAlchemy 2.0 (raw SQL via `text()`), PostgreSQL 17 (pgEdge/Spock 5.0.1). Frontend: React 19 + TS + Vite (CoreUI), TanStack Query, Vitest + RTL + MSW.
 
@@ -19,9 +19,12 @@
 ## Terms
 
 - **spock** — the pgEdge multi-primary replication extension (v5.0.1 here); its catalog lives in the `spock` schema. `.skillgrid/knowledge/glossary/02-technical-terms.md`.
-- **per-node probe** — a short-lived read-only connection from the app to ONE cluster node, used to read that node's LOCAL spock state (subscription status, receive lag, apply workers).
+- **per-node probe** — a short-lived read-only connection from the app to ONE cluster node, used to read that node's LOCAL state (subscription status, receive lag, apply workers, and whether the leader's advisory-lock session is on that node).
 - **node DSN override** — the optional INI map (`[ha] node_dsn_overrides`) that replaces a `spock.node_interface` DSN per node name (dev host reachability, findings F8).
-- **leader lease** — the single-row `leader_lease` table backing KubeDash leader election (pg advisory lock + fence, ADR-0008/0031).
+- **leader lease** — the single-row `leader_lease` table backing KubeDash leader election (ADR-0008/0031): followers poll it at 1 s, the leader heartbeats at 5 s, stale at 10 s; takeover upserts `fence = fence + 1`.
+- **per-replica advisory lock** — each replica's `pg_try_advisory_lock(hashtext(<own replica_id>))` — session-scoped liveness marker, deliberately NOT a cross-replica/cross-node mutex (F13); the fence upsert is the cross-node LWW.
+- **lock cross-check** — matching `pg_locks.objid = hashtext(leader replica_id)::oid` (`classid = 4294967295`) per node, aggregated across reachable nodes (F12).
+- **candidates** — the chart's Deployment `spec.replicas`; every pod is a candidate (`KUBEDASH_ROLE=leader`), one is elected. Nullable (F14).
 - **overall status** — the derived `healthy` | `degraded` | `down` verdict with reasons (briefing R4).
 
 ## Must-Haves (goal-backward verification)
@@ -30,6 +33,10 @@
 - An admin `GET /api/v1/admin/ha-status` → 200 with `spock_version`, `nodes[]` (one entry per `spock.node` member), `leader`, `queue`, `status`, `reasons`. A non-admin → 403 (the existing admin auth hook).
 - Against the live dev two-node cluster: both `n1` and `n2` appear, both `reachable: true`, each with its OWN subscription `status: "replicating"` and a `lag` entry — i.e. **both** replication directions are reported, not just the connected node's half. *(F2/F3 — per-node local state)*
 - The probed node name is part of each node entry (`node_name`), so a half view is visible, not silent. *(F3)*
+- **Leader election**: the report carries the `leader_lease` row (leader `replica_id`, token, `acquired_at` tenure, heartbeat age, `fence`) and the lock verdict — on the live dev cluster: `held: true`, `on_node: n1`, holder pid + `state` from `pg_stat_activity`, holder `backend_start` ≈ lease `acquired_at` (F12).
+- **Lock cross-check is per-node then aggregated** (F13): each probe reports whether the leader's lock exists locally; the verdict aggregates over REACHABLE nodes only. `docker stop kdpg-n1` while n2 is probed → "not observed on any reachable node" combines with the (still fresh, then stale) heartbeat per R4 — no false alarm while the lock's node is simply down, correct alarm once the heartbeat goes stale.
+- **Election failure classification**: stop the dev backend → within the 10 s stale window the heartbeat goes stale and the session-scoped lock releases → `degraded` + `no_leader` (200, not 500); restart → back to `healthy` with `fence` incremented by 1 (the fence counts elections).
+- **Candidates**: host-run dev backend (no KubeDash Deployment in the target cluster) → `candidates: null`; in-cluster (e2e kind install) → `spec.replicas` via the owner-refs chain; any K8s failure → `null` (never fails the report). *(F14)*
 - `docker stop kdpg-n2` → the endpoint still returns 200; the n2 entry is `reachable: false` (probe error classified, not raised); `status: "down"` with reason `node_unreachable:n2`.
 - A probe's failure is a classification (unreachable), never a 500: a dead node, a timeout, and an auth error all yield `reachable: false` + a short `probe_error`.
 - With `[ha] node_dsn_overrides = n2=postgresql://kubedash:kubedash@localhost:16433/kubedash` in the dev INI, the host backend reports n2 reachable even though `kdpg-n2` doesn't resolve on the host. *(F8)*
@@ -40,6 +47,7 @@
 
 **Artifacts** (files that must exist with real implementation, not stubs):
 - `backend/app/services/ha_status.py` — `probe_node(dsn) -> NodeProbe`, `build_report(engine, dsn_overrides) -> HaReport`, status derivation.
+- `backend/app/services/k8s_client.py` — `K8sClient.get_pod(namespace, name)` + `get_deployment(namespace, name)` (admin shape, same pattern as the existing `get_*` methods; owner-refs chain for the candidate count, F14).
 - `backend/app/api/admin.py` — `GET /admin/ha-status` route + Pydantic response schema (added to the existing `AdminApi`).
 - `backend/app/core/ini_config.py` + `backend/app/core/config.py` — the optional `ha_node_dsn_overrides` map (default empty).
 - `backend/kubedash.ini` + `backend/kubedash.ini.example` — the `[ha]` section (dev value in the gitignored INI; documented optional in the example).
@@ -50,6 +58,8 @@
 **Key links** (critical connections that must work together):
 - `AdminApi.ha_status()` → `ha_status.build_report(db.engine, settings.ha_node_dsn_overrides)` → the Pydantic schema (field-for-field; no re-derivation in the API layer).
 - `build_report` reads `spock.node` + `spock.node_interface` + `leader_lease` + `tasks` from the app engine, then calls `probe_node` per merged DSN; the probe results are keyed by `node_name` and joined onto the member list (a member whose probe failed is still listed, `reachable: false`).
+- The lock verdict aggregates the per-probe `lock_held_locally` sightings over reachable nodes only; `derive_status` combines it with heartbeat freshness per the R4 matrix (F12/F13).
+- `candidates` = best-effort `get_pod(replica_id) → ownerRefs → get_deployment → spec.replicas` via the admin client; any exception → `null` (F14).
 - The view's query hook (`useQuery`, `refetchInterval: 5000`) → `GET /admin/ha-status` → banner/cards; the nav leaf + the e2e smoke list both point at `/settings/ha-status`.
 - The INI override map is parsed once in `ini_config` (same pattern as the other optional keys) and exposed as `Settings.ha_node_dsn_overrides: dict[str, str]`.
 
@@ -88,16 +98,16 @@
 
 > Tracer: after this task the endpoint exists and renders ONE node's data (the app's own node) end-to-end; per-node fan-out is Task 2.
 
-- [ ] `backend/tests/services/test_ha_status.py` (red): `probe_node` against a fake engine yields a `NodeProbe` (node_name, subscription status, lag, apply workers, conflict count); a raising probe → `reachable: false` + classified `probe_error`, never raises; `build_report` with a fake catalog + fake probe assembles `nodes[]` keyed by `node_name`; the probe SQL set contains no DML (assert on the executed statement texts).
+- [ ] `backend/tests/services/test_ha_status.py` (red): `probe_node` against a fake engine yields a `NodeProbe` (node_name, subscription status, lag, apply workers, conflict count, `lock_held_locally` + holder pid/state); a raising probe → `reachable: false` + classified `probe_error`, never raises; `build_report` with a fake catalog + fake probe assembles `nodes[]` keyed by `node_name`; the probe SQL set contains no DML (assert on the executed statement texts) and includes the F12 cross-check (`locktype='advisory'`, `classid=4294967295::oid`, `objid=hashtext(:rid)::oid`).
 - [ ] `backend/app/services/ha_status.py` (green): `NodeProbe` (dataclass), `probe_node(dsn, timeout_s=3.0)` — `create_engine(dsn, connect_args={"connect_timeout": 3})`, run the closed read-only set (F2/F3/F4/F5/F6: local node name, `sub_show_status` per local subscription, `lag_tracker`, `get_apply_worker_status`, `get_channel_stats` totals, `exception_status` count + last 10), dispose in `finally`; `_cluster_catalog(engine)` — `spock_version()`, `spock.node`, `spock.node_interface` (if_name/if_nodeid/if_dsn), `leader_lease` row, `tasks` counts + oldest pending; `build_report` — merge member list with probe results (unprobed member ⇒ `reachable: false`).
 - [ ] `backend/app/api/admin.py`: `GET /admin/ha-status` (admin hook as its siblings), Pydantic `HaStatusOut`; wire `settings.ha_node_dsn_overrides` (empty for now).
 - [ ] Verify: `cd backend && uv run pytest tests/services/test_ha_status.py -q && uv run pytest -m "not integration" -q` (unit floor stays green); live curl on the dev stack (admin cookie) returns 200 with both catalog sections.
 
 ### Task 2: Per-node fan-out + status derivation
 
-- [ ] Tests (red): derivation matrix — (a) all good → `healthy`, no reasons; (b) one node `reachable: false` → `down` + `node_unreachable:<name>`; (c) a subscription `status != "replicating"` → `down` + `subscription_not_replicating:<node>`; (d) lag 61 s → `degraded` + `lag_exceeded:<node>`; (e) exception rows > 0 → `degraded` + `exceptions_pending:<node>`; (f) heartbeat 11 s old / lease missing → `degraded` + `leader_heartbeat_stale` / `leader_lease_missing`; combinations → all reasons listed, worst wins (`down` > `degraded`).
-- [ ] `ha_status.py` (green): `build_report` probes **every** member (DSN = override.get(name) or the node_interface DSN with the app's credentials substituted — parse the keyword DSN, keep host/port/db, swap user + add password); `derive_status(report)`.
-- [ ] Verify: unit tests green; dev stack — `docker stop kdpg-n2` → curl shows `down` + `node_unreachable:n2` (200, no 500); `docker start kdpg-n2` → back to `healthy` within one poll.
+- [ ] Tests (red): derivation matrix — (a) all good → `healthy`, no reasons; (b) one node `reachable: false` → `down` + `node_unreachable:<name>`; (c) a subscription `status != "replicating"` → `down` + `subscription_not_replicating:<node>`; (d) lag 61 s → `degraded` + `lag_exceeded:<node>`; (e) exception rows > 0 → `degraded` + `exceptions_pending:<node>`; (f) heartbeat 11 s old / lease missing → `degraded` + `leader_heartbeat_stale` / `leader_lease_missing`; (g) fresh heartbeat + lock seen on no reachable node → `degraded` + `lock_lease_mismatch`; (h) lock held + stale heartbeat → `degraded` + `lock_without_heartbeat`; (i) stale heartbeat + no lock → `degraded` + `no_leader`; combinations → all reasons listed, worst wins (`down` > `degraded`).
+- [ ] `ha_status.py` (green): `build_report` probes **every** member (DSN = override.get(name) or the node_interface DSN with the app's credentials substituted — parse the keyword DSN, keep host/port/db, swap user + add password); aggregates the lock verdict over reachable nodes; best-effort `candidates` (owner-refs chain, `null` on any failure); `derive_status(report)`.
+- [ ] Verify: unit tests green; dev stack — `docker stop kdpg-n2` → curl shows `down` + `node_unreachable:n2` (200, no 500); `docker start kdpg-n2` → back to `healthy` within one poll; stop the dev backend → `degraded` + `no_leader` within ~15 s; restart → `healthy` with `fence` +1.
 
 ### Task 3: INI override (`[ha] node_dsn_overrides`)
 
@@ -107,7 +117,7 @@
 
 ### Task 4: Frontend view + route move
 
-- [ ] `frontend/tests/views/HaStatus.test.tsx` (red, MSW): healthy fixture → green banner "HA healthy", one card per node (name, `replicating` chip, lag, conflicts 0), leader section (replica_id, fence, heartbeat age), queue section (counts); degraded fixture (n2 unreachable) → red banner with `node_unreachable:n2` reason, n2 card marked unreachable; error state (500) → banner "status unavailable".
+- [ ] `frontend/tests/views/HaStatus.test.tsx` (red, MSW): healthy fixture → green banner "HA healthy", one card per node (name, `replicating` chip, lag, conflicts 0), **leader election section** (leader replica_id, tenure, fence, heartbeat age, lock verdict "held on n1 (pid 7899, idle)", "1 leader of N candidates" or no count line when `candidates` is null), queue section (counts); degraded fixture (n2 unreachable) → red banner with `node_unreachable:n2` reason, n2 card marked unreachable; `no_leader` fixture → degraded banner with the reason; error state (500) → banner "status unavailable".
 - [ ] `frontend/src/views/HaStatus/` (green): `index.tsx` (useQuery `refetchInterval: 5000`), `HaStatusCard.tsx`, `types.ts` (mirrors `HaStatusOut`); CoreUI styling per STYLEGUIDE.
 - [ ] Route move: `App.tsx` real route; `stubRoutes` entry removed; `e2e/ui-smoke.spec.ts` — the route leaves the stub smoke list (the real view is covered by the page test + e2e admin smoke).
 - [ ] Verify: `cd frontend && corepack pnpm test -- HaStatus` + `corepack pnpm test -- Stub` green; `task fe-build` + `task fe-sync`; dev-stack browser check as admin: Settings → HA Status renders the live cluster.
@@ -136,6 +146,8 @@ None open. The lag threshold (60 s) and heartbeat staleness (10 s, matching `lea
 | Half view (only the connected node's state) reported as full | probe every member; per-entry `node_name`; member-without-probe ⇒ `reachable: false` | T2 truths (both directions present) |
 | Socket leak on unreachable nodes | `finally: engine.dispose()` | T1 (disposal asserted with fakes) |
 | App writes to `spock.*` get replicated by `autoddl` | read-only-by-contract module; DML-free assertion on the executed statements | T1 truth |
+| Lock cross-check false negative (lock session is node-local, F13) | per-node sighting + aggregation over reachable nodes; combined with heartbeat freshness | T2 truths (g)/(i) |
+| K8s candidates read hangs/fails the report | best-effort, short timeout, `null` fallback (F14) | T2 truth (candidates) |
 | Override DSN carries credentials → leak in the UI | the response shows host:port + node name, never the DSN string | T4 (types render host/port only) |
 
 ## Execution Handoff

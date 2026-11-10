@@ -85,6 +85,50 @@ Feature: HA Status page (admin endpoint + settings view)
     Then the body status is down
     And the reasons include both node_unreachable:n2 and lag_exceeded:n1
 
+  # -------------------------------------- leader election (R1, R4)
+
+  Scenario: ha-status-leader-election-report
+    # happy path — R1 (lease row + lock verdict + candidates)
+    When an admin requests GET /api/v1/admin/ha-status
+    Then the leader section names the leader replica_id, its token, tenure, heartbeat age, and fence
+    And the lock verdict is held on the leader's node with the holder pid and session state
+    And the candidates count is null (host-run dev backend, no KubeDash Deployment)
+
+  Scenario: ha-status-backend-stop-no-leader
+    # failure — R4 (session-scoped lock releases with the process; fail-closed)
+    Given the dev backend process is stopped
+    When more than 10 seconds pass and an admin requests GET /api/v1/admin/ha-status
+    Then the response is 200
+    And the body status is degraded with reason no_leader
+    When the dev backend is restarted and an admin requests GET /api/v1/admin/ha-status
+    Then the body status is healthy
+    And the fence is incremented by exactly 1 (it counts elections)
+
+  Scenario: ha-status-lock-lease-mismatch
+    # edge — R4
+    Given the leader_lease heartbeat is fresh
+    And the leader's advisory lock is held on no reachable node
+    When an admin requests GET /api/v1/admin/ha-status
+    Then the body status is degraded with reason lock_lease_mismatch
+
+  Scenario: ha-status-lock-node-down-no-false-alarm
+    # edge — F13 (the lock session is node-local; a down node simply cannot witness it)
+    Given the leader's advisory lock session is on node n1
+    And node n1 is stopped
+    And the leader_lease heartbeat is still fresh
+    When an admin requests GET /api/v1/admin/ha-status
+    Then the body carries no lock reason (the heartbeat is fresh; the lock's node is down)
+    And the body status reflects the node_unreachable condition, not a lock mismatch
+
+  Scenario: ha-status-candidates-in-cluster
+    # edge — R1/F14 (in-cluster: the owner-refs chain resolves the Deployment)
+    Given the app runs in-cluster as a pod of a 3-replica KubeDash Deployment
+    When an admin requests GET /api/v1/admin/ha-status
+    Then the leader section reports 1 leader of 3 candidates
+    Given the Deployment read fails
+    When an admin requests GET /api/v1/admin/ha-status
+    Then the response is 200 with candidates null
+
   # --------------------------------------------- DSN override (R3)
 
   Scenario: ha-status-dsn-override-honored

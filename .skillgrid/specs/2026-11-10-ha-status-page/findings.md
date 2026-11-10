@@ -121,3 +121,61 @@ dev-stack e2e.
 (`grep cluster_status backend/app` → no matches). The Stub test
 (`tests/views/Stub.test.tsx`) derives its expectations from the nav, so
 the rename self-adjusts.
+
+## F12 — The leader's advisory lock is observable, and matchable, in `pg_locks`
+
+```sql
+select l.granted, a.pid, a.state, a.backend_start
+from pg_locks l join pg_stat_activity a on a.pid = l.pid
+where l.locktype = 'advisory' and l.classid = 4294967295::oid
+  and l.objid = hashtext('local')::oid;
+-- t | 7899 | idle | 2026-11-10 08:18:44.215403+00
+```
+
+`hashtext()` returns signed int4; `pg_locks.objid` stores the two's-complement
+unsigned form — the `::oid` cast bridges them (`hashtext('local') =
+-1729230339` → objid `2565736957`). `classid = 4294967295` (0xFFFFFFFF)
+selects single-int4-key locks. The holder's `backend_start` (08:18:44)
+equals `leader_lease.acquired_at` — the lock session is the leader's
+dedicated `_advisory_conn`, kept open for the lease lifetime
+(`leader.py` `acquire_once`/`stop`). Steady-state count of granted
+advisory locks: **exactly 1** (the leader's) — followers return from
+`acquire_once` before any lock attempt while the lease is fresh and
+foreign.
+
+## F13 — The lock key is PER-REPLICA; the fence is the cross-node arbiter
+
+`leader.py`: `_binds() = {"rid": self.replica_id}` — the key is
+`hashtext(<own replica_id>)`, deliberately not a fixed constant
+(docstring: a fixed key would let a second `Leader` object on the same
+engine report spuriously non-leader and break failover). ADR-0031
+(docstring, quoted): the advisory lock is **session-local — NOT a
+cross-node mutex** ("two peers on different Postgres nodes can both hold
+their local session's lock"); the `leader_lease.fence` upsert
+(`fence = fence + 1`, every leader write fenced `WHERE fence = :f`,
+0 rows → demote) is the cross-node LWW tiebreaker. Consequences for the
+page:
+
+- The `pg_locks` cross-check must run **on every node** (per-node probe
+  set) — under active-active the leader's lock session lives on whichever
+  node its pool routed it; one node's `pg_locks` is a half view.
+- Followers hold NO lock in steady state (they never reach the lock
+  attempt) — candidate/follower count is NOT derivable from `pg_locks`.
+- Lock released ⟺ the leader's PG session died (session-scoped) — a real
+  liveness signal: fresh heartbeat + no lock on any node = mismatch
+  (transient ≤ 5 s after an acquire); stale heartbeat + no lock =
+  `no_leader` (fail-closed: no scheduled work) until a candidate re-acquires.
+
+## F14 — Candidate count needs the K8s API (and is nullable in dev)
+
+Every chart pod is a candidate (`KUBEDASH_ROLE=leader`,
+`KUBEDASH_REPLICA_ID` = pod name via Downward API; the chart sets this on
+all replicas). The expected candidate count is the KubeDash
+Deployment's `spec.replicas` — readable via the existing admin client
+shape (`build_admin_client`, ADR-0021) but `K8sClient` has no
+deployment read yet (small `get_pod`/`get_deployment` additions,
+owner-refs chain pod → ReplicaSet → Deployment from
+`settings.kubedash_replica_id` + the in-cluster namespace file). The dev
+host backend's target cluster (kind) normally has no KubeDash
+Deployment ⇒ the field is `candidates: int | null`, best-effort, null on
+any failure (it must never fail the report).
