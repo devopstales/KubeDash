@@ -245,3 +245,31 @@
   re-pinned to current code, verified 2026-11-09);
   `invariants/services-integration-boundary.md`, ADR-0013/0015/0016 task
   refs, `reference/feature-roadmap.md` + `reference/live-architecture.md`.
+
+## 2026-11-10 — Leader election: advisory lock is PER-REPLICA, not the arbiter
+
+- Corrected two pages written 2026-11-09 that called the advisory lock
+  "the arbiter, so two replicas can never both hold it". Per
+  `backend/app/core/leader.py` (`_binds()` → `{"rid": self.replica_id}`;
+  module docstring, ADR-0031): the key is `hashtext(<own replica_id>)`
+  — per-replica and session-local, deliberately NOT a cross-node mutex
+  (a fixed key would let a second Leader object on the same engine
+  report spuriously non-leader). The cross-replica/cross-node
+  arbitration is the `leader_lease` row (1 s poll / 5 s beat / 10 s
+  stale) + the `fence` LWW upsert (`WHERE fence = :f`, 0 rows →
+  demote). Steady state: exactly ONE granted advisory lock (the
+  leader's); followers hold none (they return before the lock attempt
+  while the lease is fresh). The lock's role: session-death liveness
+  marker, observable via
+  `pg_locks.objid = hashtext(rid)::oid` (`classid = 4294967295`) ×
+  `pg_stat_activity` (holder pid/state; `backend_start` ≈
+  `leader_lease.acquired_at`).
+- Files: `invariants/leader-only-rq-worker.md` (description + contract
+  bullet + why), `workflows/leader-task-execution.md` (startup step 1 +
+  failure behavior), `index.md` invariants row. Anchors/claims
+  unchanged (`pg_try_advisory_lock`, `leader_lease` still in
+  `leader.py`).
+- Context: planned during the 2026-11-10-ha-status-page spec (the HA
+  Status page's leader-election section — per-node lock cross-check +
+  fence as election count; see
+  `.skillgrid/specs/2026-11-10-ha-status-page/findings.md` F12–F14).

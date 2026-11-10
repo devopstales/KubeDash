@@ -56,7 +56,7 @@
 | Concept | One-line summary |
 |---|---|
 | [Browser sessions ride HttpOnly cookies](invariants/session-cookie-transport.md) | `kd_access`/`kd_refresh` HttpOnly (hint `kd_session` grants nothing); Bearer only for the kubectl plugin; no credential in URL/localStorage (ADR-0025) |
-| [Task enqueue/reap run only on the leader](invariants/leader-only-rq-worker.md) | `pg_try_advisory_lock` + `leader_lease` arbitrate; `kubedash-worker` thread on every candidate, enqueue + reaper leader-gated, claims via `FOR UPDATE SKIP LOCKED` (ADR-0029/0031) |
+| [Task enqueue/reap run only on the leader](invariants/leader-only-rq-worker.md) | `leader_lease` row (poll 1 s / beat 5 s / stale 10 s) + per-replica advisory lock (liveness marker, not a mutex) + fence LWW arbitrate; `kubedash-worker` thread on every candidate, enqueue + reaper leader-gated, claims via `FOR UPDATE SKIP LOCKED` (ADR-0029/0031) |
 | [Configuration fails fast at boot](invariants/config-fail-fast.md) | INI > env, no in-code default for identities/credentials; missing key raises `ConfigError` (ADR-0028) |
 | [app/services is Flask-free](invariants/services-integration-boundary.md) | No module-level Flask imports in services; one documented function-local carve-out (K8sClientPool admin branch) |
 | [SAR verdict cache key carries every attribute](invariants/sar-verdict-cache-key.md) | `sar:<cluster>:<sub>:<verb>:<resource>:<group>:<namespace>:<name>`, `kv`-table TTL 30 s; one verdict never answers for another (ADR-0004) |

@@ -1,7 +1,7 @@
 ---
 type: InvariantContract
 title: "Task enqueue and reaping run only on the elected leader; claims run on every replica"
-description: "Leader election is a Postgres advisory lock (pg_try_advisory_lock) + a single-row leader_lease table (+ strict fence, ADR-0031); every candidate replica runs the in-process pgqueue worker thread (ADR-0029), but only the leader enqueues INTERVALS and sweeps the reaper — claims are safe on every replica via FOR UPDATE SKIP LOCKED. (Supersedes the leader-only RQ worker, ADR-0006/0007/0008.)"
+description: "Leader election is the single-row leader_lease table (1 s follower poll / 5 s heartbeat / 10 s stale) + a PER-REPLICA session-scoped advisory lock (hashtext of own replica_id — liveness marker, NOT a cross-node mutex) + the strict fence LWW (ADR-0031); every candidate replica runs the in-process pgqueue worker thread (ADR-0029), but only the leader enqueues INTERVALS and sweeps the reaper — claims are safe on every replica via FOR UPDATE SKIP LOCKED. (Supersedes the leader-only RQ worker, ADR-0006/0007/0008.)"
 tags: [leader-election, pgqueue, tasks, adr-0029]
 status: stable
 generated: { by: skillgrid/knowledge-init, at: 2026-11-06T00:00:00Z }
@@ -37,13 +37,19 @@ running* tasks is safe on any replica because the claim is atomic.
 
 **The contract.**
 
-- Election is unchanged: `SELECT pg_try_advisory_lock(...)` in
-  `backend/app/core/leader.py` (non-blocking; the advisory lock is the
-  arbiter, so two replicas can never both hold it), observable
-  `leader_lease` row `id = 1` (`replica_id`, `token`, `acquired_at`,
-  `heartbeat_at`, `fence` — the ADR-0031 strict fence). The leader
-  heartbeats every 5 s; a replica treats `heartbeat_at` as stale after
-  10 s and attempts acquisition (followers poll at 1 s).
+- Election: followers poll the `leader_lease` row `id = 1` (`replica_id`,
+  `token`, `acquired_at`, `heartbeat_at`, `fence`) every 1 s; a fresh
+  lease owned by another replica → no-op (steady state: one leader,
+  N−1 passive followers holding no lock). When the lease is stale
+  (heartbeat older than 10 s) or absent, that replica takes its OWN
+  session-scoped advisory lock — key `hashtext(<own replica_id>)`,
+  per-replica by design (`backend/app/core/leader.py` `_binds`) — and
+  upserts the row with `fence = fence + 1`. The advisory lock is a
+  session-liveness marker, NOT a cross-node mutex (ADR-0031: "two peers
+  on different Postgres nodes can both hold their local session's
+  lock"); the **fence is the cross-node LWW tiebreaker** — every leader
+  write is fenced `WHERE fence = :f`, a fenced-out leader's write
+  affects 0 rows and it demotes. The leader heartbeats every 5 s.
 - `backend/wsgi.py` starts the `kubedash-worker` daemon thread in the
   Gunicorn master. Each tick: the enqueue of due `INTERVALS`
   (`app.tasks.health.run` 60 s, `app.tasks.cluster_sync.run` 300 s)
@@ -59,9 +65,11 @@ double expiry sweeps); a leader-less install simply has no scheduled
 work (fail-closed, not a crash). Claims need no gate because
 `SKIP LOCKED` row locks are cluster-wide under active-active
 (ADR-0031). The old shape — "the leader alone runs the worker" (RQ,
-ADR-0007/0008) — is superseded by ADR-0029/0031. The advisory lock
-keeps the arbiter inside the system-of-record DB — no new
-infrastructure.
+ADR-0007/0008) — is superseded by ADR-0029/0031. The lease row keeps
+the arbiter inside the system-of-record DB — no new infrastructure —
+and the per-replica advisory lock doubles as a session-death liveness
+marker (released by Postgres when the leader's session dies,
+observable in `pg_locks`).
 
 **Verification (2026-11-09).** Grepped: the per-tick `is_leader` gate
 in `backend/wsgi.py` (`_run_once` / `_reap_once`), the

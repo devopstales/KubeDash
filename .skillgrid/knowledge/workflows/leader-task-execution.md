@@ -25,11 +25,17 @@ leads.
 ## The flow
 
 1. **Startup (every replica).** `backend/wsgi.py` starts the leader
-   thread (`backend/app/core/leader.py`): `SELECT
-   pg_try_advisory_lock(...)` — non-blocking; whoever holds the lock
-   upserts `leader_lease` row `id = 1` (`replica_id`, `token` UUID,
-   `acquired_at`, `heartbeat_at`, `fence`). The `kubedash-worker`
-   daemon thread also starts in the Gunicorn master.
+   thread (`backend/app/core/leader.py`) and the `kubedash-worker`
+   daemon thread. Each replica then polls `leader_lease` row `id = 1`:
+   a fresh lease (heartbeat ≤ 10 s) owned by another replica → no-op —
+   steady state is one leader and N−1 **passive** followers that hold
+   no lock. When the lease is stale or absent, that replica takes its
+   OWN session-scoped advisory lock (`pg_try_advisory_lock(hashtext(<own
+   replica_id>))` — per-replica, a liveness marker, NOT a cross-node
+   mutex — ADR-0031) and upserts the row (`replica_id`, `token` UUID,
+   `acquired_at`, `heartbeat_at`, `fence = fence + 1`). The fence is
+   the cross-node LWW tiebreaker: a stale leader's fenced write
+   affects 0 rows and it demotes.
 2. **Heartbeat.** The leader updates `heartbeat_at` every **5 s**;
    followers poll the row every **1 s** and treat `heartbeat_at` as
    stale after **10 s**, then attempt acquisition.
@@ -53,10 +59,13 @@ leads.
 
 - Postgres unavailable: election pauses (HTTP still serves; no
   periodic work — fail-closed).
-- Partition that keeps the old leader's PG session alive: failover
-  delays until the session drops (advisory locks are session-scoped) —
-  recorded accepted cost of ADR-0008; the `fence` column (ADR-0031)
-  additionally fences a stale leader's writes under active-active.
+- Leader dies: its PG session drops, releasing the session-scoped
+  advisory lock (observable in `pg_locks`), and the heartbeat stops;
+  a follower takes over after the 10 s stale window (its own key is
+  never contested, so failover does NOT wait on the old session). If
+  the old process is only WEDGED (session alive, heartbeat stopped),
+  it still steps down: the new leader's higher fence makes its writes
+  affect 0 rows (ADR-0031 LWW).
 - A non-leader never enqueues: double-runs of *scheduled* work are
   impossible by construction (gate + arbiter); double-claims are
   impossible because the `SKIP LOCKED` claim is atomic.
