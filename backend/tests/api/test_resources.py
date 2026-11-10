@@ -5275,13 +5275,11 @@ def kind_admin_api_client(api_app, monkeypatch) -> object:
     (``_bootstrap_local_admin`` — wsgi runs it at boot; the test fixture must
     mirror it because the api_app fixture's sqlite tier has no boot hook).
 
-    The SAR cache is BYPASSED (``_cache_get``/``_cache_set`` stubbed): the
-    sqlite ``api_app``'s fake-redis swap does not cover the rbac module's
-    own ``redis_client`` import (a different binding), so a real cache read
-    would dial redis://localhost:6390 and 500. The decision itself is the
-    REAL SAR against the kind apiserver (``_sar_allowed`` unpatched) — the
-    kind kubeconfig's user is the cluster admin, so the verdict is true,
-    exactly like production."""
+    The SAR cache is BYPASSED (``_cache_get``/``_cache_set`` stubbed) so
+    every call forces a cache miss: the decision itself is the REAL SAR
+    against the kind apiserver (``_sar_allowed`` unpatched) — the kind
+    kubeconfig's user is the cluster admin, so the verdict is true, exactly
+    like production."""
     import app.services.rbac as rb
     from app import _bootstrap_local_admin
 

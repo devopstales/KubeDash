@@ -7,7 +7,7 @@ seam is the only boundary — these tests prove the probe mapping (readyz bool
 ``test_health_task_*`` use the brief's verbatim assertions against a
 ``tasks_app`` sqlite app (the brief's snippet names it ``app``; the parent
 Testcontainers fixture of the same name is env-blocked on this host and would
-need Postgres + Redis containers).
+need a Postgres container).
 """
 
 import app.tasks.cluster_sync as cluster_sync

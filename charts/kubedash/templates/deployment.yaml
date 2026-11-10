@@ -45,8 +45,6 @@ spec:
               value: leader
             - name: DATABASE_URL
               value: {{ .Values.databaseUrl | quote }}
-            - name: REDIS_URL
-              value: {{ .Values.redisUrl | quote }}
             # OIDC (Settings: oidc_issuer / oidc_client_id; secret below)
             - name: KUBEDASH_OIDC_ISSUER
               value: {{ .Values.auth.oidc.issuer | quote }}

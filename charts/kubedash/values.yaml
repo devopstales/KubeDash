@@ -45,21 +45,17 @@ cluster:
   listPageSize: 0
   namespaceScope: false
 
-# External URLs when the subcharts are off (prod). DATABASE_URL / REDIS_URL
-# match the unprefixed Settings aliases (AliasChoices in config.py).
+# External URL when the subchart is off (prod). DATABASE_URL matches the
+# unprefixed Settings alias (AliasChoices in config.py).
 # Dev defaults match Settings' (config.py) dev defaults so `helm install`
 # works out of the box; prod overrides via --set / values file.
 databaseUrl: "postgresql://kubedash:kubedash@kubedash-postgresql:5432/kubedash"
-redisUrl: "redis://kubedash-redis:6379/0"
 
 secrets:
   jwtSecret: ""      # empty → the template's dev fallback (DEV ONLY — set a real 32+ byte value in prod; ADR-0028 makes it the REQUIRED boot key)
   secretKey: ""      # empty → the template's dev fallback (DEV ONLY — set a real 32+ byte value in prod; ADR-0028 makes it the REQUIRED boot key)
 
 # All-in-one dev subcharts (bitnami) — off by default in the base structure;
-# prod points at external PG/Redis via DATABASE_URL / REDIS_URL.
+# prod points at external PG via DATABASE_URL.
 postgresql:
-  enabled: false
-
-redis:
   enabled: false

@@ -22,7 +22,7 @@
 #   kubedash_replica_id = local
 #
 # Retired sections (4.1 legacy — present in old files, IGNORED by 5.0):
-#   [k8s], [plugin_settings]
+#   [k8s], [plugin_settings], [remote_cache] (Redis removed, ADR-0029/0030)
 
 [DEFAULT]
 app_mode = development
@@ -44,14 +44,6 @@ host = localhost:5432
 name = kubedash
 user = kubedash
 password = kubedash
-
-[remote_cache]
-# EITHER a single url (wins) OR split fields.
-# url = redis://:pass@host:6379/0
-redis_host = localhost
-redis_port = 6379
-redis_db = 0
-redis_password =
 
 [sso_settings]
 # OIDC SSO (optional).  Override via KUBEDASH_OIDC_CLIENT_ID / _SECRET / _ISSUER.

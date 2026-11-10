@@ -414,10 +414,10 @@ tasks:
       # shell exits immediately, re-parenting the backend to init (macOS has
       # no setsid; nohup alone was reaped with the task's process group).
       # OBJC_DISABLE_INITIALIZE_FORK_SAFETY (macOS-only, see backend-run): the
-      # RQ worker child forks a work-horse out of a multithreaded Gunicorn
-      # master (scheduler thread + request threads); a fork after ObjC init
-      # crashes the horse with "NSCharacterSet initialize in progress in
-      # another thread" (ret_val=6). Harmless on Linux (no ObjC runtime).
+      # pgqueue worker thread runs in the Gunicorn master (scheduler + claim
+      # loop, ADR-0029), so a worker forked after ObjC init crashes the horse
+      # with "NSCharacterSet initialize in progress in another thread"
+      # (ret_val=6). Harmless on Linux (no ObjC runtime).
       - "sh -c 'OBJC_DISABLE_INITIALIZE_FORK_SAFETY=YES nohup .venv/bin/gunicorn -w 4 --threads 2 -b 0.0.0.0:8080 wsgi:wsgi > /tmp/kubedash-backend.log 2>&1 &'"
       - "sleep 2"
       - "echo 'Backend started (gunicorn :8080). Logs: /tmp/kubedash-backend.log'"
