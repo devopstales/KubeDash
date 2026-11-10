@@ -13,5 +13,5 @@ export const stubRoutes: StubRoute[] = [
   { path: '/workload/daemonsets', title: 'DaemonSets', admin: false },
   { path: '/workload/replicasets', title: 'ReplicaSets', admin: false },
   { path: '/settings/sso-config', title: 'Auth Provider', admin: true },
-  { path: '/settings/cluster-status', title: 'HA Status', admin: true },
+  { path: '/settings/ha-status', title: 'HA Status', admin: true },
 ]
