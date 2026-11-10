@@ -284,6 +284,42 @@ def test_logout_clears_cookies_then_refresh_rejected(api_client, auth_client, ap
     assert r2.get_json()["error"]["code"] == "UNAUTHORIZED"
 
 
+def test_logout_revokes_the_access_token_jti(api_client, auth_client, api_app):
+    """ADR-0030: ``POST /auth/logout`` writes the access token's ``jti`` to
+    the Postgres deny-list, so replaying that token 401s "token revoked"
+    before its own expiry (the route wiring; ``_current_jti`` and the PK
+    lookup are unit-covered separately)."""
+    import jwt as pyjwt
+    from sqlalchemy import text
+
+    from app.core.config import get_settings
+    from app.extensions import db
+
+    auth_client.login()
+    access = api_client.jwt
+    jti = pyjwt.decode(access, get_settings().kubedash_jwt_secret, algorithms=["HS256"])["jti"]
+
+    r1 = api_client.post(
+        "/api/v1/auth/logout", headers={"Authorization": f"Bearer {access}"}
+    )
+    assert r1.status_code == 200
+
+    with api_app.app_context():  # type: ignore[attr-defined]
+        row = db.session.execute(
+            text("SELECT expires_at FROM revoked_jtis WHERE jti = :j"), {"j": str(jti)}
+        ).first()
+        assert row is not None, "logout did not deny-list the access token jti"
+        assert row.expires_at is not None
+
+    # The cleared cookie jar cannot replay; the raw Bearer token can — and
+    # must now be rejected for its remaining lifetime.
+    r2 = api_client.get(
+        "/api/v1/clusters", headers={"Authorization": f"Bearer {access}"}
+    )
+    assert r2.status_code == 401
+    assert r2.get_json()["error"]["message"] == "token revoked"
+
+
 def test_me_without_token_is_401(api_client):
     r1 = api_client.get("/api/v1/auth/me")
     assert r1.status_code == 401
