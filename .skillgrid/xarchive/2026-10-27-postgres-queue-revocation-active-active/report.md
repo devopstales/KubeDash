@@ -280,3 +280,29 @@ smoke test or an explicit "manual gate" annotation on the scenarios).
 ### Human override
 
 _(none)_
+
+---
+
+## Environment Retro
+
+Standalone run (2026-11-10) after ship, `skillgrid:environment-retro`. Harness findings only —
+nothing here changes shipped code. Existing guardrails read first: `config.yaml`
+(`testing.runner`, no coverage/quality/security sections), `scripts/*.py` collectors,
+`.github/workflows/ci.yaml`, `.git/hooks/{pre-commit,commit-msg}`.
+
+| Category | Finding | Fix lands in | Source |
+|----------|---------|--------------|--------|
+| Automated checks | The QA and ship skills invoke project-local `scripts/qa-gate.mjs` and `scripts/state-lock.mjs`; neither exists — `scripts/` holds only Python collectors. Every gate run pays a failed lookup and hand-rolls the deterministic checks (state drift, size budget, ADR invariants), which is exactly where hand-rolled checks go quiet. | Vendor both scripts under `scripts/`, or add a `skillgrid.scripts_root` key to `.skillgrid/config.yaml` so the skills resolve the real location | session: `qa-gate.mjs` reported "script not found" for `state_drift`/`size_budget`/`adr_invariants`; `node scripts/state-lock.mjs` absent; `ls scripts` |
+| Automated checks | Global git config sets `commit.gpgsign=true` + `gpg.format=ssh`, but the signing key is not in the ssh-agent: `git commit` fails with `Couldn't find key in agent?` | Load the signing key in the environment setup, **or** set repo-local `commit.gpgsign=false` — every commit on `rebase` is unsigned (`%G?` = N), so the global setting only creates friction | session: 2 failed commits; `git cat-file -p 1d401eac \| grep -c gpgsig` = 0 |
+| Automated checks | `git add <paths> && git commit` is not index-exclusive in this workspace: unrelated in-flight spec files (`.skillgrid/specs/2026-11-10-ha-status-page/*`) were staged when the commit ran | Write the habit as `git commit --only -- <paths>` (or `git add -p`) in the commit contract so a concurrently-dirty index cannot sweep in another change | session: staged HA-status-page files appeared after an unrelated `git add`; had to `git reset` them |
+| Navigation | `state.yaml` `pipeline.current_change` (`2026-10-29-session-object-navigation`, phase `qa`) did not identify the change actually being worked; with 23 `in_flight` entries (phases as stale as `slicing` from 2026-10-28) and no `.skillgrid/sdd/<change>/` ledger, the change's position had to be re-derived from `git log` | Add a state-hygiene rule: the phase transition that leaves a change must update `pipeline.current_change`, and the execution skills must write the per-change ledger | `state.yaml:13`; `ls .skillgrid/sdd` (no entry for this change) |
+| Coding standards | The review found an ADR-stated *mechanism* (fence increment as LWW tiebreaker) implemented as read-then-write, which no sequential test can catch — QA passed it. This is a judgement gap, not a lintable pattern. | Add one line to the QA audit procedure: for every in-force ADR that states a concurrency mechanism, require a test that exercises the *interleaving*, not just the ordered sequence | `review.md` "Important" #1 vs `report.md` gate CONCERNS |
+| Steering-file no-ops | `AGENTS.md`'s Artifacts table records `specs/` but no archive root, while the skills default to `.skillgrid/change-archive/` and this repo uses `.skillgrid/xarchive/` — every ship step needs a `config.yaml` lookup to avoid creating a second archive | Add the archive row to the Artifacts table (`change-archive` = `.skillgrid/xarchive/`) | session ship step; `.skillgrid/config.yaml:15` |
+| Tool economy | A pytest summary piped through `tail -N` was swallowed twice, forcing the same ~190 s suite to be re-run to read the verdict | Run the suite to a log file, then grep `^(FAILED\|ERROR\|N passed)`; wrap it once in `scripts/` rather than re-typing the pipe per gate | session: full floor run re-executed after the summary was cut off; `/tmp/kd-ship-floor.log` |
+| Information access | Mnemonic `mem_*` tools were unavailable in this runtime, so the ship/retro context could not be persisted and the QA/TDD evidence had to be reconstructed from commits | Enable the mnemonic MCP for agent runs, or make the execution skills write the ledger file directly so the evidence survives without the memory service | session: no `mem_save`/`mem_session_summary` tool exposed; W030 |
+
+**Proposed follow-up tickets** (proposals only — nothing implemented here):
+
+1. Vendor or wire `qa-gate.mjs` + `state-lock.mjs` (highest value: every QA/ship run benefits, and the drift/ADR checks currently only run when a human does them by hand).
+2. Resolve the signing mismatch (load the key, or repo-local `commit.gpgsign=false`) plus the `git commit --only` habit — two mechanical failures in one session.
+3. Add the archive row to `AGENTS.md`'s Artifacts table and the state-hygiene rule for `pipeline.current_change`.
