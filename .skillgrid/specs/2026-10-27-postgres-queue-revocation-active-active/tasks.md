@@ -1,6 +1,6 @@
 # Tasks — Postgres queue, session revocation, OIDC state, SAR cache, active-active Postgres
 
-> **STATUS:** `sliced` (2026-10-27)
+> **STATUS:** `qa` (2026-11-10) — 7/7 tickets Done; QA gate CONCERNS (see `report.md`)
 
 > Sliced from `.skillgrid/specs/2026-10-27-postgres-queue-revocation-active-active/blueprint.md`.
 > Vertical tracer-bullet tickets, dependency-ordered, sized for one fresh agent context window.
