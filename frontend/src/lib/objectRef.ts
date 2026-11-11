@@ -145,6 +145,13 @@ export function postObjectToTab(
   input.name = 'o'
   input.value = token
   form.appendChild(input)
+  const csrfMeta = document.querySelector<HTMLMetaElement>('meta[name="kd-csrf"]')
+  const csrf = csrfMeta?.content ?? ''
+  const csrfInput = document.createElement('input')
+  csrfInput.type = 'hidden'
+  csrfInput.name = 'csrf'
+  csrfInput.value = csrf
+  form.appendChild(csrfInput)
   form.style.display = 'none'
   document.body.appendChild(form)
   configure?.(form)
@@ -162,6 +169,9 @@ export function postObjectToTab(
 /** Name of the one-shot `<meta>` the SPA fallback injects when this
  *  session's server-side handoff stash is fresh (ADR-0040 R4). */
 export const INCOMING_META = 'kd-object-incoming'
+/** Name of the `<meta>` carrying the verified session CSRF token for the
+ *  share form (ADR-0025/JWT `jti`; server-injected, client-echoed). */
+export const CSRF_META = 'kd-csrf'
 
 /**
  * Resolve the server-injected handoff token on the current document, read +

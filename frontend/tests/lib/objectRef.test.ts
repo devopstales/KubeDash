@@ -36,10 +36,9 @@ function seedIncoming(token: string): void {
   document.head.appendChild(meta)
 }
 
-// jsdom does not reset the DOM between tests: a failed consume leaves its
-// one-shot meta in place, which would hydrate the next test's mount.
 afterEach(() => {
   document.head.querySelector('meta[name="kd-object-incoming"]')?.remove()
+  document.head.querySelector('meta[name="kd-csrf"]')?.remove()
 })
 
 describe('registry', () => {
@@ -153,15 +152,22 @@ describe('postObjectToTab', () => {
     expect(exp).toBeLessThanOrEqual(Date.now() + 60_000)
   })
 
-  test('hidden form: POST to the list route, target _blank, single hidden input "o" = token', () => {
+  test('hidden form: POST to the list route, target _blank, o + verified csrf inputs', () => {
+    const csrfMeta = document.createElement('meta')
+    csrfMeta.name = 'kd-csrf'
+    csrfMeta.content = 'csrf-token'
+    document.head.appendChild(csrfMeta)
     postObjectToTab('node', 'n1', undefined, '/cluster/node', (form) => {
       expect(form.method.toUpperCase()).toBe('POST')
       expect(form.action).toContain('/cluster/node')
       expect(form.target).toBe('_blank')
       expect(form.innerHTML).toContain('name="o"')
+      expect(form.innerHTML).toContain('name="csrf"')
       const input = (form as HTMLFormElement).querySelector('input[name="o"]')
       expect(input?.getAttribute('value')).toMatch(/^[0-9a-f]{16}$/)
-      // No identity in the form body — only the opaque token.
+      const csrfInput = (form as HTMLFormElement).querySelector('input[name="csrf"]')
+      expect(csrfInput?.getAttribute('value')).toBe('csrf-token')
+      // No object identity in the form body — only the opaque token.
       expect(form.innerHTML).not.toContain('n1')
       expect(form.innerHTML).not.toContain('node')
     })

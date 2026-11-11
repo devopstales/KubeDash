@@ -15,7 +15,7 @@ import DefaultLayout from './layout/DefaultLayout'
 import { AdminRoute, ProtectedRoute } from './routes'
 import ObjectRoute, { registerNavigate } from './components/ObjectRoute'
 import OldDataRedirect from './components/OldDataRedirect'
-import { getActiveRef, sweepRelay } from './lib/objectRef'
+import { consumeIncoming, getActiveRef, sweepRelay } from './lib/objectRef'
 import StubView from './views/Stub'
 import { stubRoutes } from './views/Stub/routes'
 import './scss/style.scss'
@@ -148,11 +148,14 @@ export const NetworkPolicyRoute = () => {
   // renders. Mirrors ObjectRoute. The seam bump is the same backup
   // ObjectRoute uses for a navigate that leaves the location unchanged.
   const location = useLocation()
+  // R4: resolve a server-injected cross-tab handoff before the first commit
+  // (the dispatcher mirrors ObjectRoute's one-shot consume).
+  const [incoming] = React.useState(() => consumeIncoming())
   const [, bump] = React.useReducer((c: number) => c + 1, 0)
   const ref = React.useMemo(
-    () => getActiveRef(),
+    () => incoming ?? getActiveRef(),
     // eslint-disable-next-line react-hooks/exhaustive-deps
-    [location, bump],
+    [location, bump, incoming],
   )
   const isPolicy =
     ref !== null &&
@@ -196,11 +199,14 @@ export const IngressRoute = () => {
   // renders. Mirrors ObjectRoute/NetworkPolicyRoute. The seam bump is the
   // same backup for a navigate that leaves the location unchanged.
   const location = useLocation()
+  // R4: resolve a server-injected cross-tab handoff before the first commit
+  // (the dispatcher mirrors ObjectRoute's one-shot consume).
+  const [incoming] = React.useState(() => consumeIncoming())
   const [, bump] = React.useReducer((c: number) => c + 1, 0)
   const ref = React.useMemo(
-    () => getActiveRef(),
+    () => incoming ?? getActiveRef(),
     // eslint-disable-next-line react-hooks/exhaustive-deps
-    [location, bump],
+    [location, bump, incoming],
   )
   const isPageKind =
     ref !== null &&
@@ -238,11 +244,14 @@ export const IngressRoute = () => {
 export const IngressClassRoute = () => {
   const navigate = useNavigate()
   const location = useLocation()
+  // R4: resolve a server-injected cross-tab handoff before the first commit
+  // (the dispatcher mirrors ObjectRoute's one-shot consume).
+  const [incoming] = React.useState(() => consumeIncoming())
   const [, bump] = React.useReducer((c: number) => c + 1, 0)
   const ref = React.useMemo(
-    () => getActiveRef(),
+    () => incoming ?? getActiveRef(),
     // eslint-disable-next-line react-hooks/exhaustive-deps
-    [location, bump],
+    [location, bump, incoming],
   )
   const isPageKind = ref !== null && (ref.kind === 'ingressclass' || ref.kind === 'gatewayclass')
 

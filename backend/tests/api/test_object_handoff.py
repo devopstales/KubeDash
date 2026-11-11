@@ -15,6 +15,7 @@ with the stash in the fixture app's kv table (sqlite).
 
 from __future__ import annotations
 
+import json
 import os
 from pathlib import Path
 
@@ -50,16 +51,52 @@ def _kv_rows(client) -> dict[str, str]:
     return {r[0]: r[1] for r in rows if r[1] is not None}
 
 
+def _csrf_token(auth_client) -> str:
+    """The verified JWT ``jti`` doubles as the per-session CSRF token."""
+    with auth_client.application.app_context():
+        from app.core.security import verify_jwt
+
+        return str(verify_jwt(auth_client.jwt)["jti"])
+
+
 def test_post_bounces_303_to_the_same_path_and_stashes_the_token(auth_client) -> None:
     """The form POST (the share button's dispatch) must NOT 405 (the pre-fix
     behavior) and must not put the token anywhere in the URL: 303 to the
     exact same path, token stashed server-side under the session's JWT sub."""
     auth_client.login()
     _write_index()
-    r = auth_client.post("/cluster/crd", data={"o": "abcd1234abcd1234"})
+    csrf = _csrf_token(auth_client)
+    r = auth_client.post("/cluster/crd", data={"o": "abcd1234abcd1234", "csrf": csrf})
     assert r.status_code == 303
     assert r.headers["Location"] == "/cluster/crd"
-    assert _kv_rows(auth_client).get("obj_incoming:sub-oidc-1") == "abcd1234abcd1234"
+    assert _kv_rows(auth_client).get("obj_incoming:sub-oidc-1") == json.dumps(["abcd1234abcd1234"])
+
+
+def test_post_with_invalid_csrf_is_rejected_without_stashing(auth_client) -> None:
+    """A forged/missing CSRF token must not stash the object token."""
+    auth_client.login()
+    _write_index()
+    r = auth_client.post("/cluster/crd", data={"o": "abcd1234abcd1234", "csrf": "forged"})
+    assert r.status_code == 403
+    assert _kv_rows(auth_client) == {}
+
+
+def test_rapid_double_share_uses_token_queue(auth_client) -> None:
+    """A second rapid share must queue behind the first, not overwrite it."""
+    auth_client.login()
+    _write_index()
+    csrf = _csrf_token(auth_client)
+    r1 = auth_client.post("/cluster/crd", data={"o": "abcd1234abcd1234", "csrf": csrf})
+    r2 = auth_client.post("/cluster/crd", data={"o": "ef012345ef012345", "csrf": csrf})
+    assert r1.status_code == 303
+    assert r2.status_code == 303
+    r1 = auth_client.get("/cluster/crd")
+    r2 = auth_client.get("/cluster/crd")
+    token_a = "abcd1234abcd1234"
+    token_b = "ef012345ef012345"
+    assert f'<meta name="kd-object-incoming" content="{token_a}" />' in r1.get_data(as_text=True)
+    assert f'<meta name="kd-object-incoming" content="{token_b}" />' in r2.get_data(as_text=True)
+    assert "obj_incoming:sub-oidc-1" not in _kv_rows(auth_client)
 
 
 def test_get_after_bounce_injects_the_meta_and_pops_the_stash(auth_client) -> None:
@@ -67,12 +104,14 @@ def test_get_after_bounce_injects_the_meta_and_pops_the_stash(auth_client) -> No
     with the one-shot meta injected, and the stash is consumed (GETDEL)."""
     auth_client.login()
     _write_index()
-    auth_client.post("/cluster/crd", data={"o": "abcd1234abcd1234"})
+    csrf = _csrf_token(auth_client)
+    auth_client.post("/cluster/crd", data={"o": "abcd1234abcd1234", "csrf": csrf})
     r = auth_client.get("/cluster/crd")
     assert r.status_code == 200
     assert r.mimetype == "text/html"
     body = r.get_data(as_text=True)
     assert '<meta name="kd-object-incoming" content="abcd1234abcd1234" />' in body
+    assert f'<meta name="kd-csrf" content="{csrf}" />' in body
     # One-shot: the stash is gone after the first GET.
     assert "obj_incoming:sub-oidc-1" not in _kv_rows(auth_client)
     r2 = auth_client.get("/cluster/crd")
@@ -80,9 +119,12 @@ def test_get_after_bounce_injects_the_meta_and_pops_the_stash(auth_client) -> No
 
 
 def test_injected_document_is_no_store_and_plain_is_no_cache(auth_client) -> None:
+    """The fresh tab's GET (carrying the same session cookie) gets index.html
+    with the one-shot meta injected, and the stash is consumed (GETDEL)."""
     auth_client.login()
     _write_index()
-    auth_client.post("/cluster/crd", data={"o": "abcd1234abcd1234"})
+    csrf = _csrf_token(auth_client)
+    auth_client.post("/cluster/crd", data={"o": "abcd1234abcd1234", "csrf": csrf})
     r = auth_client.get("/cluster/crd")
     assert r.headers["Cache-Control"] == "no-store"
     # Plain document (no stash) keeps the current no-cache caching.
@@ -91,6 +133,7 @@ def test_injected_document_is_no_store_and_plain_is_no_cache(auth_client) -> Non
 
 
 def test_get_without_stash_serves_plain_index(auth_client) -> None:
+    """An authenticated session without a stash gets no handoff meta."""
     auth_client.login()
     _write_index()
     r = auth_client.get("/cluster/crd")
@@ -109,26 +152,37 @@ def test_post_without_a_valid_session_bounces_but_does_not_stash(api_client) -> 
 
 
 def test_post_with_malformed_token_is_not_stashed(auth_client) -> None:
+    """An authenticated session with a malformed object token gets the 303
+    bounce but no stash."""
     auth_client.login()
     _write_index()
+    csrf = _csrf_token(auth_client)
     for bad in ("XYZ", "", "g" * 20, "abcd1234abcd1234abcd1234abcd1234"):
-        r = auth_client.post("/cluster/crd", data={"o": bad})
+        r = auth_client.post("/cluster/crd", data={"o": bad, "csrf": csrf})
         assert r.status_code == 303
     assert _kv_rows(auth_client) == {}
 
 
 def test_post_without_an_o_field_bounces_and_does_not_stash(auth_client) -> None:
+    """An authenticated session without an object token gets the 303 bounce
+    but no stash."""
     auth_client.login()
     _write_index()
-    r = auth_client.post("/cluster/crd")
+    csrf = _csrf_token(auth_client)
+    r = auth_client.post("/cluster/crd", data={"csrf": csrf})
     assert r.status_code == 303
     assert _kv_rows(auth_client) == {}
 
 
 def test_post_to_an_api_path_is_404_not_a_bounce(auth_client) -> None:
+    """The SPA catch-all must not intercept API POSTs."""
     auth_client.login()
     _write_index()
-    r = auth_client.post("/api/v1/definitely-not-a-route", data={"o": "abcd1234abcd1234"})
+    csrf = _csrf_token(auth_client)
+    r = auth_client.post(
+        "/api/v1/definitely-not-a-route",
+        data={"o": "abcd1234abcd1234", "csrf": csrf},
+    )
     assert r.status_code == 404
     assert r.headers.get("Location") is None
     assert _kv_rows(auth_client) == {}
@@ -143,7 +197,12 @@ def test_root_get_consumes_a_stash(auth_client) -> None:
     from app.core import kvstore
 
     with auth_client.application.app_context():
-        kvstore.kv_set(ext.db.engine, "obj_incoming:sub-oidc-1", "abcd1234abcd1234", 60)
+        kvstore.kv_set(
+            ext.db.engine,
+            "obj_incoming:sub-oidc-1",
+            json.dumps(["abcd1234abcd1234"]),
+            60,
+        )
     r = auth_client.get("/")
     assert r.status_code == 200
     html = r.get_data(as_text=True)

@@ -11,6 +11,7 @@ import { registerNavigate } from '../../src/components/ObjectRoute'
 import { getActiveRef } from '../../src/lib/objectRef'
 import NetworkPolicyView from '../../src/views/Security/NetworkPolicy'
 import { useClusterStore } from '../../src/store/cluster'
+import { NetworkPolicyRoute as AppNetworkPolicyRoute } from '../../src/App'
 
 // KubeDataTable is faked in ../components/kube-data-table.test-utils.tsx —
 // the fleet's shared fake (the factory is async: a hoisted mock may not
@@ -51,6 +52,10 @@ const renderAt = (_ui: ReactElement, path = '/security/network-policy') => {
 
 afterEach(() => {
   useClusterStore.setState({ selectedCluster: null, selectedNamespace: null })
+  sessionStorage.clear()
+  localStorage.clear()
+  document.head.querySelector('meta[name="kd-object-incoming"]')?.remove()
+  document.head.querySelector('meta[name="kd-csrf"]')?.remove()
 })
 
 const selectTeamA = () =>
@@ -188,6 +193,41 @@ test('list-renders-namespace-policies', async () => {
   // a row with no spec degrades to —, not a crash.
   const noSpec = screen.getByRole('button', { name: 'no-spec' })
   expect(noSpec.closest('tr')?.textContent).toContain('—')
+})
+
+test('route-consumes-incoming-meta-and-renders-policy-detail', async () => {
+  const token = 'abcd1234abcd1234'
+  localStorage.setItem(
+    `kd_ref_${token}`,
+    JSON.stringify({ kind: 'NetworkPolicy', name: 'deny-all', namespace: 'team-a', ts: Date.now(), origin: 'post' }),
+  )
+  localStorage.setItem(`kd_ref_${token}_exp`, String(Date.now() + 60_000))
+  const meta = document.createElement('meta')
+  meta.name = 'kd-object-incoming'
+  meta.content = token
+  document.head.appendChild(meta)
+
+  server.use(
+    http.get('*/api/v1/clusters/1/resources/networkpolicies', () =>
+      HttpResponse.json({ kind: 'networkpolicies', cluster: 'prod', items: [denyAll] }),
+    ),
+  )
+  selectTeamA()
+
+  const qc = new QueryClient({ defaultOptions: { queries: { retry: false } } })
+  render(
+    <QueryClientProvider client={qc}>
+      <MemoryRouter initialEntries={['/security/network-policy']}>
+        <React.Suspense fallback={null}>
+          <AppNetworkPolicyRoute />
+        </React.Suspense>
+      </MemoryRouter>
+    </QueryClientProvider>,
+  )
+
+  await screen.findByText('Network Policy Data', undefined, { timeout: 5000 })
+  expect(screen.getByText('deny-all')).toBeTruthy()
+  expect(document.head.querySelector('meta[name="kd-object-incoming"]')).toBeNull()
 })
 
 test('list-cilium-section-shown-when-present', async () => {

@@ -22,6 +22,7 @@ side), or a second GET (stash already popped).
 
 from __future__ import annotations
 
+import json
 import re
 from pathlib import Path
 
@@ -32,6 +33,8 @@ from app.core.security import ACCESS_COOKIE, verify_jwt
 
 #: <meta> name the SPA's consumeIncoming() reads once at mount.
 INCOMING_META = "kd-object-incoming"
+#: <meta> name the SPA's share form echoes the verified session CSRF token from.
+CSRF_META = "kd-csrf"
 #: Client tokens are hex (32-bit legacy, 64-bit current). Anything else is
 #: not a share token — never stashed, never injected.
 TOKEN_RE = re.compile(r"^[0-9a-f]{8,16}$")
@@ -41,11 +44,13 @@ STASH_TTL_SECONDS = 60
 _HEAD_CLOSE = "</head>"
 
 
-def _subject_from_cookie() -> str | None:
-    """Best-effort session subject from the ``kd_access`` cookie.
+def _verified_identity() -> tuple[str, str] | None:
+    """Best-effort verified session identity: ``(JWT sub, jti)``.
 
-    Returns None for an absent/invalid/expired/revoked token — the bounce
-    and the plain GET are unaffected (a miss renders the list)."""
+    The ``jti`` doubles as the unguessable per-session CSRF token for the
+    share POST. Returns None for an absent/invalid/expired/revoked token — the
+    miss paths are unaffected (the bounce/GET render plain documents).
+    """
     token = request.cookies.get(ACCESS_COOKIE)
     if not token:
         return None
@@ -54,7 +59,10 @@ def _subject_from_cookie() -> str | None:
     except UnauthorizedError:
         return None
     sub = claims.get("sub")
-    return sub if isinstance(sub, str) and sub else None
+    jti = claims.get("jti")
+    if not isinstance(sub, str) or not sub or not isinstance(jti, str) or not jti:
+        return None
+    return sub, jti
 
 
 def _stash_key(sub: str) -> str:
@@ -64,22 +72,36 @@ def _stash_key(sub: str) -> str:
 def post_bounce(path: str) -> Response:
     """Handle the share form's POST to an SPA route: stash the token for the
     session and 303 back to the exact same path (clean URL — the token
-    arrived in the form body and leaves nowhere but the kv table)."""
-    token = request.form.get("o", "")
-    sub = _subject_from_cookie()
-    if sub is not None and TOKEN_RE.fullmatch(token):
-        from app.core import kvstore
-        from app.extensions import db
+    arrived in the form body and leaves nowhere but the kv table).
 
-        kvstore.kv_set(db.engine, _stash_key(sub), token, STASH_TTL_SECONDS)
+    The form must echo the verified session CSRF token (`jti`) alongside the
+    object token; anything else is rejected without stashing.
+    """
+    token = request.form.get("o", "")
+    identity = _verified_identity()
+    if identity is None:
+        # Anonymous/bogus session: bounce, but never stash.
+        return Response(status=303, headers={"Location": path})
+    sub, csrf_token = identity
+    if not TOKEN_RE.fullmatch(token):
+        return Response(status=303, headers={"Location": path})
+    if request.form.get("csrf", "") != csrf_token:
+        return Response(status=403, headers={"Location": path})
+    from app.core import kvstore
+    from app.extensions import db
+
+    current = kvstore.kv_get(db.engine, _stash_key(sub))
+    tokens = json.loads(current) if current is not None else []
+    tokens.append(token)
+    kvstore.kv_set(db.engine, _stash_key(sub), json.dumps(tokens), STASH_TTL_SECONDS)
     # A bare flask Response (not werkzeug's redirect()) so the typed view
     # signatures stay flask-Response end to end; a 303's body is ignored.
     return Response(status=303, headers={"Location": path})
 
 
 def render_index(static_dir: Path) -> Response:
-    """Serve the SPA document, injecting the one-shot handoff meta when the
-    session carries a fresh stash.
+    """Serve the SPA document, injecting the one-shot handoff meta and the
+    verified session CSRF meta when the session is authenticated.
 
     The stash is consumed by exactly one GET (kv read + one-shot delete, the
     ADR-0030 kvstore pattern): a second load — or a load by a different
@@ -91,28 +113,34 @@ def render_index(static_dir: Path) -> Response:
     if not index_file.is_file():
         abort(404)
     html = index_file.read_text(encoding="utf-8")
-    sub = _subject_from_cookie()
+    identity = _verified_identity()
+    sub = identity[0] if identity is not None else None
+    csrf_token = identity[1] if identity is not None else None
     token: str | None = None
     if sub is not None:
         from app.core import kvstore
         from app.extensions import db
 
-        # kv_delete is the one-shot (False = already consumed or absent). It
-        # also deletes an EXPIRED row — a stale relay must not be injected,
-        # so an expired read prunes and falls through to the plain document.
-        value = kvstore.kv_get(db.engine, _stash_key(sub))
-        if value is None:
+        # Per-sub token queue: POSTs append, GETs pop the oldest. Rapid
+        # double shares therefore cannot overwrite an in-flight handoff.
+        current = kvstore.kv_get(db.engine, _stash_key(sub))
+        if current is None:
             kvstore.kv_delete(db.engine, _stash_key(sub))  # prune expired tombstone
-        elif kvstore.kv_delete(db.engine, _stash_key(sub)):
-            token = value
+        else:
+            tokens = json.loads(current)
+            token = tokens.pop(0)
+            if tokens:
+                kvstore.kv_set(
+                    db.engine, _stash_key(sub), json.dumps(tokens), STASH_TTL_SECONDS
+                )
+            else:
+                kvstore.kv_delete(db.engine, _stash_key(sub))
+    injection = ""
     if token is not None:
-        # Token-only (validated hex) attribute value — no quoting hazards.
-        html = html.replace(
-            _HEAD_CLOSE,
-            f'<meta name="{INCOMING_META}" content="{token}" />\n{_HEAD_CLOSE}',
-            1,
-        )
-        cache = "no-store"
-    else:
-        cache = "no-cache"
+        injection += f'<meta name="{INCOMING_META}" content="{token}" />\n'
+    if csrf_token is not None:
+        injection += f'<meta name="{CSRF_META}" content="{csrf_token}" />\n'
+    if injection:
+        html = html.replace(_HEAD_CLOSE, injection + _HEAD_CLOSE, 1)
+    cache = "no-store" if token is not None else "no-cache"
     return Response(html, mimetype="text/html", headers={"Cache-Control": cache})
