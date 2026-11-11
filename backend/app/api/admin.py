@@ -15,7 +15,7 @@ from flask import g, jsonify
 from flask_smorest import Api, Blueprint
 
 from app.api._authhook import apply_auth
-from app.core import security
+from app.core import ini_config, security
 from app.core.config import get_settings
 from app.core.errors import (
     ClusterAlreadyExistsError,
@@ -296,9 +296,10 @@ class AdminApi(Api):
             admin_client = build_admin_client(s)
         except Exception:  # noqa: BLE001 — candidates is best-effort (F14)
             admin_client = None
+        # The lazy proxy hands back the raw `name=url;name=url` string
+        # (ADR-0028 str contract); the typed map parse is the helper.
+        overrides = ini_config.resolve_ha_node_dsn_overrides()
         return (
-            ha_status.build_report(
-                db.engine, s.ha_node_dsn_overrides, admin_client=admin_client
-            ),
+            ha_status.build_report(db.engine, overrides, admin_client=admin_client),
             200,
         )

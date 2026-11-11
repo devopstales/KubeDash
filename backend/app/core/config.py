@@ -90,10 +90,12 @@ class Settings(BaseSettings):
         default_factory=lambda: ini_config.resolve("jaeger_http_endpoint")
     )
     # [ha] node_dsn_overrides (2026-11-10-ha-status-page, F8): the optional
-    # per-node DSN map for the HA status probe. dict-typed — the map parse
-    # (name=url;name=url, fail-fast on malformed) lives in ini_config.
-    ha_node_dsn_overrides: dict[str, str] = Field(
-        default_factory=lambda: ini_config.resolve_ha_node_dsn_overrides()
+    # per-node DSN map for the HA status probe. RAW `name=url;name=url`
+    # string — the lazy proxy resolves every field to str/bool (ADR-0028);
+    # the typed map parse (fail-fast on malformed) is
+    # ini_config.resolve_ha_node_dsn_overrides(), which the endpoint calls.
+    ha_node_dsn_overrides: str = Field(
+        default_factory=lambda: ini_config.resolve("ha_node_dsn_overrides")
     )
 
 

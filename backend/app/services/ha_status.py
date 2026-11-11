@@ -32,7 +32,7 @@ from pathlib import Path
 from typing import Any
 
 from sqlalchemy import create_engine, text
-from sqlalchemy.engine import Engine
+from sqlalchemy.engine import URL, Engine
 
 LAG_EXCEEDED_S = 60.0
 HEARTBEAT_STALE_S = 10.0
@@ -294,6 +294,31 @@ def _interval_to_seconds(iv: Any) -> float:
     return float(round(iv.days * 86400 + iv.seconds + iv.microseconds / 1e6, 3))
 
 
+def _probe_engine(dsn: str, timeout_s: float) -> Engine:
+    """Short-lived probe engine for ``dsn``. ``spock.node_interface``
+    stores DSNs in libpq KEYWORD format (``host=... dbname=... user=...
+    port=...``), which ``create_engine`` rejects — so detect the shape:
+    a URL (contains ``://``) passes through unchanged, a keyword string
+    is parsed into a ``URL``. INI overrides (F8) are always URLs; the
+    keyword path is the in-cluster default."""
+    if "://" in dsn:
+        return create_engine(dsn, connect_args={"connect_timeout": timeout_s})
+    params: dict[str, str] = {}
+    for part in dsn.split():
+        key, sep, value = part.partition("=")
+        if sep:
+            params[key] = value
+    url = URL.create(
+        "postgresql",
+        host=params.get("host"),
+        port=int(params["port"]) if params.get("port") else None,
+        database=params.get("dbname"),
+        username=params.get("user"),
+        password=params.get("password"),
+    )
+    return create_engine(url, connect_args={"connect_timeout": timeout_s})
+
+
 def probe_node(dsn: str, replica_id: str, timeout_s: float = PROBE_TIMEOUT_S) -> NodeProbeData:
     """Probe one node: open a short-lived engine on its DSN, run the fixed
     read-only SQL set, close it. A failure is a RESULT (reachable=False +
@@ -301,7 +326,7 @@ def probe_node(dsn: str, replica_id: str, timeout_s: float = PROBE_TIMEOUT_S) ->
     thing it is there to diagnose (acceptance: it degrades, it reports)."""
     t0 = time.monotonic()
     node = NodeProbeData(node_name="", reachable=False)
-    engine = create_engine(dsn, connect_args={"connect_timeout": timeout_s})
+    engine = _probe_engine(dsn, timeout_s)
     try:
         with engine.connect() as conn:
             (row,) = conn.execute(text(_LOCAL_NODE_SQL)).fetchall()
