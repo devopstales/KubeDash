@@ -60,16 +60,21 @@ uv run python ../.skillgrid/meta/.prototype/001-spock-probe-visibility/probe.py
 
 ## What to Expect
 
-- **Both nodes up:** green `HEALTHY` banner; lease line (replica, fence,
-  heartbeat age); lock verdict `held on <node> (pid <N>, <state>)`; one
-  card per node (reachable, direction lag B/s, apply workers, conflicts,
-  exceptions, advisory-lock sighting, subscription status); each card says
-  `8 SELECTs`.
-- **Stop a node** (button): red `DOWN` banner with `node_unreachable:<name>`
-  + `subscription_not_replicating:<peer>` chips; the down card shows the
-  classified probe error and `≤ 3 s bound` elapsed; the lock verdict stays
-  truthful (no false `no_leader` while the heartbeat is fresh).
-- **Start the node:** back to `HEALTHY` within one re-probe.
+- **Both nodes up:** two H1 sections, each with its own status banner.
+  Section 1 "Database HA — pgEdge active-active" (node cards:
+  reachable, direction lag B/s, apply workers, cumulative conflicts,
+  exceptions, leader-lock session, subscription status; each card says
+  `8 SELECTs`). Section 2 "KubeDash HA — leader election" (lease:
+  replica_id, fence, heartbeat age, acquired_at, token; lock verdict
+  `held on <node> (pid <N>, <state>)`; candidates line). Overall verdict
+  one-liner at the top.
+- **Stop a node** (button): section 1 goes red `DOWN` with
+  `node_unreachable:<name>` + `subscription_not_replicating:<peer>`
+  chips while section 2 stays `HEALTHY` (lock still seen, heartbeat
+  fresh — no false `no_leader`); the down card shows the classified
+  probe error and `≤ 3 s bound` elapsed.
+- **Start the node:** back to `HEALTHY` in both sections within one
+  re-probe.
 
 ## Liftable Module
 
@@ -78,9 +83,23 @@ uv run python ../.skillgrid/meta/.prototype/001-spock-probe-visibility/probe.py
 
 - `derive_status(nodes: list[NodeProbeData], lease: LeaseState, *,
   lag_exceeded_s=60.0, heartbeat_stale_s=10.0) -> StatusDerivation`
-  — the R4 matrix as a pure function: per-node reachability/subscription/
-  lag/exceptions + lease freshness + lock verdict →
-  `StatusDerivation(status, reasons, leader)`.
+  — the R4 matrix, composed from two section derivations (two failure
+  domains, each rendered under its own header in the UI):
+  - `derive_database_status(nodes, *, lag_exceeded_s) ->
+    SectionDerivation` — database HA (pgEdge): `node_unreachable:<n>`,
+    `subscription_not_replicating:<n>` (down), `lag_exceeded:<n>`
+    (F17 bytes condition), `exceptions_pending:<n>` (degraded).
+  - `derive_election_status(nodes, lease, *, heartbeat_stale_s) ->
+    ElectionDerivation` — KubeDash leader election:
+    `leader_lease_missing`, `leader_heartbeat_stale`,
+    `lock_lease_mismatch`, `lock_without_heartbeat`, `no_leader`
+    (degraded only — a failed election is fail-closed, never `down`).
+    Returns `LeaderInfo` (replica_id, fence, heartbeat age, lock
+    verdict line).
+  - `derive_status` composes: overall = worst section, reasons = all
+    (database first). Live check of the split: with n2 stopped,
+    database section = `down`, election section = `healthy` (lock still
+    seen on n1, heartbeat fresh) — the two verdicts are independent.
 - Input dataclasses `NodeProbeData` (one node's probe result — the shape
   the real `probe_node` must fill) and `LeaseState` (the `leader_lease`
   row). No dependencies beyond the stdlib. Thresholds injected (no
@@ -164,6 +183,20 @@ uv run python ../.skillgrid/meta/.prototype/001-spock-probe-visibility/probe.py
   ~15 s after `docker start` (attempt 4).
 - Lag semantics: 72.5 s interval @ 0 B while starved; 2.4 s → 0.6 s with
   live traffic (attempt 5).
+- **Attempt 6 (section split, user request):** the two failure domains
+  are now separate — module restructured into `derive_database_status`
+  (pgEdge node/replication) + `derive_election_status` (lease + lock
+  cross-check), composed by `derive_status` (overall = worst section;
+  reasons = all, database first — the flat contract is unchanged). The
+  UI splits under two H1 sections ("1 · Database HA — pgEdge
+  active-active (database nodes)" / "2 · KubeDash HA — leader election
+  (app replicas)"), each with its own status banner + reason chips; the
+  overall verdict is a one-liner up top. Verified live: with n2 stopped,
+  database section = DOWN + [`subscription_not_replicating:n1`,
+  `node_unreachable:n2`] while the election section stays HEALTHY (lock
+  held on n1, heartbeat 0.3 s) — no cross-domain blame; restart →
+  overall healthy within one re-probe. All 11 matrix branches
+  re-smoke-tested through the composed path (identical reasons).
 
 **Surprises:**
 

@@ -9,19 +9,35 @@ Pure: no imports beyond the standard library, no I/O, no globals.
 All thresholds are injected as keyword arguments (no prototype-specific
 constants) so the build passes its own.
 
-Contract (blueprint Task 2, R4 matrix):
-  down (worst)  : node_unreachable:<name>, subscription_not_replicating:<node>
-  degraded      : lag_exceeded:<node>, exceptions_pending:<node>,
-                  leader_heartbeat_stale, leader_lease_missing,
-                  lock_lease_mismatch, lock_without_heartbeat, no_leader
-  healthy       : no reasons
-All applicable reasons are listed; the worst status wins.
+Two failure domains, derived separately (the UI renders them under
+separate headers; the overall verdict is the worst of the two):
+
+1. **Database HA** (pgEdge active-active) — `derive_database_status`:
+   down     : node_unreachable:<name>, subscription_not_replicating:<node>
+   degraded : lag_exceeded:<node> (F17: requires lag_bytes > 0),
+              exceptions_pending:<node>
+2. **KubeDash HA** (leader election) — `derive_election_status`:
+   degraded : leader_lease_missing, leader_heartbeat_stale,
+              lock_lease_mismatch, lock_without_heartbeat, no_leader
+   (never `down`: a failed election is fail-closed — no scheduled work —
+   not a data-loss condition)
+
+`derive_status` composes: overall status = worst section; reasons = all,
+database section first. Lock-reason rules (F12-F14):
+- heartbeat FRESH: none seen with ALL nodes reachable -> lock_lease_mismatch;
+  none seen while SOME node is unreachable -> NO alarm (the lock may sit
+  on the unreachable node — the per-replica advisory lock is only visible
+  from the node hosting the leader's session).
+- heartbeat STALE: lock seen on a reachable node -> lock_without_heartbeat
+  (a wedged leader); lock not seen -> no_leader.
 """
 
 from __future__ import annotations
 
 from dataclasses import dataclass, field
 from typing import Optional
+
+_ORDER = {"healthy": 0, "degraded": 1, "down": 2}
 
 
 @dataclass(frozen=True)
@@ -69,13 +85,26 @@ class LeaderInfo:
 
 
 @dataclass(frozen=True)
-class StatusDerivation:
+class SectionDerivation:
     status: str  # "healthy" | "degraded" | "down"
     reasons: tuple[str, ...] = field(default_factory=tuple)
+
+
+@dataclass(frozen=True)
+class ElectionDerivation(SectionDerivation):
     leader: Optional[LeaderInfo] = None
 
 
-def _lock_verdict(nodes: list[NodeProbeData]) -> Optional[LeaderInfo | str]:
+@dataclass(frozen=True)
+class StatusDerivation:
+    status: str  # overall: worst of the two sections
+    reasons: tuple[str, ...] = field(default_factory=tuple)
+    leader: Optional[LeaderInfo] = None
+    database: Optional[SectionDerivation] = None
+    election: Optional[ElectionDerivation] = None
+
+
+def _lock_verdict(nodes: list[NodeProbeData]) -> str:
     holders = [n for n in nodes if n.reachable and n.lock_held_locally]
     if holders:
         n = holders[0]
@@ -88,6 +117,70 @@ def _lock_verdict(nodes: list[NodeProbeData]) -> Optional[LeaderInfo | str]:
     return "no reachable node to check"
 
 
+def derive_database_status(
+    nodes: list[NodeProbeData],
+    *,
+    lag_exceeded_s: float = 60.0,
+) -> SectionDerivation:
+    """Database HA: per-node reachability, replication, lag, exceptions."""
+    reasons: list[str] = []
+    worst = 0
+
+    for n in nodes:
+        if not n.reachable:
+            worst = 2
+            reasons.append(f"node_unreachable:{n.node_name}")
+            continue
+        for _sub_name, status in n.sub_statuses:
+            if status != "replicating":
+                worst = 2
+                reasons.append(f"subscription_not_replicating:{n.node_name}")
+                break
+        if n.lag_bytes > 0 and n.lag_interval_s > lag_exceeded_s:
+            worst = max(worst, 1)
+            reasons.append(f"lag_exceeded:{n.node_name}")
+        if n.exceptions_pending > 0:
+            worst = max(worst, 1)
+            reasons.append(f"exceptions_pending:{n.node_name}")
+
+    return SectionDerivation(status=["healthy", "degraded", "down"][worst], reasons=tuple(reasons))
+
+
+def derive_election_status(
+    nodes: list[NodeProbeData],
+    lease: LeaseState,
+    *,
+    heartbeat_stale_s: float = 10.0,
+) -> ElectionDerivation:
+    """KubeDash HA: leader lease freshness + advisory-lock cross-check."""
+    reasons: list[str] = []
+    lock_line = _lock_verdict(nodes)
+    stale = not lease.present or lease.heartbeat_age_s is None or lease.heartbeat_age_s > heartbeat_stale_s
+
+    if not lease.present:
+        reasons.append("leader_lease_missing")
+    elif lease.heartbeat_age_s is None or lease.heartbeat_age_s > heartbeat_stale_s:
+        reasons.append("leader_heartbeat_stale")
+        if lock_line.startswith("held on"):
+            reasons.append("lock_without_heartbeat")
+        elif lock_line == "not seen on any reachable node":
+            reasons.append("no_leader")
+    elif lock_line == "not seen on any reachable node" and all(n.reachable for n in nodes):
+        reasons.append("lock_lease_mismatch")
+
+    leader = LeaderInfo(
+        lease.replica_id or "?",
+        lease.fence if lease.fence is not None else 0,
+        lease.heartbeat_age_s or 0.0,
+        lock_line,
+    )
+    return ElectionDerivation(
+        status="degraded" if reasons else "healthy",
+        reasons=tuple(reasons),
+        leader=leader,
+    )
+
+
 def derive_status(
     nodes: list[NodeProbeData],
     lease: LeaseState,
@@ -95,67 +188,15 @@ def derive_status(
     lag_exceeded_s: float = 60.0,
     heartbeat_stale_s: float = 10.0,
 ) -> StatusDerivation:
-    """R4 matrix: per-node reachability/replication + lease/lock freshness -> status + reasons.
-
-    Lock-reason rules (F12-F14):
-    - heartbeat FRESH: a lock sighting is expected on exactly one node;
-      none seen with ALL nodes reachable -> lock_lease_mismatch;
-      none seen while SOME node is unreachable -> NO alarm (the lock may
-      sit on the unreachable node — the per-replica advisory lock is only
-      visible from the node hosting the leader's session).
-    - heartbeat STALE: lock seen on a reachable node -> lock_without_heartbeat
-      (a wedged leader holds the lock but stopped heartbeating);
-      lock not seen -> no_leader.
-    """
-    reasons: list[str] = []
-    worst = 0  # 0 healthy, 1 degraded, 2 down
-
-    def add(status: int, reason: str) -> None:
-        nonlocal worst
-        worst = max(worst, status)
-        reasons.append(reason)
-
-    for n in nodes:
-        if not n.reachable:
-            add(2, f"node_unreachable:{n.node_name}")
-            continue
-        for sub_name, status in n.sub_statuses:
-            if status != "replicating":
-                add(2, f"subscription_not_replicating:{n.node_name}")
-                break
-        if n.lag_bytes > 0 and n.lag_interval_s > lag_exceeded_s:
-            add(1, f"lag_exceeded:{n.node_name}")
-        if n.exceptions_pending > 0:
-            add(1, f"exceptions_pending:{n.node_name}")
-
-    leader: Optional[LeaderInfo] = None
-    if not lease.present:
-        add(1, "leader_lease_missing")
-    elif lease.heartbeat_age_s is None or lease.heartbeat_age_s > heartbeat_stale_s:
-        add(1, "leader_heartbeat_stale")
-        lock_line = _lock_verdict(nodes)
-        if isinstance(lock_line, str) and lock_line.startswith("held on"):
-            add(1, "lock_without_heartbeat")
-        elif isinstance(lock_line, str) and lock_line == "not seen on any reachable node":
-            add(1, "no_leader")
-        leader = LeaderInfo(
-            lease.replica_id or "?",
-            lease.fence if lease.fence is not None else 0,
-            lease.heartbeat_age_s or 0.0,
-            lock_line if isinstance(lock_line, str) else "unknown",
-        )
-    else:
-        lock_line = _lock_verdict(nodes)
-        if isinstance(lock_line, str) and lock_line == "not seen on any reachable node":
-            all_reachable = all(n.reachable for n in nodes)
-            if all_reachable:
-                add(1, "lock_lease_mismatch")
-        leader = LeaderInfo(
-            lease.replica_id or "?",
-            lease.fence if lease.fence is not None else 0,
-            lease.heartbeat_age_s or 0.0,
-            lock_line if isinstance(lock_line, str) else "unknown",
-        )
-
-    status = {0: "healthy", 1: "degraded", 2: "down"}[worst]
-    return StatusDerivation(status=status, reasons=tuple(reasons), leader=leader)
+    """Overall = worst of the two sections; reasons = all, database first."""
+    db = derive_database_status(nodes, lag_exceeded_s=lag_exceeded_s)
+    el = derive_election_status(nodes, lease, heartbeat_stale_s=heartbeat_stale_s)
+    worst = max(_ORDER[db.status], _ORDER[el.status])
+    status = ["healthy", "degraded", "down"][worst]
+    return StatusDerivation(
+        status=status,
+        reasons=db.reasons + el.reasons,
+        leader=el.leader,
+        database=db,
+        election=el,
+    )

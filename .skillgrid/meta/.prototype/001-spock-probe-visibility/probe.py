@@ -189,6 +189,8 @@ def full_probe() -> dict:
             "status": der.status,
             "reasons": list(der.reasons),
             "leader": der.leader.__dict__ if der.leader else None,
+            "database": {"status": der.database.status, "reasons": list(der.database.reasons)},
+            "election": {"status": der.election.status, "reasons": list(der.election.reasons)},
         },
     }
 

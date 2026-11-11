@@ -238,8 +238,14 @@ starved-but-already-classified directions.
   F17 bytes condition.
 - **What's liftable:** `modules/ha_derive.py` (pure R4 matrix:
   `derive_status(nodes, lease, *, lag_exceeded_s, heartbeat_stale_s) ->
-  StatusDerivation(status, reasons, leader)` + the `NodeProbeData` /
-  `LeaseState` shapes the real `probe_node` must fill).
+  StatusDerivation(status, reasons, leader, database, election)` —
+  composed from `derive_database_status` (pgEdge node/replication
+  reasons) and `derive_election_status` (lease + lock cross-check
+  reasons); overall = worst section, flat contract unchanged; + the
+  `NodeProbeData` / `LeaseState` shapes the real `probe_node` must fill).
+  The UI renders the two failure domains under separate headers —
+  stopping a node takes the database section DOWN while the election
+  section stays HEALTHY.
 - **Constraints for the build:** F16 exact match (`objsubid = 1`); F17
   bytes-AND-interval lag rule; message-based error classification;
   catalog from one DSN, fan-out only for directional metrics + lock;
