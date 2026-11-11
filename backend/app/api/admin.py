@@ -16,6 +16,7 @@ from flask_smorest import Api, Blueprint
 
 from app.api._authhook import apply_auth
 from app.core import security
+from app.core.config import get_settings
 from app.core.errors import (
     ClusterAlreadyExistsError,
     InvalidKubeconfigError,
@@ -27,11 +28,14 @@ from app.models.audit import AuditLog
 from app.models.binding import ClusterBinding
 from app.models.group import Group, GroupMember
 from app.models.user import User
+from app.schemas.ha_status import HaStatusOut
 from app.schemas.permissions import (
     UserCreateIn,
     UserOut,
     UserPatch,
 )
+from app.services import ha_status
+from app.services.k8s_client import build_admin_client
 
 
 def _stored_groups_by_user() -> dict[str, set[str]]:
@@ -269,3 +273,32 @@ class AdminApi(Api):
             .filter(ClusterBinding.template.is_not(None))
         )
         return _out(user, int(count or 0), _stored_groups_by_user()), 200
+
+    @blp.route("/admin/ha-status", methods=["GET"])
+    @blp.response(200, HaStatusOut)
+    @blp.doc(responses={
+        403: "RBAC_DENIED",
+    })
+    def ha_status(self) -> tuple[dict[str, object], int]:
+        """HA Status (spec 2026-11-10-ha-status-page): the pgEdge
+        active-active cluster's health + the KubeDash leader election,
+        read-only.
+
+        A sick cluster is a 200 — each node probe degrades to
+        ``reachable: false`` + a classified error and the derived status
+        carries the reasons; a 500 here is an app-side failure (config /
+        the app's own DB), not the thing being diagnosed. The
+        ``leader.candidates`` read (the KubeDash Deployment's spec.replicas,
+        owner-refs chain) is best-effort: any failure yields null (F14)."""
+        require_admin()
+        s = get_settings()
+        try:
+            admin_client = build_admin_client(s)
+        except Exception:  # noqa: BLE001 — candidates is best-effort (F14)
+            admin_client = None
+        return (
+            ha_status.build_report(
+                db.engine, s.ha_node_dsn_overrides, admin_client=admin_client
+            ),
+            200,
+        )

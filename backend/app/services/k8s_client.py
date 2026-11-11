@@ -269,6 +269,9 @@ class K8sClient:
         # "horizontalpodautoscalers" kind (4.1-parity nav leaf; ADR-0022
         # placement). A generated core-API model: ``to_dict`` is snake_case.
         self._autoscaling = k8s_client.AutoscalingV1Api(api_client)
+        # apps/v1 (Deployment) — the HA status candidates read
+        # (pod -> ownerRefs -> ReplicaSet -> deployment.spec.replicas, F14).
+        self._apps = k8s_client.AppsV1Api(api_client)
         self._host = self._v1.api_client.configuration.host
 
     @staticmethod
@@ -310,6 +313,30 @@ class K8sClient:
             self._unreachable("list_pods", e)
             raise AssertionError("unreachable") from e
         return [p.to_dict() for p in resp.items]
+
+    def get_pod(self, namespace: str, name: str) -> dict[str, Any] | None:
+        """One pod as a dict; ``None`` on 404 (the HA status candidates
+        read treats absence as a null, not an error)."""
+        try:
+            item = self._v1.read_namespaced_pod(name, namespace)
+        except ApiException as e:
+            if e.status == 404:
+                return None
+            self._unreachable("get_pod", e)
+            raise AssertionError("unreachable") from e
+        return item.to_dict()
+
+    def get_deployment(self, namespace: str, name: str) -> dict[str, Any] | None:
+        """One Deployment as a dict; ``None`` on 404 (same contract as
+        ``get_pod``)."""
+        try:
+            item = self._apps.read_namespaced_deployment(name, namespace)
+        except ApiException as e:
+            if e.status == 404:
+                return None
+            self._unreachable("get_deployment", e)
+            raise AssertionError("unreachable") from e
+        return item.to_dict()
 
     def list_namespaces(self, _namespace: str | None) -> list[dict[str, Any]]:
         """Namespace list for the header selector. The resource route always

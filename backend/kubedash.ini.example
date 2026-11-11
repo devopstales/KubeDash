@@ -85,3 +85,14 @@ namespace_list_timeout = 5s
 [bootstrap]
 # Optional: bootstrap admin email (default: admin@kubedash.local).
 bootstrap_admin_email =
+
+[ha]
+# Optional: per-node DSN overrides for the HA status probe
+# (GET /api/v1/admin/ha-status). Format `name=url;name=url` where name is a
+# spock.node member name and url a postgresql:// DSN that the probe host
+# CAN reach. Overrides the spock.node_interface DSN for that node.
+# Prod (in-cluster): leave empty — the single DATABASE_URL already reaches
+# a node and the interface DSNs resolve inside the cluster.
+# Dev (host-run backend): set e.g.
+#   node_dsn_overrides = n2=postgresql://kubedash:kubedash@localhost:16433/kubedash
+node_dsn_overrides =

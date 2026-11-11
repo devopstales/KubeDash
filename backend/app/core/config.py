@@ -89,13 +89,19 @@ class Settings(BaseSettings):
     jaeger_http_endpoint: str = Field(
         default_factory=lambda: ini_config.resolve("jaeger_http_endpoint")
     )
+    # [ha] node_dsn_overrides (2026-11-10-ha-status-page, F8): the optional
+    # per-node DSN map for the HA status probe. dict-typed — the map parse
+    # (name=url;name=url, fail-fast on malformed) lives in ini_config.
+    ha_node_dsn_overrides: dict[str, str] = Field(
+        default_factory=lambda: ini_config.resolve_ha_node_dsn_overrides()
+    )
 
 
 _settings: Settings | None = None
 _proxy = ini_config._SettingsProxy()
 
 
-def get_settings():
+def get_settings() -> ini_config._SettingsProxy:
     """Return the lazy settings proxy. The real ``Settings`` is constructed on
     first field access (see ``ini_config._SettingsProxy``). Tests that call
     ``settings()`` get the constructed ``Settings`` via the proxy's

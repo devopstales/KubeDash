@@ -19,6 +19,7 @@ import configparser
 import contextlib
 import os
 import pathlib
+import re
 import warnings
 from collections.abc import Mapping
 
@@ -112,6 +113,13 @@ _FIELDS: dict[str, tuple[str, str, tuple[str, ...], bool, str, bool]] = {
     ),
     "jaeger_http_endpoint": (
         "monitoring", "jaeger_http_endpoint", ("KUBEDASH_JAEGER_HTTP_ENDPOINT",), True, "", False,
+    ),
+    # [ha] (2026-11-10-ha-status-page, F8): optional per-node DSN map for the
+    # HA status probe. Parsed by resolve_ha_node_dsn_overrides (dict-typed
+    # fields cannot go through the str-typed resolve()); the raw value is
+    # `name=url;name=url`.
+    "ha_node_dsn_overrides": (
+        "ha", "node_dsn_overrides", ("KUBEDASH_HA_NODE_DSN_OVERRIDES",), True, "", False,
     ),
 }
 
@@ -314,6 +322,41 @@ def resolve(field: str) -> str:
 def resolve_bool(field: str) -> bool:
     """Bool variant of :func:`resolve` (tls_edge, cookie_secure)."""
     return _parse_bool(resolve(field), field)
+
+
+#: [ha] node_dsn_overrides: the node-name half of `name=url` — pgEdge node
+#: names (n1, kdp-n2, ...) are identifier-like; anything else is a typo.
+_NODE_NAME_RE = re.compile(r"^[A-Za-z0-9][A-Za-z0-9_-]*$")
+
+
+def resolve_ha_node_dsn_overrides() -> dict[str, str]:
+    """``[ha] node_dsn_overrides`` — the optional per-node DSN map for the
+    HA status probe (F8: compose service names don't resolve on the host).
+
+    Format: ``name=url;name=url``. The raw value comes from the normal
+    precedence chain (override → env → INI → default); this function adds
+    the map parse because a dict-typed field cannot go through the
+    str-typed :func:`resolve`. Malformed entries fail fast (ADR-0028) —
+    a half-parsed DSN map would silently probe the wrong DSNs."""
+    raw = resolve("ha_node_dsn_overrides").strip()
+    if not raw:
+        return {}
+    out: dict[str, str] = {}
+    for part in raw.split(";"):
+        part = part.strip()
+        if not part:
+            continue
+        name, sep, url = part.partition("=")
+        name, url = name.strip(), url.strip()
+        if (
+            not sep
+            or not _NODE_NAME_RE.match(name)
+            or not url.startswith("postgresql://")
+            or name in out
+        ):
+            raise ConfigError("ha_node_dsn_overrides", "ha", "node_dsn_overrides")
+        out[name] = url
+    return out
 
 
 class _SettingsProxy:
