@@ -16,16 +16,21 @@ pipeline:
 # In-flight changes (besides pipeline.current_change).
 in_flight:
   - change: 2026-11-10-ha-status-page
-    phase: blueprint
+    phase: executing
     # Planned 2026-11-10 (briefing + blueprint + findings + acceptance,
     # PROPOSED): admin-only GET /api/v1/admin/ha-status — pgEdge
     # active-active health (both replication directions via per-node
     # probes of the spock.node_interface DSNs, leader_lease, tasks queue,
-    # derived healthy/degraded/down + reasons) + a real /settings/ha-status
-    # view (replaces the stub; route renamed from /settings/cluster-status —
-    # rename landed, frontend 75 files / 491 tests green). Optional
-    # [ha] node_dsn_overrides INI key for the host-run dev backend (F8:
-    # compose service names don't resolve on the host). Next: slicing.
+    # derived healthy/degraded/down + reasons) + a real /settings/cluster-status
+    # view (replaces the stub). Optional [ha] node_dsn_overrides INI key for
+    # the host-run dev backend (F8: compose service names don't resolve on
+    # the host). Executing 2026-11-11 per user instruction (develop the
+    # prototype into kubedash as a real feature; direct execution, no
+    # ticketing). Spec zone amended: the view ships at
+    # /settings/cluster-status (user decision 2026-11-11; the earlier
+    # ha-status route rename is superseded), prototype 001 referenced as
+    # the validated approach (F15-F17, liftable module). Next: backend
+    # service + endpoint + INI override, frontend view, verification.
   - change: 2026-10-29-session-object-navigation
     phase: qa
     # Sliced 2026-10-29, executed 2026-11-02 (8 tickets TASK-055..062,

@@ -8,9 +8,9 @@
 
 **Build shape:** Tracer thread (Task 1: probe seam + assembly against fakes, endpoint live with one node's data → Task 2: per-node probes + derivation → Task 3: INI override → Task 4: frontend)
 
-**Goal:** An admin-only `GET /api/v1/admin/ha-status` endpoint that reports the pgEdge active-active cluster's health (both replication directions, per-node reachability/lag/apply-workers/conflicts, leader lease, task queue, derived status + reasons) and a real `/settings/ha-status` page that renders it.
+**Goal:** An admin-only `GET /api/v1/admin/ha-status` endpoint that reports the pgEdge active-active cluster's health (both replication directions, per-node reachability/lag/apply-workers/conflicts, leader lease, task queue, derived status + reasons) and a real `/settings/cluster-status` page that renders it.
 
-**Architecture:** A Flask-free `app/services/ha_status.py` with one seam — `probe_node(dsn) -> NodeProbe` — that opens a short-lived read-only SQLAlchemy engine per node DSN and runs a fixed set of read-only queries: the spock per-node state (subscription status, receive lag, apply workers, channel totals, exceptions) **plus the leader's advisory-lock check on that node** (`pg_locks` × `pg_stat_activity` matched on `hashtext(leader replica_id)::oid`, F12/F13). The endpoint (`app/api/admin.py`) reads the cluster catalog + `leader_lease` + `tasks` from the app's engine, merges the optional INI DSN overrides, probes every node, aggregates the per-node lock sightings into one verdict, best-effort reads the candidate count from the KubeDash Deployment (admin client, owner-refs chain, nullable), assembles the report, and derives the overall status. The frontend gets a view folder (`src/views/HaStatus/`) with a TanStack Query 5 s poll; the route moves out of the Stub router.
+**Architecture:** A Flask-free `app/services/ha_status.py` with one seam — `probe_node(dsn) -> NodeProbe` — that opens a short-lived read-only SQLAlchemy engine per node DSN and runs a fixed set of read-only queries: the spock per-node state (subscription status, receive lag, apply workers, channel totals, exceptions) **plus the leader's advisory-lock check on that node** (`pg_locks` × `pg_stat_activity` matched on `hashtext(leader replica_id)::oid`, F12/F13). The endpoint (`app/api/admin.py`) reads the cluster catalog + `leader_lease` + `tasks` from the app's engine, merges the optional INI DSN overrides, probes every node, aggregates the per-node lock sightings into one verdict, best-effort reads the candidate count from the KubeDash Deployment (admin client, owner-refs chain, nullable), assembles the report, and derives the overall status. The frontend gets a view folder (`src/views/ClusterStatus/`) with a TanStack Query 5 s poll; the route moves out of the Stub router.
 
 **Tech Stack:** Flask 3 + Smorest, SQLAlchemy 2.0 (raw SQL via `text()`), PostgreSQL 17 (pgEdge/Spock 5.0.1). Frontend: React 19 + TS + Vite (CoreUI), TanStack Query, Vitest + RTL + MSW.
 
@@ -42,7 +42,7 @@
 - With `[ha] node_dsn_overrides = n2=postgresql://kubedash:kubedash@localhost:16433/kubedash` in the dev INI, the host backend reports n2 reachable even though `kdpg-n2` doesn't resolve on the host. *(F8)*
 - The derived status follows the matrix: subscription not `replicating` or node unreachable → `down`; lag > 60 s, exception rows, stale heartbeat (> 10 s) or missing lease → `degraded`; else `healthy` — and every non-healthy verdict lists the matching reason string.
 - The service issues **read-only** statements against spock objects (SELECT / function calls) — no INSERT/UPDATE/DELETE anywhere in the probe module. *(briefing R6 — `autoddl` would replicate an app write)*
-- Frontend: `/settings/ha-status` renders the banner + per-node cards + leader + queue from the API (MSW fixture: healthy and degraded variants); the entry leaves `stubRoutes` and the nav path is `/settings/ha-status`.
+- Frontend: `/settings/cluster-status` renders the banner + per-node cards + leader + queue from the API (MSW fixture: healthy and degraded variants); the entry leaves `stubRoutes` and the nav path is `/settings/cluster-status`.
 - No new dependency in `pyproject.toml` and no new `values.yaml` key on the chart (the endpoint is in-cluster; the chart's single `DATABASE_URL` already reaches a node).
 
 **Artifacts** (files that must exist with real implementation, not stubs):
@@ -51,8 +51,8 @@
 - `backend/app/api/admin.py` — `GET /admin/ha-status` route + Pydantic response schema (added to the existing `AdminApi`).
 - `backend/app/core/ini_config.py` + `backend/app/core/config.py` — the optional `ha_node_dsn_overrides` map (default empty).
 - `backend/kubedash.ini` + `backend/kubedash.ini.example` — the `[ha]` section (dev value in the gitignored INI; documented optional in the example).
-- `frontend/src/views/HaStatus/index.tsx` (+ parts) — the real view; `frontend/src/App.tsx` route; `frontend/src/views/Stub/routes.ts` entry removed.
-- `backend/tests/services/test_ha_status.py` (unit, probe seam), `frontend/tests/views/HaStatus.test.tsx` (MSW happy + degraded), `frontend/e2e/ui-smoke.spec.ts` (route moved from the stub smoke list to the real-view list).
+- `frontend/src/views/ClusterStatus/index.tsx` (+ parts) — the real view; `frontend/src/App.tsx` route; `frontend/src/views/Stub/routes.ts` entry removed.
+- `backend/tests/services/test_ha_status.py` (unit, probe seam), `frontend/tests/views/ClusterStatus.test.tsx` (MSW happy + degraded), `frontend/e2e/ui-smoke.spec.ts` (route moved from the stub smoke list to the real-view list).
 - `backend/tests/integration/test_ha_status_pgedge.py` (kind-gated, Testcontainers `pgedge/pgedge:pg17-latest` two-node) — the real-SQL backstop.
 
 **Key links** (critical connections that must work together):
@@ -60,7 +60,7 @@
 - `build_report` reads `spock.node` + `spock.node_interface` + `leader_lease` + `tasks` from the app engine, then calls `probe_node` per merged DSN; the probe results are keyed by `node_name` and joined onto the member list (a member whose probe failed is still listed, `reachable: false`).
 - The lock verdict aggregates the per-probe `lock_held_locally` sightings over reachable nodes only; `derive_status` combines it with heartbeat freshness per the R4 matrix (F12/F13).
 - `candidates` = best-effort `get_pod(replica_id) → ownerRefs → get_deployment → spec.replicas` via the admin client; any exception → `null` (F14).
-- The view's query hook (`useQuery`, `refetchInterval: 5000`) → `GET /admin/ha-status` → banner/cards; the nav leaf + the e2e smoke list both point at `/settings/ha-status`.
+- The view's query hook (`useQuery`, `refetchInterval: 5000`) → `GET /admin/ha-status` → banner/cards; the nav leaf + the e2e smoke list both point at `/settings/cluster-status`.
 - The INI override map is parsed once in `ini_config` (same pattern as the other optional keys) and exposed as `Settings.ha_node_dsn_overrides: dict[str, str]`.
 
 **One-way-door decisions** (hard to reverse — explicit approval before implementing):
@@ -86,11 +86,11 @@
 - `backend/app/core/config.py` — `Settings.ha_node_dsn_overrides: dict[str, str]` (default `{}`).
 - `backend/kubedash.ini` — `[ha]` with the dev `n2=...:16433` override.
 - `backend/kubedash.ini.example` — `[ha]` documented as optional.
-- `frontend/src/views/HaStatus/index.tsx` (+ `HaStatusCard.tsx`, `types.ts`) — the view.
-- `frontend/src/App.tsx` — real route `/settings/ha-status`.
+- `frontend/src/views/ClusterStatus/index.tsx` (+ `ClusterStatusCard.tsx`, `types.ts`) — the view.
+- `frontend/src/App.tsx` — real route `/settings/cluster-status`.
 - `frontend/src/views/Stub/routes.ts` — remove the entry.
 - `frontend/e2e/ui-smoke.spec.ts` — move the route from the stub smoke list.
-- `backend/tests/services/test_ha_status.py`, `frontend/tests/views/HaStatus.test.tsx`, `backend/tests/integration/test_ha_status_pgedge.py` — tests.
+- `backend/tests/services/test_ha_status.py`, `frontend/tests/views/ClusterStatus.test.tsx`, `backend/tests/integration/test_ha_status_pgedge.py` — tests.
 
 ---
 
@@ -117,10 +117,10 @@
 
 ### Task 4: Frontend view + route move
 
-- [ ] `frontend/tests/views/HaStatus.test.tsx` (red, MSW): healthy fixture → green banner "HA healthy", one card per node (name, `replicating` chip, lag, conflicts 0), **leader election section** (leader replica_id, tenure, fence, heartbeat age, lock verdict "held on n1 (pid 7899, idle)", "1 leader of N candidates" or no count line when `candidates` is null), queue section (counts); degraded fixture (n2 unreachable) → red banner with `node_unreachable:n2` reason, n2 card marked unreachable; `no_leader` fixture → degraded banner with the reason; error state (500) → banner "status unavailable".
-- [ ] `frontend/src/views/HaStatus/` (green): `index.tsx` (useQuery `refetchInterval: 5000`), `HaStatusCard.tsx`, `types.ts` (mirrors `HaStatusOut`); CoreUI styling per STYLEGUIDE.
+- [ ] `frontend/tests/views/ClusterStatus.test.tsx` (red, MSW): healthy fixture → green banner "HA healthy", one card per node (name, `replicating` chip, lag, conflicts 0), **leader election section** (leader replica_id, tenure, fence, heartbeat age, lock verdict "held on n1 (pid 7899, idle)", "1 leader of N candidates" or no count line when `candidates` is null), queue section (counts); degraded fixture (n2 unreachable) → red banner with `node_unreachable:n2` reason, n2 card marked unreachable; `no_leader` fixture → degraded banner with the reason; error state (500) → banner "status unavailable".
+- [ ] `frontend/src/views/ClusterStatus/` (green): `index.tsx` (useQuery `refetchInterval: 5000`), `ClusterStatusCard.tsx`, `types.ts` (mirrors `HaStatusOut`); CoreUI styling per STYLEGUIDE.
 - [ ] Route move: `App.tsx` real route; `stubRoutes` entry removed; `e2e/ui-smoke.spec.ts` — the route leaves the stub smoke list (the real view is covered by the page test + e2e admin smoke).
-- [ ] Verify: `cd frontend && corepack pnpm test -- HaStatus` + `corepack pnpm test -- Stub` green; `task fe-build` + `task fe-sync`; dev-stack browser check as admin: Settings → HA Status renders the live cluster.
+- [ ] Verify: `cd frontend && corepack pnpm test -- ClusterStatus` + `corepack pnpm test -- Stub` green; `task fe-build` + `task fe-sync`; dev-stack browser check as admin: Settings → HA Status renders the live cluster.
 
 ### Task 5: Integration backstop (kind-gated)
 

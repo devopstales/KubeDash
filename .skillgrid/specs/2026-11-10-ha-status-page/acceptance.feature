@@ -2,7 +2,7 @@ Feature: HA Status page (admin endpoint + settings view)
   # briefing.md R1-R6. The load-bearing theme: the pgEdge active-active
   # cluster's health — both replication directions, per-node reachability,
   # leader lease, task queue — is readable as ONE admin endpoint and
-  # rendered at /settings/ha-status. The page degrades (200 + reachable:false)
+  # rendered at /settings/cluster-status. The page degrades (200 + reachable:false)
   # on a sick cluster; it never 500s on the thing it is there to diagnose.
 
   Background:
@@ -149,7 +149,7 @@ Feature: HA Status page (admin endpoint + settings view)
   Scenario: ha-status-page-renders-healthy
     # happy path — R5
     Given the API returns a healthy report
-    When an admin opens /settings/ha-status
+    When an admin opens /settings/cluster-status
     Then the page shows a healthy banner
     And one card per node shows its name, replicating status, lag, and conflict count
     And the leader section shows replica_id, fence, and heartbeat age
@@ -159,12 +159,12 @@ Feature: HA Status page (admin endpoint + settings view)
   Scenario: ha-status-page-shows-degraded-reasons
     # failure — R5
     Given the API reports n2 unreachable (status down)
-    When an admin opens /settings/ha-status
+    When an admin opens /settings/cluster-status
     Then the page shows a down banner listing node_unreachable:n2
     And the n2 card is marked unreachable
 
-  Scenario: ha-status-route-replaced-the-stub
-    # route rename (this change): /settings/cluster-status is gone
-    When an admin opens /settings/ha-status
+  Scenario: cluster-status-route-replaced-the-stub
+    # route (user decision 2026-11-11): /settings/cluster-status is real
+    When an admin opens /settings/cluster-status
     Then the real HA Status view renders (not the stub placeholder)
-    And /settings/cluster-status no longer matches a route
+    And /settings/ha-status no longer matches a route
