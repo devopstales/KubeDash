@@ -273,3 +273,18 @@
   Status page's leader-election section — per-node lock cross-check +
   fence as election count; see
   `.skillgrid/specs/2026-11-10-ha-status-page/findings.md` F12–F14).
+
+## 2026-11-10
+
+- Added `gotchas/leader-fence-must-increment-in-upsert.md` (reflect of the
+  2026-10-27-postgres-queue-revocation-active-active change). Lifts the one
+  durable, non-obvious finding from that change's review: the leader fence is
+  a per-acquire counter, so a SELECT-then-bind increment lets two peers hold
+  an equal fence and voids ADR-0031's fencing. Pins three anchors in
+  `backend/app/core/leader.py` (in-upsert increment, `RETURNING fence`, the
+  heartbeat's `WHERE ... fence = :f`). Fixed in `da790985`; QA had passed the
+  read-then-bind form, so the page is also the "green suite cannot see this"
+  lesson. `index.md` gotchas row updated in the same edit.
+- Deliberately *not* lifted: `tasks` retention for `done` rows (W035) — it is
+  an open ADR-0029 amendment, not settled behavior, so the page only points
+  at the window rather than documenting a rule.

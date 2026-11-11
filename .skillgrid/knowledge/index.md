@@ -71,6 +71,7 @@
 |---|---|
 | [KubeDataTable stale render closures](gotchas/datatables-react-stale-render-closure.md) | Render fns bind at init only — join late query data into the row (Nodes.tsx pattern), not the closure (500e13e4) |
 | [PVC Bound is a phase, not a condition](gotchas/kube-pvc-bounded-phase-not-condition.md) | `kubectl wait --for=condition=Bound` on a PVC can never pass; wait on `jsonpath='{.status.phase}'=Bound` (ce6d0b19) |
+| [Leader fence must increment inside the upsert](gotchas/leader-fence-must-increment-in-upsert.md) | A read-then-bind fence hands two peers the same value (the tie ADR-0031 breaks); `fence = leader_lease.fence + 1 ... RETURNING fence` (da790985) |
 
 ## workflows/
 
