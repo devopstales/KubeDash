@@ -146,7 +146,7 @@ export function navigation(input: { clusterId: number | null; isAdmin: boolean }
     group('Settings', cilSettings, [
       leaf('Auth Provider', '/settings/sso-config'),
       leaf('Kubernetes Cluster', '/clusters'),
-      leaf('HA Status', '/settings/ha-status'),
+      leaf('HA Status', '/settings/cluster-status'),
       leaf('Audit Log', '/admin/permissions?tab=audit'),
     ]),
   )

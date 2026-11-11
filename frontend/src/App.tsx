@@ -36,6 +36,7 @@ const CrdDataView = React.lazy(() => import('./views/Cluster/CrdData'))
 const ProfileView = React.lazy(() => import('./views/Profile'))
 const PermissionsView = React.lazy(() => import('./views/Permissions'))
 const KubeconfigView = React.lazy(() => import('./views/Kubeconfig'))
+const ClusterStatusView = React.lazy(() => import('./views/ClusterStatus'))
 const AdminPermissionsView = React.lazy(() => import('./views/AdminPermissions'))
 const PrivilegesView = React.lazy(() => import('./views/AdminPermissions/Privileges'))
 const PrivilegeEditView = React.lazy(() => import('./views/AdminPermissions/PrivilegeEdit'))
@@ -433,6 +434,16 @@ const App = () => {
                       element={
                         <ProtectedRoute>
                           <KubeconfigView />
+                        </ProtectedRoute>
+                      }
+                    />
+                    <Route
+                      path="/settings/cluster-status"
+                      element={
+                        <ProtectedRoute>
+                          <AdminRoute>
+                            <ClusterStatusView />
+                          </AdminRoute>
                         </ProtectedRoute>
                       }
                     />

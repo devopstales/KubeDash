@@ -57,7 +57,6 @@ const SMOKE_STUB_ROUTES: Array<{ path: string; title: string }> = [
   { path: '/other-resource/priorityclass', title: 'Priority Classes' },
   // Admin-gated stubs (render for the bootstrap admin):
   { path: '/settings/sso-config', title: 'Auth Provider' },
-  { path: '/settings/ha-status', title: 'HA Status' },
 ]
 
 /** Every route that must keep the SPA shell (sidebar) mounted and alive. */
@@ -66,6 +65,7 @@ const REAL_ROUTES = [
   '/profile',
   '/permissions',
   '/settings/export',
+  '/settings/cluster-status',
   '/user/list',
   '/user/privilege',
   '/user/group',

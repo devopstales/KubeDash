@@ -120,6 +120,10 @@ function expectedStubs() {
     // one-shot to /network/ingress (App.tsx). Guarded here so a re-added
     // nav leaf to the merged path is not stubified.
     '/network/gateway-api',
+    // Real view (2026-11-10-ha-status-page) — the stub route is removed
+    // (promoted to the real view); the /data URL never shipped, so there
+    // is no R7 redirect — the single clean route only.
+    '/settings/cluster-status',
     // Real view (2026-10-28-service-views) — the stub route is removed
     // (promoted to the real view); the /data URL is its TICKET-07 R7
     // redirect (hydrates the ref from ?name=/?namespace=).
