@@ -16,7 +16,7 @@ pipeline:
 # In-flight changes (besides pipeline.current_change).
 in_flight:
   - change: 2026-11-10-ha-status-page
-    phase: executing
+    phase: qa
     # Planned 2026-11-10 (briefing + blueprint + findings + acceptance,
     # PROPOSED): admin-only GET /api/v1/admin/ha-status — pgEdge
     # active-active health (both replication directions via per-node
@@ -24,13 +24,25 @@ in_flight:
     # derived healthy/degraded/down + reasons) + a real /settings/cluster-status
     # view (replaces the stub). Optional [ha] node_dsn_overrides INI key for
     # the host-run dev backend (F8: compose service names don't resolve on
-    # the host). Executing 2026-11-11 per user instruction (develop the
+    # the host). Executed 2026-11-11 per user instruction (develop the
     # prototype into kubedash as a real feature; direct execution, no
     # ticketing). Spec zone amended: the view ships at
     # /settings/cluster-status (user decision 2026-11-11; the earlier
     # ha-status route rename is superseded), prototype 001 referenced as
-    # the validated approach (F15-F17, liftable module). Next: backend
-    # service + endpoint + INI override, frontend view, verification.
+    # the validated approach (F15-F17, liftable module). EXECUTED
+    # 2026-11-11: 3 commits on `rebase` — e00024fc (backend service +
+    # endpoint + INI + 32 tests), 298415df (frontend view + route + nav
+    # + e2e REAL_ROUTES + 10 tests), 6963fc83 (live-verification fixes:
+    # the ADR-0028 lazy proxy hands the override back as the RAW str,
+    # typed parse moved to ini_config.resolve_ha_node_dsn_overrides;
+    # spock.node_interface DSNs are libpq keyword format —
+    # _probe_engine parses them into a URL; dev INI overrides BOTH
+    # nodes, kdpg-n1 does not resolve on the host either). Verified:
+    # unit floor 888 passed, vitest 10/10, fe-build + fe-check +
+    # fe-sync, live endpoint 200 (healthy, both nodes replicating,
+    # leader local, spock 5.0.1, candidates null = F14 host fallback),
+    # browser: page renders banner + node/leader/queue cards with real
+    # data (lag cell "—" = zero byte backlog, intentional). Next: qa.
   - change: 2026-10-29-session-object-navigation
     phase: qa
     # Sliced 2026-10-29, executed 2026-11-02 (8 tickets TASK-055..062,
