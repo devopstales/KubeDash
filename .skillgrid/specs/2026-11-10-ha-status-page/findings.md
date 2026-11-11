@@ -179,3 +179,70 @@ owner-refs chain pod → ReplicaSet → Deployment from
 host backend's target cluster (kind) normally has no KubeDash
 Deployment ⇒ the field is `candidates: int | null`, best-effort, null on
 any failure (it must never fail the report).
+
+## F15 — A node is a HALF VIEW; the catalog is the only part readable from one DSN
+
+Prototype 001 (2026-11-11, both nodes probed live): every node shows
+exactly ONE replication direction — one `spock.lag_tracker` row (the
+direction INTO itself), one local subscription (`sub_n1n2` on n1 /
+`sub_n2n1` on n2), one apply worker, one channel's totals. `spock.node`
++ `spock.node_interface` (the member list + per-node DSNs) are
+replicated and identical on every node. ⇒ read the catalog (members,
+DSNs, `spock_version`, `leader_lease`, tasks) **once from the app's own
+DSN**, then fan out `probe_node` per member for everything
+directional + the lock check. The member DSNs are
+`host=<service> dbname=kubedash user=pgedge port=5432` — spock's
+internal `pgedge` user and compose service hostnames, so the
+credential substitution (blueprint line 109) and the F8 host/port
+override map are required for host-run dev, not an optimization.
+
+## F16 — The advisory-lock match is exact: `objsubid = 1`, raw key as `oid`
+
+The real `pg_locks` row for the leader (pid 7899):
+`classid = 4294967295, objid = 2565736957, objsubid = 1, granted`.
+Single-bigint advisory locks record **objsubid = 1** (objsubid = 0 is
+the two-integer form) and `objid` is the raw key cast to oid —
+`hashtext('local')::oid = 2565736957` (no second hash:
+`hashtext(hashtext('local'))::oid = 3176555083`). A cross-check with
+`objsubid = 0` silently matches nothing (first prototype run derived a
+false `lock_lease_mismatch` this way). Also: psycopg folds
+`ConnectionRefusedError` into its message ("…: Connection refused") —
+the exception chain ends at `psycopg.OperationalError`, so probe-error
+classification must match message text (connection refused / timed out /
+password / server closed), not exception types. A probe against a
+stopped node returns in **2-4 ms** (0 statements, engine
+create+dispose clean) — the 3 s `connect_timeout` bounds only the
+unreachable-host (no RST) path.
+
+## F17 — `replication_lag` (interval) is remote-write freshness, NOT apply delay
+
+Observed: while n2 was down, n1's direction row grew to a **72.5 s
+interval at 0 bytes**; with n2 up and no app writes, 90 s passed with
+the interval SHRINKING (2.4 s → 0.6 s; LSN advanced — spock's own
+traffic keeps live directions fresh). The interval measures the age of
+the last remote write; it grows unbounded on any starved/idle direction
+while `replication_lag_bytes` (the real apply backlog) stays 0. ⇒
+`lag_exceeded:<node>` fires only when **`replication_lag_bytes > 0` AND
+interval > threshold** — the interval alone false-alarms on idle or
+starved-but-already-classified directions.
+
+## Prototype: 001-spock-probe-visibility
+
+- **Verdict:** VALIDATED ✓ (2026-11-11; record:
+  `.skillgrid/meta/.prototype/001-spock-probe-visibility/prototype.md`)
+- **What we learned:** per-node fan-out is REQUIRED (F15); the lock
+  cross-check works with the exact F16 match and the R4 lock rules hold
+  live (lock seen only on the leader's node; no false `no_leader` while
+  the peer is down and the heartbeat is fresh); a down node yields a
+  classified error in ≤4 ms, never a hang; lag thresholding needs the
+  F17 bytes condition.
+- **What's liftable:** `modules/ha_derive.py` (pure R4 matrix:
+  `derive_status(nodes, lease, *, lag_exceeded_s, heartbeat_stale_s) ->
+  StatusDerivation(status, reasons, leader)` + the `NodeProbeData` /
+  `LeaseState` shapes the real `probe_node` must fill).
+- **Constraints for the build:** F16 exact match (`objsubid = 1`); F17
+  bytes-AND-interval lag rule; message-based error classification;
+  catalog from one DSN, fan-out only for directional metrics + lock;
+  member DSNs need credential substitution + host/port override (F8);
+  UI wording: channel conflicts are cumulative counters, worker health
+  is `worker_status='running'` (not `streaming`).

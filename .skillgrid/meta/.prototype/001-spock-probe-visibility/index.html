@@ -1,0 +1,153 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Prototype 001 — spock probe visibility</title>
+<style>
+  :root {
+    --bg: #101418; --surface: #1a2129; --surface2: #212a35; --border: #2e3a47;
+    --fg: #e8edf2; --muted: #8b98a5; --green: #3fb96f; --amber: #e0a63a; --red: #e05a5a;
+    --accent: #5aa9e6; --mono: ui-monospace, "SF Mono", Menlo, monospace;
+  }
+  * { box-sizing: border-box; }
+  body { margin: 0; background: var(--bg); color: var(--fg);
+         font: 14px/1.5 -apple-system, "Segoe UI", sans-serif; padding: 24px; }
+  h1 { font-size: 18px; margin: 0 0 4px; }
+  .sub { color: var(--muted); font-size: 12px; margin-bottom: 18px; }
+  .banner { border-radius: 8px; padding: 14px 18px; margin-bottom: 16px; border: 1px solid var(--border); background: var(--surface); }
+  .banner .status { font-size: 20px; font-weight: 700; letter-spacing: .5px; }
+  .banner.healthy { border-left: 4px solid var(--green); }
+  .banner.healthy .status { color: var(--green); }
+  .banner.degraded { border-left: 4px solid var(--amber); }
+  .banner.degraded .status { color: var(--amber); }
+  .banner.down { border-left: 4px solid var(--red); }
+  .banner.down .status { color: var(--red); }
+  .reasons { margin-top: 8px; display: flex; flex-wrap: wrap; gap: 6px; }
+  .chip { font-family: var(--mono); font-size: 12px; background: var(--surface2);
+          border: 1px solid var(--border); border-radius: 12px; padding: 2px 10px; color: var(--amber); }
+  .grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(340px, 1fr)); gap: 14px; margin-bottom: 16px; }
+  .card { background: var(--surface); border: 1px solid var(--border); border-radius: 8px; padding: 14px 16px; }
+  .card h2 { font-size: 15px; margin: 0 0 10px; display: flex; align-items: center; gap: 8px; }
+  .dot { width: 10px; height: 10px; border-radius: 50%; display: inline-block; }
+  .dot.ok { background: var(--green); } .dot.bad { background: var(--red); }
+  table { width: 100%; border-collapse: collapse; font-size: 13px; }
+  td, th { text-align: left; padding: 3px 8px 3px 0; vertical-align: top; }
+  th { color: var(--muted); font-weight: 400; white-space: nowrap; }
+  .mono { font-family: var(--mono); font-size: 12px; }
+  .ok { color: var(--green); } .warn { color: var(--amber); } .err { color: var(--red); } .mut { color: var(--muted); }
+  .btns { display: flex; gap: 8px; margin-top: 10px; }
+  button { background: var(--surface2); color: var(--fg); border: 1px solid var(--border);
+           border-radius: 6px; padding: 5px 12px; font-size: 12px; cursor: pointer; }
+  button:hover { border-color: var(--accent); }
+  button.stop { color: var(--amber); } button.start { color: var(--green); }
+  .top { display: flex; align-items: center; gap: 12px; margin-bottom: 16px; }
+  .lockline { font-family: var(--mono); font-size: 12px; color: var(--muted); margin-top: 6px; }
+  .detail { margin-top: 10px; padding: 8px 10px; background: var(--surface2); border-radius: 6px;
+            font-family: var(--mono); font-size: 11px; color: var(--muted); word-break: break-all; }
+</style>
+</head>
+<body>
+  <h1>Prototype 001 — spock probe visibility (pgEdge)</h1>
+  <div class="sub">throwaway experiment · nodes probed directly with the app credentials · <span id="probed-at">not probed yet</span></div>
+
+  <div class="top">
+    <button id="reprobe" class="reprobe">Re-probe</button>
+    <span class="mut mono" id="busy"></span>
+  </div>
+
+  <div class="banner" id="banner">
+    <span class="status" id="status">…</span>
+    <span class="mut" id="lease-line"></span>
+    <div class="reasons" id="reasons"></div>
+    <div class="lockline" id="lockline"></div>
+  </div>
+
+  <div class="grid" id="cards"></div>
+
+  <div class="card">
+    <h2>Q1 — data shape, what each node sees</h2>
+    <div id="q1" class="mono" style="font-size:12px"></div>
+  </div>
+
+<script>
+const $ = (id) => document.getElementById(id);
+function esc(s) { return String(s ?? "—").replace(/[&<>"]/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;" }[c])); }
+
+async function probe() {
+  $("busy").textContent = "probing…";
+  $("reprobe").disabled = true;
+  try {
+    const r = await fetch("/api/probe");
+    const d = await r.json();
+    render(d);
+  } catch (e) { $("busy").textContent = "probe failed: " + e; }
+  $("busy").textContent = "";
+  $("reprobe").disabled = false;
+}
+
+function render(d) {
+  $("probed-at").textContent = "probed " + d.probed_at;
+  const der = d.derivation, banner = $("banner");
+  banner.className = "banner " + der.status;
+  $("status").textContent = der.status.toUpperCase();
+  const L = d.lease;
+  $("lease-line").textContent = L
+    ? `· leader lease: replica ${L.replica_id} · fence ${L.fence} · heartbeat ${L.heartbeat_age_s}s ago`
+    : "· leader lease: MISSING";
+  $("reasons").innerHTML = der.reasons.map((x) => `<span class="chip">${esc(x)}</span>`).join("");
+  $("lockline").textContent = der.leader ? `lock verdict: ${der.leader.lock_verdict}` : "";
+
+  $("cards").innerHTML = Object.entries(d.nodes).map(([name, n]) => nodeCard(name, n, d.interfaces)).join("");
+  document.querySelectorAll("button.node-ctl").forEach((b) => {
+    b.onclick = async () => {
+      b.disabled = true; b.textContent = "…";
+      const r = await fetch(b.dataset.url, { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ name: b.dataset.name }) });
+      const res = await r.json();
+      b.textContent = (res.ok ? "ok " : "ERR ") + (res.elapsed_ms / 1000).toFixed(1) + "s";
+      setTimeout(probe, 800);
+    };
+  });
+
+  // Q1 evidence: direction rows per node
+  const rows = Object.entries(d.nodes).filter(([, n]) => n.reachable).map(([name, n]) =>
+    `${name} sees: ${n.lag_bytes} B / ${n.lag_interval_s}s into itself; workers ${n.apply_workers}${n.workers_streaming ? " (streaming)" : ""}; subs ${n.sub_statuses.map((s) => s.name + "=" + s.status).join(", ") || "none"}`);
+  $("q1").innerHTML = rows.map((x) => `· ${esc(x)}`).join("<br>") +
+    `<br><span class="mut">→ a node exposes ONLY its receive direction; both directions require probing both nodes.</span>`;
+}
+
+function nodeCard(name, n, interfaces) {
+  const reachable = n.reachable;
+  const iface = interfaces ? interfaces[name] : null;
+  let body;
+  if (reachable) {
+    body = `<table>
+      <tr><th>reachable</th><td class="ok">yes · ${n.elapsed_ms} ms · ${n.statements.length} SELECTs</td></tr>
+      <tr><th>direction (into ${esc(name)})</th><td class="mono">${n.lag_bytes} B · ${n.lag_interval_s} s</td></tr>
+      <tr><th>apply workers</th><td>${n.apply_workers}${n.workers_streaming ? ' <span class="ok">streaming</span>' : n.apply_workers ? ' <span class="warn">not streaming</span>' : ' <span class="warn">none</span>'}</td></tr>
+      <tr><th>conflicts</th><td>${n.conflicts}</td></tr>
+      <tr><th>exceptions</th><td>${n.exceptions_pending}${n.exceptions_last ? ` · last ${esc(n.exceptions_last)}` : ""}</td></tr>
+      <tr><th>advisory lock</th><td>${n.lock_held_locally ? `<span class="ok">HELD (pid ${n.lock_holder_pid}, ${esc(n.lock_holder_state)})</span>` : '<span class="mut">not held on this node</span>'}</td></tr>
+      <tr><th>subscription</th><td class="mono">${n.sub_statuses.map((s) => `${esc(s.name)}: ${s.status === "replicating" ? '<span class="ok">' + esc(s.status) + "</span>" : '<span class=\"warn\">' + esc(s.status) + "</span>"}`).join("<br>") || "—"}</td></tr>
+      ${iface ? `<tr><th>member DSN</th><td class="mono mut">${esc(iface)}</td></tr>` : ""}
+    </table>`;
+  } else {
+    body = `<table>
+      <tr><th>reachable</th><td class="err">NO</td></tr>
+      <tr><th>probe error</th><td class="err mono">${esc(n.probe_error)}</td></tr>
+      <tr><th>elapsed</th><td>${n.elapsed_ms} ms <span class="${n.elapsed_ms < 3500 ? "ok" : "err"}">${n.elapsed_ms < 3500 ? "(≤ 3 s bound)" : "(OVER BOUND)"}</span></td></tr>
+      <tr><th>statements run</th><td>${n.statements.length} (SELECT-only: ${n.statements.every((s) => s.trim().toUpperCase().startsWith("SELECT"))})</td></tr>
+    </table>`;
+  }
+  return `<div class="card"><h2><span class="dot ${reachable ? "ok" : "bad"}"></span>${esc(name)}</h2>${body}
+    <div class="btns">
+      ${reachable ? `<button class="node-ctl stop" data-url="/api/node/stop" data-name="${name}">Stop node</button>` :
+                    `<button class="node-ctl start" data-url="/api/node/start" data-name="${name}">Start node</button>`}
+    </div></div>`;
+}
+
+$("reprobe").onclick = probe;
+probe();
+</script>
+</body>
+</html>
