@@ -18,12 +18,16 @@ The storage backend moved Redis → ``kv`` under the SAME key (TICKET-06);
 this module is Flask-free (``app/services/`` seam rule), so the engine
 arrives from the call site as a parameter — never a module global.
 """
+
 from typing import Any
+from urllib.parse import quote
 
 from kubernetes import client as k8s_client
+from kubernetes.client.exceptions import ApiException
 from sqlalchemy import Engine
 
 from app.core import kvstore
+from app.core.errors import ClusterUnreachableError
 from app.services.k8s_client import pool
 
 SAR_TTL = 30  # seconds (ARCHITECTURE.md §3.3)
@@ -38,16 +42,28 @@ def _cache_key(
     namespace: str | None = None,
     name: str | None = None,
 ) -> str:
-    return f"sar:{cluster_id}:{sub}:{verb}:{resource}:{group}:{namespace or ''}:{name or ''}"
+    return (
+        f"sar:{cluster_id}:"
+        f"{quote(str(sub), safe='')}:"
+        f"{quote(str(verb), safe='')}:"
+        f"{quote(str(resource), safe='')}:"
+        f"{quote(str(group), safe='')}:"
+        f"{quote(str(namespace or ''), safe='')}:"
+        f"{quote(str(name or ''), safe='')}"
+    )
 
 
-def _cache_get(engine: Engine, key: str) -> str | None:
+def _cache_get(engine: Engine | None, key: str) -> str | None:
     # A miss (absent OR expired) is None; ``kv`` stores text, so the
     # redis-py bytes-decode branch is gone (ADR-0030).
+    if engine is None:
+        return None
     return kvstore.kv_get(engine, key)
 
 
-def _cache_set(engine: Engine, key: str, value: str) -> None:
+def _cache_set(engine: Engine | None, key: str, value: str) -> None:
+    if engine is None:
+        return
     kvstore.kv_set(engine, key, value, SAR_TTL)
 
 
@@ -109,6 +125,10 @@ def can(
     hit = _cache_get(engine, key)
     if hit is not None:
         return hit == "1"
-    ok = _sar_allowed(pool.get(cluster), verb, resource, namespace, name, group)
+    try:
+        ok = _sar_allowed(pool.get(cluster), verb, resource, namespace, name, group)
+    except ApiException as exc:
+        raise ClusterUnreachableError("cluster unreachable during SAR check") from exc
+
     _cache_set(engine, key, "1" if ok else "0")
     return ok

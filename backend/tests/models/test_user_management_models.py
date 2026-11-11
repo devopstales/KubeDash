@@ -2,6 +2,7 @@
 error codes, the ``KUBEDASH_PLUGIN_SERVER`` setting, the un-stub
 ``RBACTemplate`` / ``AuditLog`` models on ``db.metadata``, and the extended
 ``ClusterBinding`` schema (one-way-door; the migration is TICKET-02)."""
+
 import pytest
 from sqlalchemy import UniqueConstraint
 from sqlalchemy.dialects.postgresql import JSONB
@@ -9,20 +10,21 @@ from sqlalchemy.dialects.postgresql import JSONB
 from app.extensions import db
 
 
-def test_new_error_codes_are_frozen_at_14():
-    """The error contract grows from 12 to 14: BUILTIN_TEMPLATE_PROTECTED
-    (409) and NO_BINDINGS (404) join CODES with their HTTP statuses."""
+def test_new_error_codes_are_frozen_at_15():
+    """The error contract grows from 14 to 15: INVALID_RESOURCE_QUERY
+    (400) joins CODES with its HTTP status."""
     import app.core.errors as errors
 
-    assert len(errors.CODES) == 14
-    assert len({cls.error_code for cls in errors.CODES}) == 14
+    assert len(errors.CODES) == 15
+    assert len({cls.error_code for cls in errors.CODES}) == 15
+    assert errors.InvalidResourceQueryError in errors.CODES
     assert errors.BuiltinTemplateProtectedError in errors.CODES
     assert errors.NoBindingsError in errors.CODES
-    # HTTP status + envelope name per the frozen contract.
+    assert errors.InvalidResourceQueryError("x").code == 400
+    assert errors.InvalidResourceQueryError("x").error_code == "INVALID_RESOURCE_QUERY"
+    assert errors.InvalidResourceQueryError("x").as_dict()["code"] == "INVALID_RESOURCE_QUERY"
     assert errors.BuiltinTemplateProtectedError("x").code == 409
-    assert (
-        errors.BuiltinTemplateProtectedError("x").error_code == "BUILTIN_TEMPLATE_PROTECTED"
-    )
+    assert errors.BuiltinTemplateProtectedError("x").error_code == "BUILTIN_TEMPLATE_PROTECTED"
     assert errors.NoBindingsError("x").code == 404
     assert errors.NoBindingsError("x").error_code == "NO_BINDINGS"
     assert (
@@ -96,7 +98,8 @@ def test_audit_log_is_on_db_metadata(app, db_sess):
 
 
 def test_cluster_binding_gains_namespace_template_created_at_and_unique(
-    app, db_sess,
+    app,
+    db_sess,
 ):
     """ADR-0002 one-way-door (model only; migration is TICKET-02): bindings
     carry the bound namespace + role template, and (user, cluster, namespace,
@@ -114,9 +117,10 @@ def test_cluster_binding_gains_namespace_template_created_at_and_unique(
     # role stays but becomes template-derived, default "viewer".
     assert t.columns["role"].default.arg == "viewer"
     ucs = [
-        c for c in t.constraints if isinstance(c, UniqueConstraint)
-        and {col.name for col in c.columns}
-        == {"user_id", "cluster_id", "namespace", "template"}
+        c
+        for c in t.constraints
+        if isinstance(c, UniqueConstraint)
+        and {col.name for col in c.columns} == {"user_id", "cluster_id", "namespace", "template"}
     ]
     assert len(ucs) == 1
     # The existing __init__ still validates role and accepts the new kwargs.

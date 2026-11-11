@@ -12,6 +12,7 @@ The engine parameter is a no-op here — the storage seam is monkeypatched, so
 the engine value never reaches a storage function (the engine plumbing is
 proven in ``test_rbac_cache.py`` against a real Postgres).
 """
+
 from types import SimpleNamespace
 
 import pytest
@@ -38,9 +39,7 @@ def _client_allows(verbs: set[str]) -> SimpleNamespace:
     class FakeSarApi:
         def create_self_subject_access_review(self, body) -> SimpleNamespace:
             # The SAR nests the attributes under ``spec`` (k8s wire shape).
-            return SimpleNamespace(
-                status=FakeStatus(body.spec.resource_attributes.verb in verbs)
-            )
+            return SimpleNamespace(status=FakeStatus(body.spec.resource_attributes.verb in verbs))
 
     return SimpleNamespace(_auth_api=FakeSarApi())
 
@@ -64,6 +63,36 @@ def test_can_allowed_and_cached(monkeypatch: pytest.MonkeyPatch) -> None:
     assert rb.can(_user(), _cluster(), "list", "pods", None, None, engine=_ENGINE) is True
     # The production seam wrote the verdict under the frozen key format.
     assert sets == [("sar:1:u-1:list:pods:::", "1")]
+
+
+def test_cache_key_is_canonical_for_colon_segments() -> None:
+    """Colon-bearing attributes must not collide in the SAR cache key."""
+    import app.services.rbac as rb
+
+    first = rb._cache_key(1, "u-1", "get", "secrets", "", "a:b", "c")
+    second = rb._cache_key(1, "u-1", "get", "secrets", "", "a", "b:c")
+    assert first != second
+
+
+def test_sar_api_error_cluster_unreachable(monkeypatch: pytest.MonkeyPatch) -> None:
+    """A Kubernetes SAR transport/API failure must surface as cluster
+    unavailability — and must not poison the verdict cache."""
+    from kubernetes.client.exceptions import ApiException
+
+    import app.services.rbac as rb
+    from app.core.errors import ClusterUnreachableError
+
+    sets: list[tuple[str, str]] = []
+    monkeypatch.setattr(
+        rb.pool,
+        "get",
+        lambda c: (_ for _ in ()).throw(ApiException(status=503, reason="ServiceUnavailable")),
+    )
+    monkeypatch.setattr(rb, "_cache_get", lambda e, k: None)
+    monkeypatch.setattr(rb, "_cache_set", lambda e, k, v: sets.append((k, v)))
+    with pytest.raises(ClusterUnreachableError):
+        rb.can(_user(), _cluster(), "get", "secrets", "team-a", "db", engine=_ENGINE)
+    assert sets == []
 
 
 def test_cache_hit_is_a_hit(monkeypatch: pytest.MonkeyPatch) -> None:
@@ -156,7 +185,9 @@ def test_namespace_and_name_are_separate_cache_entries(monkeypatch: pytest.Monke
         def create_self_subject_access_review(self, body) -> SimpleNamespace:
             ra = body.spec.resource_attributes
             asked.append((ra.namespace, ra.name))
-            return SimpleNamespace(status=FakeStatus(ra.namespace == "team-a" and ra.name != "other"))
+            return SimpleNamespace(
+                status=FakeStatus(ra.namespace == "team-a" and ra.name != "other")
+            )
 
     monkeypatch.setattr(rb.pool, "get", lambda c: SimpleNamespace(_auth_api=FakeSarApi()))
     # The storage seam is now (engine, key) — the cache dict ignores the
@@ -165,8 +196,7 @@ def test_namespace_and_name_are_separate_cache_entries(monkeypatch: pytest.Monke
     monkeypatch.setattr(rb, "_cache_set", lambda e, k, v: cache.__setitem__(k, v))
     assert rb.can(_user(), _cluster(), "list", "secrets", "team-a", None, engine=_ENGINE) is True
     assert (
-        rb.can(_user(), _cluster(), "list", "secrets", "kube-system", None, engine=_ENGINE)
-        is False
+        rb.can(_user(), _cluster(), "list", "secrets", "kube-system", None, engine=_ENGINE) is False
     )
     assert rb.can(_user(), _cluster(), "get", "secrets", "team-a", "db", engine=_ENGINE) is True
     assert rb.can(_user(), _cluster(), "get", "secrets", "team-a", "other", engine=_ENGINE) is False
@@ -194,8 +224,14 @@ def test_sar_carries_api_group_for_rbac_resources(monkeypatch: pytest.MonkeyPatc
     monkeypatch.setattr(rb, "_cache_set", lambda e, k, v: None)
     assert (
         rb.can(
-            _user(), _cluster(), "list", "roles", "default", None,
-            "rbac.authorization.k8s.io", engine=_ENGINE,
+            _user(),
+            _cluster(),
+            "list",
+            "roles",
+            "default",
+            None,
+            "rbac.authorization.k8s.io",
+            engine=_ENGINE,
         )
         is True
     )

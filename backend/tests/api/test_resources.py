@@ -8,6 +8,7 @@ module seams the unit tests patch). The kind integration tier (``@pytest.mark
 env-block where no Docker is available, deselected with ``-m "not
 integration"``.
 """
+
 import pytest
 
 from app.core.errors import ClusterUnreachableError
@@ -73,9 +74,7 @@ class FakeK8s:
     def delete_namespace(self, name: str) -> None:
         self.deleted_namespaces.append(name)
 
-    def apply_objects(
-        self, namespace: str, objects: list[dict]
-    ) -> tuple[list[dict], list[dict]]:
+    def apply_objects(self, namespace: str, objects: list[dict]) -> tuple[list[dict], list[dict]]:
         """Models the get-or-create: first apply of a name is ``created``,
         a re-apply is ``unchanged``; a name in ``apply_fail_names`` lands in
         ``errors`` (the partial-failure scenario)."""
@@ -245,9 +244,7 @@ class FakeK8s:
                     "type": "ClusterIP",
                     "cluster_ip": "10.0.0.1",
                     "selector": {"app": "web"},
-                    "ports": [
-                        {"name": "http", "port": 80, "target_port": 8080, "protocol": "TCP"}
-                    ],
+                    "ports": [{"name": "http", "port": 80, "target_port": 8080, "protocol": "TCP"}],
                 },
             },
             {
@@ -274,9 +271,7 @@ class FakeK8s:
         ]
 
     def get_service(self, namespace: str, name: str) -> list[dict]:
-        return [
-            svc for svc in self.list_services(namespace) if svc["metadata"]["name"] == name
-        ]
+        return [svc for svc in self.list_services(namespace) if svc["metadata"]["name"] == name]
 
     # cert-manager.io: the fake models cert-manager PRESENT by default (the
     # absent case is tested by overriding get_crd_served on the instance,
@@ -742,14 +737,10 @@ class FakeK8s:
             }
         ]
 
-    def list_cilium_clusterwide_network_policies(
-        self, _namespace: str | None
-    ) -> list[dict]:
+    def list_cilium_clusterwide_network_policies(self, _namespace: str | None) -> list[dict]:
         # Cluster-scoped: the namespace argument is accepted-and-ignored
         # (mirrors the real K8sClient.list_cilium_clusterwide_network_policies).
-        return [
-            {"metadata": {"name": "ccnp"}, "spec": {"endpointSelector": {}, "egress": []}}
-        ]
+        return [{"metadata": {"name": "ccnp"}, "spec": {"endpointSelector": {}, "egress": []}}]
 
     def get_cilium_network_policy(self, namespace: str, name: str) -> list[dict]:
         if name != "cnp":
@@ -1024,7 +1015,11 @@ class FakeK8s:
                     "annotations": {},
                 },
                 "spec": {
-                    "scale_target_ref": {"kind": "Deployment", "name": "web", "api_version": "apps/v1"},
+                    "scale_target_ref": {
+                        "kind": "Deployment",
+                        "name": "web",
+                        "api_version": "apps/v1",
+                    },
                     "min_replicas": 2,
                     "max_replicas": 10,
                     "target_cpu_utilization_percentage": 80,
@@ -1365,6 +1360,20 @@ def _register(api_client, headers, name="prod") -> object:
     )
 
 
+def test_list_resources_invalid_namespace_before_sar(
+    api_client, auth_client, fake_k8s, monkeypatch
+) -> None:
+    """[shared-gate F1] an invalid ?namespace= is rejected before the SAR."""
+    auth_client.login()
+    h = {"Authorization": f"Bearer {auth_client.jwt}"}
+    _register(api_client, h)
+    asked = _record_sar(monkeypatch)
+    r = api_client.get("/api/v1/clusters/1/resources/secrets?namespace=../evil", headers=h)
+    assert r.status_code == 400
+    assert r.get_json()["error"]["code"] == "INVALID_RESOURCE_QUERY"
+    assert asked == []
+
+
 def test_unknown_kind_404_stable_code(api_client, auth_client) -> None:
     auth_client.login()
     h = {"Authorization": f"Bearer {auth_client.jwt}"}
@@ -1575,7 +1584,9 @@ def test_list_serviceaccounts_namespaced(api_client, auth_client, fake_k8s, monk
     assert sa["image_pull_secrets"] == [{"name": "registry-cred"}]
 
 
-def test_list_secrets_namespaced_without_data(api_client, auth_client, fake_k8s, monkeypatch) -> None:
+def test_list_secrets_namespaced_without_data(
+    api_client, auth_client, fake_k8s, monkeypatch
+) -> None:
     """The Security > Secrets page lists one namespace: names and types only."""
     auth_client.login()
     h = {"Authorization": f"Bearer {auth_client.jwt}"}
@@ -1607,7 +1618,9 @@ def test_get_secret_by_name_returns_data(api_client, auth_client, fake_k8s, monk
     assert secret["data"] == {"token": "dG9rZW4="}
 
 
-def test_get_missing_secret_returns_no_items(api_client, auth_client, fake_k8s, monkeypatch) -> None:
+def test_get_missing_secret_returns_no_items(
+    api_client, auth_client, fake_k8s, monkeypatch
+) -> None:
     auth_client.login()
     h = {"Authorization": f"Bearer {auth_client.jwt}"}
     _register(api_client, h)
@@ -1615,6 +1628,22 @@ def test_get_missing_secret_returns_no_items(api_client, auth_client, fake_k8s, 
     r = api_client.get("/api/v1/clusters/1/resources/secrets?namespace=team-a&name=gone", headers=h)
     assert r.status_code == 200
     assert r.get_json()["items"] == []
+
+
+def test_get_resource_invalid_name_before_sar(
+    api_client, auth_client, fake_k8s, monkeypatch
+) -> None:
+    """[shared-gate F1] an invalid ?name= is rejected before the SAR."""
+    auth_client.login()
+    h = {"Authorization": f"Bearer {auth_client.jwt}"}
+    _register(api_client, h)
+    asked = _record_sar(monkeypatch)
+    r = api_client.get(
+        "/api/v1/clusters/1/resources/secrets?namespace=team-a&name=../evil", headers=h
+    )
+    assert r.status_code == 400
+    assert r.get_json()["error"]["code"] == "INVALID_RESOURCE_QUERY"
+    assert asked == []
 
 
 def _record_sar(monkeypatch: pytest.MonkeyPatch) -> list[tuple]:
@@ -1678,7 +1707,9 @@ def test_rbac_denied_403(api_client, auth_client, fake_k8s, monkeypatch) -> None
 
     monkeypatch.setattr(rb, "_cache_get", lambda e, k: None)
     monkeypatch.setattr(rb, "_cache_set", lambda e, k, v: None)
-    monkeypatch.setattr(rb, "_sar_allowed", lambda api_client, verb, resource, ns, name, group="": False)
+    monkeypatch.setattr(
+        rb, "_sar_allowed", lambda api_client, verb, resource, ns, name, group="": False
+    )
     r = api_client.get("/api/v1/clusters/1/resources/pods", headers=h)
     assert r.status_code == 403
     assert r.get_json()["error"]["code"] == "RBAC_DENIED"
@@ -1700,9 +1731,7 @@ def test_admin_creates_namespace(api_client, auth_client, fake_k8s, monkeypatch)
     assert fake_k8s.created_namespaces == ["team-b"]
 
 
-@pytest.mark.parametrize(
-    "name", ["default", "kube-system", "kube-public", "kube-node-lease"]
-)
+@pytest.mark.parametrize("name", ["default", "kube-system", "kube-public", "kube-node-lease"])
 def test_protected_namespace_delete_is_rejected_without_client_call(
     api_client, auth_client, fake_k8s, monkeypatch, name
 ) -> None:
@@ -1711,9 +1740,7 @@ def test_protected_namespace_delete_is_rejected_without_client_call(
     h = {"Authorization": f"Bearer {auth_client.jwt}"}
     _register(api_client, h)
     _allow_sar(monkeypatch)
-    r = api_client.delete(
-        f"/api/v1/clusters/1/resources/namespaces/{name}", headers=h
-    )
+    r = api_client.delete(f"/api/v1/clusters/1/resources/namespaces/{name}", headers=h)
     assert r.status_code == 409
     assert r.get_json()["error"]["code"] == "CLUSTER_ALREADY_EXISTS"
     assert fake_k8s.deleted_namespaces == []
@@ -1725,9 +1752,7 @@ def test_admin_deletes_namespace(api_client, auth_client, fake_k8s, monkeypatch)
     h = {"Authorization": f"Bearer {auth_client.jwt}"}
     _register(api_client, h)
     _allow_sar(monkeypatch)
-    r = api_client.delete(
-        "/api/v1/clusters/1/resources/namespaces/team-b", headers=h
-    )
+    r = api_client.delete("/api/v1/clusters/1/resources/namespaces/team-b", headers=h)
     assert r.status_code == 200
     assert r.get_json() == {"name": "team-b"}
     assert fake_k8s.deleted_namespaces == ["team-b"]
@@ -1781,9 +1806,7 @@ def test_namespace_create_asks_sar_for_create(
     assert asked == [("create", "namespaces", None, None, "")]
 
 
-def test_invalid_namespace_name_is_422(
-    api_client, auth_client, fake_k8s, monkeypatch
-) -> None:
+def test_invalid_namespace_name_is_422(api_client, auth_client, fake_k8s, monkeypatch) -> None:
     auth_client.login()
     _make_admin(api_client)
     h = {"Authorization": f"Bearer {auth_client.jwt}"}
@@ -1997,15 +2020,15 @@ def test_list_crds_200_cluster_scoped(api_client, auth_client, fake_k8s, monkeyp
     assert crd["metadata"]["name"] == "applications.argoproj.io"
 
 
-def test_get_crd_by_name_returns_single_item(api_client, auth_client, fake_k8s, monkeypatch) -> None:
+def test_get_crd_by_name_returns_single_item(
+    api_client, auth_client, fake_k8s, monkeypatch
+) -> None:
     """The CRD detail page reads one CRD via the ``_GETTERS`` path."""
     auth_client.login()
     h = {"Authorization": f"Bearer {auth_client.jwt}"}
     _register(api_client, h)
     _allow_sar(monkeypatch)
-    r = api_client.get(
-        "/api/v1/clusters/1/resources/crds?name=applications.argoproj.io", headers=h
-    )
+    r = api_client.get("/api/v1/clusters/1/resources/crds?name=applications.argoproj.io", headers=h)
     assert r.status_code == 200
     [crd] = r.get_json()["items"]
     assert crd["spec"]["group"] == "argoproj.io"
@@ -2031,23 +2054,29 @@ def test_list_crds_asks_sar_for_list(api_client, auth_client, fake_k8s, monkeypa
     assert asked == [("list", "customresourcedefinitions", None, None, "apiextensions.k8s.io")]
 
 
-def test_get_crd_asks_sar_for_get_on_that_name(api_client, auth_client, fake_k8s, monkeypatch) -> None:
+def test_get_crd_asks_sar_for_get_on_that_name(
+    api_client, auth_client, fake_k8s, monkeypatch
+) -> None:
     """The ``?name=`` lookup is SAR-gated with ``get`` (matching the secrets
     ``_GETTERS`` precedent), not ``list``."""
     auth_client.login()
     h = {"Authorization": f"Bearer {auth_client.jwt}"}
     _register(api_client, h)
     asked = _record_sar(monkeypatch)
-    r = api_client.get(
-        "/api/v1/clusters/1/resources/crds?name=applications.argoproj.io", headers=h
-    )
+    r = api_client.get("/api/v1/clusters/1/resources/crds?name=applications.argoproj.io", headers=h)
     assert r.status_code == 403
     assert r.get_json()["error"]["code"] == "RBAC_DENIED"
     # namespace defaults to "default" on the ``?name=`` path (the shared
     # _GETTERS convention — see the secrets ``?name=`` tests); the CRD is
     # cluster-scoped so the value is cosmetic, but the SAR cache key carries it.
     assert asked == [
-        ("get", "customresourcedefinitions", "default", "applications.argoproj.io", "apiextensions.k8s.io")
+        (
+            "get",
+            "customresourcedefinitions",
+            "default",
+            "applications.argoproj.io",
+            "apiextensions.k8s.io",
+        )
     ]
 
 
@@ -2058,16 +2087,12 @@ def test_get_crd_by_name_sar_allow_returns_item(
     h = {"Authorization": f"Bearer {auth_client.jwt}"}
     _register(api_client, h)
     _allow_sar(monkeypatch)
-    r = api_client.get(
-        "/api/v1/clusters/1/resources/crds?name=applications.argoproj.io", headers=h
-    )
+    r = api_client.get("/api/v1/clusters/1/resources/crds?name=applications.argoproj.io", headers=h)
     assert r.status_code == 200
     assert len(r.get_json()["items"]) == 1
 
 
-def test_list_crd_instances_200_namespaced(
-    api_client, auth_client, fake_k8s, monkeypatch
-) -> None:
+def test_list_crd_instances_200_namespaced(api_client, auth_client, fake_k8s, monkeypatch) -> None:
     """The CRD detail page lists the CRD's instances: two SARs (list on the
     CRD + list on the instances) both pass, the namespace is applied because
     the fake CRD is Namespaced-scoped."""
@@ -2108,7 +2133,13 @@ def test_list_crd_instances_first_sar_denied(
     assert r.status_code == 403
     assert r.get_json()["error"]["code"] == "RBAC_DENIED"
     assert asked == [
-        ("list", "customresourcedefinitions", None, "applications.argoproj.io", "apiextensions.k8s.io")
+        (
+            "list",
+            "customresourcedefinitions",
+            None,
+            "applications.argoproj.io",
+            "apiextensions.k8s.io",
+        )
     ]
 
 
@@ -2140,7 +2171,13 @@ def test_list_crd_instances_second_sar_denied(
     assert r.status_code == 403
     assert r.get_json()["error"]["code"] == "RBAC_DENIED"
     assert asked == [
-        ("list", "customresourcedefinitions", None, "applications.argoproj.io", "apiextensions.k8s.io"),
+        (
+            "list",
+            "customresourcedefinitions",
+            None,
+            "applications.argoproj.io",
+            "apiextensions.k8s.io",
+        ),
         ("list", "applications", "team-a", None, "argoproj.io"),
     ]
 
@@ -2348,9 +2385,7 @@ def test_cilium_sar_gated(api_client, auth_client, fake_k8s, monkeypatch) -> Non
     assert ("list", "ciliumnetworkpolicies", "team-a", None, "cilium.io") in asked
 
 
-def test_cilium_absent_crds_empty_200(
-    api_client, auth_client, fake_k8s, monkeypatch
-) -> None:
+def test_cilium_absent_crds_empty_200(api_client, auth_client, fake_k8s, monkeypatch) -> None:
     """[cilium-crds-absent-empty] Cilium not installed = expected state, not
     an error: the FakeK8s Cilium methods return [] and the API responds 200
     with zero items for both Cilium kinds."""
@@ -2476,9 +2511,7 @@ def test_list_priorityclasses_ignores_namespace(
     h = {"Authorization": f"Bearer {auth_client.jwt}"}
     _register(api_client, h)
     _allow_sar(monkeypatch)
-    r = api_client.get(
-        "/api/v1/clusters/1/resources/priorityclasses?namespace=team-a", headers=h
-    )
+    r = api_client.get("/api/v1/clusters/1/resources/priorityclasses?namespace=team-a", headers=h)
     assert r.status_code == 200
     body = r.get_json()
     [item] = body["items"]
@@ -2569,9 +2602,7 @@ def test_list_runtimeclasses_ignores_namespace(
     h = {"Authorization": f"Bearer {auth_client.jwt}"}
     _register(api_client, h)
     _allow_sar(monkeypatch)
-    r = api_client.get(
-        "/api/v1/clusters/1/resources/runtimeclasses?namespace=team-a", headers=h
-    )
+    r = api_client.get("/api/v1/clusters/1/resources/runtimeclasses?namespace=team-a", headers=h)
     assert r.status_code == 200
     body = r.get_json()
     [item] = body["items"]
@@ -2579,9 +2610,7 @@ def test_list_runtimeclasses_ignores_namespace(
     assert "namespace" not in item["metadata"]
 
 
-def test_list_runtimeclasses_get_by_name(
-    api_client, auth_client, fake_k8s, monkeypatch
-) -> None:
+def test_list_runtimeclasses_get_by_name(api_client, auth_client, fake_k8s, monkeypatch) -> None:
     """[runtimeclasses-get-by-name] ?name= returns a 0/1-item list: a hit
     returns the one item, a miss returns [] (mirrors get_priority_class)."""
     auth_client.login()
@@ -2666,9 +2695,7 @@ def test_list_storageclasses_ignores_namespace(
     h = {"Authorization": f"Bearer {auth_client.jwt}"}
     _register(api_client, h)
     _allow_sar(monkeypatch)
-    r = api_client.get(
-        "/api/v1/clusters/1/resources/storageclasses?namespace=team-a", headers=h
-    )
+    r = api_client.get("/api/v1/clusters/1/resources/storageclasses?namespace=team-a", headers=h)
     assert r.status_code == 200
     body = r.get_json()
     [item] = body["items"]
@@ -2677,9 +2704,7 @@ def test_list_storageclasses_ignores_namespace(
     assert fake_k8s.storageclass_ns_calls == ["team-a"]  # query value forwarded, client ignores
 
 
-def test_list_storageclasses_get_by_name(
-    api_client, auth_client, fake_k8s, monkeypatch
-) -> None:
+def test_list_storageclasses_get_by_name(api_client, auth_client, fake_k8s, monkeypatch) -> None:
     """[storageclasses-get-by-name] ?name= returns a 0/1-item list: a hit
     returns the one item, a miss returns [] (mirrors get_priority_class)."""
     auth_client.login()
@@ -2764,17 +2789,13 @@ def test_list_persistentvolumes_claim_namespace_filter(
     h = {"Authorization": f"Bearer {auth_client.jwt}"}
     _register(api_client, h)
     _allow_sar(monkeypatch)
-    r = api_client.get(
-        "/api/v1/clusters/1/resources/persistentvolumes?namespace=team-a", headers=h
-    )
+    r = api_client.get("/api/v1/clusters/1/resources/persistentvolumes?namespace=team-a", headers=h)
     assert r.status_code == 200
     assert [item["metadata"]["name"] for item in r.get_json()["items"]] == ["pv-a", "pv-free"]
     assert fake_k8s.pv_ns_calls == ["team-a"]
 
 
-def test_list_persistentvolumes_get_by_name(
-    api_client, auth_client, fake_k8s, monkeypatch
-) -> None:
+def test_list_persistentvolumes_get_by_name(api_client, auth_client, fake_k8s, monkeypatch) -> None:
     """[persistentvolumes-get-by-name] ?name= returns a 0/1-item list
     (a single read — not 4.1's list-then-filter; the kind is
     cluster-scoped, so the ?name= namespace default is ignored)."""
@@ -2857,9 +2878,7 @@ def test_list_resourcequotas_200_in_namespace(
     h = {"Authorization": f"Bearer {auth_client.jwt}"}
     _register(api_client, h)
     _allow_sar(monkeypatch)
-    r = api_client.get(
-        "/api/v1/clusters/1/resources/resourcequotas?namespace=team-a", headers=h
-    )
+    r = api_client.get("/api/v1/clusters/1/resources/resourcequotas?namespace=team-a", headers=h)
     assert r.status_code == 200
     body = r.get_json()
     assert body["kind"] == "resourcequotas"
@@ -2888,9 +2907,7 @@ def test_list_resourcequotas_all_namespaces_without_param(
     assert [item["metadata"]["namespace"] for item in body["items"]] == ["team-b"]
 
 
-def test_list_resourcequotas_get_by_name(
-    api_client, auth_client, fake_k8s, monkeypatch
-) -> None:
+def test_list_resourcequotas_get_by_name(api_client, auth_client, fake_k8s, monkeypatch) -> None:
     """[resourcequotas-get-by-name] ?name= returns a 0/1-item list: a hit
     returns the one item in team-a, a miss returns [] (mirrors get_secret)."""
     auth_client.login()
@@ -2921,9 +2938,7 @@ def test_list_resourcequotas_sar_denied(api_client, auth_client, fake_k8s, monke
     h = {"Authorization": f"Bearer {auth_client.jwt}"}
     _register(api_client, h)
     asked = _record_sar(monkeypatch)  # denies every SAR and records calls
-    r = api_client.get(
-        "/api/v1/clusters/1/resources/resourcequotas?namespace=team-a", headers=h
-    )
+    r = api_client.get("/api/v1/clusters/1/resources/resourcequotas?namespace=team-a", headers=h)
     assert r.status_code == 403
     assert r.get_json()["error"]["code"] == "RBAC_DENIED"
     assert ("list", "resourcequotas", "team-a", None, "") in asked
@@ -2934,9 +2949,7 @@ def test_resourcequotas_binding_404(api_client, auth_client) -> None:
     before the SAR, CLUSTER_NOT_FOUND."""
     auth_client.login()
     h = {"Authorization": f"Bearer {auth_client.jwt}"}
-    r = api_client.get(
-        "/api/v1/clusters/999/resources/resourcequotas?namespace=team-a", headers=h
-    )
+    r = api_client.get("/api/v1/clusters/999/resources/resourcequotas?namespace=team-a", headers=h)
     assert r.status_code == 404
     assert r.get_json()["error"]["code"] == "CLUSTER_NOT_FOUND"
 
@@ -3019,7 +3032,9 @@ def test_list_poddisruptionbudgets_get_by_name(
     assert r.get_json()["items"] == []
 
 
-def test_list_poddisruptionbudgets_sar_denied(api_client, auth_client, fake_k8s, monkeypatch) -> None:
+def test_list_poddisruptionbudgets_sar_denied(
+    api_client, auth_client, fake_k8s, monkeypatch
+) -> None:
     """[poddisruptionbudgets-sar-denied] ADR-0004: the SAR is asked BEFORE
     the read, with the policy group and the query namespace — a deny
     short-circuits to 403 RBAC_DENIED."""
@@ -3132,7 +3147,9 @@ def test_list_verticalpodautoscalers_get_by_name(
     assert r.get_json()["items"] == []
 
 
-def test_list_verticalpodautoscalers_sar_denied(api_client, auth_client, fake_k8s, monkeypatch) -> None:
+def test_list_verticalpodautoscalers_sar_denied(
+    api_client, auth_client, fake_k8s, monkeypatch
+) -> None:
     """[verticalpodautoscalers-sar-denied] ADR-0004: the SAR is asked BEFORE
     the read, with the autoscaling.k8s.io group and the query namespace — a
     deny short-circuits to 403 RBAC_DENIED."""
@@ -3308,7 +3325,9 @@ def test_list_limitranges_200(api_client, auth_client, fake_k8s, monkeypatch) ->
     assert limit["defaultRequest"] == {"cpu": "250m", "memory": "512Mi"}
 
 
-def test_list_limitranges_respects_namespace(api_client, auth_client, fake_k8s, monkeypatch) -> None:
+def test_list_limitranges_respects_namespace(
+    api_client, auth_client, fake_k8s, monkeypatch
+) -> None:
     """[limitranges-list-respects-namespace] the kind is NAMESPACED: the
     query namespace reaches the client (the contrast to priorityclasses'
     ignores-namespace)."""
@@ -3397,9 +3416,7 @@ def test_limitrange_kind_singular_rejected(api_client, auth_client) -> None:
     assert r.get_json()["error"]["code"] == "RESOURCE_KIND_NOT_SUPPORTED"
 
 
-def test_list_configmaps_200_in_namespace(
-    api_client, auth_client, fake_k8s, monkeypatch
-) -> None:
+def test_list_configmaps_200_in_namespace(api_client, auth_client, fake_k8s, monkeypatch) -> None:
     """[configmaps-list-200] a bound user listing configmaps?namespace=team-a
     gets the to_dict items back, the namespace is forwarded, and ``data`` is
     present (NOT stripped, unlike secrets — the list view's Data Keys
@@ -3828,9 +3845,7 @@ def test_list_certificates_200(api_client, auth_client, fake_k8s, monkeypatch) -
     assert item["status"]["notAfter"] == "2026-07-02T03:04:05Z"
 
 
-def test_list_certificates_crd_absent_empty(
-    api_client, auth_client, fake_k8s, monkeypatch
-) -> None:
+def test_list_certificates_crd_absent_empty(api_client, auth_client, fake_k8s, monkeypatch) -> None:
     """[certmanager-crd-absent-empty] CRD absent -> 200 with zero items."""
     auth_client.login()
     h = {"Authorization": f"Bearer {auth_client.jwt}"}
@@ -3886,9 +3901,7 @@ def test_list_ipaddresspools_200(api_client, auth_client, fake_k8s, monkeypatch)
     h = {"Authorization": f"Bearer {auth_client.jwt}"}
     _register(api_client, h)
     _allow_sar(monkeypatch)
-    r = api_client.get(
-        "/api/v1/clusters/1/resources/ipaddresspools?namespace=team-a", headers=h
-    )
+    r = api_client.get("/api/v1/clusters/1/resources/ipaddresspools?namespace=team-a", headers=h)
     assert r.status_code == 200
     body = r.get_json()
     assert body["kind"] == "ipaddresspools"
@@ -3908,13 +3921,9 @@ def test_list_ipaddresspools_cilium_fallback(
     _register(api_client, h)
     _allow_sar(monkeypatch)
     fake_k8s.get_crd_served = lambda group, plural: (
-        ("v2", "Cluster")
-        if (group, plural) == ("cilium.io", "ciliumloadbalancerippools")
-        else None
+        ("v2", "Cluster") if (group, plural) == ("cilium.io", "ciliumloadbalancerippools") else None
     )
-    r = api_client.get(
-        "/api/v1/clusters/1/resources/ipaddresspools?namespace=team-a", headers=h
-    )
+    r = api_client.get("/api/v1/clusters/1/resources/ipaddresspools?namespace=team-a", headers=h)
     assert r.status_code == 200
     [item] = r.get_json()["items"]
     assert item["metadata"]["name"] == "cilium-pool"
@@ -3953,9 +3962,7 @@ def test_list_ipaddresspools_sar_denied(api_client, auth_client, fake_k8s, monke
     h = {"Authorization": f"Bearer {auth_client.jwt}"}
     _register(api_client, h)
     asked = _record_sar(monkeypatch)  # denies every SAR and records calls
-    r = api_client.get(
-        "/api/v1/clusters/1/resources/ipaddresspools?namespace=team-a", headers=h
-    )
+    r = api_client.get("/api/v1/clusters/1/resources/ipaddresspools?namespace=team-a", headers=h)
     assert r.status_code == 403
     assert r.get_json()["error"]["code"] == "RBAC_DENIED"
     assert ("list", "ipaddresspools", "team-a", None, "metallb.io") in asked
@@ -3968,9 +3975,7 @@ def test_list_l2advertisements_200(api_client, auth_client, fake_k8s, monkeypatc
     h = {"Authorization": f"Bearer {auth_client.jwt}"}
     _register(api_client, h)
     _allow_sar(monkeypatch)
-    r = api_client.get(
-        "/api/v1/clusters/1/resources/l2advertisements?namespace=team-a", headers=h
-    )
+    r = api_client.get("/api/v1/clusters/1/resources/l2advertisements?namespace=team-a", headers=h)
     assert r.status_code == 200
     body = r.get_json()
     assert body["kind"] == "l2advertisements"
@@ -3994,9 +3999,7 @@ def test_list_l2advertisements_cilium_fallback(
         if (group, plural) == ("cilium.io", "ciliuml2announcementpolicies")
         else None
     )
-    r = api_client.get(
-        "/api/v1/clusters/1/resources/l2advertisements?namespace=team-a", headers=h
-    )
+    r = api_client.get("/api/v1/clusters/1/resources/l2advertisements?namespace=team-a", headers=h)
     assert r.status_code == 200
     [item] = r.get_json()["items"]
     assert item["metadata"]["name"] == "cilium-l2"
@@ -4034,9 +4037,7 @@ def test_list_l2advertisements_sar_denied(api_client, auth_client, fake_k8s, mon
     h = {"Authorization": f"Bearer {auth_client.jwt}"}
     _register(api_client, h)
     asked = _record_sar(monkeypatch)  # denies every SAR and records calls
-    r = api_client.get(
-        "/api/v1/clusters/1/resources/l2advertisements?namespace=team-a", headers=h
-    )
+    r = api_client.get("/api/v1/clusters/1/resources/l2advertisements?namespace=team-a", headers=h)
     assert r.status_code == 403
     assert r.get_json()["error"]["code"] == "RBAC_DENIED"
     assert ("list", "l2advertisements", "team-a", None, "metallb.io") in asked
@@ -4067,9 +4068,7 @@ def test_list_bgppeers_cilium_fallback(api_client, auth_client, fake_k8s, monkey
     _register(api_client, h)
     _allow_sar(monkeypatch)
     fake_k8s.get_crd_served = lambda group, plural: (
-        ("v2", "Cluster")
-        if (group, plural) == ("cilium.io", "ciliumbgppeeringpolicies")
-        else None
+        ("v2", "Cluster") if (group, plural) == ("cilium.io", "ciliumbgppeeringpolicies") else None
     )
     r = api_client.get("/api/v1/clusters/1/resources/bgppeers?namespace=team-a", headers=h)
     assert r.status_code == 200
@@ -4121,9 +4120,7 @@ def test_list_bgpadvertisements_200(api_client, auth_client, fake_k8s, monkeypat
     h = {"Authorization": f"Bearer {auth_client.jwt}"}
     _register(api_client, h)
     _allow_sar(monkeypatch)
-    r = api_client.get(
-        "/api/v1/clusters/1/resources/bgpadvertisements?namespace=team-a", headers=h
-    )
+    r = api_client.get("/api/v1/clusters/1/resources/bgpadvertisements?namespace=team-a", headers=h)
     assert r.status_code == 200
     body = r.get_json()
     assert body["kind"] == "bgpadvertisements"
@@ -4143,17 +4140,13 @@ def test_list_bgpadvertisements_provider_absent_empty(
     _register(api_client, h)
     _allow_sar(monkeypatch)
     fake_k8s.get_crd_served = lambda group, plural: None
-    r = api_client.get(
-        "/api/v1/clusters/1/resources/bgpadvertisements?namespace=team-a", headers=h
-    )
+    r = api_client.get("/api/v1/clusters/1/resources/bgpadvertisements?namespace=team-a", headers=h)
     assert r.status_code == 200
     assert r.get_json()["items"] == []
     assert r.get_json()["kind"] == "bgpadvertisements"
 
 
-def test_list_bgpadvertisements_get_by_name(
-    api_client, auth_client, fake_k8s, monkeypatch
-) -> None:
+def test_list_bgpadvertisements_get_by_name(api_client, auth_client, fake_k8s, monkeypatch) -> None:
     """[exlb-get-by-name] ?name= on bgpadvertisements: a hit returns the
     one full object (provider tagged), a miss returns []."""
     auth_client.login()
@@ -4184,9 +4177,7 @@ def test_list_bgpadvertisements_sar_denied(api_client, auth_client, fake_k8s, mo
     h = {"Authorization": f"Bearer {auth_client.jwt}"}
     _register(api_client, h)
     asked = _record_sar(monkeypatch)  # denies every SAR and records calls
-    r = api_client.get(
-        "/api/v1/clusters/1/resources/bgpadvertisements?namespace=team-a", headers=h
-    )
+    r = api_client.get("/api/v1/clusters/1/resources/bgpadvertisements?namespace=team-a", headers=h)
     assert r.status_code == 403
     assert r.get_json()["error"]["code"] == "RBAC_DENIED"
     assert ("list", "bgpadvertisements", "team-a", None, "metallb.io") in asked
@@ -4253,9 +4244,7 @@ def test_list_volumesnapshotclasses_get_by_name(
     [item] = r.get_json()["items"]
     assert item["metadata"]["name"] == "csi-default"
     assert item["driver"] == "csi-driver.example.com"  # full object
-    r = api_client.get(
-        "/api/v1/clusters/1/resources/volumesnapshotclasses?name=ghost", headers=h
-    )
+    r = api_client.get("/api/v1/clusters/1/resources/volumesnapshotclasses?name=ghost", headers=h)
     assert r.status_code == 200
     assert r.get_json()["items"] == []
 
@@ -4309,9 +4298,7 @@ def test_list_volumesnapshots_200_in_namespace(
     h = {"Authorization": f"Bearer {auth_client.jwt}"}
     _register(api_client, h)
     _allow_sar(monkeypatch)
-    r = api_client.get(
-        "/api/v1/clusters/1/resources/volumesnapshots?namespace=team-a", headers=h
-    )
+    r = api_client.get("/api/v1/clusters/1/resources/volumesnapshots?namespace=team-a", headers=h)
     assert r.status_code == 200
     body = r.get_json()
     assert body["kind"] == "volumesnapshots"
@@ -4336,9 +4323,7 @@ def test_list_volumesnapshots_honors_namespace(
     h = {"Authorization": f"Bearer {auth_client.jwt}"}
     _register(api_client, h)
     _allow_sar(monkeypatch)
-    r = api_client.get(
-        "/api/v1/clusters/1/resources/volumesnapshots?namespace=team-a", headers=h
-    )
+    r = api_client.get("/api/v1/clusters/1/resources/volumesnapshots?namespace=team-a", headers=h)
     assert r.status_code == 200
     assert fake_k8s.vs_ns_calls == ["team-a"]
 
@@ -4361,9 +4346,7 @@ def test_list_volumesnapshots_all_namespaces_without_param(
     assert fake_k8s.vs_ns_calls == [None]
 
 
-def test_list_volumesnapshots_get_by_name(
-    api_client, auth_client, fake_k8s, monkeypatch
-) -> None:
+def test_list_volumesnapshots_get_by_name(api_client, auth_client, fake_k8s, monkeypatch) -> None:
     """[volumesnapshots-get-by-name] ?name= returns a 0/1-item list: a hit
     returns the one FULL object in team-a, a miss returns [] (mirrors
     get_secret)."""
@@ -4421,9 +4404,7 @@ def test_volumesnapshots_binding_404(api_client, auth_client) -> None:
     fails before the SAR, CLUSTER_NOT_FOUND."""
     auth_client.login()
     h = {"Authorization": f"Bearer {auth_client.jwt}"}
-    r = api_client.get(
-        "/api/v1/clusters/999/resources/volumesnapshots?namespace=team-a", headers=h
-    )
+    r = api_client.get("/api/v1/clusters/999/resources/volumesnapshots?namespace=team-a", headers=h)
     assert r.status_code == 404
     assert r.get_json()["error"]["code"] == "CLUSTER_NOT_FOUND"
 
@@ -4599,9 +4580,7 @@ def test_list_ingressclasses_ignores_namespace(
     h = {"Authorization": f"Bearer {auth_client.jwt}"}
     _register(api_client, h)
     _allow_sar(monkeypatch)
-    r = api_client.get(
-        "/api/v1/clusters/1/resources/ingressclasses?namespace=team-a", headers=h
-    )
+    r = api_client.get("/api/v1/clusters/1/resources/ingressclasses?namespace=team-a", headers=h)
     assert r.status_code == 200
     [item] = r.get_json()["items"]
     assert item["metadata"]["name"] == "nginx"
@@ -4689,9 +4668,7 @@ def test_list_gatewayclasses_ignores_namespace(
     h = {"Authorization": f"Bearer {auth_client.jwt}"}
     _register(api_client, h)
     _allow_sar(monkeypatch)
-    r = api_client.get(
-        "/api/v1/clusters/1/resources/gatewayclasses?namespace=team-a", headers=h
-    )
+    r = api_client.get("/api/v1/clusters/1/resources/gatewayclasses?namespace=team-a", headers=h)
     assert r.status_code == 200
     [item] = r.get_json()["items"]
     assert item["metadata"]["name"] == "eg"
@@ -4886,9 +4863,7 @@ def test_list_gateways_crd_absent_empty(api_client, auth_client, fake_k8s, monke
     _register(api_client, h)
     _allow_sar(monkeypatch)
     fake_k8s.get_crd_served = lambda group, plural: None
-    r = api_client.get(
-        "/api/v1/clusters/1/resources/gateways?namespace=team-a", headers=h
-    )
+    r = api_client.get("/api/v1/clusters/1/resources/gateways?namespace=team-a", headers=h)
     assert r.status_code == 200
     assert r.get_json()["items"] == []
     assert r.get_json()["kind"] == "gateways"
@@ -4934,9 +4909,7 @@ def test_list_httproutes_crd_absent_empty(api_client, auth_client, fake_k8s, mon
     _register(api_client, h)
     _allow_sar(monkeypatch)
     fake_k8s.get_crd_served = lambda group, plural: None
-    r = api_client.get(
-        "/api/v1/clusters/1/resources/httproutes?namespace=team-a", headers=h
-    )
+    r = api_client.get("/api/v1/clusters/1/resources/httproutes?namespace=team-a", headers=h)
     assert r.status_code == 200
     assert r.get_json()["items"] == []
     assert r.get_json()["kind"] == "httproutes"
@@ -5037,9 +5010,7 @@ def test_list_ipaddresspools_both_providers_absent_empty(
     _register(api_client, h)
     _allow_sar(monkeypatch)
     fake_k8s.get_crd_served = lambda group, plural: None
-    r = api_client.get(
-        "/api/v1/clusters/1/resources/ipaddresspools?namespace=team-a", headers=h
-    )
+    r = api_client.get("/api/v1/clusters/1/resources/ipaddresspools?namespace=team-a", headers=h)
     assert r.status_code == 200
     assert r.get_json()["items"] == []
     assert r.get_json()["kind"] == "ipaddresspools"
@@ -5198,9 +5169,7 @@ def test_rbac_denied_403_on_kind(api_client, kind_client, api_app) -> None:
         c = Cluster.query.filter_by(name="kind-test").first()
         if c is None:  # test ordering: the register happens in the pod test
             enc = encrypt_kubeconfig(kubeconfig)
-            u0 = db.session.execute(
-                db.select(User).filter_by(sub="sub-oidc-1")
-            ).scalar_one()
+            u0 = db.session.execute(db.select(User).filter_by(sub="sub-oidc-1")).scalar_one()
             c = Cluster(
                 name="kind-test",
                 api_server="https://127.0.0.1:6443",
@@ -5440,9 +5409,7 @@ def test_list_priorityclasses_on_kind(kind_admin_api_client, kind_kubeconfig) ->
     body = r.get_json()
     assert body["kind"] == "priorityclasses"
     [critical] = [
-        item
-        for item in body["items"]
-        if item["metadata"]["name"] == "system-cluster-critical"
+        item for item in body["items"] if item["metadata"]["name"] == "system-cluster-critical"
     ]
     assert critical["value"] == 2000000000
     assert critical["preemption_policy"] == "PreemptLowerPriority"

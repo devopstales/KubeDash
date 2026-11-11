@@ -9,6 +9,7 @@ Smorest 0.47 ships no ``HttpError`` symbol, so the base extends
 ``werkzeug.exceptions.HTTPException`` directly — that is the type Flask's
 error-handler dispatch keys on, and ``code``/``name`` are set per subclass.
 """
+
 from werkzeug.exceptions import HTTPException
 
 
@@ -41,6 +42,7 @@ class UnauthorizedError(KubeDashHttpError):
 class InvalidCredentialsError(UnauthorizedError):
     """Local password login (ADR-0021): wrong password OR unknown email —
     ONE code for both (no user enumeration), including SSO-sourced rows."""
+
     code = 401
     name = "Invalid Credentials"
     error_code = "INVALID_CREDENTIALS"
@@ -49,6 +51,7 @@ class InvalidCredentialsError(UnauthorizedError):
 class LocalAuthDisabledError(KubeDashHttpError):
     """Local password login attempted with no bootstrap admin configured
     (ADR-0021): both bootstrap env vars unset."""
+
     code = 403
     name = "Local Auth Disabled"
     error_code = "LOCAL_AUTH_DISABLED"
@@ -80,6 +83,12 @@ class ResourceKindNotSupportedError(KubeDashHttpError):
     code = 404
     name = "Resource Kind Not Supported"
     error_code = "RESOURCE_KIND_NOT_SUPPORTED"
+
+
+class InvalidResourceQueryError(KubeDashHttpError):
+    code = 400
+    name = "Invalid Resource Query"
+    error_code = "INVALID_RESOURCE_QUERY"
 
 
 class ClusterUnreachableError(KubeDashHttpError):
@@ -140,6 +149,7 @@ CODES: tuple[type[KubeDashHttpError], ...] = (
     RbacDeniedError,
     ClusterNotFoundError,
     ResourceKindNotSupportedError,
+    InvalidResourceQueryError,
     ClusterUnreachableError,
     ClusterAlreadyExistsError,
     InvalidKubeconfigError,

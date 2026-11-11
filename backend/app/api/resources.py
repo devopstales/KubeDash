@@ -11,6 +11,7 @@ on deny; the binding gate is Task 4's ``bound_cluster_or_404`` (404
 CLUSTER_NOT_FOUND, which does not distinguish missing cluster from missing
 binding).
 """
+
 import re
 from typing import cast
 
@@ -24,6 +25,7 @@ from app.core.errors import (
     ClusterNotFoundError,
     ClusterUnreachableError,
     InvalidKubeconfigError,
+    InvalidResourceQueryError,
     RbacDeniedError,
     ResourceKindNotSupportedError,
 )
@@ -40,9 +42,8 @@ from app.services import rbac
 from app.services.k8s_client import pool
 
 _NAMESPACE_NAME = re.compile(r"^[a-z0-9](?:[-a-z0-9]{0,61}[a-z0-9])?$")
-_PROTECTED_NAMESPACES = frozenset(
-    {"default", "kube-system", "kube-public", "kube-node-lease"}
-)
+_RESOURCE_NAME = re.compile(r"^(?!.*\.\.)[a-z0-9](?:[-a-z0-9.]*[a-z0-9])?$")
+_PROTECTED_NAMESPACES = frozenset({"default", "kube-system", "kube-public", "kube-node-lease"})
 
 # The generic apply's SAR-plural map (R8): the Gateway API kinds the
 # converter emits, pluralized for the ``create`` SAR. Anything else falls
@@ -81,11 +82,9 @@ _KINDS: dict[str, tuple[str, str, str]] = {
     # ingressclass-gatewayclass-views change (list + data views; ADR-0022
     # placement).
     "ingressclasses": ("list_ingress_classes", "ingressclasses", "networking.k8s.io"),
-
     # Ingress (networking.k8s.io, namespaced core) — the
     # ingress-gateway-api-views change (list + data views; ADR-0022 placement).
     "ingresses": ("list_ingresses", "ingresses", "networking.k8s.io"),
-
     "priorityclasses": ("list_priority_classes", "priorityclasses", "scheduling.k8s.io"),
     # RuntimeClass (node.k8s.io, cluster-scoped) — the 4.1-parity nav leaf
     # resolved by TASK-046 (list + data views; ADR-0022 placement).
@@ -112,26 +111,21 @@ _KINDS: dict[str, tuple[str, str, str]] = {
     # nav leaf resolved by TASK-049 (list + data views; ADR-0022 placement).
     # Full custom object (the Cilium CRD seam): the CRD's own served version is
     # the authority, CRD absent -> [] (first-class empty state).
-
     # GatewayClass (gateway.networking.k8s.io, cluster-scoped CRD) — the
     # ingressclass-gatewayclass-views change (list + data views; ADR-0022
     # placement). Full custom object (the VPA/CRD seam): the CRD's own served
     # version + scope is the authority, CRD absent -> [] (first-class empty
     # state).
     "gatewayclasses": ("list_gateway_classes", "gatewayclasses", "gateway.networking.k8s.io"),
-
     # Gateways (gateway.networking.k8s.io, namespaced CRD) — the
     # ingress-gateway-api-views change (list + data views; ADR-0022 placement).
     "gateways": ("list_gateways", "gateways", "gateway.networking.k8s.io"),
-
     # HTTPRoutes (gateway.networking.k8s.io, namespaced CRD) — the
     # ingress-gateway-api-views change (list + data views; ADR-0022 placement).
     "httproutes": ("list_http_routes", "httproutes", "gateway.networking.k8s.io"),
-
     # ReferenceGrants (gateway.networking.k8s.io, cluster-scoped CRD) — the
     # ingress-gateway-api-views change (list + data views; ADR-0022 placement).
     "referencegrants": ("list_reference_grants", "referencegrants", "gateway.networking.k8s.io"),
-
     "verticalpodautoscalers": (
         "list_vertical_pod_autoscalers",
         "verticalpodautoscalers",
@@ -223,7 +217,6 @@ _GETTERS: dict[str, str] = {
     "httproutes": "get_http_route",
     "referencegrants": "get_reference_grant",
     "ingresses": "get_ingress",
-
     "priorityclasses": "get_priority_class",
     "runtimeclasses": "get_runtime_class",
     "storageclasses": "get_storage_class",
@@ -278,12 +271,22 @@ class ResourceApi(Api):
         method, api_resource, api_group = _KINDS[kind]
         namespace = request.args.get("namespace")
         name = request.args.get("name")
+        if namespace is not None and not _NAMESPACE_NAME.fullmatch(namespace):
+            raise InvalidResourceQueryError(f"invalid namespace '{namespace}'")
+        if name and not _RESOURCE_NAME.fullmatch(name):
+            raise InvalidResourceQueryError(f"invalid resource name '{name}'")
         if name:
             if kind not in _GETTERS:
                 raise ResourceKindNotSupportedError(f"name lookup on kind '{kind}' not supported")
             namespace = namespace or "default"
             allowed = rbac.can(
-                g.current_user, cluster, "get", api_resource, namespace, name, api_group,
+                g.current_user,
+                cluster,
+                "get",
+                api_resource,
+                namespace,
+                name,
+                api_group,
                 engine=db.engine,
             )
             if not allowed:
@@ -291,7 +294,13 @@ class ResourceApi(Api):
             items = getattr(pool.get(cluster), _GETTERS[kind])(namespace, name)
             return {"items": items, "kind": kind, "cluster": cluster.name}
         if not rbac.can(
-            g.current_user, cluster, "list", api_resource, namespace, None, api_group,
+            g.current_user,
+            cluster,
+            "list",
+            api_resource,
+            namespace,
+            None,
+            api_group,
             engine=db.engine,
         ):
             raise RbacDeniedError(f"list on {api_resource}")
@@ -299,9 +308,7 @@ class ResourceApi(Api):
         # list_pods only: the other kinds' list_* methods take a single
         # namespace arg and are unchanged.
         if kind == "pods":
-            items = getattr(pool.get(cluster), method)(
-                namespace, request.args.get("labelSelector")
-            )
+            items = getattr(pool.get(cluster), method)(namespace, request.args.get("labelSelector"))
         else:
             items = getattr(pool.get(cluster), method)(namespace)
         return {"items": items, "kind": kind, "cluster": cluster.name}
@@ -385,7 +392,13 @@ class ResourceApi(Api):
         cluster = _cluster_for(g.current_user, cluster_id)
         client = pool.get(cluster)
         if not rbac.can(
-            g.current_user, cluster, "list", "customresourcedefinitions", None, name, _CRD_GROUP,
+            g.current_user,
+            cluster,
+            "list",
+            "customresourcedefinitions",
+            None,
+            name,
+            _CRD_GROUP,
             engine=db.engine,
         ):
             raise RbacDeniedError("list on customresourcedefinitions")
@@ -408,7 +421,13 @@ class ResourceApi(Api):
         scope_namespaced = spec.get("scope") == "Namespaced"
         namespace = request.args.get("namespace") if scope_namespaced else None
         if not rbac.can(
-            g.current_user, cluster, "list", plural, namespace, None, group,
+            g.current_user,
+            cluster,
+            "list",
+            plural,
+            namespace,
+            None,
+            group,
             engine=db.engine,
         ):
             raise RbacDeniedError(f"list on {plural}")
