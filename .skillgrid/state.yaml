@@ -299,8 +299,12 @@ completed_changes:
   - 2026-11-03-agents-md-rewrite
   # Shipped 2026-11-10 (ship: keep branch `rebase` as-is — the branch is the
   # deliverable and rollback unit, ADR-0027/0029; QA CONCERNS overridden by
-  # the human, review Grade C — independent pass still owed). Folder in
-  # .skillgrid/xarchive/:
+  # the human, review Grade C — independent pass still owed). Reflect
+  # 2026-11-10: report.md retro half completed in the archive (Final-State
+  # Facts / Acceptance Verdict / Decisions / Lessons / Patterns / Surprises /
+  # Archive Summary + Environment Retro); the fence-atomicity finding lifted
+  # to knowledge/gotchas/leader-fence-must-increment-in-upsert.md. Cycle
+  # complete for this change. Folder in .skillgrid/xarchive/:
   - 2026-10-27-postgres-queue-revocation-active-active
 
 # Onboarding state (2026-10-17): config.yaml + ASSUMPTIONS.md + state.yaml

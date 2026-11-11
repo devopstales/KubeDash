@@ -279,13 +279,124 @@ smoke test or an explicit "manual gate" annotation on the scenarios).
 
 ### Human override
 
-_(none)_
+**Recorded 2026-11-10.** The gate returned CONCERNS (no CRITICAL). The change
+owner instructed "ship" after reading the verdict, which is the explicit
+override CONCERNS requires — so integration proceeded and the WARNINGs travel
+with this archive instead of blocking. The two manual-only acceptance
+scenarios (W028) are the accepted risk: live-verified once, never
+regression-guarded.
+
+---
+
+## Final-State Facts
+
+- **Shipped 2026-11-10** on branch `rebase`, kept as the deliverable and the
+  rollback unit (no merge to `main`; that is a separate explicit act).
+- **Commits** (oldest first): `4d793038` docs(qa) · `7db8346b` style(backend)
+  · `73fcfed5` test(auth) · `30311403` docs(review) · `da790985`
+  fix(leader) · `9738fd7a` docs(ship, archive) · `981524a8` docs(retro).
+- **Integration evidence** (integrated tree, after all review fixes):
+  `uv run pytest -m "not integration"` → **848 passed, 10 deselected**,
+  186 s, exit 0. Change-scoped: 51 (QA), 41 then 29 (post-fix). `ruff` clean
+  on every changed file; `mypy app` unchanged at the 79-error branch
+  baseline (W013). No frontend or chart file changed, so `fe-build` /
+  `fe-check` / `helm lint` were not re-run.
+- **Archive move**: 7 files, `git mv`, `diff -r` against a pre-move snapshot
+  empty; committed as pure renames (`9738fd7a`).
+- **Debt carried**: W028 (manual-only scenarios), W029 (blueprint
+  `test_pgqueue_crash.py` never created), W030 (no TDD ledger), W031
+  (dev-only pgEdge credential in `dev/pgedge/db.json`), W032–W034
+  (suggestions), W035 (no `tasks` retention — ADR-gated), W036 (missing
+  indexes for claim/reap + `revoked_jtis.expires_at`).
+- **Still owed**: an independent (Grade A) review — the recorded review is
+  Grade C, diagnostic only.
+
+## Acceptance Verdict
+
+**CONCERNS + human override** — the shippable verdict from § 16, accepted by
+the change owner. Every hard gate passes baseline-relative; 14 of 16
+acceptance scenarios are automated, 2 rest on a single live observation
+(W028). Not a PASS, and the difference is exactly those two scenarios.
+
+## Decisions
+
+- **Postgres is the broker** — `tasks` + `SELECT … FOR UPDATE SKIP LOCKED`,
+  claiming on any replica, with only enqueue/scheduling leader-gated
+  (ADR-0029). **Session revocation** moved to the Postgres `revoked_jtis`
+  deny-list + `kv` store (ADR-0030), which removed Redis's last two consumers
+  and let it leave the stack entirely. **Two-node pgEdge/Spock** with a
+  strict fencing token on `leader_lease` (ADR-0031).
+- **Fix-in-gate over park-in-gate** for the three review findings (fence
+  atomicity, duplicated Bearer/cookie precedence, false docstring). Retention
+  (W035) and index gaps (W036) were parked instead, because the task runner
+  is an ADR-gated domain: no retention policy may be invented in code.
+- **The fence increments inside the upsert** (`fence = leader_lease.fence + 1`
+  → `RETURNING fence`), never as a read-then-bind.
+- **Keep the work branch** — ship did not merge `main` (repo standing rule).
+
+## Lessons
+
+- **A green sequential suite cannot see an interleaving bug.** The
+  read-then-bind fence passed the whole unit floor; only a reader asking "what
+  if two peers commit between these lines" found it. For anything that grants
+  authority across replicas, the test that matters exercises the interleaving.
+- **A docstring is a claim and needs the same scrutiny as code.** "The reaper
+  bounds the table" was false (the reaper resets stale rows; nothing deletes
+  `done` rows) and it hid W035 from review for a whole change.
+- **Lint and type debt hides in the last mile.** QA's first pass surfaced
+  E501/I001 plus a `_heartbeat` annotation — cheap, but only if `ruff` runs on
+  the changed files before the suite, not after.
+- **Only enqueue needs the leader.** Claims must stay replica-agnostic or the
+  queue serializes behind one pod; over-gating is as wrong as under-gating.
+- **Archive root is configuration, not memory** — `.skillgrid/config.yaml`
+  says `xarchive`, while the skills default to `change-archive/`.
+
+## Patterns
+
+- **Leader-gated enqueue + any-replica claim**: claim ordered by readiness,
+  reaper with a stale threshold (120 s), `MAX_ATTEMPTS = 3` with exponential
+  backoff, then dead-letter — a shape reusable for any future queue work.
+- **One credential seam**: a single `_request_token()` that resolves
+  Bearer-before-cookie, with the auth check binding `g.current_jti` once, so
+  the accept path and the revocation path cannot disagree about which token
+  is live.
+- **Deny-list with expiry-driven reaping**: key by `jti`, store an expiry equal
+  to the token's own lifetime, let a leader reaper drop expired rows — no
+  unbounded growth by construction (contrast W035, where no such rule exists).
+- **Single-statement authority tokens** (see the gotcha page below).
+
+## Surprises
+
+- `tasks` rows are **never deleted** — the queue grows without bound and no
+  ADR defines retention (W035). The obvious assumption ("the reaper cleans
+  up") is wrong twice over.
+- A partial index on `status = 'pending'` **is** legal in Postgres, because
+  text equality is immutable — while the `now()` predicate the blueprint
+  correctly rejected is not. Two adjacent rules, easy to conflate.
+- The queue's own unit tests need **Docker** (Testcontainers Postgres), so
+  the "unit floor" is not a pure-Python floor.
+- Deleting Redis removed a health signal the status surface had been reading:
+  every `redis` reference had to be traced through compose, config, and docs,
+  not just the two code consumers.
+
+## Archive Summary
+
+`.skillgrid/xarchive/2026-10-27-postgres-queue-revocation-active-active/` —
+`briefing.md`, `blueprint.md`, `tasks.md`, `acceptance.feature`,
+`findings.md`, this `report.md` (QA half + retro half + environment retro),
+`review.md` (three axes, Grade C). The change replaced the Redis/RQ task
+broker and the Redis revocation set with Postgres (ADR-0029/0030) on a
+two-node pgEdge stack (ADR-0031), and shipped with 848 unit tests green on
+`rebase`. Durable findings lifted to the vault: one gotcha page, the fence
+atomicity rule. Next for this area: an independent review, then W035's
+ADR-0029 amendment (retention) with W036's indexes in the same migration.
 
 ---
 
 ## Environment Retro
 
-Standalone run (2026-11-10) after ship, `skillgrid:environment-retro`. Harness findings only —
+Run after ship on 2026-11-10 with `skillgrid:environment-retro`; adopted as
+reflect's environment half. Harness findings only —
 nothing here changes shipped code. Existing guardrails read first: `config.yaml`
 (`testing.runner`, no coverage/quality/security sections), `scripts/*.py` collectors,
 `.github/workflows/ci.yaml`, `.git/hooks/{pre-commit,commit-msg}`.
