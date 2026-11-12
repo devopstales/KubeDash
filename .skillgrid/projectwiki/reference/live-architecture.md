@@ -1,20 +1,20 @@
 ---
 type: Reference
 title: "Live architecture document (ARCHITECTURE.md)"
-description: "Pointer to \.skillgrid/projectwiki/ARCHITECTURE.md — the live description of KubeDash's program structure (system overview, backend/frontend/multi-cluster/observability/deployment/security/testing/conventions). It is not a blueprint, spec, or decision record."
+description: "Pointer to .skillgrid/projectwiki/ARCHITECTURE.md — the live description of KubeDash's program structure (system overview, backend/frontend/multi-cluster/observability/deployment/security/testing/conventions). It is not a blueprint, spec, or decision record."
 tags: [architecture, reference, pointer]
 status: stable
 generated: { by: skillgrid/knowledge-init, at: 2026-11-06T00:00:00Z }
 verification:
   engine: ripgrep
   anchors:
-    - path: \.skillgrid/projectwiki/ARCHITECTURE.md
+    - path: .skillgrid/projectwiki/ARCHITECTURE.md
       all_of: ['## 12. ADR Index (pointer)', '## 13. Glossary pointer']
 ---
 
 # Live architecture document
 
-`\.skillgrid/projectwiki/ARCHITECTURE.md` is the **live** description of the program
+`.skillgrid/projectwiki/ARCHITECTURE.md` is the **live** description of the program
 structure: updated as the codebase changes. It is *not* a blueprint,
 *not* a spec, and *not* a decision record.
 
@@ -25,7 +25,7 @@ structure: updated as the codebase changes. It is *not* a blueprint,
 | How is the program structured today? | `ARCHITECTURE.md` (this pointer) |
 | Why was a load-bearing choice made? | `decisions/04-adr-NNNN-*.md` |
 | What do terms mean? | `glossary/01-business-terms.md`, `02-technical-terms.md` |
-| Which ADRs are in force? | `\.skillgrid/projectwiki/ASSUMPTIONS.md` § LOCKED |
+| Which ADRs are in force? | `.skillgrid/projectwiki/ASSUMPTIONS.md` § LOCKED |
 | What must always hold in the code? | `invariants/` (this bundle) |
 | How do cross-package flows work? | `workflows/` (this bundle) |
 

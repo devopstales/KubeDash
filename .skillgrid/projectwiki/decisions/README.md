@@ -49,7 +49,7 @@ in place; a new decision supersedes via its `supersedes` frontmatter).
 
 Next number: **0042** (4-digit monotonic, never reused; gap 0032–0039 unused).
 Style: `madr-full` (`.skillgrid/config.yaml` `adr_style`). Every ADR also gets a
-`.backlog/decisions/decision-NNN` copy (NNN = ADR number, zero-padded to 3).
+`.skillgrid/projectwiki/backlog/decisions/decision-NNN` copy (NNN = ADR number, zero-padded to 3).
 
 ## Related
 

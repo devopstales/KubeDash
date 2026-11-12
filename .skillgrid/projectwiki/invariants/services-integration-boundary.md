@@ -49,7 +49,7 @@ stack, and the "services are pure" seam (where ADR-0010's informer cache
 will interpose) stops being true.
 
 **Pinned by.** The seam docstring in `backend/app/services/__init__.py`;
-the rule's origin is `\.skillgrid/change-specs/2026-10-21-cluster-node/blueprint.md`
+the rule's origin is `.skillgrid/change-specs/2026-10-21-cluster-node/blueprint.md`
 ("Never import Flask in `app/services/`").
 
 **Related.** ADR-0001 (layering), ADR-0021 (admin-source branch),

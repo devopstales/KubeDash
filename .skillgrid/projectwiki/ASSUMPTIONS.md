@@ -5,7 +5,7 @@
 > architectural decisions apply. The index stores a short description + the
 > path to each ADR file; `status` / `date` / `supersedes` live in the file's
 > frontmatter, **not** here. One decision per ADR file at
-> `\.skillgrid/projectwiki/decisions/04-adr-NNNN-slug.md`.
+> `.skillgrid/projectwiki/decisions/04-adr-NNNN-slug.md`.
 
 **Highest sequence in use:** 0041
 
@@ -34,7 +34,7 @@ Assumptions confirmed against the code or a primary source.
   `flask_smorest/spec/__init__.py:100-110`). The `BearerAuth` JWT security scheme
   is declared on the spec; page-level auth wiring is deferred. Air-gap (ADR-0020).
   Confirmed by `backend/tests/api/test_apidocs.py` (9 tests) + QA report
-  (`\.skillgrid/change-specs/2026-10-17-swagger-ui-air-gap/report.md`).
+  (`.skillgrid/change-specs/2026-10-17-swagger-ui-air-gap/report.md`).
 
 - **The `.skillgrid/` tree was wiped from the working tree on 2026-11-12 and
   restored from backup the same day.** A pre-wipe copy at
@@ -123,7 +123,7 @@ are kept, with `In force: no`. Never delete a row; flip it instead (IRON RULE).
 - `adr_style`: `madr-full` (validated). Existing ADR-0014..0020 were written
   madr-minimal; **new** ADRs (and any backfill of 0001..0013) use madr-full.
 - `ticketing.type`: `backlogmd` (validated) — ADR-0014..0020 need
-  `.backlog/decisions/decision-014..020` copies (open task).
+  `.skillgrid/projectwiki/backlog/decisions/decision-014..020` copies (open task).
 - `mnemonic.enabled`: true (validated) — code index was empty at onboarding;
   verified built + fresh 2026-11-03 (`code_status`: 4239 chunks / 604 files,
   FTS5 + graph + 768-dim embedder, `stale: false`).

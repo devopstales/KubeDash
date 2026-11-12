@@ -7,9 +7,9 @@
 
 This file is the **live** description of KubeDash's program structure. It is updated
 as the codebase changes. It is *not* a blueprint, *not* a spec, and *not* a decision
-record. Load-bearing decisions live in `\.skillgrid/projectwiki/decisions/04-adr-*.md`; the
-glossary lives in `\.skillgrid/projectwiki/glossary/01-business-terms.md` and
-`02-technical-terms.md`; the ADR index lives in `\.skillgrid/projectwiki/ASSUMPTIONS.md`.
+record. Load-bearing decisions live in `.skillgrid/projectwiki/decisions/04-adr-*.md`; the
+glossary lives in `.skillgrid/projectwiki/glossary/01-business-terms.md` and
+`02-technical-terms.md`; the ADR index lives in `.skillgrid/projectwiki/ASSUMPTIONS.md`.
 
 ---
 
@@ -2181,7 +2181,7 @@ authenticate to Kubernetes clusters via the KubeDash OIDC SSO — without
 putting any SSO config in their kubeconfig. This is the CLI counterpart
 to the web UI's login flow.
 
-**Blueprint:** `\.skillgrid/change-specs/2026-10-17-kubectl-oidc-plugin/blueprint.md`
+**Blueprint:** `.skillgrid/change-specs/2026-10-17-kubectl-oidc-plugin/blueprint.md`
 
 #### The security problem it solves
 
@@ -2851,8 +2851,8 @@ These are **not** decisions yet. They will become ADRs when they are.
 
 ## 12. ADR Index (pointer)
 
-See `\.skillgrid/projectwiki/ASSUMPTIONS.md` § `## LOCKED` for the in-force ADR index.
-Each ADR is a file at `\.skillgrid/projectwiki/decisions/04-adr-NNNN-slug.md`.
+See `.skillgrid/projectwiki/ASSUMPTIONS.md` § `## LOCKED` for the in-force ADR index.
+Each ADR is a file at `.skillgrid/projectwiki/decisions/04-adr-NNNN-slug.md`.
 
 Initial ADRs expected for this change (to be authored at brainstorming time):
 
@@ -2927,8 +2927,8 @@ Initial ADRs expected for this change (to be authored at brainstorming time):
 
 ## 13. Glossary pointer
 
-- **Business terms** — `\.skillgrid/projectwiki/glossary/01-business-terms.md`
-- **Technical terms** — `\.skillgrid/projectwiki/glossary/02-technical-terms.md`
+- **Business terms** — `.skillgrid/projectwiki/glossary/01-business-terms.md`
+- **Technical terms** — `.skillgrid/projectwiki/glossary/02-technical-terms.md`
 
 Canonical terms used in this file (details in the terms files):
 

@@ -34,7 +34,7 @@ enqueue/scheduling is leader-gated (PG advisory lock + `leader_lease` table)
 | `charts/kubedash/` | Helm chart (N replicas, leader election) — the deployment artifact |
 | `dev/` | docker-compose dev stack, kind config, certs/TLS, demo-data scripts |
 | `.skillgrid/` | Skillgrid: project wiki (knowledge, ADRs), specs, state |
-| `.backlog/` | Backlog.md tracker (tasks, decisions, milestones) |
+| `.skillgrid/projectwiki/backlog/` | Backlog.md tracker (tasks, decisions, milestones) |
 
 ## Engineering Standards
 
@@ -56,7 +56,7 @@ enqueue/scheduling is leader-gated (PG advisory lock + `leader_lease` table)
 ## Dependency Policies
 
 - **ADR-gated domains:** stack, deployment shape, auth, push transport, task runner, caching, config source. Check `.skillgrid/projectwiki/ASSUMPTIONS.md` § LOCKED before changing any of them.
-- **New third-party dependency:** record a new ADR (madr-full) before it lands; every ADR also gets a `.backlog/decisions/decision-NNN` copy (NNN = ADR number, zero-padded to 3).
+- **New third-party dependency:** record a new ADR (madr-full) before it lands; every ADR also gets a `.skillgrid/projectwiki/backlog/decisions/decision-NNN` copy (NNN = ADR number, zero-padded to 3).
 
 ## Architecture Constraints
 
@@ -72,7 +72,7 @@ enqueue/scheduling is leader-gated (PG advisory lock + `leader_lease` table)
 
 ## Issue Tracker
 
-Backlog.md — `.backlog/` via the `backlog` CLI (tasks, decisions, milestones); edit tracker state with the CLI, not by hand.
+Backlog.md — `.skillgrid/projectwiki/backlog/` via the `backlog` CLI (tasks, decisions, milestones); edit tracker state with the CLI, not by hand.
 
 ## Memory
 
@@ -122,7 +122,7 @@ State: `.skillgrid/meta/state.yaml` (dynamic) — where the project is right now
 *Operational rules only — the real source of truth is this section (edit here). Design decisions do not live here; they are ADRs in `.skillgrid/projectwiki/ASSUMPTIONS.md` § `LOCKED` → `.skillgrid/projectwiki/decisions/04-adr-NNNN-slug.md`.*
 
 - **Ship keeps the work branch** — the `ship` phase does NOT merge into `main`. The work branch (`rebase`) is the deliverable and the rollback unit; merging into `main` is a separate, explicit act (VERIFIED assumption, 2026-10-18).
-- **ADR gate** — check `.skillgrid/projectwiki/ASSUMPTIONS.md` § LOCKED before touching an ADR-gated domain (Dependency Policies). New ADRs: madr-full, 4-digit monotonic, never reused (next: 0042); each also gets a `.backlog/decisions/decision-NNN` copy.
+- **ADR gate** — check `.skillgrid/projectwiki/ASSUMPTIONS.md` § LOCKED before touching an ADR-gated domain (Dependency Policies). New ADRs: madr-full, 4-digit monotonic, never reused (next: 0042); each also gets a `.skillgrid/projectwiki/backlog/decisions/decision-NNN` copy.
 - **Conventional commits** only; work units atomic and independently revertable.
 - **Tracker is pipeline-driven** — SDD tickets are created by the `ticketing` skill and phase-lifecycle tracker updates follow `~/.agents/skills/_shared/rules/ticketing/backlogmd.md`. The Backlog nudge's conversation-start `backlog instructions overview` read applies to conversations doing tracker work (create/execute/finalize/lookup); for pipeline work the entry is `.skillgrid/meta/state.yaml` + the in-flight spec, not the tracker. The versioned guides (`task-creation` / `task-execution` / `task-finalization`) stay mandatory before their lifecycle actions.
 - **Spec zone commits before code zone** — spec artifacts land before the change that implements them.

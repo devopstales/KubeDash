@@ -1,0 +1,9 @@
+{
+  "id": "backlogmd",
+  "name": "Backlog.md Board",
+  "version": "0.1.0",
+  "minAppVersion": "1.13.0",
+  "description": "Render and edit backlog.md task files as a kanban board and backlog list.",
+  "author": "skillgrid",
+  "isDesktopOnly": true
+}

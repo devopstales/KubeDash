@@ -1,20 +1,20 @@
 ---
 type: Reference
 title: "Feature roadmap and open/deferred items (ARCHITECTURE.md §7A / §11)"
-description: "Pointer to the feature roadmap (v1.0 differentiators, v1.1-v1.2, v1.3+ informed by Radar) and the Open/Deferred list (GitOps, cost tracking, plugin system, Kerberos, no-IdP multi-user mode, Celery migration) in \.skillgrid/projectwiki/ARCHITECTURE.md. As of 2026-11-06 the MCP server, AI investigations, change timeline, and workload-map research findings are captured in \.skillgrid/change-specs/2026-11-06-*; the roadmap items themselves are unchanged."
+description: "Pointer to the feature roadmap (v1.0 differentiators, v1.1-v1.2, v1.3+ informed by Radar) and the Open/Deferred list (GitOps, cost tracking, plugin system, Kerberos, no-IdP multi-user mode, Celery migration) in .skillgrid/projectwiki/ARCHITECTURE.md. As of 2026-11-06 the MCP server, AI investigations, change timeline, and workload-map research findings are captured in .skillgrid/change-specs/2026-11-06-*; the roadmap items themselves are unchanged."
 tags: [roadmap, reference, pointer]
 status: stable
 generated: { by: skillgrid/knowledge-init, at: 2026-11-06T00:00:00Z }
 verification:
   engine: ripgrep
   anchors:
-    - path: \.skillgrid/projectwiki/ARCHITECTURE.md
+    - path: .skillgrid/projectwiki/ARCHITECTURE.md
       all_of: ['## 7A. Feature Roadmap (informed by Radar)', '## 11. Open / Deferred']
 ---
 
 # Feature roadmap + open/deferred
 
-Two pointer sections of `\.skillgrid/projectwiki/ARCHITECTURE.md`:
+Two pointer sections of `.skillgrid/projectwiki/ARCHITECTURE.md`:
 
 - **§7A — Feature Roadmap (informed by Radar).** High priority
   (v1.0 differentiators), medium (v1.1–v1.2), lower (v1.3+), plus the
@@ -35,10 +35,10 @@ items have completed single-pass research findings in the spec zone
 (state: `research` — findings only, no briefings yet; they are inputs
 to future ADRs, the next number being 0041):
 
-- **MCP server** (roadmap item 5) — `\.skillgrid/change-specs/2026-11-06-mcp-server/findings.md`.
-- **AI investigations** (consumes the MCP surface) — `\.skillgrid/change-specs/2026-11-06-ai-investigations/findings.md`.
-- **Change timeline** (roadmap item 2) — `\.skillgrid/change-specs/2026-11-06-change-timeline/findings.md`.
-- **Workload map** (roadmap item 1, the topology view) — `\.skillgrid/change-specs/2026-11-06-workload-map/` (findings + a **draft** briefing; the 4.1 map is ownership-edges only; the 5.0 spec adds connections + a network-policy overlay).
+- **MCP server** (roadmap item 5) — `.skillgrid/change-specs/2026-11-06-mcp-server/findings.md`.
+- **AI investigations** (consumes the MCP surface) — `.skillgrid/change-specs/2026-11-06-ai-investigations/findings.md`.
+- **Change timeline** (roadmap item 2) — `.skillgrid/change-specs/2026-11-06-change-timeline/findings.md`.
+- **Workload map** (roadmap item 1, the topology view) — `.skillgrid/change-specs/2026-11-06-workload-map/` (findings + a **draft** briefing; the 4.1 map is ownership-edges only; the 5.0 spec adds connections + a network-policy overlay).
 
 These are evidence and scope, not commitments — the roadmap rule below
 still applies.

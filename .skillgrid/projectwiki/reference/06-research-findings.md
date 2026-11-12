@@ -32,7 +32,7 @@ the 2026-11-07 dead-code sweep (187 findings, 60 files deleted):
    files alive that look unused to any import analysis.
    **Rule:** before deleting any backend file, check the three string-wiring
    sites (spawn string, scheduler, test_file_map.py) — the 2026-11-07 sweep
-   recorded per-file verdicts in `.backlog` note `5654e914`.
+   recorded per-file verdicts in `.skillgrid/projectwiki/backlog` note `5654e914`.
 
 Related tooling note: `tsc --noEmit` does not type-check `.jsx` files
 (checkJs off), so a deleted import in a .jsx is invisible to the build until

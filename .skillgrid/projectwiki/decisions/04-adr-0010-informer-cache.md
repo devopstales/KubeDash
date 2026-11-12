@@ -69,7 +69,7 @@ maintained by long-lived watches?
 #### Implementation status (recorded at backfill)
 
 The base-structure change (2026-10-17,
-`\.skillgrid/change-specs/2026-10-17-kubedash-base-structure/briefing.md`)
+`.skillgrid/change-specs/2026-10-17-kubedash-base-structure/briefing.md`)
 **deferred** the informer cache: the spine uses direct per-request API
 calls, and the seam is left in `k8s_client.py` ("for now this is a live
 read"). As of the 2026-11-06 backfill no `watch` import exists in

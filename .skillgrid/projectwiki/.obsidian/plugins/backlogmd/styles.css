@@ -1,0 +1,5 @@
+.backlogmd-board { display: flex; gap: 12px; overflow-x: auto; }
+.backlogmd-column { min-width: 240px; background: var(--background-secondary); border-radius: 8px; padding: 8px; }
+.backlogmd-card { background: var(--background-primary); border: 1px solid var(--background-modifier-border); border-radius: 6px; padding: 8px; margin-bottom: 8px; cursor: grab; }
+.backlogmd-card.blocked { border-left: 3px solid var(--text-error); }
+.backlogmd-empty { color: var(--text-muted); font-style: italic; }

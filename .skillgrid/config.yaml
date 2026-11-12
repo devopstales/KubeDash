@@ -12,7 +12,7 @@ ticketing:
   enabled: true
   type: backlogmd
   backlogmd:
-    dir: .backlog
+    dir: .skillgrid/projectwiki/backlog
     task_prefix: "task"
     zero_padded_ids: 3
   gh:
@@ -71,7 +71,7 @@ agents:
     - { path: "charts/kubedash/", purpose: "Helm chart (N replicas, leader election) — the deployment artifact" }
     - { path: "dev/", purpose: "docker-compose dev stack, kind config, certs/TLS, demo-data scripts" }
     - { path: ".skillgrid/", purpose: "Skillgrid: project wiki (knowledge, ADRs), specs, state" }
-    - { path: ".backlog/", purpose: "Backlog.md tracker (tasks, decisions, milestones)" }
+    - { path: ".skillgrid/projectwiki/backlog/", purpose: "Backlog.md tracker (tasks, decisions, milestones)" }
   security_boundaries:
     - "Air-gap (ADR-0020): zero outbound calls at runtime; no CDN/external references in the built bundle — task fe-check is the gate (CI runs the same script)."
     - "Sessions (ADR-0025): HttpOnly cookies (kd_access + kd_refresh); no credentials in URLs or localStorage; Authorization: Bearer is accepted only for the kubectl credential plugin."
@@ -80,7 +80,7 @@ agents:
     - "Escalate (stop and ask): any change touching the one-way doors, session transport, or the auth flow beyond an ADR's stated scope."
   dependency_policies:
     - "ADR-gated domains: stack, deployment shape, auth, push transport, task runner, caching, config source. Check .skillgrid/projectwiki/ASSUMPTIONS.md § LOCKED before changing any of them."
-    - "New third-party dependency: record a new ADR (madr-full) before it lands; every ADR also gets a .backlog/decisions/decision-NNN copy (NNN = ADR number, zero-padded to 3)."
+    - "New third-party dependency: record a new ADR (madr-full) before it lands; every ADR also gets a .skillgrid/projectwiki/backlog/decisions/decision-NNN copy (NNN = ADR number, zero-padded to 3)."
   architecture_constraints:
     - "Single container (ADR-0006): Gunicorn serves the REST API + the built SPA; the pgqueue worker is in-process on every replica with leader-gated enqueue (ADR-0029/0031; ADR-0007/0008 superseded)."
     - "Dev DB is migration-managed: Alembic is the schema source of truth — never hand-edit the dev DB's schema; task dev-stack applies the same head path prod uses."

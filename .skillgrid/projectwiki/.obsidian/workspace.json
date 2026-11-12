@@ -1,0 +1,234 @@
+{
+  "main": {
+    "id": "601109270aa3817e",
+    "type": "split",
+    "children": [
+      {
+        "id": "8e29496e4b48506c",
+        "type": "tabs",
+        "children": [
+          {
+            "id": "eb3197025e69b140",
+            "type": "leaf",
+            "state": {
+              "type": "empty",
+              "state": {},
+              "icon": "lucide-file",
+              "title": "New tab"
+            }
+          }
+        ]
+      }
+    ],
+    "direction": "vertical"
+  },
+  "left": {
+    "id": "321c5374d6877648",
+    "type": "split",
+    "children": [
+      {
+        "id": "1043d1310dc9aac0",
+        "type": "tabs",
+        "children": [
+          {
+            "id": "85ba158bd9d3e4d4",
+            "type": "leaf",
+            "state": {
+              "type": "file-explorer",
+              "state": {
+                "sortOrder": "alphabetical",
+                "autoReveal": false,
+                "showSearch": false,
+                "searchQuery": ""
+              },
+              "icon": "lucide-folder-closed",
+              "title": "Files"
+            }
+          },
+          {
+            "id": "e2b89b55ab4c11aa",
+            "type": "leaf",
+            "state": {
+              "type": "search",
+              "state": {
+                "query": "",
+                "matchingCase": false,
+                "explainSearch": false,
+                "collapseAll": false,
+                "extraContext": false,
+                "sortOrder": "alphabetical"
+              },
+              "icon": "lucide-search",
+              "title": "Search"
+            }
+          },
+          {
+            "id": "f18f42ede62cfc48",
+            "type": "leaf",
+            "state": {
+              "type": "bookmarks",
+              "state": {
+                "showSearch": false,
+                "searchQuery": ""
+              },
+              "icon": "lucide-bookmark",
+              "title": "Bookmarks"
+            }
+          }
+        ]
+      }
+    ],
+    "direction": "horizontal",
+    "width": 300
+  },
+  "right": {
+    "id": "a1335511a5444bcd",
+    "type": "split",
+    "children": [
+      {
+        "id": "2288ff851912daf3",
+        "type": "tabs",
+        "children": [
+          {
+            "id": "0b1081fcd2e55a0e",
+            "type": "leaf",
+            "state": {
+              "type": "backlink",
+              "state": {
+                "file": "index.md",
+                "collapseAll": false,
+                "extraContext": false,
+                "sortOrder": "alphabetical",
+                "showSearch": false,
+                "searchQuery": "",
+                "backlinkCollapsed": false,
+                "unlinkedCollapsed": true
+              },
+              "icon": "links-coming-in",
+              "title": "Backlinks"
+            }
+          },
+          {
+            "id": "72e14874937b2524",
+            "type": "leaf",
+            "state": {
+              "type": "outgoing-link",
+              "state": {
+                "file": "index.md",
+                "linksCollapsed": false,
+                "unlinkedCollapsed": true
+              },
+              "icon": "links-going-out",
+              "title": "Outgoing links"
+            }
+          },
+          {
+            "id": "005a41136d7639f9",
+            "type": "leaf",
+            "state": {
+              "type": "tag",
+              "state": {
+                "sortOrder": "frequency",
+                "useHierarchy": true,
+                "showSearch": false,
+                "searchQuery": ""
+              },
+              "icon": "lucide-tags",
+              "title": "Tags"
+            }
+          },
+          {
+            "id": "67a216258cf185d1",
+            "type": "leaf",
+            "state": {
+              "type": "all-properties",
+              "state": {
+                "sortOrder": "frequency",
+                "showSearch": false,
+                "searchQuery": ""
+              },
+              "icon": "lucide-archive",
+              "title": "All properties"
+            }
+          },
+          {
+            "id": "2cba9724cbcc2ab7",
+            "type": "leaf",
+            "state": {
+              "type": "outline",
+              "state": {
+                "file": "index.md",
+                "followCursor": false,
+                "showSearch": false,
+                "searchQuery": ""
+              },
+              "icon": "lucide-list",
+              "title": "Outline"
+            }
+          },
+          {
+            "id": "6501288c73505c1d",
+            "type": "leaf",
+            "state": {
+              "type": "backlogmd-backlog",
+              "state": {},
+              "icon": "lucide-file",
+              "title": "Backlog List"
+            }
+          }
+        ],
+        "currentTab": 5
+      }
+    ],
+    "direction": "horizontal",
+    "width": 300
+  },
+  "left-ribbon": {
+    "hiddenItems": {
+      "switcher:Open quick switcher": false,
+      "graph:Open graph view": false,
+      "canvas:Create new canvas": false,
+      "daily-notes:Open today's daily note": false,
+      "templates:Insert template": false,
+      "command-palette:Open command palette": false,
+      "bases:Create new base": false
+    }
+  },
+  "active": "6501288c73505c1d",
+  "lastOpenFiles": [
+    "Untitled.base",
+    "Untitled.canvas",
+    "backlog/tasks/task-109 - FEATURE-TICKET-07-remove-Redis-two-node-pgEdge-dev-compose-infra.md",
+    "backlog/tasks/task-108 - FEATURE-TICKET-06-wire-auth-RBAC-to-Postgres-backend-auth.md",
+    "backlog/tasks/task-107 - FEATURE-TICKET-04-kvstore-revocation-OIDC-state-jti-deny-list-backend-core.md",
+    "backlog/tasks/task-106 - FEATURE-TICKET-05-wsgi.py-pgqueue-worker-leader-gated-reaper-replace-RQ-backend-wsgi.md",
+    "backlog/tasks/task-103 - Manual-acceptance-pass-ns_select-persistence-reload-matrix.md",
+    "backlog/tasks/task-102 - Write-audit-rows-for-POST-resources-apply-first-generic-cluster-write-path-review-2026-11-09.md",
+    "backlog/tasks/task-101 - Rename-registry-kind-bgppeers-to-bgppeer-glossary-singular-slug-review-2026-11-09.md",
+    "backlog/tasks/task-100 - Convert-cert-manager-Secret-deep-links-to-openObject-buttons-ADR-0040-R1-review-2026-11-09.md",
+    "backlog/tasks/task-099 - Delete-dead-CoreUI-header-components-components-header-jscpd-entry-point-heuristic-miss.md",
+    "backlog/tasks/task-098 - Backend-lint-debt-93-ruff-76-mypy-errors-at-D-base-CI-floor-red.md",
+    "backlog/tasks/task-097 - users.test.tsx-search-filters-rows-flake-under-full-suite-parallel-load.md",
+    "backlog/tasks/task-096 - Fix-certmanager-row-highlight-stale-closure-under-datatables.net-react-init-time-capture.md",
+    "backlog/tasks/task-095 - TICKET-07-green-measure.md",
+    "backlog/tasks/task-094 - TICKET-06-backend-23-files-dynamic-wiring-verdicts.md",
+    "backlog/tasks/task-093 - TICKET-05-KubeDataTable-test-fake-fleet-migration.md",
+    "backlog/tasks/task-092 - TICKET-04-unused-imports-verified-unused-symbols.md",
+    "backlog/tasks/task-091 - TICKET-03-delete-remaining-template-files-Pods.tsx-docs-helpers.md",
+    "backlog/tasks/task-090 - TICKET-02-delete-the-template-demo-bulk-components-forms-widgets-dashboard.md",
+    "backlog/tasks/task-089 - TICKET-01-verification-pass-the-deletion-list.md",
+    "backlog/tasks/task-088 - TICKET-04-verification-floor-e2e-backstop-single-slot-global-proof.md",
+    "backlog/tasks/task-087 - TICKET-03-pinned-relay-TTL-tests-both-sides.md",
+    "backlog/tasks/task-086 - TICKET-02-three-dispatchers-deleted-multi-kind-ObjectRoute-elements.md",
+    "backlog/tasks/task-085 - TICKET-01-kind-keyed-navigate-registry-ObjectRoute-kinds-breaking-prop-all-call-sites-migrated.md",
+    "backlog/tasks/task-084 - TICKET-05-custom-row-lock-clone-family-gone-e2e-title-backstop.md",
+    "backlog/tasks/task-083 - TICKET-04-batch-C-storage-kinds-without-legacy-data-redirects.md",
+    "backlog/tasks",
+    "backlog/milestones",
+    "backlog/docs",
+    "backlog/decisions",
+    "backlog/config.yml",
+    "backlog/completed",
+    "backlog"
+  ]
+}
