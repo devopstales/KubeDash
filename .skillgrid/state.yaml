@@ -71,12 +71,25 @@ in_flight:
     # (completes report.md retro half in the archive + session close).
     tracker: [TASK-033, TASK-034, TASK-035, TASK-036, TASK-037]
   - change: 2026-10-28-runtimeclass-views
-    phase: qa
+    phase: review
     # Executed 2026-10-28 (TASK-046): 4 commits on `rebase` — backend
     # runtimeclasses kind (node.k8s.io, cluster-scoped, SAR-gated, 718eda35),
     # list view (7580d592), data view (33adbbe7), routes + stub removal
     # (786100f5). QA 2026-10-29 (batch of 6): PASS after re-executed floor
-    # (qa-report.md in 2026-10-28-other-resource-views). Awaits review.
+    # (qa-report.md in 2026-10-28-other-resource-views). Review 2026-11-12
+    # (three-axis, Grade B, review.md in this folder): met-with-fixes —
+    # 0 Critical / 0 Important. 3 Minor fixed at the gate: e2e smoke
+    # title entry added to SMOKE_STUB_ROUTES (the view's docstring
+    # claimed e2e coverage that did not exist), ADR-0022 parity row
+    # amended implemented (feature) + log.md entry, toRow
+    # present-but-empty pod_level_overhead renders — (never an empty
+    # cell) + kata regression fixture. Parked: get-SAR namespace
+    # "default" coercion (pre-existing shared generic route, all
+    # cluster-scoped kinds — K8s ignores ns for cluster-scoped verdicts;
+    # key percent-encoded at HEAD), 2 unasserted Then-clause legs (1:1
+    # with the mandated priorityclass precedent), Security Low (SAR
+    # cache key colon delimiter at the target revision — fixed at HEAD
+    # by the quote() segments; no data-leak path). Awaits ship.
     tracker: [TASK-046]
   - change: 2026-10-28-resourcequota-views
     phase: qa

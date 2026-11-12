@@ -288,3 +288,13 @@
 - Deliberately *not* lifted: `tasks` retention for `done` rows (W035) — it is
   an open ADR-0029 amendment, not settled behavior, so the page only points
   at the window rather than documenting a rule.
+
+## 2026-11-12 — 04-adr-0022 parity row corrected (runtimeclass views review)
+- In-place amendment fix: the Other Resources → Runtime Class row still
+  said `stub` for the 5.0 route although the stub route was removed and the
+  real list + data views wired (2026-10-28, TASK-046). Amended to
+  `implemented (feature)` per the priorityclass-row precedent (1bd5afab);
+  the 4.1 route column notes the dead nav link (4.1 had no runtimeclass
+  template). Review fix from the three-axis review of
+  `2026-10-28-runtimeclass-views` (review.md in that folder).
+- `index.md`: unchanged (in-place amendment, no new concept row).

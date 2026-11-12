@@ -92,7 +92,7 @@ mapping):
 | **Interface** Other Resources | Pod Disruption Budget | `/other-resource/pod-disruption-budget` | stub | stub |
 | **Interface** Other Resources | Resource Quota | `/other-resource/resource-quota` | stub | stub |
 | **Interface** Other Resources | Limit Range | `/other-resource/limit-range` | stub | stub |
-| **Interface** Other Resources | Runtime Class | `/other-resource/runtimeclass` | stub | stub |
+| **Interface** Other Resources | Runtime Class | `/other-resource/runtimeclass` (dead — no template) | `/other-resource/runtimeclass` | implemented (feature) — 5.0 group: Other Resources (ratified deviation, 2026-10-27: 4.1's API already lived in other-resources); 4.1 had no runtimeclass template (dead nav link) — list + data follow the ratified PriorityClass precedent (2026-10-28, TASK-046) |
 | **Settings** (admin only) | Auth Provider | `/settings/sso-config` | stub | stub, admin-gated |
 | **Settings** (admin only) | Kubernetes Cluster | `/settings/k8s-config` | `/clusters` (admin cluster view) | exists |
 | **Settings** (admin only) | HA Status | `/settings/cluster-status` | stub | stub, admin-gated |
