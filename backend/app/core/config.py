@@ -40,6 +40,9 @@ class Settings(BaseSettings):
     kubedash_replica_id: str = Field(
         default_factory=lambda: ini_config.resolve("kubedash_replica_id")
     )
+    kubedash_replica_count: str = Field(
+        default_factory=lambda: ini_config.resolve("kubedash_replica_count")
+    )
     # [sso_settings] client_id / client_secret / issuer
     oidc_client_id: str = Field(default_factory=lambda: ini_config.resolve("oidc_client_id"))
     oidc_client_secret: str = Field(

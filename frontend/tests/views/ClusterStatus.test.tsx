@@ -5,6 +5,9 @@
  * cluster (n2 unreachable — the page degrades, it does not crash), a
  * no-leader election (degraded), the API-error banner, and the non-admin
  * route gate.
+ *
+ * No page-level HA banner (2026-11-12): the node and section cards sit
+ * side-by-side and each card carries its own state.
  */
 import { render, screen } from '@testing-library/react'
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query'
@@ -52,6 +55,8 @@ const LEADER_OK = {
   lock_verdict: 'held on n2 (pid 7899, idle)',
   token: 'tok',
   acquired_at: '2026-11-11 09:00:00',
+  renew_at: '2026-11-11 09:59:59',
+  lease_duration_s: 10,
   candidates: 2,
 }
 
@@ -76,10 +81,7 @@ const HEALTHY: HaReport = {
 
 const DOWN_N2: HaReport = {
   ...HEALTHY,
-  nodes: [
-    NODE_N1,
-    { ...NODE_N2_LOCK, reachable: false, probe_error: 'connection_refused' },
-  ],
+  nodes: [NODE_N1, { ...NODE_N2_LOCK, reachable: false, probe_error: 'connection_refused' }],
   leader: { ...LEADER_OK, candidates: null },
   status: 'down',
   reasons: ['node_unreachable:n2'],
@@ -102,9 +104,7 @@ const NO_LEADER: HaReport = {
 }
 
 const withHandlers = (report: HaReport) =>
-  server.use(
-    http.get('*/api/v1/admin/ha-status', () => HttpResponse.json(report)),
-  )
+  server.use(http.get('*/api/v1/admin/ha-status', () => HttpResponse.json(report)))
 
 const renderView = () => {
   const qc = new QueryClient({ defaultOptions: { queries: { retry: false } } })
@@ -150,21 +150,33 @@ describe('ClusterStatusView', () => {
     localStorage.clear()
   })
 
-  test('healthy-report-renders-banner-cards-leader-queue', async () => {
+  test('healthy-report-renders-node-cards-leader-queue', async () => {
     withHandlers(HEALTHY)
     renderView()
 
-    expect(await screen.findByText('HA healthy')).toBeTruthy()
+    // no page-level banner any more
+    expect(await screen.findByText('Leader Election')).toBeTruthy()
+    expect(screen.queryByText(/HA healthy/)).toBeNull()
     // one card per node
     expect(screen.getByText('n1')).toBeTruthy()
     expect(screen.getByText('n2')).toBeTruthy()
     // replication chip + dsns (host:port only, no credentials)
     expect(screen.getByText('n2_to_n1: replicating')).toBeTruthy()
     expect(screen.getByText('localhost:16433')).toBeTruthy()
+    // every node card states the lock either way (n1 does not hold it)
+    expect(screen.getByText('not held here')).toBeTruthy()
+    expect(screen.getByText(/held here \(pid 7899, idle\)/)).toBeTruthy()
     // leader election section
     expect(screen.getByText('replica-1')).toBeTruthy()
     expect(screen.getByText('held on n2 (pid 7899, idle)')).toBeTruthy()
-    expect(screen.getByText('1 leader of 2 candidates')).toBeTruthy()
+    // the lease object's own fields (Kubernetes Lease vocabulary)
+    expect(screen.getByText('2026-11-11 09:00:00')).toBeTruthy()
+    expect(screen.getByText('2026-11-11 09:59:59')).toBeTruthy()
+    expect(screen.getByText('10 s')).toBeTruthy()
+    // the KubeDash replica count (Deployment spec.replicas) is explicit
+    expect(screen.getByText('KubeDash replicas')).toBeTruthy()
+    expect(screen.getByText(/1 leader of 2/)).toBeTruthy()
+    expect(screen.getByText('healthy')).toBeTruthy()
     // queue section
     expect(screen.getByText('Task Queue')).toBeTruthy()
     expect(screen.getByText('12')).toBeTruthy()
@@ -176,40 +188,34 @@ describe('ClusterStatusView', () => {
     withHandlers(DOWN_N2)
     renderView()
 
-    expect(await screen.findByText('HA down')).toBeTruthy()
-    expect(screen.getByText(/node_unreachable:n2/)).toBeTruthy()
-    expect(
-      screen.getByText('Unreachable — connection_refused'),
-    ).toBeTruthy()
-    // the reachable node still renders its data
+    expect(await screen.findByText('Unreachable — connection_refused')).toBeTruthy()
+    // the reachable node still renders its data; the healthy section shows
+    // healthy, so there is no banner-level reason left to look for
     expect(screen.getByText('n2_to_n1: replicating')).toBeTruthy()
-    // candidates null -> no candidates line
-    expect(screen.queryByText(/candidates/i)).toBeNull()
+    // replica count: the fixture reports null (no Deployment read) -> the
+    // configured fallback is what the backend sends instead
+    expect(screen.getByText('KubeDash replicas')).toBeTruthy()
   })
 
   test('no-leader-renders-degraded-banner-with-reasons', async () => {
     withHandlers(NO_LEADER)
     renderView()
 
-    expect(await screen.findByText('HA degraded')).toBeTruthy()
-    expect(screen.getByText(/no_leader/)).toBeTruthy()
-    expect(screen.getByText(/leader_heartbeat_stale/)).toBeTruthy()
+    // the election card carries the section state + its reasons (the
+    // page-level banner is gone)
+    expect(await screen.findByText('degraded')).toBeTruthy()
+    expect(screen.getByText('leader_heartbeat_stale, no_leader')).toBeTruthy()
   })
 
   test('api-error-renders-unavailable-banner', async () => {
     server.use(
       http.get('*/api/v1/admin/ha-status', () =>
-        HttpResponse.json(
-          { error: { code: 'INTERNAL_ERROR', message: 'boom' } },
-          { status: 500 },
-        ),
+        HttpResponse.json({ error: { code: 'INTERNAL_ERROR', message: 'boom' } }, { status: 500 }),
       ),
     )
     renderView()
 
-    expect(
-      await screen.findByText(/Cluster status unavailable/),
-    ).toBeTruthy()
+    expect(await screen.findByText(/Cluster status unavailable/)).toBeTruthy()
   })
 
   test('non-admin-is-redirected-away', async () => {
@@ -226,6 +232,6 @@ describe('ClusterStatusView', () => {
     )
     renderGate()
     expect(await screen.findByText('Home page')).toBeTruthy()
-    expect(screen.queryByText('HA healthy')).toBeNull()
+    expect(screen.queryByText('Leader Election')).toBeNull()
   })
 })

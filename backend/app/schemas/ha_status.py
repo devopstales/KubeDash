@@ -45,6 +45,8 @@ class LeaderOut(Schema):
     lock_verdict = fields.String()
     token = fields.String(allow_none=True)
     acquired_at = fields.String(allow_none=True)
+    renew_at = fields.String(allow_none=True)
+    lease_duration_s = fields.Float()
     candidates = fields.Int(allow_none=True)
 
 

@@ -43,6 +43,10 @@ spec:
             # All replicas are candidates; the election module decides (§7.4)
             - name: KUBEDASH_ROLE
               value: leader
+            # HA status page: the replica count the election is drawn from
+            # (the page falls back to this when it cannot read the Deployment).
+            - name: KUBEDASH_REPLICA_COUNT
+              value: {{ .Values.replicaCount | quote }}
             - name: DATABASE_URL
               value: {{ .Values.databaseUrl | quote }}
             # OIDC (Settings: oidc_issuer / oidc_client_id; secret below)

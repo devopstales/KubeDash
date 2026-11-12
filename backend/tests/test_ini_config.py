@@ -119,7 +119,12 @@ def test_optional_and_behavior_knobs_keep_defaults(tmp_path: pathlib.Path, monke
     # are cleared because a host shell (or a Taskfile task) may export them
     # (KUBEDASH_REPLICA_ID=local in the dev tasks; the override leg would win
     # and mask the in-code default the assertion pins).
-    for v in ("KUBEDASH_ROLE", "KUBEDASH_REPLICA_ID", "KUBEDASH_COOKIE_SECURE"):
+    for v in (
+        "KUBEDASH_ROLE",
+        "KUBEDASH_REPLICA_ID",
+        "KUBEDASH_REPLICA_COUNT",
+        "KUBEDASH_COOKIE_SECURE",
+    ):
         monkeypatch.delenv(v, raising=False)
     ini_config.reset()
     s = _config.get_settings()
@@ -127,6 +132,7 @@ def test_optional_and_behavior_knobs_keep_defaults(tmp_path: pathlib.Path, monke
     assert s.flask_env == "production"  # INI value
     assert s.kubedash_role == "worker"  # optional default
     assert s.kubedash_replica_id == "local"
+    assert s.kubedash_replica_count == "1"  # single node (a lone process)
 
 
 # ---------------------------------------------------------------------------

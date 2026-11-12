@@ -358,6 +358,7 @@ def _catalog() -> dict:
             "replica_id": "replica-1",
             "token": "tok",
             "acquired_at": "2026-11-11 10:00:00",
+            "heartbeat_at": "2026-11-11 10:04:59",
             "heartbeat_age_s": 0.5,
             "fence": 3,
         },
@@ -397,8 +398,47 @@ def test_build_report_merges_overrides_and_assembles(
     assert report["nodes"][1]["dsn"] == "localhost:16433"
     assert report["leader"]["candidates"] is None
     assert report["leader"]["token"] == "tok"
+    # lease-object fields for the page (renewTime + leaseDurationSeconds)
+    assert report["leader"]["renew_at"] == "2026-11-11 10:04:59"
+    assert report["leader"]["lease_duration_s"] == ha_status.LEASE_DURATION_S
     assert report["queue"]["done"] == 7
     assert report["status"] == "healthy"
+
+
+def test_build_report_falls_back_to_configured_replica_count(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """No Deployment read (host dev / RBAC) -> the configured count, not null:
+    a single-node run reports 1, a 3-replica Deployment reports 3."""
+    monkeypatch.setattr(ha_status, "_read_catalog", lambda engine: _catalog())
+    monkeypatch.setattr(
+        ha_status, "probe_node", lambda dsn, rid, timeout_s=3.0: node("n1", lock=True)
+    )
+
+    single = build_report(engine=None, admin_client=None, replica_count=1)
+    assert single["leader"]["candidates"] == 1
+
+    multi = build_report(engine=None, admin_client=None, replica_count=3)
+    assert multi["leader"]["candidates"] == 3
+
+
+def test_build_report_detected_replicas_win_over_configured(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    monkeypatch.setattr(ha_status, "_read_catalog", lambda engine: _catalog())
+    monkeypatch.setattr(
+        ha_status, "probe_node", lambda dsn, rid, timeout_s=3.0: node("n1", lock=True)
+    )
+    client = _FakeAdminClient(
+        _pod_with_rs("local", "kubedash-abc12-def34"),
+        {"spec": {"replicas": 2}},
+    )
+
+    report = build_report(
+        engine=None, admin_client=client, replica_count=1
+    )
+
+    assert report["leader"]["candidates"] == 2
 
 
 def test_build_report_member_without_dsn_is_unreachable(

@@ -55,6 +55,15 @@ _FIELDS: dict[str, tuple[str, str, tuple[str, ...], bool, str, bool]] = {
     "kubedash_replica_id": (
         "deployment", "kubedash_replica_id", ("KUBEDASH_REPLICA_ID",), True, "local", False,
     ),
+    # How many KubeDash replicas the Deployment runs (HA status page: the
+    # replica count the leader election is drawn from). The chart injects
+    # KUBEDASH_REPLICA_COUNT from .Values.replicaCount; a single-node run
+    # (dev, host) is 1 — the default. A malformed value falls back to 1 at
+    # the read site (admin.py) rather than failing the diagnostic page.
+    "kubedash_replica_count": (
+        "deployment", "kubedash_replica_count",
+        ("KUBEDASH_REPLICA_COUNT",), True, "1", False,
+    ),
     # --- TICKET-02: remaining fields ----------------------------------------
     "database_url": (
         "database", "url",

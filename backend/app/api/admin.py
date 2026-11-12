@@ -299,7 +299,20 @@ class AdminApi(Api):
         # The lazy proxy hands back the raw `name=url;name=url` string
         # (ADR-0028 str contract); the typed map parse is the helper.
         overrides = ini_config.resolve_ha_node_dsn_overrides()
+        # The KubeDash replica count the chart deploys ([deployment]
+        # kubedash_replica_count, env KUBEDASH_REPLICA_COUNT). It is the
+        # fallback when the Deployment read is unavailable; a single-node run
+        # is 1. A malformed value must not take down the diagnostic page.
+        try:
+            replica_count = max(1, int(s.kubedash_replica_count))
+        except ValueError:
+            replica_count = 1
         return (
-            ha_status.build_report(db.engine, overrides, admin_client=admin_client),
+            ha_status.build_report(
+                db.engine,
+                overrides,
+                admin_client=admin_client,
+                replica_count=replica_count,
+            ),
             200,
         )

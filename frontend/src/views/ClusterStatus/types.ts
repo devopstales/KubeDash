@@ -32,13 +32,20 @@ export interface HaNode {
 }
 
 export interface Leader {
+  /** Kubernetes Lease ``holderIdentity``. */
   replica_id: string
+  /** Kubernetes Lease ``leaseTransitions`` (every acquire bumps the fence). */
   fence: number
   heartbeat_age_s: number
   /** "held on n1 (pid 7899, idle)" / "not seen on any reachable node" / ... */
   lock_verdict: string
   token: string | null
+  /** Kubernetes Lease ``acquireTime``. */
   acquired_at: string | null
+  /** Kubernetes Lease ``renewTime`` — the last lease heartbeat. */
+  renew_at: string | null
+  /** Kubernetes Lease ``leaseDurationSeconds`` — the stale threshold. */
+  lease_duration_s: number
   /** The KubeDash Deployment's spec.replicas; null when unknown (F14). */
   candidates: number | null
 }

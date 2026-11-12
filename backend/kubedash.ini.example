@@ -66,6 +66,9 @@ admin_kubeconfig =
 # Optional knobs (defaults shown):
 kubedash_role = worker
 kubedash_replica_id = local
+# KubeDash replicas the Deployment runs (HA status page). 1 = single node;
+# the chart injects KUBEDASH_REPLICA_COUNT from .Values.replicaCount.
+kubedash_replica_count = 1
 cookie_secure = true
 tls_edge = false
 # TLS server cert/key (ADR-0026): empty = plain HTTP (the container CMD binds

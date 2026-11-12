@@ -37,6 +37,12 @@ from sqlalchemy.engine import URL, Engine
 LAG_EXCEEDED_S = 60.0
 HEARTBEAT_STALE_S = 10.0
 PROBE_TIMEOUT_S = 3.0
+# The leader lease's duration: ``Leader(stale_seconds=10)``
+# (app/core/leader.py) is the Kubernetes Lease ``leaseDurationSeconds``
+# analogue — a follower may take over once the heartbeat is older than this.
+# Kept here (not imported: app/services is Flask-free and leader.py imports
+# Flask). Update both if the election timing changes.
+LEASE_DURATION_S = 10.0
 
 # --- probe SQL (prototype 001, validated 2026-11-10) ------------------------
 _LOCAL_NODE_SQL = (
@@ -404,6 +410,7 @@ def _read_catalog(engine: Engine) -> dict[str, Any]:
                 "replica_id": rid,
                 "token": str(token),
                 "acquired_at": str(acquired_at),
+                "heartbeat_at": str(heartbeat_at),
                 "heartbeat_age_s": round((now - heartbeat_at).total_seconds(), 1),
                 "fence": fence,
             }
@@ -484,11 +491,18 @@ def build_report(
     dsn_overrides: Mapping[str, str] | None = None,
     *,
     admin_client: Any = None,
+    replica_count: int | None = None,
     timeout_s: float = PROBE_TIMEOUT_S,
 ) -> dict[str, Any]:
     """Assemble the HA report: catalog read on the app engine, one probe per
     cluster member (INI DSN overrides win over ``spock.node_interface`` —
     F8), best-effort candidate count, derivation.
+
+    ``replica_count`` is the configured KubeDash replica count (the chart's
+    ``replicaCount``). It is the fallback for ``leader.candidates`` when the
+    Deployment cannot be read (no K8s client, RBAC, host-run dev): the page
+    then reports the configured number instead of "unknown", and a plain
+    single-node run reports 1.
 
     Returns a plain dict shaped exactly like ``HaStatusOut`` — the API
     layer validates, it does not re-derive (blueprint Key links).
@@ -541,7 +555,13 @@ def build_report(
     if lease:
         leader["token"] = lease["token"]
         leader["acquired_at"] = lease["acquired_at"]
-    leader["candidates"] = _candidate_count(admin_client, replica_id or "")
+    detected = _candidate_count(admin_client, replica_id or "")
+    leader["candidates"] = detected if detected is not None else replica_count
+    # Kubernetes Lease-object fields (holderIdentity / acquireTime /
+    # renewTime / leaseDurationSeconds / leaseTransitions), so the page can
+    # show the election the way `kubectl get lease -o yaml` does.
+    leader["renew_at"] = lease["heartbeat_at"] if lease else None
+    leader["lease_duration_s"] = LEASE_DURATION_S
 
     return {
         # derivation first: its `leader` entry is replaced by the enriched
