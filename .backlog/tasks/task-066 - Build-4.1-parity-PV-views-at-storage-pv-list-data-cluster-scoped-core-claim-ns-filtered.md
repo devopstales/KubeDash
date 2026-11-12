@@ -6,7 +6,7 @@ title: >-
 status: Done
 assignee: []
 created_date: '2026-11-05 07:36'
-updated_date: '2026-11-05 08:58'
+updated_date: '2026-11-12 09:49'
 labels:
   - feature
 dependencies: []
@@ -56,10 +56,12 @@ Execute .skillgrid/specs/2026-11-05-pv-views/blueprint.md end-to-end under the A
 Verification floor (2026-11-05, all on rebase): backend uv run pytest -m 'not integration' 640 passed (incl. new test_k8s_pvs.py 8 service + 6 API, RED->GREEN); targeted vitest 41/41 (pvs 8, pv_data 5, five trimmed data views 23, Stub); full vitest: 12 pre-existing failures in groups/users/admin_permissions (datatables.net window.alert in jsdom; files last touched 9113ce16/ddeb51ef, pre-dating this change); task fe-build + fe-check (air gap) + fe-sync green; task e2e 19/19 (ui-smoke /storage/pv as REAL route, auth-smoke); ruff/mypy flat vs baseline (105/81 both sides - no new lint debt). Live dev cluster (kind kubedash-test, cluster id 7): /storage/pv list under ns=kubedash-demo renders pvc-3fe50822 (Bound, standard, demo-pvc, 100Mi; hidden under ns=default per claim-ns filter); data view renders the full 4.1 row set + trimmed annotations table + JSON block; URL stays clean /storage/pv (ADR-0040, identity in the session ref). Commits: 6c8c6946 spec, fa6b1e27 T1, ab9b2e18 T3, f7c8223d T2, f3759ab7 docs, 6de151f5 T4, 9c733235 T5.
 
 2026-11-05 (user: 'Persistent Volume usage data is missing'): the PV list gained a Usage column — 5.0 addition (4.1's PV view had no usage). Reuses the PVC list's observed tier verbatim: second parallel /metrics/pvcs fetch (shared pvc-usage query key) joined by claim name (the claim-ns filter makes the join sound); free PVs + ADR-0003 degrades render '—'. 4 new tests (join/unavailable/denied/fetch-fail), free-pv dash count 2->3, column assertion +Usage: pvs 12/12. Floor re-run: fe-build + fe-check + fe-sync green, e2e 19/19, live: column renders with honest '—' on kind 1.35 (hostPath PVs emit no pvcRef stats — same as the PVC list; metrics_available true, items []).
+
+Shipped 2026-11-12 (skillgrid:ship): integration kept branch rebase as-is (VERIFIED assumption: ship does not merge main). Integrated-tree floor re-run: backend pytest -m 'not integration' 890 passed / 0 failed; vitest full 502/502 (W007 baseline failures since cleared by the in-flight users/groups work); task fe-build (fresh on this tree) + fe-check + fe-sync green; ruff 62 / mypy 65 (below the 102/78 recorded ceiling); task e2e: auth-smoke 3/3 + real-routes /storage/pv exact-title 1/1 standalone (the pv-views legs); full serial chain red on 3 out-of-scope legs (W037 'Bound clusters' heading x2 — ha-status /clusters WIP; deep-link CRD-detail leg — in-flight session-object-navigation handoff 9c9c9954/d4c28e05). Spec zone archived to .skillgrid/xarchive/2026-11-05-pv-views/ (git mv, diff -r empty).
 <!-- SECTION:NOTES:END -->
 
 ## Final Summary
 
 <!-- SECTION:FINAL_SUMMARY:BEGIN -->
-4.1-parity PV views built at /storage/pv: backend persistentvolumes kind (core, cluster-scoped, claim-ns filtered, SAR-gated), Pv list (4.1 columns, Terminating override, cross-kind refs) + PvData (4.1 rows, conditional rows, JSON block), ADR-0040 object-ref navigation, stub removed. Companion T2: the five storage data views now trim machine-managed annotations (2026-11-05 user decision, overrides the 2026-10-28 verbatim deviation; HPA 46929a10 precedent) with adr.md override notes in the five specs. Verified: backend 640/640, targeted vitest 41/41, fe-build/fe-check/fe-sync, e2e 19/19, live cluster list+data+trim checks.
+PV views at /storage/pv (backend persistentvolumes kind cluster-scoped + claim-ns filtered, Pv list + Usage column, PvData, ObjectRoute wiring, stub removal, T2 trimAnnotations companion, dev csi-hostpath for real usage data) shipped to rebase 2026-11-12: QA PASS + three-axis review met-with-fixes (1 CRITICAL cross-kind ref + 2 PARTIALs + SAR group fixed at the gate), integrated-tree floor green (backend 890/890, vitest 502/502, e2e pv legs 1/1), spec zone archived to xarchive. Open: W023 (pvcs sequential fan-out).
 <!-- SECTION:FINAL_SUMMARY:END -->

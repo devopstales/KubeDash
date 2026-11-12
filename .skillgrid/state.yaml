@@ -204,38 +204,6 @@ in_flight:
     # BINDS; hostPath PVs emit no pvcRef stats on kind 1.35 → Usage cell
     # honestly shows — on the dev cluster). QA 2026-11-05 (storage batch of 5): PASS (qa-report.md in 2026-11-05-pv-views — F1 demo-data.sh PVC wait + F2 lint debt fixed at the gate, ce6d0b19/6368cc8b; floor re-run: unit 648/648, targeted vitest 85/85, e2e 19/19, ruff flat 102, mypy 73<78, dev-stack exit 0). Review 2026-11-05 (three-axis, review.md in 2026-11-05-pv-views): PASS after fixes — pvc_usage degrade hardened at the gate (non-numeric byte count + nameless pvcRef skip the node, never 500; regression test); the /metrics/pvcs sequential fan-out parked W023. Awaits ship.
     tracker: [TASK-065]
-  # --- PV views, executed 2026-11-05 (spec-zone artifacts authored this
-  # session; backlog-driven, ADR-0040 contract) ---
-  - change: 2026-11-05-pv-views
-    phase: review
-    # Executed 2026-11-05 (TASK-066): 7 commits on `rebase` (6c8c6946 spec;
-    # fa6b1e27 backend persistentvolumes kind (core, cluster-scoped,
-    # claim-ns filtered, SAR-gated); ab9b2e18 Pv list; f7c8223d T2 trim;
-    # f3759ab7 docs; 6de151f5 PvData; 9c733235 wiring + stub removal).
-    # Companion T2 (2026-11-05 user decision): the five storage data views
-    # now trim machine-managed annotations (4.1 trimAnnotations; HPA
-    # 46929a10 precedent) — overrides the 2026-10-28 verbatim recorded
-    # deviation; adr.md override notes in the five specs. Verification
-    # floor green: unit 640/640, targeted vitest 41/41, fe-build +
-    # fe-check + fe-sync, e2e 19/19 (ui-smoke /storage/pv as REAL route),
-    # live cluster list+data+trim checks, ruff/mypy flat vs baseline
-    # (105/81 both sides). 2026-11-05 (user request "PV usage data is
-    # missing"): the list gained the Usage column — the PVC list's
-    # observed tier (/metrics/pvcs joined by claim name; free PVs +
-    # every ADR-0003 degrade render "—"), pv tests 12/12, floor
-    # re-run green (e2e 19/19). 2026-11-05 (usage data): demo-pvc
-    # migrated to a real CSI driver (dev/csi-hostpath.yaml, applied by
-    # Taskfile _kind-apps) — kind's local-path hostPath PVs emit no
-    # pvcRef stats on K8s 1.35, so the Usage cell was the honest "—".
-    # csi-hostpath implements NodeGetVolumeStats (statfs of the
-    # backing disk), so the PVC/PV Usage columns show real data on the
-    # dev cluster (live: demo-pvc 26.0% — backing-disk semantics, see
-    # demo-data.sh header). Root-caused the provisioning stall: a
-    # leaked kubedash-deny-all NetworkPolicy (test_list_networkpolicies_
-    # on_kind fixture, run interrupted 21h earlier) deny-all'd every
-    # default-ns pod and broke the csi provisioner's API egress —
-    # deleted, test pre-clean added. QA 2026-11-05 (storage batch of 5): PASS (qa-report.md in 2026-11-05-pv-views — F1 demo-data.sh PVC wait + F2 lint debt fixed at the gate, ce6d0b19/6368cc8b; floor re-run: unit 648/648, targeted vitest 85/85, e2e 19/19, ruff flat 102, mypy 73<78, dev-stack exit 0). Review 2026-11-05 (three-axis, review.md in this folder): PASS after fixes — 1 CRITICAL (PV→PVC cross-kind ref emitted 'persistentvolumeclaim', the route registry kind is 'pvc'; fixed both call sites + consumer-side regression test + blueprint amended) + 2 spec PARTIALs (PV get-SAR-denial test, e2e exact-title) fixed at the gate; W023 (pvcs fan-out) + W022 (HPA group, cross-change) parked. Awaits ship.
-    tracker: [TASK-066]
   # --- Radar research, 2026-11-06: research-only spec folders (findings.md
   # written; no briefing yet). Primary sources: skyhook-io/radar README +
   # docs/mcp.md (per-folder Source Appendix). Next: brainstorming. ---
@@ -381,6 +349,22 @@ completed_changes:
   # to knowledge/gotchas/leader-fence-must-increment-in-upsert.md. Cycle
   # complete for this change. Folder in .skillgrid/xarchive/:
   - 2026-10-27-postgres-queue-revocation-active-active
+  # Shipped 2026-11-12 (keep branch `rebase` as-is, repo VERIFIED assumption:
+  # ship does not merge main). QA PASS (batch qa-report.md, storage batch of 5)
+  # + three-axis review Floor met-with-fixes (1 CRITICAL cross-kind ref + 2
+  # spec PARTIALs + 1 SAR group fixed at the gate; 500e13e4 stale-closure +
+  # 8822c410 nav clear-ref post-review fixes). Integrated-tree floor
+  # 2026-11-12: backend 890/890, vitest 502/502, fe-build/check/sync green,
+  # ruff 62 / mypy 65 (both below the 102/78 recorded ceiling), e2e pv legs
+  # green (auth-smoke 3/3, real-routes /storage/pv exact-title 1/1 standalone);
+  # full serial chain red on 3 out-of-scope legs — 2x the W037 'Bound
+  # clusters' heading asserts (ha-status /clusters WIP, in-flight qa) + the
+  # session-object-navigation deep-link leg (CRD detail in a new tab; its own
+  # in-flight handoff 9c9c9954/d4c28e05 touches that surface; pv-views'
+  # frontend code for that leg is byte-identical to the 11-05 19/19 state).
+  # Folder archived this commit. Open: W023 (pvcs fan-out), W022 (HPA group,
+  # cross-change). Next: reflect (report.md retro half in the archive).
+  - 2026-11-05-pv-views
 
 # Onboarding state (2026-10-17): config.yaml + ASSUMPTIONS.md + state.yaml
 # created. Open items tracked in ASSUMPTIONS.md "Onboarding notes".
