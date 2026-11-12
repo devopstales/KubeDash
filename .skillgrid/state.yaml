@@ -70,27 +70,6 @@ in_flight:
     # (AGENTS.md KUBEDASH_HOME row, glossary terms). Next: reflect
     # (completes report.md retro half in the archive + session close).
     tracker: [TASK-033, TASK-034, TASK-035, TASK-036, TASK-037]
-  - change: 2026-10-28-runtimeclass-views
-    phase: review
-    # Executed 2026-10-28 (TASK-046): 4 commits on `rebase` — backend
-    # runtimeclasses kind (node.k8s.io, cluster-scoped, SAR-gated, 718eda35),
-    # list view (7580d592), data view (33adbbe7), routes + stub removal
-    # (786100f5). QA 2026-10-29 (batch of 6): PASS after re-executed floor
-    # (qa-report.md in 2026-10-28-other-resource-views). Review 2026-11-12
-    # (three-axis, Grade B, review.md in this folder): met-with-fixes —
-    # 0 Critical / 0 Important. 3 Minor fixed at the gate: e2e smoke
-    # title entry added to SMOKE_STUB_ROUTES (the view's docstring
-    # claimed e2e coverage that did not exist), ADR-0022 parity row
-    # amended implemented (feature) + log.md entry, toRow
-    # present-but-empty pod_level_overhead renders — (never an empty
-    # cell) + kata regression fixture. Parked: get-SAR namespace
-    # "default" coercion (pre-existing shared generic route, all
-    # cluster-scoped kinds — K8s ignores ns for cluster-scoped verdicts;
-    # key percent-encoded at HEAD), 2 unasserted Then-clause legs (1:1
-    # with the mandated priorityclass precedent), Security Low (SAR
-    # cache key colon delimiter at the target revision — fixed at HEAD
-    # by the quote() segments; no data-leak path). Awaits ship.
-    tracker: [TASK-046]
   - change: 2026-10-28-resourcequota-views
     phase: qa
     # Executed 2026-10-28 (TASK-047): 4 commits on `rebase` — backend
@@ -365,6 +344,25 @@ completed_changes:
   # Folder archived this commit. Open: W023 (pvcs fan-out), W022 (HPA group,
   # cross-change). Next: reflect (report.md retro half in the archive).
   - 2026-11-05-pv-views
+  # Shipped 2026-11-12 (keep branch `rebase` as-is, repo VERIFIED assumption:
+  # ship does not merge main). QA PASS (batch qa-report.md, other-resource
+  # batch of 6) + three-axis review Floor met-with-fixes 2026-11-12 (0C/0I;
+  # 3 Minor fixed at the gate — e2e smoke title entry added to
+  # SMOKE_STUB_ROUTES, ADR-0022 parity row amended + log.md, toRow
+  # present-but-empty overhead fallback + kata fixture — 0360044d/5f8d9c61).
+  # Integrated-tree floor 2026-11-12: backend 890/890, vitest 501/502 (the
+  # 1 = Clusters add-dialog flake under parallel load, 6/6 isolated —
+  # in-flight /clusters WIP), fe-build/check/sync green (bundle unchanged),
+  # ruff 62 / mypy 65 (below the 102/78 ceiling). e2e: auth-smoke 3/3,
+  # stub-routes sweep 1/1 standalone (incl. the new runtimeclass title
+  # entry); full serial chain red on the W037 'Bound clusters' legs
+  # (in-flight /clusters 4.1-parity WIP — same record as the pv-views ship).
+  # Parked: get-SAR namespace 'default' coercion (pre-existing shared route,
+  # all cluster-scoped kinds), 2 unasserted Then-clause legs (1:1 with the
+  # priorityclass precedent), SAR cache-key colon delimiter (fixed at HEAD).
+  # Folder archived this commit. Next: reflect (report.md retro half in the
+  # archive).
+  - 2026-10-28-runtimeclass-views
 
 # Onboarding state (2026-10-17): config.yaml + ASSUMPTIONS.md + state.yaml
 # created. Open items tracked in ASSUMPTIONS.md "Onboarding notes".
