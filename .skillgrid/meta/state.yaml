@@ -133,32 +133,6 @@ changes:
     # out-of-scope (W037: the ha-status /clusters WIP breaks the full
     # `task e2e` serial chain), 2 SUGGESTION (W038 blueprint file-list
     # drift, W039 no execution ledger). Next: requesting-code-review.
-  2026-10-28-volumesnapshot-views:
-    phase: review
-    status: in_progress
-    spec: .skillgrid/change-specs/2026-10-28-volumesnapshot-views
-    tracker: [TASK-053]
-    # Executed 2026-11-04 (TASK-053): 4 commits on `rebase`
-    # (2138db40..9af5180a) — backend volumesnapshots kind (CRD, namespaced,
-    # full object, SAR-gated), list view, data view (4.1 columns + JSON
-    # block), ObjectRoute wiring + stub removal. Fix 320e2b4b: dev fixture
-    # CRD needed the api-approved annotation. QA 2026-11-05 (storage batch of 5): PASS (qa-report.md in 2026-11-05-pv-views — F1 demo-data.sh PVC wait + F2 lint debt fixed at the gate, ce6d0b19/6368cc8b; floor re-run: unit 648/648, targeted vitest 85/85, e2e 19/19, ruff flat 102, mypy 73<78, dev-stack exit 0). Review 2026-11-05 (three-axis, review.md in 2026-11-05-pv-views): PASS — no kind-specific findings (1 CRITICAL cross-kind ref + 2 spec PARTIALs + 1 SAR group fixed at the gate, batch-level). Awaits ship.
-  2026-10-28-pvc-views:
-    phase: review
-    status: in_progress
-    spec: .skillgrid/change-specs/2026-10-28-pvc-views
-    tracker: [TASK-065]
-    # Executed 2026-11-04 (TASK-065): 5 commits on `rebase`
-    # (43f7e6a8..1e453d31) — backend persistentvolumeclaims kind (core,
-    # namespaced, SAR-gated), metrics/pvcs usage route (kubelet
-    # stats/summary, query-only, SAR-degraded), list view (usage column,
-    # 3-tier status badges), data view (curated table + JSON block),
-    # ObjectRoute wiring + stub removal. Closeout fixes: 9bba46d5 (pvc_usage
-    # parsed the client's str(dict) repr — json.loads saw single quotes and
-    # degraded everything; now json-first + ast.literal_eval fallback,
-    # repr regression test) + 320e2b4b (demo-pvc consumer pod so the claim
-    # BINDS; hostPath PVs emit no pvcRef stats on kind 1.35 → Usage cell
-    # honestly shows — on the dev cluster). QA 2026-11-05 (storage batch of 5): PASS (qa-report.md in 2026-11-05-pv-views — F1 demo-data.sh PVC wait + F2 lint debt fixed at the gate, ce6d0b19/6368cc8b; floor re-run: unit 648/648, targeted vitest 85/85, e2e 19/19, ruff flat 102, mypy 73<78, dev-stack exit 0). Review 2026-11-05 (three-axis, review.md in 2026-11-05-pv-views): PASS after fixes — pvc_usage degrade hardened at the gate (non-numeric byte count + nameless pvcRef skip the node, never 500; regression test); the /metrics/pvcs sequential fan-out parked W023. Awaits ship.
   2026-11-06-mcp-server:
     phase: research
     status: in_progress
@@ -234,7 +208,7 @@ changes:
     # spec zone on disk with a qa-report.md, recorded at phase qa per its artifacts.
 
 progress:
-  completed_changes: 26
+  completed_changes: 28
   blocked_changes: []
 
 constraints_ref: .skillgrid/projectwiki/ASSUMPTIONS.md
