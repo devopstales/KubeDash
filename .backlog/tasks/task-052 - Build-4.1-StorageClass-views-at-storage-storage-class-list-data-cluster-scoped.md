@@ -6,7 +6,7 @@ title: >-
 status: Done
 assignee: []
 created_date: '2026-10-28 14:43'
-updated_date: '2026-11-04 16:16'
+updated_date: '2026-11-12 14:48'
 labels: []
 dependencies: []
 references:
@@ -108,5 +108,5 @@ Hashes re-issued (T1 amended to fold in the 6th service test required by AC #7, 
 ## Final Summary
 
 <!-- SECTION:FINAL_SUMMARY:BEGIN -->
-Built 4.1 StorageClass views at /storage/storage-class (cluster-scoped core kind, SAR-gated). 4 commits (T1 backend kind, T2 list view, T3 data view, T4 routing+stub removal): 1d5bb5ba feat(resources): storageclasses kind (core, cluster-scoped, SAR-gated); ab951e9d feat(frontend): storage class list view (4.1-parity, ADR-0040 nav); 76aaa5ed feat(frontend): storage class data view (parameters table + JSON block); 08e37b50 feat(frontend): wire storage-class routes, remove stub. Executed per the shipped ADR-0040 session-object-navigation contract (re-baseline): ObjectRoute single route (no /data, no R7 — kind was a stub), openObject button list cells, data view takes {name} prop, single ?name= backend fetch. Verified: 8/8 ACs + 5/5 DoD. Backend 565 passed/10 deselected (== baseline 553 + 12 new: 6 service incl. get-ignores-namespace, 6 API). Frontend full vitest 307 passed / 12 failed (== baseline 296/12 + 11 new; the 12 are pre-existing users/groups/admin_permissions). fe-build (tsc+eslint+build) + fe-check (air-gap) + fe-sync PASS. git diff --stat = 14 files only (blueprint File Structure + re-baseline ui-smoke.spec.ts + demo-data.sh); _nav.tsx untouched.
+StorageClass views at /storage/storage-class (backend storageclasses kind cluster-scoped + SAR-gated, list view, data view with parameters table + JSON block, ObjectRoute wiring, stub removal) shipped to rebase 2026-11-12 (28c9e594, spec-zone-only commit): QA PASS (batch qa-report.md) + three-axis review met-with-fixes — this kind's SAR gate asked core group "" instead of storage.k8s.io (Low, fail-closed), fixed at the gate with the spec zone amended. Integrated-tree floor 2026-11-12: targeted backend 222/222, targeted vitest 11/11, e2e real-routes leg 1/1 (incl. /storage/storageclass); full floor (890/890 backend, 502/502 vitest, fe-build/check/sync, ruff 62/mypy 65) ran on the identical code tree during the pv-views ship. Spec zone archived to xarchive.
 <!-- SECTION:FINAL_SUMMARY:END -->
